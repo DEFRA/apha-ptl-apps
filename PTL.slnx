@@ -3,6 +3,7 @@
     <File Path=".gitignore" />
     <File Path=".editorconfig" />
     <File Path="Directory.Build.props" />
+    <File Path="README.md" />
   </Folder>
   <Folder Name="/src/">
     <Project Path="src/PTL.Api/PTL.Api.csproj" />
