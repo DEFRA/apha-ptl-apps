@@ -7,11 +7,13 @@
   </Folder>
   <Folder Name="/src/">
     <Project Path="src/PTL.Api/PTL.Api.csproj" />
+    <Project Path="src/PTL.ApiClient/PTL.ApiClient.csproj" />
     <Project Path="src/PTL.InternalWeb/PTL.InternalWeb.csproj" />
     <Project Path="src/PTL.ExternalWeb/PTL.ExternalWeb.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/PTL.Api.Tests/PTL.Api.Tests.csproj" />
+    <Project Path="tests/PTL.ApiClient.Tests/PTL.ApiClient.Tests.csproj" />
     <Project Path="tests/PTL.InternalWeb.Tests/PTL.InternalWeb.Tests.csproj" />
     <Project Path="tests/PTL.ExternalWeb.Tests/PTL.ExternalWeb.Tests.csproj" />
   </Folder>

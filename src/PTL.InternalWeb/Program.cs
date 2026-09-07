@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Mvc.Razor;
+using PTL.ApiClient;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -7,6 +8,9 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllersWithViews();
 // Also enable Razor Pages (some projects in the solution use Razor Pages)
 builder.Services.AddRazorPages();
+
+// Typed client for calling PTL.Api, shared with other web front-ends via the PTL.ApiClient library.
+builder.Services.AddPtlApiClient(builder.Configuration);
 
 // Allow views to be located under Features/{Controller}/Views and Features/Shared
 builder.Services.Configure<RazorViewEngineOptions>(options =>

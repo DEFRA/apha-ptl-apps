@@ -6,4 +6,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\PTL.ApiClient\PTL.ApiClient.csproj" />
+  </ItemGroup>
+
 </Project>
