@@ -7,6 +7,13 @@
          "command": "dotnet",
          "args": [ "format", "PTL.slnx", "--include", "${staged}", "--verify-no-changes" ],
          "include": [ "**/*.cs", "**/*.cshtml" ]
+      },
+      {
+         "name": "dotnet-test-coverage",
+         "group": "pre-commit-tasks",
+         "command": "dotnet",
+         "args": [ "test", "PTL.slnx" ],
+         "include": [ "**/*.cs" ]
       }
    ]
 }

@@ -1,15 +1,15 @@
-using Microsoft.AspNetCore.Mvc;
-using PTL.InternalWeb.Features.Account;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Mvc;
+using PTL.InternalWeb.Features.Account;
 
 namespace PTL.InternalWeb.Features.Account
 {
     public class AccountController : Controller
     {
         [HttpGet]
-        public IActionResult Login(string returnUrl = null)
+        public IActionResult Login(string? returnUrl = null)
         {
             var model = new AccountViewModel { ReturnUrl = returnUrl };
             // Let the view engine locate the view using registered locations (Features/...)

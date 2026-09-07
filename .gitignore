@@ -28,6 +28,10 @@ packages/
 [Tt]est[Rr]esult*/
 *.trx
 
+# Test coverage output
+coverage.cobertura.xml
+coverage/
+
 # Logs
 *.log
 

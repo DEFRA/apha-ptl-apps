@@ -16,3 +16,6 @@ app.MapGet("/health", () =>
 });
 
 app.Run();
+
+// Exposes the generated Program class to WebApplicationFactory<Program> in PTL.Api.Tests.
+public partial class Program { }

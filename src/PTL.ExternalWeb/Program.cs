@@ -49,3 +49,6 @@ app.MapControllerRoute(
 app.MapRazorPages();
 
 app.Run();
+
+// Exposes the generated Program class to WebApplicationFactory<Program> in PTL.ExternalWeb.Tests.
+public partial class Program { }

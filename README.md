@@ -9,6 +9,9 @@ ASP.NET Core solution for the PTL (Proficiency Testing) platform.
 | `src/PTL.Api` | Backend API | http://localhost:5252 |
 | `src/PTL.InternalWeb` | Internal-facing web portal (MVC + Razor) | http://localhost:5214 |
 | `src/PTL.ExternalWeb` | External-facing web portal (MVC + Razor) | http://localhost:5215 |
+| `tests/PTL.Api.Tests` | Unit/integration tests for `PTL.Api` | - |
+| `tests/PTL.InternalWeb.Tests` | Unit/integration tests for `PTL.InternalWeb` | - |
+| `tests/PTL.ExternalWeb.Tests` | Unit/integration tests for `PTL.ExternalWeb` | - |
 
 ## Prerequisites
 
@@ -39,3 +42,13 @@ ASP.NET Core solution for the PTL (Proficiency Testing) platform.
 - **`.editorconfig`** defines formatting and style conventions.
 - **`Directory.Build.props`** enables Roslyn analyzers (`EnableNETAnalyzers`, `AnalysisLevel=latest`) for every project.
 - **Husky.Net** runs `dotnet format --verify-no-changes` on staged `.cs`/`.cshtml` files before each commit (see [`.husky/task-runner.json`](.husky/task-runner.json)). Run `dotnet format` locally to fix violations before committing.
+
+## Testing
+
+Each app under `src/` has a matching test project under `tests/` (xUnit + `Microsoft.AspNetCore.Mvc.Testing`). Coverage is
+collected with coverlet and enforced at an 80% line-coverage threshold per project via `tests/Directory.Build.props`; the
+pre-commit hook also runs the full suite via `dotnet test PTL.slnx`.
+
+```powershell
+dotnet test PTL.slnx
+```
