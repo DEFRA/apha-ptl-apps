@@ -1,0 +1,31 @@
+name: Create Tag On PR Merge
+
+on:
+  pull_request:
+    types:
+      - closed
+
+permissions:
+  contents: write
+
+jobs:
+  tag:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Create Tag
+        run: |
+          TAG_NAME="cdc-pr-${{ github.event.pull_request.number }}-$(date +'%Y%m%d-%H%M%S')"
+
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+
+          git fetch origin main
+          git checkout main
+
+          git tag $TAG_NAME
+          git push origin $TAG_NAME
