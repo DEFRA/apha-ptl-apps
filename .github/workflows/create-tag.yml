@@ -19,7 +19,7 @@ jobs:
 
       - name: Create Tag
         run: |
-          TAG_NAME="cdc-pr-${{ github.event.pull_request.number }}-$(date +'%Y%m%d-%H%M%S')"
+          TAG_NAME="ptl-pr-${{ github.event.pull_request.number }}-$(date +'%Y%m%d-%H%M%S')"
 
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
