@@ -1,9 +1,0 @@
-<Solution>
-  <Folder Name="/Solution Items/">
-    <File Path=".gitignore" />
-  </Folder>
-  <Folder Name="/src/">
-    <Project Path="src/MyApp.Api/MyApp.Api.csproj" />
-    <Project Path="src/MyApp.Web/MyApp.Web.csproj" />
-  </Folder>
-</Solution>
