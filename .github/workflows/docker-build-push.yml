@@ -1,0 +1,202 @@
+name: Build, Test & Publish Images
+
+# Triggers on every PR to main (not just ones touching Docker-relevant paths)
+# and on every push to main, so the `gate` job below always has a real
+# result to report — see the `gate` job for why that matters.
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  id-token: write   # required for AWS OIDC
+  contents: write   # required to push the optional post-deploy git tag
+  pull-requests: read
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION }}
+  AWS_ROLE_ARN: ${{ vars.AWS_OIDC_ROLE_ARN }}
+
+jobs:
+  # ---------------------------------------------------------------------
+  # Solution-wide standards gate: formatting + full build (Roslyn analyzers
+  # are already enabled for every project via Directory.Build.props, so a
+  # normal build enforces them). Runs on every PR/push regardless of which
+  # project changed.
+  # ---------------------------------------------------------------------
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore
+        run: dotnet restore PTL.slnx
+
+      - name: Verify formatting
+        run: dotnet format PTL.slnx --verify-no-changes --no-restore
+
+      - name: Build (enforces analyzers + code style)
+        run: dotnet build PTL.slnx -c Release --no-restore
+
+      # PTL.ApiClient isn't a deployable image, so no build-* job below
+      # covers it - it only gets built/tested indirectly (via
+      # build-internalweb/build-externalweb) when something depending on it
+      # changes. Run its own tests here so the 80% coverage threshold on
+      # PTL.ApiClient.Tests is actually enforced in CI, not just locally.
+      - name: Test PTL.ApiClient
+        run: dotnet test tests/PTL.ApiClient.Tests/PTL.ApiClient.Tests.csproj -c Release --no-restore
+
+  # ---------------------------------------------------------------------
+  # SonarCloud static analysis. Disabled until the SonarCloud project
+  # exists - create it, then set the SONAR_TOKEN secret and the
+  # SONAR_PROJECT_KEY/SONAR_ORGANIZATION vars in repo settings, and flip
+  # `if: false` to `if: true` below.
+  # ---------------------------------------------------------------------
+  sonarcloud:
+    if: false
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Install SonarScanner for .NET
+        run: dotnet tool install --global dotnet-sonarscanner
+
+      - name: SonarCloud analysis
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: |
+          dotnet sonarscanner begin \
+            /k:"${{ vars.SONAR_PROJECT_KEY }}" \
+            /o:"${{ vars.SONAR_ORGANIZATION }}" \
+            /d:sonar.token="${{ secrets.SONAR_TOKEN }}" \
+            /d:sonar.host.url="https://sonarcloud.io"
+          dotnet build PTL.slnx -c Release
+          dotnet sonarscanner end /d:sonar.token="${{ secrets.SONAR_TOKEN }}"
+
+  # ---------------------------------------------------------------------
+  # Path-based change detection. Each project here has its own dedicated
+  # ECR repository, so (unlike alpha-cdc-app) tags don't need a project
+  # prefix. PTL.InternalWeb and PTL.ExternalWeb both reference the shared
+  # PTL.ApiClient library, so a change to it must trigger both of them too.
+  # ---------------------------------------------------------------------
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      api: ${{ steps.filter.outputs.api }}
+      internalweb: ${{ steps.filter.outputs.internalweb }}
+      externalweb: ${{ steps.filter.outputs.externalweb }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          base: ${{ github.event_name == 'push' && 'HEAD^' || github.event.pull_request.base.sha }}
+          filters: |
+            api:
+              - 'src/PTL.Api/**'
+            internalweb:
+              - 'src/PTL.InternalWeb/**'
+              - 'src/PTL.ApiClient/**'
+            externalweb:
+              - 'src/PTL.ExternalWeb/**'
+              - 'src/PTL.ApiClient/**'
+
+  # ---------------------------------------------------------------------
+  # PTL.Api -> alpha/ptlapi
+  # ---------------------------------------------------------------------
+  build-api:
+    needs: changes
+    if: needs.changes.outputs.api == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: ./.github/actions/build-test-publish
+        with:
+          project-dir: src/PTL.Api
+          test-project: tests/PTL.Api.Tests/PTL.Api.Tests.csproj
+          dockerfile: src/PTL.Api/Dockerfile
+          ecr-repository: alpha/ptlapi
+          git-tag-prefix: api
+          cache-scope: ptl-api
+          aws-region: ${{ env.AWS_REGION }}
+          aws-role-arn: ${{ env.AWS_ROLE_ARN }}
+
+  # ---------------------------------------------------------------------
+  # PTL.InternalWeb -> alpha/ptlinternal
+  # ---------------------------------------------------------------------
+  build-internalweb:
+    needs: changes
+    if: needs.changes.outputs.internalweb == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: ./.github/actions/build-test-publish
+        with:
+          project-dir: src/PTL.InternalWeb
+          test-project: tests/PTL.InternalWeb.Tests/PTL.InternalWeb.Tests.csproj
+          dockerfile: src/PTL.InternalWeb/Dockerfile
+          ecr-repository: alpha/ptlinternal
+          git-tag-prefix: internalweb
+          cache-scope: ptl-internalweb
+          aws-region: ${{ env.AWS_REGION }}
+          aws-role-arn: ${{ env.AWS_ROLE_ARN }}
+
+  # ---------------------------------------------------------------------
+  # PTL.ExternalWeb -> alpha/ptlexternal
+  # ---------------------------------------------------------------------
+  build-externalweb:
+    needs: changes
+    if: needs.changes.outputs.externalweb == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: ./.github/actions/build-test-publish
+        with:
+          project-dir: src/PTL.ExternalWeb
+          test-project: tests/PTL.ExternalWeb.Tests/PTL.ExternalWeb.Tests.csproj
+          dockerfile: src/PTL.ExternalWeb/Dockerfile
+          ecr-repository: alpha/ptlexternal
+          git-tag-prefix: externalweb
+          cache-scope: ptl-externalweb
+          aws-region: ${{ env.AWS_REGION }}
+          aws-role-arn: ${{ env.AWS_ROLE_ARN }}
+
+  # ---------------------------------------------------------------------
+  # Required PR status check. Individual build jobs are legitimately
+  # skipped on PRs that don't touch that project, so `gate` is the only
+  # job branch protection should require — it always reports a result.
+  # ---------------------------------------------------------------------
+  gate:
+    needs: [lint, sonarcloud, build-api, build-internalweb, build-externalweb]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          if [[ "${{ contains(needs.*.result, 'failure') }}" == "true" ]]; then
+            exit 1
+          fi
