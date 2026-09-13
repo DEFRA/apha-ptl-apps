@@ -16,16 +16,27 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Create Tag
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
         run: |
-          TAG_NAME="ptl-pr-${{ github.event.pull_request.number }}-$(date +'%Y%m%d-%H%M%S')"
-
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
 
           git fetch origin main
           git checkout main
 
-          git tag $TAG_NAME
-          git push origin $TAG_NAME
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          TAG_NAME="ptl-pr-${PR_NUMBER}-${SHORT_SHA}"
+
+          # Annotated tag (not lightweight) so the tag itself carries a
+          # message; PR_NUMBER/PR_TITLE are passed via env rather than
+          # interpolated directly into the script, since a PR title is
+          # attacker-controlled text and inlining it via ${{ }} would be a
+          # script-injection risk.
+          git tag -a "$TAG_NAME" -m "Merge PR #${PR_NUMBER}: ${PR_TITLE}"
+          git push origin "$TAG_NAME"
