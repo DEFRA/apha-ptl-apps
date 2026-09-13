@@ -5,6 +5,10 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
+    <!-- PTL.ApiClient has its own fully-covering test project (PTL.ApiClient.Tests) -
+         measuring it again here would drag this project's own coverage number down
+         for code this project doesn't own, just because it's loaded transitively. -->
+    <Exclude>[PTL.ApiClient]*</Exclude>
   </PropertyGroup>
 
   <ItemGroup>
