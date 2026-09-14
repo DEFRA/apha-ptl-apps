@@ -2,144 +2,292 @@ name: Build, Test and Publish PT-LIMS Images
 
 on:
   pull_request:
-    branches:
-      - main
-
+    branches: [main]
   push:
-    branches:
-      - main
-
-  workflow_dispatch:
+    branches: [main]
 
 permissions:
   contents: read
-  id-token: write
+  pull-requests: read
 
 concurrency:
-  group: ptlims-images-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: false
+  group: ptl-images-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
-  AWS_REGION: eu-west-2
-  AWS_ACCOUNT_ID: "783559591987"
-  AWS_ROLE_ARN: arn:aws:iam::783559591987:role/github_actions_pipeline_ecr_role
-  ECR_REGISTRY: 783559591987.dkr.ecr.eu-west-2.amazonaws.com
-  DOTNET_VERSION: "10.0.x"
+  DOTNET_VERSION: 10.0.x
+  AWS_REGION: ${{ vars.AWS_REGION }}
+  AWS_ROLE_ARN: ${{ vars.AWS_OIDC_ROLE_ARN }}
 
 jobs:
-  lint:
-    name: Format and build solution
+  changes:
+    name: Detect affected components
     runs-on: ubuntu-latest
-    timeout-minutes: 15
-
+    timeout-minutes: 5
+    outputs:
+      components: ${{ steps.filter.outputs.changes }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
 
-      - name: Configure .NET
-        uses: actions/setup-dotnet@v4
+      - name: Detect changed paths
+        id: filter
+        uses: dorny/paths-filter@v4.0.3
+        with:
+          filters: |
+            api:
+              - 'src/PTL.Api/**'
+              - 'tests/PTL.Api.Tests/**'
+              - 'PTL.slnx'
+              - 'Directory.Build.*'
+              - 'Directory.Packages.props'
+              - 'NuGet.config'
+              - 'global.json'
+              - '.github/workflows/build-test-publish-images.yml'
+            internalweb:
+              - 'src/PTL.InternalWeb/**'
+              - 'src/PTL.ApiClient/**'
+              - 'tests/PTL.InternalWeb.Tests/**'
+              - 'tests/PTL.ApiClient.Tests/**'
+              - 'PTL.slnx'
+              - 'Directory.Build.*'
+              - 'Directory.Packages.props'
+              - 'NuGet.config'
+              - 'global.json'
+              - '.github/workflows/build-test-publish-images.yml'
+            externalweb:
+              - 'src/PTL.ExternalWeb/**'
+              - 'src/PTL.ApiClient/**'
+              - 'tests/PTL.ExternalWeb.Tests/**'
+              - 'tests/PTL.ApiClient.Tests/**'
+              - 'PTL.slnx'
+              - 'Directory.Build.*'
+              - 'Directory.Packages.props'
+              - 'NuGet.config'
+              - 'global.json'
+              - '.github/workflows/build-test-publish-images.yml'
+
+  quality:
+    name: Format, build and test solution
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v6.0.0
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
-      - name: Restore dependencies
+      - name: Restore solution
         run: dotnet restore PTL.slnx
 
       - name: Verify formatting
         run: dotnet format PTL.slnx --verify-no-changes --no-restore
 
       - name: Build solution
-        run: |
-          dotnet build PTL.slnx \
-            --configuration Release \
-            --no-restore
+        run: dotnet build PTL.slnx --configuration Release --no-restore --warnaserror
 
-  build-test-publish:
-    name: Build ${{ matrix.application }}
-    needs:
-      - lint
+      - name: Test solution
+        run: >-
+          dotnet test PTL.slnx
+          --configuration Release
+          --no-build
+          --no-restore
+          --logger "trx;LogFilePrefix=ptl-tests"
+          --results-directory "${{ runner.temp }}/test-results"
 
+  sonarcloud:
+    name: SonarCloud analysis
+    if: vars.SONAR_ENABLED == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-
-    strategy:
-      fail-fast: false
-
-      matrix:
-        include:
-          - application: PTL API
-            project: PTL.Api
-            project_file: src/PTL.Api/PTL.Api.csproj
-            test_project: tests/PTL.Api.Tests/PTL.Api.Tests.csproj
-            dockerfile: src/PTL.Api/Dockerfile
-            ecr_repository: apha/ptlapi
-
-          - application: PTL Internal Web
-            project: PTL.InternalWeb
-            project_file: src/PTL.InternalWeb/PTL.InternalWeb.csproj
-            test_project: tests/PTL.InternalWeb.Tests/PTL.InternalWeb.Tests.csproj
-            dockerfile: src/PTL.InternalWeb/Dockerfile
-            ecr_repository: apha/ptlinternal
-
-          - application: PTL External Web
-            project: PTL.ExternalWeb
-            project_file: src/PTL.ExternalWeb/PTL.ExternalWeb.csproj
-            test_project: tests/PTL.ExternalWeb.Tests/PTL.ExternalWeb.Tests.csproj
-            dockerfile: src/PTL.ExternalWeb/Dockerfile
-            ecr_repository: apha/ptlexternal
-
+    timeout-minutes: 25
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - name: Checkout full history
+        uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
 
-      - name: Configure .NET
-        uses: actions/setup-dotnet@v4
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v6.0.0
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
-      - name: Restore application
-        run: dotnet restore "${{ matrix.project_file }}"
-
-      - name: Build application
-        run: |
-          dotnet build "${{ matrix.project_file }}" \
-            --configuration Release \
-            --no-restore
-
-      - name: Test application
-        run: |
-          dotnet test "${{ matrix.test_project }}" \
-            --configuration Release \
-            --no-restore \
-            --logger "trx;LogFileName=${{ matrix.project }}.trx" \
-            --results-directory TestResults
-
-      - name: Upload test results
-        if: always()
-        uses: actions/upload-artifact@v4
+      - name: Set up Java
+        uses: actions/setup-java@v6.0.0
         with:
-          name: test-results-${{ matrix.project }}
-          path: TestResults/
-          if-no-files-found: ignore
-          retention-days: 14
+          distribution: temurin
+          java-version: "17"
 
-      - name: Configure Docker Buildx
-        uses: docker/setup-buildx-action@v3
+      - name: Restore repository tools
+        run: dotnet tool restore
 
-      # Pull requests build the image but do not access AWS or push to ECR.
-      - name: Validate Docker image
-        if: github.event_name == 'pull_request'
-        uses: docker/build-push-action@v6
+      - name: Analyse solution
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "${SONAR_TOKEN}"
+          dotnet sonarscanner begin \
+            /k:"${{ vars.SONAR_PROJECT_KEY }}" \
+            /o:"${{ vars.SONAR_ORGANIZATION }}" \
+            /d:sonar.token="${SONAR_TOKEN}" \
+            /d:sonar.host.url="https://sonarcloud.io" \
+            /d:sonar.qualitygate.wait=true
+          dotnet restore PTL.slnx
+          dotnet build PTL.slnx --configuration Release --no-restore
+          dotnet sonarscanner end /d:sonar.token="${SONAR_TOKEN}"
+
+  container-validation:
+    name: Validate ${{ matrix.component }} container
+    needs: [changes, quality]
+    if: needs.changes.outputs.components != '[]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        component: ${{ fromJSON(needs.changes.outputs.components) }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7.0.1
         with:
-          context: .
-          file: ${{ matrix.dockerfile }}
-          push: false
-          tags: ${{ matrix.project }}:pr-${{ github.event.pull_request.number }}
-          cache-from: type=gha,scope=${{ matrix.project }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.project }}
+          persist-credentials: false
 
-      # This diagnostic step only runs when an ECR publication is required.
+      - name: Resolve component configuration
+        id: component
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "${{ matrix.component }}" in
+            api)
+              echo "dockerfile=src/PTL.Api/Dockerfile" >> "${GITHUB_OUTPUT}"
+              ;;
+            internalweb)
+              echo "dockerfile=src/PTL.InternalWeb/Dockerfile" >> "${GITHUB_OUTPUT}"
+              ;;
+            externalweb)
+              echo "dockerfile=src/PTL.ExternalWeb/Dockerfile" >> "${GITHUB_OUTPUT}"
+              ;;
+            *)
+              echo "::error::Unsupported component: ${{ matrix.component }}"
+              exit 1
+              ;;
+          esac
+
+      - name: Build container without publishing
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker buildx build \
+            --file "${{ steps.component.outputs.dockerfile }}" \
+            --tag "ptl-${{ matrix.component }}:${GITHUB_SHA}" \
+            --load \
+            .
+
+  publish:
+    name: Publish ${{ matrix.component }} image
+    needs: [changes, quality, sonarcloud, container-validation]
+    if: >-
+      always() &&
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/main' &&
+      needs.changes.result == 'success' &&
+      needs.quality.result == 'success' &&
+      (vars.SONAR_ENABLED != 'true' || needs.sonarcloud.result == 'success') &&
+      needs.container-validation.result == 'success' &&
+      needs.changes.outputs.components != '[]'
+    runs-on: ubuntu-latest
+    environment: ecr-production
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      id-token: write
+    strategy:
+      fail-fast: false
+      matrix:
+        component: ${{ fromJSON(needs.changes.outputs.components) }}
+    env:
+      AWS_ROLE_ARN: arn:aws:iam::783559591987:role/github_actions_pipeline_ecr_role
+      ECR_API_REPOSITORY: apha/ptlapi
+      ECR_INTERNAL_REPOSITORY: apha/ptlinternal
+      ECR_EXTERNAL_REPOSITORY: apha/ptlexternal
+      EXPECTED_AWS_ACCOUNT_ID: 783559591987
+      AWS_REGION: eu-west-2
+      AWS_ACCOUNT_ID: "783559591987"
+      DOTNET_VERSION: "10.0.x"
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Resolve and validate publishing configuration
+        id: component
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          test -n "${AWS_ROLE_ARN}" || {
+            echo "::error::Environment variable AWS_OIDC_ROLE_ARN is not configured."
+            exit 1
+          }
+
+          case "${{ matrix.component }}" in
+            api)
+              DOCKERFILE="src/PTL.Api/Dockerfile"
+              ECR_REPOSITORY="${ECR_API_REPOSITORY}"
+              ;;
+            internalweb)
+              DOCKERFILE="src/PTL.InternalWeb/Dockerfile"
+              ECR_REPOSITORY="${ECR_INTERNAL_REPOSITORY}"
+              ;;
+            externalweb)
+              DOCKERFILE="src/PTL.ExternalWeb/Dockerfile"
+              ECR_REPOSITORY="${ECR_EXTERNAL_REPOSITORY}"
+              ;;
+            *)
+              echo "::error::Unsupported component: ${{ matrix.component }}"
+              exit 1
+              ;;
+          esac
+
+          test -n "${ECR_REPOSITORY}" || {
+            echo "::error::No ECR repository is configured for ${{ matrix.component }}."
+            exit 1
+          }
+
+          EXPECTED_ROLE_PREFIX="arn:aws:iam::${EXPECTED_AWS_ACCOUNT_ID}:role/"
+          [[ "${AWS_ROLE_ARN}" == "${EXPECTED_ROLE_PREFIX}"* ]] || {
+            echo "::error::AWS_OIDC_ROLE_ARN must reference account ${EXPECTED_AWS_ACCOUNT_ID}."
+            exit 1
+          }
+
+          {
+            echo "dockerfile=${DOCKERFILE}"
+            echo "ecr_repository=${ECR_REPOSITORY}"
+          } >> "${GITHUB_OUTPUT}"
+
+      - name: Build release container
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker buildx build \
+            --file "${{ steps.component.outputs.dockerfile }}" \
+            --tag "ptl-${{ matrix.component }}:${GITHUB_SHA}" \
+            --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
+            --label "org.opencontainers.image.source=https://github.com/${GITHUB_REPOSITORY}" \
+            --load \
+            .
+
       - name: Display OIDC claims for troubleshooting
-        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
         shell: bash
         run: |
           set -euo pipefail
@@ -148,17 +296,16 @@ jobs:
             --header "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
             "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=sts.amazonaws.com")"
 
-          TOKEN="$(echo "$RESPONSE" | jq -r '.value')"
-          PAYLOAD="$(echo "$TOKEN" | cut -d '.' -f 2)"
+          TOKEN="$(echo "${RESPONSE}" | jq -er '.value')"
+          PAYLOAD="$(echo "${TOKEN}" | cut -d '.' -f 2)"
 
-          TOKEN_PAYLOAD="$PAYLOAD" python3 - <<'PY'
+          TOKEN_PAYLOAD="${PAYLOAD}" python3 - <<'PY'
           import base64
           import json
           import os
 
           payload = os.environ["TOKEN_PAYLOAD"]
           payload += "=" * (-len(payload) % 4)
-
           claims = json.loads(base64.urlsafe_b64decode(payload))
 
           for key in [
@@ -174,120 +321,111 @@ jobs:
               print(f"{key}={claims.get(key)}")
           PY
 
-      - name: Configure AWS credentials through GitHub OIDC
-        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+      - name: Configure AWS credentials through OIDC
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-region: eu-west-2
-          role-to-assume: arn:aws:iam::783559591987:role/github_actions_pipeline_ecr_role
-          role-session-name: ptlims-ecr-${{ github.run_id }}-${{ matrix.project }}
+          role-to-assume: eu-west-2
+          aws-region: arn:aws:iam::783559591987:role/github_actions_pipeline_ecr_role
+          role-session-name: ptl-exr-${{ github.run_id }}-${{ matrix.component }}
+          role-duration-seconds: 900
+          audience: sts.amazonaws.com
+          allowed-account-ids: ${{ env.EXPECTED_AWS_ACCOUNT_ID }}
 
-      - name: Verify AWS account
-        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+      - name: Verify ECR repository
         shell: bash
         run: |
           set -euo pipefail
-
-          ACTUAL_ACCOUNT_ID="$(
-            aws sts get-caller-identity \
-              --query Account \
-              --output text
-          )"
-
-          echo "Expected account: ${AWS_ACCOUNT_ID}"
-          echo "Actual account:   ${ACTUAL_ACCOUNT_ID}"
-
-          if [[ "$ACTUAL_ACCOUNT_ID" != "$AWS_ACCOUNT_ID" ]]; then
-            echo "::error::The workflow assumed a role in the wrong AWS account."
-            exit 1
-          fi
+          aws ecr describe-repositories \
+            --repository-names "${{ steps.component.outputs.ecr_repository }}" \
+            --region "${AWS_REGION}" \
+            --query 'repositories[0].repositoryUri' \
+            --output text
 
       - name: Log in to Amazon ECR
-        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
         id: ecr-login
-        uses: aws-actions/amazon-ecr-login@v2
+        uses: aws-actions/amazon-ecr-login@v2.1.6
+        with:
+          mask-password: true
 
-      - name: Generate image metadata
-        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+      - name: Publish immutable image tag
         id: image
         shell: bash
+        env:
+          ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
         run: |
           set -euo pipefail
+          IMAGE_TAG="sha-${GITHUB_SHA::12}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          IMAGE_URI="${ECR_REGISTRY}/${{ steps.component.outputs.ecr_repository }}:${IMAGE_TAG}"
 
-          IMAGE_TAG="sha-${GITHUB_SHA}"
-          IMAGE_URI="${ECR_REGISTRY}/${{ matrix.ecr_repository }}:${IMAGE_TAG}"
+          docker tag "ptl-${{ matrix.component }}:${GITHUB_SHA}" "${IMAGE_URI}"
+          docker push "${IMAGE_URI}"
 
-          echo "tag=${IMAGE_TAG}" >> "$GITHUB_OUTPUT"
-          echo "uri=${IMAGE_URI}" >> "$GITHUB_OUTPUT"
+          IMAGE_DIGEST="$(aws ecr describe-images \
+            --repository-name "${{ steps.component.outputs.ecr_repository }}" \
+            --image-ids imageTag="${IMAGE_TAG}" \
+            --query 'imageDetails[0].imageDigest' \
+            --output text)"
 
-      - name: Build and push image to ECR
-        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: ${{ matrix.dockerfile }}
-          push: true
-          tags: ${{ steps.image.outputs.uri }}
-          cache-from: type=gha,scope=${{ matrix.project }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.project }}
-          provenance: true
-          sbom: true
+          {
+            echo "image_uri=${IMAGE_URI}"
+            echo "image_digest=${IMAGE_DIGEST}"
+          } >> "${GITHUB_OUTPUT}"
 
-      - name: Verify published ECR image
-        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
-        id: verify
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          IMAGE_DIGEST="$(
-            aws ecr describe-images \
-              --repository-name "${{ matrix.ecr_repository }}" \
-              --image-ids imageTag="${{ steps.image.outputs.tag }}" \
-              --query "imageDetails[0].imageDigest" \
-              --output text
-          )"
-
-          if [[ -z "$IMAGE_DIGEST" || "$IMAGE_DIGEST" == "None" ]]; then
-            echo "::error::The pushed image could not be found in ECR."
-            exit 1
-          fi
-
-          echo "digest=${IMAGE_DIGEST}" >> "$GITHUB_OUTPUT"
-
-      - name: Publish workflow summary
-        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+      - name: Write publishing summary
         shell: bash
         run: |
           {
-            echo "### ${{ matrix.application }} published"
+            echo "### PT-LIMS ${{ matrix.component }} image published"
             echo
-            echo "- AWS account: \`${AWS_ACCOUNT_ID}\`"
-            echo "- AWS region: \`${AWS_REGION}\`"
-            echo "- ECR repository: \`${{ matrix.ecr_repository }}\`"
-            echo "- Image: \`${{ steps.image.outputs.uri }}\`"
-            echo "- Digest: \`${{ steps.verify.outputs.digest }}\`"
-          } >> "$GITHUB_STEP_SUMMARY"
+            echo "- Image: \`${{ steps.image.outputs.image_uri }}\`"
+            echo "- Digest: \`${{ steps.image.outputs.image_digest }}\`"
+            echo "- Commit: \`${GITHUB_SHA}\`"
+          } >> "${GITHUB_STEP_SUMMARY}"
 
   gate:
-    name: PT-LIMS CI gate
-    needs:
-      - lint
-      - build-test-publish
-
+    name: CI gate
+    needs: [changes, quality, sonarcloud, container-validation, publish]
     if: always()
     runs-on: ubuntu-latest
-
+    timeout-minutes: 5
+    env:
+      CHANGES_RESULT: ${{ needs.changes.result }}
+      QUALITY_RESULT: ${{ needs.quality.result }}
+      SONAR_RESULT: ${{ needs.sonarcloud.result }}
+      CONTAINER_RESULT: ${{ needs.container-validation.result }}
+      PUBLISH_RESULT: ${{ needs.publish.result }}
+      COMPONENTS: ${{ needs.changes.outputs.components }}
+      SONAR_ENABLED: ${{ vars.SONAR_ENABLED }}
+      EVENT_NAME: ${{ github.event_name }}
     steps:
-      - name: Verify required jobs
+      - name: Enforce required results
         shell: bash
         run: |
-          if [[ "${{ needs.lint.result }}" != "success" ]]; then
-            echo "::error::Lint job did not succeed."
+          set -euo pipefail
+
+          [[ "${CHANGES_RESULT}" == "success" ]] || {
+            echo "::error::Change detection result: ${CHANGES_RESULT}"
+            exit 1
+          }
+
+          [[ "${QUALITY_RESULT}" == "success" ]] || {
+            echo "::error::Quality result: ${QUALITY_RESULT}"
+            exit 1
+          }
+
+          if [[ "${SONAR_ENABLED}" == "true" && "${SONAR_RESULT}" != "success" ]]; then
+            echo "::error::SonarCloud is enabled but result is ${SONAR_RESULT}."
             exit 1
           fi
 
-          if [[ "${{ needs.build-test-publish.result }}" != "success" ]]; then
-            echo "::error::One or more application jobs did not succeed."
+          if [[ "${COMPONENTS}" != "[]" && "${CONTAINER_RESULT}" != "success" ]]; then
+            echo "::error::Container validation result: ${CONTAINER_RESULT}"
             exit 1
           fi
+
+          if [[ "${EVENT_NAME}" == "push" && "${COMPONENTS}" != "[]" && "${PUBLISH_RESULT}" != "success" ]]; then
+            echo "::error::Image publishing result: ${PUBLISH_RESULT}"
+            exit 1
+          fi
+
+          echo "All required CI checks passed."
