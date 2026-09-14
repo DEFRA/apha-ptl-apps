@@ -327,10 +327,8 @@ jobs:
           role-to-assume: "arn:aws:iam::783559591987:role/github_actions_pipeline_ecr_role"
           aws-region: "eu-west-2"
           role-session-name: ptl-exr-${{ github.run_id }}-${{ matrix.component }}
-          role-duration-seconds: 900
           audience: sts.amazonaws.com
-          allowed-account-ids: ${{ env.EXPECTED_AWS_ACCOUNT_ID }}
-
+          
       - name: Verify ECR repository
         shell: bash
         run: |
