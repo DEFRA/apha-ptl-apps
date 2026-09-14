@@ -219,6 +219,7 @@ jobs:
       ECR_API_REPOSITORY: apha/ptlapi
       ECR_INTERNAL_REPOSITORY: apha/ptlinternal
       ECR_EXTERNAL_REPOSITORY: apha/ptlexternal
+      EXPECTED_AWS_ACCOUNT_ID: 783559591987
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7.0.1
