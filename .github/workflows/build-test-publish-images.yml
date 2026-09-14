@@ -278,6 +278,7 @@ jobs:
         env:
           ACCESS_KEY: ${{ secrets.AWS_ACCESS_KEY_ID }}
           SECRET_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          SESSION_TOKEN: ${{ secrets.AWS_SESSION_TOKEN }}
         run: |
           set -euo pipefail
 
@@ -290,12 +291,17 @@ jobs:
             echo "::error::AWS_SECRET_ACCESS_KEY is not configured in the ecr-production environment."
             exit 1
           }
+          test -n "${SESSION_TOKEN}" || {
+            echo "::error::AWS_SESSION_TOKEN is not configured in the ecr-production environment."
+            exit 1
+          }  
 
       - name: Configure AWS credentials from GitHub secrets
         uses: aws-actions/configure-aws-credentials@v6.2.4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
           aws-region: ${{ env.AWS_REGION }}
           allowed-account-ids: ${{ env.EXPECTED_AWS_ACCOUNT_ID }}
           force-skip-oidc: true
