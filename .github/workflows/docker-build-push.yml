@@ -216,7 +216,7 @@ jobs:
         component: ${{ fromJSON(needs.changes.outputs.components) }}
     env:
       AWS_ROLE_ARN: ${{ vars.AWS_OIDC_ROLE_ARN }}
-      ECR_API_REPOSITORY: ${{ vars.ECR_API_REPOSITORY }}
+      ECR_API_REPOSITORY: apha/ptlapi
       ECR_INTERNAL_REPOSITORY: apha/ptlinternal
       ECR_EXTERNAL_REPOSITORY: apha/ptlexternal
     steps:
