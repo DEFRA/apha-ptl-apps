@@ -16,8 +16,8 @@ concurrency:
 
 env:
   DOTNET_VERSION: 10.0.x
-  EXPECTED_AWS_ACCOUNT_ID: "783559591987"
-  AWS_REGION: eu-west-2
+  AWS_REGION: ${{ vars.AWS_REGION }}
+  AWS_ROLE_ARN: ${{ vars.AWS_OIDC_ROLE_ARN }}
 
 jobs:
   changes:
