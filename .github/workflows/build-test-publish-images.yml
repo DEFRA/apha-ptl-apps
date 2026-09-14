@@ -215,14 +215,14 @@ jobs:
       matrix:
         component: ${{ fromJSON(needs.changes.outputs.components) }}
     env:
-      AWS_ROLE_ARN: arn:aws:iam::783559591987:role/github_actions_pipeline_ecr_role
+      AWS_ROLE_ARN: "arn:aws:iam::783559591987:role/github_actions_pipeline_ecr_role"
       ECR_API_REPOSITORY: apha/ptlapi
       ECR_INTERNAL_REPOSITORY: apha/ptlinternal
       ECR_EXTERNAL_REPOSITORY: apha/ptlexternal
-      EXPECTED_AWS_ACCOUNT_ID: 783559591987
-      AWS_REGION: eu-west-2
+      EXPECTED_AWS_ACCOUNT_ID: "783559591987"
+      AWS_REGION: "eu-west-2"
       AWS_ACCOUNT_ID: "783559591987"
-      DOTNET_VERSION: "10.0.x"
+      
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7.0.1
@@ -324,13 +324,11 @@ jobs:
       - name: Configure AWS credentials through OIDC
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: eu-west-2
-          aws-region: arn:aws:iam::783559591987:role/github_actions_pipeline_ecr_role
+          role-to-assume: "arn:aws:iam::783559591987:role/github_actions_pipeline_ecr_role"
+          aws-region: "eu-west-2"
           role-session-name: ptl-exr-${{ github.run_id }}-${{ matrix.component }}
-          role-duration-seconds: 900
           audience: sts.amazonaws.com
-          allowed-account-ids: ${{ env.EXPECTED_AWS_ACCOUNT_ID }}
-
+          
       - name: Verify ECR repository
         shell: bash
         run: |
