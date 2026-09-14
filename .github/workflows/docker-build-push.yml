@@ -1,8 +1,5 @@
-name: Build, Test & Publish Images
+name: Build, Test and Publish PT-LIMS Images
 
-# Triggers on every PR to main (not just ones touching Docker-relevant paths)
-# and on every push to main, so the `gate` job below always has a real
-# result to report — see the `gate` job for why that matters.
 on:
   pull_request:
     branches: [main]
@@ -10,193 +7,421 @@ on:
     branches: [main]
 
 permissions:
-  id-token: write   # required for AWS OIDC
-  contents: write   # required to push the optional post-deploy git tag
+  contents: read
   pull-requests: read
 
+concurrency:
+  group: ptl-images-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 env:
-  AWS_REGION: ${{ vars.AWS_REGION }}
-  AWS_ROLE_ARN: ${{ vars.AWS_OIDC_ROLE_ARN }}
+  DOTNET_VERSION: 10.0.x
+  EXPECTED_AWS_ACCOUNT_ID: "783559591987"
+  AWS_REGION: eu-west-2
 
 jobs:
-  # ---------------------------------------------------------------------
-  # Solution-wide standards gate: formatting + full build (Roslyn analyzers
-  # are already enabled for every project via Directory.Build.props, so a
-  # normal build enforces them). Runs on every PR/push regardless of which
-  # project changed.
-  # ---------------------------------------------------------------------
-  lint:
+  changes:
+    name: Detect affected components
     runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      components: ${{ steps.filter.outputs.changes }}
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-dotnet@v4
+      - name: Checkout repository
+        uses: actions/checkout@v7.0.1
         with:
-          dotnet-version: '10.0.x'
+          fetch-depth: 0
+          persist-credentials: false
 
-      - name: Restore
+      - name: Detect changed paths
+        id: filter
+        uses: dorny/paths-filter@v4.0.3
+        with:
+          filters: |
+            api:
+              - 'src/PTL.Api/**'
+              - 'tests/PTL.Api.Tests/**'
+              - 'PTL.slnx'
+              - 'Directory.Build.*'
+              - 'Directory.Packages.props'
+              - 'NuGet.config'
+              - 'global.json'
+              - '.github/workflows/build-test-publish-images.yml'
+            internalweb:
+              - 'src/PTL.InternalWeb/**'
+              - 'src/PTL.ApiClient/**'
+              - 'tests/PTL.InternalWeb.Tests/**'
+              - 'tests/PTL.ApiClient.Tests/**'
+              - 'PTL.slnx'
+              - 'Directory.Build.*'
+              - 'Directory.Packages.props'
+              - 'NuGet.config'
+              - 'global.json'
+              - '.github/workflows/build-test-publish-images.yml'
+            externalweb:
+              - 'src/PTL.ExternalWeb/**'
+              - 'src/PTL.ApiClient/**'
+              - 'tests/PTL.ExternalWeb.Tests/**'
+              - 'tests/PTL.ApiClient.Tests/**'
+              - 'PTL.slnx'
+              - 'Directory.Build.*'
+              - 'Directory.Packages.props'
+              - 'NuGet.config'
+              - 'global.json'
+              - '.github/workflows/build-test-publish-images.yml'
+
+  quality:
+    name: Format, build and test solution
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v6.0.0
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore solution
         run: dotnet restore PTL.slnx
 
       - name: Verify formatting
         run: dotnet format PTL.slnx --verify-no-changes --no-restore
 
-      - name: Build (enforces analyzers + code style)
-        run: dotnet build PTL.slnx -c Release --no-restore
+      - name: Build solution
+        run: dotnet build PTL.slnx --configuration Release --no-restore --warnaserror
 
-      # PTL.ApiClient isn't a deployable image, so no build-* job below
-      # covers it - it only gets built/tested indirectly (via
-      # build-internalweb/build-externalweb) when something depending on it
-      # changes. Run its own tests here so the 80% coverage threshold on
-      # PTL.ApiClient.Tests is actually enforced in CI, not just locally.
-      - name: Test PTL.ApiClient
-        run: dotnet test tests/PTL.ApiClient.Tests/PTL.ApiClient.Tests.csproj -c Release --no-restore
+      - name: Test solution
+        run: >-
+          dotnet test PTL.slnx
+          --configuration Release
+          --no-build
+          --no-restore
+          --logger "trx;LogFilePrefix=ptl-tests"
+          --results-directory "${{ runner.temp }}/test-results"
 
-  # ---------------------------------------------------------------------
-  # SonarCloud static analysis. Disabled until the SonarCloud project
-  # exists - create it, then set the SONAR_TOKEN secret and the
-  # SONAR_PROJECT_KEY/SONAR_ORGANIZATION vars in repo settings, and flip
-  # `if: false` to `if: true` below.
-  # ---------------------------------------------------------------------
   sonarcloud:
-    if: false
+    name: SonarCloud analysis
+    if: vars.SONAR_ENABLED == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout full history
+        uses: actions/checkout@v7.0.1
         with:
           fetch-depth: 0
+          persist-credentials: false
 
-      - uses: actions/setup-dotnet@v4
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v6.0.0
         with:
-          dotnet-version: '10.0.x'
+          dotnet-version: ${{ env.DOTNET_VERSION }}
 
-      - uses: actions/setup-java@v4
+      - name: Set up Java
+        uses: actions/setup-java@v6.0.0
         with:
-          distribution: 'temurin'
-          java-version: '17'
+          distribution: temurin
+          java-version: "17"
 
-      - name: Install SonarScanner for .NET
-        run: dotnet tool install --global dotnet-sonarscanner
+      - name: Restore repository tools
+        run: dotnet tool restore
 
-      - name: SonarCloud analysis
+      - name: Analyse solution
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: |
+          set -euo pipefail
+          test -n "${SONAR_TOKEN}"
           dotnet sonarscanner begin \
             /k:"${{ vars.SONAR_PROJECT_KEY }}" \
             /o:"${{ vars.SONAR_ORGANIZATION }}" \
-            /d:sonar.token="${{ secrets.SONAR_TOKEN }}" \
-            /d:sonar.host.url="https://sonarcloud.io"
-          dotnet build PTL.slnx -c Release
-          dotnet sonarscanner end /d:sonar.token="${{ secrets.SONAR_TOKEN }}"
+            /d:sonar.token="${SONAR_TOKEN}" \
+            /d:sonar.host.url="https://sonarcloud.io" \
+            /d:sonar.qualitygate.wait=true
+          dotnet restore PTL.slnx
+          dotnet build PTL.slnx --configuration Release --no-restore
+          dotnet sonarscanner end /d:sonar.token="${SONAR_TOKEN}"
 
-  # ---------------------------------------------------------------------
-  # Path-based change detection. Each project here has its own dedicated
-  # ECR repository, so (unlike alpha-cdc-app) tags don't need a project
-  # prefix. PTL.InternalWeb and PTL.ExternalWeb both reference the shared
-  # PTL.ApiClient library, so a change to it must trigger both of them too.
-  # ---------------------------------------------------------------------
-  changes:
+  container-validation:
+    name: Validate ${{ matrix.component }} container
+    needs: [changes, quality]
+    if: needs.changes.outputs.components != '[]'
     runs-on: ubuntu-latest
-    outputs:
-      api: ${{ steps.filter.outputs.api }}
-      internalweb: ${{ steps.filter.outputs.internalweb }}
-      externalweb: ${{ steps.filter.outputs.externalweb }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        component: ${{ fromJSON(needs.changes.outputs.components) }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: dorny/paths-filter@v3
-        id: filter
+      - name: Checkout repository
+        uses: actions/checkout@v7.0.1
         with:
-          base: ${{ github.event_name == 'push' && 'HEAD^' || github.event.pull_request.base.sha }}
-          filters: |
-            api:
-              - 'src/PTL.Api/**'
-            internalweb:
-              - 'src/PTL.InternalWeb/**'
-              - 'src/PTL.ApiClient/**'
-            externalweb:
-              - 'src/PTL.ExternalWeb/**'
-              - 'src/PTL.ApiClient/**'
+          persist-credentials: false
 
-  # ---------------------------------------------------------------------
-  # PTL.Api -> alpha/ptlapi
-  # ---------------------------------------------------------------------
-  build-api:
-    needs: changes
-    if: needs.changes.outputs.api == 'true'
+      - name: Resolve component configuration
+        id: component
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "${{ matrix.component }}" in
+            api)
+              echo "dockerfile=src/PTL.Api/Dockerfile" >> "${GITHUB_OUTPUT}"
+              ;;
+            internalweb)
+              echo "dockerfile=src/PTL.InternalWeb/Dockerfile" >> "${GITHUB_OUTPUT}"
+              ;;
+            externalweb)
+              echo "dockerfile=src/PTL.ExternalWeb/Dockerfile" >> "${GITHUB_OUTPUT}"
+              ;;
+            *)
+              echo "::error::Unsupported component: ${{ matrix.component }}"
+              exit 1
+              ;;
+          esac
+
+      - name: Build container without publishing
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker buildx build \
+            --file "${{ steps.component.outputs.dockerfile }}" \
+            --tag "ptl-${{ matrix.component }}:${GITHUB_SHA}" \
+            --load \
+            .
+
+  publish:
+    name: Publish ${{ matrix.component }} image
+    needs: [changes, quality, sonarcloud, container-validation]
+    if: >-
+      always() &&
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/main' &&
+      needs.changes.result == 'success' &&
+      needs.quality.result == 'success' &&
+      (vars.SONAR_ENABLED != 'true' || needs.sonarcloud.result == 'success') &&
+      needs.container-validation.result == 'success' &&
+      needs.changes.outputs.components != '[]'
     runs-on: ubuntu-latest
+    environment: ecr-production
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      id-token: write
+    strategy:
+      fail-fast: false
+      matrix:
+        component: ${{ fromJSON(needs.changes.outputs.components) }}
+    env:
+      AWS_ROLE_ARN: ${{ vars.AWS_OIDC_ROLE_ARN }}
+      ECR_API_REPOSITORY: ${{ vars.ECR_API_REPOSITORY }}
+      ECR_INTERNAL_REPOSITORY: apha/ptlinternal
+      ECR_EXTERNAL_REPOSITORY: apha/ptlexternal
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v7.0.1
         with:
-          fetch-depth: 0
+          persist-credentials: false
 
-      - uses: ./.github/actions/build-test-publish
+      - name: Resolve and validate publishing configuration
+        id: component
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          test -n "${AWS_ROLE_ARN}" || {
+            echo "::error::Environment variable AWS_OIDC_ROLE_ARN is not configured."
+            exit 1
+          }
+
+          case "${{ matrix.component }}" in
+            api)
+              DOCKERFILE="src/PTL.Api/Dockerfile"
+              ECR_REPOSITORY="${ECR_API_REPOSITORY}"
+              ;;
+            internalweb)
+              DOCKERFILE="src/PTL.InternalWeb/Dockerfile"
+              ECR_REPOSITORY="${ECR_INTERNAL_REPOSITORY}"
+              ;;
+            externalweb)
+              DOCKERFILE="src/PTL.ExternalWeb/Dockerfile"
+              ECR_REPOSITORY="${ECR_EXTERNAL_REPOSITORY}"
+              ;;
+            *)
+              echo "::error::Unsupported component: ${{ matrix.component }}"
+              exit 1
+              ;;
+          esac
+
+          test -n "${ECR_REPOSITORY}" || {
+            echo "::error::No ECR repository is configured for ${{ matrix.component }}."
+            exit 1
+          }
+
+          EXPECTED_ROLE_PREFIX="arn:aws:iam::${EXPECTED_AWS_ACCOUNT_ID}:role/"
+          [[ "${AWS_ROLE_ARN}" == "${EXPECTED_ROLE_PREFIX}"* ]] || {
+            echo "::error::AWS_OIDC_ROLE_ARN must reference account ${EXPECTED_AWS_ACCOUNT_ID}."
+            exit 1
+          }
+
+          {
+            echo "dockerfile=${DOCKERFILE}"
+            echo "ecr_repository=${ECR_REPOSITORY}"
+          } >> "${GITHUB_OUTPUT}"
+
+      - name: Build release container
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker buildx build \
+            --file "${{ steps.component.outputs.dockerfile }}" \
+            --tag "ptl-${{ matrix.component }}:${GITHUB_SHA}" \
+            --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
+            --label "org.opencontainers.image.source=https://github.com/${GITHUB_REPOSITORY}" \
+            --load \
+            .
+
+      - name: Display OIDC claims for troubleshooting
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          RESPONSE="$(curl --silent --show-error --fail \
+            --header "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
+            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=sts.amazonaws.com")"
+
+          TOKEN="$(echo "${RESPONSE}" | jq -er '.value')"
+          PAYLOAD="$(echo "${TOKEN}" | cut -d '.' -f 2)"
+
+          TOKEN_PAYLOAD="${PAYLOAD}" python3 - <<'PY'
+          import base64
+          import json
+          import os
+
+          payload = os.environ["TOKEN_PAYLOAD"]
+          payload += "=" * (-len(payload) % 4)
+          claims = json.loads(base64.urlsafe_b64decode(payload))
+
+          for key in [
+              "aud",
+              "sub",
+              "repository",
+              "repository_owner_id",
+              "repository_id",
+              "ref",
+              "event_name",
+              "environment",
+          ]:
+              print(f"{key}={claims.get(key)}")
+          PY
+
+      - name: Configure AWS credentials through OIDC
+        uses: aws-actions/configure-aws-credentials@v6.2.4
         with:
-          project-dir: src/PTL.Api
-          test-project: tests/PTL.Api.Tests/PTL.Api.Tests.csproj
-          dockerfile: src/PTL.Api/Dockerfile
-          ecr-repository: alpha/ptlapi
-          git-tag-prefix: api
-          cache-scope: ptl-api
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
-          aws-role-arn: ${{ env.AWS_ROLE_ARN }}
+          role-session-name: ptl-${{ matrix.component }}-${{ github.run_id }}
+          role-duration-seconds: 900
+          audience: sts.amazonaws.com
+          allowed-account-ids: ${{ env.EXPECTED_AWS_ACCOUNT_ID }}
 
-  # ---------------------------------------------------------------------
-  # PTL.InternalWeb -> alpha/ptlinternal
-  # ---------------------------------------------------------------------
-  build-internalweb:
-    needs: changes
-    if: needs.changes.outputs.internalweb == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
+      - name: Verify ECR repository
+        shell: bash
+        run: |
+          set -euo pipefail
+          aws ecr describe-repositories \
+            --repository-names "${{ steps.component.outputs.ecr_repository }}" \
+            --region "${AWS_REGION}" \
+            --query 'repositories[0].repositoryUri' \
+            --output text
+
+      - name: Log in to Amazon ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2.1.6
         with:
-          fetch-depth: 0
+          mask-password: true
 
-      - uses: ./.github/actions/build-test-publish
-        with:
-          project-dir: src/PTL.InternalWeb
-          test-project: tests/PTL.InternalWeb.Tests/PTL.InternalWeb.Tests.csproj
-          dockerfile: src/PTL.InternalWeb/Dockerfile
-          ecr-repository: alpha/ptlinternal
-          git-tag-prefix: internalweb
-          cache-scope: ptl-internalweb
-          aws-region: ${{ env.AWS_REGION }}
-          aws-role-arn: ${{ env.AWS_ROLE_ARN }}
+      - name: Publish immutable image tag
+        id: image
+        shell: bash
+        env:
+          ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+        run: |
+          set -euo pipefail
+          IMAGE_TAG="sha-${GITHUB_SHA::12}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          IMAGE_URI="${ECR_REGISTRY}/${{ steps.component.outputs.ecr_repository }}:${IMAGE_TAG}"
 
-  # ---------------------------------------------------------------------
-  # PTL.ExternalWeb -> alpha/ptlexternal
-  # ---------------------------------------------------------------------
-  build-externalweb:
-    needs: changes
-    if: needs.changes.outputs.externalweb == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+          docker tag "ptl-${{ matrix.component }}:${GITHUB_SHA}" "${IMAGE_URI}"
+          docker push "${IMAGE_URI}"
 
-      - uses: ./.github/actions/build-test-publish
-        with:
-          project-dir: src/PTL.ExternalWeb
-          test-project: tests/PTL.ExternalWeb.Tests/PTL.ExternalWeb.Tests.csproj
-          dockerfile: src/PTL.ExternalWeb/Dockerfile
-          ecr-repository: alpha/ptlexternal
-          git-tag-prefix: externalweb
-          cache-scope: ptl-externalweb
-          aws-region: ${{ env.AWS_REGION }}
-          aws-role-arn: ${{ env.AWS_ROLE_ARN }}
+          IMAGE_DIGEST="$(aws ecr describe-images \
+            --repository-name "${{ steps.component.outputs.ecr_repository }}" \
+            --image-ids imageTag="${IMAGE_TAG}" \
+            --query 'imageDetails[0].imageDigest' \
+            --output text)"
 
-  # ---------------------------------------------------------------------
-  # Required PR status check. Individual build jobs are legitimately
-  # skipped on PRs that don't touch that project, so `gate` is the only
-  # job branch protection should require — it always reports a result.
-  # ---------------------------------------------------------------------
+          {
+            echo "image_uri=${IMAGE_URI}"
+            echo "image_digest=${IMAGE_DIGEST}"
+          } >> "${GITHUB_OUTPUT}"
+
+      - name: Write publishing summary
+        shell: bash
+        run: |
+          {
+            echo "### PT-LIMS ${{ matrix.component }} image published"
+            echo
+            echo "- Image: \`${{ steps.image.outputs.image_uri }}\`"
+            echo "- Digest: \`${{ steps.image.outputs.image_digest }}\`"
+            echo "- Commit: \`${GITHUB_SHA}\`"
+          } >> "${GITHUB_STEP_SUMMARY}"
+
   gate:
-    needs: [lint, sonarcloud, build-api, build-internalweb, build-externalweb]
+    name: CI gate
+    needs: [changes, quality, sonarcloud, container-validation, publish]
     if: always()
     runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      CHANGES_RESULT: ${{ needs.changes.result }}
+      QUALITY_RESULT: ${{ needs.quality.result }}
+      SONAR_RESULT: ${{ needs.sonarcloud.result }}
+      CONTAINER_RESULT: ${{ needs.container-validation.result }}
+      PUBLISH_RESULT: ${{ needs.publish.result }}
+      COMPONENTS: ${{ needs.changes.outputs.components }}
+      SONAR_ENABLED: ${{ vars.SONAR_ENABLED }}
+      EVENT_NAME: ${{ github.event_name }}
     steps:
-      - run: |
-          if [[ "${{ contains(needs.*.result, 'failure') }}" == "true" ]]; then
+      - name: Enforce required results
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          [[ "${CHANGES_RESULT}" == "success" ]] || {
+            echo "::error::Change detection result: ${CHANGES_RESULT}"
+            exit 1
+          }
+
+          [[ "${QUALITY_RESULT}" == "success" ]] || {
+            echo "::error::Quality result: ${QUALITY_RESULT}"
+            exit 1
+          }
+
+          if [[ "${SONAR_ENABLED}" == "true" && "${SONAR_RESULT}" != "success" ]]; then
+            echo "::error::SonarCloud is enabled but result is ${SONAR_RESULT}."
             exit 1
           fi
+
+          if [[ "${COMPONENTS}" != "[]" && "${CONTAINER_RESULT}" != "success" ]]; then
+            echo "::error::Container validation result: ${CONTAINER_RESULT}"
+            exit 1
+          fi
+
+          if [[ "${EVENT_NAME}" == "push" && "${COMPONENTS}" != "[]" && "${PUBLISH_RESULT}" != "success" ]]; then
+            echo "::error::Image publishing result: ${PUBLISH_RESULT}"
+            exit 1
+          fi
+
+          echo "All required CI checks passed."
