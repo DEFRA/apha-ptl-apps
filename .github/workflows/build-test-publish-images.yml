@@ -215,7 +215,7 @@ jobs:
       matrix:
         component: ${{ fromJSON(needs.changes.outputs.components) }}
     env:
-      AWS_ROLE_ARN: "arn:aws:iam::783559591987:role/github_actions_pipeline_ecr_role"
+      AWS_ROLE_ARN: ${{ vars.AWS_OIDC_ROLE_ARN }}
       ECR_API_REPOSITORY: apha/ptlapi
       ECR_INTERNAL_REPOSITORY: apha/ptlinternal
       ECR_EXTERNAL_REPOSITORY: apha/ptlexternal
@@ -324,8 +324,8 @@ jobs:
       - name: Configure AWS credentials through OIDC
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: "arn:aws:iam::783559591987:role/github_actions_pipeline_ecr_role"
-          aws-region: "eu-west-2"
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
           role-session-name: ptl-exr-${{ github.run_id }}-${{ matrix.component }}
           audience: sts.amazonaws.com
           
