@@ -39,6 +39,8 @@ app.UseStaticFiles();
 
 app.UseRouting();
 
+app.MapHealthEndpoints();
+
 app.UseAuthentication();
 app.UseAuthorization();
 

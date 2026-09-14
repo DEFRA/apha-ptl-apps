@@ -10,4 +10,10 @@
     <PackageReference Include="Microsoft.Extensions.Http.Resilience" Version="10.9.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Needed for ASP.NET Core types (IHealthCheck, IEndpointFilter, WebApplication, ...) used by
+         the shared health-check plumbing below - this is a plain class library, not Sdk.Web. -->
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
 </Project>

@@ -1,9 +1,9 @@
 using System.Net;
 using System.Net.Http.Json;
 using Microsoft.AspNetCore.Mvc.Testing;
-using PTL.Api.Features.Health;
+using PTL.ApiClient;
 
-namespace PTL.Api.Tests.Endpoints;
+namespace PTL.InternalWeb.Tests.Integration;
 
 public class HealthEndpointsTests : IClassFixture<WebApplicationFactory<Program>>
 {
@@ -12,17 +12,6 @@ public class HealthEndpointsTests : IClassFixture<WebApplicationFactory<Program>
     public HealthEndpointsTests(WebApplicationFactory<Program> factory)
     {
         _factory = factory;
-    }
-
-    [Fact]
-    public async Task Root_ReturnsHelloWorld()
-    {
-        var client = _factory.CreateClient();
-
-        var response = await client.GetAsync("/");
-
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.Equal("Hello World!", await response.Content.ReadAsStringAsync());
     }
 
     [Fact]
@@ -36,7 +25,6 @@ public class HealthEndpointsTests : IClassFixture<WebApplicationFactory<Program>
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.NotNull(body);
         Assert.Equal("Healthy", body!.Status);
-        Assert.True(body.UptimeSeconds >= 0);
     }
 
     [Fact]
@@ -60,25 +48,8 @@ public class HealthEndpointsTests : IClassFixture<WebApplicationFactory<Program>
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
-    [Fact]
-    public async Task HealthReady_ProbesDatabase_WhenKeyCorrect()
-    {
-        // No real SQL Server is available in this test environment, so this
-        // only asserts the key check let the request through to the DB probe
-        // (503 Unhealthy), not that connectivity succeeds - see
-        // DatabaseHealthCheckTests for the health-check logic itself.
-        var client = _factory.CreateClient();
-        client.DefaultRequestHeaders.Add(ReadinessKeyFilter.HeaderName, "local-dev-readiness-key");
-
-        var response = await client.GetAsync("/health/ready");
-
-        Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
-    }
-
     private sealed class HealthResponse
     {
         public string? Status { get; set; }
-        public double UptimeSeconds { get; set; }
-        public DateTime TimestampUtc { get; set; }
     }
 }

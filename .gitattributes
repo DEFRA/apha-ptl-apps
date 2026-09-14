@@ -1,0 +1,10 @@
+# Normalize line endings in the repository regardless of the author's OS/editor
+# settings (Windows editors/tools default to CRLF, macOS/Linux to LF) - git
+# converts to LF on stage/commit and checks files out as LF on every platform,
+# so `git diff` never shows a file as fully rewritten just from a CRLF/LF swap.
+* text=auto eol=lf
+
+# Diffs/merges on these binary-ish vendor assets are meaningless; skip them
+*.png binary
+*.jpg binary
+*.ico binary

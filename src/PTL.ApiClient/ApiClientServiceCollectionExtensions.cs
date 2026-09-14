@@ -19,6 +19,9 @@ public static class ApiClientServiceCollectionExtensions
         })
             .AddStandardResilienceHandler();
 
+        services.AddHealthChecks()
+            .AddCheck<ApiConnectivityHealthCheck>("api-connectivity");
+
         return services;
     }
 }
