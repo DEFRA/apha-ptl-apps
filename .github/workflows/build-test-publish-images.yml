@@ -15,9 +15,7 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
-  DOTNET_VERSION: 10.0.x
-  AWS_REGION: ${{ vars.AWS_REGION }}
-  AWS_ROLE_ARN: ${{ vars.AWS_OIDC_ROLE_ARN }}
+  DOTNET_VERSION: "10.0.x"
 
 jobs:
   changes:
@@ -130,6 +128,7 @@ jobs:
         run: dotnet tool restore
 
       - name: Analyse solution
+        shell: bash
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: |
@@ -215,14 +214,15 @@ jobs:
       matrix:
         component: ${{ fromJSON(needs.changes.outputs.components) }}
     env:
-      AWS_ROLE_ARN: ${{secrets.AWS_ENV_OIDC_ROLE}}
-      ECR_API_REPOSITORY: ${{vars.ECR_API_REPOSITORY}}
-      ECR_INTERNAL_REPOSITORY: ${{vars.ECR_INTERNAL_REPOSITORY}}
-      ECR_EXTERNAL_REPOSITORY: ${{vars.ECR_EXTERNAL_REPOSITORY}}
-      EXPECTED_AWS_ACCOUNT_ID: ${{secrets.AWS_ENV_ACCOUNT}}
-      AWS_REGION: ${{secrets.AWS_ENV_REGION}}
-      
-      
+      AWS_REGION: ${{ secrets.AWS_ENV_REGION }}
+      AWS_ROLE_ARN: arn:aws:iam::${{ secrets.AWS_ENV_ACCOUNT }}:role/${{ secrets.AWS_ENV_OIDC_ROLE }}
+      EXPECTED_AWS_ACCOUNT_ID: ${{ vars.EXPECTED_AWS_ACCOUNT_ID }}
+      EXPECTED_AWS_REGION: ${{ vars.EXPECTED_AWS_REGION }}
+      ECR_API_REPOSITORY: ${{ vars.ECR_API_REPOSITORY }}
+      ECR_INTERNAL_REPOSITORY: ${{ vars.ECR_INTERNAL_REPOSITORY }}
+      ECR_EXTERNAL_REPOSITORY: ${{ vars.ECR_EXTERNAL_REPOSITORY }}
+     
+     
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7.0.1
@@ -235,8 +235,20 @@ jobs:
         run: |
           set -euo pipefail
 
-          test -n "${AWS_ROLE_ARN}" || {
-            echo "::error::Environment variable AWS_OIDC_ROLE_ARN is not configured."
+          test -n "${EXPECTED_AWS_ACCOUNT_ID}" || {
+            echo "::error::Repository variable EXPECTED_AWS_ACCOUNT_ID is not configured."
+            exit 1
+          }
+          test -n "${EXPECTED_AWS_REGION}" || {
+            echo "::error::Repository variable EXPECTED_AWS_REGION is not configured."
+            exit 1
+          }
+          [[ "${EXPECTED_AWS_ACCOUNT_ID}" =~ ^[0-9]{12}$ ]] || {
+            echo "::error::EXPECTED_AWS_ACCOUNT_ID must contain exactly 12 digits."
+            exit 1
+          }
+          [[ "${AWS_REGION}" == "${EXPECTED_AWS_REGION}" ]] || {
+            echo "::error::AWS_ENV_REGION does not match EXPECTED_AWS_REGION."
             exit 1
           }
 
@@ -265,8 +277,8 @@ jobs:
           }
 
           EXPECTED_ROLE_PREFIX="arn:aws:iam::${EXPECTED_AWS_ACCOUNT_ID}:role/"
-          [[ "${AWS_ROLE_ARN}" == "${EXPECTED_ROLE_PREFIX}"* ]] || {
-            echo "::error::AWS_OIDC_ROLE_ARN must reference account ${EXPECTED_AWS_ACCOUNT_ID}."
+          [[ "${AWS_ROLE_ARN}" == "${EXPECTED_ROLE_PREFIX}"* && "${AWS_ROLE_ARN}" != "${EXPECTED_ROLE_PREFIX}" ]] || {
+            echo "::error::Check AWS_ENV_ACCOUNT and AWS_ENV_OIDC_ROLE; the role ARN must reference the expected account and include a role name."
             exit 1
           }
 
@@ -324,11 +336,21 @@ jobs:
       - name: Configure AWS credentials through OIDC
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: "arn:aws:iam::783559591987:role/github_actions_pipeline_ecr_role"
-          aws-region: "eu-west-2"
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
           role-session-name: ptl-exr-${{ github.run_id }}-${{ matrix.component }}
           audience: sts.amazonaws.com
-      
+     
+
+      - name: Verify assumed AWS account
+        shell: bash
+        run: |
+          set -euo pipefail
+          ACTUAL_ACCOUNT_ID="$(aws sts get-caller-identity --query Account --output text)"
+          [[ "${ACTUAL_ACCOUNT_ID}" == "${EXPECTED_AWS_ACCOUNT_ID}" ]] || {
+            echo "::error::The assumed AWS account does not match EXPECTED_AWS_ACCOUNT_ID."
+            exit 1
+          }
 
       - name: Log in to Amazon ECR
         id: ecr-login
