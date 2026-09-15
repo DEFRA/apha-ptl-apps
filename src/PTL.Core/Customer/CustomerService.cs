@@ -5,6 +5,60 @@ namespace PTL.Core.Customer;
 
 public sealed class CustomerService(ICustomerRepository customerRepository, ILogger<CustomerService> logger) : ICustomerService
 {
+    private static readonly Action<ILogger, string?, CustomerStatusFilter, int, int, int, Exception?> LogCustomerSearchMessage =
+        LoggerMessage.Define<string?, CustomerStatusFilter, int, int, int>(
+            LogLevel.Information,
+            new EventId(1, nameof(LogCustomerSearchMessage)),
+            "Customer search: searchTerm={SearchTerm} status={Status} page={Page} pageSize={PageSize} totalResults={TotalCount}");
+
+    private static readonly Action<ILogger, Guid, string, Exception?> LogCreatedCustomerMessage =
+        LoggerMessage.Define<Guid, string>(
+            LogLevel.Information,
+            new EventId(2, nameof(LogCreatedCustomerMessage)),
+            "Created customer {CustomerId} ({QalNumber})");
+
+    private static readonly Action<ILogger, Guid, Exception?> LogUpdateUnknownCustomerMessage =
+        LoggerMessage.Define<Guid>(
+            LogLevel.Warning,
+            new EventId(3, nameof(LogUpdateUnknownCustomerMessage)),
+            "Update requested for unknown customer {CustomerId}");
+
+    private static readonly Action<ILogger, Guid, string, Exception?> LogUpdatedCustomerMessage =
+        LoggerMessage.Define<Guid, string>(
+            LogLevel.Information,
+            new EventId(4, nameof(LogUpdatedCustomerMessage)),
+            "Updated customer {CustomerId} ({QalNumber})");
+
+    private static readonly Action<ILogger, Guid, Exception?> LogDeactivateUnknownCustomerMessage =
+        LoggerMessage.Define<Guid>(
+            LogLevel.Warning,
+            new EventId(5, nameof(LogDeactivateUnknownCustomerMessage)),
+            "Deactivate requested for unknown customer {CustomerId}");
+
+    private static readonly Action<ILogger, Guid, string, Guid, Exception?> LogDeactivatedCustomerMessage =
+        LoggerMessage.Define<Guid, string, Guid>(
+            LogLevel.Information,
+            new EventId(6, nameof(LogDeactivatedCustomerMessage)),
+            "Deactivated customer {CustomerId} ({QalNumber}) with status {CustomerStatusId}");
+
+    private static readonly Action<ILogger, Guid, Exception?> LogReactivateUnknownCustomerMessage =
+        LoggerMessage.Define<Guid>(
+            LogLevel.Warning,
+            new EventId(7, nameof(LogReactivateUnknownCustomerMessage)),
+            "Reactivate requested for unknown customer {CustomerId}");
+
+    private static readonly Action<ILogger, Guid, string, Exception?> LogReactivatedCustomerMessage =
+        LoggerMessage.Define<Guid, string>(
+            LogLevel.Information,
+            new EventId(8, nameof(LogReactivatedCustomerMessage)),
+            "Reactivated customer {CustomerId} ({QalNumber})");
+
+    private static readonly Action<ILogger, Guid, string, Exception?> LogCustomerValidationFailedMessage =
+        LoggerMessage.Define<Guid, string>(
+            LogLevel.Warning,
+            new EventId(9, nameof(LogCustomerValidationFailedMessage)),
+            "Customer validation failed for {CustomerId}: {Errors}");
+
     public Task<Customer?> GetCustomerAsync(Guid customerId, CancellationToken cancellationToken = default) =>
         customerRepository.GetByIdAsync(customerId, cancellationToken);
 
@@ -29,9 +83,7 @@ public sealed class CustomerService(ICustomerRepository customerRepository, ILog
         var totalCount = filtered.Count;
         var page1 = filtered.Skip((page - 1) * pageSize).Take(pageSize).ToList();
 
-        logger.LogInformation(
-            "Customer search: searchTerm={SearchTerm} status={Status} page={Page} pageSize={PageSize} totalResults={TotalCount}",
-            searchTerm, status, page, pageSize, totalCount);
+        LogCustomerSearchMessage(logger, searchTerm, status, page, pageSize, totalCount, null);
 
         return new CustomerSearchResult(page1, totalCount);
     }
@@ -47,7 +99,7 @@ public sealed class CustomerService(ICustomerRepository customerRepository, ILog
         Validate(customer);
 
         var created = await customerRepository.CreateAsync(customer, cancellationToken);
-        logger.LogInformation("Created customer {CustomerId} ({QalNumber})", created.CustomerId, created.QalNumber);
+        LogCreatedCustomerMessage(logger, created.CustomerId, created.QalNumber, null);
         return created;
     }
 
@@ -56,7 +108,7 @@ public sealed class CustomerService(ICustomerRepository customerRepository, ILog
         var existing = await customerRepository.GetByIdAsync(customerId, cancellationToken);
         if (existing is null)
         {
-            logger.LogWarning("Update requested for unknown customer {CustomerId}", customerId);
+            LogUpdateUnknownCustomerMessage(logger, customerId, null);
             return null;
         }
 
@@ -70,7 +122,7 @@ public sealed class CustomerService(ICustomerRepository customerRepository, ILog
         Validate(updatedFields);
 
         var updated = await customerRepository.UpdateAsync(updatedFields, cancellationToken);
-        logger.LogInformation("Updated customer {CustomerId} ({QalNumber})", customerId, updatedFields.QalNumber);
+        LogUpdatedCustomerMessage(logger, customerId, updatedFields.QalNumber, null);
         return updated;
     }
 
@@ -79,7 +131,7 @@ public sealed class CustomerService(ICustomerRepository customerRepository, ILog
         var existing = await customerRepository.GetByIdAsync(customerId, cancellationToken);
         if (existing is null)
         {
-            logger.LogWarning("Deactivate requested for unknown customer {CustomerId}", customerId);
+            LogDeactivateUnknownCustomerMessage(logger, customerId, null);
             return null;
         }
 
@@ -90,7 +142,7 @@ public sealed class CustomerService(ICustomerRepository customerRepository, ILog
         Validate(existing);
 
         var updated = await customerRepository.UpdateAsync(existing, cancellationToken);
-        logger.LogInformation("Deactivated customer {CustomerId} ({QalNumber}) with status {CustomerStatusId}", customerId, existing.QalNumber, customerStatusId);
+        LogDeactivatedCustomerMessage(logger, customerId, existing.QalNumber, customerStatusId, null);
         return updated;
     }
 
@@ -99,7 +151,7 @@ public sealed class CustomerService(ICustomerRepository customerRepository, ILog
         var existing = await customerRepository.GetByIdAsync(customerId, cancellationToken);
         if (existing is null)
         {
-            logger.LogWarning("Reactivate requested for unknown customer {CustomerId}", customerId);
+            LogReactivateUnknownCustomerMessage(logger, customerId, null);
             return null;
         }
 
@@ -109,7 +161,7 @@ public sealed class CustomerService(ICustomerRepository customerRepository, ILog
         Validate(existing);
 
         var updated = await customerRepository.UpdateAsync(existing, cancellationToken);
-        logger.LogInformation("Reactivated customer {CustomerId} ({QalNumber})", customerId, existing.QalNumber);
+        LogReactivatedCustomerMessage(logger, customerId, existing.QalNumber, null);
         return updated;
     }
 
@@ -135,7 +187,7 @@ public sealed class CustomerService(ICustomerRepository customerRepository, ILog
         var result = CustomerValidator.Validate(customer);
         if (!result.IsValid)
         {
-            logger.LogWarning("Customer validation failed for {CustomerId}: {Errors}", customer.CustomerId, string.Join("; ", result.Errors.Select(e => e.Message)));
+            LogCustomerValidationFailedMessage(logger, customer.CustomerId, string.Join("; ", result.Errors.Select(e => e.Message)), null);
             throw new CustomerValidationException(result.Errors);
         }
     }

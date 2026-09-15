@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 
 namespace PTL.Api.Infrastructure;
 
@@ -9,9 +10,15 @@ namespace PTL.Api.Infrastructure;
 // leak stack traces in non-Development environments.
 public sealed class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logger) : IExceptionHandler
 {
+    private static readonly Action<ILogger, string, string, Exception?> LogUnhandledExceptionMessage =
+        LoggerMessage.Define<string, string>(
+            LogLevel.Error,
+            new EventId(1, nameof(LogUnhandledExceptionMessage)),
+            "Unhandled exception processing {Method} {Path}");
+
     public async ValueTask<bool> TryHandleAsync(HttpContext httpContext, Exception exception, CancellationToken cancellationToken)
     {
-        logger.LogError(exception, "Unhandled exception processing {Method} {Path}", httpContext.Request.Method, httpContext.Request.Path);
+        LogUnhandledExceptionMessage(logger, httpContext.Request.Method, httpContext.Request.Path.ToString(), exception);
 
         httpContext.Response.StatusCode = StatusCodes.Status500InternalServerError;
         await httpContext.Response.WriteAsJsonAsync(new ProblemDetails

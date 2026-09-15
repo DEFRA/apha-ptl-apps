@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 using PTL.Contracts.Customer;
 using PTL.Core.Customer;
 
@@ -8,6 +9,24 @@ namespace PTL.Api.Controllers;
 [Route("api/customers")]
 public sealed class CustomerController(ICustomerService customerService, ILogger<CustomerController> logger) : ControllerBase
 {
+    private static readonly Action<ILogger, Guid, Exception?> LogCustomerNotFoundMessage =
+        LoggerMessage.Define<Guid>(
+            LogLevel.Information,
+            new EventId(1, nameof(LogCustomerNotFoundMessage)),
+            "Customer {CustomerId} not found");
+
+    private static readonly Action<ILogger, Guid, Exception?> LogDeactivateUnknownCustomerMessage =
+        LoggerMessage.Define<Guid>(
+            LogLevel.Information,
+            new EventId(2, nameof(LogDeactivateUnknownCustomerMessage)),
+            "Deactivate requested for unknown customer {CustomerId}");
+
+    private static readonly Action<ILogger, Guid, Exception?> LogReactivateUnknownCustomerMessage =
+        LoggerMessage.Define<Guid>(
+            LogLevel.Information,
+            new EventId(3, nameof(LogReactivateUnknownCustomerMessage)),
+            "Reactivate requested for unknown customer {CustomerId}");
+
     // GET /api/customers?status=Active|Inactive|All - defaults to Active to match the legacy CustomerList.aspx default filter.
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<CustomerSummaryResponse>>> GetCustomers(
@@ -24,7 +43,7 @@ public sealed class CustomerController(ICustomerService customerService, ILogger
         var customer = await customerService.GetCustomerAsync(customerId, cancellationToken);
         if (customer is null)
         {
-            logger.LogInformation("Customer {CustomerId} not found", customerId);
+            LogCustomerNotFoundMessage(logger, customerId, null);
             return NotFound();
         }
 
@@ -80,7 +99,7 @@ public sealed class CustomerController(ICustomerService customerService, ILogger
             var updated = await customerService.DeactivateCustomerAsync(customerId, request.CustomerStatusId, cancellationToken);
             if (updated is null)
             {
-                logger.LogInformation("Deactivate requested for unknown customer {CustomerId}", customerId);
+                LogDeactivateUnknownCustomerMessage(logger, customerId, null);
                 return NotFound();
             }
 
@@ -101,7 +120,7 @@ public sealed class CustomerController(ICustomerService customerService, ILogger
             var updated = await customerService.ReactivateCustomerAsync(customerId, cancellationToken);
             if (updated is null)
             {
-                logger.LogInformation("Reactivate requested for unknown customer {CustomerId}", customerId);
+                LogReactivateUnknownCustomerMessage(logger, customerId, null);
                 return NotFound();
             }
 

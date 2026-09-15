@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 using PTL.ApiClient;
 using PTL.Contracts.Customer;
 
@@ -8,6 +9,66 @@ namespace PTL.InternalWeb.Features.Customer;
 // already authenticated with full access to Customer functionality. Policies will be added later.
 public class CustomerController(ICustomerApiClient customerApiClient, ILogger<CustomerController> logger) : Controller
 {
+    private static readonly Action<ILogger, string?, CustomerStatusFilter, int, int, Exception?> LogDisplayedCustomerListMessage =
+        LoggerMessage.Define<string?, CustomerStatusFilter, int, int>(
+            LogLevel.Information,
+            new EventId(1, nameof(LogDisplayedCustomerListMessage)),
+            "Displayed customer list: searchTerm={SearchTerm} status={Status} page={Page} totalResults={TotalCount}");
+
+    private static readonly Action<ILogger, Guid, Exception?> LogCustomerNotFoundMessage =
+        LoggerMessage.Define<Guid>(
+            LogLevel.Information,
+            new EventId(2, nameof(LogCustomerNotFoundMessage)),
+            "Customer {CustomerId} not found");
+
+    private static readonly Action<ILogger, string, Exception?> LogCreateFailedMessage =
+        LoggerMessage.Define<string>(
+            LogLevel.Warning,
+            new EventId(3, nameof(LogCreateFailedMessage)),
+            "Create failed for customer {Name}");
+
+    private static readonly Action<ILogger, Guid, Exception?> LogCreatedCustomerMessage =
+        LoggerMessage.Define<Guid>(
+            LogLevel.Information,
+            new EventId(4, nameof(LogCreatedCustomerMessage)),
+            "Created customer {CustomerId}");
+
+    private static readonly Action<ILogger, Guid, Exception?> LogUpdateFailedMessage =
+        LoggerMessage.Define<Guid>(
+            LogLevel.Warning,
+            new EventId(5, nameof(LogUpdateFailedMessage)),
+            "Update failed for customer {CustomerId}");
+
+    private static readonly Action<ILogger, Guid, Exception?> LogUpdatedCustomerMessage =
+        LoggerMessage.Define<Guid>(
+            LogLevel.Information,
+            new EventId(6, nameof(LogUpdatedCustomerMessage)),
+            "Updated customer {CustomerId}");
+
+    private static readonly Action<ILogger, Guid, Exception?> LogDeactivateFailedMessage =
+        LoggerMessage.Define<Guid>(
+            LogLevel.Warning,
+            new EventId(7, nameof(LogDeactivateFailedMessage)),
+            "Deactivate failed for customer {CustomerId}");
+
+    private static readonly Action<ILogger, Guid, Exception?> LogDeactivatedCustomerMessage =
+        LoggerMessage.Define<Guid>(
+            LogLevel.Information,
+            new EventId(8, nameof(LogDeactivatedCustomerMessage)),
+            "Deactivated customer {CustomerId}");
+
+    private static readonly Action<ILogger, Guid, Exception?> LogReactivateFailedMessage =
+        LoggerMessage.Define<Guid>(
+            LogLevel.Warning,
+            new EventId(9, nameof(LogReactivateFailedMessage)),
+            "Reactivate failed for customer {CustomerId}");
+
+    private static readonly Action<ILogger, Guid, Exception?> LogReactivatedCustomerMessage =
+        LoggerMessage.Define<Guid>(
+            LogLevel.Information,
+            new EventId(10, nameof(LogReactivatedCustomerMessage)),
+            "Reactivated customer {CustomerId}");
+
     public async Task<IActionResult> Index(
         string? searchTerm,
         CustomerStatusFilter status = CustomerStatusFilter.Active,
@@ -16,7 +77,7 @@ public class CustomerController(ICustomerApiClient customerApiClient, ILogger<Cu
         CancellationToken cancellationToken = default)
     {
         var result = await customerApiClient.SearchCustomersAsync(new CustomerSearchRequest(searchTerm, status, page, pageSize), cancellationToken);
-        logger.LogInformation("Displayed customer list: searchTerm={SearchTerm} status={Status} page={Page} totalResults={TotalCount}", searchTerm, status, page, result.TotalCount);
+        LogDisplayedCustomerListMessage(logger, searchTerm, status, page, result.TotalCount, null);
         return View(new CustomerListViewModel(searchTerm, status, result.Page, result.PageSize, result.TotalCount, result.Items));
     }
 
@@ -25,7 +86,7 @@ public class CustomerController(ICustomerApiClient customerApiClient, ILogger<Cu
         var customer = await customerApiClient.GetCustomerAsync(id, cancellationToken);
         if (customer is null)
         {
-            logger.LogInformation("Customer {CustomerId} not found", id);
+            LogCustomerNotFoundMessage(logger, id, null);
             return NotFound();
         }
 
@@ -50,12 +111,12 @@ public class CustomerController(ICustomerApiClient customerApiClient, ILogger<Cu
         var result = await customerApiClient.CreateCustomerAsync(ToCreateRequest(model), cancellationToken);
         if (!result.Success)
         {
-            logger.LogWarning("Create failed for customer {Name}", model.Name);
+            LogCreateFailedMessage(logger, model.Name, null);
             AddErrors(result.FieldErrors);
             return View(model);
         }
 
-        logger.LogInformation("Created customer {CustomerId}", result.Customer!.CustomerId);
+        LogCreatedCustomerMessage(logger, result.Customer!.CustomerId, null);
         return RedirectToAction(nameof(Details), new { id = result.Customer!.CustomerId });
     }
 
@@ -78,12 +139,12 @@ public class CustomerController(ICustomerApiClient customerApiClient, ILogger<Cu
         var result = await customerApiClient.UpdateCustomerAsync(id, ToUpdateRequest(model), cancellationToken);
         if (!result.Success)
         {
-            logger.LogWarning("Update failed for customer {CustomerId}", id);
+            LogUpdateFailedMessage(logger, id, null);
             AddErrors(result.FieldErrors);
             return View(model);
         }
 
-        logger.LogInformation("Updated customer {CustomerId}", id);
+        LogUpdatedCustomerMessage(logger, id, null);
         return RedirectToAction(nameof(Details), new { id });
     }
 
@@ -112,13 +173,13 @@ public class CustomerController(ICustomerApiClient customerApiClient, ILogger<Cu
         var result = await customerApiClient.DeactivateCustomerAsync(id, model.CustomerStatusId!.Value, cancellationToken);
         if (!result.Success)
         {
-            logger.LogWarning("Deactivate failed for customer {CustomerId}", id);
+            LogDeactivateFailedMessage(logger, id, null);
             AddErrors(result.FieldErrors);
             model.CustomerId = id;
             return View(model);
         }
 
-        logger.LogInformation("Deactivated customer {CustomerId}", id);
+        LogDeactivatedCustomerMessage(logger, id, null);
         return RedirectToAction(nameof(Details), new { id });
     }
 
@@ -129,13 +190,13 @@ public class CustomerController(ICustomerApiClient customerApiClient, ILogger<Cu
         var result = await customerApiClient.ReactivateCustomerAsync(id, cancellationToken);
         if (!result.Success)
         {
-            logger.LogWarning("Reactivate failed for customer {CustomerId}", id);
+            LogReactivateFailedMessage(logger, id, null);
             return result.Customer is null && result.FieldErrors.ContainsKey(string.Empty)
                 ? NotFound()
                 : RedirectToAction(nameof(Details), new { id });
         }
 
-        logger.LogInformation("Reactivated customer {CustomerId}", id);
+        LogReactivatedCustomerMessage(logger, id, null);
         return RedirectToAction(nameof(Details), new { id });
     }
 
