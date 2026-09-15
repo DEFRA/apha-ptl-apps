@@ -328,16 +328,7 @@ jobs:
           aws-region: "eu-west-2"
           role-session-name: ptl-exr-${{ github.run_id }}-${{ matrix.component }}
           audience: sts.amazonaws.com
-          
-      - name: Verify ECR repository
-        shell: bash
-        run: |
-          set -euo pipefail
-          aws ecr describe-repositories \
-            --repository-names "${{ steps.component.outputs.ecr_repository }}" \
-            --region "${AWS_REGION}" \
-            --query 'repositories[0].repositoryUri' \
-            --output text
+      
 
       - name: Log in to Amazon ECR
         id: ecr-login
