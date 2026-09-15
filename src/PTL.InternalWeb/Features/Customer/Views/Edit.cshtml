@@ -1,0 +1,18 @@
+@model PTL.InternalWeb.Features.Customer.CustomerFormViewModel
+@{
+    ViewData["Title"] = $"Edit customer - {Model.Name}";
+}
+
+<a class="govuk-back-link" asp-action="Details" asp-route-id="@Model.CustomerId">Back to customer</a>
+
+<h1 class="govuk-heading-l">Edit customer</h1>
+
+<form method="post" asp-action="Edit" asp-route-id="@Model.CustomerId" novalidate>
+    @await Html.PartialAsync("_CustomerForm", Model)
+
+    <button class="govuk-button" data-module="govuk-button" type="submit">Save changes</button>
+</form>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

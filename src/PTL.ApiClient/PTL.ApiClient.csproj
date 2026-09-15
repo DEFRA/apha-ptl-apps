@@ -16,4 +16,8 @@
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\PTL.Contracts\PTL.Contracts.csproj" />
+  </ItemGroup>
+
 </Project>
