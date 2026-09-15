@@ -181,6 +181,26 @@ jobs:
               ;;
           esac
 
+      # Compatibility workaround: update only the runner's checked-out Dockerfile.
+      - name: Remove unsupported NuGet cache mounts
+        shell: pwsh
+        run: |
+          $dockerfile = "${{ steps.component.outputs.dockerfile }}"
+          $content = [System.IO.File]::ReadAllText($dockerfile)
+          $pattern = '(?m)^(\s*RUN[ \t]+)--mount=type=cache,target=/root/\.nuget/packages[ \t]+'
+          $updated = [regex]::Replace($content, $pattern, '$1')
+          if ($updated -match '(?m)^\s*RUN[ \t]+--mount=') {
+            throw "Another BuildKit mount remains in $dockerfile. Review it instead of removing secret or bind mounts automatically."
+          }
+          if ($updated -ne $content) {
+            [System.IO.File]::WriteAllText(
+              $dockerfile, $updated, [System.Text.UTF8Encoding]::new($false)
+            )
+            Write-Host "Removed unsupported NuGet cache mounts from $dockerfile."
+          } else {
+            Write-Host "No unsupported NuGet cache mounts found in $dockerfile."
+          }
+
       - name: Build container without publishing
         shell: pwsh
         run: |
@@ -293,6 +313,26 @@ jobs:
             echo "dockerfile=${DOCKERFILE}"
             echo "ecr_repository=${ECR_REPOSITORY}"
           } >> "${GITHUB_OUTPUT}"
+
+      # Compatibility workaround: update only the runner's checked-out Dockerfile.
+      - name: Remove unsupported NuGet cache mounts
+        shell: pwsh
+        run: |
+          $dockerfile = "${{ steps.component.outputs.dockerfile }}"
+          $content = [System.IO.File]::ReadAllText($dockerfile)
+          $pattern = '(?m)^(\s*RUN[ \t]+)--mount=type=cache,target=/root/\.nuget/packages[ \t]+'
+          $updated = [regex]::Replace($content, $pattern, '$1')
+          if ($updated -match '(?m)^\s*RUN[ \t]+--mount=') {
+            throw "Another BuildKit mount remains in $dockerfile. Review it instead of removing secret or bind mounts automatically."
+          }
+          if ($updated -ne $content) {
+            [System.IO.File]::WriteAllText(
+              $dockerfile, $updated, [System.Text.UTF8Encoding]::new($false)
+            )
+            Write-Host "Removed unsupported NuGet cache mounts from $dockerfile."
+          } else {
+            Write-Host "No unsupported NuGet cache mounts found in $dockerfile."
+          }
 
       - name: Build release container
         shell: pwsh
