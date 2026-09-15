@@ -182,14 +182,21 @@ jobs:
           esac
 
       - name: Build container without publishing
-        shell: bash
+        shell: pwsh
         run: |
-          set -euo pipefail
-          docker buildx build \
-            --file "${{ steps.component.outputs.dockerfile }}" \
-            --tag "ptl-${{ matrix.component }}:${GITHUB_SHA}" \
-            --load \
-            .
+          $dockerArgs = @(
+            "build"
+            "--file"
+            "${{ steps.component.outputs.dockerfile }}"
+            "--tag"
+            "ptl-${{ matrix.component }}:$env:GITHUB_SHA"
+            "."
+          )
+
+          docker @dockerArgs
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
 
   publish:
     name: Publish ${{ matrix.component }} image
@@ -288,16 +295,25 @@ jobs:
           } >> "${GITHUB_OUTPUT}"
 
       - name: Build release container
-        shell: bash
+        shell: pwsh
         run: |
-          set -euo pipefail
-          docker buildx build \
-            --file "${{ steps.component.outputs.dockerfile }}" \
-            --tag "ptl-${{ matrix.component }}:${GITHUB_SHA}" \
-            --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
-            --label "org.opencontainers.image.source=https://github.com/${GITHUB_REPOSITORY}" \
-            --load \
-            .
+          $dockerArgs = @(
+            "build"
+            "--file"
+            "${{ steps.component.outputs.dockerfile }}"
+            "--tag"
+            "ptl-${{ matrix.component }}:$env:GITHUB_SHA"
+            "--label"
+            "org.opencontainers.image.revision=$env:GITHUB_SHA"
+            "--label"
+            "org.opencontainers.image.source=https://github.com/$env:GITHUB_REPOSITORY"
+            "."
+          )
+
+          docker @dockerArgs
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
 
       - name: Display OIDC claims for troubleshooting
         shell: bash
