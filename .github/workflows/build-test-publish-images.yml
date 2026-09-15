@@ -215,11 +215,11 @@ jobs:
       matrix:
         component: ${{ fromJSON(needs.changes.outputs.components) }}
     env:
-      AWS_ROLE_ARN: ${{secrets.AWS_OIDC_ROLE_ARN}}
+      AWS_ROLE_ARN: ${{secrets.AWS_ENV_OIDC_ROLE}}
       ECR_API_REPOSITORY: ${{vars.ECR_API_REPOSITORY}}
       ECR_INTERNAL_REPOSITORY: ${{vars.ECR_INTERNAL_REPOSITORY}}
       ECR_EXTERNAL_REPOSITORY: ${{vars.ECR_EXTERNAL_REPOSITORY}}
-      EXPECTED_AWS_ACCOUNT_ID: ${{secrets.AWS_ENV_ACCOUNT_ID}}
+      EXPECTED_AWS_ACCOUNT_ID: ${{secrets.AWS_ENV_ACCOUNT}}
       AWS_REGION: ${{secrets.AWS_ENV_REGION}}
       
       
