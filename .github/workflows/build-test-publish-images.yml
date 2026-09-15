@@ -215,13 +215,13 @@ jobs:
       matrix:
         component: ${{ fromJSON(needs.changes.outputs.components) }}
     env:
-      AWS_ROLE_ARN: "arn:aws:iam::783559591987:role/github_actions_pipeline_ecr_role"
-      ECR_API_REPOSITORY: apha/ptlapi
-      ECR_INTERNAL_REPOSITORY: apha/ptlinternal
-      ECR_EXTERNAL_REPOSITORY: apha/ptlexternal
-      EXPECTED_AWS_ACCOUNT_ID: "783559591987"
-      AWS_REGION: "eu-west-2"
-      AWS_ACCOUNT_ID: "783559591987"
+      AWS_ROLE_ARN: ${{secrets.AWS_OIDC_ROLE_ARN}}
+      ECR_API_REPOSITORY: ${{vars.ECR_API_REPOSITORY}}
+      ECR_INTERNAL_REPOSITORY: ${{vars.ECR_INTERNAL_REPOSITORY}}
+      ECR_EXTERNAL_REPOSITORY: ${{vars.ECR_EXTERNAL_REPOSITORY}}
+      EXPECTED_AWS_ACCOUNT_ID: ${{secrets.AWS_ENV_ACCOUNT_ID}}
+      AWS_REGION: ${{secrets.AWS_ENV_REGION}}
+      
       
     steps:
       - name: Checkout repository
