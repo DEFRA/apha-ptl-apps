@@ -1,0 +1,32 @@
+name: Strip unsupported NuGet cache mount
+description: >
+  Removes BuildKit `--mount=type=cache` flags from a Dockerfile's RUN
+  instructions before a plain `docker build`, which does not support cache
+  mounts. Only the runner's checked-out copy of the Dockerfile is changed.
+
+inputs:
+  dockerfile:
+    description: Path to the Dockerfile to patch
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Remove unsupported NuGet cache mounts
+      shell: pwsh
+      run: |
+        $dockerfile = "${{ inputs.dockerfile }}"
+        $content = [System.IO.File]::ReadAllText($dockerfile)
+        $pattern = '(?m)^(\s*RUN[ \t]+)--mount=type=cache,target=/root/\.nuget/packages[ \t]+'
+        $updated = [regex]::Replace($content, $pattern, '$1')
+        if ($updated -match '(?m)^\s*RUN[ \t]+--mount=') {
+          throw "Another BuildKit mount remains in $dockerfile. Review it instead of removing secret or bind mounts automatically."
+        }
+        if ($updated -ne $content) {
+          [System.IO.File]::WriteAllText(
+            $dockerfile, $updated, [System.Text.UTF8Encoding]::new($false)
+          )
+          Write-Host "Removed unsupported NuGet cache mounts from $dockerfile."
+        } else {
+          Write-Host "No unsupported NuGet cache mounts found in $dockerfile."
+        }

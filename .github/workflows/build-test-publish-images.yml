@@ -11,7 +11,7 @@ permissions:
   pull-requests: read
 
 concurrency:
-  group: ptl-images-${{ github.workflow }}-${{ github.ref }}
+  group: ptl-images-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
@@ -24,6 +24,7 @@ jobs:
     timeout-minutes: 5
     outputs:
       components: ${{ steps.filter.outputs.changes }}
+      dockerfiles: ${{ steps.dockerfiles.outputs.map }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7.0.1
@@ -67,6 +68,14 @@ jobs:
               - 'NuGet.config'
               - 'global.json'
               - '.github/workflows/build-test-publish-images.yml'
+
+      # Single source of truth for the component -> Dockerfile mapping, consumed
+      # by container-validation and publish instead of each duplicating it.
+      - name: Map components to their Dockerfiles
+        id: dockerfiles
+        shell: bash
+        run: |
+          echo 'map={"api":"src/PTL.Api/Dockerfile","internalweb":"src/PTL.InternalWeb/Dockerfile","externalweb":"src/PTL.ExternalWeb/Dockerfile"}' >> "${GITHUB_OUTPUT}"
 
   quality:
     name: Format, build and test solution
@@ -154,52 +163,27 @@ jobs:
       fail-fast: false
       matrix:
         component: ${{ fromJSON(needs.changes.outputs.components) }}
+    env:
+      DOCKERFILE: ${{ fromJSON(needs.changes.outputs.dockerfiles)[matrix.component] }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7.0.1
         with:
           persist-credentials: false
 
-      - name: Resolve component configuration
-        id: component
+      - name: Validate resolved Dockerfile path
+        if: env.DOCKERFILE == ''
         shell: bash
         run: |
-          set -euo pipefail
-          case "${{ matrix.component }}" in
-            api)
-              echo "dockerfile=src/PTL.Api/Dockerfile" >> "${GITHUB_OUTPUT}"
-              ;;
-            internalweb)
-              echo "dockerfile=src/PTL.InternalWeb/Dockerfile" >> "${GITHUB_OUTPUT}"
-              ;;
-            externalweb)
-              echo "dockerfile=src/PTL.ExternalWeb/Dockerfile" >> "${GITHUB_OUTPUT}"
-              ;;
-            *)
-              echo "::error::Unsupported component: ${{ matrix.component }}"
-              exit 1
-              ;;
-          esac
+          echo "::error::No Dockerfile mapped for component '${{ matrix.component }}'. Check the 'Map components to their Dockerfiles' step in the changes job."
+          exit 1
 
-      # Compatibility workaround: update only the runner's checked-out Dockerfile.
+      # Compatibility workaround: this job builds with `docker build` (no BuildKit),
+      # which does not support the --mount=type=cache flag used in the Dockerfile.
       - name: Remove unsupported NuGet cache mounts
-        shell: pwsh
-        run: |
-          $dockerfile = "${{ steps.component.outputs.dockerfile }}"
-          $content = [System.IO.File]::ReadAllText($dockerfile)
-          $pattern = '(?m)^(\s*RUN[ \t]+)--mount=type=cache,target=/root/\.nuget/packages[ \t]+'
-          $updated = [regex]::Replace($content, $pattern, '$1')
-          if ($updated -match '(?m)^\s*RUN[ \t]+--mount=') {
-            throw "Another BuildKit mount remains in $dockerfile. Review it instead of removing secret or bind mounts automatically."
-          }
-          if ($updated -ne $content) {
-            [System.IO.File]::WriteAllText(
-              $dockerfile, $updated, [System.Text.UTF8Encoding]::new($false)
-            )
-            Write-Host "Removed unsupported NuGet cache mounts from $dockerfile."
-          } else {
-            Write-Host "No unsupported NuGet cache mounts found in $dockerfile."
-          }
+        uses: ./.github/actions/strip-nuget-cache-mount
+        with:
+          dockerfile: ${{ env.DOCKERFILE }}
 
       - name: Build container without publishing
         shell: pwsh
@@ -207,9 +191,13 @@ jobs:
           $dockerArgs = @(
             "build"
             "--file"
-            "${{ steps.component.outputs.dockerfile }}"
+            "${{ env.DOCKERFILE }}"
             "--tag"
             "ptl-${{ matrix.component }}:$env:GITHUB_SHA"
+            "--label"
+            "org.opencontainers.image.revision=$env:GITHUB_SHA"
+            "--label"
+            "org.opencontainers.image.source=https://github.com/$env:GITHUB_REPOSITORY"
             "."
           )
 
@@ -217,6 +205,23 @@ jobs:
           if ($LASTEXITCODE -ne 0) {
             exit $LASTEXITCODE
           }
+
+      # On push to main this is the exact image publish later pushes - saving it here
+      # means publish loads it instead of rebuilding, so what's pushed is guaranteed
+      # to be byte-identical to what was just validated (and it's not rebuilt twice).
+      - name: Save built image for reuse by publish
+        if: github.event_name == 'push'
+        shell: pwsh
+        run: docker save "ptl-${{ matrix.component }}:$env:GITHUB_SHA" -o "${{ runner.temp }}/ptl-${{ matrix.component }}.tar"
+
+      - name: Upload built image artifact
+        if: github.event_name == 'push'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ptl-image-${{ matrix.component }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/ptl-${{ matrix.component }}.tar
+          retention-days: 1
+          overwrite: true
 
   publish:
     name: Publish ${{ matrix.component }} image
@@ -248,8 +253,6 @@ jobs:
       ECR_API_REPOSITORY: ${{ vars.ECR_API_REPOSITORY }}
       ECR_INTERNAL_REPOSITORY: ${{ vars.ECR_INTERNAL_REPOSITORY }}
       ECR_EXTERNAL_REPOSITORY: ${{ vars.ECR_EXTERNAL_REPOSITORY }}
-     
-     
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7.0.1
@@ -280,18 +283,9 @@ jobs:
           }
 
           case "${{ matrix.component }}" in
-            api)
-              DOCKERFILE="src/PTL.Api/Dockerfile"
-              ECR_REPOSITORY="${ECR_API_REPOSITORY}"
-              ;;
-            internalweb)
-              DOCKERFILE="src/PTL.InternalWeb/Dockerfile"
-              ECR_REPOSITORY="${ECR_INTERNAL_REPOSITORY}"
-              ;;
-            externalweb)
-              DOCKERFILE="src/PTL.ExternalWeb/Dockerfile"
-              ECR_REPOSITORY="${ECR_EXTERNAL_REPOSITORY}"
-              ;;
+            api) ECR_REPOSITORY="${ECR_API_REPOSITORY}" ;;
+            internalweb) ECR_REPOSITORY="${ECR_INTERNAL_REPOSITORY}" ;;
+            externalweb) ECR_REPOSITORY="${ECR_EXTERNAL_REPOSITORY}" ;;
             *)
               echo "::error::Unsupported component: ${{ matrix.component }}"
               exit 1
@@ -309,53 +303,22 @@ jobs:
             exit 1
           }
 
-          {
-            echo "dockerfile=${DOCKERFILE}"
-            echo "ecr_repository=${ECR_REPOSITORY}"
-          } >> "${GITHUB_OUTPUT}"
+          echo "ecr_repository=${ECR_REPOSITORY}" >> "${GITHUB_OUTPUT}"
 
-      # Compatibility workaround: update only the runner's checked-out Dockerfile.
-      - name: Remove unsupported NuGet cache mounts
+      # Reuses the exact image container-validation already built and validated for
+      # this commit, instead of building it again from scratch.
+      - name: Download validated image artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ptl-image-${{ matrix.component }}-${{ github.run_id }}
+          path: ${{ runner.temp }}
+
+      - name: Load validated image
         shell: pwsh
-        run: |
-          $dockerfile = "${{ steps.component.outputs.dockerfile }}"
-          $content = [System.IO.File]::ReadAllText($dockerfile)
-          $pattern = '(?m)^(\s*RUN[ \t]+)--mount=type=cache,target=/root/\.nuget/packages[ \t]+'
-          $updated = [regex]::Replace($content, $pattern, '$1')
-          if ($updated -match '(?m)^\s*RUN[ \t]+--mount=') {
-            throw "Another BuildKit mount remains in $dockerfile. Review it instead of removing secret or bind mounts automatically."
-          }
-          if ($updated -ne $content) {
-            [System.IO.File]::WriteAllText(
-              $dockerfile, $updated, [System.Text.UTF8Encoding]::new($false)
-            )
-            Write-Host "Removed unsupported NuGet cache mounts from $dockerfile."
-          } else {
-            Write-Host "No unsupported NuGet cache mounts found in $dockerfile."
-          }
-
-      - name: Build release container
-        shell: pwsh
-        run: |
-          $dockerArgs = @(
-            "build"
-            "--file"
-            "${{ steps.component.outputs.dockerfile }}"
-            "--tag"
-            "ptl-${{ matrix.component }}:$env:GITHUB_SHA"
-            "--label"
-            "org.opencontainers.image.revision=$env:GITHUB_SHA"
-            "--label"
-            "org.opencontainers.image.source=https://github.com/$env:GITHUB_REPOSITORY"
-            "."
-          )
-
-          docker @dockerArgs
-          if ($LASTEXITCODE -ne 0) {
-            exit $LASTEXITCODE
-          }
+        run: docker load -i "${{ runner.temp }}/ptl-${{ matrix.component }}.tar"
 
       - name: Display OIDC claims for troubleshooting
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
@@ -396,7 +359,6 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
           role-session-name: ptl-exr-${{ github.run_id }}-${{ matrix.component }}
           audience: sts.amazonaws.com
-     
 
       - name: Verify assumed AWS account
         shell: bash
