@@ -5,6 +5,9 @@ on:
     branches: [main]
   push:
     branches: [main]
+  # Manual "rebuild and publish everything" trigger, independent of what changed -
+  # e.g. to validate a change to this pipeline itself, or to re-publish on demand.
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -23,7 +26,7 @@ jobs:
     runs-on: windows-2022
     timeout-minutes: 5
     outputs:
-      components: ${{ steps.filter.outputs.changes }}
+      components: ${{ steps.components.outputs.result }}
       dockerfiles: ${{ steps.dockerfiles.outputs.map }}
     steps:
       - name: Checkout repository
@@ -34,6 +37,7 @@ jobs:
 
       - name: Detect changed paths
         id: filter
+        if: github.event_name != 'workflow_dispatch'
         uses: dorny/paths-filter@v4.0.3
         with:
           filters: |
@@ -68,6 +72,16 @@ jobs:
               - 'NuGet.config'
               - 'global.json'
               - '.github/workflows/build-test-publish-images.yml'
+
+      - name: Resolve affected components
+        id: components
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo 'result=["api","internalweb","externalweb"]' >> "${GITHUB_OUTPUT}"
+          else
+            echo 'result=${{ steps.filter.outputs.changes }}' >> "${GITHUB_OUTPUT}"
+          fi
 
       # Single source of truth for the component -> Dockerfile mapping, consumed
       # by container-validation and publish instead of each duplicating it.
@@ -210,12 +224,12 @@ jobs:
       # means publish loads it instead of rebuilding, so what's pushed is guaranteed
       # to be byte-identical to what was just validated (and it's not rebuilt twice).
       - name: Save built image for reuse by publish
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
         shell: pwsh
         run: docker save "ptl-${{ matrix.component }}:$env:GITHUB_SHA" -o "${{ runner.temp }}/ptl-${{ matrix.component }}.tar"
 
       - name: Upload built image artifact
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@v4
         with:
           name: ptl-image-${{ matrix.component }}-${{ github.run_id }}
@@ -228,7 +242,7 @@ jobs:
     needs: [changes, quality, sonarcloud, container-validation]
     if: >-
       always() &&
-      github.event_name == 'push' &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch') &&
       github.ref == 'refs/heads/main' &&
       needs.changes.result == 'success' &&
       needs.quality.result == 'success' &&
@@ -452,7 +466,7 @@ jobs:
             exit 1
           fi
 
-          if [[ "${EVENT_NAME}" == "push" && "${COMPONENTS}" != "[]" && "${PUBLISH_RESULT}" != "success" ]]; then
+          if [[ "${EVENT_NAME}" =~ ^(push|workflow_dispatch)$ && "${COMPONENTS}" != "[]" && "${PUBLISH_RESULT}" != "success" ]]; then
             echo "::error::Image publishing result: ${PUBLISH_RESULT}"
             exit 1
           fi
