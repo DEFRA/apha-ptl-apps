@@ -17,6 +17,7 @@ concurrency:
 env:
   DOTNET_VERSION: 10.0.x
   AWS_REGION: ${{ vars.AWS_REGION }}
+  AWS_ROLE_ARN: ${{ vars.AWS_OIDC_ROLE_ARN }}
 
 jobs:
   changes:
@@ -208,18 +209,20 @@ jobs:
     timeout-minutes: 25
     permissions:
       contents: read
+      id-token: write
     strategy:
       fail-fast: false
       matrix:
         component: ${{ fromJSON(needs.changes.outputs.components) }}
     env:
+      AWS_ROLE_ARN: "arn:aws:iam::783559591987:role/github_actions_pipeline_ecr_role"
       ECR_API_REPOSITORY: apha/ptlapi
       ECR_INTERNAL_REPOSITORY: apha/ptlinternal
       ECR_EXTERNAL_REPOSITORY: apha/ptlexternal
       EXPECTED_AWS_ACCOUNT_ID: "783559591987"
       AWS_REGION: "eu-west-2"
       AWS_ACCOUNT_ID: "783559591987"
-     
+      
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7.0.1
@@ -231,6 +234,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+
+          test -n "${AWS_ROLE_ARN}" || {
+            echo "::error::Environment variable AWS_OIDC_ROLE_ARN is not configured."
+            exit 1
+          }
 
           case "${{ matrix.component }}" in
             api)
@@ -256,6 +264,12 @@ jobs:
             exit 1
           }
 
+          EXPECTED_ROLE_PREFIX="arn:aws:iam::${EXPECTED_AWS_ACCOUNT_ID}:role/"
+          [[ "${AWS_ROLE_ARN}" == "${EXPECTED_ROLE_PREFIX}"* ]] || {
+            echo "::error::AWS_OIDC_ROLE_ARN must reference account ${EXPECTED_AWS_ACCOUNT_ID}."
+            exit 1
+          }
+
           {
             echo "dockerfile=${DOCKERFILE}"
             echo "ecr_repository=${ECR_REPOSITORY}"
@@ -273,55 +287,48 @@ jobs:
             --load \
             .
 
-      - name: Validate required AWS secrets
+      - name: Display OIDC claims for troubleshooting
         shell: bash
-        env:
-          ACCESS_KEY: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          SECRET_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          SESSION_TOKEN: ${{ secrets.AWS_SESSION_TOKEN }}
         run: |
           set -euo pipefail
 
-          test -n "${ACCESS_KEY}" || {
-            echo "::error::AWS_ACCESS_KEY_ID is not configured in the ecr-production environment."
-            exit 1
-          }
+          RESPONSE="$(curl --silent --show-error --fail \
+            --header "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
+            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=sts.amazonaws.com")"
 
-          test -n "${SECRET_KEY}" || {
-            echo "::error::AWS_SECRET_ACCESS_KEY is not configured in the ecr-production environment."
-            exit 1
-          }
-          test -n "${SESSION_TOKEN}" || {
-            echo "::error::AWS_SESSION_TOKEN is not configured in the ecr-production environment."
-            exit 1
-          }  
+          TOKEN="$(echo "${RESPONSE}" | jq -er '.value')"
+          PAYLOAD="$(echo "${TOKEN}" | cut -d '.' -f 2)"
 
-      - name: Configure AWS credentials from GitHub secrets
-        uses: aws-actions/configure-aws-credentials@v6.2.4
+          TOKEN_PAYLOAD="${PAYLOAD}" python3 - <<'PY'
+          import base64
+          import json
+          import os
+
+          payload = os.environ["TOKEN_PAYLOAD"]
+          payload += "=" * (-len(payload) % 4)
+          claims = json.loads(base64.urlsafe_b64decode(payload))
+
+          for key in [
+              "aud",
+              "sub",
+              "repository",
+              "repository_owner_id",
+              "repository_id",
+              "ref",
+              "event_name",
+              "environment",
+          ]:
+              print(f"{key}={claims.get(key)}")
+          PY
+
+      - name: Configure AWS credentials through OIDC
+        uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
-          aws-region: ${{ env.AWS_REGION }}
-          allowed-account-ids: ${{ env.EXPECTED_AWS_ACCOUNT_ID }}
-          force-skip-oidc: true
-
-      - name: Verify AWS identity
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          ACTUAL_ACCOUNT_ID="$(aws sts get-caller-identity \
-            --query Account \
-            --output text)"
-
-          [[ "${ACTUAL_ACCOUNT_ID}" == "${EXPECTED_AWS_ACCOUNT_ID}" ]] || {
-            echo "::error::Expected AWS account ${EXPECTED_AWS_ACCOUNT_ID}, authenticated to ${ACTUAL_ACCOUNT_ID}."
-            exit 1
-          }
-
-          aws sts get-caller-identity
-         
+          role-to-assume: "arn:aws:iam::783559591987:role/github_actions_pipeline_ecr_role"
+          aws-region: "eu-west-2"
+          role-session-name: ptl-exr-${{ github.run_id }}-${{ matrix.component }}
+          audience: sts.amazonaws.com
+          
       - name: Verify ECR repository
         shell: bash
         run: |
