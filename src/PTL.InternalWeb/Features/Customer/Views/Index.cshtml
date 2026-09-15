@@ -1,0 +1,91 @@
+@model PTL.InternalWeb.Features.Customer.CustomerListViewModel
+@using PTL.Contracts.Customer
+@{
+    ViewData["Title"] = "Customers";
+    var activeSelected = Model.SelectedStatus == CustomerStatusFilter.Active ? "selected" : null;
+    var inactiveSelected = Model.SelectedStatus == CustomerStatusFilter.Inactive ? "selected" : null;
+    var allSelected = Model.SelectedStatus == CustomerStatusFilter.All ? "selected" : null;
+    var totalPages = Model.PageSize == 0 ? 1 : (int)Math.Ceiling(Model.TotalCount / (double)Model.PageSize);
+}
+
+<h1 class="govuk-heading-l">Customers</h1>
+
+<p class="govuk-body">
+    <a class="govuk-button" data-module="govuk-button" asp-action="Create">Create customer</a>
+</p>
+
+<form method="get" asp-action="Index" class="govuk-!-margin-bottom-6">
+    <div class="govuk-form-group">
+        <label class="govuk-label" for="searchTerm">Search</label>
+        <div class="govuk-hint">Matches name, QAL number, or organisation.</div>
+        <input class="govuk-input" id="searchTerm" name="searchTerm" value="@Model.SearchTerm" />
+    </div>
+    <div class="govuk-form-group">
+        <label class="govuk-label" for="status">Status</label>
+        <select class="govuk-select" id="status" name="status">
+            <option value="@CustomerStatusFilter.Active" selected="@activeSelected">Active</option>
+            <option value="@CustomerStatusFilter.Inactive" selected="@inactiveSelected">Inactive</option>
+            <option value="@CustomerStatusFilter.All" selected="@allSelected">All</option>
+        </select>
+    </div>
+    <button class="govuk-button" data-module="govuk-button" type="submit">Search</button>
+</form>
+
+@if (Model.Customers.Count == 0)
+{
+    <p class="govuk-body">There are no customers to display.</p>
+}
+else
+{
+    <table class="govuk-table">
+        <thead class="govuk-table__head">
+            <tr class="govuk-table__row">
+                <th scope="col" class="govuk-table__header">QAL number</th>
+                <th scope="col" class="govuk-table__header">Name</th>
+                <th scope="col" class="govuk-table__header">Organisation</th>
+                <th scope="col" class="govuk-table__header">Status</th>
+                <th scope="col" class="govuk-table__header"><span class="govuk-visually-hidden">Actions</span></th>
+            </tr>
+        </thead>
+        <tbody class="govuk-table__body">
+            @foreach (var customer in Model.Customers)
+            {
+                <tr class="govuk-table__row">
+                    <td class="govuk-table__cell">@customer.QalNumber</td>
+                    <td class="govuk-table__cell">@customer.Name</td>
+                    <td class="govuk-table__cell">@customer.Organisation</td>
+                    <td class="govuk-table__cell">
+                        <strong class="govuk-tag @(customer.IsActive ? "govuk-tag--green" : "govuk-tag--grey")">
+                            @(customer.IsActive ? "Active" : "Inactive")
+                        </strong>
+                    </td>
+                    <td class="govuk-table__cell">
+                        <a class="govuk-link" asp-action="Details" asp-route-id="@customer.CustomerId">View details</a>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+
+    @if (totalPages > 1)
+    {
+        <nav class="govuk-pagination" aria-label="Pagination">
+            <ul class="govuk-pagination__list">
+                @for (var pageNumber = 1; pageNumber <= totalPages; pageNumber++)
+                {
+                    <li class="govuk-pagination__item @(pageNumber == Model.Page ? "govuk-pagination__item--current" : "")">
+                        <a class="govuk-link govuk-pagination__link"
+                           asp-action="Index"
+                           asp-route-searchTerm="@Model.SearchTerm"
+                           asp-route-status="@Model.SelectedStatus"
+                           asp-route-page="@pageNumber"
+                           asp-route-pageSize="@Model.PageSize"
+                           aria-label="Page @pageNumber">
+                            @pageNumber
+                        </a>
+                    </li>
+                }
+            </ul>
+        </nav>
+    }
+}

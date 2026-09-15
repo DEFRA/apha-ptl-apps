@@ -5,6 +5,11 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
+    <!-- PTL.Contracts is a pure DTO project shared by every test project; each one only exercises
+         the slice of DTOs relevant to its own layer (PTL.Api.Tests already covers it thoroughly
+         through the full Customer request/response surface). Measuring the whole of PTL.Contracts
+         here would drag this project's coverage number down for DTOs it doesn't own testing for. -->
+    <Exclude>[PTL.Contracts]*</Exclude>
   </PropertyGroup>
 
   <ItemGroup>
