@@ -22,7 +22,7 @@ env:
 jobs:
   changes:
     name: Detect affected components
-    runs-on: ubuntu-latest
+    runs-on: windows-2022
     timeout-minutes: 5
     outputs:
       components: ${{ steps.filter.outputs.changes }}
@@ -72,7 +72,7 @@ jobs:
 
   quality:
     name: Format, build and test solution
-    runs-on: ubuntu-latest
+    runs-on: windows-2022
     timeout-minutes: 20
     steps:
       - name: Checkout repository
@@ -106,7 +106,7 @@ jobs:
   sonarcloud:
     name: SonarCloud analysis
     if: vars.SONAR_ENABLED == 'true'
-    runs-on: ubuntu-latest
+    runs-on: windows-2022
     timeout-minutes: 25
     steps:
       - name: Checkout full history
@@ -149,7 +149,7 @@ jobs:
     name: Validate ${{ matrix.component }} container
     needs: [changes, quality]
     if: needs.changes.outputs.components != '[]'
-    runs-on: ubuntu-latest
+    runs-on: windows-2022
     timeout-minutes: 20
     strategy:
       fail-fast: false
@@ -204,7 +204,7 @@ jobs:
       (vars.SONAR_ENABLED != 'true' || needs.sonarcloud.result == 'success') &&
       needs.container-validation.result == 'success' &&
       needs.changes.outputs.components != '[]'
-    runs-on: ubuntu-latest
+    runs-on: windows-2022
     environment: ecr-production
     timeout-minutes: 25
     permissions:
@@ -375,7 +375,7 @@ jobs:
     name: CI gate
     needs: [changes, quality, sonarcloud, container-validation, publish]
     if: always()
-    runs-on: ubuntu-latest
+    runs-on: windows-2022
     timeout-minutes: 5
     env:
       CHANGES_RESULT: ${{ needs.changes.result }}
