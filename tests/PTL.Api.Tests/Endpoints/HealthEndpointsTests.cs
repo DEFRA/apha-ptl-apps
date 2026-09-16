@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.Configuration;
 using PTL.Api.Features.Health;
 
 namespace PTL.Api.Tests.Endpoints;
@@ -63,11 +64,19 @@ public class HealthEndpointsTests : IClassFixture<WebApplicationFactory<Program>
     [Fact]
     public async Task HealthReady_ProbesDatabase_WhenKeyCorrect()
     {
-        // No real SQL Server is available in this test environment, so this
-        // only asserts the key check let the request through to the DB probe
-        // (503 Unhealthy), not that connectivity succeeds - see
-        // DatabaseHealthCheckTests for the health-check logic itself.
-        var client = _factory.CreateClient();
+        // Deliberately point at an unreachable host (rather than relying on no SQL Server being
+        // present in the test environment) so this test is deterministic on any machine,
+        // including one with a working local dev database - see DatabaseHealthCheckTests for the
+        // health-check logic itself.
+        var factory = _factory.WithWebHostBuilder(builder =>
+            builder.ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Database:Host"] = "invalid-host-for-tests,1433",
+                ["Database:Name"] = "ProficiencyTesting",
+                ["Database:IntegratedSecurity"] = "true",
+                ["Database:TrustServerCertificate"] = "true"
+            })));
+        var client = factory.CreateClient();
         client.DefaultRequestHeaders.Add(ReadinessKeyFilter.HeaderName, "local-dev-readiness-key");
 
         var response = await client.GetAsync("/health/ready");

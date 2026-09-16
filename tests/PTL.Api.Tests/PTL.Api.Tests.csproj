@@ -5,6 +5,11 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
+    <!-- PTL.Data only wraps existing stored procedures via raw SQL (FromSqlRaw/ExecuteSqlRawAsync)
+         and has no logic to unit test without a live SQL Server - it is exercised via manual/live
+         reproduction against a real database, not unit tests. Measuring it here would drag this
+         project's coverage number down for code that cannot be meaningfully unit tested. -->
+    <Exclude>[PTL.Data]*</Exclude>
   </PropertyGroup>
 
   <ItemGroup>

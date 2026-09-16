@@ -1,0 +1,170 @@
+@model PTL.Contracts.Customer.CustomerResponse
+@{
+    ViewData["Title"] = $"Customer - {Model.Name}";
+}
+
+<a class="govuk-back-link" asp-action="Index">Back to customers</a>
+
+<h1 class="govuk-heading-l">@Model.Name</h1>
+
+<p class="govuk-body">
+    <a class="govuk-button" data-module="govuk-button" asp-action="Edit" asp-route-id="@Model.CustomerId">Edit customer</a>
+    @if (Model.IsActive)
+    {
+        <a class="govuk-button govuk-button--warning" data-module="govuk-button" asp-action="Deactivate" asp-route-id="@Model.CustomerId">Deactivate customer</a>
+    }
+    else
+    {
+        <form asp-action="Reactivate" asp-route-id="@Model.CustomerId" method="post" class="govuk-!-display-inline">
+            @Html.AntiForgeryToken()
+            <button type="submit" class="govuk-button" data-module="govuk-button">Reactivate customer</button>
+        </form>
+    }
+</p>
+
+<h2 class="govuk-heading-m">Customer details</h2>
+<dl class="govuk-summary-list">
+    <div class="govuk-summary-list__row">
+        <dt class="govuk-summary-list__key">QAL number</dt>
+        <dd class="govuk-summary-list__value">@Model.QalNumber</dd>
+    </div>
+    <div class="govuk-summary-list__row">
+        <dt class="govuk-summary-list__key">Registered file number</dt>
+        <dd class="govuk-summary-list__value">@Model.RegisteredFileNumber</dd>
+    </div>
+    <div class="govuk-summary-list__row">
+        <dt class="govuk-summary-list__key">Previous name</dt>
+        <dd class="govuk-summary-list__value">@Model.PreviousName</dd>
+    </div>
+    <div class="govuk-summary-list__row">
+        <dt class="govuk-summary-list__key">Status</dt>
+        <dd class="govuk-summary-list__value">
+            <strong class="govuk-tag @(Model.IsActive ? "govuk-tag--green" : "govuk-tag--grey")">
+                @(Model.IsActive ? "Active" : "Inactive")
+            </strong>
+        </dd>
+    </div>
+    @if (Model.InactiveDate is not null)
+    {
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Inactive date</dt>
+            <dd class="govuk-summary-list__value">@Model.InactiveDate.Value.ToString("d MMMM yyyy")</dd>
+        </div>
+    }
+    <div class="govuk-summary-list__row">
+        <dt class="govuk-summary-list__key">Initial start date</dt>
+        <dd class="govuk-summary-list__value">@Model.InitialStartDate.ToString("d MMMM yyyy")</dd>
+    </div>
+    <div class="govuk-summary-list__row">
+        <dt class="govuk-summary-list__key">Can order online</dt>
+        <dd class="govuk-summary-list__value">@(Model.CanOrderOnline ? "Yes" : "No")</dd>
+    </div>
+</dl>
+
+<h2 class="govuk-heading-m">Contact details</h2>
+<dl class="govuk-summary-list">
+    <div class="govuk-summary-list__row">
+        <dt class="govuk-summary-list__key">Contact name</dt>
+        <dd class="govuk-summary-list__value">@Model.ContactName</dd>
+    </div>
+    <div class="govuk-summary-list__row">
+        <dt class="govuk-summary-list__key">Organisation</dt>
+        <dd class="govuk-summary-list__value">@Model.Organisation</dd>
+    </div>
+    <div class="govuk-summary-list__row">
+        <dt class="govuk-summary-list__key">Address</dt>
+        <dd class="govuk-summary-list__value">
+            @Model.Address1<br />
+            @Model.Address2<br />
+            @Model.Address3<br />
+            @Model.Address4<br />
+            @Model.Address5
+        </dd>
+    </div>
+    <div class="govuk-summary-list__row">
+        <dt class="govuk-summary-list__key">Telephone</dt>
+        <dd class="govuk-summary-list__value">@Model.Telephone</dd>
+    </div>
+    <div class="govuk-summary-list__row">
+        <dt class="govuk-summary-list__key">Telephone (alternative)</dt>
+        <dd class="govuk-summary-list__value">@Model.Telephone2</dd>
+    </div>
+    <div class="govuk-summary-list__row">
+        <dt class="govuk-summary-list__key">Fax</dt>
+        <dd class="govuk-summary-list__value">@Model.Fax</dd>
+    </div>
+    <div class="govuk-summary-list__row">
+        <dt class="govuk-summary-list__key">Email</dt>
+        <dd class="govuk-summary-list__value">@Model.Email</dd>
+    </div>
+</dl>
+
+<h2 class="govuk-heading-m">Invoice details</h2>
+<dl class="govuk-summary-list">
+    <div class="govuk-summary-list__row">
+        <dt class="govuk-summary-list__key">Invoice name</dt>
+        <dd class="govuk-summary-list__value">@Model.InvoiceName</dd>
+    </div>
+    <div class="govuk-summary-list__row">
+        <dt class="govuk-summary-list__key">Invoice organisation</dt>
+        <dd class="govuk-summary-list__value">@Model.InvoiceOrganisation</dd>
+    </div>
+    <div class="govuk-summary-list__row">
+        <dt class="govuk-summary-list__key">Invoice address</dt>
+        <dd class="govuk-summary-list__value">
+            @Model.InvoiceAddress1<br />
+            @Model.InvoiceAddress2<br />
+            @Model.InvoiceAddress3<br />
+            @Model.InvoiceAddress4<br />
+            @Model.InvoiceAddress5
+        </dd>
+    </div>
+    <div class="govuk-summary-list__row">
+        <dt class="govuk-summary-list__key">Invoice telephone</dt>
+        <dd class="govuk-summary-list__value">@Model.InvoiceTelephone</dd>
+    </div>
+    <div class="govuk-summary-list__row">
+        <dt class="govuk-summary-list__key">Invoice telephone (alternative)</dt>
+        <dd class="govuk-summary-list__value">@Model.InvoiceTelephone2</dd>
+    </div>
+    <div class="govuk-summary-list__row">
+        <dt class="govuk-summary-list__key">Invoice fax</dt>
+        <dd class="govuk-summary-list__value">@Model.InvoiceFax</dd>
+    </div>
+    <div class="govuk-summary-list__row">
+        <dt class="govuk-summary-list__key">Invoice email</dt>
+        <dd class="govuk-summary-list__value">@Model.InvoiceEmail</dd>
+    </div>
+</dl>
+
+<h2 class="govuk-heading-m">Financial details</h2>
+<dl class="govuk-summary-list">
+    <div class="govuk-summary-list__row">
+        <dt class="govuk-summary-list__key">VAT number</dt>
+        <dd class="govuk-summary-list__value">@Model.VatNumber</dd>
+    </div>
+    <div class="govuk-summary-list__row">
+        <dt class="govuk-summary-list__key">Account number</dt>
+        <dd class="govuk-summary-list__value">@Model.AccountNumber</dd>
+    </div>
+    <div class="govuk-summary-list__row">
+        <dt class="govuk-summary-list__key">Customer finance ID</dt>
+        <dd class="govuk-summary-list__value">@Model.CustomerFinanceId</dd>
+    </div>
+    <div class="govuk-summary-list__row">
+        <dt class="govuk-summary-list__key">Payment (non-UK)</dt>
+        <dd class="govuk-summary-list__value">@(Model.PaymentNonUK ? "Yes" : "No")</dd>
+    </div>
+</dl>
+
+<h2 class="govuk-heading-m">Other</h2>
+<dl class="govuk-summary-list">
+    <div class="govuk-summary-list__row">
+        <dt class="govuk-summary-list__key">Postage arrangements</dt>
+        <dd class="govuk-summary-list__value">@Model.PostageArrangements</dd>
+    </div>
+    <div class="govuk-summary-list__row">
+        <dt class="govuk-summary-list__key">Comments</dt>
+        <dd class="govuk-summary-list__value">@Model.Comments</dd>
+    </div>
+</dl>

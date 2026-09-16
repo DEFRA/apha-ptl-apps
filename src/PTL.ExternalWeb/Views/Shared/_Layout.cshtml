@@ -13,13 +13,18 @@
     <link rel="apple-touch-icon" href="/assets/images/govuk-icon-180.png">
     <link rel="manifest" href="/assets/manifest.json">
     <meta property="og:image" content="YOUR-DOMAIN/images/govuk-opengraph-image.png">
+    <style>
+        /* Sign out must be a form post for CSRF protection; reset button chrome so it reads as a service navigation link */
+        .app-signout-form { display: inline; margin: 0; }
+        .app-signout-button { background: none; border: 0; padding: 0; font: inherit; cursor: pointer; }
+    </style>
 </head>
 
 <body class="govuk-template__body app-body-class" data-test="My value" data-other="report:details">
     <script>
             document.body.className += ' js-enabled' + ('noModule' in HTMLScriptElement.prototype ? ' govuk-frontend-supported' : '');
     </script>
-    <form action="/form-handler" method="post" novalidate>
+    @* <form action="/form-handler" method="post" novalidate>
         <div class="govuk-cookie-banner" data-nosnippet role="region" aria-label="Cookies on Proficiency Testing">
             <div class="govuk-cookie-banner__message govuk-width-container">
                 <div class="govuk-grid-row">
@@ -44,7 +49,7 @@
                 </div>
             </div>
         </div>
-    </form>
+    </form> *@
     <a href="#main-content" class="govuk-skip-link" data-module="govuk-skip-link">Skip to main content</a>
     <header class="govuk-template__header">
         <div class="govuk-header">
@@ -79,7 +84,7 @@
         </div>
         <section aria-label="Service information" class="govuk-service-navigation"
                  data-module="govuk-service-navigation">
-            <div class="govuk-width-container">
+            <div class="govuk-width-container govuk-service-navigation__inlining-container">
                 <div class="govuk-service-navigation__container">
                     <span class="govuk-service-navigation__service-name">
                         <a href="#" class="govuk-service-navigation__link">
@@ -96,19 +101,26 @@
                                     <strong class="govuk-service-navigation__active-fallback">Navigation item 1</strong>
                                 </a>
                             </li>
-                            <li class="govuk-service-navigation__item">
-                                <a class="govuk-service-navigation__link" href="#">
-                                    Navigation item 2
-                                </a>
-                            </li>
-                            <li class="govuk-service-navigation__item">
-                                <a class="govuk-service-navigation__link" href="#">
-                                    Navigation item 3
-                                </a>
-                            </li>
+                          
                         </ul>
                     </nav>
                 </div>
+                @if (User.Identity is not null && User.Identity.IsAuthenticated)
+                {
+                    <nav aria-label="Account" class="govuk-service-navigation__wrapper">
+                        <ul class="govuk-service-navigation__list">
+                            <li class="govuk-service-navigation__item">
+                                <span class="govuk-service-navigation__link">Signed in as <strong>@User.Identity.Name</strong></span>
+                            </li>
+                            <li class="govuk-service-navigation__item">
+                                <form asp-controller="Account" asp-action="Logout" method="post" class="app-signout-form">
+                                    @Html.AntiForgeryToken()
+                                    <button type="submit" class="govuk-service-navigation__link app-signout-button">Sign out</button>
+                                </form>
+                            </li>
+                        </ul>
+                    </nav>
+                }
             </div>
         </section>
         <div class="govuk-phase-banner govuk-width-container">
@@ -206,7 +218,7 @@
     <script type="module">
             import {
                 initAll
-            } from '/js/govuk-frontend.min.js'
+            } from '/js/govuk-frontend-6.5.0.min.js'
             initAll()
     </script>
     @await RenderSectionAsync("Scripts", required: false)

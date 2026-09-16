@@ -8,15 +8,6 @@ public sealed class SqlConnectionFactory(IConfiguration configuration) : IDbConn
     public IDbConnection CreateConnection()
     {
         var options = StartupChecks.RequireDatabaseOptions(configuration);
-        var connectionString = new SqlConnectionStringBuilder
-        {
-            DataSource = options.Host,
-            InitialCatalog = options.Name,
-            UserID = options.User,
-            Password = options.Password,
-            TrustServerCertificate = options.TrustServerCertificate
-        }.ConnectionString;
-
-        return new SqlConnection(connectionString);
+        return new SqlConnection(options.ToConnectionString());
     }
 }

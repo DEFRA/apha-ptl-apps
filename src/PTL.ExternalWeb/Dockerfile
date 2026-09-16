@@ -4,12 +4,12 @@
 FROM mcr.microsoft.com/dotnet/sdk:10.0-windowsservercore-ltsc2022 AS build
 WORKDIR /src
 
-# PTL.ExternalWeb references the shared PTL.ApiClient library, so its
-# .csproj must be copied here too - otherwise restore fails on the
-# ProjectReference and the cache layer below is never invalidated when
-# PTL.ApiClient changes.
+# PTL.ExternalWeb references PTL.ApiClient, which references PTL.Contracts.
+# All referenced .csproj files must be copied before restore so transitive
+# ProjectReference restores can resolve correctly and use cache invalidation.
 COPY ["src/PTL.ExternalWeb/PTL.ExternalWeb.csproj", "src/PTL.ExternalWeb/"]
 COPY ["src/PTL.ApiClient/PTL.ApiClient.csproj", "src/PTL.ApiClient/"]
+COPY ["src/PTL.Contracts/PTL.Contracts.csproj", "src/PTL.Contracts/"]
 
 RUN --mount=type=cache,target=/root/.nuget/packages \
     dotnet restore "src/PTL.ExternalWeb/PTL.ExternalWeb.csproj"
