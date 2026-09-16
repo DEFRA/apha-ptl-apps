@@ -5,6 +5,9 @@ FROM mcr.microsoft.com/dotnet/sdk:10.0-windowsservercore-ltsc2022 AS build
 WORKDIR /src
 
 COPY ["src/PTL.Api/PTL.Api.csproj", "src/PTL.Api/"]
+COPY ["src/PTL.Core/PTL.Core.csproj", "src/PTL.Core/"]
+COPY ["src/PTL.Data/PTL.Data.csproj", "src/PTL.Data/"]
+COPY ["src/PTL.Contracts/PTL.Contracts.csproj", "src/PTL.Contracts/"]
 
 RUN --mount=type=cache,target=/root/.nuget/packages \
     dotnet restore "src/PTL.Api/PTL.Api.csproj"
