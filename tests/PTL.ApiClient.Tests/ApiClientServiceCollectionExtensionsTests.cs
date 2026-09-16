@@ -28,4 +28,18 @@ public class ApiClientServiceCollectionExtensionsTests
         var client = provider.GetRequiredService<IApiClient>();
         Assert.IsType<ApiClient>(client);
     }
+
+    [Theory]
+    [InlineData("ptl-api:8080")]
+    [InlineData("not a url")]
+    [InlineData("ftp://ptl-api:8080")]
+    public void AddPtlApiClient_WithNonHttpBaseUrl_Throws(string baseUrl)
+    {
+        var services = new ServiceCollection();
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?> { ["Api:BaseUrl"] = baseUrl })
+            .Build();
+
+        Assert.Throws<InvalidOperationException>(() => services.AddPtlApiClient(configuration));
+    }
 }
