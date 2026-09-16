@@ -199,6 +199,29 @@ jobs:
         with:
           dockerfile: ${{ env.DOCKERFILE }}
 
+      # windows-2022 runners don't guarantee the Docker Engine service is already
+      # running - start it and wait for the daemon to accept connections first.
+      - name: Start Docker service
+        shell: pwsh
+        run: |
+          Start-Service -Name Docker -ErrorAction SilentlyContinue
+
+          $maxAttempts = 30
+          $attempt = 0
+          while ($attempt -lt $maxAttempts) {
+            try {
+              docker ps | Out-Null
+              Write-Host "Docker is running"
+              exit 0
+            } catch {
+              $attempt++
+              Start-Sleep -Seconds 1
+            }
+          }
+
+          Write-Error "Docker failed to start after $maxAttempts attempts"
+          exit 1
+
       - name: Build container without publishing
         shell: pwsh
         run: |
@@ -326,6 +349,29 @@ jobs:
         with:
           name: ptl-image-${{ matrix.component }}-${{ github.run_id }}
           path: ${{ runner.temp }}
+
+      # windows-2022 runners don't guarantee the Docker Engine service is already
+      # running - start it and wait for the daemon to accept connections first.
+      - name: Start Docker service
+        shell: pwsh
+        run: |
+          Start-Service -Name Docker -ErrorAction SilentlyContinue
+
+          $maxAttempts = 30
+          $attempt = 0
+          while ($attempt -lt $maxAttempts) {
+            try {
+              docker ps | Out-Null
+              Write-Host "Docker is running"
+              exit 0
+            } catch {
+              $attempt++
+              Start-Sleep -Seconds 1
+            }
+          }
+
+          Write-Error "Docker failed to start after $maxAttempts attempts"
+          exit 1
 
       - name: Load validated image
         shell: pwsh
