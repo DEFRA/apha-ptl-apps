@@ -1,0 +1,16 @@
+@model PTL.InternalWeb.Features.Participant.ParticipantFormViewModel
+@{
+    ViewData["Title"] = "Create participant";
+}
+
+<h1 class="govuk-heading-l">Create participant</h1>
+
+<form method="post" asp-action="Create" asp-route-customerId="@Model.CustomerId" novalidate>
+    @await Html.PartialAsync("_ParticipantForm", Model)
+
+    <button class="govuk-button" data-module="govuk-button" type="submit">Create participant</button>
+</form>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

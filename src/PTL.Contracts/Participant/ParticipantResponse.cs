@@ -1,0 +1,26 @@
+namespace PTL.Contracts.Participant;
+
+public sealed record ParticipantResponse(
+    Guid ParticipantId,
+    Guid SsoId,
+    Guid CustomerId,
+    string LabCode,
+    string LabName,
+    Guid LabTypeId,
+    string ContactName,
+    string Organisation,
+    string Address1,
+    string Address2,
+    string Address3,
+    string Address4,
+    string Address5,
+    Guid CountryId,
+    string Telephone,
+    string Fax,
+    string Email,
+    string Email2,
+    string Comments,
+    bool IsActive,
+    DateTime? InactiveDate,
+    bool InactiveError,
+    DateTime? InactiveErrorDate);

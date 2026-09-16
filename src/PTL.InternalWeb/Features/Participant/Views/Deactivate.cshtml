@@ -1,7 +1,6 @@
-@model PTL.InternalWeb.Features.Customer.DeactivateCustomerViewModel
+@model PTL.InternalWeb.Features.Participant.DeactivateParticipantViewModel
 @{
-    ViewData["Title"] = "Deactivate customer";
-
+    ViewData["Title"] = "Deactivate participant";
     bool HasError(string field) => ViewData.ModelState.TryGetValue(field, out var entry) && entry.Errors.Count > 0;
     string? FirstError(string field) => ViewData.ModelState.TryGetValue(field, out var entry) && entry.Errors.Count > 0 ? entry.Errors[0].ErrorMessage : null;
     string FormGroupClass(string field) => HasError(field) ? "govuk-form-group govuk-form-group--error" : "govuk-form-group";
@@ -39,33 +38,23 @@
     </div>
 }
 
-<h1 class="govuk-heading-l">Deactivate @Model.Name</h1>
+<h1 class="govuk-heading-l">Deactivate @Model.LabName</h1>
 
 <div class="govuk-warning-text">
     <span class="govuk-warning-text__icon" aria-hidden="true">!</span>
     <strong class="govuk-warning-text__text">
         <span class="govuk-visually-hidden">Warning</span>
-        This customer will be marked inactive and will no longer be available for transactional use.
+        This participant will be marked inactive and will no longer be available for transactional use.
     </strong>
 </div>
 
-<form asp-action="Deactivate" asp-route-id="@Model.CustomerId" method="post" novalidate>
+<form asp-action="Deactivate" asp-route-id="@Model.ParticipantId" method="post" novalidate>
     @Html.AntiForgeryToken()
-    <input type="hidden" asp-for="CustomerId" />
-    <input type="hidden" asp-for="Name" />
-
-    <div class="@FormGroupClass("CustomerStatusId")">
-        <label class="govuk-label" asp-for="CustomerStatusId">Customer status (inactive reason)</label>
-        <div class="govuk-hint">[NEEDS INVESTIGATION] no CustomerStatus lookup service yet - enter the CustomerStatus GUID directly.</div>
-        @if (HasError("CustomerStatusId"))
-        {
-            <p id="CustomerStatusId-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @FirstError("CustomerStatusId")</p>
-        }
-        <input class="@InputClass("CustomerStatusId")" asp-for="CustomerStatusId" aria-describedby="@DescribedBy("CustomerStatusId")" />
-    </div>
+    <input type="hidden" asp-for="ParticipantId" />
+    <input type="hidden" asp-for="LabName" />
 
     <div class="govuk-button-group">
-        <button type="submit" class="govuk-button govuk-button--warning" data-module="govuk-button">Deactivate customer</button>
-        <a class="govuk-link" asp-action="Details" asp-route-id="@Model.CustomerId">Cancel</a>
+        <button type="submit" class="govuk-button govuk-button--warning" data-module="govuk-button">Deactivate participant</button>
+        <a class="govuk-link" asp-action="Details" asp-route-id="@Model.ParticipantId">Cancel</a>
     </div>
 </form>

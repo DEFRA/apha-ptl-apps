@@ -2,8 +2,10 @@ using Microsoft.EntityFrameworkCore;
 using PTL.Api.Features.Health;
 using PTL.Api.Infrastructure;
 using PTL.Core.Customer;
+using PTL.Core.Participant;
 using PTL.Data;
 using PTL.Data.Customer;
+using PTL.Data.Participant;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -40,6 +42,21 @@ else
 }
 
 builder.Services.AddScoped<ICustomerService, CustomerService>();
+
+// TEMPORARY (Development only): see DevelopmentParticipantRepository.cs - falls back to sample data
+// when the local dev database has no participant rows. Delete this if-block plus that file to remove.
+if (builder.Environment.IsDevelopment())
+{
+    builder.Services.AddScoped<ParticipantRepository>();
+    builder.Services.AddScoped<IParticipantRepository>(sp =>
+        new DevelopmentParticipantRepository(sp.GetRequiredService<ParticipantRepository>()));
+}
+else
+{
+    builder.Services.AddScoped<IParticipantRepository, ParticipantRepository>();
+}
+
+builder.Services.AddScoped<IParticipantService, ParticipantService>();
 
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<PTL.Api.Infrastructure.GlobalExceptionHandler>();
