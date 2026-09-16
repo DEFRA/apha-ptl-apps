@@ -19,5 +19,4 @@ Closes #
 - [ ] I have self-reviewed my own diff
 - [ ] Tests added/updated and passing locally
 - [ ] Documentation updated (README, docs, code comments) if this change affects setup, behavior, or usage
-- [ ] `VERSION` bumped for each project this PR changes (`src/PTL.Api/VERSION`, `src/PTL.InternalWeb/VERSION`, `src/PTL.ExternalWeb/VERSION`) - CI fails the PR otherwise
 

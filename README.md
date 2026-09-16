@@ -154,48 +154,55 @@ dotnet test PTL.slnx
 
 ## Docker images & deployment
 
-Each project has its own `Dockerfile` next to its `.csproj`, and (unlike `alpha-cdc-app`) **each pushes to
-its own dedicated ECR repository**, so the tag is just the plain version - no project prefix needed:
+`.github/workflows/build-test-publish-images.yml` builds and, on push to `main`, publishes images for
+whichever of `PTL.Api` / `PTL.InternalWeb` / `PTL.ExternalWeb` changed, each to its own ECR repository
+(configured via the `ECR_API_REPOSITORY` / `ECR_INTERNAL_REPOSITORY` / `ECR_EXTERNAL_REPOSITORY` variables
+on the `ecr-production` environment). `PTL.InternalWeb` and `PTL.ExternalWeb` both depend on the shared
+`PTL.ApiClient` library, so a change to `PTL.ApiClient` triggers a rebuild/publish of both consumers even if
+their own project folder didn't change.
 
-| Project | ECR repository | Tag format |
-|---|---|---|
-| `PTL.Api` | `alpha/ptlapi` | `<version>` |
-| `PTL.InternalWeb` | `alpha/ptlinternal` | `<version>` |
-| `PTL.ExternalWeb` | `alpha/ptlexternal` | `<version>` |
+### Image tags
 
-When picking an image to deploy in Jenkins, pick the ECR repository for the project you're deploying, then
-the version tag - there is no `latest` tag; every push is an explicit version. `PTL.InternalWeb` and
-`PTL.ExternalWeb` both depend on the shared `PTL.ApiClient` library, so a change to `PTL.ApiClient` triggers
-a rebuild/retag of both consumers even if their own project folder didn't change.
+Every image is tagged `sha-<12-char-commit-sha>-<run-id>-<run-attempt>`, generated automatically by the
+workflow - there is no hand-maintained version file. This is deliberate:
 
-Versions come from a plain `VERSION` file in each project folder, bumped by hand in the PR that changes that
-project (semver: feature = minor, fix = patch, breaking = major - not computed from commit history). Tags
-intentionally contain **no git SHA**. This is safe because:
+- It's always unique per push (or re-run), so ECR tag immutability never blocks a publish.
+- It's directly traceable back to the exact commit and Actions run that produced it, with no separate
+  version-bump step to keep in sync.
+- There is no `latest` tag - the ECR repositories have tag immutability enabled, which would make a mutable
+  `latest` tag impossible to update anyway.
 
-- CI fails the PR if a project's files changed (including its `PTL.ApiClient` dependency, for the two web
-  projects) but its `VERSION` file didn't (see the "Verify VERSION was bumped" step in
-  `.github/workflows/docker-build-push.yml`), so a version can't be silently reused.
-- Every ECR repository has tag immutability enabled, so even if that check were bypassed, re-pushing an
-  existing tag would fail loudly at push time rather than overwrite a deployed image.
+**Finding the latest image for a component**: since the tag itself carries no ordering information, use
+ECR's push timestamp instead of a tag convention:
 
-GitHub Actions builds and pushes images on merge to `main`; it does not deploy. Jenkins is used manually to
-pick a specific version tag and deploy it to ECS. A git tag (`api-v<version>`, `internalweb-v<version>`,
-`externalweb-v<version>`) is also created on merge as a human-readable pointer from git history to the
-deployed image version.
+```bash
+aws ecr describe-images \
+  --repository-name <repository> \
+  --query 'sort_by(imageDetails,& imagePushedAt)[-1].imageTags[0]' \
+  --output text
+```
 
-Note there are **two separate, unrelated git-tag schemes** on this repo - don't confuse them when browsing
-`git tag -l`:
-- `api-v<version>` / `internalweb-v<version>` / `externalweb-v<version>` (from `docker-build-push.yml`) - only
-  created when that project's files changed, points to a deployable image version.
-- `ptl-pr-<pr-number>-<short-sha>` (from `create-tag.yml`) - created on **every** merged PR regardless of what
-  changed, as a whole-repo traceability marker back to the PR and exact commit.
+The `publish` job's step summary also records the exact image URI and digest for every run, so the Actions
+run history for `build-test-publish-images.yml` on `main` is a complete, ordered audit trail of what was
+published.
 
-The only required PR status check is `gate`, which aggregates `lint` (formatting + analyzer-enforced build,
-always runs), `sonarcloud` (disabled - see below), and the per-project `build-api`/`build-internalweb`/
-`build-externalweb` jobs, which are skipped on PRs that don't touch that project so they can't be required
-directly without permanently blocking unrelated PRs.
+An earlier revision of this pipeline used a hand-bumped `VERSION` file per project with semver tags and a
+required "was VERSION bumped?" PR check. That has been retired in favour of the fully-automatic scheme
+above - there is no version file to remember to bump.
 
-**SonarCloud** is wired up but disabled (`if: false`) until the project exists in SonarCloud. To enable it:
-create the project, configure its access token and project identifiers as repo secrets/variables (see the
-`sonarcloud` job in `docker-build-push.yml` for what it expects), then flip `if: false` to `if: true` on that
-job.
+GitHub Actions builds and pushes images; it does not deploy. Jenkins (or other deployment tooling) picks a
+specific `sha-*` tag from ECR and deploys it to ECS.
+
+A separate, unrelated git tag (`ptl-pr-<pr-number>-<short-sha>`, from
+[`.github/workflows/create-tag.yml`](.github/workflows/create-tag.yml)) is created on every merged PR as a
+whole-repo traceability marker back to the PR and exact commit - it has no relationship to the image tags
+above.
+
+The only required PR status check is `gate`, which aggregates `changes` (path detection), `quality`
+(formatting + analyzer-enforced build/test), `sonarcloud` (disabled - see below), `container-validation`
+(container build for each changed component) and, on push to `main`, `publish`.
+
+**SonarCloud** is wired up but only runs when the `SONAR_ENABLED` repository variable is `'true'`. To enable
+it: create the project, configure its access token and project identifiers as repo secrets/variables (see
+the `sonarcloud` job in `build-test-publish-images.yml` for what it expects), then set `SONAR_ENABLED` to
+`'true'`.
