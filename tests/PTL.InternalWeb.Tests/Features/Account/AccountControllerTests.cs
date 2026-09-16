@@ -60,7 +60,7 @@ public class AccountControllerTests
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
         Assert.Equal("Index", redirect.ActionName);
-        Assert.Equal("Home", redirect.ControllerName);
+        Assert.Equal("Customer", redirect.ControllerName);
     }
 
     [Fact]

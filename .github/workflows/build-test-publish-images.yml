@@ -5,27 +5,29 @@ on:
     branches: [main]
   push:
     branches: [main]
+  # Manual "rebuild and publish everything" trigger, independent of what changed -
+  # e.g. to validate a change to this pipeline itself, or to re-publish on demand.
+  workflow_dispatch:
 
 permissions:
   contents: read
   pull-requests: read
 
 concurrency:
-  group: ptl-images-${{ github.workflow }}-${{ github.ref }}
+  group: ptl-images-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
-  DOTNET_VERSION: 10.0.x
-  AWS_REGION: ${{ vars.AWS_REGION }}
-  AWS_ROLE_ARN: ${{ vars.AWS_OIDC_ROLE_ARN }}
+  DOTNET_VERSION: "10.0.x"
 
 jobs:
   changes:
     name: Detect affected components
-    runs-on: ubuntu-latest
+    runs-on: windows-2022
     timeout-minutes: 5
     outputs:
-      components: ${{ steps.filter.outputs.changes }}
+      components: ${{ steps.components.outputs.result }}
+      dockerfiles: ${{ steps.dockerfiles.outputs.map }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7.0.1
@@ -35,6 +37,7 @@ jobs:
 
       - name: Detect changed paths
         id: filter
+        if: github.event_name != 'workflow_dispatch'
         uses: dorny/paths-filter@v4.0.3
         with:
           filters: |
@@ -70,9 +73,27 @@ jobs:
               - 'global.json'
               - '.github/workflows/build-test-publish-images.yml'
 
+      - name: Resolve affected components
+        id: components
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo 'result=["api","internalweb","externalweb"]' >> "${GITHUB_OUTPUT}"
+          else
+            echo 'result=${{ steps.filter.outputs.changes }}' >> "${GITHUB_OUTPUT}"
+          fi
+
+      # Single source of truth for the component -> Dockerfile mapping, consumed
+      # by container-validation and publish instead of each duplicating it.
+      - name: Map components to their Dockerfiles
+        id: dockerfiles
+        shell: bash
+        run: |
+          echo 'map={"api":"src/PTL.Api/Dockerfile","internalweb":"src/PTL.InternalWeb/Dockerfile","externalweb":"src/PTL.ExternalWeb/Dockerfile"}' >> "${GITHUB_OUTPUT}"
+
   quality:
     name: Format, build and test solution
-    runs-on: ubuntu-latest
+    runs-on: windows-2022
     timeout-minutes: 20
     steps:
       - name: Checkout repository
@@ -106,7 +127,7 @@ jobs:
   sonarcloud:
     name: SonarCloud analysis
     if: vars.SONAR_ENABLED == 'true'
-    runs-on: ubuntu-latest
+    runs-on: windows-2022
     timeout-minutes: 25
     steps:
       - name: Checkout full history
@@ -130,6 +151,7 @@ jobs:
         run: dotnet tool restore
 
       - name: Analyse solution
+        shell: bash
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: |
@@ -149,62 +171,108 @@ jobs:
     name: Validate ${{ matrix.component }} container
     needs: [changes, quality]
     if: needs.changes.outputs.components != '[]'
-    runs-on: ubuntu-latest
+    runs-on: windows-2022
     timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
         component: ${{ fromJSON(needs.changes.outputs.components) }}
+    env:
+      DOCKERFILE: ${{ fromJSON(needs.changes.outputs.dockerfiles)[matrix.component] }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7.0.1
         with:
           persist-credentials: false
 
-      - name: Resolve component configuration
-        id: component
+      - name: Validate resolved Dockerfile path
+        if: env.DOCKERFILE == ''
         shell: bash
         run: |
-          set -euo pipefail
-          case "${{ matrix.component }}" in
-            api)
-              echo "dockerfile=src/PTL.Api/Dockerfile" >> "${GITHUB_OUTPUT}"
-              ;;
-            internalweb)
-              echo "dockerfile=src/PTL.InternalWeb/Dockerfile" >> "${GITHUB_OUTPUT}"
-              ;;
-            externalweb)
-              echo "dockerfile=src/PTL.ExternalWeb/Dockerfile" >> "${GITHUB_OUTPUT}"
-              ;;
-            *)
-              echo "::error::Unsupported component: ${{ matrix.component }}"
-              exit 1
-              ;;
-          esac
+          echo "::error::No Dockerfile mapped for component '${{ matrix.component }}'. Check the 'Map components to their Dockerfiles' step in the changes job."
+          exit 1
+
+      # Compatibility workaround: this job builds with `docker build` (no BuildKit),
+      # which does not support the --mount=type=cache flag used in the Dockerfile.
+      - name: Remove unsupported NuGet cache mounts
+        uses: ./.github/actions/strip-nuget-cache-mount
+        with:
+          dockerfile: ${{ env.DOCKERFILE }}
+
+      # windows-2022 runners don't guarantee the Docker Engine service is already
+      # running - start it and wait for the daemon to accept connections first.
+      - name: Start Docker service
+        shell: pwsh
+        run: |
+          Start-Service -Name Docker -ErrorAction SilentlyContinue
+
+          $maxAttempts = 30
+          $attempt = 0
+          while ($attempt -lt $maxAttempts) {
+            try {
+              docker ps | Out-Null
+              Write-Host "Docker is running"
+              exit 0
+            } catch {
+              $attempt++
+              Start-Sleep -Seconds 1
+            }
+          }
+
+          Write-Error "Docker failed to start after $maxAttempts attempts"
+          exit 1
 
       - name: Build container without publishing
-        shell: bash
+        shell: pwsh
         run: |
-          set -euo pipefail
-          docker buildx build \
-            --file "${{ steps.component.outputs.dockerfile }}" \
-            --tag "ptl-${{ matrix.component }}:${GITHUB_SHA}" \
-            --load \
-            .
+          $dockerArgs = @(
+            "build"
+            "--file"
+            "${{ env.DOCKERFILE }}"
+            "--tag"
+            "ptl-${{ matrix.component }}:$env:GITHUB_SHA"
+            "--label"
+            "org.opencontainers.image.revision=$env:GITHUB_SHA"
+            "--label"
+            "org.opencontainers.image.source=https://github.com/$env:GITHUB_REPOSITORY"
+            "."
+          )
+
+          docker @dockerArgs
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
+      # On push to main this is the exact image publish later pushes - saving it here
+      # means publish loads it instead of rebuilding, so what's pushed is guaranteed
+      # to be byte-identical to what was just validated (and it's not rebuilt twice).
+      - name: Save built image for reuse by publish
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        shell: pwsh
+        run: docker save "ptl-${{ matrix.component }}:$env:GITHUB_SHA" -o "${{ runner.temp }}/ptl-${{ matrix.component }}.tar"
+
+      - name: Upload built image artifact
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ptl-image-${{ matrix.component }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/ptl-${{ matrix.component }}.tar
+          retention-days: 1
+          overwrite: true
 
   publish:
     name: Publish ${{ matrix.component }} image
     needs: [changes, quality, sonarcloud, container-validation]
     if: >-
       always() &&
-      github.event_name == 'push' &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch') &&
       github.ref == 'refs/heads/main' &&
       needs.changes.result == 'success' &&
       needs.quality.result == 'success' &&
       (vars.SONAR_ENABLED != 'true' || needs.sonarcloud.result == 'success') &&
       needs.container-validation.result == 'success' &&
       needs.changes.outputs.components != '[]'
-    runs-on: ubuntu-latest
+    runs-on: windows-2022
     environment: ecr-production
     timeout-minutes: 25
     permissions:
@@ -215,14 +283,13 @@ jobs:
       matrix:
         component: ${{ fromJSON(needs.changes.outputs.components) }}
     env:
-      AWS_ROLE_ARN: "arn:aws:iam::783559591987:role/github_actions_pipeline_ecr_role"
-      ECR_API_REPOSITORY: apha/ptlapi
-      ECR_INTERNAL_REPOSITORY: apha/ptlinternal
-      ECR_EXTERNAL_REPOSITORY: apha/ptlexternal
-      EXPECTED_AWS_ACCOUNT_ID: "783559591987"
-      AWS_REGION: "eu-west-2"
-      AWS_ACCOUNT_ID: "783559591987"
-      
+      AWS_REGION: ${{ secrets.AWS_ENV_REGION }}
+      AWS_ROLE_ARN: arn:aws:iam::${{ secrets.AWS_ENV_ACCOUNT }}:role/${{ secrets.AWS_ENV_OIDC_ROLE }}
+      EXPECTED_AWS_ACCOUNT_ID: ${{ vars.EXPECTED_AWS_ACCOUNT_ID }}
+      EXPECTED_AWS_REGION: ${{ vars.EXPECTED_AWS_REGION }}
+      ECR_API_REPOSITORY: ${{ vars.ECR_API_REPOSITORY }}
+      ECR_INTERNAL_REPOSITORY: ${{ vars.ECR_INTERNAL_REPOSITORY }}
+      ECR_EXTERNAL_REPOSITORY: ${{ vars.ECR_EXTERNAL_REPOSITORY }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7.0.1
@@ -235,24 +302,27 @@ jobs:
         run: |
           set -euo pipefail
 
-          test -n "${AWS_ROLE_ARN}" || {
-            echo "::error::Environment variable AWS_OIDC_ROLE_ARN is not configured."
+          test -n "${EXPECTED_AWS_ACCOUNT_ID}" || {
+            echo "::error::Repository variable EXPECTED_AWS_ACCOUNT_ID is not configured."
+            exit 1
+          }
+          test -n "${EXPECTED_AWS_REGION}" || {
+            echo "::error::Repository variable EXPECTED_AWS_REGION is not configured."
+            exit 1
+          }
+          [[ "${EXPECTED_AWS_ACCOUNT_ID}" =~ ^[0-9]{12}$ ]] || {
+            echo "::error::EXPECTED_AWS_ACCOUNT_ID must contain exactly 12 digits."
+            exit 1
+          }
+          [[ "${AWS_REGION}" == "${EXPECTED_AWS_REGION}" ]] || {
+            echo "::error::AWS_ENV_REGION does not match EXPECTED_AWS_REGION."
             exit 1
           }
 
           case "${{ matrix.component }}" in
-            api)
-              DOCKERFILE="src/PTL.Api/Dockerfile"
-              ECR_REPOSITORY="${ECR_API_REPOSITORY}"
-              ;;
-            internalweb)
-              DOCKERFILE="src/PTL.InternalWeb/Dockerfile"
-              ECR_REPOSITORY="${ECR_INTERNAL_REPOSITORY}"
-              ;;
-            externalweb)
-              DOCKERFILE="src/PTL.ExternalWeb/Dockerfile"
-              ECR_REPOSITORY="${ECR_EXTERNAL_REPOSITORY}"
-              ;;
+            api) ECR_REPOSITORY="${ECR_API_REPOSITORY}" ;;
+            internalweb) ECR_REPOSITORY="${ECR_INTERNAL_REPOSITORY}" ;;
+            externalweb) ECR_REPOSITORY="${ECR_EXTERNAL_REPOSITORY}" ;;
             *)
               echo "::error::Unsupported component: ${{ matrix.component }}"
               exit 1
@@ -265,29 +335,50 @@ jobs:
           }
 
           EXPECTED_ROLE_PREFIX="arn:aws:iam::${EXPECTED_AWS_ACCOUNT_ID}:role/"
-          [[ "${AWS_ROLE_ARN}" == "${EXPECTED_ROLE_PREFIX}"* ]] || {
-            echo "::error::AWS_OIDC_ROLE_ARN must reference account ${EXPECTED_AWS_ACCOUNT_ID}."
+          [[ "${AWS_ROLE_ARN}" == "${EXPECTED_ROLE_PREFIX}"* && "${AWS_ROLE_ARN}" != "${EXPECTED_ROLE_PREFIX}" ]] || {
+            echo "::error::Check AWS_ENV_ACCOUNT and AWS_ENV_OIDC_ROLE; the role ARN must reference the expected account and include a role name."
             exit 1
           }
 
-          {
-            echo "dockerfile=${DOCKERFILE}"
-            echo "ecr_repository=${ECR_REPOSITORY}"
-          } >> "${GITHUB_OUTPUT}"
+          echo "ecr_repository=${ECR_REPOSITORY}" >> "${GITHUB_OUTPUT}"
 
-      - name: Build release container
-        shell: bash
+      # Reuses the exact image container-validation already built and validated for
+      # this commit, instead of building it again from scratch.
+      - name: Download validated image artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ptl-image-${{ matrix.component }}-${{ github.run_id }}
+          path: ${{ runner.temp }}
+
+      # windows-2022 runners don't guarantee the Docker Engine service is already
+      # running - start it and wait for the daemon to accept connections first.
+      - name: Start Docker service
+        shell: pwsh
         run: |
-          set -euo pipefail
-          docker buildx build \
-            --file "${{ steps.component.outputs.dockerfile }}" \
-            --tag "ptl-${{ matrix.component }}:${GITHUB_SHA}" \
-            --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
-            --label "org.opencontainers.image.source=https://github.com/${GITHUB_REPOSITORY}" \
-            --load \
-            .
+          Start-Service -Name Docker -ErrorAction SilentlyContinue
+
+          $maxAttempts = 30
+          $attempt = 0
+          while ($attempt -lt $maxAttempts) {
+            try {
+              docker ps | Out-Null
+              Write-Host "Docker is running"
+              exit 0
+            } catch {
+              $attempt++
+              Start-Sleep -Seconds 1
+            }
+          }
+
+          Write-Error "Docker failed to start after $maxAttempts attempts"
+          exit 1
+
+      - name: Load validated image
+        shell: pwsh
+        run: docker load -i "${{ runner.temp }}/ptl-${{ matrix.component }}.tar"
 
       - name: Display OIDC claims for troubleshooting
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
@@ -324,11 +415,20 @@ jobs:
       - name: Configure AWS credentials through OIDC
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: "arn:aws:iam::783559591987:role/github_actions_pipeline_ecr_role"
-          aws-region: "eu-west-2"
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
           role-session-name: ptl-exr-${{ github.run_id }}-${{ matrix.component }}
           audience: sts.amazonaws.com
-      
+
+      - name: Verify assumed AWS account
+        shell: bash
+        run: |
+          set -euo pipefail
+          ACTUAL_ACCOUNT_ID="$(aws sts get-caller-identity --query Account --output text)"
+          [[ "${ACTUAL_ACCOUNT_ID}" == "${EXPECTED_AWS_ACCOUNT_ID}" ]] || {
+            echo "::error::The assumed AWS account does not match EXPECTED_AWS_ACCOUNT_ID."
+            exit 1
+          }
 
       - name: Log in to Amazon ECR
         id: ecr-login
@@ -375,7 +475,7 @@ jobs:
     name: CI gate
     needs: [changes, quality, sonarcloud, container-validation, publish]
     if: always()
-    runs-on: ubuntu-latest
+    runs-on: windows-2022
     timeout-minutes: 5
     env:
       CHANGES_RESULT: ${{ needs.changes.result }}
@@ -412,7 +512,7 @@ jobs:
             exit 1
           fi
 
-          if [[ "${EVENT_NAME}" == "push" && "${COMPONENTS}" != "[]" && "${PUBLISH_RESULT}" != "success" ]]; then
+          if [[ "${EVENT_NAME}" =~ ^(push|workflow_dispatch)$ && "${COMPONENTS}" != "[]" && "${PUBLISH_RESULT}" != "success" ]]; then
             echo "::error::Image publishing result: ${PUBLISH_RESULT}"
             exit 1
           fi

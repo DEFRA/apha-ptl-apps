@@ -18,22 +18,29 @@ internal static class StartupChecks
     {
         var host = configuration["Database:Host"];
         var name = configuration["Database:Name"];
+        var integratedSecurity = configuration.GetValue("Database:IntegratedSecurity", false);
         var user = configuration["Database:User"];
         var password = configuration["Database:Password"];
 
-        if (string.IsNullOrWhiteSpace(host) || string.IsNullOrWhiteSpace(name) ||
-            string.IsNullOrWhiteSpace(user) || string.IsNullOrWhiteSpace(password))
+        if (string.IsNullOrWhiteSpace(host) || string.IsNullOrWhiteSpace(name))
         {
             throw new InvalidOperationException(
-                "Database:Host, Database:Name, Database:User and Database:Password must all be configured. " +
+                "Database:Host and Database:Name must always be configured. " +
                 "Locally, set them in appsettings.Development.json; in a deployed environment, check the " +
-                "Database__Host / Database__Name / Database__User / Database__Password secret wiring in the " +
-                "ECS task definition.");
+                "Database__Host / Database__Name secret wiring in the ECS task definition.");
+        }
+
+        if (!integratedSecurity && (string.IsNullOrWhiteSpace(user) || string.IsNullOrWhiteSpace(password)))
+        {
+            throw new InvalidOperationException(
+                "Database:User and Database:Password must be configured unless Database:IntegratedSecurity is true. " +
+                "Locally, set them in appsettings.Development.json; in a deployed environment, check the " +
+                "Database__User / Database__Password secret wiring in the ECS task definition.");
         }
 
         var trustServerCertificate = configuration.GetValue("Database:TrustServerCertificate", false);
 
-        return new DatabaseOptions(host, name, user, password, trustServerCertificate);
+        return new DatabaseOptions(host, name, user ?? string.Empty, password ?? string.Empty, trustServerCertificate, integratedSecurity);
     }
 
     /// <summary>

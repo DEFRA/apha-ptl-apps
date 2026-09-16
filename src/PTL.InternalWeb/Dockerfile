@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # ---- Build stage ----
-FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:10.0-windowsservercore-ltsc2022 AS build
 WORKDIR /src
 
 # PTL.InternalWeb references the shared PTL.ApiClient library, so its
@@ -10,6 +10,8 @@ WORKDIR /src
 # PTL.ApiClient changes.
 COPY ["src/PTL.InternalWeb/PTL.InternalWeb.csproj", "src/PTL.InternalWeb/"]
 COPY ["src/PTL.ApiClient/PTL.ApiClient.csproj", "src/PTL.ApiClient/"]
+COPY ["src/PTL.Core/PTL.Core.csproj", "src/PTL.Core/"]
+COPY ["src/PTL.Contracts/PTL.Contracts.csproj", "src/PTL.Contracts/"]
 
 RUN --mount=type=cache,target=/root/.nuget/packages \
     dotnet restore "src/PTL.InternalWeb/PTL.InternalWeb.csproj"
@@ -20,7 +22,7 @@ RUN --mount=type=cache,target=/root/.nuget/packages \
     --no-restore /p:UseAppHost=false
 
 # ---- Runtime stage ----
-FROM mcr.microsoft.com/dotnet/aspnet:10.0-alpine AS final
+FROM mcr.microsoft.com/dotnet/aspnet:10.0-windowsservercore-ltsc2022 AS final
 WORKDIR /app
 # Must match the ECS task definition's containerPort (and ALB target group
 # port, if fronted by one) - coordinate any change here with infra.

@@ -1,10 +1,13 @@
 # syntax=docker/dockerfile:1
 
 # ---- Build stage ----
-FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:10.0-windowsservercore-ltsc2022 AS build
 WORKDIR /src
 
 COPY ["src/PTL.Api/PTL.Api.csproj", "src/PTL.Api/"]
+COPY ["src/PTL.Core/PTL.Core.csproj", "src/PTL.Core/"]
+COPY ["src/PTL.Data/PTL.Data.csproj", "src/PTL.Data/"]
+COPY ["src/PTL.Contracts/PTL.Contracts.csproj", "src/PTL.Contracts/"]
 
 RUN --mount=type=cache,target=/root/.nuget/packages \
     dotnet restore "src/PTL.Api/PTL.Api.csproj"
@@ -15,7 +18,7 @@ RUN --mount=type=cache,target=/root/.nuget/packages \
     --no-restore /p:UseAppHost=false
 
 # ---- Runtime stage ----
-FROM mcr.microsoft.com/dotnet/aspnet:10.0-alpine AS final
+FROM mcr.microsoft.com/dotnet/aspnet:10.0-windowsservercore-ltsc2022 AS final
 WORKDIR /app
 # Must match the ECS task definition's containerPort (and ALB target group
 # port, if fronted by one) - coordinate any change here with infra.

@@ -1,27 +1,67 @@
 @model PTL.ExternalWeb.Features.Account.AccountViewModel
 @{
-    ViewData["Title"] = "Login";
+    ViewData["Title"] = "Sign in";
+
+    bool HasError(string field) => ViewData.ModelState.TryGetValue(field, out var entry) && entry.Errors.Count > 0;
+    string? FirstError(string field) => ViewData.ModelState.TryGetValue(field, out var entry) && entry.Errors.Count > 0 ? entry.Errors[0].ErrorMessage : null;
+    string FormGroupClass(string field) => HasError(field) ? "govuk-form-group govuk-form-group--error" : "govuk-form-group";
+    string InputClass(string field) => HasError(field) ? "govuk-input govuk-input--error" : "govuk-input";
+    string? DescribedBy(string field) => HasError(field) ? $"{field}-error" : null;
+
+    var summaryErrors = ViewData.ModelState
+        .SelectMany(entry => entry.Value!.Errors.Select(error => new { Field = entry.Key, error.ErrorMessage }))
+        .ToList();
 }
 
-<h2>Login</h2>
+@if (!ViewData.ModelState.IsValid)
+{
+    <div class="govuk-error-summary" data-module="govuk-error-summary">
+        <div role="alert">
+            <h2 class="govuk-error-summary__title">There is a problem</h2>
+            <div class="govuk-error-summary__body">
+                <ul class="govuk-list govuk-error-summary__list">
+                    @foreach (var error in summaryErrors)
+                    {
+                        <li>
+                            @if (!string.IsNullOrEmpty(error.Field))
+                            {
+                                <a href="#@error.Field">@error.ErrorMessage</a>
+                            }
+                            else
+                            {
+                                @error.ErrorMessage
+                            }
+                        </li>
+                    }
+                </ul>
+            </div>
+        </div>
+    </div>
+}
 
+<h1 class="govuk-heading-l">Sign in</h1>
 
-<form asp-action="Login" method="post">
+<form asp-action="Login" method="post" novalidate>
     @Html.AntiForgeryToken()
-    <div class="form-group mb-3">
-        <label asp-for="Username" class="form-label"></label>
-        <input asp-for="Username" class="form-control" />
-        <span asp-validation-for="Username" class="text-danger"></span>
-    </div>
-    <div class="form-group mb-3">
-        <label asp-for="Password" class="form-label"></label>
-        <input asp-for="Password" class="form-control" />
-        <span asp-validation-for="Password" class="text-danger"></span>
-    </div>
     <input type="hidden" asp-for="ReturnUrl" />
-    <button type="submit" class="btn btn-primary">Sign in</button>
-</form>
 
-@section Scripts {
-    <partial name="_ValidationScriptsPartial" />
-}
+    <div class="@FormGroupClass("Username")">
+        <label class="govuk-label" asp-for="Username">Username</label>
+        @if (HasError("Username"))
+        {
+            <p id="Username-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @FirstError("Username")</p>
+        }
+        <input class="@InputClass("Username")" asp-for="Username" aria-describedby="@DescribedBy("Username")" autocomplete="username" />
+    </div>
+
+    <div class="@FormGroupClass("Password")">
+        <label class="govuk-label" asp-for="Password">Password</label>
+        @if (HasError("Password"))
+        {
+            <p id="Password-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @FirstError("Password")</p>
+        }
+        <input class="@InputClass("Password")" asp-for="Password" aria-describedby="@DescribedBy("Password")" autocomplete="current-password" />
+    </div>
+
+    <button type="submit" class="govuk-button" data-module="govuk-button">Sign in</button>
+</form>

@@ -1,0 +1,18 @@
+@model PTL.InternalWeb.Features.Customer.CustomerFormViewModel
+@{
+    ViewData["Title"] = "Create customer";
+}
+
+<a class="govuk-back-link" asp-action="Index">Back to customers</a>
+
+<h1 class="govuk-heading-l">Create customer</h1>
+
+<form method="post" asp-action="Create" novalidate>
+    @await Html.PartialAsync("_CustomerForm", Model)
+
+    <button class="govuk-button" data-module="govuk-button" type="submit">Create customer</button>
+</form>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}
