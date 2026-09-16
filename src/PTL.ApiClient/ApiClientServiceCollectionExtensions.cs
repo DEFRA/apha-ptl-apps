@@ -13,9 +13,19 @@ public static class ApiClientServiceCollectionExtensions
         var apiBaseUrl = configuration["Api:BaseUrl"]
             ?? throw new InvalidOperationException("Configuration value 'Api:BaseUrl' is required.");
 
+        // Fail fast at startup on a malformed value (e.g. a Service Connect DNS name
+        // configured without an http(s):// scheme), rather than a confusing failure on
+        // the first outgoing request.
+        if (!Uri.TryCreate(apiBaseUrl, UriKind.Absolute, out var baseUri) ||
+            (baseUri.Scheme != Uri.UriSchemeHttp && baseUri.Scheme != Uri.UriSchemeHttps))
+        {
+            throw new InvalidOperationException(
+                $"Configuration value 'Api:BaseUrl' ('{apiBaseUrl}') must be an absolute http:// or https:// URL, e.g. 'http://ptl-api:8080'.");
+        }
+
         services.AddHttpClient<IApiClient, ApiClient>(client =>
         {
-            client.BaseAddress = new Uri(apiBaseUrl);
+            client.BaseAddress = baseUri;
         })
             .AddStandardResilienceHandler();
 
