@@ -1,12 +1,6 @@
 @model PTL.InternalWeb.Features.Participant.DeactivateParticipantViewModel
 @{
     ViewData["Title"] = "Deactivate participant";
-    bool HasError(string field) => ViewData.ModelState.TryGetValue(field, out var entry) && entry.Errors.Count > 0;
-    string? FirstError(string field) => ViewData.ModelState.TryGetValue(field, out var entry) && entry.Errors.Count > 0 ? entry.Errors[0].ErrorMessage : null;
-    string FormGroupClass(string field) => HasError(field) ? "govuk-form-group govuk-form-group--error" : "govuk-form-group";
-    string InputClass(string field) => HasError(field) ? "govuk-input govuk-input--error" : "govuk-input";
-    string? DescribedBy(string field) => HasError(field) ? $"{field}-error" : null;
-
     var summaryErrors = ViewData.ModelState
         .SelectMany(entry => entry.Value!.Errors.Select(error => new { Field = entry.Key, error.ErrorMessage }))
         .ToList();
