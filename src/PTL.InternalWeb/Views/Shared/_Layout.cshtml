@@ -1,3 +1,11 @@
+@{
+    var currentController = (ViewContext.RouteData.Values["controller"]?.ToString() ?? string.Empty).Trim();
+    var currentAction = (ViewContext.RouteData.Values["action"]?.ToString() ?? string.Empty).Trim();
+    var isHomePage = string.Equals(currentController, "Home", StringComparison.OrdinalIgnoreCase)
+        && string.Equals(currentAction, "Index", StringComparison.OrdinalIgnoreCase);
+    var isLoginPage = string.Equals(currentController, "Account", StringComparison.OrdinalIgnoreCase)
+        && string.Equals(currentAction, "Login", StringComparison.OrdinalIgnoreCase);
+}
 <!DOCTYPE html>
 <html lang="en" class="govuk-template app-html-class">
 
@@ -17,6 +25,10 @@
         /* Sign out must be a form post for CSRF protection; reset button chrome so it reads as a service navigation link */
         .app-signout-form { display: inline; margin: 0; }
         .app-signout-button { background: none; border: 0; padding: 0; font: inherit; cursor: pointer; }
+        .govuk-header__container { min-height: 56px; display: flex; align-items: center; }
+        .app-service-bar { background: #ffffff; border-bottom: 1px solid #b1b4b6; }
+        .app-service-bar__container { min-height: 70px; display: flex; align-items: center; }
+        .app-account-panel { margin-left: auto; display: flex; align-items: center; gap: 1rem; }
     </style>
 </head>
 
@@ -54,73 +66,27 @@
     <header class="govuk-template__header">
         <div class="govuk-header">
             <div class="govuk-header__container govuk-width-container">
-                <div class="govuk-header__logo">
-                    <a href="//gov.uk" class="govuk-header__homepage-link">
-                        <svg focusable="false"
-                             role="img"
-                             xmlns="http://www.w3.org/2000/svg"
-                             viewBox="0 0 324 60"
-                             height="30"
-                             width="162"
-                             fill="currentcolor" class="govuk-header__logotype" aria-label="GOV.UK">
-                            <title>GOV.UK</title>
-                            <g>
-                                <circle cx="20" cy="17.6" r="3.7" />
-                                <circle cx="10.2" cy="23.5" r="3.7" />
-                                <circle cx="3.7" cy="33.2" r="3.7" />
-                                <circle cx="31.7" cy="30.6" r="3.7" />
-                                <circle cx="43.3" cy="17.6" r="3.7" />
-                                <circle cx="53.2" cy="23.5" r="3.7" />
-                                <circle cx="59.7" cy="33.2" r="3.7" />
-                                <circle cx="31.7" cy="30.6" r="3.7" />
-                                <path d="M33.1,9.8c.2-.1.3-.3.5-.5l4.6,2.4v-6.8l-4.6,1.5c-.1-.2-.3-.3-.5-.5l1.9-5.9h-6.7l1.9,5.9c-.2.1-.3.3-.5.5l-4.6-1.5v6.8l4.6-2.4c.1.2.3.3.5.5l-2.6,8c-.9,2.8,1.2,5.7,4.1,5.7h0c3,0,5.1-2.9,4.1-5.7l-2.6-8ZM37,37.9s-3.4,3.8-4.1,6.1c2.2,0,4.2-.5,6.4-2.8l-.7,8.5c-2-2.8-4.4-4.1-5.7-3.8.1,3.1.5,6.7,5.8,7.2,3.7.3,6.7-1.5,7-3.8.4-2.6-2-4.3-3.7-1.6-1.4-4.5,2.4-6.1,4.9-3.2-1.9-4.5-1.8-7.7,2.4-10.9,3,4,2.6,7.3-1.2,11.1,2.4-1.3,6.2,0,4,4.6-1.2-2.8-3.7-2.2-4.2.2-.3,1.7.7,3.7,3,4.2,1.9.3,4.7-.9,7-5.9-1.3,0-2.4.7-3.9,1.7l2.4-8c.6,2.3,1.4,3.7,2.2,4.5.6-1.6.5-2.8,0-5.3l5,1.8c-2.6,3.6-5.2,8.7-7.3,17.5-7.4-1.1-15.7-1.7-24.5-1.7h0c-8.8,0-17.1.6-24.5,1.7-2.1-8.9-4.7-13.9-7.3-17.5l5-1.8c-.5,2.5-.6,3.7,0,5.3.8-.8,1.6-2.3,2.2-4.5l2.4,8c-1.5-1-2.6-1.7-3.9-1.7,2.3,5,5.2,6.2,7,5.9,2.3-.4,3.3-2.4,3-4.2-.5-2.4-3-3.1-4.2-.2-2.2-4.6,1.6-6,4-4.6-3.7-3.7-4.2-7.1-1.2-11.1,4.2,3.2,4.3,6.4,2.4,10.9,2.5-2.8,6.3-1.3,4.9,3.2-1.8-2.7-4.1-1-3.7,1.6.3,2.3,3.3,4.1,7,3.8,5.4-.5,5.7-4.2,5.8-7.2-1.3-.2-3.7,1-5.7,3.8l-.7-8.5c2.2,2.3,4.2,2.7,6.4,2.8-.7-2.3-4.1-6.1-4.1-6.1h10.6,0Z" />
-                        </svg>
-                    </a>
+                <div class="govuk-header__content">
+                    <span class="govuk-header__link govuk-header__service-name">Proficiency Testing - Internal</span>
                 </div>
             </div>
         </div>
-        <section aria-label="Service information" class="govuk-service-navigation"
-                 data-module="govuk-service-navigation">
-            <div class="govuk-width-container govuk-service-navigation__inlining-container">
-                <div class="govuk-service-navigation__container">
-                    <span class="govuk-service-navigation__service-name">
-                        <a href="#" class="govuk-service-navigation__link">
-                            Proficiency Testing - Internal
-                        </a>
-                    </span>
-                    <nav aria-label="Menu" class="govuk-service-navigation__wrapper">
-                        <button type="button" class="govuk-service-navigation__toggle govuk-js-service-navigation-toggle" aria-controls="navigation" hidden aria-hidden="true">
-                            Menu
-                        </button>
-                        <ul class="govuk-service-navigation__list" id="navigation">
-                            <li class="govuk-service-navigation__item">
-                                <a class="govuk-service-navigation__link" asp-controller="Customer" asp-action="Index">
-                                    Customers
-                                </a>
-                            </li>
-                            <li class="govuk-service-navigation__item govuk-service-navigation__item--active">
-                                <a class="govuk-service-navigation__link" href="#" aria-current="true">
-                                    <strong class="govuk-service-navigation__active-fallback">Navigation item 1</strong>
-                                </a>
-                            </li> 
-                        </ul>
-                    </nav>
+        <section aria-label="Service information" class="app-service-bar">
+            <div class="govuk-width-container app-service-bar__container">
+                <div>
+                    <a asp-controller="Home" asp-action="Index" aria-label="Home">
+                            <img src="~/assets/images/AphaLogo.png" alt="APHA" style="height:40px; width:auto;" />
+                    </a>
                 </div>
                 @if (User.Identity is not null && User.Identity.IsAuthenticated)
                 {
-                    <nav aria-label="Account" class="govuk-service-navigation__wrapper">
-                        <ul class="govuk-service-navigation__list">
-                            <li class="govuk-service-navigation__item">
-                                <span class="govuk-service-navigation__link">Signed in as <strong>@User.Identity.Name</strong></span>
-                            </li>
-                            <li class="govuk-service-navigation__item">
-                                <form asp-controller="Account" asp-action="Logout" method="post" class="app-signout-form">
-                                    @Html.AntiForgeryToken()
-                                    <button type="submit" class="govuk-service-navigation__link app-signout-button">Sign out</button>
-                                </form>
-                            </li>
-                        </ul>
-                    </nav>
+                    <div class="app-account-panel">
+                        <span class="govuk-body govuk-!-margin-bottom-0">Signed in as: <strong>@User.Identity.Name</strong></span>
+                        <form asp-controller="Account" asp-action="Logout" method="post" class="app-signout-form">
+                            @Html.AntiForgeryToken()
+                            <button type="submit" class="app-signout-button govuk-link govuk-!-margin-bottom-0">Sign out</button>
+                        </form>
+                    </div>
                 }
             </div>
         </section>
@@ -138,8 +104,37 @@
     <div class="govuk-width-container app-width-container">
 
         <main class="govuk-main-wrapper app-main-class" id="main-content">
-            @await Html.PartialAsync("_Breadcrumbs")
-            @RenderBody()
+            @if (!isLoginPage)
+            {
+                @await Html.PartialAsync("_Breadcrumbs")
+            }
+            <div class="govuk-grid-row">
+                @if (!isLoginPage)
+                {
+                    <div class="govuk-grid-column-one-quarter">
+                        <nav aria-label="Primary navigation" class="app-primary-navigation">
+                            <ul class="govuk-list">
+                                <li>
+                                    @if (isHomePage)
+                                    {
+                                        <a class="govuk-link" asp-controller="Home" asp-action="Index" aria-current="page"><strong>Home</strong></a>
+                                    }
+                                    else
+                                    {
+                                        <a class="govuk-link" asp-controller="Home" asp-action="Index">Home</a>
+                                    }
+                                </li>
+                                <li><a class="govuk-link" asp-controller="Customer" asp-action="Index">Customers</a></li>
+                                <li><a class="govuk-link" href="#">Navigation item 2</a></li>
+                                <li><a class="govuk-link" href="#">Navigation item 3</a></li>
+                            </ul>
+                        </nav>
+                    </div>
+                }
+                <div class="@(isLoginPage ? "govuk-grid-column-full" : "govuk-grid-column-three-quarters")">
+                    @RenderBody()
+                </div>
+            </div>
         </main>
     </div>
     <footer class="govuk-template__footer">
