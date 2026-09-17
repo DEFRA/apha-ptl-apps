@@ -13,7 +13,7 @@ Use:
 - docs/analysis/csla-analysis.md
 - docs/migration/api-migration.md
 - docs/analysis/authentication-analysis.md
-- PTLIMS HLD
+- PTLIMS-HLD-v0.3.docx
 - Existing source code
 - Existing solution structure
 
@@ -21,7 +21,21 @@ The HLD is the source of truth for the target architecture.
 
 Do not introduce architecture decisions that conflict with the HLD.
 
-Preserve all business behaviour, validation rules, workflows, role restrictions, and domain rules identified during analysis.
+Preserve all business behaviour, validation rules, workflows, role restrictions, and domain rules identified during analysis and migration.
+
+---
+
+# Existing Code Reuse Rules
+
+Before generating any code:
+
+1. Review all existing implementation for the [DOMAIN] feature.
+2. Reuse existing files where possible.
+3. Extend existing implementations instead of replacing them.
+4. Refactor existing code where appropriate.
+5. Do not create duplicate services, repositories, controllers, DTOs, or views.
+6. Do not generate alternative implementations if one already exists.
+7. Maintain consistency with existing coding patterns.
 
 ---
 
@@ -34,6 +48,12 @@ src
 PTL.Api
 
 PTL.ApiClient
+
+PTL.Core
+
+PTL.Data
+
+PTL.Contracts
 
 PTL.InternalWeb
 
@@ -56,7 +76,6 @@ PTL.ExternalWeb.Tests
 Use:
 
 - ASP.NET Core (.NET 10)
-- Entity Framework Core
 - Repository Pattern
 - Dependency Injection
 - REST APIs
@@ -73,9 +92,140 @@ Do NOT use:
 - BusinessBase
 - ReadOnlyBase
 
-Avoid introducing additional complexity unless the migration documents require it.
+Avoid introducing additional complexity unless required by the migration documents.
 
 Prefer the simplest maintainable solution.
+
+---
+
+# Project Boundaries
+
+## PTL.Api
+
+Contains:
+
+- Controllers
+- API configuration
+- Authentication configuration
+- Swagger/OpenAPI
+- Filters
+- API middleware
+
+Do NOT place:
+
+- Business entities
+- Repository implementations
+- Domain logic
+
+inside controllers.
+
+---
+
+## PTL.Contracts
+
+Contains:
+
+- Request DTOs
+- Response DTOs
+- Shared contracts
+- ApiClient DTOs
+
+---
+
+## PTL.Core
+
+Contains:
+
+- Domain models
+- Business rules
+- Validation logic
+- Service interfaces
+- Service implementations
+
+---
+
+## PTL.Data
+
+Contains:
+
+- Repository interfaces
+- Repository implementations
+- EF Core configuration
+- Dapper access
+- Stored procedure integration
+
+---
+
+## PTL.ApiClient
+
+Contains:
+
+- Typed HttpClients
+- API access logic
+- Shared API communication helpers
+
+---
+
+## PTL.InternalWeb
+
+Contains:
+
+- Internal feature pages
+- ViewModels
+- Controllers
+- GOV.UK views
+
+---
+
+## PTL.ExternalWeb
+
+Contains:
+
+- External feature pages
+- ViewModels
+- Controllers
+- GOV.UK views
+
+---
+
+# Domain Boundary Rules
+
+Before implementation:
+
+Determine what belongs to the [DOMAIN].
+
+Implement only functionality that belongs to that domain.
+
+Do not implement functionality belonging to:
+
+- Participant
+- Contract
+- Scheme
+- Distribution
+- Tabulation
+- Reporting
+
+unless explicitly required by the migration document.
+
+Cross-domain interactions may be consumed but should not be implemented here.
+
+---
+
+# Cross Domain Review
+
+Before implementing:
+
+Review cross-domain dependencies identified in:
+
+docs/analysis/[domain]-analysis.md
+
+Identify:
+
+- Upstream dependencies
+- Downstream dependencies
+- Shared dependencies
+
+Explain any implementation impact.
 
 ---
 
@@ -102,7 +252,7 @@ Repository implementations should use:
 
 Repository
 ↓
-Entity Framework Core
+Entity Framework Core and/or Dapper
 ↓
 Stored Procedures
 ↓
@@ -122,7 +272,23 @@ SchemeRepository
 ↓
 spgScheme
 
-If EF Core mapping becomes difficult for a stored procedure result set, explain why and propose the simplest alternative.
+---
+
+# Stored Procedure Validation
+
+Before implementing any repository method:
+
+1. Identify the exact stored procedure.
+2. Verify the procedure exists.
+3. Verify parameters.
+4. Verify output columns.
+5. Verify table dependencies.
+
+If a stored procedure cannot be confirmed:
+
+[NEEDS INVESTIGATION]
+
+Do not invent stored procedure names.
 
 ---
 
@@ -148,22 +314,19 @@ Use role mappings already identified.
 
 Do not invent new roles.
 
+If authentication is currently out of scope:
+
+Do not implement authentication.
+
+Assume access is temporarily granted for development purposes.
+
 ---
 
 # Implementation Scope
 
 Implement only the scope required by the migration document.
 
-If the migration document specifies Phase 1:
-
-Implement:
-
-- Read-only functionality
-- Browse
-- Search
-- Details pages
-
-Do NOT automatically implement:
+Do not automatically implement:
 
 - Create
 - Update
@@ -179,7 +342,7 @@ unless explicitly requested.
 
 ## Step 1 – File Inventory
 
-Before generating any code produce:
+Before generating code produce:
 
 ### Files To Create
 
@@ -189,7 +352,13 @@ Before generating any code produce:
 
 ### Project Boundaries
 
-Wait for verification in the output before generating code.
+### Stored Procedures Required
+
+### Project References Required
+
+### Dependency Injection Changes Required
+
+Only after inventory is complete proceed with implementation.
 
 ---
 
@@ -211,25 +380,15 @@ Generate:
 
 ### Service Implementations
 
-### Repository Interfaces
-
-### Repository Implementations
-
 Requirements:
 
 - REST conventions
 - Proper status codes
 - Error handling
-- Logging hooks
-- Authorization attributes
+- Logging
+- Authorization attributes where required
 
-Implement only the endpoints required by the migration document.
-
-Example:
-
-GET /api/customers
-
-GET /api/customers/{id}
+Implement only endpoints required by migration documents.
 
 ---
 
@@ -243,23 +402,53 @@ Generate:
 
 ### Typed HttpClient
 
+### Interface
+
 ### Request Models
 
 ### Response Models
 
-### Interface
+---
 
-Example:
+## Step 4 – Core Layer
 
-CustomerApiClient
+Project:
 
-GetCustomersAsync()
+PTL.Core
 
-GetCustomerAsync(Guid id)
+Generate:
+
+### Domain Models
+
+### Services
+
+### Interfaces
+
+### Business Rules
+
+### Validation Logic
 
 ---
 
-## Step 4 – Internal Web
+## Step 5 – Data Layer
+
+Project:
+
+PTL.Data
+
+Generate:
+
+### Repository Interfaces
+
+### Repository Implementations
+
+### EF Core Configuration
+
+### Stored Procedure Integration
+
+---
+
+## Step 6 – Internal Web
 
 Project:
 
@@ -285,31 +474,17 @@ Use existing GOV.UK layout.
 
 Follow existing feature-folder conventions.
 
-Example:
-
-Features/Customer
-
-CustomerController.cs
-
-CustomerViewModel.cs
-
-Views/Index.cshtml
-
-Views/Details.cshtml
-
 ---
 
-## Step 5 – External Web
+## Step 7 – External Web
 
 Project:
 
 PTL.ExternalWeb
 
-If this domain is externally accessible:
+If externally accessible:
 
 Generate:
-
-Features/[DOMAIN]
 
 ### Controller
 
@@ -321,13 +496,13 @@ Features/[DOMAIN]
 
 ### API Client Integration
 
-If the domain is internal-only:
+If not externally accessible:
 
-Explain why no ExternalWeb implementation is required.
+Explain why.
 
 ---
 
-## Step 6 – Validation
+## Step 8 – Validation
 
 Implement validation identified in:
 
@@ -346,15 +521,7 @@ Do not invent validation rules.
 
 ---
 
-## Step 7 – Testing
-
-Projects:
-
-PTL.Api.Tests
-
-PTL.InternalWeb.Tests
-
-PTL.ExternalWeb.Tests
+## Step 9 – Testing
 
 Generate:
 
@@ -387,6 +554,10 @@ Provide:
 
 ## Project Dependencies
 
+## Stored Procedures Used
+
+## Dependency Injection Changes
+
 ## Build Instructions
 
 ## Test Instructions
@@ -397,8 +568,8 @@ For anything missing:
 
 [NEEDS INVESTIGATION]
 
-Preserve all existing PTLIMS business behaviour.
+Preserve all PTLIMS business behaviour.
 
 Do not generate mock business rules.
 
-Follow the migration documents as the source of truth.
+Follow migration documents as the source of truth.

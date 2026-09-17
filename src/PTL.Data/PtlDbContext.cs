@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using PTL.Core.Customer;
+using PTL.Core.Participant;
 using CoreCustomer = PTL.Core.Customer.Customer;
+using CoreParticipant = PTL.Core.Participant.Participant;
 
 namespace PTL.Data;
 
@@ -10,6 +12,8 @@ public class PtlDbContext(DbContextOptions<PtlDbContext> options) : DbContext(op
 {
     public DbSet<CoreCustomer> Customers => Set<CoreCustomer>();
     public DbSet<CustomerSummaryEntity> CustomerSummaries => Set<CustomerSummaryEntity>();
+    public DbSet<CoreParticipant> Participants => Set<CoreParticipant>();
+    public DbSet<ParticipantSummaryEntity> ParticipantSummaries => Set<ParticipantSummaryEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -70,6 +74,46 @@ public class PtlDbContext(DbContextOptions<PtlDbContext> options) : DbContext(op
             entity.Property(c => c.Name).HasColumnName("fldName");
             entity.Property(c => c.Organisation).HasColumnName("fldOrganisation");
             entity.Property(c => c.IsActive).HasColumnName("fldIsActive");
+        });
+
+        modelBuilder.Entity<CoreParticipant>(entity =>
+        {
+            entity.ToTable("tblParticipant");
+            entity.HasKey(p => p.ParticipantId);
+            entity.Property(p => p.ParticipantId).HasColumnName("fldParticipantId");
+            entity.Property(p => p.SsoId).HasColumnName("fldSsoId");
+            entity.Property(p => p.CustomerId).HasColumnName("fldCustomerId");
+            entity.Property(p => p.LabCode).HasColumnName("fldLabCode");
+            entity.Property(p => p.LabName).HasColumnName("fldLabName");
+            entity.Property(p => p.LabTypeId).HasColumnName("fldLabTypeId");
+            entity.Property(p => p.ContactName).HasColumnName("fldContactName");
+            entity.Property(p => p.Organisation).HasColumnName("fldOrganisation");
+            entity.Property(p => p.Address1).HasColumnName("fldAddress1");
+            entity.Property(p => p.Address2).HasColumnName("fldAddress2");
+            entity.Property(p => p.Address3).HasColumnName("fldAddress3");
+            entity.Property(p => p.Address4).HasColumnName("fldAddress4");
+            entity.Property(p => p.Address5).HasColumnName("fldAddress5");
+            entity.Property(p => p.CountryId).HasColumnName("fldCountryId");
+            entity.Property(p => p.Telephone).HasColumnName("fldTelephone");
+            entity.Property(p => p.Fax).HasColumnName("fldFax");
+            entity.Property(p => p.Email).HasColumnName("fldEmail");
+            entity.Property(p => p.Email2).HasColumnName("fldEmail2");
+            entity.Property(p => p.Comments).HasColumnName("fldComments");
+            entity.Property(p => p.IsActive).HasColumnName("fldIsActive");
+            entity.Property(p => p.InactiveDate).HasColumnName("fldInactiveDate");
+            entity.Property(p => p.InactiveError).HasColumnName("fldInactiveError");
+            entity.Property(p => p.InactiveErrorDate).HasColumnName("fldInactiveErrorDate");
+        });
+
+        modelBuilder.Entity<ParticipantSummaryEntity>(entity =>
+        {
+            entity.HasNoKey();
+            entity.Property(p => p.ParticipantId).HasColumnName("fldParticipantId");
+            entity.Property(p => p.CustomerId).HasColumnName("fldCustomerId");
+            entity.Property(p => p.LabCode).HasColumnName("fldLabCode");
+            entity.Property(p => p.LabName).HasColumnName("fldLabName");
+            entity.Property(p => p.ContactName).HasColumnName("fldContactName");
+            entity.Property(p => p.IsActive).HasColumnName("fldIsActive");
         });
     }
 }

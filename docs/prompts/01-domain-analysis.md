@@ -1,8 +1,19 @@
 # Domain Analysis Prompt
 
-You are a Senior .NET Modernization Architect, Solution Analyst, and Migration Lead.
+You are a Principal Solution Architect, Domain Analyst, and Legacy Modernization Specialist.
 
-Analyze the [DOMAIN] domain across the entire PTLIMS legacy solution.
+Analyze the [DOMAIN] domain across the entire PTLIMS legacy solution(C:\Users\ac000232\source\repos\proficiency-testing).
+
+This is an AS-IS analysis only.
+
+Do NOT generate:
+
+- .NET 10 design
+- Migration architecture
+- Repository design
+- CQRS
+- DDD
+- Future implementation plans
 
 Use:
 
@@ -12,35 +23,48 @@ Use:
 - ASMX services
 - CSLA business objects
 - Configuration
-- HLD
-- KT documentation
+- docs/source/PTLIMS-HLD-v0.3.docx
+- docs/source/PTLIMS-KT.md
+- Existing analysis documents
 
-Search all relevant projects:
+Search:
 
 - ASP.NET Web Forms (.aspx, .ascx)
 - Code-behind (.vb, .cs)
-- ASMX Services
-- CSLA Business Objects
-- Class Libraries
+- ASMX services
+- CSLA business objects
 - DTOs
-- Structures
-- Database Project
+- Database project
 - Tables
 - Views
 - Functions
-- Stored Procedures
+- Stored procedures
 - Reports
-- Unit Tests
+- Unit tests
+
+---
 
 ## Generate
 
 ### Executive Summary
 
+### Business Purpose
+
+What business problem does this domain solve?
+
 ### User Journeys
+
+For each journey identify:
+
+- User Role
+- Entry Point
+- Exit Point
+- Workflow
+- Dependencies
 
 ### Page Inventory
 
-Include:
+For each page:
 
 - Page
 - Role
@@ -50,7 +74,7 @@ Include:
 
 ### Service Inventory
 
-Include:
+For each ASMX service:
 
 - Service
 - WebMethod
@@ -60,11 +84,15 @@ Include:
 
 ### Business Objects
 
-Extract:
+Identify:
 
 - BusinessBase
 - ReadOnlyBase
 - BusinessListBase
+- ReadOnlyListBase
+
+Extract:
+
 - DataPortal_Fetch
 - DataPortal_Insert
 - DataPortal_Update
@@ -82,23 +110,123 @@ Identify:
 - Stored Procedures
 - TVPs
 
+Provide:
+
+Page
+↓
+Service
+↓
+Business Object
+↓
+Stored Procedure
+↓
+Table
+
+mapping.
+
 ### Validation Rules
+
+Classify:
+
+- Critical
+- Important
+- Optional
 
 ### Business Rules
 
+Classify:
+
+- Critical
+- Important
+- Optional
+
 ### Security Analysis
 
-### Dependency Analysis
+Identify:
 
-Generate Mermaid diagrams.
+- Authentication dependencies
+- Authorization dependencies
+- Role checks
+- Ownership checks
 
-### Migration Complexity Assessment
+### Cross-Domain Dependencies
+
+Identify:
+
+- Upstream Domains
+- Downstream Domains
+- Shared Domains
+
+Example:
+
+Customer
+↓
+Participant
+↓
+Contract
+
+Explain:
+
+- Dependency reason
+- Impact of changes
+
+Generate Mermaid diagram.
+
+### Workflow Boundaries
+
+Identify:
+
+Entry Points
+
+Exit Points
+
+Example:
+
+Customer
+↓
+Participant Creation
+
+Customer
+↓
+Pending Customer Update
+
+### Stored Procedure Dependency Matrix
+
+For every major SP:
+
+Page
+↓
+Service
+↓
+Business Object
+↓
+Stored Procedure
+↓
+Table
+
+### Migration Impact Assessment
+
+If this domain changes:
+
+What domains are affected?
+
+Classify:
+
+- High Impact
+- Medium Impact
+- Low Impact
+
+### Complexity Assessment
 
 ### Open Questions
 
-For any missing information write:
+Use:
 
 [NEEDS INVESTIGATION]
+
+for unknown information.
+
+---
 
 ## Output
 
@@ -106,6 +234,7 @@ Create:
 
 docs/analysis/[domain]-analysis.md
 
-Do not generate code.
-
 Provide source file references for all findings.
+
+Do not generate code.
+``

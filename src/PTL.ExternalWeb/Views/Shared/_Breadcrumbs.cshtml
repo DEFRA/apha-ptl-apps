@@ -1,0 +1,43 @@
+@using System.Text.RegularExpressions
+@{
+    var controller = (ViewContext.RouteData.Values["controller"]?.ToString() ?? string.Empty).Trim();
+    var action = (ViewContext.RouteData.Values["action"]?.ToString() ?? string.Empty).Trim();
+
+    static string ToDisplay(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        return Regex.Replace(value, "([a-z])([A-Z])", "$1 $2");
+    }
+
+    var hasController =
+        !string.IsNullOrWhiteSpace(controller) &&
+        !string.Equals(controller, "Home", StringComparison.OrdinalIgnoreCase);
+
+    var hasAction = !string.IsNullOrWhiteSpace(action) && !string.Equals(action, "Index", StringComparison.OrdinalIgnoreCase);
+}
+
+<nav class="govuk-breadcrumbs" aria-label="Breadcrumb">
+    <ol class="govuk-breadcrumbs__list">
+        <li class="govuk-breadcrumbs__list-item">
+            <a class="govuk-breadcrumbs__link" asp-controller="Home" asp-action="Index">Home</a>
+        </li>
+
+        @if (hasController)
+        {
+            <li class="govuk-breadcrumbs__list-item">
+                <a class="govuk-breadcrumbs__link" asp-controller="@controller" asp-action="Index">@ToDisplay(controller)</a>
+            </li>
+        }
+
+        @if (hasAction)
+        {
+            <li class="govuk-breadcrumbs__list-item">
+                <a class="govuk-breadcrumbs__link" asp-controller="@controller" asp-action="@action">@ToDisplay(action)</a>
+            </li>
+        }
+    </ol>
+</nav>

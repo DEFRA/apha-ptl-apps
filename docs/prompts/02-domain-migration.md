@@ -1,105 +1,162 @@
 # Domain Migration Prompt
 
-You are a Senior Solution Architect and Lead Engineer.
+You are a Principal Solution Architect and .NET Modernization Lead.
 
 Use:
 
-docs/analysis/[domain]-analysis.md
+- docs/analysis/[domain]-analysis.md
+- docs/analysis/csla-analysis.md
+- docs/migration/api-migration.md
+- docs/analysis/authentication-analysis.md
+- docs/source/PTLIMS-HLD-v0.3.docx
+- docs/source/PTLIMS-KT.md
 
-and the PTLIMS HLD.
 
-Design the migration plan for the [DOMAIN] domain.
+Design the TO-BE migration plan for the [DOMAIN] domain.
+
+Do NOT write implementation code.
+
+---
 
 ## Generate
 
 ### Current State Summary
 
-### UI Migration Mapping
+### Domain Boundaries
 
-Map:
+Define:
+
+What belongs to this domain?
+
+What does NOT belong to this domain?
+
+Example:
+
+Customer Domain
+
+Contains:
+- Customer
+- CustomerStatus
+- CustomerType
+
+Does Not Contain:
+- Participant
+- Scheme
+- Distribution
+
+### UI Migration Mapping
 
 Legacy Page
 ↓
-Target Razor Page
+Target Page
 
-Example:
-
-Customer.aspx
-↓
-Features/Customer/Pages/Details.cshtml
+Map all pages.
 
 ### API Migration Mapping
 
-Map:
-
-Legacy ASMX Service
+Legacy ASMX
 ↓
 REST Endpoint
 
-Example:
-
-Customer.asmx
-GetCustomer()
-↓
-GET /api/customers/{id}
+Map all methods.
 
 ### Repository Mapping
 
-Identify:
+For every repository provide:
 
 - Repository Name
 - Methods
-- Stored Procedures Used
+- Stored Procedures
+- Database Dependencies
 
 ### Authentication Mapping
 
-Current:
-- Windows Auth
-- Forms Auth
-- VLAServices
+Current
 
-Future:
-- Entra ID
-- Gov UK One Login
-- JWT Claims
+Future
+
+Impact
 
 ### Database Strategy
 
-Recommend:
+Classify:
 
 - Keep SP
-- Replace SP
 - Wrap SP
+- Replace SP
 
-### .NET 10 Design
+with rationale.
 
-#### Domain Layer
+### API Client Design
 
-#### Application Layer
+For PTL.ApiClient.
 
-#### Infrastructure Layer
+### Target Project Placement
 
-#### API Layer
+Identify what goes into:
 
-#### UI Layer
+- PTL.Api
+- PTL.ApiClient
+- PTL.Core
+- PTL.Data
+- PTL.Contracts
+- PTL.InternalWeb
+- PTL.ExternalWeb
 
-### Sprint Plan
+### Future Domain Dependencies
+
+Identify:
+
+Domains depending on this one.
+
+Example:
+
+Participant depends on Customer.
+
+Contract depends on Customer.
+
+### Feature Breakdown
+
+Separate:
+
+Phase 1
+Phase 2
+Phase 3
+
+Example:
+
+Phase 1
+- List
+- Details
+
+Phase 2
+- Create
+- Edit
+
+Phase 3
+- Workflow
+- Approvals
 
 ### Risks
 
 ### Dependencies
 
+### Testing Strategy
+
 ### Development Readiness
 
 Can development start?
 
-If not:
-
 What is missing?
+
+### Recommendations
+
+---
 
 ## Output
 
 Create:
 
 docs/migration/[domain]-migration.md
-``
+
+Do not generate code.

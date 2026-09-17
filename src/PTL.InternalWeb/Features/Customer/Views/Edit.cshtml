@@ -3,8 +3,6 @@
     ViewData["Title"] = $"Edit customer - {Model.Name}";
 }
 
-<a class="govuk-back-link" asp-action="Details" asp-route-id="@Model.CustomerId">Back to customer</a>
-
 <h1 class="govuk-heading-l">Edit customer</h1>
 
 <form method="post" asp-action="Edit" asp-route-id="@Model.CustomerId" novalidate>

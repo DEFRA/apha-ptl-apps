@@ -1,0 +1,89 @@
+@model PTL.InternalWeb.Features.Participant.ParticipantListViewModel
+@using PTL.Contracts.Participant
+@{
+    ViewData["Title"] = "Participants";
+    var totalPages = Model.PageSize == 0 ? 1 : (int)Math.Ceiling(Model.TotalCount / (double)Model.PageSize);
+}
+
+<h1 class="govuk-heading-l">Participants</h1>
+
+<p class="govuk-body">
+    <a class="govuk-button" data-module="govuk-button" asp-action="Create" asp-route-customerId="@Model.CustomerId">Create participant</a>
+</p>
+
+<form method="get" asp-action="Index" class="govuk-!-margin-bottom-6">
+    <input type="hidden" name="customerId" value="@Model.CustomerId" />
+    <div class="govuk-form-group">
+        <label class="govuk-label" for="searchTerm">Search</label>
+        <div class="govuk-hint">Matches lab code, lab name, or contact name.</div>
+        <input class="govuk-input" id="searchTerm" name="searchTerm" value="@Model.SearchTerm" />
+    </div>
+    <div class="govuk-form-group">
+        <label class="govuk-label" for="includeInactive">Status</label>
+        <select class="govuk-select" id="includeInactive" name="includeInactive">
+            <option value="false" selected="@(Model.IncludeInactive ? null : "selected")">Active</option>
+            <option value="true" selected="@(Model.IncludeInactive ? "selected" : null)">Inactive</option>
+        </select>
+    </div>
+    <button class="govuk-button" data-module="govuk-button" type="submit">Search</button>
+</form>
+
+@if (Model.Participants.Count == 0)
+{
+    <p class="govuk-body">There are no participants to display.</p>
+}
+else
+{
+    <table class="govuk-table">
+        <thead class="govuk-table__head">
+            <tr class="govuk-table__row">
+                <th scope="col" class="govuk-table__header">Lab code</th>
+                <th scope="col" class="govuk-table__header">Lab name</th>
+                <th scope="col" class="govuk-table__header">Contact</th>
+                <th scope="col" class="govuk-table__header">Status</th>
+                <th scope="col" class="govuk-table__header"><span class="govuk-visually-hidden">Actions</span></th>
+            </tr>
+        </thead>
+        <tbody class="govuk-table__body">
+            @foreach (var participant in Model.Participants)
+            {
+                <tr class="govuk-table__row">
+                    <td class="govuk-table__cell">@participant.LabCode</td>
+                    <td class="govuk-table__cell">@participant.LabName</td>
+                    <td class="govuk-table__cell">@participant.ContactName</td>
+                    <td class="govuk-table__cell">
+                        <strong class="govuk-tag @(participant.IsActive ? "govuk-tag--green" : "govuk-tag--grey")">
+                            @(participant.IsActive ? "Active" : "Inactive")
+                        </strong>
+                    </td>
+                    <td class="govuk-table__cell">
+                        <a class="govuk-link" asp-action="Details" asp-route-id="@participant.ParticipantId">View details</a>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+
+    @if (totalPages > 1)
+    {
+        <nav class="govuk-pagination" aria-label="Pagination">
+            <ul class="govuk-pagination__list">
+                @for (var pageNumber = 1; pageNumber <= totalPages; pageNumber++)
+                {
+                    <li class="govuk-pagination__item @(pageNumber == Model.Page ? "govuk-pagination__item--current" : "")">
+                        <a class="govuk-link govuk-pagination__link"
+                           asp-action="Index"
+                           asp-route-customerId="@Model.CustomerId"
+                           asp-route-searchTerm="@Model.SearchTerm"
+                           asp-route-includeInactive="@Model.IncludeInactive"
+                           asp-route-page="@pageNumber"
+                           asp-route-pageSize="@Model.PageSize"
+                           aria-label="Page @pageNumber">
+                            @pageNumber
+                        </a>
+                    </li>
+                }
+            </ul>
+        </nav>
+    }
+}

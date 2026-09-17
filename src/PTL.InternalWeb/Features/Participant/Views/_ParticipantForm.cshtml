@@ -1,0 +1,210 @@
+@model PTL.InternalWeb.Features.Participant.ParticipantFormViewModel
+@{
+    var errors = ViewData.ModelState
+        .Where(entry => entry.Value?.Errors.Count > 0)
+        .SelectMany(entry => entry.Value!.Errors.Select(error => (Field: entry.Key, Message: error.ErrorMessage)))
+        .ToList();
+
+    bool HasError(string field) => ViewData.ModelState.TryGetValue(field, out var entry) && entry.Errors.Count > 0;
+    string? FirstError(string field) => ViewData.ModelState.TryGetValue(field, out var entry) && entry.Errors.Count > 0 ? entry.Errors[0].ErrorMessage : null;
+    string FormGroupClass(string field) => HasError(field) ? "govuk-form-group govuk-form-group--error" : "govuk-form-group";
+    string InputClass(string baseClass, string field) => HasError(field) ? $"{baseClass} {baseClass}--error" : baseClass;
+    string? DescribedBy(string field) => HasError(field) ? $"{field}-error" : null;
+}
+
+@if (errors.Count > 0)
+{
+    <div class="govuk-error-summary" data-module="govuk-error-summary">
+        <div role="alert">
+            <h2 class="govuk-error-summary__title">There is a problem</h2>
+            <div class="govuk-error-summary__body">
+                <ul class="govuk-list govuk-error-summary__list">
+                    @foreach (var error in errors)
+                    {
+                        <li>
+                            @if (string.IsNullOrEmpty(error.Field))
+                            {
+                                @error.Message
+                            }
+                            else
+                            {
+                                <a href="#@error.Field">@error.Message</a>
+                            }
+                        </li>
+                    }
+                </ul>
+            </div>
+        </div>
+    </div>
+}
+
+<input type="hidden" asp-for="CustomerId" />
+<input type="hidden" asp-for="ParticipantId" />
+
+<h2 class="govuk-heading-m">Participant details</h2>
+
+<div class="@FormGroupClass("LabCode")">
+    <label class="govuk-label" asp-for="LabCode">Lab code</label>
+    @if (HasError("LabCode"))
+    {
+        <p id="LabCode-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @FirstError("LabCode")</p>
+    }
+    <input class="@InputClass("govuk-input", "LabCode")" asp-for="LabCode" aria-describedby="@DescribedBy("LabCode")" />
+</div>
+
+<div class="@FormGroupClass("LabName")">
+    <label class="govuk-label" asp-for="LabName">Lab name</label>
+    @if (HasError("LabName"))
+    {
+        <p id="LabName-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @FirstError("LabName")</p>
+    }
+    <input class="@InputClass("govuk-input", "LabName")" asp-for="LabName" aria-describedby="@DescribedBy("LabName")" />
+</div>
+
+<div class="@FormGroupClass("LabTypeId")">
+    <label class="govuk-label" asp-for="LabTypeId">Lab type ID</label>
+    <div class="govuk-hint">Enter the lab type GUID directly.</div>
+    @if (HasError("LabTypeId"))
+    {
+        <p id="LabTypeId-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @FirstError("LabTypeId")</p>
+    }
+    <input class="@InputClass("govuk-input", "LabTypeId")" asp-for="LabTypeId" aria-describedby="@DescribedBy("LabTypeId")" />
+</div>
+
+<div class="@FormGroupClass("SsoId")">
+    <label class="govuk-label" asp-for="SsoId">SSO ID</label>
+    @if (HasError("SsoId"))
+    {
+        <p id="SsoId-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @FirstError("SsoId")</p>
+    }
+    <input class="@InputClass("govuk-input", "SsoId")" asp-for="SsoId" aria-describedby="@DescribedBy("SsoId")" />
+</div>
+
+<h2 class="govuk-heading-m">Contact details</h2>
+
+<div class="@FormGroupClass("ContactName")">
+    <label class="govuk-label" asp-for="ContactName">Contact name</label>
+    @if (HasError("ContactName"))
+    {
+        <p id="ContactName-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @FirstError("ContactName")</p>
+    }
+    <input class="@InputClass("govuk-input", "ContactName")" asp-for="ContactName" aria-describedby="@DescribedBy("ContactName")" />
+</div>
+
+<div class="@FormGroupClass("Organisation")">
+    <label class="govuk-label" asp-for="Organisation">Organisation</label>
+    @if (HasError("Organisation"))
+    {
+        <p id="Organisation-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @FirstError("Organisation")</p>
+    }
+    <input class="@InputClass("govuk-input", "Organisation")" asp-for="Organisation" aria-describedby="@DescribedBy("Organisation")" />
+</div>
+
+<div class="@FormGroupClass("Address1")">
+    <label class="govuk-label" asp-for="Address1">Address line 1</label>
+    @if (HasError("Address1"))
+    {
+        <p id="Address1-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @FirstError("Address1")</p>
+    }
+    <input class="@InputClass("govuk-input", "Address1")" asp-for="Address1" aria-describedby="@DescribedBy("Address1")" />
+</div>
+
+<div class="@FormGroupClass("Address2")">
+    <label class="govuk-label" asp-for="Address2">Address line 2</label>
+    @if (HasError("Address2"))
+    {
+        <p id="Address2-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @FirstError("Address2")</p>
+    }
+    <input class="@InputClass("govuk-input", "Address2")" asp-for="Address2" aria-describedby="@DescribedBy("Address2")" />
+</div>
+
+<div class="@FormGroupClass("Address3")">
+    <label class="govuk-label" asp-for="Address3">Address line 3</label>
+    @if (HasError("Address3"))
+    {
+        <p id="Address3-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @FirstError("Address3")</p>
+    }
+    <input class="@InputClass("govuk-input", "Address3")" asp-for="Address3" aria-describedby="@DescribedBy("Address3")" />
+</div>
+
+<div class="@FormGroupClass("Address4")">
+    <label class="govuk-label" asp-for="Address4">Address line 4</label>
+    @if (HasError("Address4"))
+    {
+        <p id="Address4-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @FirstError("Address4")</p>
+    }
+    <input class="@InputClass("govuk-input", "Address4")" asp-for="Address4" aria-describedby="@DescribedBy("Address4")" />
+</div>
+
+<div class="@FormGroupClass("Address5")">
+    <label class="govuk-label" asp-for="Address5">Address line 5</label>
+    @if (HasError("Address5"))
+    {
+        <p id="Address5-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @FirstError("Address5")</p>
+    }
+    <input class="@InputClass("govuk-input", "Address5")" asp-for="Address5" aria-describedby="@DescribedBy("Address5")" />
+</div>
+
+<div class="@FormGroupClass("CountryId")">
+    <label class="govuk-label" asp-for="CountryId">Country ID</label>
+    <div class="govuk-hint">Enter the country GUID directly.</div>
+    @if (HasError("CountryId"))
+    {
+        <p id="CountryId-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @FirstError("CountryId")</p>
+    }
+    <input class="@InputClass("govuk-input", "CountryId")" asp-for="CountryId" aria-describedby="@DescribedBy("CountryId")" />
+</div>
+
+<div class="@FormGroupClass("Telephone")">
+    <label class="govuk-label" asp-for="Telephone">Telephone</label>
+    @if (HasError("Telephone"))
+    {
+        <p id="Telephone-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @FirstError("Telephone")</p>
+    }
+    <input class="@InputClass("govuk-input", "Telephone")" asp-for="Telephone" aria-describedby="@DescribedBy("Telephone")" />
+</div>
+
+<div class="@FormGroupClass("Fax")">
+    <label class="govuk-label" asp-for="Fax">Fax</label>
+    @if (HasError("Fax"))
+    {
+        <p id="Fax-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @FirstError("Fax")</p>
+    }
+    <input class="@InputClass("govuk-input", "Fax")" asp-for="Fax" aria-describedby="@DescribedBy("Fax")" />
+</div>
+
+<div class="@FormGroupClass("Email")">
+    <label class="govuk-label" asp-for="Email">Email</label>
+    @if (HasError("Email"))
+    {
+        <p id="Email-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @FirstError("Email")</p>
+    }
+    <input class="@InputClass("govuk-input", "Email")" asp-for="Email" aria-describedby="@DescribedBy("Email")" />
+</div>
+
+<div class="@FormGroupClass("Email2")">
+    <label class="govuk-label" asp-for="Email2">Alternative email</label>
+    @if (HasError("Email2"))
+    {
+        <p id="Email2-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @FirstError("Email2")</p>
+    }
+    <input class="@InputClass("govuk-input", "Email2")" asp-for="Email2" aria-describedby="@DescribedBy("Email2")" />
+</div>
+
+<div class="@FormGroupClass("Comments")">
+    <label class="govuk-label" asp-for="Comments">Comments</label>
+    @if (HasError("Comments"))
+    {
+        <p id="Comments-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @FirstError("Comments")</p>
+    }
+    <textarea class="@InputClass("govuk-textarea", "Comments")" asp-for="Comments" rows="5" aria-describedby="@DescribedBy("Comments")"></textarea>
+</div>
+
+<div class="govuk-form-group">
+    <div class="govuk-checkboxes" data-module="govuk-checkboxes">
+        <div class="govuk-checkboxes__item">
+            <input class="govuk-checkboxes__input" asp-for="IsActive" />
+            <label class="govuk-label govuk-checkboxes__label" asp-for="IsActive">Active</label>
+        </div>
+    </div>
+</div>
