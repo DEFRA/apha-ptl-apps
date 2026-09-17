@@ -1,3 +1,7 @@
+@{
+    var isHomePage = string.Equals(ViewContext.RouteData.Values["controller"] as string, "Home", StringComparison.OrdinalIgnoreCase)
+        && string.Equals(ViewContext.RouteData.Values["action"] as string, "Index", StringComparison.OrdinalIgnoreCase);
+}
 <!DOCTYPE html>
 <html lang="en" class="govuk-template app-html-class">
 
@@ -96,16 +100,22 @@
                             Menu
                         </button>
                         <ul class="govuk-service-navigation__list" id="navigation">
-                            <li class="govuk-service-navigation__item">
-                                <a class="govuk-service-navigation__link" asp-controller="Customer" asp-action="Index">
-                                    Customers
-                                </a>
-                            </li>
-                            <li class="govuk-service-navigation__item govuk-service-navigation__item--active">
-                                <a class="govuk-service-navigation__link" href="#" aria-current="true">
-                                    <strong class="govuk-service-navigation__active-fallback">Navigation item 1</strong>
-                                </a>
-                            </li> 
+                            @if (isHomePage)
+                            {
+                                <li class="govuk-service-navigation__item govuk-service-navigation__item--active">
+                                    <span class="govuk-service-navigation__text" aria-current="page">
+                                        <strong class="govuk-service-navigation__active-fallback">Home</strong>
+                                    </span>
+                                </li>
+                            }
+                            else
+                            {
+                                <li class="govuk-service-navigation__item">
+                                    <a class="govuk-service-navigation__link" asp-controller="Home" asp-action="Index">
+                                        Home
+                                    </a>
+                                </li>
+                            }
                         </ul>
                     </nav>
                 </div>
@@ -141,7 +151,30 @@
     <div class="govuk-width-container app-width-container">
         <a href="#" class="govuk-back-link">Back</a>
         <main class="govuk-main-wrapper app-main-class" id="main-content">
-            @RenderBody()
+            <div class="govuk-grid-row">
+                <div class="govuk-grid-column-one-quarter">
+                    <nav aria-label="Primary navigation" class="app-primary-navigation">
+                        <ul class="govuk-list">
+                            <li>
+                                @if (isHomePage)
+                                {
+                                    <a class="govuk-link" asp-controller="Home" asp-action="Index" aria-current="page"><strong>Home</strong></a>
+                                }
+                                else
+                                {
+                                    <a class="govuk-link" asp-controller="Home" asp-action="Index">Home</a>
+                                }
+                            </li>
+                            <li><a class="govuk-link" asp-controller="Customer" asp-action="Index">Customers</a></li>
+                            <li><a class="govuk-link" href="#">Navigation item 2</a></li>
+                            <li><a class="govuk-link" href="#">Navigation item 3</a></li>
+                        </ul>
+                    </nav>
+                </div>
+                <div class="govuk-grid-column-three-quarters">
+                    @RenderBody()
+                </div>
+            </div>
         </main>
     </div>
     <footer class="govuk-template__footer">
