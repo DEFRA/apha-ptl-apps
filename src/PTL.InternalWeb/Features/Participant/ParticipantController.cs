@@ -19,6 +19,30 @@ public class ParticipantController(IParticipantApiClient participantApiClient, I
             new EventId(2, nameof(LogParticipantNotFoundMessage)),
             "Participant {ParticipantId} not found");
 
+    private static readonly Action<ILogger, Guid, Exception?> LogCreateFailedMessage =
+        LoggerMessage.Define<Guid>(
+            LogLevel.Warning,
+            new EventId(3, nameof(LogCreateFailedMessage)),
+            "Failed to create participant for customer {CustomerId}");
+
+    private static readonly Action<ILogger, Guid, Exception?> LogUpdateFailedMessage =
+        LoggerMessage.Define<Guid>(
+            LogLevel.Warning,
+            new EventId(4, nameof(LogUpdateFailedMessage)),
+            "Failed to update participant {ParticipantId}");
+
+    private static readonly Action<ILogger, Guid, Exception?> LogDeactivateFailedMessage =
+        LoggerMessage.Define<Guid>(
+            LogLevel.Warning,
+            new EventId(5, nameof(LogDeactivateFailedMessage)),
+            "Failed to deactivate participant {ParticipantId}");
+
+    private static readonly Action<ILogger, Guid, Exception?> LogReactivateFailedMessage =
+        LoggerMessage.Define<Guid>(
+            LogLevel.Warning,
+            new EventId(6, nameof(LogReactivateFailedMessage)),
+            "Failed to reactivate participant {ParticipantId}");
+
     public async Task<IActionResult> Index(Guid customerId, string? searchTerm = null, bool includeInactive = false, int page = 1, int pageSize = 20, CancellationToken cancellationToken = default)
     {
         var result = await participantApiClient.SearchParticipantsAsync(new ParticipantSearchRequest(customerId, searchTerm, includeInactive, page, pageSize), cancellationToken);
@@ -81,7 +105,7 @@ public class ParticipantController(IParticipantApiClient participantApiClient, I
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "Failed to create participant for customer {CustomerId}", customerId);
+            LogCreateFailedMessage(logger, customerId, ex);
             ModelState.AddModelError(string.Empty, "Unable to create this participant. Please review the details and try again.");
             model.CustomerId = customerId;
             return View(model);
@@ -131,7 +155,7 @@ public class ParticipantController(IParticipantApiClient participantApiClient, I
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "Failed to update participant {ParticipantId}", id);
+            LogUpdateFailedMessage(logger, id, ex);
             ModelState.AddModelError(string.Empty, "Unable to update this participant. Please review the changes and try again.");
             return View(model);
         }
@@ -161,7 +185,7 @@ public class ParticipantController(IParticipantApiClient participantApiClient, I
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "Failed to deactivate participant {ParticipantId}", id);
+            LogDeactivateFailedMessage(logger, id, ex);
             ModelState.AddModelError(string.Empty, "Unable to deactivate this participant.");
             model.ParticipantId = id;
             return View(model);
@@ -179,7 +203,7 @@ public class ParticipantController(IParticipantApiClient participantApiClient, I
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "Failed to reactivate participant {ParticipantId}", id);
+            LogReactivateFailedMessage(logger, id, ex);
             return RedirectToAction(nameof(Details), new { id });
         }
     }
