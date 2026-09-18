@@ -15,14 +15,4 @@ public interface ICustomerService
 
     // Returns null when customerId does not exist. Throws CustomerValidationException when business rules are violated.
     Task<Customer?> UpdateCustomerAsync(Guid customerId, Customer updatedFields, CancellationToken cancellationToken = default);
-
-    // Sets IsActive=false, stamps InactiveDate, and records the chosen inactive-reason status -
-    // mirrors Customer.aspx.vb's ButtonSave_Click status-change branch (participant/viewer
-    // cascade is explicitly out of scope for the Customer domain). Returns null when
-    // customerId does not exist. Throws CustomerValidationException when business rules are violated.
-    Task<Customer?> DeactivateCustomerAsync(Guid customerId, Guid customerStatusId, CancellationToken cancellationToken = default);
-
-    // Sets IsActive=true and clears InactiveDate/CustomerStatusId. Returns null when customerId
-    // does not exist. Throws CustomerValidationException when business rules are violated.
-    Task<Customer?> ReactivateCustomerAsync(Guid customerId, CancellationToken cancellationToken = default);
 }

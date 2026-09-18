@@ -8,22 +8,25 @@ namespace PTL.Data.Participant;
 
 public sealed class ParticipantRepository(PtlDbContext dbContext) : IParticipantRepository
 {
-    public Task<CoreParticipant?> GetByIdAsync(Guid participantId, CancellationToken cancellationToken = default)
+    public async Task<CoreParticipant?> GetByIdAsync(Guid participantId, CancellationToken cancellationToken = default)
     {
+        // EXEC ... is not composable SQL, so SingleOrDefaultAsync (which wraps the query) cannot be used here.
         var parameter = new SqlParameter("@ParticipantId", participantId);
-        return dbContext.Participants
-            .FromSqlRaw("EXEC dbo.spgParticipantByCustomerId @ParticipantId", parameter)
+        var results = await dbContext.Participants
+            .FromSqlRaw("EXEC dbo.spgParticipantByParticipantId @ParticipantId", parameter)
             .AsNoTracking()
-            .SingleOrDefaultAsync(cancellationToken);
+            .ToListAsync(cancellationToken);
+        return results.SingleOrDefault();
     }
 
     public async Task<CoreParticipant?> GetBySsoIdAsync(Guid ssoId, CancellationToken cancellationToken = default)
     {
         var parameter = new SqlParameter("@SsoId", ssoId);
-        return await dbContext.Participants
+        var results = await dbContext.Participants
             .FromSqlRaw("EXEC dbo.spgParticipantBySsoId @SsoId", parameter)
             .AsNoTracking()
-            .SingleOrDefaultAsync(cancellationToken);
+            .ToListAsync(cancellationToken);
+        return results.SingleOrDefault();
     }
 
     public async Task<IReadOnlyList<ParticipantSummaryEntity>> GetSummariesAsync(Guid customerId, bool includeInactive = false, CancellationToken cancellationToken = default)

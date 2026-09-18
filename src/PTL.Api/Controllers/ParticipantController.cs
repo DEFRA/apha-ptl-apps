@@ -50,20 +50,6 @@ public sealed class ParticipantController(IParticipantService participantService
         return updated is null ? NotFound() : Ok(ToResponse(updated));
     }
 
-    [HttpPost("participants/{participantId:guid}/deactivate")]
-    public async Task<ActionResult<ParticipantResponse>> DeactivateParticipant(Guid participantId, CancellationToken cancellationToken)
-    {
-        var updated = await participantService.DeactivateParticipantAsync(participantId, cancellationToken);
-        return updated is null ? NotFound() : Ok(ToResponse(updated));
-    }
-
-    [HttpPost("participants/{participantId:guid}/reactivate")]
-    public async Task<ActionResult<ParticipantResponse>> ReactivateParticipant(Guid participantId, CancellationToken cancellationToken)
-    {
-        var updated = await participantService.ReactivateParticipantAsync(participantId, cancellationToken);
-        return updated is null ? NotFound() : Ok(ToResponse(updated));
-    }
-
     private static Participant ToEntity(CreateParticipantRequest request) => new()
     {
         ParticipantId = Guid.NewGuid(),

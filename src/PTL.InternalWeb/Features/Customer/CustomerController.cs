@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.Extensions.Logging;
 using PTL.ApiClient;
 using PTL.Contracts.Customer;
@@ -7,7 +8,7 @@ namespace PTL.InternalWeb.Features.Customer;
 
 // Authentication/authorization are out of scope for this phase - assume the current user is
 // already authenticated with full access to Customer functionality. Policies will be added later.
-public class CustomerController(ICustomerApiClient customerApiClient, ILogger<CustomerController> logger) : Controller
+public class CustomerController(ICustomerApiClient customerApiClient, ILookupApiClient lookupApiClient, ILogger<CustomerController> logger) : Controller
 {
     private static readonly Action<ILogger, string?, CustomerStatusFilter, int, int, Exception?> LogDisplayedCustomerListMessage =
         LoggerMessage.Define<string?, CustomerStatusFilter, int, int>(
@@ -45,30 +46,6 @@ public class CustomerController(ICustomerApiClient customerApiClient, ILogger<Cu
             new EventId(6, nameof(LogUpdatedCustomerMessage)),
             "Updated customer {CustomerId}");
 
-    private static readonly Action<ILogger, Guid, Exception?> LogDeactivateFailedMessage =
-        LoggerMessage.Define<Guid>(
-            LogLevel.Warning,
-            new EventId(7, nameof(LogDeactivateFailedMessage)),
-            "Deactivate failed for customer {CustomerId}");
-
-    private static readonly Action<ILogger, Guid, Exception?> LogDeactivatedCustomerMessage =
-        LoggerMessage.Define<Guid>(
-            LogLevel.Information,
-            new EventId(8, nameof(LogDeactivatedCustomerMessage)),
-            "Deactivated customer {CustomerId}");
-
-    private static readonly Action<ILogger, Guid, Exception?> LogReactivateFailedMessage =
-        LoggerMessage.Define<Guid>(
-            LogLevel.Warning,
-            new EventId(9, nameof(LogReactivateFailedMessage)),
-            "Reactivate failed for customer {CustomerId}");
-
-    private static readonly Action<ILogger, Guid, Exception?> LogReactivatedCustomerMessage =
-        LoggerMessage.Define<Guid>(
-            LogLevel.Information,
-            new EventId(10, nameof(LogReactivatedCustomerMessage)),
-            "Reactivated customer {CustomerId}");
-
     public async Task<IActionResult> Index(
         string? searchTerm,
         CustomerStatusFilter status = CustomerStatusFilter.Active,
@@ -94,17 +71,26 @@ public class CustomerController(ICustomerApiClient customerApiClient, ILogger<Cu
     }
 
     [HttpGet]
-    public IActionResult Create()
+    public async Task<IActionResult> Create(CancellationToken cancellationToken)
     {
-        return View(new CustomerFormViewModel());
+        // InitialStartDate is server-generated at save time (CustomerService.CreateCustomerAsync
+        // sets it to DateTime.UtcNow) - shown here only as a "today" preview, matching legacy
+        // Customer.aspx's disabled TextboxInitialStartDate.
+        var model = new CustomerFormViewModel { InitialStartDate = DateTime.UtcNow };
+        await PopulateLookupOptionsAsync(model, cancellationToken);
+        return View(model);
     }
 
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Create(CustomerFormViewModel model, CancellationToken cancellationToken)
     {
+        // Not posted back (no input renders it) - restore the "today" preview for redisplay.
+        model.InitialStartDate = DateTime.UtcNow;
+
         if (!ModelState.IsValid)
         {
+            await PopulateLookupOptionsAsync(model, cancellationToken);
             return View(model);
         }
 
@@ -113,6 +99,7 @@ public class CustomerController(ICustomerApiClient customerApiClient, ILogger<Cu
         {
             LogCreateFailedMessage(logger, model.Name, null);
             AddErrors(result.FieldErrors);
+            await PopulateLookupOptionsAsync(model, cancellationToken);
             return View(model);
         }
 
@@ -124,7 +111,14 @@ public class CustomerController(ICustomerApiClient customerApiClient, ILogger<Cu
     public async Task<IActionResult> Edit(Guid id, CancellationToken cancellationToken)
     {
         var customer = await customerApiClient.GetCustomerAsync(id, cancellationToken);
-        return customer is null ? NotFound() : View(ToFormViewModel(customer));
+        if (customer is null)
+        {
+            return NotFound();
+        }
+
+        var model = ToFormViewModel(customer);
+        await PopulateLookupOptionsAsync(model, cancellationToken);
+        return View(model);
     }
 
     [HttpPost]
@@ -133,6 +127,8 @@ public class CustomerController(ICustomerApiClient customerApiClient, ILogger<Cu
     {
         if (!ModelState.IsValid)
         {
+            await RestoreDisplayOnlyFieldsAsync(model, id, cancellationToken);
+            await PopulateLookupOptionsAsync(model, cancellationToken);
             return View(model);
         }
 
@@ -141,62 +137,12 @@ public class CustomerController(ICustomerApiClient customerApiClient, ILogger<Cu
         {
             LogUpdateFailedMessage(logger, id, null);
             AddErrors(result.FieldErrors);
+            await RestoreDisplayOnlyFieldsAsync(model, id, cancellationToken);
+            await PopulateLookupOptionsAsync(model, cancellationToken);
             return View(model);
         }
 
         LogUpdatedCustomerMessage(logger, id, null);
-        return RedirectToAction(nameof(Details), new { id });
-    }
-
-    [HttpGet]
-    public async Task<IActionResult> Deactivate(Guid id, CancellationToken cancellationToken)
-    {
-        var customer = await customerApiClient.GetCustomerAsync(id, cancellationToken);
-        if (customer is null)
-        {
-            return NotFound();
-        }
-
-        return View(new DeactivateCustomerViewModel { CustomerId = customer.CustomerId, Name = customer.Name });
-    }
-
-    [HttpPost]
-    [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Deactivate(Guid id, DeactivateCustomerViewModel model, CancellationToken cancellationToken)
-    {
-        if (!ModelState.IsValid)
-        {
-            model.CustomerId = id;
-            return View(model);
-        }
-
-        var result = await customerApiClient.DeactivateCustomerAsync(id, model.CustomerStatusId!.Value, cancellationToken);
-        if (!result.Success)
-        {
-            LogDeactivateFailedMessage(logger, id, null);
-            AddErrors(result.FieldErrors);
-            model.CustomerId = id;
-            return View(model);
-        }
-
-        LogDeactivatedCustomerMessage(logger, id, null);
-        return RedirectToAction(nameof(Details), new { id });
-    }
-
-    [HttpPost]
-    [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Reactivate(Guid id, CancellationToken cancellationToken)
-    {
-        var result = await customerApiClient.ReactivateCustomerAsync(id, cancellationToken);
-        if (!result.Success)
-        {
-            LogReactivateFailedMessage(logger, id, null);
-            return result.Customer is null && result.FieldErrors.ContainsKey(string.Empty)
-                ? NotFound()
-                : RedirectToAction(nameof(Details), new { id });
-        }
-
-        LogReactivatedCustomerMessage(logger, id, null);
         return RedirectToAction(nameof(Details), new { id });
     }
 
@@ -209,6 +155,47 @@ public class CustomerController(ICustomerApiClient customerApiClient, ILogger<Cu
                 ModelState.AddModelError(field, message);
             }
         }
+    }
+
+    // Fetches the Country/Currency/CustomerType/VatRating reference lists once per request and
+    // shapes them into SelectListItem so _CustomerForm.cshtml can render <select asp-items="..."> -
+    // matches the legacy DropDownCountry/DropDownCurrency DataBind() calls in Customer.aspx.vb
+    // LoadLabelNames() (VatRating has no legacy dropdown to mirror, added per explicit request).
+    private async Task PopulateLookupOptionsAsync(CustomerFormViewModel model, CancellationToken cancellationToken)
+    {
+        var countriesTask = lookupApiClient.GetCountriesAsync(cancellationToken);
+        var currenciesTask = lookupApiClient.GetCurrenciesAsync(cancellationToken);
+        var customerTypesTask = lookupApiClient.GetCustomerTypesAsync(cancellationToken);
+        var vatRatingsTask = lookupApiClient.GetVatRatingsAsync(cancellationToken);
+        await Task.WhenAll(countriesTask, currenciesTask, customerTypesTask, vatRatingsTask);
+
+        // Country is optional-until-active in CustomerValidator, so a blank option is offered -
+        // matches DropDownCountry.Items.Insert(0, New ListItem("- Please Select -", Guid.Empty)).
+        var countryOptions = countriesTask.Result
+            .Select(c => new SelectListItem(c.Country, c.CountryId.ToString()))
+            .Prepend(new SelectListItem("- Please Select -", Guid.Empty.ToString()))
+            .ToList();
+        model.CountryOptions = countryOptions;
+        model.InvoiceCountryOptions = countryOptions;
+
+        // Currency has no blank option in the legacy DropDownCurrency (it is never required to be
+        // empty), so none is added here either.
+        model.CurrencyOptions = currenciesTask.Result
+            .Select(c => new SelectListItem(c.LongName, c.CurrencyId.ToString()))
+            .ToList();
+
+        // CustomerTypeId is validated as required (non-empty GUID) by both CustomerValidator and
+        // the legacy ValidCustomerType rule, so a blank option is offered to force an explicit choice.
+        model.CustomerTypeOptions = customerTypesTask.Result
+            .Select(c => new SelectListItem(c.CustomerType, c.CustomerTypeId.ToString()))
+            .Prepend(new SelectListItem("- Please Select -", Guid.Empty.ToString()))
+            .ToList();
+
+        // VatRatingId is not validated as required anywhere, so a blank option is offered.
+        model.VatRatingOptions = vatRatingsTask.Result
+            .Select(v => new SelectListItem(v.VatRating, v.VatRatingId.ToString()))
+            .Prepend(new SelectListItem("- Please Select -", Guid.Empty.ToString()))
+            .ToList();
     }
 
     private static CreateCustomerRequest ToCreateRequest(CustomerFormViewModel model) => new(
@@ -297,6 +284,7 @@ public class CustomerController(ICustomerApiClient customerApiClient, ILogger<Cu
     {
         CustomerId = customer.CustomerId,
         QalNumber = customer.QalNumber,
+        InitialStartDate = customer.InitialStartDate,
         RegisteredFileNumber = customer.RegisteredFileNumber,
         Name = customer.Name,
         PreviousName = customer.PreviousName,
@@ -335,6 +323,24 @@ public class CustomerController(ICustomerApiClient customerApiClient, ILogger<Cu
         InvoiceEmail = customer.InvoiceEmail,
         IsActive = customer.IsActive,
         CanOrderOnline = customer.CanOrderOnline,
+        InactiveDate = customer.InactiveDate,
         CustomerStatusId = customer.CustomerStatusId
     };
+
+    // QalNumber/CustomerId/InitialStartDate/InactiveDate are display-only (no form input renders
+    // them), so a posted-back model on a failed Edit submission has them blank/default - re-fetch
+    // the persisted customer to restore them for redisplay.
+    private async Task RestoreDisplayOnlyFieldsAsync(CustomerFormViewModel model, Guid customerId, CancellationToken cancellationToken)
+    {
+        var customer = await customerApiClient.GetCustomerAsync(customerId, cancellationToken);
+        if (customer is null)
+        {
+            return;
+        }
+
+        model.CustomerId = customer.CustomerId;
+        model.QalNumber = customer.QalNumber;
+        model.InitialStartDate = customer.InitialStartDate;
+        model.InactiveDate = customer.InactiveDate;
+    }
 }

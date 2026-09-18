@@ -8,7 +8,7 @@ namespace PTL.InternalWeb.Tests.Features.Participant;
 public class ParticipantControllerTests
 {
     private static PTL.InternalWeb.Features.Participant.ParticipantController CreateController(FakeParticipantApiClient apiClient) =>
-        new(apiClient, NullLogger<PTL.InternalWeb.Features.Participant.ParticipantController>.Instance);
+        new(apiClient, new FakeCustomerApiClient(), new FakeLookupApiClient(), NullLogger<PTL.InternalWeb.Features.Participant.ParticipantController>.Instance);
 
     private static ParticipantResponse SampleParticipant(Guid participantId, Guid customerId, bool isActive = true) => new(
         participantId,
@@ -82,11 +82,11 @@ public class ParticipantControllerTests
     }
 
     [Fact]
-    public void Create_Get_ReturnsEmptyFormViewModel()
+    public async Task Create_Get_ReturnsEmptyFormViewModel()
     {
         var controller = CreateController(new FakeParticipantApiClient());
 
-        var result = controller.Create(Guid.NewGuid());
+        var result = await controller.Create(Guid.NewGuid(), CancellationToken.None);
 
         var view = Assert.IsType<ViewResult>(result);
         Assert.IsType<PTL.InternalWeb.Features.Participant.ParticipantFormViewModel>(view.Model);
@@ -169,65 +169,6 @@ public class ParticipantControllerTests
         };
 
         var result = await controller.Edit(participantId, model, CancellationToken.None);
-
-        var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal(nameof(PTL.InternalWeb.Features.Participant.ParticipantController.Details), redirect.ActionName);
-    }
-
-    [Fact]
-    public async Task Deactivate_Get_UnknownParticipant_ReturnsNotFound()
-    {
-        var controller = CreateController(new FakeParticipantApiClient { ParticipantResponse = null });
-
-        var result = await controller.Deactivate(Guid.NewGuid(), CancellationToken.None);
-
-        Assert.IsType<NotFoundResult>(result);
-    }
-
-    [Fact]
-    public async Task Deactivate_Get_ExistingParticipant_ReturnsViewWithModel()
-    {
-        var participantId = Guid.NewGuid();
-        var customerId = Guid.NewGuid();
-        var controller = CreateController(new FakeParticipantApiClient { ParticipantResponse = SampleParticipant(participantId, customerId) });
-
-        var result = await controller.Deactivate(participantId, CancellationToken.None);
-
-        var view = Assert.IsType<ViewResult>(result);
-        var model = Assert.IsType<PTL.InternalWeb.Features.Participant.DeactivateParticipantViewModel>(view.Model);
-        Assert.Equal(participantId, model.ParticipantId);
-    }
-
-    [Fact]
-    public async Task Deactivate_Post_Success_RedirectsToDetails()
-    {
-        var participantId = Guid.NewGuid();
-        var customerId = Guid.NewGuid();
-        var apiClient = new FakeParticipantApiClient
-        {
-            CreatedOrUpdatedResponse = SampleParticipant(participantId, customerId, isActive: false)
-        };
-        var controller = CreateController(apiClient);
-        var model = new PTL.InternalWeb.Features.Participant.DeactivateParticipantViewModel { ParticipantId = participantId, LabName = "Sample Laboratory" };
-
-        var result = await controller.Deactivate(participantId, model, CancellationToken.None);
-
-        var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal(nameof(PTL.InternalWeb.Features.Participant.ParticipantController.Details), redirect.ActionName);
-    }
-
-    [Fact]
-    public async Task Reactivate_Post_Success_RedirectsToDetails()
-    {
-        var participantId = Guid.NewGuid();
-        var customerId = Guid.NewGuid();
-        var apiClient = new FakeParticipantApiClient
-        {
-            CreatedOrUpdatedResponse = SampleParticipant(participantId, customerId, isActive: true)
-        };
-        var controller = CreateController(apiClient);
-
-        var result = await controller.Reactivate(participantId, CancellationToken.None);
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
         Assert.Equal(nameof(PTL.InternalWeb.Features.Participant.ParticipantController.Details), redirect.ActionName);

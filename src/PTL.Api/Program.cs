@@ -3,9 +3,13 @@ using PTL.Api.Features.Health;
 using PTL.Api.Infrastructure;
 using PTL.Core.Customer;
 using PTL.Core.Participant;
+using PTL.Core.Contract;
+using PTL.Core.Lookup;
 using PTL.Data;
 using PTL.Data.Customer;
 using PTL.Data.Participant;
+using PTL.Data.Contract;
+using PTL.Data.Lookup;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -28,35 +32,17 @@ builder.Services.AddHealthChecks()
 builder.Services.AddControllers();
 builder.Services.AddDbContext<PtlDbContext>(options => options.UseSqlServer(databaseOptions.ToConnectionString()));
 
-// TEMPORARY (Development only): see DevelopmentCustomerRepository.cs - falls back to sample data
-// when the local dev database has no customer rows. Delete this if-block plus that file to remove.
-if (builder.Environment.IsDevelopment())
-{
-    builder.Services.AddScoped<CustomerRepository>();
-    builder.Services.AddScoped<ICustomerRepository>(sp =>
-        new DevelopmentCustomerRepository(sp.GetRequiredService<CustomerRepository>()));
-}
-else
-{
-    builder.Services.AddScoped<ICustomerRepository, CustomerRepository>();
-}
-
+builder.Services.AddScoped<ICustomerRepository, CustomerRepository>();
 builder.Services.AddScoped<ICustomerService, CustomerService>();
 
-// TEMPORARY (Development only): see DevelopmentParticipantRepository.cs - falls back to sample data
-// when the local dev database has no participant rows. Delete this if-block plus that file to remove.
-if (builder.Environment.IsDevelopment())
-{
-    builder.Services.AddScoped<ParticipantRepository>();
-    builder.Services.AddScoped<IParticipantRepository>(sp =>
-        new DevelopmentParticipantRepository(sp.GetRequiredService<ParticipantRepository>()));
-}
-else
-{
-    builder.Services.AddScoped<IParticipantRepository, ParticipantRepository>();
-}
-
+builder.Services.AddScoped<IParticipantRepository, ParticipantRepository>();
 builder.Services.AddScoped<IParticipantService, ParticipantService>();
+
+builder.Services.AddScoped<IContractRepository, ContractRepository>();
+builder.Services.AddScoped<IContractService, ContractService>();
+
+builder.Services.AddScoped<ILookupRepository, LookupRepository>();
+builder.Services.AddScoped<ILookupService, LookupService>();
 
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<PTL.Api.Infrastructure.GlobalExceptionHandler>();

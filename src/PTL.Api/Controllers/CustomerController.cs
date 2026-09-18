@@ -15,18 +15,6 @@ public sealed class CustomerController(ICustomerService customerService, ILogger
             new EventId(1, nameof(LogCustomerNotFoundMessage)),
             "Customer {CustomerId} not found");
 
-    private static readonly Action<ILogger, Guid, Exception?> LogDeactivateUnknownCustomerMessage =
-        LoggerMessage.Define<Guid>(
-            LogLevel.Information,
-            new EventId(2, nameof(LogDeactivateUnknownCustomerMessage)),
-            "Deactivate requested for unknown customer {CustomerId}");
-
-    private static readonly Action<ILogger, Guid, Exception?> LogReactivateUnknownCustomerMessage =
-        LoggerMessage.Define<Guid>(
-            LogLevel.Information,
-            new EventId(3, nameof(LogReactivateUnknownCustomerMessage)),
-            "Reactivate requested for unknown customer {CustomerId}");
-
     // GET /api/customers?status=Active|Inactive|All - defaults to Active to match the legacy CustomerList.aspx default filter.
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<CustomerSummaryResponse>>> GetCustomers(
@@ -83,48 +71,6 @@ public sealed class CustomerController(ICustomerService customerService, ILogger
         {
             var updated = await customerService.UpdateCustomerAsync(customerId, ToEntity(customerId, request), cancellationToken);
             return updated is null ? NotFound() : Ok(ToResponse(updated));
-        }
-        catch (CustomerValidationException ex)
-        {
-            return ToValidationProblem(ex);
-        }
-    }
-
-    // [NEEDS INVESTIGATION] see CreateCustomer note above - authorization deferred to a later phase.
-    [HttpPost("{customerId:guid}/deactivate")]
-    public async Task<ActionResult<CustomerResponse>> DeactivateCustomer(Guid customerId, [FromBody] DeactivateCustomerRequest request, CancellationToken cancellationToken)
-    {
-        try
-        {
-            var updated = await customerService.DeactivateCustomerAsync(customerId, request.CustomerStatusId, cancellationToken);
-            if (updated is null)
-            {
-                LogDeactivateUnknownCustomerMessage(logger, customerId, null);
-                return NotFound();
-            }
-
-            return Ok(ToResponse(updated));
-        }
-        catch (CustomerValidationException ex)
-        {
-            return ToValidationProblem(ex);
-        }
-    }
-
-    // [NEEDS INVESTIGATION] see CreateCustomer note above - authorization deferred to a later phase.
-    [HttpPost("{customerId:guid}/reactivate")]
-    public async Task<ActionResult<CustomerResponse>> ReactivateCustomer(Guid customerId, CancellationToken cancellationToken)
-    {
-        try
-        {
-            var updated = await customerService.ReactivateCustomerAsync(customerId, cancellationToken);
-            if (updated is null)
-            {
-                LogReactivateUnknownCustomerMessage(logger, customerId, null);
-                return NotFound();
-            }
-
-            return Ok(ToResponse(updated));
         }
         catch (CustomerValidationException ex)
         {

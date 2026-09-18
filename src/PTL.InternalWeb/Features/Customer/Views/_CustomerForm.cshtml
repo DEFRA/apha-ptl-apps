@@ -1,5 +1,21 @@
 @model PTL.InternalWeb.Features.Customer.CustomerFormViewModel
 @{
+    // Fixed field order matching the visual layout below, so the error summary links appear in
+    // the same top-to-bottom order as the fields themselves rather than ModelState's insertion
+    // order (which follows validation execution order, not the page layout).
+    string[] fieldOrder =
+    [
+        "Name", "PreviousName", "CurrencyId", "PaymentNonUK", "CustomerTypeId", "VatNumber",
+        "AccountNumber", "CustomerFinanceId", "VatRatingId", "RegisteredFileNumber", "CanOrderOnline",
+        "IsActive", "CustomerStatusId",
+        "ContactName", "Organisation", "Address1", "Address2", "Address3", "Address4", "Address5",
+        "CountryId", "Telephone", "Telephone2", "Fax", "Email",
+        "InvoiceName", "InvoiceOrganisation", "InvoiceAddress1", "InvoiceAddress2", "InvoiceAddress3",
+        "InvoiceAddress4", "InvoiceAddress5", "InvoiceCountryId", "InvoiceTelephone", "InvoiceTelephone2",
+        "InvoiceFax", "InvoiceEmail",
+        "PostageArrangements", "Comments"
+    ];
+
     // Hand-rolled to match the GOV.UK Design System error summary exactly (title + linked list),
     // since the built-in ValidationSummaryTagHelper doesn't produce that markup. Each link's href
     // matches the target input's id (rendered by asp-for), and govuk-frontend's bundled
@@ -8,6 +24,7 @@
     var errors = ViewData.ModelState
         .Where(entry => entry.Value?.Errors.Count > 0)
         .SelectMany(entry => entry.Value!.Errors.Select(error => (Field: entry.Key, Message: error.ErrorMessage)))
+        .OrderBy(error => Array.IndexOf(fieldOrder, error.Field) is var idx && idx == -1 ? -1 : idx)
         .ToList();
 
     // Per-field GOV.UK error state (govuk-form-group--error / govuk-input--error / error message
@@ -66,13 +83,81 @@
     <input class="@InputClass("govuk-input", "Name")" asp-for="Name" aria-describedby="@DescribedBy("Name")" />
 </div>
 
-<div class="@FormGroupClass("PreviousName")">
-    <label class="govuk-label" asp-for="PreviousName">Previous name</label>
-    @if (HasError("PreviousName"))
+<!-- Previous name is not editable on this page - kept as a hidden field so an existing value
+     is preserved (not silently blanked) when other Customer details are saved. -->
+<input type="hidden" asp-for="PreviousName" />
+
+<div class="govuk-form-group">
+    <label class="govuk-label" asp-for="InitialStartDate">Initial start date</label>
+    <div class="govuk-hint">Set automatically and cannot be changed.</div>
+    <input class="govuk-input govuk-input--width-10" value="@Model.InitialStartDate.ToString("d MMMM yyyy")" disabled />
+</div>
+
+<div class="@FormGroupClass("CurrencyId")">
+    <label class="govuk-label" asp-for="CurrencyId">Currency</label>
+    @if (HasError("CurrencyId"))
     {
-        <p id="PreviousName-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @FirstError("PreviousName")</p>
+        <p id="CurrencyId-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @FirstError("CurrencyId")</p>
     }
-    <input class="@InputClass("govuk-input", "PreviousName")" asp-for="PreviousName" aria-describedby="@DescribedBy("PreviousName")" />
+    <select class="@InputClass("govuk-select", "CurrencyId")" asp-for="CurrencyId" asp-items="Model.CurrencyOptions" aria-describedby="@DescribedBy("CurrencyId")"></select>
+</div>
+
+<div class="govuk-checkboxes__item">
+    <input class="govuk-checkboxes__input" asp-for="PaymentNonUK" />
+    <label class="govuk-label govuk-checkboxes__label" asp-for="PaymentNonUK">Payment (non-UK)</label>
+</div>
+
+<div class="@FormGroupClass("CustomerTypeId")">
+    <label class="govuk-label" asp-for="CustomerTypeId">Customer type</label>
+    @if (HasError("CustomerTypeId"))
+    {
+        <p id="CustomerTypeId-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @FirstError("CustomerTypeId")</p>
+    }
+    <select class="@InputClass("govuk-select", "CustomerTypeId")" asp-for="CustomerTypeId" asp-items="Model.CustomerTypeOptions" aria-describedby="@DescribedBy("CustomerTypeId")"></select>
+</div>
+
+<div class="@FormGroupClass("VatNumber")">
+    <label class="govuk-label" asp-for="VatNumber">VAT number</label>
+    @if (HasError("VatNumber"))
+    {
+        <p id="VatNumber-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @FirstError("VatNumber")</p>
+    }
+    <input class="@InputClass("govuk-input", "VatNumber")" asp-for="VatNumber" aria-describedby="@DescribedBy("VatNumber")" />
+</div>
+
+<div class="@FormGroupClass("AccountNumber")">
+    <label class="govuk-label" asp-for="AccountNumber">Account number</label>
+    @if (HasError("AccountNumber"))
+    {
+        <p id="AccountNumber-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @FirstError("AccountNumber")</p>
+    }
+    <input class="@InputClass("govuk-input", "AccountNumber")" asp-for="AccountNumber" aria-describedby="@DescribedBy("AccountNumber")" />
+</div>
+
+<div class="@FormGroupClass("CustomerFinanceId")">
+    <label class="govuk-label" asp-for="CustomerFinanceId">Customer ID</label>
+    @if (HasError("CustomerFinanceId"))
+    {
+        <p id="CustomerFinanceId-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @FirstError("CustomerFinanceId")</p>
+    }
+    <input class="@InputClass("govuk-input", "CustomerFinanceId")" asp-for="CustomerFinanceId" aria-describedby="@DescribedBy("CustomerFinanceId")" />
+</div>
+
+@if (Model.CustomerId is not null)
+{
+    <div class="govuk-form-group">
+        <label class="govuk-label">Customer ID</label>
+        <p class="govuk-body">@Model.CustomerId</p>
+    </div>
+}
+
+<div class="@FormGroupClass("VatRatingId")">
+    <label class="govuk-label" asp-for="VatRatingId">VAT rating</label>
+    @if (HasError("VatRatingId"))
+    {
+        <p id="VatRatingId-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @FirstError("VatRatingId")</p>
+    }
+    <select class="@InputClass("govuk-select", "VatRatingId")" asp-for="VatRatingId" asp-items="Model.VatRatingOptions" aria-describedby="@DescribedBy("VatRatingId")"></select>
 </div>
 
 <div class="@FormGroupClass("RegisteredFileNumber")">
@@ -85,15 +170,28 @@
     <input class="@InputClass("govuk-input", "RegisteredFileNumber")" asp-for="RegisteredFileNumber" aria-describedby="@DescribedBy("RegisteredFileNumber")" />
 </div>
 
-<div class="@FormGroupClass("CustomerTypeId")">
-    <label class="govuk-label" asp-for="CustomerTypeId">Customer type ID</label>
-    <div class="govuk-hint">[NEEDS INVESTIGATION] no lookup service yet - enter the CustomerType GUID directly.</div>
-    @if (HasError("CustomerTypeId"))
-    {
-        <p id="CustomerTypeId-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @FirstError("CustomerTypeId")</p>
-    }
-    <input class="@InputClass("govuk-input", "CustomerTypeId")" asp-for="CustomerTypeId" aria-describedby="@DescribedBy("CustomerTypeId")" />
+<div class="govuk-checkboxes__item">
+    <input class="govuk-checkboxes__input" asp-for="CanOrderOnline" />
+    <label class="govuk-label govuk-checkboxes__label" asp-for="CanOrderOnline">Can order online</label>
 </div>
+
+<div class="govuk-checkboxes__item">
+    <input class="govuk-checkboxes__input" asp-for="IsActive" id="IsActive" />
+    <label class="govuk-label govuk-checkboxes__label" asp-for="IsActive">Active</label>
+</div>
+
+@if (Model.InactiveDate is not null)
+{
+    <div class="govuk-form-group">
+        <label class="govuk-label" for="InactiveDateDisplay">Inactive from</label>
+        <input class="govuk-input govuk-input--width-10" id="InactiveDateDisplay" value="@Model.InactiveDate.Value.ToString("d MMMM yyyy")" disabled />
+    </div>
+}
+
+<!-- Customer status (inactive-error reason) is not editable on this page - kept as a hidden
+     field so the existing value is preserved (required by CustomerValidator whenever the
+     customer is inactive) when other Customer details are saved. -->
+<input type="hidden" asp-for="CustomerStatusId" />
 
 <h2 class="govuk-heading-m">Contact details</h2>
 
@@ -161,13 +259,12 @@
 </div>
 
 <div class="@FormGroupClass("CountryId")">
-    <label class="govuk-label" asp-for="CountryId">Country ID</label>
-    <div class="govuk-hint">[NEEDS INVESTIGATION] no lookup service yet - enter the Country GUID directly.</div>
+    <label class="govuk-label" asp-for="CountryId">Country</label>
     @if (HasError("CountryId"))
     {
         <p id="CountryId-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @FirstError("CountryId")</p>
     }
-    <input class="@InputClass("govuk-input", "CountryId")" asp-for="CountryId" aria-describedby="@DescribedBy("CountryId")" />
+    <select class="@InputClass("govuk-select", "CountryId")" asp-for="CountryId" asp-items="Model.CountryOptions" aria-describedby="@DescribedBy("CountryId")"></select>
 </div>
 
 <div class="@FormGroupClass("Telephone")">
@@ -206,17 +303,10 @@
     <input class="@InputClass("govuk-input", "Email")" asp-for="Email" aria-describedby="@DescribedBy("Email")" />
 </div>
 
-<div class="@FormGroupClass("CurrencyId")">
-    <label class="govuk-label" asp-for="CurrencyId">Currency ID</label>
-    <div class="govuk-hint">[NEEDS INVESTIGATION] no lookup service yet - enter the Currency GUID directly.</div>
-    @if (HasError("CurrencyId"))
-    {
-        <p id="CurrencyId-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @FirstError("CurrencyId")</p>
-    }
-    <input class="@InputClass("govuk-input", "CurrencyId")" asp-for="CurrencyId" aria-describedby="@DescribedBy("CurrencyId")" />
-</div>
-
-<h2 class="govuk-heading-m">Invoice details</h2>
+<h2 class="govuk-heading-m">
+    Invoice details
+    <button type="button" class="govuk-button govuk-button--secondary govuk-!-margin-left-3" data-module="govuk-button" id="CopyFromContactButton">Copy from contact details</button>
+</h2>
 
 <div class="@FormGroupClass("InvoiceName")">
     <label class="govuk-label" asp-for="InvoiceName">Invoice name</label>
@@ -282,13 +372,12 @@
 </div>
 
 <div class="@FormGroupClass("InvoiceCountryId")">
-    <label class="govuk-label" asp-for="InvoiceCountryId">Invoice country ID</label>
-    <div class="govuk-hint">[NEEDS INVESTIGATION] no lookup service yet - enter the Country GUID directly.</div>
+    <label class="govuk-label" asp-for="InvoiceCountryId">Invoice country</label>
     @if (HasError("InvoiceCountryId"))
     {
         <p id="InvoiceCountryId-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @FirstError("InvoiceCountryId")</p>
     }
-    <input class="@InputClass("govuk-input", "InvoiceCountryId")" asp-for="InvoiceCountryId" aria-describedby="@DescribedBy("InvoiceCountryId")" />
+    <select class="@InputClass("govuk-select", "InvoiceCountryId")" asp-for="InvoiceCountryId" asp-items="Model.InvoiceCountryOptions" aria-describedby="@DescribedBy("InvoiceCountryId")"></select>
 </div>
 
 <div class="@FormGroupClass("InvoiceTelephone")">
@@ -327,72 +416,6 @@
     <input class="@InputClass("govuk-input", "InvoiceEmail")" asp-for="InvoiceEmail" aria-describedby="@DescribedBy("InvoiceEmail")" />
 </div>
 
-<h2 class="govuk-heading-m">Financial details</h2>
-
-<div class="@FormGroupClass("VatNumber")">
-    <label class="govuk-label" asp-for="VatNumber">VAT number</label>
-    @if (HasError("VatNumber"))
-    {
-        <p id="VatNumber-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @FirstError("VatNumber")</p>
-    }
-    <input class="@InputClass("govuk-input", "VatNumber")" asp-for="VatNumber" aria-describedby="@DescribedBy("VatNumber")" />
-</div>
-
-<div class="@FormGroupClass("VatRatingId")">
-    <label class="govuk-label" asp-for="VatRatingId">VAT rating ID</label>
-    <div class="govuk-hint">[NEEDS INVESTIGATION] no lookup service yet - enter the VatRating GUID directly.</div>
-    @if (HasError("VatRatingId"))
-    {
-        <p id="VatRatingId-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @FirstError("VatRatingId")</p>
-    }
-    <input class="@InputClass("govuk-input", "VatRatingId")" asp-for="VatRatingId" aria-describedby="@DescribedBy("VatRatingId")" />
-</div>
-
-<div class="@FormGroupClass("AccountNumber")">
-    <label class="govuk-label" asp-for="AccountNumber">Account number</label>
-    @if (HasError("AccountNumber"))
-    {
-        <p id="AccountNumber-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @FirstError("AccountNumber")</p>
-    }
-    <input class="@InputClass("govuk-input", "AccountNumber")" asp-for="AccountNumber" aria-describedby="@DescribedBy("AccountNumber")" />
-</div>
-
-<div class="@FormGroupClass("CustomerFinanceId")">
-    <label class="govuk-label" asp-for="CustomerFinanceId">Customer finance ID</label>
-    @if (HasError("CustomerFinanceId"))
-    {
-        <p id="CustomerFinanceId-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @FirstError("CustomerFinanceId")</p>
-    }
-    <input class="@InputClass("govuk-input", "CustomerFinanceId")" asp-for="CustomerFinanceId" aria-describedby="@DescribedBy("CustomerFinanceId")" />
-</div>
-
-<div class="govuk-checkboxes__item">
-    <input class="govuk-checkboxes__input" asp-for="PaymentNonUK" />
-    <label class="govuk-label govuk-checkboxes__label" asp-for="PaymentNonUK">Payment (non-UK)</label>
-</div>
-
-<h2 class="govuk-heading-m">Status</h2>
-
-<div class="govuk-checkboxes__item">
-    <input class="govuk-checkboxes__input" asp-for="IsActive" />
-    <label class="govuk-label govuk-checkboxes__label" asp-for="IsActive">Active</label>
-</div>
-
-<div class="govuk-checkboxes__item">
-    <input class="govuk-checkboxes__input" asp-for="CanOrderOnline" />
-    <label class="govuk-label govuk-checkboxes__label" asp-for="CanOrderOnline">Can order online</label>
-</div>
-
-<div class="@FormGroupClass("CustomerStatusId")">
-    <label class="govuk-label" asp-for="CustomerStatusId">Customer status ID (inactive-error flag)</label>
-    <div class="govuk-hint">Only meaningful when Active is unchecked. [NEEDS INVESTIGATION] no CustomerStatus lookup service yet.</div>
-    @if (HasError("CustomerStatusId"))
-    {
-        <p id="CustomerStatusId-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @FirstError("CustomerStatusId")</p>
-    }
-    <input class="@InputClass("govuk-input", "CustomerStatusId")" asp-for="CustomerStatusId" aria-describedby="@DescribedBy("CustomerStatusId")" />
-</div>
-
 <h2 class="govuk-heading-m">Other</h2>
 
 <div class="@FormGroupClass("PostageArrangements")">
@@ -412,4 +435,23 @@
     }
     <textarea class="@InputClass("govuk-textarea", "Comments")" asp-for="Comments" aria-describedby="@DescribedBy("Comments")"></textarea>
 </div>
+
+<script>
+    // Mirrors legacy Customer.aspx.vb ButtonCopyDetails_Click - copies the Contact details
+    // section straight into the Invoice details section, entirely client-side (no postback).
+    document.getElementById('CopyFromContactButton').addEventListener('click', function () {
+        document.getElementById('InvoiceName').value = document.getElementById('ContactName').value;
+        document.getElementById('InvoiceOrganisation').value = document.getElementById('Organisation').value;
+        document.getElementById('InvoiceAddress1').value = document.getElementById('Address1').value;
+        document.getElementById('InvoiceAddress2').value = document.getElementById('Address2').value;
+        document.getElementById('InvoiceAddress3').value = document.getElementById('Address3').value;
+        document.getElementById('InvoiceAddress4').value = document.getElementById('Address4').value;
+        document.getElementById('InvoiceAddress5').value = document.getElementById('Address5').value;
+        document.getElementById('InvoiceCountryId').value = document.getElementById('CountryId').value;
+        document.getElementById('InvoiceTelephone').value = document.getElementById('Telephone').value;
+        document.getElementById('InvoiceTelephone2').value = document.getElementById('Telephone2').value;
+        document.getElementById('InvoiceFax').value = document.getElementById('Fax').value;
+        document.getElementById('InvoiceEmail').value = document.getElementById('Email').value;
+    });
+</script>
 

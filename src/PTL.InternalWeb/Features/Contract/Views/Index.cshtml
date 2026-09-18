@@ -1,0 +1,93 @@
+@model PTL.InternalWeb.Features.Contract.ContractListViewModel
+@using PTL.Contracts.Contract
+@{
+    ViewData["Title"] = "Contracts";
+    var totalPages = Model.Search.PageSize == 0 ? 1 : (int)Math.Ceiling(Model.TotalCount / (double)Model.Search.PageSize);
+    var historicalSelected = Model.Search.Period == ContractPeriodFilter.Historical ? "selected" : null;
+    var currentSelected = Model.Search.Period == ContractPeriodFilter.CurrentAndNext ? "selected" : null;
+    var allSelected = Model.Search.Period == ContractPeriodFilter.All ? "selected" : null;
+}
+
+<h1 class="govuk-heading-l">Contracts</h1>
+
+<p class="govuk-body">
+    <a class="govuk-button" data-module="govuk-button" asp-action="Create" asp-route-customerId="@Model.Search.CustomerId">Create contract</a>
+</p>
+
+<form method="get" asp-action="Index" class="govuk-!-margin-bottom-6">
+    <input type="hidden" name="customerId" value="@Model.Search.CustomerId" />
+    <div class="govuk-form-group">
+        <label class="govuk-label" for="searchTerm">Search</label>
+        <div class="govuk-hint">Matches contract suffix.</div>
+        <input class="govuk-input" id="searchTerm" name="searchTerm" value="@Model.Search.SearchTerm" />
+    </div>
+    <div class="govuk-form-group">
+        <label class="govuk-label" for="yearId">Year</label>
+        <div class="govuk-hint">Leave blank to use the period filter below.</div>
+        <input class="govuk-input" id="yearId" name="yearId" value="@Model.Search.YearId" />
+    </div>
+    <div class="govuk-form-group">
+        <label class="govuk-label" for="period">Period</label>
+        <select class="govuk-select" id="period" name="period">
+            <option value="@ContractPeriodFilter.Historical" selected="@historicalSelected">Historical</option>
+            <option value="@ContractPeriodFilter.CurrentAndNext" selected="@currentSelected">Current / next year</option>
+            <option value="@ContractPeriodFilter.All" selected="@allSelected">All</option>
+        </select>
+    </div>
+    <button class="govuk-button" data-module="govuk-button" type="submit">Search</button>
+</form>
+
+@if (Model.Contracts.Count == 0)
+{
+    <p class="govuk-body">There are no contracts to display.</p>
+}
+else
+{
+    <table class="govuk-table">
+        <thead class="govuk-table__head">
+            <tr class="govuk-table__row">
+                <th scope="col" class="govuk-table__header">Year</th>
+                <th scope="col" class="govuk-table__header">Suffix</th>
+                <th scope="col" class="govuk-table__header">Status</th>
+                <th scope="col" class="govuk-table__header"><span class="govuk-visually-hidden">Actions</span></th>
+            </tr>
+        </thead>
+        <tbody class="govuk-table__body">
+            @foreach (var contract in Model.Contracts)
+            {
+                <tr class="govuk-table__row">
+                    <td class="govuk-table__cell">@contract.YearId</td>
+                    <td class="govuk-table__cell">@contract.Suffix</td>
+                    <td class="govuk-table__cell">
+                        <strong class="govuk-tag @(contract.IsActive ? "govuk-tag--green" : "govuk-tag--grey")">
+                            @(contract.IsActive ? "Active" : "Inactive")
+                        </strong>
+                    </td>
+                    <td class="govuk-table__cell">
+                        <a class="govuk-link" asp-action="Details" asp-route-id="@contract.ContractId">View details</a>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+
+    @if (totalPages > 1)
+    {
+        <nav class="govuk-pagination" aria-label="Pagination">
+            <ul class="govuk-pagination__list">
+                @for (var pageNumber = 1; pageNumber <= totalPages; pageNumber++)
+                {
+                    <li class="govuk-pagination__item @(pageNumber == Model.Search.Page ? "govuk-pagination__item--current" : "")">
+                        <a class="govuk-link govuk-pagination__link"
+                           asp-action="Index"
+                           asp-route-customerId="@Model.Search.CustomerId"
+                           asp-route-yearId="@Model.Search.YearId"
+                           asp-route-period="@Model.Search.Period"
+                           asp-route-searchTerm="@Model.Search.SearchTerm"
+                           asp-route-page="@pageNumber">@pageNumber</a>
+                    </li>
+                }
+            </ul>
+        </nav>
+    }
+}

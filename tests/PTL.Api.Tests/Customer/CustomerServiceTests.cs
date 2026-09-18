@@ -97,54 +97,38 @@ public class CustomerServiceTests
     }
 
     [Fact]
-    public async Task DeactivateCustomerAsync_SetsInactiveAndStampsInactiveDate()
+    public async Task UpdateCustomerAsync_SetIsActiveFalse_StampsInactiveDate()
     {
         var repository = new FakeCustomerRepository();
         var service = CreateService(repository);
         var created = await service.CreateCustomerAsync(ValidActiveCustomer());
-        var statusId = Guid.NewGuid();
+        var updatedFields = ValidActiveCustomer();
+        updatedFields.IsActive = false;
 
-        var deactivated = await service.DeactivateCustomerAsync(created.CustomerId, statusId);
+        var deactivated = await service.UpdateCustomerAsync(created.CustomerId, updatedFields);
 
         Assert.NotNull(deactivated);
         Assert.False(deactivated!.IsActive);
-        Assert.Equal(statusId, deactivated.CustomerStatusId);
         Assert.NotNull(deactivated.InactiveDate);
     }
 
     [Fact]
-    public async Task DeactivateCustomerAsync_UnknownCustomer_ReturnsNull()
-    {
-        var service = CreateService(new FakeCustomerRepository());
-
-        var result = await service.DeactivateCustomerAsync(Guid.NewGuid(), Guid.NewGuid());
-
-        Assert.Null(result);
-    }
-
-    [Fact]
-    public async Task ReactivateCustomerAsync_ClearsInactiveDateAndCustomerStatusId()
+    public async Task UpdateCustomerAsync_SetIsActiveTrueAfterInactive_ClearsInactiveDateAndCustomerStatusId()
     {
         var repository = new FakeCustomerRepository();
         var service = CreateService(repository);
         var created = await service.CreateCustomerAsync(ValidActiveCustomer());
-        await service.DeactivateCustomerAsync(created.CustomerId, Guid.NewGuid());
+        var inactiveFields = ValidActiveCustomer();
+        inactiveFields.IsActive = false;
+        await service.UpdateCustomerAsync(created.CustomerId, inactiveFields);
 
-        var reactivated = await service.ReactivateCustomerAsync(created.CustomerId);
+        var reactivateFields = ValidActiveCustomer();
+        reactivateFields.IsActive = true;
+        var reactivated = await service.UpdateCustomerAsync(created.CustomerId, reactivateFields);
 
         Assert.NotNull(reactivated);
         Assert.True(reactivated!.IsActive);
         Assert.Null(reactivated.InactiveDate);
         Assert.Null(reactivated.CustomerStatusId);
-    }
-
-    [Fact]
-    public async Task ReactivateCustomerAsync_UnknownCustomer_ReturnsNull()
-    {
-        var service = CreateService(new FakeCustomerRepository());
-
-        var result = await service.ReactivateCustomerAsync(Guid.NewGuid());
-
-        Assert.Null(result);
     }
 }

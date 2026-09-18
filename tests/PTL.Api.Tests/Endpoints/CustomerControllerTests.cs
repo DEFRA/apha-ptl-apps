@@ -180,49 +180,32 @@ public class CustomerControllerTests
     }
 
     [Fact]
-    public async Task DeactivateCustomer_UnknownCustomer_ReturnsNotFound()
-    {
-        var controller = CreateController(new FakeCustomerRepository());
-
-        var result = await controller.DeactivateCustomer(Guid.NewGuid(), new DeactivateCustomerRequest(Guid.NewGuid()), CancellationToken.None);
-
-        Assert.IsType<NotFoundResult>(result.Result);
-    }
-
-    [Fact]
-    public async Task DeactivateCustomer_ExistingCustomer_ReturnsOkWithInactiveCustomer()
+    public async Task UpdateCustomer_SetIsActiveFalse_ReturnsOkWithInactiveCustomer()
     {
         var repository = new FakeCustomerRepository();
         var controller = CreateController(repository);
         var created = await controller.CreateCustomer(ValidCreateRequest(), CancellationToken.None);
         var customerId = ((CustomerResponse)((CreatedAtActionResult)created.Result!).Value!).CustomerId;
+        var inactiveUpdate = ToUpdateRequest(ValidCreateRequest()) with { IsActive = false };
 
-        var result = await controller.DeactivateCustomer(customerId, new DeactivateCustomerRequest(Guid.NewGuid()), CancellationToken.None);
+        var result = await controller.UpdateCustomer(customerId, inactiveUpdate, CancellationToken.None);
 
         var ok = Assert.IsType<OkObjectResult>(result.Result);
         Assert.False(((CustomerResponse)ok.Value!).IsActive);
     }
 
     [Fact]
-    public async Task ReactivateCustomer_UnknownCustomer_ReturnsNotFound()
-    {
-        var controller = CreateController(new FakeCustomerRepository());
-
-        var result = await controller.ReactivateCustomer(Guid.NewGuid(), CancellationToken.None);
-
-        Assert.IsType<NotFoundResult>(result.Result);
-    }
-
-    [Fact]
-    public async Task ReactivateCustomer_ExistingCustomer_ReturnsOkWithActiveCustomer()
+    public async Task UpdateCustomer_SetIsActiveTrueAfterInactive_ReturnsOkWithActiveCustomer()
     {
         var repository = new FakeCustomerRepository();
         var controller = CreateController(repository);
         var created = await controller.CreateCustomer(ValidCreateRequest(), CancellationToken.None);
         var customerId = ((CustomerResponse)((CreatedAtActionResult)created.Result!).Value!).CustomerId;
-        await controller.DeactivateCustomer(customerId, new DeactivateCustomerRequest(Guid.NewGuid()), CancellationToken.None);
+        var inactiveUpdate = ToUpdateRequest(ValidCreateRequest()) with { IsActive = false };
+        await controller.UpdateCustomer(customerId, inactiveUpdate, CancellationToken.None);
+        var activeUpdate = ToUpdateRequest(ValidCreateRequest()) with { IsActive = true };
 
-        var result = await controller.ReactivateCustomer(customerId, CancellationToken.None);
+        var result = await controller.UpdateCustomer(customerId, activeUpdate, CancellationToken.None);
 
         var ok = Assert.IsType<OkObjectResult>(result.Result);
         Assert.True(((CustomerResponse)ok.Value!).IsActive);

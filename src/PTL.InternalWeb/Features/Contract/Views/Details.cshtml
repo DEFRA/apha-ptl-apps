@@ -1,0 +1,103 @@
+@model PTL.Contracts.Contract.ContractResponse
+@{
+    ViewData["Title"] = $"Contract - {Model.YearId} {Model.Suffix}";
+}
+
+<a class="govuk-back-link" asp-action="Index" asp-route-customerId="@Model.CustomerId">Back to contracts</a>
+
+<h1 class="govuk-heading-l">@Model.QalNumber, @Model.YearId@(string.IsNullOrEmpty(Model.Suffix) ? "" : $" ({Model.Suffix})")</h1>
+
+<p class="govuk-body">
+    @if (Model.IsReadOnly)
+    {
+        <strong class="govuk-tag govuk-tag--grey">Read only (closed year)</strong>
+    }
+    else
+    {
+        <a class="govuk-button" data-module="govuk-button" asp-action="Edit" asp-route-id="@Model.ContractId">Edit contract</a>
+    }
+</p>
+
+<h2 class="govuk-heading-m">Contract details</h2>
+<dl class="govuk-summary-list">
+    <div class="govuk-summary-list__row">
+        <dt class="govuk-summary-list__key">Customer</dt>
+        <dd class="govuk-summary-list__value">@Model.CustomerName (@Model.QalNumber)</dd>
+    </div>
+    <div class="govuk-summary-list__row">
+        <dt class="govuk-summary-list__key">Year</dt>
+        <dd class="govuk-summary-list__value">@Model.YearId</dd>
+    </div>
+    <div class="govuk-summary-list__row">
+        <dt class="govuk-summary-list__key">Suffix</dt>
+        <dd class="govuk-summary-list__value">@Model.Suffix</dd>
+    </div>
+    <div class="govuk-summary-list__row">
+        <dt class="govuk-summary-list__key">UT number</dt>
+        <dd class="govuk-summary-list__value">@Model.UTNumber</dd>
+    </div>
+    <div class="govuk-summary-list__row">
+        <dt class="govuk-summary-list__key">FT number</dt>
+        <dd class="govuk-summary-list__value">@Model.FTNumber</dd>
+    </div>
+    <div class="govuk-summary-list__row">
+        <dt class="govuk-summary-list__key">Contract signatory</dt>
+        <dd class="govuk-summary-list__value">@Model.ContractSignatory</dd>
+    </div>
+    <div class="govuk-summary-list__row">
+        <dt class="govuk-summary-list__key">Status</dt>
+        <dd class="govuk-summary-list__value">
+            <strong class="govuk-tag @(Model.IsActive ? "govuk-tag--green" : "govuk-tag--grey")">
+                @(Model.IsActive ? "Active" : "Inactive")
+            </strong>
+        </dd>
+    </div>
+    <div class="govuk-summary-list__row">
+        <dt class="govuk-summary-list__key">Commencement date</dt>
+        <dd class="govuk-summary-list__value">@(Model.CommencementDate?.ToString("d MMMM yyyy") ?? "Not set")</dd>
+    </div>
+</dl>
+
+<h2 class="govuk-heading-m">Pricing</h2>
+<dl class="govuk-summary-list">
+    <div class="govuk-summary-list__row">
+        <dt class="govuk-summary-list__key">Discount rate</dt>
+        <dd class="govuk-summary-list__value">@Model.DiscountRate.ToString("P2")</dd>
+    </div>
+    <div class="govuk-summary-list__row">
+        <dt class="govuk-summary-list__key">Administration charge</dt>
+        <dd class="govuk-summary-list__value">@Model.AdministrationCharge.ToString("N2")</dd>
+    </div>
+    <div class="govuk-summary-list__row">
+        <dt class="govuk-summary-list__key">Courier</dt>
+        <dd class="govuk-summary-list__value">@Model.NumberCourier x @Model.CourierPrice.ToString("N2")</dd>
+    </div>
+    <div class="govuk-summary-list__row">
+        <dt class="govuk-summary-list__key">Postage</dt>
+        <dd class="govuk-summary-list__value">@Model.NumberPostage x @Model.PostagePrice.ToString("N2")</dd>
+    </div>
+    <div class="govuk-summary-list__row">
+        <dt class="govuk-summary-list__key">Special delivery</dt>
+        <dd class="govuk-summary-list__value">@Model.NumberSpecialDelivery x @Model.SpecialDeliveryPrice.ToString("N2")</dd>
+    </div>
+</dl>
+
+<h2 class="govuk-heading-m">Invoicing</h2>
+<dl class="govuk-summary-list">
+    <div class="govuk-summary-list__row">
+        <dt class="govuk-summary-list__key">Purchase order number</dt>
+        <dd class="govuk-summary-list__value">@Model.PurchaseOrderNumber</dd>
+    </div>
+    <div class="govuk-summary-list__row">
+        <dt class="govuk-summary-list__key">Opted out of invoice generation</dt>
+        <dd class="govuk-summary-list__value">@(Model.OptOutOfInvoiceGeneration ? "Yes" : "No")</dd>
+    </div>
+    <div class="govuk-summary-list__row">
+        <dt class="govuk-summary-list__key">Invoice sent</dt>
+        <dd class="govuk-summary-list__value">@(Model.IsInvoiceSent ? "Yes" : "No")</dd>
+    </div>
+    <div class="govuk-summary-list__row">
+        <dt class="govuk-summary-list__key">Online order</dt>
+        <dd class="govuk-summary-list__value">@(Model.IsOnlineOrder ? "Yes" : "No")</dd>
+    </div>
+</dl>

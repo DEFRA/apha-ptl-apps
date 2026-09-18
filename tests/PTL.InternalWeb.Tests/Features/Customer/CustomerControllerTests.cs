@@ -8,7 +8,7 @@ namespace PTL.InternalWeb.Tests.Features.Customer;
 public class CustomerControllerTests
 {
     private static PTL.InternalWeb.Features.Customer.CustomerController CreateController(FakeCustomerApiClient apiClient) =>
-        new(apiClient, NullLogger<PTL.InternalWeb.Features.Customer.CustomerController>.Instance);
+        new(apiClient, new FakeLookupApiClient(), NullLogger<PTL.InternalWeb.Features.Customer.CustomerController>.Instance);
 
     private static CustomerResponse SampleCustomer(Guid customerId, bool isActive = true) => new(
         customerId, "QAL/00001", string.Empty, "Sample Laboratories Ltd", string.Empty, Guid.NewGuid(), string.Empty,
@@ -66,7 +66,7 @@ public class CustomerControllerTests
     {
         var controller = CreateController(new FakeCustomerApiClient());
 
-        var result = controller.Create();
+        var result = await controller.Create(CancellationToken.None);
 
         var view = Assert.IsType<ViewResult>(result);
         Assert.IsType<PTL.InternalWeb.Features.Customer.CustomerFormViewModel>(view.Model);
@@ -146,124 +146,6 @@ public class CustomerControllerTests
         var redirect = Assert.IsType<RedirectToActionResult>(result);
         Assert.Equal(nameof(PTL.InternalWeb.Features.Customer.CustomerController.Details), redirect.ActionName);
         Assert.Equal(customerId, redirect.RouteValues!["id"]);
-    }
-
-    [Fact]
-    public async Task Deactivate_Get_UnknownCustomer_ReturnsNotFound()
-    {
-        var controller = CreateController(new FakeCustomerApiClient { CustomerResponse = null });
-
-        var result = await controller.Deactivate(Guid.NewGuid(), CancellationToken.None);
-
-        Assert.IsType<NotFoundResult>(result);
-    }
-
-    [Fact]
-    public async Task Deactivate_Get_ExistingCustomer_ReturnsViewWithModel()
-    {
-        var customerId = Guid.NewGuid();
-        var controller = CreateController(new FakeCustomerApiClient { CustomerResponse = SampleCustomer(customerId) });
-
-        var result = await controller.Deactivate(customerId, CancellationToken.None);
-
-        var view = Assert.IsType<ViewResult>(result);
-        var model = Assert.IsType<PTL.InternalWeb.Features.Customer.DeactivateCustomerViewModel>(view.Model);
-        Assert.Equal(customerId, model.CustomerId);
-    }
-
-    [Fact]
-    public async Task Deactivate_Post_Success_RedirectsToDetails()
-    {
-        var customerId = Guid.NewGuid();
-        var apiClient = new FakeCustomerApiClient
-        {
-            SaveResult = new CustomerSaveResult(true, SampleCustomer(customerId, isActive: false), new Dictionary<string, string[]>())
-        };
-        var controller = CreateController(apiClient);
-        var model = new PTL.InternalWeb.Features.Customer.DeactivateCustomerViewModel { CustomerId = customerId, CustomerStatusId = Guid.NewGuid() };
-
-        var result = await controller.Deactivate(customerId, model, CancellationToken.None);
-
-        var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal(nameof(PTL.InternalWeb.Features.Customer.CustomerController.Details), redirect.ActionName);
-    }
-
-    [Fact]
-    public async Task Deactivate_Post_InvalidModelState_ReturnsViewWithModel()
-    {
-        var customerId = Guid.NewGuid();
-        var controller = CreateController(new FakeCustomerApiClient());
-        controller.ModelState.AddModelError("CustomerStatusId", "Select a customer status.");
-        var model = new PTL.InternalWeb.Features.Customer.DeactivateCustomerViewModel { CustomerId = customerId };
-
-        var result = await controller.Deactivate(customerId, model, CancellationToken.None);
-
-        var view = Assert.IsType<ViewResult>(result);
-        Assert.Same(model, view.Model);
-    }
-
-    [Fact]
-    public async Task Deactivate_Post_ApiFailure_ReturnsViewWithFieldErrors()
-    {
-        var customerId = Guid.NewGuid();
-        var apiClient = new FakeCustomerApiClient
-        {
-            SaveResult = new CustomerSaveResult(false, null, new Dictionary<string, string[]> { ["CustomerStatusId"] = ["Invalid status."] })
-        };
-        var controller = CreateController(apiClient);
-        var model = new PTL.InternalWeb.Features.Customer.DeactivateCustomerViewModel { CustomerId = customerId, CustomerStatusId = Guid.NewGuid() };
-
-        var result = await controller.Deactivate(customerId, model, CancellationToken.None);
-
-        var view = Assert.IsType<ViewResult>(result);
-        Assert.Same(model, view.Model);
-        Assert.False(controller.ModelState.IsValid);
-    }
-
-    [Fact]
-    public async Task Reactivate_Post_Success_RedirectsToDetails()
-    {
-        var customerId = Guid.NewGuid();
-        var apiClient = new FakeCustomerApiClient
-        {
-            SaveResult = new CustomerSaveResult(true, SampleCustomer(customerId), new Dictionary<string, string[]>())
-        };
-        var controller = CreateController(apiClient);
-
-        var result = await controller.Reactivate(customerId, CancellationToken.None);
-
-        var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal(nameof(PTL.InternalWeb.Features.Customer.CustomerController.Details), redirect.ActionName);
-    }
-
-    [Fact]
-    public async Task Reactivate_Post_UnknownCustomer_ReturnsNotFound()
-    {
-        var apiClient = new FakeCustomerApiClient
-        {
-            SaveResult = new CustomerSaveResult(false, null, new Dictionary<string, string[]> { [string.Empty] = ["Customer was not found."] })
-        };
-        var controller = CreateController(apiClient);
-
-        var result = await controller.Reactivate(Guid.NewGuid(), CancellationToken.None);
-
-        Assert.IsType<NotFoundResult>(result);
-    }
-
-    [Fact]
-    public async Task Reactivate_Post_ValidationFailure_RedirectsToDetails()
-    {
-        var customerId = Guid.NewGuid();
-        var apiClient = new FakeCustomerApiClient
-        {
-            SaveResult = new CustomerSaveResult(false, null, new Dictionary<string, string[]> { ["CustomerStatusId"] = ["Unexpected error."] })
-        };
-        var controller = CreateController(apiClient);
-
-        var result = await controller.Reactivate(customerId, CancellationToken.None);
-
-        var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal(nameof(PTL.InternalWeb.Features.Customer.CustomerController.Details), redirect.ActionName);
     }
 
     [Fact]

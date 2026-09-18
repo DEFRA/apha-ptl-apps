@@ -65,40 +65,4 @@ public sealed class ParticipantService(IParticipantRepository participantReposit
         logger.LogInformation("Updated participant {ParticipantId}", participantId);
         return updated;
     }
-
-    public async Task<Participant?> DeactivateParticipantAsync(Guid participantId, CancellationToken cancellationToken = default)
-    {
-        var existing = await participantRepository.GetByIdAsync(participantId, cancellationToken);
-        if (existing is null)
-        {
-            logger.LogWarning("Deactivate requested for unknown participant {ParticipantId}", participantId);
-            return null;
-        }
-
-        existing.IsActive = false;
-        existing.InactiveDate ??= DateTime.UtcNow;
-
-        var updated = await participantRepository.UpdateAsync(existing, cancellationToken);
-        logger.LogInformation("Deactivated participant {ParticipantId}", participantId);
-        return updated;
-    }
-
-    public async Task<Participant?> ReactivateParticipantAsync(Guid participantId, CancellationToken cancellationToken = default)
-    {
-        var existing = await participantRepository.GetByIdAsync(participantId, cancellationToken);
-        if (existing is null)
-        {
-            logger.LogWarning("Reactivate requested for unknown participant {ParticipantId}", participantId);
-            return null;
-        }
-
-        existing.IsActive = true;
-        existing.InactiveDate = null;
-        existing.InactiveError = false;
-        existing.InactiveErrorDate = null;
-
-        var updated = await participantRepository.UpdateAsync(existing, cancellationToken);
-        logger.LogInformation("Reactivated participant {ParticipantId}", participantId);
-        return updated;
-    }
 }

@@ -11,14 +11,16 @@ namespace PTL.Data.Customer;
 // the database schema and procedure behaviour are owned elsewhere and are not modified here.
 public sealed class CustomerRepository(PtlDbContext dbContext) : ICustomerRepository
 {
-    public Task<CoreCustomer?> GetByIdAsync(Guid customerId, CancellationToken cancellationToken = default)
+    public async Task<CoreCustomer?> GetByIdAsync(Guid customerId, CancellationToken cancellationToken = default)
     {
+        // EXEC ... is not composable SQL, so SingleOrDefaultAsync (which wraps the query) cannot be used here.
         var customerIdParameter = new SqlParameter("@CustomerId", customerId);
 
-        return dbContext.Customers
+        var results = await dbContext.Customers
             .FromSqlRaw("EXEC dbo.spgCustomerByCustomerId @CustomerId", customerIdParameter)
             .AsNoTracking()
-            .SingleOrDefaultAsync(cancellationToken);
+            .ToListAsync(cancellationToken);
+        return results.SingleOrDefault();
     }
 
     public async Task<IReadOnlyList<CustomerSummaryEntity>> GetSummariesAsync(CustomerStatusFilter status, CancellationToken cancellationToken = default)

@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using Microsoft.AspNetCore.Mvc.Rendering;
 using PTL.Contracts.Customer;
 using PTL.Core.Customer;
 using CoreCustomer = PTL.Core.Customer.Customer;
@@ -13,19 +14,6 @@ public sealed record CustomerListViewModel(
     int TotalCount,
     IReadOnlyList<CustomerSummaryResponse> Customers);
 
-// Confirmation screen for the deactivation workflow (Details.cshtml -> Deactivate.cshtml -> POST).
-// CustomerStatusId records the inactive reason, mirroring the legacy inactive-error flag.
-public sealed class DeactivateCustomerViewModel
-{
-    public Guid CustomerId { get; set; }
-
-    public string Name { get; set; } = string.Empty;
-
-    // [NEEDS INVESTIGATION] rendered as a raw GUID pending a CustomerStatus lookup API/stored procedure.
-    [Required(ErrorMessage = "Select a customer status.")]
-    public Guid? CustomerStatusId { get; set; }
-}
-
 
 // Shared by Create.cshtml and Edit.cshtml. Validation attributes mirror
 // PtaBusinessObjects.BusinessObjects.Contracts.Customer.AddBusinessRules() (see
@@ -37,6 +25,13 @@ public sealed class CustomerFormViewModel : IValidatableObject
     public Guid? CustomerId { get; set; }
 
     public string? QalNumber { get; set; }
+
+    // Display-only - server-generated (CustomerService.CreateCustomerAsync sets it to
+    // DateTime.UtcNow and UpdateCustomerAsync always preserves the existing value), never posted
+    // back or trusted from the client. Populated by CustomerController with a "today" preview on
+    // Create and the persisted value on Edit, matching legacy Customer.aspx's
+    // TextboxInitialStartDate.Enabled = False.
+    public DateTime InitialStartDate { get; set; }
 
     [Required(ErrorMessage = "Enter a name.")]
     [StringLength(50, ErrorMessage = "Name must not exceed 50 characters.")]
@@ -53,9 +48,12 @@ public sealed class CustomerFormViewModel : IValidatableObject
     [RegularExpression(@"^(QAL/[0-9]*)?$", ErrorMessage = "Registered file number must match the format QAL/nnnnn.")]
     public string? RegisteredFileNumber { get; set; }
 
-    // [NEEDS INVESTIGATION] rendered as a raw GUID pending a CustomerType lookup API/stored procedure.
-    [Required(ErrorMessage = "Enter a customer type ID.")]
+    [Required(ErrorMessage = "Select a customer type.")]
     public Guid CustomerTypeId { get; set; }
+
+    // Populated by CustomerController before the view is rendered (GET, and re-populated on a
+    // failed POST) from ILookupApiClient.GetCustomerTypesAsync - see /api/lookups/customer-types.
+    public IEnumerable<SelectListItem> CustomerTypeOptions { get; set; } = [];
 
     [StringLength(20, ErrorMessage = "VAT number must not exceed 20 characters.")]
     public string? VatNumber { get; set; }
@@ -63,10 +61,13 @@ public sealed class CustomerFormViewModel : IValidatableObject
     // [NEEDS INVESTIGATION] rendered as a raw GUID pending a VatRating lookup API/stored procedure.
     public Guid VatRatingId { get; set; }
 
+    // Populated by CustomerController before the view is rendered - see /api/lookups/vat-ratings.
+    public IEnumerable<SelectListItem> VatRatingOptions { get; set; } = [];
+
     [StringLength(20, ErrorMessage = "Account number must not exceed 20 characters.")]
     public string? AccountNumber { get; set; }
 
-    [StringLength(30, ErrorMessage = "Customer finance ID must not exceed 30 characters.")]
+    [StringLength(30, ErrorMessage = "Customer ID must not exceed 30 characters.")]
     public string? CustomerFinanceId { get; set; }
 
     [StringLength(50, ErrorMessage = "Contact name must not exceed 50 characters.")]
@@ -90,8 +91,10 @@ public sealed class CustomerFormViewModel : IValidatableObject
     [StringLength(100, ErrorMessage = "Address line 5 must not exceed 100 characters.")]
     public string? Address5 { get; set; }
 
-    // [NEEDS INVESTIGATION] rendered as a raw GUID pending a Country lookup API/stored procedure.
     public Guid CountryId { get; set; }
+
+    // Populated by CustomerController before the view is rendered - see /api/lookups/countries.
+    public IEnumerable<SelectListItem> CountryOptions { get; set; } = [];
 
     [StringLength(20, ErrorMessage = "Telephone must not exceed 20 characters.")]
     [RegularExpression(@"^[ 0-9\+\-\(\)\*\#]*$", ErrorMessage = "Telephone contains characters that are not allowed.")]
@@ -109,8 +112,10 @@ public sealed class CustomerFormViewModel : IValidatableObject
     [EmailAddress(ErrorMessage = "Enter a valid email address.")]
     public string? Email { get; set; }
 
-    // [NEEDS INVESTIGATION] rendered as a raw GUID pending a Currency lookup API/stored procedure.
     public Guid CurrencyId { get; set; }
+
+    // Populated by CustomerController before the view is rendered - see /api/lookups/currencies.
+    public IEnumerable<SelectListItem> CurrencyOptions { get; set; } = [];
 
     [StringLength(2000, ErrorMessage = "Comments must not exceed 2000 characters.")]
     public string? Comments { get; set; }
@@ -141,8 +146,11 @@ public sealed class CustomerFormViewModel : IValidatableObject
     [StringLength(100, ErrorMessage = "Invoice address line 5 must not exceed 100 characters.")]
     public string? InvoiceAddress5 { get; set; }
 
-    // [NEEDS INVESTIGATION] rendered as a raw GUID pending a Country lookup API/stored procedure.
     public Guid InvoiceCountryId { get; set; }
+
+    // Populated by CustomerController before the view is rendered - see /api/lookups/countries
+    // (same list as CountryOptions, rendered as a second dropdown - mirrors DropDownInvoiceCountry).
+    public IEnumerable<SelectListItem> InvoiceCountryOptions { get; set; } = [];
 
     [StringLength(20, ErrorMessage = "Invoice telephone must not exceed 20 characters.")]
     [RegularExpression(@"^[ 0-9\+\-\(\)\*\#]*$", ErrorMessage = "Invoice telephone contains characters that are not allowed.")]
@@ -163,6 +171,11 @@ public sealed class CustomerFormViewModel : IValidatableObject
     public bool IsActive { get; set; } = true;
 
     public bool CanOrderOnline { get; set; }
+
+    // Display-only - server-generated by CustomerService.ApplyStatusTransition (set on deactivate,
+    // cleared on reactivate), never posted back or trusted from the client. Rendered greyed out
+    // and only shown once IsActive is unchecked, matching the "Inactive from" legacy concept.
+    public DateTime? InactiveDate { get; set; }
 
     // [NEEDS INVESTIGATION] rendered as a raw GUID pending a CustomerStatus lookup API/stored
     // procedure; only meaningful while IsActive is false (mirrors the legacy "inactive error" flag).

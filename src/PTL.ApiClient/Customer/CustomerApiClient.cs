@@ -12,8 +12,6 @@ public interface ICustomerApiClient
     Task<CustomerSearchResponse> SearchCustomersAsync(CustomerSearchRequest request, CancellationToken cancellationToken = default);
     Task<CustomerSaveResult> CreateCustomerAsync(CreateCustomerRequest request, CancellationToken cancellationToken = default);
     Task<CustomerSaveResult> UpdateCustomerAsync(Guid customerId, UpdateCustomerRequest request, CancellationToken cancellationToken = default);
-    Task<CustomerSaveResult> DeactivateCustomerAsync(Guid customerId, Guid customerStatusId, CancellationToken cancellationToken = default);
-    Task<CustomerSaveResult> ReactivateCustomerAsync(Guid customerId, CancellationToken cancellationToken = default);
 }
 
 // Thin typed HttpClient wrapper around PTL.Api's customer endpoints, shared by every web
@@ -55,28 +53,6 @@ public sealed class CustomerApiClient(HttpClient httpClient) : ICustomerApiClien
     public async Task<CustomerSaveResult> UpdateCustomerAsync(Guid customerId, UpdateCustomerRequest request, CancellationToken cancellationToken = default)
     {
         var response = await httpClient.PutAsJsonAsync($"/api/customers/{customerId}", request, cancellationToken);
-        if (response.StatusCode == HttpStatusCode.NotFound)
-        {
-            return new CustomerSaveResult(false, null, new Dictionary<string, string[]> { [string.Empty] = ["Customer was not found."] });
-        }
-
-        return await ToSaveResultAsync(response, cancellationToken);
-    }
-
-    public async Task<CustomerSaveResult> DeactivateCustomerAsync(Guid customerId, Guid customerStatusId, CancellationToken cancellationToken = default)
-    {
-        var response = await httpClient.PostAsJsonAsync($"/api/customers/{customerId}/deactivate", new DeactivateCustomerRequest(customerStatusId), cancellationToken);
-        if (response.StatusCode == HttpStatusCode.NotFound)
-        {
-            return new CustomerSaveResult(false, null, new Dictionary<string, string[]> { [string.Empty] = ["Customer was not found."] });
-        }
-
-        return await ToSaveResultAsync(response, cancellationToken);
-    }
-
-    public async Task<CustomerSaveResult> ReactivateCustomerAsync(Guid customerId, CancellationToken cancellationToken = default)
-    {
-        var response = await httpClient.PostAsync($"/api/customers/{customerId}/reactivate", null, cancellationToken);
         if (response.StatusCode == HttpStatusCode.NotFound)
         {
             return new CustomerSaveResult(false, null, new Dictionary<string, string[]> { [string.Empty] = ["Customer was not found."] });

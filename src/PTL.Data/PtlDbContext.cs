@@ -1,8 +1,11 @@
 using Microsoft.EntityFrameworkCore;
 using PTL.Core.Customer;
 using PTL.Core.Participant;
+using PTL.Core.Contract;
+using PTL.Core.Lookup;
 using CoreCustomer = PTL.Core.Customer.Customer;
 using CoreParticipant = PTL.Core.Participant.Participant;
+using CoreContract = PTL.Core.Contract.Contract;
 
 namespace PTL.Data;
 
@@ -14,6 +17,14 @@ public class PtlDbContext(DbContextOptions<PtlDbContext> options) : DbContext(op
     public DbSet<CustomerSummaryEntity> CustomerSummaries => Set<CustomerSummaryEntity>();
     public DbSet<CoreParticipant> Participants => Set<CoreParticipant>();
     public DbSet<ParticipantSummaryEntity> ParticipantSummaries => Set<ParticipantSummaryEntity>();
+    public DbSet<CoreContract> Contracts => Set<CoreContract>();
+    public DbSet<ContractSummaryEntity> ContractSummaries => Set<ContractSummaryEntity>();
+    public DbSet<CountryEntity> Countries => Set<CountryEntity>();
+    public DbSet<CurrencyEntity> Currencies => Set<CurrencyEntity>();
+    public DbSet<CustomerTypeEntity> CustomerTypes => Set<CustomerTypeEntity>();
+    public DbSet<VatRatingEntity> VatRatings => Set<VatRatingEntity>();
+    public DbSet<LabTypeEntity> LabTypes => Set<LabTypeEntity>();
+    public DbSet<YearEntity> Years => Set<YearEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -114,6 +125,109 @@ public class PtlDbContext(DbContextOptions<PtlDbContext> options) : DbContext(op
             entity.Property(p => p.LabName).HasColumnName("fldLabName");
             entity.Property(p => p.ContactName).HasColumnName("fldContactName");
             entity.Property(p => p.IsActive).HasColumnName("fldIsActive");
+        });
+
+        // CustomerName and QalNumber are joined from tblCustomer, and IsReadOnly is computed -
+        // none are real tblContract columns, but this entity is only ever populated via
+        // FromSqlRaw(spgContractByContractId) / written via ExecuteSqlRawAsync(spiContract/spuContract),
+        // never EF's own change-tracked SaveChanges, so mapping them to the stored procedure's result
+        // column aliases here is safe (see ContractRepository).
+        modelBuilder.Entity<CoreContract>(entity =>
+        {
+            entity.ToTable("tblContract");
+            entity.HasKey(c => c.ContractId);
+            entity.Property(c => c.ContractId).HasColumnName("fldContractId");
+            entity.Property(c => c.CustomerId).HasColumnName("fldCustomerId");
+            entity.Property(c => c.CustomerName).HasColumnName("fldCustomerName");
+            entity.Property(c => c.QalNumber).HasColumnName("fldQALNumber");
+            entity.Property(c => c.YearId).HasColumnName("fldYearId");
+            entity.Property(c => c.UTNumber).HasColumnName("fldUTNumber");
+            entity.Property(c => c.FTNumber).HasColumnName("fldFTNumber");
+            entity.Property(c => c.ContractSignatory).HasColumnName("fldContractSignatory");
+            entity.Property(c => c.ActionsRequired).HasColumnName("fldActionsRequired");
+            entity.Property(c => c.RenewalInformation).HasColumnName("fldRenewalInformation");
+            entity.Property(c => c.DiscountRate).HasColumnName("fldDiscountRate");
+            entity.Property(c => c.AdministrationCharge).HasColumnName("fldAdministrationCharge");
+            entity.Property(c => c.NumberCourier).HasColumnName("fldNumberCourier");
+            entity.Property(c => c.CourierPrice).HasColumnName("fldCourierPrice");
+            entity.Property(c => c.NumberPostage).HasColumnName("fldNumberPostage");
+            entity.Property(c => c.PostagePrice).HasColumnName("fldPostagePrice");
+            entity.Property(c => c.NumberSpecialDelivery).HasColumnName("fldNumberSpecialDelivery");
+            entity.Property(c => c.SpecialDeliveryPrice).HasColumnName("fldSpecialDeliveryPrice");
+            entity.Property(c => c.AcknowledgementPostedDate).HasColumnName("fldAcknowledgementPostedDate");
+            entity.Property(c => c.AcknowledgementReturnedDate).HasColumnName("fldAcknowledgementReturnedDate");
+            entity.Property(c => c.JobSheetPostedDate).HasColumnName("fldJobSheetPostedDate");
+            entity.Property(c => c.ReasonForClosure).HasColumnName("fldReasonForClosure");
+            entity.Property(c => c.DateOfLeaving).HasColumnName("fldDateOfLeaving");
+            entity.Property(c => c.IsActive).HasColumnName("fldIsActive");
+            entity.Property(c => c.IsReadOnly).HasColumnName("Readonly");
+            entity.Property(c => c.Suffix).HasColumnName("fldSuffix");
+            entity.Property(c => c.CommencementDate).HasColumnName("fldCommencementDate");
+            entity.Property(c => c.PurchaseOrderNumber).HasColumnName("fldPurchaseOrderNumber");
+            entity.Property(c => c.OptOutOfInvoiceGeneration).HasColumnName("fldOptOutOfInvoiceGeneration");
+            entity.Property(c => c.IsInvoiceSent).HasColumnName("fldIsInvoiceSent");
+            entity.Property(c => c.IsOnlineOrder).HasColumnName("fldIsOnlineOrder");
+            entity.Property(c => c.ApprovedBy).HasColumnName("fldApprovedBy");
+            entity.Property(c => c.ApprovedDate).HasColumnName("fldApprovedDate");
+        });
+
+        modelBuilder.Entity<ContractSummaryEntity>(entity =>
+        {
+            entity.HasNoKey();
+            entity.Property(c => c.ContractId).HasColumnName("fldContractId");
+            entity.Property(c => c.CustomerId).HasColumnName("fldCustomerId");
+            entity.Property(c => c.YearId).HasColumnName("fldYearId");
+            entity.Property(c => c.IsActive).HasColumnName("fldIsActive");
+            entity.Property(c => c.Suffix).HasColumnName("fldSuffix");
+        });
+
+        // spgaCountry also returns fldCountryTypeId/fldCountryType/fldAllocationCount, but only the
+        // id/name are needed for a dropdown - EF ignores unmapped result columns automatically.
+        modelBuilder.Entity<CountryEntity>(entity =>
+        {
+            entity.HasNoKey();
+            entity.Property(c => c.CountryId).HasColumnName("fldCountryId");
+            entity.Property(c => c.Country).HasColumnName("fldCountry");
+        });
+
+        // LongName is computed client-side (Symbol + " - " + Name), matching
+        // PtaBusinessObjects.BusinessObjects.SystemObjects.Currency.LongName - it is not a
+        // spgaCurrency result column, so it must be excluded from the model.
+        modelBuilder.Entity<CurrencyEntity>(entity =>
+        {
+            entity.HasNoKey();
+            entity.Property(c => c.CurrencyId).HasColumnName("fldCurrencyId");
+            entity.Property(c => c.Name).HasColumnName("fldName");
+            entity.Property(c => c.Symbol).HasColumnName("fldSymbol");
+            entity.Ignore(c => c.LongName);
+        });
+
+        modelBuilder.Entity<CustomerTypeEntity>(entity =>
+        {
+            entity.HasNoKey();
+            entity.Property(c => c.CustomerTypeId).HasColumnName("fldCustomerTypeId");
+            entity.Property(c => c.CustomerType).HasColumnName("fldCustomerType");
+        });
+
+        modelBuilder.Entity<VatRatingEntity>(entity =>
+        {
+            entity.HasNoKey();
+            entity.Property(v => v.VatRatingId).HasColumnName("fldVatRatingId");
+            entity.Property(v => v.VatRating).HasColumnName("fldVatRating");
+        });
+
+        modelBuilder.Entity<LabTypeEntity>(entity =>
+        {
+            entity.HasNoKey();
+            entity.Property(l => l.LabTypeId).HasColumnName("fldLabTypeId");
+            entity.Property(l => l.Name).HasColumnName("fldName");
+        });
+
+        modelBuilder.Entity<YearEntity>(entity =>
+        {
+            entity.HasNoKey();
+            entity.Property(y => y.YearId).HasColumnName("fldYearId");
+            entity.Property(y => y.Year).HasColumnName("fldYear");
         });
     }
 }
