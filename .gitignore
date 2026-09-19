@@ -32,6 +32,9 @@ packages/
 coverage.cobertura.xml
 coverage/
 
+# SonarCloud scanner working directory
+.sonarqube/
+
 # Logs
 *.log
 
