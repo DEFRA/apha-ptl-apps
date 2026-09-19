@@ -176,6 +176,43 @@ request) can supply their own GUID to make a request traceable under a known val
   `PTL.ApiClient.AddPtlApiClient()` - so one user action produces the same `CorrelationId` in the calling
   web app's and `PTL.Api`'s logs.
 
+### Example: logging from application code
+
+Inject `ILogger<T>` and log with a structured message template - never string interpolation - so the
+values stay queryable as real JSON fields rather than being flattened into the message text:
+
+```csharp
+public sealed class ParticipantService(IParticipantRepository participantRepository, ILogger<ParticipantService> logger) : IParticipantService
+{
+    public async Task<Participant?> DeactivateParticipantAsync(Guid participantId, CancellationToken cancellationToken = default)
+    {
+        var existing = await participantRepository.GetByIdAsync(participantId, cancellationToken);
+        if (existing is null)
+        {
+            logger.LogWarning("Deactivate requested for unknown participant {ParticipantId}", participantId);
+            return null;
+        }
+
+        existing.IsActive = false;
+        existing.InactiveDate ??= DateTime.UtcNow;
+
+        var updated = await participantRepository.UpdateAsync(existing, cancellationToken);
+        logger.LogInformation("Deactivated participant {ParticipantId}", participantId);
+        return updated;
+    }
+}
+```
+
+Because `CorrelationId` is already in the Serilog `LogContext` for the current request (see above), both
+log lines above are automatically enriched with it - no need to pass it around manually. The resulting
+CloudWatch Logs Insights query to see everything that happened to one participant, across both log lines:
+
+```
+fields @timestamp, CorrelationId, ParticipantId, @message
+| filter ParticipantId = "…"
+| sort @timestamp asc
+```
+
 ## Docker images & deployment
 
 `.github/workflows/build-test-publish-images.yml` builds and, on push to `main`, publishes images for
