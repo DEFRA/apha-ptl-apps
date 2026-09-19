@@ -9,6 +9,10 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.Data.SqlClient" Version="6.1.1" />
     <PackageReference Include="Dapper" Version="2.1.66" />
+    <PackageReference Include="Serilog.AspNetCore" Version="9.0.0" />
+    <PackageReference Include="Serilog.Sinks.Console" Version="6.0.0" />
+    <PackageReference Include="Serilog.Formatting.Compact" Version="3.0.0" />
+    <PackageReference Include="Serilog.Enrichers.Environment" Version="3.0.1" />
   </ItemGroup>
 
   <ItemGroup>
@@ -19,6 +23,7 @@
     <ProjectReference Include="..\PTL.Core\PTL.Core.csproj" />
     <ProjectReference Include="..\PTL.Data\PTL.Data.csproj" />
     <ProjectReference Include="..\PTL.Contracts\PTL.Contracts.csproj" />
+    <ProjectReference Include="..\PTL.Common\PTL.Common.csproj" />
   </ItemGroup>
 
 </Project>

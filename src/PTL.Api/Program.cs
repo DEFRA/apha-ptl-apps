@@ -1,13 +1,24 @@
 using Microsoft.EntityFrameworkCore;
 using PTL.Api.Features.Health;
 using PTL.Api.Infrastructure;
+using PTL.Common.Correlation;
 using PTL.Core.Customer;
 using PTL.Core.Participant;
 using PTL.Data;
 using PTL.Data.Customer;
 using PTL.Data.Participant;
+using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Structured JSON to stdout only - ECS/Fargate storage is ephemeral, so no file sinks. The
+// awslogs driver on the container picks stdout/stderr up and ships it to CloudWatch Logs.
+builder.Host.UseSerilog((context, services, configuration) => configuration
+    .ReadFrom.Configuration(context.Configuration)
+    .Enrich.FromLogContext()
+    .Enrich.WithMachineName()
+    .Enrich.WithEnvironmentName()
+    .WriteTo.Console(new Serilog.Formatting.Compact.CompactJsonFormatter()));
 
 // Database:Host/Name/User/Password are sourced from appsettings.Development.json
 // locally; in every deployed environment they come from the
@@ -64,6 +75,12 @@ builder.Services.AddExceptionHandler<PTL.Api.Infrastructure.GlobalExceptionHandl
 var app = builder.Build();
 
 app.UseExceptionHandler();
+
+// Correlation ID before request logging so the one-line-per-request log carries it; the web
+// front-ends forward their own ID here via CorrelationIdDelegatingHandler, so all services' logs
+// correlate.
+app.UseCorrelationId();
+app.UseSerilogRequestLogging();
 
 app.MapGet("/", () => "Hello World!");
 
