@@ -145,7 +145,7 @@ dependency issue even though it can still serve everything that doesn't need Api
 ## Testing
 
 Each app under `src/` has a matching test project under `tests/` (xUnit + `Microsoft.AspNetCore.Mvc.Testing`). Coverage is
-collected with coverlet and enforced at an 80% line-coverage threshold per project via `tests/Directory.Build.props`; the
+collected with coverlet and enforced at a 90% line-coverage threshold per project via `tests/Directory.Build.props`; the
 pre-commit hook also runs the full suite via `dotnet test PTL.slnx`.
 
 ```powershell
