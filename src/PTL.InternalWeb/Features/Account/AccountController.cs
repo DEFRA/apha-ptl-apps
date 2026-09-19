@@ -34,7 +34,7 @@ namespace PTL.InternalWeb.Features.Account
             if (!string.IsNullOrEmpty(model.ReturnUrl) && Url.IsLocalUrl(model.ReturnUrl))
                 return Redirect(model.ReturnUrl);
 
-            return RedirectToAction("Index", "Home");
+            return RedirectToAction("Index", "Customer");
         }
 
         [HttpPost]
