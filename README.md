@@ -152,6 +152,30 @@ pre-commit hook also runs the full suite via `dotnet test PTL.slnx`.
 dotnet test PTL.slnx
 ```
 
+## Logging & correlation IDs
+
+All three services (`PTL.Api`, `PTL.InternalWeb`, `PTL.ExternalWeb`) log structured JSON to the console
+only (no file sinks) via Serilog, using `CompactJsonFormatter`. Locally, that means one JSON object per
+line in the terminal running `dotnet run`; in a deployed environment, follow whatever your environment
+tails (e.g. `docker logs -f <container>`, or the container platform's own log viewer).
+
+Each log line includes `MachineName`, `EnvironmentName`, and - for anything logged during a request -
+`CorrelationId`. To follow a single request end-to-end, filter/grep the log stream for its `CorrelationId`
+value.
+
+**Correlation IDs are automatic, not manual.** `CorrelationIdMiddlewareExtensions.UseCorrelationId()` (in
+`PTL.Common`, registered in every `Program.cs` before `UseSerilogRequestLogging()`) reads the
+`X-Correlation-Id` request header; if it is missing or not a well-formed GUID, a new one is generated. No
+caller is required to supply one, but a caller (e.g. an upstream service, or a manual `curl`/Postman
+request) can supply their own GUID to make a request traceable under a known value. The ID is:
+
+- pushed into the Serilog `LogContext` for the lifetime of the request, so every log line carries it,
+- echoed back on the response's `X-Correlation-Id` header, and
+- forwarded automatically from `PTL.InternalWeb`/`PTL.ExternalWeb` to `PTL.Api` by
+  `CorrelationIdDelegatingHandler`, attached to every typed `HttpClient` registered in
+  `PTL.ApiClient.AddPtlApiClient()` - so one user action produces the same `CorrelationId` in the calling
+  web app's and `PTL.Api`'s logs.
+
 ## Docker images & deployment
 
 `.github/workflows/build-test-publish-images.yml` builds and, on push to `main`, publishes images for
