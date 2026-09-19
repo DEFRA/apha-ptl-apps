@@ -1,8 +1,19 @@
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Mvc.Razor;
 using PTL.ApiClient;
+using PTL.Common.Correlation;
+using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Structured JSON to stdout only - ECS/Fargate storage is ephemeral, so no file sinks. The
+// awslogs driver on the container picks stdout/stderr up and ships it to CloudWatch Logs.
+builder.Host.UseSerilog((context, services, configuration) => configuration
+    .ReadFrom.Configuration(context.Configuration)
+    .Enrich.FromLogContext()
+    .Enrich.WithMachineName()
+    .Enrich.WithEnvironmentName()
+    .WriteTo.Console(new Serilog.Formatting.Compact.CompactJsonFormatter()));
 
 // Add services to the container.
 builder.Services.AddControllersWithViews();
@@ -33,6 +44,11 @@ if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Home/Error");
 }
+
+// Correlation ID before request logging so the one-line-per-request log carries it, and so it's
+// available on HttpContext.Items for CorrelationIdDelegatingHandler when calling PTL.Api.
+app.UseCorrelationId();
+app.UseSerilogRequestLogging();
 
 // Serve static files from wwwroot
 app.UseStaticFiles();
