@@ -18,6 +18,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\PTL.Contracts\PTL.Contracts.csproj" />
+    <ProjectReference Include="..\PTL.Common\PTL.Common.csproj" />
   </ItemGroup>
 
 </Project>
