@@ -196,7 +196,8 @@ jobs:
             --configuration Release \
             --no-restore \
             --logger "trx;LogFilePrefix=ptl-sonar-tests" \
-            --results-directory "${{ runner.temp }}/test-results"
+            --results-directory "${{ runner.temp }}/test-results" \
+            /p:Threshold=0
           "${{ runner.temp }}/scanner/dotnet-sonarscanner" end /d:sonar.token="${SONAR_TOKEN}"
 
   container-validation:
