@@ -11,6 +11,16 @@
     <PackageReference Include="Serilog.Sinks.Console" Version="6.0.0" />
     <PackageReference Include="Serilog.Formatting.Compact" Version="3.0.0" />
     <PackageReference Include="Serilog.Enrichers.Environment" Version="3.0.1" />
+    <!-- The OpenID Connect authentication handler is not part of the ASP.NET Core shared
+         framework (unlike Cookies) and must be referenced explicitly. -->
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" Version="10.0.0" />
+    <!-- Shares the Data Protection key ring across every ECS task/AZ via Redis (ElastiCache) so
+         auth/correlation/antiforgery cookies encrypted by one task can be read by any other. -->
+    <PackageReference Include="Microsoft.AspNetCore.DataProtection.StackExchangeRedis" Version="9.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="PTL.InternalWeb.Tests" />
   </ItemGroup>
 
   <ItemGroup>
