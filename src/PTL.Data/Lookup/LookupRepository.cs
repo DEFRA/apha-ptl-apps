@@ -44,4 +44,16 @@ public sealed class LookupRepository(PtlDbContext dbContext) : ILookupRepository
             .FromSqlRaw("EXEC dbo.spgaYearCurrent")
             .AsNoTracking()
             .ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<SchemeCurrencyEntity>> GetSchemeCurrenciesAsync(CancellationToken cancellationToken = default) =>
+        await dbContext.SchemeCurrencies
+            .FromSqlRaw("EXEC dbo.spgaSchemeCurrency")
+            .AsNoTracking()
+            .ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<PostagePricingPlanEntity>> GetPostagePricingPlansForYearAsync(int yearId, CancellationToken cancellationToken = default) =>
+        await dbContext.PostagePricingPlans
+            .FromSqlRaw("EXEC dbo.spgPostageByYearID @year", new Microsoft.Data.SqlClient.SqlParameter("@year", yearId))
+            .AsNoTracking()
+            .ToListAsync(cancellationToken);
 }

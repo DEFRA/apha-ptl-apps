@@ -1,8 +1,6 @@
 @{
     var currentController = (ViewContext.RouteData.Values["controller"]?.ToString() ?? string.Empty).Trim();
     var currentAction = (ViewContext.RouteData.Values["action"]?.ToString() ?? string.Empty).Trim();
-    var isHomePage = string.Equals(currentController, "Home", StringComparison.OrdinalIgnoreCase)
-        && string.Equals(currentAction, "Index", StringComparison.OrdinalIgnoreCase);
     var isLoginPage = string.Equals(currentController, "Account", StringComparison.OrdinalIgnoreCase)
         && string.Equals(currentAction, "Login", StringComparison.OrdinalIgnoreCase);
 }
@@ -29,6 +27,33 @@
         .app-service-bar { background: #ffffff; border-bottom: 1px solid #b1b4b6; }
         .app-service-bar__container { min-height: 70px; display: flex; align-items: center; }
         .app-account-panel { margin-left: auto; display: flex; align-items: center; gap: 1rem; }
+
+        /* Left-hand PTLIMS navigation - see PTL.InternalWeb/Navigation/SideNavigationProvider.cs
+           for the legacy menu mapping this preserves. Context-based, not a permanent tree: each
+           page shows only its own node's title plus that node's direct children, matching the
+           legacy ListControl behaviour - breadcrumbs (_Breadcrumbs.cshtml) provide the way back
+           to the level above. */
+        .app-side-navigation__list { margin: 0; padding: 0; }
+        .app-side-navigation__item { border-bottom: 1px solid #b1b4b6; }
+        /* govuk-body (added alongside this class in _SideNavigation.cshtml) supplies the GOV.UK
+           font stack and responsive sizing; this only overrides colour/background/spacing. */
+        .app-side-navigation__title {
+                background-color: #1D70B8;
+            color: #ffffff;
+            font-weight: 700;
+            margin: 0;
+            padding: 10px 5px;
+        }
+        a.app-side-navigation__link { display: block; padding: 8px 5px; }
+        /* Disabled items stay visible (never removed) but are not links: no href, no focus, no
+           pointer cursor - screen readers announce them via aria-disabled. */
+        span.app-side-navigation__link--disabled {
+            display: block;
+            margin: 0;
+            padding: 8px 5px;
+            color: #6f777b;
+            cursor: not-allowed;
+        }
     </style>
 </head>
 
@@ -112,24 +137,7 @@
                 @if (!isLoginPage)
                 {
                     <div class="govuk-grid-column-one-quarter">
-                        <nav aria-label="Primary navigation" class="app-primary-navigation">
-                            <ul class="govuk-list">
-                                <li>
-                                    @if (isHomePage)
-                                    {
-                                        <a class="govuk-link" asp-controller="Home" asp-action="Index" aria-current="page"><strong>Home</strong></a>
-                                    }
-                                    else
-                                    {
-                                        <a class="govuk-link" asp-controller="Home" asp-action="Index">Home</a>
-                                    }
-                                </li>
-                                <li><a class="govuk-link" asp-controller="Customer" asp-action="Index">Customers</a></li>
-                                <li><a class="govuk-link" href="#">Navigation item 2</a></li>
-                                <!-- Contract list requires a customerId, so no top-level nav entry - reached via the customer list's "View contracts" link -->
-                                <li><a class="govuk-link" href="#">Navigation item 3</a></li>
-                            </ul>
-                        </nav>
+                        @await Html.PartialAsync("_SideNavigation")
                     </div>
                 }
                 <div class="@(isLoginPage ? "govuk-grid-column-full" : "govuk-grid-column-three-quarters")">

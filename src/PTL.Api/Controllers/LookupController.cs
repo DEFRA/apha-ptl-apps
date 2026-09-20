@@ -52,4 +52,22 @@ public sealed class LookupController(ILookupService lookupService) : ControllerB
         var years = await lookupService.GetCurrentYearsAsync(cancellationToken);
         return Ok(years.Select(y => new YearResponse(y.YearId, y.Year)).ToList());
     }
+
+    // GET /api/lookups/schemes/{schemeId}/currencies - see docs/analysis/scheme-analysis.md,
+    // "Scheme Currency Read Operations".
+    [HttpGet("schemes/{schemeId:guid}/currencies")]
+    public async Task<ActionResult<IReadOnlyList<SchemeCurrencyResponse>>> GetSchemeCurrencies(Guid schemeId, CancellationToken cancellationToken)
+    {
+        var currencies = await lookupService.GetSchemeCurrenciesAsync(schemeId, cancellationToken);
+        return Ok(currencies.Select(c => new SchemeCurrencyResponse(c.SchemeCurrencyId, c.SchemeId, c.CurrencyId, c.Price, c.CurrencyName, c.CurrencySymbol)).ToList());
+    }
+
+    // GET /api/lookups/postage-pricing-plans?year={yearId} - see docs/analysis/scheme-analysis.md,
+    // "Postage Pricing Plan Read Operations".
+    [HttpGet("postage-pricing-plans")]
+    public async Task<ActionResult<IReadOnlyList<PostagePricingPlanResponse>>> GetPostagePricingPlans([FromQuery] int year, CancellationToken cancellationToken)
+    {
+        var plans = await lookupService.GetPostagePricingPlansForYearAsync(year, cancellationToken);
+        return Ok(plans.Select(p => new PostagePricingPlanResponse(p.PostageId, p.Name, p.UKPrice, p.EUPrice, p.NonEUPrice, p.YearId)).ToList());
+    }
 }

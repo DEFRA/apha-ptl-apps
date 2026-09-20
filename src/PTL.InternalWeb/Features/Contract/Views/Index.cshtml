@@ -10,10 +10,6 @@
 
 <h1 class="govuk-heading-l">Contracts</h1>
 
-<p class="govuk-body">
-    <a class="govuk-button" data-module="govuk-button" asp-action="Create" asp-route-customerId="@Model.Search.CustomerId">Create contract</a>
-</p>
-
 <form method="get" asp-action="Index" class="govuk-!-margin-bottom-6">
     <input type="hidden" name="customerId" value="@Model.Search.CustomerId" />
     <div class="govuk-form-group">

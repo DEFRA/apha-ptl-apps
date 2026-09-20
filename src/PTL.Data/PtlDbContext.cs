@@ -2,10 +2,12 @@ using Microsoft.EntityFrameworkCore;
 using PTL.Core.Customer;
 using PTL.Core.Participant;
 using PTL.Core.Contract;
+using PTL.Core.Scheme;
 using PTL.Core.Lookup;
 using CoreCustomer = PTL.Core.Customer.Customer;
 using CoreParticipant = PTL.Core.Participant.Participant;
 using CoreContract = PTL.Core.Contract.Contract;
+using CoreScheme = PTL.Core.Scheme.Scheme;
 
 namespace PTL.Data;
 
@@ -19,6 +21,11 @@ public class PtlDbContext(DbContextOptions<PtlDbContext> options) : DbContext(op
     public DbSet<ParticipantSummaryEntity> ParticipantSummaries => Set<ParticipantSummaryEntity>();
     public DbSet<CoreContract> Contracts => Set<CoreContract>();
     public DbSet<ContractSummaryEntity> ContractSummaries => Set<ContractSummaryEntity>();
+    public DbSet<CoreScheme> Schemes => Set<CoreScheme>();
+    public DbSet<SchemeSummaryEntity> SchemeSummaries => Set<SchemeSummaryEntity>();
+    public DbSet<SchemeHistoryEntity> SchemeHistory => Set<SchemeHistoryEntity>();
+    public DbSet<SchemeCurrencyEntity> SchemeCurrencies => Set<SchemeCurrencyEntity>();
+    public DbSet<PostagePricingPlanEntity> PostagePricingPlans => Set<PostagePricingPlanEntity>();
     public DbSet<CountryEntity> Countries => Set<CountryEntity>();
     public DbSet<CurrencyEntity> Currencies => Set<CurrencyEntity>();
     public DbSet<CustomerTypeEntity> CustomerTypes => Set<CustomerTypeEntity>();
@@ -179,6 +186,124 @@ public class PtlDbContext(DbContextOptions<PtlDbContext> options) : DbContext(op
             entity.Property(c => c.YearId).HasColumnName("fldYearId");
             entity.Property(c => c.IsActive).HasColumnName("fldIsActive");
             entity.Property(c => c.Suffix).HasColumnName("fldSuffix");
+        });
+
+        // SampleNoSequence is joined from tblSchedule (fldSampleNoSequence) and IsReadOnly is
+        // computed - neither is a real tblScheme column, but this entity is only ever populated
+        // via FromSqlRaw(spgSchemeBySchemeId) / written via ExecuteSqlRawAsync(spiScheme/spuScheme),
+        // never EF's own change-tracked SaveChanges - see SchemeRepository, and ContractRepository
+        // for the equivalent pattern already established for Contract.IsReadOnly.
+        modelBuilder.Entity<CoreScheme>(entity =>
+        {
+            entity.ToTable("tblScheme");
+            entity.HasKey(s => s.SchemeId);
+            entity.Property(s => s.SchemeId).HasColumnName("fldSchemeId");
+            entity.Property(s => s.SharedId).HasColumnName("fldSharedId");
+            entity.Property(s => s.YearId).HasColumnName("fldYearId");
+            entity.Property(s => s.Identifier).HasColumnName("fldIdentifier");
+            entity.Property(s => s.Name).HasColumnName("fldName");
+            entity.Property(s => s.ScheduleId).HasColumnName("fldScheduleId");
+            entity.Property(s => s.ScheduleCodeId).HasColumnName("fldScheduleCodeId");
+            entity.Property(s => s.StartDate).HasColumnName("fldStartDate");
+            entity.Property(s => s.DistributionMonthJan).HasColumnName("fldDistributionMonthJan");
+            entity.Property(s => s.DistributionMonthFeb).HasColumnName("fldDistributionMonthFeb");
+            entity.Property(s => s.DistributionMonthMar).HasColumnName("fldDistributionMonthMar");
+            entity.Property(s => s.DistributionMonthApr).HasColumnName("fldDistributionMonthApr");
+            entity.Property(s => s.DistributionMonthMay).HasColumnName("fldDistributionMonthMay");
+            entity.Property(s => s.DistributionMonthJun).HasColumnName("fldDistributionMonthJun");
+            entity.Property(s => s.DistributionMonthJul).HasColumnName("fldDistributionMonthJul");
+            entity.Property(s => s.DistributionMonthAug).HasColumnName("fldDistributionMonthAug");
+            entity.Property(s => s.DistributionMonthSep).HasColumnName("fldDistributionMonthSep");
+            entity.Property(s => s.DistributionMonthOct).HasColumnName("fldDistributionMonthOct");
+            entity.Property(s => s.DistributionMonthNov).HasColumnName("fldDistributionMonthNov");
+            entity.Property(s => s.DistributionMonthDec).HasColumnName("fldDistributionMonthDec");
+            entity.Property(s => s.DistributionAsAvailable).HasColumnName("fldDistributionAsAvailable");
+            entity.Property(s => s.WeekNumber).HasColumnName("fldWeekNumber");
+            entity.Property(s => s.DayOfWeekId).HasColumnName("fldDayOfWeekId");
+            entity.Property(s => s.Deadline).HasColumnName("fldDeadline");
+            entity.Property(s => s.Pilot).HasColumnName("fldPilot");
+            entity.Property(s => s.Accredited).HasColumnName("fldAccredited");
+            entity.Property(s => s.ComerciallyAvailable).HasColumnName("fldComerciallyAvailable");
+            entity.Property(s => s.LimitedSampleAvailability).HasColumnName("fldLimitedSampleAvailability");
+            entity.Property(s => s.NoVLALabs).HasColumnName("fldNoVLALabs");
+            entity.Property(s => s.CombinedPackaging).HasColumnName("fldCombinedPackaging");
+            entity.Property(s => s.SampleOrigin).HasColumnName("fldSampleOrigin");
+            entity.Property(s => s.Subcontractor).HasColumnName("fldSubcontractor");
+            entity.Property(s => s.NumberOfSamples).HasColumnName("fldNumberOfSamples");
+            entity.Property(s => s.SamplePackingInstructions).HasColumnName("fldSamplePackingInstructions");
+            entity.Property(s => s.TestConsultant1).HasColumnName("fldTestConsultant1");
+            entity.Property(s => s.TestConsultant2).HasColumnName("fldTestConsultant2");
+            entity.Property(s => s.TestConsultant3).HasColumnName("fldTestConsultant3");
+            entity.Property(s => s.CommentsRequired).HasColumnName("fldCommentsRequired");
+            entity.Property(s => s.DateOfReceipt).HasColumnName("fldDateOfReceipt");
+            entity.Property(s => s.StorageConditions).HasColumnName("fldStorageConditions");
+            entity.Property(s => s.ConditionOnReceipt).HasColumnName("fldConditionOnReceipt");
+            entity.Property(s => s.Instructions).HasColumnName("fldInstructions");
+            entity.Property(s => s.SampleNoSequence).HasColumnName("fldSampleNoSequence");
+            entity.Property(s => s.TestConsultantTabulationId).HasColumnName("fldTestConsultantTabulationId");
+            entity.Property(s => s.UseExternalReference).HasColumnName("fldUseExternalReference");
+            entity.Property(s => s.LastModified).HasColumnName("fldLastModified");
+            entity.Property(s => s.StoreRatings).HasColumnName("fldStoreRatings");
+            entity.Property(s => s.Assessor1).HasColumnName("fldAssessor1");
+            entity.Property(s => s.Assessor2).HasColumnName("fldAssessor2");
+            entity.Property(s => s.Assessor3).HasColumnName("fldAssessor3");
+            entity.Property(s => s.Assessor4).HasColumnName("fldAssessor4");
+            entity.Property(s => s.RequiresAssessment).HasColumnName("fldRequiresAssessment");
+            entity.Property(s => s.StandardTabulationText).HasColumnName("fldStandardTabulationText");
+            entity.Property(s => s.Postage).HasColumnName("fldPostage");
+            entity.Property(s => s.CustomsDescription).HasColumnName("fldCustomsDocumentDescription");
+            entity.Property(s => s.CustomsVolume).HasColumnName("fldCustomsDocumentVolume");
+            entity.Property(s => s.DataConsentDeclarationActive).HasColumnName("fldDataConsentDeclarationActive");
+            entity.Property(s => s.DataConsentDeclarationText).HasColumnName("fldDataConsentDeclarationText");
+            entity.Property(s => s.IsReadOnly).HasColumnName("Readonly");
+        });
+
+        modelBuilder.Entity<SchemeSummaryEntity>(entity =>
+        {
+            entity.HasNoKey();
+            entity.Property(s => s.SharedId).HasColumnName("fldSharedId");
+            entity.Property(s => s.YearId).HasColumnName("fldYearId");
+            entity.Property(s => s.CurrentSchemeId).HasColumnName("fldCurrentSchemeId");
+            entity.Property(s => s.CurrentIdentifier).HasColumnName("fldCurrentIdentifier");
+            entity.Property(s => s.CurrentName).HasColumnName("fldCurrentName");
+            entity.Property(s => s.NextSchemeId).HasColumnName("fldNextSchemeId");
+            entity.Property(s => s.NextIdentifier).HasColumnName("fldNextIdentifier");
+            entity.Property(s => s.NextName).HasColumnName("fldNextName");
+            entity.Property(s => s.RecentSchemeId).HasColumnName("fldRecentSchemeId");
+            entity.Property(s => s.RecentIdentifier).HasColumnName("fldRecentIdentifier");
+            entity.Property(s => s.RecentName).HasColumnName("fldRecentName");
+        });
+
+        modelBuilder.Entity<SchemeHistoryEntity>(entity =>
+        {
+            entity.HasNoKey();
+            entity.Property(s => s.SchemeId).HasColumnName("fldCurrentSchemeId");
+            entity.Property(s => s.SharedId).HasColumnName("fldSharedId");
+            entity.Property(s => s.YearId).HasColumnName("fldYearId");
+            entity.Property(s => s.Identifier).HasColumnName("fldCurrentIdentifier");
+            entity.Property(s => s.Name).HasColumnName("fldCurrentName");
+        });
+
+        modelBuilder.Entity<SchemeCurrencyEntity>(entity =>
+        {
+            entity.HasNoKey();
+            entity.Property(s => s.SchemeCurrencyId).HasColumnName("fldSchemeCurrencyId");
+            entity.Property(s => s.SchemeId).HasColumnName("fldSchemeId");
+            entity.Property(s => s.CurrencyId).HasColumnName("fldCurrencyId");
+            entity.Property(s => s.Price).HasColumnName("fldPrice");
+            entity.Property(s => s.CurrencyName).HasColumnName("fldCurrencyName");
+            entity.Property(s => s.CurrencySymbol).HasColumnName("fldCurrencySymbol");
+        });
+
+        modelBuilder.Entity<PostagePricingPlanEntity>(entity =>
+        {
+            entity.HasNoKey();
+            entity.Property(p => p.PostageId).HasColumnName("fldPostageId");
+            entity.Property(p => p.Name).HasColumnName("fldName");
+            entity.Property(p => p.UKPrice).HasColumnName("fldUkPrice");
+            entity.Property(p => p.EUPrice).HasColumnName("fldEuPrice");
+            entity.Property(p => p.NonEUPrice).HasColumnName("fldNonEuPrice");
+            entity.Property(p => p.YearId).HasColumnName("fldYearId");
         });
 
         // spgaCountry also returns fldCountryTypeId/fldCountryType/fldAllocationCount, but only the

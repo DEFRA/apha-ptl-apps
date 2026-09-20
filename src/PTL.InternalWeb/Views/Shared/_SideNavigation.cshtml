@@ -1,0 +1,44 @@
+@using PTL.InternalWeb.Navigation
+@{
+    // Legacy behaviour (ProficiencyTestingWeb/Admin ListControl): each page shows only its OWN
+    // node's title plus that node's direct children - never a permanent tree of every domain.
+    // Home is special-cased to show the top-level menu (it has no "children" of its own).
+    var currentController = (ViewContext.RouteData.Values["controller"]?.ToString() ?? string.Empty).Trim();
+    var currentAction = (ViewContext.RouteData.Values["action"]?.ToString() ?? string.Empty).Trim();
+    var customerId = ViewContext.HttpContext.Request.Query["customerId"].FirstOrDefault()
+        ?? ViewContext.RouteData.Values["customerId"]?.ToString();
+
+    var topLevel = SideNavigationProvider.Build();
+    var isHome = string.Equals(currentController, "Home", StringComparison.OrdinalIgnoreCase);
+    var currentNode = isHome ? null : SideNavigationProvider.FindNode(topLevel, currentController, currentAction);
+    var visibleItems = currentNode is null ? topLevel : currentNode.Children.Where(child => !child.IsHidden).ToList();
+}
+
+<nav aria-label="Primary navigation" class="app-side-navigation">
+    @if (currentNode is not null)
+    {
+        <div class="govuk-body app-side-navigation__title">@currentNode.Text</div>
+    }
+    @if (visibleItems.Count > 0)
+    {
+        <ul class="govuk-list app-side-navigation__list">
+            @foreach (var item in visibleItems)
+            {
+                <li class="app-side-navigation__item">
+                    @if (!item.IsEnabled || item.ControllerName is null)
+                    {
+                        <span class="govuk-body app-side-navigation__link app-side-navigation__link--disabled" aria-disabled="true">@item.Text</span>
+                    }
+                    else if (item.ControllerName is "Participant" or "Contract" && customerId is not null)
+                    {
+                        <a class="govuk-link app-side-navigation__link" asp-controller="@item.ControllerName" asp-action="@item.ActionName" asp-route-customerId="@customerId">@item.Text</a>
+                    }
+                    else
+                    {
+                        <a class="govuk-link app-side-navigation__link" asp-controller="@item.ControllerName" asp-action="@item.ActionName">@item.Text</a>
+                    }
+                </li>
+            }
+        </ul>
+    }
+</nav>

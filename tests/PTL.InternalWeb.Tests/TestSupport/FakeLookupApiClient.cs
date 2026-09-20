@@ -14,6 +14,8 @@ internal sealed class FakeLookupApiClient : ILookupApiClient
     public IReadOnlyList<VatRatingResponse> VatRatings { get; set; } = [];
     public IReadOnlyList<LabTypeResponse> LabTypes { get; set; } = [];
     public IReadOnlyList<YearResponse> Years { get; set; } = [];
+    public IReadOnlyList<SchemeCurrencyResponse> SchemeCurrencies { get; set; } = [];
+    public IReadOnlyList<PostagePricingPlanResponse> PostagePricingPlans { get; set; } = [];
 
     public Task<IReadOnlyList<CountryResponse>> GetCountriesAsync(CancellationToken cancellationToken = default) =>
         Task.FromResult(Countries);
@@ -32,4 +34,10 @@ internal sealed class FakeLookupApiClient : ILookupApiClient
 
     public Task<IReadOnlyList<YearResponse>> GetCurrentYearsAsync(CancellationToken cancellationToken = default) =>
         Task.FromResult(Years);
+
+    public Task<IReadOnlyList<SchemeCurrencyResponse>> GetSchemeCurrenciesAsync(Guid schemeId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(SchemeCurrencies);
+
+    public Task<IReadOnlyList<PostagePricingPlanResponse>> GetPostagePricingPlansForYearAsync(int yearId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(PostagePricingPlans);
 }

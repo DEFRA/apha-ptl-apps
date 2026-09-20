@@ -11,6 +11,8 @@ public interface ILookupApiClient
     Task<IReadOnlyList<VatRatingResponse>> GetVatRatingsAsync(CancellationToken cancellationToken = default);
     Task<IReadOnlyList<LabTypeResponse>> GetLabTypesAsync(CancellationToken cancellationToken = default);
     Task<IReadOnlyList<YearResponse>> GetCurrentYearsAsync(CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<SchemeCurrencyResponse>> GetSchemeCurrenciesAsync(Guid schemeId, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<PostagePricingPlanResponse>> GetPostagePricingPlansForYearAsync(int yearId, CancellationToken cancellationToken = default);
 }
 
 // Thin typed HttpClient wrapper around PTL.Api's read-only lookup endpoints, shared by every web
@@ -51,5 +53,17 @@ public sealed class LookupApiClient(HttpClient httpClient) : ILookupApiClient
     {
         var years = await httpClient.GetFromJsonAsync<IReadOnlyList<YearResponse>>("/api/lookups/years", cancellationToken);
         return years ?? [];
+    }
+
+    public async Task<IReadOnlyList<SchemeCurrencyResponse>> GetSchemeCurrenciesAsync(Guid schemeId, CancellationToken cancellationToken = default)
+    {
+        var currencies = await httpClient.GetFromJsonAsync<IReadOnlyList<SchemeCurrencyResponse>>($"/api/lookups/schemes/{schemeId}/currencies", cancellationToken);
+        return currencies ?? [];
+    }
+
+    public async Task<IReadOnlyList<PostagePricingPlanResponse>> GetPostagePricingPlansForYearAsync(int yearId, CancellationToken cancellationToken = default)
+    {
+        var plans = await httpClient.GetFromJsonAsync<IReadOnlyList<PostagePricingPlanResponse>>($"/api/lookups/postage-pricing-plans?year={yearId}", cancellationToken);
+        return plans ?? [];
     }
 }

@@ -25,6 +25,200 @@ Preserve all business behaviour, validation rules, workflows, role restrictions,
 
 ---
 
+# Legacy User Experience Preservation
+
+PTLIMS is a business-critical operational application used by long-term users.
+
+This is a technology modernisation project, not a business process redesign project.
+
+The primary objective is:
+
+- Modernise technology
+- Modernise architecture
+- Modernise maintainability
+
+while preserving existing user experience and business behaviour.
+
+Existing PTLIMS users should be able to move from the legacy application to the modern application with minimal retraining.
+
+The target system should feel like:
+
+"PTLIMS on a modern platform"
+
+and not:
+
+"a completely new application."
+
+---
+
+## Preserve Existing Business Terminology
+
+Preserve all existing:
+
+- Field Labels
+- Display Names
+- Page Titles
+- Page Headings
+- Menu Names
+- Section Names
+- Tab Names
+- Button Labels
+- Grid Column Names
+- Lookup Names
+- Business Terminology
+
+Do not rename business concepts unless explicitly requested by the business.
+
+Examples:
+
+Keep:
+
+- UT Number
+- FT Number
+- Participant
+- Participant Scheme
+- Scheme
+- Contract Signatory
+- Actions Required
+- Renewal Information
+- Administration Charge
+- Data Consent Declaration
+- Postage Pricing Plan
+
+Do not introduce alternative terminology simply because it sounds more modern.
+
+---
+
+## Preserve Existing Screen Layout
+
+Preserve:
+
+- Page Structure
+- Section Structure
+- Grouping Of Fields
+- Existing User Workflow
+- Existing Screen Navigation
+
+Use GOV.UK components while maintaining the legacy screen layout as closely as practical.
+
+---
+
+## Preserve Existing Field Order
+
+Field order is part of business workflow.
+
+Maintain the same field sequence as the legacy screen wherever practical.
+
+Do not reorder fields for visual or design reasons.
+
+If field order changes:
+
+- Explain why
+- Identify business impact
+
+Otherwise preserve existing ordering exactly.
+
+---
+
+## Preserve Existing Visibility Behaviour
+
+Preserve:
+
+- Hidden Fields
+- Hidden Controls
+- Hidden Sections
+- Conditional Visibility Rules
+- Show / Hide Logic
+
+Existing visibility behaviour is considered business functionality.
+
+---
+
+## Preserve Existing ReadOnly Behaviour
+
+Preserve:
+
+- ReadOnly Fields
+- ReadOnly Sections
+- ReadOnly Screen States
+
+Examples:
+
+- Contract.IsReadOnly
+- Scheme.IsReadonly
+- Participant ReadOnly behaviour
+
+Existing users expect these states.
+
+---
+
+## Preserve Existing Enable / Disable Behaviour
+
+Preserve:
+
+- Enabled Controls
+- Disabled Controls
+- Conditionally Editable Controls
+
+Examples:
+
+If:
+
+RequiresAssessment
+
+is:
+
+- Enabled During Create
+- Disabled During Edit
+
+then preserve exactly the same behaviour.
+
+Do not make previously disabled fields editable unless explicitly required.
+
+---
+
+## Preserve Existing Workflow Behaviour
+
+Preserve:
+
+- Create Workflows
+- Edit Workflows
+- Renewal Workflows
+- Copy Workflows
+- Approval Workflows
+- Navigation Workflows
+- Save Behaviour
+
+Do not simplify workflows without an explicit migration decision.
+
+---
+
+## Preserve Existing Validation Behaviour
+
+Preserve:
+
+- Required Fields
+- Length Restrictions
+- Validation Messages
+- Status Checks
+- Workflow Restrictions
+- Conditional Validation Rules
+- Business Rule Validation
+
+Do not replace existing validation behaviour with simplified alternatives.
+
+---
+
+## Minimise User Retraining
+
+Assume users are already familiar with PTLIMS.
+
+Do not redesign screens simply because newer UX approaches exist.
+
+User familiarity takes precedence over UI redesign unless the migration documents specifically require change.
+
+---
+
 # Existing Code Reuse Rules
 
 Before generating any code:
@@ -45,29 +239,20 @@ Use the existing project layout.
 
 src
 
-PTL.Api
-
-PTL.ApiClient
-
-PTL.Core
-
-PTL.Data
-
-PTL.Contracts
-
-PTL.InternalWeb
-
-PTL.ExternalWeb
+- PTL.Api
+- PTL.ApiClient
+- PTL.Core
+- PTL.Data
+- PTL.Contracts
+- PTL.InternalWeb
+- PTL.ExternalWeb
 
 tests
 
-PTL.Api.Tests
-
-PTL.ApiClient.Tests
-
-PTL.InternalWeb.Tests
-
-PTL.ExternalWeb.Tests
+- PTL.Api.Tests
+- PTL.ApiClient.Tests
+- PTL.InternalWeb.Tests
+- PTL.ExternalWeb.Tests
 
 ---
 
@@ -92,99 +277,9 @@ Do NOT use:
 - BusinessBase
 - ReadOnlyBase
 
-Avoid introducing additional complexity unless required by the migration documents.
+Avoid introducing additional complexity unless required by migration documents.
 
 Prefer the simplest maintainable solution.
-
----
-
-# Project Boundaries
-
-## PTL.Api
-
-Contains:
-
-- Controllers
-- API configuration
-- Authentication configuration
-- Swagger/OpenAPI
-- Filters
-- API middleware
-
-Do NOT place:
-
-- Business entities
-- Repository implementations
-- Domain logic
-
-inside controllers.
-
----
-
-## PTL.Contracts
-
-Contains:
-
-- Request DTOs
-- Response DTOs
-- Shared contracts
-- ApiClient DTOs
-
----
-
-## PTL.Core
-
-Contains:
-
-- Domain models
-- Business rules
-- Validation logic
-- Service interfaces
-- Service implementations
-
----
-
-## PTL.Data
-
-Contains:
-
-- Repository interfaces
-- Repository implementations
-- EF Core configuration
-- Dapper access
-- Stored procedure integration
-
----
-
-## PTL.ApiClient
-
-Contains:
-
-- Typed HttpClients
-- API access logic
-- Shared API communication helpers
-
----
-
-## PTL.InternalWeb
-
-Contains:
-
-- Internal feature pages
-- ViewModels
-- Controllers
-- GOV.UK views
-
----
-
-## PTL.ExternalWeb
-
-Contains:
-
-- External feature pages
-- ViewModels
-- Controllers
-- GOV.UK views
 
 ---
 
@@ -196,18 +291,7 @@ Determine what belongs to the [DOMAIN].
 
 Implement only functionality that belongs to that domain.
 
-Do not implement functionality belonging to:
-
-- Participant
-- Contract
-- Scheme
-- Distribution
-- Tabulation
-- Reporting
-
-unless explicitly required by the migration document.
-
-Cross-domain interactions may be consumed but should not be implemented here.
+Cross-domain interactions may be consumed but should not be implemented here unless explicitly required.
 
 ---
 
@@ -225,7 +309,138 @@ Identify:
 - Downstream dependencies
 - Shared dependencies
 
-Explain any implementation impact.
+Explain implementation impact.
+
+---
+
+# Legacy Behaviour Preservation Checklist
+
+Before generating implementation code review the legacy screens and document:
+
+## Field Order
+
+Identify:
+
+- Existing Field Order
+- Existing Section Order
+
+Preserve both.
+
+---
+
+## Hidden Controls
+
+Identify:
+
+- Hidden Fields
+- Hidden Sections
+- Hidden Actions
+
+Preserve visibility behaviour.
+
+---
+
+## ReadOnly Controls
+
+Identify:
+
+- ReadOnly Fields
+- ReadOnly Sections
+- ReadOnly Screens
+
+Preserve behaviour.
+
+---
+
+## Enable / Disable Behaviour
+
+Identify:
+
+- Enabled Controls
+- Disabled Controls
+- Conditionally Editable Controls
+
+Preserve behaviour.
+
+---
+
+## Conditional Visibility Rules
+
+Identify:
+
+- Show Rules
+- Hide Rules
+- Conditional Sections
+- Conditional Actions
+
+Preserve behaviour.
+
+---
+
+## Validation Rules
+
+Identify:
+
+- Required Fields
+- Length Rules
+- Conditional Rules
+- Workflow Rules
+
+Preserve behaviour.
+
+---
+
+## Workflow Rules
+
+Identify:
+
+- Create Flow
+- Edit Flow
+- Save Flow
+- Copy Flow
+- Renewal Flow
+- Approval Flow
+
+Preserve behaviour.
+
+---
+
+## Navigation Rules
+
+Identify:
+
+- Entry Pages
+- Exit Pages
+- Navigation Flow
+
+Preserve behaviour.
+
+---
+
+## Behaviour Mapping
+
+Before implementation provide:
+
+Legacy Behaviour
+↓
+Target Behaviour
+
+for:
+
+- Field Order
+- Hidden Controls
+- ReadOnly Controls
+- Enable/Disable Controls
+- Visibility Rules
+- Validation Rules
+- Workflow Rules
+- Navigation Rules
+
+Demonstrate how behaviour is preserved.
+
+If behaviour cannot be confirmed:
+
+[NEEDS INVESTIGATION]
 
 ---
 
@@ -258,37 +473,23 @@ Stored Procedures
 ↓
 SQL Server
 
-Examples:
-
-CustomerRepository
-↓
-spgCustomer
-
-ParticipantRepository
-↓
-spgParticipant
-
-SchemeRepository
-↓
-spgScheme
-
 ---
 
 # Stored Procedure Validation
 
 Before implementing any repository method:
 
-1. Identify the exact stored procedure.
-2. Verify the procedure exists.
+1. Identify exact procedure.
+2. Verify procedure exists.
 3. Verify parameters.
 4. Verify output columns.
 5. Verify table dependencies.
 
-If a stored procedure cannot be confirmed:
+If a procedure cannot be confirmed:
 
 [NEEDS INVESTIGATION]
 
-Do not invent stored procedure names.
+Do not invent procedure names.
 
 ---
 
@@ -296,29 +497,18 @@ Do not invent stored procedure names.
 
 Follow authentication-analysis.md.
 
-Internal Users:
+If authentication / authorization are currently out of scope:
 
-- Microsoft Entra ID
-- SAML
-- Claims-based authentication
-- Policy-based authorization
+- Do not implement authentication.
+- Do not implement authorization.
+- Preserve security requirements.
+- Preserve future role mappings.
+- Preserve future policy requirements.
+- Document expected security behaviour for later implementation.
 
-External Users:
-
-- Gov UK One Login
-- OIDC
-- Claims-based authentication
-- Policy-based authorization
-
-Use role mappings already identified.
+Assume temporary development access only.
 
 Do not invent new roles.
-
-If authentication is currently out of scope:
-
-Do not implement authentication.
-
-Assume access is temporarily granted for development purposes.
 
 ---
 
@@ -364,21 +554,15 @@ Only after inventory is complete proceed with implementation.
 
 ## Step 2 – API Layer
 
-Project:
-
 PTL.Api
 
 Generate:
 
-### Controllers
-
-### Request Models
-
-### Response Models
-
-### Service Interfaces
-
-### Service Implementations
+- Controllers
+- Request Models
+- Response Models
+- Service Interfaces
+- Service Implementations
 
 Requirements:
 
@@ -386,71 +570,52 @@ Requirements:
 - Proper status codes
 - Error handling
 - Logging
-- Authorization attributes where required
 
-Implement only endpoints required by migration documents.
+Only implement endpoints required by migration documents.
 
 ---
 
 ## Step 3 – API Client
 
-Project:
-
 PTL.ApiClient
 
 Generate:
 
-### Typed HttpClient
-
-### Interface
-
-### Request Models
-
-### Response Models
+- Typed HttpClient
+- Interface
+- Request Models
+- Response Models
 
 ---
 
 ## Step 4 – Core Layer
 
-Project:
-
 PTL.Core
 
 Generate:
 
-### Domain Models
-
-### Services
-
-### Interfaces
-
-### Business Rules
-
-### Validation Logic
+- Domain Models
+- Services
+- Interfaces
+- Business Rules
+- Validation Logic
 
 ---
 
 ## Step 5 – Data Layer
 
-Project:
-
 PTL.Data
 
 Generate:
 
-### Repository Interfaces
-
-### Repository Implementations
-
-### EF Core Configuration
-
-### Stored Procedure Integration
+- Repository Interfaces
+- Repository Implementations
+- EF Core Configuration
+- Stored Procedure Integration
 
 ---
 
 ## Step 6 – Internal Web
-
-Project:
 
 PTL.InternalWeb
 
@@ -460,15 +625,11 @@ Features/[DOMAIN]
 
 Include:
 
-### Controller
-
-### ViewModel
-
-### Views
-
-### Validation
-
-### Navigation Integration
+- Controller
+- ViewModel
+- Views
+- Validation
+- Navigation Integration
 
 Use existing GOV.UK layout.
 
@@ -478,23 +639,15 @@ Follow existing feature-folder conventions.
 
 ## Step 7 – External Web
 
-Project:
-
 PTL.ExternalWeb
 
-If externally accessible:
+If externally accessible generate:
 
-Generate:
-
-### Controller
-
-### ViewModel
-
-### Views
-
-### Validation
-
-### API Client Integration
+- Controller
+- ViewModel
+- Views
+- Validation
+- API Client Integration
 
 If not externally accessible:
 
@@ -516,6 +669,13 @@ Preserve:
 - Workflow restrictions
 - Business rules
 - Role restrictions
+- Field order
+- Hidden controls
+- ReadOnly controls
+- Enable/Disable behaviour
+- Visibility rules
+- Navigation behaviour
+- Existing user workflow
 
 Do not invent validation rules.
 
@@ -525,19 +685,15 @@ Do not invent validation rules.
 
 Generate:
 
-### Unit Tests
-
-### Controller Tests
-
-### Repository Tests
-
-### API Tests
+- Unit Tests
+- Controller Tests
+- Repository Tests
+- API Tests
 
 Cover:
 
 - Success scenarios
 - Validation failures
-- Authorization failures
 - Empty result scenarios
 
 ---

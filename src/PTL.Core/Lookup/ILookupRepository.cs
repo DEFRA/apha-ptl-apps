@@ -15,4 +15,11 @@ public interface ILookupRepository
     // spgaYearCurrent - current + next year only, matching the legacy Contract.aspx
     // SetYearDropDown() behaviour for creating/editing a contract.
     Task<IReadOnlyList<YearEntity>> GetCurrentYearsAsync(CancellationToken cancellationToken = default);
+
+    // spgaSchemeCurrency - all scheme-currency pricing rows; SchemeService filters by SchemeId
+    // (see docs/analysis/scheme-analysis.md, "Scheme Currency Read Operations").
+    Task<IReadOnlyList<SchemeCurrencyEntity>> GetSchemeCurrenciesAsync(CancellationToken cancellationToken = default);
+
+    // spgPostageByYearID - postage pricing plans for a given year.
+    Task<IReadOnlyList<PostagePricingPlanEntity>> GetPostagePricingPlansForYearAsync(int yearId, CancellationToken cancellationToken = default);
 }

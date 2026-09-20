@@ -1,0 +1,72 @@
+@model PTL.InternalWeb.Features.Scheme.SchemeListViewModel
+@{
+    ViewData["Title"] = "Schemes";
+    var totalPages = Model.Search.PageSize == 0 ? 1 : (int)Math.Ceiling(Model.TotalCount / (double)Model.Search.PageSize);
+}
+
+<h1 class="govuk-heading-l">Schemes</h1>
+
+<form method="get" asp-action="Index" class="govuk-!-margin-bottom-6">
+    <div class="govuk-form-group">
+        <label class="govuk-label" for="yearId">Year</label>
+        <select class="govuk-select" id="yearId" name="yearId" asp-items="Model.YearOptions"></select>
+    </div>
+    <div class="govuk-form-group">
+        <label class="govuk-label" for="searchTerm">Search</label>
+        <div class="govuk-hint">Matches scheme identifier or name.</div>
+        <input class="govuk-input" id="searchTerm" name="searchTerm" value="@Model.Search.SearchTerm" />
+    </div>
+    <button class="govuk-button" data-module="govuk-button" type="submit">Search</button>
+</form>
+
+@if (Model.Schemes.Count == 0)
+{
+    <p class="govuk-body">There are no schemes to display for this year.</p>
+}
+else
+{
+    <table class="govuk-table">
+        <thead class="govuk-table__head">
+            <tr class="govuk-table__row">
+                <th scope="col" class="govuk-table__header">Identifier</th>
+                <th scope="col" class="govuk-table__header">Name</th>
+                <th scope="col" class="govuk-table__header"><span class="govuk-visually-hidden">Actions</span></th>
+            </tr>
+        </thead>
+        <tbody class="govuk-table__body">
+            @foreach (var scheme in Model.Schemes)
+            {
+                <tr class="govuk-table__row">
+                    <td class="govuk-table__cell">@scheme.CurrentIdentifier</td>
+                    <td class="govuk-table__cell">@scheme.CurrentName</td>
+                    <td class="govuk-table__cell">
+                        @if (scheme.CurrentSchemeId is not null)
+                        {
+                            <a class="govuk-link" asp-action="Details" asp-route-id="@scheme.CurrentSchemeId">View details</a>
+                            <span class="govuk-!-margin-left-2"></span>
+                            <a class="govuk-link" asp-action="History" asp-route-sharedId="@scheme.SharedId">History</a>
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+
+    @if (totalPages > 1)
+    {
+        <nav class="govuk-pagination" aria-label="Pagination">
+            <ul class="govuk-pagination__list">
+                @for (var pageNumber = 1; pageNumber <= totalPages; pageNumber++)
+                {
+                    <li class="govuk-pagination__item @(pageNumber == Model.Search.Page ? "govuk-pagination__item--current" : "")">
+                        <a class="govuk-link govuk-pagination__link"
+                           asp-action="Index"
+                           asp-route-yearId="@Model.Search.YearId"
+                           asp-route-searchTerm="@Model.Search.SearchTerm"
+                           asp-route-page="@pageNumber">@pageNumber</a>
+                    </li>
+                }
+            </ul>
+        </nav>
+    }
+}

@@ -1,0 +1,157 @@
+@model PTL.Contracts.Scheme.SchemeResponse
+@{
+    ViewData["Title"] = $"Scheme - {Model.Identifier}";
+}
+
+<a class="govuk-back-link" asp-action="Index">Back to schemes</a>
+
+<h1 class="govuk-heading-l">@Model.Identifier - @Model.Name</h1>
+
+<p class="govuk-body">
+    @if (Model.IsReadOnly)
+    {
+        <strong class="govuk-tag govuk-tag--grey">Read only (closed year)</strong>
+    }
+    else
+    {
+        <a class="govuk-button" data-module="govuk-button" asp-action="Edit" asp-route-id="@Model.SchemeId">Edit scheme</a>
+    }
+    <a class="govuk-link govuk-!-margin-left-2" asp-action="History" asp-route-sharedId="@Model.SharedId">View family history</a>
+</p>
+
+<h2 class="govuk-heading-m">Scheme details</h2>
+<dl class="govuk-summary-list">
+    <div class="govuk-summary-list__row">
+        <dt class="govuk-summary-list__key">Identifier</dt>
+        <dd class="govuk-summary-list__value">@Model.Identifier</dd>
+    </div>
+    <div class="govuk-summary-list__row">
+        <dt class="govuk-summary-list__key">Name</dt>
+        <dd class="govuk-summary-list__value">@Model.Name</dd>
+    </div>
+    <div class="govuk-summary-list__row">
+        <dt class="govuk-summary-list__key">Year</dt>
+        <dd class="govuk-summary-list__value">@Model.YearId</dd>
+    </div>
+    <div class="govuk-summary-list__row">
+        <dt class="govuk-summary-list__key">Start date</dt>
+        <dd class="govuk-summary-list__value">@(Model.StartDate?.ToString("d MMMM yyyy") ?? "Not set")</dd>
+    </div>
+    <div class="govuk-summary-list__row">
+        <dt class="govuk-summary-list__key">Status</dt>
+        <dd class="govuk-summary-list__value">
+            <strong class="govuk-tag @(Model.Pilot ? "govuk-tag--blue" : "govuk-tag--green")">
+                @(Model.Pilot ? "Pilot" : "Live")
+            </strong>
+        </dd>
+    </div>
+</dl>
+
+<h2 class="govuk-heading-m">Distribution</h2>
+<dl class="govuk-summary-list">
+    <div class="govuk-summary-list__row">
+        <dt class="govuk-summary-list__key">Distribution</dt>
+        <dd class="govuk-summary-list__value">
+            @if (Model.DistributionAsAvailable)
+            {
+                @:As available
+            }
+            else
+            {
+                var months = new List<string>();
+                if (Model.DistributionMonthApr) { months.Add("April"); }
+                if (Model.DistributionMonthMay) { months.Add("May"); }
+                if (Model.DistributionMonthJun) { months.Add("June"); }
+                if (Model.DistributionMonthJul) { months.Add("July"); }
+                if (Model.DistributionMonthAug) { months.Add("August"); }
+                if (Model.DistributionMonthSep) { months.Add("September"); }
+                if (Model.DistributionMonthOct) { months.Add("October"); }
+                if (Model.DistributionMonthNov) { months.Add("November"); }
+                if (Model.DistributionMonthDec) { months.Add("December"); }
+                if (Model.DistributionMonthJan) { months.Add("January"); }
+                if (Model.DistributionMonthFeb) { months.Add("February"); }
+                if (Model.DistributionMonthMar) { months.Add("March"); }
+                @string.Join(", ", months)
+            }
+        </dd>
+    </div>
+    <div class="govuk-summary-list__row">
+        <dt class="govuk-summary-list__key">Deadline</dt>
+        <dd class="govuk-summary-list__value">@Model.Deadline</dd>
+    </div>
+</dl>
+
+<h2 class="govuk-heading-m">Sample &amp; logistics</h2>
+<dl class="govuk-summary-list">
+    <div class="govuk-summary-list__row">
+        <dt class="govuk-summary-list__key">Sample origin</dt>
+        <dd class="govuk-summary-list__value">@Model.SampleOrigin</dd>
+    </div>
+    <div class="govuk-summary-list__row">
+        <dt class="govuk-summary-list__key">Number of samples</dt>
+        <dd class="govuk-summary-list__value">@Model.NumberOfSamples</dd>
+    </div>
+    <div class="govuk-summary-list__row">
+        <dt class="govuk-summary-list__key">Sample number sequence</dt>
+        <dd class="govuk-summary-list__value">@Model.SampleNoSequence</dd>
+    </div>
+    <div class="govuk-summary-list__row">
+        <dt class="govuk-summary-list__key">Subcontractor</dt>
+        <dd class="govuk-summary-list__value">@Model.Subcontractor</dd>
+    </div>
+    <div class="govuk-summary-list__row">
+        <dt class="govuk-summary-list__key">Sample packing instructions</dt>
+        <dd class="govuk-summary-list__value">@Model.SamplePackingInstructions</dd>
+    </div>
+</dl>
+
+<h2 class="govuk-heading-m">Classification</h2>
+<dl class="govuk-summary-list">
+    <div class="govuk-summary-list__row">
+        <dt class="govuk-summary-list__key">Comments required</dt>
+        <dd class="govuk-summary-list__value">@(Model.CommentsRequired ? "Yes" : "No")</dd>
+    </div>
+    <div class="govuk-summary-list__row">
+        <dt class="govuk-summary-list__key">Accredited</dt>
+        <dd class="govuk-summary-list__value">@(Model.Accredited ? "Yes" : "No")</dd>
+    </div>
+    <div class="govuk-summary-list__row">
+        <dt class="govuk-summary-list__key">Limited sample availability</dt>
+        <dd class="govuk-summary-list__value">@(Model.LimitedSampleAvailability ? "Yes" : "No")</dd>
+    </div>
+    <div class="govuk-summary-list__row">
+        <dt class="govuk-summary-list__key">No VLA labs</dt>
+        <dd class="govuk-summary-list__value">@(Model.NoVLALabs ? "Yes" : "No")</dd>
+    </div>
+    <div class="govuk-summary-list__row">
+        <dt class="govuk-summary-list__key">Commercially available</dt>
+        <dd class="govuk-summary-list__value">@(Model.ComerciallyAvailable ? "Yes" : "No")</dd>
+    </div>
+</dl>
+
+<h2 class="govuk-heading-m">Customs</h2>
+<dl class="govuk-summary-list">
+    <div class="govuk-summary-list__row">
+        <dt class="govuk-summary-list__key">Customs description</dt>
+        <dd class="govuk-summary-list__value">@Model.CustomsDescription</dd>
+    </div>
+    <div class="govuk-summary-list__row">
+        <dt class="govuk-summary-list__key">Customs volume</dt>
+        <dd class="govuk-summary-list__value">@Model.CustomsVolume</dd>
+    </div>
+</dl>
+
+<h2 class="govuk-heading-m">Data Consent Declaration</h2>
+<dl class="govuk-summary-list">
+    <div class="govuk-summary-list__row">
+        <dt class="govuk-summary-list__key">Active</dt>
+        <dd class="govuk-summary-list__value">@(Model.DataConsentDeclarationActive ? "Yes" : "No")</dd>
+    </div>
+    @if (Model.DataConsentDeclarationActive)
+    {
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Consent text</dt>
+            <dd class="govuk-summary-list__value">@Model.DataConsentDeclarationText</dd>
+        </div>
+    }
+</dl>

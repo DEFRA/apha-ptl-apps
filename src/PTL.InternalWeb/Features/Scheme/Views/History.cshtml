@@ -1,0 +1,39 @@
+@model IReadOnlyList<PTL.Contracts.Scheme.SchemeHistoryResponse>
+@{
+    ViewData["Title"] = "Scheme family history";
+}
+
+<a class="govuk-back-link" asp-action="Index">Back to schemes</a>
+
+<h1 class="govuk-heading-l">Scheme family history</h1>
+
+@if (Model.Count == 0)
+{
+    <p class="govuk-body">No history found for this scheme family.</p>
+}
+else
+{
+    <table class="govuk-table">
+        <thead class="govuk-table__head">
+            <tr class="govuk-table__row">
+                <th scope="col" class="govuk-table__header">Year</th>
+                <th scope="col" class="govuk-table__header">Identifier</th>
+                <th scope="col" class="govuk-table__header">Name</th>
+                <th scope="col" class="govuk-table__header"><span class="govuk-visually-hidden">Actions</span></th>
+            </tr>
+        </thead>
+        <tbody class="govuk-table__body">
+            @foreach (var scheme in Model)
+            {
+                <tr class="govuk-table__row">
+                    <td class="govuk-table__cell">@scheme.YearId</td>
+                    <td class="govuk-table__cell">@scheme.Identifier</td>
+                    <td class="govuk-table__cell">@scheme.Name</td>
+                    <td class="govuk-table__cell">
+                        <a class="govuk-link" asp-action="Details" asp-route-id="@scheme.SchemeId">View details</a>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
