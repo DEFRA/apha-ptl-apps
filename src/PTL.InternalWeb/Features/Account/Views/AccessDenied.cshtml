@@ -1,0 +1,14 @@
+@model PTL.InternalWeb.Features.Account.AccessDeniedViewModel
+@{
+    ViewData["Title"] = "Access denied";
+}
+
+<h1 class="govuk-heading-l">Access denied</h1>
+
+<p class="govuk-body">
+    You do not have permission to access this service, or your sign-in attempt could not be completed.
+</p>
+
+<p class="govuk-body">
+    <a class="govuk-link" asp-controller="Account" asp-action="Login" asp-route-returnUrl="@Model.ReturnUrl">Try signing in again</a>
+</p>

@@ -1,49 +1,41 @@
-using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authentication.OpenIdConnect;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using PTL.InternalWeb.Features.Account;
 
 namespace PTL.InternalWeb.Features.Account
 {
     public class AccountController : Controller
     {
+        // Reached automatically by the authorization fallback policy whenever an unauthenticated
+        // request hits any page, and also usable directly as an explicit "Sign in" link target.
+        [AllowAnonymous]
         [HttpGet]
         public IActionResult Login(string? returnUrl = null)
         {
-            var model = new AccountViewModel { ReturnUrl = returnUrl };
-            // Let the view engine locate the view using registered locations (Features/...)
-            return View(model);
+            var redirectUri = !string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl) ? returnUrl : "/";
+            return Challenge(new AuthenticationProperties { RedirectUri = redirectUri }, OpenIdConnectDefaults.AuthenticationScheme);
         }
 
+        [Authorize]
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async System.Threading.Tasks.Task<IActionResult> Login(AccountViewModel model)
+        public IActionResult Logout()
         {
-            if (model == null || string.IsNullOrWhiteSpace(model.Username) || string.IsNullOrWhiteSpace(model.Password))
-            {
-                ModelState.AddModelError(string.Empty, "Please provide username and password.");
-                return View(model ?? new AccountViewModel());
-            }
-
-            var claims = new[] { new Claim(ClaimTypes.Name, model.Username) };
-            var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
-            var principal = new ClaimsPrincipal(identity);
-            var authProperties = new AuthenticationProperties { IsPersistent = false };
-            await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal, authProperties);
-            if (!string.IsNullOrEmpty(model.ReturnUrl) && Url.IsLocalUrl(model.ReturnUrl))
-                return Redirect(model.ReturnUrl);
-
-            return RedirectToAction("Index", "Customer");
+            // Sign out of both the local cookie and Entra ID (front-channel logout), otherwise the
+            // browser's still-live Entra ID session would silently re-establish a new local session
+            // on the very next request via SSO.
+            var authProperties = new AuthenticationProperties { RedirectUri = Url.Action("Index", "Home") };
+            return SignOut(authProperties, CookieAuthenticationDefaults.AuthenticationScheme, OpenIdConnectDefaults.AuthenticationScheme);
         }
 
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public async System.Threading.Tasks.Task<IActionResult> Logout()
+        [AllowAnonymous]
+        [HttpGet]
+        public IActionResult AccessDenied(string? returnUrl = null)
         {
-            TempData["LoginMessage"] = "Signed out";
-            await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
-            return RedirectToAction("Index", "Home");
+            return View(new AccessDeniedViewModel { ReturnUrl = returnUrl });
         }
     }
 }
+
