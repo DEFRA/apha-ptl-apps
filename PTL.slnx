@@ -8,6 +8,7 @@
   <Folder Name="/src/">
     <Project Path="src/PTL.Api/PTL.Api.csproj" />
     <Project Path="src/PTL.ApiClient/PTL.ApiClient.csproj" />
+    <Project Path="src/PTL.Common/PTL.Common.csproj" />
     <Project Path="src/PTL.InternalWeb/PTL.InternalWeb.csproj" />
     <Project Path="src/PTL.Contracts/PTL.Contracts.csproj" />
     <Project Path="src/PTL.Core/PTL.Core.csproj" />

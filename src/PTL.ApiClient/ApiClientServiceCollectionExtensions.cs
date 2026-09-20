@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using PTL.Common.Correlation;
 
 namespace PTL.ApiClient;
 
@@ -23,22 +24,30 @@ public static class ApiClientServiceCollectionExtensions
                 $"Configuration value 'Api:BaseUrl' ('{apiBaseUrl}') must be an absolute http:// or https:// URL, e.g. 'http://ptl-api:8080'.");
         }
 
+        // Forwards the caller's correlation ID to PTL.Api, so a single ID traces the action
+        // across both the web front-end's and the API's CloudWatch log groups.
+        services.AddHttpContextAccessor();
+        services.AddTransient<CorrelationIdDelegatingHandler>();
+
         services.AddHttpClient<IApiClient, ApiClient>(client =>
         {
             client.BaseAddress = baseUri;
         })
+            .AddHttpMessageHandler<CorrelationIdDelegatingHandler>()
             .AddStandardResilienceHandler();
 
         services.AddHttpClient<ICustomerApiClient, CustomerApiClient>(client =>
         {
             client.BaseAddress = new Uri(apiBaseUrl);
         })
+            .AddHttpMessageHandler<CorrelationIdDelegatingHandler>()
             .AddStandardResilienceHandler();
 
         services.AddHttpClient<IParticipantApiClient, ParticipantApiClient>(client =>
         {
             client.BaseAddress = new Uri(apiBaseUrl);
         })
+            .AddHttpMessageHandler<CorrelationIdDelegatingHandler>()
             .AddStandardResilienceHandler();
 
         services.AddHealthChecks()

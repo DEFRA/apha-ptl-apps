@@ -4,6 +4,48 @@ namespace PTL.Core.Participant;
 
 public sealed class ParticipantService(IParticipantRepository participantRepository, ILogger<ParticipantService> logger) : IParticipantService
 {
+    private static readonly Action<ILogger, Guid, string, Exception?> LogCreatedParticipantMessage =
+        LoggerMessage.Define<Guid, string>(
+            LogLevel.Information,
+            new EventId(1, nameof(LogCreatedParticipantMessage)),
+            "Created participant {ParticipantId} ({LabCode})");
+
+    private static readonly Action<ILogger, Guid, Exception?> LogUpdateRequestedForUnknownParticipantMessage =
+        LoggerMessage.Define<Guid>(
+            LogLevel.Warning,
+            new EventId(2, nameof(LogUpdateRequestedForUnknownParticipantMessage)),
+            "Update requested for unknown participant {ParticipantId}");
+
+    private static readonly Action<ILogger, Guid, Exception?> LogUpdatedParticipantMessage =
+        LoggerMessage.Define<Guid>(
+            LogLevel.Information,
+            new EventId(3, nameof(LogUpdatedParticipantMessage)),
+            "Updated participant {ParticipantId}");
+
+    private static readonly Action<ILogger, Guid, Exception?> LogDeactivateRequestedForUnknownParticipantMessage =
+        LoggerMessage.Define<Guid>(
+            LogLevel.Warning,
+            new EventId(4, nameof(LogDeactivateRequestedForUnknownParticipantMessage)),
+            "Deactivate requested for unknown participant {ParticipantId}");
+
+    private static readonly Action<ILogger, Guid, Exception?> LogDeactivatedParticipantMessage =
+        LoggerMessage.Define<Guid>(
+            LogLevel.Information,
+            new EventId(5, nameof(LogDeactivatedParticipantMessage)),
+            "Deactivated participant {ParticipantId}");
+
+    private static readonly Action<ILogger, Guid, Exception?> LogReactivateRequestedForUnknownParticipantMessage =
+        LoggerMessage.Define<Guid>(
+            LogLevel.Warning,
+            new EventId(6, nameof(LogReactivateRequestedForUnknownParticipantMessage)),
+            "Reactivate requested for unknown participant {ParticipantId}");
+
+    private static readonly Action<ILogger, Guid, Exception?> LogReactivatedParticipantMessage =
+        LoggerMessage.Define<Guid>(
+            LogLevel.Information,
+            new EventId(7, nameof(LogReactivatedParticipantMessage)),
+            "Reactivated participant {ParticipantId}");
+
     public Task<Participant?> GetParticipantAsync(Guid participantId, CancellationToken cancellationToken = default) =>
         participantRepository.GetByIdAsync(participantId, cancellationToken);
 
@@ -43,7 +85,7 @@ public sealed class ParticipantService(IParticipantRepository participantReposit
 
         participant.InactiveDate ??= participant.IsActive ? null : DateTime.UtcNow;
         var created = await participantRepository.CreateAsync(participant, cancellationToken);
-        logger.LogInformation("Created participant {ParticipantId} ({LabCode})", created.ParticipantId, created.LabCode);
+        LogCreatedParticipantMessage(logger, created.ParticipantId, created.LabCode, null);
         return created;
     }
 
@@ -52,7 +94,7 @@ public sealed class ParticipantService(IParticipantRepository participantReposit
         var existing = await participantRepository.GetByIdAsync(participantId, cancellationToken);
         if (existing is null)
         {
-            logger.LogWarning("Update requested for unknown participant {ParticipantId}", participantId);
+            LogUpdateRequestedForUnknownParticipantMessage(logger, participantId, null);
             return null;
         }
 
@@ -62,7 +104,7 @@ public sealed class ParticipantService(IParticipantRepository participantReposit
         updatedFields.InactiveDate ??= updatedFields.IsActive ? null : DateTime.UtcNow;
 
         var updated = await participantRepository.UpdateAsync(updatedFields, cancellationToken);
-        logger.LogInformation("Updated participant {ParticipantId}", participantId);
+        LogUpdatedParticipantMessage(logger, participantId, null);
         return updated;
     }
 
@@ -71,7 +113,7 @@ public sealed class ParticipantService(IParticipantRepository participantReposit
         var existing = await participantRepository.GetByIdAsync(participantId, cancellationToken);
         if (existing is null)
         {
-            logger.LogWarning("Deactivate requested for unknown participant {ParticipantId}", participantId);
+            LogDeactivateRequestedForUnknownParticipantMessage(logger, participantId, null);
             return null;
         }
 
@@ -79,7 +121,7 @@ public sealed class ParticipantService(IParticipantRepository participantReposit
         existing.InactiveDate ??= DateTime.UtcNow;
 
         var updated = await participantRepository.UpdateAsync(existing, cancellationToken);
-        logger.LogInformation("Deactivated participant {ParticipantId}", participantId);
+        LogDeactivatedParticipantMessage(logger, participantId, null);
         return updated;
     }
 
@@ -88,7 +130,7 @@ public sealed class ParticipantService(IParticipantRepository participantReposit
         var existing = await participantRepository.GetByIdAsync(participantId, cancellationToken);
         if (existing is null)
         {
-            logger.LogWarning("Reactivate requested for unknown participant {ParticipantId}", participantId);
+            LogReactivateRequestedForUnknownParticipantMessage(logger, participantId, null);
             return null;
         }
 
@@ -98,7 +140,7 @@ public sealed class ParticipantService(IParticipantRepository participantReposit
         existing.InactiveErrorDate = null;
 
         var updated = await participantRepository.UpdateAsync(existing, cancellationToken);
-        logger.LogInformation("Reactivated participant {ParticipantId}", participantId);
+        LogReactivatedParticipantMessage(logger, participantId, null);
         return updated;
     }
 }

@@ -12,6 +12,7 @@ COPY ["src/PTL.InternalWeb/PTL.InternalWeb.csproj", "src/PTL.InternalWeb/"]
 COPY ["src/PTL.ApiClient/PTL.ApiClient.csproj", "src/PTL.ApiClient/"]
 COPY ["src/PTL.Core/PTL.Core.csproj", "src/PTL.Core/"]
 COPY ["src/PTL.Contracts/PTL.Contracts.csproj", "src/PTL.Contracts/"]
+COPY ["src/PTL.Common/PTL.Common.csproj", "src/PTL.Common/"]
 
 RUN --mount=type=cache,target=/root/.nuget/packages \
     dotnet restore "src/PTL.InternalWeb/PTL.InternalWeb.csproj"

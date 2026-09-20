@@ -10,6 +10,7 @@ WORKDIR /src
 COPY ["src/PTL.ExternalWeb/PTL.ExternalWeb.csproj", "src/PTL.ExternalWeb/"]
 COPY ["src/PTL.ApiClient/PTL.ApiClient.csproj", "src/PTL.ApiClient/"]
 COPY ["src/PTL.Contracts/PTL.Contracts.csproj", "src/PTL.Contracts/"]
+COPY ["src/PTL.Common/PTL.Common.csproj", "src/PTL.Common/"]
 
 RUN --mount=type=cache,target=/root/.nuget/packages \
     dotnet restore "src/PTL.ExternalWeb/PTL.ExternalWeb.csproj"
