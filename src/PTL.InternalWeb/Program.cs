@@ -1,7 +1,8 @@
-using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc.Razor;
 using PTL.ApiClient;
 using PTL.Common.Correlation;
+using PTL.InternalWeb.Authentication;
 using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -30,12 +31,17 @@ builder.Services.Configure<RazorViewEngineOptions>(options =>
     options.ViewLocationFormats.Insert(1, "/Features/Shared/{0}.cshtml");
 });
 
-builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
-    .AddCookie(options =>
-    {
-        options.LoginPath = "/Account/Login";
-        options.LogoutPath = "/Account/Logout";
-    });
+// Microsoft Entra ID OIDC SSO. Every endpoint requires an authenticated session by default (see
+// the FallbackPolicy below) unless explicitly marked [AllowAnonymous].
+builder.Services.AddEntraIdAuthentication(builder.Configuration);
+builder.Services.AddAuthorization(options =>
+    options.FallbackPolicy = new AuthorizationPolicyBuilder()
+        .RequireAuthenticatedUser()
+        .Build());
+
+// Data Protection keys must be shared across every ECS task/AZ or cookies encrypted by one task
+// can't be decrypted by another - see DistributedDataProtectionExtensions for why this matters.
+builder.Services.AddDistributedDataProtection(builder.Configuration, builder.Environment);
 
 var app = builder.Build();
 
@@ -60,11 +66,13 @@ app.MapHealthEndpoints();
 app.UseAuthentication();
 app.UseAuthorization();
 
-app.MapStaticAssets();
+// Static assets never require a session - the app shell (css/js) must still load while a
+// redirect to Entra ID is in flight, and again on the AccessDenied/Error pages.
+app.MapStaticAssets().AllowAnonymous();
 
 app.MapControllerRoute(
     name: "default",
-    pattern: "{controller=Account}/{action=Login}/{id?}")
+    pattern: "{controller=Home}/{action=Index}/{id?}")
     .WithStaticAssets();
 
 // Ensure Razor Pages are available if any exist in the project
