@@ -9,6 +9,12 @@ namespace PTL.Api.Controllers;
 [Route("api")]
 public sealed class ParticipantController(IParticipantService participantService, ILogger<ParticipantController> logger) : ControllerBase
 {
+    private static readonly Action<ILogger, Guid, Exception?> LogParticipantNotFoundMessage =
+        LoggerMessage.Define<Guid>(
+            LogLevel.Information,
+            new EventId(1, nameof(LogParticipantNotFoundMessage)),
+            "Participant {ParticipantId} not found");
+
     [HttpGet("customers/{customerId:guid}/participants")]
     public async Task<ActionResult<IReadOnlyList<ParticipantSummaryResponse>>> GetParticipants(Guid customerId, [FromQuery] bool includeInactive = false, CancellationToken cancellationToken = default)
     {
@@ -29,7 +35,7 @@ public sealed class ParticipantController(IParticipantService participantService
         var participant = await participantService.GetParticipantAsync(participantId, cancellationToken);
         if (participant is null)
         {
-            logger.LogInformation("Participant {ParticipantId} not found", participantId);
+            LogParticipantNotFoundMessage(logger, participantId, null);
             return NotFound();
         }
 
