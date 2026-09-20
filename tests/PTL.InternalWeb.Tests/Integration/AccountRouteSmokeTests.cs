@@ -1,13 +1,11 @@
 using System.Net;
-using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Mvc.Testing;
+using PTL.InternalWeb.Tests.TestSupport;
 
 namespace PTL.InternalWeb.Tests.Integration;
 
-// Renders the Login view through the full MVC pipeline (rather than only via the unit tests in
-// AccountControllerTests) so its GOV.UK error-state branches and the shared _Layout's
-// "Signed in as" nav slot are actually exercised. Cookies (antiforgery + auth) are handled
-// automatically by HttpClient across requests made with the same client instance.
+// Full-pipeline tests for the OIDC sign-in/sign-out entry points. A real Entra ID metadata
+// document is never fetched - see OidcTestMetadataExtensions for why.
 public class AccountRouteSmokeTests : IClassFixture<WebApplicationFactory<Program>>
 {
     private readonly WebApplicationFactory<Program> _factory;
@@ -15,47 +13,44 @@ public class AccountRouteSmokeTests : IClassFixture<WebApplicationFactory<Progra
     public AccountRouteSmokeTests(WebApplicationFactory<Program> factory) => _factory = factory;
 
     [Fact]
-    public async Task Login_Post_MissingCredentials_RendersErrorSummary()
+    public async Task Login_RedirectsToEntraIdAuthorizationEndpoint()
     {
-        var client = _factory.CreateClient();
-        var token = await GetAntiforgeryTokenAsync(client, "/Account/Login");
+        var client = _factory.WithoutRealOidcDiscovery()
+            .CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
 
-        var response = await client.PostAsync("/Account/Login", new FormUrlEncodedContent(new Dictionary<string, string>
-        {
-            ["__RequestVerificationToken"] = token,
-            ["Username"] = string.Empty,
-            ["Password"] = string.Empty
-        }));
-        var body = await response.Content.ReadAsStringAsync();
+        var response = await client.GetAsync("/Account/Login");
 
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.Contains("govuk-error-summary", body);
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        Assert.StartsWith(OidcTestMetadataExtensions.FakeAuthorizationEndpoint, response.Headers.Location!.ToString());
     }
 
     [Fact]
-    public async Task Login_Post_Valid_SignsInAndLayoutShowsSignedInAs()
+    public async Task AccessDenied_IsReachable_WithoutAuthentication()
     {
         var client = _factory.CreateClient();
-        var token = await GetAntiforgeryTokenAsync(client, "/Account/Login");
 
-        await client.PostAsync("/Account/Login", new FormUrlEncodedContent(new Dictionary<string, string>
-        {
-            ["__RequestVerificationToken"] = token,
-            ["Username"] = "alice",
-            ["Password"] = "secret"
-        }));
+        var response = await client.GetAsync("/Account/AccessDenied");
+        var body = await response.Content.ReadAsStringAsync();
 
-        var homeResponse = await client.GetAsync("/Home/Index");
-        var body = await homeResponse.Content.ReadAsStringAsync();
-
-        Assert.Equal(HttpStatusCode.OK, homeResponse.StatusCode);
-        Assert.Contains("Signed in as", body);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("Access denied", body);
     }
 
-    private static async Task<string> GetAntiforgeryTokenAsync(HttpClient client, string url)
+    [Fact]
+    public async Task Logout_WhenAuthenticated_SignsOutAndRedirects()
     {
-        var response = await client.GetAsync(url);
-        var body = await response.Content.ReadAsStringAsync();
-        return Regex.Match(body, "__RequestVerificationToken[^>]*value=\"([^\"]+)\"").Groups[1].Value;
+        var client = _factory.WithTestAuthentication().WithoutRealOidcDiscovery()
+            .CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        var homeResponse = await client.GetAsync("/Home/Index");
+        var body = await homeResponse.Content.ReadAsStringAsync();
+        var token = System.Text.RegularExpressions.Regex.Match(body, "__RequestVerificationToken[^>]*value=\"([^\"]+)\"").Groups[1].Value;
+
+        var response = await client.PostAsync("/Account/Logout", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["__RequestVerificationToken"] = token
+        }));
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        Assert.StartsWith(OidcTestMetadataExtensions.FakeEndSessionEndpoint, response.Headers.Location!.ToString());
     }
 }

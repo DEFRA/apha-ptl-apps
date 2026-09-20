@@ -35,7 +35,8 @@ public class CustomerRouteSmokeTests : IClassFixture<WebApplicationFactory<Progr
             {
                 services.RemoveAll<ICustomerApiClient>();
                 services.AddSingleton<ICustomerApiClient>(_fakeApiClient);
-            }));
+            }))
+            .WithTestAuthentication();
     }
 
     private Guid CustomerId { get; }
