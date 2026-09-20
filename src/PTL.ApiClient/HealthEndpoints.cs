@@ -28,7 +28,7 @@ public static class HealthEndpoints
                 uptimeSeconds = Math.Round(uptimeSeconds, 0),
                 timestampUtc = DateTime.UtcNow
             });
-        });
+        }).AllowAnonymous();
 
         // Checks whether PTL.Api is reachable (reports Degraded, not
         // Unhealthy - see ApiConnectivityHealthCheck). Gated behind
@@ -37,6 +37,7 @@ public static class HealthEndpoints
         // on-demand/manual diagnostics and internal monitoring only.
         app.MapGroup("/health/ready")
             .AddEndpointFilter<ReadinessKeyFilter>()
-            .MapHealthChecks("", new HealthCheckOptions { ResponseWriter = HealthCheckResponseWriter.WriteResponse });
+            .MapHealthChecks("", new HealthCheckOptions { ResponseWriter = HealthCheckResponseWriter.WriteResponse })
+            .AllowAnonymous();
     }
 }

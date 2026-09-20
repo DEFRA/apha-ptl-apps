@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using PTL.ApiClient;
 using PTL.InternalWeb.Models;
@@ -24,9 +25,13 @@ public class HomeController(IApiClient apiClient) : Controller
         return Json(health);
     }
 
+    // Must stay reachable for a user who isn't authenticated (e.g. the exception happened before
+    // sign-in completed), so this can't require the same session as every other page.
+    [AllowAnonymous]
     [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
     public IActionResult Error()
     {
         return View(new ErrorViewModel { RequestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier });
     }
 }
+
