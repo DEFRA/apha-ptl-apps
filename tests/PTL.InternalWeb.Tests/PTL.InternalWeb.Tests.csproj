@@ -5,12 +5,14 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
-    <!-- PTL.ApiClient, PTL.Contracts, and PTL.Core each have their own fully-covering test
-         project (PTL.ApiClient.Tests, PTL.Api.Tests) - measuring them again here would drag this
-         project's own coverage number down for code this project doesn't own, just because
-         they're loaded transitively (PTL.Core is pulled in directly by CustomerFormViewModel,
-         which reuses CustomerValidator rather than duplicating its rules). -->
-    <Exclude>[PTL.ApiClient]*,[PTL.Contracts]*,[PTL.Core]*</Exclude>
+    <!-- PTL.Contracts and PTL.Core each have their own fully-covering test project (PTL.Api.Tests)
+         - measuring them again here would drag this project's own coverage number down for code
+         this project doesn't own, just because they're loaded transitively (PTL.Core is pulled in
+         directly by CustomerFormViewModel, which reuses CustomerValidator rather than duplicating
+         its rules). PTL.ApiClient is NOT excluded: PtlAccountControllerBase<T> only ever runs via
+         each web front-end's own AccountController tests - excluding it here would zero out its
+         only source of coverage. -->
+    <Exclude>[PTL.Contracts]*,[PTL.Core]*</Exclude>
   </PropertyGroup>
 
   <ItemGroup>

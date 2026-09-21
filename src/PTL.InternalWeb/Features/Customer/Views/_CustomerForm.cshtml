@@ -88,9 +88,9 @@
 <input type="hidden" asp-for="PreviousName" />
 
 <div class="govuk-form-group">
-    <label class="govuk-label" asp-for="InitialStartDate">Initial start date</label>
+    <label class="govuk-label" for="InitialStartDate">Initial start date</label>
     <div class="govuk-hint">Set automatically and cannot be changed.</div>
-    <input class="govuk-input govuk-input--width-10" value="@Model.InitialStartDate?.ToString("d MMMM yyyy")" disabled />
+    <input id="InitialStartDate" class="govuk-input govuk-input--width-10" value="@Model.InitialStartDate?.ToString("d MMMM yyyy")" disabled />
 </div>
 
 <div class="@FormGroupClass("CurrencyId")">
@@ -146,7 +146,7 @@
 @if (Model.CustomerId is not null)
 {
     <div class="govuk-form-group">
-        <label class="govuk-label">Customer ID</label>
+        <p class="govuk-label govuk-label--s">Customer ID</p>
         <p class="govuk-body">@Model.CustomerId</p>
     </div>
 }

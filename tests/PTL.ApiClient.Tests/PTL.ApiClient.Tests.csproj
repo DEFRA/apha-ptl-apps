@@ -5,11 +5,12 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
-    <!-- PTL.Contracts is a pure DTO project shared by every test project; each one only exercises
-         the slice of DTOs relevant to its own layer (PTL.Api.Tests already covers it thoroughly
-         through the full Customer request/response surface). Measuring the whole of PTL.Contracts
-         here would drag this project's coverage number down for DTOs it doesn't own testing for. -->
-    <Exclude>[PTL.Contracts]*</Exclude>
+    <!-- PTL.Api.Tests owns coverage for the DTOs shared across every layer (Request/Response/
+         SearchRequest/SearchResponse/SummaryResponse types actually constructed by PTL.Api's
+         controllers). ContractSaveResult/SchemeSaveResult/SchemeSearchRequest are ApiClient-only
+         wrapper types PTL.Api never constructs, so they must stay measured here - do not restore
+         a blanket "[PTL.Contracts]*" exclude, it would silently zero out the only test coverage
+         these three types get. -->
   </PropertyGroup>
 
   <ItemGroup>

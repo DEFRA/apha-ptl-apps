@@ -104,6 +104,55 @@ public class ContractControllerTests
     }
 
     [Fact]
+    public async Task GetContract_ExistingContract_ReturnsFullyMappedResponse()
+    {
+        var repository = new FakeContractRepository();
+        var controller = CreateController(repository);
+        var customerId = Guid.NewGuid();
+        var request = ValidCreateRequest();
+        var created = await controller.CreateContract(customerId, request, CancellationToken.None);
+        var contractId = ((ContractResponse)((CreatedAtActionResult)created.Result!).Value!).ContractId;
+
+        var result = await controller.GetContract(contractId, CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var response = Assert.IsType<ContractResponse>(ok.Value);
+        Assert.Equal(contractId, response.ContractId);
+        Assert.Equal(customerId, response.CustomerId);
+        Assert.Equal("Sample Laboratories Ltd", response.CustomerName);
+        Assert.Equal("QAL/00001", response.QalNumber);
+        Assert.Equal(request.YearId, response.YearId);
+        Assert.Equal(request.UTNumber, response.UTNumber);
+        Assert.Equal(request.FTNumber, response.FTNumber);
+        Assert.Equal(request.ContractSignatory, response.ContractSignatory);
+        Assert.Equal(request.ActionsRequired, response.ActionsRequired);
+        Assert.Equal(request.RenewalInformation, response.RenewalInformation);
+        Assert.Equal(request.DiscountRate, response.DiscountRate);
+        Assert.Equal(request.AdministrationCharge, response.AdministrationCharge);
+        Assert.Equal(request.NumberCourier, response.NumberCourier);
+        Assert.Equal(request.CourierPrice, response.CourierPrice);
+        Assert.Equal(request.NumberPostage, response.NumberPostage);
+        Assert.Equal(request.PostagePrice, response.PostagePrice);
+        Assert.Equal(request.NumberSpecialDelivery, response.NumberSpecialDelivery);
+        Assert.Equal(request.SpecialDeliveryPrice, response.SpecialDeliveryPrice);
+        Assert.Equal(request.AcknowledgementPostedDate, response.AcknowledgementPostedDate);
+        Assert.Equal(request.AcknowledgementReturnedDate, response.AcknowledgementReturnedDate);
+        Assert.Equal(request.JobSheetPostedDate, response.JobSheetPostedDate);
+        Assert.Equal(request.ReasonForClosure, response.ReasonForClosure);
+        Assert.Equal(request.DateOfLeaving, response.DateOfLeaving);
+        Assert.Equal(request.IsActive, response.IsActive);
+        Assert.False(response.IsReadOnly);
+        Assert.Equal(request.Suffix, response.Suffix);
+        Assert.NotNull(response.CommencementDate);
+        Assert.Equal(request.PurchaseOrderNumber, response.PurchaseOrderNumber);
+        Assert.Equal(request.OptOutOfInvoiceGeneration, response.OptOutOfInvoiceGeneration);
+        Assert.False(response.IsInvoiceSent);
+        Assert.Equal(request.IsOnlineOrder, response.IsOnlineOrder);
+        Assert.Null(response.ApprovedBy);
+        Assert.Null(response.ApprovedDate);
+    }
+
+    [Fact]
     public async Task GetContractsForCustomer_ByYear_ReturnsExactMatch()
     {
         var repository = new FakeContractRepository();

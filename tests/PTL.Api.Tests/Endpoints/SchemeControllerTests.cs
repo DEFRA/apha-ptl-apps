@@ -132,6 +132,79 @@ public class SchemeControllerTests
     }
 
     [Fact]
+    public async Task GetScheme_ExistingScheme_ReturnsFullyMappedResponse()
+    {
+        var controller = CreateController(new FakeSchemeRepository());
+        var request = ValidCreateRequest();
+        var created = await controller.CreateScheme(request, CancellationToken.None);
+        var schemeId = ((SchemeResponse)((CreatedAtActionResult)created.Result!).Value!).SchemeId;
+
+        var result = await controller.GetScheme(schemeId, CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var response = Assert.IsType<SchemeResponse>(ok.Value);
+        Assert.Equal(schemeId, response.SchemeId);
+        Assert.NotEqual(Guid.Empty, response.SharedId);
+        Assert.Equal(request.YearId, response.YearId);
+        Assert.Equal(request.Identifier, response.Identifier);
+        Assert.Equal(request.Name, response.Name);
+        Assert.Equal(request.ScheduleId, response.ScheduleId);
+        Assert.Equal(request.ScheduleCodeId, response.ScheduleCodeId);
+        Assert.Equal(request.StartDate, response.StartDate);
+        Assert.Equal(request.DistributionMonthApr, response.DistributionMonthApr);
+        Assert.Equal(request.DistributionMonthMay, response.DistributionMonthMay);
+        Assert.Equal(request.DistributionMonthJun, response.DistributionMonthJun);
+        Assert.Equal(request.DistributionMonthJul, response.DistributionMonthJul);
+        Assert.Equal(request.DistributionMonthAug, response.DistributionMonthAug);
+        Assert.Equal(request.DistributionMonthSep, response.DistributionMonthSep);
+        Assert.Equal(request.DistributionAsAvailable, response.DistributionAsAvailable);
+        Assert.Equal(request.DistributionMonthOct, response.DistributionMonthOct);
+        Assert.Equal(request.DistributionMonthNov, response.DistributionMonthNov);
+        Assert.Equal(request.DistributionMonthDec, response.DistributionMonthDec);
+        Assert.Equal(request.DistributionMonthJan, response.DistributionMonthJan);
+        Assert.Equal(request.DistributionMonthFeb, response.DistributionMonthFeb);
+        Assert.Equal(request.DistributionMonthMar, response.DistributionMonthMar);
+        Assert.Equal(request.WeekNumber, response.WeekNumber);
+        Assert.Equal(request.DayOfWeekId, response.DayOfWeekId);
+        Assert.Equal(request.NumberOfSamples, response.NumberOfSamples);
+        Assert.Equal(1, response.SampleNoSequence);
+        Assert.Equal(request.SampleOrigin, response.SampleOrigin);
+        Assert.Equal(request.Deadline, response.Deadline);
+        Assert.Equal(request.Subcontractor, response.Subcontractor);
+        Assert.Equal(request.CombinedPackaging, response.CombinedPackaging);
+        Assert.Equal(request.Postage, response.Postage);
+        Assert.Equal(request.CustomsVolume, response.CustomsVolume);
+        Assert.Equal(request.SamplePackingInstructions, response.SamplePackingInstructions);
+        Assert.Equal(request.RequiresAssessment, response.RequiresAssessment);
+        Assert.Equal(request.CommentsRequired, response.CommentsRequired);
+        Assert.Equal(request.Pilot, response.Pilot);
+        Assert.Equal(request.LimitedSampleAvailability, response.LimitedSampleAvailability);
+        Assert.Equal(request.Accredited, response.Accredited);
+        Assert.Equal(request.NoVLALabs, response.NoVLALabs);
+        Assert.Equal(request.ComerciallyAvailable, response.ComerciallyAvailable);
+        Assert.Equal(request.CustomsDescription, response.CustomsDescription);
+        Assert.Equal(request.DataConsentDeclarationActive, response.DataConsentDeclarationActive);
+        Assert.Equal(request.DataConsentDeclarationText, response.DataConsentDeclarationText);
+        Assert.Equal(request.Instructions, response.Instructions);
+        Assert.Equal(request.DateOfReceipt, response.DateOfReceipt);
+        Assert.Equal(request.StorageConditions, response.StorageConditions);
+        Assert.Equal(request.ConditionOnReceipt, response.ConditionOnReceipt);
+        Assert.Equal(request.TestConsultant1, response.TestConsultant1);
+        Assert.Equal(request.TestConsultant2, response.TestConsultant2);
+        Assert.Equal(request.TestConsultant3, response.TestConsultant3);
+        Assert.Equal(request.TestConsultantTabulationId, response.TestConsultantTabulationId);
+        Assert.Equal(request.UseExternalReference, response.UseExternalReference);
+        Assert.Equal(request.StoreRatings, response.StoreRatings);
+        Assert.Equal(request.Assessor1, response.Assessor1);
+        Assert.Equal(request.Assessor2, response.Assessor2);
+        Assert.Equal(request.Assessor3, response.Assessor3);
+        Assert.Equal(request.Assessor4, response.Assessor4);
+        Assert.Equal(request.StandardTabulationText, response.StandardTabulationText);
+        Assert.True(response.LastModified > DateTime.MinValue);
+        Assert.False(response.IsReadOnly);
+    }
+
+    [Fact]
     public async Task GetSchemes_ByYear_ReturnsMatch()
     {
         var controller = CreateController(new FakeSchemeRepository());
