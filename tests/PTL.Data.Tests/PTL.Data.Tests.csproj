@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <!-- Repositories only wrap existing stored procedures via Dapper and have no logic to unit
+         test without a live SQL Server (see tests/PTL.Api.Tests's identical rationale for
+         excluding [PTL.Data]* entirely) - this project instead covers PTL.Data.Infrastructure
+         (column mapping, connection factory, config validation), which has no DB dependency.
+         Include restricts measurement to PTL.Data itself - PTL.Core/PTL.Contracts (pulled in
+         transitively) are already measured by PTL.Api.Tests, which owns their coverage. -->
+    <Include>[PTL.Data]*</Include>
+    <Exclude>[PTL.Data]PTL.Data.Customer.*,[PTL.Data]PTL.Data.Contract.*,[PTL.Data]PTL.Data.Participant.*,[PTL.Data]PTL.Data.Scheme.*,[PTL.Data]PTL.Data.Lookup.*</Exclude>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" Version="6.0.4" />
+    <PackageReference Include="coverlet.msbuild" Version="10.0.1">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.Extensions.Configuration" Version="10.0.0" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\PTL.Data\PTL.Data.csproj" />
+  </ItemGroup>
+
+</Project>

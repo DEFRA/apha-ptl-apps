@@ -90,7 +90,7 @@
 <div class="govuk-form-group">
     <label class="govuk-label" asp-for="InitialStartDate">Initial start date</label>
     <div class="govuk-hint">Set automatically and cannot be changed.</div>
-    <input class="govuk-input govuk-input--width-10" value="@Model.InitialStartDate.ToString("d MMMM yyyy")" disabled />
+    <input class="govuk-input govuk-input--width-10" value="@Model.InitialStartDate?.ToString("d MMMM yyyy")" disabled />
 </div>
 
 <div class="@FormGroupClass("CurrencyId")">

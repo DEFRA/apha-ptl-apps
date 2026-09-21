@@ -26,7 +26,7 @@ public sealed class ContractFormViewModel : IValidatableObject
 {
     public Guid? ContractId { get; set; }
 
-    public Guid CustomerId { get; set; }
+    public Guid? CustomerId { get; set; }
 
     // Read-only display fields, not posted back - mirrors legacy Contract.aspx never allowing
     // CustomerName/QalNumber/IsReadOnly/CommencementDate to be edited.
@@ -34,12 +34,12 @@ public sealed class ContractFormViewModel : IValidatableObject
 
     public string? QalNumber { get; set; }
 
-    public bool IsReadOnly { get; set; }
+    public bool? IsReadOnly { get; set; }
 
     public DateTime? CommencementDate { get; set; }
 
     [Required(ErrorMessage = "Enter a year.")]
-    public int YearId { get; set; }
+    public int? YearId { get; set; }
 
     // Populated by ContractController before the view is rendered - see /api/lookups/years
     // (current + next year only, mirrors legacy DropDownYear SetYearDropDown()).
@@ -61,28 +61,28 @@ public sealed class ContractFormViewModel : IValidatableObject
     public string? RenewalInformation { get; set; }
 
     [Range(0, double.MaxValue, ErrorMessage = "Discount rate must not be negative.")]
-    public decimal DiscountRate { get; set; }
+    public decimal? DiscountRate { get; set; }
 
     [Range(0, double.MaxValue, ErrorMessage = "Administration charge must not be negative.")]
-    public decimal AdministrationCharge { get; set; }
+    public decimal? AdministrationCharge { get; set; }
 
     [Range(0, int.MaxValue, ErrorMessage = "Number of courier deliveries must not be negative.")]
-    public int NumberCourier { get; set; }
+    public int? NumberCourier { get; set; }
 
     [Range(0, double.MaxValue, ErrorMessage = "Courier price must not be negative.")]
-    public decimal CourierPrice { get; set; }
+    public decimal? CourierPrice { get; set; }
 
     [Range(0, int.MaxValue, ErrorMessage = "Number of postage deliveries must not be negative.")]
-    public int NumberPostage { get; set; }
+    public int? NumberPostage { get; set; }
 
     [Range(0, double.MaxValue, ErrorMessage = "Postage price must not be negative.")]
-    public decimal PostagePrice { get; set; }
+    public decimal? PostagePrice { get; set; }
 
     [Range(0, int.MaxValue, ErrorMessage = "Number of special deliveries must not be negative.")]
-    public int NumberSpecialDelivery { get; set; }
+    public int? NumberSpecialDelivery { get; set; }
 
     [Range(0, double.MaxValue, ErrorMessage = "Special delivery price must not be negative.")]
-    public decimal SpecialDeliveryPrice { get; set; }
+    public decimal? SpecialDeliveryPrice { get; set; }
 
     [Required(ErrorMessage = "Enter the acknowledgement posted date.")]
     [DataType(DataType.Date)]
@@ -103,6 +103,11 @@ public sealed class ContractFormViewModel : IValidatableObject
     [DataType(DataType.Date)]
     public DateTime? DateOfLeaving { get; set; }
 
+    // S6964 (value-type controller-action input) suppressed for this block: these are HTML
+    // checkboxes, where an unchecked box simply isn't posted and the framework's own
+    // asp-for-generated hidden companion input already supplies "false" - non-nullable bool
+    // defaulting to false on under-posting is the framework-intended behaviour, not a bug.
+#pragma warning disable S6964
     public bool IsActive { get; set; } = true;
 
     [StringLength(2, ErrorMessage = "Suffix must not exceed 2 characters.")]
@@ -114,6 +119,7 @@ public sealed class ContractFormViewModel : IValidatableObject
     public bool OptOutOfInvoiceGeneration { get; set; }
 
     public bool IsOnlineOrder { get; set; }
+#pragma warning restore S6964
 
     // Preserves ValidateUTFT: exactly one of UTNumber/FTNumber must be populated.
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)

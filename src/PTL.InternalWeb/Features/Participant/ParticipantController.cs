@@ -88,10 +88,10 @@ public class ParticipantController(IParticipantApiClient participantApiClient, I
         {
             var created = await participantApiClient.CreateParticipantAsync(new ParticipantRequest(
                 customerId,
-                model.SsoId,
+                model.SsoId.GetValueOrDefault(),
                 model.LabCode,
                 model.LabName,
-                model.LabTypeId,
+                model.LabTypeId.GetValueOrDefault(),
                 model.ContactName,
                 model.Organisation,
                 model.Address1,
@@ -99,7 +99,7 @@ public class ParticipantController(IParticipantApiClient participantApiClient, I
                 model.Address3,
                 model.Address4,
                 model.Address5,
-                model.CountryId,
+                model.CountryId.GetValueOrDefault(),
                 model.Telephone,
                 model.Fax,
                 model.Email,
@@ -143,18 +143,18 @@ public class ParticipantController(IParticipantApiClient participantApiClient, I
         {
             await RestoreDisplayOnlyFieldsAsync(model, id, cancellationToken);
             await PopulateLookupOptionsAsync(model, cancellationToken);
-            await PopulateCustomerContactAsync(model, model.CustomerId, cancellationToken);
+            await PopulateCustomerContactAsync(model, model.CustomerId.GetValueOrDefault(), cancellationToken);
             return View(model);
         }
 
         try
         {
             var updated = await participantApiClient.UpdateParticipantAsync(id, new ParticipantRequest(
-                model.CustomerId,
-                model.SsoId,
+                model.CustomerId.GetValueOrDefault(),
+                model.SsoId.GetValueOrDefault(),
                 model.LabCode,
                 model.LabName,
-                model.LabTypeId,
+                model.LabTypeId.GetValueOrDefault(),
                 model.ContactName,
                 model.Organisation,
                 model.Address1,
@@ -162,7 +162,7 @@ public class ParticipantController(IParticipantApiClient participantApiClient, I
                 model.Address3,
                 model.Address4,
                 model.Address5,
-                model.CountryId,
+                model.CountryId.GetValueOrDefault(),
                 model.Telephone,
                 model.Fax,
                 model.Email,
@@ -178,7 +178,7 @@ public class ParticipantController(IParticipantApiClient participantApiClient, I
             ModelState.AddModelError(string.Empty, "Unable to update this participant. Please review the changes and try again.");
             await RestoreDisplayOnlyFieldsAsync(model, id, cancellationToken);
             await PopulateLookupOptionsAsync(model, cancellationToken);
-            await PopulateCustomerContactAsync(model, model.CustomerId, cancellationToken);
+            await PopulateCustomerContactAsync(model, model.CustomerId.GetValueOrDefault(), cancellationToken);
             return View(model);
         }
     }

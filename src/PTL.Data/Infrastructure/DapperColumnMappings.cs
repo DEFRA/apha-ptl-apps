@@ -316,17 +316,18 @@ public static class DapperColumnMappings
 
     private static void Map<T>(Dictionary<string, string> columnNameToPropertyName)
     {
+        // CustomPropertyTypeMap's Func<Type,string,PropertyInfo> is declared non-nullable, but
+        // Dapper explicitly supports returning null to mean "skip this column" (see ResolveProperty).
+#pragma warning disable CS8603
         SqlMapper.SetTypeMap(typeof(T), new CustomPropertyTypeMap(typeof(T), (type, columnName) =>
             ResolveProperty(type, columnNameToPropertyName, columnName)));
+#pragma warning restore CS8603
     }
 
     // Dapper skips a result column entirely when this returns null (e.g. spgaCountry's unused
-    // fldCountryTypeId/fldCountryType/fldAllocationCount columns) - CustomPropertyTypeMap's Func
-    // signature is declared non-nullable, but null is an explicitly supported "no mapping" result.
-#pragma warning disable CS8766
+    // fldCountryTypeId/fldCountryType/fldAllocationCount columns).
     private static PropertyInfo? ResolveProperty(Type type, Dictionary<string, string> columnNameToPropertyName, string columnName) =>
         columnNameToPropertyName.TryGetValue(columnName, out var propertyName)
             ? type.GetProperty(propertyName, BindingFlags.Public | BindingFlags.Instance)
             : null;
-#pragma warning restore CS8766
 }
