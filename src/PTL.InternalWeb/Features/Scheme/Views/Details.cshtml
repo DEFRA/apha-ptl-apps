@@ -1,6 +1,29 @@
 @model PTL.Contracts.Scheme.SchemeResponse
 @{
     ViewData["Title"] = $"Scheme - {Model.Identifier}";
+
+    string distributionText;
+    if (Model.DistributionAsAvailable)
+    {
+        distributionText = "As available";
+    }
+    else
+    {
+        var months = new List<string>();
+        if (Model.DistributionMonthApr) { months.Add("April"); }
+        if (Model.DistributionMonthMay) { months.Add("May"); }
+        if (Model.DistributionMonthJun) { months.Add("June"); }
+        if (Model.DistributionMonthJul) { months.Add("July"); }
+        if (Model.DistributionMonthAug) { months.Add("August"); }
+        if (Model.DistributionMonthSep) { months.Add("September"); }
+        if (Model.DistributionMonthOct) { months.Add("October"); }
+        if (Model.DistributionMonthNov) { months.Add("November"); }
+        if (Model.DistributionMonthDec) { months.Add("December"); }
+        if (Model.DistributionMonthJan) { months.Add("January"); }
+        if (Model.DistributionMonthFeb) { months.Add("February"); }
+        if (Model.DistributionMonthMar) { months.Add("March"); }
+        distributionText = string.Join(", ", months);
+    }
 }
 
 <a class="govuk-back-link" asp-action="Index">Back to schemes</a>
@@ -51,29 +74,7 @@
 <dl class="govuk-summary-list">
     <div class="govuk-summary-list__row">
         <dt class="govuk-summary-list__key">Distribution</dt>
-        <dd class="govuk-summary-list__value">
-            @if (Model.DistributionAsAvailable)
-            {
-                @:As available
-            }
-            else
-            {
-                var months = new List<string>();
-                if (Model.DistributionMonthApr) { months.Add("April"); }
-                if (Model.DistributionMonthMay) { months.Add("May"); }
-                if (Model.DistributionMonthJun) { months.Add("June"); }
-                if (Model.DistributionMonthJul) { months.Add("July"); }
-                if (Model.DistributionMonthAug) { months.Add("August"); }
-                if (Model.DistributionMonthSep) { months.Add("September"); }
-                if (Model.DistributionMonthOct) { months.Add("October"); }
-                if (Model.DistributionMonthNov) { months.Add("November"); }
-                if (Model.DistributionMonthDec) { months.Add("December"); }
-                if (Model.DistributionMonthJan) { months.Add("January"); }
-                if (Model.DistributionMonthFeb) { months.Add("February"); }
-                if (Model.DistributionMonthMar) { months.Add("March"); }
-                @string.Join(", ", months)
-            }
-        </dd>
+        <dd class="govuk-summary-list__value">@distributionText</dd>
     </div>
     <div class="govuk-summary-list__row">
         <dt class="govuk-summary-list__key">Deadline</dt>

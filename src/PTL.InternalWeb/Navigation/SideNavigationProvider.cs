@@ -18,6 +18,7 @@ public static class SideNavigationProvider
 {
     private const string IndexAction = "Index";
     private const string CreateAction = "Create";
+    private const string SchemeControllerName = "Scheme";
 
     public static IReadOnlyList<SideNavigationItem> Build() =>
     [
@@ -78,16 +79,16 @@ public static class SideNavigationProvider
             [
                 new SideNavigationItem
                 {
-                    Text = "Scheme",
-                    ControllerName = "Scheme",
+                    Text = SchemeControllerName,
+                    ControllerName = SchemeControllerName,
                     ActionName = IndexAction,
                     Children =
                     [
-                        new SideNavigationItem { Text = "Create Scheme", ControllerName = "Scheme", ActionName = CreateAction },
+                        new SideNavigationItem { Text = "Create Scheme", ControllerName = SchemeControllerName, ActionName = CreateAction },
 
                         // Hidden: only reached from a specific scheme's Details page ("View family
                         // history" link), not listed as a Scheme List child - same hidden pattern.
-                        new SideNavigationItem { Text = "Scheme History", ControllerName = "Scheme", ActionName = "History", IsHidden = true }
+                        new SideNavigationItem { Text = "Scheme History", ControllerName = SchemeControllerName, ActionName = "History", IsHidden = true }
                     ]
                 },
                 new SideNavigationItem { Text = "Search", IsEnabled = false },

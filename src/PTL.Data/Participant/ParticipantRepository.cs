@@ -32,7 +32,7 @@ public sealed class ParticipantRepository(IDbConnectionFactory connectionFactory
 
         return (await connection.QueryAsync<ParticipantSummaryEntity>(
             "EXEC dbo.spgParticipantInfoByCustomerId @CustomerId, @ActiveOnly",
-            new { CustomerId = customerId, ActiveOnly = includeInactive ? false : true })).ToList();
+            new { CustomerId = customerId, ActiveOnly = !includeInactive })).ToList();
     }
 
     public async Task<CoreParticipant> CreateAsync(CoreParticipant participant, CancellationToken cancellationToken = default)
