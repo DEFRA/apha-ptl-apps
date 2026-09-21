@@ -317,7 +317,7 @@ public static class DapperColumnMappings
     private static void Map<T>(Dictionary<string, string> columnNameToPropertyName)
     {
         SqlMapper.SetTypeMap(typeof(T), new CustomPropertyTypeMap(typeof(T), (type, columnName) =>
-            ResolveProperty(type, columnNameToPropertyName, columnName)));
+            ResolveProperty(type, columnNameToPropertyName, columnName)!));
     }
 
     // Dapper skips a result column entirely when this returns null (e.g. spgaCountry's unused
