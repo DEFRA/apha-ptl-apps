@@ -320,8 +320,7 @@ public static class DapperColumnMappings
         // Dapper explicitly supports returning null to mean "skip this column" (see ResolveProperty).
 #pragma warning disable CS8603
         SqlMapper.SetTypeMap(typeof(T), new CustomPropertyTypeMap(typeof(T), (type, columnName) =>
-            ResolveProperty(type, columnNameToPropertyName, columnName)));
-#pragma warning restore CS8603
+            ResolveProperty(type, columnNameToPropertyName, columnName)!));
     }
 
     // Dapper skips a result column entirely when this returns null (e.g. spgaCountry's unused
