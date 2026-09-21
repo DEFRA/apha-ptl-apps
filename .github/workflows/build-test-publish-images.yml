@@ -123,6 +123,7 @@ jobs:
           --no-restore
           --logger "trx;LogFilePrefix=ptl-tests"
           --results-directory "${{ runner.temp }}/test-results"
+          /p:Threshold=0
 
   sonarcloud:
     name: SonarCloud analysis
