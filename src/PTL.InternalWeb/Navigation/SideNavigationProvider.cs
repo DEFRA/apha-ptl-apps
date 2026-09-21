@@ -16,9 +16,12 @@ namespace PTL.InternalWeb.Navigation;
 // matches the legacy application until each area is migrated (docs/prompts/05-feature-implementation.md).
 public static class SideNavigationProvider
 {
+    private const string IndexAction = "Index";
+    private const string CreateAction = "Create";
+
     public static IReadOnlyList<SideNavigationItem> Build() =>
     [
-        new SideNavigationItem { Text = "Home", ControllerName = "Home", ActionName = "Index" },
+        new SideNavigationItem { Text = "Home", ControllerName = "Home", ActionName = IndexAction },
         new SideNavigationItem { Text = "System Administration", IsEnabled = false },
         new SideNavigationItem
         {
@@ -31,10 +34,10 @@ public static class SideNavigationProvider
                 {
                     Text = "Customers",
                     ControllerName = "Customer",
-                    ActionName = "Index",
+                    ActionName = IndexAction,
                     Children =
                     [
-                        new SideNavigationItem { Text = "Create Customer", ControllerName = "Customer", ActionName = "Create" },
+                        new SideNavigationItem { Text = "Create Customer", ControllerName = "Customer", ActionName = CreateAction },
                         new SideNavigationItem { Text = "Review Pending Customer Updates", IsEnabled = false },
                         new SideNavigationItem { Text = "Review Pending Participant Updates", IsEnabled = false },
                         new SideNavigationItem { Text = "Review Pending Orders", IsEnabled = false },
@@ -46,17 +49,17 @@ public static class SideNavigationProvider
                         {
                             Text = "Participants",
                             ControllerName = "Participant",
-                            ActionName = "Index",
+                            ActionName = IndexAction,
                             IsHidden = true,
-                            Children = [new SideNavigationItem { Text = "Create Participant", ControllerName = "Participant", ActionName = "Create" }]
+                            Children = [new SideNavigationItem { Text = "Create Participant", ControllerName = "Participant", ActionName = CreateAction }]
                         },
                         new SideNavigationItem
                         {
                             Text = "Contracts",
                             ControllerName = "Contract",
-                            ActionName = "Index",
+                            ActionName = IndexAction,
                             IsHidden = true,
-                            Children = [new SideNavigationItem { Text = "Create Contract", ControllerName = "Contract", ActionName = "Create" }]
+                            Children = [new SideNavigationItem { Text = "Create Contract", ControllerName = "Contract", ActionName = CreateAction }]
                         }
                     ]
                 },
@@ -77,10 +80,10 @@ public static class SideNavigationProvider
                 {
                     Text = "Scheme",
                     ControllerName = "Scheme",
-                    ActionName = "Index",
+                    ActionName = IndexAction,
                     Children =
                     [
-                        new SideNavigationItem { Text = "Create Scheme", ControllerName = "Scheme", ActionName = "Create" },
+                        new SideNavigationItem { Text = "Create Scheme", ControllerName = "Scheme", ActionName = CreateAction },
 
                         // Hidden: only reached from a specific scheme's Details page ("View family
                         // history" link), not listed as a Scheme List child - same hidden pattern.

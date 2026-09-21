@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.Extensions.Logging;
@@ -152,7 +153,7 @@ public class ContractController(IContractApiClient contractApiClient, ILookupApi
     {
         var years = await lookupApiClient.GetCurrentYearsAsync(cancellationToken);
         model.YearOptions = years
-            .Select(y => new SelectListItem(y.Year, y.YearId.ToString()))
+            .Select(y => new SelectListItem(y.Year, y.YearId.ToString(CultureInfo.InvariantCulture)))
             .ToList();
     }
 
