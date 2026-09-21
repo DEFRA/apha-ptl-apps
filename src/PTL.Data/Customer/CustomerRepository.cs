@@ -102,8 +102,8 @@ public sealed class CustomerRepository(IDbConnectionFactory connectionFactory) :
         parameters.Add("@InitialStartDate", customer.InitialStartDate);
         parameters.Add("@IsActive", customer.IsActive);
         parameters.Add("@CanOrderOnline", customer.CanOrderOnline);
-        parameters.Add("@InactiveDate", (object?)customer.InactiveDate ?? DBNull.Value);
-        parameters.Add("@CustomerStatusId", (object?)customer.CustomerStatusId ?? DBNull.Value);
+        parameters.Add("@InactiveDate", customer.InactiveDate);
+        parameters.Add("@CustomerStatusId", customer.CustomerStatusId);
         return parameters;
     }
 }

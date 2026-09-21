@@ -5,14 +5,13 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
-    <!-- Repositories only wrap existing stored procedures via Dapper and have no logic to unit
-         test without a live SQL Server (see tests/PTL.Api.Tests's identical rationale for
-         excluding [PTL.Data]* entirely) - this project instead covers PTL.Data.Infrastructure
-         (column mapping, connection factory, config validation), which has no DB dependency.
-         Include restricts measurement to PTL.Data itself - PTL.Core/PTL.Contracts (pulled in
-         transitively) are already measured by PTL.Api.Tests, which owns their coverage. -->
+    <!-- Include restricts measurement to PTL.Data itself - PTL.Core/PTL.Contracts (pulled in
+         transitively) are already measured by PTL.Api.Tests, which owns their coverage.
+         Repositories are now covered too (Contract/Customer/Participant/Scheme/Lookup), using the
+         fake ADO.NET connection/command test doubles under Fakes/ instead of a live SQL Server -
+         they exercise the exact "EXEC dbo.spXxx" text/parameters a real run would send and prove
+         DapperColumnMappings materialises the result correctly, without needing a database. -->
     <Include>[PTL.Data]*</Include>
-    <Exclude>[PTL.Data]PTL.Data.Customer.*,[PTL.Data]PTL.Data.Contract.*,[PTL.Data]PTL.Data.Participant.*,[PTL.Data]PTL.Data.Scheme.*,[PTL.Data]PTL.Data.Lookup.*</Exclude>
   </PropertyGroup>
 
   <ItemGroup>

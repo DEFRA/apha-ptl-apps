@@ -80,19 +80,19 @@ public sealed class ContractRepository(IDbConnectionFactory connectionFactory) :
         parameters.Add("@PostagePrice", contract.PostagePrice);
         parameters.Add("@NumberSpecialDelivery", contract.NumberSpecialDelivery);
         parameters.Add("@SpecialDeliveryPrice", contract.SpecialDeliveryPrice);
-        parameters.Add("@AcknowledgementPostedDate", (object?)contract.AcknowledgementPostedDate ?? DBNull.Value);
-        parameters.Add("@AcknowledgementReturnedDate", (object?)contract.AcknowledgementReturnedDate ?? DBNull.Value);
-        parameters.Add("@JobSheetPostedDate", (object?)contract.JobSheetPostedDate ?? DBNull.Value);
+        parameters.Add("@AcknowledgementPostedDate", contract.AcknowledgementPostedDate);
+        parameters.Add("@AcknowledgementReturnedDate", contract.AcknowledgementReturnedDate);
+        parameters.Add("@JobSheetPostedDate", contract.JobSheetPostedDate);
         parameters.Add("@ReasonForClosure", contract.ReasonForClosure);
-        parameters.Add("@DateOfLeaving", (object?)contract.DateOfLeaving ?? DBNull.Value);
+        parameters.Add("@DateOfLeaving", contract.DateOfLeaving);
         parameters.Add("@IsActive", contract.IsActive);
         parameters.Add("@Suffix", contract.Suffix);
-        parameters.Add("@CommencementDate", (object?)contract.CommencementDate ?? DBNull.Value);
+        parameters.Add("@CommencementDate", contract.CommencementDate);
         parameters.Add("@PurchaseOrderNumber", contract.PurchaseOrderNumber);
         parameters.Add("@OptOutOfInvoiceGeneration", contract.OptOutOfInvoiceGeneration);
         parameters.Add("@IsOnlineOrder", contract.IsOnlineOrder);
-        parameters.Add("@ApprovedBy", (object?)contract.ApprovedBy ?? DBNull.Value);
-        parameters.Add("@ApprovedDate", (object?)contract.ApprovedDate ?? DBNull.Value);
+        parameters.Add("@ApprovedBy", contract.ApprovedBy);
+        parameters.Add("@ApprovedDate", contract.ApprovedDate);
         return parameters;
     }
 }

@@ -5,10 +5,9 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
-    <!-- PTL.Data only wraps existing stored procedures via raw SQL (FromSqlRaw/ExecuteSqlRawAsync)
-         and has no logic to unit test without a live SQL Server - it is exercised via manual/live
-         reproduction against a real database, not unit tests. Measuring it here would drag this
-         project's coverage number down for code that cannot be meaningfully unit tested. -->
+    <!-- PTL.Data (repositories + Infrastructure) has its own fully-covering test project,
+         PTL.Data.Tests, which uses a fake ADO.NET connection/command instead of a live SQL Server -
+         measuring it again here would double-count and drag this project's own number down. -->
     <Exclude>[PTL.Data]*</Exclude>
   </PropertyGroup>
 

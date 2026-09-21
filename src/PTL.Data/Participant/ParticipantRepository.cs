@@ -81,9 +81,9 @@ public sealed class ParticipantRepository(IDbConnectionFactory connectionFactory
         parameters.Add("@Email2", participant.Email2);
         parameters.Add("@Comments", participant.Comments);
         parameters.Add("@IsActive", participant.IsActive);
-        parameters.Add("@InactiveDate", (object?)participant.InactiveDate ?? DBNull.Value);
+        parameters.Add("@InactiveDate", participant.InactiveDate);
         parameters.Add("@InactiveError", participant.InactiveError);
-        parameters.Add("@InactiveErrorDate", (object?)participant.InactiveErrorDate ?? DBNull.Value);
+        parameters.Add("@InactiveErrorDate", participant.InactiveErrorDate);
         return parameters;
     }
 }

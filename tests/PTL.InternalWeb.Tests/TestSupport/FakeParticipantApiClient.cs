@@ -8,6 +8,8 @@ internal sealed class FakeParticipantApiClient : IParticipantApiClient
     public ParticipantSearchResponse SearchResponse { get; set; } = new([], 0, 1, 20);
     public ParticipantResponse? ParticipantResponse { get; set; }
     public ParticipantResponse? CreatedOrUpdatedResponse { get; set; }
+    public bool UpdateReturnsNull { get; set; }
+    public Exception? ExceptionToThrow { get; set; }
 
     public Task<IReadOnlyList<ParticipantSummaryResponse>> GetParticipantsAsync(Guid customerId, bool includeInactive = false, CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<ParticipantSummaryResponse>>(SearchResponse.Items);
@@ -18,17 +20,36 @@ internal sealed class FakeParticipantApiClient : IParticipantApiClient
     public Task<ParticipantSearchResponse> SearchParticipantsAsync(ParticipantSearchRequest request, CancellationToken cancellationToken = default) =>
         Task.FromResult(SearchResponse);
 
-    public Task<ParticipantResponse> CreateParticipantAsync(ParticipantRequest request, CancellationToken cancellationToken = default) =>
-        Task.FromResult(CreatedOrUpdatedResponse ?? new ParticipantResponse(
+    public Task<ParticipantResponse> CreateParticipantAsync(ParticipantRequest request, CancellationToken cancellationToken = default)
+    {
+        if (ExceptionToThrow is not null)
+        {
+            throw ExceptionToThrow;
+        }
+
+        return Task.FromResult(CreatedOrUpdatedResponse ?? new ParticipantResponse(
             Guid.NewGuid(), request.SsoId, request.CustomerId, request.LabCode, request.LabName, request.LabTypeId,
             request.ContactName, request.Organisation, request.Address1, request.Address2, request.Address3,
             request.Address4, request.Address5, request.CountryId, request.Telephone, request.Fax, request.Email,
             request.Email2, request.Comments, request.IsActive, null, false, null));
+    }
 
-    public Task<ParticipantResponse?> UpdateParticipantAsync(Guid participantId, ParticipantRequest request, CancellationToken cancellationToken = default) =>
-        Task.FromResult<ParticipantResponse?>(CreatedOrUpdatedResponse ?? new ParticipantResponse(
+    public Task<ParticipantResponse?> UpdateParticipantAsync(Guid participantId, ParticipantRequest request, CancellationToken cancellationToken = default)
+    {
+        if (ExceptionToThrow is not null)
+        {
+            throw ExceptionToThrow;
+        }
+
+        if (UpdateReturnsNull)
+        {
+            return Task.FromResult<ParticipantResponse?>(null);
+        }
+
+        return Task.FromResult<ParticipantResponse?>(CreatedOrUpdatedResponse ?? new ParticipantResponse(
             participantId, request.SsoId, request.CustomerId, request.LabCode, request.LabName, request.LabTypeId,
             request.ContactName, request.Organisation, request.Address1, request.Address2, request.Address3,
             request.Address4, request.Address5, request.CountryId, request.Telephone, request.Fax, request.Email,
             request.Email2, request.Comments, request.IsActive, null, false, null));
+    }
 }
