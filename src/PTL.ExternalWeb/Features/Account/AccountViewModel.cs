@@ -1,8 +1,9 @@
 using System.ComponentModel.DataAnnotations;
+using PTL.ApiClient;
 
 namespace PTL.ExternalWeb.Features.Account
 {
-    public class AccountViewModel
+    public class AccountViewModel : IAccountCredentials
     {
         [Required]
         public string? Username { get; set; }

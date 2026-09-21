@@ -1,13 +1,13 @@
-using System.Security.Claims;
-using Microsoft.AspNetCore.Authentication;
-using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Mvc;
+using PTL.ApiClient;
 using PTL.ExternalWeb.Features.Account;
 
 namespace PTL.ExternalWeb.Features.Account
 {
-    public class AccountController : Controller
+    public class AccountController : PtlAccountControllerBase
     {
+        protected override string PostLoginRedirectController => "Home";
+
         [HttpGet]
         public IActionResult Login(string? returnUrl = null)
         {
@@ -18,7 +18,7 @@ namespace PTL.ExternalWeb.Features.Account
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async System.Threading.Tasks.Task<IActionResult> Login(AccountViewModel model)
+        public async Task<IActionResult> Login(AccountViewModel model)
         {
             if (model == null || string.IsNullOrWhiteSpace(model.Username) || string.IsNullOrWhiteSpace(model.Password))
             {
@@ -26,24 +26,11 @@ namespace PTL.ExternalWeb.Features.Account
                 return View(model ?? new AccountViewModel());
             }
 
-            var claims = new[] { new Claim(ClaimTypes.Name, model.Username) };
-            var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
-            var principal = new ClaimsPrincipal(identity);
-            var authProperties = new AuthenticationProperties { IsPersistent = false };
-            await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal, authProperties);
-            if (!string.IsNullOrEmpty(model.ReturnUrl) && Url.IsLocalUrl(model.ReturnUrl))
-                return Redirect(model.ReturnUrl);
-
-            return RedirectToAction("Index", "Home");
+            return await SignInAndRedirectAsync(model);
         }
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async System.Threading.Tasks.Task<IActionResult> Logout()
-        {
-            TempData["LoginMessage"] = "Signed out";
-            await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
-            return RedirectToAction("Index", "Home");
-        }
+        public Task<IActionResult> Logout() => SignOutAndRedirectToHomeAsync();
     }
 }

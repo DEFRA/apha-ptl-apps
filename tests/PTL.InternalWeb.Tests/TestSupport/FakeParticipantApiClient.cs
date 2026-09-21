@@ -26,7 +26,7 @@ internal sealed class FakeParticipantApiClient : IParticipantApiClient
             request.Email2, request.Comments, request.IsActive, null, false, null));
 
     public Task<ParticipantResponse?> UpdateParticipantAsync(Guid participantId, UpdateParticipantRequest request, CancellationToken cancellationToken = default) =>
-        Task.FromResult(CreatedOrUpdatedResponse ?? new ParticipantResponse(
+        Task.FromResult<ParticipantResponse?>(CreatedOrUpdatedResponse ?? new ParticipantResponse(
             participantId, request.SsoId, request.CustomerId, request.LabCode, request.LabName, request.LabTypeId,
             request.ContactName, request.Organisation, request.Address1, request.Address2, request.Address3,
             request.Address4, request.Address5, request.CountryId, request.Telephone, request.Fax, request.Email,

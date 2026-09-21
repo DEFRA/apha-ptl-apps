@@ -147,8 +147,33 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - name: Restore repository tools
-        run: dotnet tool restore
+      - name: Cache SonarCloud packages
+        uses: actions/cache@v4
+        with:
+          path: ~\sonar\cache
+          key: ${{ runner.os }}-sonar
+          restore-keys: ${{ runner.os }}-sonar
+
+      # dotnet-sonarscanner is intentionally not in the .config/dotnet-tools.json manifest -
+      # installing it to a cached tool-path (Sonar's own recommended pattern) avoids pinning
+      # to a specific NuGet version that can go stale/incompatible with the scanner engine.
+      - name: Cache SonarCloud scanner
+        id: cache-sonar-scanner
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}\scanner
+          key: ${{ runner.os }}-sonar-scanner
+          restore-keys: ${{ runner.os }}-sonar-scanner
+
+      - name: Install SonarCloud scanner
+        if: steps.cache-sonar-scanner.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: |
+          New-Item -Path "${{ runner.temp }}\scanner" -ItemType Directory -Force | Out-Null
+          dotnet tool update dotnet-sonarscanner --tool-path "${{ runner.temp }}\scanner"
+
+      - name: Restore solution
+        run: dotnet restore PTL.slnx
 
       - name: Analyse solution
         shell: bash
@@ -157,15 +182,23 @@ jobs:
         run: |
           set -euo pipefail
           test -n "${SONAR_TOKEN}"
-          dotnet sonarscanner begin \
+          "${{ runner.temp }}/scanner/dotnet-sonarscanner" begin \
             /k:"${{ vars.SONAR_PROJECT_KEY }}" \
             /o:"${{ vars.SONAR_ORGANIZATION }}" \
             /d:sonar.token="${SONAR_TOKEN}" \
             /d:sonar.host.url="https://sonarcloud.io" \
-            /d:sonar.qualitygate.wait=true
-          dotnet restore PTL.slnx
+            /d:sonar.qualitygate.wait=true \
+            /d:sonar.cs.cobertura.reportsPaths="**/coverage.cobertura.xml" \
+            /d:sonar.cs.vstest.reportsPaths="**/*.trx" \
+            /d:sonar.exclusions="**/wwwroot/lib/**,**/wwwroot/js/*.min.js"
           dotnet build PTL.slnx --configuration Release --no-restore
-          dotnet sonarscanner end /d:sonar.token="${SONAR_TOKEN}"
+          dotnet test PTL.slnx \
+            --configuration Release \
+            --no-restore \
+            --logger "trx;LogFilePrefix=ptl-sonar-tests" \
+            --results-directory "${{ runner.temp }}/test-results" \
+            /p:Threshold=0
+          "${{ runner.temp }}/scanner/dotnet-sonarscanner" end /d:sonar.token="${SONAR_TOKEN}"
 
   container-validation:
     name: Validate ${{ matrix.component }} container

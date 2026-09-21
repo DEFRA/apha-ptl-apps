@@ -145,11 +145,72 @@ dependency issue even though it can still serve everything that doesn't need Api
 ## Testing
 
 Each app under `src/` has a matching test project under `tests/` (xUnit + `Microsoft.AspNetCore.Mvc.Testing`). Coverage is
-collected with coverlet and enforced at an 80% line-coverage threshold per project via `tests/Directory.Build.props`; the
+collected with coverlet and enforced at a 90% line-coverage threshold per project via `tests/Directory.Build.props`; the
 pre-commit hook also runs the full suite via `dotnet test PTL.slnx`.
 
 ```powershell
 dotnet test PTL.slnx
+```
+
+## Logging & correlation IDs
+
+All three services (`PTL.Api`, `PTL.InternalWeb`, `PTL.ExternalWeb`) log structured JSON to the console
+only (no file sinks) via Serilog, using `CompactJsonFormatter`. Locally, that means one JSON object per
+line in the terminal running `dotnet run`; in a deployed environment, follow whatever your environment
+tails (e.g. `docker logs -f <container>`, or the container platform's own log viewer).
+
+Each log line includes `MachineName`, `EnvironmentName`, and - for anything logged during a request -
+`CorrelationId`. To follow a single request end-to-end, filter/grep the log stream for its `CorrelationId`
+value.
+
+**Correlation IDs are automatic, not manual.** `CorrelationIdMiddlewareExtensions.UseCorrelationId()` (in
+`PTL.Common`, registered in every `Program.cs` before `UseSerilogRequestLogging()`) reads the
+`X-Correlation-Id` request header; if it is missing or not a well-formed GUID, a new one is generated. No
+caller is required to supply one, but a caller (e.g. an upstream service, or a manual `curl`/Postman
+request) can supply their own GUID to make a request traceable under a known value. The ID is:
+
+- pushed into the Serilog `LogContext` for the lifetime of the request, so every log line carries it,
+- echoed back on the response's `X-Correlation-Id` header, and
+- forwarded automatically from `PTL.InternalWeb`/`PTL.ExternalWeb` to `PTL.Api` by
+  `CorrelationIdDelegatingHandler`, attached to every typed `HttpClient` registered in
+  `PTL.ApiClient.AddPtlApiClient()` - so one user action produces the same `CorrelationId` in the calling
+  web app's and `PTL.Api`'s logs.
+
+### Example: logging from application code
+
+Inject `ILogger<T>` and log with a structured message template - never string interpolation - so the
+values stay queryable as real JSON fields rather than being flattened into the message text:
+
+```csharp
+public sealed class ParticipantService(IParticipantRepository participantRepository, ILogger<ParticipantService> logger) : IParticipantService
+{
+    public async Task<Participant?> DeactivateParticipantAsync(Guid participantId, CancellationToken cancellationToken = default)
+    {
+        var existing = await participantRepository.GetByIdAsync(participantId, cancellationToken);
+        if (existing is null)
+        {
+            logger.LogWarning("Deactivate requested for unknown participant {ParticipantId}", participantId);
+            return null;
+        }
+
+        existing.IsActive = false;
+        existing.InactiveDate ??= DateTime.UtcNow;
+
+        var updated = await participantRepository.UpdateAsync(existing, cancellationToken);
+        logger.LogInformation("Deactivated participant {ParticipantId}", participantId);
+        return updated;
+    }
+}
+```
+
+Because `CorrelationId` is already in the Serilog `LogContext` for the current request (see above), both
+log lines above are automatically enriched with it - no need to pass it around manually. The resulting
+CloudWatch Logs Insights query to see everything that happened to one participant, across both log lines:
+
+```
+fields @timestamp, CorrelationId, ParticipantId, @message
+| filter ParticipantId = "…"
+| sort @timestamp asc
 ```
 
 ## Docker images & deployment

@@ -8,6 +8,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\PTL.ApiClient\PTL.ApiClient.csproj" />
+    <ProjectReference Include="..\PTL.Common\PTL.Common.csproj" />
   </ItemGroup>
 
 </Project>
