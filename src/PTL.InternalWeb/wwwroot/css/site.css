@@ -29,3 +29,87 @@ body {
 .form-floating > .form-control-plaintext:focus::placeholder, .form-floating > .form-control:focus::placeholder {
   text-align: start;
 }
+
+/* Shared layout styling */
+
+/* Sign out must be a form post for CSRF protection; reset button chrome so it reads as a service navigation link */
+.app-signout-form {
+  display: inline;
+  margin: 0;
+}
+
+.app-signout-button {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  cursor: pointer;
+}
+
+.govuk-header__container {
+  min-height: 56px;
+  display: flex;
+  align-items: center;
+}
+
+.app-service-bar {
+  background: #ffffff;
+  border-bottom: 1px solid #b1b4b6;
+}
+
+.app-service-bar__container {
+  min-height: 70px;
+  display: flex;
+  align-items: center;
+}
+
+.app-service-bar__container a[aria-label="Home"] img {
+  height: 40px;
+  width: auto;
+}
+
+.app-account-panel {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+/* Left-hand PTLIMS navigation - see PTL.InternalWeb/Navigation/SideNavigationProvider.cs
+   for the legacy menu mapping this preserves. Context-based, not a permanent tree: each
+   page shows only its own node's title plus that node's direct children, matching the
+   legacy ListControl behaviour - breadcrumbs (_Breadcrumbs.cshtml) provide the way back
+   to the level above. */
+.app-side-navigation__list {
+  margin: 0;
+  padding: 0;
+}
+
+.app-side-navigation__item {
+  border-bottom: 1px solid #b1b4b6;
+}
+
+/* govuk-body (added alongside this class in _SideNavigation.cshtml) supplies the GOV.UK
+   font stack and responsive sizing; this only overrides colour/background/spacing. */
+.app-side-navigation__title {
+  background-color: #1D70B8;
+  color: #ffffff;
+  font-weight: 700;
+  margin: 0;
+  padding: 10px 5px;
+}
+
+a.app-side-navigation__link {
+  display: block;
+  padding: 8px 5px;
+}
+
+/* Disabled items stay visible (never removed) but are not links: no href, no focus, no
+   pointer cursor - screen readers announce them via aria-disabled. */
+span.app-side-navigation__link--disabled {
+  display: block;
+  margin: 0;
+  padding: 8px 5px;
+  color: #6f777b;
+  cursor: not-allowed;
+}
