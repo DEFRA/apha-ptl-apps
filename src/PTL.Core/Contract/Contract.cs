@@ -1,6 +1,6 @@
 namespace PTL.Core.Contract;
 
-// Domain entity mapped to tblContract by PTL.Data's PtlDbContext; shape matches the row
+// Domain entity mapped to tblContract by PTL.Data's ContractRepository (Dapper); shape matches the row
 // returned by spgContractByContractId (joined to tblCustomer for CustomerName/QalNumber).
 // CommencementDate, IsInvoiceSent, ApprovedBy, ApprovedDate, and IsReadOnly are system-managed
 // (see docs/analysis/contract-analysis.md) - never bound from Create/Update requests.

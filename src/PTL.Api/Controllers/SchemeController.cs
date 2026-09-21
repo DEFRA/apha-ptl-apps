@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.Extensions.Logging;
 using PTL.Contracts.Scheme;
 using PTL.Core.Scheme;
@@ -11,6 +12,7 @@ namespace PTL.Api.Controllers;
 // docs/migration/scheme-migration.md, "Authentication Mapping" - the legacy domain has
 // inconsistent authorization enforcement that must not be carried forward mechanically).
 [ApiController]
+[Route("api")]
 public sealed class SchemeController(ISchemeService schemeService, ILogger<SchemeController> logger) : ControllerBase
 {
     private static readonly Action<ILogger, Guid, Exception?> LogSchemeNotFoundMessage =
@@ -19,7 +21,7 @@ public sealed class SchemeController(ISchemeService schemeService, ILogger<Schem
             new EventId(1, nameof(LogSchemeNotFoundMessage)),
             "Scheme {SchemeId} not found");
 
-    [HttpGet("api/schemes/{schemeId:guid}")]
+    [HttpGet("schemes/{schemeId:guid}")]
     public async Task<ActionResult<SchemeResponse>> GetScheme(Guid schemeId, CancellationToken cancellationToken)
     {
         var scheme = await schemeService.GetSchemeAsync(schemeId, cancellationToken);
@@ -38,9 +40,9 @@ public sealed class SchemeController(ISchemeService schemeService, ILogger<Schem
     // string key "year" does not match the SchemeSearchRequest.YearId property name and
     // PTL.Contracts must stay free of an ASP.NET Core MVC dependency for a [FromQuery(Name=...)]
     // attribute.
-    [HttpGet("api/schemes")]
+    [HttpGet("schemes")]
     public async Task<ActionResult<SchemeSearchResponse>> GetSchemes(
-        [FromQuery] int year,
+        [FromQuery, BindRequired] int year,
         [FromQuery] string? searchTerm,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20,
@@ -50,19 +52,19 @@ public sealed class SchemeController(ISchemeService schemeService, ILogger<Schem
         return Ok(new SchemeSearchResponse(result.Items.Select(ToSummaryResponse).ToList(), result.TotalCount, page, pageSize));
     }
 
-    [HttpGet("api/schemes/families/{sharedId:guid}/history")]
+    [HttpGet("schemes/families/{sharedId:guid}/history")]
     public async Task<ActionResult<IReadOnlyList<SchemeHistoryResponse>>> GetSchemeFamilyHistory(Guid sharedId, CancellationToken cancellationToken)
     {
         var history = await schemeService.GetSchemeFamilyHistoryAsync(sharedId, cancellationToken);
         return Ok(history.Select(ToHistoryResponse).ToList());
     }
 
-    [HttpPost("api/schemes")]
-    public async Task<ActionResult<SchemeResponse>> CreateScheme([FromBody] CreateSchemeRequest request, CancellationToken cancellationToken)
+    [HttpPost("schemes")]
+    public async Task<ActionResult<SchemeResponse>> CreateScheme([FromBody] SchemeRequest request, CancellationToken cancellationToken)
     {
         try
         {
-            var created = await schemeService.CreateSchemeAsync(ToEntity(request), cancellationToken);
+            var created = await schemeService.CreateSchemeAsync(ToEntity(Guid.Empty, request), cancellationToken);
             return CreatedAtAction(nameof(GetScheme), new { schemeId = created.SchemeId }, ToResponse(created));
         }
         catch (SchemeValidationException ex)
@@ -71,8 +73,8 @@ public sealed class SchemeController(ISchemeService schemeService, ILogger<Schem
         }
     }
 
-    [HttpPut("api/schemes/{schemeId:guid}")]
-    public async Task<ActionResult<SchemeResponse>> UpdateScheme(Guid schemeId, [FromBody] UpdateSchemeRequest request, CancellationToken cancellationToken)
+    [HttpPut("schemes/{schemeId:guid}")]
+    public async Task<ActionResult<SchemeResponse>> UpdateScheme(Guid schemeId, [FromBody] SchemeRequest request, CancellationToken cancellationToken)
     {
         try
         {
@@ -95,65 +97,9 @@ public sealed class SchemeController(ISchemeService schemeService, ILogger<Schem
         return ValidationProblem(ModelState);
     }
 
-    private static Scheme ToEntity(CreateSchemeRequest request) => new()
-    {
-        YearId = request.YearId,
-        Identifier = request.Identifier,
-        Name = request.Name,
-        ScheduleId = request.ScheduleId,
-        ScheduleCodeId = request.ScheduleCodeId,
-        StartDate = request.StartDate,
-        DistributionMonthApr = request.DistributionMonthApr,
-        DistributionMonthMay = request.DistributionMonthMay,
-        DistributionMonthJun = request.DistributionMonthJun,
-        DistributionMonthJul = request.DistributionMonthJul,
-        DistributionMonthAug = request.DistributionMonthAug,
-        DistributionMonthSep = request.DistributionMonthSep,
-        DistributionAsAvailable = request.DistributionAsAvailable,
-        DistributionMonthOct = request.DistributionMonthOct,
-        DistributionMonthNov = request.DistributionMonthNov,
-        DistributionMonthDec = request.DistributionMonthDec,
-        DistributionMonthJan = request.DistributionMonthJan,
-        DistributionMonthFeb = request.DistributionMonthFeb,
-        DistributionMonthMar = request.DistributionMonthMar,
-        WeekNumber = request.WeekNumber,
-        DayOfWeekId = request.DayOfWeekId,
-        NumberOfSamples = request.NumberOfSamples,
-        SampleOrigin = request.SampleOrigin,
-        Deadline = request.Deadline,
-        Subcontractor = request.Subcontractor,
-        CombinedPackaging = request.CombinedPackaging,
-        Postage = request.Postage,
-        CustomsVolume = request.CustomsVolume,
-        SamplePackingInstructions = request.SamplePackingInstructions,
-        RequiresAssessment = request.RequiresAssessment,
-        CommentsRequired = request.CommentsRequired,
-        Pilot = request.Pilot,
-        LimitedSampleAvailability = request.LimitedSampleAvailability,
-        Accredited = request.Accredited,
-        NoVLALabs = request.NoVLALabs,
-        ComerciallyAvailable = request.ComerciallyAvailable,
-        CustomsDescription = request.CustomsDescription,
-        DataConsentDeclarationActive = request.DataConsentDeclarationActive,
-        DataConsentDeclarationText = request.DataConsentDeclarationText,
-        Instructions = request.Instructions,
-        DateOfReceipt = request.DateOfReceipt,
-        StorageConditions = request.StorageConditions,
-        ConditionOnReceipt = request.ConditionOnReceipt,
-        TestConsultant1 = request.TestConsultant1,
-        TestConsultant2 = request.TestConsultant2,
-        TestConsultant3 = request.TestConsultant3,
-        TestConsultantTabulationId = request.TestConsultantTabulationId,
-        UseExternalReference = request.UseExternalReference,
-        StoreRatings = request.StoreRatings,
-        Assessor1 = request.Assessor1,
-        Assessor2 = request.Assessor2,
-        Assessor3 = request.Assessor3,
-        Assessor4 = request.Assessor4,
-        StandardTabulationText = request.StandardTabulationText
-    };
-
-    private static Scheme ToEntity(Guid schemeId, UpdateSchemeRequest request) => new()
+    // SchemeId is Guid.Empty for Create (server-generates a real id in SchemeService) and the
+    // route id for Update - one mapper for both verbs since the request shape is now identical.
+    private static Scheme ToEntity(Guid schemeId, SchemeRequest request) => new()
     {
         SchemeId = schemeId,
         YearId = request.YearId,

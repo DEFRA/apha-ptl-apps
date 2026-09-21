@@ -55,11 +55,9 @@ public class ContractApiClientTests
         Assert.Null(result.Contract);
     }
 
-    private static CreateContractRequest MinimalCreateRequest() => new(
+    private static ContractRequest MinimalCreateRequest() => new(
         2027, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, 0, 0, 0, 0, 0, 0, 0, 0,
         DateTime.UtcNow, DateTime.UtcNow, DateTime.UtcNow, string.Empty, DateTime.UtcNow, true, string.Empty, string.Empty, false, false);
 
-    private static UpdateContractRequest MinimalUpdateRequest() => new(
-        2027, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, 0, 0, 0, 0, 0, 0, 0, 0,
-        DateTime.UtcNow, DateTime.UtcNow, DateTime.UtcNow, string.Empty, DateTime.UtcNow, true, string.Empty, string.Empty, false, false);
+    private static ContractRequest MinimalUpdateRequest() => MinimalCreateRequest();
 }

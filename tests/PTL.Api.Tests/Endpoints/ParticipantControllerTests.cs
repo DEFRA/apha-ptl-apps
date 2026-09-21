@@ -24,7 +24,7 @@ public class ParticipantControllerTests
         return controller;
     }
 
-    private static CreateParticipantRequest ValidCreateRequest(Guid customerId, string labName = "Sample Lab") => new(
+    private static ParticipantRequest ValidCreateRequest(Guid customerId, string labName = "Sample Lab") => new(
         CustomerId: customerId,
         SsoId: Guid.NewGuid(),
         LabCode: "LAB-001",
@@ -45,10 +45,7 @@ public class ParticipantControllerTests
         Comments: string.Empty,
         IsActive: true);
 
-    private static UpdateParticipantRequest ToUpdateRequest(CreateParticipantRequest request) => new(
-        request.CustomerId, request.SsoId, request.LabCode, request.LabName, request.LabTypeId, request.ContactName,
-        request.Organisation, request.Address1, request.Address2, request.Address3, request.Address4, request.Address5,
-        request.CountryId, request.Telephone, request.Fax, request.Email, request.Email2, request.Comments, request.IsActive);
+    private static ParticipantRequest ToUpdateRequest(ParticipantRequest request) => request;
 
     [Fact]
     public async Task CreateParticipant_ValidRequest_ReturnsCreatedAtAction()

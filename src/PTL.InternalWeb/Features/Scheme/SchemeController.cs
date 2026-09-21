@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.Extensions.Logging;
@@ -56,12 +57,12 @@ public class SchemeController(ISchemeApiClient schemeApiClient, ILookupApiClient
     public async Task<IActionResult> Index(int? yearId, string? searchTerm = null, int page = 1, int pageSize = 20, CancellationToken cancellationToken = default)
     {
         var years = await lookupApiClient.GetCurrentYearsAsync(cancellationToken);
-        var resolvedYearId = yearId ?? years.FirstOrDefault()?.YearId ?? 0;
+        var resolvedYearId = yearId ?? (years.Count > 0 ? years[0].YearId : 0);
 
         var result = await schemeApiClient.GetSchemesForYearAsync(new SchemeSearchRequest(resolvedYearId, searchTerm, page, pageSize), cancellationToken);
         LogDisplayedSchemeListMessage(logger, resolvedYearId, searchTerm, page, result.TotalCount, null);
 
-        var yearOptions = years.Select(y => new SelectListItem(y.Year, y.YearId.ToString())).ToList();
+        var yearOptions = years.Select(y => new SelectListItem(y.Year, y.YearId.ToString(CultureInfo.InvariantCulture))).ToList();
         var search = new SchemeSearchViewModel(resolvedYearId, searchTerm, result.Page, result.PageSize);
         return View(new SchemeListViewModel(search, result.TotalCount, yearOptions, result.Items));
     }
@@ -105,7 +106,7 @@ public class SchemeController(ISchemeApiClient schemeApiClient, ILookupApiClient
             return View(model);
         }
 
-        var result = await schemeApiClient.CreateSchemeAsync(ToCreateRequest(model), cancellationToken);
+        var result = await schemeApiClient.CreateSchemeAsync(ToRequest(model), cancellationToken);
         if (!result.Success)
         {
             LogCreateFailedMessage(logger, null);
@@ -115,8 +116,17 @@ public class SchemeController(ISchemeApiClient schemeApiClient, ILookupApiClient
             return View(model);
         }
 
-        LogCreatedSchemeMessage(logger, result.Scheme!.SchemeId, null);
-        return RedirectToAction(nameof(Details), new { id = result.Scheme!.SchemeId });
+        if (result.Scheme is null)
+        {
+            LogCreateFailedMessage(logger, null);
+            ModelState.AddModelError(string.Empty, "The scheme could not be created.");
+            await PopulateYearOptionsAsync(model, cancellationToken);
+            await PopulatePostageOptionsAsync(model, cancellationToken);
+            return View(model);
+        }
+
+        LogCreatedSchemeMessage(logger, result.Scheme.SchemeId, null);
+        return RedirectToAction(nameof(Details), new { id = result.Scheme.SchemeId });
     }
 
     [HttpGet]
@@ -145,7 +155,7 @@ public class SchemeController(ISchemeApiClient schemeApiClient, ILookupApiClient
             return View(model);
         }
 
-        var result = await schemeApiClient.UpdateSchemeAsync(id, ToUpdateRequest(model), cancellationToken);
+        var result = await schemeApiClient.UpdateSchemeAsync(id, ToRequest(model), cancellationToken);
         if (!result.Success)
         {
             LogUpdateFailedMessage(logger, id, null);
@@ -159,39 +169,30 @@ public class SchemeController(ISchemeApiClient schemeApiClient, ILookupApiClient
         return RedirectToAction(nameof(Details), new { id });
     }
 
-    private void AddErrors(IReadOnlyDictionary<string, string[]> fieldErrors)
-    {
-        foreach (var (field, messages) in fieldErrors)
-        {
-            foreach (var message in messages)
-            {
-                ModelState.AddModelError(field, message);
-            }
-        }
-    }
+    private void AddErrors(IReadOnlyDictionary<string, string[]> fieldErrors) => this.AddFieldErrors(fieldErrors);
 
     // Current + next year only, mirrors legacy Scheme.aspx.vb SetYearDropDown() reuse of
     // SystemObjects.YearCollection.FetchYearCollectionCurrent() (same lookup as Contract's).
     private async Task PopulateYearOptionsAsync(SchemeFormViewModel model, CancellationToken cancellationToken)
     {
         var years = await lookupApiClient.GetCurrentYearsAsync(cancellationToken);
-        model.YearOptions = years.Select(y => new SelectListItem(y.Year, y.YearId.ToString())).ToList();
+        model.YearOptions = years.Select(y => new SelectListItem(y.Year, y.YearId.ToString(CultureInfo.InvariantCulture))).ToList();
     }
 
     // Postage plans are year-scoped (DropDownPostage in the legacy form) - reload against the
     // currently selected YearId so the option list matches the year the scheme belongs to.
     private async Task PopulatePostageOptionsAsync(SchemeFormViewModel model, CancellationToken cancellationToken)
     {
-        var plans = await lookupApiClient.GetPostagePricingPlansForYearAsync(model.YearId, cancellationToken);
+        var plans = await lookupApiClient.GetPostagePricingPlansForYearAsync(model.YearId.GetValueOrDefault(), cancellationToken);
         model.PostageOptions = plans.Select(p => new SelectListItem(p.Name, p.PostageId.ToString())).ToList();
     }
 
-    private static CreateSchemeRequest ToCreateRequest(SchemeFormViewModel model) => new(
-        model.YearId,
+    private static SchemeRequest ToRequest(SchemeFormViewModel model) => new(
+        model.YearId.GetValueOrDefault(),
         model.Identifier ?? string.Empty,
         model.Name ?? string.Empty,
-        model.ScheduleId,
-        model.ScheduleCodeId,
+        model.ScheduleId.GetValueOrDefault(),
+        model.ScheduleCodeId.GetValueOrDefault(),
         model.StartDate,
         model.DistributionMonthApr,
         model.DistributionMonthMay,
@@ -208,65 +209,9 @@ public class SchemeController(ISchemeApiClient schemeApiClient, ILookupApiClient
         model.DistributionMonthMar,
         model.WeekNumber,
         model.DayOfWeekId,
-        model.NumberOfSamples,
+        model.NumberOfSamples.GetValueOrDefault(),
         model.SampleOrigin ?? string.Empty,
-        model.Deadline,
-        model.Subcontractor ?? string.Empty,
-        model.CombinedPackaging,
-        model.Postage,
-        model.CustomsVolume,
-        model.SamplePackingInstructions ?? string.Empty,
-        model.RequiresAssessment,
-        model.CommentsRequired,
-        model.Pilot,
-        model.LimitedSampleAvailability,
-        model.Accredited,
-        model.NoVLALabs,
-        model.ComerciallyAvailable,
-        model.CustomsDescription,
-        model.DataConsentDeclarationActive,
-        model.DataConsentDeclarationText,
-        model.Instructions ?? string.Empty,
-        model.DateOfReceipt,
-        model.StorageConditions,
-        model.ConditionOnReceipt,
-        model.TestConsultant1,
-        model.TestConsultant2,
-        model.TestConsultant3,
-        model.TestConsultantTabulationId,
-        model.UseExternalReference,
-        model.StoreRatings,
-        model.Assessor1,
-        model.Assessor2,
-        model.Assessor3,
-        model.Assessor4,
-        model.StandardTabulationText);
-
-    private static UpdateSchemeRequest ToUpdateRequest(SchemeFormViewModel model) => new(
-        model.YearId,
-        model.Identifier ?? string.Empty,
-        model.Name ?? string.Empty,
-        model.ScheduleId,
-        model.ScheduleCodeId,
-        model.StartDate,
-        model.DistributionMonthApr,
-        model.DistributionMonthMay,
-        model.DistributionMonthJun,
-        model.DistributionMonthJul,
-        model.DistributionMonthAug,
-        model.DistributionMonthSep,
-        model.DistributionAsAvailable,
-        model.DistributionMonthOct,
-        model.DistributionMonthNov,
-        model.DistributionMonthDec,
-        model.DistributionMonthJan,
-        model.DistributionMonthFeb,
-        model.DistributionMonthMar,
-        model.WeekNumber,
-        model.DayOfWeekId,
-        model.NumberOfSamples,
-        model.SampleOrigin ?? string.Empty,
-        model.Deadline,
+        model.Deadline.GetValueOrDefault(),
         model.Subcontractor ?? string.Empty,
         model.CombinedPackaging,
         model.Postage,

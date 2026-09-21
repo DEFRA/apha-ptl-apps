@@ -94,7 +94,7 @@ public class CustomerController(ICustomerApiClient customerApiClient, ILookupApi
             return View(model);
         }
 
-        var result = await customerApiClient.CreateCustomerAsync(ToCreateRequest(model), cancellationToken);
+        var result = await customerApiClient.CreateCustomerAsync(ToRequest(model), cancellationToken);
         if (!result.Success)
         {
             LogCreateFailedMessage(logger, model.Name, null);
@@ -132,7 +132,7 @@ public class CustomerController(ICustomerApiClient customerApiClient, ILookupApi
             return View(model);
         }
 
-        var result = await customerApiClient.UpdateCustomerAsync(id, ToUpdateRequest(model), cancellationToken);
+        var result = await customerApiClient.UpdateCustomerAsync(id, ToRequest(model), cancellationToken);
         if (!result.Success)
         {
             LogUpdateFailedMessage(logger, id, null);
@@ -198,48 +198,7 @@ public class CustomerController(ICustomerApiClient customerApiClient, ILookupApi
             .ToList();
     }
 
-    private static CreateCustomerRequest ToCreateRequest(CustomerFormViewModel model) => new(
-        model.RegisteredFileNumber ?? string.Empty,
-        model.Name,
-        model.PreviousName ?? string.Empty,
-        model.CustomerTypeId,
-        model.VatNumber ?? string.Empty,
-        model.VatRatingId,
-        model.AccountNumber ?? string.Empty,
-        model.CustomerFinanceId ?? string.Empty,
-        model.ContactName ?? string.Empty,
-        model.Organisation ?? string.Empty,
-        model.Address1 ?? string.Empty,
-        model.Address2 ?? string.Empty,
-        model.Address3 ?? string.Empty,
-        model.Address4 ?? string.Empty,
-        model.Address5 ?? string.Empty,
-        model.CountryId,
-        model.Telephone ?? string.Empty,
-        model.Telephone2 ?? string.Empty,
-        model.Fax ?? string.Empty,
-        model.Email ?? string.Empty,
-        model.CurrencyId,
-        model.Comments ?? string.Empty,
-        model.PostageArrangements ?? string.Empty,
-        model.PaymentNonUK,
-        model.InvoiceName ?? string.Empty,
-        model.InvoiceOrganisation ?? string.Empty,
-        model.InvoiceAddress1 ?? string.Empty,
-        model.InvoiceAddress2 ?? string.Empty,
-        model.InvoiceAddress3 ?? string.Empty,
-        model.InvoiceAddress4 ?? string.Empty,
-        model.InvoiceAddress5 ?? string.Empty,
-        model.InvoiceCountryId,
-        model.InvoiceTelephone ?? string.Empty,
-        model.InvoiceTelephone2 ?? string.Empty,
-        model.InvoiceFax ?? string.Empty,
-        model.InvoiceEmail ?? string.Empty,
-        model.IsActive,
-        model.CanOrderOnline,
-        model.CustomerStatusId);
-
-    private static UpdateCustomerRequest ToUpdateRequest(CustomerFormViewModel model) => new(
+    private static CustomerSaveRequest ToRequest(CustomerFormViewModel model) => new(
         model.RegisteredFileNumber ?? string.Empty,
         model.Name,
         model.PreviousName ?? string.Empty,

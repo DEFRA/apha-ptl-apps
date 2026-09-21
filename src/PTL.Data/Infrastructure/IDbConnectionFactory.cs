@@ -1,6 +1,6 @@
 using System.Data;
 
-namespace PTL.Api.Infrastructure;
+namespace PTL.Data.Infrastructure;
 
 /// <summary>
 /// Single place that knows how to open a SQL Server connection. Dapper works

@@ -10,8 +10,8 @@ public interface ISchemeApiClient
     Task<SchemeResponse?> GetSchemeAsync(Guid schemeId, CancellationToken cancellationToken = default);
     Task<SchemeSearchResponse> GetSchemesForYearAsync(SchemeSearchRequest request, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<SchemeHistoryResponse>> GetSchemeHistoryAsync(Guid sharedId, CancellationToken cancellationToken = default);
-    Task<SchemeSaveResult> CreateSchemeAsync(CreateSchemeRequest request, CancellationToken cancellationToken = default);
-    Task<SchemeSaveResult> UpdateSchemeAsync(Guid schemeId, UpdateSchemeRequest request, CancellationToken cancellationToken = default);
+    Task<SchemeSaveResult> CreateSchemeAsync(SchemeRequest request, CancellationToken cancellationToken = default);
+    Task<SchemeSaveResult> UpdateSchemeAsync(Guid schemeId, SchemeRequest request, CancellationToken cancellationToken = default);
 }
 
 // Thin typed HttpClient wrapper around PTL.Api's scheme endpoints, shared by every web front-end
@@ -43,13 +43,13 @@ public sealed class SchemeApiClient(HttpClient httpClient) : ISchemeApiClient
         return result ?? [];
     }
 
-    public async Task<SchemeSaveResult> CreateSchemeAsync(CreateSchemeRequest request, CancellationToken cancellationToken = default)
+    public async Task<SchemeSaveResult> CreateSchemeAsync(SchemeRequest request, CancellationToken cancellationToken = default)
     {
         var response = await httpClient.PostAsJsonAsync("/api/schemes", request, cancellationToken);
         return await ToSaveResultAsync(response, cancellationToken);
     }
 
-    public async Task<SchemeSaveResult> UpdateSchemeAsync(Guid schemeId, UpdateSchemeRequest request, CancellationToken cancellationToken = default)
+    public async Task<SchemeSaveResult> UpdateSchemeAsync(Guid schemeId, SchemeRequest request, CancellationToken cancellationToken = default)
     {
         var response = await httpClient.PutAsJsonAsync($"/api/schemes/{schemeId}", request, cancellationToken);
         if (response.StatusCode == HttpStatusCode.NotFound)

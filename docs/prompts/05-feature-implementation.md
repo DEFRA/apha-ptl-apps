@@ -467,7 +467,7 @@ Repository implementations should use:
 
 Repository
 ↓
-Entity Framework Core and/or Dapper
+Dapper
 ↓
 Stored Procedures
 ↓

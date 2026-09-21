@@ -39,7 +39,7 @@ public sealed class SchemeFormViewModel : IValidatableObject
     public int? SampleNoSequence { get; set; }
 
     [Required(ErrorMessage = "Enter a year.")]
-    public int YearId { get; set; }
+    public int? YearId { get; set; }
 
     // Populated by SchemeController before the view is rendered - see /api/lookups/years
     // (current + next year only, mirrors legacy DropDownYear behaviour).
@@ -58,10 +58,10 @@ public sealed class SchemeFormViewModel : IValidatableObject
     public DateTime? StartDate { get; set; }
 
     [Required(ErrorMessage = "Select a schedule.")]
-    public Guid ScheduleId { get; set; }
+    public Guid? ScheduleId { get; set; }
 
     [Required(ErrorMessage = "Select a schedule code.")]
-    public Guid ScheduleCodeId { get; set; }
+    public Guid? ScheduleCodeId { get; set; }
 
     // Distribution months - legacy screen order (financial year, Apr first).
     public bool DistributionMonthApr { get; set; }
@@ -84,7 +84,7 @@ public sealed class SchemeFormViewModel : IValidatableObject
 
     [Required(ErrorMessage = "Enter the number of samples.")]
     [Range(1, 999, ErrorMessage = "Number of samples must be between 1 and 999.")]
-    public int NumberOfSamples { get; set; }
+    public int? NumberOfSamples { get; set; }
 
     [Required(ErrorMessage = "Enter the sample origin.")]
     [StringLength(50, ErrorMessage = "Sample origin must not exceed 50 characters.")]
@@ -92,7 +92,7 @@ public sealed class SchemeFormViewModel : IValidatableObject
 
     [Required(ErrorMessage = "Enter the deadline.")]
     [Range(1, 999, ErrorMessage = "Deadline must be between 1 and 999.")]
-    public int Deadline { get; set; }
+    public int? Deadline { get; set; }
 
     [StringLength(50, ErrorMessage = "Subcontractor must not exceed 50 characters.")]
     public string? Subcontractor { get; set; }

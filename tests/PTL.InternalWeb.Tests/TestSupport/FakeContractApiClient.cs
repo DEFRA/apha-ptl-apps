@@ -20,9 +20,9 @@ internal sealed class FakeContractApiClient : IContractApiClient
     public Task<ContractSearchResponse> GetContractsForCustomerByYearAsync(Guid customerId, int yearId, CancellationToken cancellationToken = default) =>
         Task.FromResult(SearchResponse);
 
-    public Task<ContractSaveResult> CreateContractAsync(Guid customerId, CreateContractRequest request, CancellationToken cancellationToken = default) =>
+    public Task<ContractSaveResult> CreateContractAsync(Guid customerId, ContractRequest request, CancellationToken cancellationToken = default) =>
         Task.FromResult(SaveResult);
 
-    public Task<ContractSaveResult> UpdateContractAsync(Guid contractId, UpdateContractRequest request, CancellationToken cancellationToken = default) =>
+    public Task<ContractSaveResult> UpdateContractAsync(Guid contractId, ContractRequest request, CancellationToken cancellationToken = default) =>
         Task.FromResult(SaveResult);
 }

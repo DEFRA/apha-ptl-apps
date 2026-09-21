@@ -1,9 +1,13 @@
 namespace PTL.Contracts.Customer;
 
-// Same editable field set as CreateCustomerRequest. CustomerId comes from the route,
-// QalNumber and InitialStartDate are preserved server-side and cannot be edited (matches
-// the legacy Customer.aspx form, which never posts these back).
-public sealed record UpdateCustomerRequest(
+// Field set mirrors CustomerResponse minus server-generated values (CustomerId, QalNumber,
+// InitialStartDate). Shared by both create and update actions since the editable field set is
+// identical for both operations. IsActive/CanOrderOnline/CustomerStatusId default values match
+// Customer.DataPortal_Create() in the legacy app, which always creates a new customer as active
+// unless the form explicitly unchecks it; update callers always pass every field explicitly so
+// the defaults have no effect there. Named CustomerSaveRequest (not CustomerRequest) because
+// CustomerRequest is already the GET /api/customers query-filter contract.
+public sealed record CustomerSaveRequest(
     string RegisteredFileNumber,
     string Name,
     string PreviousName,
@@ -40,6 +44,6 @@ public sealed record UpdateCustomerRequest(
     string InvoiceTelephone2,
     string InvoiceFax,
     string InvoiceEmail,
-    bool IsActive,
-    bool CanOrderOnline,
-    Guid? CustomerStatusId);
+    bool IsActive = true,
+    bool CanOrderOnline = false,
+    Guid? CustomerStatusId = null);

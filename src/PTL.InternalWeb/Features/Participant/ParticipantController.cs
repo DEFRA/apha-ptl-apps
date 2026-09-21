@@ -86,7 +86,7 @@ public class ParticipantController(IParticipantApiClient participantApiClient, I
 
         try
         {
-            var created = await participantApiClient.CreateParticipantAsync(new CreateParticipantRequest(
+            var created = await participantApiClient.CreateParticipantAsync(new ParticipantRequest(
                 customerId,
                 model.SsoId,
                 model.LabCode,
@@ -149,7 +149,7 @@ public class ParticipantController(IParticipantApiClient participantApiClient, I
 
         try
         {
-            var updated = await participantApiClient.UpdateParticipantAsync(id, new UpdateParticipantRequest(
+            var updated = await participantApiClient.UpdateParticipantAsync(id, new ParticipantRequest(
                 model.CustomerId,
                 model.SsoId,
                 model.LabCode,

@@ -1,9 +1,12 @@
 namespace PTL.Contracts.Scheme;
 
-// Field set matches SchemeResponse minus server-generated/system-managed values (SchemeId,
-// SharedId, LastModified, IsReadOnly, SampleNoSequence - joined from tblSchedule, never a
-// spiScheme/spuScheme parameter). See docs/analysis/scheme-analysis.md.
-public sealed record CreateSchemeRequest(
+// Shared by POST /api/schemes (create) and PUT /api/schemes/{id} (update) - field set matches
+// SchemeResponse minus server-generated/system-managed values (SchemeId, SharedId, LastModified,
+// IsReadOnly, SampleNoSequence - joined from tblSchedule, never a spiScheme/spuScheme parameter).
+// See docs/analysis/scheme-analysis.md. RequiresAssessment is accepted on update (spuScheme always
+// requires a value) but SchemeService overwrites it with the existing persisted value on update -
+// mirrors the legacy Scheme.aspx.vb behaviour of disabling the checkbox once a SchemeId exists.
+public sealed record SchemeRequest(
     int YearId,
     string Identifier,
     string Name,

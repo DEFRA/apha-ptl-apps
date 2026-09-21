@@ -9,6 +9,7 @@ namespace PTL.Api.Controllers;
 // out of scope for this phase - assume the current caller is already authenticated with full
 // access to Contract functionality. Policies will be added in a later phase.
 [ApiController]
+[Route("api")]
 public sealed class ContractController(IContractService contractService, ILogger<ContractController> logger) : ControllerBase
 {
     private static readonly Action<ILogger, Guid, Exception?> LogContractNotFoundMessage =
@@ -17,7 +18,7 @@ public sealed class ContractController(IContractService contractService, ILogger
             new EventId(1, nameof(LogContractNotFoundMessage)),
             "Contract {ContractId} not found");
 
-    [HttpGet("api/contracts/{contractId:guid}")]
+    [HttpGet("contracts/{contractId:guid}")]
     public async Task<ActionResult<ContractResponse>> GetContract(Guid contractId, CancellationToken cancellationToken)
     {
         var contract = await contractService.GetContractAsync(contractId, cancellationToken);
@@ -33,7 +34,7 @@ public sealed class ContractController(IContractService contractService, ILogger
     // GET /api/customers/{customerId}/contracts[?yearId=&period=&searchTerm=&page=&pageSize=]
     // - yearId supplied: exact-year lookup via spgContractInfoByCustomerIdAndYearId (no search/paging).
     // - yearId omitted: spgContractInfoByCustomerId(period) with in-memory search/paging.
-    [HttpGet("api/customers/{customerId:guid}/contracts")]
+    [HttpGet("customers/{customerId:guid}/contracts")]
     public async Task<ActionResult<ContractSearchResponse>> GetContractsForCustomer(
         Guid customerId,
         [FromQuery] ContractSearchRequest request,
@@ -43,12 +44,12 @@ public sealed class ContractController(IContractService contractService, ILogger
         return Ok(new ContractSearchResponse(result.Items.Select(ToSummaryResponse).ToList(), result.TotalCount, request.Page, request.PageSize));
     }
 
-    [HttpPost("api/customers/{customerId:guid}/contracts")]
-    public async Task<ActionResult<ContractResponse>> CreateContract(Guid customerId, [FromBody] CreateContractRequest request, CancellationToken cancellationToken)
+    [HttpPost("customers/{customerId:guid}/contracts")]
+    public async Task<ActionResult<ContractResponse>> CreateContract(Guid customerId, [FromBody] ContractRequest request, CancellationToken cancellationToken)
     {
         try
         {
-            var created = await contractService.CreateContractAsync(ToEntity(customerId, request), cancellationToken);
+            var created = await contractService.CreateContractAsync(ToEntity(Guid.Empty, customerId, request), cancellationToken);
             return CreatedAtAction(nameof(GetContract), new { contractId = created.ContractId }, ToResponse(created));
         }
         catch (ContractValidationException ex)
@@ -57,12 +58,12 @@ public sealed class ContractController(IContractService contractService, ILogger
         }
     }
 
-    [HttpPut("api/contracts/{contractId:guid}")]
-    public async Task<ActionResult<ContractResponse>> UpdateContract(Guid contractId, [FromBody] UpdateContractRequest request, CancellationToken cancellationToken)
+    [HttpPut("contracts/{contractId:guid}")]
+    public async Task<ActionResult<ContractResponse>> UpdateContract(Guid contractId, [FromBody] ContractRequest request, CancellationToken cancellationToken)
     {
         try
         {
-            var updated = await contractService.UpdateContractAsync(contractId, ToEntity(contractId, request), cancellationToken);
+            var updated = await contractService.UpdateContractAsync(contractId, ToEntity(contractId, Guid.Empty, request), cancellationToken);
             return updated is null ? NotFound() : Ok(ToResponse(updated));
         }
         catch (ContractValidationException ex)
@@ -81,38 +82,10 @@ public sealed class ContractController(IContractService contractService, ILogger
         return ValidationProblem(ModelState);
     }
 
-    private static Contract ToEntity(Guid customerId, CreateContractRequest request) => new()
-    {
-        CustomerId = customerId,
-        YearId = request.YearId,
-        UTNumber = request.UTNumber,
-        FTNumber = request.FTNumber,
-        ContractSignatory = request.ContractSignatory,
-        ActionsRequired = request.ActionsRequired,
-        RenewalInformation = request.RenewalInformation,
-        DiscountRate = request.DiscountRate,
-        AdministrationCharge = request.AdministrationCharge,
-        NumberCourier = request.NumberCourier,
-        CourierPrice = request.CourierPrice,
-        NumberPostage = request.NumberPostage,
-        PostagePrice = request.PostagePrice,
-        NumberSpecialDelivery = request.NumberSpecialDelivery,
-        SpecialDeliveryPrice = request.SpecialDeliveryPrice,
-        AcknowledgementPostedDate = request.AcknowledgementPostedDate,
-        AcknowledgementReturnedDate = request.AcknowledgementReturnedDate,
-        JobSheetPostedDate = request.JobSheetPostedDate,
-        ReasonForClosure = request.ReasonForClosure,
-        DateOfLeaving = request.DateOfLeaving,
-        IsActive = request.IsActive,
-        Suffix = request.Suffix,
-        PurchaseOrderNumber = request.PurchaseOrderNumber,
-        OptOutOfInvoiceGeneration = request.OptOutOfInvoiceGeneration,
-        IsOnlineOrder = request.IsOnlineOrder
-    };
-
-    private static Contract ToEntity(Guid contractId, UpdateContractRequest request) => new()
+    private static Contract ToEntity(Guid contractId, Guid customerId, ContractRequest request) => new()
     {
         ContractId = contractId,
+        CustomerId = customerId,
         YearId = request.YearId,
         UTNumber = request.UTNumber,
         FTNumber = request.FTNumber,

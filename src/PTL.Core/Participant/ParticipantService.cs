@@ -107,4 +107,38 @@ public sealed class ParticipantService(IParticipantRepository participantReposit
         LogUpdatedParticipantMessage(logger, participantId, null);
         return updated;
     }
+
+    public async Task<Participant?> DeactivateParticipantAsync(Guid participantId, CancellationToken cancellationToken = default)
+    {
+        var existing = await participantRepository.GetByIdAsync(participantId, cancellationToken);
+        if (existing is null)
+        {
+            LogDeactivateRequestedForUnknownParticipantMessage(logger, participantId, null);
+            return null;
+        }
+
+        existing.IsActive = false;
+        existing.InactiveDate ??= DateTime.UtcNow;
+
+        var updated = await participantRepository.UpdateAsync(existing, cancellationToken);
+        LogDeactivatedParticipantMessage(logger, participantId, null);
+        return updated;
+    }
+
+    public async Task<Participant?> ReactivateParticipantAsync(Guid participantId, CancellationToken cancellationToken = default)
+    {
+        var existing = await participantRepository.GetByIdAsync(participantId, cancellationToken);
+        if (existing is null)
+        {
+            LogReactivateRequestedForUnknownParticipantMessage(logger, participantId, null);
+            return null;
+        }
+
+        existing.IsActive = true;
+        existing.InactiveDate = null;
+
+        var updated = await participantRepository.UpdateAsync(existing, cancellationToken);
+        LogReactivatedParticipantMessage(logger, participantId, null);
+        return updated;
+    }
 }

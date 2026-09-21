@@ -22,9 +22,9 @@ internal sealed class FakeSchemeApiClient : ISchemeApiClient
     public Task<IReadOnlyList<SchemeHistoryResponse>> GetSchemeHistoryAsync(Guid sharedId, CancellationToken cancellationToken = default) =>
         Task.FromResult(HistoryResponse);
 
-    public Task<SchemeSaveResult> CreateSchemeAsync(CreateSchemeRequest request, CancellationToken cancellationToken = default) =>
+    public Task<SchemeSaveResult> CreateSchemeAsync(SchemeRequest request, CancellationToken cancellationToken = default) =>
         Task.FromResult(SaveResult);
 
-    public Task<SchemeSaveResult> UpdateSchemeAsync(Guid schemeId, UpdateSchemeRequest request, CancellationToken cancellationToken = default) =>
+    public Task<SchemeSaveResult> UpdateSchemeAsync(Guid schemeId, SchemeRequest request, CancellationToken cancellationToken = default) =>
         Task.FromResult(SaveResult);
 }

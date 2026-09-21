@@ -43,20 +43,34 @@ public sealed class ParticipantController(IParticipantService participantService
     }
 
     [HttpPost("participants")]
-    public async Task<ActionResult<ParticipantResponse>> CreateParticipant([FromBody] CreateParticipantRequest request, CancellationToken cancellationToken)
+    public async Task<ActionResult<ParticipantResponse>> CreateParticipant([FromBody] ParticipantRequest request, CancellationToken cancellationToken)
     {
         var created = await participantService.CreateParticipantAsync(ToEntity(request), cancellationToken);
         return CreatedAtAction(nameof(GetParticipant), new { participantId = created.ParticipantId }, ToResponse(created));
     }
 
     [HttpPut("participants/{participantId:guid}")]
-    public async Task<ActionResult<ParticipantResponse>> UpdateParticipant(Guid participantId, [FromBody] UpdateParticipantRequest request, CancellationToken cancellationToken)
+    public async Task<ActionResult<ParticipantResponse>> UpdateParticipant(Guid participantId, [FromBody] ParticipantRequest request, CancellationToken cancellationToken)
     {
         var updated = await participantService.UpdateParticipantAsync(participantId, ToEntity(participantId, request), cancellationToken);
         return updated is null ? NotFound() : Ok(ToResponse(updated));
     }
 
-    private static Participant ToEntity(CreateParticipantRequest request) => new()
+    [HttpPatch("participants/{participantId:guid}/deactivate")]
+    public async Task<ActionResult<ParticipantResponse>> DeactivateParticipant(Guid participantId, CancellationToken cancellationToken)
+    {
+        var updated = await participantService.DeactivateParticipantAsync(participantId, cancellationToken);
+        return updated is null ? NotFound() : Ok(ToResponse(updated));
+    }
+
+    [HttpPatch("participants/{participantId:guid}/reactivate")]
+    public async Task<ActionResult<ParticipantResponse>> ReactivateParticipant(Guid participantId, CancellationToken cancellationToken)
+    {
+        var updated = await participantService.ReactivateParticipantAsync(participantId, cancellationToken);
+        return updated is null ? NotFound() : Ok(ToResponse(updated));
+    }
+
+    private static Participant ToEntity(ParticipantRequest request) => new()
     {
         ParticipantId = Guid.NewGuid(),
         CustomerId = request.CustomerId,
@@ -80,7 +94,7 @@ public sealed class ParticipantController(IParticipantService participantService
         IsActive = request.IsActive
     };
 
-    private static Participant ToEntity(Guid participantId, UpdateParticipantRequest request) => new()
+    private static Participant ToEntity(Guid participantId, ParticipantRequest request) => new()
     {
         ParticipantId = participantId,
         CustomerId = request.CustomerId,

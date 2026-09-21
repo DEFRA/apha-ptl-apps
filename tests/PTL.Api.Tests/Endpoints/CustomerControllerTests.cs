@@ -26,7 +26,7 @@ public class CustomerControllerTests
         return controller;
     }
 
-    private static CreateCustomerRequest ValidCreateRequest(string name = "Sample Laboratories Ltd") => new(
+    private static CustomerSaveRequest ValidCreateRequest(string name = "Sample Laboratories Ltd") => new(
         RegisteredFileNumber: string.Empty,
         Name: name,
         PreviousName: string.Empty,
@@ -67,15 +67,7 @@ public class CustomerControllerTests
         CanOrderOnline: false,
         CustomerStatusId: null);
 
-    private static UpdateCustomerRequest ToUpdateRequest(CreateCustomerRequest request) => new(
-        request.RegisteredFileNumber, request.Name, request.PreviousName, request.CustomerTypeId, request.VatNumber,
-        request.VatRatingId, request.AccountNumber, request.CustomerFinanceId, request.ContactName, request.Organisation,
-        request.Address1, request.Address2, request.Address3, request.Address4, request.Address5, request.CountryId,
-        request.Telephone, request.Telephone2, request.Fax, request.Email, request.CurrencyId, request.Comments,
-        request.PostageArrangements, request.PaymentNonUK, request.InvoiceName, request.InvoiceOrganisation,
-        request.InvoiceAddress1, request.InvoiceAddress2, request.InvoiceAddress3, request.InvoiceAddress4,
-        request.InvoiceAddress5, request.InvoiceCountryId, request.InvoiceTelephone, request.InvoiceTelephone2,
-        request.InvoiceFax, request.InvoiceEmail, request.IsActive, request.CanOrderOnline, request.CustomerStatusId);
+    private static CustomerSaveRequest ToUpdateRequest(CustomerSaveRequest request) => request;
 
     [Fact]
     public async Task CreateCustomer_ValidRequest_ReturnsCreatedAtAction()

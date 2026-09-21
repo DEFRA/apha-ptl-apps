@@ -8,7 +8,7 @@ public static class ContractValidator
 {
     // The legacy code-behind uses 1/1/9999 as a Csla.SmartDate "unset" sentinel and rejects it
     // server-side via AddBusinessRules' ValidateDate rule - preserved here verbatim.
-    private static readonly DateTime UnsetDateSentinelYear = new(9999, 1, 1);
+    private static readonly DateTime UnsetDateSentinelYear = new(9999, 1, 1, 0, 0, 0, DateTimeKind.Unspecified);
 
     public static ContractValidationResult Validate(Contract contract)
     {

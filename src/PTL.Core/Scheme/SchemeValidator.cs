@@ -1,16 +1,21 @@
+using System.Text.RegularExpressions;
+
 namespace PTL.Core.Scheme;
 
 // Preserves the validation rules identified in docs/analysis/scheme-analysis.md ("Validation
 // Rules" section) verbatim - no additional rules invented beyond what is documented there.
-public static class SchemeValidator
+public static partial class SchemeValidator
 {
+    [GeneratedRegex("^PT[0-9]{4}$", RegexOptions.None, 1000)]
+    private static partial Regex IdentifierPattern();
+
     public static SchemeValidationResult Validate(Scheme scheme)
     {
         var errors = new List<SchemeValidationError>();
 
         RequireNotEmpty(scheme.Identifier, "Identifier", errors);
         MaxLength(scheme.Identifier, 6, "Identifier", errors);
-        if (!string.IsNullOrEmpty(scheme.Identifier) && !System.Text.RegularExpressions.Regex.IsMatch(scheme.Identifier, "^PT[0-9]{4}$"))
+        if (!string.IsNullOrEmpty(scheme.Identifier) && !IdentifierPattern().IsMatch(scheme.Identifier))
         {
             errors.Add(new SchemeValidationError("Identifier", "Identifier must match the format PT followed by 4 digits (e.g. PT1234)."));
         }

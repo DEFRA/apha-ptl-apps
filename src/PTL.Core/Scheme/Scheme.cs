@@ -1,6 +1,6 @@
 namespace PTL.Core.Scheme;
 
-// Domain entity mapped to tblScheme by PTL.Data's PtlDbContext; shape matches the first result set
+// Domain entity mapped to tblScheme by PTL.Data's SchemeRepository (Dapper); shape matches the first result set
 // returned by spgSchemeBySchemeId (Scheme Core scope only - see docs/analysis/scheme-analysis.md).
 // SharedId and LastModified are system-managed; IsReadOnly is computed by the fetch procedure.
 public class Scheme

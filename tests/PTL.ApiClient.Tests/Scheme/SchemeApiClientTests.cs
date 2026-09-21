@@ -66,7 +66,7 @@ public class SchemeApiClientTests
         Assert.Null(result.Scheme);
     }
 
-    private static CreateSchemeRequest MinimalCreateRequest() => new(
+    private static SchemeRequest MinimalCreateRequest() => new(
         2027, "PT1234", "Test Scheme", Guid.NewGuid(), Guid.NewGuid(), null,
         true, false, false, false, false, false, false, false, false, false, false, false, false,
         0, Guid.NewGuid(), 5, "UK", 10, string.Empty, false, null, null, string.Empty,
@@ -74,11 +74,5 @@ public class SchemeApiClientTests
         "Biological samples", false, null, "Instructions", false, false, false,
         null, null, null, null, false, false, null, null, null, null, null);
 
-    private static UpdateSchemeRequest MinimalUpdateRequest() => new(
-        2027, "PT1234", "Test Scheme", Guid.NewGuid(), Guid.NewGuid(), null,
-        true, false, false, false, false, false, false, false, false, false, false, false, false,
-        0, Guid.NewGuid(), 5, "UK", 10, string.Empty, false, null, null, string.Empty,
-        false, false, false, false, false, false, false,
-        "Biological samples", false, null, "Instructions", false, false, false,
-        null, null, null, null, false, false, null, null, null, null, null);
+    private static SchemeRequest MinimalUpdateRequest() => MinimalCreateRequest();
 }

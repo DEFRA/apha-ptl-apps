@@ -2,7 +2,7 @@ using System.Data;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using PTL.Api.Features.Health;
-using PTL.Api.Infrastructure;
+using PTL.Data.Infrastructure;
 
 namespace PTL.Api.Tests;
 

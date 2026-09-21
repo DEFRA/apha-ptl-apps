@@ -1,111 +1,109 @@
 using System.Data;
-using Microsoft.Data.SqlClient;
-using Microsoft.EntityFrameworkCore;
+using Dapper;
 using PTL.Contracts.Customer;
 using PTL.Core.Customer;
+using PTL.Data.Infrastructure;
 using CoreCustomer = PTL.Core.Customer.Customer;
 
 namespace PTL.Data.Customer;
 
-// Wraps the existing spgCustomerByCustomerId / spgaCustomerInfo stored procedures via EF Core;
-// the database schema and procedure behaviour are owned elsewhere and are not modified here.
-public sealed class CustomerRepository(PtlDbContext dbContext) : ICustomerRepository
+// The database schema and stored procedure contracts are owned elsewhere. This repository executes
+// the legacy SQL via Dapper against a connection obtained from IDbConnectionFactory.
+public sealed class CustomerRepository(IDbConnectionFactory connectionFactory) : ICustomerRepository
 {
     public async Task<CoreCustomer?> GetByIdAsync(Guid customerId, CancellationToken cancellationToken = default)
     {
-        // EXEC ... is not composable SQL, so SingleOrDefaultAsync (which wraps the query) cannot be used here.
-        var customerIdParameter = new SqlParameter("@CustomerId", customerId);
+        using var connection = connectionFactory.CreateConnection();
 
-        var results = await dbContext.Customers
-            .FromSqlRaw("EXEC dbo.spgCustomerByCustomerId @CustomerId", customerIdParameter)
-            .AsNoTracking()
-            .ToListAsync(cancellationToken);
-        return results.SingleOrDefault();
+        return await connection.QuerySingleOrDefaultAsync<CoreCustomer>(
+            "EXEC dbo.spgCustomerByCustomerId @CustomerId",
+            new { CustomerId = customerId });
     }
 
     public async Task<IReadOnlyList<CustomerSummaryEntity>> GetSummariesAsync(CustomerStatusFilter status, CancellationToken cancellationToken = default)
     {
-        var isActiveParameter = new SqlParameter("@IsActive", SqlDbType.Bit)
+        using var connection = connectionFactory.CreateConnection();
+
+        var isActive = status switch
         {
-            Value = status switch
-            {
-                CustomerStatusFilter.Active => true,
-                CustomerStatusFilter.Inactive => false,
-                _ => DBNull.Value
-            }
+            CustomerStatusFilter.Active => true,
+            CustomerStatusFilter.Inactive => false,
+            _ => (bool?)null
         };
 
-        return await dbContext.CustomerSummaries
-            .FromSqlRaw("EXEC dbo.spgaCustomerInfo @IsActive", isActiveParameter)
-            .AsNoTracking()
-            .ToListAsync(cancellationToken);
+        return (await connection.QueryAsync<CustomerSummaryEntity>(
+            "EXEC dbo.spgaCustomerInfo @IsActive",
+            new { IsActive = isActive })).ToList();
     }
 
     public async Task<CoreCustomer> CreateAsync(CoreCustomer customer, CancellationToken cancellationToken = default)
     {
-        await dbContext.Database.ExecuteSqlRawAsync(InsertSql, BuildParameters(customer), cancellationToken);
+        using var connection = connectionFactory.CreateConnection();
+
+        await connection.ExecuteAsync(InsertSql, BuildParameters(customer));
         var created = await GetByIdAsync(customer.CustomerId, cancellationToken);
         return created ?? throw new InvalidOperationException($"Customer {customer.CustomerId} was inserted but could not be re-read.");
     }
 
     public async Task<CoreCustomer?> UpdateAsync(CoreCustomer customer, CancellationToken cancellationToken = default)
     {
-        var rowsAffected = await dbContext.Database.ExecuteSqlRawAsync(UpdateSql, BuildParameters(customer), cancellationToken);
+        using var connection = connectionFactory.CreateConnection();
+
+        var rowsAffected = await connection.ExecuteAsync(UpdateSql, BuildParameters(customer));
         return rowsAffected == 0 ? null : await GetByIdAsync(customer.CustomerId, cancellationToken);
     }
 
-    // Parameter order matches spiCustomer/spuCustomer exactly (see ProficiencyTestingDatabase/Object
-    // Scripts/Stored Procedures/spi/spiCustomer.sql and spu/spuCustomer.sql). QalNumber is never
-    // passed - spiCustomer generates it from a sequence, and spuCustomer never updates it.
     private const string InsertSql =
         "EXEC dbo.spiCustomer @CustomerId, @RegisteredFileNumber, @Name, @PreviousName, @CustomerTypeID, @VatNumber, @VatRatingId, @AccountNumber, @CustomerFinanceId, @ContactName, @Organisation, @Address1, @Address2, @Address3, @Address4, @Address5, @CountryId, @Telephone, @Telephone2, @Fax, @Email, @CurrencyId, @Comments, @PostageArrangements, @PaymentNonUK, @InvoiceName, @InvoiceOrganisation, @InvoiceAddress1, @InvoiceAddress2, @InvoiceAddress3, @InvoiceAddress4, @InvoiceAddress5, @InvoiceCountryId, @InvoiceTelephone, @InvoiceTelephone2, @InvoiceFax, @InvoiceEmail, @InitialStartDate, @IsActive, @CanOrderOnline, @InactiveDate, @CustomerStatusId";
 
     private const string UpdateSql =
         "EXEC dbo.spuCustomer @CustomerId, @RegisteredFileNumber, @Name, @PreviousName, @CustomerTypeID, @VatNumber, @VatRatingId, @AccountNumber, @CustomerFinanceId, @ContactName, @Organisation, @Address1, @Address2, @Address3, @Address4, @Address5, @CountryId, @Telephone, @Telephone2, @Fax, @Email, @CurrencyId, @Comments, @PostageArrangements, @PaymentNonUK, @InvoiceName, @InvoiceOrganisation, @InvoiceAddress1, @InvoiceAddress2, @InvoiceAddress3, @InvoiceAddress4, @InvoiceAddress5, @InvoiceCountryId, @InvoiceTelephone, @InvoiceTelephone2, @InvoiceFax, @InvoiceEmail, @InitialStartDate, @IsActive, @CanOrderOnline, @InactiveDate, @CustomerStatusId";
 
-    private static SqlParameter[] BuildParameters(CoreCustomer customer) =>
-    [
-        new SqlParameter("@CustomerId", customer.CustomerId),
-        new SqlParameter("@RegisteredFileNumber", customer.RegisteredFileNumber),
-        new SqlParameter("@Name", customer.Name),
-        new SqlParameter("@PreviousName", customer.PreviousName),
-        new SqlParameter("@CustomerTypeID", customer.CustomerTypeId),
-        new SqlParameter("@VatNumber", customer.VatNumber),
-        new SqlParameter("@VatRatingId", customer.VatRatingId),
-        new SqlParameter("@AccountNumber", customer.AccountNumber),
-        new SqlParameter("@CustomerFinanceId", customer.CustomerFinanceId),
-        new SqlParameter("@ContactName", customer.ContactName),
-        new SqlParameter("@Organisation", customer.Organisation),
-        new SqlParameter("@Address1", customer.Address1),
-        new SqlParameter("@Address2", customer.Address2),
-        new SqlParameter("@Address3", customer.Address3),
-        new SqlParameter("@Address4", customer.Address4),
-        new SqlParameter("@Address5", customer.Address5),
-        new SqlParameter("@CountryId", customer.CountryId),
-        new SqlParameter("@Telephone", customer.Telephone),
-        new SqlParameter("@Telephone2", customer.Telephone2),
-        new SqlParameter("@Fax", customer.Fax),
-        new SqlParameter("@Email", customer.Email),
-        new SqlParameter("@CurrencyId", customer.CurrencyId),
-        new SqlParameter("@Comments", customer.Comments),
-        new SqlParameter("@PostageArrangements", customer.PostageArrangements),
-        new SqlParameter("@PaymentNonUK", customer.PaymentNonUK),
-        new SqlParameter("@InvoiceName", customer.InvoiceName),
-        new SqlParameter("@InvoiceOrganisation", customer.InvoiceOrganisation),
-        new SqlParameter("@InvoiceAddress1", customer.InvoiceAddress1),
-        new SqlParameter("@InvoiceAddress2", customer.InvoiceAddress2),
-        new SqlParameter("@InvoiceAddress3", customer.InvoiceAddress3),
-        new SqlParameter("@InvoiceAddress4", customer.InvoiceAddress4),
-        new SqlParameter("@InvoiceAddress5", customer.InvoiceAddress5),
-        new SqlParameter("@InvoiceCountryId", customer.InvoiceCountryId),
-        new SqlParameter("@InvoiceTelephone", customer.InvoiceTelephone),
-        new SqlParameter("@InvoiceTelephone2", customer.InvoiceTelephone2),
-        new SqlParameter("@InvoiceFax", customer.InvoiceFax),
-        new SqlParameter("@InvoiceEmail", customer.InvoiceEmail),
-        new SqlParameter("@InitialStartDate", customer.InitialStartDate),
-        new SqlParameter("@IsActive", customer.IsActive),
-        new SqlParameter("@CanOrderOnline", customer.CanOrderOnline),
-        new SqlParameter("@InactiveDate", (object?)customer.InactiveDate ?? DBNull.Value),
-        new SqlParameter("@CustomerStatusId", (object?)customer.CustomerStatusId ?? DBNull.Value)
-    ];
+    private static DynamicParameters BuildParameters(CoreCustomer customer)
+    {
+        var parameters = new DynamicParameters();
+        parameters.Add("@CustomerId", customer.CustomerId);
+        parameters.Add("@RegisteredFileNumber", customer.RegisteredFileNumber);
+        parameters.Add("@Name", customer.Name);
+        parameters.Add("@PreviousName", customer.PreviousName);
+        parameters.Add("@CustomerTypeID", customer.CustomerTypeId);
+        parameters.Add("@VatNumber", customer.VatNumber);
+        parameters.Add("@VatRatingId", customer.VatRatingId);
+        parameters.Add("@AccountNumber", customer.AccountNumber);
+        parameters.Add("@CustomerFinanceId", customer.CustomerFinanceId);
+        parameters.Add("@ContactName", customer.ContactName);
+        parameters.Add("@Organisation", customer.Organisation);
+        parameters.Add("@Address1", customer.Address1);
+        parameters.Add("@Address2", customer.Address2);
+        parameters.Add("@Address3", customer.Address3);
+        parameters.Add("@Address4", customer.Address4);
+        parameters.Add("@Address5", customer.Address5);
+        parameters.Add("@CountryId", customer.CountryId);
+        parameters.Add("@Telephone", customer.Telephone);
+        parameters.Add("@Telephone2", customer.Telephone2);
+        parameters.Add("@Fax", customer.Fax);
+        parameters.Add("@Email", customer.Email);
+        parameters.Add("@CurrencyId", customer.CurrencyId);
+        parameters.Add("@Comments", customer.Comments);
+        parameters.Add("@PostageArrangements", customer.PostageArrangements);
+        parameters.Add("@PaymentNonUK", customer.PaymentNonUK);
+        parameters.Add("@InvoiceName", customer.InvoiceName);
+        parameters.Add("@InvoiceOrganisation", customer.InvoiceOrganisation);
+        parameters.Add("@InvoiceAddress1", customer.InvoiceAddress1);
+        parameters.Add("@InvoiceAddress2", customer.InvoiceAddress2);
+        parameters.Add("@InvoiceAddress3", customer.InvoiceAddress3);
+        parameters.Add("@InvoiceAddress4", customer.InvoiceAddress4);
+        parameters.Add("@InvoiceAddress5", customer.InvoiceAddress5);
+        parameters.Add("@InvoiceCountryId", customer.InvoiceCountryId);
+        parameters.Add("@InvoiceTelephone", customer.InvoiceTelephone);
+        parameters.Add("@InvoiceTelephone2", customer.InvoiceTelephone2);
+        parameters.Add("@InvoiceFax", customer.InvoiceFax);
+        parameters.Add("@InvoiceEmail", customer.InvoiceEmail);
+        parameters.Add("@InitialStartDate", customer.InitialStartDate);
+        parameters.Add("@IsActive", customer.IsActive);
+        parameters.Add("@CanOrderOnline", customer.CanOrderOnline);
+        parameters.Add("@InactiveDate", (object?)customer.InactiveDate ?? DBNull.Value);
+        parameters.Add("@CustomerStatusId", (object?)customer.CustomerStatusId ?? DBNull.Value);
+        return parameters;
+    }
 }

@@ -26,7 +26,7 @@ public class ContractControllerTests
         return controller;
     }
 
-    private static CreateContractRequest ValidCreateRequest(int? yearId = null) => new(
+    private static ContractRequest ValidCreateRequest(int? yearId = null) => new(
         YearId: yearId ?? DateTime.UtcNow.Year + 1,
         UTNumber: "UT12345",
         FTNumber: string.Empty,
@@ -52,13 +52,7 @@ public class ContractControllerTests
         OptOutOfInvoiceGeneration: false,
         IsOnlineOrder: false);
 
-    private static UpdateContractRequest ToUpdateRequest(CreateContractRequest request) => new(
-        request.YearId, request.UTNumber, request.FTNumber, request.ContractSignatory, request.ActionsRequired,
-        request.RenewalInformation, request.DiscountRate, request.AdministrationCharge, request.NumberCourier,
-        request.CourierPrice, request.NumberPostage, request.PostagePrice, request.NumberSpecialDelivery,
-        request.SpecialDeliveryPrice, request.AcknowledgementPostedDate, request.AcknowledgementReturnedDate,
-        request.JobSheetPostedDate, request.ReasonForClosure, request.DateOfLeaving, request.IsActive,
-        request.Suffix, request.PurchaseOrderNumber, request.OptOutOfInvoiceGeneration, request.IsOnlineOrder);
+    private static ContractRequest ToUpdateRequest(ContractRequest request) => request;
 
     [Fact]
     public async Task CreateContract_ValidRequest_ReturnsCreatedAtAction()

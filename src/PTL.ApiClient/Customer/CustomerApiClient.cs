@@ -10,8 +10,8 @@ public interface ICustomerApiClient
     Task<IReadOnlyList<CustomerSummaryResponse>> GetCustomersAsync(CustomerStatusFilter status = CustomerStatusFilter.Active, CancellationToken cancellationToken = default);
     Task<CustomerResponse?> GetCustomerAsync(Guid customerId, CancellationToken cancellationToken = default);
     Task<CustomerSearchResponse> SearchCustomersAsync(CustomerSearchRequest request, CancellationToken cancellationToken = default);
-    Task<CustomerSaveResult> CreateCustomerAsync(CreateCustomerRequest request, CancellationToken cancellationToken = default);
-    Task<CustomerSaveResult> UpdateCustomerAsync(Guid customerId, UpdateCustomerRequest request, CancellationToken cancellationToken = default);
+    Task<CustomerSaveResult> CreateCustomerAsync(CustomerSaveRequest request, CancellationToken cancellationToken = default);
+    Task<CustomerSaveResult> UpdateCustomerAsync(Guid customerId, CustomerSaveRequest request, CancellationToken cancellationToken = default);
 }
 
 // Thin typed HttpClient wrapper around PTL.Api's customer endpoints, shared by every web
@@ -44,13 +44,13 @@ public sealed class CustomerApiClient(HttpClient httpClient) : ICustomerApiClien
         return result ?? new CustomerSearchResponse([], 0, request.Page, request.PageSize);
     }
 
-    public async Task<CustomerSaveResult> CreateCustomerAsync(CreateCustomerRequest request, CancellationToken cancellationToken = default)
+    public async Task<CustomerSaveResult> CreateCustomerAsync(CustomerSaveRequest request, CancellationToken cancellationToken = default)
     {
         var response = await httpClient.PostAsJsonAsync("/api/customers", request, cancellationToken);
         return await ToSaveResultAsync(response, cancellationToken);
     }
 
-    public async Task<CustomerSaveResult> UpdateCustomerAsync(Guid customerId, UpdateCustomerRequest request, CancellationToken cancellationToken = default)
+    public async Task<CustomerSaveResult> UpdateCustomerAsync(Guid customerId, CustomerSaveRequest request, CancellationToken cancellationToken = default)
     {
         var response = await httpClient.PutAsJsonAsync($"/api/customers/{customerId}", request, cancellationToken);
         if (response.StatusCode == HttpStatusCode.NotFound)

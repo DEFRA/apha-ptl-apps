@@ -1,13 +1,14 @@
 using System.Data;
 using Microsoft.Data.SqlClient;
+using Microsoft.Extensions.Configuration;
 
-namespace PTL.Api.Infrastructure;
+namespace PTL.Data.Infrastructure;
 
 public sealed class SqlConnectionFactory(IConfiguration configuration) : IDbConnectionFactory
 {
     public IDbConnection CreateConnection()
     {
-        var options = StartupChecks.RequireDatabaseOptions(configuration);
+        var options = DatabaseOptions.RequireFromConfiguration(configuration);
         return new SqlConnection(options.ToConnectionString());
     }
 }

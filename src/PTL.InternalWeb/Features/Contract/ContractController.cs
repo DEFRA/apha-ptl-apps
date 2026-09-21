@@ -93,7 +93,7 @@ public class ContractController(IContractApiClient contractApiClient, ILookupApi
             return View(model);
         }
 
-        var result = await contractApiClient.CreateContractAsync(customerId, ToCreateRequest(model), cancellationToken);
+        var result = await contractApiClient.CreateContractAsync(customerId, ToRequest(model), cancellationToken);
         if (!result.Success)
         {
             LogCreateFailedMessage(logger, customerId, null);
@@ -131,7 +131,7 @@ public class ContractController(IContractApiClient contractApiClient, ILookupApi
             return View(model);
         }
 
-        var result = await contractApiClient.UpdateContractAsync(id, ToUpdateRequest(model), cancellationToken);
+        var result = await contractApiClient.UpdateContractAsync(id, ToRequest(model), cancellationToken);
         if (!result.Success)
         {
             LogUpdateFailedMessage(logger, id, null);
@@ -144,16 +144,7 @@ public class ContractController(IContractApiClient contractApiClient, ILookupApi
         return RedirectToAction(nameof(Details), new { id });
     }
 
-    private void AddErrors(IReadOnlyDictionary<string, string[]> fieldErrors)
-    {
-        foreach (var (field, messages) in fieldErrors)
-        {
-            foreach (var message in messages)
-            {
-                ModelState.AddModelError(field, message);
-            }
-        }
-    }
+    private void AddErrors(IReadOnlyDictionary<string, string[]> fieldErrors) => this.AddFieldErrors(fieldErrors);
 
     // Fetches the current+next year reference list once per request - matches legacy
     // Contract.aspx.vb SetYearDropDown() (SystemObjects.YearCollection.FetchYearCollectionCurrent()).
@@ -165,33 +156,7 @@ public class ContractController(IContractApiClient contractApiClient, ILookupApi
             .ToList();
     }
 
-    private static CreateContractRequest ToCreateRequest(ContractFormViewModel model) => new(
-        model.YearId,
-        model.UTNumber ?? string.Empty,
-        model.FTNumber ?? string.Empty,
-        model.ContractSignatory ?? string.Empty,
-        model.ActionsRequired ?? string.Empty,
-        model.RenewalInformation ?? string.Empty,
-        model.DiscountRate,
-        model.AdministrationCharge,
-        model.NumberCourier,
-        model.CourierPrice,
-        model.NumberPostage,
-        model.PostagePrice,
-        model.NumberSpecialDelivery,
-        model.SpecialDeliveryPrice,
-        model.AcknowledgementPostedDate ?? default,
-        model.AcknowledgementReturnedDate ?? default,
-        model.JobSheetPostedDate ?? default,
-        model.ReasonForClosure ?? string.Empty,
-        model.DateOfLeaving ?? default,
-        model.IsActive,
-        model.Suffix ?? string.Empty,
-        model.PurchaseOrderNumber ?? string.Empty,
-        model.OptOutOfInvoiceGeneration,
-        model.IsOnlineOrder);
-
-    private static UpdateContractRequest ToUpdateRequest(ContractFormViewModel model) => new(
+    private static ContractRequest ToRequest(ContractFormViewModel model) => new(
         model.YearId,
         model.UTNumber ?? string.Empty,
         model.FTNumber ?? string.Empty,

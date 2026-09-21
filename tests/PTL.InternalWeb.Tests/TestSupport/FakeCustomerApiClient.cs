@@ -20,9 +20,9 @@ internal sealed class FakeCustomerApiClient : ICustomerApiClient
     public Task<CustomerSearchResponse> SearchCustomersAsync(CustomerSearchRequest request, CancellationToken cancellationToken = default) =>
         Task.FromResult(SearchResponse);
 
-    public Task<CustomerSaveResult> CreateCustomerAsync(CreateCustomerRequest request, CancellationToken cancellationToken = default) =>
+    public Task<CustomerSaveResult> CreateCustomerAsync(CustomerSaveRequest request, CancellationToken cancellationToken = default) =>
         Task.FromResult(SaveResult);
 
-    public Task<CustomerSaveResult> UpdateCustomerAsync(Guid customerId, UpdateCustomerRequest request, CancellationToken cancellationToken = default) =>
+    public Task<CustomerSaveResult> UpdateCustomerAsync(Guid customerId, CustomerSaveRequest request, CancellationToken cancellationToken = default) =>
         Task.FromResult(SaveResult);
 }

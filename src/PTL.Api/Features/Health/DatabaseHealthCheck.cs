@@ -1,7 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
 using Dapper;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
-using PTL.Api.Infrastructure;
+using PTL.Data.Infrastructure;
 
 namespace PTL.Api.Features.Health;
 

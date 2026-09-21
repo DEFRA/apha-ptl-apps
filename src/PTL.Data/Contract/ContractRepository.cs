@@ -1,102 +1,98 @@
 using System.Data;
-using Microsoft.Data.SqlClient;
-using Microsoft.EntityFrameworkCore;
+using Dapper;
 using PTL.Contracts.Contract;
 using PTL.Core.Contract;
+using PTL.Data.Infrastructure;
 using CoreContract = PTL.Core.Contract.Contract;
 
 namespace PTL.Data.Contract;
 
-// Wraps the existing spgContractByContractId / spiContract / spuContract / spgContractInfoByCustomerId
-// / spgContractInfoByCustomerIdAndYearId stored procedures via EF Core; the database schema and
-// procedure behaviour are owned elsewhere and are not modified here. Parameter counts/order were
-// verified against the live LocalDB schema (29 params for spiContract/spuContract) before wiring
-// this up - see docs/analysis/contract-analysis.md and repo memory notes on schema-drift risk.
-public sealed class ContractRepository(PtlDbContext dbContext) : IContractRepository
+// The stored procedure contracts are unchanged; the repository executes them through Dapper
+// against a connection obtained from IDbConnectionFactory.
+public sealed class ContractRepository(IDbConnectionFactory connectionFactory) : IContractRepository
 {
     public async Task<CoreContract?> GetByIdAsync(Guid contractId, CancellationToken cancellationToken = default)
     {
-        // EXEC ... is not composable SQL, so SingleOrDefaultAsync (which wraps the query) cannot be used here.
-        var contractIdParameter = new SqlParameter("@ContractId", contractId);
+        using var connection = connectionFactory.CreateConnection();
 
-        var results = await dbContext.Contracts
-            .FromSqlRaw("EXEC dbo.spgContractByContractId @ContractId", contractIdParameter)
-            .AsNoTracking()
-            .ToListAsync(cancellationToken);
-        return results.SingleOrDefault();
+        return await connection.QuerySingleOrDefaultAsync<CoreContract>(
+            "EXEC dbo.spgContractByContractId @ContractId",
+            new { ContractId = contractId });
     }
 
     public async Task<IReadOnlyList<ContractSummaryEntity>> GetSummariesAsync(Guid customerId, ContractPeriodFilter period, CancellationToken cancellationToken = default)
     {
-        var activeParameter = new SqlParameter("@Active", SqlDbType.TinyInt) { Value = (byte)period };
+        using var connection = connectionFactory.CreateConnection();
 
-        return await dbContext.ContractSummaries
-            .FromSqlRaw("EXEC dbo.spgContractInfoByCustomerId @CustomerId, @Active", new SqlParameter("@CustomerId", customerId), activeParameter)
-            .AsNoTracking()
-            .ToListAsync(cancellationToken);
+        return (await connection.QueryAsync<ContractSummaryEntity>(
+            "EXEC dbo.spgContractInfoByCustomerId @CustomerId, @Active",
+            new { CustomerId = customerId, Active = (byte)period })).ToList();
     }
 
     public async Task<IReadOnlyList<ContractSummaryEntity>> GetSummariesByYearAsync(Guid customerId, int yearId, CancellationToken cancellationToken = default)
     {
-        return await dbContext.ContractSummaries
-            .FromSqlRaw("EXEC dbo.spgContractInfoByCustomerIdAndYearId @CustomerId, @YearId", new SqlParameter("@CustomerId", customerId), new SqlParameter("@YearId", yearId))
-            .AsNoTracking()
-            .ToListAsync(cancellationToken);
+        using var connection = connectionFactory.CreateConnection();
+
+        return (await connection.QueryAsync<ContractSummaryEntity>(
+            "EXEC dbo.spgContractInfoByCustomerIdAndYearId @CustomerId, @YearId",
+            new { CustomerId = customerId, YearId = yearId })).ToList();
     }
 
     public async Task<CoreContract> CreateAsync(CoreContract contract, CancellationToken cancellationToken = default)
     {
-        await dbContext.Database.ExecuteSqlRawAsync(InsertSql, BuildParameters(contract), cancellationToken);
+        using var connection = connectionFactory.CreateConnection();
+
+        await connection.ExecuteAsync(InsertSql, BuildParameters(contract));
         var created = await GetByIdAsync(contract.ContractId, cancellationToken);
         return created ?? throw new InvalidOperationException($"Contract {contract.ContractId} was inserted but could not be re-read.");
     }
 
     public async Task<CoreContract?> UpdateAsync(CoreContract contract, CancellationToken cancellationToken = default)
     {
-        var rowsAffected = await dbContext.Database.ExecuteSqlRawAsync(UpdateSql, BuildParameters(contract), cancellationToken);
+        using var connection = connectionFactory.CreateConnection();
+
+        var rowsAffected = await connection.ExecuteAsync(UpdateSql, BuildParameters(contract));
         return rowsAffected == 0 ? null : await GetByIdAsync(contract.ContractId, cancellationToken);
     }
 
-    // Parameter order matches spiContract/spuContract exactly (see ProficiencyTestingDatabase/Object
-    // Scripts/Stored Procedures/spi/spiContract.sql and spu/spuContract.sql - 29 parameters each,
-    // confirmed against the live schema). CustomerName, QalNumber, and IsReadOnly are never passed -
-    // they are computed/joined by spgContractByContractId only.
     private const string InsertSql =
         "EXEC dbo.spiContract @ContractId, @CustomerId, @YearId, @UTNumber, @FTNumber, @ContractSignatory, @ActionsRequired, @RenewalInformation, @DiscountRate, @AdministrationCharge, @NumberCourier, @CourierPrice, @NumberPostage, @PostagePrice, @NumberSpecialDelivery, @SpecialDeliveryPrice, @AcknowledgementPostedDate, @AcknowledgementReturnedDate, @JobSheetPostedDate, @ReasonForClosure, @DateOfLeaving, @IsActive, @Suffix, @CommencementDate, @PurchaseOrderNumber, @OptOutOfInvoiceGeneration, @IsOnlineOrder, @ApprovedBy, @ApprovedDate";
 
     private const string UpdateSql =
         "EXEC dbo.spuContract @ContractId, @CustomerId, @YearId, @UTNumber, @FTNumber, @ContractSignatory, @ActionsRequired, @RenewalInformation, @DiscountRate, @AdministrationCharge, @NumberCourier, @CourierPrice, @NumberPostage, @PostagePrice, @NumberSpecialDelivery, @SpecialDeliveryPrice, @AcknowledgementPostedDate, @AcknowledgementReturnedDate, @JobSheetPostedDate, @ReasonForClosure, @DateOfLeaving, @IsActive, @Suffix, @CommencementDate, @PurchaseOrderNumber, @OptOutOfInvoiceGeneration, @IsOnlineOrder, @ApprovedBy, @ApprovedDate";
 
-    private static SqlParameter[] BuildParameters(CoreContract contract) =>
-    [
-        new SqlParameter("@ContractId", contract.ContractId),
-        new SqlParameter("@CustomerId", contract.CustomerId),
-        new SqlParameter("@YearId", contract.YearId),
-        new SqlParameter("@UTNumber", contract.UTNumber),
-        new SqlParameter("@FTNumber", contract.FTNumber),
-        new SqlParameter("@ContractSignatory", contract.ContractSignatory),
-        new SqlParameter("@ActionsRequired", contract.ActionsRequired),
-        new SqlParameter("@RenewalInformation", contract.RenewalInformation),
-        new SqlParameter("@DiscountRate", contract.DiscountRate),
-        new SqlParameter("@AdministrationCharge", contract.AdministrationCharge),
-        new SqlParameter("@NumberCourier", contract.NumberCourier),
-        new SqlParameter("@CourierPrice", contract.CourierPrice),
-        new SqlParameter("@NumberPostage", contract.NumberPostage),
-        new SqlParameter("@PostagePrice", contract.PostagePrice),
-        new SqlParameter("@NumberSpecialDelivery", contract.NumberSpecialDelivery),
-        new SqlParameter("@SpecialDeliveryPrice", contract.SpecialDeliveryPrice),
-        new SqlParameter("@AcknowledgementPostedDate", (object?)contract.AcknowledgementPostedDate ?? DBNull.Value),
-        new SqlParameter("@AcknowledgementReturnedDate", (object?)contract.AcknowledgementReturnedDate ?? DBNull.Value),
-        new SqlParameter("@JobSheetPostedDate", (object?)contract.JobSheetPostedDate ?? DBNull.Value),
-        new SqlParameter("@ReasonForClosure", contract.ReasonForClosure),
-        new SqlParameter("@DateOfLeaving", (object?)contract.DateOfLeaving ?? DBNull.Value),
-        new SqlParameter("@IsActive", contract.IsActive),
-        new SqlParameter("@Suffix", contract.Suffix),
-        new SqlParameter("@CommencementDate", (object?)contract.CommencementDate ?? DBNull.Value),
-        new SqlParameter("@PurchaseOrderNumber", contract.PurchaseOrderNumber),
-        new SqlParameter("@OptOutOfInvoiceGeneration", contract.OptOutOfInvoiceGeneration),
-        new SqlParameter("@IsOnlineOrder", contract.IsOnlineOrder),
-        new SqlParameter("@ApprovedBy", (object?)contract.ApprovedBy ?? DBNull.Value),
-        new SqlParameter("@ApprovedDate", (object?)contract.ApprovedDate ?? DBNull.Value)
-    ];
+    private static DynamicParameters BuildParameters(CoreContract contract)
+    {
+        var parameters = new DynamicParameters();
+        parameters.Add("@ContractId", contract.ContractId);
+        parameters.Add("@CustomerId", contract.CustomerId);
+        parameters.Add("@YearId", contract.YearId);
+        parameters.Add("@UTNumber", contract.UTNumber);
+        parameters.Add("@FTNumber", contract.FTNumber);
+        parameters.Add("@ContractSignatory", contract.ContractSignatory);
+        parameters.Add("@ActionsRequired", contract.ActionsRequired);
+        parameters.Add("@RenewalInformation", contract.RenewalInformation);
+        parameters.Add("@DiscountRate", contract.DiscountRate);
+        parameters.Add("@AdministrationCharge", contract.AdministrationCharge);
+        parameters.Add("@NumberCourier", contract.NumberCourier);
+        parameters.Add("@CourierPrice", contract.CourierPrice);
+        parameters.Add("@NumberPostage", contract.NumberPostage);
+        parameters.Add("@PostagePrice", contract.PostagePrice);
+        parameters.Add("@NumberSpecialDelivery", contract.NumberSpecialDelivery);
+        parameters.Add("@SpecialDeliveryPrice", contract.SpecialDeliveryPrice);
+        parameters.Add("@AcknowledgementPostedDate", (object?)contract.AcknowledgementPostedDate ?? DBNull.Value);
+        parameters.Add("@AcknowledgementReturnedDate", (object?)contract.AcknowledgementReturnedDate ?? DBNull.Value);
+        parameters.Add("@JobSheetPostedDate", (object?)contract.JobSheetPostedDate ?? DBNull.Value);
+        parameters.Add("@ReasonForClosure", contract.ReasonForClosure);
+        parameters.Add("@DateOfLeaving", (object?)contract.DateOfLeaving ?? DBNull.Value);
+        parameters.Add("@IsActive", contract.IsActive);
+        parameters.Add("@Suffix", contract.Suffix);
+        parameters.Add("@CommencementDate", (object?)contract.CommencementDate ?? DBNull.Value);
+        parameters.Add("@PurchaseOrderNumber", contract.PurchaseOrderNumber);
+        parameters.Add("@OptOutOfInvoiceGeneration", contract.OptOutOfInvoiceGeneration);
+        parameters.Add("@IsOnlineOrder", contract.IsOnlineOrder);
+        parameters.Add("@ApprovedBy", (object?)contract.ApprovedBy ?? DBNull.Value);
+        parameters.Add("@ApprovedDate", (object?)contract.ApprovedDate ?? DBNull.Value);
+        return parameters;
+    }
 }

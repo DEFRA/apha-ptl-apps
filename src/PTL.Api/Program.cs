@@ -1,4 +1,3 @@
-using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi;
 using PTL.Api.Features.Health;
 using PTL.Api.Infrastructure;
@@ -8,7 +7,7 @@ using PTL.Core.Participant;
 using PTL.Core.Contract;
 using PTL.Core.Scheme;
 using PTL.Core.Lookup;
-using PTL.Data;
+using PTL.Data.Infrastructure;
 using PTL.Data.Customer;
 using PTL.Data.Participant;
 using PTL.Data.Contract;
@@ -18,6 +17,10 @@ using System.Reflection;
 using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Maps stored-procedure result columns (fldXxx, plus a few aliases like "Readonly") onto entity
+// properties for every repository's Dapper queries - must run before any repository is used.
+DapperColumnMappings.Register();
 
 // Structured JSON to stdout only - ECS/Fargate storage is ephemeral, so no file sinks. The
 // awslogs driver on the container picks stdout/stderr up and ships it to CloudWatch Logs.
@@ -33,7 +36,7 @@ builder.Host.UseSerilog((context, services, configuration) => configuration
 // Database__Host/Database__Name/Database__User/Database__Password environment
 // variables, which the ECS task definition injects from Parameter Store at
 // container start - never baked into the image or read from appsettings.json.
-var databaseOptions = StartupChecks.RequireDatabaseOptions(builder.Configuration);
+StartupChecks.RequireDatabaseOptions(builder.Configuration);
 
 // HealthCheck__ReadinessKey - same fail-fast reasoning: a broken secret
 // wiring here would otherwise be invisible, since ReadinessKeyFilter must
@@ -45,7 +48,6 @@ builder.Services.AddHealthChecks()
     .AddCheck<DatabaseHealthCheck>("database");
 
 builder.Services.AddControllers();
-builder.Services.AddDbContext<PtlDbContext>(options => options.UseSqlServer(databaseOptions.ToConnectionString()));
 
 builder.Services.AddScoped<ICustomerRepository, CustomerRepository>();
 builder.Services.AddScoped<ICustomerService, CustomerService>();

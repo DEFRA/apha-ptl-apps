@@ -68,14 +68,14 @@ public class CustomerApiClientTests
         Assert.Null(result.Customer);
     }
 
-    private static CreateCustomerRequest MinimalCreateRequest() => new(
+    private static CustomerSaveRequest MinimalCreateRequest() => new(
         string.Empty, string.Empty, string.Empty, Guid.Empty, string.Empty, Guid.Empty, string.Empty, string.Empty,
         string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, Guid.Empty,
         string.Empty, string.Empty, string.Empty, string.Empty, Guid.Empty, string.Empty, string.Empty, false,
         string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, Guid.Empty,
         string.Empty, string.Empty, string.Empty, string.Empty);
 
-    private static UpdateCustomerRequest MinimalUpdateRequest() => new(
+    private static CustomerSaveRequest MinimalUpdateRequest() => new(
         string.Empty, string.Empty, string.Empty, Guid.Empty, string.Empty, Guid.Empty, string.Empty, string.Empty,
         string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, Guid.Empty,
         string.Empty, string.Empty, string.Empty, string.Empty, Guid.Empty, string.Empty, string.Empty, false,

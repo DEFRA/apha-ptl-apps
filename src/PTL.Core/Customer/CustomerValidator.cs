@@ -7,10 +7,10 @@ namespace PTL.Core.Customer;
 // spiCustomer/spuCustomer stored procedure parameter sizes (and therefore the tblCustomer columns).
 public static partial class CustomerValidator
 {
-    [GeneratedRegex(@"^(QAL/[0-9]*)?$")]
+    [GeneratedRegex(@"^(QAL/[0-9]*)?$", RegexOptions.None, 1000)]
     private static partial Regex RegisteredFileNumberPattern();
 
-    [GeneratedRegex(@"^[ 0-9\+\-\(\)\*\#]*$")]
+    [GeneratedRegex(@"^[ 0-9\+\-\(\)\*\#]*$", RegexOptions.None, 1000)]
     private static partial Regex PhonePattern();
 
     // Human-readable labels matching each field's <label> text in _CustomerForm.cshtml, so

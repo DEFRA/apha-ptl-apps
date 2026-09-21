@@ -26,7 +26,7 @@ public class SchemeControllerTests
         return controller;
     }
 
-    private static CreateSchemeRequest ValidCreateRequest(int? yearId = null, string identifier = "PT1234") => new(
+    private static SchemeRequest ValidCreateRequest(int? yearId = null, string identifier = "PT1234") => new(
         YearId: yearId ?? DateTime.UtcNow.Year + 1,
         Identifier: identifier,
         Name: "Test Scheme",
@@ -82,20 +82,7 @@ public class SchemeControllerTests
         Assessor4: null,
         StandardTabulationText: null);
 
-    private static UpdateSchemeRequest ToUpdateRequest(CreateSchemeRequest request) => new(
-        request.YearId, request.Identifier, request.Name, request.ScheduleId, request.ScheduleCodeId, request.StartDate,
-        request.DistributionMonthApr, request.DistributionMonthMay, request.DistributionMonthJun, request.DistributionMonthJul,
-        request.DistributionMonthAug, request.DistributionMonthSep, request.DistributionAsAvailable, request.DistributionMonthOct,
-        request.DistributionMonthNov, request.DistributionMonthDec, request.DistributionMonthJan, request.DistributionMonthFeb,
-        request.DistributionMonthMar, request.WeekNumber, request.DayOfWeekId, request.NumberOfSamples, request.SampleOrigin,
-        request.Deadline, request.Subcontractor, request.CombinedPackaging, request.Postage, request.CustomsVolume,
-        request.SamplePackingInstructions, request.RequiresAssessment, request.CommentsRequired, request.Pilot,
-        request.LimitedSampleAvailability, request.Accredited, request.NoVLALabs, request.ComerciallyAvailable,
-        request.CustomsDescription, request.DataConsentDeclarationActive, request.DataConsentDeclarationText,
-        request.Instructions, request.DateOfReceipt, request.StorageConditions, request.ConditionOnReceipt,
-        request.TestConsultant1, request.TestConsultant2, request.TestConsultant3, request.TestConsultantTabulationId,
-        request.UseExternalReference, request.StoreRatings, request.Assessor1, request.Assessor2, request.Assessor3,
-        request.Assessor4, request.StandardTabulationText);
+    private static SchemeRequest ToUpdateRequest(SchemeRequest request) => request;
 
     [Fact]
     public async Task CreateScheme_ValidRequest_ReturnsCreatedAtAction()

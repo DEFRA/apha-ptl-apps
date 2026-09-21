@@ -1,6 +1,8 @@
 namespace PTL.Contracts.Participant;
 
-public sealed record CreateParticipantRequest(
+// Shared by POST /api/participants (create) and PUT /api/participants/{id} (update). The editable
+// field set matches the stored Participant entity and is identical for both operations.
+public sealed record ParticipantRequest(
     Guid CustomerId,
     Guid SsoId,
     string LabCode,

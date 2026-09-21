@@ -10,8 +10,8 @@ public interface IContractApiClient
     Task<ContractResponse?> GetContractAsync(Guid contractId, CancellationToken cancellationToken = default);
     Task<ContractSearchResponse> GetContractsForCustomerAsync(Guid customerId, ContractSearchRequest request, CancellationToken cancellationToken = default);
     Task<ContractSearchResponse> GetContractsForCustomerByYearAsync(Guid customerId, int yearId, CancellationToken cancellationToken = default);
-    Task<ContractSaveResult> CreateContractAsync(Guid customerId, CreateContractRequest request, CancellationToken cancellationToken = default);
-    Task<ContractSaveResult> UpdateContractAsync(Guid contractId, UpdateContractRequest request, CancellationToken cancellationToken = default);
+    Task<ContractSaveResult> CreateContractAsync(Guid customerId, ContractRequest request, CancellationToken cancellationToken = default);
+    Task<ContractSaveResult> UpdateContractAsync(Guid contractId, ContractRequest request, CancellationToken cancellationToken = default);
 }
 
 // Thin typed HttpClient wrapper around PTL.Api's contract endpoints, shared by every web
@@ -45,13 +45,13 @@ public sealed class ContractApiClient(HttpClient httpClient) : IContractApiClien
     public Task<ContractSearchResponse> GetContractsForCustomerByYearAsync(Guid customerId, int yearId, CancellationToken cancellationToken = default) =>
         GetContractsForCustomerAsync(customerId, new ContractSearchRequest(YearId: yearId), cancellationToken);
 
-    public async Task<ContractSaveResult> CreateContractAsync(Guid customerId, CreateContractRequest request, CancellationToken cancellationToken = default)
+    public async Task<ContractSaveResult> CreateContractAsync(Guid customerId, ContractRequest request, CancellationToken cancellationToken = default)
     {
         var response = await httpClient.PostAsJsonAsync($"/api/customers/{customerId}/contracts", request, cancellationToken);
         return await ToSaveResultAsync(response, cancellationToken);
     }
 
-    public async Task<ContractSaveResult> UpdateContractAsync(Guid contractId, UpdateContractRequest request, CancellationToken cancellationToken = default)
+    public async Task<ContractSaveResult> UpdateContractAsync(Guid contractId, ContractRequest request, CancellationToken cancellationToken = default)
     {
         var response = await httpClient.PutAsJsonAsync($"/api/contracts/{contractId}", request, cancellationToken);
         if (response.StatusCode == HttpStatusCode.NotFound)

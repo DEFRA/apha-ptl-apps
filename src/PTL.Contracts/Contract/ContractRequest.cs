@@ -1,9 +1,11 @@
 namespace PTL.Contracts.Contract;
 
-// Same editable field set as CreateContractRequest. ContractId comes from the route; CustomerId,
-// CommencementDate, IsInvoiceSent, ApprovedBy, and ApprovedDate are preserved server-side and
-// cannot be edited (see docs/analysis/contract-analysis.md).
-public sealed record UpdateContractRequest(
+// Field set matches ContractResponse minus server-generated/system-managed values (ContractId,
+// CustomerId - taken from the route, CustomerName, QalNumber, IsReadOnly, CommencementDate,
+// IsInvoiceSent, ApprovedBy, ApprovedDate). See docs/analysis/contract-analysis.md: Contract.aspx.vb
+// never posts these fields back even on edit - they are system/other-process managed. Shared by
+// both create and update actions since the editable field set is identical for both operations.
+public sealed record ContractRequest(
     int YearId,
     string UTNumber,
     string FTNumber,

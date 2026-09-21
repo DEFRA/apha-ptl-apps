@@ -1,59 +1,58 @@
-using Microsoft.EntityFrameworkCore;
+using Dapper;
 using PTL.Core.Lookup;
+using PTL.Data.Infrastructure;
 
 namespace PTL.Data.Lookup;
 
-// Wraps the existing spgaCountry / spgaCurrency / spgaCustomerType stored procedures via EF Core;
-// all three take no parameters and return a plain list, so ToListAsync (no SingleOrDefaultAsync
-// composition) is safe directly on FromSqlRaw - see ContractRepository/CustomerRepository for why
-// composing over an EXEC ... statement is not safe for single-row lookups.
-public sealed class LookupRepository(PtlDbContext dbContext) : ILookupRepository
+public sealed class LookupRepository(IDbConnectionFactory connectionFactory) : ILookupRepository
 {
-    public async Task<IReadOnlyList<CountryEntity>> GetCountriesAsync(CancellationToken cancellationToken = default) =>
-        await dbContext.Countries
-            .FromSqlRaw("EXEC dbo.spgaCountry")
-            .AsNoTracking()
-            .ToListAsync(cancellationToken);
+    public async Task<IReadOnlyList<CountryEntity>> GetCountriesAsync(CancellationToken cancellationToken = default)
+    {
+        using var connection = connectionFactory.CreateConnection();
+        return (await connection.QueryAsync<CountryEntity>("EXEC dbo.spgaCountry")).ToList();
+    }
 
-    public async Task<IReadOnlyList<CurrencyEntity>> GetCurrenciesAsync(CancellationToken cancellationToken = default) =>
-        await dbContext.Currencies
-            .FromSqlRaw("EXEC dbo.spgaCurrency")
-            .AsNoTracking()
-            .ToListAsync(cancellationToken);
+    public async Task<IReadOnlyList<CurrencyEntity>> GetCurrenciesAsync(CancellationToken cancellationToken = default)
+    {
+        using var connection = connectionFactory.CreateConnection();
+        return (await connection.QueryAsync<CurrencyEntity>("EXEC dbo.spgaCurrency")).ToList();
+    }
 
-    public async Task<IReadOnlyList<CustomerTypeEntity>> GetCustomerTypesAsync(CancellationToken cancellationToken = default) =>
-        await dbContext.CustomerTypes
-            .FromSqlRaw("EXEC dbo.spgaCustomerType")
-            .AsNoTracking()
-            .ToListAsync(cancellationToken);
+    public async Task<IReadOnlyList<CustomerTypeEntity>> GetCustomerTypesAsync(CancellationToken cancellationToken = default)
+    {
+        using var connection = connectionFactory.CreateConnection();
+        return (await connection.QueryAsync<CustomerTypeEntity>("EXEC dbo.spgaCustomerType")).ToList();
+    }
 
-    public async Task<IReadOnlyList<VatRatingEntity>> GetVatRatingsAsync(CancellationToken cancellationToken = default) =>
-        await dbContext.VatRatings
-            .FromSqlRaw("EXEC dbo.spgaVatRating")
-            .AsNoTracking()
-            .ToListAsync(cancellationToken);
+    public async Task<IReadOnlyList<VatRatingEntity>> GetVatRatingsAsync(CancellationToken cancellationToken = default)
+    {
+        using var connection = connectionFactory.CreateConnection();
+        return (await connection.QueryAsync<VatRatingEntity>("EXEC dbo.spgaVatRating")).ToList();
+    }
 
-    public async Task<IReadOnlyList<LabTypeEntity>> GetLabTypesAsync(CancellationToken cancellationToken = default) =>
-        await dbContext.LabTypes
-            .FromSqlRaw("EXEC dbo.spgaLabType")
-            .AsNoTracking()
-            .ToListAsync(cancellationToken);
+    public async Task<IReadOnlyList<LabTypeEntity>> GetLabTypesAsync(CancellationToken cancellationToken = default)
+    {
+        using var connection = connectionFactory.CreateConnection();
+        return (await connection.QueryAsync<LabTypeEntity>("EXEC dbo.spgaLabType")).ToList();
+    }
 
-    public async Task<IReadOnlyList<YearEntity>> GetCurrentYearsAsync(CancellationToken cancellationToken = default) =>
-        await dbContext.Years
-            .FromSqlRaw("EXEC dbo.spgaYearCurrent")
-            .AsNoTracking()
-            .ToListAsync(cancellationToken);
+    public async Task<IReadOnlyList<YearEntity>> GetCurrentYearsAsync(CancellationToken cancellationToken = default)
+    {
+        using var connection = connectionFactory.CreateConnection();
+        return (await connection.QueryAsync<YearEntity>("EXEC dbo.spgaYearCurrent")).ToList();
+    }
 
-    public async Task<IReadOnlyList<SchemeCurrencyEntity>> GetSchemeCurrenciesAsync(CancellationToken cancellationToken = default) =>
-        await dbContext.SchemeCurrencies
-            .FromSqlRaw("EXEC dbo.spgaSchemeCurrency")
-            .AsNoTracking()
-            .ToListAsync(cancellationToken);
+    public async Task<IReadOnlyList<SchemeCurrencyEntity>> GetSchemeCurrenciesAsync(CancellationToken cancellationToken = default)
+    {
+        using var connection = connectionFactory.CreateConnection();
+        return (await connection.QueryAsync<SchemeCurrencyEntity>("EXEC dbo.spgaSchemeCurrency")).ToList();
+    }
 
-    public async Task<IReadOnlyList<PostagePricingPlanEntity>> GetPostagePricingPlansForYearAsync(int yearId, CancellationToken cancellationToken = default) =>
-        await dbContext.PostagePricingPlans
-            .FromSqlRaw("EXEC dbo.spgPostageByYearID @year", new Microsoft.Data.SqlClient.SqlParameter("@year", yearId))
-            .AsNoTracking()
-            .ToListAsync(cancellationToken);
+    public async Task<IReadOnlyList<PostagePricingPlanEntity>> GetPostagePricingPlansForYearAsync(int yearId, CancellationToken cancellationToken = default)
+    {
+        using var connection = connectionFactory.CreateConnection();
+        return (await connection.QueryAsync<PostagePricingPlanEntity>(
+            "EXEC dbo.spgPostageByYearID @YearId",
+            new { YearId = yearId })).ToList();
+    }
 }
