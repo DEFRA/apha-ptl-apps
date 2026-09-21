@@ -1,19 +1,19 @@
+using System.Reflection;
 using Microsoft.OpenApi;
 using PTL.Api.Features.Health;
 using PTL.Api.Infrastructure;
 using PTL.Common.Correlation;
-using PTL.Core.Customer;
-using PTL.Core.Participant;
 using PTL.Core.Contract;
-using PTL.Core.Scheme;
+using PTL.Core.Customer;
 using PTL.Core.Lookup;
-using PTL.Data.Infrastructure;
-using PTL.Data.Customer;
-using PTL.Data.Participant;
+using PTL.Core.Participant;
+using PTL.Core.Scheme;
 using PTL.Data.Contract;
-using PTL.Data.Scheme;
+using PTL.Data.Customer;
+using PTL.Data.Infrastructure;
 using PTL.Data.Lookup;
-using System.Reflection;
+using PTL.Data.Participant;
+using PTL.Data.Scheme;
 using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
