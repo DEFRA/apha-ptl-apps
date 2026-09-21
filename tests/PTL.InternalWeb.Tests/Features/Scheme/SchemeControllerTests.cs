@@ -73,7 +73,7 @@ public class SchemeControllerTests
         var result = await controller.History(sharedId, CancellationToken.None);
 
         var view = Assert.IsType<ViewResult>(result);
-        var model = Assert.IsAssignableFrom<IReadOnlyList<SchemeHistoryResponse>>(view.Model);
+        var model = Assert.IsType<IReadOnlyList<SchemeHistoryResponse>>(view.Model, exactMatch: false);
         Assert.Single(model);
     }
 

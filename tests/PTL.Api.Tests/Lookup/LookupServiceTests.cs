@@ -93,4 +93,39 @@ public class LookupServiceTests
         Assert.Single(result);
         Assert.Equal("2026/27", result[0].Year);
     }
+
+    [Fact]
+    public async Task GetSchemeCurrenciesAsync_FiltersRepositoryResultBySchemeId()
+    {
+        var schemeId = Guid.NewGuid();
+        var repository = new FakeLookupRepository
+        {
+            SchemeCurrencies =
+            [
+                new SchemeCurrencyEntity { SchemeCurrencyId = Guid.NewGuid(), SchemeId = schemeId, CurrencyId = Guid.NewGuid(), Price = 12.5m, CurrencyName = "British Pound", CurrencySymbol = "£" },
+                new SchemeCurrencyEntity { SchemeCurrencyId = Guid.NewGuid(), SchemeId = Guid.NewGuid(), CurrencyId = Guid.NewGuid(), Price = 20m, CurrencyName = "Euro", CurrencySymbol = "€" }
+            ]
+        };
+        var service = new LookupService(repository);
+
+        var result = await service.GetSchemeCurrenciesAsync(schemeId);
+
+        Assert.Single(result);
+        Assert.Equal(schemeId, result[0].SchemeId);
+    }
+
+    [Fact]
+    public async Task GetPostagePricingPlansForYearAsync_ReturnsRepositoryResult()
+    {
+        var repository = new FakeLookupRepository
+        {
+            PostagePricingPlans = [new PostagePricingPlanEntity { PostageId = Guid.NewGuid(), Name = "Standard", UKPrice = 5.5m, YearId = 2026 }]
+        };
+        var service = new LookupService(repository);
+
+        var result = await service.GetPostagePricingPlansForYearAsync(2026);
+
+        Assert.Single(result);
+        Assert.Equal("Standard", result[0].Name);
+    }
 }

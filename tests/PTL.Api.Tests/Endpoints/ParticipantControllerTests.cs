@@ -95,7 +95,7 @@ public class ParticipantControllerTests
         var result = await controller.GetParticipants(customerId, includeInactive: false, CancellationToken.None);
 
         var ok = Assert.IsType<OkObjectResult>(result.Result);
-        var summaries = Assert.IsAssignableFrom<IReadOnlyList<ParticipantSummaryResponse>>(ok.Value);
+        var summaries = Assert.IsType<IReadOnlyList<ParticipantSummaryResponse>>(ok.Value, exactMatch: false);
         Assert.Equal(2, summaries.Count);
     }
 

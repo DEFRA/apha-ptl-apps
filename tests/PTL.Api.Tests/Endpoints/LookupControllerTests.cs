@@ -20,7 +20,7 @@ public class LookupControllerTests
         var result = await controller.GetCountries(CancellationToken.None);
 
         var ok = Assert.IsType<OkObjectResult>(result.Result);
-        var countries = Assert.IsAssignableFrom<IReadOnlyList<PTL.Contracts.Lookup.CountryResponse>>(ok.Value);
+        var countries = Assert.IsType<IReadOnlyList<PTL.Contracts.Lookup.CountryResponse>>(ok.Value, exactMatch: false);
         Assert.Single(countries);
         Assert.Equal(countryId, countries[0].CountryId);
         Assert.Equal("United Kingdom", countries[0].Country);
@@ -36,7 +36,7 @@ public class LookupControllerTests
         var result = await controller.GetCurrencies(CancellationToken.None);
 
         var ok = Assert.IsType<OkObjectResult>(result.Result);
-        var currencies = Assert.IsAssignableFrom<IReadOnlyList<PTL.Contracts.Lookup.CurrencyResponse>>(ok.Value);
+        var currencies = Assert.IsType<IReadOnlyList<PTL.Contracts.Lookup.CurrencyResponse>>(ok.Value, exactMatch: false);
         Assert.Single(currencies);
         Assert.Equal("£ - British Pound", currencies[0].LongName);
     }
@@ -51,7 +51,7 @@ public class LookupControllerTests
         var result = await controller.GetCustomerTypes(CancellationToken.None);
 
         var ok = Assert.IsType<OkObjectResult>(result.Result);
-        var customerTypes = Assert.IsAssignableFrom<IReadOnlyList<PTL.Contracts.Lookup.CustomerTypeResponse>>(ok.Value);
+        var customerTypes = Assert.IsType<IReadOnlyList<PTL.Contracts.Lookup.CustomerTypeResponse>>(ok.Value, exactMatch: false);
         Assert.Single(customerTypes);
         Assert.Equal(customerTypeId, customerTypes[0].CustomerTypeId);
     }
@@ -66,7 +66,7 @@ public class LookupControllerTests
         var result = await controller.GetVatRatings(CancellationToken.None);
 
         var ok = Assert.IsType<OkObjectResult>(result.Result);
-        var vatRatings = Assert.IsAssignableFrom<IReadOnlyList<PTL.Contracts.Lookup.VatRatingResponse>>(ok.Value);
+        var vatRatings = Assert.IsType<IReadOnlyList<PTL.Contracts.Lookup.VatRatingResponse>>(ok.Value, exactMatch: false);
         Assert.Single(vatRatings);
         Assert.Equal(vatRatingId, vatRatings[0].VatRatingId);
     }
@@ -81,7 +81,7 @@ public class LookupControllerTests
         var result = await controller.GetLabTypes(CancellationToken.None);
 
         var ok = Assert.IsType<OkObjectResult>(result.Result);
-        var labTypes = Assert.IsAssignableFrom<IReadOnlyList<PTL.Contracts.Lookup.LabTypeResponse>>(ok.Value);
+        var labTypes = Assert.IsType<IReadOnlyList<PTL.Contracts.Lookup.LabTypeResponse>>(ok.Value, exactMatch: false);
         Assert.Single(labTypes);
         Assert.Equal(labTypeId, labTypes[0].LabTypeId);
     }
@@ -95,8 +95,47 @@ public class LookupControllerTests
         var result = await controller.GetCurrentYears(CancellationToken.None);
 
         var ok = Assert.IsType<OkObjectResult>(result.Result);
-        var years = Assert.IsAssignableFrom<IReadOnlyList<PTL.Contracts.Lookup.YearResponse>>(ok.Value);
+        var years = Assert.IsType<IReadOnlyList<PTL.Contracts.Lookup.YearResponse>>(ok.Value, exactMatch: false);
         Assert.Single(years);
         Assert.Equal("2026/27", years[0].Year);
+    }
+
+    [Fact]
+    public async Task GetSchemeCurrencies_ReturnsMappedResponses()
+    {
+        var schemeId = Guid.NewGuid();
+        var repository = new FakeLookupRepository
+        {
+            SchemeCurrencies = [new SchemeCurrencyEntity { SchemeCurrencyId = Guid.NewGuid(), SchemeId = schemeId, CurrencyId = Guid.NewGuid(), Price = 12.5m, CurrencyName = "British Pound", CurrencySymbol = "£" }]
+        };
+        var controller = CreateController(repository);
+
+        var result = await controller.GetSchemeCurrencies(schemeId, CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var currencies = Assert.IsType<IReadOnlyList<PTL.Contracts.Lookup.SchemeCurrencyResponse>>(ok.Value, exactMatch: false);
+        Assert.Single(currencies);
+        Assert.Equal(schemeId, currencies[0].SchemeId);
+        Assert.Equal(12.5m, currencies[0].Price);
+        Assert.Equal("£", currencies[0].CurrencySymbol);
+    }
+
+    [Fact]
+    public async Task GetPostagePricingPlans_ReturnsMappedResponses()
+    {
+        var postageId = Guid.NewGuid();
+        var repository = new FakeLookupRepository
+        {
+            PostagePricingPlans = [new PostagePricingPlanEntity { PostageId = postageId, Name = "Standard", UKPrice = 5.5m, EUPrice = 8m, NonEUPrice = 12m, YearId = 2026 }]
+        };
+        var controller = CreateController(repository);
+
+        var result = await controller.GetPostagePricingPlans(2026, CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var plans = Assert.IsType<IReadOnlyList<PTL.Contracts.Lookup.PostagePricingPlanResponse>>(ok.Value, exactMatch: false);
+        Assert.Single(plans);
+        Assert.Equal(postageId, plans[0].PostageId);
+        Assert.Equal(2026, plans[0].YearId);
     }
 }

@@ -25,8 +25,12 @@ public class ApiClientServiceCollectionExtensionsTests
         services.AddPtlApiClient(configuration);
         var provider = services.BuildServiceProvider();
 
-        var client = provider.GetRequiredService<IApiClient>();
-        Assert.IsType<ApiClient>(client);
+        Assert.IsType<ApiClient>(provider.GetRequiredService<IApiClient>());
+        Assert.IsType<CustomerApiClient>(provider.GetRequiredService<ICustomerApiClient>());
+        Assert.IsType<ParticipantApiClient>(provider.GetRequiredService<IParticipantApiClient>());
+        Assert.IsType<ContractApiClient>(provider.GetRequiredService<IContractApiClient>());
+        Assert.IsType<SchemeApiClient>(provider.GetRequiredService<ISchemeApiClient>());
+        Assert.IsType<LookupApiClient>(provider.GetRequiredService<ILookupApiClient>());
     }
 
     [Theory]

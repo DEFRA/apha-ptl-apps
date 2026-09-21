@@ -74,7 +74,7 @@ public class ContractControllerTests
 
         var result = await controller.CreateContract(Guid.NewGuid(), request, CancellationToken.None);
 
-        var badRequest = Assert.IsAssignableFrom<ObjectResult>(result.Result);
+        var badRequest = Assert.IsType<ObjectResult>(result.Result, exactMatch: false);
         Assert.Equal(400, badRequest.StatusCode);
     }
 
@@ -159,7 +159,7 @@ public class ContractControllerTests
 
         var result = await controller.UpdateContract(contractId, ToUpdateRequest(ValidCreateRequest(DateTime.UtcNow.Year - 1)), CancellationToken.None);
 
-        var badRequest = Assert.IsAssignableFrom<ObjectResult>(result.Result);
+        var badRequest = Assert.IsType<ObjectResult>(result.Result, exactMatch: false);
         Assert.Equal(400, badRequest.StatusCode);
     }
 }

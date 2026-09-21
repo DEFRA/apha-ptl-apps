@@ -89,7 +89,7 @@ public class CustomerControllerTests
 
         var result = await controller.CreateCustomer(request, CancellationToken.None);
 
-        var badRequest = Assert.IsAssignableFrom<ObjectResult>(result.Result);
+        var badRequest = Assert.IsType<ObjectResult>(result.Result, exactMatch: false);
         Assert.Equal(400, badRequest.StatusCode);
     }
 
@@ -127,7 +127,7 @@ public class CustomerControllerTests
         var result = await controller.GetCustomers(new CustomerRequest(CustomerStatusFilter.Active), CancellationToken.None);
 
         var ok = Assert.IsType<OkObjectResult>(result.Result);
-        var summaries = Assert.IsAssignableFrom<IReadOnlyList<CustomerSummaryResponse>>(ok.Value);
+        var summaries = Assert.IsType<IReadOnlyList<CustomerSummaryResponse>>(ok.Value, exactMatch: false);
         Assert.Equal(2, summaries.Count);
     }
 
@@ -167,7 +167,7 @@ public class CustomerControllerTests
 
         var result = await controller.UpdateCustomer(customerId, invalidUpdate, CancellationToken.None);
 
-        var badRequest = Assert.IsAssignableFrom<ObjectResult>(result.Result);
+        var badRequest = Assert.IsType<ObjectResult>(result.Result, exactMatch: false);
         Assert.Equal(400, badRequest.StatusCode);
     }
 

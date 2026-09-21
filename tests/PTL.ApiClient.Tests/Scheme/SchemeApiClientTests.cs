@@ -21,6 +21,18 @@ public class SchemeApiClientTests
     }
 
     [Fact]
+    public async Task GetSchemeAsync_Success_ReturnsDeserializedScheme()
+    {
+        var client = CreateClient(HttpStatusCode.OK, FullSchemeJson());
+
+        var result = await client.GetSchemeAsync(Guid.NewGuid());
+
+        Assert.NotNull(result);
+        Assert.Equal("PT1234", result!.Identifier);
+        Assert.False(result.IsReadOnly);
+    }
+
+    [Fact]
     public async Task GetSchemesForYearAsync_ReturnsDeserializedSearchResponse()
     {
         const string json = "{\"items\":[],\"totalCount\":0,\"page\":1,\"pageSize\":20}";
@@ -41,6 +53,29 @@ public class SchemeApiClientTests
         var result = await client.GetSchemeHistoryAsync(Guid.NewGuid());
 
         Assert.Empty(result);
+    }
+
+    [Fact]
+    public async Task CreateSchemeAsync_Success_ReturnsSavedScheme()
+    {
+        var client = CreateClient(HttpStatusCode.OK, FullSchemeJson());
+
+        var result = await client.CreateSchemeAsync(MinimalCreateRequest());
+
+        Assert.True(result.Success);
+        Assert.NotNull(result.Scheme);
+        Assert.Empty(result.FieldErrors);
+    }
+
+    [Fact]
+    public async Task CreateSchemeAsync_BadRequestWithNoErrors_ReturnsGenericFieldError()
+    {
+        var client = CreateClient(HttpStatusCode.BadRequest, "{}");
+
+        var result = await client.CreateSchemeAsync(MinimalCreateRequest());
+
+        Assert.False(result.Success);
+        Assert.True(result.FieldErrors.ContainsKey(string.Empty));
     }
 
     [Fact]
@@ -65,6 +100,81 @@ public class SchemeApiClientTests
         Assert.False(result.Success);
         Assert.Null(result.Scheme);
     }
+
+    [Fact]
+    public async Task UpdateSchemeAsync_Success_ReturnsSavedScheme()
+    {
+        var client = CreateClient(HttpStatusCode.OK, FullSchemeJson());
+
+        var result = await client.UpdateSchemeAsync(Guid.NewGuid(), MinimalUpdateRequest());
+
+        Assert.True(result.Success);
+        Assert.NotNull(result.Scheme);
+    }
+
+    private static string FullSchemeJson() => """
+        {
+            "schemeId":"11111111-1111-1111-1111-111111111111",
+            "sharedId":"22222222-2222-2222-2222-222222222222",
+            "yearId":2026,
+            "identifier":"PT1234",
+            "name":"Test Scheme",
+            "scheduleId":"33333333-3333-3333-3333-333333333333",
+            "scheduleCodeId":"44444444-4444-4444-4444-444444444444",
+            "startDate":null,
+            "distributionMonthApr":true,
+            "distributionMonthMay":false,
+            "distributionMonthJun":false,
+            "distributionMonthJul":false,
+            "distributionMonthAug":false,
+            "distributionMonthSep":false,
+            "distributionAsAvailable":false,
+            "distributionMonthOct":false,
+            "distributionMonthNov":false,
+            "distributionMonthDec":false,
+            "distributionMonthJan":false,
+            "distributionMonthFeb":false,
+            "distributionMonthMar":false,
+            "weekNumber":5,
+            "dayOfWeekId":"55555555-5555-5555-5555-555555555555",
+            "numberOfSamples":10,
+            "sampleNoSequence":1,
+            "sampleOrigin":"UK",
+            "deadline":10,
+            "subcontractor":"",
+            "combinedPackaging":false,
+            "postage":null,
+            "customsVolume":null,
+            "samplePackingInstructions":"",
+            "requiresAssessment":false,
+            "commentsRequired":false,
+            "pilot":false,
+            "limitedSampleAvailability":false,
+            "accredited":false,
+            "noVLALabs":false,
+            "comerciallyAvailable":false,
+            "customsDescription":null,
+            "dataConsentDeclarationActive":false,
+            "dataConsentDeclarationText":null,
+            "instructions":"Instructions",
+            "dateOfReceipt":false,
+            "storageConditions":false,
+            "conditionOnReceipt":false,
+            "testConsultant1":null,
+            "testConsultant2":null,
+            "testConsultant3":null,
+            "testConsultantTabulationId":null,
+            "useExternalReference":false,
+            "storeRatings":false,
+            "assessor1":null,
+            "assessor2":null,
+            "assessor3":null,
+            "assessor4":null,
+            "standardTabulationText":null,
+            "lastModified":"2026-01-01T00:00:00",
+            "isReadOnly":false
+        }
+        """;
 
     private static SchemeRequest MinimalCreateRequest() => new(
         2027, "PT1234", "Test Scheme", Guid.NewGuid(), Guid.NewGuid(), null,

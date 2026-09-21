@@ -104,7 +104,7 @@ public class SchemeControllerTests
 
         var result = await controller.CreateScheme(request, CancellationToken.None);
 
-        var badRequest = Assert.IsAssignableFrom<ObjectResult>(result.Result);
+        var badRequest = Assert.IsType<ObjectResult>(result.Result, exactMatch: false);
         Assert.Equal(400, badRequest.StatusCode);
     }
 
@@ -180,7 +180,7 @@ public class SchemeControllerTests
         var result = await controller.GetSchemeFamilyHistory(response.SharedId, CancellationToken.None);
 
         var ok = Assert.IsType<OkObjectResult>(result.Result);
-        var history = Assert.IsAssignableFrom<IReadOnlyList<SchemeHistoryResponse>>(ok.Value);
+        var history = Assert.IsType<IReadOnlyList<SchemeHistoryResponse>>(ok.Value, exactMatch: false);
         Assert.Single(history);
     }
 }
