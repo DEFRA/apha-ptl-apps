@@ -123,7 +123,6 @@ jobs:
           --no-restore
           --logger "trx;LogFilePrefix=ptl-tests"
           --results-directory "${{ runner.temp }}/test-results"
-          /p:Threshold=0
 
   sonarcloud:
     name: SonarCloud analysis
@@ -180,7 +179,6 @@ jobs:
         shell: bash
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          MSYS2_ARG_CONV_EXCL: "*"
         run: |
           set -euo pipefail
           test -n "${SONAR_TOKEN}"
