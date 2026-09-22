@@ -1,76 +1,76 @@
-@model PTL.Contracts.Customer.CustomerResponse
+@model PTL.InternalWeb.Features.Customer.CustomerDetailsViewModel
 @{
-    ViewData["Title"] = $"Customer - {Model.Name}";
+    var customer = Model.Customer;
+    ViewData["Title"] = $"Customer - {customer.Name}";
 }
 
-<h1 class="govuk-heading-l">@Model.Name</h1>
+<h1 class="govuk-heading-l">@customer.Name</h1>
 
 <p class="govuk-body">
-    <a class="govuk-button" data-module="govuk-button" asp-action="Edit" asp-route-id="@Model.CustomerId">Edit customer</a>
+    <a class="govuk-button" data-module="govuk-button" asp-action="Edit" asp-route-id="@customer.CustomerId">Edit customer</a>
 </p>
 
 <h2 class="govuk-heading-m">Customer details</h2>
 <dl class="govuk-summary-list">
-    <govuk-summary-row label="QAL number">@Model.QalNumber</govuk-summary-row>
-    <govuk-summary-row label="Registered file number">@Model.RegisteredFileNumber</govuk-summary-row>
-    <govuk-summary-row label="Previous name">@Model.PreviousName</govuk-summary-row>
+    <govuk-summary-row label="QAL number">@customer.QalNumber</govuk-summary-row>
+    <govuk-summary-row label="Name">@customer.Name</govuk-summary-row>
+    <govuk-summary-row label="Initial start date">@customer.InitialStartDate.ToString("d MMMM yyyy")</govuk-summary-row>
+    <govuk-summary-row label="Payment (non-UK)">@(customer.PaymentNonUK ? "Yes" : "No")</govuk-summary-row>
+    <govuk-summary-row label="Customer type">@Model.CustomerTypeName</govuk-summary-row>
+    <govuk-summary-row label="VAT number">@customer.VatNumber</govuk-summary-row>
+    <govuk-summary-row label="Account number">@customer.AccountNumber</govuk-summary-row>
+    <govuk-summary-row label="Customer ID">@customer.CustomerFinanceId</govuk-summary-row>
+    <govuk-summary-row label="Registered file number">@customer.RegisteredFileNumber</govuk-summary-row>
+    <govuk-summary-row label="Order online">@(customer.CanOrderOnline ? "Yes" : "No")</govuk-summary-row>
     <govuk-summary-row label="Status">
-        <strong class="govuk-tag @(Model.IsActive ? "govuk-tag--green" : "govuk-tag--grey")">
-            @(Model.IsActive ? "Active" : "Inactive")
+        <strong class="govuk-tag @(customer.IsActive ? "govuk-tag--green" : "govuk-tag--grey")">
+            @(customer.IsActive ? "Active" : "Inactive")
         </strong>
     </govuk-summary-row>
-    @if (Model.InactiveDate is not null)
+    @if (customer.InactiveDate is not null)
     {
-        <govuk-summary-row label="Inactive date">@Model.InactiveDate.Value.ToString("d MMMM yyyy")</govuk-summary-row>
+        <govuk-summary-row label="Inactive date">@customer.InactiveDate.Value.ToString("d MMMM yyyy")</govuk-summary-row>
     }
-    <govuk-summary-row label="Initial start date">@Model.InitialStartDate.ToString("d MMMM yyyy")</govuk-summary-row>
-    <govuk-summary-row label="Can order online">@(Model.CanOrderOnline ? "Yes" : "No")</govuk-summary-row>
 </dl>
 
 <h2 class="govuk-heading-m">Contact details</h2>
 <dl class="govuk-summary-list">
-    <govuk-summary-row label="Contact name">@Model.ContactName</govuk-summary-row>
-    <govuk-summary-row label="Organisation">@Model.Organisation</govuk-summary-row>
+    <govuk-summary-row label="Contact name">@customer.ContactName</govuk-summary-row>
+    <govuk-summary-row label="Organisation">@customer.Organisation</govuk-summary-row>
     <govuk-summary-row label="Address">
-        @Model.Address1<br />
-        @Model.Address2<br />
-        @Model.Address3<br />
-        @Model.Address4<br />
-        @Model.Address5
+        @customer.Address1<br />
+        @customer.Address2<br />
+        @customer.Address3<br />
+        @customer.Address4<br />
+        @customer.Address5
     </govuk-summary-row>
-    <govuk-summary-row label="Telephone">@Model.Telephone</govuk-summary-row>
-    <govuk-summary-row label="Telephone (alternative)">@Model.Telephone2</govuk-summary-row>
-    <govuk-summary-row label="Fax">@Model.Fax</govuk-summary-row>
-    <govuk-summary-row label="Email">@Model.Email</govuk-summary-row>
+    <govuk-summary-row label="Country">@Model.CountryName</govuk-summary-row>
+    <govuk-summary-row label="Telephone">@customer.Telephone</govuk-summary-row>
+    <govuk-summary-row label="Telephone (alternative)">@customer.Telephone2</govuk-summary-row>
+    <govuk-summary-row label="Fax">@customer.Fax</govuk-summary-row>
+    <govuk-summary-row label="Email">@customer.Email</govuk-summary-row>
 </dl>
 
 <h2 class="govuk-heading-m">Invoice details</h2>
 <dl class="govuk-summary-list">
-    <govuk-summary-row label="Invoice name">@Model.InvoiceName</govuk-summary-row>
-    <govuk-summary-row label="Invoice organisation">@Model.InvoiceOrganisation</govuk-summary-row>
+    <govuk-summary-row label="Invoice name">@customer.InvoiceName</govuk-summary-row>
+    <govuk-summary-row label="Invoice organisation">@customer.InvoiceOrganisation</govuk-summary-row>
     <govuk-summary-row label="Invoice address">
-        @Model.InvoiceAddress1<br />
-        @Model.InvoiceAddress2<br />
-        @Model.InvoiceAddress3<br />
-        @Model.InvoiceAddress4<br />
-        @Model.InvoiceAddress5
+        @customer.InvoiceAddress1<br />
+        @customer.InvoiceAddress2<br />
+        @customer.InvoiceAddress3<br />
+        @customer.InvoiceAddress4<br />
+        @customer.InvoiceAddress5
     </govuk-summary-row>
-    <govuk-summary-row label="Invoice telephone">@Model.InvoiceTelephone</govuk-summary-row>
-    <govuk-summary-row label="Invoice telephone (alternative)">@Model.InvoiceTelephone2</govuk-summary-row>
-    <govuk-summary-row label="Invoice fax">@Model.InvoiceFax</govuk-summary-row>
-    <govuk-summary-row label="Invoice email">@Model.InvoiceEmail</govuk-summary-row>
-</dl>
-
-<h2 class="govuk-heading-m">Financial details</h2>
-<dl class="govuk-summary-list">
-    <govuk-summary-row label="VAT number">@Model.VatNumber</govuk-summary-row>
-    <govuk-summary-row label="Account number">@Model.AccountNumber</govuk-summary-row>
-    <govuk-summary-row label="Customer ID">@Model.CustomerFinanceId</govuk-summary-row>
-    <govuk-summary-row label="Payment (non-UK)">@(Model.PaymentNonUK ? "Yes" : "No")</govuk-summary-row>
+    <govuk-summary-row label="Invoice country">@Model.InvoiceCountryName</govuk-summary-row>
+    <govuk-summary-row label="Invoice telephone">@customer.InvoiceTelephone</govuk-summary-row>
+    <govuk-summary-row label="Invoice telephone (alternative)">@customer.InvoiceTelephone2</govuk-summary-row>
+    <govuk-summary-row label="Invoice fax">@customer.InvoiceFax</govuk-summary-row>
+    <govuk-summary-row label="Invoice email">@customer.InvoiceEmail</govuk-summary-row>
 </dl>
 
 <h2 class="govuk-heading-m">Other</h2>
 <dl class="govuk-summary-list">
-    <govuk-summary-row label="Postage arrangements">@Model.PostageArrangements</govuk-summary-row>
-    <govuk-summary-row label="Comments">@Model.Comments</govuk-summary-row>
+    <govuk-summary-row label="Postage arrangements">@customer.PostageArrangements</govuk-summary-row>
+    <govuk-summary-row label="Comments">@customer.Comments</govuk-summary-row>
 </dl>

@@ -58,7 +58,8 @@ public class CustomerControllerTests
         var result = await controller.Details(customerId, CancellationToken.None);
 
         var view = Assert.IsType<ViewResult>(result);
-        Assert.Equal(customerId, Assert.IsType<CustomerResponse>(view.Model).CustomerId);
+        var model = Assert.IsType<PTL.InternalWeb.Features.Customer.CustomerDetailsViewModel>(view.Model);
+        Assert.Equal(customerId, model.Customer.CustomerId);
     }
 
     [Fact]
