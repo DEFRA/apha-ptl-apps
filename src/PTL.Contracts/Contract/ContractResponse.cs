@@ -1,0 +1,38 @@
+namespace PTL.Contracts.Contract;
+
+// Public API contract for GET /api/contracts/{contractId}; field set matches
+// PtaBusinessObjects.BusinessObjects.Contracts.Contract as fetched by spgContractByContractId.
+public sealed record ContractResponse(
+    Guid ContractId,
+    Guid CustomerId,
+    string CustomerName,
+    string QalNumber,
+    int YearId,
+    string UTNumber,
+    string FTNumber,
+    string ContractSignatory,
+    string ActionsRequired,
+    string RenewalInformation,
+    decimal DiscountRate,
+    decimal AdministrationCharge,
+    int NumberCourier,
+    decimal CourierPrice,
+    int NumberPostage,
+    decimal PostagePrice,
+    int NumberSpecialDelivery,
+    decimal SpecialDeliveryPrice,
+    DateTime? AcknowledgementPostedDate,
+    DateTime? AcknowledgementReturnedDate,
+    DateTime? JobSheetPostedDate,
+    string ReasonForClosure,
+    DateTime? DateOfLeaving,
+    bool IsActive,
+    bool IsReadOnly,
+    string Suffix,
+    DateTime? CommencementDate,
+    string PurchaseOrderNumber,
+    bool OptOutOfInvoiceGeneration,
+    bool IsInvoiceSent,
+    bool IsOnlineOrder,
+    string? ApprovedBy,
+    DateTime? ApprovedDate);

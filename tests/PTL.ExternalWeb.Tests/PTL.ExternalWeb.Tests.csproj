@@ -5,11 +5,10 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
-    <!-- PTL.ApiClient and PTL.Contracts each have their own fully-covering test project
-         (PTL.ApiClient.Tests, PTL.Api.Tests) - measuring them again here would drag this
-         project's own coverage number down for code this project doesn't own (PTL.ExternalWeb
-         does not implement any Customer-domain features), just because they're loaded transitively. -->
-    <Exclude>[PTL.ApiClient]*,[PTL.Contracts]*</Exclude>
+    <!-- PTL.ExternalWeb owns the web UI, not the shared API client or DTO libraries it consumes.
+         Keep the coverage gate focused on the application itself by excluding transitively loaded
+         support assemblies that already have their own coverage baselines. -->
+    <Exclude>[PTL.ApiClient]*,[PTL.Common]*,[PTL.Contracts]*</Exclude>
   </PropertyGroup>
 
   <ItemGroup>

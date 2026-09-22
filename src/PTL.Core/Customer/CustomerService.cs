@@ -29,30 +29,6 @@ public sealed class CustomerService(ICustomerRepository customerRepository, ILog
             new EventId(4, nameof(LogUpdatedCustomerMessage)),
             "Updated customer {CustomerId} ({QalNumber})");
 
-    private static readonly Action<ILogger, Guid, Exception?> LogDeactivateUnknownCustomerMessage =
-        LoggerMessage.Define<Guid>(
-            LogLevel.Warning,
-            new EventId(5, nameof(LogDeactivateUnknownCustomerMessage)),
-            "Deactivate requested for unknown customer {CustomerId}");
-
-    private static readonly Action<ILogger, Guid, string, Guid, Exception?> LogDeactivatedCustomerMessage =
-        LoggerMessage.Define<Guid, string, Guid>(
-            LogLevel.Information,
-            new EventId(6, nameof(LogDeactivatedCustomerMessage)),
-            "Deactivated customer {CustomerId} ({QalNumber}) with status {CustomerStatusId}");
-
-    private static readonly Action<ILogger, Guid, Exception?> LogReactivateUnknownCustomerMessage =
-        LoggerMessage.Define<Guid>(
-            LogLevel.Warning,
-            new EventId(7, nameof(LogReactivateUnknownCustomerMessage)),
-            "Reactivate requested for unknown customer {CustomerId}");
-
-    private static readonly Action<ILogger, Guid, string, Exception?> LogReactivatedCustomerMessage =
-        LoggerMessage.Define<Guid, string>(
-            LogLevel.Information,
-            new EventId(8, nameof(LogReactivatedCustomerMessage)),
-            "Reactivated customer {CustomerId} ({QalNumber})");
-
     private static readonly Action<ILogger, Guid, string, Exception?> LogCustomerValidationFailedMessage =
         LoggerMessage.Define<Guid, string>(
             LogLevel.Warning,
@@ -126,47 +102,10 @@ public sealed class CustomerService(ICustomerRepository customerRepository, ILog
         return updated;
     }
 
-    public async Task<Customer?> DeactivateCustomerAsync(Guid customerId, Guid customerStatusId, CancellationToken cancellationToken = default)
-    {
-        var existing = await customerRepository.GetByIdAsync(customerId, cancellationToken);
-        if (existing is null)
-        {
-            LogDeactivateUnknownCustomerMessage(logger, customerId, null);
-            return null;
-        }
-
-        existing.IsActive = false;
-        existing.CustomerStatusId = customerStatusId;
-        ApplyStatusTransition(existing);
-
-        Validate(existing);
-
-        var updated = await customerRepository.UpdateAsync(existing, cancellationToken);
-        LogDeactivatedCustomerMessage(logger, customerId, existing.QalNumber, customerStatusId, null);
-        return updated;
-    }
-
-    public async Task<Customer?> ReactivateCustomerAsync(Guid customerId, CancellationToken cancellationToken = default)
-    {
-        var existing = await customerRepository.GetByIdAsync(customerId, cancellationToken);
-        if (existing is null)
-        {
-            LogReactivateUnknownCustomerMessage(logger, customerId, null);
-            return null;
-        }
-
-        existing.IsActive = true;
-        ApplyStatusTransition(existing);
-
-        Validate(existing);
-
-        var updated = await customerRepository.UpdateAsync(existing, cancellationToken);
-        LogReactivatedCustomerMessage(logger, customerId, existing.QalNumber, null);
-        return updated;
-    }
-
     // Mirrors Customer.aspx.vb's LoadObjectFromForm: activating clears the inactive markers;
-    // deactivating stamps InactiveDate only if one is not already set. Does not cascade to
+    // deactivating stamps InactiveDate only if one is not already set. Runs on every
+    // UpdateCustomerAsync call, so toggling IsActive directly on the Edit screen (no separate
+    // Deactivate/Reactivate flow) already applies these transitions. Does not cascade to
     // participants/viewers - that is explicitly out of scope for the Customer domain (see
     // customer-migration.md; participant integration is a separate task).
     private static void ApplyStatusTransition(Customer customer)

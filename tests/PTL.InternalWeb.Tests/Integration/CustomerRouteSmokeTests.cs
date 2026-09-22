@@ -10,11 +10,14 @@ using PTL.InternalWeb.Tests.TestSupport;
 
 namespace PTL.InternalWeb.Tests.Integration;
 
-// Full-pipeline smoke tests so the Customer Razor views (Index/Details/_CustomerForm/Deactivate)
+// Full-pipeline smoke tests so the Customer Razor views (Index/Details/_CustomerForm)
 // actually render at least once, rather than only being exercised via controller unit tests that
 // never invoke the view engine.
-public class CustomerRouteSmokeTests : IClassFixture<WebApplicationFactory<Program>>
+public partial class CustomerRouteSmokeTests : IClassFixture<WebApplicationFactory<Program>>
 {
+    [GeneratedRegex("__RequestVerificationToken[^>]*value=\"([^\"]+)\"", RegexOptions.None)]
+    private static partial Regex AntiforgeryTokenPattern();
+
     private readonly WebApplicationFactory<Program> _factory;
     private readonly FakeCustomerApiClient _fakeApiClient;
 
@@ -35,6 +38,8 @@ public class CustomerRouteSmokeTests : IClassFixture<WebApplicationFactory<Progr
             {
                 services.RemoveAll<ICustomerApiClient>();
                 services.AddSingleton<ICustomerApiClient>(_fakeApiClient);
+                services.RemoveAll<ILookupApiClient>();
+                services.AddSingleton<ILookupApiClient>(new FakeLookupApiClient());
             }));
     }
 
@@ -90,16 +95,6 @@ public class CustomerRouteSmokeTests : IClassFixture<WebApplicationFactory<Progr
         var client = _factory.CreateClient();
 
         var response = await client.GetAsync($"/Customer/Edit/{CustomerId}");
-
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-    }
-
-    [Fact]
-    public async Task Deactivate_ReturnsSuccess()
-    {
-        var client = _factory.CreateClient();
-
-        var response = await client.GetAsync($"/Customer/Deactivate/{CustomerId}");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
@@ -205,58 +200,11 @@ public class CustomerRouteSmokeTests : IClassFixture<WebApplicationFactory<Progr
         Assert.Contains("govuk-form-group--error", body);
     }
 
-    [Fact]
-    public async Task Deactivate_Post_Valid_RedirectsToDetails()
-    {
-        _fakeApiClient.SaveResult = new PTL.Contracts.Customer.CustomerSaveResult(true, SampleCustomer(CustomerId, isActive: false), new Dictionary<string, string[]>());
-        var client = _factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
-        var (token, cookie) = await GetAntiforgeryAsync(client, $"/Customer/Deactivate/{CustomerId}");
-
-        var request = new HttpRequestMessage(HttpMethod.Post, $"/Customer/Deactivate/{CustomerId}")
-        {
-            Content = new FormUrlEncodedContent(new Dictionary<string, string>
-            {
-                ["__RequestVerificationToken"] = token,
-                ["CustomerId"] = CustomerId.ToString(),
-                ["CustomerStatusId"] = Guid.NewGuid().ToString()
-            })
-        };
-        request.Headers.Add("Cookie", cookie);
-
-        var response = await client.SendAsync(request);
-
-        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
-        Assert.Contains($"/Customer/Details/{CustomerId}", response.Headers.Location!.ToString());
-    }
-
-    [Fact]
-    public async Task Deactivate_Post_MissingCustomerStatusId_RendersFieldError()
-    {
-        var client = _factory.CreateClient();
-        var (token, cookie) = await GetAntiforgeryAsync(client, $"/Customer/Deactivate/{CustomerId}");
-
-        var request = new HttpRequestMessage(HttpMethod.Post, $"/Customer/Deactivate/{CustomerId}")
-        {
-            Content = new FormUrlEncodedContent(new Dictionary<string, string>
-            {
-                ["__RequestVerificationToken"] = token,
-                ["CustomerId"] = CustomerId.ToString()
-            })
-        };
-        request.Headers.Add("Cookie", cookie);
-
-        var response = await client.SendAsync(request);
-        var body = await response.Content.ReadAsStringAsync();
-
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.Contains("govuk-error-summary", body);
-    }
-
     private static async Task<(string Token, string Cookie)> GetAntiforgeryAsync(HttpClient client, string url)
     {
         var response = await client.GetAsync(url);
         var body = await response.Content.ReadAsStringAsync();
-        var token = Regex.Match(body, "__RequestVerificationToken[^>]*value=\"([^\"]+)\"").Groups[1].Value;
+        var token = AntiforgeryTokenPattern().Match(body).Groups[1].Value;
         var cookie = string.Join("; ", response.Headers.TryGetValues("Set-Cookie", out var cookies)
             ? cookies.Select(c => c.Split(';')[0])
             : []);

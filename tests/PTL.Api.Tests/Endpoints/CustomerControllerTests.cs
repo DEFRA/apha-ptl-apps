@@ -26,7 +26,7 @@ public class CustomerControllerTests
         return controller;
     }
 
-    private static CreateCustomerRequest ValidCreateRequest(string name = "Sample Laboratories Ltd") => new(
+    private static CustomerSaveRequest ValidCreateRequest(string name = "Sample Laboratories Ltd") => new(
         RegisteredFileNumber: string.Empty,
         Name: name,
         PreviousName: string.Empty,
@@ -67,15 +67,7 @@ public class CustomerControllerTests
         CanOrderOnline: false,
         CustomerStatusId: null);
 
-    private static UpdateCustomerRequest ToUpdateRequest(CreateCustomerRequest request) => new(
-        request.RegisteredFileNumber, request.Name, request.PreviousName, request.CustomerTypeId, request.VatNumber,
-        request.VatRatingId, request.AccountNumber, request.CustomerFinanceId, request.ContactName, request.Organisation,
-        request.Address1, request.Address2, request.Address3, request.Address4, request.Address5, request.CountryId,
-        request.Telephone, request.Telephone2, request.Fax, request.Email, request.CurrencyId, request.Comments,
-        request.PostageArrangements, request.PaymentNonUK, request.InvoiceName, request.InvoiceOrganisation,
-        request.InvoiceAddress1, request.InvoiceAddress2, request.InvoiceAddress3, request.InvoiceAddress4,
-        request.InvoiceAddress5, request.InvoiceCountryId, request.InvoiceTelephone, request.InvoiceTelephone2,
-        request.InvoiceFax, request.InvoiceEmail, request.IsActive, request.CanOrderOnline, request.CustomerStatusId);
+    private static CustomerSaveRequest ToUpdateRequest(CustomerSaveRequest request) => request;
 
     [Fact]
     public async Task CreateCustomer_ValidRequest_ReturnsCreatedAtAction()
@@ -97,7 +89,7 @@ public class CustomerControllerTests
 
         var result = await controller.CreateCustomer(request, CancellationToken.None);
 
-        var badRequest = Assert.IsAssignableFrom<ObjectResult>(result.Result);
+        var badRequest = Assert.IsType<ObjectResult>(result.Result, exactMatch: false);
         Assert.Equal(400, badRequest.StatusCode);
     }
 
@@ -135,7 +127,7 @@ public class CustomerControllerTests
         var result = await controller.GetCustomers(new CustomerRequest(CustomerStatusFilter.Active), CancellationToken.None);
 
         var ok = Assert.IsType<OkObjectResult>(result.Result);
-        var summaries = Assert.IsAssignableFrom<IReadOnlyList<CustomerSummaryResponse>>(ok.Value);
+        var summaries = Assert.IsType<IReadOnlyList<CustomerSummaryResponse>>(ok.Value, exactMatch: false);
         Assert.Equal(2, summaries.Count);
     }
 
@@ -175,54 +167,37 @@ public class CustomerControllerTests
 
         var result = await controller.UpdateCustomer(customerId, invalidUpdate, CancellationToken.None);
 
-        var badRequest = Assert.IsAssignableFrom<ObjectResult>(result.Result);
+        var badRequest = Assert.IsType<ObjectResult>(result.Result, exactMatch: false);
         Assert.Equal(400, badRequest.StatusCode);
     }
 
     [Fact]
-    public async Task DeactivateCustomer_UnknownCustomer_ReturnsNotFound()
-    {
-        var controller = CreateController(new FakeCustomerRepository());
-
-        var result = await controller.DeactivateCustomer(Guid.NewGuid(), new DeactivateCustomerRequest(Guid.NewGuid()), CancellationToken.None);
-
-        Assert.IsType<NotFoundResult>(result.Result);
-    }
-
-    [Fact]
-    public async Task DeactivateCustomer_ExistingCustomer_ReturnsOkWithInactiveCustomer()
+    public async Task UpdateCustomer_SetIsActiveFalse_ReturnsOkWithInactiveCustomer()
     {
         var repository = new FakeCustomerRepository();
         var controller = CreateController(repository);
         var created = await controller.CreateCustomer(ValidCreateRequest(), CancellationToken.None);
         var customerId = ((CustomerResponse)((CreatedAtActionResult)created.Result!).Value!).CustomerId;
+        var inactiveUpdate = ToUpdateRequest(ValidCreateRequest()) with { IsActive = false };
 
-        var result = await controller.DeactivateCustomer(customerId, new DeactivateCustomerRequest(Guid.NewGuid()), CancellationToken.None);
+        var result = await controller.UpdateCustomer(customerId, inactiveUpdate, CancellationToken.None);
 
         var ok = Assert.IsType<OkObjectResult>(result.Result);
         Assert.False(((CustomerResponse)ok.Value!).IsActive);
     }
 
     [Fact]
-    public async Task ReactivateCustomer_UnknownCustomer_ReturnsNotFound()
-    {
-        var controller = CreateController(new FakeCustomerRepository());
-
-        var result = await controller.ReactivateCustomer(Guid.NewGuid(), CancellationToken.None);
-
-        Assert.IsType<NotFoundResult>(result.Result);
-    }
-
-    [Fact]
-    public async Task ReactivateCustomer_ExistingCustomer_ReturnsOkWithActiveCustomer()
+    public async Task UpdateCustomer_SetIsActiveTrueAfterInactive_ReturnsOkWithActiveCustomer()
     {
         var repository = new FakeCustomerRepository();
         var controller = CreateController(repository);
         var created = await controller.CreateCustomer(ValidCreateRequest(), CancellationToken.None);
         var customerId = ((CustomerResponse)((CreatedAtActionResult)created.Result!).Value!).CustomerId;
-        await controller.DeactivateCustomer(customerId, new DeactivateCustomerRequest(Guid.NewGuid()), CancellationToken.None);
+        var inactiveUpdate = ToUpdateRequest(ValidCreateRequest()) with { IsActive = false };
+        await controller.UpdateCustomer(customerId, inactiveUpdate, CancellationToken.None);
+        var activeUpdate = ToUpdateRequest(ValidCreateRequest()) with { IsActive = true };
 
-        var result = await controller.ReactivateCustomer(customerId, CancellationToken.None);
+        var result = await controller.UpdateCustomer(customerId, activeUpdate, CancellationToken.None);
 
         var ok = Assert.IsType<OkObjectResult>(result.Result);
         Assert.True(((CustomerResponse)ok.Value!).IsActive);

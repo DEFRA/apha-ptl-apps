@@ -1,11 +1,12 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.Extensions.Logging;
 using PTL.ApiClient;
 using PTL.Contracts.Participant;
 
 namespace PTL.InternalWeb.Features.Participant;
 
-public class ParticipantController(IParticipantApiClient participantApiClient, ILogger<ParticipantController> logger) : Controller
+public class ParticipantController(IParticipantApiClient participantApiClient, ICustomerApiClient customerApiClient, ILookupApiClient lookupApiClient, ILogger<ParticipantController> logger) : Controller
 {
     private static readonly Action<ILogger, string?, bool, int, int, Exception?> LogDisplayedParticipantListMessage =
         LoggerMessage.Define<string?, bool, int, int>(
@@ -63,9 +64,12 @@ public class ParticipantController(IParticipantApiClient participantApiClient, I
     }
 
     [HttpGet]
-    public IActionResult Create(Guid customerId)
+    public async Task<IActionResult> Create(Guid customerId, CancellationToken cancellationToken)
     {
-        return View(new ParticipantFormViewModel { CustomerId = customerId });
+        var model = new ParticipantFormViewModel { CustomerId = customerId };
+        await PopulateLookupOptionsAsync(model, cancellationToken);
+        await PopulateCustomerContactAsync(model, customerId, cancellationToken);
+        return View(model);
     }
 
     [HttpPost]
@@ -75,17 +79,19 @@ public class ParticipantController(IParticipantApiClient participantApiClient, I
         if (!ModelState.IsValid)
         {
             model.CustomerId = customerId;
+            await PopulateLookupOptionsAsync(model, cancellationToken);
+            await PopulateCustomerContactAsync(model, customerId, cancellationToken);
             return View(model);
         }
 
         try
         {
-            var created = await participantApiClient.CreateParticipantAsync(new CreateParticipantRequest(
+            var created = await participantApiClient.CreateParticipantAsync(new ParticipantRequest(
                 customerId,
-                model.SsoId,
+                model.SsoId.GetValueOrDefault(),
                 model.LabCode,
                 model.LabName,
-                model.LabTypeId,
+                model.LabTypeId.GetValueOrDefault(),
                 model.ContactName,
                 model.Organisation,
                 model.Address1,
@@ -93,7 +99,7 @@ public class ParticipantController(IParticipantApiClient participantApiClient, I
                 model.Address3,
                 model.Address4,
                 model.Address5,
-                model.CountryId,
+                model.CountryId.GetValueOrDefault(),
                 model.Telephone,
                 model.Fax,
                 model.Email,
@@ -108,6 +114,8 @@ public class ParticipantController(IParticipantApiClient participantApiClient, I
             LogFailedToCreateParticipantMessage(logger, customerId, ex);
             ModelState.AddModelError(string.Empty, "Unable to create this participant. Please review the details and try again.");
             model.CustomerId = customerId;
+            await PopulateLookupOptionsAsync(model, cancellationToken);
+            await PopulateCustomerContactAsync(model, customerId, cancellationToken);
             return View(model);
         }
     }
@@ -116,7 +124,15 @@ public class ParticipantController(IParticipantApiClient participantApiClient, I
     public async Task<IActionResult> Edit(Guid id, CancellationToken cancellationToken)
     {
         var participant = await participantApiClient.GetParticipantAsync(id, cancellationToken);
-        return participant is null ? NotFound() : View(ToFormViewModel(participant));
+        if (participant is null)
+        {
+            return NotFound();
+        }
+
+        var model = ToFormViewModel(participant);
+        await PopulateLookupOptionsAsync(model, cancellationToken);
+        await PopulateCustomerContactAsync(model, participant.CustomerId, cancellationToken);
+        return View(model);
     }
 
     [HttpPost]
@@ -125,17 +141,20 @@ public class ParticipantController(IParticipantApiClient participantApiClient, I
     {
         if (!ModelState.IsValid)
         {
+            await RestoreDisplayOnlyFieldsAsync(model, id, cancellationToken);
+            await PopulateLookupOptionsAsync(model, cancellationToken);
+            await PopulateCustomerContactAsync(model, model.CustomerId.GetValueOrDefault(), cancellationToken);
             return View(model);
         }
 
         try
         {
-            var updated = await participantApiClient.UpdateParticipantAsync(id, new UpdateParticipantRequest(
-                model.CustomerId,
-                model.SsoId,
+            var updated = await participantApiClient.UpdateParticipantAsync(id, new ParticipantRequest(
+                model.CustomerId.GetValueOrDefault(),
+                model.SsoId.GetValueOrDefault(),
                 model.LabCode,
                 model.LabName,
-                model.LabTypeId,
+                model.LabTypeId.GetValueOrDefault(),
                 model.ContactName,
                 model.Organisation,
                 model.Address1,
@@ -143,7 +162,7 @@ public class ParticipantController(IParticipantApiClient participantApiClient, I
                 model.Address3,
                 model.Address4,
                 model.Address5,
-                model.CountryId,
+                model.CountryId.GetValueOrDefault(),
                 model.Telephone,
                 model.Fax,
                 model.Email,
@@ -157,54 +176,10 @@ public class ParticipantController(IParticipantApiClient participantApiClient, I
         {
             LogFailedToUpdateParticipantMessage(logger, id, ex);
             ModelState.AddModelError(string.Empty, "Unable to update this participant. Please review the changes and try again.");
+            await RestoreDisplayOnlyFieldsAsync(model, id, cancellationToken);
+            await PopulateLookupOptionsAsync(model, cancellationToken);
+            await PopulateCustomerContactAsync(model, model.CustomerId.GetValueOrDefault(), cancellationToken);
             return View(model);
-        }
-    }
-
-    [HttpGet]
-    public async Task<IActionResult> Deactivate(Guid id, CancellationToken cancellationToken)
-    {
-        var participant = await participantApiClient.GetParticipantAsync(id, cancellationToken);
-        return participant is null ? NotFound() : View(new DeactivateParticipantViewModel { ParticipantId = participant.ParticipantId, LabName = participant.LabName });
-    }
-
-    [HttpPost]
-    [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Deactivate(Guid id, DeactivateParticipantViewModel model, CancellationToken cancellationToken)
-    {
-        if (!ModelState.IsValid)
-        {
-            model.ParticipantId = id;
-            return View(model);
-        }
-
-        try
-        {
-            var updated = await participantApiClient.DeactivateParticipantAsync(id, cancellationToken);
-            return updated is null ? NotFound() : RedirectToAction(nameof(Details), new { id });
-        }
-        catch (Exception ex)
-        {
-            LogFailedToDeactivateParticipantMessage(logger, id, ex);
-            ModelState.AddModelError(string.Empty, "Unable to deactivate this participant.");
-            model.ParticipantId = id;
-            return View(model);
-        }
-    }
-
-    [HttpPost]
-    [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Reactivate(Guid id, CancellationToken cancellationToken)
-    {
-        try
-        {
-            var updated = await participantApiClient.ReactivateParticipantAsync(id, cancellationToken);
-            return updated is null ? NotFound() : RedirectToAction(nameof(Details), new { id });
-        }
-        catch (Exception ex)
-        {
-            LogFailedToReactivateParticipantMessage(logger, id, ex);
-            return RedirectToAction(nameof(Details), new { id });
         }
     }
 
@@ -229,6 +204,69 @@ public class ParticipantController(IParticipantApiClient participantApiClient, I
         Email = participant.Email,
         Email2 = participant.Email2,
         Comments = participant.Comments,
-        IsActive = participant.IsActive
+        IsActive = participant.IsActive,
+        InactiveDate = participant.InactiveDate
     };
+
+    // SsoId is a disabled field (server-generated/preserved, never user-editable - see
+    // ParticipantService.UpdateParticipantAsync/CreateParticipantAsync) and InactiveDate has no
+    // form input at all, so a posted-back model on a failed Edit submission has them blank/default -
+    // re-fetch the persisted participant to restore them for redisplay.
+    private async Task RestoreDisplayOnlyFieldsAsync(ParticipantFormViewModel model, Guid participantId, CancellationToken cancellationToken)
+    {
+        var participant = await participantApiClient.GetParticipantAsync(participantId, cancellationToken);
+        if (participant is null)
+        {
+            return;
+        }
+
+        model.SsoId = participant.SsoId;
+        model.InactiveDate = participant.InactiveDate;
+    }
+
+    // Fetches the LabType/Country reference lists once per request and shapes them into
+    // SelectListItem so _ParticipantForm.cshtml can render <select asp-items="..."> - matches the
+    // legacy DropDownLabType/DropDownCountry DataBind() calls in Participant.aspx.vb LoadLabelNames().
+    private async Task PopulateLookupOptionsAsync(ParticipantFormViewModel model, CancellationToken cancellationToken)
+    {
+        var countriesTask = lookupApiClient.GetCountriesAsync(cancellationToken);
+        var labTypesTask = lookupApiClient.GetLabTypesAsync(cancellationToken);
+        await Task.WhenAll(countriesTask, labTypesTask);
+
+        // Country is validated as required by ValidatorCountryRequired in the legacy form, so a
+        // blank option is offered - matches DropDownCountry.Items.Insert(0, New ListItem(...)).
+        model.CountryOptions = countriesTask.Result
+            .Select(c => new SelectListItem(c.Country, c.CountryId.ToString()))
+            .Prepend(new SelectListItem("- Please Select -", Guid.Empty.ToString()))
+            .ToList();
+
+        // LabType has no blank option in the legacy DropDownLabType, so none is added here either.
+        model.LabTypeOptions = labTypesTask.Result
+            .Select(l => new SelectListItem(l.Name, l.LabTypeId.ToString()))
+            .ToList();
+    }
+
+    // Fetches the parent Customer's contact details so the "Copy from customer contact" button
+    // (mirrors legacy ButtonCopyDetails_Click) can copy them client-side with no extra round trip.
+    // Missing/unreachable Customer is not fatal here - the button just has nothing to copy.
+    private async Task PopulateCustomerContactAsync(ParticipantFormViewModel model, Guid customerId, CancellationToken cancellationToken)
+    {
+        var customer = await customerApiClient.GetCustomerAsync(customerId, cancellationToken);
+        if (customer is null)
+        {
+            return;
+        }
+
+        model.CustomerContactName = customer.ContactName;
+        model.CustomerOrganisation = customer.Organisation;
+        model.CustomerAddress1 = customer.Address1;
+        model.CustomerAddress2 = customer.Address2;
+        model.CustomerAddress3 = customer.Address3;
+        model.CustomerAddress4 = customer.Address4;
+        model.CustomerAddress5 = customer.Address5;
+        model.CustomerCountryId = customer.CountryId;
+        model.CustomerTelephone = customer.Telephone;
+        model.CustomerFax = customer.Fax;
+        model.CustomerEmail = customer.Email;
+    }
 }

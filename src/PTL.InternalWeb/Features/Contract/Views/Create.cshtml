@@ -1,0 +1,16 @@
+@model PTL.InternalWeb.Features.Contract.ContractFormViewModel
+@{
+    ViewData["Title"] = "Create contract";
+}
+
+<h1 class="govuk-heading-l">Create contract</h1>
+
+<form method="post" asp-action="Create" asp-route-customerId="@Model.CustomerId" novalidate>
+    @await Html.PartialAsync("_ContractForm", Model)
+
+    <button class="govuk-button" data-module="govuk-button" type="submit">Create contract</button>
+</form>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

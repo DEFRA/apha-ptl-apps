@@ -136,8 +136,6 @@ public sealed class ParticipantService(IParticipantRepository participantReposit
 
         existing.IsActive = true;
         existing.InactiveDate = null;
-        existing.InactiveError = false;
-        existing.InactiveErrorDate = null;
 
         var updated = await participantRepository.UpdateAsync(existing, cancellationToken);
         LogReactivatedParticipantMessage(logger, participantId, null);

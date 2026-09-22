@@ -18,6 +18,7 @@
   <Folder Name="/tests/">
     <Project Path="tests/PTL.Api.Tests/PTL.Api.Tests.csproj" />
     <Project Path="tests/PTL.ApiClient.Tests/PTL.ApiClient.Tests.csproj" />
+    <Project Path="tests/PTL.Data.Tests/PTL.Data.Tests.csproj" />
     <Project Path="tests/PTL.InternalWeb.Tests/PTL.InternalWeb.Tests.csproj" />
     <Project Path="tests/PTL.ExternalWeb.Tests/PTL.ExternalWeb.Tests.csproj" />
   </Folder>

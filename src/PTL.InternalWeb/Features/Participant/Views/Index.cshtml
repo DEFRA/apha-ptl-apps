@@ -7,10 +7,6 @@
 
 <h1 class="govuk-heading-l">Participants</h1>
 
-<p class="govuk-body">
-    <a class="govuk-button" data-module="govuk-button" asp-action="Create" asp-route-customerId="@Model.CustomerId">Create participant</a>
-</p>
-
 <form method="get" asp-action="Index" class="govuk-!-margin-bottom-6">
     <input type="hidden" name="customerId" value="@Model.CustomerId" />
     <div class="govuk-form-group">

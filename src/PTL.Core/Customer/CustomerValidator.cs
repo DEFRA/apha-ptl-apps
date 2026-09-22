@@ -7,11 +7,55 @@ namespace PTL.Core.Customer;
 // spiCustomer/spuCustomer stored procedure parameter sizes (and therefore the tblCustomer columns).
 public static partial class CustomerValidator
 {
-    [GeneratedRegex(@"^(QAL/[0-9]*)?$")]
+    private const string OrganisationField = "Organisation";
+    private const string RegisteredFileNumberField = "RegisteredFileNumber";
+    private const string TelephoneField = "Telephone";
+    private const string EmailField = "Email";
+
+    [GeneratedRegex(@"^(QAL/[0-9]*)?$", RegexOptions.None, 1000)]
     private static partial Regex RegisteredFileNumberPattern();
 
-    [GeneratedRegex(@"^[ 0-9\+\-\(\)\*\#]*$")]
+    [GeneratedRegex(@"^[ 0-9\+\-\(\)\*\#]*$", RegexOptions.None, 1000)]
     private static partial Regex PhonePattern();
+
+    // Human-readable labels matching each field's <label> text in _CustomerForm.cshtml, so
+    // validation messages read naturally (e.g. "VAT number must not exceed...") instead of
+    // exposing the raw PascalCase property name to the user.
+    private static readonly Dictionary<string, string> FieldLabels = new()
+    {
+        ["Name"] = "Name",
+        ["ContactName"] = "Contact name",
+        [OrganisationField] = "Organisation",
+        [RegisteredFileNumberField] = "Registered file number",
+        ["Address1"] = "Address line 1",
+        ["Address2"] = "Address line 2",
+        ["Address3"] = "Address line 3",
+        ["Address4"] = "Address line 4",
+        ["Address5"] = "Address line 5",
+        [TelephoneField] = "Telephone",
+        ["Telephone2"] = "Telephone (alternative)",
+        ["Fax"] = "Fax",
+        [EmailField] = "Email",
+        ["Comments"] = "Comments",
+        ["PostageArrangements"] = "Postage arrangements",
+        ["InvoiceName"] = "Invoice name",
+        ["InvoiceOrganisation"] = "Invoice organisation",
+        ["InvoiceAddress1"] = "Invoice address line 1",
+        ["InvoiceAddress2"] = "Invoice address line 2",
+        ["InvoiceAddress3"] = "Invoice address line 3",
+        ["InvoiceAddress4"] = "Invoice address line 4",
+        ["InvoiceAddress5"] = "Invoice address line 5",
+        ["InvoiceTelephone"] = "Invoice telephone",
+        ["InvoiceTelephone2"] = "Invoice telephone (alternative)",
+        ["InvoiceFax"] = "Invoice fax",
+        ["InvoiceEmail"] = "Invoice email",
+        ["VatNumber"] = "VAT number",
+        ["AccountNumber"] = "Account number",
+        ["CustomerFinanceId"] = "Customer finance ID",
+        ["CustomerTypeId"] = "Customer type"
+    };
+
+    private static string Label(string field) => FieldLabels.GetValueOrDefault(field, field);
 
     public static CustomerValidationResult Validate(Customer customer)
     {
@@ -19,18 +63,18 @@ public static partial class CustomerValidator
 
         if (customer.CustomerTypeId == Guid.Empty)
         {
-            errors.Add(new CustomerValidationError("CustomerTypeId", "CustomerTypeId cannot be an empty GUID."));
+            errors.Add(new CustomerValidationError("CustomerTypeId", $"{Label("CustomerTypeId")} must be selected."));
         }
 
         RequireNotEmpty(customer.Name, "Name", errors);
         MaxLength(customer.Name, 50, "Name", errors);
         MaxLength(customer.ContactName, 50, "ContactName", errors);
-        MaxLength(customer.Organisation, 50, "Organisation", errors);
+        MaxLength(customer.Organisation, 50, OrganisationField, errors);
 
-        MaxLength(customer.RegisteredFileNumber, 10, "RegisteredFileNumber", errors);
+        MaxLength(customer.RegisteredFileNumber, 10, RegisteredFileNumberField, errors);
         if (!RegisteredFileNumberPattern().IsMatch(customer.RegisteredFileNumber))
         {
-            errors.Add(new CustomerValidationError("RegisteredFileNumber", "RegisteredFileNumber must match the format QAL/nnnnn."));
+            errors.Add(new CustomerValidationError(RegisteredFileNumberField, $"{Label(RegisteredFileNumberField)} must match the format QAL/nnnnn."));
         }
 
         MaxLength(customer.Address1, 100, "Address1", errors);
@@ -39,14 +83,14 @@ public static partial class CustomerValidator
         MaxLength(customer.Address4, 100, "Address4", errors);
         MaxLength(customer.Address5, 100, "Address5", errors);
 
-        MaxLength(customer.Telephone, 20, "Telephone", errors);
-        RegexMatch(customer.Telephone, PhonePattern(), "Telephone", errors);
+        MaxLength(customer.Telephone, 20, TelephoneField, errors);
+        RegexMatch(customer.Telephone, PhonePattern(), TelephoneField, errors);
         MaxLength(customer.Telephone2, 20, "Telephone2", errors);
         RegexMatch(customer.Telephone2, PhonePattern(), "Telephone2", errors);
         MaxLength(customer.Fax, 20, "Fax", errors);
         RegexMatch(customer.Fax, PhonePattern(), "Fax", errors);
 
-        MaxLength(customer.Email, 150, "Email", errors);
+        MaxLength(customer.Email, 150, EmailField, errors);
         MaxLength(customer.Comments, 2000, "Comments", errors);
         MaxLength(customer.PostageArrangements, 500, "PostageArrangements", errors);
 
@@ -76,20 +120,14 @@ public static partial class CustomerValidator
             RequireNotEmpty(customer.Organisation, "Organisation", errors);
             RequireNotEmpty(customer.Address1, "Address1", errors);
             RequireNotEmpty(customer.Address2, "Address2", errors);
-            RequireNotEmpty(customer.Telephone, "Telephone", errors);
-            RequireNotEmpty(customer.Email, "Email", errors);
+            RequireNotEmpty(customer.Telephone, TelephoneField, errors);
+            RequireNotEmpty(customer.Email, EmailField, errors);
             RequireNotEmpty(customer.InvoiceOrganisation, "InvoiceOrganisation", errors);
             RequireNotEmpty(customer.InvoiceAddress1, "InvoiceAddress1", errors);
             RequireNotEmpty(customer.InvoiceAddress2, "InvoiceAddress2", errors);
 
-            RequireValidEmail(customer.Email, "Email", errors);
+            RequireValidEmail(customer.Email, EmailField, errors);
             RequireValidEmail(customer.InvoiceEmail, "InvoiceEmail", errors);
-        }
-        else if (customer.CustomerStatusId is null || customer.CustomerStatusId == Guid.Empty)
-        {
-            // Mirrors Customer.aspx.vb's LoadStatusValues/inactive-error flag: an inactive customer
-            // must record which CustomerStatus (inactive reason) applies.
-            errors.Add(new CustomerValidationError("CustomerStatusId", "Select a customer status when the customer is inactive."));
         }
 
         return new CustomerValidationResult(errors.Count == 0, errors);
@@ -99,7 +137,7 @@ public static partial class CustomerValidator
     {
         if (string.IsNullOrWhiteSpace(value))
         {
-            errors.Add(new CustomerValidationError(field, $"{field} is required."));
+            errors.Add(new CustomerValidationError(field, $"{Label(field)} is required."));
         }
     }
 
@@ -107,7 +145,7 @@ public static partial class CustomerValidator
     {
         if (value.Length > max)
         {
-            errors.Add(new CustomerValidationError(field, $"{field} must not exceed {max} characters."));
+            errors.Add(new CustomerValidationError(field, $"{Label(field)} must not exceed {max} characters."));
         }
     }
 
@@ -115,7 +153,7 @@ public static partial class CustomerValidator
     {
         if (!string.IsNullOrEmpty(value) && !pattern.IsMatch(value))
         {
-            errors.Add(new CustomerValidationError(field, $"{field} contains characters that are not allowed."));
+            errors.Add(new CustomerValidationError(field, $"{Label(field)} contains characters that are not allowed."));
         }
     }
 
@@ -135,7 +173,7 @@ public static partial class CustomerValidator
         }
         catch (FormatException)
         {
-            errors.Add(new CustomerValidationError(field, $"{field} must be a valid email address."));
+            errors.Add(new CustomerValidationError(field, $"{Label(field)} must be a valid email address."));
         }
     }
 }

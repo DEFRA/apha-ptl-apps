@@ -132,30 +132,6 @@ public class CustomerValidatorTests
     }
 
     [Fact]
-    public void Validate_InactiveCustomerWithoutCustomerStatusId_ReturnsError()
-    {
-        var customer = ValidActiveCustomer();
-        customer.IsActive = false;
-        customer.CustomerStatusId = null;
-
-        var result = CustomerValidator.Validate(customer);
-
-        Assert.Contains(result.Errors, e => e.Field == "CustomerStatusId");
-    }
-
-    [Fact]
-    public void Validate_InactiveCustomerWithEmptyCustomerStatusId_ReturnsError()
-    {
-        var customer = ValidActiveCustomer();
-        customer.IsActive = false;
-        customer.CustomerStatusId = Guid.Empty;
-
-        var result = CustomerValidator.Validate(customer);
-
-        Assert.Contains(result.Errors, e => e.Field == "CustomerStatusId");
-    }
-
-    [Fact]
     public void Validate_InvalidEmailFormat_ReturnsError()
     {
         var customer = ValidActiveCustomer();

@@ -32,40 +32,16 @@ public sealed class ParticipantApiClient(HttpClient httpClient) : IParticipantAp
         return result ?? new ParticipantSearchResponse([], 0, request.Page, request.PageSize);
     }
 
-    public async Task<ParticipantResponse> CreateParticipantAsync(CreateParticipantRequest request, CancellationToken cancellationToken = default)
+    public async Task<ParticipantResponse> CreateParticipantAsync(ParticipantRequest request, CancellationToken cancellationToken = default)
     {
         var response = await httpClient.PostAsJsonAsync("/api/participants", request, cancellationToken);
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadFromJsonAsync<ParticipantResponse>(cancellationToken) ?? throw new InvalidOperationException("Participant creation response was empty.");
     }
 
-    public async Task<ParticipantResponse?> UpdateParticipantAsync(Guid participantId, UpdateParticipantRequest request, CancellationToken cancellationToken = default)
+    public async Task<ParticipantResponse?> UpdateParticipantAsync(Guid participantId, ParticipantRequest request, CancellationToken cancellationToken = default)
     {
         var response = await httpClient.PutAsJsonAsync($"/api/participants/{participantId}", request, cancellationToken);
-        if (response.StatusCode == HttpStatusCode.NotFound)
-        {
-            return null;
-        }
-
-        response.EnsureSuccessStatusCode();
-        return await response.Content.ReadFromJsonAsync<ParticipantResponse>(cancellationToken);
-    }
-
-    public async Task<ParticipantResponse?> DeactivateParticipantAsync(Guid participantId, CancellationToken cancellationToken = default)
-    {
-        var response = await httpClient.PostAsync($"/api/participants/{participantId}/deactivate", null, cancellationToken);
-        if (response.StatusCode == HttpStatusCode.NotFound)
-        {
-            return null;
-        }
-
-        response.EnsureSuccessStatusCode();
-        return await response.Content.ReadFromJsonAsync<ParticipantResponse>(cancellationToken);
-    }
-
-    public async Task<ParticipantResponse?> ReactivateParticipantAsync(Guid participantId, CancellationToken cancellationToken = default)
-    {
-        var response = await httpClient.PostAsync($"/api/participants/{participantId}/reactivate", null, cancellationToken);
         if (response.StatusCode == HttpStatusCode.NotFound)
         {
             return null;

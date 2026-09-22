@@ -7,17 +7,6 @@
 
 <p class="govuk-body">
     <a class="govuk-button" data-module="govuk-button" asp-action="Edit" asp-route-id="@Model.CustomerId">Edit customer</a>
-    @if (Model.IsActive)
-    {
-        <a class="govuk-button govuk-button--warning" data-module="govuk-button" asp-action="Deactivate" asp-route-id="@Model.CustomerId">Deactivate customer</a>
-    }
-    else
-    {
-        <form asp-action="Reactivate" asp-route-id="@Model.CustomerId" method="post" class="govuk-!-display-inline">
-            @Html.AntiForgeryToken()
-            <button type="submit" class="govuk-button" data-module="govuk-button">Reactivate customer</button>
-        </form>
-    }
 </p>
 
 <h2 class="govuk-heading-m">Customer details</h2>
@@ -146,7 +135,7 @@
         <dd class="govuk-summary-list__value">@Model.AccountNumber</dd>
     </div>
     <div class="govuk-summary-list__row">
-        <dt class="govuk-summary-list__key">Customer finance ID</dt>
+        <dt class="govuk-summary-list__key">Customer ID</dt>
         <dd class="govuk-summary-list__value">@Model.CustomerFinanceId</dd>
     </div>
     <div class="govuk-summary-list__row">

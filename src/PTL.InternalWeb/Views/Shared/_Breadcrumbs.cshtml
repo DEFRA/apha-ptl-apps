@@ -1,7 +1,10 @@
 @using System.Text.RegularExpressions
+@using PTL.InternalWeb.Navigation
 @{
     var controller = (ViewContext.RouteData.Values["controller"]?.ToString() ?? string.Empty).Trim();
     var action = (ViewContext.RouteData.Values["action"]?.ToString() ?? string.Empty).Trim();
+    var customerId = ViewContext.HttpContext.Request.Query["customerId"].FirstOrDefault()
+        ?? ViewContext.RouteData.Values["customerId"]?.ToString();
 
     static string ToDisplay(string value)
     {
@@ -13,11 +16,12 @@
         return Regex.Replace(value, "([a-z])([A-Z])", "$1 $2");
     }
 
-    var hasController =
-        !string.IsNullOrWhiteSpace(controller) &&
-        !string.Equals(controller, "Home", StringComparison.OrdinalIgnoreCase);
+    var isHome = string.Equals(controller, "Home", StringComparison.OrdinalIgnoreCase);
 
-    var hasAction = !string.IsNullOrWhiteSpace(action) && !string.Equals(action, "Index", StringComparison.OrdinalIgnoreCase);
+    // Mirrors the current page's node in the left nav (_SideNavigation.cshtml) - the breadcrumb
+    // trail is the exact reverse of the drill-down journey: Home > ... > current page. Falls back
+    // to a plain controller/action crumb for any page not represented in the nav tree.
+    var path = isHome ? null : SideNavigationProvider.FindPath(SideNavigationProvider.Build(), controller, action);
 }
 
 <nav class="govuk-breadcrumbs" aria-label="Breadcrumb">
@@ -26,18 +30,32 @@
             <a class="govuk-breadcrumbs__link" asp-controller="Home" asp-action="Index">Home</a>
         </li>
 
-        @if (hasController)
+        @if (path is not null)
         {
-            <li class="govuk-breadcrumbs__list-item">
-                <a class="govuk-breadcrumbs__link" asp-controller="@controller" asp-action="Index">@ToDisplay(controller)</a>
-            </li>
+            for (var i = 0; i < path.Count; i++)
+            {
+                var node = path[i];
+                var isLast = i == path.Count - 1;
+                <li class="govuk-breadcrumbs__list-item">
+                    @if (isLast)
+                    {
+                        @node.Text
+                    }
+                    else if (node.ControllerName is "Participant" or "Contract" && customerId is not null)
+                    {
+                        <a class="govuk-breadcrumbs__link" asp-controller="@node.ControllerName" asp-action="@node.ActionName" asp-route-customerId="@customerId">@node.Text</a>
+                    }
+                    else
+                    {
+                        <a class="govuk-breadcrumbs__link" asp-controller="@node.ControllerName" asp-action="@node.ActionName">@node.Text</a>
+                    }
+                </li>
+            }
         }
-
-        @if (hasAction)
+        else if (!isHome)
         {
-            <li class="govuk-breadcrumbs__list-item">
-                <a class="govuk-breadcrumbs__link" asp-controller="@controller" asp-action="@action">@ToDisplay(action)</a>
-            </li>
+            <li class="govuk-breadcrumbs__list-item">@ToDisplay(controller)@(string.IsNullOrWhiteSpace(action) || string.Equals(action, "Index", StringComparison.OrdinalIgnoreCase) ? "" : $" - {ToDisplay(action)}")</li>
         }
     </ol>
+
 </nav>

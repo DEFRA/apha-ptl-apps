@@ -39,13 +39,15 @@ public class ParticipantServiceTests
     }
 
     [Fact]
-    public async Task DeactivateParticipantAsync_SetsInactiveAndStampsInactiveDate()
+    public async Task UpdateParticipantAsync_SetIsActiveFalse_StampsInactiveDate()
     {
         var repository = new FakeParticipantRepository();
         var service = CreateService(repository);
         var created = await service.CreateParticipantAsync(ValidActiveParticipant());
+        var updatedFields = ValidActiveParticipant();
+        updatedFields.IsActive = false;
 
-        var deactivated = await service.DeactivateParticipantAsync(created.ParticipantId);
+        var deactivated = await service.UpdateParticipantAsync(created.ParticipantId, updatedFields);
 
         Assert.NotNull(deactivated);
         Assert.False(deactivated!.IsActive);

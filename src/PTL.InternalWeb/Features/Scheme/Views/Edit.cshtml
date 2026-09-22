@@ -1,0 +1,16 @@
+@model PTL.InternalWeb.Features.Scheme.SchemeFormViewModel
+@{
+    ViewData["Title"] = "Edit scheme";
+}
+
+<h1 class="govuk-heading-l">Edit scheme</h1>
+
+<form method="post" asp-action="Edit" asp-route-id="@Model.SchemeId" novalidate>
+    @await Html.PartialAsync("_SchemeForm", Model)
+
+    <button class="govuk-button" data-module="govuk-button" type="submit">Save changes</button>
+</form>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

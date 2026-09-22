@@ -1,8 +1,19 @@
 @model PTL.InternalWeb.Features.Participant.ParticipantFormViewModel
 @{
+    // Fixed field order matching the visual layout below, so the error summary links appear in
+    // the same top-to-bottom order as the fields themselves rather than ModelState's insertion
+    // order (which follows validation execution order, not the page layout).
+    string[] fieldOrder =
+    [
+        "LabCode", "LabName", "LabTypeId", "SsoId",
+        "ContactName", "Organisation", "Address1", "Address2", "Address3", "Address4", "Address5",
+        "CountryId", "Telephone", "Fax", "Email", "Email2", "Comments", "IsActive"
+    ];
+
     var errors = ViewData.ModelState
         .Where(entry => entry.Value?.Errors.Count > 0)
         .SelectMany(entry => entry.Value!.Errors.Select(error => (Field: entry.Key, Message: error.ErrorMessage)))
+        .OrderBy(error => Array.IndexOf(fieldOrder, error.Field) is var idx && idx == -1 ? -1 : idx)
         .ToList();
 
     bool HasError(string field) => ViewData.ModelState.TryGetValue(field, out var entry) && entry.Errors.Count > 0;
@@ -62,25 +73,49 @@
 </div>
 
 <div class="@FormGroupClass("LabTypeId")">
-    <label class="govuk-label" asp-for="LabTypeId">Lab type ID</label>
-    <div class="govuk-hint">Enter the lab type GUID directly.</div>
+    <label class="govuk-label" asp-for="LabTypeId">Lab type</label>
     @if (HasError("LabTypeId"))
     {
         <p id="LabTypeId-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @FirstError("LabTypeId")</p>
     }
-    <input class="@InputClass("govuk-input", "LabTypeId")" asp-for="LabTypeId" aria-describedby="@DescribedBy("LabTypeId")" />
+    <select class="@InputClass("govuk-select", "LabTypeId")" asp-for="LabTypeId" asp-items="Model.LabTypeOptions" aria-describedby="@DescribedBy("LabTypeId")"></select>
 </div>
 
 <div class="@FormGroupClass("SsoId")">
     <label class="govuk-label" asp-for="SsoId">SSO ID</label>
+    <div class="govuk-hint">Set automatically and cannot be changed.</div>
     @if (HasError("SsoId"))
     {
         <p id="SsoId-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @FirstError("SsoId")</p>
     }
-    <input class="@InputClass("govuk-input", "SsoId")" asp-for="SsoId" aria-describedby="@DescribedBy("SsoId")" />
+    <input class="@InputClass("govuk-input", "SsoId")" asp-for="SsoId" aria-describedby="@DescribedBy("SsoId")" disabled />
 </div>
 
-<h2 class="govuk-heading-m">Contact details</h2>
+<div class="govuk-form-group">
+    <div class="govuk-checkboxes" data-module="govuk-checkboxes">
+        <div class="govuk-checkboxes__item">
+            <input class="govuk-checkboxes__input" asp-for="IsActive" id="IsActive" />
+            <label class="govuk-label govuk-checkboxes__label" asp-for="IsActive">Active</label>
+        </div>
+    </div>
+</div>
+
+@if (Model.InactiveDate is not null)
+{
+    <div class="govuk-form-group">
+        <label class="govuk-label" for="InactiveDateDisplay">Inactive from</label>
+        <input class="govuk-input govuk-input--width-10" id="InactiveDateDisplay" value="@Model.InactiveDate.Value.ToString("d MMMM yyyy")" disabled />
+    </div>
+}
+
+<h2 class="govuk-heading-m">
+    Contact details
+    <button type="button" class="govuk-button govuk-button--secondary govuk-!-margin-left-3" data-module="govuk-button" id="CopyFromCustomerContactButton"
+        data-contact-name="@Model.CustomerContactName" data-organisation="@Model.CustomerOrganisation"
+        data-address1="@Model.CustomerAddress1" data-address2="@Model.CustomerAddress2" data-address3="@Model.CustomerAddress3"
+        data-address4="@Model.CustomerAddress4" data-address5="@Model.CustomerAddress5" data-country-id="@Model.CustomerCountryId"
+        data-telephone="@Model.CustomerTelephone" data-fax="@Model.CustomerFax" data-email="@Model.CustomerEmail">Copy from customer contact</button>
+</h2>
 
 <div class="@FormGroupClass("ContactName")">
     <label class="govuk-label" asp-for="ContactName">Contact name</label>
@@ -146,13 +181,12 @@
 </div>
 
 <div class="@FormGroupClass("CountryId")">
-    <label class="govuk-label" asp-for="CountryId">Country ID</label>
-    <div class="govuk-hint">Enter the country GUID directly.</div>
+    <label class="govuk-label" asp-for="CountryId">Country</label>
     @if (HasError("CountryId"))
     {
         <p id="CountryId-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @FirstError("CountryId")</p>
     }
-    <input class="@InputClass("govuk-input", "CountryId")" asp-for="CountryId" aria-describedby="@DescribedBy("CountryId")" />
+    <select class="@InputClass("govuk-select", "CountryId")" asp-for="CountryId" asp-items="Model.CountryOptions" aria-describedby="@DescribedBy("CountryId")"></select>
 </div>
 
 <div class="@FormGroupClass("Telephone")">
@@ -192,7 +226,7 @@
 </div>
 
 <div class="@FormGroupClass("Comments")">
-    <label class="govuk-label" asp-for="Comments">Comments</label>
+    <label class="govuk-label" asp-for="Comments">Other Packaging Requirements</label>
     @if (HasError("Comments"))
     {
         <p id="Comments-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @FirstError("Comments")</p>
@@ -200,11 +234,24 @@
     <textarea class="@InputClass("govuk-textarea", "Comments")" asp-for="Comments" rows="5" aria-describedby="@DescribedBy("Comments")"></textarea>
 </div>
 
-<div class="govuk-form-group">
-    <div class="govuk-checkboxes" data-module="govuk-checkboxes">
-        <div class="govuk-checkboxes__item">
-            <input class="govuk-checkboxes__input" asp-for="IsActive" />
-            <label class="govuk-label govuk-checkboxes__label" asp-for="IsActive">Active</label>
-        </div>
-    </div>
-</div>
+
+
+<script>
+    // Mirrors legacy Participant.aspx.vb ButtonCopyDetails_Click - copies the parent Customer's
+    // contact details into this form's contact fields, entirely client-side (no postback). The
+    // source values are rendered onto the button as data attributes by _ParticipantForm.cshtml.
+    document.getElementById('CopyFromCustomerContactButton').addEventListener('click', function () {
+        var source = this.dataset;
+        document.getElementById('ContactName').value = source.contactName;
+        document.getElementById('Organisation').value = source.organisation;
+        document.getElementById('Address1').value = source.address1;
+        document.getElementById('Address2').value = source.address2;
+        document.getElementById('Address3').value = source.address3;
+        document.getElementById('Address4').value = source.address4;
+        document.getElementById('Address5').value = source.address5;
+        document.getElementById('CountryId').value = source.countryId;
+        document.getElementById('Telephone').value = source.telephone;
+        document.getElementById('Fax').value = source.fax;
+        document.getElementById('Email').value = source.email;
+    });
+</script>

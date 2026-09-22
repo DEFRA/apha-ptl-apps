@@ -1,8 +1,6 @@
 @{
     var currentController = (ViewContext.RouteData.Values["controller"]?.ToString() ?? string.Empty).Trim();
     var currentAction = (ViewContext.RouteData.Values["action"]?.ToString() ?? string.Empty).Trim();
-    var isHomePage = string.Equals(currentController, "Home", StringComparison.OrdinalIgnoreCase)
-        && string.Equals(currentAction, "Index", StringComparison.OrdinalIgnoreCase);
     var isLoginPage = string.Equals(currentController, "Account", StringComparison.OrdinalIgnoreCase)
         && string.Equals(currentAction, "Login", StringComparison.OrdinalIgnoreCase);
 }
@@ -15,21 +13,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="theme-color" content="blue">
     <link rel="stylesheet" href="/css/govuk-frontend-6.5.0.min.css">
+    •
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
     <link rel="icon" sizes="48x48" href="/assets/images/favicon.ico">
     <link rel="icon" sizes="any" href="/assets/images/favicon.svg" type="image/svg+xml">
     <link rel="mask-icon" href="/assets/images/govuk-icon-mask.svg" color="blue">
     <link rel="apple-touch-icon" href="/assets/images/govuk-icon-180.png">
     <link rel="manifest" href="/assets/manifest.json">
     <meta property="og:image" content="YOUR-DOMAIN/images/govuk-opengraph-image.png">
-    <style>
-        /* Sign out must be a form post for CSRF protection; reset button chrome so it reads as a service navigation link */
-        .app-signout-form { display: inline; margin: 0; }
-        .app-signout-button { background: none; border: 0; padding: 0; font: inherit; cursor: pointer; }
-        .govuk-header__container { min-height: 56px; display: flex; align-items: center; }
-        .app-service-bar { background: #ffffff; border-bottom: 1px solid #b1b4b6; }
-        .app-service-bar__container { min-height: 70px; display: flex; align-items: center; }
-        .app-account-panel { margin-left: auto; display: flex; align-items: center; gap: 1rem; }
-    </style>
 </head>
 
 <body class="govuk-template__body app-body-class" data-test="My value" data-other="report:details">
@@ -75,7 +66,7 @@
             <div class="govuk-width-container app-service-bar__container">
                 <div>
                     <a asp-controller="Home" asp-action="Index" aria-label="Home">
-                            <img src="~/assets/images/AphaLogo.png" alt="APHA" style="height:40px; width:auto;" />
+                            <img src="~/assets/images/AphaLogo.png" alt="APHA" />
                     </a>
                 </div>
                 @if (User.Identity is not null && User.Identity.IsAuthenticated)
@@ -84,6 +75,7 @@
                         <span class="govuk-body govuk-!-margin-bottom-0">Signed in as: <strong>@User.Identity.Name</strong></span>
                         <form asp-controller="Account" asp-action="Logout" method="post" class="app-signout-form">
                             @Html.AntiForgeryToken()
+                           
                             <button type="submit" class="app-signout-button govuk-link govuk-!-margin-bottom-0">Sign out</button>
                         </form>
                     </div>
@@ -112,23 +104,7 @@
                 @if (!isLoginPage)
                 {
                     <div class="govuk-grid-column-one-quarter">
-                        <nav aria-label="Primary navigation" class="app-primary-navigation">
-                            <ul class="govuk-list">
-                                <li>
-                                    @if (isHomePage)
-                                    {
-                                        <a class="govuk-link" asp-controller="Home" asp-action="Index" aria-current="page"><strong>Home</strong></a>
-                                    }
-                                    else
-                                    {
-                                        <a class="govuk-link" asp-controller="Home" asp-action="Index">Home</a>
-                                    }
-                                </li>
-                                <li><a class="govuk-link" asp-controller="Customer" asp-action="Index">Customers</a></li>
-                                <li><a class="govuk-link" href="#">Navigation item 2</a></li>
-                                <li><a class="govuk-link" href="#">Navigation item 3</a></li>
-                            </ul>
-                        </nav>
+                        @await Html.PartialAsync("_SideNavigation")
                     </div>
                 }
                 <div class="@(isLoginPage ? "govuk-grid-column-full" : "govuk-grid-column-three-quarters")">
@@ -164,7 +140,7 @@
                         <h2 class="govuk-visually-hidden">Support links</h2>
                         <ul class="govuk-footer__inline-list">
                             <li class="govuk-footer__inline-list-item">
-                                <a class="govuk-footer__link" href="#">
+                                <a class="govuk-footer__link" href="/docs/QuickReferenceGuide.pdf">
                                     Help
                                 </a>
                             </li>

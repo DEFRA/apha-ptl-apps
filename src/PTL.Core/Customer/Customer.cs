@@ -1,6 +1,6 @@
 namespace PTL.Core.Customer;
 
-// Domain entity mapped to tblCustomer by PTL.Data's PtlDbContext; shape matches the full row
+// Domain entity mapped to tblCustomer by PTL.Data's CustomerRepository (Dapper); shape matches the full row
 // returned by the spgCustomerByCustomerId stored procedure.
 public class Customer
 {
