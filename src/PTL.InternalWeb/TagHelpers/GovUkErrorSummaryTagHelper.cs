@@ -16,7 +16,7 @@ public class GovUkErrorSummaryTagHelper : TagHelper
     private const string ErrorsAttributeName = "errors";
 
     [HtmlAttributeName(ErrorsAttributeName)]
-    public IEnumerable<(string Field, string? Message)> Errors { get; set; } = [];
+    public IEnumerable<(string Field, string Message)> Errors { get; set; } = [];
 
     public override void Process(TagHelperContext context, TagHelperOutput output)
     {
