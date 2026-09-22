@@ -10,7 +10,7 @@ namespace PTL.Data.Tests.Fakes;
 // GetByIdAsync re-read that CreateAsync/UpdateAsync perform after an insert/update).
 internal sealed class FakeDbCommand(FakeDbConnection connection) : DbCommand
 {
-    private readonly FakeDbParameterCollection _parameters = new();
+    private readonly FakeDbParameterCollection _parameters = [];
 
     [AllowNull]
     public override string CommandText { get; set; } = string.Empty;
