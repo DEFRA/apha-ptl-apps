@@ -3,6 +3,7 @@ using Microsoft.OpenApi;
 using PTL.Api.Features.Health;
 using PTL.Api.Infrastructure;
 using PTL.Common.Correlation;
+using PTL.Common.Health;
 using PTL.Core.Contract;
 using PTL.Core.Customer;
 using PTL.Core.Lookup;
@@ -136,4 +137,4 @@ app.MapGet("/", () => "Hello World!");
 app.MapHealthEndpoints();
 app.MapControllers();
 
-app.Run();
+await app.RunAsync();

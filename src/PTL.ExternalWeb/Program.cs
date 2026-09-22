@@ -6,7 +6,10 @@ builder.AddPtlWebFrontEnd();
 var app = builder.Build();
 app.UsePtlWebFrontEnd();
 
-app.Run();
+await app.RunAsync();
 
 // Exposes the generated Program class to WebApplicationFactory<Program> in PTL.ExternalWeb.Tests.
-public partial class Program { }
+public sealed partial class Program
+{
+    private Program() { }
+}

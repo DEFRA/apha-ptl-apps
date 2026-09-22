@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
+using PTL.Common.Health;
 
 namespace PTL.ApiClient.Tests;
 

@@ -2,7 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
-using PTL.Api.Features.Health;
+using PTL.Common.Health;
 
 namespace PTL.Api.Tests.Endpoints;
 

@@ -10,7 +10,7 @@
             return string.Empty;
         }
 
-        return Regex.Replace(value, "([a-z])([A-Z])", "$1 $2");
+        return Regex.Replace(value, "([a-z])([A-Z])", "$1 $2", RegexOptions.None, TimeSpan.FromMilliseconds(100));
     }
 
     var hasController =

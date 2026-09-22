@@ -11,4 +11,12 @@
     <ProjectReference Include="..\PTL.Common\PTL.Common.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Views shared byte-for-byte with the other PTL web front-end(s) - single physical file under
+         src/Shared, linked in here (and in the sibling app) instead of duplicated per app. -->
+    <Content Include="..\Shared\Views\Shared\Error.cshtml" Link="Views\Shared\Error.cshtml" />
+    <Content Include="..\Shared\Views\Shared\_Footer.cshtml" Link="Views\Shared\_Footer.cshtml" />
+    <Content Include="..\Shared\Views\Account\Login.cshtml" Link="Features\Account\Views\Login.cshtml" />
+  </ItemGroup>
+
 </Project>

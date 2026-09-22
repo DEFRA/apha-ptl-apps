@@ -8,7 +8,7 @@ namespace PTL.InternalWeb.Tests.Integration;
 // AccountControllerTests) so its GOV.UK error-state branches and the shared _Layout's
 // "Signed in as" nav slot are actually exercised. Cookies (antiforgery + auth) are handled
 // automatically by HttpClient across requests made with the same client instance.
-public class AccountRouteSmokeTests : IClassFixture<WebApplicationFactory<Program>>
+public partial class AccountRouteSmokeTests : IClassFixture<WebApplicationFactory<Program>>
 {
     private readonly WebApplicationFactory<Program> _factory;
 
@@ -56,6 +56,9 @@ public class AccountRouteSmokeTests : IClassFixture<WebApplicationFactory<Progra
     {
         var response = await client.GetAsync(url);
         var body = await response.Content.ReadAsStringAsync();
-        return Regex.Match(body, "__RequestVerificationToken[^>]*value=\"([^\"]+)\"").Groups[1].Value;
+        return AntiforgeryTokenRegex().Match(body).Groups[1].Value;
     }
+
+    [GeneratedRegex("__RequestVerificationToken[^>]*value=\"([^\"]+)\"")]
+    private static partial Regex AntiforgeryTokenRegex();
 }

@@ -103,8 +103,8 @@ public class CustomerController(ICustomerApiClient customerApiClient, ILookupApi
             return View(model);
         }
 
-        LogCreatedCustomerMessage(logger, result.Customer!.CustomerId, null);
-        return RedirectToAction(nameof(Details), new { id = result.Customer!.CustomerId });
+        LogCreatedCustomerMessage(logger, result.Customer.CustomerId, null);
+        return RedirectToAction(nameof(Details), new { id = result.Customer.CustomerId });
     }
 
     [HttpGet]

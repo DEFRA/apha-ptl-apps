@@ -2,7 +2,6 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using PTL.ApiClient;
 using PTL.ExternalWeb.Features.Home;
-using PTL.ExternalWeb.Models;
 using PTL.ExternalWeb.Tests.TestSupport;
 
 namespace PTL.ExternalWeb.Tests.Features.Home;

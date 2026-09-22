@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc.Razor;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using PTL.Common.Correlation;
+using PTL.Common.Health;
 using Serilog;
 using Serilog.Formatting.Compact;
 
