@@ -102,7 +102,7 @@ public sealed class CustomerService(ICustomerRepository customerRepository, ILog
         return updated;
     }
 
-    // Mirrors Customer.aspx.vb's LoadObjectFromForm: activating clears the inactive markers;
+    // Mirrors Customer.aspx.vb's LoadObjectFromForm: activating clears the inactive markers
     // deactivating stamps InactiveDate only if one is not already set. Runs on every
     // UpdateCustomerAsync call, so toggling IsActive directly on the Edit screen (no separate
     // Deactivate/Reactivate flow) already applies these transitions. Does not cascade to

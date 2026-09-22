@@ -14,31 +14,7 @@
     string? DescribedBy(string field) => HasError(field) ? $"{field}-error" : null;
 }
 
-@if (errors.Count > 0)
-{
-    <div class="govuk-error-summary" data-module="govuk-error-summary">
-        <div role="alert">
-            <h2 class="govuk-error-summary__title">There is a problem</h2>
-            <div class="govuk-error-summary__body">
-                <ul class="govuk-list govuk-error-summary__list">
-                    @foreach (var error in errors)
-                    {
-                        <li>
-                            @if (string.IsNullOrEmpty(error.Field))
-                            {
-                                @error.Message
-                            }
-                            else
-                            {
-                                <a href="#@error.Field">@error.Message</a>
-                            }
-                        </li>
-                    }
-                </ul>
-            </div>
-        </div>
-    </div>
-}
+<govuk-error-summary errors="@errors" />
 
 <input type="hidden" asp-for="CustomerId" />
 
@@ -53,51 +29,15 @@
 
 <h2 class="govuk-heading-m">Contract details</h2>
 
-<div class="@FormGroupClass("YearId")">
-    <label class="govuk-label" asp-for="YearId">Year</label>
-    @if (HasError("YearId"))
-    {
-        <p id="YearId-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @FirstError("YearId")</p>
-    }
-    <select class="@InputClass("govuk-select", "YearId")" asp-for="YearId" asp-items="Model.YearOptions" aria-describedby="@DescribedBy("YearId")"></select>
-</div>
+<govuk-select asp-for="YearId" label="Year" asp-items="Model.YearOptions" />
 
-<div class="@FormGroupClass("UTNumber")">
-    <label class="govuk-label" asp-for="UTNumber">UT number</label>
-    <div class="govuk-hint">Enter either a UT number or an FT number, but not both.</div>
-    @if (HasError("UTNumber"))
-    {
-        <p id="UTNumber-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @FirstError("UTNumber")</p>
-    }
-    <input class="@InputClass("govuk-input", "UTNumber")" asp-for="UTNumber" aria-describedby="@DescribedBy("UTNumber")" />
-</div>
+<govuk-input asp-for="UTNumber" label="UT number" hint="Enter either a UT number or an FT number, but not both." />
 
-<div class="@FormGroupClass("FTNumber")">
-    <label class="govuk-label" asp-for="FTNumber">FT number</label>
-    @if (HasError("FTNumber"))
-    {
-        <p id="FTNumber-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @FirstError("FTNumber")</p>
-    }
-    <input class="@InputClass("govuk-input", "FTNumber")" asp-for="FTNumber" aria-describedby="@DescribedBy("FTNumber")" />
-</div>
+<govuk-input asp-for="FTNumber" label="FT number" />
 
-<div class="@FormGroupClass("ContractSignatory")">
-    <label class="govuk-label" asp-for="ContractSignatory">Contract signatory</label>
-    @if (HasError("ContractSignatory"))
-    {
-        <p id="ContractSignatory-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @FirstError("ContractSignatory")</p>
-    }
-    <input class="@InputClass("govuk-input", "ContractSignatory")" asp-for="ContractSignatory" aria-describedby="@DescribedBy("ContractSignatory")" />
-</div>
+<govuk-input asp-for="ContractSignatory" label="Contract signatory" />
 
-<div class="@FormGroupClass("Suffix")">
-    <label class="govuk-label" asp-for="Suffix">Suffix</label>
-    @if (HasError("Suffix"))
-    {
-        <p id="Suffix-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @FirstError("Suffix")</p>
-    }
-    <input class="@InputClass("govuk-input govuk-input--width-2", "Suffix")" asp-for="Suffix" aria-describedby="@DescribedBy("Suffix")" />
-</div>
+<govuk-input asp-for="Suffix" label="Suffix" input-class="govuk-input govuk-input--width-2" />
 
 <div class="govuk-form-group">
     <div class="govuk-checkboxes__item">
@@ -108,124 +48,33 @@
 
 <h2 class="govuk-heading-m">Pricing</h2>
 
-<div class="@FormGroupClass("DiscountRate")">
-    <label class="govuk-label" asp-for="DiscountRate">Discount rate</label>
-    @if (HasError("DiscountRate"))
-    {
-        <p id="DiscountRate-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @FirstError("DiscountRate")</p>
-    }
-    <input class="@InputClass("govuk-input govuk-input--width-5", "DiscountRate")" asp-for="DiscountRate" aria-describedby="@DescribedBy("DiscountRate")" />
-</div>
+<govuk-input asp-for="DiscountRate" label="Discount rate" input-class="govuk-input govuk-input--width-5" />
 
-<div class="@FormGroupClass("AdministrationCharge")">
-    <label class="govuk-label" asp-for="AdministrationCharge">Administration charge</label>
-    @if (HasError("AdministrationCharge"))
-    {
-        <p id="AdministrationCharge-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @FirstError("AdministrationCharge")</p>
-    }
-    <input class="@InputClass("govuk-input govuk-input--width-5", "AdministrationCharge")" asp-for="AdministrationCharge" aria-describedby="@DescribedBy("AdministrationCharge")" />
-</div>
+<govuk-input asp-for="AdministrationCharge" label="Administration charge" input-class="govuk-input govuk-input--width-5" />
 
-<div class="@FormGroupClass("NumberCourier")">
-    <label class="govuk-label" asp-for="NumberCourier">Number of courier deliveries</label>
-    @if (HasError("NumberCourier"))
-    {
-        <p id="NumberCourier-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @FirstError("NumberCourier")</p>
-    }
-    <input class="@InputClass("govuk-input govuk-input--width-5", "NumberCourier")" asp-for="NumberCourier" aria-describedby="@DescribedBy("NumberCourier")" />
-</div>
+<govuk-input asp-for="NumberCourier" label="Number of courier deliveries" input-class="govuk-input govuk-input--width-5" />
 
-<div class="@FormGroupClass("CourierPrice")">
-    <label class="govuk-label" asp-for="CourierPrice">Courier price</label>
-    @if (HasError("CourierPrice"))
-    {
-        <p id="CourierPrice-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @FirstError("CourierPrice")</p>
-    }
-    <input class="@InputClass("govuk-input govuk-input--width-5", "CourierPrice")" asp-for="CourierPrice" aria-describedby="@DescribedBy("CourierPrice")" />
-</div>
+<govuk-input asp-for="CourierPrice" label="Courier price" input-class="govuk-input govuk-input--width-5" />
 
-<div class="@FormGroupClass("NumberPostage")">
-    <label class="govuk-label" asp-for="NumberPostage">Number of postage deliveries</label>
-    @if (HasError("NumberPostage"))
-    {
-        <p id="NumberPostage-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @FirstError("NumberPostage")</p>
-    }
-    <input class="@InputClass("govuk-input govuk-input--width-5", "NumberPostage")" asp-for="NumberPostage" aria-describedby="@DescribedBy("NumberPostage")" />
-</div>
+<govuk-input asp-for="NumberPostage" label="Number of postage deliveries" input-class="govuk-input govuk-input--width-5" />
 
-<div class="@FormGroupClass("PostagePrice")">
-    <label class="govuk-label" asp-for="PostagePrice">Postage price</label>
-    @if (HasError("PostagePrice"))
-    {
-        <p id="PostagePrice-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @FirstError("PostagePrice")</p>
-    }
-    <input class="@InputClass("govuk-input govuk-input--width-5", "PostagePrice")" asp-for="PostagePrice" aria-describedby="@DescribedBy("PostagePrice")" />
-</div>
+<govuk-input asp-for="PostagePrice" label="Postage price" input-class="govuk-input govuk-input--width-5" />
 
-<div class="@FormGroupClass("NumberSpecialDelivery")">
-    <label class="govuk-label" asp-for="NumberSpecialDelivery">Number of special deliveries</label>
-    @if (HasError("NumberSpecialDelivery"))
-    {
-        <p id="NumberSpecialDelivery-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @FirstError("NumberSpecialDelivery")</p>
-    }
-    <input class="@InputClass("govuk-input govuk-input--width-5", "NumberSpecialDelivery")" asp-for="NumberSpecialDelivery" aria-describedby="@DescribedBy("NumberSpecialDelivery")" />
-</div>
+<govuk-input asp-for="NumberSpecialDelivery" label="Number of special deliveries" input-class="govuk-input govuk-input--width-5" />
 
-<div class="@FormGroupClass("SpecialDeliveryPrice")">
-    <label class="govuk-label" asp-for="SpecialDeliveryPrice">Special delivery price</label>
-    @if (HasError("SpecialDeliveryPrice"))
-    {
-        <p id="SpecialDeliveryPrice-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @FirstError("SpecialDeliveryPrice")</p>
-    }
-    <input class="@InputClass("govuk-input govuk-input--width-5", "SpecialDeliveryPrice")" asp-for="SpecialDeliveryPrice" aria-describedby="@DescribedBy("SpecialDeliveryPrice")" />
-</div>
+<govuk-input asp-for="SpecialDeliveryPrice" label="Special delivery price" input-class="govuk-input govuk-input--width-5" />
 
 <h2 class="govuk-heading-m">Dates</h2>
 
-<div class="@FormGroupClass("AcknowledgementPostedDate")">
-    <label class="govuk-label" asp-for="AcknowledgementPostedDate">Acknowledgement posted date</label>
-    @if (HasError("AcknowledgementPostedDate"))
-    {
-        <p id="AcknowledgementPostedDate-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @FirstError("AcknowledgementPostedDate")</p>
-    }
-    <input type="date" class="@InputClass("govuk-input govuk-input--width-10", "AcknowledgementPostedDate")" asp-for="AcknowledgementPostedDate" aria-describedby="@DescribedBy("AcknowledgementPostedDate")" />
-</div>
+<govuk-input asp-for="AcknowledgementPostedDate" label="Acknowledgement posted date" input-class="govuk-input govuk-input--width-10" type="date" />
 
-<div class="@FormGroupClass("AcknowledgementReturnedDate")">
-    <label class="govuk-label" asp-for="AcknowledgementReturnedDate">Acknowledgement returned date</label>
-    @if (HasError("AcknowledgementReturnedDate"))
-    {
-        <p id="AcknowledgementReturnedDate-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @FirstError("AcknowledgementReturnedDate")</p>
-    }
-    <input type="date" class="@InputClass("govuk-input govuk-input--width-10", "AcknowledgementReturnedDate")" asp-for="AcknowledgementReturnedDate" aria-describedby="@DescribedBy("AcknowledgementReturnedDate")" />
-</div>
+<govuk-input asp-for="AcknowledgementReturnedDate" label="Acknowledgement returned date" input-class="govuk-input govuk-input--width-10" type="date" />
 
-<div class="@FormGroupClass("JobSheetPostedDate")">
-    <label class="govuk-label" asp-for="JobSheetPostedDate">Job sheet posted date</label>
-    @if (HasError("JobSheetPostedDate"))
-    {
-        <p id="JobSheetPostedDate-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @FirstError("JobSheetPostedDate")</p>
-    }
-    <input type="date" class="@InputClass("govuk-input govuk-input--width-10", "JobSheetPostedDate")" asp-for="JobSheetPostedDate" aria-describedby="@DescribedBy("JobSheetPostedDate")" />
-</div>
+<govuk-input asp-for="JobSheetPostedDate" label="Job sheet posted date" input-class="govuk-input govuk-input--width-10" type="date" />
 
-<div class="@FormGroupClass("DateOfLeaving")">
-    <label class="govuk-label" asp-for="DateOfLeaving">Date of leaving</label>
-    @if (HasError("DateOfLeaving"))
-    {
-        <p id="DateOfLeaving-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @FirstError("DateOfLeaving")</p>
-    }
-    <input type="date" class="@InputClass("govuk-input govuk-input--width-10", "DateOfLeaving")" asp-for="DateOfLeaving" aria-describedby="@DescribedBy("DateOfLeaving")" />
-</div>
+<govuk-input asp-for="DateOfLeaving" label="Date of leaving" input-class="govuk-input govuk-input--width-10" type="date" />
 
-<div class="@FormGroupClass("ReasonForClosure")">
-    <label class="govuk-label" asp-for="ReasonForClosure">Reason for closure</label>
-    @if (HasError("ReasonForClosure"))
-    {
-        <p id="ReasonForClosure-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @FirstError("ReasonForClosure")</p>
-    }
-    <input class="@InputClass("govuk-input", "ReasonForClosure")" asp-for="ReasonForClosure" aria-describedby="@DescribedBy("ReasonForClosure")" />
-</div>
+<govuk-input asp-for="ReasonForClosure" label="Reason for closure" />
 
 <div class="@FormGroupClass("RenewalInformation")">
     <label class="govuk-label" asp-for="RenewalInformation">Renewal information</label>
@@ -247,14 +96,7 @@
 
 <h2 class="govuk-heading-m">Invoicing</h2>
 
-<div class="@FormGroupClass("PurchaseOrderNumber")">
-    <label class="govuk-label" asp-for="PurchaseOrderNumber">Purchase order number</label>
-    @if (HasError("PurchaseOrderNumber"))
-    {
-        <p id="PurchaseOrderNumber-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @FirstError("PurchaseOrderNumber")</p>
-    }
-    <input class="@InputClass("govuk-input", "PurchaseOrderNumber")" asp-for="PurchaseOrderNumber" aria-describedby="@DescribedBy("PurchaseOrderNumber")" />
-</div>
+<govuk-input asp-for="PurchaseOrderNumber" label="Purchase order number" />
 
 <div class="govuk-form-group">
     <div class="govuk-checkboxes__item">
