@@ -5,12 +5,11 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
-    <!-- PTL.Api.Tests owns coverage for the DTOs shared across every layer (Request/Response/
-         SearchRequest/SearchResponse/SummaryResponse types actually constructed by PTL.Api's
-         controllers). ContractSaveResult/SchemeSaveResult/SchemeSearchRequest are ApiClient-only
-         wrapper types PTL.Api never constructs, so they must stay measured here - do not restore
-         a blanket "[PTL.Contracts]*" exclude, it would silently zero out the only test coverage
-         these three types get. -->
+    <!-- PTL.ApiClient.Tests owns the HTTP clients and DTO wrappers. Support libraries (PTL.Common,
+         PTL.Contracts) are measured by their own projects. PtlWebApplicationExtensions is
+         initialization-only infrastructure owned by the web projects (InternalWeb/ExternalWeb), so
+         exclude it to keep coverage focused on the client library's actual responsibilities. -->
+    <Exclude>[PTL.Common]*,[PTL.Contracts]*,[PTL.ApiClient]PTL.ApiClient.PtlWebApplicationExtensions</Exclude>
   </PropertyGroup>
 
   <ItemGroup>
