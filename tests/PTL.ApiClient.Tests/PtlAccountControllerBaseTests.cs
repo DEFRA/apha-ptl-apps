@@ -96,8 +96,8 @@ public class PtlAccountControllerBaseTests
         ModelStateExtensions.AddFieldErrors(controller, values);
 
         Assert.False(controller.ModelState.IsValid);
-        Assert.Contains("Email", controller.ModelState.Keys);
-        Assert.Contains("Enter an email.", controller.ModelState["Email"].Errors.Select(e => e.ErrorMessage));
+        Assert.True(controller.ModelState.TryGetValue("Email", out var emailEntry));
+        Assert.Contains("Enter an email.", emailEntry.Errors.Select(e => e.ErrorMessage));
     }
 
     private static DefaultHttpContext CreateHttpContextWithFakeAuth()
