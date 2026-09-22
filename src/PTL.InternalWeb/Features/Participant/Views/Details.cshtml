@@ -11,73 +11,37 @@
 
 <h2 class="govuk-heading-m">Participant details</h2>
 <dl class="govuk-summary-list">
-    <div class="govuk-summary-list__row">
-        <dt class="govuk-summary-list__key">Lab code</dt>
-        <dd class="govuk-summary-list__value">@Model.LabCode</dd>
-    </div>
-    <div class="govuk-summary-list__row">
-        <dt class="govuk-summary-list__key">Lab name</dt>
-        <dd class="govuk-summary-list__value">@Model.LabName</dd>
-    </div>
-    <div class="govuk-summary-list__row">
-        <dt class="govuk-summary-list__key">Status</dt>
-        <dd class="govuk-summary-list__value">
-            <strong class="govuk-tag @(Model.IsActive ? "govuk-tag--green" : "govuk-tag--grey")">
-                @(Model.IsActive ? "Active" : "Inactive")
-            </strong>
-        </dd>
-    </div>
+    <govuk-summary-row label="Lab code">@Model.LabCode</govuk-summary-row>
+    <govuk-summary-row label="Lab name">@Model.LabName</govuk-summary-row>
+    <govuk-summary-row label="Status">
+        <strong class="govuk-tag @(Model.IsActive ? "govuk-tag--green" : "govuk-tag--grey")">
+            @(Model.IsActive ? "Active" : "Inactive")
+        </strong>
+    </govuk-summary-row>
     @if (Model.InactiveDate is not null)
     {
-        <div class="govuk-summary-list__row">
-            <dt class="govuk-summary-list__key">Inactive date</dt>
-            <dd class="govuk-summary-list__value">@Model.InactiveDate.Value.ToString("d MMMM yyyy")</dd>
-        </div>
+        <govuk-summary-row label="Inactive date">@Model.InactiveDate.Value.ToString("d MMMM yyyy")</govuk-summary-row>
     }
 </dl>
 
 <h2 class="govuk-heading-m">Contact details</h2>
 <dl class="govuk-summary-list">
-    <div class="govuk-summary-list__row">
-        <dt class="govuk-summary-list__key">Contact name</dt>
-        <dd class="govuk-summary-list__value">@Model.ContactName</dd>
-    </div>
-    <div class="govuk-summary-list__row">
-        <dt class="govuk-summary-list__key">Organisation</dt>
-        <dd class="govuk-summary-list__value">@Model.Organisation</dd>
-    </div>
-    <div class="govuk-summary-list__row">
-        <dt class="govuk-summary-list__key">Address</dt>
-        <dd class="govuk-summary-list__value">
-            @Model.Address1<br />
-            @Model.Address2<br />
-            @Model.Address3<br />
-            @Model.Address4<br />
-            @Model.Address5
-        </dd>
-    </div>
-    <div class="govuk-summary-list__row">
-        <dt class="govuk-summary-list__key">Telephone</dt>
-        <dd class="govuk-summary-list__value">@Model.Telephone</dd>
-    </div>
-    <div class="govuk-summary-list__row">
-        <dt class="govuk-summary-list__key">Fax</dt>
-        <dd class="govuk-summary-list__value">@Model.Fax</dd>
-    </div>
-    <div class="govuk-summary-list__row">
-        <dt class="govuk-summary-list__key">Email</dt>
-        <dd class="govuk-summary-list__value">@Model.Email</dd>
-    </div>
-    <div class="govuk-summary-list__row">
-        <dt class="govuk-summary-list__key">Alternative email</dt>
-        <dd class="govuk-summary-list__value">@Model.Email2</dd>
-    </div>
+    <govuk-summary-row label="Contact name">@Model.ContactName</govuk-summary-row>
+    <govuk-summary-row label="Organisation">@Model.Organisation</govuk-summary-row>
+    <govuk-summary-row label="Address">
+        @Model.Address1<br />
+        @Model.Address2<br />
+        @Model.Address3<br />
+        @Model.Address4<br />
+        @Model.Address5
+    </govuk-summary-row>
+    <govuk-summary-row label="Telephone">@Model.Telephone</govuk-summary-row>
+    <govuk-summary-row label="Fax">@Model.Fax</govuk-summary-row>
+    <govuk-summary-row label="Email">@Model.Email</govuk-summary-row>
+    <govuk-summary-row label="Alternative email">@Model.Email2</govuk-summary-row>
 </dl>
 
 <h2 class="govuk-heading-m">Other</h2>
 <dl class="govuk-summary-list">
-    <div class="govuk-summary-list__row">
-        <dt class="govuk-summary-list__key">Other Packaging Requirements</dt>
-        <dd class="govuk-summary-list__value">@Model.Comments</dd>
-    </div>
+    <govuk-summary-row label="Other Packaging Requirements">@Model.Comments</govuk-summary-row>
 </dl>

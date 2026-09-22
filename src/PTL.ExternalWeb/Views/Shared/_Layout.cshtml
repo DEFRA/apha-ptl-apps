@@ -64,44 +64,7 @@
         && string.Equals(currentAction, "Login", StringComparison.OrdinalIgnoreCase);
 }
 
-<header class="govuk-template__header">
-    <div class="govuk-header">
-        <div class="govuk-header__container govuk-width-container">
-            <div class="govuk-header__content">
-                <span class="govuk-header__link govuk-header__service-name">Proficiency Testing - External</span>
-            </div>
-        </div>
-    </div>
-<section aria-label="Service information" class="app-service-bar">
-    <div class="govuk-width-container app-service-bar__container">
-        <div>
-            <a asp-controller="Home" asp-action="Index" aria-label="Home">
-                    <img src="~/assets/images/AphaLogo.png" alt="APHA" style="height:40px; width:auto;" />
-            </a>
-        </div>
-        @if (User.Identity is not null && User.Identity.IsAuthenticated)
-        {
-            <div class="app-account-panel">
-                <span class="govuk-body govuk-!-margin-bottom-0">Signed in as: <strong>@User.Identity.Name</strong></span>
-                <form asp-controller="Account" asp-action="Logout" method="post" class="app-signout-form">
-                    @Html.AntiForgeryToken()
-                    <button type="submit" class="app-signout-button govuk-link govuk-!-margin-bottom-0">Sign out</button>
-                </form>
-            </div>
-        }
-    </div>
-</section>
-<div class="govuk-phase-banner govuk-width-container">
-    <p class="govuk-phase-banner__content">
-        <strong class="govuk-tag govuk-phase-banner__content__tag">
-            Alpha
-        </strong>
-        <span class="govuk-phase-banner__text">
-            This is a new service – your <a class="govuk-link" href="#">feedback</a> will help us to improve it.
-        </span>
-    </p>
-</div>
-</header>
+@await Html.PartialAsync("_Header", ("Proficiency Testing - External", "height:40px; width:auto;"))
 <div class="govuk-width-container app-width-container">
     <main role="main" class="pb-3">
         @if (!isLoginPage)

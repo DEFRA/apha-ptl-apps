@@ -16,6 +16,7 @@
          src/Shared, linked in here (and in the sibling app) instead of duplicated per app. -->
     <Content Include="..\Shared\Views\Shared\Error.cshtml" Link="Views\Shared\Error.cshtml" />
     <Content Include="..\Shared\Views\Shared\_Footer.cshtml" Link="Views\Shared\_Footer.cshtml" />
+    <Content Include="..\Shared\Views\Shared\_Header.cshtml" Link="Views\Shared\_Header.cshtml" />
     <Content Include="..\Shared\Views\Account\Login.cshtml" Link="Features\Account\Views\Login.cshtml" />
   </ItemGroup>
 
