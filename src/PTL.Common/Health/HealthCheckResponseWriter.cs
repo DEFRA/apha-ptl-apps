@@ -2,13 +2,14 @@ using System.Text.Json;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 
-namespace PTL.Api.Features.Health;
+namespace PTL.Common.Health;
 
 /// <summary>
 /// MapHealthChecks' default response writer emits only the overall status
 /// as plain text (e.g. "Degraded") - useless for a monitoring tool that
 /// needs to know *why*. This writes the full report as JSON instead: which
 /// named check ran, its own status, and its description/exception.
+/// Shared by every PTL service rather than duplicated per app.
 /// </summary>
 public static class HealthCheckResponseWriter
 {
@@ -29,6 +30,6 @@ public static class HealthCheckResponseWriter
             })
         };
 
-        return context.Response.WriteAsync(JsonSerializer.Serialize(payload));
+        return context.Response.WriteAsync(JsonSerializer.Serialize(payload), context.RequestAborted);
     }
 }

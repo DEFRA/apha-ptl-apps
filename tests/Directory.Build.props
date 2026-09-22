@@ -8,5 +8,9 @@
     <Threshold>90</Threshold>
     <ThresholdType>line</ThresholdType>
     <ThresholdStat>total</ThresholdStat>
+    <!-- Program.cs top-level statements end in app.Run()/RunAsync(), which WebApplicationFactory-based
+         tests deliberately never execute (it builds its own in-memory TestServer instead of starting
+         the real host) - that line is structurally untestable, not a real coverage gap. -->
+    <ExcludeByFile>$(ExcludeByFile);**/Program.cs</ExcludeByFile>
   </PropertyGroup>
 </Project>

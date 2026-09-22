@@ -3,18 +3,18 @@ using System.Text;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 
-namespace PTL.ApiClient;
+namespace PTL.Common.Health;
 
 /// <summary>
 /// Gates a route behind a shared-secret header instead of real auth/authz -
 /// this exists purely to stop bots/scanners from probing (and needlessly
-/// triggering) the Api-connectivity check, not as an access-control
-/// boundary. Matters more here than in PTL.Api: the web front-ends are
-/// internet-facing, so this endpoint really is reachable by internet bots
-/// unless gated. Note: an AWS ALB target-group health check cannot send
-/// custom headers, so this only works for callers that can set one (a curl
-/// from an ops box, an internal monitoring canary) - never point an
-/// ALB/ECS health check directly at a key-gated route.
+/// triggering) the DB-backed/Api-connectivity readiness check, not as an
+/// access-control boundary. Note: an AWS ALB target-group health check
+/// cannot send custom headers, so this only works for callers that can set
+/// one (a curl from an ops box, an internal monitoring canary) - never
+/// point an ALB/ECS health check directly at a key-gated route.
+/// Shared by every PTL service (PTL.Api, PTL.InternalWeb, PTL.ExternalWeb, ...)
+/// rather than duplicated per app.
 /// </summary>
 public sealed class ReadinessKeyFilter(IConfiguration configuration) : IEndpointFilter
 {

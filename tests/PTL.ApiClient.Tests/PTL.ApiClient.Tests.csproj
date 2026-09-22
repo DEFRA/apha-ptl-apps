@@ -5,11 +5,15 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
-    <!-- PTL.ApiClient.Tests owns the HTTP clients and DTO wrappers. Support libraries (PTL.Common,
-         PTL.Contracts) are measured by their own projects. PtlWebApplicationExtensions is
-         initialization-only infrastructure owned by the web projects (InternalWeb/ExternalWeb), so
-         exclude it to keep coverage focused on the client library's actual responsibilities. -->
-    <Exclude>[PTL.Common]*,[PTL.Contracts]*,[PTL.ApiClient]PTL.ApiClient.PtlWebApplicationExtensions</Exclude>
+    <!-- PTL.ApiClient.Tests owns the HTTP clients and DTO wrappers. PTL.Common and most of
+         PTL.Contracts are measured by their own projects - except CustomerSaveResult, which is
+         exclusively constructed by this library's own CustomerApiClient success/failure-path
+         tests, so it must stay included here or Sonar sees it as 0% covered everywhere.
+         PtlWebApplicationExtensions is initialization-only infrastructure owned by the web
+         projects (InternalWeb/ExternalWeb), so exclude it to keep coverage focused on the client
+         library's actual responsibilities. -->
+    <Include>[PTL.ApiClient]*,[PTL.Contracts]PTL.Contracts.Customer.CustomerSaveResult*</Include>
+    <Exclude>[PTL.ApiClient]PTL.ApiClient.PtlWebApplicationExtensions</Exclude>
   </PropertyGroup>
 
   <ItemGroup>

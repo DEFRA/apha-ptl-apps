@@ -5,7 +5,7 @@ namespace PTL.Api.Tests.Participant;
 
 internal sealed class FakeParticipantRepository : IParticipantRepository
 {
-    private readonly Dictionary<Guid, ParticipantEntity> _participants = new();
+    private readonly Dictionary<Guid, ParticipantEntity> _participants = [];
 
     public Task<ParticipantEntity?> GetByIdAsync(Guid participantId, CancellationToken cancellationToken = default) =>
         Task.FromResult(_participants.TryGetValue(participantId, out var participant) ? Clone(participant) : null);

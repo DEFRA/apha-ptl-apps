@@ -7,7 +7,7 @@ namespace PTL.Api.Tests.Customer;
 // database or the spgCustomer*/spiCustomer/spuCustomer stored procedures.
 internal sealed class FakeCustomerRepository : ICustomerRepository
 {
-    private readonly Dictionary<Guid, PTL.Core.Customer.Customer> _customers = new();
+    private readonly Dictionary<Guid, PTL.Core.Customer.Customer> _customers = [];
 
     public IReadOnlyDictionary<Guid, PTL.Core.Customer.Customer> Customers => _customers;
 
