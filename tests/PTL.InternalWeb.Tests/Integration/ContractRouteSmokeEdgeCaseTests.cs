@@ -13,8 +13,11 @@ namespace PTL.InternalWeb.Tests.Integration;
 /// Enhanced Contract route tests covering additional page rendering scenarios.
 /// Ensures all Contract Razor view code paths are exercised for coverage.
 /// </summary>
-public class ContractRouteSmokeEdgeCaseTests : IClassFixture<WebApplicationFactory<Program>>
+public partial class ContractRouteSmokeEdgeCaseTests : IClassFixture<WebApplicationFactory<Program>>
 {
+    [GeneratedRegex("__RequestVerificationToken[^>]*value=\"([^\"]+)\"", RegexOptions.None)]
+    private static partial Regex AntiforgeryTokenPattern();
+
     private readonly WebApplicationFactory<Program> _factory;
     private readonly FakeContractApiClient _fakeApiClient;
     private readonly Guid _customerId;
@@ -160,7 +163,7 @@ public class ContractRouteSmokeEdgeCaseTests : IClassFixture<WebApplicationFacto
     {
         var response = await client.GetAsync(url);
         var body = await response.Content.ReadAsStringAsync();
-        var token = Regex.Match(body, "__RequestVerificationToken[^>]*value=\"([^\"]+)\"").Groups[1].Value;
+        var token = AntiforgeryTokenPattern().Match(body).Groups[1].Value;
         var cookie = string.Join("; ", response.Headers.TryGetValues("Set-Cookie", out var cookies)
             ? cookies.Select(c => c.Split(';')[0])
             : []);

@@ -7,6 +7,11 @@ namespace PTL.Core.Customer;
 // spiCustomer/spuCustomer stored procedure parameter sizes (and therefore the tblCustomer columns).
 public static partial class CustomerValidator
 {
+    private const string OrganisationField = "Organisation";
+    private const string RegisteredFileNumberField = "RegisteredFileNumber";
+    private const string TelephoneField = "Telephone";
+    private const string EmailField = "Email";
+
     [GeneratedRegex(@"^(QAL/[0-9]*)?$", RegexOptions.None, 1000)]
     private static partial Regex RegisteredFileNumberPattern();
 
@@ -20,17 +25,17 @@ public static partial class CustomerValidator
     {
         ["Name"] = "Name",
         ["ContactName"] = "Contact name",
-        ["Organisation"] = "Organisation",
-        ["RegisteredFileNumber"] = "Registered file number",
+        [OrganisationField] = "Organisation",
+        [RegisteredFileNumberField] = "Registered file number",
         ["Address1"] = "Address line 1",
         ["Address2"] = "Address line 2",
         ["Address3"] = "Address line 3",
         ["Address4"] = "Address line 4",
         ["Address5"] = "Address line 5",
-        ["Telephone"] = "Telephone",
+        [TelephoneField] = "Telephone",
         ["Telephone2"] = "Telephone (alternative)",
         ["Fax"] = "Fax",
-        ["Email"] = "Email",
+        [EmailField] = "Email",
         ["Comments"] = "Comments",
         ["PostageArrangements"] = "Postage arrangements",
         ["InvoiceName"] = "Invoice name",
@@ -64,12 +69,12 @@ public static partial class CustomerValidator
         RequireNotEmpty(customer.Name, "Name", errors);
         MaxLength(customer.Name, 50, "Name", errors);
         MaxLength(customer.ContactName, 50, "ContactName", errors);
-        MaxLength(customer.Organisation, 50, "Organisation", errors);
+        MaxLength(customer.Organisation, 50, OrganisationField, errors);
 
-        MaxLength(customer.RegisteredFileNumber, 10, "RegisteredFileNumber", errors);
+        MaxLength(customer.RegisteredFileNumber, 10, RegisteredFileNumberField, errors);
         if (!RegisteredFileNumberPattern().IsMatch(customer.RegisteredFileNumber))
         {
-            errors.Add(new CustomerValidationError("RegisteredFileNumber", $"{Label("RegisteredFileNumber")} must match the format QAL/nnnnn."));
+            errors.Add(new CustomerValidationError(RegisteredFileNumberField, $"{Label(RegisteredFileNumberField)} must match the format QAL/nnnnn."));
         }
 
         MaxLength(customer.Address1, 100, "Address1", errors);
@@ -78,14 +83,14 @@ public static partial class CustomerValidator
         MaxLength(customer.Address4, 100, "Address4", errors);
         MaxLength(customer.Address5, 100, "Address5", errors);
 
-        MaxLength(customer.Telephone, 20, "Telephone", errors);
-        RegexMatch(customer.Telephone, PhonePattern(), "Telephone", errors);
+        MaxLength(customer.Telephone, 20, TelephoneField, errors);
+        RegexMatch(customer.Telephone, PhonePattern(), TelephoneField, errors);
         MaxLength(customer.Telephone2, 20, "Telephone2", errors);
         RegexMatch(customer.Telephone2, PhonePattern(), "Telephone2", errors);
         MaxLength(customer.Fax, 20, "Fax", errors);
         RegexMatch(customer.Fax, PhonePattern(), "Fax", errors);
 
-        MaxLength(customer.Email, 150, "Email", errors);
+        MaxLength(customer.Email, 150, EmailField, errors);
         MaxLength(customer.Comments, 2000, "Comments", errors);
         MaxLength(customer.PostageArrangements, 500, "PostageArrangements", errors);
 
@@ -115,13 +120,13 @@ public static partial class CustomerValidator
             RequireNotEmpty(customer.Organisation, "Organisation", errors);
             RequireNotEmpty(customer.Address1, "Address1", errors);
             RequireNotEmpty(customer.Address2, "Address2", errors);
-            RequireNotEmpty(customer.Telephone, "Telephone", errors);
-            RequireNotEmpty(customer.Email, "Email", errors);
+            RequireNotEmpty(customer.Telephone, TelephoneField, errors);
+            RequireNotEmpty(customer.Email, EmailField, errors);
             RequireNotEmpty(customer.InvoiceOrganisation, "InvoiceOrganisation", errors);
             RequireNotEmpty(customer.InvoiceAddress1, "InvoiceAddress1", errors);
             RequireNotEmpty(customer.InvoiceAddress2, "InvoiceAddress2", errors);
 
-            RequireValidEmail(customer.Email, "Email", errors);
+            RequireValidEmail(customer.Email, EmailField, errors);
             RequireValidEmail(customer.InvoiceEmail, "InvoiceEmail", errors);
         }
 

@@ -7,7 +7,7 @@ namespace PTL.Api.Tests.Contract;
 // database or the spgContract*/spiContract/spuContract stored procedures.
 internal sealed class FakeContractRepository : IContractRepository
 {
-    private readonly Dictionary<Guid, PTL.Core.Contract.Contract> _contracts = new();
+    private readonly Dictionary<Guid, PTL.Core.Contract.Contract> _contracts = [];
 
     public Task<PTL.Core.Contract.Contract?> GetByIdAsync(Guid contractId, CancellationToken cancellationToken = default) =>
         Task.FromResult(_contracts.TryGetValue(contractId, out var contract) ? Clone(contract) : null);

@@ -6,7 +6,7 @@ namespace PTL.Api.Tests.Scheme;
 // or the spgScheme*/spiScheme/spuScheme stored procedures.
 internal sealed class FakeSchemeRepository : ISchemeRepository
 {
-    private readonly Dictionary<Guid, PTL.Core.Scheme.Scheme> _schemes = new();
+    private readonly Dictionary<Guid, PTL.Core.Scheme.Scheme> _schemes = [];
 
     public Task<PTL.Core.Scheme.Scheme?> GetByIdAsync(Guid schemeId, CancellationToken cancellationToken = default) =>
         Task.FromResult(_schemes.TryGetValue(schemeId, out var scheme) ? Clone(scheme) : null);

@@ -13,8 +13,11 @@ namespace PTL.InternalWeb.Tests.Integration;
 // Full-pipeline smoke tests so the Customer Razor views (Index/Details/_CustomerForm)
 // actually render at least once, rather than only being exercised via controller unit tests that
 // never invoke the view engine.
-public class CustomerRouteSmokeTests : IClassFixture<WebApplicationFactory<Program>>
+public partial class CustomerRouteSmokeTests : IClassFixture<WebApplicationFactory<Program>>
 {
+    [GeneratedRegex("__RequestVerificationToken[^>]*value=\"([^\"]+)\"", RegexOptions.None)]
+    private static partial Regex AntiforgeryTokenPattern();
+
     private readonly WebApplicationFactory<Program> _factory;
     private readonly FakeCustomerApiClient _fakeApiClient;
 
@@ -201,7 +204,7 @@ public class CustomerRouteSmokeTests : IClassFixture<WebApplicationFactory<Progr
     {
         var response = await client.GetAsync(url);
         var body = await response.Content.ReadAsStringAsync();
-        var token = Regex.Match(body, "__RequestVerificationToken[^>]*value=\"([^\"]+)\"").Groups[1].Value;
+        var token = AntiforgeryTokenPattern().Match(body).Groups[1].Value;
         var cookie = string.Join("; ", response.Headers.TryGetValues("Set-Cookie", out var cookies)
             ? cookies.Select(c => c.Split(';')[0])
             : []);

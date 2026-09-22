@@ -16,8 +16,11 @@ namespace PTL.InternalWeb.Tests.Integration;
 /// Exercises the Participant Create/Details/Edit/Index Razor views which were showing 0% coverage.
 /// Uses WebApplicationFactory to render views through the full ASP.NET Core pipeline.
 /// </summary>
-public class ParticipantRouteSmokeTests : IClassFixture<WebApplicationFactory<Program>>
+public partial class ParticipantRouteSmokeTests : IClassFixture<WebApplicationFactory<Program>>
 {
+    [GeneratedRegex("__RequestVerificationToken[^>]*value=\"([^\"]+)\"", RegexOptions.None)]
+    private static partial Regex AntiforgeryTokenPattern();
+
     private readonly WebApplicationFactory<Program> _factory;
     private readonly FakeParticipantApiClient _fakeParticipantClient;
     private readonly FakeCustomerApiClient _fakeCustomerClient;
@@ -191,7 +194,7 @@ public class ParticipantRouteSmokeTests : IClassFixture<WebApplicationFactory<Pr
     {
         var response = await client.GetAsync(url);
         var body = await response.Content.ReadAsStringAsync();
-        var token = Regex.Match(body, "__RequestVerificationToken[^>]*value=\"([^\"]+)\"").Groups[1].Value;
+        var token = AntiforgeryTokenPattern().Match(body).Groups[1].Value;
         var cookie = string.Join("; ", response.Headers.TryGetValues("Set-Cookie", out var cookies)
             ? cookies.Select(c => c.Split(';')[0])
             : []);

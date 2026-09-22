@@ -104,8 +104,9 @@ public class ContractController(IContractApiClient contractApiClient, ILookupApi
             return View(model);
         }
 
-        LogCreatedContractMessage(logger, result.Contract!.ContractId, null);
-        return RedirectToAction(nameof(Details), new { id = result.Contract!.ContractId });
+        ArgumentNullException.ThrowIfNull(result.Contract);
+        LogCreatedContractMessage(logger, result.Contract.ContractId, null);
+        return RedirectToAction(nameof(Details), new { id = result.Contract.ContractId });
     }
 
     [HttpGet]
