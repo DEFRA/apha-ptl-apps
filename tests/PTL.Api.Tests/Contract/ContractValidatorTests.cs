@@ -8,7 +8,7 @@ public class ContractValidatorTests
     {
         CustomerId = Guid.NewGuid(),
         YearId = 2027,
-        UTNumber = "UT12345",
+        UTNumber = "UT3/306",
         ContractSignatory = "Alice Example",
         AcknowledgementPostedDate = new DateTime(2026, 1, 1),
         AcknowledgementReturnedDate = new DateTime(2026, 1, 5),
@@ -94,5 +94,43 @@ public class ContractValidatorTests
         var result = ContractValidator.Validate(contract);
 
         Assert.Contains(result.Errors, e => e.Field == "Suffix");
+    }
+
+    [Theory]
+    [InlineData("UT12345")]
+    [InlineData("UT3-306")]
+    [InlineData("UT/306")]
+    public void Validate_UtNumberBadFormat_ReturnsError(string ut)
+    {
+        var contract = ValidContract();
+        contract.UTNumber = ut;
+
+        var result = ContractValidator.Validate(contract);
+
+        Assert.Contains(result.Errors, e => e.Field == "UTNumber");
+    }
+
+    [Fact]
+    public void Validate_FtNumberBadFormat_ReturnsError()
+    {
+        var contract = ValidContract();
+        contract.UTNumber = string.Empty;
+        contract.FTNumber = "FT1000";
+
+        var result = ContractValidator.Validate(contract);
+
+        Assert.Contains(result.Errors, e => e.Field == "FTNumber");
+    }
+
+    [Fact]
+    public void Validate_ValidFtNumber_ReturnsNoErrors()
+    {
+        var contract = ValidContract();
+        contract.UTNumber = string.Empty;
+        contract.FTNumber = "1000";
+
+        var result = ContractValidator.Validate(contract);
+
+        Assert.True(result.IsValid);
     }
 }

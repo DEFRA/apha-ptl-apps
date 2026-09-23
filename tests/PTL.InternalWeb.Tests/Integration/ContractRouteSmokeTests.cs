@@ -37,12 +37,26 @@ public class ContractRouteSmokeTests : IClassFixture<WebApplicationFactory<Progr
                 services.AddSingleton<IContractApiClient>(_fakeApiClient);
                 services.RemoveAll<ILookupApiClient>();
                 services.AddSingleton<ILookupApiClient>(new FakeLookupApiClient());
+                services.RemoveAll<ICustomerApiClient>();
+                services.AddSingleton<ICustomerApiClient>(new FakeCustomerApiClient { CustomerResponse = SampleCustomer(customerId) });
             }));
     }
 
     private Guid CustomerId { get; }
 
     private Guid ContractId { get; }
+
+    private static PTL.Contracts.Customer.CustomerResponse SampleCustomer(Guid customerId) => new(
+        CustomerId: customerId, QalNumber: "QAL/00001", RegisteredFileNumber: string.Empty, Name: "Sample Laboratories Ltd",
+        PreviousName: string.Empty, CustomerTypeId: Guid.Empty, VatNumber: string.Empty, VatRatingId: Guid.Empty,
+        AccountNumber: string.Empty, CustomerFinanceId: string.Empty, ContactName: string.Empty, Organisation: string.Empty,
+        Address1: string.Empty, Address2: string.Empty, Address3: string.Empty, Address4: string.Empty, Address5: string.Empty,
+        CountryId: Guid.Empty, Telephone: string.Empty, Telephone2: string.Empty, Fax: string.Empty, Email: string.Empty,
+        CurrencyId: Guid.Empty, Comments: string.Empty, InitialStartDate: DateTime.UtcNow, PostageArrangements: string.Empty,
+        PaymentNonUK: false, InvoiceName: string.Empty, InvoiceOrganisation: string.Empty, InvoiceAddress1: string.Empty,
+        InvoiceAddress2: string.Empty, InvoiceAddress3: string.Empty, InvoiceAddress4: string.Empty, InvoiceAddress5: string.Empty,
+        InvoiceCountryId: Guid.Empty, InvoiceTelephone: string.Empty, InvoiceTelephone2: string.Empty, InvoiceFax: string.Empty,
+        InvoiceEmail: string.Empty, IsActive: true, CanOrderOnline: true, InactiveDate: null, CustomerStatusId: null);
 
     private static ContractResponse SampleContract(Guid contractId, Guid customerId) => new(
         contractId, customerId, "Sample Laboratories Ltd", "QAL/00001", DateTime.UtcNow.Year + 1, "UT12345",

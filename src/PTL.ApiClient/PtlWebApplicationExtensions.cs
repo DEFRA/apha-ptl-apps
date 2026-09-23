@@ -36,6 +36,11 @@ public static class PtlWebApplicationExtensions
             // (only the first failing [Required] property showed; the IValidatableObject-driven business
             // rule errors only appeared once every attribute-based validation had been fixed one at a time).
             options.ValidateComplexTypesIfChildValidationFails = true;
+
+            // Default is "The value '{0}' is not valid for {1}." using the raw property name - replace
+            // with a friendlier message using the field's [Display(Name)] where one is set.
+            options.ModelBindingMessageProvider.SetAttemptedValueIsInvalidAccessor(
+                (_, field) => $"Enter a valid value for {field}");
         });
         // Also enable Razor Pages (some projects in the solution use Razor Pages)
         builder.Services.AddRazorPages();

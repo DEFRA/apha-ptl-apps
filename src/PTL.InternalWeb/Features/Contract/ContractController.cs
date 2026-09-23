@@ -9,7 +9,7 @@ namespace PTL.InternalWeb.Features.Contract;
 
 // Authentication/authorization are out of scope for this phase - assume the current user is
 // already authenticated with full access to Contract functionality. Policies will be added later.
-public class ContractController(IContractApiClient contractApiClient, ILookupApiClient lookupApiClient, ILogger<ContractController> logger) : Controller
+public class ContractController(IContractApiClient contractApiClient, ICustomerApiClient customerApiClient, ILookupApiClient lookupApiClient, ILogger<ContractController> logger) : Controller
 {
     private static readonly Action<ILogger, Guid, int?, string?, int, int, Exception?> LogDisplayedContractListMessage =
         LoggerMessage.Define<Guid, int?, string?, int, int>(
@@ -78,8 +78,16 @@ public class ContractController(IContractApiClient contractApiClient, ILookupApi
     [HttpGet]
     public async Task<IActionResult> Create(Guid customerId, CancellationToken cancellationToken)
     {
-        var model = new ContractFormViewModel { CustomerId = customerId, IsActive = true };
+        var model = new ContractFormViewModel { CustomerId = customerId, IsActive = true, ContractType = "UT" };
         await PopulateYearOptionsAsync(model, cancellationToken);
+        await PopulateCustomerContextAsync(model, customerId, cancellationToken);
+
+        // Suggest the system-wide default UT number (legacy Contract.DataPortal_Create() -
+        // SystemObjects.SystemSettings.FetchSystemSettings().UTNumber) - the admin can still
+        // overwrite it, or switch the dropdown to FT and enter an FT number instead.
+        var systemSettings = await lookupApiClient.GetSystemSettingsAsync(cancellationToken);
+        model.UTNumber = systemSettings.UTNumber;
+
         return View(model);
     }
 
@@ -91,6 +99,7 @@ public class ContractController(IContractApiClient contractApiClient, ILookupApi
         {
             model.CustomerId = customerId;
             await PopulateYearOptionsAsync(model, cancellationToken);
+            await PopulateCustomerContextAsync(model, customerId, cancellationToken);
             return View(model);
         }
 
@@ -101,6 +110,7 @@ public class ContractController(IContractApiClient contractApiClient, ILookupApi
             AddErrors(result.FieldErrors);
             model.CustomerId = customerId;
             await PopulateYearOptionsAsync(model, cancellationToken);
+            await PopulateCustomerContextAsync(model, customerId, cancellationToken);
             return View(model);
         }
 
@@ -120,6 +130,7 @@ public class ContractController(IContractApiClient contractApiClient, ILookupApi
 
         var model = ToFormViewModel(contract);
         await PopulateYearOptionsAsync(model, cancellationToken);
+        await PopulateCustomerContextAsync(model, contract.CustomerId, cancellationToken);
         return View(model);
     }
 
@@ -130,6 +141,7 @@ public class ContractController(IContractApiClient contractApiClient, ILookupApi
         if (!ModelState.IsValid)
         {
             await PopulateYearOptionsAsync(model, cancellationToken);
+            await PopulateCustomerContextAsync(model, model.CustomerId.GetValueOrDefault(), cancellationToken);
             return View(model);
         }
 
@@ -139,6 +151,7 @@ public class ContractController(IContractApiClient contractApiClient, ILookupApi
             LogUpdateFailedMessage(logger, id, null);
             AddErrors(result.FieldErrors);
             await PopulateYearOptionsAsync(model, cancellationToken);
+            await PopulateCustomerContextAsync(model, model.CustomerId.GetValueOrDefault(), cancellationToken);
             return View(model);
         }
 
@@ -158,6 +171,26 @@ public class ContractController(IContractApiClient contractApiClient, ILookupApi
             .ToList();
     }
 
+    // Displays the customer's QAL number prominently at the top of Create/Edit (matches legacy
+    // Contract.aspx.vb Page_Load: LblSubTitle.Text = mCustomer.QalNumber [+ ", " + Year]) and
+    // resolves the currency symbol used to label the Postage + packaging pricing fields (matches
+    // Contract.aspx.vb LoadLabelNames() using mCurrency.Symbol, from
+    // SystemObjects.CurrencyCollection.FetchCurrencyCollectionByCurrencyId(mCustomer.CurrencyId)).
+    private async Task PopulateCustomerContextAsync(ContractFormViewModel model, Guid customerId, CancellationToken cancellationToken)
+    {
+        var customer = await customerApiClient.GetCustomerAsync(customerId, cancellationToken);
+        if (customer is null)
+        {
+            return;
+        }
+
+        model.CustomerName = customer.Name;
+        model.QalNumber = customer.QalNumber;
+
+        var currencies = await lookupApiClient.GetCurrenciesAsync(cancellationToken);
+        model.CurrencySymbol = currencies.FirstOrDefault(c => c.CurrencyId == customer.CurrencyId)?.Symbol ?? string.Empty;
+    }
+
     private static ContractRequest ToRequest(ContractFormViewModel model) => new(
         model.YearId.GetValueOrDefault(),
         model.UTNumber ?? string.Empty,
@@ -173,11 +206,11 @@ public class ContractController(IContractApiClient contractApiClient, ILookupApi
         model.PostagePrice.GetValueOrDefault(),
         model.NumberSpecialDelivery.GetValueOrDefault(),
         model.SpecialDeliveryPrice.GetValueOrDefault(),
-        model.AcknowledgementPostedDate ?? default,
-        model.AcknowledgementReturnedDate ?? default,
-        model.JobSheetPostedDate ?? default,
+        model.AcknowledgementPostedDate,
+        model.AcknowledgementReturnedDate,
+        model.JobSheetPostedDate,
         model.ReasonForClosure ?? string.Empty,
-        model.DateOfLeaving ?? default,
+        model.DateOfLeaving,
         model.IsActive,
         model.Suffix ?? string.Empty,
         model.PurchaseOrderNumber ?? string.Empty,
@@ -195,6 +228,7 @@ public class ContractController(IContractApiClient contractApiClient, ILookupApi
         YearId = contract.YearId,
         UTNumber = contract.UTNumber,
         FTNumber = contract.FTNumber,
+        ContractType = string.IsNullOrEmpty(contract.FTNumber) ? "UT" : "FT",
         ContractSignatory = contract.ContractSignatory,
         ActionsRequired = contract.ActionsRequired,
         RenewalInformation = contract.RenewalInformation,
@@ -215,6 +249,7 @@ public class ContractController(IContractApiClient contractApiClient, ILookupApi
         Suffix = contract.Suffix,
         PurchaseOrderNumber = contract.PurchaseOrderNumber,
         OptOutOfInvoiceGeneration = contract.OptOutOfInvoiceGeneration,
-        IsOnlineOrder = contract.IsOnlineOrder
+        IsOnlineOrder = contract.IsOnlineOrder,
+        IsInvoiceSent = contract.IsInvoiceSent
     };
 }

@@ -17,7 +17,7 @@ public static partial class SchemeValidator
         MaxLength(scheme.Identifier, 6, "Identifier", errors);
         if (!string.IsNullOrEmpty(scheme.Identifier) && !IdentifierPattern().IsMatch(scheme.Identifier))
         {
-            errors.Add(new SchemeValidationError("Identifier", "Identifier must match the format PT followed by 4 digits (e.g. PT1234)."));
+            errors.Add(new SchemeValidationError("Identifier", "Identifier must match the format PT followed by 4 digits (e.g. PT1234)"));
         }
 
         RequireNotEmpty(scheme.Name, "Name", errors);
@@ -53,14 +53,14 @@ public static partial class SchemeValidator
             || scheme.DistributionMonthOct || scheme.DistributionMonthNov || scheme.DistributionMonthDec;
         if (hasAnyMonth == scheme.DistributionAsAvailable)
         {
-            errors.Add(new SchemeValidationError("DistributionAsAvailable", "Select either specific distribution months or 'as available', but not both."));
+            errors.Add(new SchemeValidationError("DistributionAsAvailable", "Select either specific distribution months or 'as available', but not both"));
         }
 
         // ValidateDataConsentDeclaration: DataConsentDeclarationText is required only if
         // DataConsentDeclarationActive is true.
         if (scheme.DataConsentDeclarationActive && string.IsNullOrWhiteSpace(scheme.DataConsentDeclarationText))
         {
-            errors.Add(new SchemeValidationError("DataConsentDeclarationText", "Enter the consent text when the Data Consent Declaration is active."));
+            errors.Add(new SchemeValidationError("DataConsentDeclarationText", "Enter the consent text when the Data Consent Declaration is active"));
         }
 
         return new SchemeValidationResult(errors.Count == 0, errors);
@@ -70,7 +70,7 @@ public static partial class SchemeValidator
     {
         if (string.IsNullOrWhiteSpace(value))
         {
-            errors.Add(new SchemeValidationError(field, $"{field} is required."));
+            errors.Add(new SchemeValidationError(field, $"{field} is required"));
         }
     }
 
@@ -78,7 +78,7 @@ public static partial class SchemeValidator
     {
         if (value is not null && value.Length > max)
         {
-            errors.Add(new SchemeValidationError(field, $"{field} must not exceed {max} characters."));
+            errors.Add(new SchemeValidationError(field, $"{field} must not exceed {max} characters"));
         }
     }
 
@@ -86,7 +86,7 @@ public static partial class SchemeValidator
     {
         if (value < min || value > max)
         {
-            errors.Add(new SchemeValidationError(field, $"{field} must be between {min} and {max}."));
+            errors.Add(new SchemeValidationError(field, $"{field} must be between {min} and {max}"));
         }
     }
 }

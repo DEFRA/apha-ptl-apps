@@ -14,6 +14,7 @@ internal sealed class FakeLookupRepository : ILookupRepository
     public IReadOnlyList<YearEntity> Years { get; set; } = [];
     public IReadOnlyList<SchemeCurrencyEntity> SchemeCurrencies { get; set; } = [];
     public IReadOnlyList<PostagePricingPlanEntity> PostagePricingPlans { get; set; } = [];
+    public SystemSettingsEntity SystemSettings { get; set; } = new();
 
     public Task<IReadOnlyList<CountryEntity>> GetCountriesAsync(CancellationToken cancellationToken = default) =>
         Task.FromResult(Countries);
@@ -38,4 +39,7 @@ internal sealed class FakeLookupRepository : ILookupRepository
 
     public Task<IReadOnlyList<PostagePricingPlanEntity>> GetPostagePricingPlansForYearAsync(int yearId, CancellationToken cancellationToken = default) =>
         Task.FromResult(PostagePricingPlans);
+
+    public Task<SystemSettingsEntity> GetSystemSettingsAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult(SystemSettings);
 }

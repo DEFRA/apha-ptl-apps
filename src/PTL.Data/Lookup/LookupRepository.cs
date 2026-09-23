@@ -55,4 +55,10 @@ public sealed class LookupRepository(IDbConnectionFactory connectionFactory) : I
             "EXEC dbo.spgPostageByYearID @YearId",
             new { YearId = yearId })).ToList();
     }
+
+    public async Task<SystemSettingsEntity> GetSystemSettingsAsync(CancellationToken cancellationToken = default)
+    {
+        using var connection = connectionFactory.CreateConnection();
+        return await connection.QueryFirstAsync<SystemSettingsEntity>("EXEC dbo.spgaSystemSettings");
+    }
 }

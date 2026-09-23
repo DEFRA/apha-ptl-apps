@@ -22,4 +22,7 @@ public interface ILookupRepository
 
     // spgPostageByYearID - postage pricing plans for a given year.
     Task<IReadOnlyList<PostagePricingPlanEntity>> GetPostagePricingPlansForYearAsync(int yearId, CancellationToken cancellationToken = default);
+
+    // spgaSystemSettings - single-row system settings (only UTNumber is modelled).
+    Task<SystemSettingsEntity> GetSystemSettingsAsync(CancellationToken cancellationToken = default);
 }

@@ -128,4 +128,15 @@ public class LookupServiceTests
         Assert.Single(result);
         Assert.Equal("Standard", result[0].Name);
     }
+
+    [Fact]
+    public async Task GetSystemSettingsAsync_ReturnsRepositoryResult()
+    {
+        var repository = new FakeLookupRepository { SystemSettings = new SystemSettingsEntity { UTNumber = "UT3/306" } };
+        var service = new LookupService(repository);
+
+        var result = await service.GetSystemSettingsAsync();
+
+        Assert.Equal("UT3/306", result.UTNumber);
+    }
 }

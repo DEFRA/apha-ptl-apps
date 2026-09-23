@@ -70,4 +70,13 @@ public sealed class LookupController(ILookupService lookupService) : ControllerB
         var plans = await lookupService.GetPostagePricingPlansForYearAsync(year, cancellationToken);
         return Ok(plans.Select(p => new PostagePricingPlanResponse(p.PostageId, p.Name, p.UKPrice, p.EUPrice, p.NonEUPrice, p.YearId)).ToList());
     }
+
+    // GET /api/lookups/system-settings - see docs/analysis/contract-analysis.md,
+    // "Default pricing derivation on creation" (UT number default for a new contract).
+    [HttpGet("system-settings")]
+    public async Task<ActionResult<SystemSettingsResponse>> GetSystemSettings(CancellationToken cancellationToken)
+    {
+        var settings = await lookupService.GetSystemSettingsAsync(cancellationToken);
+        return Ok(new SystemSettingsResponse(settings.UTNumber));
+    }
 }

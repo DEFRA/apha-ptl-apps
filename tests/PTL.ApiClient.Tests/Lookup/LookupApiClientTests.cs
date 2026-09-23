@@ -105,4 +105,15 @@ public class LookupApiClientTests
         Assert.Equal("Standard", result[0].Name);
         Assert.Equal(2026, result[0].YearId);
     }
+
+    [Fact]
+    public async Task GetSystemSettingsAsync_ReturnsDeserializedResponse()
+    {
+        const string json = """{"utNumber":"UT3/306"}""";
+        var client = CreateClient(HttpStatusCode.OK, json);
+
+        var result = await client.GetSystemSettingsAsync();
+
+        Assert.Equal("UT3/306", result.UTNumber);
+    }
 }

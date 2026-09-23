@@ -29,4 +29,7 @@ public sealed class LookupService(ILookupRepository lookupRepository) : ILookupS
 
     public Task<IReadOnlyList<PostagePricingPlanEntity>> GetPostagePricingPlansForYearAsync(int yearId, CancellationToken cancellationToken = default) =>
         lookupRepository.GetPostagePricingPlansForYearAsync(yearId, cancellationToken);
+
+    public Task<SystemSettingsEntity> GetSystemSettingsAsync(CancellationToken cancellationToken = default) =>
+        lookupRepository.GetSystemSettingsAsync(cancellationToken);
 }

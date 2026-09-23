@@ -14,4 +14,6 @@ public interface ILookupService
     Task<IReadOnlyList<SchemeCurrencyEntity>> GetSchemeCurrenciesAsync(Guid schemeId, CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<PostagePricingPlanEntity>> GetPostagePricingPlansForYearAsync(int yearId, CancellationToken cancellationToken = default);
+
+    Task<SystemSettingsEntity> GetSystemSettingsAsync(CancellationToken cancellationToken = default);
 }

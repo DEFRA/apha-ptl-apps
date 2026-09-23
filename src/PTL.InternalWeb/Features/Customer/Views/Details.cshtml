@@ -4,11 +4,14 @@
     ViewData["Title"] = $"Customer - {customer.Name}";
 }
 
-<h1 class="govuk-heading-l">@customer.Name</h1>
-
-<p class="govuk-body">
-    <a class="govuk-button" data-module="govuk-button" asp-action="Edit" asp-route-id="@customer.CustomerId">Edit customer</a>
-</p>
+<div class="govuk-grid-row">
+    <div class="govuk-grid-column-two-thirds">
+        <h1 class="govuk-heading-l">@customer.Name</h1>
+    </div>
+    <div class="govuk-grid-column-one-third govuk-!-text-align-right">
+        <a class="govuk-button" data-module="govuk-button" asp-action="Edit" asp-route-id="@customer.CustomerId">Edit customer</a>
+    </div>
+</div>
 
 <h2 class="govuk-heading-m">Customer details</h2>
 <dl class="govuk-summary-list">
