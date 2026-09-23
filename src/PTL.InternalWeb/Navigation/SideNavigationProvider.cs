@@ -23,7 +23,26 @@ public static class SideNavigationProvider
     public static IReadOnlyList<SideNavigationItem> Build() =>
     [
         new SideNavigationItem { Text = "Home", ControllerName = "Home", ActionName = IndexAction },
-        new SideNavigationItem { Text = "System Administration", IsEnabled = false },
+        new SideNavigationItem
+        {
+            Text = "System Administration",
+            ControllerName = "Menu",
+            ActionName = "SystemAdministration",
+            Children =
+            [
+                new SideNavigationItem { Text = "Create User", IsEnabled = false },
+                new SideNavigationItem { Text = "Assign Roles to User", IsEnabled = false },
+                new SideNavigationItem { Text = "Remove User", IsEnabled = false },
+                new SideNavigationItem { Text = "Internal Test Consultant Department Management", IsEnabled = false },
+                new SideNavigationItem { Text = "External Test Consultant Management", IsEnabled = false },
+                new SideNavigationItem { Text = "Viewer Management", IsEnabled = false },
+                new SideNavigationItem { Text = "Country Management", IsEnabled = false },
+                new SideNavigationItem { Text = "External Site Management", IsEnabled = false },
+                new SideNavigationItem { Text = "Administration Charges Management", IsEnabled = false },
+                new SideNavigationItem { Text = "Weighted Charging Plan", IsEnabled = false },
+                new SideNavigationItem { Text = "Postage Pricing Plan", IsEnabled = false }
+            ]
+        },
         new SideNavigationItem
         {
             Text = "Manage Contracts",
