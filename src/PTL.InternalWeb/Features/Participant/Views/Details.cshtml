@@ -1,47 +1,50 @@
-@model PTL.Contracts.Participant.ParticipantResponse
+@model PTL.InternalWeb.Features.Participant.ParticipantDetailsViewModel
 @{
-    ViewData["Title"] = $"Participant - {Model.LabName}";
+    var participant = Model.Participant;
+    ViewData["Title"] = $"Participant - {participant.LabName}";
 }
 
-<h1 class="govuk-heading-l">@Model.LabName</h1>
+<h1 class="govuk-heading-l">@participant.LabName</h1>
 
 <p class="govuk-body">
-    <a class="govuk-button" data-module="govuk-button" asp-action="Edit" asp-route-id="@Model.ParticipantId">Edit participant</a>
+    <a class="govuk-button" data-module="govuk-button" asp-action="Edit" asp-route-id="@participant.ParticipantId">Edit participant</a>
 </p>
 
 <h2 class="govuk-heading-m">Participant details</h2>
 <dl class="govuk-summary-list">
-    <govuk-summary-row label="Lab code">@Model.LabCode</govuk-summary-row>
-    <govuk-summary-row label="Lab name">@Model.LabName</govuk-summary-row>
+    <govuk-summary-row label="Lab code">@participant.LabCode</govuk-summary-row>
+    <govuk-summary-row label="Lab name">@participant.LabName</govuk-summary-row>
+    <govuk-summary-row label="Lab type">@Model.LabTypeName</govuk-summary-row>
     <govuk-summary-row label="Status">
-        <strong class="govuk-tag @(Model.IsActive ? "govuk-tag--green" : "govuk-tag--grey")">
-            @(Model.IsActive ? "Active" : "Inactive")
+        <strong class="govuk-tag @(participant.IsActive ? "govuk-tag--green" : "govuk-tag--grey")">
+            @(participant.IsActive ? "Active" : "Inactive")
         </strong>
     </govuk-summary-row>
-    @if (Model.InactiveDate is not null)
+    @if (participant.InactiveDate is not null)
     {
-        <govuk-summary-row label="Inactive date">@Model.InactiveDate.Value.ToString("d MMMM yyyy")</govuk-summary-row>
+        <govuk-summary-row label="Inactive date">@participant.InactiveDate.Value.ToString("d MMMM yyyy")</govuk-summary-row>
     }
 </dl>
 
 <h2 class="govuk-heading-m">Contact details</h2>
 <dl class="govuk-summary-list">
-    <govuk-summary-row label="Contact name">@Model.ContactName</govuk-summary-row>
-    <govuk-summary-row label="Organisation">@Model.Organisation</govuk-summary-row>
+    <govuk-summary-row label="Contact name">@participant.ContactName</govuk-summary-row>
+    <govuk-summary-row label="Organisation">@participant.Organisation</govuk-summary-row>
     <govuk-summary-row label="Address">
-        @Model.Address1<br />
-        @Model.Address2<br />
-        @Model.Address3<br />
-        @Model.Address4<br />
-        @Model.Address5
+        @participant.Address1<br />
+        @participant.Address2<br />
+        @participant.Address3<br />
+        @participant.Address4<br />
+        @participant.Address5
     </govuk-summary-row>
-    <govuk-summary-row label="Telephone">@Model.Telephone</govuk-summary-row>
-    <govuk-summary-row label="Fax">@Model.Fax</govuk-summary-row>
-    <govuk-summary-row label="Email">@Model.Email</govuk-summary-row>
-    <govuk-summary-row label="Alternative email">@Model.Email2</govuk-summary-row>
+    <govuk-summary-row label="Country">@Model.CountryName</govuk-summary-row>
+    <govuk-summary-row label="Telephone">@participant.Telephone</govuk-summary-row>
+    <govuk-summary-row label="Fax">@participant.Fax</govuk-summary-row>
+    <govuk-summary-row label="Email">@participant.Email</govuk-summary-row>
+    <govuk-summary-row label="Alternative email">@participant.Email2</govuk-summary-row>
 </dl>
 
 <h2 class="govuk-heading-m">Other</h2>
 <dl class="govuk-summary-list">
-    <govuk-summary-row label="Other Packaging Requirements">@Model.Comments</govuk-summary-row>
+    <govuk-summary-row label="Other Packaging Requirements">@participant.Comments</govuk-summary-row>
 </dl>

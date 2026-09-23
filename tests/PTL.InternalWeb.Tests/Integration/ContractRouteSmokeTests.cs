@@ -71,6 +71,20 @@ public class ContractRouteSmokeTests : IClassFixture<WebApplicationFactory<Progr
     }
 
     [Fact]
+    public async Task Details_RendersFullBreadcrumbTrail()
+    {
+        var client = _factory.CreateClient();
+
+        var response = await client.GetAsync($"/Contract/Details/{ContractId}");
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Contains("Manage Contracts", body);
+        Assert.Contains("Customers", body);
+        Assert.Contains("Contracts", body);
+        Assert.Contains("Contract Details", body);
+    }
+
+    [Fact]
     public async Task Create_ReturnsSuccess()
     {
         var client = _factory.CreateClient();
@@ -88,6 +102,20 @@ public class ContractRouteSmokeTests : IClassFixture<WebApplicationFactory<Progr
         var response = await client.GetAsync($"/Contract/Edit/{ContractId}");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Edit_RendersFullBreadcrumbTrail()
+    {
+        var client = _factory.CreateClient();
+
+        var response = await client.GetAsync($"/Contract/Edit/{ContractId}");
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Contains("Manage Contracts", body);
+        Assert.Contains("Customers", body);
+        Assert.Contains("Contracts", body);
+        Assert.Contains("Edit Contract", body);
     }
 
     [Fact]

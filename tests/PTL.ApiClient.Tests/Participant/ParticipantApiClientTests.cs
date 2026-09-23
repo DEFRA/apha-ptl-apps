@@ -118,23 +118,31 @@ public class ParticipantApiClientTests
     }
 
     [Fact]
-    public async Task CreateParticipantAsync_Success_ReturnsDeserializedResponse()
+    public async Task CreateParticipantAsync_Success_ReturnsSuccess()
     {
         const string json = """{"participantId":"22222222-2222-2222-2222-222222222222","ssoId":"33333333-3333-3333-3333-333333333333","customerId":"11111111-1111-1111-1111-111111111111","labCode":"LAB001","labName":"Lab 1","labTypeId":"44444444-4444-4444-4444-444444444444","contactName":"John","organisation":"Org","address1":"St 1","address2":"Town","address3":"","address4":"","address5":"","countryId":"55555555-5555-5555-5555-555555555555","telephone":"01234567890","fax":"","email":"lab@example.com","email2":"","comments":"","isActive":true,"inactiveDate":null,"inactiveError":false,"inactiveErrorDate":null}""";
         var client = CreateClient(HttpStatusCode.Created, json);
 
         var result = await client.CreateParticipantAsync(MinimalCreateRequest());
 
-        Assert.Equal("22222222-2222-2222-2222-222222222222", result.ParticipantId.ToString());
-        Assert.Equal("Lab 1", result.LabName);
+        Assert.True(result.Success);
+        Assert.NotNull(result.Participant);
+        Assert.Equal("22222222-2222-2222-2222-222222222222", result.Participant.ParticipantId.ToString());
+        Assert.Equal("Lab 1", result.Participant.LabName);
     }
 
     [Fact]
-    public async Task CreateParticipantAsync_EmptyResponse_Throws()
+    public async Task CreateParticipantAsync_ValidationError_ReturnsFail()
     {
-        var client = CreateClient(HttpStatusCode.Created, "null");
+        const string json = """{"type":"https://tools.ietf.org/html/rfc7231#section-6.5.1","title":"One or more validation errors occurred.","status":400,"traceId":"0HNOPBPFCD812","errors":{"Country":["Country is required."]}}""";
+        var client = CreateClient(HttpStatusCode.BadRequest, json);
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() => client.CreateParticipantAsync(MinimalCreateRequest()));
+        var result = await client.CreateParticipantAsync(MinimalCreateRequest());
+
+        Assert.False(result.Success);
+        Assert.Null(result.Participant);
+        Assert.NotEmpty(result.FieldErrors);
+        Assert.Contains("Country", result.FieldErrors.Keys);
     }
 
     [Fact]
@@ -146,25 +154,28 @@ public class ParticipantApiClientTests
     }
 
     [Fact]
-    public async Task UpdateParticipantAsync_Success_ReturnsDeserializedResponse()
+    public async Task UpdateParticipantAsync_Success_ReturnsSuccess()
     {
         const string json = """{"participantId":"22222222-2222-2222-2222-222222222222","ssoId":"33333333-3333-3333-3333-333333333333","customerId":"11111111-1111-1111-1111-111111111111","labCode":"LAB001","labName":"Lab 1","labTypeId":"44444444-4444-4444-4444-444444444444","contactName":"John","organisation":"Org","address1":"St 1","address2":"Town","address3":"","address4":"","address5":"","countryId":"55555555-5555-5555-5555-555555555555","telephone":"01234567890","fax":"","email":"lab@example.com","email2":"","comments":"","isActive":true,"inactiveDate":null,"inactiveError":false,"inactiveErrorDate":null}""";
         var client = CreateClient(HttpStatusCode.OK, json);
 
         var result = await client.UpdateParticipantAsync(Guid.NewGuid(), MinimalUpdateRequest());
 
-        Assert.NotNull(result);
-        Assert.Equal("Lab 1", result.LabName);
+        Assert.True(result.Success);
+        Assert.NotNull(result.Participant);
+        Assert.Equal("Lab 1", result.Participant.LabName);
     }
 
     [Fact]
-    public async Task UpdateParticipantAsync_NotFound_ReturnsNull()
+    public async Task UpdateParticipantAsync_NotFound_ReturnsFail()
     {
         var client = CreateClient(HttpStatusCode.NotFound, null);
 
         var result = await client.UpdateParticipantAsync(Guid.NewGuid(), MinimalUpdateRequest());
 
-        Assert.Null(result);
+        Assert.False(result.Success);
+        Assert.Null(result.Participant);
+        Assert.NotEmpty(result.FieldErrors);
     }
 
     [Fact]

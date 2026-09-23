@@ -18,6 +18,7 @@ public static class SideNavigationProvider
 {
     private const string IndexAction = "Index";
     private const string CreateAction = "Create";
+    private const string EditAction = "Edit";
     private const string SchemeControllerName = "Scheme";
 
     public static IReadOnlyList<SideNavigationItem> Build() =>
@@ -43,6 +44,14 @@ public static class SideNavigationProvider
                         new SideNavigationItem { Text = "Review Pending Participant Updates", IsEnabled = false },
                         new SideNavigationItem { Text = "Review Pending Orders", IsEnabled = false },
 
+                        // Hidden: only reached via a specific customer row's "View" link - lets the
+                        // breadcrumb trail resolve to Manage Contracts > Customers > Customer Details
+                        // instead of falling back to a plain controller/action crumb.
+                        new SideNavigationItem { Text = "Customer Details", ControllerName = "Customer", ActionName = "Details", IsHidden = true },
+
+                        // Hidden: same reasoning as "Customer Details" above, for the Edit page.
+                        new SideNavigationItem { Text = "Edit Customer", ControllerName = "Customer", ActionName = EditAction, IsHidden = true },
+
                         // Hidden: only reached from within a specific customer (Customer Details'
                         // "View participants"/"View contracts" links), never listed here - matches
                         // the legacy sitemap's hidden Participants/Contracts nodes under Customers.
@@ -52,7 +61,12 @@ public static class SideNavigationProvider
                             ControllerName = "Participant",
                             ActionName = IndexAction,
                             IsHidden = true,
-                            Children = [new SideNavigationItem { Text = "Create Participant", ControllerName = "Participant", ActionName = CreateAction }]
+                            Children =
+                            [
+                                new SideNavigationItem { Text = "Create Participant", ControllerName = "Participant", ActionName = CreateAction },
+                                new SideNavigationItem { Text = "Participant Details", ControllerName = "Participant", ActionName = "Details", IsHidden = true },
+                                new SideNavigationItem { Text = "Edit Participant", ControllerName = "Participant", ActionName = EditAction, IsHidden = true }
+                            ]
                         },
                         new SideNavigationItem
                         {
@@ -60,7 +74,12 @@ public static class SideNavigationProvider
                             ControllerName = "Contract",
                             ActionName = IndexAction,
                             IsHidden = true,
-                            Children = [new SideNavigationItem { Text = "Create Contract", ControllerName = "Contract", ActionName = CreateAction }]
+                            Children =
+                            [
+                                new SideNavigationItem { Text = "Create Contract", ControllerName = "Contract", ActionName = CreateAction },
+                                new SideNavigationItem { Text = "Contract Details", ControllerName = "Contract", ActionName = "Details", IsHidden = true },
+                                new SideNavigationItem { Text = "Edit Contract", ControllerName = "Contract", ActionName = EditAction, IsHidden = true }
+                            ]
                         }
                     ]
                 },
@@ -88,7 +107,14 @@ public static class SideNavigationProvider
 
                         // Hidden: only reached from a specific scheme's Details page ("View family
                         // history" link), not listed as a Scheme List child - same hidden pattern.
-                        new SideNavigationItem { Text = "Scheme History", ControllerName = SchemeControllerName, ActionName = "History", IsHidden = true }
+                        new SideNavigationItem { Text = "Scheme History", ControllerName = SchemeControllerName, ActionName = "History", IsHidden = true },
+
+                        // Hidden: lets the breadcrumb trail resolve to Manage Schemes > Scheme >
+                        // Scheme Details instead of falling back to a plain controller/action crumb.
+                        new SideNavigationItem { Text = "Scheme Details", ControllerName = SchemeControllerName, ActionName = "Details", IsHidden = true },
+
+                        // Hidden: same reasoning as "Scheme Details" above, for the Edit page.
+                        new SideNavigationItem { Text = "Edit Scheme", ControllerName = SchemeControllerName, ActionName = EditAction, IsHidden = true }
                     ]
                 },
                 new SideNavigationItem { Text = "Search", IsEnabled = false },
