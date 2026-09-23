@@ -8,7 +8,10 @@
 <form method="post" asp-action="Edit" asp-route-id="@Model.CustomerId" novalidate>
     @await Html.PartialAsync("_CustomerForm", Model)
 
-    <button class="govuk-button" data-module="govuk-button" type="submit">Save changes</button>
+    <div class="govuk-button-group">
+        <button class="govuk-button" data-module="govuk-button" type="submit">Save changes</button>
+        <a class="govuk-button govuk-button--secondary" data-module="govuk-button" asp-controller="Customer" asp-action="Index">Cancel</a>
+    </div>
 </form>
 
 @section Scripts {

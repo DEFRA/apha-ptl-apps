@@ -8,7 +8,10 @@
 <form method="post" asp-action="Create" novalidate>
     @await Html.PartialAsync("_SchemeForm", Model)
 
-    <button class="govuk-button" data-module="govuk-button" type="submit">Create scheme</button>
+    <div class="govuk-button-group">
+        <button class="govuk-button" data-module="govuk-button" type="submit">Create scheme</button>
+        <a class="govuk-button govuk-button--secondary" data-module="govuk-button" asp-controller="Scheme" asp-action="Index">Cancel</a>
+    </div>
 </form>
 
 @section Scripts {

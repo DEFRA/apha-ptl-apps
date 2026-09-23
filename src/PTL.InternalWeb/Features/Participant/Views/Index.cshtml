@@ -37,7 +37,7 @@ else
                 <th scope="col" class="govuk-table__header">Lab name</th>
                 <th scope="col" class="govuk-table__header">Contact</th>
                 <th scope="col" class="govuk-table__header">Status</th>
-                <th scope="col" class="govuk-table__header"><span class="govuk-visually-hidden">Actions</span></th>
+                <th scope="col" class="govuk-table__header">Details</th>
             </tr>
         </thead>
         <tbody class="govuk-table__body">
@@ -53,7 +53,7 @@ else
                         </strong>
                     </td>
                     <td class="govuk-table__cell">
-                        <a class="govuk-link" asp-action="Details" asp-route-id="@participant.ParticipantId">View details</a>
+                        <a class="govuk-link" asp-action="Details" asp-route-id="@participant.ParticipantId">Details</a>
                     </td>
                 </tr>
             }
