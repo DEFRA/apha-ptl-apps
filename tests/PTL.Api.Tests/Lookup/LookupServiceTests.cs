@@ -95,6 +95,21 @@ public class LookupServiceTests
     }
 
     [Fact]
+    public async Task GetAllYearsAsync_ReturnsRepositoryResult()
+    {
+        var repository = new FakeLookupRepository
+        {
+            AllYears = [new YearEntity { YearId = 2020, Year = "2020/21" }]
+        };
+        var service = new LookupService(repository);
+
+        var result = await service.GetAllYearsAsync();
+
+        Assert.Single(result);
+        Assert.Equal("2020/21", result[0].Year);
+    }
+
+    [Fact]
     public async Task GetSchemeCurrenciesAsync_FiltersRepositoryResultBySchemeId()
     {
         var schemeId = Guid.NewGuid();

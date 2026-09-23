@@ -16,6 +16,11 @@ public interface ILookupRepository
     // SetYearDropDown() behaviour for creating/editing a contract.
     Task<IReadOnlyList<YearEntity>> GetCurrentYearsAsync(CancellationToken cancellationToken = default);
 
+    // spgaYear - every year on record, ordered newest first. Needed to render the Year column on
+    // the Contract list (legacy GetYearNameFromYearId), since historical contracts can reference
+    // any past year, not just current/next.
+    Task<IReadOnlyList<YearEntity>> GetAllYearsAsync(CancellationToken cancellationToken = default);
+
     // spgaSchemeCurrency - all scheme-currency pricing rows; SchemeService filters by SchemeId
     // (see docs/analysis/scheme-analysis.md, "Scheme Currency Read Operations").
     Task<IReadOnlyList<SchemeCurrencyEntity>> GetSchemeCurrenciesAsync(CancellationToken cancellationToken = default);

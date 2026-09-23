@@ -21,6 +21,9 @@ public sealed class LookupService(ILookupRepository lookupRepository) : ILookupS
     public Task<IReadOnlyList<YearEntity>> GetCurrentYearsAsync(CancellationToken cancellationToken = default) =>
         lookupRepository.GetCurrentYearsAsync(cancellationToken);
 
+    public Task<IReadOnlyList<YearEntity>> GetAllYearsAsync(CancellationToken cancellationToken = default) =>
+        lookupRepository.GetAllYearsAsync(cancellationToken);
+
     public async Task<IReadOnlyList<SchemeCurrencyEntity>> GetSchemeCurrenciesAsync(Guid schemeId, CancellationToken cancellationToken = default)
     {
         var all = await lookupRepository.GetSchemeCurrenciesAsync(cancellationToken);

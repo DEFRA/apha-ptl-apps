@@ -2,6 +2,7 @@ using System.ComponentModel.DataAnnotations;
 using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using PTL.Contracts.Contract;
+using PTL.Contracts.Customer;
 
 namespace PTL.InternalWeb.Features.Contract;
 
@@ -14,10 +15,15 @@ public sealed record ContractSearchViewModel(
     int Page,
     int PageSize);
 
+// Customer and YearNames mirror legacy ContractList.aspx.vb: LblSubTitle.Text (QAL/Name/Organisation
+// header) and GetYearNameFromYearId (YearId -> "2025/26" display text via a separately fetched
+// year list) - Customer is null only if the lookup failed, in which case the header is omitted.
 public sealed record ContractListViewModel(
     ContractSearchViewModel Search,
     int TotalCount,
-    IReadOnlyList<ContractSummaryResponse> Contracts);
+    IReadOnlyList<ContractSummaryResponse> Contracts,
+    CustomerResponse? Customer,
+    IReadOnlyDictionary<int, string> YearNames);
 
 // Shared by Create.cshtml and Edit.cshtml. Validation attributes mirror
 // PTL.Core.Contract.ContractValidator (see docs/analysis/contract-analysis.md, "Validation Rules")

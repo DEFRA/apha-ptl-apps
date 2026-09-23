@@ -101,6 +101,20 @@ public class LookupControllerTests
     }
 
     [Fact]
+    public async Task GetAllYears_ReturnsMappedResponses()
+    {
+        var repository = new FakeLookupRepository { AllYears = [new YearEntity { YearId = 2020, Year = "2020/21" }] };
+        var controller = CreateController(repository);
+
+        var result = await controller.GetAllYears(CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var years = Assert.IsType<IReadOnlyList<PTL.Contracts.Lookup.YearResponse>>(ok.Value, exactMatch: false);
+        Assert.Single(years);
+        Assert.Equal("2020/21", years[0].Year);
+    }
+
+    [Fact]
     public async Task GetSchemeCurrencies_ReturnsMappedResponses()
     {
         var schemeId = Guid.NewGuid();

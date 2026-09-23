@@ -53,6 +53,15 @@ public sealed class LookupController(ILookupService lookupService) : ControllerB
         return Ok(years.Select(y => new YearResponse(y.YearId, y.Year)).ToList());
     }
 
+    // GET /api/lookups/years/all - every year on record, for mapping historical contract rows'
+    // YearId to display text (legacy GetYearNameFromYearId on ContractList.aspx.vb).
+    [HttpGet("years/all")]
+    public async Task<ActionResult<IReadOnlyList<YearResponse>>> GetAllYears(CancellationToken cancellationToken)
+    {
+        var years = await lookupService.GetAllYearsAsync(cancellationToken);
+        return Ok(years.Select(y => new YearResponse(y.YearId, y.Year)).ToList());
+    }
+
     // GET /api/lookups/schemes/{schemeId}/currencies - see docs/analysis/scheme-analysis.md,
     // "Scheme Currency Read Operations".
     [HttpGet("schemes/{schemeId:guid}/currencies")]

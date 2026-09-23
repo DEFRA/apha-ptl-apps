@@ -59,9 +59,26 @@ public class ContractController(IContractApiClient contractApiClient, ICustomerA
         var result = await contractApiClient.GetContractsForCustomerAsync(customerId, new ContractSearchRequest(yearId, period, searchTerm, page, pageSize), cancellationToken);
         LogDisplayedContractListMessage(logger, customerId, yearId, searchTerm, page, result.TotalCount, null);
 
+        // Matches legacy ContractList.aspx.vb: LblSubTitle.Text (QAL/Name/Organisation) and
+        // GetYearNameFromYearId (YearId -> display text, e.g. "2025/26") via a separately fetched
+        // all-years list, since historical rows can reference any past year.
+        var customer = await customerApiClient.GetCustomerAsync(customerId, cancellationToken);
+        var years = await lookupApiClient.GetAllYearsAsync(cancellationToken);
+        var yearNames = years.ToDictionary(y => y.YearId, y => y.Year);
+
         var search = new ContractSearchViewModel(customerId, yearId, period, searchTerm, result.Page, result.PageSize);
-        return View(new ContractListViewModel(search, result.TotalCount, result.Items));
+        return View(new ContractListViewModel(search, result.TotalCount, result.Items, customer, yearNames));
     }
+
+    // Legacy ContractItems.aspx (priced scheme line items) has not been migrated yet - see
+    // docs/migration/contract-migration.md "Feature Breakdown" Phase 1/3. Stub keeps the Contract
+    // list's column/link parity without reimplementing that separate, larger feature.
+    public IActionResult ContractItems(Guid id) => View("FeatureNotAvailable", "Contract items");
+
+    // Legacy mail-merge export (Contract/Address Confirmation/Job Sheet/Renewal Letter/Import
+    // Permit(s)) depends on template-upload infrastructure explicitly deferred to a later phase
+    // per docs/migration/contract-migration.md. Stub keeps the Export column's link parity.
+    public IActionResult Export(Guid id, string documentType) => View("FeatureNotAvailable", documentType);
 
     public async Task<IActionResult> Details(Guid id, CancellationToken cancellationToken)
     {

@@ -11,6 +11,7 @@ public interface ILookupApiClient
     Task<IReadOnlyList<VatRatingResponse>> GetVatRatingsAsync(CancellationToken cancellationToken = default);
     Task<IReadOnlyList<LabTypeResponse>> GetLabTypesAsync(CancellationToken cancellationToken = default);
     Task<IReadOnlyList<YearResponse>> GetCurrentYearsAsync(CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<YearResponse>> GetAllYearsAsync(CancellationToken cancellationToken = default);
     Task<IReadOnlyList<SchemeCurrencyResponse>> GetSchemeCurrenciesAsync(Guid schemeId, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<PostagePricingPlanResponse>> GetPostagePricingPlansForYearAsync(int yearId, CancellationToken cancellationToken = default);
     Task<SystemSettingsResponse> GetSystemSettingsAsync(CancellationToken cancellationToken = default);
@@ -53,6 +54,12 @@ public sealed class LookupApiClient(HttpClient httpClient) : ILookupApiClient
     public async Task<IReadOnlyList<YearResponse>> GetCurrentYearsAsync(CancellationToken cancellationToken = default)
     {
         var years = await httpClient.GetFromJsonAsync<IReadOnlyList<YearResponse>>("/api/lookups/years", cancellationToken);
+        return years ?? [];
+    }
+
+    public async Task<IReadOnlyList<YearResponse>> GetAllYearsAsync(CancellationToken cancellationToken = default)
+    {
+        var years = await httpClient.GetFromJsonAsync<IReadOnlyList<YearResponse>>("/api/lookups/years/all", cancellationToken);
         return years ?? [];
     }
 

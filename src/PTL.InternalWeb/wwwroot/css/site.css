@@ -72,6 +72,12 @@ body {
   gap: 1rem;
 }
 
+/* Inactive contracts render struck-through, matching legacy ContractList.aspx.vb
+   GridViewCurrentContracts_RowDataBound's manual cell.Style.Add("text-decoration", "line-through"). */
+.ptl-inactive-row td {
+  text-decoration: line-through;
+}
+
 /* Left-hand PTLIMS navigation - see PTL.InternalWeb/Navigation/SideNavigationProvider.cs
    for the legacy menu mapping this preserves. Context-based, not a permanent tree: each
    page shows only its own node's title plus that node's direct children, matching the

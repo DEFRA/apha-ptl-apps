@@ -36,6 +36,45 @@ public class ContractControllerTests
     }
 
     [Fact]
+    public async Task Index_ReturnsCustomerAndYearNames()
+    {
+        var customerId = Guid.NewGuid();
+        var contractId = Guid.NewGuid();
+        var apiClient = new FakeContractApiClient
+        {
+            SearchResponse = new ContractSearchResponse([new ContractSummaryResponse(contractId, customerId, 2020, true, "A")], 1, 1, 20)
+        };
+        var customerApiClient = new FakeCustomerApiClient
+        {
+            CustomerResponse = SampleCustomer(customerId)
+        };
+        var lookupApiClient = new FakeLookupApiClient
+        {
+            AllYears = [new PTL.Contracts.Lookup.YearResponse(2020, "2020/21")]
+        };
+        var controller = CreateController(apiClient, customerApiClient, lookupApiClient);
+
+        var result = await controller.Index(customerId, null, ContractPeriodFilter.All, null, 1, 20, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<PTL.InternalWeb.Features.Contract.ContractListViewModel>(view.Model);
+        Assert.Equal("Sample Laboratories Ltd", model.Customer?.Name);
+        Assert.Equal("2020/21", model.YearNames[2020]);
+    }
+
+    private static PTL.Contracts.Customer.CustomerResponse SampleCustomer(Guid customerId) => new(
+        CustomerId: customerId, QalNumber: "QAL/00001", RegisteredFileNumber: string.Empty, Name: "Sample Laboratories Ltd",
+        PreviousName: string.Empty, CustomerTypeId: Guid.Empty, VatNumber: string.Empty, VatRatingId: Guid.Empty,
+        AccountNumber: string.Empty, CustomerFinanceId: string.Empty, ContactName: string.Empty, Organisation: "Sample Organisation",
+        Address1: string.Empty, Address2: string.Empty, Address3: string.Empty, Address4: string.Empty, Address5: string.Empty,
+        CountryId: Guid.Empty, Telephone: string.Empty, Telephone2: string.Empty, Fax: string.Empty, Email: string.Empty,
+        CurrencyId: Guid.Empty, Comments: string.Empty, InitialStartDate: DateTime.UtcNow, PostageArrangements: string.Empty,
+        PaymentNonUK: false, InvoiceName: string.Empty, InvoiceOrganisation: string.Empty, InvoiceAddress1: string.Empty,
+        InvoiceAddress2: string.Empty, InvoiceAddress3: string.Empty, InvoiceAddress4: string.Empty, InvoiceAddress5: string.Empty,
+        InvoiceCountryId: Guid.Empty, InvoiceTelephone: string.Empty, InvoiceTelephone2: string.Empty, InvoiceFax: string.Empty,
+        InvoiceEmail: string.Empty, IsActive: true, CanOrderOnline: true, InactiveDate: null, CustomerStatusId: null);
+
+    [Fact]
     public async Task Details_UnknownContract_ReturnsNotFound()
     {
         var controller = CreateController(new FakeContractApiClient { ContractResponse = null });
