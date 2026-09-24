@@ -29,7 +29,7 @@ public sealed record ContractListViewModel(
 // PTL.Core.Contract.ContractValidator (see docs/analysis/contract-analysis.md, "Validation Rules")
 // so invalid input is rejected client + server side before it ever reaches PTL.Api. The API's
 // ContractValidator re-validates the same rules server-side as the authoritative source of truth.
-public sealed class ContractFormViewModel : IValidatableObject
+public sealed partial class ContractFormViewModel : IValidatableObject
 {
     public Guid? ContractId { get; set; }
 
@@ -149,9 +149,14 @@ public sealed class ContractFormViewModel : IValidatableObject
 #pragma warning restore S6964
 
     // Preserves ValidateUTFT: exactly one of UTNumber/FTNumber must be populated, in the legacy
-    // format (Contract.aspx.vb SetUT()/SetFT() RegularExpressionValidator expressions).
-    private static readonly Regex UtNumberFormat = new("^UT[0-9]/[0-9]{1,3}$", RegexOptions.Compiled);
-    private static readonly Regex FtNumberFormat = new("^[0-9]+$", RegexOptions.Compiled);
+    // format (Contract.aspx.vb SetUT()/SetFT() RegularExpressionValidator expressions). Compiled
+    // at build time (GeneratedRegexAttribute) with a timeout so a pathological input can't hang
+    // the request thread.
+    [GeneratedRegex("^UT[0-9]/[0-9]{1,3}$", RegexOptions.None, matchTimeoutMilliseconds: 1000)]
+    private static partial Regex UtNumberFormat();
+
+    [GeneratedRegex("^[0-9]+$", RegexOptions.None, matchTimeoutMilliseconds: 1000)]
+    private static partial Regex FtNumberFormat();
 
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
     {
@@ -169,11 +174,11 @@ public sealed class ContractFormViewModel : IValidatableObject
         {
             yield return new ValidationResult("Enter either a UT number or an FT number, but not both", [nameof(UTNumber)]);
         }
-        else if (hasUt && !UtNumberFormat.IsMatch(UTNumber!))
+        else if (hasUt && !UtNumberFormat().IsMatch(UTNumber!))
         {
             yield return new ValidationResult("Enter a valid UT number, for example UT3/306", [nameof(UTNumber)]);
         }
-        else if (hasFt && !FtNumberFormat.IsMatch(FTNumber!))
+        else if (hasFt && !FtNumberFormat().IsMatch(FTNumber!))
         {
             yield return new ValidationResult("Enter a valid FT number, for example 1000", [nameof(FTNumber)]);
         }

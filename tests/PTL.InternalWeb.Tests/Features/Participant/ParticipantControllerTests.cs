@@ -303,11 +303,11 @@ public class ParticipantControllerTests
     {
         var participantId = Guid.NewGuid();
         var customerId = Guid.NewGuid();
-        var apiClient = new FakeParticipantApiClient 
-        { 
+        var apiClient = new FakeParticipantApiClient
+        {
             SaveResult = new ParticipantSaveResult(
-                false, 
-                null, 
+                false,
+                null,
                 new Dictionary<string, string[]> { ["LabName"] = ["Lab name is required."] })
         };
         var controller = CreateController(apiClient, new FakeCustomerApiClient { CustomerResponse = SampleCustomer(customerId) });

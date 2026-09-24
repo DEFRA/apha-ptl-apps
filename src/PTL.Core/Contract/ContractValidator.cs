@@ -20,13 +20,15 @@ public static partial class ContractValidator
     [GeneratedRegex("^[0-9]+$")]
     private static partial Regex FtNumberFormat();
 
+    private const string UtNumberField = "UTNumber";
+
     // Human-readable labels for error messages - mirrors CustomerValidator's Label() pattern so
     // messages read e.g. "UT number must not exceed 10 characters." instead of "UTNumber must...".
     private static readonly Dictionary<string, string> FieldLabels = new()
     {
         ["CustomerId"] = "Customer",
         ["YearId"] = "Year",
-        ["UTNumber"] = "UT number",
+        [UtNumberField] = "UT number",
         ["FTNumber"] = "FT number",
         ["ContractSignatory"] = "Contract signatory",
         ["ActionsRequired"] = "Actions required",
@@ -69,22 +71,22 @@ public static partial class ContractValidator
         var hasFt = !string.IsNullOrWhiteSpace(contract.FTNumber);
         if (!hasUt && !hasFt)
         {
-            errors.Add(new ContractValidationError("UTNumber", "Enter a UT number or an FT number"));
+            errors.Add(new ContractValidationError(UtNumberField, "Enter a UT number or an FT number"));
         }
         else if (hasUt && hasFt)
         {
-            errors.Add(new ContractValidationError("UTNumber", "Enter either a UT number or an FT number, but not both"));
+            errors.Add(new ContractValidationError(UtNumberField, "Enter either a UT number or an FT number, but not both"));
         }
         else if (hasUt && !UtNumberFormat().IsMatch(contract.UTNumber))
         {
-            errors.Add(new ContractValidationError("UTNumber", "Enter a valid UT number, for example UT3/306"));
+            errors.Add(new ContractValidationError(UtNumberField, "Enter a valid UT number, for example UT3/306"));
         }
         else if (hasFt && !FtNumberFormat().IsMatch(contract.FTNumber))
         {
             errors.Add(new ContractValidationError("FTNumber", "Enter a valid FT number, for example 1000"));
         }
 
-        MaxLength(contract.UTNumber, 10, "UTNumber", errors);
+        MaxLength(contract.UTNumber, 10, UtNumberField, errors);
         MaxLength(contract.FTNumber, 10, "FTNumber", errors);
         MaxLength(contract.ContractSignatory, 50, "ContractSignatory", errors);
         MaxLength(contract.ActionsRequired, 1000, "ActionsRequired", errors);

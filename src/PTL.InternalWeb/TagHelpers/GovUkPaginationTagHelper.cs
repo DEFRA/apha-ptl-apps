@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
@@ -48,7 +49,7 @@ public class GovUkPaginationTagHelper(IUrlHelperFactory urlHelperFactory) : TagH
 
         if (Model.HasPreviousPage)
         {
-            html.Append($"""
+            html.Append(CultureInfo.InvariantCulture, $"""
                 <div class="govuk-pagination__prev">
                     <a class="govuk-link govuk-pagination__link" href="{WebUtility.HtmlEncode(LinkFor(Model.CurrentPage - 1))}" rel="prev">
                         <svg class="govuk-pagination__icon govuk-pagination__icon--prev" xmlns="http://www.w3.org/2000/svg" height="13" width="15" aria-hidden="true" focusable="false" viewBox="0 0 15 13">
@@ -73,7 +74,7 @@ public class GovUkPaginationTagHelper(IUrlHelperFactory urlHelperFactory) : TagH
             var isCurrent = pageNumber == Model.CurrentPage;
             var currentClass = isCurrent ? " govuk-pagination__item--current" : "";
             var ariaCurrent = isCurrent ? " aria-current=\"page\"" : "";
-            html.Append($"""
+            html.Append(CultureInfo.InvariantCulture, $"""
                 <li class="govuk-pagination__item{currentClass}">
                     <a class="govuk-link govuk-pagination__link" href="{WebUtility.HtmlEncode(LinkFor(pageNumber))}" aria-label="Page {pageNumber}"{ariaCurrent}>{pageNumber}</a>
                 </li>
@@ -83,7 +84,7 @@ public class GovUkPaginationTagHelper(IUrlHelperFactory urlHelperFactory) : TagH
 
         if (Model.HasNextPage)
         {
-            html.Append($"""
+            html.Append(CultureInfo.InvariantCulture, $"""
                 <div class="govuk-pagination__next">
                     <a class="govuk-link govuk-pagination__link" href="{WebUtility.HtmlEncode(LinkFor(Model.CurrentPage + 1))}" rel="next">
                         <span class="govuk-pagination__link-title">Next<span class="govuk-visually-hidden"> page</span></span>
@@ -179,7 +180,7 @@ public class GovUkPageSizeSelectorTagHelper(IUrlHelperFactory urlHelperFactory) 
         html.Append("""<input type="hidden" name="page" value="1" />""");
         foreach (var (key, value) in Model.RouteValues)
         {
-            html.Append($"""<input type="hidden" name="{WebUtility.HtmlEncode(key)}" value="{WebUtility.HtmlEncode(value?.ToString())}" />""");
+            html.Append(CultureInfo.InvariantCulture, $"""<input type="hidden" name="{WebUtility.HtmlEncode(key)}" value="{WebUtility.HtmlEncode(value?.ToString())}" />""");
         }
 
         html.Append("""
@@ -190,7 +191,7 @@ public class GovUkPageSizeSelectorTagHelper(IUrlHelperFactory urlHelperFactory) 
         foreach (var size in PaginationModel.AvailablePageSizes)
         {
             var selected = size == Model.PageSize ? " selected" : "";
-            html.Append($"""<option value="{size}"{selected}>{size}</option>""");
+            html.Append(CultureInfo.InvariantCulture, $"""<option value="{size}"{selected}>{size}</option>""");
         }
         html.Append("""
                 </select>

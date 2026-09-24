@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -83,5 +84,24 @@ public class PtlWebApplicationExtensionsTests
             ApiClientServiceCollectionExtensions.AddPtlApiClient(services, config));
 
         Assert.Contains("http://", ex.Message);
+    }
+
+    private static WebApplicationBuilder CreateFrontEndBuilder()
+    {
+        var builder = WebApplication.CreateBuilder();
+        builder.Configuration["Api:BaseUrl"] = "http://localhost:5252";
+        return builder;
+    }
+
+    [Fact]
+    public void AddPtlWebFrontEnd_RegistersExpectedServices()
+    {
+        var builder = CreateFrontEndBuilder();
+
+        var result = builder.AddPtlWebFrontEnd();
+
+        Assert.Same(builder, result);
+        using var provider = builder.Services.BuildServiceProvider();
+        Assert.NotNull(provider.GetService<ICustomerApiClient>());
     }
 }

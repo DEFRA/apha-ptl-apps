@@ -11,6 +11,7 @@ public static partial class CustomerValidator
     private const string RegisteredFileNumberField = "RegisteredFileNumber";
     private const string TelephoneField = "Telephone";
     private const string EmailField = "Email";
+    private const string InvoiceEmailField = "InvoiceEmail";
 
     [GeneratedRegex(@"^(QAL/[0-9]*)?$", RegexOptions.None, 1000)]
     private static partial Regex RegisteredFileNumberPattern();
@@ -48,7 +49,7 @@ public static partial class CustomerValidator
         ["InvoiceTelephone"] = "Invoice telephone",
         ["InvoiceTelephone2"] = "Invoice telephone (alternative)",
         ["InvoiceFax"] = "Invoice fax",
-        ["InvoiceEmail"] = "Invoice email",
+        [InvoiceEmailField] = "Invoice email",
         ["CountryId"] = "Country",
         ["InvoiceCountryId"] = "Invoice country",
         ["VatNumber"] = "VAT number",
@@ -109,7 +110,7 @@ public static partial class CustomerValidator
         RegexMatch(customer.InvoiceTelephone2, PhonePattern(), "InvoiceTelephone2", errors);
         MaxLength(customer.InvoiceFax, 20, "InvoiceFax", errors);
         RegexMatch(customer.InvoiceFax, PhonePattern(), "InvoiceFax", errors);
-        MaxLength(customer.InvoiceEmail, 150, "InvoiceEmail", errors);
+        MaxLength(customer.InvoiceEmail, 150, InvoiceEmailField, errors);
 
         MaxLength(customer.VatNumber, 20, "VatNumber", errors);
         MaxLength(customer.AccountNumber, 20, "AccountNumber", errors);
@@ -128,11 +129,11 @@ public static partial class CustomerValidator
             RequireNotEmpty(customer.InvoiceOrganisation, "InvoiceOrganisation", errors);
             RequireNotEmpty(customer.InvoiceAddress1, "InvoiceAddress1", errors);
             RequireNotEmpty(customer.InvoiceAddress2, "InvoiceAddress2", errors);
-            RequireNotEmpty(customer.InvoiceEmail, "InvoiceEmail", errors);
+            RequireNotEmpty(customer.InvoiceEmail, InvoiceEmailField, errors);
             RequireSelected(customer.InvoiceCountryId, "InvoiceCountryId", errors);
 
             RequireValidEmail(customer.Email, EmailField, errors);
-            RequireValidEmail(customer.InvoiceEmail, "InvoiceEmail", errors);
+            RequireValidEmail(customer.InvoiceEmail, InvoiceEmailField, errors);
         }
 
         return new CustomerValidationResult(errors.Count == 0, errors);
