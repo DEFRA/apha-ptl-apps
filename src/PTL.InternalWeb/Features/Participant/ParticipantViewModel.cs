@@ -1,5 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Mvc.Rendering;
+using PTL.Core.Participant;
+using CoreParticipant = PTL.Core.Participant.Participant;
 
 namespace PTL.InternalWeb.Features.Participant;
 
@@ -12,44 +14,77 @@ public sealed record ParticipantListViewModel(
     int TotalCount,
     IReadOnlyList<PTL.Contracts.Participant.ParticipantSummaryResponse> Participants);
 
-public sealed class ParticipantFormViewModel
+// Wraps ParticipantResponse with the lookup names (LabType/Country) Details.cshtml needs but
+// ParticipantResponse only carries as raw GUIDs - populated by ParticipantController.Details.
+public sealed record ParticipantDetailsViewModel(
+    PTL.Contracts.Participant.ParticipantResponse Participant,
+    string LabTypeName,
+    string CountryName);
+
+// Validation attributes deliberately omitted - Validate() below runs PTL.Core's ParticipantValidator
+// (the same rules PTL.Api enforces) as part of the normal MVC ModelState pass, mirroring
+// CustomerFormViewModel, so every field - including Country - is caught together on one submit.
+public sealed class ParticipantFormViewModel : IValidatableObject
 {
     public Guid? ParticipantId { get; set; }
     public Guid? CustomerId { get; set; }
     public Guid? SsoId { get; set; }
 
-    [Required(ErrorMessage = "Enter a lab code.")]
-    public string LabCode { get; set; } = string.Empty;
+    public string CustomerName { get; set; } = string.Empty;
+    public string CustomerQalNumber { get; set; } = string.Empty;
 
-    [Required(ErrorMessage = "Enter a lab name.")]
-    public string LabName { get; set; } = string.Empty;
+    [Display(Name = "Lab code")]
+    public string? LabCode { get; set; } = string.Empty;
+
+    [Display(Name = "Lab name")]
+    public string? LabName { get; set; } = string.Empty;
 
     public Guid? LabTypeId { get; set; }
 
     // Populated by ParticipantController before the view is rendered - see /api/lookups/lab-types.
     public IEnumerable<SelectListItem> LabTypeOptions { get; set; } = [];
 
-    [Required(ErrorMessage = "Enter a contact name.")]
-    public string ContactName { get; set; } = string.Empty;
+    [Display(Name = "Contact name")]
+    public string? ContactName { get; set; } = string.Empty;
 
-    public string Organisation { get; set; } = string.Empty;
-    public string Address1 { get; set; } = string.Empty;
-    public string Address2 { get; set; } = string.Empty;
-    public string Address3 { get; set; } = string.Empty;
-    public string Address4 { get; set; } = string.Empty;
-    public string Address5 { get; set; } = string.Empty;
+    [Display(Name = "Organisation name")]
+    public string? Organisation { get; set; } = string.Empty;
+
+    [Display(Name = "Address line 1")]
+    public string? Address1 { get; set; } = string.Empty;
+
+    [Display(Name = "Address line 2")]
+    public string? Address2 { get; set; } = string.Empty;
+
+    [Display(Name = "Address line 3")]
+    public string? Address3 { get; set; } = string.Empty;
+
+    [Display(Name = "Address line 4")]
+    public string? Address4 { get; set; } = string.Empty;
+
+    [Display(Name = "Address line 5")]
+    public string? Address5 { get; set; } = string.Empty;
+
+    [Display(Name = "Country")]
     public Guid? CountryId { get; set; }
 
     // Populated by ParticipantController before the view is rendered - see /api/lookups/countries.
     public IEnumerable<SelectListItem> CountryOptions { get; set; } = [];
 
-    public string Telephone { get; set; } = string.Empty;
-    public string Fax { get; set; } = string.Empty;
-    [EmailAddress(ErrorMessage = "Enter a valid email address.")]
-    public string Email { get; set; } = string.Empty;
-    [EmailAddress(ErrorMessage = "Enter a valid alternative email address.")]
-    public string Email2 { get; set; } = string.Empty;
-    public string Comments { get; set; } = string.Empty;
+    [Display(Name = "Telephone")]
+    public string? Telephone { get; set; } = string.Empty;
+
+    [Display(Name = "Fax")]
+    public string? Fax { get; set; } = string.Empty;
+
+    [Display(Name = "Email")]
+    public string? Email { get; set; } = string.Empty;
+
+    [Display(Name = "Alternative email")]
+    public string? Email2 { get; set; } = string.Empty;
+
+    [Display(Name = "Other Packaging Requirements")]
+    public string? Comments { get; set; } = string.Empty;
 
     // S6964 (value-type controller-action input) suppressed: this is an HTML checkbox, where an
     // unchecked box simply isn't posted and the framework's own asp-for-generated hidden companion
@@ -79,4 +114,32 @@ public sealed class ParticipantFormViewModel
     public string CustomerTelephone { get; set; } = string.Empty;
     public string CustomerFax { get; set; } = string.Empty;
     public string CustomerEmail { get; set; } = string.Empty;
+
+    public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+    {
+        var participant = new CoreParticipant
+        {
+            LabCode = LabCode ?? string.Empty,
+            LabName = LabName ?? string.Empty,
+            ContactName = ContactName ?? string.Empty,
+            Organisation = Organisation ?? string.Empty,
+            Address1 = Address1 ?? string.Empty,
+            Address2 = Address2 ?? string.Empty,
+            Address3 = Address3 ?? string.Empty,
+            Address4 = Address4 ?? string.Empty,
+            Address5 = Address5 ?? string.Empty,
+            CountryId = CountryId.GetValueOrDefault(),
+            Telephone = Telephone ?? string.Empty,
+            Fax = Fax ?? string.Empty,
+            Email = Email ?? string.Empty,
+            Email2 = Email2 ?? string.Empty,
+            Comments = Comments ?? string.Empty
+        };
+
+        var result = ParticipantValidator.Validate(participant);
+        foreach (var error in result.Errors)
+        {
+            yield return new ValidationResult(error.Message, [error.Field]);
+        }
+    }
 }

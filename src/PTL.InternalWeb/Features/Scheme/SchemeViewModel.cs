@@ -38,29 +38,29 @@ public sealed class SchemeFormViewModel : IValidatableObject
 
     public int? SampleNoSequence { get; set; }
 
-    [Required(ErrorMessage = "Enter a year.")]
+    [Required(ErrorMessage = "Enter a year")]
     public int? YearId { get; set; }
 
     // Populated by SchemeController before the view is rendered - see /api/lookups/years
     // (current + next year only, mirrors legacy DropDownYear behaviour).
     public IEnumerable<SelectListItem> YearOptions { get; set; } = [];
 
-    [Required(ErrorMessage = "Enter the scheme identifier.")]
-    [StringLength(6, ErrorMessage = "Identifier must not exceed 6 characters.")]
-    [RegularExpression("^PT[0-9]{4}$", ErrorMessage = "Identifier must match the format PT followed by 4 digits (e.g. PT1234).")]
+    [Required(ErrorMessage = "Enter the scheme identifier")]
+    [StringLength(6, ErrorMessage = "Identifier must not exceed 6 characters")]
+    [RegularExpression("^PT[0-9]{4}$", ErrorMessage = "Identifier must match the format PT followed by 4 digits (e.g. PT1234)")]
     public string? Identifier { get; set; }
 
-    [Required(ErrorMessage = "Enter the scheme name.")]
-    [StringLength(100, ErrorMessage = "Name must not exceed 100 characters.")]
+    [Required(ErrorMessage = "Enter the scheme name")]
+    [StringLength(100, ErrorMessage = "Name must not exceed 100 characters")]
     public string? Name { get; set; }
 
     [DataType(DataType.Date)]
     public DateTime? StartDate { get; set; }
 
-    [Required(ErrorMessage = "Select a schedule.")]
+    [Required(ErrorMessage = "Select a schedule")]
     public Guid? ScheduleId { get; set; }
 
-    [Required(ErrorMessage = "Select a schedule code.")]
+    [Required(ErrorMessage = "Select a schedule code")]
     public Guid? ScheduleCodeId { get; set; }
 
     // Distribution months - legacy screen order (financial year, Apr first).
@@ -84,25 +84,25 @@ public sealed class SchemeFormViewModel : IValidatableObject
     public bool DistributionMonthMar { get; set; }
 #pragma warning restore S6964
 
-    [Required(ErrorMessage = "Enter the week number.")]
+    [Required(ErrorMessage = "Enter the week number")]
     public int? WeekNumber { get; set; }
 
-    [Required(ErrorMessage = "Select a day of week.")]
+    [Required(ErrorMessage = "Select a day of week")]
     public Guid? DayOfWeekId { get; set; }
 
-    [Required(ErrorMessage = "Enter the number of samples.")]
-    [Range(1, 999, ErrorMessage = "Number of samples must be between 1 and 999.")]
+    [Required(ErrorMessage = "Enter the number of samples")]
+    [Range(1, 999, ErrorMessage = "Number of samples must be between 1 and 999")]
     public int? NumberOfSamples { get; set; }
 
-    [Required(ErrorMessage = "Enter the sample origin.")]
-    [StringLength(50, ErrorMessage = "Sample origin must not exceed 50 characters.")]
+    [Required(ErrorMessage = "Enter the sample origin")]
+    [StringLength(50, ErrorMessage = "Sample origin must not exceed 50 characters")]
     public string? SampleOrigin { get; set; }
 
-    [Required(ErrorMessage = "Enter the deadline.")]
-    [Range(1, 999, ErrorMessage = "Deadline must be between 1 and 999.")]
+    [Required(ErrorMessage = "Enter the deadline")]
+    [Range(1, 999, ErrorMessage = "Deadline must be between 1 and 999")]
     public int? Deadline { get; set; }
 
-    [StringLength(50, ErrorMessage = "Subcontractor must not exceed 50 characters.")]
+    [StringLength(50, ErrorMessage = "Subcontractor must not exceed 50 characters")]
     public string? Subcontractor { get; set; }
 
     // See the S6964 suppression note above the distribution-month block - same HTML-checkbox
@@ -115,10 +115,10 @@ public sealed class SchemeFormViewModel : IValidatableObject
 
     public IEnumerable<SelectListItem> PostageOptions { get; set; } = [];
 
-    [StringLength(20, ErrorMessage = "Customs volume must not exceed 20 characters.")]
+    [StringLength(20, ErrorMessage = "Customs volume must not exceed 20 characters")]
     public string? CustomsVolume { get; set; }
 
-    [StringLength(2000, ErrorMessage = "Sample packing instructions must not exceed 2000 characters.")]
+    [StringLength(2000, ErrorMessage = "Sample packing instructions must not exceed 2000 characters")]
     public string? SamplePackingInstructions { get; set; }
 #pragma warning restore S6964
 
@@ -135,19 +135,19 @@ public sealed class SchemeFormViewModel : IValidatableObject
     public bool ComerciallyAvailable { get; set; }
 #pragma warning restore S6964
 
-    [StringLength(500, ErrorMessage = "Customs description must not exceed 500 characters.")]
+    [StringLength(500, ErrorMessage = "Customs description must not exceed 500 characters")]
     public string? CustomsDescription { get; set; }
 
 #pragma warning disable S6964
     public bool DataConsentDeclarationActive { get; set; }
 #pragma warning restore S6964
 
-    [StringLength(500, ErrorMessage = "Consent text must not exceed 500 characters.")]
+    [StringLength(500, ErrorMessage = "Consent text must not exceed 500 characters")]
     public string? DataConsentDeclarationText { get; set; }
 
     // Additional configuration - see class remarks above.
-    [Required(ErrorMessage = "Enter the instructions.")]
-    [StringLength(50000, ErrorMessage = "Instructions must not exceed 50,000 characters.")]
+    [Required(ErrorMessage = "Enter the instructions")]
+    [StringLength(50000, ErrorMessage = "Instructions must not exceed 50,000 characters")]
     public string? Instructions { get; set; }
 
 #pragma warning disable S6964
@@ -166,7 +166,7 @@ public sealed class SchemeFormViewModel : IValidatableObject
     public Guid? Assessor3 { get; set; }
     public Guid? Assessor4 { get; set; }
 
-    [StringLength(500, ErrorMessage = "Standard tabulation text must not exceed 500 characters.")]
+    [StringLength(500, ErrorMessage = "Standard tabulation text must not exceed 500 characters")]
     public string? StandardTabulationText { get; set; }
 
     // Preserves ValidateDistribution/ValidateDataConsentDeclaration.
@@ -178,12 +178,12 @@ public sealed class SchemeFormViewModel : IValidatableObject
             || DistributionMonthOct || DistributionMonthNov || DistributionMonthDec;
         if (hasAnyMonth == DistributionAsAvailable)
         {
-            yield return new ValidationResult("Select either specific distribution months or 'as available', but not both.", [nameof(DistributionAsAvailable)]);
+            yield return new ValidationResult("Select either specific distribution months or 'as available', but not both", [nameof(DistributionAsAvailable)]);
         }
 
         if (DataConsentDeclarationActive && string.IsNullOrWhiteSpace(DataConsentDeclarationText))
         {
-            yield return new ValidationResult("Enter the consent text when the Data Consent Declaration is active.", [nameof(DataConsentDeclarationText)]);
+            yield return new ValidationResult("Enter the consent text when the Data Consent Declaration is active", [nameof(DataConsentDeclarationText)]);
         }
     }
 }

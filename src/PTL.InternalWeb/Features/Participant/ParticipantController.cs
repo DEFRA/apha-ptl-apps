@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.Extensions.Logging;
@@ -44,7 +45,7 @@ public class ParticipantController(IParticipantApiClient participantApiClient, I
             new EventId(6, nameof(LogFailedToReactivateParticipantMessage)),
             "Failed to reactivate participant {ParticipantId}");
 
-    public async Task<IActionResult> Index(Guid customerId, string? searchTerm = null, bool includeInactive = false, int page = 1, int pageSize = 20, CancellationToken cancellationToken = default)
+    public async Task<IActionResult> Index(Guid customerId, string? searchTerm = null, bool includeInactive = false, int page = 1, int pageSize = PTL.InternalWeb.Pagination.PaginationModel.DefaultPageSize, CancellationToken cancellationToken = default)
     {
         var result = await participantApiClient.SearchParticipantsAsync(new ParticipantSearchRequest(customerId, searchTerm, includeInactive, page, pageSize), cancellationToken);
         LogDisplayedParticipantListMessage(logger, searchTerm, includeInactive, page, result.TotalCount, null);
@@ -60,13 +61,25 @@ public class ParticipantController(IParticipantApiClient participantApiClient, I
             return NotFound();
         }
 
-        return View(participant);
+        var labTypesTask = lookupApiClient.GetLabTypesAsync(cancellationToken);
+        var countriesTask = lookupApiClient.GetCountriesAsync(cancellationToken);
+        await Task.WhenAll(labTypesTask, countriesTask);
+
+        var labTypeName = labTypesTask.Result.FirstOrDefault(t => t.LabTypeId == participant.LabTypeId)?.Name ?? string.Empty;
+        var countryName = countriesTask.Result.FirstOrDefault(c => c.CountryId == participant.CountryId)?.Country ?? string.Empty;
+
+        var model = new ParticipantDetailsViewModel(participant, labTypeName, countryName);
+        return View(model);
     }
 
     [HttpGet]
     public async Task<IActionResult> Create(Guid customerId, CancellationToken cancellationToken)
     {
-        var model = new ParticipantFormViewModel { CustomerId = customerId };
+        var model = new ParticipantFormViewModel
+        {
+            CustomerId = customerId,
+            LabCode = await GenerateLabCodeAsync(customerId, cancellationToken)
+        };
         await PopulateLookupOptionsAsync(model, cancellationToken);
         await PopulateCustomerContactAsync(model, customerId, cancellationToken);
         return View(model);
@@ -79,45 +92,47 @@ public class ParticipantController(IParticipantApiClient participantApiClient, I
         if (!ModelState.IsValid)
         {
             model.CustomerId = customerId;
+            if (string.IsNullOrWhiteSpace(model.LabCode))
+            {
+                model.LabCode = await GenerateLabCodeAsync(customerId, cancellationToken);
+            }
             await PopulateLookupOptionsAsync(model, cancellationToken);
             await PopulateCustomerContactAsync(model, customerId, cancellationToken);
             return View(model);
         }
 
-        try
-        {
-            var created = await participantApiClient.CreateParticipantAsync(new ParticipantRequest(
-                customerId,
-                model.SsoId.GetValueOrDefault(),
-                model.LabCode,
-                model.LabName,
-                model.LabTypeId.GetValueOrDefault(),
-                model.ContactName,
-                model.Organisation,
-                model.Address1,
-                model.Address2,
-                model.Address3,
-                model.Address4,
-                model.Address5,
-                model.CountryId.GetValueOrDefault(),
-                model.Telephone,
-                model.Fax,
-                model.Email,
-                model.Email2,
-                model.Comments,
-                model.IsActive), cancellationToken);
+        var result = await participantApiClient.CreateParticipantAsync(new ParticipantRequest(
+            customerId,
+            model.SsoId.GetValueOrDefault(),
+            model.LabCode ?? string.Empty,
+            model.LabName ?? string.Empty,
+            model.LabTypeId.GetValueOrDefault(),
+            model.ContactName ?? string.Empty,
+            model.Organisation ?? string.Empty,
+            model.Address1 ?? string.Empty,
+            model.Address2 ?? string.Empty,
+            model.Address3 ?? string.Empty,
+            model.Address4 ?? string.Empty,
+            model.Address5 ?? string.Empty,
+            model.CountryId.GetValueOrDefault(),
+            model.Telephone ?? string.Empty,
+            model.Fax ?? string.Empty,
+            model.Email ?? string.Empty,
+            model.Email2 ?? string.Empty,
+            model.Comments ?? string.Empty,
+            model.IsActive), cancellationToken);
 
-            return RedirectToAction(nameof(Details), new { id = created.ParticipantId });
-        }
-        catch (Exception ex)
+        if (!result.Success)
         {
-            LogFailedToCreateParticipantMessage(logger, customerId, ex);
-            ModelState.AddModelError(string.Empty, "Unable to create this participant. Please review the details and try again.");
+            LogFailedToCreateParticipantMessage(logger, customerId, null);
+            AddErrors(result.FieldErrors);
             model.CustomerId = customerId;
             await PopulateLookupOptionsAsync(model, cancellationToken);
             await PopulateCustomerContactAsync(model, customerId, cancellationToken);
             return View(model);
         }
+
+        return RedirectToAction(nameof(Details), new { id = result.Participant.ParticipantId });
     }
 
     [HttpGet]
@@ -147,39 +162,54 @@ public class ParticipantController(IParticipantApiClient participantApiClient, I
             return View(model);
         }
 
-        try
-        {
-            var updated = await participantApiClient.UpdateParticipantAsync(id, new ParticipantRequest(
-                model.CustomerId.GetValueOrDefault(),
-                model.SsoId.GetValueOrDefault(),
-                model.LabCode,
-                model.LabName,
-                model.LabTypeId.GetValueOrDefault(),
-                model.ContactName,
-                model.Organisation,
-                model.Address1,
-                model.Address2,
-                model.Address3,
-                model.Address4,
-                model.Address5,
-                model.CountryId.GetValueOrDefault(),
-                model.Telephone,
-                model.Fax,
-                model.Email,
-                model.Email2,
-                model.Comments,
-                model.IsActive), cancellationToken);
+        var result = await participantApiClient.UpdateParticipantAsync(id, new ParticipantRequest(
+            model.CustomerId.GetValueOrDefault(),
+            model.SsoId.GetValueOrDefault(),
+            model.LabCode ?? string.Empty,
+            model.LabName ?? string.Empty,
+            model.LabTypeId.GetValueOrDefault(),
+            model.ContactName ?? string.Empty,
+            model.Organisation ?? string.Empty,
+            model.Address1 ?? string.Empty,
+            model.Address2 ?? string.Empty,
+            model.Address3 ?? string.Empty,
+            model.Address4 ?? string.Empty,
+            model.Address5 ?? string.Empty,
+            model.CountryId.GetValueOrDefault(),
+            model.Telephone ?? string.Empty,
+            model.Fax ?? string.Empty,
+            model.Email ?? string.Empty,
+            model.Email2 ?? string.Empty,
+            model.Comments ?? string.Empty,
+            model.IsActive), cancellationToken);
 
-            return updated is null ? NotFound() : RedirectToAction(nameof(Details), new { id });
-        }
-        catch (Exception ex)
+        if (!result.Success)
         {
-            LogFailedToUpdateParticipantMessage(logger, id, ex);
-            ModelState.AddModelError(string.Empty, "Unable to update this participant. Please review the changes and try again.");
+            // If the participant was not found (no validation errors), return NotFound
+            if (result.Participant is null && result.FieldErrors.Count == 0)
+            {
+                return NotFound();
+            }
+
+            LogFailedToUpdateParticipantMessage(logger, id, null);
+            AddErrors(result.FieldErrors);
             await RestoreDisplayOnlyFieldsAsync(model, id, cancellationToken);
             await PopulateLookupOptionsAsync(model, cancellationToken);
             await PopulateCustomerContactAsync(model, model.CustomerId.GetValueOrDefault(), cancellationToken);
             return View(model);
+        }
+
+        return RedirectToAction(nameof(Details), new { id = result.Participant.ParticipantId });
+    }
+
+    private void AddErrors(IReadOnlyDictionary<string, string[]> fieldErrors)
+    {
+        foreach (var kvp in fieldErrors)
+        {
+            foreach (var error in kvp.Value)
+            {
+                ModelState.AddModelError(kvp.Key, error);
+            }
         }
     }
 
@@ -257,6 +287,8 @@ public class ParticipantController(IParticipantApiClient participantApiClient, I
             return;
         }
 
+        model.CustomerName = customer.Name;
+        model.CustomerQalNumber = customer.QalNumber;
         model.CustomerContactName = customer.ContactName;
         model.CustomerOrganisation = customer.Organisation;
         model.CustomerAddress1 = customer.Address1;
@@ -268,5 +300,32 @@ public class ParticipantController(IParticipantApiClient participantApiClient, I
         model.CustomerTelephone = customer.Telephone;
         model.CustomerFax = customer.Fax;
         model.CustomerEmail = customer.Email;
+    }
+
+    private async Task<string> GenerateLabCodeAsync(Guid customerId, CancellationToken cancellationToken)
+    {
+        var participants = await participantApiClient.GetParticipantsAsync(customerId, includeInactive: true, cancellationToken);
+        var usedCodes = participants
+            .Select(p => int.TryParse(p.LabCode, out var parsed) ? parsed : int.MinValue)
+            .Where(code => code >= 1000)
+            .ToHashSet();
+
+        var availableCodes = new List<int>();
+        for (var candidate = 1000; candidate < 2000 && availableCodes.Count < 1000; candidate++)
+        {
+            if (!usedCodes.Contains(candidate))
+            {
+                availableCodes.Add(candidate);
+            }
+        }
+
+        if (availableCodes.Count == 0)
+        {
+            var fallback = 1000 + Random.Shared.Next(9000);
+            return fallback.ToString(CultureInfo.InvariantCulture);
+        }
+
+        var nextCode = availableCodes[Random.Shared.Next(availableCodes.Count)];
+        return nextCode.ToString(CultureInfo.InvariantCulture);
     }
 }

@@ -73,6 +73,8 @@ public sealed class ParticipantService(IParticipantRepository participantReposit
 
     public async Task<Participant> CreateParticipantAsync(Participant participant, CancellationToken cancellationToken = default)
     {
+        Validate(participant);
+
         if (participant.ParticipantId == Guid.Empty)
         {
             participant.ParticipantId = Guid.NewGuid();
@@ -103,6 +105,8 @@ public sealed class ParticipantService(IParticipantRepository participantReposit
         updatedFields.CustomerId = existing.CustomerId;
         updatedFields.InactiveDate ??= updatedFields.IsActive ? null : DateTime.UtcNow;
 
+        Validate(updatedFields);
+
         var updated = await participantRepository.UpdateAsync(updatedFields, cancellationToken);
         LogUpdatedParticipantMessage(logger, participantId, null);
         return updated;
@@ -119,6 +123,8 @@ public sealed class ParticipantService(IParticipantRepository participantReposit
 
         existing.IsActive = false;
         existing.InactiveDate ??= DateTime.UtcNow;
+
+        Validate(existing);
 
         var updated = await participantRepository.UpdateAsync(existing, cancellationToken);
         LogDeactivatedParticipantMessage(logger, participantId, null);
@@ -137,8 +143,19 @@ public sealed class ParticipantService(IParticipantRepository participantReposit
         existing.IsActive = true;
         existing.InactiveDate = null;
 
+        Validate(existing);
+
         var updated = await participantRepository.UpdateAsync(existing, cancellationToken);
         LogReactivatedParticipantMessage(logger, participantId, null);
         return updated;
+    }
+
+    private static void Validate(Participant participant)
+    {
+        var result = ParticipantValidator.Validate(participant);
+        if (!result.IsValid)
+        {
+            throw new ParticipantValidationException(result.Errors);
+        }
     }
 }

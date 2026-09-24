@@ -50,7 +50,7 @@ public class CustomerController(ICustomerApiClient customerApiClient, ILookupApi
         string? searchTerm,
         CustomerStatusFilter status = CustomerStatusFilter.Active,
         int page = 1,
-        int pageSize = 20,
+        int pageSize = PTL.InternalWeb.Pagination.PaginationModel.DefaultPageSize,
         CancellationToken cancellationToken = default)
     {
         var result = await customerApiClient.SearchCustomersAsync(new CustomerSearchRequest(searchTerm, status, page, pageSize), cancellationToken);
@@ -67,7 +67,20 @@ public class CustomerController(ICustomerApiClient customerApiClient, ILookupApi
             return NotFound();
         }
 
-        return View(customer);
+        var countriesTask = lookupApiClient.GetCountriesAsync(cancellationToken);
+        var customerTypesTask = lookupApiClient.GetCustomerTypesAsync(cancellationToken);
+        await Task.WhenAll(countriesTask, customerTypesTask);
+
+        var countryNames = countriesTask.Result.ToDictionary(c => c.CountryId, c => c.Country);
+        var customerTypeName = customerTypesTask.Result.FirstOrDefault(t => t.CustomerTypeId == customer.CustomerTypeId)?.CustomerType ?? string.Empty;
+
+        var model = new CustomerDetailsViewModel(
+            customer,
+            customerTypeName,
+            countryNames.GetValueOrDefault(customer.CountryId, string.Empty),
+            countryNames.GetValueOrDefault(customer.InvoiceCountryId, string.Empty));
+
+        return View(model);
     }
 
     [HttpGet]
@@ -169,8 +182,9 @@ public class CustomerController(ICustomerApiClient customerApiClient, ILookupApi
         var vatRatingsTask = lookupApiClient.GetVatRatingsAsync(cancellationToken);
         await Task.WhenAll(countriesTask, currenciesTask, customerTypesTask, vatRatingsTask);
 
-        // Country is optional-until-active in CustomerValidator, so a blank option is offered -
-        // matches DropDownCountry.Items.Insert(0, New ListItem("- Please Select -", Guid.Empty)).
+        // CountryId/InvoiceCountryId are required-while-active in CustomerValidator, so a blank
+        // option is offered to force an explicit choice - matches
+        // DropDownCountry.Items.Insert(0, New ListItem("- Please Select -", Guid.Empty)).
         var countryOptions = countriesTask.Result
             .Select(c => new SelectListItem(c.Country, c.CountryId.ToString()))
             .Prepend(new SelectListItem("- Please Select -", Guid.Empty.ToString()))

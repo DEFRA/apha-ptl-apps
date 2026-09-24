@@ -13,7 +13,7 @@ public class ContractServiceTests
     {
         CustomerId = customerId ?? Guid.NewGuid(),
         YearId = yearId ?? DateTime.UtcNow.Year + 1,
-        UTNumber = "UT12345",
+        UTNumber = "UT3/306",
         ContractSignatory = "Alice Example",
         AcknowledgementPostedDate = new DateTime(2026, 1, 1),
         AcknowledgementReturnedDate = new DateTime(2026, 1, 5),
@@ -138,5 +138,34 @@ public class ContractServiceTests
         Assert.Equal("B", searchResult.Items[0].Suffix);
         Assert.Equal(2, pagedResult.TotalCount);
         Assert.Single(pagedResult.Items);
+    }
+
+    [Fact]
+    public async Task CreateContractAsync_AlwaysForcesIsOnlineOrderFalse()
+    {
+        var service = CreateService(new FakeContractRepository());
+        var contract = ValidContract();
+        contract.IsOnlineOrder = true;
+
+        var created = await service.CreateContractAsync(contract);
+
+        Assert.False(created.IsOnlineOrder);
+    }
+
+    [Fact]
+    public async Task UpdateContractAsync_PreservesIsOnlineOrder()
+    {
+        var repository = new FakeContractRepository();
+        var service = CreateService(repository);
+        var contract = ValidContract();
+        contract.IsOnlineOrder = false;
+        var created = await service.CreateContractAsync(contract);
+
+        var updatedFields = ValidContract(created.CustomerId, created.YearId);
+        updatedFields.IsOnlineOrder = true;
+        var updated = await service.UpdateContractAsync(created.ContractId, updatedFields);
+
+        Assert.NotNull(updated);
+        Assert.False(updated!.IsOnlineOrder);
     }
 }

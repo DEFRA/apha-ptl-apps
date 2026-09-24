@@ -5,10 +5,21 @@
 
 <h1 class="govuk-heading-l">Create participant</h1>
 
+@if (Model.CustomerId is not null)
+{
+    <div class="govuk-form-group">
+        <p class="govuk-label govuk-label--s">Customer</p>
+        <p class="govuk-body">@Model.CustomerName (@Model.CustomerQalNumber)</p>
+    </div>
+}
+
 <form method="post" asp-action="Create" asp-route-customerId="@Model.CustomerId" novalidate>
     @await Html.PartialAsync("_ParticipantForm", Model)
 
-    <button class="govuk-button" data-module="govuk-button" type="submit">Create participant</button>
+    <div class="govuk-button-group">
+        <button class="govuk-button" data-module="govuk-button" type="submit">Create participant</button>
+        <a class="govuk-button govuk-button--secondary" data-module="govuk-button" asp-controller="Participant" asp-action="Index" asp-route-customerId="@Model.CustomerId">Cancel</a>
+    </div>
 </form>
 
 @section Scripts {

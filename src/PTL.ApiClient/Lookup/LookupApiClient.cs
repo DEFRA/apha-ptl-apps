@@ -11,8 +11,10 @@ public interface ILookupApiClient
     Task<IReadOnlyList<VatRatingResponse>> GetVatRatingsAsync(CancellationToken cancellationToken = default);
     Task<IReadOnlyList<LabTypeResponse>> GetLabTypesAsync(CancellationToken cancellationToken = default);
     Task<IReadOnlyList<YearResponse>> GetCurrentYearsAsync(CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<YearResponse>> GetAllYearsAsync(CancellationToken cancellationToken = default);
     Task<IReadOnlyList<SchemeCurrencyResponse>> GetSchemeCurrenciesAsync(Guid schemeId, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<PostagePricingPlanResponse>> GetPostagePricingPlansForYearAsync(int yearId, CancellationToken cancellationToken = default);
+    Task<SystemSettingsResponse> GetSystemSettingsAsync(CancellationToken cancellationToken = default);
 }
 
 // Thin typed HttpClient wrapper around PTL.Api's read-only lookup endpoints, shared by every web
@@ -55,6 +57,12 @@ public sealed class LookupApiClient(HttpClient httpClient) : ILookupApiClient
         return years ?? [];
     }
 
+    public async Task<IReadOnlyList<YearResponse>> GetAllYearsAsync(CancellationToken cancellationToken = default)
+    {
+        var years = await httpClient.GetFromJsonAsync<IReadOnlyList<YearResponse>>("/api/lookups/years/all", cancellationToken);
+        return years ?? [];
+    }
+
     public async Task<IReadOnlyList<SchemeCurrencyResponse>> GetSchemeCurrenciesAsync(Guid schemeId, CancellationToken cancellationToken = default)
     {
         var currencies = await httpClient.GetFromJsonAsync<IReadOnlyList<SchemeCurrencyResponse>>($"/api/lookups/schemes/{schemeId}/currencies", cancellationToken);
@@ -65,5 +73,11 @@ public sealed class LookupApiClient(HttpClient httpClient) : ILookupApiClient
     {
         var plans = await httpClient.GetFromJsonAsync<IReadOnlyList<PostagePricingPlanResponse>>($"/api/lookups/postage-pricing-plans?year={yearId}", cancellationToken);
         return plans ?? [];
+    }
+
+    public async Task<SystemSettingsResponse> GetSystemSettingsAsync(CancellationToken cancellationToken = default)
+    {
+        var settings = await httpClient.GetFromJsonAsync<SystemSettingsResponse>("/api/lookups/system-settings", cancellationToken);
+        return settings ?? new SystemSettingsResponse(string.Empty);
     }
 }

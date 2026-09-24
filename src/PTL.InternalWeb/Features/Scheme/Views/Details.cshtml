@@ -28,18 +28,24 @@
 
 <a class="govuk-back-link" asp-action="Index">Back to schemes</a>
 
-<h1 class="govuk-heading-l">@Model.Identifier - @Model.Name</h1>
+<div class="govuk-grid-row">
+    <div class="govuk-grid-column-two-thirds">
+        <h1 class="govuk-heading-l">@Model.Identifier - @Model.Name</h1>
+    </div>
+    <div class="govuk-grid-column-one-third govuk-!-text-align-right">
+        @if (Model.IsReadOnly)
+        {
+            <strong class="govuk-tag govuk-tag--grey">Read only (closed year)</strong>
+        }
+        else
+        {
+            <a class="govuk-button" data-module="govuk-button" asp-action="Edit" asp-route-id="@Model.SchemeId">Edit scheme</a>
+        }
+    </div>
+</div>
 
 <p class="govuk-body">
-    @if (Model.IsReadOnly)
-    {
-        <strong class="govuk-tag govuk-tag--grey">Read only (closed year)</strong>
-    }
-    else
-    {
-        <a class="govuk-button" data-module="govuk-button" asp-action="Edit" asp-route-id="@Model.SchemeId">Edit scheme</a>
-    }
-    <a class="govuk-link govuk-!-margin-left-2" asp-action="History" asp-route-sharedId="@Model.SharedId">View family history</a>
+    <a class="govuk-link" asp-action="History" asp-route-sharedId="@Model.SharedId">View family history</a>
 </p>
 
 <h2 class="govuk-heading-m">Scheme details</h2>

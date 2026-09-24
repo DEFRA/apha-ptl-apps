@@ -2,10 +2,94 @@ using System.ComponentModel.DataAnnotations;
 
 namespace PTL.InternalWeb.Tests.Features.Participant;
 
-// ParticipantFormViewModel currently has no Validate() method, so this file tests basic
-// model construction and property assignment to ensure all properties are covered in coverage reports.
+// ParticipantFormViewModel.Validate() delegates to PTL.Core.Participant.ParticipantValidator and is
+// only ever invoked by ASP.NET Core's model-validation pipeline, never by the controller directly -
+// existing ParticipantControllerTests bypass real model binding, so this is the only place it runs.
 public class ParticipantFormViewModelTests
 {
+    private static List<ValidationResult> Validate(PTL.InternalWeb.Features.Participant.ParticipantFormViewModel model) =>
+        model.Validate(new ValidationContext(model)).ToList();
+
+    [Fact]
+    public void Validate_WithoutAnyFields_ReturnsAllRequiredFieldErrorsInOneSubmission()
+    {
+        var model = new PTL.InternalWeb.Features.Participant.ParticipantFormViewModel();
+
+        var errors = Validate(model);
+
+        Assert.Contains(errors, e => e.MemberNames.Contains("LabCode"));
+        Assert.Contains(errors, e => e.MemberNames.Contains("LabName"));
+        Assert.Contains(errors, e => e.MemberNames.Contains("ContactName"));
+        Assert.Contains(errors, e => e.MemberNames.Contains("Organisation"));
+        Assert.Contains(errors, e => e.MemberNames.Contains("Address1"));
+        Assert.Contains(errors, e => e.MemberNames.Contains("Address2"));
+        Assert.Contains(errors, e => e.MemberNames.Contains("CountryId"));
+        Assert.Contains(errors, e => e.MemberNames.Contains("Telephone"));
+        Assert.Contains(errors, e => e.MemberNames.Contains("Email"));
+    }
+
+    [Fact]
+    public void Validate_WithoutCountry_ReturnsCountryError()
+    {
+        var model = new PTL.InternalWeb.Features.Participant.ParticipantFormViewModel
+        {
+            LabCode = "LAB-01",
+            LabName = "Laboratory 1",
+            ContactName = "Contact Name",
+            Organisation = "Organisation Name",
+            Address1 = "Address Line 1",
+            Address2 = "Address Line 2",
+            Telephone = "01234567890",
+            Email = "test@example.com"
+        };
+
+        var errors = Validate(model);
+
+        Assert.Contains(errors, e => e.MemberNames.Contains("CountryId"));
+    }
+
+    [Fact]
+    public void Validate_WithInvalidEmail_ReturnsEmailFormatError()
+    {
+        var model = new PTL.InternalWeb.Features.Participant.ParticipantFormViewModel
+        {
+            LabCode = "LAB-01",
+            LabName = "Laboratory 1",
+            ContactName = "Contact Name",
+            Organisation = "Organisation Name",
+            Address1 = "Address Line 1",
+            Address2 = "Address Line 2",
+            CountryId = Guid.NewGuid(),
+            Telephone = "01234567890",
+            Email = "not-an-email"
+        };
+
+        var errors = Validate(model);
+
+        Assert.Contains(errors, e => e.MemberNames.Contains("Email"));
+    }
+
+    [Fact]
+    public void Validate_WithAllFieldsPopulated_ReturnsNoErrors()
+    {
+        var model = new PTL.InternalWeb.Features.Participant.ParticipantFormViewModel
+        {
+            LabCode = "LAB-01",
+            LabName = "Laboratory 1",
+            ContactName = "Contact Name",
+            Organisation = "Organisation Name",
+            Address1 = "Address Line 1",
+            Address2 = "Address Line 2",
+            CountryId = Guid.NewGuid(),
+            Telephone = "01234567890",
+            Email = "test@example.com"
+        };
+
+        var errors = Validate(model);
+
+        Assert.Empty(errors);
+    }
+
     [Fact]
     public void ParticipantFormViewModel_AllPropertiesAssignable()
     {

@@ -42,6 +42,12 @@ public sealed class LookupRepository(IDbConnectionFactory connectionFactory) : I
         return (await connection.QueryAsync<YearEntity>("EXEC dbo.spgaYearCurrent")).ToList();
     }
 
+    public async Task<IReadOnlyList<YearEntity>> GetAllYearsAsync(CancellationToken cancellationToken = default)
+    {
+        using var connection = connectionFactory.CreateConnection();
+        return (await connection.QueryAsync<YearEntity>("EXEC dbo.spgaYear")).ToList();
+    }
+
     public async Task<IReadOnlyList<SchemeCurrencyEntity>> GetSchemeCurrenciesAsync(CancellationToken cancellationToken = default)
     {
         using var connection = connectionFactory.CreateConnection();
@@ -54,5 +60,11 @@ public sealed class LookupRepository(IDbConnectionFactory connectionFactory) : I
         return (await connection.QueryAsync<PostagePricingPlanEntity>(
             "EXEC dbo.spgPostageByYearID @YearId",
             new { YearId = yearId })).ToList();
+    }
+
+    public async Task<SystemSettingsEntity> GetSystemSettingsAsync(CancellationToken cancellationToken = default)
+    {
+        using var connection = connectionFactory.CreateConnection();
+        return await connection.QueryFirstAsync<SystemSettingsEntity>("EXEC dbo.spgaSystemSettings");
     }
 }

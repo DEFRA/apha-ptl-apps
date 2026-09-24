@@ -76,6 +76,18 @@ public class SchemeRouteSmokeTests : IClassFixture<WebApplicationFactory<Program
     }
 
     [Fact]
+    public async Task Details_RendersFullBreadcrumbTrail()
+    {
+        var client = _factory.CreateClient();
+
+        var response = await client.GetAsync($"/Scheme/Details/{SchemeId}");
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Contains("Manage Schemes", body);
+        Assert.Contains("Scheme Details", body);
+    }
+
+    [Fact]
     public async Task Edit_ReturnsSuccess()
     {
         var client = _factory.CreateClient();
@@ -83,6 +95,18 @@ public class SchemeRouteSmokeTests : IClassFixture<WebApplicationFactory<Program
         var response = await client.GetAsync($"/Scheme/Edit/{SchemeId}");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Edit_RendersFullBreadcrumbTrail()
+    {
+        var client = _factory.CreateClient();
+
+        var response = await client.GetAsync($"/Scheme/Edit/{SchemeId}");
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Contains("Manage Schemes", body);
+        Assert.Contains("Edit Scheme", body);
     }
 
     [Fact]

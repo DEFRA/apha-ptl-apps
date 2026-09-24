@@ -28,7 +28,7 @@ public class ContractControllerTests
 
     private static ContractRequest ValidCreateRequest(int? yearId = null) => new(
         YearId: yearId ?? DateTime.UtcNow.Year + 1,
-        UTNumber: "UT12345",
+        UTNumber: "UT3/306",
         FTNumber: string.Empty,
         ContractSignatory: "Alice Example",
         ActionsRequired: string.Empty,

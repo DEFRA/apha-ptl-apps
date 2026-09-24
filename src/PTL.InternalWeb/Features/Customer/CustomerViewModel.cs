@@ -14,6 +14,14 @@ public sealed record CustomerListViewModel(
     int TotalCount,
     IReadOnlyList<CustomerSummaryResponse> Customers);
 
+// Wraps CustomerResponse with the lookup names (CustomerType/Country/InvoiceCountry) Details.cshtml
+// needs but CustomerResponse only carries as raw GUIDs - populated by CustomerController.Details.
+public sealed record CustomerDetailsViewModel(
+    CustomerResponse Customer,
+    string CustomerTypeName,
+    string CountryName,
+    string InvoiceCountryName);
+
 
 // Shared by Create.cshtml and Edit.cshtml. Validation attributes mirror
 // PtaBusinessObjects.BusinessObjects.Contracts.Customer.AddBusinessRules() (see
@@ -33,29 +41,29 @@ public sealed class CustomerFormViewModel : IValidatableObject
     // TextboxInitialStartDate.Enabled = False.
     public DateTime? InitialStartDate { get; set; }
 
-    [Required(ErrorMessage = "Enter a name.")]
-    [StringLength(50, ErrorMessage = "Name must not exceed 50 characters.")]
+    [Required(ErrorMessage = "Enter a name")]
+    [StringLength(50, ErrorMessage = "Name must not exceed 50 characters")]
     public string Name { get; set; } = string.Empty;
 
     // These fields are genuinely optional in the legacy Customer.aspx form (see
     // CustomerValidator in PTL.Core, which only requires a subset while IsActive is true).
     // They must stay nullable: with <Nullable>enable</Nullable>, ASP.NET Core MVC implicitly
     // treats a non-nullable `string` as [Required] and rejects an empty submitted value.
-    [StringLength(50, ErrorMessage = "Previous name must not exceed 50 characters.")]
+    [StringLength(50, ErrorMessage = "Previous name must not exceed 50 characters")]
     public string? PreviousName { get; set; }
 
-    [StringLength(10, ErrorMessage = "Registered file number must not exceed 10 characters.")]
-    [RegularExpression(@"^(QAL/[0-9]*)?$", ErrorMessage = "Registered file number must match the format QAL/nnnnn.")]
+    [StringLength(10, ErrorMessage = "Registered file number must not exceed 10 characters")]
+    [RegularExpression(@"^(QAL/[0-9]*)?$", ErrorMessage = "Registered file number must match the format QAL/nnnnn")]
     public string? RegisteredFileNumber { get; set; }
 
-    [Required(ErrorMessage = "Select a customer type.")]
+    [Required(ErrorMessage = "Select a customer type")]
     public Guid? CustomerTypeId { get; set; }
 
     // Populated by CustomerController before the view is rendered (GET, and re-populated on a
     // failed POST) from ILookupApiClient.GetCustomerTypesAsync - see /api/lookups/customer-types.
     public IEnumerable<SelectListItem> CustomerTypeOptions { get; set; } = [];
 
-    [StringLength(20, ErrorMessage = "VAT number must not exceed 20 characters.")]
+    [StringLength(20, ErrorMessage = "VAT number must not exceed 20 characters")]
     public string? VatNumber { get; set; }
 
     // [NEEDS INVESTIGATION] rendered as a raw GUID pending a VatRating lookup API/stored procedure.
@@ -64,31 +72,31 @@ public sealed class CustomerFormViewModel : IValidatableObject
     // Populated by CustomerController before the view is rendered - see /api/lookups/vat-ratings.
     public IEnumerable<SelectListItem> VatRatingOptions { get; set; } = [];
 
-    [StringLength(20, ErrorMessage = "Account number must not exceed 20 characters.")]
+    [StringLength(20, ErrorMessage = "Account number must not exceed 20 characters")]
     public string? AccountNumber { get; set; }
 
-    [StringLength(30, ErrorMessage = "Customer ID must not exceed 30 characters.")]
+    [StringLength(30, ErrorMessage = "Customer ID must not exceed 30 characters")]
     public string? CustomerFinanceId { get; set; }
 
-    [StringLength(50, ErrorMessage = "Contact name must not exceed 50 characters.")]
+    [StringLength(50, ErrorMessage = "Contact name must not exceed 50 characters")]
     public string? ContactName { get; set; }
 
-    [StringLength(50, ErrorMessage = "Organisation must not exceed 50 characters.")]
+    [StringLength(50, ErrorMessage = "Organisation must not exceed 50 characters")]
     public string? Organisation { get; set; }
 
-    [StringLength(100, ErrorMessage = "Address line 1 must not exceed 100 characters.")]
+    [StringLength(100, ErrorMessage = "Address line 1 must not exceed 100 characters")]
     public string? Address1 { get; set; }
 
-    [StringLength(100, ErrorMessage = "Address line 2 must not exceed 100 characters.")]
+    [StringLength(100, ErrorMessage = "Address line 2 must not exceed 100 characters")]
     public string? Address2 { get; set; }
 
-    [StringLength(100, ErrorMessage = "Address line 3 must not exceed 100 characters.")]
+    [StringLength(100, ErrorMessage = "Address line 3 must not exceed 100 characters")]
     public string? Address3 { get; set; }
 
-    [StringLength(100, ErrorMessage = "Address line 4 must not exceed 100 characters.")]
+    [StringLength(100, ErrorMessage = "Address line 4 must not exceed 100 characters")]
     public string? Address4 { get; set; }
 
-    [StringLength(100, ErrorMessage = "Address line 5 must not exceed 100 characters.")]
+    [StringLength(100, ErrorMessage = "Address line 5 must not exceed 100 characters")]
     public string? Address5 { get; set; }
 
     public Guid? CountryId { get; set; }
@@ -96,20 +104,20 @@ public sealed class CustomerFormViewModel : IValidatableObject
     // Populated by CustomerController before the view is rendered - see /api/lookups/countries.
     public IEnumerable<SelectListItem> CountryOptions { get; set; } = [];
 
-    [StringLength(20, ErrorMessage = "Telephone must not exceed 20 characters.")]
-    [RegularExpression(@"^[ 0-9\+\-\(\)\*\#]*$", ErrorMessage = "Telephone contains characters that are not allowed.")]
+    [StringLength(20, ErrorMessage = "Telephone must not exceed 20 characters")]
+    [RegularExpression(@"^[ 0-9\+\-\(\)\*\#]*$", ErrorMessage = "Telephone contains characters that are not allowed")]
     public string? Telephone { get; set; }
 
-    [StringLength(20, ErrorMessage = "Telephone (alternative) must not exceed 20 characters.")]
-    [RegularExpression(@"^[ 0-9\+\-\(\)\*\#]*$", ErrorMessage = "Telephone (alternative) contains characters that are not allowed.")]
+    [StringLength(20, ErrorMessage = "Telephone (alternative) must not exceed 20 characters")]
+    [RegularExpression(@"^[ 0-9\+\-\(\)\*\#]*$", ErrorMessage = "Telephone (alternative) contains characters that are not allowed")]
     public string? Telephone2 { get; set; }
 
-    [StringLength(20, ErrorMessage = "Fax must not exceed 20 characters.")]
-    [RegularExpression(@"^[ 0-9\+\-\(\)\*\#]*$", ErrorMessage = "Fax contains characters that are not allowed.")]
+    [StringLength(20, ErrorMessage = "Fax must not exceed 20 characters")]
+    [RegularExpression(@"^[ 0-9\+\-\(\)\*\#]*$", ErrorMessage = "Fax contains characters that are not allowed")]
     public string? Fax { get; set; }
 
-    [StringLength(150, ErrorMessage = "Email must not exceed 150 characters.")]
-    [EmailAddress(ErrorMessage = "Enter a valid email address.")]
+    [StringLength(150, ErrorMessage = "Email must not exceed 150 characters")]
+    [EmailAddress(ErrorMessage = "Enter a valid email address")]
     public string? Email { get; set; }
 
     public Guid? CurrencyId { get; set; }
@@ -117,10 +125,10 @@ public sealed class CustomerFormViewModel : IValidatableObject
     // Populated by CustomerController before the view is rendered - see /api/lookups/currencies.
     public IEnumerable<SelectListItem> CurrencyOptions { get; set; } = [];
 
-    [StringLength(2000, ErrorMessage = "Comments must not exceed 2000 characters.")]
+    [StringLength(2000, ErrorMessage = "Comments must not exceed 2000 characters")]
     public string? Comments { get; set; }
 
-    [StringLength(500, ErrorMessage = "Postage arrangements must not exceed 500 characters.")]
+    [StringLength(500, ErrorMessage = "Postage arrangements must not exceed 500 characters")]
     public string? PostageArrangements { get; set; }
 
     // S6964 (value-type controller-action input) suppressed for this block: these are HTML
@@ -131,25 +139,25 @@ public sealed class CustomerFormViewModel : IValidatableObject
     public bool PaymentNonUK { get; set; }
 #pragma warning restore S6964
 
-    [StringLength(50, ErrorMessage = "Invoice name must not exceed 50 characters.")]
+    [StringLength(50, ErrorMessage = "Invoice name must not exceed 50 characters")]
     public string? InvoiceName { get; set; }
 
-    [StringLength(50, ErrorMessage = "Invoice organisation must not exceed 50 characters.")]
+    [StringLength(50, ErrorMessage = "Invoice organisation must not exceed 50 characters")]
     public string? InvoiceOrganisation { get; set; }
 
-    [StringLength(100, ErrorMessage = "Invoice address line 1 must not exceed 100 characters.")]
+    [StringLength(100, ErrorMessage = "Invoice address line 1 must not exceed 100 characters")]
     public string? InvoiceAddress1 { get; set; }
 
-    [StringLength(100, ErrorMessage = "Invoice address line 2 must not exceed 100 characters.")]
+    [StringLength(100, ErrorMessage = "Invoice address line 2 must not exceed 100 characters")]
     public string? InvoiceAddress2 { get; set; }
 
-    [StringLength(100, ErrorMessage = "Invoice address line 3 must not exceed 100 characters.")]
+    [StringLength(100, ErrorMessage = "Invoice address line 3 must not exceed 100 characters")]
     public string? InvoiceAddress3 { get; set; }
 
-    [StringLength(100, ErrorMessage = "Invoice address line 4 must not exceed 100 characters.")]
+    [StringLength(100, ErrorMessage = "Invoice address line 4 must not exceed 100 characters")]
     public string? InvoiceAddress4 { get; set; }
 
-    [StringLength(100, ErrorMessage = "Invoice address line 5 must not exceed 100 characters.")]
+    [StringLength(100, ErrorMessage = "Invoice address line 5 must not exceed 100 characters")]
     public string? InvoiceAddress5 { get; set; }
 
     public Guid? InvoiceCountryId { get; set; }
@@ -158,20 +166,20 @@ public sealed class CustomerFormViewModel : IValidatableObject
     // (same list as CountryOptions, rendered as a second dropdown - mirrors DropDownInvoiceCountry).
     public IEnumerable<SelectListItem> InvoiceCountryOptions { get; set; } = [];
 
-    [StringLength(20, ErrorMessage = "Invoice telephone must not exceed 20 characters.")]
-    [RegularExpression(@"^[ 0-9\+\-\(\)\*\#]*$", ErrorMessage = "Invoice telephone contains characters that are not allowed.")]
+    [StringLength(20, ErrorMessage = "Invoice telephone must not exceed 20 characters")]
+    [RegularExpression(@"^[ 0-9\+\-\(\)\*\#]*$", ErrorMessage = "Invoice telephone contains characters that are not allowed")]
     public string? InvoiceTelephone { get; set; }
 
-    [StringLength(20, ErrorMessage = "Invoice telephone (alternative) must not exceed 20 characters.")]
-    [RegularExpression(@"^[ 0-9\+\-\(\)\*\#]*$", ErrorMessage = "Invoice telephone (alternative) contains characters that are not allowed.")]
+    [StringLength(20, ErrorMessage = "Invoice telephone (alternative) must not exceed 20 characters")]
+    [RegularExpression(@"^[ 0-9\+\-\(\)\*\#]*$", ErrorMessage = "Invoice telephone (alternative) contains characters that are not allowed")]
     public string? InvoiceTelephone2 { get; set; }
 
-    [StringLength(20, ErrorMessage = "Invoice fax must not exceed 20 characters.")]
-    [RegularExpression(@"^[ 0-9\+\-\(\)\*\#]*$", ErrorMessage = "Invoice fax contains characters that are not allowed.")]
+    [StringLength(20, ErrorMessage = "Invoice fax must not exceed 20 characters")]
+    [RegularExpression(@"^[ 0-9\+\-\(\)\*\#]*$", ErrorMessage = "Invoice fax contains characters that are not allowed")]
     public string? InvoiceFax { get; set; }
 
-    [StringLength(150, ErrorMessage = "Invoice email must not exceed 150 characters.")]
-    [EmailAddress(ErrorMessage = "Enter a valid invoice email address.")]
+    [StringLength(150, ErrorMessage = "Invoice email must not exceed 150 characters")]
+    [EmailAddress(ErrorMessage = "Enter a valid invoice email address")]
     public string? InvoiceEmail { get; set; }
 
 #pragma warning disable S6964

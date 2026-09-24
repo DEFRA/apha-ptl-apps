@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using Microsoft.AspNetCore.Mvc;
 using PTL.Contracts.Participant;
 
 namespace PTL.ApiClient;
@@ -32,22 +33,36 @@ public sealed class ParticipantApiClient(HttpClient httpClient) : IParticipantAp
         return result ?? new ParticipantSearchResponse([], 0, request.Page, request.PageSize);
     }
 
-    public async Task<ParticipantResponse> CreateParticipantAsync(ParticipantRequest request, CancellationToken cancellationToken = default)
+    public async Task<ParticipantSaveResult> CreateParticipantAsync(ParticipantRequest request, CancellationToken cancellationToken = default)
     {
         var response = await httpClient.PostAsJsonAsync("/api/participants", request, cancellationToken);
-        response.EnsureSuccessStatusCode();
-        return await response.Content.ReadFromJsonAsync<ParticipantResponse>(cancellationToken) ?? throw new InvalidOperationException("Participant creation response was empty.");
+        return await ToSaveResultAsync(response, cancellationToken);
     }
 
-    public async Task<ParticipantResponse?> UpdateParticipantAsync(Guid participantId, ParticipantRequest request, CancellationToken cancellationToken = default)
+    public async Task<ParticipantSaveResult> UpdateParticipantAsync(Guid participantId, ParticipantRequest request, CancellationToken cancellationToken = default)
     {
         var response = await httpClient.PutAsJsonAsync($"/api/participants/{participantId}", request, cancellationToken);
         if (response.StatusCode == HttpStatusCode.NotFound)
         {
-            return null;
+            return new ParticipantSaveResult(false, null, new Dictionary<string, string[]> { [string.Empty] = ["Participant was not found."] });
+        }
+
+        return await ToSaveResultAsync(response, cancellationToken);
+    }
+
+    private static async Task<ParticipantSaveResult> ToSaveResultAsync(HttpResponseMessage response, CancellationToken cancellationToken)
+    {
+        if (response.StatusCode == HttpStatusCode.BadRequest)
+        {
+            var problem = await response.Content.ReadFromJsonAsync<ValidationProblemDetails>(cancellationToken);
+            var errors = problem?.Errors is { Count: > 0 }
+                ? problem.Errors.ToDictionary(e => e.Key, e => e.Value)
+                : new Dictionary<string, string[]> { [string.Empty] = ["The request was invalid."] };
+            return new ParticipantSaveResult(false, null, errors);
         }
 
         response.EnsureSuccessStatusCode();
-        return await response.Content.ReadFromJsonAsync<ParticipantResponse>(cancellationToken);
+        var participant = await response.Content.ReadFromJsonAsync<ParticipantResponse>(cancellationToken);
+        return new ParticipantSaveResult(true, participant, new Dictionary<string, string[]>());
     }
 }

@@ -160,6 +160,11 @@ public static class DapperColumnMappings
             ["fldApprovedDate"] = nameof(CoreContract.ApprovedDate),
         });
 
+        Map<SystemSettingsEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldUTNumber"] = nameof(SystemSettingsEntity.UTNumber),
+        });
+
         Map<ContractSummaryEntity>(new(StringComparer.OrdinalIgnoreCase)
         {
             ["fldContractId"] = nameof(ContractSummaryEntity.ContractId),

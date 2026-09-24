@@ -60,6 +60,34 @@ public class ParticipantControllerTests
     }
 
     [Fact]
+    public async Task CreateParticipant_InvalidRequest_ReturnsValidationProblem()
+    {
+        var controller = CreateController(new FakeParticipantRepository());
+        var invalidRequest = ValidCreateRequest(Guid.NewGuid()) with { LabName = string.Empty, Email = "not-an-email" };
+
+        var result = await controller.CreateParticipant(invalidRequest, CancellationToken.None);
+
+        var objectResult = Assert.IsType<BadRequestObjectResult>(result.Result);
+        var problem = Assert.IsType<ValidationProblemDetails>(objectResult.Value);
+        Assert.True(problem.Errors.ContainsKey(nameof(PTL.Core.Participant.Participant.LabName)));
+    }
+
+    [Fact]
+    public async Task UpdateParticipant_InvalidRequest_ReturnsValidationProblem()
+    {
+        var repository = new FakeParticipantRepository();
+        var controller = CreateController(repository);
+        var created = await controller.CreateParticipant(ValidCreateRequest(Guid.NewGuid()), CancellationToken.None);
+        var participantId = ((ParticipantResponse)((CreatedAtActionResult)created.Result!).Value!).ParticipantId;
+        var invalidRequest = ValidCreateRequest(Guid.NewGuid()) with { LabName = string.Empty };
+
+        var result = await controller.UpdateParticipant(participantId, invalidRequest, CancellationToken.None);
+
+        var objectResult = Assert.IsType<BadRequestObjectResult>(result.Result);
+        Assert.IsType<ValidationProblemDetails>(objectResult.Value);
+    }
+
+    [Fact]
     public async Task GetParticipant_UnknownParticipant_ReturnsNotFound()
     {
         var controller = CreateController(new FakeParticipantRepository());
