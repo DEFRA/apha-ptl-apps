@@ -72,7 +72,7 @@
 <h2 class="govuk-heading-m">Invoice generation</h2>
 <dl class="govuk-summary-list">
     <govuk-summary-row label="Opt out of invoice generation">@(Model.OptOutOfInvoiceGeneration ? "Yes" : "No")</govuk-summary-row>
-    <govuk-summary-row label="Has been invoiced">@(Model.IsInvoiceSent ? "Yes" : "No")</govuk-summary-row>
+    <govuk-summary-row label="Has been invoiced">@(Model.IsInvoiceSent == true ? "Yes" : "No")</govuk-summary-row>
 </dl>
 
 <h2 class="govuk-heading-m">Others</h2>

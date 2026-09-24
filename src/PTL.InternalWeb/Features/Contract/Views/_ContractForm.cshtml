@@ -133,7 +133,7 @@
 
 <div class="govuk-form-group">
     <div class="govuk-checkboxes__item">
-        <input class="govuk-checkboxes__input" type="checkbox" id="IsInvoiceSentDisplay" checked="@(Model.IsInvoiceSent ? "checked" : null)" disabled />
+        <input class="govuk-checkboxes__input" type="checkbox" id="IsInvoiceSentDisplay" checked="@(Model.IsInvoiceSent == true ? "checked" : null)" disabled />
         <label class="govuk-label govuk-checkboxes__label" for="IsInvoiceSentDisplay">Has been invoiced</label>
     </div>
 </div>

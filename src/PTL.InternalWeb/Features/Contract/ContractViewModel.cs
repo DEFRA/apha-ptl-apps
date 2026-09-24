@@ -49,7 +49,8 @@ public sealed partial class ContractFormViewModel : IValidatableObject
     // Contract.aspx's CheckBoxIsInvoiceSent (permanently Enabled="false"); CurrencySymbol is
     // resolved from the owning customer's currency by ContractController (see
     // Contract.aspx.vb LoadLabelNames() using mCurrency.Symbol for the pricing field labels).
-    public bool IsInvoiceSent { get; set; }
+    // Keep nullable to avoid under-posting warnings when the value is absent from a form submission.
+    public bool? IsInvoiceSent { get; set; }
 
     public string CurrencySymbol { get; set; } = string.Empty;
 
