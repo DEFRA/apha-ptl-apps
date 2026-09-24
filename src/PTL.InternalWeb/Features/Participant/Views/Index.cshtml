@@ -1,8 +1,15 @@
 @model PTL.InternalWeb.Features.Participant.ParticipantListViewModel
 @using PTL.Contracts.Participant
+@using PTL.InternalWeb.Pagination
 @{
     ViewData["Title"] = "Participants";
-    var totalPages = Model.PageSize == 0 ? 1 : (int)Math.Ceiling(Model.TotalCount / (double)Model.PageSize);
+    var pagination = new PaginationModel
+    {
+        CurrentPage = Model.Page,
+        PageSize = Model.PageSize,
+        TotalRecords = Model.TotalCount,
+        RouteValues = new Dictionary<string, object?> { ["customerId"] = Model.CustomerId, ["searchTerm"] = Model.SearchTerm, ["includeInactive"] = Model.IncludeInactive }
+    };
 }
 
 <h1 class="govuk-heading-l">Participants</h1>
@@ -30,6 +37,8 @@
 }
 else
 {
+    <govuk-page-size-selector model="pagination" />
+
     <table class="govuk-table">
         <thead class="govuk-table__head">
             <tr class="govuk-table__row">
@@ -60,26 +69,5 @@ else
         </tbody>
     </table>
 
-    @if (totalPages > 1)
-    {
-        <nav class="govuk-pagination" aria-label="Pagination">
-            <ul class="govuk-pagination__list">
-                @for (var pageNumber = 1; pageNumber <= totalPages; pageNumber++)
-                {
-                    <li class="govuk-pagination__item @(pageNumber == Model.Page ? "govuk-pagination__item--current" : "")">
-                        <a class="govuk-link govuk-pagination__link"
-                           asp-action="Index"
-                           asp-route-customerId="@Model.CustomerId"
-                           asp-route-searchTerm="@Model.SearchTerm"
-                           asp-route-includeInactive="@Model.IncludeInactive"
-                           asp-route-page="@pageNumber"
-                           asp-route-pageSize="@Model.PageSize"
-                           aria-label="Page @pageNumber">
-                            @pageNumber
-                        </a>
-                    </li>
-                }
-            </ul>
-        </nav>
-    }
+    <govuk-pagination model="pagination" />
 }

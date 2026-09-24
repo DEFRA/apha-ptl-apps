@@ -1,12 +1,19 @@
 @model PTL.InternalWeb.Features.Contract.ContractListViewModel
 @using PTL.Contracts.Contract
+@using PTL.InternalWeb.Pagination
 @{
     ViewData["Title"] = "Contracts";
-    var totalPages = Model.Search.PageSize == 0 ? 1 : (int)Math.Ceiling(Model.TotalCount / (double)Model.Search.PageSize);
     var historicalSelected = Model.Search.Period == ContractPeriodFilter.Historical ? "selected" : null;
     var currentSelected = Model.Search.Period == ContractPeriodFilter.CurrentAndNext ? "selected" : null;
     var allSelected = Model.Search.Period == ContractPeriodFilter.All ? "selected" : null;
     string YearText(int yearId) => Model.YearNames.GetValueOrDefault(yearId, yearId.ToString());
+    var pagination = new PaginationModel
+    {
+        CurrentPage = Model.Search.Page,
+        PageSize = Model.Search.PageSize,
+        TotalRecords = Model.TotalCount,
+        RouteValues = new Dictionary<string, object?> { ["customerId"] = Model.Search.CustomerId, ["period"] = Model.Search.Period }
+    };
 }
 
 <h1 class="govuk-heading-l">Contracts</h1>
@@ -35,6 +42,8 @@
 }
 else
 {
+    <govuk-page-size-selector model="pagination" />
+
     <table class="govuk-table">
         <thead class="govuk-table__head">
             <tr class="govuk-table__row">
@@ -69,21 +78,5 @@ else
         </tbody>
     </table>
 
-    @if (totalPages > 1)
-    {
-        <nav class="govuk-pagination" aria-label="Pagination">
-            <ul class="govuk-pagination__list">
-                @for (var pageNumber = 1; pageNumber <= totalPages; pageNumber++)
-                {
-                    <li class="govuk-pagination__item @(pageNumber == Model.Search.Page ? "govuk-pagination__item--current" : "")">
-                        <a class="govuk-link govuk-pagination__link"
-                           asp-action="Index"
-                           asp-route-customerId="@Model.Search.CustomerId"
-                           asp-route-period="@Model.Search.Period"
-                           asp-route-page="@pageNumber">@pageNumber</a>
-                    </li>
-                }
-            </ul>
-        </nav>
-    }
+    <govuk-pagination model="pagination" />
 }

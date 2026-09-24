@@ -53,7 +53,7 @@ public class ContractController(IContractApiClient contractApiClient, ICustomerA
         ContractPeriodFilter period = ContractPeriodFilter.CurrentAndNext,
         string? searchTerm = null,
         int page = 1,
-        int pageSize = 20,
+        int pageSize = PTL.InternalWeb.Pagination.PaginationModel.DefaultPageSize,
         CancellationToken cancellationToken = default)
     {
         var result = await contractApiClient.GetContractsForCustomerAsync(customerId, new ContractSearchRequest(yearId, period, searchTerm, page, pageSize), cancellationToken);

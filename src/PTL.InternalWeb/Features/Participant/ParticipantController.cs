@@ -45,7 +45,7 @@ public class ParticipantController(IParticipantApiClient participantApiClient, I
             new EventId(6, nameof(LogFailedToReactivateParticipantMessage)),
             "Failed to reactivate participant {ParticipantId}");
 
-    public async Task<IActionResult> Index(Guid customerId, string? searchTerm = null, bool includeInactive = false, int page = 1, int pageSize = 20, CancellationToken cancellationToken = default)
+    public async Task<IActionResult> Index(Guid customerId, string? searchTerm = null, bool includeInactive = false, int page = 1, int pageSize = PTL.InternalWeb.Pagination.PaginationModel.DefaultPageSize, CancellationToken cancellationToken = default)
     {
         var result = await participantApiClient.SearchParticipantsAsync(new ParticipantSearchRequest(customerId, searchTerm, includeInactive, page, pageSize), cancellationToken);
         LogDisplayedParticipantListMessage(logger, searchTerm, includeInactive, page, result.TotalCount, null);
