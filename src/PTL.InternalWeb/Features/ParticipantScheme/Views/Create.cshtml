@@ -1,0 +1,89 @@
+@model PTL.InternalWeb.Features.ParticipantScheme.ParticipantSchemeFormViewModel
+@{
+    ViewData["Title"] = "Contract Item Details";
+    var errors = ViewData.ModelState.Where(kvp => kvp.Value?.Errors.Count > 0).SelectMany(kvp => kvp.Value!.Errors.Select(e => (Field: kvp.Key, e.ErrorMessage))).ToList();
+}
+
+<a class="govuk-back-link" asp-controller="Contract" asp-action="ContractItems" asp-route-id="@Model.ContractId">Back</a>
+
+<h1 class="govuk-heading-l">Contract Item Details</h1>
+
+<govuk-error-summary errors="@errors" />
+
+<form method="get" asp-action="Create" class="govuk-!-margin-bottom-4">
+    <input type="hidden" name="contractId" value="@Model.ContractId" />
+    <input type="hidden" name="customerId" value="@Model.CustomerId" />
+    <div class="govuk-form-group">
+        <label class="govuk-label" for="participantId">Participant</label>
+        <select class="govuk-select" id="participantId" name="participantId" onchange="this.form.submit()">
+            <option value="">Please select a Participant from the List</option>
+            @foreach (var option in Model.ParticipantOptions)
+            {
+                var selected = option.Value == Model.ParticipantId?.ToString() ? "selected" : null;
+                <option value="@option.Value" selected="@selected">@option.Text</option>
+            }
+        </select>
+    </div>
+</form>
+
+@if (Model.SchemeId is null)
+{
+    <h2 class="govuk-heading-m">Please select a Scheme from the List</h2>
+    <form method="get" asp-action="Create" class="govuk-!-margin-bottom-4">
+        <input type="hidden" name="contractId" value="@Model.ContractId" />
+        <input type="hidden" name="customerId" value="@Model.CustomerId" />
+        <input type="hidden" name="participantId" value="@Model.ParticipantId" />
+        <div class="govuk-form-group">
+            <label class="govuk-label" for="schemeSearchTerm">Search schemes</label>
+            <input class="govuk-input" id="schemeSearchTerm" name="schemeSearchTerm" type="text" value="@Model.SchemeSearchTerm" />
+        </div>
+        <button class="govuk-button" data-module="govuk-button" type="submit">Search</button>
+    </form>
+
+    @if (Model.SchemeOptions.Count == 0)
+    {
+        <p class="govuk-body">There are no schemes available for this year.</p>
+    }
+    else
+    {
+        <govuk-page-size-selector model="Model.SchemePagination" />
+        <table class="govuk-table">
+            <thead class="govuk-table__head">
+                <tr class="govuk-table__row">
+                    <th scope="col" class="govuk-table__header">Identifier</th>
+                    <th scope="col" class="govuk-table__header">Name</th>
+                    <th scope="col" class="govuk-table__header"></th>
+                </tr>
+            </thead>
+            <tbody class="govuk-table__body">
+                @foreach (var scheme in Model.SchemeOptions)
+                {
+                    <tr class="govuk-table__row">
+                        <td class="govuk-table__cell">@scheme.CurrentIdentifier</td>
+                        <td class="govuk-table__cell">@scheme.CurrentName</td>
+                        <td class="govuk-table__cell">
+                            <a class="govuk-link" asp-action="Create" asp-route-contractId="@Model.ContractId" asp-route-customerId="@Model.CustomerId" asp-route-participantId="@Model.ParticipantId" asp-route-schemeId="@scheme.CurrentSchemeId">Select</a>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        <govuk-pagination model="Model.SchemePagination" />
+    }
+}
+else
+{
+    <p class="govuk-body">
+        <strong>@Model.SchemeDisplayName</strong>
+        <a class="govuk-link" asp-action="Create" asp-route-contractId="@Model.ContractId" asp-route-customerId="@Model.CustomerId" asp-route-participantId="@Model.ParticipantId">Change</a>
+    </p>
+
+    <form method="post" asp-action="Create">
+        @Html.AntiForgeryToken()
+        <partial name="_ParticipantSchemeFields" model="Model" />
+        <div class="govuk-button-group">
+            <button class="govuk-button" data-module="govuk-button" type="submit">Save</button>
+            <a class="govuk-button govuk-button--secondary" data-module="govuk-button" asp-controller="Contract" asp-action="ContractItems" asp-route-id="@Model.ContractId">Cancel</a>
+        </div>
+    </form>
+}

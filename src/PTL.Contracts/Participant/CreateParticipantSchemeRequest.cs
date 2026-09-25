@@ -1,0 +1,43 @@
+namespace PTL.Contracts.Participant;
+
+// Public API contract for POST /api/participant-schemes - matches legacy
+// ParticipantScheme.aspx.vb's editable fields (Scheme/Participant are selected once at Add time and
+// never change afterwards). ContractId/ParticipantId/SchemeId are always required.
+public sealed record CreateParticipantSchemeRequest(
+    Guid ContractId,
+    Guid ParticipantId,
+    Guid SchemeId,
+    bool DistributionMonthJan,
+    bool DistributionMonthFeb,
+    bool DistributionMonthMar,
+    bool DistributionMonthApr,
+    bool DistributionMonthMay,
+    bool DistributionMonthJun,
+    bool DistributionMonthJul,
+    bool DistributionMonthAug,
+    bool DistributionMonthSep,
+    bool DistributionMonthOct,
+    bool DistributionMonthNov,
+    bool DistributionMonthDec,
+    int NumberOfSetsRequired,
+    string? ExternalReference,
+    string? Contact,
+    bool ImportExportLicenceRequired,
+    bool CustomsCertificateRequired,
+    bool NonFeePaying,
+    string? PackingInstructions,
+    bool IsWeightedPricing,
+    bool DataConsentDeclarationGiven,
+    bool IsOverrideJan,
+    bool IsOverrideFeb,
+    bool IsOverrideMar,
+    bool IsOverrideApr,
+    bool IsOverrideMay,
+    bool IsOverrideJun,
+    bool IsOverrideJul,
+    bool IsOverrideAug,
+    bool IsOverrideSep,
+    bool IsOverrideOct,
+    bool IsOverrideNov,
+    bool IsOverrideDec,
+    Guid? GroupAddressId = null);

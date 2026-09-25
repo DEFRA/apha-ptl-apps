@@ -11,9 +11,9 @@ namespace PTL.Api.Tests.Endpoints;
 
 public class ContractControllerTests
 {
-    private static ContractController CreateController(FakeContractRepository repository)
+    private static ContractController CreateController(FakeContractRepository repository, FakeParticipantSchemeRepository? participantSchemeRepository = null)
     {
-        var controller = new ContractController(new ContractService(repository, NullLogger<ContractService>.Instance), NullLogger<ContractController>.Instance);
+        var controller = new ContractController(new ContractService(repository, participantSchemeRepository ?? new FakeParticipantSchemeRepository(), NullLogger<ContractService>.Instance), NullLogger<ContractController>.Instance);
 
         // ValidationProblem() resolves ProblemDetailsFactory from HttpContext.RequestServices,
         // which a bare controller instance does not have without this wiring.

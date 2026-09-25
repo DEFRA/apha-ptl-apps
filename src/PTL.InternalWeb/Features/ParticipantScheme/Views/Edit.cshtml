@@ -1,0 +1,26 @@
+@model PTL.InternalWeb.Features.ParticipantScheme.ParticipantSchemeFormViewModel
+@{
+    ViewData["Title"] = Model.IsReadOnly ? "Contract Item (Removed)" : "Contract Item Details";
+    var errors = ViewData.ModelState.Where(kvp => kvp.Value?.Errors.Count > 0).SelectMany(kvp => kvp.Value!.Errors.Select(e => (Field: kvp.Key, e.ErrorMessage))).ToList();
+}
+
+<a class="govuk-back-link" asp-action="Details" asp-route-id="@Model.ParticipantSchemeId">Back</a>
+
+<h1 class="govuk-heading-l">@ViewData["Title"]</h1>
+
+<govuk-error-summary errors="@errors" />
+
+<p class="govuk-body"><strong>Participant:</strong> @Model.ParticipantDisplayName</p>
+<p class="govuk-body"><strong>Scheme:</strong> @Model.SchemeDisplayName</p>
+
+<form method="post" asp-action="Edit" asp-route-id="@Model.ParticipantSchemeId">
+    @Html.AntiForgeryToken()
+    <partial name="_ParticipantSchemeFields" model="Model" />
+    <div class="govuk-button-group">
+        @if (!Model.IsReadOnly)
+        {
+            <button class="govuk-button" data-module="govuk-button" type="submit">Save</button>
+        }
+        <a class="govuk-button govuk-button--secondary" data-module="govuk-button" asp-action="Details" asp-route-id="@Model.ParticipantSchemeId">Cancel</a>
+    </div>
+</form>

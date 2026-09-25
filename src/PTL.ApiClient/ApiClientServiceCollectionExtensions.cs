@@ -50,6 +50,12 @@ public static class ApiClientServiceCollectionExtensions
             .AddHttpMessageHandler<CorrelationIdDelegatingHandler>()
             .AddStandardResilienceHandler();
 
+        services.AddHttpClient<IParticipantSchemeApiClient, ParticipantSchemeApiClient>(client =>
+        {
+            client.BaseAddress = new Uri(apiBaseUrl);
+        })
+            .AddStandardResilienceHandler();
+
         services.AddHttpClient<IContractApiClient, ContractApiClient>(client =>
         {
             client.BaseAddress = new Uri(apiBaseUrl);
@@ -63,6 +69,12 @@ public static class ApiClientServiceCollectionExtensions
             .AddStandardResilienceHandler();
 
         services.AddHttpClient<ILookupApiClient, LookupApiClient>(client =>
+        {
+            client.BaseAddress = new Uri(apiBaseUrl);
+        })
+            .AddStandardResilienceHandler();
+
+        services.AddHttpClient<IImportPermitApiClient, ImportPermitApiClient>(client =>
         {
             client.BaseAddress = new Uri(apiBaseUrl);
         })

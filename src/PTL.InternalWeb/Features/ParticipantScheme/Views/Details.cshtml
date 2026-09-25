@@ -1,0 +1,29 @@
+@model PTL.InternalWeb.Features.ParticipantScheme.ParticipantSchemeDetailsViewModel
+@{
+    ViewData["Title"] = "Contract Item Details";
+    var ps = Model.ParticipantScheme;
+}
+
+<a class="govuk-back-link" asp-controller="Contract" asp-action="ContractItems" asp-route-id="@ps.ContractId">Back</a>
+
+<h1 class="govuk-heading-l">@(Model.IsReadOnly ? "Contract Item (Removed)" : "Contract Item Details")</h1>
+
+<dl class="govuk-summary-list">
+    <govuk-summary-row label="Participant">@ps.ParticipantDisplayName</govuk-summary-row>
+    <govuk-summary-row label="Scheme">@ps.SchemeDisplayName</govuk-summary-row>
+    <govuk-summary-row label="Number of sets required">@ps.NumberOfSetsRequired</govuk-summary-row>
+    <govuk-summary-row label="External reference">@ps.ExternalReference</govuk-summary-row>
+    <govuk-summary-row label="Contact">@ps.Contact</govuk-summary-row>
+    <govuk-summary-row label="Import/export licence required">@(ps.ImportExportLicenceRequired ? "Yes" : "No")</govuk-summary-row>
+    <govuk-summary-row label="Customs certificate required">@(ps.CustomsCertificateRequired ? "Yes" : "No")</govuk-summary-row>
+    <govuk-summary-row label="Non fee paying">@(ps.NonFeePaying ? "Yes" : "No")</govuk-summary-row>
+    <govuk-summary-row label="Packing instructions">@ps.PackingInstructions</govuk-summary-row>
+    <govuk-summary-row label="Weighted pricing plan">@(ps.IsWeightedPricing ? "Yes" : "No")</govuk-summary-row>
+    <govuk-summary-row label="Data consent given">@(ps.DataConsentDeclarationGiven ? "Yes" : "No")</govuk-summary-row>
+    <govuk-summary-row label="Price">@ps.Price.ToString("N2")</govuk-summary-row>
+</dl>
+
+@if (!Model.IsReadOnly)
+{
+    <a class="govuk-button" data-module="govuk-button" asp-action="Edit" asp-route-id="@ps.ParticipantSchemeId">Edit</a>
+}

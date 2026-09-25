@@ -24,6 +24,12 @@ public sealed class LookupService(ILookupRepository lookupRepository) : ILookupS
     public Task<IReadOnlyList<YearEntity>> GetAllYearsAsync(CancellationToken cancellationToken = default) =>
         lookupRepository.GetAllYearsAsync(cancellationToken);
 
+    public Task<IReadOnlyList<YearEntity>> GetWeightedPricingYearsAsync(CancellationToken cancellationToken = default) =>
+        lookupRepository.GetWeightedPricingYearsAsync(cancellationToken);
+
+    public Task<IReadOnlyList<GroupAddressEntity>> GetGroupAddressesAsync(CancellationToken cancellationToken = default) =>
+        lookupRepository.GetGroupAddressesAsync(cancellationToken);
+
     public async Task<IReadOnlyList<SchemeCurrencyEntity>> GetSchemeCurrenciesAsync(Guid schemeId, CancellationToken cancellationToken = default)
     {
         var all = await lookupRepository.GetSchemeCurrenciesAsync(cancellationToken);

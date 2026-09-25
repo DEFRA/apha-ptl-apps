@@ -62,6 +62,15 @@ internal sealed class FakeContractRepository : IContractRepository
         return Task.FromResult<PTL.Core.Contract.Contract?>(Clone(contract));
     }
 
+    public ContractItemsAggregate? ContractItems { get; set; }
+
+    public Task<ContractItemsAggregate?> GetContractItemsAsync(Guid contractId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(ContractItems is not null && ContractItems.ContractId == contractId ? ContractItems : null);
+
+    // Test-only helper to seed a contract directly (e.g. with a specific IsReadOnly state) without
+    // going through CreateAsync's server-generated-field logic.
+    public void Seed(PTL.Core.Contract.Contract contract) => _contracts[contract.ContractId] = Clone(contract);
+
     private static ContractSummaryEntity ToSummary(PTL.Core.Contract.Contract c) => new()
     {
         ContractId = c.ContractId,

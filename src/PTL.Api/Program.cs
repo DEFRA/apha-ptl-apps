@@ -5,11 +5,13 @@ using PTL.Api.Infrastructure;
 using PTL.Common.Correlation;
 using PTL.Common.Health;
 using PTL.Core.Contract;
+using PTL.Core.Contract.ImportPermit;
 using PTL.Core.Customer;
 using PTL.Core.Lookup;
 using PTL.Core.Participant;
 using PTL.Core.Scheme;
 using PTL.Data.Contract;
+using PTL.Data.Contract.ImportPermit;
 using PTL.Data.Customer;
 using PTL.Data.Infrastructure;
 using PTL.Data.Lookup;
@@ -55,9 +57,14 @@ builder.Services.AddScoped<ICustomerService, CustomerService>();
 
 builder.Services.AddScoped<IParticipantRepository, ParticipantRepository>();
 builder.Services.AddScoped<IParticipantService, ParticipantService>();
+builder.Services.AddScoped<IParticipantSchemeRepository, ParticipantSchemeRepository>();
+builder.Services.AddScoped<IParticipantSchemeService, ParticipantSchemeService>();
 
 builder.Services.AddScoped<IContractRepository, ContractRepository>();
 builder.Services.AddScoped<IContractService, ContractService>();
+
+builder.Services.AddScoped<IImportPermitRepository, ImportPermitRepository>();
+builder.Services.AddScoped<IImportPermitService, ImportPermitService>();
 
 builder.Services.AddScoped<ISchemeRepository, SchemeRepository>();
 builder.Services.AddScoped<ISchemeService, SchemeService>();

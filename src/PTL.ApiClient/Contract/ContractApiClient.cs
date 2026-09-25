@@ -12,6 +12,8 @@ public interface IContractApiClient
     Task<ContractSearchResponse> GetContractsForCustomerByYearAsync(Guid customerId, int yearId, CancellationToken cancellationToken = default);
     Task<ContractSaveResult> CreateContractAsync(Guid customerId, ContractRequest request, CancellationToken cancellationToken = default);
     Task<ContractSaveResult> UpdateContractAsync(Guid contractId, ContractRequest request, CancellationToken cancellationToken = default);
+    Task<ContractItemsResponse?> GetContractItemsAsync(Guid contractId, CancellationToken cancellationToken = default);
+    Task<ContractItemRemovalResult> RemoveContractItemAsync(Guid contractId, Guid participantSchemeId, CancellationToken cancellationToken = default);
 }
 
 // Thin typed HttpClient wrapper around PTL.Api's contract endpoints, shared by every web
@@ -76,5 +78,36 @@ public sealed class ContractApiClient(HttpClient httpClient) : IContractApiClien
         response.EnsureSuccessStatusCode();
         var contract = await response.Content.ReadFromJsonAsync<ContractResponse>(cancellationToken);
         return new ContractSaveResult(true, contract, new Dictionary<string, string[]>());
+    }
+
+    public async Task<ContractItemsResponse?> GetContractItemsAsync(Guid contractId, CancellationToken cancellationToken = default)
+    {
+        var response = await httpClient.GetAsync($"/api/contracts/{contractId}/items", cancellationToken);
+        if (response.StatusCode == HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<ContractItemsResponse>(cancellationToken);
+    }
+
+    public async Task<ContractItemRemovalResult> RemoveContractItemAsync(Guid contractId, Guid participantSchemeId, CancellationToken cancellationToken = default)
+    {
+        var response = await httpClient.DeleteAsync($"/api/contracts/{contractId}/items/{participantSchemeId}", cancellationToken);
+        if (response.StatusCode == HttpStatusCode.NotFound)
+        {
+            return new ContractItemRemovalResult(false, true, "This contract item was not found.");
+        }
+
+        if (response.StatusCode == HttpStatusCode.BadRequest)
+        {
+            var problem = await response.Content.ReadFromJsonAsync<ValidationProblemDetails>(cancellationToken);
+            var message = problem?.Errors is { Count: > 0 } errors ? string.Join(" ", errors.Values.SelectMany(v => v)) : "The request was invalid.";
+            return new ContractItemRemovalResult(false, false, message);
+        }
+
+        response.EnsureSuccessStatusCode();
+        return new ContractItemRemovalResult(true, false, null);
     }
 }

@@ -48,6 +48,18 @@ public sealed class LookupRepository(IDbConnectionFactory connectionFactory) : I
         return (await connection.QueryAsync<YearEntity>("EXEC dbo.spgaYear")).ToList();
     }
 
+    public async Task<IReadOnlyList<YearEntity>> GetWeightedPricingYearsAsync(CancellationToken cancellationToken = default)
+    {
+        using var connection = connectionFactory.CreateConnection();
+        return (await connection.QueryAsync<YearEntity>("EXEC dbo.spgaWeightedPricingYear")).ToList();
+    }
+
+    public async Task<IReadOnlyList<GroupAddressEntity>> GetGroupAddressesAsync(CancellationToken cancellationToken = default)
+    {
+        using var connection = connectionFactory.CreateConnection();
+        return (await connection.QueryAsync<GroupAddressEntity>("EXEC dbo.spgaGroupAddress")).ToList();
+    }
+
     public async Task<IReadOnlyList<SchemeCurrencyEntity>> GetSchemeCurrenciesAsync(CancellationToken cancellationToken = default)
     {
         using var connection = connectionFactory.CreateConnection();

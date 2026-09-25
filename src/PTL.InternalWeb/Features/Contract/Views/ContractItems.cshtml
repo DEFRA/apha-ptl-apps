@@ -1,0 +1,106 @@
+@model PTL.InternalWeb.Features.Contract.ContractItemsViewModel
+@{
+    ViewData["Title"] = "Contract Items";
+    var items = Model.Items;
+    var errorMessage = TempData["ContractItemsError"] as string;
+}
+
+<a class="govuk-back-link" asp-action="Index" asp-route-customerId="@Model.CustomerId">Back</a>
+
+<h1 class="govuk-heading-l">@items.QalNumber@(string.IsNullOrEmpty(items.Suffix) ? "" : items.Suffix), @items.YearId</h1>
+
+@if (!string.IsNullOrEmpty(errorMessage))
+{
+    <div class="govuk-error-summary" data-module="govuk-error-summary">
+        <div role="alert">
+            <h2 class="govuk-error-summary__title">There is a problem</h2>
+            <div class="govuk-error-summary__body">
+                <p class="govuk-body">@errorMessage</p>
+            </div>
+        </div>
+    </div>
+}
+
+<p class="govuk-body">The table below lists all the items on this Contract.</p>
+
+@if (items.Schemes.Count == 0)
+{
+    <div class="contractsNoItems govuk-body">There are no Items on this Contract</div>
+}
+else
+{
+    @foreach (var scheme in items.Schemes)
+    {
+        <h2 class="govuk-heading-m">@scheme.SchemeIdentifier: @scheme.SchemeName</h2>
+        <table class="govuk-table">
+            <thead class="govuk-table__head">
+                <tr class="govuk-table__row">
+                    <th scope="col" class="govuk-table__header">Participants</th>
+                    <th scope="col" class="govuk-table__header">No. of Distributions</th>
+                    <th scope="col" class="govuk-table__header">Actions</th>
+                    <th scope="col" class="govuk-table__header">Price (@items.Symbol)</th>
+                </tr>
+            </thead>
+            <tbody class="govuk-table__body">
+                @foreach (var participant in scheme.Participants)
+                {
+                    <tr class="govuk-table__row">
+                        <td class="govuk-table__cell">@participant.FullName@(participant.HasOverride ? " - Has Override" : "")</td>
+                        <td class="govuk-table__cell">@participant.NumberOfDistributions</td>
+                        <td class="govuk-table__cell">
+                            <a class="govuk-link" asp-controller="ParticipantScheme" asp-action="Edit" asp-route-id="@participant.ParticipantSchemeId">@(items.IsReadOnly ? "View" : "View / Edit")</a>
+                            @if (!items.IsReadOnly)
+                            {
+                                <text> | </text>
+                                <form method="post" asp-action="RemoveContractItem" class="ptl-inline-form" onsubmit="return confirm('Are you sure you want to remove this Contract Item?');">
+                                    <input type="hidden" name="id" value="@Model.Items.ContractId" />
+                                    <input type="hidden" name="participantSchemeId" value="@participant.ParticipantSchemeId" />
+                                    @Html.AntiForgeryToken()
+                                    <button type="submit" class="govuk-link ptl-link-button">Remove</button>
+                                </form>
+                            }
+                        </td>
+                        <td class="govuk-table__cell@(participant.NonFeePaying ? " ptl-non-fee-paying" : "")">@participant.Price.ToString("N2")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+}
+
+<h2 class="govuk-heading-m">Additional Charges</h2>
+<table class="govuk-table">
+    <tbody class="govuk-table__body">
+        <tr class="govuk-table__row">
+            <td class="govuk-table__cell">Administration Charge</td>
+            <td class="govuk-table__cell">@items.AdministrationCharge.ToString("N2")</td>
+        </tr>
+        <tr class="govuk-table__row">
+            <td class="govuk-table__cell">Biofreeze x @items.NumberPostage.ToString("N0")</td>
+            <td class="govuk-table__cell">@items.PostagePriceTotal.ToString("N2")</td>
+        </tr>
+        <tr class="govuk-table__row">
+            <td class="govuk-table__cell">Courier x @items.NumberCourier.ToString("N0")</td>
+            <td class="govuk-table__cell">@items.CourierPriceTotal.ToString("N2")</td>
+        </tr>
+        <tr class="govuk-table__row">
+            <td class="govuk-table__cell">Dry Ice x @items.NumberSpecialDelivery.ToString("N0")</td>
+            <td class="govuk-table__cell">@items.SpecialDeliveryPriceTotal.ToString("N2")</td>
+        </tr>
+        <tr class="govuk-table__row">
+            <td class="govuk-table__cell">Discount: @((items.DiscountRate * 100).ToString("N2"))%</td>
+            <td class="govuk-table__cell">@items.DiscountPrice.ToString("N2")</td>
+        </tr>
+    </tbody>
+</table>
+
+<h2 class="govuk-heading-m">Total (@items.Symbol)</h2>
+<p class="govuk-body govuk-!-font-weight-bold">@items.TotalPrice.ToString("N2")</p>
+
+<div class="govuk-button-group">
+    <a class="govuk-button govuk-button--secondary" data-module="govuk-button" asp-action="Index" asp-route-customerId="@Model.CustomerId">Back</a>
+    @if (!items.IsReadOnly)
+    {
+        <a class="govuk-button" data-module="govuk-button" asp-controller="ParticipantScheme" asp-action="Create" asp-route-contractId="@Model.Items.ContractId" asp-route-customerId="@Model.CustomerId">Add Contract Item</a>
+    }
+</div>

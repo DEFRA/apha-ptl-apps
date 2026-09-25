@@ -1,0 +1,244 @@
+@model PTL.InternalWeb.Features.ParticipantScheme.ParticipantSchemeFormViewModel
+
+<h2 class="govuk-heading-m">Distribution months</h2>
+<table class="govuk-table">
+    <thead class="govuk-table__head">
+        <tr class="govuk-table__row">
+            <th scope="col" class="govuk-table__header">Month</th>
+            <th scope="col" class="govuk-table__header">Distribute</th>
+            <th scope="col" class="govuk-table__header">Is Override</th>
+        </tr>
+    </thead>
+    <tbody class="govuk-table__body">
+        @{
+            // GOV.UK checkboxes render an invisible native <input> (govuk-frontend CSS sets
+            // .govuk-checkboxes__input { opacity: 0 }) and draw the visible box/tick via the
+            // adjacent .govuk-checkboxes__label's ::before/::after pseudo-elements, inside a
+            // .govuk-checkboxes__item wrapper - a bare <input class="govuk-checkboxes__input">
+            // with no wrapper/label is therefore genuinely invisible, not just unstyled. Every
+            // month/override checkbox below must use this same div > div.item > input + label
+            // structure already used further down this page for the plain checkbox fields.
+        }
+        <tr class="govuk-table__row">
+            <td class="govuk-table__cell">January</td>
+            <td class="govuk-table__cell"><div class="govuk-checkboxes govuk-checkboxes--small" data-module="govuk-checkboxes"><div class="govuk-checkboxes__item"><input asp-for="DistributionMonthJan" class="govuk-checkboxes__input ptl-month-checkbox" disabled="@(Model.IsReadOnly || !Model.SchemeDistributionMonthJan || !Model.CanEditJan)" /><label class="govuk-checkboxes__label" asp-for="DistributionMonthJan"><span class="govuk-visually-hidden">Distribute in January</span></label></div></div></td>
+            <td class="govuk-table__cell"><div class="govuk-checkboxes govuk-checkboxes--small" data-module="govuk-checkboxes"><div class="govuk-checkboxes__item"><input asp-for="IsOverrideJan" class="govuk-checkboxes__input" disabled /><label class="govuk-checkboxes__label" asp-for="IsOverrideJan"><span class="govuk-visually-hidden">Is Override &mdash; January</span></label></div></div></td>
+        </tr>
+        <tr class="govuk-table__row">
+            <td class="govuk-table__cell">February</td>
+            <td class="govuk-table__cell"><div class="govuk-checkboxes govuk-checkboxes--small" data-module="govuk-checkboxes"><div class="govuk-checkboxes__item"><input asp-for="DistributionMonthFeb" class="govuk-checkboxes__input ptl-month-checkbox" disabled="@(Model.IsReadOnly || !Model.SchemeDistributionMonthFeb || !Model.CanEditFeb)" /><label class="govuk-checkboxes__label" asp-for="DistributionMonthFeb"><span class="govuk-visually-hidden">Distribute in February</span></label></div></div></td>
+            <td class="govuk-table__cell"><div class="govuk-checkboxes govuk-checkboxes--small" data-module="govuk-checkboxes"><div class="govuk-checkboxes__item"><input asp-for="IsOverrideFeb" class="govuk-checkboxes__input" disabled /><label class="govuk-checkboxes__label" asp-for="IsOverrideFeb"><span class="govuk-visually-hidden">Is Override &mdash; February</span></label></div></div></td>
+        </tr>
+        <tr class="govuk-table__row">
+            <td class="govuk-table__cell">March</td>
+            <td class="govuk-table__cell"><div class="govuk-checkboxes govuk-checkboxes--small" data-module="govuk-checkboxes"><div class="govuk-checkboxes__item"><input asp-for="DistributionMonthMar" class="govuk-checkboxes__input ptl-month-checkbox" disabled="@(Model.IsReadOnly || !Model.SchemeDistributionMonthMar || !Model.CanEditMar)" /><label class="govuk-checkboxes__label" asp-for="DistributionMonthMar"><span class="govuk-visually-hidden">Distribute in March</span></label></div></div></td>
+            <td class="govuk-table__cell"><div class="govuk-checkboxes govuk-checkboxes--small" data-module="govuk-checkboxes"><div class="govuk-checkboxes__item"><input asp-for="IsOverrideMar" class="govuk-checkboxes__input" disabled /><label class="govuk-checkboxes__label" asp-for="IsOverrideMar"><span class="govuk-visually-hidden">Is Override &mdash; March</span></label></div></div></td>
+        </tr>
+        <tr class="govuk-table__row">
+            <td class="govuk-table__cell">April</td>
+            <td class="govuk-table__cell"><div class="govuk-checkboxes govuk-checkboxes--small" data-module="govuk-checkboxes"><div class="govuk-checkboxes__item"><input asp-for="DistributionMonthApr" class="govuk-checkboxes__input ptl-month-checkbox" disabled="@(Model.IsReadOnly || !Model.SchemeDistributionMonthApr || !Model.CanEditApr)" /><label class="govuk-checkboxes__label" asp-for="DistributionMonthApr"><span class="govuk-visually-hidden">Distribute in April</span></label></div></div></td>
+            <td class="govuk-table__cell"><div class="govuk-checkboxes govuk-checkboxes--small" data-module="govuk-checkboxes"><div class="govuk-checkboxes__item"><input asp-for="IsOverrideApr" class="govuk-checkboxes__input" disabled /><label class="govuk-checkboxes__label" asp-for="IsOverrideApr"><span class="govuk-visually-hidden">Is Override &mdash; April</span></label></div></div></td>
+        </tr>
+        <tr class="govuk-table__row">
+            <td class="govuk-table__cell">May</td>
+            <td class="govuk-table__cell"><div class="govuk-checkboxes govuk-checkboxes--small" data-module="govuk-checkboxes"><div class="govuk-checkboxes__item"><input asp-for="DistributionMonthMay" class="govuk-checkboxes__input ptl-month-checkbox" disabled="@(Model.IsReadOnly || !Model.SchemeDistributionMonthMay || !Model.CanEditMay)" /><label class="govuk-checkboxes__label" asp-for="DistributionMonthMay"><span class="govuk-visually-hidden">Distribute in May</span></label></div></div></td>
+            <td class="govuk-table__cell"><div class="govuk-checkboxes govuk-checkboxes--small" data-module="govuk-checkboxes"><div class="govuk-checkboxes__item"><input asp-for="IsOverrideMay" class="govuk-checkboxes__input" disabled /><label class="govuk-checkboxes__label" asp-for="IsOverrideMay"><span class="govuk-visually-hidden">Is Override &mdash; May</span></label></div></div></td>
+        </tr>
+        <tr class="govuk-table__row">
+            <td class="govuk-table__cell">June</td>
+            <td class="govuk-table__cell"><div class="govuk-checkboxes govuk-checkboxes--small" data-module="govuk-checkboxes"><div class="govuk-checkboxes__item"><input asp-for="DistributionMonthJun" class="govuk-checkboxes__input ptl-month-checkbox" disabled="@(Model.IsReadOnly || !Model.SchemeDistributionMonthJun || !Model.CanEditJun)" /><label class="govuk-checkboxes__label" asp-for="DistributionMonthJun"><span class="govuk-visually-hidden">Distribute in June</span></label></div></div></td>
+            <td class="govuk-table__cell"><div class="govuk-checkboxes govuk-checkboxes--small" data-module="govuk-checkboxes"><div class="govuk-checkboxes__item"><input asp-for="IsOverrideJun" class="govuk-checkboxes__input" disabled /><label class="govuk-checkboxes__label" asp-for="IsOverrideJun"><span class="govuk-visually-hidden">Is Override &mdash; June</span></label></div></div></td>
+        </tr>
+        <tr class="govuk-table__row">
+            <td class="govuk-table__cell">July</td>
+            <td class="govuk-table__cell"><div class="govuk-checkboxes govuk-checkboxes--small" data-module="govuk-checkboxes"><div class="govuk-checkboxes__item"><input asp-for="DistributionMonthJul" class="govuk-checkboxes__input ptl-month-checkbox" disabled="@(Model.IsReadOnly || !Model.SchemeDistributionMonthJul || !Model.CanEditJul)" /><label class="govuk-checkboxes__label" asp-for="DistributionMonthJul"><span class="govuk-visually-hidden">Distribute in July</span></label></div></div></td>
+            <td class="govuk-table__cell"><div class="govuk-checkboxes govuk-checkboxes--small" data-module="govuk-checkboxes"><div class="govuk-checkboxes__item"><input asp-for="IsOverrideJul" class="govuk-checkboxes__input" disabled /><label class="govuk-checkboxes__label" asp-for="IsOverrideJul"><span class="govuk-visually-hidden">Is Override &mdash; July</span></label></div></div></td>
+        </tr>
+        <tr class="govuk-table__row">
+            <td class="govuk-table__cell">August</td>
+            <td class="govuk-table__cell"><div class="govuk-checkboxes govuk-checkboxes--small" data-module="govuk-checkboxes"><div class="govuk-checkboxes__item"><input asp-for="DistributionMonthAug" class="govuk-checkboxes__input ptl-month-checkbox" disabled="@(Model.IsReadOnly || !Model.SchemeDistributionMonthAug || !Model.CanEditAug)" /><label class="govuk-checkboxes__label" asp-for="DistributionMonthAug"><span class="govuk-visually-hidden">Distribute in August</span></label></div></div></td>
+            <td class="govuk-table__cell"><div class="govuk-checkboxes govuk-checkboxes--small" data-module="govuk-checkboxes"><div class="govuk-checkboxes__item"><input asp-for="IsOverrideAug" class="govuk-checkboxes__input" disabled /><label class="govuk-checkboxes__label" asp-for="IsOverrideAug"><span class="govuk-visually-hidden">Is Override &mdash; August</span></label></div></div></td>
+        </tr>
+        <tr class="govuk-table__row">
+            <td class="govuk-table__cell">September</td>
+            <td class="govuk-table__cell"><div class="govuk-checkboxes govuk-checkboxes--small" data-module="govuk-checkboxes"><div class="govuk-checkboxes__item"><input asp-for="DistributionMonthSep" class="govuk-checkboxes__input ptl-month-checkbox" disabled="@(Model.IsReadOnly || !Model.SchemeDistributionMonthSep || !Model.CanEditSep)" /><label class="govuk-checkboxes__label" asp-for="DistributionMonthSep"><span class="govuk-visually-hidden">Distribute in September</span></label></div></div></td>
+            <td class="govuk-table__cell"><div class="govuk-checkboxes govuk-checkboxes--small" data-module="govuk-checkboxes"><div class="govuk-checkboxes__item"><input asp-for="IsOverrideSep" class="govuk-checkboxes__input" disabled /><label class="govuk-checkboxes__label" asp-for="IsOverrideSep"><span class="govuk-visually-hidden">Is Override &mdash; September</span></label></div></div></td>
+        </tr>
+        <tr class="govuk-table__row">
+            <td class="govuk-table__cell">October</td>
+            <td class="govuk-table__cell"><div class="govuk-checkboxes govuk-checkboxes--small" data-module="govuk-checkboxes"><div class="govuk-checkboxes__item"><input asp-for="DistributionMonthOct" class="govuk-checkboxes__input ptl-month-checkbox" disabled="@(Model.IsReadOnly || !Model.SchemeDistributionMonthOct || !Model.CanEditOct)" /><label class="govuk-checkboxes__label" asp-for="DistributionMonthOct"><span class="govuk-visually-hidden">Distribute in October</span></label></div></div></td>
+            <td class="govuk-table__cell"><div class="govuk-checkboxes govuk-checkboxes--small" data-module="govuk-checkboxes"><div class="govuk-checkboxes__item"><input asp-for="IsOverrideOct" class="govuk-checkboxes__input" disabled /><label class="govuk-checkboxes__label" asp-for="IsOverrideOct"><span class="govuk-visually-hidden">Is Override &mdash; October</span></label></div></div></td>
+        </tr>
+        <tr class="govuk-table__row">
+            <td class="govuk-table__cell">November</td>
+            <td class="govuk-table__cell"><div class="govuk-checkboxes govuk-checkboxes--small" data-module="govuk-checkboxes"><div class="govuk-checkboxes__item"><input asp-for="DistributionMonthNov" class="govuk-checkboxes__input ptl-month-checkbox" disabled="@(Model.IsReadOnly || !Model.SchemeDistributionMonthNov || !Model.CanEditNov)" /><label class="govuk-checkboxes__label" asp-for="DistributionMonthNov"><span class="govuk-visually-hidden">Distribute in November</span></label></div></div></td>
+            <td class="govuk-table__cell"><div class="govuk-checkboxes govuk-checkboxes--small" data-module="govuk-checkboxes"><div class="govuk-checkboxes__item"><input asp-for="IsOverrideNov" class="govuk-checkboxes__input" disabled /><label class="govuk-checkboxes__label" asp-for="IsOverrideNov"><span class="govuk-visually-hidden">Is Override &mdash; November</span></label></div></div></td>
+        </tr>
+        <tr class="govuk-table__row">
+            <td class="govuk-table__cell">December</td>
+            <td class="govuk-table__cell"><div class="govuk-checkboxes govuk-checkboxes--small" data-module="govuk-checkboxes"><div class="govuk-checkboxes__item"><input asp-for="DistributionMonthDec" class="govuk-checkboxes__input ptl-month-checkbox" disabled="@(Model.IsReadOnly || !Model.SchemeDistributionMonthDec || !Model.CanEditDec)" /><label class="govuk-checkboxes__label" asp-for="DistributionMonthDec"><span class="govuk-visually-hidden">Distribute in December</span></label></div></div></td>
+            <td class="govuk-table__cell"><div class="govuk-checkboxes govuk-checkboxes--small" data-module="govuk-checkboxes"><div class="govuk-checkboxes__item"><input asp-for="IsOverrideDec" class="govuk-checkboxes__input" disabled /><label class="govuk-checkboxes__label" asp-for="IsOverrideDec"><span class="govuk-visually-hidden">Is Override &mdash; December</span></label></div></div></td>
+        </tr>
+    </tbody>
+</table>
+
+@if (!Model.IsReadOnly)
+{
+    <button type="button" id="ptl-override-button" class="govuk-button govuk-button--secondary" data-module="govuk-button">Override</button>
+    <input type="hidden" asp-for="OverrideModeActive" id="OverrideModeActiveField" />
+    <p class="govuk-hint">Override unlocks a distribution month that has already been posted, so it can be re-selected. Only one month may be selected while overriding.</p>
+}
+
+<h2 class="govuk-heading-m">Group Address</h2>
+@if (!Model.IsReadOnly)
+{
+    <div class="govuk-form-group">
+        <label class="govuk-label" for="GroupAddressSelector">Group Address Identifier</label>
+        <select id="GroupAddressSelector" class="govuk-select">
+            <option value="">-- Select --</option>
+            @foreach (var option in Model.GroupAddressOptions)
+            {
+                var selected = option.GroupAddressId == Model.GroupAddressId ? "selected" : null;
+                <option value="@option.GroupAddressId" data-identifier="@option.Identifier" data-address1="@option.Address1" data-country="@option.CountryName" selected="@selected">@option.Identifier</option>
+            }
+        </select>
+    </div>
+    <div class="govuk-button-group">
+        <button type="button" id="SelectGroupAddressButton" class="govuk-button govuk-button--secondary" data-module="govuk-button">Select a Group Address</button>
+        <button type="button" id="ClearGroupAddressButton" class="govuk-button govuk-button--secondary" data-module="govuk-button">Clear Group Address</button>
+    </div>
+}
+<govuk-input asp-for="GroupAddressIdentifier" label="Group Address Identifier" disabled />
+<govuk-input asp-for="GroupAddressAddress1" label="Group Address 1" disabled />
+<govuk-input asp-for="GroupAddressCountry" label="Group Country" disabled />
+<input type="hidden" asp-for="GroupAddressId" id="GroupAddressIdField" />
+
+<govuk-input asp-for="NumberOfSetsRequired" label="Sets of Samples Required" disabled="@Model.IsReadOnly" />
+<govuk-input asp-for="ExternalReference" label="External reference" disabled="@Model.IsReadOnly" />
+<govuk-input asp-for="Contact" label="Contact" disabled="@Model.IsReadOnly" />
+
+@if (Model.IsWeightedSchemeAvailable)
+{
+    var options = Model.PricingPlanOptions.ToList();
+    <div class="govuk-form-group">
+        <label class="govuk-label" asp-for="PricingPlan">Pricing Plan</label>
+        <select class="govuk-select" asp-for="PricingPlan" disabled="@(Model.IsReadOnly || options.Count <= 1)">
+            @foreach (var option in options)
+            {
+                var selected = option.Value == Model.PricingPlan ? "selected" : null;
+                <option value="@option.Value" selected="@selected">@option.Text</option>
+            }
+        </select>
+    </div>
+}
+
+<div class="govuk-checkboxes govuk-checkboxes--small" data-module="govuk-checkboxes">
+    <div class="govuk-checkboxes__item">
+        <input asp-for="ImportExportLicenceRequired" class="govuk-checkboxes__input" disabled="@Model.IsReadOnly" />
+        <label class="govuk-label govuk-checkboxes__label" asp-for="ImportExportLicenceRequired">Import/Export Licence Required</label>
+    </div>
+    <div class="govuk-checkboxes__item">
+        <input asp-for="CustomsCertificateRequired" class="govuk-checkboxes__input" disabled="@Model.IsReadOnly" />
+        <label class="govuk-label govuk-checkboxes__label" asp-for="CustomsCertificateRequired">Customs Certificate Required</label>
+    </div>
+    <div class="govuk-checkboxes__item">
+        <input asp-for="NonFeePaying" class="govuk-checkboxes__input" disabled="@Model.IsReadOnly" />
+        <label class="govuk-label govuk-checkboxes__label" asp-for="NonFeePaying">Non Fee Paying</label>
+    </div>
+    @if (Model.SchemeRequiresDataConsent)
+    {
+        <div class="govuk-checkboxes__item">
+            <input asp-for="DataConsentDeclarationGiven" class="govuk-checkboxes__input" disabled="@Model.IsReadOnly" />
+            <label class="govuk-label govuk-checkboxes__label" asp-for="DataConsentDeclarationGiven">Consent received for sharing information</label>
+        </div>
+    }
+</div>
+
+<govuk-input asp-for="PackingInstructions" label="Other Packaging Requirements" disabled="@Model.IsReadOnly" />
+
+@if (Model.ParticipantSchemeId is not null)
+{
+    <p class="govuk-body">Price: @Model.Price.ToString("N2")</p>
+}
+
+<input type="hidden" asp-for="ParticipantSchemeId" />
+<input type="hidden" asp-for="ContractId" />
+<input type="hidden" asp-for="CustomerId" />
+<input type="hidden" asp-for="YearId" />
+<input type="hidden" asp-for="ParticipantId" />
+<input type="hidden" asp-for="SchemeId" />
+<input type="hidden" asp-for="IsWeightedSchemeAvailable" />
+
+@if (!Model.IsReadOnly)
+{
+    <script>
+        // Matches legacy ButtonOverride_Click + AddOverrideSingleSelectionScript: entering
+        // "override mode" unlocks any already-posted (disabled) month checkbox, clears it, and
+        // while in this mode checking one month unchecks every other month (single selection only).
+        (function () {
+            var button = document.getElementById('ptl-override-button');
+            var overrideModeField = document.getElementById('OverrideModeActiveField');
+            if (!button) { return; }
+
+            button.addEventListener('click', function () {
+                var enteringOverrideMode = overrideModeField.value !== 'true';
+                overrideModeField.value = enteringOverrideMode ? 'true' : 'false';
+                button.textContent = enteringOverrideMode ? 'Cancel' : 'Override';
+
+                var monthCheckboxes = document.querySelectorAll('.ptl-month-checkbox');
+                monthCheckboxes.forEach(function (checkbox) {
+                    if (enteringOverrideMode && checkbox.disabled) {
+                        checkbox.disabled = false;
+                        checkbox.checked = false;
+                    }
+                });
+            });
+
+            document.querySelectorAll('.ptl-month-checkbox').forEach(function (checkbox) {
+                checkbox.addEventListener('change', function () {
+                    if (overrideModeField.value === 'true' && checkbox.checked) {
+                        document.querySelectorAll('.ptl-month-checkbox').forEach(function (other) {
+                            if (other !== checkbox) {
+                                other.checked = false;
+                            }
+                        });
+                    }
+                });
+            });
+        })();
+    </script>
+    <script>
+        // Matches legacy Button1 (Select a Group Address) + lnkSelectGroupAddress_Click /
+        // ButtonClearGroupAddress_Click: choosing an option fills the read-only Identifier/Address 1/
+        // Country display fields and the hidden GroupAddressId; Clear blanks all four.
+        (function () {
+            var selector = document.getElementById('GroupAddressSelector');
+            var selectButton = document.getElementById('SelectGroupAddressButton');
+            var clearButton = document.getElementById('ClearGroupAddressButton');
+            var idField = document.getElementById('GroupAddressIdField');
+            var identifierField = document.getElementById('GroupAddressIdentifier');
+            var address1Field = document.getElementById('GroupAddressAddress1');
+            var countryField = document.getElementById('GroupAddressCountry');
+            if (!selector || !selectButton || !clearButton) { return; }
+
+            selectButton.addEventListener('click', function () {
+                var option = selector.options[selector.selectedIndex];
+                if (!option || !option.value) { return; }
+
+                idField.value = option.value;
+                identifierField.value = option.dataset.identifier || '';
+                address1Field.value = option.dataset.address1 || '';
+                countryField.value = option.dataset.country || '';
+            });
+
+            clearButton.addEventListener('click', function () {
+                selector.selectedIndex = 0;
+                idField.value = '';
+                identifierField.value = '';
+                address1Field.value = '';
+                countryField.value = '';
+            });
+        })();
+    </script>
+}
+

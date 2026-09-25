@@ -1,0 +1,40 @@
+namespace PTL.Contracts.Participant;
+
+// Public API contract for PUT /api/participant-schemes/{participantSchemeId} - Scheme/Participant/
+// Contract are NOT included: legacy ParticipantScheme.aspx hides DropDownParticipant/GridViewSchemes
+// once mParticipantScheme.IsNew is false, so they can never be changed after Add.
+public sealed record UpdateParticipantSchemeRequest(
+    bool DistributionMonthJan,
+    bool DistributionMonthFeb,
+    bool DistributionMonthMar,
+    bool DistributionMonthApr,
+    bool DistributionMonthMay,
+    bool DistributionMonthJun,
+    bool DistributionMonthJul,
+    bool DistributionMonthAug,
+    bool DistributionMonthSep,
+    bool DistributionMonthOct,
+    bool DistributionMonthNov,
+    bool DistributionMonthDec,
+    int NumberOfSetsRequired,
+    string? ExternalReference,
+    string? Contact,
+    bool ImportExportLicenceRequired,
+    bool CustomsCertificateRequired,
+    bool NonFeePaying,
+    string? PackingInstructions,
+    bool IsWeightedPricing,
+    bool DataConsentDeclarationGiven,
+    bool IsOverrideJan,
+    bool IsOverrideFeb,
+    bool IsOverrideMar,
+    bool IsOverrideApr,
+    bool IsOverrideMay,
+    bool IsOverrideJun,
+    bool IsOverrideJul,
+    bool IsOverrideAug,
+    bool IsOverrideSep,
+    bool IsOverrideOct,
+    bool IsOverrideNov,
+    bool IsOverrideDec,
+    Guid? GroupAddressId = null);

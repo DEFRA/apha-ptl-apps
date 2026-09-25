@@ -99,6 +99,23 @@ body {
   width: auto;
 }
 
+/* Contract Items' "Remove" action must look identical to the "View / Edit" link beside it (matches
+   legacy's LinkButton) - reset the native <button> chrome so only .govuk-link's styling shows, and
+   keep the wrapping <form> inline so "Remove" sits on the same line as "View / Edit". */
+.ptl-inline-form {
+  display: inline;
+}
+
+.ptl-link-button {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  cursor: pointer;
+}
+
+
 /* Left-hand PTLIMS navigation - see PTL.InternalWeb/Navigation/SideNavigationProvider.cs
    for the legacy menu mapping this preserves. Context-based, not a permanent tree: each
    page shows only its own node's title plus that node's direct children, matching the

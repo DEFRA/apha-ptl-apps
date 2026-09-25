@@ -1,6 +1,7 @@
 using System.Reflection;
 using Dapper;
 using PTL.Core.Contract;
+using PTL.Core.Contract.ImportPermit;
 using PTL.Core.Customer;
 using PTL.Core.Lookup;
 using PTL.Core.Participant;
@@ -174,6 +175,17 @@ public static class DapperColumnMappings
             ["fldSuffix"] = nameof(ContractSummaryEntity.Suffix),
         });
 
+        Map<ImportPermitEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["ParticipantSchemeId"] = nameof(ImportPermitEntity.ParticipantSchemeId),
+            ["SchemeNumber"] = nameof(ImportPermitEntity.SchemeNumber),
+            ["SchemeName"] = nameof(ImportPermitEntity.SchemeName),
+            ["LabID"] = nameof(ImportPermitEntity.LabId),
+            ["fldImportExportLicenceRequired"] = nameof(ImportPermitEntity.ImportPermitRequired),
+            ["fldImportPermitReceived"] = nameof(ImportPermitEntity.ImportPermitReceived),
+            ["fldImportPermitExpiry"] = nameof(ImportPermitEntity.ImportPermitExpiry),
+        });
+
         Map<CoreScheme>(new(StringComparer.OrdinalIgnoreCase)
         {
             ["fldSchemeId"] = nameof(CoreScheme.SchemeId),
@@ -316,6 +328,14 @@ public static class DapperColumnMappings
         {
             [ColYearId] = nameof(YearEntity.YearId),
             ["fldYear"] = nameof(YearEntity.Year),
+        });
+
+        Map<GroupAddressEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldGroupAddressId"] = nameof(GroupAddressEntity.GroupAddressId),
+            ["fldIdentifier"] = nameof(GroupAddressEntity.Identifier),
+            ["fldAddress1"] = nameof(GroupAddressEntity.Address1),
+            ["fldCountryId"] = nameof(GroupAddressEntity.CountryId),
         });
     }
 

@@ -25,4 +25,13 @@ internal sealed class FakeContractApiClient : IContractApiClient
 
     public Task<ContractSaveResult> UpdateContractAsync(Guid contractId, ContractRequest request, CancellationToken cancellationToken = default) =>
         Task.FromResult(SaveResult);
+
+    public ContractItemsResponse? ItemsResponse { get; set; }
+    public ContractItemRemovalResult RemovalResult { get; set; } = new(true, false, null);
+
+    public Task<ContractItemsResponse?> GetContractItemsAsync(Guid contractId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(ItemsResponse);
+
+    public Task<ContractItemRemovalResult> RemoveContractItemAsync(Guid contractId, Guid participantSchemeId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(RemovalResult);
 }

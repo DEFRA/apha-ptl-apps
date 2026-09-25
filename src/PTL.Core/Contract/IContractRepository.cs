@@ -20,4 +20,8 @@ public interface IContractRepository
 
     // Uses spuContract; returns null when no row was updated (contract does not exist).
     Task<Contract?> UpdateAsync(Contract contract, CancellationToken cancellationToken = default);
+
+    // Uses spgContractItems (three result sets: header, schemes, participant-scheme line items).
+    // Returns null when the contract does not exist.
+    Task<ContractItemsAggregate?> GetContractItemsAsync(Guid contractId, CancellationToken cancellationToken = default);
 }

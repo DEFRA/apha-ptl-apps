@@ -12,6 +12,8 @@ public interface ILookupApiClient
     Task<IReadOnlyList<LabTypeResponse>> GetLabTypesAsync(CancellationToken cancellationToken = default);
     Task<IReadOnlyList<YearResponse>> GetCurrentYearsAsync(CancellationToken cancellationToken = default);
     Task<IReadOnlyList<YearResponse>> GetAllYearsAsync(CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<YearResponse>> GetWeightedPricingYearsAsync(CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<GroupAddressResponse>> GetGroupAddressesAsync(CancellationToken cancellationToken = default);
     Task<IReadOnlyList<SchemeCurrencyResponse>> GetSchemeCurrenciesAsync(Guid schemeId, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<PostagePricingPlanResponse>> GetPostagePricingPlansForYearAsync(int yearId, CancellationToken cancellationToken = default);
     Task<SystemSettingsResponse> GetSystemSettingsAsync(CancellationToken cancellationToken = default);
@@ -61,6 +63,18 @@ public sealed class LookupApiClient(HttpClient httpClient) : ILookupApiClient
     {
         var years = await httpClient.GetFromJsonAsync<IReadOnlyList<YearResponse>>("/api/lookups/years/all", cancellationToken);
         return years ?? [];
+    }
+
+    public async Task<IReadOnlyList<YearResponse>> GetWeightedPricingYearsAsync(CancellationToken cancellationToken = default)
+    {
+        var years = await httpClient.GetFromJsonAsync<IReadOnlyList<YearResponse>>("/api/lookups/years/weighted-pricing", cancellationToken);
+        return years ?? [];
+    }
+
+    public async Task<IReadOnlyList<GroupAddressResponse>> GetGroupAddressesAsync(CancellationToken cancellationToken = default)
+    {
+        var groupAddresses = await httpClient.GetFromJsonAsync<IReadOnlyList<GroupAddressResponse>>("/api/lookups/group-addresses", cancellationToken);
+        return groupAddresses ?? [];
     }
 
     public async Task<IReadOnlyList<SchemeCurrencyResponse>> GetSchemeCurrenciesAsync(Guid schemeId, CancellationToken cancellationToken = default)

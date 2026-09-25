@@ -1,0 +1,116 @@
+@model PTL.InternalWeb.Features.Contract.ImportPermitsViewModel
+@{
+    ViewData["Title"] = "Import Permit(s)";
+    var errors = ViewData.ModelState.Where(kvp => kvp.Value?.Errors.Count > 0).SelectMany(kvp => kvp.Value!.Errors.Select(e => (Field: kvp.Key, e.ErrorMessage))).ToList();
+}
+
+<a class="govuk-back-link" asp-action="ContractItems" asp-route-id="@Model.ContractId">Back</a>
+
+<h1 class="govuk-heading-l">Import Permit(s)</h1>
+
+<govuk-error-summary errors="@errors" />
+
+@if (Model.Permits.Count == 0)
+{
+    <p class="govuk-body">There are no import permits to display.</p>
+    <a class="govuk-button govuk-button--secondary" data-module="govuk-button" asp-action="ContractItems" asp-route-id="@Model.ContractId">Back</a>
+}
+else
+{
+    <table class="govuk-table">
+        <thead class="govuk-table__head">
+            <tr class="govuk-table__row">
+                <th scope="col" class="govuk-table__header">Scheme ID</th>
+                <th scope="col" class="govuk-table__header">Scheme Name</th>
+                <th scope="col" class="govuk-table__header">Lab ID</th>
+                <th scope="col" class="govuk-table__header">Import Permit Required</th>
+                <th scope="col" class="govuk-table__header">Import Permit Received</th>
+                <th scope="col" class="govuk-table__header">Import Permit Expiry</th>
+                <th scope="col" class="govuk-table__header">Actions</th>
+            </tr>
+        </thead>
+        <tbody class="govuk-table__body">
+            @foreach (var permit in Model.Permits)
+            {
+                var isEditing = permit.ParticipantSchemeId == Model.EditParticipantSchemeId;
+                <tr class="govuk-table__row">
+                    <td class="govuk-table__cell">@permit.SchemeNumber</td>
+                    <td class="govuk-table__cell">@permit.SchemeName</td>
+                    <td class="govuk-table__cell">@permit.LabId</td>
+                    <td class="govuk-table__cell">
+                        @* Matches legacy: this column has no EditItemTemplate, so it stays this
+                        same disabled, read-only checkbox in both view and edit mode - Import
+                        Permit Required is never itself editable on this screen. *@
+                        <div class="govuk-checkboxes govuk-checkboxes--small" data-module="govuk-checkboxes">
+                            <div class="govuk-checkboxes__item">
+                                <input type="checkbox" class="govuk-checkboxes__input" checked="@(permit.ImportPermitRequired ? "checked" : null)" disabled />
+                                <label class="govuk-checkboxes__label"><span class="govuk-visually-hidden">Import Permit Required</span></label>
+                            </div>
+                        </div>
+                    </td>
+                    @if (isEditing)
+                    {
+                        <td class="govuk-table__cell" colspan="2">
+                            <form method="post" asp-action="UpdateImportPermit" id="editForm-@permit.ParticipantSchemeId">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="id" value="@Model.ContractId" />
+                                <input type="hidden" name="participantSchemeId" value="@permit.ParticipantSchemeId" />
+                                <div class="govuk-form-group">
+                                    <label class="govuk-label" for="received-@permit.ParticipantSchemeId">Import Permit Received</label>
+                                    <select class="govuk-select ptl-permit-received" id="received-@permit.ParticipantSchemeId" name="importPermitReceived" data-row="@permit.ParticipantSchemeId" disabled="@(!permit.ImportPermitRequired)">
+                                        <option value="false" selected="@(!permit.ImportPermitReceived ? "selected" : null)">No</option>
+                                        <option value="true" selected="@(permit.ImportPermitReceived ? "selected" : null)">Yes</option>
+                                    </select>
+                                </div>
+                                <div class="govuk-form-group">
+                                    <label class="govuk-label" for="expiry-@permit.ParticipantSchemeId">Import Permit Expiry</label>
+                                    <input class="govuk-input ptl-permit-expiry" id="expiry-@permit.ParticipantSchemeId" name="importPermitExpiry" placeholder="dd/mm/yyyy" data-row="@permit.ParticipantSchemeId" value="@permit.ImportPermitExpiry" disabled="@(!(permit.ImportPermitRequired && permit.ImportPermitReceived))" />
+                                </div>
+                            </form>
+                        </td>
+                        <td class="govuk-table__cell">
+                            <div class="govuk-button-group">
+                                <button class="govuk-button govuk-button--small" data-module="govuk-button" type="submit" form="editForm-@permit.ParticipantSchemeId">Update</button>
+                                <a class="govuk-button govuk-button--secondary govuk-button--small" data-module="govuk-button" asp-action="ImportPermits" asp-route-id="@Model.ContractId">Cancel</a>
+                            </div>
+                        </td>
+                    }
+                    else
+                    {
+                        <td class="govuk-table__cell">
+                            @(permit.ImportPermitRequired ? (permit.ImportPermitReceived ? "Yes" : "No") : "N/A")
+                        </td>
+                        <td class="govuk-table__cell">@permit.ImportPermitExpiry</td>
+                        <td class="govuk-table__cell">
+                            <a class="govuk-link" asp-action="ImportPermits" asp-route-id="@Model.ContractId" asp-route-editParticipantSchemeId="@permit.ParticipantSchemeId">Edit</a>
+                        </td>
+                    }
+                </tr>
+            }
+        </tbody>
+    </table>
+
+    <div class="govuk-button-group">
+        <a class="govuk-button" data-module="govuk-button" asp-action="ContractItems" asp-route-id="@Model.ContractId">Save</a>
+        <a class="govuk-button govuk-button--secondary" data-module="govuk-button" asp-action="ImportPermits" asp-route-id="@Model.ContractId">Apply</a>
+        <a class="govuk-button govuk-button--secondary" data-module="govuk-button" asp-action="ContractItems" asp-route-id="@Model.ContractId">Cancel</a>
+    </div>
+
+    <script>
+        // Matches legacy ddlPermitReceived_SelectedIndexChanged: the expiry field is only enabled
+        // (and required) while the edited row's Received dropdown is "Yes".
+        (function () {
+            document.querySelectorAll('.ptl-permit-received').forEach(function (select) {
+                select.addEventListener('change', function () {
+                    var row = select.dataset.row;
+                    var expiryField = document.getElementById('expiry-' + row);
+                    if (!expiryField) { return; }
+
+                    var isReceived = select.value === 'true';
+                    expiryField.disabled = !isReceived;
+                    if (!isReceived) { expiryField.value = ''; }
+                });
+            });
+        })();
+    </script>
+}

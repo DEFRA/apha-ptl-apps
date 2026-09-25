@@ -95,4 +95,105 @@ public sealed class ContractRepository(IDbConnectionFactory connectionFactory) :
         parameters.Add("@ApprovedDate", contract.ApprovedDate);
         return parameters;
     }
+
+    public async Task<ContractItemsAggregate?> GetContractItemsAsync(Guid contractId, CancellationToken cancellationToken = default)
+    {
+        using var connection = connectionFactory.CreateConnection();
+        using var multi = await connection.QueryMultipleAsync("EXEC dbo.spgContractItems @ContractId", new { ContractId = contractId });
+
+        var header = await multi.ReadSingleOrDefaultAsync();
+        if (header is null)
+        {
+            return null;
+        }
+
+        var schemeRows = (await multi.ReadAsync()).ToList();
+        var participantRows = (await multi.ReadAsync()).ToList();
+
+        IDictionary<string, object> Row(dynamic row) => (IDictionary<string, object>)row;
+
+        var headerRow = Row(header);
+        var aggregate = new ContractItemsAggregate
+        {
+            ContractId = (Guid)headerRow["fldContractId"],
+            Suffix = headerRow["fldSuffix"] as string ?? string.Empty,
+            YearId = Convert.ToInt32(headerRow["fldYearId"]),
+            QalNumber = headerRow["fldQalNumber"] as string ?? string.Empty,
+            Symbol = headerRow["fldSymbol"] as string ?? string.Empty,
+            DiscountRate = Convert.ToDecimal(headerRow["fldDiscountRate"]),
+            AdministrationCharge = Convert.ToDecimal(headerRow["fldAdministrationCharge"]),
+            NumberCourier = Convert.ToInt32(headerRow["fldNumberCourier"]),
+            CourierPrice = Convert.ToDecimal(headerRow["fldCourierPrice"]),
+            NumberPostage = Convert.ToInt32(headerRow["fldNumberPostage"]),
+            PostagePrice = Convert.ToDecimal(headerRow["fldPostagePrice"]),
+            NumberSpecialDelivery = Convert.ToInt32(headerRow["fldNumberSpecialDelivery"]),
+            SpecialDeliveryPrice = Convert.ToDecimal(headerRow["fldSpecialDeliveryPrice"]),
+            IsReadOnly = GetBool(headerRow, "fldIsReadOnly")
+        };
+
+        var schemesById = schemeRows.ToDictionary(
+            s => (Guid)Row(s)["fldSchemeId"],
+            s =>
+            {
+                var schemeRow = Row(s);
+                return new ContractItemSchemeGroup
+                {
+                    SchemeId = (Guid)schemeRow["fldSchemeId"],
+                    SchemeName = schemeRow["fldName"] as string ?? string.Empty,
+                    SchemeIdentifier = schemeRow["fldIdentifier"] as string ?? string.Empty
+                };
+            });
+
+        string[] overrideMonthColumns =
+        [
+            "fldIsOverrideJan", "fldIsOverrideFeb", "fldIsOverrideMar", "fldIsOverrideApr",
+            "fldIsOverrideMay", "fldIsOverrideJun", "fldIsOverrideJul", "fldIsOverrideAug",
+            "fldIsOverrideSep", "fldIsOverrideOct", "fldIsOverrideNov", "fldIsOverrideDec"
+        ];
+
+        foreach (var participantRow in participantRows)
+        {
+            var row = Row(participantRow);
+
+            // Explicit-delete model (see docs/migration/contract-migration.md): once removed via
+            // DELETE /api/contracts/{contractId}/items/{participantSchemeId}, an item no longer
+            // appears in this read model at all - unlike legacy's deferred-delete "[Item Removed]" row.
+            if (GetBool(row, "fldIsRemoved"))
+            {
+                continue;
+            }
+
+            var schemeId = (Guid)row["fldSchemeId"];
+            if (!schemesById.TryGetValue(schemeId, out var group))
+            {
+                continue;
+            }
+
+            group.Participants.Add(new ContractItemLine
+            {
+                ParticipantSchemeId = (Guid)row["fldParticipantSchemeId"],
+                ParticipantId = (Guid)row["fldParticipantId"],
+                SchemeId = schemeId,
+                LabCode = row["fldLabCode"] as string ?? string.Empty,
+                LabName = row["fldLabName"] as string ?? string.Empty,
+                NumberOfDistributions = Convert.ToInt32(row["fldNumberOfDistributions"]),
+                Price = Convert.ToDecimal(row["fldPrice"]),
+                NonFeePaying = GetBool(row, "fldNonFeePaying"),
+                HasOverride = overrideMonthColumns.Any(column => GetBool(row, column))
+            });
+        }
+
+        aggregate.Schemes = schemesById.Values
+            .Where(g => g.Participants.Count > 0)
+            .OrderBy(g => g.SchemeIdentifier, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        return aggregate;
+    }
+
+    // NULL bit columns throw InvalidCastException on a direct (bool) cast (and Convert.ToBoolean
+    // throws on DBNull too) - treats missing/null as false explicitly.
+    private static bool GetBool(IDictionary<string, object> row, string column) =>
+        row.TryGetValue(column, out var value) && value is bool flag && flag;
 }
+

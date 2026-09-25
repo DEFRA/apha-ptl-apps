@@ -72,6 +72,30 @@ public sealed class ContractController(IContractService contractService, ILogger
         }
     }
 
+    // Aggregated read-model over spgContractItems - see docs/migration/contract-migration.md.
+    [HttpGet("contracts/{contractId:guid}/items")]
+    public async Task<ActionResult<ContractItemsResponse>> GetContractItems(Guid contractId, CancellationToken cancellationToken)
+    {
+        var items = await contractService.GetContractItemsAsync(contractId, cancellationToken);
+        return items is null ? NotFound() : Ok(ToItemsResponse(items));
+    }
+
+    // Explicit REST mutation replacing legacy ContractItems.aspx's deferred "mark removed, save
+    // later" flow - see docs/migration/contract-migration.md.
+    [HttpDelete("contracts/{contractId:guid}/items/{participantSchemeId:guid}")]
+    public async Task<IActionResult> RemoveContractItem(Guid contractId, Guid participantSchemeId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var removed = await contractService.RemoveContractItemAsync(contractId, participantSchemeId, cancellationToken);
+            return removed ? NoContent() : NotFound();
+        }
+        catch (ContractValidationException ex)
+        {
+            return ToValidationProblem(ex);
+        }
+    }
+
     private ActionResult ToValidationProblem(ContractValidationException ex)
     {
         foreach (var error in ex.Errors)
@@ -153,4 +177,44 @@ public sealed class ContractController(IContractService contractService, ILogger
         contract.YearId,
         contract.IsActive,
         contract.Suffix);
+
+    private static ContractItemsResponse ToItemsResponse(ContractItemsAggregate items) => new(
+        items.ContractId,
+        items.Suffix,
+        items.YearId,
+        items.QalNumber,
+        items.Symbol,
+        items.DiscountRate,
+        items.AdministrationCharge,
+        items.NumberCourier,
+        items.CourierPrice,
+        items.CourierPriceTotal,
+        items.NumberPostage,
+        items.PostagePrice,
+        items.PostagePriceTotal,
+        items.NumberSpecialDelivery,
+        items.SpecialDeliveryPrice,
+        items.SpecialDeliveryPriceTotal,
+        items.DiscountPrice,
+        items.TotalPriceItems,
+        items.TotalPrice,
+        items.IsReadOnly,
+        items.Schemes.Select(ToSchemeResponse).ToList());
+
+    private static ContractItemSchemeResponse ToSchemeResponse(ContractItemSchemeGroup scheme) => new(
+        scheme.SchemeId,
+        scheme.SchemeIdentifier,
+        scheme.SchemeName,
+        scheme.Participants.Select(ToItemResponse).ToList());
+
+    private static ContractItemResponse ToItemResponse(ContractItemLine item) => new(
+        item.ParticipantSchemeId,
+        item.ParticipantId,
+        item.LabCode,
+        item.LabName,
+        item.FullName,
+        item.NumberOfDistributions,
+        item.Price,
+        item.NonFeePaying,
+        item.HasOverride);
 }
