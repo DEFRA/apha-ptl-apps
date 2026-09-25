@@ -6,6 +6,16 @@ namespace PTL.InternalWeb.Tests.Features.Menu;
 public class MenuControllerTests
 {
     [Fact]
+    public void SystemAdministration_ReturnsView()
+    {
+        var controller = new MenuController();
+
+        var result = controller.SystemAdministration();
+
+        Assert.IsType<ViewResult>(result);
+    }
+
+    [Fact]
     public void ManageContracts_ReturnsView()
     {
         var controller = new MenuController();
