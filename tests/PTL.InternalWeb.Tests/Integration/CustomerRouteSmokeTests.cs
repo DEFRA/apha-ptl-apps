@@ -173,7 +173,8 @@ public partial class CustomerRouteSmokeTests : IClassFixture<WebApplicationFacto
                 ["InvoiceTelephone2"] = "call-me",
                 ["InvoiceFax"] = "call-me",
                 ["InvoiceEmail"] = "not-an-email",
-                ["Name"] = new string('a', 60)
+                ["Name"] = new string('a', 60),
+                ["Comments"] = new string('a', 2001)
             })
         };
         request.Headers.Add("Cookie", cookie);
@@ -184,6 +185,9 @@ public partial class CustomerRouteSmokeTests : IClassFixture<WebApplicationFacto
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Contains("govuk-form-group--error", body);
         Assert.Contains("govuk-error-summary", body);
+        // Comments is rendered via govuk-textarea (not govuk-input/govuk-select) - assert its
+        // own error path renders too, since it's the only field exercising that tag helper.
+        Assert.Contains("Comments must not exceed 2000 characters", body);
     }
 
     [Fact]
