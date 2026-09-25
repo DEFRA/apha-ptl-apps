@@ -43,6 +43,7 @@ on:
 
 permissions:
   contents: read
+  pull-requests: read
 
 # Pull-request release-label contract:
 # - API: release:api:patch, release:api:minor or release:api:major
@@ -59,6 +60,7 @@ concurrency:
 
 env:
   DOTNET_VERSION: "10.0.x"
+  SONAR_SCANNER_VERSION: "11.3.0"
 
 jobs:
   changes:
@@ -80,7 +82,7 @@ jobs:
       - name: Detect changed paths
         id: filter
         if: github.event_name != 'workflow_dispatch'
-        uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
+        uses: dorny/paths-filter@v4.0.3
         with:
           filters: |
             api:
@@ -282,31 +284,53 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - name: Restore repository tools
-        run: dotnet tool restore
+      - name: Install pinned SonarScanner for .NET
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $toolPath = Join-Path $env:RUNNER_TEMP "sonarscanner"
+          New-Item -ItemType Directory -Force -Path $toolPath | Out-Null
+
+          dotnet tool install dotnet-sonarscanner `
+            --tool-path $toolPath `
+            --version $env:SONAR_SCANNER_VERSION
+
+          $scannerPath = Join-Path $toolPath "dotnet-sonarscanner.exe"
+          if (-not (Test-Path $scannerPath)) {
+            throw "SonarScanner executable was not installed at $scannerPath"
+          }
+
+          "SONAR_SCANNER_PATH=$scannerPath" |
+            Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Analyse solution
-        shell: bash
+        shell: pwsh
         env:
-          MSYS_NO_PATHCONV: "1"
-          MSYS2_ARG_CONV_EXCL: "*"
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: |
-          set -euo pipefail
-          test -n "${SONAR_TOKEN}"
+          $ErrorActionPreference = "Stop"
 
-          dotnet sonarscanner begin \
-            /k:"${{ vars.SONAR_PROJECT_KEY }}" \
-            /o:"${{ vars.SONAR_ORGANIZATION }}" \
-            /d:sonar.token="${SONAR_TOKEN}" \
-            /d:sonar.host.url="https://sonarcloud.io" \
-            /d:sonar.qualitygate.wait=true
+          if ([string]::IsNullOrWhiteSpace($env:SONAR_TOKEN)) {
+            throw "SONAR_TOKEN is not configured."
+          }
+
+          if (-not (Test-Path $env:SONAR_SCANNER_PATH)) {
+            throw "SonarScanner executable was not found."
+          }
+
+          & $env:SONAR_SCANNER_PATH begin `
+            "/k:${{ vars.SONAR_PROJECT_KEY }}" `
+            "/o:${{ vars.SONAR_ORGANIZATION }}" `
+            "/d:sonar.token=$env:SONAR_TOKEN" `
+            "/d:sonar.host.url=https://sonarcloud.io" `
+            "/d:sonar.qualitygate.wait=true"
 
           dotnet restore PTL.slnx
           dotnet build PTL.slnx --configuration Release --no-restore
 
-          dotnet sonarscanner end \
-            /d:sonar.token="${SONAR_TOKEN}"
+          & $env:SONAR_SCANNER_PATH end `
+            "/d:sonar.token=$env:SONAR_TOKEN"
+
   container-validation:
     name: Validate ${{ matrix.component }} container
     needs: [changes, quality]
@@ -334,11 +358,6 @@ jobs:
         run: |
           echo "::error::No Dockerfile is mapped for component '${{ matrix.component }}'."
           exit 1
-
-      - name: Remove unsupported NuGet cache mounts
-        uses: ./.github/actions/strip-nuget-cache-mount
-        with:
-          dockerfile: ${{ env.DOCKERFILE }}
 
       - name: Start Docker service
         shell: pwsh
@@ -817,7 +836,7 @@ jobs:
           PY
 
       - name: Configure AWS credentials through OIDC
-        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
+        uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ env.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
@@ -838,7 +857,7 @@ jobs:
 
       - name: Log in to Amazon ECR
         id: ecr-login
-        uses: aws-actions/amazon-ecr-login@d539f0932e70871a027e9d5a9d8fc38589180a64 # v2.1.6
+        uses: aws-actions/amazon-ecr-login@v2.1.6
         with:
           mask-password: true
 
