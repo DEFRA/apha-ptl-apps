@@ -12,11 +12,14 @@ public class CustomerValidatorTests
         Organisation = "Sample Laboratories Ltd",
         Address1 = "1 Sample Street",
         Address2 = "Sample District",
+        CountryId = Guid.NewGuid(),
         Telephone = "01234 567890",
         Email = "alice@example.com",
         InvoiceOrganisation = "Sample Laboratories Ltd",
         InvoiceAddress1 = "1 Sample Street",
         InvoiceAddress2 = "Sample District",
+        InvoiceCountryId = Guid.NewGuid(),
+        InvoiceEmail = "invoices@example.com",
         IsActive = true
     };
 
@@ -107,6 +110,7 @@ public class CustomerValidatorTests
     [InlineData("InvoiceOrganisation")]
     [InlineData("InvoiceAddress1")]
     [InlineData("InvoiceAddress2")]
+    [InlineData("InvoiceEmail")]
     public void Validate_ActiveCustomerMissingConditionallyRequiredField_ReturnsError(string field)
     {
         var customer = ValidActiveCustomer();
@@ -118,12 +122,60 @@ public class CustomerValidatorTests
     }
 
     [Fact]
+    public void Validate_ActiveCustomerMissingInvoiceCountryId_ReturnsError()
+    {
+        var customer = ValidActiveCustomer();
+        customer.InvoiceCountryId = Guid.Empty;
+
+        var result = CustomerValidator.Validate(customer);
+
+        Assert.Contains(result.Errors, e => e.Field == "InvoiceCountryId");
+    }
+
+    [Fact]
+    public void Validate_ActiveCustomerMissingCountryId_ReturnsError()
+    {
+        var customer = ValidActiveCustomer();
+        customer.CountryId = Guid.Empty;
+
+        var result = CustomerValidator.Validate(customer);
+
+        Assert.Contains(result.Errors, e => e.Field == "CountryId");
+    }
+
+    [Fact]
+    public void Validate_ActiveCustomerAllRequiredFieldsMissing_ReturnsAllErrorsInOneCall()
+    {
+        var customer = new PTL.Core.Customer.Customer { IsActive = true };
+
+        var result = CustomerValidator.Validate(customer);
+
+        Assert.Contains(result.Errors, e => e.Field == "Name");
+        Assert.Contains(result.Errors, e => e.Field == "CustomerTypeId");
+        Assert.Contains(result.Errors, e => e.Field == "ContactName");
+        Assert.Contains(result.Errors, e => e.Field == "Organisation");
+        Assert.Contains(result.Errors, e => e.Field == "Address1");
+        Assert.Contains(result.Errors, e => e.Field == "Address2");
+        Assert.Contains(result.Errors, e => e.Field == "CountryId");
+        Assert.Contains(result.Errors, e => e.Field == "Telephone");
+        Assert.Contains(result.Errors, e => e.Field == "Email");
+        Assert.Contains(result.Errors, e => e.Field == "InvoiceOrganisation");
+        Assert.Contains(result.Errors, e => e.Field == "InvoiceAddress1");
+        Assert.Contains(result.Errors, e => e.Field == "InvoiceAddress2");
+        Assert.Contains(result.Errors, e => e.Field == "InvoiceEmail");
+        Assert.Contains(result.Errors, e => e.Field == "InvoiceCountryId");
+    }
+
+    [Fact]
     public void Validate_InactiveCustomerMissingConditionallyRequiredFields_ReturnsNoErrorsForThem()
     {
         var customer = ValidActiveCustomer();
         customer.IsActive = false;
         customer.ContactName = string.Empty;
         customer.Organisation = string.Empty;
+        customer.CountryId = Guid.Empty;
+        customer.InvoiceEmail = string.Empty;
+        customer.InvoiceCountryId = Guid.Empty;
         customer.CustomerStatusId = Guid.NewGuid();
 
         var result = CustomerValidator.Validate(customer);
@@ -140,5 +192,35 @@ public class CustomerValidatorTests
         var result = CustomerValidator.Validate(customer);
 
         Assert.Contains(result.Errors, e => e.Field == "Email");
+    }
+
+    // Request DTO string properties are declared non-nullable, but a JSON body that omits a
+    // property still deserializes it to null at runtime - Validate() must not throw for that.
+    [Theory]
+    [InlineData("Name")]
+    [InlineData("ContactName")]
+    [InlineData("Organisation")]
+    [InlineData("Telephone")]
+    [InlineData("Email")]
+    [InlineData("InvoiceEmail")]
+    public void Validate_NullRequiredStringField_DoesNotThrowAndStillReportsRequiredError(string field)
+    {
+        var customer = ValidActiveCustomer();
+        typeof(PTL.Core.Customer.Customer).GetProperty(field)!.SetValue(customer, null);
+
+        var result = CustomerValidator.Validate(customer);
+
+        Assert.Contains(result.Errors, e => e.Field == field);
+    }
+
+    [Fact]
+    public void Validate_NullRegisteredFileNumber_DoesNotThrow()
+    {
+        var customer = ValidActiveCustomer();
+        customer.RegisteredFileNumber = null!;
+
+        var result = CustomerValidator.Validate(customer);
+
+        Assert.DoesNotContain(result.Errors, e => e.Field == "RegisteredFileNumber");
     }
 }

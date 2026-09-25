@@ -77,21 +77,13 @@
 
 <govuk-input asp-for="CustomerFinanceId" label="Customer ID" />
 
-@if (Model.CustomerId is not null)
-{
-    <div class="govuk-form-group">
-        <p class="govuk-label govuk-label--s">Customer ID</p>
-        <p class="govuk-body">@Model.CustomerId</p>
-    </div>
-}
-
 <govuk-select asp-for="VatRatingId" label="VAT rating" asp-items="Model.VatRatingOptions" />
 
-<govuk-input asp-for="RegisteredFileNumber" label="Registered file number" hint="Format: QAL/nnnnn" />
+<govuk-input asp-for="RegisteredFileNumber" label="Registered file number"/>
 
 <div class="govuk-checkboxes__item">
     <input class="govuk-checkboxes__input" asp-for="CanOrderOnline" />
-    <label class="govuk-label govuk-checkboxes__label" asp-for="CanOrderOnline">Can order online</label>
+    <label class="govuk-label govuk-checkboxes__label" asp-for="CanOrderOnline">Order online</label>
 </div>
 
 <div class="govuk-checkboxes__item">
@@ -116,7 +108,7 @@
 
 <govuk-input asp-for="ContactName" label="Contact name" />
 
-<govuk-input asp-for="Organisation" label="Organisation" />
+<govuk-input asp-for="Organisation" label="Organisation name" />
 
 <govuk-input asp-for="Address1" label="Address line 1" />
 
@@ -145,7 +137,7 @@
 
 <govuk-input asp-for="InvoiceName" label="Invoice name" />
 
-<govuk-input asp-for="InvoiceOrganisation" label="Invoice organisation" />
+<govuk-input asp-for="InvoiceOrganisation" label="Invoice organisation name" />
 
 <govuk-input asp-for="InvoiceAddress1" label="Invoice address line 1" />
 

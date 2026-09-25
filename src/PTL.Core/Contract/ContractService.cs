@@ -75,6 +75,11 @@ public sealed class ContractService(IContractRepository contractRepository, ILog
         contract.ContractId = Guid.NewGuid();
         contract.CommencementDate = DateTime.UtcNow;
 
+        // IsOnlineOrder is always false for a contract created via this admin path - Contract.aspx's
+        // CheckBoxIsOnlineOrder is permanently disabled (read-only); only the external
+        // PendingContractOrder.asmx workflow ever sets it true.
+        contract.IsOnlineOrder = false;
+
         // [NEEDS INVESTIGATION] Legacy Contract.DataPortal_Create() defaults AdministrationCharge
         // from the customer's currency via SystemObjects.AdministrationChargeCurrencyCollection,
         // which has not been ported to this codebase (no corresponding repository/stored procedure
@@ -114,6 +119,10 @@ public sealed class ContractService(IContractRepository contractRepository, ILog
         updatedFields.IsInvoiceSent = existing.IsInvoiceSent;
         updatedFields.ApprovedBy = existing.ApprovedBy;
         updatedFields.ApprovedDate = existing.ApprovedDate;
+
+        // IsOnlineOrder is likewise never editable via Contract.aspx (CheckBoxIsOnlineOrder is
+        // permanently disabled there too) - preserve whatever the external ordering workflow set.
+        updatedFields.IsOnlineOrder = existing.IsOnlineOrder;
 
         Validate(updatedFields);
 

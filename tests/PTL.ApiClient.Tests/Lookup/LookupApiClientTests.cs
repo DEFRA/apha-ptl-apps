@@ -81,6 +81,18 @@ public class LookupApiClientTests
     }
 
     [Fact]
+    public async Task GetAllYearsAsync_ReturnsDeserializedList()
+    {
+        const string json = """[{"yearId":2020,"year":"2020/21"}]""";
+        var client = CreateClient(HttpStatusCode.OK, json);
+
+        var result = await client.GetAllYearsAsync();
+
+        Assert.Single(result);
+        Assert.Equal("2020/21", result[0].Year);
+    }
+
+    [Fact]
     public async Task GetSchemeCurrenciesAsync_ReturnsDeserializedList()
     {
         const string json = """[{"schemeCurrencyId":"66666666-6666-6666-6666-666666666666","schemeId":"77777777-7777-7777-7777-777777777777","currencyId":"22222222-2222-2222-2222-222222222222","price":12.5,"currencyName":"British Pound","currencySymbol":"£"}]""";
@@ -104,5 +116,16 @@ public class LookupApiClientTests
         Assert.Single(result);
         Assert.Equal("Standard", result[0].Name);
         Assert.Equal(2026, result[0].YearId);
+    }
+
+    [Fact]
+    public async Task GetSystemSettingsAsync_ReturnsDeserializedResponse()
+    {
+        const string json = """{"utNumber":"UT3/306"}""";
+        var client = CreateClient(HttpStatusCode.OK, json);
+
+        var result = await client.GetSystemSettingsAsync();
+
+        Assert.Equal("UT3/306", result.UTNumber);
     }
 }

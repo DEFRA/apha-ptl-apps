@@ -11,6 +11,7 @@ public static partial class CustomerValidator
     private const string RegisteredFileNumberField = "RegisteredFileNumber";
     private const string TelephoneField = "Telephone";
     private const string EmailField = "Email";
+    private const string InvoiceEmailField = "InvoiceEmail";
 
     [GeneratedRegex(@"^(QAL/[0-9]*)?$", RegexOptions.None, 1000)]
     private static partial Regex RegisteredFileNumberPattern();
@@ -48,7 +49,9 @@ public static partial class CustomerValidator
         ["InvoiceTelephone"] = "Invoice telephone",
         ["InvoiceTelephone2"] = "Invoice telephone (alternative)",
         ["InvoiceFax"] = "Invoice fax",
-        ["InvoiceEmail"] = "Invoice email",
+        [InvoiceEmailField] = "Invoice email",
+        ["CountryId"] = "Country",
+        ["InvoiceCountryId"] = "Invoice country",
         ["VatNumber"] = "VAT number",
         ["AccountNumber"] = "Account number",
         ["CustomerFinanceId"] = "Customer finance ID",
@@ -63,7 +66,7 @@ public static partial class CustomerValidator
 
         if (customer.CustomerTypeId == Guid.Empty)
         {
-            errors.Add(new CustomerValidationError("CustomerTypeId", $"{Label("CustomerTypeId")} must be selected."));
+            errors.Add(new CustomerValidationError("CustomerTypeId", $"{Label("CustomerTypeId")} must be selected"));
         }
 
         RequireNotEmpty(customer.Name, "Name", errors);
@@ -72,9 +75,9 @@ public static partial class CustomerValidator
         MaxLength(customer.Organisation, 50, OrganisationField, errors);
 
         MaxLength(customer.RegisteredFileNumber, 10, RegisteredFileNumberField, errors);
-        if (!RegisteredFileNumberPattern().IsMatch(customer.RegisteredFileNumber))
+        if (!RegisteredFileNumberPattern().IsMatch(customer.RegisteredFileNumber ?? string.Empty))
         {
-            errors.Add(new CustomerValidationError(RegisteredFileNumberField, $"{Label(RegisteredFileNumberField)} must match the format QAL/nnnnn."));
+            errors.Add(new CustomerValidationError(RegisteredFileNumberField, $"{Label(RegisteredFileNumberField)} must match the format QAL/nnnnn"));
         }
 
         MaxLength(customer.Address1, 100, "Address1", errors);
@@ -107,7 +110,7 @@ public static partial class CustomerValidator
         RegexMatch(customer.InvoiceTelephone2, PhonePattern(), "InvoiceTelephone2", errors);
         MaxLength(customer.InvoiceFax, 20, "InvoiceFax", errors);
         RegexMatch(customer.InvoiceFax, PhonePattern(), "InvoiceFax", errors);
-        MaxLength(customer.InvoiceEmail, 150, "InvoiceEmail", errors);
+        MaxLength(customer.InvoiceEmail, 150, InvoiceEmailField, errors);
 
         MaxLength(customer.VatNumber, 20, "VatNumber", errors);
         MaxLength(customer.AccountNumber, 20, "AccountNumber", errors);
@@ -120,32 +123,46 @@ public static partial class CustomerValidator
             RequireNotEmpty(customer.Organisation, "Organisation", errors);
             RequireNotEmpty(customer.Address1, "Address1", errors);
             RequireNotEmpty(customer.Address2, "Address2", errors);
+            RequireSelected(customer.CountryId, "CountryId", errors);
             RequireNotEmpty(customer.Telephone, TelephoneField, errors);
             RequireNotEmpty(customer.Email, EmailField, errors);
             RequireNotEmpty(customer.InvoiceOrganisation, "InvoiceOrganisation", errors);
             RequireNotEmpty(customer.InvoiceAddress1, "InvoiceAddress1", errors);
             RequireNotEmpty(customer.InvoiceAddress2, "InvoiceAddress2", errors);
+            RequireNotEmpty(customer.InvoiceEmail, InvoiceEmailField, errors);
+            RequireSelected(customer.InvoiceCountryId, "InvoiceCountryId", errors);
 
             RequireValidEmail(customer.Email, EmailField, errors);
-            RequireValidEmail(customer.InvoiceEmail, "InvoiceEmail", errors);
+            RequireValidEmail(customer.InvoiceEmail, InvoiceEmailField, errors);
         }
 
         return new CustomerValidationResult(errors.Count == 0, errors);
     }
 
+    // `value` is declared non-nullable, but callers ultimately originate from JSON request bodies -
+    // a property omitted from the payload deserializes to null despite the C# annotation, so every
+    // helper below must tolerate that at runtime rather than relying on the compile-time type alone.
     private static void RequireNotEmpty(string value, string field, List<CustomerValidationError> errors)
     {
         if (string.IsNullOrWhiteSpace(value))
         {
-            errors.Add(new CustomerValidationError(field, $"{Label(field)} is required."));
+            errors.Add(new CustomerValidationError(field, $"{Label(field)} is required"));
+        }
+    }
+
+    private static void RequireSelected(Guid value, string field, List<CustomerValidationError> errors)
+    {
+        if (value == Guid.Empty)
+        {
+            errors.Add(new CustomerValidationError(field, $"{Label(field)} must be selected"));
         }
     }
 
     private static void MaxLength(string value, int max, string field, List<CustomerValidationError> errors)
     {
-        if (value.Length > max)
+        if (value is not null && value.Length > max)
         {
-            errors.Add(new CustomerValidationError(field, $"{Label(field)} must not exceed {max} characters."));
+            errors.Add(new CustomerValidationError(field, $"{Label(field)} must not exceed {max} characters"));
         }
     }
 
@@ -153,7 +170,7 @@ public static partial class CustomerValidator
     {
         if (!string.IsNullOrEmpty(value) && !pattern.IsMatch(value))
         {
-            errors.Add(new CustomerValidationError(field, $"{Label(field)} contains characters that are not allowed."));
+            errors.Add(new CustomerValidationError(field, $"{Label(field)} contains characters that are not allowed"));
         }
     }
 
@@ -173,7 +190,7 @@ public static partial class CustomerValidator
         }
         catch (FormatException)
         {
-            errors.Add(new CustomerValidationError(field, $"{Label(field)} must be a valid email address."));
+            errors.Add(new CustomerValidationError(field, $"{Label(field)} must be a valid email address"));
         }
     }
 }

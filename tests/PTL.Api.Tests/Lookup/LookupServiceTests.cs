@@ -95,6 +95,21 @@ public class LookupServiceTests
     }
 
     [Fact]
+    public async Task GetAllYearsAsync_ReturnsRepositoryResult()
+    {
+        var repository = new FakeLookupRepository
+        {
+            AllYears = [new YearEntity { YearId = 2020, Year = "2020/21" }]
+        };
+        var service = new LookupService(repository);
+
+        var result = await service.GetAllYearsAsync();
+
+        Assert.Single(result);
+        Assert.Equal("2020/21", result[0].Year);
+    }
+
+    [Fact]
     public async Task GetSchemeCurrenciesAsync_FiltersRepositoryResultBySchemeId()
     {
         var schemeId = Guid.NewGuid();
@@ -127,5 +142,16 @@ public class LookupServiceTests
 
         Assert.Single(result);
         Assert.Equal("Standard", result[0].Name);
+    }
+
+    [Fact]
+    public async Task GetSystemSettingsAsync_ReturnsRepositoryResult()
+    {
+        var repository = new FakeLookupRepository { SystemSettings = new SystemSettingsEntity { UTNumber = "UT3/306" } };
+        var service = new LookupService(repository);
+
+        var result = await service.GetSystemSettingsAsync();
+
+        Assert.Equal("UT3/306", result.UTNumber);
     }
 }

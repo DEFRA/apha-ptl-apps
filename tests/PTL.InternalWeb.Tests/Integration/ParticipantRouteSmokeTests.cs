@@ -120,6 +120,20 @@ public partial class ParticipantRouteSmokeTests : IClassFixture<WebApplicationFa
     }
 
     [Fact]
+    public async Task Details_RendersFullBreadcrumbTrail()
+    {
+        var client = _factory.CreateClient();
+
+        var response = await client.GetAsync($"/Participant/Details/{_participantId}?customerId={_customerId}");
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Contains("Manage Contracts", body);
+        Assert.Contains("Customers", body);
+        Assert.Contains("Participants", body);
+        Assert.Contains("Participant Details", body);
+    }
+
+    [Fact]
     public async Task Details_InactiveParticipant_RendersInactiveDateRow()
     {
         _fakeParticipantClient.ParticipantResponse = SampleParticipant(_participantId, _customerId, isActive: false);
@@ -140,6 +154,20 @@ public partial class ParticipantRouteSmokeTests : IClassFixture<WebApplicationFa
         var response = await client.GetAsync($"/Participant/Edit/{_participantId}?customerId={_customerId}");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Edit_RendersFullBreadcrumbTrail()
+    {
+        var client = _factory.CreateClient();
+
+        var response = await client.GetAsync($"/Participant/Edit/{_participantId}?customerId={_customerId}");
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Contains("Manage Contracts", body);
+        Assert.Contains("Customers", body);
+        Assert.Contains("Participants", body);
+        Assert.Contains("Edit Participant", body);
     }
 
     [Fact]

@@ -45,29 +45,57 @@ public sealed class ParticipantController(IParticipantService participantService
     [HttpPost("participants")]
     public async Task<ActionResult<ParticipantResponse>> CreateParticipant([FromBody] ParticipantRequest request, CancellationToken cancellationToken)
     {
-        var created = await participantService.CreateParticipantAsync(ToEntity(request), cancellationToken);
-        return CreatedAtAction(nameof(GetParticipant), new { participantId = created.ParticipantId }, ToResponse(created));
+        try
+        {
+            var created = await participantService.CreateParticipantAsync(ToEntity(request), cancellationToken);
+            return CreatedAtAction(nameof(GetParticipant), new { participantId = created.ParticipantId }, ToResponse(created));
+        }
+        catch (ParticipantValidationException ex)
+        {
+            return ToValidationProblem(ex);
+        }
     }
 
     [HttpPut("participants/{participantId:guid}")]
     public async Task<ActionResult<ParticipantResponse>> UpdateParticipant(Guid participantId, [FromBody] ParticipantRequest request, CancellationToken cancellationToken)
     {
-        var updated = await participantService.UpdateParticipantAsync(participantId, ToEntity(participantId, request), cancellationToken);
-        return updated is null ? NotFound() : Ok(ToResponse(updated));
+        try
+        {
+            var updated = await participantService.UpdateParticipantAsync(participantId, ToEntity(participantId, request), cancellationToken);
+            return updated is null ? NotFound() : Ok(ToResponse(updated));
+        }
+        catch (ParticipantValidationException ex)
+        {
+            return ToValidationProblem(ex);
+        }
     }
 
     [HttpPatch("participants/{participantId:guid}/deactivate")]
     public async Task<ActionResult<ParticipantResponse>> DeactivateParticipant(Guid participantId, CancellationToken cancellationToken)
     {
-        var updated = await participantService.DeactivateParticipantAsync(participantId, cancellationToken);
-        return updated is null ? NotFound() : Ok(ToResponse(updated));
+        try
+        {
+            var updated = await participantService.DeactivateParticipantAsync(participantId, cancellationToken);
+            return updated is null ? NotFound() : Ok(ToResponse(updated));
+        }
+        catch (ParticipantValidationException ex)
+        {
+            return ToValidationProblem(ex);
+        }
     }
 
     [HttpPatch("participants/{participantId:guid}/reactivate")]
     public async Task<ActionResult<ParticipantResponse>> ReactivateParticipant(Guid participantId, CancellationToken cancellationToken)
     {
-        var updated = await participantService.ReactivateParticipantAsync(participantId, cancellationToken);
-        return updated is null ? NotFound() : Ok(ToResponse(updated));
+        try
+        {
+            var updated = await participantService.ReactivateParticipantAsync(participantId, cancellationToken);
+            return updated is null ? NotFound() : Ok(ToResponse(updated));
+        }
+        catch (ParticipantValidationException ex)
+        {
+            return ToValidationProblem(ex);
+        }
     }
 
     private static Participant ToEntity(ParticipantRequest request) => new()
@@ -142,6 +170,16 @@ public sealed class ParticipantController(IParticipantService participantService
         participant.InactiveDate,
         participant.InactiveError,
         participant.InactiveErrorDate);
+
+    private ActionResult ToValidationProblem(ParticipantValidationException ex)
+    {
+        foreach (var error in ex.Errors)
+        {
+            ModelState.AddModelError(error.Field, error.Message);
+        }
+
+        return ValidationProblem(ModelState);
+    }
 
     private static ParticipantSummaryResponse ToSummaryResponse(ParticipantSummaryEntity participant) => new(
         participant.ParticipantId,

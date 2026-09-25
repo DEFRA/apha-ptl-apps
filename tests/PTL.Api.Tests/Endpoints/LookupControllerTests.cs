@@ -101,6 +101,20 @@ public class LookupControllerTests
     }
 
     [Fact]
+    public async Task GetAllYears_ReturnsMappedResponses()
+    {
+        var repository = new FakeLookupRepository { AllYears = [new YearEntity { YearId = 2020, Year = "2020/21" }] };
+        var controller = CreateController(repository);
+
+        var result = await controller.GetAllYears(CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var years = Assert.IsType<IReadOnlyList<PTL.Contracts.Lookup.YearResponse>>(ok.Value, exactMatch: false);
+        Assert.Single(years);
+        Assert.Equal("2020/21", years[0].Year);
+    }
+
+    [Fact]
     public async Task GetSchemeCurrencies_ReturnsMappedResponses()
     {
         var schemeId = Guid.NewGuid();
@@ -137,5 +151,18 @@ public class LookupControllerTests
         Assert.Single(plans);
         Assert.Equal(postageId, plans[0].PostageId);
         Assert.Equal(2026, plans[0].YearId);
+    }
+
+    [Fact]
+    public async Task GetSystemSettings_ReturnsMappedResponse()
+    {
+        var repository = new FakeLookupRepository { SystemSettings = new PTL.Core.Lookup.SystemSettingsEntity { UTNumber = "UT3/306" } };
+        var controller = CreateController(repository);
+
+        var result = await controller.GetSystemSettings(CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var settings = Assert.IsType<PTL.Contracts.Lookup.SystemSettingsResponse>(ok.Value);
+        Assert.Equal("UT3/306", settings.UTNumber);
     }
 }

@@ -1,7 +1,14 @@
 @model PTL.InternalWeb.Features.Scheme.SchemeListViewModel
+@using PTL.InternalWeb.Pagination
 @{
     ViewData["Title"] = "Schemes";
-    var totalPages = Model.Search.PageSize == 0 ? 1 : (int)Math.Ceiling(Model.TotalCount / (double)Model.Search.PageSize);
+    var pagination = new PaginationModel
+    {
+        CurrentPage = Model.Search.Page,
+        PageSize = Model.Search.PageSize,
+        TotalRecords = Model.TotalCount,
+        RouteValues = new Dictionary<string, object?> { ["yearId"] = Model.Search.YearId, ["searchTerm"] = Model.Search.SearchTerm }
+    };
 }
 
 <h1 class="govuk-heading-l">Schemes</h1>
@@ -25,6 +32,8 @@
 }
 else
 {
+    <govuk-page-size-selector model="pagination" />
+
     <table class="govuk-table">
         <thead class="govuk-table__head">
             <tr class="govuk-table__row">
@@ -52,21 +61,5 @@ else
         </tbody>
     </table>
 
-    @if (totalPages > 1)
-    {
-        <nav class="govuk-pagination" aria-label="Pagination">
-            <ul class="govuk-pagination__list">
-                @for (var pageNumber = 1; pageNumber <= totalPages; pageNumber++)
-                {
-                    <li class="govuk-pagination__item @(pageNumber == Model.Search.Page ? "govuk-pagination__item--current" : "")">
-                        <a class="govuk-link govuk-pagination__link"
-                           asp-action="Index"
-                           asp-route-yearId="@Model.Search.YearId"
-                           asp-route-searchTerm="@Model.Search.SearchTerm"
-                           asp-route-page="@pageNumber">@pageNumber</a>
-                    </li>
-                }
-            </ul>
-        </nav>
-    }
+    <govuk-pagination model="pagination" />
 }

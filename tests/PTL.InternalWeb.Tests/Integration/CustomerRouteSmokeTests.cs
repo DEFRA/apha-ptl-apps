@@ -77,6 +77,18 @@ public partial class CustomerRouteSmokeTests : IClassFixture<WebApplicationFacto
     }
 
     [Fact]
+    public async Task Details_RendersFullBreadcrumbTrail()
+    {
+        var client = _factory.CreateClient();
+
+        var response = await client.GetAsync($"/Customer/Details/{CustomerId}");
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Contains("Manage Contracts", body);
+        Assert.Contains("Customer Details", body);
+    }
+
+    [Fact]
     public async Task Details_InactiveCustomer_RendersInactiveDateRow()
     {
         _fakeApiClient.CustomerResponse = SampleCustomer(CustomerId, isActive: false);
@@ -97,6 +109,18 @@ public partial class CustomerRouteSmokeTests : IClassFixture<WebApplicationFacto
         var response = await client.GetAsync($"/Customer/Edit/{CustomerId}");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Edit_RendersFullBreadcrumbTrail()
+    {
+        var client = _factory.CreateClient();
+
+        var response = await client.GetAsync($"/Customer/Edit/{CustomerId}");
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Contains("Manage Contracts", body);
+        Assert.Contains("Edit Customer", body);
     }
 
     [Fact]

@@ -72,6 +72,33 @@ body {
   gap: 1rem;
 }
 
+/* Inactive contracts render struck-through, matching legacy ContractList.aspx.vb
+   GridViewCurrentContracts_RowDataBound's manual cell.Style.Add("text-decoration", "line-through"). */
+.ptl-inactive-row td {
+  text-decoration: line-through;
+}
+
+/* "Items per page" selector sits right-aligned directly above the table on every list page. */
+.ptl-page-size-selector {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+}
+
+.ptl-page-size-selector .govuk-form-group {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.ptl-page-size-selector .govuk-label {
+  margin-bottom: 0;
+}
+
+.ptl-page-size-selector .govuk-select {
+  width: auto;
+}
+
 /* Left-hand PTLIMS navigation - see PTL.InternalWeb/Navigation/SideNavigationProvider.cs
    for the legacy menu mapping this preserves. Context-based, not a permanent tree: each
    page shows only its own node's title plus that node's direct children, matching the

@@ -62,7 +62,7 @@ public class CustomerControllerTests
         InvoiceTelephone: string.Empty,
         InvoiceTelephone2: string.Empty,
         InvoiceFax: string.Empty,
-        InvoiceEmail: string.Empty,
+        InvoiceEmail: "invoices@example.com",
         IsActive: true,
         CanOrderOnline: false,
         CustomerStatusId: null);

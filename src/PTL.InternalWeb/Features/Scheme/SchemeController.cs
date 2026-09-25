@@ -54,7 +54,7 @@ public class SchemeController(ISchemeApiClient schemeApiClient, ILookupApiClient
             new EventId(7, nameof(LogSchemeHistoryMessage)),
             "Displayed scheme family history for {SharedId}");
 
-    public async Task<IActionResult> Index(int? yearId, string? searchTerm = null, int page = 1, int pageSize = 20, CancellationToken cancellationToken = default)
+    public async Task<IActionResult> Index(int? yearId, string? searchTerm = null, int page = 1, int pageSize = PTL.InternalWeb.Pagination.PaginationModel.DefaultPageSize, CancellationToken cancellationToken = default)
     {
         var years = await lookupApiClient.GetCurrentYearsAsync(cancellationToken);
         var resolvedYearId = yearId ?? (years.Count > 0 ? years[0].YearId : 0);

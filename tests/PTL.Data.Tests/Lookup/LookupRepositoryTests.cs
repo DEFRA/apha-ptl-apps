@@ -153,4 +153,35 @@ public class LookupRepositoryTests
         Assert.Single(result);
         Assert.Equal("Standard", result[0].Name);
     }
+
+    [Fact]
+    public async Task GetAllYearsAsync_ReturnsMappedYears()
+    {
+        var (repository, connection) = CreateRepository();
+        var table = new DataTable();
+        table.Columns.Add("fldYearId", typeof(int));
+        table.Columns.Add("fldYear", typeof(string));
+        table.Rows.Add(2025, "2025/26");
+        table.Rows.Add(2026, "2026/27");
+        connection.RespondToQuery("EXEC dbo.spgaYear", table);
+
+        var result = await repository.GetAllYearsAsync();
+
+        Assert.Equal(2, result.Count);
+        Assert.Equal("2025/26", result[0].Year);
+    }
+
+    [Fact]
+    public async Task GetSystemSettingsAsync_ReturnsMappedSettings()
+    {
+        var (repository, connection) = CreateRepository();
+        var table = new DataTable();
+        table.Columns.Add("fldUTNumber", typeof(string));
+        table.Rows.Add("UT1/1");
+        connection.RespondToQuery("EXEC dbo.spgaSystemSettings", table);
+
+        var result = await repository.GetSystemSettingsAsync();
+
+        Assert.Equal("UT1/1", result.UTNumber);
+    }
 }

@@ -17,11 +17,14 @@ public class CustomerServiceTests
         Organisation = name,
         Address1 = "1 Sample Street",
         Address2 = "Sample District",
+        CountryId = Guid.NewGuid(),
         Telephone = "01234 567890",
         Email = "alice@example.com",
         InvoiceOrganisation = name,
         InvoiceAddress1 = "1 Sample Street",
         InvoiceAddress2 = "Sample District",
+        InvoiceCountryId = Guid.NewGuid(),
+        InvoiceEmail = "invoices@example.com",
         IsActive = true
     };
 
