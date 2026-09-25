@@ -92,7 +92,7 @@ jobs:
               - 'Directory.Packages.props'
               - 'NuGet.config'
               - 'global.json'
-              - '.github/actions/strip-nuget-cache-mount/**'
+              - '.github/workflows/build-test-publish-images.yml'
             internalweb:
               - 'src/PTL.InternalWeb/**'
               - 'src/PTL.ApiClient/**'
@@ -103,7 +103,7 @@ jobs:
               - 'Directory.Packages.props'
               - 'NuGet.config'
               - 'global.json'
-              - '.github/actions/strip-nuget-cache-mount/**'
+              - '.github/workflows/build-test-publish-images.yml'
             externalweb:
               - 'src/PTL.ExternalWeb/**'
               - 'src/PTL.ApiClient/**'
@@ -114,7 +114,7 @@ jobs:
               - 'Directory.Packages.props'
               - 'NuGet.config'
               - 'global.json'
-              - '.github/actions/strip-nuget-cache-mount/**'
+              - '.github/workflows/build-test-publish-images.yml'
 
       - name: Resolve affected components
         id: components
