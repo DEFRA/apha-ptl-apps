@@ -41,9 +41,8 @@ on:
           - minor
           - major
 
-permissions:
-  contents: read
-  pull-requests: read
+# Deny GitHub token access by default. Each job grants only what it needs.
+permissions: {}
 
 # Pull-request release-label contract:
 # - API: release:api:patch, release:api:minor or release:api:major
@@ -67,6 +66,10 @@ jobs:
     name: Detect affected components
     runs-on: windows-2022
     timeout-minutes: 5
+
+    permissions:
+      contents: read
+      pull-requests: read
 
     outputs:
       components: ${{ steps.components.outputs.result }}
@@ -166,6 +169,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
 
+    permissions:
+      pull-requests: read
+
     env:
       GH_TOKEN: ${{ github.token }}
       COMPONENTS_JSON: ${{ needs.changes.outputs.components }}
@@ -231,6 +237,9 @@ jobs:
     runs-on: windows-2022
     timeout-minutes: 20
 
+    permissions:
+      contents: read
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -265,6 +274,9 @@ jobs:
     if: vars.SONAR_ENABLED == 'true'
     runs-on: windows-2022
     timeout-minutes: 25
+
+    permissions:
+      contents: read
 
     steps:
       - name: Checkout full history
@@ -337,6 +349,9 @@ jobs:
     if: needs.changes.outputs.components != '[]'
     runs-on: windows-2022
     timeout-minutes: 20
+
+    permissions:
+      contents: read
 
     strategy:
       fail-fast: false
@@ -1057,6 +1072,8 @@ jobs:
     if: always()
     runs-on: windows-2022
     timeout-minutes: 5
+
+    permissions: {}
 
     env:
       CHANGES_RESULT: ${{ needs.changes.result }}
