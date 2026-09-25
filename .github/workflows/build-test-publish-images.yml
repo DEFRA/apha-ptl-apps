@@ -333,12 +333,22 @@ jobs:
           & $env:SONAR_SCANNER_PATH begin `
             "/k:${{ vars.SONAR_PROJECT_KEY }}" `
             "/o:${{ vars.SONAR_ORGANIZATION }}" `
+            "/s:${{ github.workspace }}\SonarQube.Analysis.xml" `
             "/d:sonar.token=$env:SONAR_TOKEN" `
             "/d:sonar.host.url=https://sonarcloud.io" `
             "/d:sonar.qualitygate.wait=true"
 
           dotnet restore PTL.slnx
           dotnet build PTL.slnx --configuration Release --no-restore
+
+          # coverlet.msbuild only produces coverage.cobertura.xml during `dotnet test` - the
+          # scanner has nothing to ingest without this step (see SonarQube.Analysis.xml).
+          dotnet test PTL.slnx `
+            --configuration Release `
+            --no-restore `
+            --logger "trx;LogFilePrefix=ptl-sonar-tests" `
+            --results-directory "${{ runner.temp }}/test-results" `
+            /p:Threshold=0
 
           & $env:SONAR_SCANNER_PATH end `
             "/d:sonar.token=$env:SONAR_TOKEN"

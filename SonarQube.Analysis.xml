@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<SonarQubeAnalysisProperties xmlns="http://www.sonarsource.com/msbuild/integration/2015/1">
+
+  <!-- Vendored/generated assets and build output - never hand-edited, not worth analysing -->
+  <Property Name="sonar.exclusions">**/bin/**,**/obj/**,**/wwwroot/lib/**,**/wwwroot/js/*.min.js</Property>
+
+  <!-- coverlet excludes Program.cs from instrumentation everywhere (see tests/Directory.Build.props
+       ExcludeByFile - WebApplicationFactory-based tests never execute app.Run()/RunAsync(), so it's
+       absent from every coverage.cobertura.xml). Without this matching exclusion here, Sonar still
+       counts Program.cs's lines as "to cover" from its own source scan but finds no coverage data
+       for it at all, which drags the reported percentage towards 0 instead of just being N/A.
+       Test code itself is excluded from the coverage requirement, not from analysis, to avoid
+       trivially-covered test methods inflating the number the other way. -->
+  <Property Name="sonar.coverage.exclusions">**/Program.cs,**/Properties/AssemblyInfo.cs,tests/**</Property>
+
+  <!-- Report locations produced by `dotnet test` in the CI pipeline -->
+  <Property Name="sonar.cs.vstest.reportsPaths">**/*.trx</Property>
+  <Property Name="sonar.cs.cobertura.reportsPaths">**/coverage.cobertura.xml</Property>
+
+</SonarQubeAnalysisProperties>
