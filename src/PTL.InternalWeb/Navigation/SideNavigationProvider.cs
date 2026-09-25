@@ -20,6 +20,9 @@ public static class SideNavigationProvider
     private const string CreateAction = "Create";
     private const string SchemeControllerName = "Scheme";
 
+    // Placeholder for a menu entry whose page hasn't been migrated yet - see class remarks.
+    private static SideNavigationItem Disabled(string text) => new() { Text = text, IsEnabled = false };
+
     public static IReadOnlyList<SideNavigationItem> Build() =>
     [
         new SideNavigationItem { Text = "Home", ControllerName = "Home", ActionName = IndexAction },
@@ -30,17 +33,17 @@ public static class SideNavigationProvider
             ActionName = "SystemAdministration",
             Children =
             [
-                new SideNavigationItem { Text = "Create User", IsEnabled = false },
-                new SideNavigationItem { Text = "Assign Roles to User", IsEnabled = false },
-                new SideNavigationItem { Text = "Remove User", IsEnabled = false },
-                new SideNavigationItem { Text = "Internal Test Consultant Department Management", IsEnabled = false },
-                new SideNavigationItem { Text = "External Test Consultant Management", IsEnabled = false },
-                new SideNavigationItem { Text = "Viewer Management", IsEnabled = false },
-                new SideNavigationItem { Text = "Country Management", IsEnabled = false },
-                new SideNavigationItem { Text = "External Site Management", IsEnabled = false },
-                new SideNavigationItem { Text = "Administration Charges Management", IsEnabled = false },
-                new SideNavigationItem { Text = "Weighted Charging Plan", IsEnabled = false },
-                new SideNavigationItem { Text = "Postage Pricing Plan", IsEnabled = false }
+                Disabled("Create User"),
+                Disabled("Assign Roles to User"),
+                Disabled("Remove User"),
+                Disabled("Internal Test Consultant Department Management"),
+                Disabled("External Test Consultant Management"),
+                Disabled("Viewer Management"),
+                Disabled("Country Management"),
+                Disabled("External Site Management"),
+                Disabled("Administration Charges Management"),
+                Disabled("Weighted Charging Plan"),
+                Disabled("Postage Pricing Plan")
             ]
         },
         new SideNavigationItem
@@ -58,9 +61,9 @@ public static class SideNavigationProvider
                     Children =
                     [
                         new SideNavigationItem { Text = "Create Customer", ControllerName = "Customer", ActionName = CreateAction },
-                        new SideNavigationItem { Text = "Review Pending Customer Updates", IsEnabled = false },
-                        new SideNavigationItem { Text = "Review Pending Participant Updates", IsEnabled = false },
-                        new SideNavigationItem { Text = "Review Pending Orders", IsEnabled = false },
+                        Disabled("Review Pending Customer Updates"),
+                        Disabled("Review Pending Participant Updates"),
+                        Disabled("Review Pending Orders"),
 
                         // Hidden: only reached from within a specific customer (Customer Details'
                         // "View participants"/"View contracts" links), never listed here - matches
@@ -83,10 +86,10 @@ public static class SideNavigationProvider
                         }
                     ]
                 },
-                new SideNavigationItem { Text = "Search", IsEnabled = false },
-                new SideNavigationItem { Text = "Group Addresses", IsEnabled = false },
-                new SideNavigationItem { Text = "Exports", IsEnabled = false },
-                new SideNavigationItem { Text = "Invoice Generation", IsEnabled = false }
+                Disabled("Search"),
+                Disabled("Group Addresses"),
+                Disabled("Exports"),
+                Disabled("Invoice Generation")
             ]
         },
         new SideNavigationItem
@@ -110,18 +113,18 @@ public static class SideNavigationProvider
                         new SideNavigationItem { Text = "Scheme History", ControllerName = SchemeControllerName, ActionName = "History", IsHidden = true }
                     ]
                 },
-                new SideNavigationItem { Text = "Search", IsEnabled = false },
-                new SideNavigationItem { Text = "Test Types", IsEnabled = false },
-                new SideNavigationItem { Text = "Test Result Items", IsEnabled = false },
-                new SideNavigationItem { Text = "Test Method Items", IsEnabled = false },
-                new SideNavigationItem { Text = "Category Items", IsEnabled = false },
-                new SideNavigationItem { Text = "Criterion Items", IsEnabled = false }
+                Disabled("Search"),
+                Disabled("Test Types"),
+                Disabled("Test Result Items"),
+                Disabled("Test Method Items"),
+                Disabled("Category Items"),
+                Disabled("Criterion Items")
             ]
         },
-        new SideNavigationItem { Text = "Distributions", IsEnabled = false },
-        new SideNavigationItem { Text = "Test Consultant", IsEnabled = false },
-        new SideNavigationItem { Text = "Assessor", IsEnabled = false },
-        new SideNavigationItem { Text = "Results Sign-Off", IsEnabled = false }
+        Disabled("Distributions"),
+        Disabled("Test Consultant"),
+        Disabled("Assessor"),
+        Disabled("Results Sign-Off")
     ];
 
     // Depth-first search for the node matching the current controller/action, regardless of
