@@ -186,12 +186,10 @@ jobs:
           "${{ runner.temp }}/scanner/dotnet-sonarscanner" begin \
             /k:"${{ vars.SONAR_PROJECT_KEY }}" \
             /o:"${{ vars.SONAR_ORGANIZATION }}" \
+            /s:"${{ github.workspace }}\SonarQube.Analysis.xml" \
             /d:sonar.token="${SONAR_TOKEN}" \
             /d:sonar.host.url="https://sonarcloud.io" \
-            /d:sonar.qualitygate.wait=true \
-            /d:sonar.cs.cobertura.reportsPaths="**/coverage.cobertura.xml" \
-            /d:sonar.cs.vstest.reportsPaths="**/*.trx" \
-            /d:sonar.exclusions="**/wwwroot/lib/**,**/wwwroot/js/*.min.js"
+            /d:sonar.qualitygate.wait=true
           dotnet build PTL.slnx --configuration Release --no-restore
           dotnet test PTL.slnx \
             --configuration Release \
