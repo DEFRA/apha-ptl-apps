@@ -359,6 +359,53 @@ jobs:
           echo "::error::No Dockerfile is mapped for component '${{ matrix.component }}'."
           exit 1
 
+      # Compatibility bridge for the current PT-LIMS Dockerfiles. The Windows
+      # Docker builder cannot use the Linux BuildKit NuGet cache mount. The
+      # committed Dockerfile is not modified; only a temporary build copy is used.
+      - name: Prepare Windows-compatible Dockerfile
+        id: prepared-dockerfile
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+
+          $sourceDockerfile = Join-Path $env:GITHUB_WORKSPACE $env:DOCKERFILE
+          if (-not (Test-Path -LiteralPath $sourceDockerfile)) {
+            throw "Dockerfile does not exist: $sourceDockerfile"
+          }
+
+          $buildDockerfile = Join-Path `
+            $env:RUNNER_TEMP `
+            "Dockerfile-${{ matrix.component }}"
+
+          $content = [System.IO.File]::ReadAllText($sourceDockerfile)
+          $mountPattern = `
+            '(?m)^([ \t]*RUN)[ \t]+--mount=type=cache,target=/root/\.nuget/packages(?:(?:[ \t]*[\\`]\r?\n[ \t]*)|[ \t]+)'
+          $updatedContent = [System.Text.RegularExpressions.Regex]::Replace(
+            $content,
+            $mountPattern,
+            '$1 '
+          )
+
+          if ($updatedContent -match `
+              '(?m)^\s*RUN\s+--mount=type=cache,target=/root/\.nuget/packages') {
+            throw "The unsupported NuGet cache mount could not be removed safely."
+          }
+
+          if ($updatedContent -ne $content) {
+            Write-Warning `
+              "Removed the unsupported Linux NuGet cache mount from the temporary Dockerfile."
+          }
+
+          $utf8WithoutBom = [System.Text.UTF8Encoding]::new($false)
+          [System.IO.File]::WriteAllText(
+            $buildDockerfile,
+            $updatedContent,
+            $utf8WithoutBom
+          )
+
+          "path=$buildDockerfile" |
+            Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+
       - name: Start Docker service
         shell: pwsh
         run: |
@@ -383,11 +430,35 @@ jobs:
 
       - name: Build container without publishing
         shell: pwsh
+        env:
+          BUILD_DOCKERFILE: ${{ steps.prepared-dockerfile.outputs.path }}
         run: |
+          $ErrorActionPreference = "Stop"
+
+          if ([string]::IsNullOrWhiteSpace($env:BUILD_DOCKERFILE) -or
+              -not (Test-Path -LiteralPath $env:BUILD_DOCKERFILE)) {
+            throw "The prepared Dockerfile path is missing or invalid."
+          }
+
+          $preparedContent = [System.IO.File]::ReadAllText(
+            $env:BUILD_DOCKERFILE
+          )
+
+          if ($preparedContent -match
+              '--mount=type=cache,target=/root/\.nuget/packages') {
+            throw "The prepared Dockerfile still contains the unsupported NuGet cache mount."
+          }
+
+          Write-Host "Building with prepared Dockerfile: $env:BUILD_DOCKERFILE"
+          Select-String `
+            -LiteralPath $env:BUILD_DOCKERFILE `
+            -Pattern 'RUN\s+dotnet\s+restore' |
+            ForEach-Object { Write-Host $_.Line.Trim() }
+
           $dockerArgs = @(
             "build"
             "--file"
-            "${{ env.DOCKERFILE }}"
+            $env:BUILD_DOCKERFILE
             "--tag"
             "ptl-${{ matrix.component }}:$env:GITHUB_SHA"
             "--label"
