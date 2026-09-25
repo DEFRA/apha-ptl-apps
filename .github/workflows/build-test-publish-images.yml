@@ -3,33 +3,81 @@ name: Build, Test and Publish PT-LIMS Images
 on:
   pull_request:
     branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review, labeled, unlabeled]
+
   push:
     branches: [main]
-  # Manual "rebuild and publish everything" trigger, independent of what changed -
-  # e.g. to validate a change to this pipeline itself, or to re-publish on demand.
+
   workflow_dispatch:
+    inputs:
+      api_release_type:
+        description: API release increment; choose none when API is not being released
+        required: true
+        default: none
+        type: choice
+        options:
+          - none
+          - patch
+          - minor
+          - major
+      internalweb_release_type:
+        description: Internal Web release increment; choose none when it is not being released
+        required: true
+        default: none
+        type: choice
+        options:
+          - none
+          - patch
+          - minor
+          - major
+      externalweb_release_type:
+        description: External Web release increment; choose none when it is not being released
+        required: true
+        default: none
+        type: choice
+        options:
+          - none
+          - patch
+          - minor
+          - major
 
-permissions:
-  contents: read
+# Deny GitHub token access by default. Each job grants only what it needs.
+permissions: {}
 
+# Pull-request release-label contract:
+# - API: release:api:patch, release:api:minor or release:api:major
+# - Internal Web: release:internalweb:patch, release:internalweb:minor or release:internalweb:major
+# - External Web: release:externalweb:patch, release:externalweb:minor or release:externalweb:major
+# A changed component requires exactly one matching label. An unchanged
+# component must not have a release label.
+
+# Production releases are serialized so two merges cannot calculate the same
+# next semantic version. Pull-request validation remains independently cancellable.
 concurrency:
-  group: ptl-images-${{ github.ref }}
+  group: ${{ github.event_name == 'pull_request' && format('ptl-pr-{0}', github.ref) || 'ptl-production-release' }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   DOTNET_VERSION: "10.0.x"
+  SONAR_SCANNER_VERSION: "11.3.0"
 
 jobs:
   changes:
     name: Detect affected components
     runs-on: windows-2022
     timeout-minutes: 5
+
+    permissions:
+      contents: read
+      pull-requests: read
+
     outputs:
       components: ${{ steps.components.outputs.result }}
       dockerfiles: ${{ steps.dockerfiles.outputs.map }}
+
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v7.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -76,32 +124,130 @@ jobs:
         id: components
         shell: bash
         run: |
+          set -euo pipefail
+
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            echo 'result=["api","internalweb","externalweb"]' >> "${GITHUB_OUTPUT}"
+            if [[ "${{ github.ref }}" != "refs/heads/main" ]]; then
+              echo "::error::Production workflow dispatches must run from the main branch."
+              exit 1
+            fi
+
+            COMPONENTS='[]'
+
+            if [[ "${{ inputs.api_release_type }}" != "none" ]]; then
+              COMPONENTS="$(jq -c '. + [\"api\"]' <<< "${COMPONENTS}")"
+            fi
+
+            if [[ "${{ inputs.internalweb_release_type }}" != "none" ]]; then
+              COMPONENTS="$(jq -c '. + [\"internalweb\"]' <<< "${COMPONENTS}")"
+            fi
+
+            if [[ "${{ inputs.externalweb_release_type }}" != "none" ]]; then
+              COMPONENTS="$(jq -c '. + [\"externalweb\"]' <<< "${COMPONENTS}")"
+            fi
+
+            if [[ "${COMPONENTS}" == "[]" ]]; then
+              echo "::error::Select a release increment for at least one component."
+              exit 1
+            fi
+
+            echo "result=${COMPONENTS}" >> "${GITHUB_OUTPUT}"
           else
             echo 'result=${{ steps.filter.outputs.changes }}' >> "${GITHUB_OUTPUT}"
           fi
 
-      # Single source of truth for the component -> Dockerfile mapping, consumed
-      # by container-validation and publish instead of each duplicating it.
-      - name: Map components to their Dockerfiles
+      - name: Map components to Dockerfiles
         id: dockerfiles
         shell: bash
         run: |
           echo 'map={"api":"src/PTL.Api/Dockerfile","internalweb":"src/PTL.InternalWeb/Dockerfile","externalweb":"src/PTL.ExternalWeb/Dockerfile"}' >> "${GITHUB_OUTPUT}"
 
+  release-label-validation:
+    name: Validate component release labels
+    needs: [changes]
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    permissions:
+      pull-requests: read
+
+    env:
+      GH_TOKEN: ${{ github.token }}
+      COMPONENTS_JSON: ${{ needs.changes.outputs.components }}
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+
+    steps:
+      - name: Enforce component-specific release labels
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          LABELS_JSON="$(gh api \
+            "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}" \
+            --jq '[.labels[].name]')"
+
+          jq -e 'type == "array"' <<< "${COMPONENTS_JSON}" >/dev/null
+          jq -e 'type == "array"' <<< "${LABELS_JSON}" >/dev/null
+
+          mapfile -t GENERIC_LABELS < <(
+            jq -r '.[]' <<< "${LABELS_JSON}" |
+              grep -E '^release:(patch|minor|major)$' || true
+          )
+
+          if (( ${#GENERIC_LABELS[@]} > 0 )); then
+            echo "::error::Generic release labels are not allowed. Use release:api:*, release:internalweb:* or release:externalweb:* labels."
+            exit 1
+          fi
+
+          validate_component() {
+            local component="$1"
+            local changed="false"
+            local labels=()
+
+            if jq -e --arg component "${component}" 'index($component) != null' \
+              <<< "${COMPONENTS_JSON}" >/dev/null; then
+              changed="true"
+            fi
+
+            mapfile -t labels < <(
+              jq -r '.[]' <<< "${LABELS_JSON}" |
+                grep -E "^release:${component}:(patch|minor|major)$" || true
+            )
+
+            if [[ "${changed}" == "true" && "${#labels[@]}" -ne 1 ]]; then
+              echo "::error::Changed ${component} requires exactly one release:${component}:patch, release:${component}:minor or release:${component}:major label."
+              return 1
+            fi
+
+            if [[ "${changed}" == "false" && "${#labels[@]}" -ne 0 ]]; then
+              echo "::error::${component} did not change, so remove its release label."
+              return 1
+            fi
+          }
+
+          validate_component api
+          validate_component internalweb
+          validate_component externalweb
+
+          echo "Component release labels match the changed paths."
+
   quality:
     name: Format, build and test solution
     runs-on: windows-2022
     timeout-minutes: 20
+
+    permissions:
+      contents: read
+
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v7.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
       - name: Set up .NET
-        uses: actions/setup-dotnet@v6.0.0
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
@@ -128,78 +274,74 @@ jobs:
     if: vars.SONAR_ENABLED == 'true'
     runs-on: windows-2022
     timeout-minutes: 25
+
+    permissions:
+      contents: read
+
     steps:
       - name: Checkout full history
-        uses: actions/checkout@v7.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
 
       - name: Set up .NET
-        uses: actions/setup-dotnet@v6.0.0
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
       - name: Set up Java
-        uses: actions/setup-java@v6.0.0
+        uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c # v6.0.0
         with:
           distribution: temurin
           java-version: "17"
 
-      - name: Cache SonarCloud packages
-        uses: actions/cache@v4
-        with:
-          path: ~\sonar\cache
-          key: ${{ runner.os }}-sonar
-          restore-keys: ${{ runner.os }}-sonar
-
-      # dotnet-sonarscanner is intentionally not in the .config/dotnet-tools.json manifest -
-      # installing it to a cached tool-path (Sonar's own recommended pattern) avoids pinning
-      # to a specific NuGet version that can go stale/incompatible with the scanner engine.
-      - name: Cache SonarCloud scanner
-        id: cache-sonar-scanner
-        uses: actions/cache@v4
-        with:
-          path: ${{ runner.temp }}\scanner
-          key: ${{ runner.os }}-sonar-scanner
-          restore-keys: ${{ runner.os }}-sonar-scanner
-
-      - name: Install SonarCloud scanner
-        if: steps.cache-sonar-scanner.outputs.cache-hit != 'true'
+      - name: Install pinned SonarScanner for .NET
         shell: pwsh
         run: |
-          New-Item -Path "${{ runner.temp }}\scanner" -ItemType Directory -Force | Out-Null
-          dotnet tool update dotnet-sonarscanner --tool-path "${{ runner.temp }}\scanner"
+          $ErrorActionPreference = "Stop"
+          $toolPath = Join-Path $env:RUNNER_TEMP "sonarscanner"
+          New-Item -ItemType Directory -Force -Path $toolPath | Out-Null
 
-      - name: Restore solution
-        run: dotnet restore PTL.slnx
+          dotnet tool install dotnet-sonarscanner `
+            --tool-path $toolPath `
+            --version $env:SONAR_SCANNER_VERSION
+
+          $scannerPath = Join-Path $toolPath "dotnet-sonarscanner.exe"
+          if (-not (Test-Path $scannerPath)) {
+            throw "SonarScanner executable was not installed at $scannerPath"
+          }
+
+          "SONAR_SCANNER_PATH=$scannerPath" |
+            Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Analyse solution
-        shell: bash
+        shell: pwsh
         env:
-          MSYS_NO_PATHCONV: "1"
-          MSYS2_ARG_CONV_EXCL: "*"
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: |
-          set -euo pipefail
-          test -n "${SONAR_TOKEN}"
-          "${{ runner.temp }}/scanner/dotnet-sonarscanner" begin \
-            /k:"${{ vars.SONAR_PROJECT_KEY }}" \
-            /o:"${{ vars.SONAR_ORGANIZATION }}" \
-            /d:sonar.token="${SONAR_TOKEN}" \
-            /d:sonar.host.url="https://sonarcloud.io" \
-            /d:sonar.qualitygate.wait=true \
-            /d:sonar.cs.cobertura.reportsPaths="**/coverage.cobertura.xml" \
-            /d:sonar.cs.vstest.reportsPaths="**/*.trx" \
-            /d:sonar.exclusions="**/wwwroot/lib/**,**/wwwroot/js/*.min.js"
+          $ErrorActionPreference = "Stop"
+
+          if ([string]::IsNullOrWhiteSpace($env:SONAR_TOKEN)) {
+            throw "SONAR_TOKEN is not configured."
+          }
+
+          if (-not (Test-Path $env:SONAR_SCANNER_PATH)) {
+            throw "SonarScanner executable was not found."
+          }
+
+          & $env:SONAR_SCANNER_PATH begin `
+            "/k:${{ vars.SONAR_PROJECT_KEY }}" `
+            "/o:${{ vars.SONAR_ORGANIZATION }}" `
+            "/d:sonar.token=$env:SONAR_TOKEN" `
+            "/d:sonar.host.url=https://sonarcloud.io" `
+            "/d:sonar.qualitygate.wait=true"
+
+          dotnet restore PTL.slnx
           dotnet build PTL.slnx --configuration Release --no-restore
-          dotnet test PTL.slnx \
-            --configuration Release \
-            --no-restore \
-            --logger "trx;LogFilePrefix=ptl-sonar-tests" \
-            --results-directory "${{ runner.temp }}/test-results" \
-            /p:Threshold=0
-          "${{ runner.temp }}/scanner/dotnet-sonarscanner" end /d:sonar.token="${SONAR_TOKEN}"
+
+          & $env:SONAR_SCANNER_PATH end `
+            "/d:sonar.token=$env:SONAR_TOKEN"
 
   container-validation:
     name: Validate ${{ matrix.component }} container
@@ -207,15 +349,21 @@ jobs:
     if: needs.changes.outputs.components != '[]'
     runs-on: windows-2022
     timeout-minutes: 20
+
+    permissions:
+      contents: read
+
     strategy:
       fail-fast: false
       matrix:
         component: ${{ fromJSON(needs.changes.outputs.components) }}
+
     env:
       DOCKERFILE: ${{ fromJSON(needs.changes.outputs.dockerfiles)[matrix.component] }}
+
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v7.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
@@ -223,31 +371,70 @@ jobs:
         if: env.DOCKERFILE == ''
         shell: bash
         run: |
-          echo "::error::No Dockerfile mapped for component '${{ matrix.component }}'. Check the 'Map components to their Dockerfiles' step in the changes job."
+          echo "::error::No Dockerfile is mapped for component '${{ matrix.component }}'."
           exit 1
 
-      # Compatibility workaround: this job builds with `docker build` (no BuildKit),
-      # which does not support the --mount=type=cache flag used in the Dockerfile.
-      - name: Remove unsupported NuGet cache mounts
-        uses: ./.github/actions/strip-nuget-cache-mount
-        with:
-          dockerfile: ${{ env.DOCKERFILE }}
+      # Compatibility bridge for the current PT-LIMS Dockerfiles. The Windows
+      # Docker builder cannot use the Linux BuildKit NuGet cache mount. The
+      # committed Dockerfile is not modified; only a temporary build copy is used.
+      - name: Prepare Windows-compatible Dockerfile
+        id: prepared-dockerfile
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
 
-      # windows-2022 runners don't guarantee the Docker Engine service is already
-      # running - start it and wait for the daemon to accept connections first.
+          $sourceDockerfile = Join-Path $env:GITHUB_WORKSPACE $env:DOCKERFILE
+          if (-not (Test-Path -LiteralPath $sourceDockerfile)) {
+            throw "Dockerfile does not exist: $sourceDockerfile"
+          }
+
+          $buildDockerfile = Join-Path `
+            $env:RUNNER_TEMP `
+            "Dockerfile-${{ matrix.component }}"
+
+          $content = [System.IO.File]::ReadAllText($sourceDockerfile)
+          $mountPattern = `
+            '(?m)^([ \t]*RUN)[ \t]+--mount=type=cache,target=/root/\.nuget/packages(?:(?:[ \t]*[\\`]\r?\n[ \t]*)|[ \t]+)'
+          $updatedContent = [System.Text.RegularExpressions.Regex]::Replace(
+            $content,
+            $mountPattern,
+            '$1 '
+          )
+
+          if ($updatedContent -match `
+              '(?m)^\s*RUN\s+--mount=type=cache,target=/root/\.nuget/packages') {
+            throw "The unsupported NuGet cache mount could not be removed safely."
+          }
+
+          if ($updatedContent -ne $content) {
+            Write-Warning `
+              "Removed the unsupported Linux NuGet cache mount from the temporary Dockerfile."
+          }
+
+          $utf8WithoutBom = [System.Text.UTF8Encoding]::new($false)
+          [System.IO.File]::WriteAllText(
+            $buildDockerfile,
+            $updatedContent,
+            $utf8WithoutBom
+          )
+
+          "path=$buildDockerfile" |
+            Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+
       - name: Start Docker service
         shell: pwsh
         run: |
           Start-Service -Name Docker -ErrorAction SilentlyContinue
-
           $maxAttempts = 30
           $attempt = 0
+
           while ($attempt -lt $maxAttempts) {
             try {
               docker ps | Out-Null
               Write-Host "Docker is running"
               exit 0
-            } catch {
+            }
+            catch {
               $attempt++
               Start-Sleep -Seconds 1
             }
@@ -258,11 +445,35 @@ jobs:
 
       - name: Build container without publishing
         shell: pwsh
+        env:
+          BUILD_DOCKERFILE: ${{ steps.prepared-dockerfile.outputs.path }}
         run: |
+          $ErrorActionPreference = "Stop"
+
+          if ([string]::IsNullOrWhiteSpace($env:BUILD_DOCKERFILE) -or
+              -not (Test-Path -LiteralPath $env:BUILD_DOCKERFILE)) {
+            throw "The prepared Dockerfile path is missing or invalid."
+          }
+
+          $preparedContent = [System.IO.File]::ReadAllText(
+            $env:BUILD_DOCKERFILE
+          )
+
+          if ($preparedContent -match
+              '--mount=type=cache,target=/root/\.nuget/packages') {
+            throw "The prepared Dockerfile still contains the unsupported NuGet cache mount."
+          }
+
+          Write-Host "Building with prepared Dockerfile: $env:BUILD_DOCKERFILE"
+          Select-String `
+            -LiteralPath $env:BUILD_DOCKERFILE `
+            -Pattern 'RUN\s+dotnet\s+restore' |
+            ForEach-Object { Write-Host $_.Line.Trim() }
+
           $dockerArgs = @(
             "build"
             "--file"
-            "${{ env.DOCKERFILE }}"
+            $env:BUILD_DOCKERFILE
             "--tag"
             "ptl-${{ matrix.component }}:$env:GITHUB_SHA"
             "--label"
@@ -273,30 +484,272 @@ jobs:
           )
 
           docker @dockerArgs
+
           if ($LASTEXITCODE -ne 0) {
             exit $LASTEXITCODE
           }
 
-      # On push to main this is the exact image publish later pushes - saving it here
-      # means publish loads it instead of rebuilding, so what's pushed is guaranteed
-      # to be byte-identical to what was just validated (and it's not rebuilt twice).
-      - name: Save built image for reuse by publish
+      - name: Save validated image for publishing
         if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
         shell: pwsh
-        run: docker save "ptl-${{ matrix.component }}:$env:GITHUB_SHA" -o "${{ runner.temp }}/ptl-${{ matrix.component }}.tar"
+        run: |
+          docker save "ptl-${{ matrix.component }}:$env:GITHUB_SHA" `
+            -o "${{ runner.temp }}/ptl-${{ matrix.component }}.tar"
 
-      - name: Upload built image artifact
+      - name: Upload validated image artifact
         if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: ptl-image-${{ matrix.component }}-${{ github.run_id }}
           path: ${{ runner.temp }}/ptl-${{ matrix.component }}.tar
           retention-days: 1
           overwrite: true
 
+  release-version:
+    name: Calculate component release versions
+    needs: [changes]
+    if: >-
+      needs.changes.outputs.components != '[]' &&
+      ((github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+       (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    permissions:
+      contents: read
+      pull-requests: read
+
+    outputs:
+      versions: ${{ steps.version.outputs.versions }}
+      git_tags: ${{ steps.version.outputs.git_tags }}
+      release_types: ${{ steps.version.outputs.release_types }}
+      pull_request: ${{ steps.version.outputs.pull_request }}
+
+    steps:
+      - name: Checkout full history
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Calculate independent PT-LIMS component versions
+        id: version
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          COMPONENTS_JSON: ${{ needs.changes.outputs.components }}
+          MANUAL_API_RELEASE_TYPE: ${{ inputs.api_release_type }}
+          MANUAL_INTERNALWEB_RELEASE_TYPE: ${{ inputs.internalweb_release_type }}
+          MANUAL_EXTERNALWEB_RELEASE_TYPE: ${{ inputs.externalweb_release_type }}
+        run: |
+          set -euo pipefail
+
+          git fetch --tags --force
+
+          PR_NUMBER=""
+          LABELS_JSON='[]'
+
+          if [[ "${{ github.event_name }}" != "workflow_dispatch" ]]; then
+            PR_NUMBER="$(gh api \
+              "repos/${GITHUB_REPOSITORY}/commits/${GITHUB_SHA}/pulls" \
+              --jq '[.[] | select(.merged_at != null and .base.ref == "main")] | sort_by(.merged_at) | last | .number // empty')"
+
+            if [[ -z "${PR_NUMBER}" ]]; then
+              echo "::error::Production publication must originate from a pull request merged into main."
+              exit 1
+            fi
+
+            LABELS_JSON="$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}" \
+              --jq '[.labels[].name]')"
+          fi
+
+          mapfile -t GENERIC_LABELS < <(
+            jq -r '.[]' <<< "${LABELS_JSON}" |
+              grep -E '^release:(patch|minor|major)$' || true
+          )
+
+          if (( ${#GENERIC_LABELS[@]} > 0 )); then
+            echo "::error::Generic release labels are not supported. Use component-specific labels."
+            exit 1
+          fi
+
+          VERSIONS='{}'
+          GIT_TAGS='{}'
+          RELEASE_TYPES='{}'
+
+          component_changed() {
+            jq -e --arg component "$1" 'index($component) != null' \
+              <<< "${COMPONENTS_JSON}" >/dev/null
+          }
+
+          manual_release_type() {
+            case "$1" in
+              api) printf '%s\n' "${MANUAL_API_RELEASE_TYPE}" ;;
+              internalweb) printf '%s\n' "${MANUAL_INTERNALWEB_RELEASE_TYPE}" ;;
+              externalweb) printf '%s\n' "${MANUAL_EXTERNALWEB_RELEASE_TYPE}" ;;
+              *) return 1 ;;
+            esac
+          }
+
+          resolve_release_type() {
+            local component="$1"
+            local changed="$2"
+            local release_type=""
+            local labels=()
+
+            if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+              release_type="$(manual_release_type "${component}")"
+
+              if [[ "${changed}" == "true" && ! "${release_type}" =~ ^(patch|minor|major)$ ]]; then
+                echo "::error::A release increment is required for changed component ${component}." >&2
+                return 1
+              fi
+
+              if [[ "${changed}" == "false" && "${release_type}" != "none" ]]; then
+                echo "::error::Component ${component} is not selected but has release type ${release_type}." >&2
+                return 1
+              fi
+            else
+              mapfile -t labels < <(
+                jq -r '.[]' <<< "${LABELS_JSON}" |
+                  grep -E "^release:${component}:(patch|minor|major)$" || true
+              )
+
+              if [[ "${changed}" == "true" && "${#labels[@]}" -ne 1 ]]; then
+                echo "::error::PR #${PR_NUMBER} must have exactly one release:${component}:* label because ${component} changed." >&2
+                return 1
+              fi
+
+              if [[ "${changed}" == "false" && "${#labels[@]}" -ne 0 ]]; then
+                echo "::error::PR #${PR_NUMBER} has a release label for unchanged component ${component}." >&2
+                return 1
+              fi
+
+              if [[ "${changed}" == "true" ]]; then
+                release_type="${labels[0]#release:${component}:}"
+              else
+                release_type="none"
+              fi
+            fi
+
+            printf '%s\n' "${release_type}"
+          }
+
+          calculate_version() {
+            local component="$1"
+            local release_type="$2"
+            local latest_tag
+            local current_version
+            local major
+            local minor
+            local patch
+
+            latest_tag="$(
+              git tag --list "${component}-v*" |
+                grep -E "^${component}-v[0-9]+\.[0-9]+\.[0-9]+$" |
+                sort -t v -k 2,2V |
+                tail -1 || true
+            )"
+
+            if [[ -z "${latest_tag}" ]]; then
+              latest_tag="${component}-v0.0.0"
+            fi
+
+            current_version="${latest_tag#${component}-v}"
+            IFS='.' read -r major minor patch <<< "${current_version}"
+
+            case "${release_type}" in
+              major)
+                major=$((major + 1))
+                minor=0
+                patch=0
+                ;;
+              minor)
+                minor=$((minor + 1))
+                patch=0
+                ;;
+              patch)
+                patch=$((patch + 1))
+                ;;
+              *)
+                echo "::error::Unsupported ${component} release type '${release_type}'." >&2
+                return 1
+                ;;
+            esac
+
+            printf '%s\n' "${major}.${minor}.${patch}"
+          }
+
+          for COMPONENT in api internalweb externalweb; do
+            CHANGED="false"
+
+            if component_changed "${COMPONENT}"; then
+              CHANGED="true"
+            fi
+
+            RELEASE_TYPE="$(resolve_release_type "${COMPONENT}" "${CHANGED}")"
+
+            if [[ "${CHANGED}" == "false" ]]; then
+              continue
+            fi
+
+            mapfile -t EXISTING_COMMIT_TAGS < <(
+              git tag --points-at "${GITHUB_SHA}" |
+                grep -E "^${COMPONENT}-v[0-9]+\.[0-9]+\.[0-9]+$" || true
+            )
+
+            if (( ${#EXISTING_COMMIT_TAGS[@]} > 1 )); then
+              echo "::error::Commit ${GITHUB_SHA} has multiple ${COMPONENT} release tags; refusing an ambiguous rerun."
+              exit 1
+            fi
+
+            if (( ${#EXISTING_COMMIT_TAGS[@]} == 1 )); then
+              NEXT_TAG="${EXISTING_COMMIT_TAGS[0]}"
+              NEXT_VERSION="${NEXT_TAG#${COMPONENT}-v}"
+              echo "Reusing ${NEXT_TAG} for an idempotent rerun."
+            else
+              NEXT_VERSION="$(calculate_version "${COMPONENT}" "${RELEASE_TYPE}")"
+              NEXT_TAG="${COMPONENT}-v${NEXT_VERSION}"
+
+              if git rev-parse --verify --quiet "refs/tags/${NEXT_TAG}" >/dev/null; then
+                echo "::error::Calculated Git tag ${NEXT_TAG} already exists."
+                exit 1
+              fi
+            fi
+
+            VERSIONS="$(jq -c \
+              --arg component "${COMPONENT}" \
+              --arg value "${NEXT_VERSION}" \
+              '. + {($component): $value}' <<< "${VERSIONS}")"
+
+            GIT_TAGS="$(jq -c \
+              --arg component "${COMPONENT}" \
+              --arg value "${NEXT_TAG}" \
+              '. + {($component): $value}' <<< "${GIT_TAGS}")"
+
+            RELEASE_TYPES="$(jq -c \
+              --arg component "${COMPONENT}" \
+              --arg value "${RELEASE_TYPE}" \
+              '. + {($component): $value}' <<< "${RELEASE_TYPES}")"
+
+            echo "${COMPONENT}: ${NEXT_TAG} (${RELEASE_TYPE})"
+          done
+
+          {
+            echo "versions=${VERSIONS}"
+            echo "git_tags=${GIT_TAGS}"
+            echo "release_types=${RELEASE_TYPES}"
+            echo "pull_request=${PR_NUMBER}"
+          } >> "${GITHUB_OUTPUT}"
+
   publish:
-    name: Publish ${{ matrix.component }} image
-    needs: [changes, quality, sonarcloud, container-validation]
+    name: Publish ${{ matrix.component }} production image
+    needs:
+      - changes
+      - quality
+      - sonarcloud
+      - container-validation
+      - release-version
     if: >-
       always() &&
       (github.event_name == 'push' || github.event_name == 'workflow_dispatch') &&
@@ -305,17 +758,21 @@ jobs:
       needs.quality.result == 'success' &&
       (vars.SONAR_ENABLED != 'true' || needs.sonarcloud.result == 'success') &&
       needs.container-validation.result == 'success' &&
+      needs.release-version.result == 'success' &&
       needs.changes.outputs.components != '[]'
     runs-on: windows-2022
     environment: ecr-production
     timeout-minutes: 25
+
     permissions:
       contents: read
       id-token: write
+
     strategy:
       fail-fast: false
       matrix:
         component: ${{ fromJSON(needs.changes.outputs.components) }}
+
     env:
       AWS_REGION: ${{ secrets.AWS_ENV_REGION }}
       AWS_ROLE_ARN: arn:aws:iam::${{ secrets.AWS_ENV_ACCOUNT }}:role/${{ secrets.AWS_ENV_OIDC_ROLE }}
@@ -324,9 +781,11 @@ jobs:
       ECR_API_REPOSITORY: ${{ vars.ECR_API_REPOSITORY }}
       ECR_INTERNAL_REPOSITORY: ${{ vars.ECR_INTERNAL_REPOSITORY }}
       ECR_EXTERNAL_REPOSITORY: ${{ vars.ECR_EXTERNAL_REPOSITORY }}
+      VERSIONS_JSON: ${{ needs.release-version.outputs.versions }}
+
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v7.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
@@ -336,69 +795,85 @@ jobs:
         run: |
           set -euo pipefail
 
-          test -n "${EXPECTED_AWS_ACCOUNT_ID}" || {
-            echo "::error::Repository variable EXPECTED_AWS_ACCOUNT_ID is not configured."
-            exit 1
-          }
-          test -n "${EXPECTED_AWS_REGION}" || {
-            echo "::error::Repository variable EXPECTED_AWS_REGION is not configured."
-            exit 1
-          }
-          [[ "${EXPECTED_AWS_ACCOUNT_ID}" =~ ^[0-9]{12}$ ]] || {
-            echo "::error::EXPECTED_AWS_ACCOUNT_ID must contain exactly 12 digits."
-            exit 1
-          }
-          [[ "${AWS_REGION}" == "${EXPECTED_AWS_REGION}" ]] || {
-            echo "::error::AWS_ENV_REGION does not match EXPECTED_AWS_REGION."
-            exit 1
-          }
-
           case "${{ matrix.component }}" in
-            api) ECR_REPOSITORY="${ECR_API_REPOSITORY}" ;;
-            internalweb) ECR_REPOSITORY="${ECR_INTERNAL_REPOSITORY}" ;;
-            externalweb) ECR_REPOSITORY="${ECR_EXTERNAL_REPOSITORY}" ;;
+            api)
+              ECR_REPOSITORY="${ECR_API_REPOSITORY}"
+              ;;
+            internalweb)
+              ECR_REPOSITORY="${ECR_INTERNAL_REPOSITORY}"
+              ;;
+            externalweb)
+              ECR_REPOSITORY="${ECR_EXTERNAL_REPOSITORY}"
+              ;;
             *)
               echo "::error::Unsupported component: ${{ matrix.component }}"
               exit 1
               ;;
           esac
 
+          RELEASE_VERSION="$(jq -er --arg component "${{ matrix.component }}" \
+            '.[$component]' <<< "${VERSIONS_JSON}")"
+
+          test -n "${EXPECTED_AWS_ACCOUNT_ID}" || {
+            echo "::error::EXPECTED_AWS_ACCOUNT_ID is not configured."
+            exit 1
+          }
+
+          test -n "${EXPECTED_AWS_REGION}" || {
+            echo "::error::EXPECTED_AWS_REGION is not configured."
+            exit 1
+          }
+
+          [[ "${EXPECTED_AWS_ACCOUNT_ID}" =~ ^[0-9]{12}$ ]] || {
+            echo "::error::EXPECTED_AWS_ACCOUNT_ID must contain exactly 12 digits."
+            exit 1
+          }
+
+          [[ "${AWS_REGION}" == "${EXPECTED_AWS_REGION}" ]] || {
+            echo "::error::AWS_REGION does not match EXPECTED_AWS_REGION."
+            exit 1
+          }
+
           test -n "${ECR_REPOSITORY}" || {
             echo "::error::No ECR repository is configured for ${{ matrix.component }}."
             exit 1
           }
 
+          [[ "${RELEASE_VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
+            echo "::error::Invalid calculated release version '${RELEASE_VERSION}'."
+            exit 1
+          }
+
           EXPECTED_ROLE_PREFIX="arn:aws:iam::${EXPECTED_AWS_ACCOUNT_ID}:role/"
+
           [[ "${AWS_ROLE_ARN}" == "${EXPECTED_ROLE_PREFIX}"* && "${AWS_ROLE_ARN}" != "${EXPECTED_ROLE_PREFIX}" ]] || {
-            echo "::error::Check AWS_ENV_ACCOUNT and AWS_ENV_OIDC_ROLE; the role ARN must reference the expected account and include a role name."
+            echo "::error::The OIDC role ARN must reference the expected AWS account and include a role name."
             exit 1
           }
 
           echo "ecr_repository=${ECR_REPOSITORY}" >> "${GITHUB_OUTPUT}"
+          echo "release_version=${RELEASE_VERSION}" >> "${GITHUB_OUTPUT}"
 
-      # Reuses the exact image container-validation already built and validated for
-      # this commit, instead of building it again from scratch.
       - name: Download validated image artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: ptl-image-${{ matrix.component }}-${{ github.run_id }}
           path: ${{ runner.temp }}
 
-      # windows-2022 runners don't guarantee the Docker Engine service is already
-      # running - start it and wait for the daemon to accept connections first.
       - name: Start Docker service
         shell: pwsh
         run: |
           Start-Service -Name Docker -ErrorAction SilentlyContinue
-
           $maxAttempts = 30
           $attempt = 0
+
           while ($attempt -lt $maxAttempts) {
             try {
               docker ps | Out-Null
               Write-Host "Docker is running"
               exit 0
-            } catch {
+            }
+            catch {
               $attempt++
               Start-Sleep -Seconds 1
             }
@@ -451,14 +926,16 @@ jobs:
         with:
           role-to-assume: ${{ env.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
-          role-session-name: ptl-exr-${{ github.run_id }}-${{ matrix.component }}
+          role-session-name: ptl-${{ github.run_id }}-${{ matrix.component }}
           audience: sts.amazonaws.com
 
       - name: Verify assumed AWS account
         shell: bash
         run: |
           set -euo pipefail
+
           ACTUAL_ACCOUNT_ID="$(aws sts get-caller-identity --query Account --output text)"
+
           [[ "${ACTUAL_ACCOUNT_ID}" == "${EXPECTED_AWS_ACCOUNT_ID}" ]] || {
             echo "::error::The assumed AWS account does not match EXPECTED_AWS_ACCOUNT_ID."
             exit 1
@@ -470,56 +947,147 @@ jobs:
         with:
           mask-password: true
 
-      - name: Publish immutable image tag
+      - name: Publish immutable versioned image
         id: image
         shell: bash
         env:
           ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+          ECR_REPOSITORY: ${{ steps.component.outputs.ecr_repository }}
+          RELEASE_VERSION: ${{ steps.component.outputs.release_version }}
         run: |
           set -euo pipefail
-          IMAGE_TAG="sha-${GITHUB_SHA::12}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
-          IMAGE_URI="${ECR_REGISTRY}/${{ steps.component.outputs.ecr_repository }}:${IMAGE_TAG}"
 
-          docker tag "ptl-${{ matrix.component }}:${GITHUB_SHA}" "${IMAGE_URI}"
-          docker push "${IMAGE_URI}"
+          LOCAL_IMAGE="ptl-${{ matrix.component }}:${GITHUB_SHA}"
+          CANDIDATE_TAG="${{ matrix.component }}-sha-${GITHUB_SHA::12}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          CANDIDATE_URI="${ECR_REGISTRY}/${ECR_REPOSITORY}:${CANDIDATE_TAG}"
+
+          docker tag "${LOCAL_IMAGE}" "${CANDIDATE_URI}"
+          docker push "${CANDIDATE_URI}"
 
           IMAGE_DIGEST="$(aws ecr describe-images \
-            --repository-name "${{ steps.component.outputs.ecr_repository }}" \
-            --image-ids imageTag="${IMAGE_TAG}" \
+            --registry-id "${EXPECTED_AWS_ACCOUNT_ID}" \
+            --repository-name "${ECR_REPOSITORY}" \
+            --image-ids imageTag="${CANDIDATE_TAG}" \
             --query 'imageDetails[0].imageDigest' \
             --output text)"
 
+          [[ "${IMAGE_DIGEST}" =~ ^sha256:[0-9a-f]{64}$ ]] || {
+            echo "::error::ECR returned an invalid image digest '${IMAGE_DIGEST}'."
+            exit 1
+          }
+
+          DIGEST_HEX="${IMAGE_DIGEST#sha256:}"
+          DIGEST_SUFFIX="${DIGEST_HEX: -8}"
+          RELEASE_TAG="v${RELEASE_VERSION}-${DIGEST_SUFFIX}"
+          RELEASE_URI="${ECR_REGISTRY}/${ECR_REPOSITORY}:${RELEASE_TAG}"
+
+          EXISTING_DIGEST="$(aws ecr describe-images \
+            --registry-id "${EXPECTED_AWS_ACCOUNT_ID}" \
+            --repository-name "${ECR_REPOSITORY}" \
+            --image-ids imageTag="${RELEASE_TAG}" \
+            --query 'imageDetails[0].imageDigest' \
+            --output text 2>/dev/null || true)"
+
+          if [[ -n "${EXISTING_DIGEST}" && "${EXISTING_DIGEST}" != "None" ]]; then
+            if [[ "${EXISTING_DIGEST}" != "${IMAGE_DIGEST}" ]]; then
+              echo "::error::Immutable tag ${RELEASE_TAG} already points to another digest."
+              exit 1
+            fi
+
+            echo "${RELEASE_TAG} already points to the expected digest; continuing safely."
+          else
+            IMAGE_MANIFEST="$(aws ecr batch-get-image \
+              --registry-id "${EXPECTED_AWS_ACCOUNT_ID}" \
+              --repository-name "${ECR_REPOSITORY}" \
+              --image-ids imageDigest="${IMAGE_DIGEST}" \
+              --accepted-media-types \
+                application/vnd.docker.distribution.manifest.v2+json \
+                application/vnd.oci.image.manifest.v1+json \
+              --query 'images[0].imageManifest' \
+              --output text)"
+
+            test -n "${IMAGE_MANIFEST}" || {
+              echo "::error::Unable to retrieve the ECR image manifest."
+              exit 1
+            }
+
+            aws ecr put-image \
+              --registry-id "${EXPECTED_AWS_ACCOUNT_ID}" \
+              --repository-name "${ECR_REPOSITORY}" \
+              --image-tag "${RELEASE_TAG}" \
+              --image-manifest "${IMAGE_MANIFEST}" \
+              >/dev/null
+          fi
+
+          RELEASE_DIGEST="$(aws ecr describe-images \
+            --registry-id "${EXPECTED_AWS_ACCOUNT_ID}" \
+            --repository-name "${ECR_REPOSITORY}" \
+            --image-ids imageTag="${RELEASE_TAG}" \
+            --query 'imageDetails[0].imageDigest' \
+            --output text)"
+
+          if [[ "${RELEASE_DIGEST}" != "${IMAGE_DIGEST}" ]]; then
+            echo "::error::Release tag digest does not match the validated candidate digest."
+            exit 1
+          fi
+
           {
-            echo "image_uri=${IMAGE_URI}"
+            echo "image_tag=${RELEASE_TAG}"
+            echo "image_uri=${RELEASE_URI}"
             echo "image_digest=${IMAGE_DIGEST}"
+            echo "candidate_tag=${CANDIDATE_TAG}"
+            echo "digest_suffix=${DIGEST_SUFFIX}"
           } >> "${GITHUB_OUTPUT}"
 
       - name: Write publishing summary
         shell: bash
+        env:
+          IMAGE_TAG: ${{ steps.image.outputs.image_tag }}
+          IMAGE_URI: ${{ steps.image.outputs.image_uri }}
+          IMAGE_DIGEST: ${{ steps.image.outputs.image_digest }}
+          CANDIDATE_TAG: ${{ steps.image.outputs.candidate_tag }}
+          RELEASE_VERSION: ${{ steps.component.outputs.release_version }}
         run: |
           {
-            echo "### PT-LIMS ${{ matrix.component }} image published"
+            echo "### PT-LIMS ${{ matrix.component }} production image"
             echo
-            echo "- Image: \`${{ steps.image.outputs.image_uri }}\`"
-            echo "- Digest: \`${{ steps.image.outputs.image_digest }}\`"
-            echo "- Commit: \`${GITHUB_SHA}\`"
+            echo "- Release version: v${RELEASE_VERSION}"
+            echo "- ECR release tag: ${IMAGE_TAG}"
+            echo "- Image URI: ${IMAGE_URI}"
+            echo "- Immutable digest: ${IMAGE_DIGEST}"
+            echo "- Candidate tag: ${CANDIDATE_TAG}"
+            echo "- Commit: ${GITHUB_SHA}"
           } >> "${GITHUB_STEP_SUMMARY}"
 
   gate:
-    name: CI gate
-    needs: [changes, quality, sonarcloud, container-validation, publish]
+    name: CI and publication gate
+    needs:
+      - changes
+      - release-label-validation
+      - quality
+      - sonarcloud
+      - container-validation
+      - release-version
+      - publish
     if: always()
     runs-on: windows-2022
     timeout-minutes: 5
+
+    permissions: {}
+
     env:
       CHANGES_RESULT: ${{ needs.changes.result }}
+      LABEL_RESULT: ${{ needs.release-label-validation.result }}
       QUALITY_RESULT: ${{ needs.quality.result }}
       SONAR_RESULT: ${{ needs.sonarcloud.result }}
       CONTAINER_RESULT: ${{ needs.container-validation.result }}
+      VERSION_RESULT: ${{ needs.release-version.result }}
       PUBLISH_RESULT: ${{ needs.publish.result }}
       COMPONENTS: ${{ needs.changes.outputs.components }}
       SONAR_ENABLED: ${{ vars.SONAR_ENABLED }}
       EVENT_NAME: ${{ github.event_name }}
+      GIT_REF: ${{ github.ref }}
+
     steps:
       - name: Enforce required results
         shell: bash
@@ -536,6 +1104,11 @@ jobs:
             exit 1
           }
 
+          if [[ "${EVENT_NAME}" == "pull_request" && "${LABEL_RESULT}" != "success" ]]; then
+            echo "::error::Component release-label validation result: ${LABEL_RESULT}"
+            exit 1
+          fi
+
           if [[ "${SONAR_ENABLED}" == "true" && "${SONAR_RESULT}" != "success" ]]; then
             echo "::error::SonarCloud is enabled but result is ${SONAR_RESULT}."
             exit 1
@@ -546,9 +1119,123 @@ jobs:
             exit 1
           fi
 
-          if [[ "${EVENT_NAME}" =~ ^(push|workflow_dispatch)$ && "${COMPONENTS}" != "[]" && "${PUBLISH_RESULT}" != "success" ]]; then
-            echo "::error::Image publishing result: ${PUBLISH_RESULT}"
-            exit 1
+          if [[ "${EVENT_NAME}" =~ ^(push|workflow_dispatch)$ && \
+                "${GIT_REF}" == "refs/heads/main" && \
+                "${COMPONENTS}" != "[]" ]]; then
+            [[ "${VERSION_RESULT}" == "success" ]] || {
+              echo "::error::Release-version result: ${VERSION_RESULT}"
+              exit 1
+            }
+
+            [[ "${PUBLISH_RESULT}" == "success" ]] || {
+              echo "::error::Image publication result: ${PUBLISH_RESULT}"
+              exit 1
+            }
           fi
 
-          echo "All required CI checks passed."
+          echo "All required CI and publication checks passed."
+
+  finalise-release:
+    name: Create immutable component Git tags
+    needs:
+      - changes
+      - release-version
+      - publish
+      - gate
+    if: >-
+      needs.gate.result == 'success' &&
+      needs.publish.result == 'success' &&
+      needs.release-version.result == 'success' &&
+      needs.changes.outputs.components != '[]' &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch') &&
+      github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout full history
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Create annotated component release tags
+        id: tags
+        shell: bash
+        env:
+          COMPONENTS_JSON: ${{ needs.changes.outputs.components }}
+          GIT_TAGS_JSON: ${{ needs.release-version.outputs.git_tags }}
+          RELEASE_TYPES_JSON: ${{ needs.release-version.outputs.release_types }}
+          PR_NUMBER: ${{ needs.release-version.outputs.pull_request }}
+        run: |
+          set -euo pipefail
+
+          git fetch --tags --force
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+
+          TAG_REFS_TO_PUSH=()
+          CREATED_TAGS='[]'
+
+          while IFS= read -r COMPONENT; do
+            RELEASE_TAG="$(jq -er --arg component "${COMPONENT}" \
+              '.[$component]' <<< "${GIT_TAGS_JSON}")"
+            RELEASE_TYPE="$(jq -er --arg component "${COMPONENT}" \
+              '.[$component]' <<< "${RELEASE_TYPES_JSON}")"
+
+            EXISTING_COMMIT="$(git rev-list -n 1 "${RELEASE_TAG}" 2>/dev/null || true)"
+
+            if [[ -n "${EXISTING_COMMIT}" ]]; then
+              if [[ "${EXISTING_COMMIT}" != "${GITHUB_SHA}" ]]; then
+                echo "::error::${RELEASE_TAG} already points to ${EXISTING_COMMIT}."
+                exit 1
+              fi
+
+              echo "${RELEASE_TAG} already points to this release commit."
+            else
+              MESSAGE="PT-LIMS ${COMPONENT} production release ${RELEASE_TAG}; increment=${RELEASE_TYPE}"
+
+              if [[ -n "${PR_NUMBER}" ]]; then
+                MESSAGE="${MESSAGE}; PR #${PR_NUMBER}"
+              fi
+
+              git tag -a "${RELEASE_TAG}" "${GITHUB_SHA}" -m "${MESSAGE}"
+              TAG_REFS_TO_PUSH+=("refs/tags/${RELEASE_TAG}")
+            fi
+
+            CREATED_TAGS="$(jq -c --arg tag "${RELEASE_TAG}" '. + [$tag]' \
+              <<< "${CREATED_TAGS}")"
+          done < <(jq -r '.[]' <<< "${COMPONENTS_JSON}")
+
+          if (( ${#TAG_REFS_TO_PUSH[@]} > 0 )); then
+            git push --atomic origin "${TAG_REFS_TO_PUSH[@]}"
+          fi
+
+          echo "created_tags=${CREATED_TAGS}" >> "${GITHUB_OUTPUT}"
+
+      - name: Write release summary
+        shell: bash
+        env:
+          COMPONENTS_JSON: ${{ needs.changes.outputs.components }}
+          GIT_TAGS_JSON: ${{ needs.release-version.outputs.git_tags }}
+          RELEASE_TYPES_JSON: ${{ needs.release-version.outputs.release_types }}
+        run: |
+          {
+            echo "### PT-LIMS production releases finalised"
+            echo
+            echo "| Component | Git tag | Increment |"
+            echo "|---|---|---|"
+
+            while IFS= read -r COMPONENT; do
+              RELEASE_TAG="$(jq -er --arg component "${COMPONENT}" \
+                '.[$component]' <<< "${GIT_TAGS_JSON}")"
+              RELEASE_TYPE="$(jq -er --arg component "${COMPONENT}" \
+                '.[$component]' <<< "${RELEASE_TYPES_JSON}")"
+              echo "| ${COMPONENT} | ${RELEASE_TAG} | ${RELEASE_TYPE} |"
+            done < <(jq -r '.[]' <<< "${COMPONENTS_JSON}")
+
+            echo
+            echo "- Commit: ${GITHUB_SHA}"
+          } >> "${GITHUB_STEP_SUMMARY}"
