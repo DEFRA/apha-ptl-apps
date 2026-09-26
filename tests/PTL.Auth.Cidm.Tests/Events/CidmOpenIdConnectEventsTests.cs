@@ -118,10 +118,14 @@ public class CidmOpenIdConnectEventsTests
     [Fact]
     public async Task TokenValidated_PrincipalWithoutClaimsIdentity_ReturnsWithoutThrowing()
     {
+        var principal = new ClaimsPrincipal();
         var context = new TokenValidatedContext(
-            new DefaultHttpContext(), CreateScheme(), new OpenIdConnectOptions(), new ClaimsPrincipal(), new AuthenticationProperties());
+            new DefaultHttpContext(), CreateScheme(), new OpenIdConnectOptions(), principal, new AuthenticationProperties());
 
-        await CreateEvents().TokenValidated(context);
+        var exception = await Record.ExceptionAsync(() => CreateEvents().TokenValidated(context));
+
+        Assert.Null(exception);
+        Assert.Empty(principal.Claims);
     }
 
     [Fact]
