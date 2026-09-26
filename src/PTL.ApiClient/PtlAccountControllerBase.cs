@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace PTL.ApiClient;
@@ -17,6 +18,7 @@ public abstract class PtlAccountControllerBase<T> : Controller where T : class, 
     protected abstract T CreateLoginModel(string? returnUrl = null);
 
     [HttpGet]
+    [AllowAnonymous]
     public virtual IActionResult Login(string? returnUrl = null)
     {
         var model = CreateLoginModel(returnUrl);
@@ -24,6 +26,7 @@ public abstract class PtlAccountControllerBase<T> : Controller where T : class, 
     }
 
     [HttpPost]
+    [AllowAnonymous]
     [ValidateAntiForgeryToken]
     public virtual async Task<IActionResult> Login(T model)
     {
@@ -37,6 +40,7 @@ public abstract class PtlAccountControllerBase<T> : Controller where T : class, 
     }
 
     [HttpPost]
+    [AllowAnonymous]
     [ValidateAntiForgeryToken]
     public virtual Task<IActionResult> Logout() => SignOutAndRedirectToHomeAsync();
 

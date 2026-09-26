@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using PTL.ApiClient;
 using PTL.Auth.Cidm;
@@ -61,6 +62,7 @@ namespace PTL.ExternalWeb.Features.Account
         }
 
         [HttpGet]
+        [AllowAnonymous]
         public IActionResult SignedOut() => View();
     }
 }

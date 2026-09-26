@@ -3,13 +3,8 @@
 }
 
 <div class="text-center">
-    @if (User?.Identity?.IsAuthenticated ?? false)
-    {
-        <h1 class="display-4">Welcome, @User.Identity.Name</h1>
-    }
-    else
-    {
-        <h1 class="display-4">Welcome</h1>
-    }
+    @* Index requires authentication (the app's default authorization policy), so User.Identity is
+       always authenticated here - no anonymous fallback branch needed. *@
+    <h1 class="display-4">Welcome, @User.Identity!.Name</h1>
     <p>Learn about <a href="https://learn.microsoft.com/aspnet/core">building Web apps with ASP.NET Core</a>.</p>
 </div>
