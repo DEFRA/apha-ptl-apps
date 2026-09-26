@@ -2,6 +2,7 @@ using PTL.ApiClient;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.AddPtlWebFrontEnd();
+builder.AddPtlDefaultCookieAuthentication();
 
 var app = builder.Build();
 app.UsePtlWebFrontEnd();
