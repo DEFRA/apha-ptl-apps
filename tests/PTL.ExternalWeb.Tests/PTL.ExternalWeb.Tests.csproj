@@ -8,7 +8,14 @@
     <!-- PTL.ExternalWeb owns the web UI, not the shared API client or DTO libraries it consumes.
          Keep the coverage gate focused on the application itself by excluding transitively loaded
          support assemblies that already have their own coverage baselines. -->
-    <Exclude>[PTL.ApiClient]*,[PTL.Common]*,[PTL.Contracts]*</Exclude>
+    <Exclude>[PTL.ApiClient]*,[PTL.Common]*,[PTL.Contracts]*,[PTL.Auth.Cidm]*</Exclude>
+    <!-- The shared username/password Login view is compiled into this assembly via the linked Content
+         item below, but AccountController never renders it here (Login(GET) always challenges CIDM
+         instead) - it's exercised by PTL.InternalWeb.Tests, which still uses it for real. Combined
+         with Program.cs's own exclusion (inherited from tests/Directory.Build.props) using a comma,
+         not a semicolon - Coverlet's glob-list parser silently stops excluding anything once more than
+         one semicolon-separated pattern is present. -->
+    <ExcludeByFile>**/Program.cs,**/Shared/Views/Account/Login.cshtml</ExcludeByFile>
   </PropertyGroup>
 
   <ItemGroup>

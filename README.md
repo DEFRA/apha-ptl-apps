@@ -136,6 +136,30 @@ dependency issue even though it can still serve everything that doesn't need Api
   unreachable - Degraded still returns HTTP `200` from the health check middleware by default, so it's
   visible in the JSON body to a monitoring tool without ever affecting ALB/ECS routing decisions.
 
+## CIDM authentication (PTL.ExternalWeb)
+
+`PTL.ExternalWeb` signs users in via DEFRA Customer Identity (CIDM) - OpenID Connect on top of Azure AD B2C
+(`PTL.Auth.Cidm`). `PTL.InternalWeb` is unaffected (separate Entra ID/SAML work, out of scope here) and
+keeps its own plain cookie auth via `AddPtlDefaultCookieAuthentication()`.
+
+Five values are required, none of them ever committed to source control (not even the non-secret ones):
+
+| Config key | Env var (task definition `name`) | Local source |
+|---|---|---|
+| `Cidm:ClientId` | `Cidm__ClientId` | `dotnet user-secrets` |
+| `Cidm:ClientSecret` | `Cidm__ClientSecret` | `dotnet user-secrets` |
+| `Cidm:ServiceId` | `Cidm__ServiceId` | `dotnet user-secrets` |
+| `Cidm:Address` | `Cidm__Address` | `dotnet user-secrets` |
+| `Cidm:Policy` | `Cidm__Policy` | `dotnet user-secrets` |
+
+```powershell
+dotnet user-secrets set "Cidm:ClientId" "<client-id>"
+dotnet user-secrets set "Cidm:ClientSecret" "<client-secret>"
+dotnet user-secrets set "Cidm:ServiceId" "<service-id>"
+dotnet user-secrets set "Cidm:Address" "https://your-account.cpdev.cui.defra.gov.uk/idphub/b2c"
+dotnet user-secrets set "Cidm:Policy" "b2c_1a_cui_cpdev_signupsignin"
+```
+
 ## Code Quality
 
 - **`.editorconfig`** defines formatting and style conventions.

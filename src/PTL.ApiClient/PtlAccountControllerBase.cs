@@ -17,7 +17,7 @@ public abstract class PtlAccountControllerBase<T> : Controller where T : class, 
     protected abstract T CreateLoginModel(string? returnUrl = null);
 
     [HttpGet]
-    public IActionResult Login(string? returnUrl = null)
+    public virtual IActionResult Login(string? returnUrl = null)
     {
         var model = CreateLoginModel(returnUrl);
         return View(model);
@@ -25,7 +25,7 @@ public abstract class PtlAccountControllerBase<T> : Controller where T : class, 
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Login(T model)
+    public virtual async Task<IActionResult> Login(T model)
     {
         if (model == null || string.IsNullOrWhiteSpace(model.Username) || string.IsNullOrWhiteSpace(model.Password))
         {
@@ -38,7 +38,7 @@ public abstract class PtlAccountControllerBase<T> : Controller where T : class, 
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public Task<IActionResult> Logout() => SignOutAndRedirectToHomeAsync();
+    public virtual Task<IActionResult> Logout() => SignOutAndRedirectToHomeAsync();
 
     protected async Task<IActionResult> SignInAndRedirectAsync(IAccountCredentials model)
     {

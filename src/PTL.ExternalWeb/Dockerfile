@@ -4,11 +4,13 @@
 FROM mcr.microsoft.com/dotnet/sdk:10.0-windowsservercore-ltsc2022 AS build
 WORKDIR /src
 
-# PTL.ExternalWeb references PTL.ApiClient, which references PTL.Contracts.
+# PTL.ExternalWeb references PTL.ApiClient, which references PTL.Contracts. It also references
+# PTL.Auth.Cidm directly (CIDM OpenID Connect authentication).
 # All referenced .csproj files must be copied before restore so transitive
 # ProjectReference restores can resolve correctly and use cache invalidation.
 COPY ["src/PTL.ExternalWeb/PTL.ExternalWeb.csproj", "src/PTL.ExternalWeb/"]
 COPY ["src/PTL.ApiClient/PTL.ApiClient.csproj", "src/PTL.ApiClient/"]
+COPY ["src/PTL.Auth.Cidm/PTL.Auth.Cidm.csproj", "src/PTL.Auth.Cidm/"]
 COPY ["src/PTL.Contracts/PTL.Contracts.csproj", "src/PTL.Contracts/"]
 COPY ["src/PTL.Common/PTL.Common.csproj", "src/PTL.Common/"]
 

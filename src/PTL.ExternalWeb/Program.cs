@@ -1,7 +1,9 @@
 using PTL.ApiClient;
+using PTL.Auth.Cidm;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.AddPtlWebFrontEnd();
+builder.AddCidmAuthentication();
 
 var app = builder.Build();
 app.UsePtlWebFrontEnd();
