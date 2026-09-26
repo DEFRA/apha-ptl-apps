@@ -10,8 +10,13 @@
        counts Program.cs's lines as "to cover" from its own source scan but finds no coverage data
        for it at all, which drags the reported percentage towards 0 instead of just being N/A.
        Test code itself is excluded from the coverage requirement, not from analysis, to avoid
-       trivially-covered test methods inflating the number the other way. -->
-  <Property Name="sonar.coverage.exclusions">**/Program.cs,**/Properties/AssemblyInfo.cs,tests/**</Property>
+       trivially-covered test methods inflating the number the other way.
+       CidmAuthenticationExtensions.cs is the same situation: pure DI wiring exercised end-to-end via
+       PTL.ExternalWeb.Tests' WebApplicationFactory-based integration tests (which run the real
+       Program.cs -> AddCidmAuthentication path) rather than PTL.Auth.Cidm.Tests - Coverlet's
+       ExcludeByFile only affects that project's own pass/fail threshold, not what Sonar sees in the
+       raw cobertura report, so it needs the same explicit exclusion here. -->
+  <Property Name="sonar.coverage.exclusions">**/Program.cs,**/Properties/AssemblyInfo.cs,tests/**,**/CidmAuthenticationExtensions.cs</Property>
 
   <!-- Report locations produced by `dotnet test` in the CI pipeline -->
   <Property Name="sonar.cs.vstest.reportsPaths">**/*.trx</Property>
