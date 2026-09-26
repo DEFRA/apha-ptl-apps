@@ -116,6 +116,15 @@ public class CidmOpenIdConnectEventsTests
     }
 
     [Fact]
+    public async Task TokenValidated_PrincipalWithoutClaimsIdentity_ReturnsWithoutThrowing()
+    {
+        var context = new TokenValidatedContext(
+            new DefaultHttpContext(), CreateScheme(), new OpenIdConnectOptions(), new ClaimsPrincipal(), new AuthenticationProperties());
+
+        await CreateEvents().TokenValidated(context);
+    }
+
+    [Fact]
     public async Task RemoteFailure_HandlesResponseAndRedirectsToGenericErrorPage()
     {
         var httpContext = new DefaultHttpContext();

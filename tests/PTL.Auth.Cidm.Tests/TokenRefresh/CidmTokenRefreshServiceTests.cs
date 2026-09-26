@@ -41,6 +41,23 @@ public class CidmTokenRefreshServiceTests
     }
 
     [Fact]
+    public async Task RefreshAsync_NoConfigurationManager_ReturnsFailed()
+    {
+        var services = new ServiceCollection();
+        services.AddHttpClient(CidmTokenRefreshService.HttpClientName)
+            .ConfigurePrimaryHttpMessageHandler(() => new FakeHttpMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)));
+        var provider = services.BuildServiceProvider();
+        var service = new CidmTokenRefreshService(
+            provider.GetRequiredService<IHttpClientFactory>(),
+            new FakeOptionsMonitor<OpenIdConnectOptions>(new OpenIdConnectOptions()),
+            Microsoft.Extensions.Options.Options.Create(TestCidmOptions));
+
+        var result = await service.RefreshAsync("old-refresh-token", "https://app.test/signin-oidc");
+
+        Assert.False(result.Succeeded);
+    }
+
+    [Fact]
     public async Task RefreshAsync_SuccessfulResponse_ReturnsNewTokens()
     {
         var handler = new FakeHttpMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)
