@@ -6,12 +6,16 @@ using PTL.Common.Correlation;
 using PTL.Common.Health;
 using PTL.Core.Contract;
 using PTL.Core.Contract.ImportPermit;
+using PTL.Core.Contract.Renewal;
+using PTL.Core.Contract.SampleAddress;
 using PTL.Core.Customer;
 using PTL.Core.Lookup;
 using PTL.Core.Participant;
 using PTL.Core.Scheme;
 using PTL.Data.Contract;
 using PTL.Data.Contract.ImportPermit;
+using PTL.Data.Contract.Renewal;
+using PTL.Data.Contract.SampleAddress;
 using PTL.Data.Customer;
 using PTL.Data.Infrastructure;
 using PTL.Data.Lookup;
@@ -65,6 +69,12 @@ builder.Services.AddScoped<IContractService, ContractService>();
 
 builder.Services.AddScoped<IImportPermitRepository, ImportPermitRepository>();
 builder.Services.AddScoped<IImportPermitService, ImportPermitService>();
+
+builder.Services.AddScoped<ISampleAddressRepository, SampleAddressRepository>();
+builder.Services.AddScoped<ISampleAddressService, SampleAddressService>();
+
+builder.Services.AddScoped<IContractRenewalRepository, ContractRenewalRepository>();
+builder.Services.AddScoped<IContractRenewalService, ContractRenewalService>();
 
 builder.Services.AddScoped<ISchemeRepository, SchemeRepository>();
 builder.Services.AddScoped<ISchemeService, SchemeService>();

@@ -80,6 +80,12 @@ public static class ApiClientServiceCollectionExtensions
         })
             .AddStandardResilienceHandler();
 
+        services.AddHttpClient<IContractExportApiClient, ContractExportApiClient>(client =>
+        {
+            client.BaseAddress = new Uri(apiBaseUrl);
+        })
+            .AddStandardResilienceHandler();
+
         services.AddHealthChecks()
             .AddCheck<ApiConnectivityHealthCheck>("api-connectivity");
 

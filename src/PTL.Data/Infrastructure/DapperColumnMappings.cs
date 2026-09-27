@@ -2,6 +2,8 @@ using System.Reflection;
 using Dapper;
 using PTL.Core.Contract;
 using PTL.Core.Contract.ImportPermit;
+using PTL.Core.Contract.Renewal;
+using PTL.Core.Contract.SampleAddress;
 using PTL.Core.Customer;
 using PTL.Core.Lookup;
 using PTL.Core.Participant;
@@ -336,6 +338,60 @@ public static class DapperColumnMappings
             ["fldIdentifier"] = nameof(GroupAddressEntity.Identifier),
             ["fldAddress1"] = nameof(GroupAddressEntity.Address1),
             ["fldCountryId"] = nameof(GroupAddressEntity.CountryId),
+        });
+
+        Map<SampleAddressEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldContractId"] = nameof(SampleAddressEntity.ContractId),
+            ["fldParticipantId"] = nameof(SampleAddressEntity.ParticipantId),
+            ["fldQalNumber"] = nameof(SampleAddressEntity.QalNumber),
+            ["fldLabCode"] = nameof(SampleAddressEntity.LabCode),
+            ["fldContactName"] = nameof(SampleAddressEntity.ContactName),
+            ["fldOrganisation"] = nameof(SampleAddressEntity.Organisation),
+            ["fldAddress1"] = nameof(SampleAddressEntity.Address1),
+            ["fldAddress2"] = nameof(SampleAddressEntity.Address2),
+            ["fldAddress3"] = nameof(SampleAddressEntity.Address3),
+            ["fldAddress4"] = nameof(SampleAddressEntity.Address4),
+            ["fldAddress5"] = nameof(SampleAddressEntity.Address5),
+            ["fldCountry"] = nameof(SampleAddressEntity.Country),
+            ["fldTelephone"] = nameof(SampleAddressEntity.Telephone),
+            ["fldFax"] = nameof(SampleAddressEntity.Fax),
+            ["fldEmail"] = nameof(SampleAddressEntity.Email),
+            ["fldVatNumber"] = nameof(SampleAddressEntity.VatNumber),
+            ["fldAccountNumber"] = nameof(SampleAddressEntity.AccountNumber),
+            ["fldVatRating"] = nameof(SampleAddressEntity.VatRating),
+            ["fldPurchaseOrderNumber"] = nameof(SampleAddressEntity.PurchaseOrderNumber),
+        });
+
+        Map<SampleAddressSchemeEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldContractId"] = nameof(SampleAddressSchemeEntity.ContractId),
+            ["fldParticipantId"] = nameof(SampleAddressSchemeEntity.ParticipantId),
+            ["fldParticipantSchemeId"] = nameof(SampleAddressSchemeEntity.ParticipantSchemeId),
+            [ColName] = nameof(SampleAddressSchemeEntity.SchemeName),
+            ["fldIdentifier"] = nameof(SampleAddressSchemeEntity.SchemeIdentifier),
+            ["fldMonthsActive"] = nameof(SampleAddressSchemeEntity.MonthsActive),
+            ["fldWeekNumber"] = nameof(SampleAddressSchemeEntity.WeekNumber),
+        });
+
+        // ContractStartDate/ContractEndDate/RenewalInformation are computed aliases in
+        // spgaExportContractRenewal and carry no fld prefix.
+        Map<ContractRenewalEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldContractId"] = nameof(ContractRenewalEntity.ContractId),
+            [ColCustomerId] = nameof(ContractRenewalEntity.CustomerId),
+            ["fldQALNumber"] = nameof(ContractRenewalEntity.QalNumber),
+            ["fldOrganisation"] = nameof(ContractRenewalEntity.OrganisationName),
+            ["fldContactName"] = nameof(ContractRenewalEntity.ContactName),
+            ["fldAddress1"] = nameof(ContractRenewalEntity.Address1),
+            ["fldAddress2"] = nameof(ContractRenewalEntity.Address2),
+            ["fldAddress3"] = nameof(ContractRenewalEntity.Address3),
+            ["fldAddress4"] = nameof(ContractRenewalEntity.Address4),
+            ["fldAddress5"] = nameof(ContractRenewalEntity.Address5),
+            ["fldCountry"] = nameof(ContractRenewalEntity.Country),
+            ["ContractStartDate"] = nameof(ContractRenewalEntity.ContractStartDate),
+            ["ContractEndDate"] = nameof(ContractRenewalEntity.ContractEndDate),
+            ["RenewalInformation"] = nameof(ContractRenewalEntity.RenewalInformation),
         });
     }
 

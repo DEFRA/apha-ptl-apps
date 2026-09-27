@@ -1,14 +1,15 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging.Abstractions;
 using PTL.Contracts.Contract;
+using PTL.Core.Contract.Document;
 using PTL.InternalWeb.Tests.TestSupport;
 
 namespace PTL.InternalWeb.Tests.Features.Contract;
 
 public class ContractControllerTests
 {
-    private static PTL.InternalWeb.Features.Contract.ContractController CreateController(FakeContractApiClient apiClient, FakeCustomerApiClient? customerApiClient = null, FakeLookupApiClient? lookupApiClient = null, FakeImportPermitApiClient? importPermitApiClient = null) =>
-        new(apiClient, customerApiClient ?? new FakeCustomerApiClient(), lookupApiClient ?? new FakeLookupApiClient(), importPermitApiClient ?? new FakeImportPermitApiClient(), NullLogger<PTL.InternalWeb.Features.Contract.ContractController>.Instance);
+    private static PTL.InternalWeb.Features.Contract.ContractController CreateController(FakeContractApiClient apiClient, FakeCustomerApiClient? customerApiClient = null, FakeLookupApiClient? lookupApiClient = null, FakeImportPermitApiClient? importPermitApiClient = null, FakeContractDocumentService? documentService = null, FakeContractExportApiClient? contractExportApiClient = null) =>
+        new(apiClient, customerApiClient ?? new FakeCustomerApiClient(), lookupApiClient ?? new FakeLookupApiClient(), importPermitApiClient ?? new FakeImportPermitApiClient(), NullLogger<PTL.InternalWeb.Features.Contract.ContractController>.Instance, documentService ?? new FakeContractDocumentService(), contractExportApiClient ?? new FakeContractExportApiClient());
 
     private static ContractResponse SampleContract(Guid contractId, Guid customerId, bool isReadOnly = false) => new(
         contractId, customerId, "Sample Laboratories Ltd", "QAL/00001", DateTime.UtcNow.Year + 1, "UT12345",
@@ -75,6 +76,60 @@ public class ContractControllerTests
         InvoiceEmail: string.Empty, IsActive: true, CanOrderOnline: true, InactiveDate: null, CustomerStatusId: null);
 
     [Fact]
+    public async Task Export_ExistingContract_GeneratesDocxDownload()
+    {
+        var contractId = Guid.NewGuid();
+        var customerId = Guid.NewGuid();
+        var apiClient = new FakeContractApiClient
+        {
+            ContractResponse = SampleContract(contractId, customerId),
+            ItemsResponse = new ContractItemsResponse(
+                contractId,
+                "A",
+                DateTime.UtcNow.Year,
+                "QAL/00001",
+                "£",
+                0m,
+                10m,
+                0,
+                0m,
+                0m,
+                0,
+                0m,
+                0m,
+                0,
+                0m,
+                0m,
+                0m,
+                0m,
+                0m,
+                false,
+                [])
+        };
+
+        var customerApiClient = new FakeCustomerApiClient { CustomerResponse = SampleCustomer(customerId) };
+        var documentService = new FakeContractDocumentService
+        {
+            Response = new ContractDocumentResponse("Contract-ABC.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", [0x50, 0x4B, 0x03, 0x04])
+        };
+        var controller = new PTL.InternalWeb.Features.Contract.ContractController(
+            apiClient,
+            customerApiClient,
+            new FakeLookupApiClient(),
+            new FakeImportPermitApiClient(),
+            NullLogger<PTL.InternalWeb.Features.Contract.ContractController>.Instance,
+            documentService,
+            new FakeContractExportApiClient());
+
+        var result = await controller.Export(contractId, "Contract", CancellationToken.None);
+
+        var file = Assert.IsType<FileContentResult>(result);
+        Assert.Equal("Contract-ABC.docx", file.FileDownloadName);
+        Assert.Equal("application/vnd.openxmlformats-officedocument.wordprocessingml.document", file.ContentType);
+        Assert.Equal(new byte[] { 0x50, 0x4B, 0x03, 0x04 }, file.FileContents);
+    }
+
+    [Fact]
     public async Task Details_UnknownContract_ReturnsNotFound()
     {
         var controller = CreateController(new FakeContractApiClient { ContractResponse = null });
@@ -82,6 +137,111 @@ public class ContractControllerTests
         var result = await controller.Details(Guid.NewGuid(), CancellationToken.None);
 
         Assert.IsType<NotFoundResult>(result);
+    }
+
+    [Fact]
+    public async Task Export_UnknownDocumentType_ReturnsFeatureNotAvailable()
+    {
+        var contractId = Guid.NewGuid();
+        var controller = CreateController(new FakeContractApiClient { ContractResponse = SampleContract(contractId, Guid.NewGuid()) });
+
+        var result = await controller.Export(contractId, "Something Else", CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        Assert.Equal("FeatureNotAvailable", view.ViewName);
+    }
+
+    [Fact]
+    public async Task Export_UnknownContract_ReturnsNotFound()
+    {
+        var controller = CreateController(new FakeContractApiClient { ContractResponse = null });
+
+        var result = await controller.Export(Guid.NewGuid(), "Contract", CancellationToken.None);
+
+        Assert.IsType<NotFoundResult>(result);
+    }
+
+    [Fact]
+    public async Task Export_MissingTemplate_FallsBackToFeatureNotAvailable()
+    {
+        var contractId = Guid.NewGuid();
+        var controller = CreateController(
+            new FakeContractApiClient { ContractResponse = SampleContract(contractId, Guid.NewGuid()) },
+            documentService: new FakeContractDocumentService { ExceptionToThrow = new FileNotFoundException("no template") });
+
+        var result = await controller.Export(contractId, "Contract", CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        Assert.Equal("FeatureNotAvailable", view.ViewName);
+    }
+
+    [Fact]
+    public async Task Export_MapsLegacyMergeFieldsAndContractItemsRegion()
+    {
+        var contractId = Guid.NewGuid();
+        var customerId = Guid.NewGuid();
+        var schemeId = Guid.NewGuid();
+        var countryId = Guid.NewGuid();
+        var vatRatingId = Guid.NewGuid();
+
+        var apiClient = new FakeContractApiClient
+        {
+            ContractResponse = SampleContract(contractId, customerId),
+            ItemsResponse = new ContractItemsResponse(
+                contractId, "A", DateTime.UtcNow.Year, "QAL/00001", "£", 0.1m, 25m,
+                2, 5m, 10m, 3, 4m, 12m, 1, 6m, 6m, 9.5m, 85m, 95.5m, false,
+                [
+                    new ContractItemSchemeResponse(schemeId, "S1", "Salmonella",
+                    [
+                        new ContractItemResponse(Guid.NewGuid(), Guid.NewGuid(), "LAB1", "Lab One", "Lab One Ltd", 4, 42.5m, false, false)
+                    ])
+                ])
+        };
+
+        var customer = SampleCustomer(customerId) with
+        {
+            AccountNumber = "ACC-1",
+            VatNumber = "GB123",
+            VatRatingId = vatRatingId,
+            CountryId = countryId,
+            ContactName = "Alice Example"
+        };
+
+        var documentService = new FakeContractDocumentService
+        {
+            Response = new ContractDocumentResponse("Contract-QAL00001A.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", [0x50])
+        };
+
+        var controller = CreateController(
+            apiClient,
+            new FakeCustomerApiClient { CustomerResponse = customer },
+            new FakeLookupApiClient
+            {
+                Countries = [new PTL.Contracts.Lookup.CountryResponse(countryId, "United Kingdom")],
+                VatRatings = [new PTL.Contracts.Lookup.VatRatingResponse(vatRatingId, "Standard")]
+            },
+            documentService: documentService);
+
+        await controller.Export(contractId, "Contract", CancellationToken.None);
+
+        var request = Assert.IsType<ContractDocumentRequest>(documentService.LastRequest);
+        Assert.Equal("Contract", request.DocumentType);
+        Assert.Equal("ContractExampleTemplate", request.TemplateName);
+        Assert.Equal("QAL/00001", request.MergeValues["ContractNumber"]);
+        Assert.Equal("ACC-1", request.MergeValues["AccountNumber"]);
+        Assert.Equal("Standard", request.MergeValues["VatRating"]);
+        Assert.Equal("United Kingdom", request.MergeValues["Country"]);
+        Assert.Equal("£25.00", request.MergeValues["AdminCharge"]);
+        Assert.Equal("£95.50", request.MergeValues["ContractTotal"]);
+        Assert.Equal("10.00", request.MergeValues["DiscountRate"]);
+
+        var rows = Assert.IsAssignableFrom<IReadOnlyList<IReadOnlyDictionary<string, string>>>(
+            request.Regions!["ContractItems"]);
+        var row = Assert.Single(rows);
+        Assert.Equal("Salmonella", row["SchemeName"]);
+        Assert.Equal("Lab One Ltd", row["ParticipantName"]);
+        Assert.Equal("4", row["NumberOfDistributions"]);
+        Assert.Equal("£42.50", row["Price"]);
     }
 
     [Fact]

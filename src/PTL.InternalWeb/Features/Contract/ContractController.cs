@@ -4,12 +4,13 @@ using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.Extensions.Logging;
 using PTL.ApiClient;
 using PTL.Contracts.Contract;
+using PTL.Core.Contract.Document;
 
 namespace PTL.InternalWeb.Features.Contract;
 
 // Authentication/authorization are out of scope for this phase - assume the current user is
 // already authenticated with full access to Contract functionality. Policies will be added later.
-public class ContractController(IContractApiClient contractApiClient, ICustomerApiClient customerApiClient, ILookupApiClient lookupApiClient, IImportPermitApiClient importPermitApiClient, ILogger<ContractController> logger) : Controller
+public class ContractController(IContractApiClient contractApiClient, ICustomerApiClient customerApiClient, ILookupApiClient lookupApiClient, IImportPermitApiClient importPermitApiClient, ILogger<ContractController> logger, IContractDocumentService documentService, IContractExportApiClient contractExportApiClient) : Controller
 {
     private static readonly Action<ILogger, Guid, int?, string?, int, int, Exception?> LogDisplayedContractListMessage =
         LoggerMessage.Define<Guid, int?, string?, int, int>(
@@ -70,6 +71,24 @@ public class ContractController(IContractApiClient contractApiClient, ICustomerA
             LogLevel.Information,
             new EventId(10, nameof(LogDisplayedImportPermitsMessage)),
             "Displayed import permits: contractId={ContractId} totalPermits={TotalPermitCount}");
+
+    private static readonly Action<ILogger, Guid, string, Exception?> LogExportedContractDocumentMessage =
+        LoggerMessage.Define<Guid, string>(
+            LogLevel.Information,
+            new EventId(11, nameof(LogExportedContractDocumentMessage)),
+            "Exported contract document: contractId={ContractId} documentType={DocumentType}");
+
+    private static readonly Action<ILogger, Guid, string, Exception?> LogMissingTemplateMessage =
+        LoggerMessage.Define<Guid, string>(
+            LogLevel.Warning,
+            new EventId(12, nameof(LogMissingTemplateMessage)),
+            "No merge template available for contract {ContractId} document type {DocumentType}");
+
+    private static readonly Action<ILogger, Guid, string, Exception?> LogExportNoDataMessage =
+        LoggerMessage.Define<Guid, string>(
+            LogLevel.Information,
+            new EventId(13, nameof(LogExportNoDataMessage)),
+            "Export produced no data for contract {ContractId} document type {DocumentType}");
 
     public async Task<IActionResult> Index(
         Guid customerId,
@@ -139,11 +158,93 @@ public class ContractController(IContractApiClient contractApiClient, ICustomerA
         return RedirectToAction(nameof(ContractItems), new { id });
     }
 
-    // Legacy mail-merge export (Contract/Address Confirmation/Job Sheet/Renewal Letter) depends on
-    // template-upload infrastructure explicitly deferred to a later phase per docs/migration/
-    // contract-migration.md. Stub keeps the Export column's link parity. Import Permit(s) is NOT a
-    // document export - see the dedicated ImportPermits action below.
-    public IActionResult Export(Guid id, string documentType) => View("FeatureNotAvailable", documentType);
+    // Replaces legacy ContractList.aspx's MailMergeContract/MailMergeSampleAddressLetter/
+    // MailMergeJobSheet/MailMergeRenewalLetter row commands, which streamed a merged Word document
+    // back to the browser. Output is DOCX rather than the legacy binary DOC. Import Permit(s) is NOT
+    // a document export - see the dedicated ImportPermits action below.
+    [HttpGet]
+    public async Task<IActionResult> Export(Guid id, string documentType, CancellationToken cancellationToken = default)
+    {
+        if (!ContractDocumentTypes.TryResolve(documentType, out var canonicalType, out var templateKey))
+        {
+            return View("FeatureNotAvailable", documentType);
+        }
+
+        var contract = await contractApiClient.GetContractAsync(id, cancellationToken);
+        if (contract is null)
+        {
+            LogContractNotFoundMessage(logger, id, null);
+            return NotFound();
+        }
+
+        var context = await BuildDocumentContextAsync(canonicalType, templateKey, contract, cancellationToken);
+
+        // Legacy no-data guards: MailMergeJobSheet returns False when TotalPrice is 0, and
+        // MailMergeSampleAddressLetter/RenewalLetter when their collection yields nothing. Contract
+        // deliberately has no guard - its TotalPrice check was commented out in the legacy source.
+        var noDataMessage = NoDataMessageFor(canonicalType, context);
+        if (noDataMessage is not null)
+        {
+            LogExportNoDataMessage(logger, id, canonicalType, null);
+            TempData["ContractExportError"] = noDataMessage;
+            return RedirectToAction(nameof(Index), new { customerId = contract.CustomerId });
+        }
+
+        var request = ContractDocumentMergeMapper.Build(context);
+
+        ContractDocumentResponse document;
+        try
+        {
+            document = await documentService.GenerateAsync(request, cancellationToken);
+        }
+        catch (Exception ex) when (ex is FileNotFoundException or NotSupportedException)
+        {
+            // The converted .docx template has not been committed yet - see docs/migration.
+            LogMissingTemplateMessage(logger, id, canonicalType, ex);
+            return View("FeatureNotAvailable", documentType);
+        }
+
+        LogExportedContractDocumentMessage(logger, id, canonicalType, null);
+        return File(document.DocumentBytes, document.ContentType, document.FileName);
+    }
+
+    // Only the data the requested document actually needs is fetched.
+    private async Task<ContractDocumentContext> BuildDocumentContextAsync(
+        string canonicalType,
+        string templateKey,
+        ContractResponse contract,
+        CancellationToken cancellationToken)
+    {
+        if (canonicalType == ContractDocumentTypes.AddressConfirmation)
+        {
+            var sampleAddresses = await contractExportApiClient.GetSampleAddressesAsync(contract.ContractId, cancellationToken);
+            return new ContractDocumentContext(canonicalType, templateKey, contract, null, null, [], [], sampleAddresses, null);
+        }
+
+        if (canonicalType == ContractDocumentTypes.RenewalLetter)
+        {
+            var renewal = await contractExportApiClient.GetRenewalAsync(contract.ContractId, cancellationToken);
+            return new ContractDocumentContext(canonicalType, templateKey, contract, null, null, [], [], [], renewal);
+        }
+
+        var items = await contractApiClient.GetContractItemsAsync(contract.ContractId, cancellationToken);
+        var customer = await customerApiClient.GetCustomerAsync(contract.CustomerId, cancellationToken);
+        var countries = await lookupApiClient.GetCountriesAsync(cancellationToken);
+        var vatRatings = await lookupApiClient.GetVatRatingsAsync(cancellationToken);
+
+        return new ContractDocumentContext(canonicalType, templateKey, contract, items, customer, countries, vatRatings, [], null);
+    }
+
+    private static string? NoDataMessageFor(string canonicalType, ContractDocumentContext context) => canonicalType switch
+    {
+        ContractDocumentTypes.JobSheet when (context.Items?.TotalPrice ?? 0m) == 0m =>
+            "Total Price of this contract is 0 or there is no data set.",
+        ContractDocumentTypes.AddressConfirmation when context.SampleAddresses.Count == 0 =>
+            "There is no data set",
+        ContractDocumentTypes.RenewalLetter when context.Renewal is null =>
+            "There is no data set",
+        _ => null,
+    };
 
     // Legacy ImportPermit.aspx GridViewImportPermits: a CommandField "Actions" column with an Edit
     // button per row; clicking it switches that row into edit mode (Update/Cancel). Only the
