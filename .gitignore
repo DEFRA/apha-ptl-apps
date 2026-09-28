@@ -35,6 +35,19 @@ coverage/
 # SonarCloud scanner working directory
 .sonarqube/
 
+# Environment/secrets
+.env
+.env.local
+appsettings.*.local.json
+appsettings.Development.json
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Prompts
+docs/
+
 # Logs
 *.log
 
