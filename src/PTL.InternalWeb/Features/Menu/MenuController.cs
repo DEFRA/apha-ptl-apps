@@ -8,6 +8,8 @@ namespace PTL.InternalWeb.Features.Menu;
 // (SideNavigationProvider) for the actual section contents.
 public class MenuController : Controller
 {
+    public IActionResult SystemAdministration() => View();
+
     public IActionResult ManageContracts() => View();
 
     public IActionResult ManageSchemes() => View();
