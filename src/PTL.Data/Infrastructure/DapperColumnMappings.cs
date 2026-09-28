@@ -1,10 +1,12 @@
 using System.Reflection;
 using Dapper;
+using PTL.Core.AdministrationCharge;
 using PTL.Core.Contract;
 using PTL.Core.Customer;
 using PTL.Core.Lookup;
 using PTL.Core.Participant;
 using PTL.Core.Scheme;
+using PTL.Core.WeightedPricingPlan;
 using CoreContract = PTL.Core.Contract.Contract;
 using CoreCustomer = PTL.Core.Customer.Customer;
 using CoreParticipant = PTL.Core.Participant.Participant;
@@ -316,6 +318,29 @@ public static class DapperColumnMappings
         {
             [ColYearId] = nameof(YearEntity.YearId),
             ["fldYear"] = nameof(YearEntity.Year),
+        });
+
+        Map<AdministrationChargeEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldAdministrationChargeId"] = nameof(AdministrationChargeEntity.AdministrationChargeId),
+            ["fldAdministrationCharge"] = nameof(AdministrationChargeEntity.Name),
+        });
+
+        Map<AdministrationChargeCurrencyEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldAdministrationChargeCurrencyId"] = nameof(AdministrationChargeCurrencyEntity.AdministrationChargeCurrencyId),
+            ["fldAdministrationChargeId"] = nameof(AdministrationChargeCurrencyEntity.AdministrationChargeId),
+            ["fldCurrencyId"] = nameof(AdministrationChargeCurrencyEntity.CurrencyId),
+            ["fldPrice"] = nameof(AdministrationChargeCurrencyEntity.Price),
+        });
+
+        Map<PricingPercentageEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldPricingPercentageId"] = nameof(PricingPercentageEntity.PricingPercentageId),
+            [ColYearId] = nameof(PricingPercentageEntity.YearId),
+            ["fldNumberOfDistributionsOnScheme"] = nameof(PricingPercentageEntity.NumberOfDistributionsOnScheme),
+            ["fldNumberOfDistributionsChosen"] = nameof(PricingPercentageEntity.NumberOfDistributionsChosen),
+            ["fldWeight"] = nameof(PricingPercentageEntity.Weight),
         });
     }
 

@@ -46,8 +46,8 @@ public static class SideNavigationProvider
                 Disabled("Viewer Management"),
                 Disabled("Country Management"),
                 Disabled("External Site Management"),
-                Disabled("Administration Charges Management"),
-                Disabled("Weighted Charging Plan"),
+                new SideNavigationItem { Text = "Administration Charges Management", ControllerName = "AdministrationCharge", ActionName = IndexAction },
+                new SideNavigationItem { Text = "Weighted Charging Plan", ControllerName = "WeightedPricingPlan", ActionName = IndexAction },
                 Disabled("Postage Pricing Plan")
             ]
         },

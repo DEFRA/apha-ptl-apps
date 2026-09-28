@@ -1,0 +1,72 @@
+@model PTL.InternalWeb.Features.WeightedPricingPlan.WeightedPricingPlanViewModel
+@{
+    ViewData["Title"] = "Weighted Pricing Plan";
+}
+
+<h1 class="govuk-heading-l">Weighted Pricing Plan</h1>
+
+@if (Model.Message is not null)
+{
+    var bannerType = Model.MessageIsError ? "" : "govuk-notification-banner--success";
+    <div class="govuk-notification-banner @bannerType" role="@(Model.MessageIsError ? "alert" : "region")" aria-labelledby="govuk-notification-banner-title" data-module="govuk-notification-banner">
+        <div class="govuk-notification-banner__header">
+            <h2 class="govuk-notification-banner__title" id="govuk-notification-banner-title">@(Model.MessageIsError ? "Important" : "Success")</h2>
+        </div>
+        <div class="govuk-notification-banner__content">
+            <p class="govuk-notification-banner__heading">@Model.Message</p>
+        </div>
+    </div>
+}
+
+@if (Model.HasNoYears)
+{
+    return;
+}
+
+<form method="get" asp-action="Index" class="govuk-!-margin-bottom-6">
+    <div class="govuk-form-group">
+        <label class="govuk-label" for="yearId">Select a financial year:</label>
+        <select class="govuk-select" id="yearId" name="yearId" onchange="this.form.submit()" asp-items="Model.YearOptions" asp-for="SelectedYearId"></select>
+    </div>
+</form>
+
+<table class="govuk-table">
+    <thead class="govuk-table__head">
+        <tr class="govuk-table__row">
+            <th scope="col" rowspan="2" class="govuk-table__header">No. Per Year</th>
+            <th scope="col" colspan="@Model.DistributionsChosenColumns.Count" class="govuk-table__header">Weighted pricing %</th>
+            <th scope="col" rowspan="2" class="govuk-table__header">Cum. Total</th>
+        </tr>
+        <tr class="govuk-table__row">
+            @foreach (var numberChosen in Model.DistributionsChosenColumns)
+            {
+                <th scope="col" class="govuk-table__header">@numberChosen</th>
+            }
+        </tr>
+    </thead>
+    <tbody class="govuk-table__body">
+        @foreach (var row in Model.Rows)
+        {
+            <tr class="govuk-table__row">
+                <td class="govuk-table__cell">@row.NumberOfDistributionsOnScheme</td>
+                @foreach (var numberChosen in Model.DistributionsChosenColumns)
+                {
+                    var weight = row.WeightByDistributionsChosen.GetValueOrDefault(numberChosen);
+                    <td class="govuk-table__cell">@(weight is not null ? $"{weight}%" : "")</td>
+                }
+                <td class="govuk-table__cell">100%</td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+@if (Model.CanRenew)
+{
+    <form method="post" asp-action="Renew">
+        <input type="hidden" name="yearId" value="@Model.SelectedYearId" />
+        <button class="govuk-button" data-module="govuk-button" type="submit"
+                onclick="return confirm('Are you sure that you want to renew the pricing plan?');">
+            Renew pricing plan for financial year @Model.NextYearLabel
+        </button>
+    </form>
+}
