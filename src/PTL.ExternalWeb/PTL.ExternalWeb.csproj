@@ -4,10 +4,14 @@
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <!-- Enables dotnet user-secrets for local CIDM credentials - only loaded automatically by
+         WebApplicationBuilder when running as the Development environment. -->
+    <UserSecretsId>ptl-externalweb-1f2c6d9a-6b8e-4b3d-9e7a-5c2f0a8b7d61</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\PTL.ApiClient\PTL.ApiClient.csproj" />
+    <ProjectReference Include="..\PTL.Auth.Cidm\PTL.Auth.Cidm.csproj" />
     <ProjectReference Include="..\PTL.Common\PTL.Common.csproj" />
   </ItemGroup>
 

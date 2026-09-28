@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace PTL.ApiClient;
@@ -10,17 +11,21 @@ namespace PTL.ApiClient;
 /// </summary>
 public abstract class HomeControllerBase(IApiClient apiClient) : Controller
 {
+    // Requires authentication (via the app's default authorization policy) - the signed-in landing page.
     public IActionResult Index() => View();
 
+    [AllowAnonymous]
     public IActionResult Privacy() => View();
 
     // Diagnostic endpoint proving Web -> Api connectivity; useful as a smoke-test in any environment.
+    [AllowAnonymous]
     public async Task<IActionResult> ApiStatus(CancellationToken cancellationToken)
     {
         var health = await apiClient.GetHealthAsync(cancellationToken);
         return Json(health);
     }
 
+    [AllowAnonymous]
     [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
     public IActionResult Error()
     {

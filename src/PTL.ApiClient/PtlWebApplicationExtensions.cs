@@ -55,6 +55,21 @@ public static class PtlWebApplicationExtensions
             options.ViewLocationFormats.Insert(1, "/Features/Shared/{0}.cshtml");
         });
 
+        // Authentication scheme registration is deliberately NOT done here - each app's identity
+        // provider is different (see AddPtlDefaultCookieAuthentication / PTL.Auth.Cidm's
+        // AddCidmAuthentication), and a scheme can only be registered once per app.
+
+        return builder;
+    }
+
+    /// <summary>
+    /// Registers the plain username/password cookie authentication used today by PTL.InternalWeb.
+    /// PTL.ExternalWeb does not call this - it registers cookie + CIDM OpenID Connect together via
+    /// <c>AddCidmAuthentication</c> instead, since the two apps' identity providers are unrelated
+    /// (Entra ID/SAML vs DEFRA Customer Identity) and a scheme can only be registered once per app.
+    /// </summary>
+    public static WebApplicationBuilder AddPtlDefaultCookieAuthentication(this WebApplicationBuilder builder)
+    {
         builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
             .AddCookie(options =>
             {

@@ -111,8 +111,10 @@ jobs:
             externalweb:
               - 'src/PTL.ExternalWeb/**'
               - 'src/PTL.ApiClient/**'
+              - 'src/PTL.Auth.Cidm/**'
               - 'tests/PTL.ExternalWeb.Tests/**'
               - 'tests/PTL.ApiClient.Tests/**'
+              - 'tests/PTL.Auth.Cidm.Tests/**'
               - 'PTL.slnx'
               - 'Directory.Build.*'
               - 'Directory.Packages.props'
