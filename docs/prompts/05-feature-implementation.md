@@ -13,7 +13,7 @@ Use:
 - docs/analysis/csla-analysis.md
 - docs/migration/api-migration.md
 - docs/analysis/authentication-analysis.md
-- PTLIMS-HLD-v0.3.docx
+- PTLIMS_High Level Design_v0.5.docx
 - Existing source code
 - Existing solution structure
 

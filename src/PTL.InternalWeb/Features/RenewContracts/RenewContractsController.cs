@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using PTL.ApiClient;
 using PTL.Contracts.Contract;
+using PTL.InternalWeb.Notifications;
 
 namespace PTL.InternalWeb.Features.RenewContracts;
 
@@ -41,6 +42,7 @@ public class RenewContractsController(
             return View(model);
         }
 
+        TempData.SetNotification(NotificationType.Success, "Contract renewed successfully.");
         return RedirectToAction("Index", "Contract", new { customerId });
     }
 

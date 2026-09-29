@@ -18,15 +18,6 @@
 
 <h1 class="govuk-heading-l">Contracts</h1>
 
-@if (TempData["ContractExportError"] is string exportError)
-{
-    <div class="govuk-error-summary" data-module="govuk-error-summary" role="alert">
-        <div class="govuk-error-summary__body">
-            <p class="govuk-body"><strong>@exportError</strong></p>
-        </div>
-    </div>
-}
-
 @if (Model.Customer is not null)
 {
     <p class="govuk-body">@Model.Customer.QalNumber, @Model.Customer.Name, @Model.Customer.Organisation</p>

@@ -2,7 +2,7 @@
 
 **Domain:** Scheme
 **Scope:** TO-BE migration plan for the legacy Scheme domain in PTLIMS
-**Analysis basis:** docs/analysis/scheme-analysis.md, docs/analysis/contract-analysis.md, docs/analysis/customer-analysis.md, docs/analysis/participant-analysis.md, docs/analysis/csla-analysis.md, docs/migration/api-migration.md, docs/source/PTLIMS-HLD-v0.3.docx
+**Analysis basis:** docs/analysis/scheme-analysis.md, docs/analysis/contract-analysis.md, docs/analysis/customer-analysis.md, docs/analysis/participant-analysis.md, docs/analysis/csla-analysis.md, docs/migration/api-migration.md, docs/source/PTLIMS_High Level Design_v0.5.docx
 **Status:** Design only; no implementation code produced.
 
 ---

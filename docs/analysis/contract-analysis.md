@@ -3,7 +3,7 @@
 **Scope:** Contract domain in the legacy PTLIMS solution as implemented in the ASP.NET Web Forms / CSLA / ASMX architecture.
 **Analysis date:** 2026-09-17
 **Repository:** `proficiency-testing`
-**Cross-reference inputs:** `docs/analysis/customer-analysis.md`, `docs/analysis/participant-analysis.md`, `docs/analysis/csla-analysis.md`, `docs/migration/api-migration.md`, `docs/source/PTLIMS-HLD-v0.3.docx`.
+**Cross-reference inputs:** `docs/analysis/customer-analysis.md`, `docs/analysis/participant-analysis.md`, `docs/analysis/csla-analysis.md`, `docs/migration/api-migration.md`, `docs/source/PTLIMS_High Level Design_v0.5.docx`.
 
 This is an AS-IS analysis only. It does not define .NET 10 design, migration architecture, repository design, CQRS, DDD, or future implementation plans.
 
@@ -610,7 +610,7 @@ This complexity reflects the current implementation model in the legacy applicat
 - Is there a role/ownership authorization check for `Contracts Admin` pages (e.g. web.config-level), given none was found in the reviewed code-behind? [NEEDS INVESTIGATION]
 - What is the full save/delete path in `ContractItems.aspx`'s `BtnSave_Click` for queued `mDeleteParticipantSchemeIds` (which stored procedure performs the actual delete)? [NEEDS INVESTIGATION]
 - Which external UI (if any, inside or outside this repository) actually consumes `PendingContractOrder.asmx`/`AvailableSchemeCollection.asmx`/`CurrentlyParticipatingSchemeCollection.asmx`? No corresponding page was found under `ProficiencyTestingExternalWeb` in this workspace. [NEEDS INVESTIGATION]
-- Does the HLD (`docs/source/PTLIMS-HLD-v0.3.docx`) describe Contract-domain responsibilities not reflected in this page/service inventory? [NEEDS INVESTIGATION]
+- Does the HLD (`docs/source/PTLIMS_High Level Design_v0.5.docx`) describe Contract-domain responsibilities not reflected in this page/service inventory? [NEEDS INVESTIGATION]
 - Full field list of `ParticipantSchemeMergeInfo` (nested in `ContractMergeInfo`)? [NEEDS INVESTIGATION]
 
 ---
@@ -643,6 +643,6 @@ The analysis above is based on the following current-source references:
 - `docs/analysis/participant-analysis.md` (cross-reference)
 - `docs/analysis/csla-analysis.md` (cross-reference)
 - `docs/migration/api-migration.md` (cross-reference)
-- `docs/source/PTLIMS-HLD-v0.3.docx` (cross-reference — not independently re-parsed in this pass beyond prior analyses' citations)
+- `docs/source/PTLIMS_High Level Design_v0.5.docx` (cross-reference — not independently re-parsed in this pass beyond prior analyses' citations)
 
 This document intentionally describes only the current AS-IS Contract domain and does not define new design targets, repositories, CQRS, DDD, migration architecture, or .NET 10 patterns.

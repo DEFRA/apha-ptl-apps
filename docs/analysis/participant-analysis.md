@@ -3,7 +3,7 @@
 **Scope:** Participant domain in the legacy PTLIMS solution as implemented in the ASP.NET Web Forms / CSLA / ASMX architecture.
 **Analysis date:** 2026-09-16
 **Repository:** `proficiency-testing`
-**Cross-reference inputs:** `docs/source/PTLIMS-HLD-v0.3.docx`, `docs/source/PTLIMS-KT.md`, `docs/analysis/csla-analysis.md`, `docs/migration/api-migration.md`, `docs/analysis/customer-analysis.md`, `docs/migration/customer-migration.md`, and the legacy code under `proficiency-testing`.
+**Cross-reference inputs:** `docs/source/PTLIMS_High Level Design_v0.5.docx`, `docs/source/PTLIMS-KT.md`, `docs/analysis/csla-analysis.md`, `docs/migration/api-migration.md`, `docs/analysis/customer-analysis.md`, `docs/migration/customer-migration.md`, and the legacy code under `proficiency-testing`.
 
 ---
 

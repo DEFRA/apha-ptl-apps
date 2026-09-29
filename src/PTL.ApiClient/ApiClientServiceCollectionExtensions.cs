@@ -27,7 +27,7 @@ public static class ApiClientServiceCollectionExtensions
         // Forwards the caller's correlation ID to PTL.Api, so a single ID traces the action
         // across both the web front-end's and the API's CloudWatch log groups.
         services.AddHttpContextAccessor();
-        services.AddTransient<CorrelationIdDelegatingHandler>();
+        services.AddTransient<CorrelationIdDelegatingHandler>(); 
 
         services.AddHttpClient<IApiClient, ApiClient>(client =>
         {
@@ -60,6 +60,13 @@ public static class ApiClientServiceCollectionExtensions
         {
             client.BaseAddress = new Uri(apiBaseUrl);
         })
+            .AddStandardResilienceHandler();
+
+        services.AddHttpClient<IGroupAddressApiClient, GroupAddressApiClient>(client =>
+        {
+            client.BaseAddress = new Uri(apiBaseUrl);
+        })
+            .AddHttpMessageHandler<CorrelationIdDelegatingHandler>()
             .AddStandardResilienceHandler();
 
         services.AddHttpClient<ISchemeApiClient, SchemeApiClient>(client =>

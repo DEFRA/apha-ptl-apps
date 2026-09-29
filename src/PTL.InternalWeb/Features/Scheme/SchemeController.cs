@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.Extensions.Logging;
 using PTL.ApiClient;
 using PTL.Contracts.Scheme;
+using PTL.InternalWeb.Notifications;
 
 namespace PTL.InternalWeb.Features.Scheme;
 
@@ -126,6 +127,7 @@ public class SchemeController(ISchemeApiClient schemeApiClient, ILookupApiClient
         }
 
         LogCreatedSchemeMessage(logger, result.Scheme.SchemeId, null);
+        TempData.SetNotification(NotificationType.Success, "Scheme created successfully.");
         return RedirectToAction(nameof(Details), new { id = result.Scheme.SchemeId });
     }
 
@@ -166,6 +168,7 @@ public class SchemeController(ISchemeApiClient schemeApiClient, ILookupApiClient
         }
 
         LogUpdatedSchemeMessage(logger, id, null);
+        TempData.SetNotification(NotificationType.Success, "Scheme updated successfully.");
         return RedirectToAction(nameof(Details), new { id });
     }
 

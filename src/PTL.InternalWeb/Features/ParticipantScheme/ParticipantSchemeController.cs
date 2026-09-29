@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using PTL.ApiClient;
 using PTL.Contracts.Participant;
 using PTL.Contracts.Scheme;
+using PTL.InternalWeb.Notifications;
 
 namespace PTL.InternalWeb.Features.ParticipantScheme;
 
@@ -63,8 +64,18 @@ public class ParticipantSchemeController(
         }
 
         var contract = await contractApiClient.GetContractAsync(participantScheme.ContractId, cancellationToken);
-        var isReadOnly = participantScheme.IsRemoved || (contract?.IsReadOnly ?? false);
-        return View(new ParticipantSchemeDetailsViewModel(participantScheme, contract?.CustomerId ?? Guid.Empty, isReadOnly));
+        if (contract is null)
+        {
+            return NotFound();
+        }
+
+        // Populated exactly as Edit does, then rendered read-only - legacy has no separate view screen.
+        var fields = ToFormViewModel(participantScheme, contract.CustomerId, contract.YearId, isReadOnly: true);
+        await PopulateDataConsentAsync(fields, cancellationToken);
+        await PopulatePricingPlanAsync(fields, cancellationToken, isFreshLoad: true);
+        await PopulateGroupAddressOptionsAsync(fields, cancellationToken);
+
+        return View(new ParticipantSchemeDetailsViewModel(fields, participantScheme.IsRemoved || contract.IsReadOnly));
     }
 
     [HttpGet]
@@ -140,6 +151,7 @@ public class ParticipantSchemeController(
             }
 
             LogCreatedMessage(logger, result.ParticipantScheme!.ParticipantSchemeId, null);
+            TempData.SetNotification(NotificationType.Success, "Contract item created successfully.");
             return RedirectToAction("ContractItems", "Contract", new { area = "", id = model.ContractId });
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
@@ -202,6 +214,7 @@ public class ParticipantSchemeController(
             }
 
             LogUpdatedMessage(logger, id, null);
+            TempData.SetNotification(NotificationType.Success, "Contract item updated successfully.");
             return RedirectToAction(nameof(Details), new { id });
         }
         catch (Exception ex) when (ex is not OperationCanceledException)

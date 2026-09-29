@@ -18,7 +18,13 @@ public static class SideNavigationProvider
 {
     private const string IndexAction = "Index";
     private const string CreateAction = "Create";
+    private const string EditAction = "Edit";
+    private const string DetailsAction = "Details";
     private const string SchemeControllerName = "Scheme";
+    private const string CustomerControllerName = "Customer";
+    private const string ParticipantControllerName = "Participant";
+    private const string ContractControllerName = "Contract";
+    private const string GroupAddressControllerName = "GroupAddress";
 
     // Placeholder for a menu entry whose page hasn't been migrated yet - see class remarks.
     private static SideNavigationItem Disabled(string text) => new() { Text = text, IsEnabled = false };
@@ -56,14 +62,19 @@ public static class SideNavigationProvider
                 new SideNavigationItem
                 {
                     Text = "Customers",
-                    ControllerName = "Customer",
+                    ControllerName = CustomerControllerName,
                     ActionName = IndexAction,
                     Children =
                     [
-                        new SideNavigationItem { Text = "Create Customer", ControllerName = "Customer", ActionName = CreateAction },
+                        new SideNavigationItem { Text = "Create Customer", ControllerName = CustomerControllerName, ActionName = CreateAction },
                         new SideNavigationItem { Text = "Review Pending Customer Updates", IsEnabled = false },
                         new SideNavigationItem { Text = "Review Pending Participant Updates", IsEnabled = false },
                         new SideNavigationItem { Text = "Review Pending Orders", IsEnabled = false },
+
+                        // Hidden: not a menu entry, but present so Details/Edit pages resolve a full
+                        // breadcrumb trail instead of a plain controller/action crumb.
+                        new SideNavigationItem { Text = "Customer Details", ControllerName = CustomerControllerName, ActionName = DetailsAction, IsHidden = true },
+                        new SideNavigationItem { Text = "Edit Customer", ControllerName = CustomerControllerName, ActionName = EditAction, IsHidden = true },
 
                         // Hidden: only reached from within a specific customer (Customer Details'
                         // "View participants"/"View contracts" links), never listed here - matches
@@ -71,27 +82,45 @@ public static class SideNavigationProvider
                         new SideNavigationItem
                         {
                             Text = "Participants",
-                            ControllerName = "Participant",
-                            ActionName = IndexAction,
-                            IsHidden = true,
-                            Children = [new SideNavigationItem { Text = "Create Participant", ControllerName = "Participant", ActionName = CreateAction }]
-                        },
-                        new SideNavigationItem
-                        {
-                            Text = "Contracts",
-                            ControllerName = "Contract",
+                            ControllerName = ParticipantControllerName,
                             ActionName = IndexAction,
                             IsHidden = true,
                             Children =
                             [
-                                new SideNavigationItem { Text = "Create Contract", ControllerName = "Contract", ActionName = CreateAction },
-                                new SideNavigationItem { Text = "Renew Contracts", ControllerName = "RenewContracts", ActionName = "RenewContracts" }
+                                new SideNavigationItem { Text = "Create Participant", ControllerName = ParticipantControllerName, ActionName = CreateAction },
+                                new SideNavigationItem { Text = "Participant Details", ControllerName = ParticipantControllerName, ActionName = DetailsAction, IsHidden = true },
+                                new SideNavigationItem { Text = "Edit Participant", ControllerName = ParticipantControllerName, ActionName = EditAction, IsHidden = true }
+                            ]
+                        },
+                        new SideNavigationItem
+                        {
+                            Text = "Contracts",
+                            ControllerName = ContractControllerName,
+                            ActionName = IndexAction,
+                            IsHidden = true,
+                            Children =
+                            [
+                                new SideNavigationItem { Text = "Create Contract", ControllerName = ContractControllerName, ActionName = CreateAction },
+                                new SideNavigationItem { Text = "Renew Contracts", ControllerName = "RenewContracts", ActionName = "RenewContracts" },
+                                new SideNavigationItem { Text = "Contract Details", ControllerName = ContractControllerName, ActionName = DetailsAction, IsHidden = true },
+                                new SideNavigationItem { Text = "Edit Contract", ControllerName = ContractControllerName, ActionName = EditAction, IsHidden = true }
                             ]
                         }
                     ]
                 },
                 Disabled("Search"),
-                Disabled("Group Addresses"),
+                new SideNavigationItem
+                {
+                    Text = "Group Addresses",
+                    ControllerName = GroupAddressControllerName,
+                    ActionName = IndexAction,
+                    Children =
+                    [
+                        new SideNavigationItem { Text = "Create Group Address", ControllerName = GroupAddressControllerName, ActionName = CreateAction },
+                        new SideNavigationItem { Text = "Group Address Details", ControllerName = GroupAddressControllerName, ActionName = DetailsAction, IsHidden = true },
+                        new SideNavigationItem { Text = "Edit Group Address", ControllerName = GroupAddressControllerName, ActionName = EditAction, IsHidden = true }
+                    ]
+                },
                 Disabled("Exports"),
                 Disabled("Invoice Generation")
             ]
@@ -111,6 +140,11 @@ public static class SideNavigationProvider
                     Children =
                     [
                         new SideNavigationItem { Text = "Create Scheme", ControllerName = SchemeControllerName, ActionName = CreateAction },
+
+                        // Hidden: not menu entries, but present so Details/Edit pages resolve a full
+                        // breadcrumb trail instead of a plain controller/action crumb.
+                        new SideNavigationItem { Text = "Scheme Details", ControllerName = SchemeControllerName, ActionName = DetailsAction, IsHidden = true },
+                        new SideNavigationItem { Text = "Edit Scheme", ControllerName = SchemeControllerName, ActionName = EditAction, IsHidden = true },
 
                         // Hidden: only reached from a specific scheme's Details page ("View family
                         // history" link), not listed as a Scheme List child - same hidden pattern.
@@ -190,7 +224,7 @@ public static class SideNavigationProvider
         // the top-level menu.
         if (string.Equals(controllerName, "RenewContracts", StringComparison.OrdinalIgnoreCase))
         {
-            return FindNode(items, "Contract", IndexAction);
+            return FindNode(items, ContractControllerName, IndexAction);
         }
 
         return null;
@@ -206,7 +240,7 @@ public static class SideNavigationProvider
 
         if (string.Equals(controllerName, "RenewContracts", StringComparison.OrdinalIgnoreCase))
         {
-            var contractPath = FindPath(items, "Contract", IndexAction);
+            var contractPath = FindPath(items, ContractControllerName, IndexAction);
             if (contractPath is not null)
             {
                 return [.. contractPath, new SideNavigationItem { Text = "Renew Contracts", ControllerName = controllerName, ActionName = actionName }];

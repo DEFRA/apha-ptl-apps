@@ -3,7 +3,7 @@
 **Scope:** Scheme domain in the legacy PTLIMS solution as implemented in the ASP.NET Web Forms / CSLA / ASMX architecture.
 **Analysis date:** 2026-09-17
 **Repository:** `proficiency-testing`
-**Cross-reference inputs:** `docs/analysis/customer-analysis.md`, `docs/analysis/participant-analysis.md`, `docs/analysis/contract-analysis.md`, `docs/analysis/csla-analysis.md`, `docs/migration/api-migration.md`, `docs/source/PTLIMS-HLD-v0.3.docx`.
+**Cross-reference inputs:** `docs/analysis/customer-analysis.md`, `docs/analysis/participant-analysis.md`, `docs/analysis/contract-analysis.md`, `docs/analysis/csla-analysis.md`, `docs/migration/api-migration.md`, `docs/source/PTLIMS_High Level Design_v0.5.docx`.
 
 This is an AS-IS analysis only. It does not define .NET 10 design, migration architecture, repository design, CQRS, DDD, or future implementation plans.
 
@@ -581,7 +581,7 @@ This complexity reflects the current implementation model in the legacy applicat
 - What are the exact table names and schemas backing `SchemeCurrency`, `Test`/`TestResultItem`/`TestMethodItem`/`CategoryItem`, `Tabulations` (as a Scheme child collection, distinct from the Distribution/Results `Tabulation` business object), and `ViewerScheme`? [NEEDS INVESTIGATION]
 - What are the exact stored procedure(s)/table(s) backing the external `SchemeListCollection` business object (`SchemeList.aspx`'s data source)? [NEEDS INVESTIGATION]
 - Is there a documented reason why `SchemeListCollection.asmx` enforces its role check while every other Scheme-related ASMX has it disabled or absent — is this an intentional exception or an oversight? [NEEDS INVESTIGATION]
-- Does the HLD (`docs/source/PTLIMS-HLD-v0.3.docx`) describe Scheme-domain responsibilities not reflected in this page/service inventory, particularly around the Distribution/Results/Tabulation boundary? [NEEDS INVESTIGATION]
+- Does the HLD (`docs/source/PTLIMS_High Level Design_v0.5.docx`) describe Scheme-domain responsibilities not reflected in this page/service inventory, particularly around the Distribution/Results/Tabulation boundary? [NEEDS INVESTIGATION]
 - What does the "bold schemes" client-side highlighting logic in the external `SchemeList.aspx` actually indicate to the participant (e.g. newly available, deadline approaching)? [NEEDS INVESTIGATION]
 - Current live-schema parameter count for `spiScheme`/`spuScheme` given the same `tblScheme` incremental-migration pattern that caused the `spiParticipant` schema-drift bug elsewhere in this workspace? [NEEDS INVESTIGATION]
 
@@ -615,6 +615,6 @@ The analysis above is based on the following current-source references:
 - `docs/analysis/contract-analysis.md` (cross-reference)
 - `docs/analysis/csla-analysis.md` (cross-reference — `AuditableBusinessBase` pattern)
 - `docs/migration/api-migration.md` (cross-reference)
-- `docs/source/PTLIMS-HLD-v0.3.docx` (cross-reference — not independently re-parsed in this pass beyond prior analyses' citations)
+- `docs/source/PTLIMS_High Level Design_v0.5.docx` (cross-reference — not independently re-parsed in this pass beyond prior analyses' citations)
 
 This document intentionally describes only the current AS-IS Scheme domain and does not define new design targets, repositories, CQRS, DDD, migration architecture, or .NET 10 patterns.

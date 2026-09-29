@@ -30,5 +30,5 @@ public sealed class PaginationModel
 
     public const int DefaultPageSize = 25;
 
-    public static IReadOnlyList<int> AvailablePageSizes { get; } = [10, 25, 50, 100];
+    public static IReadOnlyList<int> AvailablePageSizes { get; } = [10, 20, 25, 50, 100];
 }

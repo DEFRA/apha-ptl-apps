@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.Extensions.Logging;
 using PTL.ApiClient;
 using PTL.Contracts.Participant;
+using PTL.InternalWeb.Notifications;
 
 namespace PTL.InternalWeb.Features.Participant;
 
@@ -132,6 +133,7 @@ public class ParticipantController(IParticipantApiClient participantApiClient, I
             return View(model);
         }
 
+        TempData.SetNotification(NotificationType.Success, "Participant created successfully.");
         return RedirectToAction(nameof(Details), new { id = result.Participant.ParticipantId });
     }
 
@@ -199,6 +201,7 @@ public class ParticipantController(IParticipantApiClient participantApiClient, I
             return View(model);
         }
 
+        TempData.SetNotification(NotificationType.Success, "Participant updated successfully.");
         return RedirectToAction(nameof(Details), new { id = result.Participant.ParticipantId });
     }
 

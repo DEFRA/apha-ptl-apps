@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using PTL.ApiClient;
 using PTL.Contracts.Contract;
 using PTL.Core.Contract.Document;
+using PTL.InternalWeb.Notifications;
 
 namespace PTL.InternalWeb.Features.Contract;
 
@@ -148,11 +149,12 @@ public class ContractController(IContractApiClient contractApiClient, ICustomerA
         if (!result.Success)
         {
             LogRemoveContractItemFailedMessage(logger, id, participantSchemeId, result.ErrorMessage, null);
-            TempData["ContractItemsError"] = result.ErrorMessage ?? "The contract item could not be removed.";
+            TempData.SetNotification(NotificationType.Error, result.ErrorMessage ?? "The contract item could not be removed.");
         }
         else
         {
             LogRemovedContractItemMessage(logger, id, participantSchemeId, null);
+            TempData.SetNotification(NotificationType.Success, "Contract item removed successfully.");
         }
 
         return RedirectToAction(nameof(ContractItems), new { id });
@@ -186,7 +188,7 @@ public class ContractController(IContractApiClient contractApiClient, ICustomerA
         if (noDataMessage is not null)
         {
             LogExportNoDataMessage(logger, id, canonicalType, null);
-            TempData["ContractExportError"] = noDataMessage;
+            TempData.SetNotification(NotificationType.Warning, noDataMessage);
             return RedirectToAction(nameof(Index), new { customerId = contract.CustomerId });
         }
 
@@ -294,6 +296,7 @@ public class ContractController(IContractApiClient contractApiClient, ICustomerA
         }
 
         await importPermitApiClient.UpdateImportPermitAsync(participantSchemeId, new UpdateImportPermitRequest(importPermitReceived, expiry), cancellationToken);
+        TempData.SetNotification(NotificationType.Success, "Import permit updated successfully.");
         return RedirectToAction(nameof(ImportPermits), new { id });
     }
 
@@ -372,6 +375,7 @@ public class ContractController(IContractApiClient contractApiClient, ICustomerA
 
         ArgumentNullException.ThrowIfNull(result.Contract);
         LogCreatedContractMessage(logger, result.Contract.ContractId, null);
+        TempData.SetNotification(NotificationType.Success, "Contract created successfully.");
         return RedirectToAction(nameof(Details), new { id = result.Contract.ContractId });
     }
 
@@ -412,6 +416,7 @@ public class ContractController(IContractApiClient contractApiClient, ICustomerA
         }
 
         LogUpdatedContractMessage(logger, id, null);
+        TempData.SetNotification(NotificationType.Success, "Contract updated successfully.");
         return RedirectToAction(nameof(Details), new { id });
     }
 

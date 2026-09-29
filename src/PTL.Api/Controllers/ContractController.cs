@@ -2,6 +2,10 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using PTL.Contracts.Contract;
 using PTL.Core.Contract;
+using PTL.Core.Contract.ImportPermit;
+using PTL.Core.Contract.Renew;
+using PTL.Core.Contract.Renewal;
+using PTL.Core.Contract.SampleAddress;
 
 namespace PTL.Api.Controllers;
 
@@ -10,7 +14,13 @@ namespace PTL.Api.Controllers;
 // access to Contract functionality. Policies will be added in a later phase.
 [ApiController]
 [Route("api")]
-public sealed class ContractController(IContractService contractService, ILogger<ContractController> logger) : ControllerBase
+public sealed class ContractController(
+    IContractService contractService,
+    IImportPermitService importPermitService,
+    ISampleAddressService sampleAddressService,
+    IContractRenewalService contractRenewalService,
+    IRenewContractsService renewContractsService,
+    ILogger<ContractController> logger) : ControllerBase
 {
     private static readonly Action<ILogger, Guid, Exception?> LogContractNotFoundMessage =
         LoggerMessage.Define<Guid>(
@@ -94,6 +104,74 @@ public sealed class ContractController(IContractService contractService, ILogger
         {
             return ToValidationProblem(ex);
         }
+    }
+
+    // GET /api/contracts/{contractId}/import-permits - see ImportPermit.aspx.
+    [HttpGet("contracts/{contractId:guid}/import-permits")]
+    public async Task<ActionResult<IReadOnlyList<ImportPermitResponse>>> GetImportPermits(Guid contractId, CancellationToken cancellationToken)
+    {
+        var permits = await importPermitService.GetByContractIdAsync(contractId, cancellationToken);
+        return Ok(permits.Select(ToResponse).ToList());
+    }
+
+    // PUT /api/contracts/import-permits/{participantSchemeId} - matches legacy btnApply_Click/
+    // btnSave_Click looping ImportPermitDataAccess.UpdateImportPermit per row.
+    [HttpPut("contracts/import-permits/{participantSchemeId:guid}")]
+    public async Task<IActionResult> UpdateImportPermit(Guid participantSchemeId, [FromBody] UpdateImportPermitRequest request, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await importPermitService.UpdateAsync(participantSchemeId, request.ImportPermitReceived, request.ImportPermitExpiry, cancellationToken);
+            return NoContent();
+        }
+        catch (ImportPermitValidationException ex)
+        {
+            ModelState.AddModelError(nameof(request.ImportPermitExpiry), ex.Message);
+            return ValidationProblem(ModelState);
+        }
+    }
+
+    // GET /api/contracts/{contractId}/sample-addresses - legacy SampleAddressContractCollection,
+    // one entry per participant sample address on the contract.
+    [HttpGet("contracts/{contractId:guid}/sample-addresses")]
+    public async Task<ActionResult<IReadOnlyList<SampleAddressResponse>>> GetSampleAddresses(Guid contractId, CancellationToken cancellationToken)
+    {
+        var addresses = await sampleAddressService.GetByContractIdAsync(contractId, cancellationToken);
+        return Ok(addresses.Select(ToResponse).ToList());
+    }
+
+    // GET /api/contracts/{contractId}/renewal - legacy ContractRenewalCollection.GetByContractId.
+    [HttpGet("contracts/{contractId:guid}/renewal")]
+    public async Task<ActionResult<ContractRenewalResponse>> GetRenewal(Guid contractId, CancellationToken cancellationToken)
+    {
+        var renewal = await contractRenewalService.GetByContractIdAsync(contractId, cancellationToken);
+        return renewal is null ? NotFound() : Ok(ToResponse(renewal));
+    }
+
+    // Legacy MergeContracts.aspx - the screen users know as "Renew Contracts".
+    [HttpGet("customers/{customerId:guid}/contracts/renewable-contracts")]
+    public async Task<ActionResult<RenewableContractsResponse>> GetRenewableContracts(Guid customerId, CancellationToken cancellationToken)
+    {
+        var result = await renewContractsService.GetRenewableContractsAsync(customerId, cancellationToken);
+        return Ok(new RenewableContractsResponse(
+            result.Eligibility.IsAllowed,
+            result.Eligibility.BlockedReason,
+            result.ExistingSignatories,
+            result.Contracts.Select(ToDto).ToList()));
+    }
+
+    [HttpGet("customers/{customerId:guid}/contracts/renewable-items")]
+    public async Task<ActionResult<RenewableContractItemsResponse>> GetRenewableItems(Guid customerId, CancellationToken cancellationToken)
+    {
+        var items = await renewContractsService.GetRenewableItemsAsync(customerId, cancellationToken);
+        return Ok(new RenewableContractItemsResponse(items.Select(ToDto).ToList()));
+    }
+
+    [HttpPost("customers/{customerId:guid}/contracts/renew")]
+    public async Task<ActionResult<RenewContractResponse>> RenewContracts(Guid customerId, [FromBody] RenewContractRequest request, CancellationToken cancellationToken)
+    {
+        var result = await renewContractsService.RenewContractsAsync(customerId, request.ContractIds, request.ParticipantSchemeIds, request.NewContractSignatory, cancellationToken);
+        return Ok(new RenewContractResponse(result.Success, result.NewContractId, result.ErrorMessage));
     }
 
     private ActionResult ToValidationProblem(ContractValidationException ex)
@@ -217,4 +295,81 @@ public sealed class ContractController(IContractService contractService, ILogger
         item.Price,
         item.NonFeePaying,
         item.HasOverride);
+
+    private static ImportPermitResponse ToResponse(ImportPermitEntity entity) => new(
+        entity.ParticipantSchemeId,
+        entity.SchemeNumber,
+        entity.SchemeName,
+        entity.LabId,
+        entity.ImportPermitRequired,
+        entity.ImportPermitReceived,
+        entity.ImportPermitExpiry);
+
+    private static SampleAddressResponse ToResponse(SampleAddressEntity address) => new(
+        address.ContractId,
+        address.ParticipantId,
+        address.QalNumber,
+        address.LabCode,
+        address.ContactName,
+        address.Organisation,
+        address.Address1,
+        address.Address2,
+        address.Address3,
+        address.Address4,
+        address.Address5,
+        address.Country,
+        address.Telephone,
+        address.Fax,
+        address.Email,
+        address.VatNumber,
+        address.AccountNumber,
+        address.VatRating,
+        address.PurchaseOrderNumber,
+        address.FeePayingSchemes.Select(ToResponse).ToList(),
+        address.NonFeePayingSchemes.Select(ToResponse).ToList());
+
+    private static SampleAddressSchemeResponse ToResponse(SampleAddressSchemeEntity scheme) => new(
+        scheme.ParticipantSchemeId,
+        scheme.SchemeName,
+        scheme.SchemeIdentifier,
+        scheme.MonthsActive,
+        scheme.WeekNumber);
+
+    private static ContractRenewalResponse ToResponse(ContractRenewalEntity renewal) => new(
+        renewal.ContractId,
+        renewal.CustomerId,
+        renewal.QalNumber,
+        renewal.OrganisationName,
+        renewal.ContactName,
+        renewal.Address1,
+        renewal.Address2,
+        renewal.Address3,
+        renewal.Address4,
+        renewal.Address5,
+        renewal.Country,
+        renewal.ContractStartDate,
+        renewal.ContractEndDate,
+        renewal.RenewalInformation);
+
+    private static RenewableContractDto ToDto(RenewableContractEntity contract) => new(
+        contract.ContractId,
+        contract.Suffix,
+        contract.ContractSignatory,
+        contract.RenewalInformation,
+        contract.ActionsRequired,
+        contract.IsActive,
+        contract.NoOfItems);
+
+    private static RenewableContractItemDto ToDto(RenewableContractItemEntity item) => new(
+        item.ContractId,
+        item.Suffix,
+        item.ParticipantSchemeId,
+        item.LabCode,
+        item.LabName,
+        item.OldSchemeIdentifier,
+        item.OldSchemeName,
+        item.NewSchemeIdentifier,
+        item.NewSchemeName,
+        item.IsRenewable,
+        item.Identifier);
 }

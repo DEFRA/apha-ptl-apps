@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.Extensions.Logging;
 using PTL.ApiClient;
 using PTL.Contracts.Customer;
+using PTL.InternalWeb.Notifications;
 
 namespace PTL.InternalWeb.Features.Customer;
 
@@ -117,6 +118,7 @@ public class CustomerController(ICustomerApiClient customerApiClient, ILookupApi
         }
 
         LogCreatedCustomerMessage(logger, result.Customer.CustomerId, null);
+        TempData.SetNotification(NotificationType.Success, "Customer created successfully.");
         return RedirectToAction(nameof(Details), new { id = result.Customer.CustomerId });
     }
 
@@ -156,6 +158,7 @@ public class CustomerController(ICustomerApiClient customerApiClient, ILookupApi
         }
 
         LogUpdatedCustomerMessage(logger, id, null);
+        TempData.SetNotification(NotificationType.Success, "Customer updated successfully.");
         return RedirectToAction(nameof(Details), new { id });
     }
 

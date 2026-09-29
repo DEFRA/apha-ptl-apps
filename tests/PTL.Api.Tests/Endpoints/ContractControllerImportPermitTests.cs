@@ -1,20 +1,28 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
 using PTL.Api.Controllers;
 using PTL.Api.Tests.Contract;
 using PTL.Contracts.Contract;
+using PTL.Core.Contract;
 using PTL.Core.Contract.ImportPermit;
 
 namespace PTL.Api.Tests.Endpoints;
 
-public class ImportPermitControllerTests
+public class ContractControllerImportPermitTests
 {
-    private static (ImportPermitController Controller, FakeImportPermitRepository Repository) CreateController()
+    private static (ContractController Controller, FakeImportPermitRepository Repository) CreateController()
     {
         var repository = new FakeImportPermitRepository();
         var service = new ImportPermitService(repository);
-        var controller = new ImportPermitController(service);
+        var controller = new ContractController(
+            new ContractService(new FakeContractRepository(), new FakeParticipantSchemeRepository(), NullLogger<ContractService>.Instance),
+            service,
+            new StubSampleAddressService(),
+            new StubContractRenewalService(),
+            new StubRenewContractsService(),
+            NullLogger<ContractController>.Instance);
 
         var services = new ServiceCollection().AddMvc().Services.BuildServiceProvider();
         controller.ControllerContext = new ControllerContext

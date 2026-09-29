@@ -1,0 +1,83 @@
+@model PTL.InternalWeb.Features.GroupAddress.GroupAddressFormViewModel
+@{
+    var isEdit = Model.GroupAddressId != Guid.Empty;
+    ViewData["Title"] = isEdit ? "Edit Group Address" : "Create Group Address";
+
+    string[] fieldOrder =
+    [
+        "Identifier", "Address1", "Address2", "Address3", "Address4", "Address5",
+        "CountryId", "Telephone", "PackingInstructions"
+    ];
+
+    var errors = ViewData.ModelState
+        .Where(entry => entry.Value?.Errors.Count > 0)
+        .SelectMany(entry => entry.Value!.Errors.Select(error => (Field: entry.Key, Message: error.ErrorMessage)))
+        .OrderBy(error => Array.IndexOf(fieldOrder, error.Field) is var idx && idx == -1 ? -1 : idx)
+        .ToList();
+}
+
+<h1 class="govuk-heading-l">@(isEdit ? "Edit Group Address" : "Create Group Address")</h1>
+
+<form method="post" asp-antiforgery="true" novalidate>
+    <govuk-error-summary errors="@errors" />
+
+    <div class="govuk-form-group">
+        <label class="govuk-label" asp-for="Identifier">Identifier</label>
+        <input class="govuk-input" asp-for="Identifier" />
+        <span asp-validation-for="Identifier" class="govuk-error-message"></span>
+    </div>
+
+    <div class="govuk-form-group">
+        <label class="govuk-label" asp-for="Address1">Address line 1</label>
+        <input class="govuk-input" asp-for="Address1" />
+        <span asp-validation-for="Address1" class="govuk-error-message"></span>
+    </div>
+
+    <div class="govuk-form-group">
+        <label class="govuk-label" asp-for="Address2">Address line 2</label>
+        <input class="govuk-input" asp-for="Address2" />
+        <span asp-validation-for="Address2" class="govuk-error-message"></span>
+    </div>
+
+    <div class="govuk-form-group">
+        <label class="govuk-label" asp-for="Address3">Address line 3</label>
+        <input class="govuk-input" asp-for="Address3" />
+    </div>
+
+    <div class="govuk-form-group">
+        <label class="govuk-label" asp-for="Address4">Address line 4</label>
+        <input class="govuk-input" asp-for="Address4" />
+    </div>
+
+    <div class="govuk-form-group">
+        <label class="govuk-label" asp-for="Address5">Address line 5</label>
+        <input class="govuk-input" asp-for="Address5" />
+    </div>
+
+    <div class="govuk-form-group">
+        <label class="govuk-label" asp-for="CountryId">Country</label>
+        <select class="govuk-select" asp-for="CountryId" asp-items="Model.CountryOptions"></select>
+        <span asp-validation-for="CountryId" class="govuk-error-message"></span>
+    </div>
+
+    <div class="govuk-form-group">
+        <label class="govuk-label" asp-for="Telephone">Telephone</label>
+        <input class="govuk-input" asp-for="Telephone" />
+        <span asp-validation-for="Telephone" class="govuk-error-message"></span>
+    </div>
+
+    <div class="govuk-form-group">
+        <label class="govuk-label" asp-for="PackingInstructions">Packing Instructions</label>
+        <textarea class="govuk-textarea" asp-for="PackingInstructions" rows="6"></textarea>
+        <span asp-validation-for="PackingInstructions" class="govuk-error-message"></span>
+    </div>
+
+    <div class="govuk-button-group">
+        <button type="submit" class="govuk-button" data-module="govuk-button">Save</button>
+        <a class="govuk-button govuk-button--secondary" asp-action="Index">Cancel</a>
+    </div>
+</form>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

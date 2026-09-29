@@ -23,7 +23,7 @@ Use:
 - ASMX services
 - CSLA business objects
 - Configuration
-- docs/source/PTLIMS-HLD-v0.3.docx
+- docs/source/PTLIMS_High Level Design_v0.5.docx
 - docs/source/PTLIMS-KT.md
 - Existing analysis documents
 

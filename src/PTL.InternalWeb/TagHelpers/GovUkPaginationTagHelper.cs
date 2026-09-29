@@ -30,12 +30,6 @@ public class GovUkPaginationTagHelper(IUrlHelperFactory urlHelperFactory) : TagH
 
     public override void Process(TagHelperContext context, TagHelperOutput output)
     {
-        if (Model.TotalPages <= 1)
-        {
-            output.SuppressOutput();
-            return;
-        }
-
         var urlHelper = urlHelperFactory.GetUrlHelper(ViewContext);
         string LinkFor(int page) => urlHelper.Action(Model.Action, MergeRouteValues(page)) ?? "#";
 

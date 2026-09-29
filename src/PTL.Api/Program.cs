@@ -10,6 +10,7 @@ using PTL.Core.Contract.Renew;
 using PTL.Core.Contract.Renewal;
 using PTL.Core.Contract.SampleAddress;
 using PTL.Core.Customer;
+using PTL.Core.GroupAddress;
 using PTL.Core.Lookup;
 using PTL.Core.Participant;
 using PTL.Core.Scheme;
@@ -19,6 +20,7 @@ using PTL.Data.Contract.Renew;
 using PTL.Data.Contract.Renewal;
 using PTL.Data.Contract.SampleAddress;
 using PTL.Data.Customer;
+using PTL.Data.GroupAddress;
 using PTL.Data.Infrastructure;
 using PTL.Data.Lookup;
 using PTL.Data.Participant;
@@ -60,6 +62,9 @@ builder.Services.AddControllers();
 
 builder.Services.AddScoped<ICustomerRepository, CustomerRepository>();
 builder.Services.AddScoped<ICustomerService, CustomerService>();
+
+builder.Services.AddScoped<IGroupAddressRepository, GroupAddressRepository>();
+builder.Services.AddScoped<IGroupAddressService, GroupAddressService>();
 
 builder.Services.AddScoped<IParticipantRepository, ParticipantRepository>();
 builder.Services.AddScoped<IParticipantService, ParticipantService>();

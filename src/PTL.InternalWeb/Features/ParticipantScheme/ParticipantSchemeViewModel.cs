@@ -1,14 +1,14 @@
 using Microsoft.AspNetCore.Mvc.Rendering;
-using PTL.Contracts.Participant;
 using PTL.Contracts.Scheme;
 using PTL.InternalWeb.Pagination;
 
 namespace PTL.InternalWeb.Features.ParticipantScheme;
 
-// Details.cshtml model - read-only summary, used both as the standalone "View" page and whenever
-// IsReadOnly is true (matches legacy ParticipantScheme.aspx locking every control down when
-// mContract.IsReadOnly or mParticipantScheme.IsRemoved).
-public sealed record ParticipantSchemeDetailsViewModel(ParticipantSchemeResponse ParticipantScheme, Guid CustomerId, bool IsReadOnly);
+// Details.cshtml model. Legacy has no separate view screen - ParticipantScheme.aspx serves both
+// Create and Edit and locks every control when mContract.IsReadOnly or mParticipantScheme.IsRemoved,
+// so Details renders the same field partial with Fields.IsReadOnly always true. IsReadOnly here is
+// the item's own removed/closed-year state, driving the page title and the Edit button only.
+public sealed record ParticipantSchemeDetailsViewModel(ParticipantSchemeFormViewModel Fields, bool IsReadOnly);
 
 // Shared by Create.cshtml and Edit.cshtml. Participant/Scheme selection only happens on Create -
 // legacy hides DropDownParticipant/GridViewSchemes once mParticipantScheme.IsNew is false, so Edit

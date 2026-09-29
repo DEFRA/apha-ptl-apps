@@ -6,6 +6,7 @@ using PTL.Api.Controllers;
 using PTL.Api.Tests.Contract;
 using PTL.Contracts.Contract;
 using PTL.Core.Contract;
+using PTL.Core.Contract.ImportPermit;
 
 namespace PTL.Api.Tests.Endpoints;
 
@@ -13,7 +14,13 @@ public class ContractControllerTests
 {
     private static ContractController CreateController(FakeContractRepository repository, FakeParticipantSchemeRepository? participantSchemeRepository = null)
     {
-        var controller = new ContractController(new ContractService(repository, participantSchemeRepository ?? new FakeParticipantSchemeRepository(), NullLogger<ContractService>.Instance), NullLogger<ContractController>.Instance);
+        var controller = new ContractController(
+            new ContractService(repository, participantSchemeRepository ?? new FakeParticipantSchemeRepository(), NullLogger<ContractService>.Instance),
+            new ImportPermitService(new FakeImportPermitRepository()),
+            new StubSampleAddressService(),
+            new StubContractRenewalService(),
+            new StubRenewContractsService(),
+            NullLogger<ContractController>.Instance);
 
         // ValidationProblem() resolves ProblemDetailsFactory from HttpContext.RequestServices,
         // which a bare controller instance does not have without this wiring.

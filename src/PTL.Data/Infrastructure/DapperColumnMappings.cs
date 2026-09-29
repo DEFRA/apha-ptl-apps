@@ -6,11 +6,13 @@ using PTL.Core.Contract.Renew;
 using PTL.Core.Contract.Renewal;
 using PTL.Core.Contract.SampleAddress;
 using PTL.Core.Customer;
+using PTL.Core.GroupAddress;
 using PTL.Core.Lookup;
 using PTL.Core.Participant;
 using PTL.Core.Scheme;
 using CoreContract = PTL.Core.Contract.Contract;
 using CoreCustomer = PTL.Core.Customer.Customer;
+using CoreGroupAddress = PTL.Core.GroupAddress.GroupAddress;
 using CoreParticipant = PTL.Core.Participant.Participant;
 using CoreScheme = PTL.Core.Scheme.Scheme;
 
@@ -366,6 +368,20 @@ public static class DapperColumnMappings
             ["fldIdentifier"] = nameof(GroupAddressEntity.Identifier),
             ["fldAddress1"] = nameof(GroupAddressEntity.Address1),
             ["fldCountryId"] = nameof(GroupAddressEntity.CountryId),
+        });
+
+        Map<CoreGroupAddress>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldGroupAddressId"] = nameof(CoreGroupAddress.GroupAddressId),
+            ["fldIdentifier"] = nameof(CoreGroupAddress.Identifier),
+            ["fldAddress1"] = nameof(CoreGroupAddress.Address1),
+            ["fldAddress2"] = nameof(CoreGroupAddress.Address2),
+            ["fldAddress3"] = nameof(CoreGroupAddress.Address3),
+            ["fldAddress4"] = nameof(CoreGroupAddress.Address4),
+            ["fldAddress5"] = nameof(CoreGroupAddress.Address5),
+            ["fldCountryId"] = nameof(CoreGroupAddress.CountryId),
+            ["fldTelephone"] = nameof(CoreGroupAddress.Telephone),
+            ["fldPackingInstructions"] = nameof(CoreGroupAddress.PackingInstructions),
         });
 
         Map<SampleAddressEntity>(new(StringComparer.OrdinalIgnoreCase)
