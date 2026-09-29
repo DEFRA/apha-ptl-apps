@@ -37,7 +37,7 @@
                     {
                         <span class="govuk-body app-side-navigation__link app-side-navigation__link--disabled" aria-disabled="true">@item.Text</span>
                     }
-                    else if (item.ControllerName is "Participant" or "Contract" or "RenewContracts" && customerId is not null)
+                    else if (item.ControllerName is "Participant" or "Contract" && customerId is not null)
                     {
                         <a class="govuk-link app-side-navigation__link" asp-controller="@item.ControllerName" asp-action="@item.ActionName" asp-route-customerId="@customerId">@item.Text</a>
                     }

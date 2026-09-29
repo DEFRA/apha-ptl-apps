@@ -12,6 +12,13 @@ internal sealed class FakeGroupAddressApiClient : IGroupAddressApiClient
     public Task<IReadOnlyList<GroupAddressResponse>> GetGroupAddressesAsync(CancellationToken cancellationToken = default) =>
         Task.FromResult(GroupAddresses);
 
+    public Task<GroupAddressSearchResponse> SearchGroupAddressesAsync(GroupAddressSearchRequest request, CancellationToken cancellationToken = default)
+    {
+        var ordered = GroupAddresses.OrderBy(g => g.Identifier).ToList();
+        var items = ordered.Skip((request.Page - 1) * request.PageSize).Take(request.PageSize).ToList();
+        return Task.FromResult(new GroupAddressSearchResponse(items, ordered.Count, request.Page, request.PageSize));
+    }
+
     public Task<GroupAddressResponse?> GetGroupAddressAsync(Guid groupAddressId, CancellationToken cancellationToken = default) =>
         Task.FromResult(GroupAddress);
 

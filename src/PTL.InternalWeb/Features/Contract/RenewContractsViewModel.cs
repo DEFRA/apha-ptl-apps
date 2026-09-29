@@ -1,6 +1,6 @@
 using PTL.Contracts.Contract;
 
-namespace PTL.InternalWeb.Features.RenewContracts;
+namespace PTL.InternalWeb.Features.Contract;
 
 // Legacy MergeContracts.aspx / MergeContractsViewModel - screen users know as "Renew Contracts".
 public sealed class RenewContractsViewModel

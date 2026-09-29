@@ -1,14 +1,28 @@
+using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
 
 namespace PTL.InternalWeb.Tests.Features.Customer;
 
-// CustomerFormViewModel.Validate() delegates to PTL.Core.Customer.CustomerValidator and is only
-// ever invoked by ASP.NET Core's model-validation pipeline, never by the controller directly -
-// existing CustomerControllerTests bypass real model binding, so this is the only place it runs.
+// CustomerFormViewModel now splits validation: DataAnnotations cover primitive rules (required/
+// length/format), while Validate() forwards only PTL.Core.Customer.CustomerValidator's conditional/
+// cross-field rules. ASP.NET Core MVC's real pipeline always runs BOTH independently - unlike
+// System.ComponentModel.DataAnnotations.Validator.TryValidateObject, which skips IValidatableObject
+// entirely once any property attribute fails - so this helper validates each property's attributes
+// independently (never short-circuited by another property) and always also calls Validate().
 public class CustomerFormViewModelTests
 {
-    private static List<ValidationResult> Validate(PTL.InternalWeb.Features.Customer.CustomerFormViewModel model) =>
-        model.Validate(new ValidationContext(model)).ToList();
+    private static List<ValidationResult> Validate(PTL.InternalWeb.Features.Customer.CustomerFormViewModel model)
+    {
+        var results = new List<ValidationResult>();
+        foreach (PropertyDescriptor property in TypeDescriptor.GetProperties(model))
+        {
+            var propertyContext = new ValidationContext(model) { MemberName = property.Name };
+            Validator.TryValidateProperty(property.GetValue(model), propertyContext, results);
+        }
+
+        results.AddRange(model.Validate(new ValidationContext(model)));
+        return results;
+    }
 
     [Fact]
     public void Validate_InactiveWithMinimalFields_ReturnsErrorsWithoutThrowing()

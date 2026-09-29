@@ -1,14 +1,26 @@
+using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
 
 namespace PTL.InternalWeb.Tests.Features.Participant;
 
-// ParticipantFormViewModel.Validate() delegates to PTL.Core.Participant.ParticipantValidator and is
-// only ever invoked by ASP.NET Core's model-validation pipeline, never by the controller directly -
-// existing ParticipantControllerTests bypass real model binding, so this is the only place it runs.
+// ParticipantFormViewModel validates purely via DataAnnotations - every PTL.Core.Participant.
+// ParticipantValidator rule is an unconditional primitive (required/select/email format), so no
+// IValidatableObject delegation is needed. Each property's attributes are validated independently
+// (via TryValidateProperty, one property at a time) so one field's failure never hides another's -
+// matching ASP.NET Core MVC's real per-property model-validation behaviour.
 public class ParticipantFormViewModelTests
 {
-    private static List<ValidationResult> Validate(PTL.InternalWeb.Features.Participant.ParticipantFormViewModel model) =>
-        model.Validate(new ValidationContext(model)).ToList();
+    private static List<ValidationResult> Validate(PTL.InternalWeb.Features.Participant.ParticipantFormViewModel model)
+    {
+        var results = new List<ValidationResult>();
+        foreach (PropertyDescriptor property in TypeDescriptor.GetProperties(model))
+        {
+            var propertyContext = new ValidationContext(model) { MemberName = property.Name };
+            Validator.TryValidateProperty(property.GetValue(model), propertyContext, results);
+        }
+
+        return results;
+    }
 
     [Fact]
     public void Validate_WithoutAnyFields_ReturnsAllRequiredFieldErrorsInOneSubmission()

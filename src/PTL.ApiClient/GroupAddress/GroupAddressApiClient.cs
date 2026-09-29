@@ -8,6 +8,7 @@ namespace PTL.ApiClient;
 public interface IGroupAddressApiClient
 {
     Task<IReadOnlyList<GroupAddressResponse>> GetGroupAddressesAsync(CancellationToken cancellationToken = default);
+    Task<GroupAddressSearchResponse> SearchGroupAddressesAsync(GroupAddressSearchRequest request, CancellationToken cancellationToken = default);
     Task<GroupAddressResponse?> GetGroupAddressAsync(Guid groupAddressId, CancellationToken cancellationToken = default);
     Task<GroupAddressSaveResult> CreateGroupAddressAsync(GroupAddressSaveRequest request, CancellationToken cancellationToken = default);
     Task<GroupAddressSaveResult> UpdateGroupAddressAsync(Guid groupAddressId, GroupAddressSaveRequest request, CancellationToken cancellationToken = default);
@@ -21,6 +22,13 @@ public sealed class GroupAddressApiClient(HttpClient httpClient) : IGroupAddress
     {
         var items = await httpClient.GetFromJsonAsync<IReadOnlyList<GroupAddressResponse>>("/api/group-addresses", cancellationToken);
         return items ?? [];
+    }
+
+    public async Task<GroupAddressSearchResponse> SearchGroupAddressesAsync(GroupAddressSearchRequest request, CancellationToken cancellationToken = default)
+    {
+        var response = await httpClient.GetFromJsonAsync<GroupAddressSearchResponse>(
+            $"/api/group-addresses/search?page={request.Page}&pageSize={request.PageSize}", cancellationToken);
+        return response ?? new GroupAddressSearchResponse([], 0, request.Page, request.PageSize);
     }
 
     public async Task<GroupAddressResponse?> GetGroupAddressAsync(Guid groupAddressId, CancellationToken cancellationToken = default)

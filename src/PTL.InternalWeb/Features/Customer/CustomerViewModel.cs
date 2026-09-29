@@ -2,6 +2,7 @@ using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using PTL.Contracts.Customer;
 using PTL.Core.Customer;
+using PTL.InternalWeb.ValidationAttributes;
 using CoreCustomer = PTL.Core.Customer.Customer;
 
 namespace PTL.InternalWeb.Features.Customer;
@@ -56,7 +57,9 @@ public sealed class CustomerFormViewModel : IValidatableObject
     [RegularExpression(@"^(QAL/[0-9]*)?$", ErrorMessage = "Registered file number must match the format QAL/nnnnn")]
     public string? RegisteredFileNumber { get; set; }
 
-    [Required(ErrorMessage = "Select a customer type")]
+    // Plain [Required] never fires here - the dropdown's "- Please Select -" option posts
+    // Guid.Empty, not null, so a dedicated empty-Guid check is needed.
+    [NotEmptyGuid(ErrorMessage = "Select a customer type")]
     public Guid? CustomerTypeId { get; set; }
 
     // Populated by CustomerController before the view is rendered (GET, and re-populated on a
@@ -117,7 +120,7 @@ public sealed class CustomerFormViewModel : IValidatableObject
     public string? Fax { get; set; }
 
     [StringLength(150, ErrorMessage = "Email must not exceed 150 characters")]
-    [EmailAddress(ErrorMessage = "Enter a valid email address")]
+    [OptionalEmailAddress(ErrorMessage = "Enter a valid email address")]
     public string? Email { get; set; }
 
     public Guid? CurrencyId { get; set; }
@@ -179,7 +182,7 @@ public sealed class CustomerFormViewModel : IValidatableObject
     public string? InvoiceFax { get; set; }
 
     [StringLength(150, ErrorMessage = "Invoice email must not exceed 150 characters")]
-    [EmailAddress(ErrorMessage = "Enter a valid invoice email address")]
+    [OptionalEmailAddress(ErrorMessage = "Enter a valid invoice email address")]
     public string? InvoiceEmail { get; set; }
 
 #pragma warning disable S6964
@@ -197,10 +200,28 @@ public sealed class CustomerFormViewModel : IValidatableObject
     // procedure; only meaningful while IsActive is false (mirrors the legacy "inactive error" flag).
     public Guid? CustomerStatusId { get; set; }
 
-    // Runs PTL.Core's CustomerValidator (the same rules PTL.Api enforces - not duplicated) as part
-    // of the normal MVC ModelState validation pass, so conditional-required-when-active fields and
-    // the CustomerTypeId-not-empty rule are caught on the same submit as the DataAnnotations above,
-    // instead of only surfacing after a round trip to the API.
+    // Fields whose only PTL.Core.CustomerValidator rules are unconditional primitives (required/
+    // length/format) already fully covered by the DataAnnotations above - forwarding them here
+    // would just duplicate the same message under a different wording.
+    private static readonly HashSet<string> PrimitiveOnlyFields = new()
+    {
+        "Name", "RegisteredFileNumber", "Telephone2", "Fax", "InvoiceName", "InvoiceTelephone",
+        "InvoiceTelephone2", "InvoiceFax", "VatNumber", "AccountNumber", "CustomerFinanceId",
+        "Comments", "PostageArrangements", "Address3", "Address4", "Address5",
+        "InvoiceAddress3", "InvoiceAddress4", "InvoiceAddress5", "CustomerTypeId"
+    };
+
+    // Some fields (e.g. ContactName, Address1, Email) are BOTH an unconditional primitive check
+    // (already covered above) AND a conditional-required-when-active business rule (not copied -
+    // stays in Core). For those, only the primitive-shaped messages are filtered out here.
+    private static bool IsPrimitiveDuplicateMessage(string message) =>
+        message.Contains("must not exceed", StringComparison.Ordinal) ||
+        message.Contains("contains characters that are not allowed", StringComparison.Ordinal) ||
+        message.Contains("must be a valid", StringComparison.Ordinal);
+
+    // Runs PTL.Core's CustomerValidator as part of the normal MVC ModelState validation pass so
+    // conditional-required-when-active and other cross-field/domain rules are caught on the same
+    // submit as the DataAnnotations above, instead of only surfacing after a round trip to the API.
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
     {
         var customer = new CoreCustomer
@@ -249,6 +270,11 @@ public sealed class CustomerFormViewModel : IValidatableObject
         var result = CustomerValidator.Validate(customer);
         foreach (var error in result.Errors)
         {
+            if (PrimitiveOnlyFields.Contains(error.Field) || IsPrimitiveDuplicateMessage(error.Message))
+            {
+                continue;
+            }
+
             yield return new ValidationResult(error.Message, [error.Field]);
         }
     }

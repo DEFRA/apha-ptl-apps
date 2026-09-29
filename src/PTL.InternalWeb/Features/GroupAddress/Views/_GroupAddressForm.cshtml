@@ -1,0 +1,28 @@
+@model PTL.InternalWeb.Features.GroupAddress.GroupAddressFormViewModel
+@{
+    string[] fieldOrder =
+    [
+        "Identifier", "Address1", "Address2", "Address3", "Address4", "Address5",
+        "CountryId", "Telephone", "PackingInstructions"
+    ];
+
+    var errors = ViewData.ModelState
+        .Where(entry => entry.Value?.Errors.Count > 0)
+        .SelectMany(entry => entry.Value!.Errors.Select(error => (Field: entry.Key, Message: error.ErrorMessage)))
+        .OrderBy(error => Array.IndexOf(fieldOrder, error.Field) is var idx && idx == -1 ? -1 : idx)
+        .ToList();
+}
+
+<govuk-error-summary errors="@errors" />
+
+<input type="hidden" asp-for="GroupAddressId" />
+
+<govuk-input asp-for="Identifier" label="Identifier" />
+<govuk-input asp-for="Address1" label="Address line 1" />
+<govuk-input asp-for="Address2" label="Address line 2" />
+<govuk-input asp-for="Address3" label="Address line 3" />
+<govuk-input asp-for="Address4" label="Address line 4" />
+<govuk-input asp-for="Address5" label="Address line 5" />
+<govuk-select asp-for="CountryId" label="Country" asp-items="Model.CountryOptions" />
+<govuk-input asp-for="Telephone" label="Telephone" />
+<govuk-textarea asp-for="PackingInstructions" label="Packing instructions" rows="6" />

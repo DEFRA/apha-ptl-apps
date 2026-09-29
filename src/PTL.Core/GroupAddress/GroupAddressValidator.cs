@@ -10,11 +10,11 @@ public static partial class GroupAddressValidator
     private static readonly Dictionary<string, string> FieldLabels = new()
     {
         [nameof(GroupAddress.Identifier)] = "Identifier",
-        [nameof(GroupAddress.Address1)] = "Address 1",
-        [nameof(GroupAddress.Address2)] = "Address 2",
-        [nameof(GroupAddress.Address3)] = "Address 3",
-        [nameof(GroupAddress.Address4)] = "Address 4",
-        [nameof(GroupAddress.Address5)] = "Address 5",
+        [nameof(GroupAddress.Address1)] = "Address line 1",
+        [nameof(GroupAddress.Address2)] = "Address line 2",
+        [nameof(GroupAddress.Address3)] = "Address line 3",
+        [nameof(GroupAddress.Address4)] = "Address line 4",
+        [nameof(GroupAddress.Address5)] = "Address line 5",
         [nameof(GroupAddress.CountryId)] = "Country",
         [nameof(GroupAddress.Telephone)] = "Telephone",
         [nameof(GroupAddress.PackingInstructions)] = "Packing Instructions"

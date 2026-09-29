@@ -41,7 +41,7 @@
                     {
                         @node.Text
                     }
-                    else if (node.ControllerName is "Participant" or "Contract" or "RenewContracts" && customerId is not null)
+                    else if (node.ControllerName is "Participant" or "Contract" && customerId is not null)
                     {
                         <a class="govuk-breadcrumbs__link" asp-controller="@node.ControllerName" asp-action="@node.ActionName" asp-route-customerId="@customerId">@node.Text</a>
                     }

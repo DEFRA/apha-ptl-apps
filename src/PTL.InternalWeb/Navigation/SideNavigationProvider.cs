@@ -101,7 +101,7 @@ public static class SideNavigationProvider
                             Children =
                             [
                                 new SideNavigationItem { Text = "Create Contract", ControllerName = ContractControllerName, ActionName = CreateAction },
-                                new SideNavigationItem { Text = "Renew Contracts", ControllerName = "RenewContracts", ActionName = "RenewContracts" },
+                                new SideNavigationItem { Text = "Renew Contracts", ControllerName = ContractControllerName, ActionName = "RenewContracts" },
                                 new SideNavigationItem { Text = "Contract Details", ControllerName = ContractControllerName, ActionName = DetailsAction, IsHidden = true },
                                 new SideNavigationItem { Text = "Edit Contract", ControllerName = ContractControllerName, ActionName = EditAction, IsHidden = true }
                             ]
@@ -210,44 +210,10 @@ public static class SideNavigationProvider
         return null;
     }
 
-    public static SideNavigationItem? FindActiveNode(IReadOnlyList<SideNavigationItem> items, string controllerName, string actionName)
-    {
-        var node = FindNode(items, controllerName, actionName);
-        if (node is not null)
-        {
-            return node;
-        }
+    public static SideNavigationItem? FindActiveNode(IReadOnlyList<SideNavigationItem> items, string controllerName, string actionName) =>
+        FindNode(items, controllerName, actionName);
 
-        // The legacy customer-scoped contract flow nests Renew Contracts under the hidden Contracts
-        // node. Resolving the current page via the parent Contract/Index node keeps the left-hand
-        // navigation and breadcrumbs aligned with the legacy sitemap instead of falling back to
-        // the top-level menu.
-        if (string.Equals(controllerName, "RenewContracts", StringComparison.OrdinalIgnoreCase))
-        {
-            return FindNode(items, ContractControllerName, IndexAction);
-        }
-
-        return null;
-    }
-
-    public static IReadOnlyList<SideNavigationItem>? FindActivePath(IReadOnlyList<SideNavigationItem> items, string controllerName, string actionName)
-    {
-        var path = FindPath(items, controllerName, actionName);
-        if (path is not null)
-        {
-            return path;
-        }
-
-        if (string.Equals(controllerName, "RenewContracts", StringComparison.OrdinalIgnoreCase))
-        {
-            var contractPath = FindPath(items, ContractControllerName, IndexAction);
-            if (contractPath is not null)
-            {
-                return [.. contractPath, new SideNavigationItem { Text = "Renew Contracts", ControllerName = controllerName, ActionName = actionName }];
-            }
-        }
-
-        return null;
-    }
+    public static IReadOnlyList<SideNavigationItem>? FindActivePath(IReadOnlyList<SideNavigationItem> items, string controllerName, string actionName) =>
+        FindPath(items, controllerName, actionName);
 }
 

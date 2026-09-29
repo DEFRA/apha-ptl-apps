@@ -7,6 +7,21 @@ public sealed class GroupAddressService(IGroupAddressRepository groupAddressRepo
     public Task<IReadOnlyList<GroupAddress>> GetAllAsync(CancellationToken cancellationToken = default) =>
         groupAddressRepository.GetAllAsync(cancellationToken);
 
+    public async Task<GroupAddressSearchResult> SearchAsync(int page, int pageSize, CancellationToken cancellationToken = default)
+    {
+        page = page < 1 ? 1 : page;
+        pageSize = pageSize is < 1 or > 200 ? 20 : pageSize;
+
+        var all = (await groupAddressRepository.GetAllAsync(cancellationToken))
+            .OrderBy(g => g.Identifier)
+            .ToList();
+
+        var totalCount = all.Count;
+        var items = all.Skip((page - 1) * pageSize).Take(pageSize).ToList();
+
+        return new GroupAddressSearchResult(items, totalCount);
+    }
+
     public Task<GroupAddress?> GetByIdAsync(Guid groupAddressId, CancellationToken cancellationToken = default) =>
         groupAddressRepository.GetByIdAsync(groupAddressId, cancellationToken);
 

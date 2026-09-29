@@ -9,24 +9,15 @@ namespace PTL.InternalWeb.Features.GroupAddress;
 public sealed class GroupAddressController(IGroupAddressApiClient groupAddressApiClient, ILookupApiClient lookupApiClient) : Controller
 {
     [HttpGet]
-    public async Task<IActionResult> Index(int page = 1, int pageSize = 20, CancellationToken cancellationToken = default)
+    public async Task<IActionResult> Index(int page = 1, int pageSize = PTL.InternalWeb.Pagination.PaginationModel.DefaultPageSize, CancellationToken cancellationToken = default)
     {
-        var groupAddresses = (await groupAddressApiClient.GetGroupAddressesAsync(cancellationToken))
-            .OrderBy(g => g.Identifier)
-            .ToList();
+        var result = await groupAddressApiClient.SearchGroupAddressesAsync(new GroupAddressSearchRequest(page, pageSize), cancellationToken);
 
-        pageSize = pageSize is < 1 or > 200 ? 20 : pageSize;
-        var totalCount = groupAddresses.Count;
-        var totalPages = Math.Max(1, (int)Math.Ceiling(totalCount / (double)pageSize));
-        page = Math.Clamp(page, 1, totalPages);
-
-        var pagedItems = groupAddresses
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
+        var pagedItems = result.Items
             .Select(g => new GroupAddressSummaryViewModel(g.GroupAddressId, g.Identifier, g.Address1))
             .ToList();
 
-        var model = new GroupAddressListViewModel(page, pageSize, totalCount, pagedItems);
+        var model = new GroupAddressListViewModel(result.Page, result.PageSize, result.TotalCount, pagedItems);
         return View(model);
     }
 
@@ -50,7 +41,7 @@ public sealed class GroupAddressController(IGroupAddressApiClient groupAddressAp
     {
         var model = new GroupAddressFormViewModel();
         await PopulateCountryOptionsAsync(model, cancellationToken);
-        return View("Edit", model);
+        return View(model);
     }
 
     [HttpPost]
@@ -60,7 +51,7 @@ public sealed class GroupAddressController(IGroupAddressApiClient groupAddressAp
         if (!ModelState.IsValid)
         {
             await PopulateCountryOptionsAsync(model, cancellationToken);
-            return View("Edit", model);
+            return View(model);
         }
 
         var result = await groupAddressApiClient.CreateGroupAddressAsync(ToRequest(model), cancellationToken);
@@ -68,7 +59,7 @@ public sealed class GroupAddressController(IGroupAddressApiClient groupAddressAp
         {
             AddErrors(result.FieldErrors);
             await PopulateCountryOptionsAsync(model, cancellationToken);
-            return View("Edit", model);
+            return View(model);
         }
 
         TempData.SetNotification(NotificationType.Success, "Group Address created successfully.");

@@ -15,6 +15,14 @@ public sealed class GroupAddressController(IGroupAddressService groupAddressServ
         return Ok(groupAddresses.Select(ToResponse).ToList());
     }
 
+    // GET /api/group-addresses/search?page=1&pageSize=20
+    [HttpGet("search")]
+    public async Task<ActionResult<GroupAddressSearchResponse>> SearchGroupAddresses([FromQuery] GroupAddressSearchRequest request, CancellationToken cancellationToken)
+    {
+        var result = await groupAddressService.SearchAsync(request.Page, request.PageSize, cancellationToken);
+        return Ok(new GroupAddressSearchResponse(result.Items.Select(ToResponse).ToList(), result.TotalCount, request.Page, request.PageSize));
+    }
+
     [HttpGet("{groupAddressId:guid}")]
     public async Task<ActionResult<GroupAddressResponse>> GetGroupAddress(Guid groupAddressId, CancellationToken cancellationToken)
     {

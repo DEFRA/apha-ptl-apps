@@ -90,7 +90,8 @@ public class ContractExportEndToEndTests : IDisposable
             new FakeImportPermitApiClient(),
             NullLogger<PTL.InternalWeb.Features.Contract.ContractController>.Instance,
             documentService,
-            new FakeContractExportApiClient());
+            new FakeContractExportApiClient(),
+            new FakeContractRenewalApiClient());
     }
 
     private static PTL.Contracts.Customer.CustomerResponse SampleCustomer(Guid customerId) => new(
