@@ -200,6 +200,10 @@ public class SystemAdministrationControllerTests
         var view = Assert.IsType<ViewResult>(result);
         var model = Assert.IsType<WeightedPricingPlanViewModel>(view.Model);
         Assert.Equal(2025, model.SelectedYearId);
+        var yearOptions = model.YearOptions.ToList();
+        Assert.Equal(2, yearOptions.Count);
+        Assert.Contains(yearOptions, o => o.Text == "2024/25" && o.Value == "2024");
+        Assert.Contains(yearOptions, o => o.Text == "2025/26" && o.Value == "2025");
     }
 
     [Fact]

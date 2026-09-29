@@ -132,11 +132,19 @@ public class SystemAdministrationController(
         var currentYears = await lookupApiClient.GetCurrentYearsAsync(cancellationToken);
         var currentYearId = currentYears.Count > 0 ? currentYears[0].YearId : (int?)null;
 
-        var selectedYearId = yearId is not null && years.AvailableYears.Any(y => y.YearId == yearId)
-            ? yearId.Value
-            : currentYearId is not null && years.AvailableYears.Any(y => y.YearId == currentYearId)
-                ? currentYearId.Value
-                : years.AvailableYears[0].YearId;
+        int selectedYearId;
+        if (yearId is not null && years.AvailableYears.Any(y => y.YearId == yearId))
+        {
+            selectedYearId = yearId.Value;
+        }
+        else if (currentYearId is not null && years.AvailableYears.Any(y => y.YearId == currentYearId))
+        {
+            selectedYearId = currentYearId.Value;
+        }
+        else
+        {
+            selectedYearId = years.AvailableYears[0].YearId;
+        }
 
         var percentages = await weightedPricingPlanApiClient.GetPercentagesForYearAsync(selectedYearId, cancellationToken);
         var rowKeys = percentages.Select(p => p.NumberOfDistributionsOnScheme).Distinct().OrderBy(n => n).ToList();

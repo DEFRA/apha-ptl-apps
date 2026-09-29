@@ -40,7 +40,7 @@ public class AdministrationChargeControllerTests
         var result = await controller.GetAdministrationCharges(CancellationToken.None);
 
         var ok = Assert.IsType<OkObjectResult>(result.Result);
-        var response = Assert.IsAssignableFrom<IReadOnlyList<AdministrationChargeResponse>>(ok.Value);
+        var response = Assert.IsType<IReadOnlyList<AdministrationChargeResponse>>(ok.Value, exactMatch: false);
         var charge = Assert.Single(response);
         var price = Assert.Single(charge.Prices);
         Assert.Equal(currencyId, price.CurrencyId);

@@ -24,6 +24,7 @@ public static class SideNavigationProvider
     private const string ParticipantControllerName = "Participant";
     private const string ContractControllerName = "Contract";
     private const string SchemeControllerName = "Scheme";
+    private const string SystemAdministrationControllerName = "SystemAdministration";
 
     // Placeholder for a menu entry whose page hasn't been migrated yet - see class remarks.
     private static SideNavigationItem Disabled(string text) => new() { Text = text, IsEnabled = false };
@@ -34,8 +35,8 @@ public static class SideNavigationProvider
         new SideNavigationItem
         {
             Text = "System Administration",
-            ControllerName = "SystemAdministration",
-            ActionName = "SystemAdministration",
+            ControllerName = SystemAdministrationControllerName,
+            ActionName = SystemAdministrationControllerName,
             Children =
             [
                 Disabled("Create User"),
@@ -46,8 +47,8 @@ public static class SideNavigationProvider
                 Disabled("Viewer Management"),
                 Disabled("Country Management"),
                 Disabled("External Site Management"),
-                new SideNavigationItem { Text = "Administration Charges Management", ControllerName = "SystemAdministration", ActionName = "AdministrationCharge" },
-                new SideNavigationItem { Text = "Weighted Charging Plan", ControllerName = "SystemAdministration", ActionName = "WeightedPricingPlan" },
+                new SideNavigationItem { Text = "Administration Charges Management", ControllerName = SystemAdministrationControllerName, ActionName = "AdministrationCharge" },
+                new SideNavigationItem { Text = "Weighted Charging Plan", ControllerName = SystemAdministrationControllerName, ActionName = "WeightedPricingPlan" },
                 Disabled("Postage Pricing Plan")
             ]
         },

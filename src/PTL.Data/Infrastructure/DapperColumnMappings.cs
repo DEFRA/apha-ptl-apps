@@ -29,6 +29,7 @@ public static class DapperColumnMappings
     private const string ColName = "fldName";
     private const string ColIsActive = "fldIsActive";
     private const string ColYearId = "fldYearId";
+    private const string ColCurrencyId = "fldCurrencyId";
 
     public static void Register()
     {
@@ -56,7 +57,7 @@ public static class DapperColumnMappings
             ["fldTelephone2"] = nameof(CoreCustomer.Telephone2),
             ["fldFax"] = nameof(CoreCustomer.Fax),
             ["fldEmail"] = nameof(CoreCustomer.Email),
-            ["fldCurrencyId"] = nameof(CoreCustomer.CurrencyId),
+            [ColCurrencyId] = nameof(CoreCustomer.CurrencyId),
             ["fldComments"] = nameof(CoreCustomer.Comments),
             ["fldInitialStartDate"] = nameof(CoreCustomer.InitialStartDate),
             ["fldPostageArrangements"] = nameof(CoreCustomer.PostageArrangements),
@@ -267,7 +268,7 @@ public static class DapperColumnMappings
         {
             ["fldSchemeCurrencyId"] = nameof(SchemeCurrencyEntity.SchemeCurrencyId),
             ["fldSchemeId"] = nameof(SchemeCurrencyEntity.SchemeId),
-            ["fldCurrencyId"] = nameof(SchemeCurrencyEntity.CurrencyId),
+            [ColCurrencyId] = nameof(SchemeCurrencyEntity.CurrencyId),
             ["fldPrice"] = nameof(SchemeCurrencyEntity.Price),
             ["fldCurrencyName"] = nameof(SchemeCurrencyEntity.CurrencyName),
             ["fldCurrencySymbol"] = nameof(SchemeCurrencyEntity.CurrencySymbol),
@@ -291,7 +292,7 @@ public static class DapperColumnMappings
 
         Map<CurrencyEntity>(new(StringComparer.OrdinalIgnoreCase)
         {
-            ["fldCurrencyId"] = nameof(CurrencyEntity.CurrencyId),
+            [ColCurrencyId] = nameof(CurrencyEntity.CurrencyId),
             [ColName] = nameof(CurrencyEntity.Name),
             ["fldSymbol"] = nameof(CurrencyEntity.Symbol),
         });
@@ -330,7 +331,7 @@ public static class DapperColumnMappings
         {
             ["fldAdministrationChargeCurrencyId"] = nameof(AdministrationChargeCurrencyEntity.AdministrationChargeCurrencyId),
             ["fldAdministrationChargeId"] = nameof(AdministrationChargeCurrencyEntity.AdministrationChargeId),
-            ["fldCurrencyId"] = nameof(AdministrationChargeCurrencyEntity.CurrencyId),
+            [ColCurrencyId] = nameof(AdministrationChargeCurrencyEntity.CurrencyId),
             ["fldPrice"] = nameof(AdministrationChargeCurrencyEntity.Price),
         });
 
