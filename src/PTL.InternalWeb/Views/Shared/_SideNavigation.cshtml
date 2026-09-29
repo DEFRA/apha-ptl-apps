@@ -10,8 +10,16 @@
 
     var topLevel = SideNavigationProvider.Build();
     var isHome = string.Equals(currentController, "Home", StringComparison.OrdinalIgnoreCase);
-    var currentNode = isHome ? null : SideNavigationProvider.FindNode(topLevel, currentController, currentAction);
-    var visibleItems = currentNode is null ? topLevel : currentNode.Children.Where(child => !child.IsHidden).ToList();
+    var homeNode = SideNavigationProvider.FindNode(topLevel, "Home", "Index");
+    var currentNode = isHome ? homeNode : SideNavigationProvider.FindActiveNode(topLevel, currentController, currentAction);
+    var visibleItems = isHome
+        ? topLevel.Where(item =>
+            !(string.Equals(item.ControllerName, "Home", StringComparison.OrdinalIgnoreCase)
+              && string.Equals(item.ActionName, "Index", StringComparison.OrdinalIgnoreCase)))
+            .ToList()
+        : currentNode is null
+            ? topLevel
+            : currentNode.Children.Where(child => !child.IsHidden).ToList();
 }
 
 <nav aria-label="Primary navigation" class="app-side-navigation">
@@ -29,7 +37,7 @@
                     {
                         <span class="govuk-body app-side-navigation__link app-side-navigation__link--disabled" aria-disabled="true">@item.Text</span>
                     }
-                    else if (item.ControllerName is "Participant" or "Contract" && customerId is not null)
+                    else if (item.ControllerName is "Participant" or "Contract" or "RenewContracts" && customerId is not null)
                     {
                         <a class="govuk-link app-side-navigation__link" asp-controller="@item.ControllerName" asp-action="@item.ActionName" asp-route-customerId="@customerId">@item.Text</a>
                     }

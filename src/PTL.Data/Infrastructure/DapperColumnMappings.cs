@@ -2,6 +2,7 @@ using System.Reflection;
 using Dapper;
 using PTL.Core.Contract;
 using PTL.Core.Contract.ImportPermit;
+using PTL.Core.Contract.Renew;
 using PTL.Core.Contract.Renewal;
 using PTL.Core.Contract.SampleAddress;
 using PTL.Core.Customer;
@@ -166,6 +167,33 @@ public static class DapperColumnMappings
         Map<SystemSettingsEntity>(new(StringComparer.OrdinalIgnoreCase)
         {
             ["fldUTNumber"] = nameof(SystemSettingsEntity.UTNumber),
+            ["NextYearWithDelayId"] = nameof(SystemSettingsEntity.NextYearWithDelayId),
+        });
+
+        // spgContractMerge result set 1 (legacy ContractMergeInfo).
+        Map<RenewableContractEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldContractId"] = nameof(RenewableContractEntity.ContractId),
+            ["fldSuffix"] = nameof(RenewableContractEntity.Suffix),
+            ["fldContractSignatory"] = nameof(RenewableContractEntity.ContractSignatory),
+            ["fldRenewalInformation"] = nameof(RenewableContractEntity.RenewalInformation),
+            ["fldActionsRequired"] = nameof(RenewableContractEntity.ActionsRequired),
+            [ColIsActive] = nameof(RenewableContractEntity.IsActive),
+            ["fldNoOfItems"] = nameof(RenewableContractEntity.NoOfItems),
+        });
+
+        // spgContractMerge result set 2 (legacy ParticipantSchemeMergeInfo). Suffix is not a result
+        // column - it is copied from the parent contract by ContractMergeRepository.
+        Map<RenewableContractItemEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldContractId"] = nameof(RenewableContractItemEntity.ContractId),
+            ["fldParticipantSchemeId"] = nameof(RenewableContractItemEntity.ParticipantSchemeId),
+            ["fldLabCode"] = nameof(RenewableContractItemEntity.LabCode),
+            ["fldLabName"] = nameof(RenewableContractItemEntity.LabName),
+            ["fldOldSchemeIdentifier"] = nameof(RenewableContractItemEntity.OldSchemeIdentifier),
+            ["fldOldSchemeName"] = nameof(RenewableContractItemEntity.OldSchemeName),
+            ["fldNewSchemeIdentifier"] = nameof(RenewableContractItemEntity.NewSchemeIdentifier),
+            ["fldNewSchemeName"] = nameof(RenewableContractItemEntity.NewSchemeName),
         });
 
         Map<ContractSummaryEntity>(new(StringComparer.OrdinalIgnoreCase)

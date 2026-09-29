@@ -21,7 +21,7 @@
     // Mirrors the current page's node in the left nav (_SideNavigation.cshtml) - the breadcrumb
     // trail is the exact reverse of the drill-down journey: Home > ... > current page. Falls back
     // to a plain controller/action crumb for any page not represented in the nav tree.
-    var path = isHome ? null : SideNavigationProvider.FindPath(SideNavigationProvider.Build(), controller, action);
+    var path = isHome ? null : SideNavigationProvider.FindActivePath(SideNavigationProvider.Build(), controller, action);
 }
 
 <nav class="govuk-breadcrumbs" aria-label="Breadcrumb">
@@ -41,7 +41,7 @@
                     {
                         @node.Text
                     }
-                    else if (node.ControllerName is "Participant" or "Contract" && customerId is not null)
+                    else if (node.ControllerName is "Participant" or "Contract" or "RenewContracts" && customerId is not null)
                     {
                         <a class="govuk-breadcrumbs__link" asp-controller="@node.ControllerName" asp-action="@node.ActionName" asp-route-customerId="@customerId">@node.Text</a>
                     }

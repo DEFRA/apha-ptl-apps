@@ -28,6 +28,26 @@ internal sealed class FakeSchemeRepository : ISchemeRepository
         return Task.FromResult(summaries);
     }
 
+    public Task<IReadOnlyList<SchemeSummaryEntity>> GetSummariesBySchemeIdAsync(Guid schemeId, CancellationToken cancellationToken = default)
+    {
+        IReadOnlyList<SchemeSummaryEntity> summaries = _schemes.TryGetValue(schemeId, out var scheme)
+            ?
+            [
+                new SchemeSummaryEntity
+                {
+                    SharedId = scheme.SharedId,
+                    YearId = scheme.YearId,
+                    CurrentSchemeId = scheme.SchemeId,
+                    CurrentIdentifier = scheme.Identifier,
+                    CurrentName = scheme.Name,
+                    NextSchemeId = _schemes.Values.FirstOrDefault(s => s.SharedId == scheme.SharedId && s.YearId == scheme.YearId + 1)?.SchemeId
+                }
+            ]
+            : [];
+
+        return Task.FromResult(summaries);
+    }
+
     public Task<IReadOnlyList<SchemeHistoryEntity>> GetHistoryAsync(Guid sharedId, CancellationToken cancellationToken = default)
     {
         IReadOnlyList<SchemeHistoryEntity> history = _schemes.Values
