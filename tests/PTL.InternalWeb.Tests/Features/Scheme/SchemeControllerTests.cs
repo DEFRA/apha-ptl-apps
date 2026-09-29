@@ -176,4 +176,14 @@ public class SchemeControllerTests
         Assert.Equal("Details", redirect.ActionName);
         Assert.Equal(schemeId, redirect.RouteValues!["id"]);
     }
+
+    [Fact]
+    public void ManageSchemes_ReturnsView()
+    {
+        var controller = CreateController(new FakeSchemeApiClient());
+
+        var result = controller.ManageSchemes();
+
+        Assert.IsType<ViewResult>(result);
+    }
 }

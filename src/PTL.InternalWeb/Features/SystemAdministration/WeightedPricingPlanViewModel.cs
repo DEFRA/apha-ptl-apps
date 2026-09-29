@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Mvc.Rendering;
 
-namespace PTL.InternalWeb.Features.WeightedPricingPlan;
+namespace PTL.InternalWeb.Features.SystemAdministration;
 
 // One row of the grid: "No. Per Year" (NumberOfDistributionsOnScheme) plus one weight per
 // "No. Chosen" column - mirrors legacy WeightedPricingPlan.aspx.vb's BuildTable(). A null weight

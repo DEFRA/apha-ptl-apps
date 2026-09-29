@@ -1,4 +1,4 @@
-@model PTL.InternalWeb.Features.WeightedPricingPlan.WeightedPricingPlanViewModel
+@model PTL.InternalWeb.Features.SystemAdministration.WeightedPricingPlanViewModel
 @{
     ViewData["Title"] = "Weighted Pricing Plan";
 }
@@ -23,7 +23,7 @@
     return;
 }
 
-<form method="get" asp-action="Index" class="govuk-!-margin-bottom-6">
+<form method="get" asp-action="WeightedPricingPlan" class="govuk-!-margin-bottom-6">
     <div class="govuk-form-group">
         <label class="govuk-label" for="yearId">Select a financial year:</label>
         <select class="govuk-select" id="yearId" name="yearId" onchange="this.form.submit()" asp-items="Model.YearOptions" asp-for="SelectedYearId"></select>

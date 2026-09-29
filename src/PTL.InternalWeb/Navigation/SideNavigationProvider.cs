@@ -34,7 +34,7 @@ public static class SideNavigationProvider
         new SideNavigationItem
         {
             Text = "System Administration",
-            ControllerName = "Menu",
+            ControllerName = "SystemAdministration",
             ActionName = "SystemAdministration",
             Children =
             [
@@ -46,15 +46,15 @@ public static class SideNavigationProvider
                 Disabled("Viewer Management"),
                 Disabled("Country Management"),
                 Disabled("External Site Management"),
-                new SideNavigationItem { Text = "Administration Charges Management", ControllerName = "AdministrationCharge", ActionName = IndexAction },
-                new SideNavigationItem { Text = "Weighted Charging Plan", ControllerName = "WeightedPricingPlan", ActionName = IndexAction },
+                new SideNavigationItem { Text = "Administration Charges Management", ControllerName = "SystemAdministration", ActionName = "AdministrationCharge" },
+                new SideNavigationItem { Text = "Weighted Charging Plan", ControllerName = "SystemAdministration", ActionName = "WeightedPricingPlan" },
                 Disabled("Postage Pricing Plan")
             ]
         },
         new SideNavigationItem
         {
             Text = "Manage Contracts",
-            ControllerName = "Menu",
+            ControllerName = ContractControllerName,
             ActionName = "ManageContracts",
             Children =
             [
@@ -118,7 +118,7 @@ public static class SideNavigationProvider
         new SideNavigationItem
         {
             Text = "Manage Schemes",
-            ControllerName = "Menu",
+            ControllerName = SchemeControllerName,
             ActionName = "ManageSchemes",
             Children =
             [

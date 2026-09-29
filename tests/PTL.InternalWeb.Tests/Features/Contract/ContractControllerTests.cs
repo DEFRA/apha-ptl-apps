@@ -184,4 +184,14 @@ public class ContractControllerTests
         Assert.Equal("Details", redirect.ActionName);
         Assert.Equal(contractId, redirect.RouteValues!["id"]);
     }
+
+    [Fact]
+    public void ManageContracts_ReturnsView()
+    {
+        var controller = CreateController(new FakeContractApiClient());
+
+        var result = controller.ManageContracts();
+
+        Assert.IsType<ViewResult>(result);
+    }
 }

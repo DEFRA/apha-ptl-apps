@@ -47,6 +47,11 @@ public class ContractController(IContractApiClient contractApiClient, ICustomerA
             new EventId(6, nameof(LogUpdatedContractMessage)),
             "Updated contract {ContractId}");
 
+    // Landing page for the Manage Contracts section (moved from the removed Menu feature) -
+    // mirrors legacy Contracts Admin/MenuContracts.aspx; the left nav (SideNavigationProvider)
+    // supplies the actual section contents.
+    public IActionResult ManageContracts() => View();
+
     public async Task<IActionResult> Index(
         Guid customerId,
         int? yearId,

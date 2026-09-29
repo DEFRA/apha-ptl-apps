@@ -1,4 +1,4 @@
-@model PTL.InternalWeb.Features.AdministrationCharge.AdministrationChargeListViewModel
+@model PTL.InternalWeb.Features.SystemAdministration.AdministrationChargeListViewModel
 @{
     ViewData["Title"] = "Administration Charges";
 
@@ -23,7 +23,7 @@
 }
 else
 {
-    <form method="post" asp-action="Index" novalidate>
+    <form method="post" asp-action="AdministrationCharge" novalidate>
         <table class="govuk-table">
             <thead class="govuk-table__head">
                 <tr class="govuk-table__row">
@@ -68,7 +68,7 @@ else
 
         <div class="govuk-button-group">
             <button class="govuk-button" data-module="govuk-button" type="submit">Save</button>
-            <a class="govuk-button govuk-button--secondary" data-module="govuk-button" asp-action="Index">Cancel</a>
+            <a class="govuk-button govuk-button--secondary" data-module="govuk-button" asp-action="AdministrationCharge">Cancel</a>
         </div>
     </form>
 }

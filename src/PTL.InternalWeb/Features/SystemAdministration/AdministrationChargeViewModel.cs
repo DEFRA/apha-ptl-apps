@@ -1,6 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 
-namespace PTL.InternalWeb.Features.AdministrationCharge;
+namespace PTL.InternalWeb.Features.SystemAdministration;
 
 // One row per administration charge, one cell per system currency (in ILookupApiClient.
 // GetCurrenciesAsync order) - mirrors the legacy AdministrationChargeCurrency.aspx grid (a fixed
