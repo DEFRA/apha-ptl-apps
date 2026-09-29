@@ -26,15 +26,6 @@
         .SelectMany(entry => entry.Value!.Errors.Select(error => (Field: entry.Key, Message: error.ErrorMessage)))
         .OrderBy(error => Array.IndexOf(fieldOrder, error.Field) is var idx && idx == -1 ? -1 : idx)
         .ToList();
-
-    // Per-field GOV.UK error state (govuk-form-group--error / govuk-input--error / error message
-    // paragraph / aria-describedby) - applied via these helpers instead of duplicating the same
-    // ModelState lookup and markup for every one of the 40+ fields below.
-    bool HasError(string field) => ViewData.ModelState.TryGetValue(field, out var entry) && entry.Errors.Count > 0;
-    string? FirstError(string field) => ViewData.ModelState.TryGetValue(field, out var entry) && entry.Errors.Count > 0 ? entry.Errors[0].ErrorMessage : null;
-    string FormGroupClass(string field) => HasError(field) ? "govuk-form-group govuk-form-group--error" : "govuk-form-group";
-    string InputClass(string baseClass, string field) => HasError(field) ? $"{baseClass} {baseClass}--error" : baseClass;
-    string? DescribedBy(string field) => HasError(field) ? $"{field}-error" : null;
 }
 
 <govuk-error-summary errors="@errors" />
@@ -161,23 +152,9 @@
 
 <h2 class="govuk-heading-m">Other</h2>
 
-<div class="@FormGroupClass("PostageArrangements")">
-    <label class="govuk-label" asp-for="PostageArrangements">Postage arrangements</label>
-    @if (HasError("PostageArrangements"))
-    {
-        <p id="PostageArrangements-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @FirstError("PostageArrangements")</p>
-    }
-    <textarea class="@InputClass("govuk-textarea", "PostageArrangements")" asp-for="PostageArrangements" aria-describedby="@DescribedBy("PostageArrangements")"></textarea>
-</div>
+<govuk-textarea asp-for="PostageArrangements" label="Postage arrangements" />
 
-<div class="@FormGroupClass("Comments")">
-    <label class="govuk-label" asp-for="Comments">Comments</label>
-    @if (HasError("Comments"))
-    {
-        <p id="Comments-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @FirstError("Comments")</p>
-    }
-    <textarea class="@InputClass("govuk-textarea", "Comments")" asp-for="Comments" aria-describedby="@DescribedBy("Comments")"></textarea>
-</div>
+<govuk-textarea asp-for="Comments" label="Comments" />
 
 <script>
     // Mirrors legacy Customer.aspx.vb ButtonCopyDetails_Click - copies the Contact details

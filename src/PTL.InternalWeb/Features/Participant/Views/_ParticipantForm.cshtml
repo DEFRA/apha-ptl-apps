@@ -15,12 +15,6 @@
         .SelectMany(entry => entry.Value!.Errors.Select(error => (Field: entry.Key, Message: error.ErrorMessage)))
         .OrderBy(error => Array.IndexOf(fieldOrder, error.Field) is var idx && idx == -1 ? -1 : idx)
         .ToList();
-
-    bool HasError(string field) => ViewData.ModelState.TryGetValue(field, out var entry) && entry.Errors.Count > 0;
-    string? FirstError(string field) => ViewData.ModelState.TryGetValue(field, out var entry) && entry.Errors.Count > 0 ? entry.Errors[0].ErrorMessage : null;
-    string FormGroupClass(string field) => HasError(field) ? "govuk-form-group govuk-form-group--error" : "govuk-form-group";
-    string InputClass(string baseClass, string field) => HasError(field) ? $"{baseClass} {baseClass}--error" : baseClass;
-    string? DescribedBy(string field) => HasError(field) ? $"{field}-error" : null;
 }
 
 <govuk-error-summary errors="@errors" />
@@ -86,14 +80,7 @@
 
 <govuk-input asp-for="Email2" label="Alternative email" />
 
-<div class="@FormGroupClass("Comments")">
-    <label class="govuk-label" asp-for="Comments">Other Packaging Requirements</label>
-    @if (HasError("Comments"))
-    {
-        <p id="Comments-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @FirstError("Comments")</p>
-    }
-    <textarea class="@InputClass("govuk-textarea", "Comments")" asp-for="Comments" rows="5" aria-describedby="@DescribedBy("Comments")"></textarea>
-</div>
+<govuk-textarea asp-for="Comments" label="Other Packaging Requirements" rows="5" />
 
 
 

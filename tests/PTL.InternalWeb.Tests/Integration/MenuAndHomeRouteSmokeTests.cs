@@ -17,6 +17,28 @@ public class MenuAndHomeRouteSmokeTests : IClassFixture<WebApplicationFactory<Pr
     }
 
     [Fact]
+    public async Task Menu_SystemAdministration_ReturnsSuccess()
+    {
+        var client = _factory.CreateClient();
+
+        var response = await client.GetAsync("/Menu/SystemAdministration");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Menu_SystemAdministration_RendersHeading()
+    {
+        var client = _factory.CreateClient();
+
+        var response = await client.GetAsync("/Menu/SystemAdministration");
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("govuk-heading", body, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task Menu_ManageContracts_ReturnsSuccess()
     {
         var client = _factory.CreateClient();
