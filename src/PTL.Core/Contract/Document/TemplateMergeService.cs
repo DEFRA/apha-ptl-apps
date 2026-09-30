@@ -401,7 +401,8 @@ public sealed partial class TemplateMergeService : ITemplateMergeService
     private static IEnumerable<OpenXmlElement> SelfAndDescendants(OpenXmlElement element) =>
         Enumerable.Repeat(element, 1).Concat(element.Descendants());
 
-    private static bool TryGetMergeFieldName(string? instruction, out string name)    {
+    private static bool TryGetMergeFieldName(string? instruction, out string name)
+    {
         name = string.Empty;
         if (string.IsNullOrWhiteSpace(instruction))
         {

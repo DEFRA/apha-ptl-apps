@@ -7,8 +7,8 @@ using PTL.Contracts.GroupAddress;
 using PTL.Contracts.Lookup;
 using PTL.Core.GroupAddress;
 using PTL.InternalWeb.Tests.TestSupport;
-using GroupAddressLookupResponse = PTL.Contracts.Lookup.GroupAddressResponse;
 using GroupAddressDataResponse = PTL.Contracts.GroupAddress.GroupAddressResponse;
+using GroupAddressLookupResponse = PTL.Contracts.Lookup.GroupAddressResponse;
 
 namespace PTL.InternalWeb.Tests.Integration;
 

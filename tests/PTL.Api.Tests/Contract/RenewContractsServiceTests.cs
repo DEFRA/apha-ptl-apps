@@ -3,9 +3,9 @@ using PTL.Core.Contract.Renew;
 using PTL.Core.Lookup;
 using PTL.Core.Participant;
 using PTL.Core.Scheme;
+using ContractPeriod = PTL.Contracts.Contract.ContractPeriodFilter;
 using CoreContract = PTL.Core.Contract.Contract;
 using CoreScheme = PTL.Core.Scheme.Scheme;
-using ContractPeriod = PTL.Contracts.Contract.ContractPeriodFilter;
 
 namespace PTL.Api.Tests.Contract;
 

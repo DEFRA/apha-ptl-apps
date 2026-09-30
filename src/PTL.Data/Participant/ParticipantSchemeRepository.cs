@@ -1,5 +1,5 @@
-using Dapper;
 using System.Globalization;
+using Dapper;
 using PTL.Core.Participant;
 using PTL.Data.Infrastructure;
 
