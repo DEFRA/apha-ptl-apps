@@ -108,6 +108,46 @@ public static class DapperColumnMappings
             [ColIsActive] = nameof(CustomerSummaryEntity.IsActive),
         });
 
+        Map<PendingCustomerUpdateSummaryEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            [ColCustomerId] = nameof(PendingCustomerUpdateSummaryEntity.CustomerId),
+            ["fldPendingCustomerDetailsEditId"] = nameof(PendingCustomerUpdateSummaryEntity.PendingCustomerUpdateId),
+            ["fldQalNumber"] = nameof(PendingCustomerUpdateSummaryEntity.QalNumber),
+            [ColName] = nameof(PendingCustomerUpdateSummaryEntity.Name),
+        });
+
+        Map<PendingCustomerUpdate>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldPendingCustomerDetailsEditId"] = nameof(PendingCustomerUpdate.PendingCustomerUpdateId),
+            [ColCustomerId] = nameof(PendingCustomerUpdate.CustomerId),
+            [ColContactName] = nameof(PendingCustomerUpdate.ContactName),
+            [ColOrganisation] = nameof(PendingCustomerUpdate.Organisation),
+            [ColAddress1] = nameof(PendingCustomerUpdate.Address1),
+            [ColAddress2] = nameof(PendingCustomerUpdate.Address2),
+            [ColAddress3] = nameof(PendingCustomerUpdate.Address3),
+            [ColAddress4] = nameof(PendingCustomerUpdate.Address4),
+            [ColAddress5] = nameof(PendingCustomerUpdate.Address5),
+            [ColCountryId] = nameof(PendingCustomerUpdate.CountryId),
+            [ColTelephone] = nameof(PendingCustomerUpdate.Telephone),
+            ["fldTelephone2"] = nameof(PendingCustomerUpdate.Telephone2),
+            ["fldFax"] = nameof(PendingCustomerUpdate.Fax),
+            ["fldEmail"] = nameof(PendingCustomerUpdate.Email),
+            ["fldInvoiceName"] = nameof(PendingCustomerUpdate.InvoiceName),
+            ["fldInvoiceOrganisation"] = nameof(PendingCustomerUpdate.InvoiceOrganisation),
+            ["fldInvoiceAddress1"] = nameof(PendingCustomerUpdate.InvoiceAddress1),
+            ["fldInvoiceAddress2"] = nameof(PendingCustomerUpdate.InvoiceAddress2),
+            ["fldInvoiceAddress3"] = nameof(PendingCustomerUpdate.InvoiceAddress3),
+            ["fldInvoiceAddress4"] = nameof(PendingCustomerUpdate.InvoiceAddress4),
+            ["fldInvoiceAddress5"] = nameof(PendingCustomerUpdate.InvoiceAddress5),
+            ["fldInvoiceCountryId"] = nameof(PendingCustomerUpdate.InvoiceCountryId),
+            ["fldInvoiceTelephone"] = nameof(PendingCustomerUpdate.InvoiceTelephone),
+            ["fldInvoiceTelephone2"] = nameof(PendingCustomerUpdate.InvoiceTelephone2),
+            ["fldInvoiceFax"] = nameof(PendingCustomerUpdate.InvoiceFax),
+            ["fldInvoiceEmail"] = nameof(PendingCustomerUpdate.InvoiceEmail),
+            ["fldIsSubmitted"] = nameof(PendingCustomerUpdate.IsSubmitted),
+            ["fldIsDeleted"] = nameof(PendingCustomerUpdate.IsDeleted),
+        });
+
         Map<CoreParticipant>(new(StringComparer.OrdinalIgnoreCase)
         {
             [ColParticipantId] = nameof(CoreParticipant.ParticipantId),
@@ -143,6 +183,36 @@ public static class DapperColumnMappings
             ["fldLabName"] = nameof(ParticipantSummaryEntity.LabName),
             [ColContactName] = nameof(ParticipantSummaryEntity.ContactName),
             [ColIsActive] = nameof(ParticipantSummaryEntity.IsActive),
+        });
+
+        Map<PendingParticipantUpdateSummaryEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            [ColParticipantId] = nameof(PendingParticipantUpdateSummaryEntity.ParticipantId),
+            ["fldPendingParticipantDetailsEditId"] = nameof(PendingParticipantUpdateSummaryEntity.PendingParticipantUpdateId),
+            [ColLabCode] = nameof(PendingParticipantUpdateSummaryEntity.LabCode),
+            ["fldLabName"] = nameof(PendingParticipantUpdateSummaryEntity.LabName),
+        });
+
+        Map<PendingParticipantUpdate>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldPendingParticipantDetailsEditId"] = nameof(PendingParticipantUpdate.PendingParticipantUpdateId),
+            [ColParticipantId] = nameof(PendingParticipantUpdate.ParticipantId),
+            [ColCustomerId] = nameof(PendingParticipantUpdate.CustomerId),
+            [ColLabCode] = nameof(PendingParticipantUpdate.LabCode),
+            [ColContactName] = nameof(PendingParticipantUpdate.ContactName),
+            [ColOrganisation] = nameof(PendingParticipantUpdate.Organisation),
+            [ColAddress1] = nameof(PendingParticipantUpdate.Address1),
+            [ColAddress2] = nameof(PendingParticipantUpdate.Address2),
+            [ColAddress3] = nameof(PendingParticipantUpdate.Address3),
+            [ColAddress4] = nameof(PendingParticipantUpdate.Address4),
+            [ColAddress5] = nameof(PendingParticipantUpdate.Address5),
+            [ColCountryId] = nameof(PendingParticipantUpdate.CountryId),
+            [ColTelephone] = nameof(PendingParticipantUpdate.Telephone),
+            ["fldFax"] = nameof(PendingParticipantUpdate.Fax),
+            ["fldEmail"] = nameof(PendingParticipantUpdate.Email),
+            ["fldEmail2"] = nameof(PendingParticipantUpdate.Email2),
+            ["fldIsSubmitted"] = nameof(PendingParticipantUpdate.IsSubmitted),
+            ["fldIsDeleted"] = nameof(PendingParticipantUpdate.IsDeleted),
         });
 
         Map<CoreContract>(new(StringComparer.OrdinalIgnoreCase)

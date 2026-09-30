@@ -68,8 +68,28 @@ public static class SideNavigationProvider
                     Children =
                     [
                         new SideNavigationItem { Text = "Create Customer", ControllerName = CustomerControllerName, ActionName = CreateAction },
-                        new SideNavigationItem { Text = "Review Pending Customer Updates", IsEnabled = false },
-                        new SideNavigationItem { Text = "Review Pending Participant Updates", IsEnabled = false },
+                        new SideNavigationItem
+                        {
+                            Text = "Review Pending Customer Updates",
+                            ControllerName = CustomerControllerName,
+                            ActionName = "ReviewPendingCustomerUpdates",
+                            Children =
+                            [
+                                new SideNavigationItem { Text = "Pending Customer Update Details", ControllerName = CustomerControllerName, ActionName = "PendingCustomerUpdateDetails", IsHidden = true },
+                                new SideNavigationItem { Text = "Edit Pending Customer Update", ControllerName = CustomerControllerName, ActionName = "EditPendingCustomerUpdate", IsHidden = true }
+                            ]
+                        },
+                        new SideNavigationItem
+                        {
+                            Text = "Review Pending Participant Updates",
+                            ControllerName = ParticipantControllerName,
+                            ActionName = "ReviewPendingParticipantUpdates",
+                            Children =
+                            [
+                                new SideNavigationItem { Text = "Pending Participant Update Details", ControllerName = ParticipantControllerName, ActionName = "PendingParticipantUpdateDetails", IsHidden = true },
+                                new SideNavigationItem { Text = "Edit Pending Participant Update", ControllerName = ParticipantControllerName, ActionName = "EditPendingParticipantUpdate", IsHidden = true }
+                            ]
+                        },
                         new SideNavigationItem { Text = "Review Pending Orders", IsEnabled = false },
 
                         // Hidden: not a menu entry, but present so Details/Edit pages resolve a full

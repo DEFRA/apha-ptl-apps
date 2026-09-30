@@ -1,0 +1,35 @@
+@model PTL.InternalWeb.Features.Participant.PendingParticipantUpdateListViewModel
+@{
+    ViewData["Title"] = "Review Pending Participant Updates";
+}
+
+<h1 class="govuk-heading-l">Review Pending Participant Updates</h1>
+
+@if (Model.Updates.Count == 0)
+{
+    <p class="govuk-body">There are no pending participant updates to review.</p>
+}
+else
+{
+    <table class="govuk-table">
+        <thead class="govuk-table__head">
+            <tr class="govuk-table__row">
+                <th scope="col" class="govuk-table__header">LAB Code</th>
+                <th scope="col" class="govuk-table__header">Lab Name</th>
+                <th scope="col" class="govuk-table__header">Details</th>
+            </tr>
+        </thead>
+        <tbody class="govuk-table__body">
+            @foreach (var update in Model.Updates)
+            {
+                <tr class="govuk-table__row">
+                    <td class="govuk-table__cell">@update.LabCode</td>
+                    <td class="govuk-table__cell">@update.LabName</td>
+                    <td class="govuk-table__cell">
+                        <a class="govuk-link" asp-action="PendingParticipantUpdateDetails" asp-route-participantId="@update.ParticipantId">Details</a>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}

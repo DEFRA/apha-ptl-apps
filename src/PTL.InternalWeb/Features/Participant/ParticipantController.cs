@@ -205,6 +205,181 @@ public class ParticipantController(IParticipantApiClient participantApiClient, I
         return RedirectToAction(nameof(Details), new { id = result.Participant.ParticipantId });
     }
 
+    // Review Pending Participant Updates (legacy ReviewPendingParticipantUpdates.aspx).
+    public async Task<IActionResult> ReviewPendingParticipantUpdates(CancellationToken cancellationToken)
+    {
+        var updates = await participantApiClient.GetPendingParticipantUpdatesAsync(cancellationToken);
+        return View(new PendingParticipantUpdateListViewModel(updates));
+    }
+
+    // Pending Participant Update Details (legacy PendingParticipantUpdateDetails.aspx) - current vs
+    // pending comparison, Approve/Decline/Cancel.
+    public async Task<IActionResult> PendingParticipantUpdateDetails(Guid participantId, CancellationToken cancellationToken)
+    {
+        var comparison = await participantApiClient.GetPendingParticipantUpdateAsync(participantId, cancellationToken);
+        if (comparison is null)
+        {
+            return NotFound();
+        }
+
+        var countries = await lookupApiClient.GetCountriesAsync(cancellationToken);
+        var countryNames = countries.ToDictionary(c => c.CountryId, c => c.Country);
+        return View(BuildPendingParticipantUpdateDetailsViewModel(comparison, countryNames));
+    }
+
+    // Edit Pending Participant Update (legacy PendingParticipantUpdateDetails.aspx's editable form).
+    [HttpGet]
+    public async Task<IActionResult> EditPendingParticipantUpdate(Guid participantId, CancellationToken cancellationToken)
+    {
+        var comparison = await participantApiClient.GetPendingParticipantUpdateAsync(participantId, cancellationToken);
+        if (comparison is null)
+        {
+            return NotFound();
+        }
+
+        var model = ToPendingFormViewModel(comparison);
+        await PopulatePendingCountryOptionsAsync(model, cancellationToken);
+        return View(model);
+    }
+
+    // Only approved changes update the live participant record - declined changes do not.
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ApprovePendingParticipantUpdate(Guid participantId, CancellationToken cancellationToken)
+    {
+        var result = await participantApiClient.ApprovePendingParticipantUpdateAsync(participantId, request: null, cancellationToken);
+        if (result.NotFound)
+        {
+            return NotFound();
+        }
+
+        if (!result.Success)
+        {
+            // The stored pending values break a participant business rule - the reviewer must amend
+            // them on the Edit page before the update can be approved.
+            var messages = string.Join(" ", result.FieldErrors.SelectMany(e => e.Value));
+            TempData.SetNotification(NotificationType.Error, $"Participant update could not be approved. {messages}");
+            return RedirectToAction(nameof(EditPendingParticipantUpdate), new { participantId });
+        }
+
+        TempData.SetNotification(NotificationType.Success, "Participant update approved successfully.");
+        return RedirectToAction(nameof(ReviewPendingParticipantUpdates));
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> EditPendingParticipantUpdate(Guid participantId, PendingParticipantUpdateFormViewModel model, CancellationToken cancellationToken)
+    {
+        if (!ModelState.IsValid)
+        {
+            await PopulatePendingCountryOptionsAsync(model, cancellationToken);
+            return View(model);
+        }
+
+        var result = await participantApiClient.ApprovePendingParticipantUpdateAsync(participantId, ToPendingSaveRequest(model), cancellationToken);
+        if (result.NotFound)
+        {
+            return NotFound();
+        }
+
+        if (!result.Success)
+        {
+            AddErrors(result.FieldErrors);
+            await PopulatePendingCountryOptionsAsync(model, cancellationToken);
+            return View(model);
+        }
+
+        TempData.SetNotification(NotificationType.Success, "Participant update approved successfully.");
+        return RedirectToAction(nameof(ReviewPendingParticipantUpdates));
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> DeclinePendingParticipantUpdate(Guid participantId, CancellationToken cancellationToken)
+    {
+        var declined = await participantApiClient.DeclinePendingParticipantUpdateAsync(participantId, cancellationToken);
+        if (!declined)
+        {
+            return NotFound();
+        }
+
+        TempData.SetNotification(NotificationType.Success, "Participant update declined successfully.");
+        return RedirectToAction(nameof(ReviewPendingParticipantUpdates));
+    }
+
+    private async Task PopulatePendingCountryOptionsAsync(PendingParticipantUpdateFormViewModel model, CancellationToken cancellationToken)
+    {
+        var countries = await lookupApiClient.GetCountriesAsync(cancellationToken);
+        model.CountryOptions = countries
+            .Select(c => new SelectListItem(c.Country, c.CountryId.ToString()))
+            .Prepend(new SelectListItem("- Please Select -", Guid.Empty.ToString()))
+            .ToList();
+    }
+
+    // Field order and labels reproduce legacy PendingParticipantUpdateDetails.aspx exactly.
+    private static PendingParticipantUpdateDetailsViewModel BuildPendingParticipantUpdateDetailsViewModel(
+        PendingParticipantUpdateComparisonResponse comparison,
+        Dictionary<Guid, string> countryNames)
+    {
+        var current = comparison.Current;
+        var pending = comparison.Pending;
+
+        List<PendingParticipantUpdateComparisonRow> participantDetails =
+        [
+            new("Contact Name", current.ContactName, pending.ContactName),
+            new("Organisation Name", current.Organisation, pending.Organisation),
+            new("Address 1", current.Address1, pending.Address1),
+            new("Address 2", current.Address2, pending.Address2),
+            new("Address 3", current.Address3, pending.Address3),
+            new("Address 4", current.Address4, pending.Address4),
+            new("Address 5", current.Address5, pending.Address5),
+            new("Country", countryNames.GetValueOrDefault(current.CountryId, string.Empty), countryNames.GetValueOrDefault(pending.CountryId, string.Empty)),
+            new("Telephone", current.Telephone, pending.Telephone),
+            new("Fax", current.Fax, pending.Fax),
+            new("Email (Primary)", current.Email, pending.Email),
+            new("Email (Secondary)", current.Email2, pending.Email2)
+        ];
+
+        return new PendingParticipantUpdateDetailsViewModel(current.ParticipantId, current.LabCode, current.LabName, participantDetails);
+    }
+
+    private static PendingParticipantUpdateFormViewModel ToPendingFormViewModel(PendingParticipantUpdateComparisonResponse comparison)
+    {
+        var pending = comparison.Pending;
+        return new PendingParticipantUpdateFormViewModel
+        {
+            ParticipantId = comparison.Current.ParticipantId,
+            LabCode = comparison.Current.LabCode,
+            LabName = comparison.Current.LabName,
+            ContactName = pending.ContactName,
+            Organisation = pending.Organisation,
+            Address1 = pending.Address1,
+            Address2 = pending.Address2,
+            Address3 = pending.Address3,
+            Address4 = pending.Address4,
+            Address5 = pending.Address5,
+            CountryId = pending.CountryId,
+            Telephone = pending.Telephone,
+            Fax = pending.Fax,
+            Email = pending.Email,
+            Email2 = pending.Email2
+        };
+    }
+
+    private static PendingParticipantUpdateSaveRequest ToPendingSaveRequest(PendingParticipantUpdateFormViewModel model) => new(
+        model.ContactName ?? string.Empty,
+        model.Organisation ?? string.Empty,
+        model.Address1 ?? string.Empty,
+        model.Address2 ?? string.Empty,
+        model.Address3 ?? string.Empty,
+        model.Address4 ?? string.Empty,
+        model.Address5 ?? string.Empty,
+        model.CountryId.GetValueOrDefault(),
+        model.Telephone ?? string.Empty,
+        model.Fax ?? string.Empty,
+        model.Email ?? string.Empty,
+        model.Email2 ?? string.Empty);
+
     private void AddErrors(IReadOnlyDictionary<string, string[]> fieldErrors)
     {
         foreach (var kvp in fieldErrors)

@@ -11,9 +11,9 @@ namespace PTL.Api.Tests.Endpoints;
 
 public class ParticipantControllerTests
 {
-    private static ParticipantController CreateController(FakeParticipantRepository repository)
+    private static ParticipantController CreateController(FakeParticipantRepository repository, FakePendingParticipantUpdateRepository? pendingRepository = null)
     {
-        var controller = new ParticipantController(new ParticipantService(repository, NullLogger<ParticipantService>.Instance), NullLogger<ParticipantController>.Instance);
+        var controller = new ParticipantController(new ParticipantService(repository, pendingRepository ?? new FakePendingParticipantUpdateRepository(), NullLogger<ParticipantService>.Instance), NullLogger<ParticipantController>.Instance);
 
         var services = new ServiceCollection().AddMvc().Services.BuildServiceProvider();
         controller.ControllerContext = new ControllerContext

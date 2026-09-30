@@ -20,6 +20,94 @@ public sealed record ParticipantDetailsViewModel(
     string LabTypeName,
     string CountryName);
 
+// Review Pending Participant Updates list (legacy ReviewPendingParticipantUpdates.aspx).
+public sealed record PendingParticipantUpdateListViewModel(IReadOnlyList<PTL.Contracts.Participant.PendingParticipantUpdateSummaryResponse> Updates);
+
+// One aligned comparison row - the label appears once and both values sit on the same line,
+// replacing legacy's "editable pending value with the current value in green beside it".
+public sealed record PendingParticipantUpdateComparisonRow(string Label, string CurrentValue, string PendingValue)
+{
+    public bool HasChanged => !string.Equals(CurrentValue?.Trim(), PendingValue?.Trim(), StringComparison.Ordinal);
+}
+
+// Pending Participant Update Details comparison page (legacy PendingParticipantUpdateDetails.aspx).
+public sealed record PendingParticipantUpdateDetailsViewModel(
+    Guid ParticipantId,
+    string LabCode,
+    string LabName,
+    IReadOnlyList<PendingParticipantUpdateComparisonRow> ParticipantDetails);
+
+// Edit Pending Participant Update (legacy PendingParticipantUpdateDetails.aspx's editable form).
+// Labels, field order, lengths and character rules mirror that page's LoadLabelNames() exactly.
+public sealed class PendingParticipantUpdateFormViewModel
+{
+    public Guid ParticipantId { get; set; }
+
+    public string? LabCode { get; set; }
+
+    public string? LabName { get; set; }
+
+    [Required(ErrorMessage = "Enter a contact name")]
+    [StringLength(50, ErrorMessage = "Contact Name must not exceed 50 characters")]
+    [RegularExpression(@"^[a-zA-Z0-9_%&().',/\s\-]*$", ErrorMessage = "Contact Name contains characters that are not allowed")]
+    public string? ContactName { get; set; }
+
+    [Required(ErrorMessage = "Enter an organisation name")]
+    [StringLength(50, ErrorMessage = "Organisation Name must not exceed 50 characters")]
+    [RegularExpression(@"^[a-zA-Z0-9_%&().',/\s\-]*$", ErrorMessage = "Organisation Name contains characters that are not allowed")]
+    public string? Organisation { get; set; }
+
+    [Required(ErrorMessage = "Enter address 1")]
+    [StringLength(100, ErrorMessage = "Address 1 must not exceed 100 characters")]
+    [RegularExpression(@"^[a-zA-Z0-9_%&().',/\s\-]*$", ErrorMessage = "Address 1 contains characters that are not allowed")]
+    public string? Address1 { get; set; }
+
+    [Required(ErrorMessage = "Enter address 2")]
+    [StringLength(100, ErrorMessage = "Address 2 must not exceed 100 characters")]
+    [RegularExpression(@"^[a-zA-Z0-9_%&().',/\s\-]*$", ErrorMessage = "Address 2 contains characters that are not allowed")]
+    public string? Address2 { get; set; }
+
+    [StringLength(100, ErrorMessage = "Address 3 must not exceed 100 characters")]
+    [RegularExpression(@"^[a-zA-Z0-9_%&().',/\s\-]*$", ErrorMessage = "Address 3 contains characters that are not allowed")]
+    public string? Address3 { get; set; }
+
+    [StringLength(100, ErrorMessage = "Address 4 must not exceed 100 characters")]
+    [RegularExpression(@"^[a-zA-Z0-9_%&().',/\s\-]*$", ErrorMessage = "Address 4 contains characters that are not allowed")]
+    public string? Address4 { get; set; }
+
+    [StringLength(100, ErrorMessage = "Address 5 must not exceed 100 characters")]
+    [RegularExpression(@"^[a-zA-Z0-9_%&().',/\s\-]*$", ErrorMessage = "Address 5 contains characters that are not allowed")]
+    public string? Address5 { get; set; }
+
+    [NotEmptyGuid(ErrorMessage = "Select a country")]
+    public Guid? CountryId { get; set; }
+
+    public IEnumerable<SelectListItem> CountryOptions { get; set; } = [];
+
+    [Required(ErrorMessage = "Enter a telephone number")]
+    [StringLength(20, ErrorMessage = "Telephone must not exceed 20 characters")]
+    [RegularExpression(@"^[ 0-9\+\-\(\)\*\#]*$", ErrorMessage = "Telephone contains characters that are not allowed")]
+    public string? Telephone { get; set; }
+
+    [StringLength(20, ErrorMessage = "Fax must not exceed 20 characters")]
+    [RegularExpression(@"^[ 0-9\+\-\(\)\*\#]*$", ErrorMessage = "Fax contains characters that are not allowed")]
+    public string? Fax { get; set; }
+
+    [Required(ErrorMessage = "Enter an email address")]
+    [StringLength(150, ErrorMessage = "Email (Primary) must not exceed 150 characters")]
+    [OptionalEmailAddress(ErrorMessage = "Enter a valid email address")]
+    public string? Email { get; set; }
+
+    [StringLength(150, ErrorMessage = "Email (Secondary) must not exceed 150 characters")]
+    [OptionalEmailAddress(ErrorMessage = "Enter a valid secondary email address")]
+    public string? Email2 { get; set; }
+
+    // Legacy captures Comments purely to include in the approval/decline notification email
+    // (EmailUpdateNotifications). Email notification is not migrated - [NEEDS INVESTIGATION].
+    [StringLength(2000, ErrorMessage = "Comments must not exceed 2000 characters")]
+    public string? Comments { get; set; }
+}
+
 // Every ParticipantValidator (PTL.Core) rule is an unconditional primitive check (required/select/
 // email format) with no cross-field, conditional, or domain logic, so DataAnnotations here fully
 // mirror it - no IValidatableObject/Core delegation is needed. PTL.Core.Participant.ParticipantValidator

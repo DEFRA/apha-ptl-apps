@@ -98,6 +98,88 @@ public sealed class ParticipantController(IParticipantService participantService
         }
     }
 
+    // GET /api/participants/pending-updates - Review Pending Participant Updates list.
+    [HttpGet("participants/pending-updates")]
+    public async Task<ActionResult<IReadOnlyList<PendingParticipantUpdateSummaryResponse>>> GetPendingParticipantUpdates(CancellationToken cancellationToken)
+    {
+        var pending = await participantService.GetPendingParticipantUpdatesAsync(cancellationToken);
+        return Ok(pending.Select(p => new PendingParticipantUpdateSummaryResponse(p.ParticipantId, p.LabCode, p.LabName)).ToList());
+    }
+
+    // GET /api/participants/{participantId}/pending-update - comparison for the details page.
+    [HttpGet("participants/{participantId:guid}/pending-update")]
+    public async Task<ActionResult<PendingParticipantUpdateComparisonResponse>> GetPendingParticipantUpdate(Guid participantId, CancellationToken cancellationToken)
+    {
+        var result = await participantService.GetPendingParticipantUpdateAsync(participantId, cancellationToken);
+        if (result is null)
+        {
+            return NotFound();
+        }
+
+        var (current, pending) = result.Value;
+        return Ok(new PendingParticipantUpdateComparisonResponse(ToResponse(current), ToPendingResponse(pending)));
+    }
+
+    // POST /api/participants/{participantId}/pending-update/approve - applies the pending changes
+    // to the live participant record, then soft-deletes the pending update. An optional body
+    // carries amended values, matching legacy PendingParticipantUpdateDetails.aspx's editable Approve.
+    [HttpPost("participants/{participantId:guid}/pending-update/approve")]
+    public async Task<IActionResult> ApprovePendingParticipantUpdate(Guid participantId, [FromBody] PendingParticipantUpdateSaveRequest? request, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var approved = await participantService.ApprovePendingParticipantUpdateAsync(participantId, ToPendingEntity(participantId, request), cancellationToken);
+            return approved ? NoContent() : NotFound();
+        }
+        catch (ParticipantValidationException ex)
+        {
+            return ToValidationProblem(ex);
+        }
+    }
+
+    // POST /api/participants/{participantId}/pending-update/decline - soft-deletes the pending
+    // update without changing the live participant record.
+    [HttpPost("participants/{participantId:guid}/pending-update/decline")]
+    public async Task<IActionResult> DeclinePendingParticipantUpdate(Guid participantId, CancellationToken cancellationToken)
+    {
+        var declined = await participantService.DeclinePendingParticipantUpdateAsync(participantId, cancellationToken);
+        return declined ? NoContent() : NotFound();
+    }
+
+    private static PendingParticipantUpdate? ToPendingEntity(Guid participantId, PendingParticipantUpdateSaveRequest? request) => request is null ? null : new PendingParticipantUpdate
+    {
+        ParticipantId = participantId,
+        ContactName = request.ContactName,
+        Organisation = request.Organisation,
+        Address1 = request.Address1,
+        Address2 = request.Address2,
+        Address3 = request.Address3,
+        Address4 = request.Address4,
+        Address5 = request.Address5,
+        CountryId = request.CountryId,
+        Telephone = request.Telephone,
+        Fax = request.Fax,
+        Email = request.Email,
+        Email2 = request.Email2
+    };
+
+    private static PendingParticipantUpdateResponse ToPendingResponse(PendingParticipantUpdate pending) => new(
+        pending.ParticipantId,
+        pending.CustomerId,
+        pending.LabCode,
+        pending.ContactName,
+        pending.Organisation,
+        pending.Address1,
+        pending.Address2,
+        pending.Address3,
+        pending.Address4,
+        pending.Address5,
+        pending.CountryId,
+        pending.Telephone,
+        pending.Fax,
+        pending.Email,
+        pending.Email2);
+
     private static Participant ToEntity(ParticipantRequest request) => new()
     {
         ParticipantId = Guid.NewGuid(),

@@ -6,8 +6,8 @@ namespace PTL.Api.Tests.Participant;
 
 public class ParticipantServiceTests
 {
-    private static ParticipantService CreateService(FakeParticipantRepository repository) =>
-        new(repository, NullLogger<ParticipantService>.Instance);
+    private static ParticipantService CreateService(FakeParticipantRepository repository, FakePendingParticipantUpdateRepository? pendingRepository = null) =>
+        new(repository, pendingRepository ?? new FakePendingParticipantUpdateRepository(), NullLogger<ParticipantService>.Instance);
 
     private static ParticipantEntity ValidActiveParticipant(string labName = "Alpha Lab") => new()
     {

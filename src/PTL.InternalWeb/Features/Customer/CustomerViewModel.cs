@@ -23,6 +23,149 @@ public sealed record CustomerDetailsViewModel(
     string CountryName,
     string InvoiceCountryName);
 
+// Review Pending Customer Updates list (legacy ReviewPendingCustomerUpdates.aspx).
+public sealed record PendingCustomerUpdateListViewModel(IReadOnlyList<PendingCustomerUpdateSummaryResponse> Updates);
+
+// One aligned comparison row - the label appears once and both values sit on the same line,
+// replacing legacy's "editable pending value with the current value in green beside it".
+public sealed record PendingCustomerUpdateComparisonRow(string Label, string CurrentValue, string PendingValue)
+{
+    public bool HasChanged => !string.Equals(CurrentValue?.Trim(), PendingValue?.Trim(), StringComparison.Ordinal);
+}
+
+// Pending Customer Update Details comparison page (legacy PendingCustomerUpdateDetails.aspx).
+public sealed record PendingCustomerUpdateDetailsViewModel(
+    Guid CustomerId,
+    string QalNumber,
+    string CustomerName,
+    IReadOnlyList<PendingCustomerUpdateComparisonRow> CustomerDetails,
+    IReadOnlyList<PendingCustomerUpdateComparisonRow> InvoiceDetails);
+
+// Edit Pending Customer Update (legacy PendingCustomerUpdateDetails.aspx's editable form). Labels,
+// field order, lengths and character rules mirror that page's LoadLabelNames() exactly. Only the
+// contact and invoice-contact fields a participant can propose are editable - the financial,
+// currency and status fields on Customer Edit have no pending-record columns.
+public sealed class PendingCustomerUpdateFormViewModel
+{
+    public Guid CustomerId { get; set; }
+
+    public string? QalNumber { get; set; }
+
+    public string? CustomerName { get; set; }
+
+    [Required(ErrorMessage = "Enter a contact name")]
+    [StringLength(50, ErrorMessage = "Contact Name must not exceed 50 characters")]
+    [RegularExpression(@"^[a-zA-Z0-9_%&().',/\s\-]*$", ErrorMessage = "Contact Name contains characters that are not allowed")]
+    public string? ContactName { get; set; }
+
+    [Required(ErrorMessage = "Enter an organisation name")]
+    [StringLength(50, ErrorMessage = "Organisation Name must not exceed 50 characters")]
+    [RegularExpression(@"^[a-zA-Z0-9_%&().',/\s\-]*$", ErrorMessage = "Organisation Name contains characters that are not allowed")]
+    public string? Organisation { get; set; }
+
+    [Required(ErrorMessage = "Enter address 1")]
+    [StringLength(100, ErrorMessage = "Address 1 must not exceed 100 characters")]
+    [RegularExpression(@"^[a-zA-Z0-9_%&().',/\s\-]*$", ErrorMessage = "Address 1 contains characters that are not allowed")]
+    public string? Address1 { get; set; }
+
+    [Required(ErrorMessage = "Enter address 2")]
+    [StringLength(100, ErrorMessage = "Address 2 must not exceed 100 characters")]
+    [RegularExpression(@"^[a-zA-Z0-9_%&().',/\s\-]*$", ErrorMessage = "Address 2 contains characters that are not allowed")]
+    public string? Address2 { get; set; }
+
+    [StringLength(100, ErrorMessage = "Address 3 must not exceed 100 characters")]
+    [RegularExpression(@"^[a-zA-Z0-9_%&().',/\s\-]*$", ErrorMessage = "Address 3 contains characters that are not allowed")]
+    public string? Address3 { get; set; }
+
+    [StringLength(100, ErrorMessage = "Address 4 must not exceed 100 characters")]
+    [RegularExpression(@"^[a-zA-Z0-9_%&().',/\s\-]*$", ErrorMessage = "Address 4 contains characters that are not allowed")]
+    public string? Address4 { get; set; }
+
+    [StringLength(100, ErrorMessage = "Address 5 must not exceed 100 characters")]
+    [RegularExpression(@"^[a-zA-Z0-9_%&().',/\s\-]*$", ErrorMessage = "Address 5 contains characters that are not allowed")]
+    public string? Address5 { get; set; }
+
+    [NotEmptyGuid(ErrorMessage = "Select a country")]
+    public Guid? CountryId { get; set; }
+
+    public IEnumerable<SelectListItem> CountryOptions { get; set; } = [];
+
+    [Required(ErrorMessage = "Enter a telephone number")]
+    [StringLength(20, ErrorMessage = "Telephone must not exceed 20 characters")]
+    [RegularExpression(@"^[ 0-9\+\-\(\)\*\#]*$", ErrorMessage = "Telephone contains characters that are not allowed")]
+    public string? Telephone { get; set; }
+
+    [StringLength(20, ErrorMessage = "Telephone 2 must not exceed 20 characters")]
+    [RegularExpression(@"^[ 0-9\+\-\(\)\*\#]*$", ErrorMessage = "Telephone 2 contains characters that are not allowed")]
+    public string? Telephone2 { get; set; }
+
+    [StringLength(20, ErrorMessage = "Fax must not exceed 20 characters")]
+    [RegularExpression(@"^[ 0-9\+\-\(\)\*\#]*$", ErrorMessage = "Fax contains characters that are not allowed")]
+    public string? Fax { get; set; }
+
+    [Required(ErrorMessage = "Enter an email address")]
+    [StringLength(150, ErrorMessage = "Email must not exceed 150 characters")]
+    [OptionalEmailAddress(ErrorMessage = "Enter a valid email address")]
+    public string? Email { get; set; }
+
+    [StringLength(50, ErrorMessage = "Invoice Contact Name must not exceed 50 characters")]
+    [RegularExpression(@"^[a-zA-Z0-9_%&().',/\s\-]*$", ErrorMessage = "Invoice Contact Name contains characters that are not allowed")]
+    public string? InvoiceName { get; set; }
+
+    [Required(ErrorMessage = "Enter an invoice organisation name")]
+    [StringLength(50, ErrorMessage = "Invoice Organisation Name must not exceed 50 characters")]
+    [RegularExpression(@"^[a-zA-Z0-9_%&().',/\s\-]*$", ErrorMessage = "Invoice Organisation Name contains characters that are not allowed")]
+    public string? InvoiceOrganisation { get; set; }
+
+    [Required(ErrorMessage = "Enter invoice address 1")]
+    [StringLength(100, ErrorMessage = "Invoice Address 1 must not exceed 100 characters")]
+    [RegularExpression(@"^[a-zA-Z0-9_%&().',/\s\-]*$", ErrorMessage = "Invoice Address 1 contains characters that are not allowed")]
+    public string? InvoiceAddress1 { get; set; }
+
+    [Required(ErrorMessage = "Enter invoice address 2")]
+    [StringLength(100, ErrorMessage = "Invoice Address 2 must not exceed 100 characters")]
+    [RegularExpression(@"^[a-zA-Z0-9_%&().',/\s\-]*$", ErrorMessage = "Invoice Address 2 contains characters that are not allowed")]
+    public string? InvoiceAddress2 { get; set; }
+
+    [StringLength(100, ErrorMessage = "Invoice Address 3 must not exceed 100 characters")]
+    [RegularExpression(@"^[a-zA-Z0-9_%&().',/\s\-]*$", ErrorMessage = "Invoice Address 3 contains characters that are not allowed")]
+    public string? InvoiceAddress3 { get; set; }
+
+    [StringLength(100, ErrorMessage = "Invoice Address 4 must not exceed 100 characters")]
+    [RegularExpression(@"^[a-zA-Z0-9_%&().',/\s\-]*$", ErrorMessage = "Invoice Address 4 contains characters that are not allowed")]
+    public string? InvoiceAddress4 { get; set; }
+
+    [StringLength(100, ErrorMessage = "Invoice Address 5 must not exceed 100 characters")]
+    [RegularExpression(@"^[a-zA-Z0-9_%&().',/\s\-]*$", ErrorMessage = "Invoice Address 5 contains characters that are not allowed")]
+    public string? InvoiceAddress5 { get; set; }
+
+    [NotEmptyGuid(ErrorMessage = "Select an invoice country")]
+    public Guid? InvoiceCountryId { get; set; }
+
+    public IEnumerable<SelectListItem> InvoiceCountryOptions { get; set; } = [];
+
+    [StringLength(20, ErrorMessage = "Invoice Telephone must not exceed 20 characters")]
+    [RegularExpression(@"^[ 0-9\+\-\(\)\*\#]*$", ErrorMessage = "Invoice Telephone contains characters that are not allowed")]
+    public string? InvoiceTelephone { get; set; }
+
+    [StringLength(20, ErrorMessage = "Invoice Telephone 2 must not exceed 20 characters")]
+    [RegularExpression(@"^[ 0-9\+\-\(\)\*\#]*$", ErrorMessage = "Invoice Telephone 2 contains characters that are not allowed")]
+    public string? InvoiceTelephone2 { get; set; }
+
+    [StringLength(20, ErrorMessage = "Invoice Fax must not exceed 20 characters")]
+    [RegularExpression(@"^[ 0-9\+\-\(\)\*\#]*$", ErrorMessage = "Invoice Fax contains characters that are not allowed")]
+    public string? InvoiceFax { get; set; }
+
+    [StringLength(150, ErrorMessage = "Invoice Email must not exceed 150 characters")]
+    [OptionalEmailAddress(ErrorMessage = "Enter a valid invoice email address")]
+    public string? InvoiceEmail { get; set; }
+
+    // Legacy captures Comments purely to include in the approval/decline notification email
+    // (EmailUpdateNotifications). Email notification is not migrated - [NEEDS INVESTIGATION].
+    [StringLength(2000, ErrorMessage = "Comments must not exceed 2000 characters")]
+    public string? Comments { get; set; }
+}
+
 
 // Shared by Create.cshtml and Edit.cshtml. Validation attributes mirror
 // PtaBusinessObjects.BusinessObjects.Contracts.Customer.AddBusinessRules() (see

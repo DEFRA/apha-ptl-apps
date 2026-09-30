@@ -168,6 +168,119 @@ public class CustomerApiClientTests
         Assert.True(result.FieldErrors.ContainsKey("Name"));
     }
 
+    [Fact]
+    public async Task GetPendingCustomerUpdatesAsync_ReturnsDeserializedList()
+    {
+        const string json = """[{"customerId":"11111111-1111-1111-1111-111111111111","qalNumber":"QAL/00001","name":"Sample Labs"}]""";
+        var client = CreateClient(HttpStatusCode.OK, json);
+
+        var result = await client.GetPendingCustomerUpdatesAsync();
+
+        Assert.Single(result);
+        Assert.Equal("Sample Labs", result[0].Name);
+    }
+
+    [Fact]
+    public async Task GetPendingCustomerUpdatesAsync_NullResponse_ReturnsEmptyList()
+    {
+        var client = CreateClient(HttpStatusCode.OK, "null");
+
+        var result = await client.GetPendingCustomerUpdatesAsync();
+
+        Assert.Empty(result);
+    }
+
+    [Fact]
+    public async Task GetPendingCustomerUpdateAsync_NotFound_ReturnsNull()
+    {
+        var client = CreateClient(HttpStatusCode.NotFound, null);
+
+        var result = await client.GetPendingCustomerUpdateAsync(Guid.NewGuid());
+
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public async Task GetPendingCustomerUpdateAsync_Found_ReturnsComparison()
+    {
+        const string json = """{"current":{"customerId":"11111111-1111-1111-1111-111111111111","qalNumber":"QAL/00001","name":"Sample Labs","organisation":"Sample Labs","isActive":true},"pending":{"customerId":"11111111-1111-1111-1111-111111111111","contactName":"New Contact","organisation":"","address1":"","address2":"","address3":"","address4":"","address5":"","countryId":"00000000-0000-0000-0000-000000000000","telephone":"","telephone2":"","fax":"","email":"","invoiceName":"","invoiceOrganisation":"","invoiceAddress1":"","invoiceAddress2":"","invoiceAddress3":"","invoiceAddress4":"","invoiceAddress5":"","invoiceCountryId":"00000000-0000-0000-0000-000000000000","invoiceTelephone":"","invoiceTelephone2":"","invoiceFax":"","invoiceEmail":""}}""";
+        var client = CreateClient(HttpStatusCode.OK, json);
+
+        var result = await client.GetPendingCustomerUpdateAsync(Guid.NewGuid());
+
+        Assert.NotNull(result);
+        Assert.Equal("Sample Labs", result.Current.Name);
+        Assert.Equal("New Contact", result.Pending.ContactName);
+    }
+
+    [Fact]
+    public async Task ApprovePendingCustomerUpdateAsync_NotFound_ReturnsNotFoundResult()
+    {
+        var client = CreateClient(HttpStatusCode.NotFound, null);
+
+        var result = await client.ApprovePendingCustomerUpdateAsync(Guid.NewGuid());
+
+        Assert.False(result.Success);
+        Assert.True(result.NotFound);
+    }
+
+    [Fact]
+    public async Task ApprovePendingCustomerUpdateAsync_Success_ReturnsSuccessResult()
+    {
+        var client = CreateClient(HttpStatusCode.NoContent, null);
+
+        var result = await client.ApprovePendingCustomerUpdateAsync(Guid.NewGuid());
+
+        Assert.True(result.Success);
+        Assert.False(result.NotFound);
+        Assert.Empty(result.FieldErrors);
+    }
+
+    [Fact]
+    public async Task ApprovePendingCustomerUpdateAsync_ValidationFailure_ReturnsFieldErrors()
+    {
+        const string json = """{"errors":{"ContactName":["Contact name is required."]}}""";
+        var client = CreateClient(HttpStatusCode.BadRequest, json);
+
+        var result = await client.ApprovePendingCustomerUpdateAsync(Guid.NewGuid());
+
+        Assert.False(result.Success);
+        Assert.False(result.NotFound);
+        Assert.True(result.FieldErrors.ContainsKey("ContactName"));
+    }
+
+    [Fact]
+    public async Task ApprovePendingCustomerUpdateAsync_BadRequestWithNoErrors_ReturnsDefaultError()
+    {
+        const string json = """{"errors":{}}""";
+        var client = CreateClient(HttpStatusCode.BadRequest, json);
+
+        var result = await client.ApprovePendingCustomerUpdateAsync(Guid.NewGuid());
+
+        Assert.False(result.Success);
+        Assert.Equal("The request was invalid.", result.FieldErrors[string.Empty][0]);
+    }
+
+    [Fact]
+    public async Task DeclinePendingCustomerUpdateAsync_NotFound_ReturnsFalse()
+    {
+        var client = CreateClient(HttpStatusCode.NotFound, null);
+
+        var result = await client.DeclinePendingCustomerUpdateAsync(Guid.NewGuid());
+
+        Assert.False(result);
+    }
+
+    [Fact]
+    public async Task DeclinePendingCustomerUpdateAsync_Success_ReturnsTrue()
+    {
+        var client = CreateClient(HttpStatusCode.NoContent, null);
+
+        var result = await client.DeclinePendingCustomerUpdateAsync(Guid.NewGuid());
+
+        Assert.True(result);
+    }
+
     private static CustomerSaveRequest MinimalCreateRequest() => new(
         string.Empty, string.Empty, string.Empty, Guid.Empty, string.Empty, Guid.Empty, string.Empty, string.Empty,
         string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, Guid.Empty,

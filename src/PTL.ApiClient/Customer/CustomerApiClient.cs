@@ -12,6 +12,10 @@ public interface ICustomerApiClient
     Task<CustomerSearchResponse> SearchCustomersAsync(CustomerSearchRequest request, CancellationToken cancellationToken = default);
     Task<CustomerSaveResult> CreateCustomerAsync(CustomerSaveRequest request, CancellationToken cancellationToken = default);
     Task<CustomerSaveResult> UpdateCustomerAsync(Guid customerId, CustomerSaveRequest request, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<PendingCustomerUpdateSummaryResponse>> GetPendingCustomerUpdatesAsync(CancellationToken cancellationToken = default);
+    Task<PendingCustomerUpdateComparisonResponse?> GetPendingCustomerUpdateAsync(Guid customerId, CancellationToken cancellationToken = default);
+    Task<PendingCustomerUpdateDecisionResult> ApprovePendingCustomerUpdateAsync(Guid customerId, PendingCustomerUpdateSaveRequest? request = null, CancellationToken cancellationToken = default);
+    Task<bool> DeclinePendingCustomerUpdateAsync(Guid customerId, CancellationToken cancellationToken = default);
 }
 
 // Thin typed HttpClient wrapper around PTL.Api's customer endpoints, shared by every web
@@ -75,5 +79,57 @@ public sealed class CustomerApiClient(HttpClient httpClient) : ICustomerApiClien
         response.EnsureSuccessStatusCode();
         var customer = await response.Content.ReadFromJsonAsync<CustomerResponse>(cancellationToken);
         return new CustomerSaveResult(true, customer, new Dictionary<string, string[]>());
+    }
+
+    public async Task<IReadOnlyList<PendingCustomerUpdateSummaryResponse>> GetPendingCustomerUpdatesAsync(CancellationToken cancellationToken = default)
+    {
+        var pending = await httpClient.GetFromJsonAsync<IReadOnlyList<PendingCustomerUpdateSummaryResponse>>(
+            "/api/customers/pending-updates", cancellationToken);
+        return pending ?? [];
+    }
+
+    public async Task<PendingCustomerUpdateComparisonResponse?> GetPendingCustomerUpdateAsync(Guid customerId, CancellationToken cancellationToken = default)
+    {
+        var response = await httpClient.GetAsync($"/api/customers/{customerId}/pending-update", cancellationToken);
+        if (response.StatusCode == HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<PendingCustomerUpdateComparisonResponse>(cancellationToken);
+    }
+
+    public async Task<PendingCustomerUpdateDecisionResult> ApprovePendingCustomerUpdateAsync(Guid customerId, PendingCustomerUpdateSaveRequest? request = null, CancellationToken cancellationToken = default)
+    {
+        var url = $"/api/customers/{customerId}/pending-update/approve";
+
+        // Approving without amendments posts no body at all rather than a JSON "null" literal, so
+        // the endpoint's optional [FromBody] parameter binds cleanly.
+        var response = request is null
+            ? await httpClient.PostAsync(url, content: null, cancellationToken)
+            : await httpClient.PostAsJsonAsync(url, request, cancellationToken);
+        if (response.StatusCode == HttpStatusCode.NotFound)
+        {
+            return new PendingCustomerUpdateDecisionResult(false, true, new Dictionary<string, string[]>());
+        }
+
+        if (response.StatusCode == HttpStatusCode.BadRequest)
+        {
+            var problem = await response.Content.ReadFromJsonAsync<ValidationProblemDetails>(cancellationToken);
+            var errors = problem?.Errors is { Count: > 0 }
+                ? problem.Errors.ToDictionary(e => e.Key, e => e.Value)
+                : new Dictionary<string, string[]> { [string.Empty] = ["The request was invalid."] };
+            return new PendingCustomerUpdateDecisionResult(false, false, errors);
+        }
+
+        response.EnsureSuccessStatusCode();
+        return new PendingCustomerUpdateDecisionResult(true, false, new Dictionary<string, string[]>());
+    }
+
+    public async Task<bool> DeclinePendingCustomerUpdateAsync(Guid customerId, CancellationToken cancellationToken = default)
+    {
+        var response = await httpClient.PostAsync($"/api/customers/{customerId}/pending-update/decline", content: null, cancellationToken);
+        return response.IsSuccessStatusCode;
     }
 }

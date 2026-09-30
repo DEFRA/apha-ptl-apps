@@ -1,0 +1,78 @@
+@model PTL.InternalWeb.Features.Customer.PendingCustomerUpdateDetailsViewModel
+@{
+    ViewData["Title"] = $"Pending Customer Update - {Model.CustomerName}";
+}
+
+@functions {
+    static string RowClass(bool hasChanged) => hasChanged ? "govuk-table__row ptl-comparison-row--changed" : "govuk-table__row";
+}
+
+<div class="govuk-grid-row">
+    <div class="govuk-grid-column-two-thirds">
+        <h1 class="govuk-heading-l">Customer Details</h1>
+    </div>
+    <div class="govuk-grid-column-one-third govuk-!-text-align-right">
+        <a class="govuk-button govuk-button--primary" data-module="govuk-button" asp-action="EditPendingCustomerUpdate" asp-route-customerId="@Model.CustomerId">Edit Customer</a>
+    </div>
+</div>
+
+<dl class="govuk-summary-list govuk-summary-list--no-border">
+    <govuk-summary-row label="QAL Number">@Model.QalNumber</govuk-summary-row>
+</dl>
+
+<h2 class="govuk-heading-m">Customer Details</h2>
+<table class="govuk-table">
+    <thead class="govuk-table__head">
+        <tr class="govuk-table__row">
+            <th scope="col" class="govuk-table__header govuk-!-width-one-quarter">Field</th>
+            <th scope="col" class="govuk-table__header">Current Value</th>
+            <th scope="col" class="govuk-table__header">Pending Value</th>
+        </tr>
+    </thead>
+    <tbody class="govuk-table__body">
+        @foreach (var row in Model.CustomerDetails)
+        {
+            <tr class="@RowClass(row.HasChanged)">
+                <th scope="row" class="govuk-table__header">@row.Label</th>
+                <td class="govuk-table__cell">@row.CurrentValue</td>
+                <td class="govuk-table__cell">@row.PendingValue</td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+<h2 class="govuk-heading-m">Invoice Details</h2>
+<table class="govuk-table">
+    <thead class="govuk-table__head">
+        <tr class="govuk-table__row">
+            <th scope="col" class="govuk-table__header govuk-!-width-one-quarter">Field</th>
+            <th scope="col" class="govuk-table__header">Current Value</th>
+            <th scope="col" class="govuk-table__header">Pending Value</th>
+        </tr>
+    </thead>
+    <tbody class="govuk-table__body">
+        @foreach (var row in Model.InvoiceDetails)
+        {
+            <tr class="@RowClass(row.HasChanged)">
+                <th scope="row" class="govuk-table__header">@row.Label</th>
+                <td class="govuk-table__cell">@row.CurrentValue</td>
+                <td class="govuk-table__cell">@row.PendingValue</td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+<form method="post" asp-action="ApprovePendingCustomerUpdate" asp-route-customerId="@Model.CustomerId">
+    <h2 class="govuk-heading-m">Comments</h2>
+    <div class="govuk-form-group">
+        <label class="govuk-label" for="Comments">Comments</label>
+        <textarea class="govuk-textarea" id="Comments" name="Comments" rows="5" maxlength="2000"></textarea>
+    </div>
+
+    <div class="govuk-button-group">
+        <button class="govuk-button" data-module="govuk-button" type="submit">Approve</button>
+        <button class="govuk-button govuk-button--warning" data-module="govuk-button" type="submit"
+                formaction="@Url.Action("DeclinePendingCustomerUpdate", new { customerId = Model.CustomerId })">Decline</button>
+        <a class="govuk-button govuk-button--secondary" data-module="govuk-button" asp-action="ReviewPendingCustomerUpdates">Cancel</a>
+    </div>
+</form>

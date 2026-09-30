@@ -78,6 +78,17 @@ body {
   text-decoration: line-through;
 }
 
+/* Pending update comparison: a changed field is tinted so differences are visible at a glance,
+   replacing legacy PendingCustomerUpdateDetails.aspx's green current-value labels. */
+.ptl-comparison-row--changed td,
+.ptl-comparison-row--changed th {
+  background-color: #f3f9f1;
+}
+
+.ptl-comparison-row--changed td:last-child {
+  font-weight: bold;
+}
+
 /* "Items per page" selector sits right-aligned directly above the table on every list page. */
 .ptl-page-size-selector {
   display: flex;
