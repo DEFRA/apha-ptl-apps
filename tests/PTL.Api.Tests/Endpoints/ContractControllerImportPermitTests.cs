@@ -22,6 +22,7 @@ public class ContractControllerImportPermitTests
             new StubSampleAddressService(),
             new StubContractRenewalService(),
             new StubRenewContractsService(),
+            new StubPendingOrderService(),
             NullLogger<ContractController>.Instance);
 
         var services = new ServiceCollection().AddMvc().Services.BuildServiceProvider();

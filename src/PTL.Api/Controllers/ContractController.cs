@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using PTL.Contracts.Contract;
 using PTL.Core.Contract;
 using PTL.Core.Contract.ImportPermit;
+using PTL.Core.Contract.PendingOrder;
 using PTL.Core.Contract.Renew;
 using PTL.Core.Contract.Renewal;
 using PTL.Core.Contract.SampleAddress;
@@ -20,6 +21,7 @@ public sealed class ContractController(
     ISampleAddressService sampleAddressService,
     IContractRenewalService contractRenewalService,
     IRenewContractsService renewContractsService,
+    IPendingOrderService pendingOrderService,
     ILogger<ContractController> logger) : ControllerBase
 {
     private static readonly Action<ILogger, Guid, Exception?> LogContractNotFoundMessage =
@@ -40,6 +42,105 @@ public sealed class ContractController(
 
         return Ok(ToResponse(contract));
     }
+
+    // GET /api/contracts/pending-orders - Review Pending Orders, split by contract year.
+    [HttpGet("contracts/pending-orders")]
+    public async Task<ActionResult<PendingOrderListResponse>> GetPendingOrders(CancellationToken cancellationToken)
+    {
+        var (currentYear, nextYear) = await pendingOrderService.GetPendingOrdersAsync(cancellationToken);
+
+        return Ok(new PendingOrderListResponse(
+            currentYear.Select(ToPendingOrderSummaryResponse).ToList(),
+            nextYear.Select(ToPendingOrderSummaryResponse).ToList()));
+    }
+
+    // GET /api/contracts/pending-orders/{pendingContractId} - Pending Order Details.
+    [HttpGet("contracts/pending-orders/{pendingContractId:guid}")]
+    public async Task<ActionResult<PendingOrderDetailsResponse>> GetPendingOrder(Guid pendingContractId, CancellationToken cancellationToken)
+    {
+        var detail = await pendingOrderService.GetPendingOrderAsync(pendingContractId, cancellationToken);
+        return detail is null ? NotFound() : Ok(ToPendingOrderDetailsResponse(detail));
+    }
+
+    // PUT /api/contracts/pending-orders/{pendingContractId}/schemes/{pendingParticipantSchemeId}
+    // - the per-row month / Import-Export Licence / Remove edit.
+    [HttpPut("contracts/pending-orders/{pendingContractId:guid}/schemes/{pendingParticipantSchemeId:guid}")]
+    public async Task<IActionResult> UpdatePendingOrderScheme(
+        Guid pendingContractId,
+        Guid pendingParticipantSchemeId,
+        [FromBody] PendingOrderSchemeUpdateRequest request,
+        CancellationToken cancellationToken)
+    {
+        var edit = new PendingOrderSchemeEdit(
+            request.DistributionMonthJan, request.DistributionMonthFeb, request.DistributionMonthMar,
+            request.DistributionMonthApr, request.DistributionMonthMay, request.DistributionMonthJun,
+            request.DistributionMonthJul, request.DistributionMonthAug, request.DistributionMonthSep,
+            request.DistributionMonthOct, request.DistributionMonthNov, request.DistributionMonthDec,
+            request.ImportExportLicenceRequired, request.IsRemoved);
+
+        var updated = await pendingOrderService.UpdateSchemeAsync(pendingContractId, pendingParticipantSchemeId, edit, cancellationToken);
+        return updated ? NoContent() : NotFound();
+    }
+
+    // POST /api/contracts/pending-orders/{pendingContractId}/approve - creates the contract and its
+    // participant schemes, then soft-deletes the pending order.
+    [HttpPost("contracts/pending-orders/{pendingContractId:guid}/approve")]
+    public async Task<IActionResult> ApprovePendingOrder(Guid pendingContractId, [FromBody] PendingOrderApproveRequest? request, CancellationToken cancellationToken)
+    {
+        // Authentication is out of scope, so there is no signed-in user to record yet; legacy
+        // GetCurrentUser() falls back to "Guest" for the same reason.
+        var approvedBy = User?.Identity?.Name is { Length: > 0 } name ? name.ToLowerInvariant() : "Guest";
+
+        var approved = await pendingOrderService.ApprovePendingOrderAsync(
+            pendingContractId, request?.PurchaseOrderNumber ?? string.Empty, approvedBy, cancellationToken);
+        return approved ? NoContent() : NotFound();
+    }
+
+    // POST /api/contracts/pending-orders/{pendingContractId}/decline - discards the pending order
+    // without creating a contract.
+    [HttpPost("contracts/pending-orders/{pendingContractId:guid}/decline")]
+    public async Task<IActionResult> DeclinePendingOrder(Guid pendingContractId, CancellationToken cancellationToken)
+    {
+        var declined = await pendingOrderService.DeclinePendingOrderAsync(pendingContractId, cancellationToken);
+        return declined ? NoContent() : NotFound();
+    }
+
+    private static PendingOrderSummaryResponse ToPendingOrderSummaryResponse(PendingOrderSummaryEntity order) => new(
+        order.PendingContractId,
+        order.CustomerId,
+        order.QalNumber,
+        order.CustomerName,
+        order.YearId,
+        order.Year,
+        order.OrderSubmitDate);
+
+    private static PendingOrderDetailsResponse ToPendingOrderDetailsResponse(PendingOrderDetail detail) => new(
+        detail.Order.PendingContractId,
+        detail.Order.CustomerId,
+        detail.QalNumber,
+        detail.Order.CustomerName,
+        detail.Order.YearId,
+        detail.Year,
+        detail.Order.PurchaseOrderNumber,
+        detail.Order.CurrencySymbol,
+        detail.Schemes.Select(ToPendingOrderSchemeResponse).ToList(),
+        detail.TotalSchemePrice,
+        detail.TotalPostagePrice,
+        detail.Total);
+
+    private static PendingOrderSchemeResponse ToPendingOrderSchemeResponse(PendingOrderSchemeLine line) => new(
+        line.Scheme.PendingParticipantSchemeId,
+        line.Scheme.ParticipantId,
+        line.Scheme.ParticipantName,
+        line.Scheme.SchemeId,
+        line.Scheme.SchemeIdentifier,
+        line.Scheme.SchemeName,
+        line.Months.Select(m => new PendingOrderSchemeMonthResponse(m.Label, m.MonthNumber, m.Selected, m.Enabled, m.AlreadyParticipating)).ToList(),
+        line.Scheme.ImportExportLicenceRequired,
+        line.Scheme.IsRemoved,
+        line.Scheme.Price,
+        line.PostagePrice,
+        line.TotalPrice);
 
     // GET /api/customers/{customerId}/contracts[?yearId=&period=&searchTerm=&page=&pageSize=]
     // - yearId supplied: exact-year lookup via spgContractInfoByCustomerIdAndYearId (no search/paging).

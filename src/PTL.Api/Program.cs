@@ -7,6 +7,7 @@ using PTL.Common.Health;
 using PTL.Core.AdministrationCharge;
 using PTL.Core.Contract;
 using PTL.Core.Contract.ImportPermit;
+using PTL.Core.Contract.PendingOrder;
 using PTL.Core.Contract.Renew;
 using PTL.Core.Contract.Renewal;
 using PTL.Core.Contract.SampleAddress;
@@ -19,6 +20,7 @@ using PTL.Core.WeightedPricingPlan;
 using PTL.Data.AdministrationCharge;
 using PTL.Data.Contract;
 using PTL.Data.Contract.ImportPermit;
+using PTL.Data.Contract.PendingOrder;
 using PTL.Data.Contract.Renew;
 using PTL.Data.Contract.Renewal;
 using PTL.Data.Contract.SampleAddress;
@@ -91,6 +93,8 @@ builder.Services.AddScoped<IContractRenewalService, ContractRenewalService>();
 
 builder.Services.AddScoped<IContractMergeRepository, ContractMergeRepository>();
 builder.Services.AddScoped<IRenewContractsService, RenewContractsService>();
+builder.Services.AddScoped<IPendingOrderRepository, PendingOrderRepository>();
+builder.Services.AddScoped<IPendingOrderService, PendingOrderService>();
 
 builder.Services.AddScoped<ISchemeRepository, SchemeRepository>();
 builder.Services.AddScoped<ISchemeService, SchemeService>();

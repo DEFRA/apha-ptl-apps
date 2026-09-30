@@ -14,12 +14,69 @@ public interface IContractApiClient
     Task<ContractSaveResult> UpdateContractAsync(Guid contractId, ContractRequest request, CancellationToken cancellationToken = default);
     Task<ContractItemsResponse?> GetContractItemsAsync(Guid contractId, CancellationToken cancellationToken = default);
     Task<ContractItemRemovalResult> RemoveContractItemAsync(Guid contractId, Guid participantSchemeId, CancellationToken cancellationToken = default);
+    Task<PendingOrderListResponse> GetPendingOrdersAsync(CancellationToken cancellationToken = default);
+    Task<PendingOrderDetailsResponse?> GetPendingOrderAsync(Guid pendingContractId, CancellationToken cancellationToken = default);
+    Task<bool> UpdatePendingOrderSchemeAsync(Guid pendingContractId, Guid pendingParticipantSchemeId, PendingOrderSchemeUpdateRequest request, CancellationToken cancellationToken = default);
+    Task<PendingOrderDecisionResult> ApprovePendingOrderAsync(Guid pendingContractId, PendingOrderApproveRequest request, CancellationToken cancellationToken = default);
+    Task<bool> DeclinePendingOrderAsync(Guid pendingContractId, CancellationToken cancellationToken = default);
 }
 
 // Thin typed HttpClient wrapper around PTL.Api's contract endpoints, shared by every web
 // front-end (PTL.InternalWeb, PTL.ExternalWeb, ...).
 public sealed class ContractApiClient(HttpClient httpClient) : IContractApiClient
 {
+    public async Task<PendingOrderListResponse> GetPendingOrdersAsync(CancellationToken cancellationToken = default)
+    {
+        var result = await httpClient.GetFromJsonAsync<PendingOrderListResponse>("/api/contracts/pending-orders", cancellationToken);
+        return result ?? new PendingOrderListResponse([], []);
+    }
+
+    public async Task<PendingOrderDetailsResponse?> GetPendingOrderAsync(Guid pendingContractId, CancellationToken cancellationToken = default)
+    {
+        var response = await httpClient.GetAsync($"/api/contracts/pending-orders/{pendingContractId}", cancellationToken);
+        if (response.StatusCode == HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<PendingOrderDetailsResponse>(cancellationToken);
+    }
+
+    public async Task<bool> UpdatePendingOrderSchemeAsync(Guid pendingContractId, Guid pendingParticipantSchemeId, PendingOrderSchemeUpdateRequest request, CancellationToken cancellationToken = default)
+    {
+        var response = await httpClient.PutAsJsonAsync(
+            $"/api/contracts/pending-orders/{pendingContractId}/schemes/{pendingParticipantSchemeId}", request, cancellationToken);
+        return response.IsSuccessStatusCode;
+    }
+
+    public async Task<PendingOrderDecisionResult> ApprovePendingOrderAsync(Guid pendingContractId, PendingOrderApproveRequest request, CancellationToken cancellationToken = default)
+    {
+        var response = await httpClient.PostAsJsonAsync($"/api/contracts/pending-orders/{pendingContractId}/approve", request, cancellationToken);
+        if (response.StatusCode == HttpStatusCode.NotFound)
+        {
+            return new PendingOrderDecisionResult(false, true, new Dictionary<string, string[]>());
+        }
+
+        if (response.StatusCode == HttpStatusCode.BadRequest)
+        {
+            var problem = await response.Content.ReadFromJsonAsync<ValidationProblemDetails>(cancellationToken);
+            var errors = problem?.Errors is { Count: > 0 }
+                ? problem.Errors.ToDictionary(e => e.Key, e => e.Value)
+                : new Dictionary<string, string[]> { [string.Empty] = ["The request was invalid."] };
+            return new PendingOrderDecisionResult(false, false, errors);
+        }
+
+        response.EnsureSuccessStatusCode();
+        return new PendingOrderDecisionResult(true, false, new Dictionary<string, string[]>());
+    }
+
+    public async Task<bool> DeclinePendingOrderAsync(Guid pendingContractId, CancellationToken cancellationToken = default)
+    {
+        var response = await httpClient.PostAsync($"/api/contracts/pending-orders/{pendingContractId}/decline", content: null, cancellationToken);
+        return response.IsSuccessStatusCode;
+    }
+
     public async Task<ContractResponse?> GetContractAsync(Guid contractId, CancellationToken cancellationToken = default)
     {
         var response = await httpClient.GetAsync($"/api/contracts/{contractId}", cancellationToken);

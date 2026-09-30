@@ -1,3 +1,4 @@
+using PTL.Core.Contract.PendingOrder;
 using PTL.Core.Contract.Renew;
 using PTL.Core.Contract.Renewal;
 using PTL.Core.Contract.SampleAddress;
@@ -33,4 +34,22 @@ internal sealed class StubRenewContractsService : IRenewContractsService
         string? newContractSignatory,
         CancellationToken cancellationToken = default) =>
         Task.FromResult(new RenewContractsResult(true, Guid.NewGuid(), null));
+}
+
+internal sealed class StubPendingOrderService : IPendingOrderService
+{
+    public Task<(IReadOnlyList<PendingOrderSummaryEntity> CurrentYear, IReadOnlyList<PendingOrderSummaryEntity> NextYear)> GetPendingOrdersAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult<(IReadOnlyList<PendingOrderSummaryEntity>, IReadOnlyList<PendingOrderSummaryEntity>)>(([], []));
+
+    public Task<PendingOrderDetail?> GetPendingOrderAsync(Guid pendingContractId, CancellationToken cancellationToken = default) =>
+        Task.FromResult<PendingOrderDetail?>(null);
+
+    public Task<bool> UpdateSchemeAsync(Guid pendingContractId, Guid pendingParticipantSchemeId, PendingOrderSchemeEdit edit, CancellationToken cancellationToken = default) =>
+        Task.FromResult(false);
+
+    public Task<bool> ApprovePendingOrderAsync(Guid pendingContractId, string purchaseOrderNumber, string approvedBy, CancellationToken cancellationToken = default) =>
+        Task.FromResult(false);
+
+    public Task<bool> DeclinePendingOrderAsync(Guid pendingContractId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(false);
 }

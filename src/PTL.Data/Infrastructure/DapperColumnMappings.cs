@@ -3,6 +3,7 @@ using Dapper;
 using PTL.Core.AdministrationCharge;
 using PTL.Core.Contract;
 using PTL.Core.Contract.ImportPermit;
+using PTL.Core.Contract.PendingOrder;
 using PTL.Core.Contract.Renew;
 using PTL.Core.Contract.Renewal;
 using PTL.Core.Contract.SampleAddress;
@@ -256,6 +257,8 @@ public static class DapperColumnMappings
         {
             ["fldUTNumber"] = nameof(SystemSettingsEntity.UTNumber),
             ["NextYearWithDelayId"] = nameof(SystemSettingsEntity.NextYearWithDelayId),
+            ["CurrentYearId"] = nameof(SystemSettingsEntity.CurrentYearId),
+            ["NextYearId"] = nameof(SystemSettingsEntity.NextYearId),
         });
 
         // spgContractMerge result set 1 (legacy ContractMergeInfo).
@@ -291,6 +294,83 @@ public static class DapperColumnMappings
             [ColYearId] = nameof(ContractSummaryEntity.YearId),
             [ColIsActive] = nameof(ContractSummaryEntity.IsActive),
             ["fldSuffix"] = nameof(ContractSummaryEntity.Suffix),
+        });
+
+        Map<PendingOrderSummaryEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldPendingContractId"] = nameof(PendingOrderSummaryEntity.PendingContractId),
+            [ColCustomerId] = nameof(PendingOrderSummaryEntity.CustomerId),
+            [ColYearId] = nameof(PendingOrderSummaryEntity.YearId),
+            ["fldIsSubmitted"] = nameof(PendingOrderSummaryEntity.IsSubmitted),
+            ["fldIsDeleted"] = nameof(PendingOrderSummaryEntity.IsDeleted),
+            ["fldOrderSubmitDate"] = nameof(PendingOrderSummaryEntity.OrderSubmitDate),
+            [ColName] = nameof(PendingOrderSummaryEntity.CustomerName),
+            ["fldQalNumber"] = nameof(PendingOrderSummaryEntity.QalNumber),
+        });
+
+        Map<PendingOrderEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldPendingContractId"] = nameof(PendingOrderEntity.PendingContractId),
+            [ColCustomerId] = nameof(PendingOrderEntity.CustomerId),
+            [ColYearId] = nameof(PendingOrderEntity.YearId),
+            ["fldIsSubmitted"] = nameof(PendingOrderEntity.IsSubmitted),
+            ["fldIsDeleted"] = nameof(PendingOrderEntity.IsDeleted),
+            ["fldPurchaseOrderNumber"] = nameof(PendingOrderEntity.PurchaseOrderNumber),
+            ["fldOrderSubmitDate"] = nameof(PendingOrderEntity.OrderSubmitDate),
+            [ColName] = nameof(PendingOrderEntity.CustomerName),
+            ["fldSymbol"] = nameof(PendingOrderEntity.CurrencySymbol),
+        });
+
+        Map<PendingOrderSchemeEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldPendingParticipantSchemeId"] = nameof(PendingOrderSchemeEntity.PendingParticipantSchemeId),
+            ["fldPendingContractId"] = nameof(PendingOrderSchemeEntity.PendingContractId),
+            [ColParticipantId] = nameof(PendingOrderSchemeEntity.ParticipantId),
+            ["fldParticipantName"] = nameof(PendingOrderSchemeEntity.ParticipantName),
+            ["fldSchemeId"] = nameof(PendingOrderSchemeEntity.SchemeId),
+            ["fldSchemeName"] = nameof(PendingOrderSchemeEntity.SchemeName),
+            [ColIdentifier] = nameof(PendingOrderSchemeEntity.SchemeIdentifier),
+            ["fldJan"] = nameof(PendingOrderSchemeEntity.DistributionMonthJan),
+            ["fldFeb"] = nameof(PendingOrderSchemeEntity.DistributionMonthFeb),
+            ["fldMar"] = nameof(PendingOrderSchemeEntity.DistributionMonthMar),
+            ["fldApr"] = nameof(PendingOrderSchemeEntity.DistributionMonthApr),
+            ["fldMay"] = nameof(PendingOrderSchemeEntity.DistributionMonthMay),
+            ["fldJun"] = nameof(PendingOrderSchemeEntity.DistributionMonthJun),
+            ["fldJul"] = nameof(PendingOrderSchemeEntity.DistributionMonthJul),
+            ["fldAug"] = nameof(PendingOrderSchemeEntity.DistributionMonthAug),
+            ["fldSep"] = nameof(PendingOrderSchemeEntity.DistributionMonthSep),
+            ["fldOct"] = nameof(PendingOrderSchemeEntity.DistributionMonthOct),
+            ["fldNov"] = nameof(PendingOrderSchemeEntity.DistributionMonthNov),
+            ["fldDec"] = nameof(PendingOrderSchemeEntity.DistributionMonthDec),
+            ["fldImportExportLicenceRequired"] = nameof(PendingOrderSchemeEntity.ImportExportLicenceRequired),
+            ["fldIsSelected"] = nameof(PendingOrderSchemeEntity.IsSelected),
+            ["fldIsRemoved"] = nameof(PendingOrderSchemeEntity.IsRemoved),
+            ["fldDataConsentDeclarationGiven"] = nameof(PendingOrderSchemeEntity.DataConsentDeclarationGiven),
+            ["fldPrice"] = nameof(PendingOrderSchemeEntity.Price),
+            ["fldCanEditJan"] = nameof(PendingOrderSchemeEntity.CanEditJan),
+            ["fldCanEditFeb"] = nameof(PendingOrderSchemeEntity.CanEditFeb),
+            ["fldCanEditMar"] = nameof(PendingOrderSchemeEntity.CanEditMar),
+            ["fldCanEditApr"] = nameof(PendingOrderSchemeEntity.CanEditApr),
+            ["fldCanEditMay"] = nameof(PendingOrderSchemeEntity.CanEditMay),
+            ["fldCanEditJun"] = nameof(PendingOrderSchemeEntity.CanEditJun),
+            ["fldCanEditJul"] = nameof(PendingOrderSchemeEntity.CanEditJul),
+            ["fldCanEditAug"] = nameof(PendingOrderSchemeEntity.CanEditAug),
+            ["fldCanEditSep"] = nameof(PendingOrderSchemeEntity.CanEditSep),
+            ["fldCanEditOct"] = nameof(PendingOrderSchemeEntity.CanEditOct),
+            ["fldCanEditNov"] = nameof(PendingOrderSchemeEntity.CanEditNov),
+            ["fldCanEditDec"] = nameof(PendingOrderSchemeEntity.CanEditDec),
+            ["fldDistributionMonthJanIsContracted"] = nameof(PendingOrderSchemeEntity.IsContractedJan),
+            ["fldDistributionMonthFebIsContracted"] = nameof(PendingOrderSchemeEntity.IsContractedFeb),
+            ["fldDistributionMonthMarIsContracted"] = nameof(PendingOrderSchemeEntity.IsContractedMar),
+            ["fldDistributionMonthAprIsContracted"] = nameof(PendingOrderSchemeEntity.IsContractedApr),
+            ["fldDistributionMonthMayIsContracted"] = nameof(PendingOrderSchemeEntity.IsContractedMay),
+            ["fldDistributionMonthJunIsContracted"] = nameof(PendingOrderSchemeEntity.IsContractedJun),
+            ["fldDistributionMonthJulIsContracted"] = nameof(PendingOrderSchemeEntity.IsContractedJul),
+            ["fldDistributionMonthAugIsContracted"] = nameof(PendingOrderSchemeEntity.IsContractedAug),
+            ["fldDistributionMonthSepIsContracted"] = nameof(PendingOrderSchemeEntity.IsContractedSep),
+            ["fldDistributionMonthOctIsContracted"] = nameof(PendingOrderSchemeEntity.IsContractedOct),
+            ["fldDistributionMonthNovIsContracted"] = nameof(PendingOrderSchemeEntity.IsContractedNov),
+            ["fldDistributionMonthDecIsContracted"] = nameof(PendingOrderSchemeEntity.IsContractedDec),
         });
 
         Map<ImportPermitEntity>(new(StringComparer.OrdinalIgnoreCase)
@@ -364,6 +444,18 @@ public static class DapperColumnMappings
             ["fldCustomsDocumentVolume"] = nameof(CoreScheme.CustomsVolume),
             ["fldDataConsentDeclarationActive"] = nameof(CoreScheme.DataConsentDeclarationActive),
             ["fldDataConsentDeclarationText"] = nameof(CoreScheme.DataConsentDeclarationText),
+            ["fldCanEditJan"] = nameof(CoreScheme.CanEditJan),
+            ["fldCanEditFeb"] = nameof(CoreScheme.CanEditFeb),
+            ["fldCanEditMar"] = nameof(CoreScheme.CanEditMar),
+            ["fldCanEditApr"] = nameof(CoreScheme.CanEditApr),
+            ["fldCanEditMay"] = nameof(CoreScheme.CanEditMay),
+            ["fldCanEditJun"] = nameof(CoreScheme.CanEditJun),
+            ["fldCanEditJul"] = nameof(CoreScheme.CanEditJul),
+            ["fldCanEditAug"] = nameof(CoreScheme.CanEditAug),
+            ["fldCanEditSep"] = nameof(CoreScheme.CanEditSep),
+            ["fldCanEditOct"] = nameof(CoreScheme.CanEditOct),
+            ["fldCanEditNov"] = nameof(CoreScheme.CanEditNov),
+            ["fldCanEditDec"] = nameof(CoreScheme.CanEditDec),
             ["Readonly"] = nameof(CoreScheme.IsReadOnly),
         });
 
@@ -415,6 +507,7 @@ public static class DapperColumnMappings
         {
             [ColCountryId] = nameof(CountryEntity.CountryId),
             ["fldCountry"] = nameof(CountryEntity.Country),
+            ["fldCountryType"] = nameof(CountryEntity.CountryType),
         });
 
         Map<CurrencyEntity>(new(StringComparer.OrdinalIgnoreCase)

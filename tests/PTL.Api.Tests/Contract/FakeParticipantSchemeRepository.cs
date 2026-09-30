@@ -7,6 +7,8 @@ internal sealed class FakeParticipantSchemeRepository : IParticipantSchemeReposi
 {
     private readonly Dictionary<Guid, ParticipantSchemeRecord> _records = [];
 
+    public IReadOnlyDictionary<Guid, ParticipantSchemeRecord> Records => _records;
+
     public void Add(ParticipantSchemeRecord record) => _records[record.ParticipantSchemeId] = record;
 
     public Task<ParticipantSchemeRecord?> GetByIdAsync(Guid participantSchemeId, CancellationToken cancellationToken = default) =>

@@ -90,7 +90,16 @@ public static class SideNavigationProvider
                                 new SideNavigationItem { Text = "Edit Pending Participant Update", ControllerName = ParticipantControllerName, ActionName = "EditPendingParticipantUpdate", IsHidden = true }
                             ]
                         },
-                        new SideNavigationItem { Text = "Review Pending Orders", IsEnabled = false },
+                        new SideNavigationItem
+                        {
+                            Text = "Review Pending Orders",
+                            ControllerName = ContractControllerName,
+                            ActionName = "ReviewPendingOrders",
+                            Children =
+                            [
+                                new SideNavigationItem { Text = "Pending Order Details", ControllerName = ContractControllerName, ActionName = "PendingOrderDetails", IsHidden = true }
+                            ]
+                        },
 
                         // Hidden: not a menu entry, but present so Details/Edit pages resolve a full
                         // breadcrumb trail instead of a plain controller/action crumb.

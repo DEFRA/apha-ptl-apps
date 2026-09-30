@@ -85,6 +85,12 @@ body {
   background-color: #f3f9f1;
 }
 
+/* A pending order month the participant is already contracted for. Legacy PendingContractOrder
+   FlagCheckboxAsAlreadyParticipating set the cell's BgColor to #add5eb and locked the checkbox. */
+.ptl-month-contracted {
+  background-color: #add5eb;
+}
+
 .ptl-comparison-row--changed td:last-child {
   font-weight: bold;
 }

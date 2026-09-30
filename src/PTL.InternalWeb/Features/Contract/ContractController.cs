@@ -486,6 +486,99 @@ public class ContractController(IContractApiClient contractApiClient, ICustomerA
         return RedirectToAction(nameof(Details), new { id });
     }
 
+    // Review Pending Orders (legacy ReviewPendingOrders.aspx) - two grids, current and next year.
+    public async Task<IActionResult> ReviewPendingOrders(CancellationToken cancellationToken)
+    {
+        var orders = await contractApiClient.GetPendingOrdersAsync(cancellationToken);
+        return View(new PendingOrderListViewModel(orders.CurrentYearOrders, orders.NextYearOrders));
+    }
+
+    // Pending Order Details (legacy PendingContractOrder.aspx).
+    public async Task<IActionResult> PendingOrderDetails(Guid pendingContractId, CancellationToken cancellationToken)
+    {
+        var order = await contractApiClient.GetPendingOrderAsync(pendingContractId, cancellationToken);
+        return order is null ? NotFound() : View(new PendingOrderDetailsViewModel(order));
+    }
+
+    // Legacy toggles a month / the Import-Export Licence checkbox with an AutoPostBack that saves
+    // the row and re-totals the order; here the whole row posts back at once.
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> UpdatePendingOrderScheme(
+        Guid pendingContractId,
+        Guid pendingParticipantSchemeId,
+        PendingOrderSchemeUpdateRequest request,
+        CancellationToken cancellationToken)
+    {
+        var updated = await contractApiClient.UpdatePendingOrderSchemeAsync(pendingContractId, pendingParticipantSchemeId, request, cancellationToken);
+        if (!updated)
+        {
+            return NotFound();
+        }
+
+        return RedirectToAction(nameof(PendingOrderDetails), new { pendingContractId });
+    }
+
+    // Legacy's per-row Add/Remove link - flips fldIsRemoved, leaving every other value intact.
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> RemovePendingOrderScheme(
+        Guid pendingContractId,
+        Guid pendingParticipantSchemeId,
+        PendingOrderSchemeUpdateRequest request,
+        CancellationToken cancellationToken)
+    {
+        var updated = await contractApiClient.UpdatePendingOrderSchemeAsync(
+            pendingContractId,
+            pendingParticipantSchemeId,
+            request with { IsRemoved = !request.IsRemoved },
+            cancellationToken);
+
+        if (!updated)
+        {
+            return NotFound();
+        }
+
+        return RedirectToAction(nameof(PendingOrderDetails), new { pendingContractId });
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ApprovePendingOrder(Guid pendingContractId, string? purchaseOrderNumber, CancellationToken cancellationToken)
+    {
+        var result = await contractApiClient.ApprovePendingOrderAsync(
+            pendingContractId, new PendingOrderApproveRequest(purchaseOrderNumber ?? string.Empty), cancellationToken);
+
+        if (result.NotFound)
+        {
+            return NotFound();
+        }
+
+        if (!result.Success)
+        {
+            var messages = string.Join(" ", result.FieldErrors.SelectMany(e => e.Value));
+            TempData.SetNotification(NotificationType.Error, $"Order could not be approved. {messages}");
+            return RedirectToAction(nameof(PendingOrderDetails), new { pendingContractId });
+        }
+
+        TempData.SetNotification(NotificationType.Success, "Order approved successfully.");
+        return RedirectToAction(nameof(ReviewPendingOrders));
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> DeclinePendingOrder(Guid pendingContractId, CancellationToken cancellationToken)
+    {
+        var declined = await contractApiClient.DeclinePendingOrderAsync(pendingContractId, cancellationToken);
+        if (!declined)
+        {
+            return NotFound();
+        }
+
+        TempData.SetNotification(NotificationType.Success, "Order declined successfully.");
+        return RedirectToAction(nameof(ReviewPendingOrders));
+    }
+
     private void AddErrors(IReadOnlyDictionary<string, string[]> fieldErrors) => this.AddFieldErrors(fieldErrors);
 
     // Fetches the current+next year reference list once per request - matches legacy

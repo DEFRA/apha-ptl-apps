@@ -34,4 +34,33 @@ internal sealed class FakeContractApiClient : IContractApiClient
 
     public Task<ContractItemRemovalResult> RemoveContractItemAsync(Guid contractId, Guid participantSchemeId, CancellationToken cancellationToken = default) =>
         Task.FromResult(RemovalResult);
+
+    public PendingOrderListResponse PendingOrders { get; set; } = new([], []);
+    public PendingOrderDetailsResponse? PendingOrder { get; set; }
+    public bool UpdatePendingOrderSchemeResult { get; set; } = true;
+    public PendingOrderDecisionResult ApprovePendingOrderResult { get; set; } = new(true, false, new Dictionary<string, string[]>());
+    public bool DeclinePendingOrderResult { get; set; } = true;
+    public PendingOrderSchemeUpdateRequest? LastSchemeUpdate { get; private set; }
+    public PendingOrderApproveRequest? LastApproveRequest { get; private set; }
+
+    public Task<PendingOrderListResponse> GetPendingOrdersAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult(PendingOrders);
+
+    public Task<PendingOrderDetailsResponse?> GetPendingOrderAsync(Guid pendingContractId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(PendingOrder);
+
+    public Task<bool> UpdatePendingOrderSchemeAsync(Guid pendingContractId, Guid pendingParticipantSchemeId, PendingOrderSchemeUpdateRequest request, CancellationToken cancellationToken = default)
+    {
+        LastSchemeUpdate = request;
+        return Task.FromResult(UpdatePendingOrderSchemeResult);
+    }
+
+    public Task<PendingOrderDecisionResult> ApprovePendingOrderAsync(Guid pendingContractId, PendingOrderApproveRequest request, CancellationToken cancellationToken = default)
+    {
+        LastApproveRequest = request;
+        return Task.FromResult(ApprovePendingOrderResult);
+    }
+
+    public Task<bool> DeclinePendingOrderAsync(Guid pendingContractId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(DeclinePendingOrderResult);
 }

@@ -7,6 +7,7 @@ using PTL.Api.Tests.Contract;
 using PTL.Contracts.Contract;
 using PTL.Core.Contract;
 using PTL.Core.Contract.ImportPermit;
+using PTL.Core.Contract.PendingOrder;
 using PTL.Core.Contract.Renew;
 using PTL.Core.Contract.Renewal;
 using PTL.Core.Contract.SampleAddress;
@@ -24,7 +25,8 @@ public class ContractControllerAdditionalEndpointsTests
         FakeParticipantSchemeRepository? participantSchemeRepository = null,
         ISampleAddressService? sampleAddressService = null,
         IContractRenewalService? contractRenewalService = null,
-        IRenewContractsService? renewContractsService = null)
+        IRenewContractsService? renewContractsService = null,
+        IPendingOrderService? pendingOrderService = null)
     {
         var controller = new ContractController(
             new ContractService(contractRepository ?? new FakeContractRepository(), participantSchemeRepository ?? new FakeParticipantSchemeRepository(), NullLogger<ContractService>.Instance),
@@ -32,6 +34,7 @@ public class ContractControllerAdditionalEndpointsTests
             sampleAddressService ?? new StubSampleAddressService(),
             contractRenewalService ?? new StubContractRenewalService(),
             renewContractsService ?? new StubRenewContractsService(),
+            pendingOrderService ?? new StubPendingOrderService(),
             NullLogger<ContractController>.Instance);
 
         var services = new ServiceCollection().AddMvc().Services.BuildServiceProvider();

@@ -71,6 +71,8 @@ internal sealed class FakeContractRepository : IContractRepository
     // going through CreateAsync's server-generated-field logic.
     public void Seed(PTL.Core.Contract.Contract contract) => _contracts[contract.ContractId] = Clone(contract);
 
+    public IReadOnlyDictionary<Guid, PTL.Core.Contract.Contract> Contracts => _contracts;
+
     private static ContractSummaryEntity ToSummary(PTL.Core.Contract.Contract c) => new()
     {
         ContractId = c.ContractId,

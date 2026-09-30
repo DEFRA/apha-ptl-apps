@@ -20,6 +20,7 @@ public class ContractControllerTests
             new StubSampleAddressService(),
             new StubContractRenewalService(),
             new StubRenewContractsService(),
+            new StubPendingOrderService(),
             NullLogger<ContractController>.Instance);
 
         // ValidationProblem() resolves ProblemDetailsFactory from HttpContext.RequestServices,
