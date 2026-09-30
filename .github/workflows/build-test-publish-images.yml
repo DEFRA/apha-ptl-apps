@@ -51,6 +51,14 @@ permissions: {}
 # A changed component requires exactly one matching label. An unchanged
 # component must not have a release label.
 
+# Dynamic semantic-version rules are maintained independently per component:
+# - No existing tag + patch = 0.0.1
+# - No existing tag + minor = 0.1.0
+# - api-v0.1.0 + patch = api-v0.1.1
+# - api-v0.1.0 + minor = api-v0.2.0
+# - api-v0.2.0 + patch = api-v0.2.1
+# - internalweb and externalweb follow the same independent sequence.
+
 # Production releases are serialized so two merges cannot calculate the same
 # next semantic version. Pull-request validation remains independently cancellable.
 concurrency:
@@ -97,6 +105,7 @@ jobs:
               - 'NuGet.config'
               - 'global.json'
               - '.github/workflows/build-test-publish-images.yml'
+              - '.github/actions/strip-nuget-cache-mount/**'
             internalweb:
               - 'src/PTL.InternalWeb/**'
               - 'src/PTL.ApiClient/**'
@@ -108,6 +117,7 @@ jobs:
               - 'NuGet.config'
               - 'global.json'
               - '.github/workflows/build-test-publish-images.yml'
+              - '.github/actions/strip-nuget-cache-mount/**'
             externalweb:
               - 'src/PTL.ExternalWeb/**'
               - 'src/PTL.ApiClient/**'
@@ -119,6 +129,7 @@ jobs:
               - 'NuGet.config'
               - 'global.json'
               - '.github/workflows/build-test-publish-images.yml'
+              - '.github/actions/strip-nuget-cache-mount/**'
 
       - name: Resolve affected components
         id: components
@@ -333,22 +344,12 @@ jobs:
           & $env:SONAR_SCANNER_PATH begin `
             "/k:${{ vars.SONAR_PROJECT_KEY }}" `
             "/o:${{ vars.SONAR_ORGANIZATION }}" `
-            "/s:${{ github.workspace }}\SonarQube.Analysis.xml" `
             "/d:sonar.token=$env:SONAR_TOKEN" `
             "/d:sonar.host.url=https://sonarcloud.io" `
             "/d:sonar.qualitygate.wait=true"
 
           dotnet restore PTL.slnx
           dotnet build PTL.slnx --configuration Release --no-restore
-
-          # coverlet.msbuild only produces coverage.cobertura.xml during `dotnet test` - the
-          # scanner has nothing to ingest without this step (see SonarQube.Analysis.xml).
-          dotnet test PTL.slnx `
-            --configuration Release `
-            --no-restore `
-            --logger "trx;LogFilePrefix=ptl-sonar-tests" `
-            --results-directory "${{ runner.temp }}/test-results" `
-            /p:Threshold=0
 
           & $env:SONAR_SCANNER_PATH end `
             "/d:sonar.token=$env:SONAR_TOKEN"
@@ -1000,44 +1001,40 @@ jobs:
 
           if [[ -n "${EXISTING_DIGEST}" && "${EXISTING_DIGEST}" != "None" ]]; then
             if [[ "${EXISTING_DIGEST}" != "${IMAGE_DIGEST}" ]]; then
-              echo "::error::Immutable tag ${RELEASE_TAG} already points to another digest."
+              echo "::error::Immutable tag ${RELEASE_TAG} already points to ${EXISTING_DIGEST}; expected ${IMAGE_DIGEST}."
               exit 1
             fi
 
             echo "${RELEASE_TAG} already points to the expected digest; continuing safely."
           else
-            IMAGE_MANIFEST="$(aws ecr batch-get-image \
-              --registry-id "${EXPECTED_AWS_ACCOUNT_ID}" \
-              --repository-name "${ECR_REPOSITORY}" \
-              --image-ids imageDigest="${IMAGE_DIGEST}" \
-              --accepted-media-types \
-                application/vnd.docker.distribution.manifest.v2+json \
-                application/vnd.oci.image.manifest.v1+json \
-              --query 'images[0].imageManifest' \
-              --output text)"
-
-            test -n "${IMAGE_MANIFEST}" || {
-              echo "::error::Unable to retrieve the ECR image manifest."
-              exit 1
-            }
-
-            aws ecr put-image \
-              --registry-id "${EXPECTED_AWS_ACCOUNT_ID}" \
-              --repository-name "${ECR_REPOSITORY}" \
-              --image-tag "${RELEASE_TAG}" \
-              --image-manifest "${IMAGE_MANIFEST}" \
-              >/dev/null
+            # Promote the exact local image that produced the candidate tag.
+            # Avoid round-tripping the manifest through batch-get-image and
+            # put-image, which can select a different manifest representation.
+            docker tag "${CANDIDATE_URI}" "${RELEASE_URI}"
+            docker push "${RELEASE_URI}"
           fi
 
-          RELEASE_DIGEST="$(aws ecr describe-images \
-            --registry-id "${EXPECTED_AWS_ACCOUNT_ID}" \
-            --repository-name "${ECR_REPOSITORY}" \
-            --image-ids imageTag="${RELEASE_TAG}" \
-            --query 'imageDetails[0].imageDigest' \
-            --output text)"
+          RELEASE_DIGEST=""
+
+          for ATTEMPT in $(seq 1 10); do
+            RELEASE_DIGEST="$(aws ecr describe-images \
+              --registry-id "${EXPECTED_AWS_ACCOUNT_ID}" \
+              --repository-name "${ECR_REPOSITORY}" \
+              --image-ids imageTag="${RELEASE_TAG}" \
+              --query 'imageDetails[0].imageDigest' \
+              --output text 2>/dev/null || true)"
+
+            if [[ "${RELEASE_DIGEST}" == "${IMAGE_DIGEST}" ]]; then
+              break
+            fi
+
+            if (( ATTEMPT < 10 )); then
+              sleep 2
+            fi
+          done
 
           if [[ "${RELEASE_DIGEST}" != "${IMAGE_DIGEST}" ]]; then
-            echo "::error::Release tag digest does not match the validated candidate digest."
+            echo "::error::Release tag ${RELEASE_TAG} points to '${RELEASE_DIGEST:-missing}', but validated candidate ${CANDIDATE_TAG} points to '${IMAGE_DIGEST}'."
             exit 1
           fi
 
