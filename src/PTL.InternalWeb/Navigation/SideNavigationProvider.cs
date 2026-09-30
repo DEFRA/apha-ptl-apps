@@ -25,7 +25,6 @@ public static class SideNavigationProvider
     private const string ParticipantControllerName = "Participant";
     private const string ContractControllerName = "Contract";
     private const string GroupAddressControllerName = "GroupAddress";
-    private const string SchemeControllerName = "Scheme";
     private const string SystemAdministrationControllerName = "SystemAdministration";
 
     // Placeholder for a menu entry whose page hasn't been migrated yet - see class remarks.
