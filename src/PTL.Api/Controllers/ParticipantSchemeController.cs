@@ -81,47 +81,52 @@ public sealed class ParticipantSchemeController(IParticipantSchemeService partic
         return ValidationProblem(ModelState);
     }
 
-    private static ParticipantSchemeRecord ToEntity(Guid participantSchemeId, CreateParticipantSchemeRequest request) => new()
+    private static ParticipantSchemeRecord ToEntity(Guid participantSchemeId, CreateParticipantSchemeRequest request)
     {
-        ParticipantSchemeId = participantSchemeId,
-        ContractId = request.ContractId,
-        ParticipantId = request.ParticipantId,
-        SchemeId = request.SchemeId,
-        DistributionMonthJan = request.DistributionMonthJan,
-        DistributionMonthFeb = request.DistributionMonthFeb,
-        DistributionMonthMar = request.DistributionMonthMar,
-        DistributionMonthApr = request.DistributionMonthApr,
-        DistributionMonthMay = request.DistributionMonthMay,
-        DistributionMonthJun = request.DistributionMonthJun,
-        DistributionMonthJul = request.DistributionMonthJul,
-        DistributionMonthAug = request.DistributionMonthAug,
-        DistributionMonthSep = request.DistributionMonthSep,
-        DistributionMonthOct = request.DistributionMonthOct,
-        DistributionMonthNov = request.DistributionMonthNov,
-        DistributionMonthDec = request.DistributionMonthDec,
-        NumberOfSetsRequired = request.NumberOfSetsRequired,
-        ExternalReference = request.ExternalReference,
-        Contact = request.Contact,
-        ImportExportLicenceRequired = request.ImportExportLicenceRequired,
-        CustomsCertificateRequired = request.CustomsCertificateRequired,
-        NonFeePaying = request.NonFeePaying,
-        PackingInstructions = request.PackingInstructions,
-        IsWeightedPricing = request.IsWeightedPricing,
-        DataConsentDeclarationGiven = request.DataConsentDeclarationGiven,
-        IsOverrideJan = request.IsOverrideJan,
-        IsOverrideFeb = request.IsOverrideFeb,
-        IsOverrideMar = request.IsOverrideMar,
-        IsOverrideApr = request.IsOverrideApr,
-        IsOverrideMay = request.IsOverrideMay,
-        IsOverrideJun = request.IsOverrideJun,
-        IsOverrideJul = request.IsOverrideJul,
-        IsOverrideAug = request.IsOverrideAug,
-        IsOverrideSep = request.IsOverrideSep,
-        IsOverrideOct = request.IsOverrideOct,
-        IsOverrideNov = request.IsOverrideNov,
-        IsOverrideDec = request.IsOverrideDec,
-        GroupAddressId = request.GroupAddressId
-    };
+        var record = ToEntity(participantSchemeId, ToUpdateRequest(request));
+        record.ContractId = request.ContractId;
+        record.ParticipantId = request.ParticipantId;
+        record.SchemeId = request.SchemeId;
+        return record;
+    }
+
+    // CreateParticipantSchemeRequest carries every UpdateParticipantSchemeRequest field plus the
+    // Scheme/Participant/Contract selected once at Add time - reuse the Update mapping for them.
+    private static UpdateParticipantSchemeRequest ToUpdateRequest(CreateParticipantSchemeRequest request) => new(
+        request.DistributionMonthJan,
+        request.DistributionMonthFeb,
+        request.DistributionMonthMar,
+        request.DistributionMonthApr,
+        request.DistributionMonthMay,
+        request.DistributionMonthJun,
+        request.DistributionMonthJul,
+        request.DistributionMonthAug,
+        request.DistributionMonthSep,
+        request.DistributionMonthOct,
+        request.DistributionMonthNov,
+        request.DistributionMonthDec,
+        request.NumberOfSetsRequired,
+        request.ExternalReference,
+        request.Contact,
+        request.ImportExportLicenceRequired,
+        request.CustomsCertificateRequired,
+        request.NonFeePaying,
+        request.PackingInstructions,
+        request.IsWeightedPricing,
+        request.DataConsentDeclarationGiven,
+        request.IsOverrideJan,
+        request.IsOverrideFeb,
+        request.IsOverrideMar,
+        request.IsOverrideApr,
+        request.IsOverrideMay,
+        request.IsOverrideJun,
+        request.IsOverrideJul,
+        request.IsOverrideAug,
+        request.IsOverrideSep,
+        request.IsOverrideOct,
+        request.IsOverrideNov,
+        request.IsOverrideDec,
+        request.GroupAddressId);
 
     private static ParticipantSchemeRecord ToEntity(Guid participantSchemeId, UpdateParticipantSchemeRequest request) => new()
     {

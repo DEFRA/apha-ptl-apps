@@ -1,4 +1,6 @@
 using System.Globalization;
+using PTL.Contracts.Contract;
+using PTL.Contracts.Customer;
 using PTL.Contracts.Lookup;
 
 namespace PTL.InternalWeb.Features.Contract;
@@ -61,5 +63,38 @@ internal static class MergeValueFormatting
         var reference = string.Concat($"{qalNumber}{suffix}".Where(c => char.IsLetterOrDigit(c) || c is '-' or '_'));
         var type = string.Concat(canonicalDocumentType.Where(char.IsLetterOrDigit));
         return string.IsNullOrEmpty(reference) ? $"{type}.docx" : $"{type}-{reference}.docx";
+    }
+
+    // Shared by Contract and Job Sheet: identical Invoice* merge fields in every legacy template.
+    internal static void AddInvoiceFields(IDictionary<string, string> values, CustomerResponse? customer, IReadOnlyList<CountryResponse> countries)
+    {
+        values["InvoiceName"] = customer?.InvoiceName ?? string.Empty;
+        values["InvoiceOrganisation"] = customer?.InvoiceOrganisation ?? string.Empty;
+        values["InvoiceAddressLine1"] = customer?.InvoiceAddress1 ?? string.Empty;
+        values["InvoiceAddressLine2"] = customer?.InvoiceAddress2 ?? string.Empty;
+        values["InvoiceAddressLine3"] = customer?.InvoiceAddress3 ?? string.Empty;
+        values["InvoiceAddressLine4"] = customer?.InvoiceAddress4 ?? string.Empty;
+        values["InvoiceAddressLine5"] = customer?.InvoiceAddress5 ?? string.Empty;
+        values["InvoiceCountry"] = Country(countries, customer?.InvoiceCountryId);
+        values["InvoiceTelephone"] = customer?.InvoiceTelephone ?? string.Empty;
+        values["InvoiceFax"] = customer?.InvoiceFax ?? string.Empty;
+        values["InvoiceEmail"] = customer?.InvoiceEmail ?? string.Empty;
+    }
+
+    // Shared by Contract and Job Sheet: identical postage/courier/discount/total/date merge fields.
+    internal static void AddFinancialFields(IDictionary<string, string> values, ContractResponse contract, ContractItemsResponse? items, string symbol)
+    {
+        values["AdminCharge"] = Money(symbol, items?.AdministrationCharge ?? contract.AdministrationCharge);
+        values["PostageNumber"] = Number(items?.NumberPostage ?? contract.NumberPostage);
+        values["CourierNumber"] = Number(items?.NumberCourier ?? contract.NumberCourier);
+        values["SpecialDeliveryNumber"] = Number(items?.NumberSpecialDelivery ?? contract.NumberSpecialDelivery);
+        values["PostageCharge"] = Money(symbol, items?.PostagePriceTotal);
+        values["CourierCharge"] = Money(symbol, items?.CourierPriceTotal);
+        values["SpecialDeliveryCharge"] = Money(symbol, items?.SpecialDeliveryPriceTotal);
+        values["DiscountRate"] = Percentage(items?.DiscountRate ?? contract.DiscountRate);
+        values["Discount"] = Money(symbol, items?.DiscountPrice);
+        values["ContractTotal"] = Money(symbol, items?.TotalPrice);
+        values["CommencementDate"] = Date(contract.CommencementDate);
+        values["CompletionDate"] = CompletionDate(contract.CommencementDate);
     }
 }

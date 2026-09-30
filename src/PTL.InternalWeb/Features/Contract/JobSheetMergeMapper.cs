@@ -60,33 +60,10 @@ public static class JobSheetMergeMapper
             ["Telephone"] = telephone,
             ["Fax"] = fax,
             ["Email"] = email,
-
-            ["InvoiceName"] = customer?.InvoiceName ?? string.Empty,
-            ["InvoiceOrganisation"] = customer?.InvoiceOrganisation ?? string.Empty,
-            ["InvoiceAddressLine1"] = customer?.InvoiceAddress1 ?? string.Empty,
-            ["InvoiceAddressLine2"] = customer?.InvoiceAddress2 ?? string.Empty,
-            ["InvoiceAddressLine3"] = customer?.InvoiceAddress3 ?? string.Empty,
-            ["InvoiceAddressLine4"] = customer?.InvoiceAddress4 ?? string.Empty,
-            ["InvoiceAddressLine5"] = customer?.InvoiceAddress5 ?? string.Empty,
-            ["InvoiceCountry"] = MergeValueFormatting.Country(context.Countries, customer?.InvoiceCountryId),
-            ["InvoiceTelephone"] = customer?.InvoiceTelephone ?? string.Empty,
-            ["InvoiceFax"] = customer?.InvoiceFax ?? string.Empty,
-            ["InvoiceEmail"] = customer?.InvoiceEmail ?? string.Empty,
-
-            ["AdminCharge"] = MergeValueFormatting.Money(symbol, items?.AdministrationCharge ?? contract.AdministrationCharge),
-            ["PostageNumber"] = MergeValueFormatting.Number(items?.NumberPostage ?? contract.NumberPostage),
-            ["CourierNumber"] = MergeValueFormatting.Number(items?.NumberCourier ?? contract.NumberCourier),
-            ["SpecialDeliveryNumber"] = MergeValueFormatting.Number(items?.NumberSpecialDelivery ?? contract.NumberSpecialDelivery),
-            ["PostageCharge"] = MergeValueFormatting.Money(symbol, items?.PostagePriceTotal),
-            ["CourierCharge"] = MergeValueFormatting.Money(symbol, items?.CourierPriceTotal),
-            ["SpecialDeliveryCharge"] = MergeValueFormatting.Money(symbol, items?.SpecialDeliveryPriceTotal),
-            ["DiscountRate"] = MergeValueFormatting.Percentage(items?.DiscountRate ?? contract.DiscountRate),
-            ["Discount"] = MergeValueFormatting.Money(symbol, items?.DiscountPrice),
-            ["ContractTotal"] = MergeValueFormatting.Money(symbol, items?.TotalPrice),
-
-            ["CommencementDate"] = MergeValueFormatting.Date(contract.CommencementDate),
-            ["CompletionDate"] = MergeValueFormatting.CompletionDate(contract.CommencementDate),
         };
+
+        MergeValueFormatting.AddInvoiceFields(values, customer, context.Countries);
+        MergeValueFormatting.AddFinancialFields(values, contract, items, symbol);
 
         var regions = new Dictionary<string, IReadOnlyList<IReadOnlyDictionary<string, string>>>(StringComparer.OrdinalIgnoreCase)
         {
