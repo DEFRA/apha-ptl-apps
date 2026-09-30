@@ -1049,6 +1049,7 @@ jobs:
             fi
 
             [[ "${RELEASE_DIGEST}" == "${IMAGE_DIGEST}" ]] && break
+            [[ "${ATTEMPT}" == "${MAX_ATTEMPTS}" ]] && break
 
             echo "Waiting for ECR to reflect the ${RELEASE_TAG} tag (attempt ${ATTEMPT}/${MAX_ATTEMPTS})..."
             sleep "${RETRY_INTERVAL_SECONDS}"
