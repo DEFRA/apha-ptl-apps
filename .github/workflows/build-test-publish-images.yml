@@ -1029,23 +1029,32 @@ jobs:
               >/dev/null
           fi
 
+          MAX_ATTEMPTS=10
+          RETRY_INTERVAL_SECONDS=3
           RELEASE_DIGEST=""
-          for ATTEMPT in $(seq 1 10); do
-            RELEASE_DIGEST="$(aws ecr describe-images \
+          DESCRIBE_ERROR=""
+          for ATTEMPT in $(seq 1 "${MAX_ATTEMPTS}"); do
+            if RELEASE_DIGEST="$(aws ecr describe-images \
               --registry-id "${EXPECTED_AWS_ACCOUNT_ID}" \
               --repository-name "${ECR_REPOSITORY}" \
               --image-ids imageTag="${RELEASE_TAG}" \
               --query 'imageDetails[0].imageDigest' \
-              --output text 2>/dev/null || true)"
+              --output text 2>/tmp/describe-images-error.log)"; then
+              DESCRIBE_ERROR=""
+            else
+              DESCRIBE_ERROR="$(cat /tmp/describe-images-error.log)"
+              RELEASE_DIGEST=""
+            fi
 
             [[ "${RELEASE_DIGEST}" == "${IMAGE_DIGEST}" ]] && break
 
-            echo "Waiting for ECR to reflect the ${RELEASE_TAG} tag (attempt ${ATTEMPT}/10)..."
-            sleep 3
+            echo "Waiting for ECR to reflect the ${RELEASE_TAG} tag (attempt ${ATTEMPT}/${MAX_ATTEMPTS})..."
+            sleep "${RETRY_INTERVAL_SECONDS}"
           done
 
           if [[ "${RELEASE_DIGEST}" != "${IMAGE_DIGEST}" ]]; then
             echo "::error::Release tag digest does not match the validated candidate digest."
+            [[ -n "${DESCRIBE_ERROR}" ]] && echo "::error::Last aws ecr describe-images failure: ${DESCRIBE_ERROR}"
             exit 1
           fi
 
