@@ -55,7 +55,7 @@ public class ContractControllerImportPermitTests
         var result = await controller.GetImportPermits(Guid.NewGuid(), CancellationToken.None);
 
         var ok = Assert.IsType<OkObjectResult>(result.Result);
-        var permits = Assert.IsAssignableFrom<IReadOnlyList<ImportPermitResponse>>(ok.Value);
+        var permits = Assert.IsType<IReadOnlyList<ImportPermitResponse>>(ok.Value, exactMatch: false);
         Assert.Single(permits);
         Assert.Equal(participantSchemeId, permits[0].ParticipantSchemeId);
         Assert.True(permits[0].ImportPermitRequired);
@@ -86,7 +86,7 @@ public class ContractControllerImportPermitTests
             new UpdateImportPermitRequest(true, null),
             CancellationToken.None);
 
-        Assert.IsAssignableFrom<ObjectResult>(result);
+        Assert.IsType<ObjectResult>(result, exactMatch: false);
         Assert.Empty(repository.UpdateCalls);
     }
 }

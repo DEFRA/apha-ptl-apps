@@ -55,7 +55,7 @@ public class TemplateMergeServiceTests
 
         using var stream = new MemoryStream(bytes);
         using var document = WordprocessingDocument.Open(stream, false);
-        var run = document.MainDocumentPart!.Document.Body!.Descendants<Run>().Single();
+        var run = document.MainDocumentPart!.Document!.Body!.Descendants<Run>().Single();
         Assert.Equal("UT3/306", run.InnerText);
         Assert.NotNull(run.RunProperties?.Bold);
     }
@@ -99,7 +99,7 @@ public class TemplateMergeServiceTests
 
         using var stream = new MemoryStream(bytes);
         using var document = WordprocessingDocument.Open(stream, false);
-        var rows = document.MainDocumentPart!.Document.Body!.Descendants<TableRow>().ToList();
+        var rows = document.MainDocumentPart!.Document!.Body!.Descendants<TableRow>().ToList();
 
         Assert.Equal(3, rows.Count);
         Assert.Equal("Salmonella\u00a342.50", rows[1].InnerText);
@@ -123,7 +123,7 @@ public class TemplateMergeServiceTests
 
         using var stream = new MemoryStream(bytes);
         using var document = WordprocessingDocument.Open(stream, false);
-        Assert.Single(document.MainDocumentPart!.Document.Body!.Descendants<TableRow>());
+        Assert.Single(document.MainDocumentPart!.Document!.Body!.Descendants<TableRow>());
     }
 
     [Fact]
@@ -157,7 +157,7 @@ public class TemplateMergeServiceTests
 
         using var stream = new MemoryStream(bytes);
         using var document = WordprocessingDocument.Open(stream, false);
-        var rows = document.MainDocumentPart!.Document.Body!.Descendants<TableRow>().ToList();
+        var rows = document.MainDocumentPart!.Document!.Body!.Descendants<TableRow>().ToList();
 
         Assert.Equal(3, rows.Count);
         Assert.Equal("Salmonella", rows[0].InnerText);
@@ -188,7 +188,7 @@ public class TemplateMergeServiceTests
 
         using var stream = new MemoryStream(bytes);
         using var document = WordprocessingDocument.Open(stream, false);
-        Assert.Empty(document.MainDocumentPart!.Document.Body!.ChildElements);
+        Assert.Empty(document.MainDocumentPart!.Document!.Body!.ChildElements);
     }
 
     [Fact]
@@ -224,9 +224,9 @@ public class TemplateMergeServiceTests
 
         // The first letter is the host document; each subsequent letter is embedded as an AltChunk
         // which Word resolves on open.
-        Assert.Equal("QAL/00001", document.MainDocumentPart!.Document.Body!.Descendants<Text>().First().Text);
+        Assert.Equal("QAL/00001", document.MainDocumentPart!.Document!.Body!.Descendants<Text>().First().Text);
         Assert.Equal(2, document.MainDocumentPart.AlternativeFormatImportParts.Count());
-        Assert.Equal(2, document.MainDocumentPart.Document.Body!.Descendants<AltChunk>().Count());
+        Assert.Equal(2, document.MainDocumentPart.Document!.Body!.Descendants<AltChunk>().Count());
     }
 
     [Fact]
@@ -244,7 +244,7 @@ public class TemplateMergeServiceTests
         using var stream = new MemoryStream(bytes);
         using var document = WordprocessingDocument.Open(stream, false);
         Assert.Contains(
-            document.MainDocumentPart!.Document.Body!.Descendants<FieldCode>(),
+            document.MainDocumentPart!.Document!.Body!.Descendants<FieldCode>(),
             f => f.Text.Contains("PAGE", StringComparison.Ordinal));
     }
 
@@ -274,7 +274,7 @@ public class TemplateMergeServiceTests
     {
         using var stream = new MemoryStream(bytes);
         using var document = WordprocessingDocument.Open(stream, false);
-        return document.MainDocumentPart?.Document.Body?.InnerText ?? string.Empty;
+        return document.MainDocumentPart?.Document?.Body?.InnerText ?? string.Empty;
     }
 
     // The five-run fldChar form Word writes for a real mail-merge field.

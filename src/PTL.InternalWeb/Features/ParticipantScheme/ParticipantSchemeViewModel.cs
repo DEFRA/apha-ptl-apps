@@ -17,11 +17,11 @@ public sealed class ParticipantSchemeFormViewModel
 {
     public Guid? ParticipantSchemeId { get; set; }
 
-    public Guid ContractId { get; set; }
+    public Guid? ContractId { get; set; }
 
-    public Guid CustomerId { get; set; }
+    public Guid? CustomerId { get; set; }
 
-    public int YearId { get; set; }
+    public int? YearId { get; set; }
 
     public Guid? ParticipantId { get; set; }
 
@@ -39,19 +39,23 @@ public sealed class ParticipantSchemeFormViewModel
 
     public IReadOnlyList<SchemeSummaryResponse> SchemeOptions { get; set; } = [];
 
-    public int SchemeOptionsTotalCount { get; set; }
+    public int? SchemeOptionsTotalCount { get; set; }
 
-    public int SchemeOptionsPage { get; set; } = 1;
+    public int? SchemeOptionsPage { get; set; } = 1;
 
     public PaginationModel SchemePagination => new()
     {
-        CurrentPage = SchemeOptionsPage,
+        CurrentPage = SchemeOptionsPage.GetValueOrDefault(1),
         PageSize = PaginationModel.DefaultPageSize,
-        TotalRecords = SchemeOptionsTotalCount,
+        TotalRecords = SchemeOptionsTotalCount.GetValueOrDefault(),
         Action = "Create",
         RouteValues = new Dictionary<string, object?> { ["contractId"] = ContractId, ["customerId"] = CustomerId, ["participantId"] = ParticipantId, ["schemeSearchTerm"] = SchemeSearchTerm }
     };
 
+    // Real GOV.UK checkboxes (ASP.NET Core's CheckBoxTagHelper only emits its hidden "false"
+    // companion input for a non-nullable bool property - switching these to bool? would silently
+    // break the unchecked-checkbox-posts-false behaviour). Known S6964 false positive.
+#pragma warning disable S6964
     public bool DistributionMonthJan { get; set; }
 
     public bool DistributionMonthFeb { get; set; }
@@ -75,10 +79,12 @@ public sealed class ParticipantSchemeFormViewModel
     public bool DistributionMonthNov { get; set; }
 
     public bool DistributionMonthDec { get; set; }
+#pragma warning restore S6964
 
-    // Whether the scheme itself offers each month at all (PtaBusinessObjects.Schemes.Scheme.
-    // DistributionMonthX) - a month checkbox is only ever shown/checkable when both this AND the
-    // matching CanEditX below are true, matching legacy's `mScheme.DistributionMonthX And ...`.
+    // Never rendered as a real input - recomputed server-side (ApplySchemeMonths) on every GET and
+    // POST-redisplay path before being read, so the posted value is always overwritten. Known S6964
+    // false positive.
+#pragma warning disable S6964
     public bool SchemeDistributionMonthJan { get; set; } = true;
 
     public bool SchemeDistributionMonthFeb { get; set; } = true;
@@ -104,7 +110,8 @@ public sealed class ParticipantSchemeFormViewModel
     public bool SchemeDistributionMonthDec { get; set; } = true;
 
     // False once that month's distribution has already been posted (dbo.fnIsDistributionNotPosted) -
-    // the checkbox is then locked unless the Override button is used, matching legacy exactly.
+    // the checkbox is then locked unless the Override button is used, matching legacy exactly. Never
+    // rendered as a real input - display-only, populated server-side. Known S6964 false positive.
     public bool CanEditJan { get; set; } = true;
 
     public bool CanEditFeb { get; set; } = true;
@@ -128,6 +135,7 @@ public sealed class ParticipantSchemeFormViewModel
     public bool CanEditNov { get; set; } = true;
 
     public bool CanEditDec { get; set; } = true;
+#pragma warning restore S6964
 
     public int? NumberOfSetsRequired { get; set; } = 1;
 
@@ -135,11 +143,15 @@ public sealed class ParticipantSchemeFormViewModel
 
     public string? Contact { get; set; }
 
+    // Real GOV.UK checkboxes - stay non-nullable bool (see the DistributionMonth group above for
+    // why). Known S6964 false positive.
+#pragma warning disable S6964
     public bool ImportExportLicenceRequired { get; set; }
 
     public bool CustomsCertificateRequired { get; set; }
 
     public bool NonFeePaying { get; set; }
+#pragma warning restore S6964
 
     public string? PackingInstructions { get; set; }
 
@@ -151,20 +163,28 @@ public sealed class ParticipantSchemeFormViewModel
     public IEnumerable<SelectListItem> PricingPlanOptions { get; set; } = [];
 
     // False for contracts before the 2010/11 year (WeightedPricingYearCollection.PricingPlanExists) -
-    // when false, legacy hides the Pricing Plan control entirely and forces Pro rata.
+    // when false, legacy hides the Pricing Plan control entirely and forces Pro rata. Recomputed
+    // server-side before every read - display-only. Known S6964 false positive.
+#pragma warning disable S6964
     public bool IsWeightedSchemeAvailable { get; set; } = true;
+#pragma warning restore S6964
 
-    public bool IsWeightedPricing { get; set; } = true;
+    public bool? IsWeightedPricing { get; set; } = true;
 
     public bool DataConsentDeclarationGiven { get; set; }
 
     // Only rendered when the selected scheme's DataConsentDeclarationActive is true - matches
-    // legacy's CheckBoxDataConsent/LblConsentBox visibility toggle.
+    // legacy's CheckBoxDataConsent/LblConsentBox visibility toggle. Recomputed server-side before
+    // every read - display-only. Known S6964 false positive.
+#pragma warning disable S6964
     public bool SchemeRequiresDataConsent { get; set; }
+#pragma warning restore S6964
 
     // Matches legacy CheckboxIsOverrideJan.._Dec - a read-only per-month indicator shown alongside
     // each month checkbox, backed by the real per-month tlnkParticipantScheme.fldIsOverrideJan.._Dec
-    // columns (see ParticipantSchemeRecord).
+    // columns (see ParticipantSchemeRecord). Rendered as a permanently-disabled checkbox (never
+    // posted). Known S6964 false positive.
+#pragma warning disable S6964
     public bool IsOverrideJan { get; set; }
 
     public bool IsOverrideFeb { get; set; }
@@ -188,15 +208,20 @@ public sealed class ParticipantSchemeFormViewModel
     public bool IsOverrideNov { get; set; }
 
     public bool IsOverrideDec { get; set; }
+#pragma warning restore S6964
 
     // Hidden field toggled client-side by the "Override" button (matches legacy
     // HiddenFieldOverrideMode) - only used to decide whether a checked, previously-locked month
     // should be recorded as an override on save; never persisted itself.
-    public bool OverrideModeActive { get; set; }
+    public bool? OverrideModeActive { get; set; }
 
-    public decimal Price { get; set; }
+    public decimal? Price { get; set; }
 
+    // Recomputed server-side on every GET/POST-redisplay path before being read - display-only.
+    // Known S6964 false positive.
+#pragma warning disable S6964
     public bool IsReadOnly { get; set; }
+#pragma warning restore S6964
 
     // Matches legacy hidGroupAddressId/TextboxGroupAddress/TextboxGroupAddress1/TextboxGroupCountry
     // (Group Address section of ParticipantScheme.aspx). GroupAddressId is the only field actually

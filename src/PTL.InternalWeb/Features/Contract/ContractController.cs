@@ -318,7 +318,7 @@ public class ContractController(IContractApiClient contractApiClient, ICustomerA
             LabId = p.LabId,
             ImportPermitRequired = p.ImportPermitRequired,
             ImportPermitReceived = p.ImportPermitReceived,
-            ImportPermitExpiry = p.ImportPermitExpiry?.ToString("dd/MM/yyyy")
+            ImportPermitExpiry = p.ImportPermitExpiry?.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture)
         }).ToList()
     };
 

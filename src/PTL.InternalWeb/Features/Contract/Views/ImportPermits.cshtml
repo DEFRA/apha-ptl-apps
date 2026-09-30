@@ -43,8 +43,8 @@ else
                         Permit Required is never itself editable on this screen. *@
                         <div class="govuk-checkboxes govuk-checkboxes--small" data-module="govuk-checkboxes">
                             <div class="govuk-checkboxes__item">
-                                <input type="checkbox" class="govuk-checkboxes__input" checked="@(permit.ImportPermitRequired ? "checked" : null)" disabled />
-                                <label class="govuk-checkboxes__label"><span class="govuk-visually-hidden">Import Permit Required</span></label>
+                                <input type="checkbox" class="govuk-checkboxes__input" id="required-@permit.ParticipantSchemeId" checked="@(permit.ImportPermitRequired ? "checked" : null)" disabled />
+                                <label class="govuk-checkboxes__label" for="required-@permit.ParticipantSchemeId"><span class="govuk-visually-hidden">Import Permit Required</span></label>
                             </div>
                         </div>
                     </td>
@@ -77,8 +77,11 @@ else
                     }
                     else
                     {
+                        var receivedText = permit.ImportPermitRequired
+                            ? (permit.ImportPermitReceived ? "Yes" : "No")
+                            : "N/A";
                         <td class="govuk-table__cell">
-                            @(permit.ImportPermitRequired ? (permit.ImportPermitReceived ? "Yes" : "No") : "N/A")
+                            @receivedText
                         </td>
                         <td class="govuk-table__cell">@permit.ImportPermitExpiry</td>
                         <td class="govuk-table__cell">

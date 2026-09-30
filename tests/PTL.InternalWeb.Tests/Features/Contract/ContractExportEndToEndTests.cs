@@ -35,7 +35,7 @@ public class ContractExportEndToEndTests : IDisposable
 
         using var stream = new MemoryStream(file.FileContents);
         using var document = WordprocessingDocument.Open(stream, false);
-        var body = document.MainDocumentPart!.Document.Body!;
+        var body = document.MainDocumentPart!.Document!.Body!;
 
         Assert.Contains("QAL/00001", body.InnerText, StringComparison.Ordinal);
         Assert.Contains("Sample Laboratories Ltd", body.InnerText, StringComparison.Ordinal);

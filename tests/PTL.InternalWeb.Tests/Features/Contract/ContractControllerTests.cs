@@ -236,8 +236,8 @@ public class ContractControllerTests
         Assert.Equal("£95.50", request.MergeValues["ContractTotal"]);
         Assert.Equal("10.00", request.MergeValues["DiscountRate"]);
 
-        var rows = Assert.IsAssignableFrom<IReadOnlyList<IReadOnlyDictionary<string, string>>>(
-            request.Regions!["ContractItems"]);
+        var rows = Assert.IsType<IReadOnlyList<IReadOnlyDictionary<string, string>>>(
+            request.Regions!["ContractItems"], exactMatch: false);
         var row = Assert.Single(rows);
         Assert.Equal("Salmonella", row["SchemeName"]);
         Assert.Equal("Lab One Ltd", row["ParticipantName"]);

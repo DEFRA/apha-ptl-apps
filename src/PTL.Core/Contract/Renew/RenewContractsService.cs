@@ -146,35 +146,7 @@ public sealed class RenewContractsService(
         var newRecords = new List<ParticipantSchemeRecord>();
         foreach (var participantSchemeId in orderedParticipantSchemeIds)
         {
-            var oldRecord = await participantSchemeRepository.GetByIdAsync(participantSchemeId, cancellationToken);
-            if (oldRecord is null)
-            {
-                continue;
-            }
-
-            // Legacy SchemeInfoCollection.FetchSchemeInfoCollectionBySchemeId(...)(0).NextSchemeId.
-            var schemeInfo = await schemeRepository.GetSummariesBySchemeIdAsync(oldRecord.SchemeId, cancellationToken);
-            var newSchemeId = schemeInfo.Count > 0 ? schemeInfo[0].NextSchemeId : null;
-            if (newSchemeId is null)
-            {
-                continue;
-            }
-
-            var newScheme = await schemeRepository.GetByIdAsync(newSchemeId.Value, cancellationToken);
-            if (newScheme is null)
-            {
-                continue;
-            }
-
-            var existing = newRecords.SingleOrDefault(r => r.SchemeId == newScheme.SchemeId && r.ParticipantId == oldRecord.ParticipantId);
-            if (existing is not null)
-            {
-                UpdateParticipantScheme(existing, oldRecord, newScheme);
-            }
-            else
-            {
-                newRecords.Add(CreateNewParticipantScheme(oldRecord, newScheme));
-            }
+            await ApplyRenewalForParticipantSchemeAsync(participantSchemeId, newRecords, cancellationToken);
         }
 
         // Legacy checks weighted pricing once the full set of new participant schemes is built,
@@ -210,6 +182,43 @@ public sealed class RenewContractsService(
         }
 
         return new RenewContractsResult(true, createdContract.ContractId, null);
+    }
+
+    // Resolves one selected participant scheme's next-year scheme and either merges it into an
+    // already-built new record (duplicate scheme on this contract set) or creates a new one. A
+    // missing old record, missing next-year scheme, or unresolved scheme is silently skipped -
+    // matches legacy's tolerant per-row handling in ContractMergeService.MergeContracts.
+    private async Task ApplyRenewalForParticipantSchemeAsync(Guid participantSchemeId, List<ParticipantSchemeRecord> newRecords, CancellationToken cancellationToken)
+    {
+        var oldRecord = await participantSchemeRepository.GetByIdAsync(participantSchemeId, cancellationToken);
+        if (oldRecord is null)
+        {
+            return;
+        }
+
+        // Legacy SchemeInfoCollection.FetchSchemeInfoCollectionBySchemeId(...)(0).NextSchemeId.
+        var schemeInfo = await schemeRepository.GetSummariesBySchemeIdAsync(oldRecord.SchemeId, cancellationToken);
+        var newSchemeId = schemeInfo.Count > 0 ? schemeInfo[0].NextSchemeId : null;
+        if (newSchemeId is null)
+        {
+            return;
+        }
+
+        var newScheme = await schemeRepository.GetByIdAsync(newSchemeId.Value, cancellationToken);
+        if (newScheme is null)
+        {
+            return;
+        }
+
+        var existing = newRecords.SingleOrDefault(r => r.SchemeId == newScheme.SchemeId && r.ParticipantId == oldRecord.ParticipantId);
+        if (existing is not null)
+        {
+            UpdateParticipantScheme(existing, oldRecord, newScheme);
+        }
+        else
+        {
+            newRecords.Add(CreateNewParticipantScheme(oldRecord, newScheme));
+        }
     }
 
     // Legacy ContractMergeService.IsMergeAllowed.

@@ -52,6 +52,6 @@ public class ImportPermitRepositoryTests
 
         await repository.UpdateAsync(Guid.NewGuid(), true, new DateTime(2026, 12, 31));
 
-        Assert.Single(connection.ExecutedCommands.Where(c => c.CommandText == UpdateSql));
+        Assert.Single(connection.ExecutedCommands, c => c.CommandText == UpdateSql);
     }
 }

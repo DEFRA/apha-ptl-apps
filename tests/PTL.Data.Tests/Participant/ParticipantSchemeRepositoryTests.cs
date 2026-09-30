@@ -188,7 +188,7 @@ public class ParticipantSchemeRepositoryTests
         var result = await repository.CreateAsync(SampleRecord(participantSchemeId, contractId, participantId, schemeId));
 
         Assert.Equal(participantSchemeId, result.ParticipantSchemeId);
-        Assert.Single(connection.ExecutedCommands.Where(c => c.CommandText == InsertSql));
+        Assert.Single(connection.ExecutedCommands, c => c.CommandText == InsertSql);
     }
 
     [Fact]

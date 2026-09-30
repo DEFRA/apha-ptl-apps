@@ -7,8 +7,8 @@ namespace PTL.InternalWeb.Tests.Notifications;
 
 public class TempDataNotificationExtensionsTests
 {
-    private static ITempDataDictionary CreateTempData() =>
-        new TempDataDictionary(new DefaultHttpContext(), new FakeTempDataProvider());
+    private static TempDataDictionary CreateTempData() =>
+        new(new DefaultHttpContext(), new FakeTempDataProvider());
 
     [Fact]
     public void SetNotification_ThenGetNotification_RoundTrips()
@@ -56,7 +56,9 @@ public class TempDataNotificationExtensionsTests
     {
         ITempDataDictionary? tempData = null;
 
-        tempData!.SetNotification(PTL.InternalWeb.Notifications.NotificationType.Success, "message");
+        var exception = Record.Exception(() => tempData!.SetNotification(PTL.InternalWeb.Notifications.NotificationType.Success, "message"));
+
+        Assert.Null(exception);
     }
 
     [Fact]

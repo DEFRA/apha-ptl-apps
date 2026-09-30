@@ -1,4 +1,5 @@
 using Dapper;
+using System.Globalization;
 using PTL.Core.Participant;
 using PTL.Data.Infrastructure;
 
@@ -92,7 +93,7 @@ public sealed class ParticipantSchemeRepository(IDbConnectionFactory connectionF
         row.TryGetValue(column, out var value) && value is not null && value is not DBNull ? Convert.ToDecimal(value) : 0m;
 
     private static int GetInt(IDictionary<string, object> row, string column, int defaultValue) =>
-        row.TryGetValue(column, out var value) && value is not null && value is not DBNull ? Convert.ToInt32(value) : defaultValue;
+        row.TryGetValue(column, out var value) && value is not null && value is not DBNull ? Convert.ToInt32(value, CultureInfo.InvariantCulture) : defaultValue;
 
     public async Task<ParticipantSchemeRecord> CreateAsync(ParticipantSchemeRecord record, CancellationToken cancellationToken = default)
     {

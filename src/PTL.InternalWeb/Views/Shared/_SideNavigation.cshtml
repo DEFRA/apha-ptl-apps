@@ -12,14 +12,23 @@
     var isHome = string.Equals(currentController, "Home", StringComparison.OrdinalIgnoreCase);
     var homeNode = SideNavigationProvider.FindNode(topLevel, "Home", "Index");
     var currentNode = isHome ? homeNode : SideNavigationProvider.FindActiveNode(topLevel, currentController, currentAction);
-    var visibleItems = isHome
-        ? topLevel.Where(item =>
+
+    IReadOnlyList<SideNavigationItem> visibleItems;
+    if (isHome)
+    {
+        visibleItems = topLevel.Where(item =>
             !(string.Equals(item.ControllerName, "Home", StringComparison.OrdinalIgnoreCase)
               && string.Equals(item.ActionName, "Index", StringComparison.OrdinalIgnoreCase)))
-            .ToList()
-        : currentNode is null
-            ? topLevel
-            : currentNode.Children.Where(child => !child.IsHidden).ToList();
+            .ToList();
+    }
+    else if (currentNode is null)
+    {
+        visibleItems = topLevel;
+    }
+    else
+    {
+        visibleItems = currentNode.Children.Where(child => !child.IsHidden).ToList();
+    }
 }
 
 <nav aria-label="Primary navigation" class="app-side-navigation">

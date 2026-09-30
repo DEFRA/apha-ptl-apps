@@ -18,6 +18,9 @@ public class ParticipantSchemeController(
     ILookupApiClient lookupApiClient,
     ILogger<ParticipantSchemeController> logger) : Controller
 {
+    private const string WeightedPricingPlan = "Weighted";
+    private const string ProRataPricingPlan = "ProRata";
+
     private static readonly Action<ILogger, Guid, Exception?> LogNotFoundMessage =
         LoggerMessage.Define<Guid>(
             LogLevel.Information,
@@ -72,7 +75,7 @@ public class ParticipantSchemeController(
         // Populated exactly as Edit does, then rendered read-only - legacy has no separate view screen.
         var fields = ToFormViewModel(participantScheme, contract.CustomerId, contract.YearId, isReadOnly: true);
         await PopulateDataConsentAsync(fields, cancellationToken);
-        await PopulatePricingPlanAsync(fields, cancellationToken, isFreshLoad: true);
+        await PopulatePricingPlanAsync(fields, isFreshLoad: true, cancellationToken);
         await PopulateGroupAddressOptionsAsync(fields, cancellationToken);
 
         return View(new ParticipantSchemeDetailsViewModel(fields, participantScheme.IsRemoved || contract.IsReadOnly));
@@ -108,7 +111,7 @@ public class ParticipantSchemeController(
 
         await PopulateParticipantOptionsAsync(model, cancellationToken);
         await PopulateSchemeContextAsync(model, cancellationToken);
-        await PopulatePricingPlanAsync(model, cancellationToken, isFreshLoad: true);
+        await PopulatePricingPlanAsync(model, isFreshLoad: true, cancellationToken);
         await PopulateGroupAddressOptionsAsync(model, cancellationToken);
         return View(model);
     }
@@ -131,7 +134,7 @@ public class ParticipantSchemeController(
 
             await PopulateParticipantOptionsAsync(model, cancellationToken);
             await PopulateSchemeContextAsync(model, cancellationToken);
-            await PopulatePricingPlanAsync(model, cancellationToken, isFreshLoad: false);
+            await PopulatePricingPlanAsync(model, isFreshLoad: false, cancellationToken);
             await PopulateGroupAddressOptionsAsync(model, cancellationToken);
             return View(model);
         }
@@ -141,26 +144,26 @@ public class ParticipantSchemeController(
             var result = await participantSchemeApiClient.CreateParticipantSchemeAsync(ToCreateRequest(model), cancellationToken);
             if (!result.Success)
             {
-                LogCreateFailedMessage(logger, model.ContractId, null);
+                LogCreateFailedMessage(logger, model.ContractId.GetValueOrDefault(), null);
                 this.AddFieldErrors(result.FieldErrors);
                 await PopulateParticipantOptionsAsync(model, cancellationToken);
                 await PopulateSchemeContextAsync(model, cancellationToken);
-                await PopulatePricingPlanAsync(model, cancellationToken, isFreshLoad: false);
+                await PopulatePricingPlanAsync(model, isFreshLoad: false, cancellationToken);
                 await PopulateGroupAddressOptionsAsync(model, cancellationToken);
                 return View(model);
             }
 
             LogCreatedMessage(logger, result.ParticipantScheme!.ParticipantSchemeId, null);
             TempData.SetNotification(NotificationType.Success, "Contract item created successfully.");
-            return RedirectToAction("ContractItems", "Contract", new { area = "", id = model.ContractId });
+            return RedirectToAction("ContractItems", "Contract", new { area = "", id = model.ContractId.GetValueOrDefault() });
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            LogSaveErrorMessage(logger, model.ContractId, ex);
+            LogSaveErrorMessage(logger, model.ContractId.GetValueOrDefault(), ex);
             ModelState.AddModelError(string.Empty, "The contract item could not be saved. Please try again.");
             await PopulateParticipantOptionsAsync(model, cancellationToken);
             await PopulateSchemeContextAsync(model, cancellationToken);
-            await PopulatePricingPlanAsync(model, cancellationToken, isFreshLoad: false);
+            await PopulatePricingPlanAsync(model, isFreshLoad: false, cancellationToken);
             await PopulateGroupAddressOptionsAsync(model, cancellationToken);
             return View(model);
         }
@@ -183,7 +186,7 @@ public class ParticipantSchemeController(
 
         var model = ToFormViewModel(participantScheme, contract.CustomerId, contract.YearId, participantScheme.IsRemoved || contract.IsReadOnly);
         await PopulateDataConsentAsync(model, cancellationToken);
-        await PopulatePricingPlanAsync(model, cancellationToken, isFreshLoad: true);
+        await PopulatePricingPlanAsync(model, isFreshLoad: true, cancellationToken);
         await PopulateGroupAddressOptionsAsync(model, cancellationToken);
         return View(model);
     }
@@ -195,7 +198,7 @@ public class ParticipantSchemeController(
         if (!ModelState.IsValid)
         {
             await PopulateDataConsentAsync(model, cancellationToken);
-            await PopulatePricingPlanAsync(model, cancellationToken, isFreshLoad: false);
+            await PopulatePricingPlanAsync(model, isFreshLoad: false, cancellationToken);
             await PopulateGroupAddressOptionsAsync(model, cancellationToken);
             return View(model);
         }
@@ -208,7 +211,7 @@ public class ParticipantSchemeController(
                 LogUpdateFailedMessage(logger, id, null);
                 this.AddFieldErrors(result.FieldErrors);
                 await PopulateDataConsentAsync(model, cancellationToken);
-                await PopulatePricingPlanAsync(model, cancellationToken, isFreshLoad: false);
+                await PopulatePricingPlanAsync(model, isFreshLoad: false, cancellationToken);
                 await PopulateGroupAddressOptionsAsync(model, cancellationToken);
                 return View(model);
             }
@@ -219,10 +222,10 @@ public class ParticipantSchemeController(
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            LogSaveErrorMessage(logger, model.ContractId, ex);
+            LogSaveErrorMessage(logger, model.ContractId.GetValueOrDefault(), ex);
             ModelState.AddModelError(string.Empty, "The contract item could not be saved. Please try again.");
             await PopulateDataConsentAsync(model, cancellationToken);
-            await PopulatePricingPlanAsync(model, cancellationToken, isFreshLoad: false);
+            await PopulatePricingPlanAsync(model, isFreshLoad: false, cancellationToken);
             await PopulateGroupAddressOptionsAsync(model, cancellationToken);
             return View(model);
         }
@@ -230,7 +233,7 @@ public class ParticipantSchemeController(
 
     private async Task PopulateParticipantOptionsAsync(ParticipantSchemeFormViewModel model, CancellationToken cancellationToken)
     {
-        var participants = await participantApiClient.GetParticipantsAsync(model.CustomerId, includeInactive: false, cancellationToken);
+        var participants = await participantApiClient.GetParticipantsAsync(model.CustomerId.GetValueOrDefault(), includeInactive: false, cancellationToken);
         model.ParticipantOptions = participants
             .Select(p => new SelectListItem($"{p.LabCode}: {p.LabName}", p.ParticipantId.ToString()))
             .ToList();
@@ -249,7 +252,7 @@ public class ParticipantSchemeController(
             return;
         }
 
-        var request = new SchemeSearchRequest(model.YearId, model.SchemeSearchTerm, model.SchemeOptionsPage, PTL.InternalWeb.Pagination.PaginationModel.DefaultPageSize);
+        var request = new SchemeSearchRequest(model.YearId.GetValueOrDefault(), model.SchemeSearchTerm, model.SchemeOptionsPage.GetValueOrDefault(1), PTL.InternalWeb.Pagination.PaginationModel.DefaultPageSize);
         var result = await schemeApiClient.GetSchemesForYearAsync(request, cancellationToken);
         model.SchemeOptions = result.Items;
         model.SchemeOptionsTotalCount = result.TotalCount;
@@ -292,15 +295,15 @@ public class ParticipantSchemeController(
     // when the whole scheme is fully available), otherwise it offers "Weighted pricing plan"/
     // "Pro rata"; hidden entirely when the contract's year has no weighted-pricing plan configured
     // (WeightedPricingYearCollection.PricingPlanExists).
-    private async Task PopulatePricingPlanAsync(ParticipantSchemeFormViewModel model, CancellationToken cancellationToken, bool isFreshLoad)
+    private async Task PopulatePricingPlanAsync(ParticipantSchemeFormViewModel model, bool isFreshLoad, CancellationToken cancellationToken)
     {
         var weightedYears = await lookupApiClient.GetWeightedPricingYearsAsync(cancellationToken);
-        model.IsWeightedSchemeAvailable = weightedYears.Any(y => y.YearId == model.YearId);
+        model.IsWeightedSchemeAvailable = weightedYears.Any(y => y.YearId == model.YearId.GetValueOrDefault());
 
         if (!model.IsWeightedSchemeAvailable)
         {
             model.PricingPlanOptions = [];
-            model.PricingPlan = "ProRata";
+            model.PricingPlan = ProRataPricingPlan;
             return;
         }
 
@@ -317,13 +320,20 @@ public class ParticipantSchemeController(
 
         model.PricingPlanOptions =
         [
-            new SelectListItem("Weighted pricing plan", "Weighted"),
-            new SelectListItem("Pro rata", "ProRata")
+            new SelectListItem("Weighted pricing plan", WeightedPricingPlan),
+            new SelectListItem("Pro rata", ProRataPricingPlan)
         ];
 
         if (isFreshLoad)
         {
-            model.PricingPlan = model.ParticipantSchemeId is null ? "Weighted" : (model.IsWeightedPricing ? "Weighted" : "ProRata");
+            if (model.ParticipantSchemeId is null)
+            {
+                model.PricingPlan = WeightedPricingPlan;
+            }
+            else
+            {
+                model.PricingPlan = model.IsWeightedPricing.GetValueOrDefault() ? WeightedPricingPlan : ProRataPricingPlan;
+            }
         }
     }
 
@@ -376,7 +386,7 @@ public class ParticipantSchemeController(
     {
         var shared = ToUpdateRequest(model);
         return new CreateParticipantSchemeRequest(
-            model.ContractId,
+            model.ContractId.GetValueOrDefault(),
             model.ParticipantId!.Value,
             model.SchemeId!.Value,
             shared.DistributionMonthJan,
@@ -437,18 +447,18 @@ public class ParticipantSchemeController(
         model.PackingInstructions,
         IsWeightedPricing(model),
         model.DataConsentDeclarationGiven,
-        model.OverrideModeActive && model.DistributionMonthJan,
-        model.OverrideModeActive && model.DistributionMonthFeb,
-        model.OverrideModeActive && model.DistributionMonthMar,
-        model.OverrideModeActive && model.DistributionMonthApr,
-        model.OverrideModeActive && model.DistributionMonthMay,
-        model.OverrideModeActive && model.DistributionMonthJun,
-        model.OverrideModeActive && model.DistributionMonthJul,
-        model.OverrideModeActive && model.DistributionMonthAug,
-        model.OverrideModeActive && model.DistributionMonthSep,
-        model.OverrideModeActive && model.DistributionMonthOct,
-        model.OverrideModeActive && model.DistributionMonthNov,
-        model.OverrideModeActive && model.DistributionMonthDec,
+        model.OverrideModeActive.GetValueOrDefault() && model.DistributionMonthJan,
+        model.OverrideModeActive.GetValueOrDefault() && model.DistributionMonthFeb,
+        model.OverrideModeActive.GetValueOrDefault() && model.DistributionMonthMar,
+        model.OverrideModeActive.GetValueOrDefault() && model.DistributionMonthApr,
+        model.OverrideModeActive.GetValueOrDefault() && model.DistributionMonthMay,
+        model.OverrideModeActive.GetValueOrDefault() && model.DistributionMonthJun,
+        model.OverrideModeActive.GetValueOrDefault() && model.DistributionMonthJul,
+        model.OverrideModeActive.GetValueOrDefault() && model.DistributionMonthAug,
+        model.OverrideModeActive.GetValueOrDefault() && model.DistributionMonthSep,
+        model.OverrideModeActive.GetValueOrDefault() && model.DistributionMonthOct,
+        model.OverrideModeActive.GetValueOrDefault() && model.DistributionMonthNov,
+        model.OverrideModeActive.GetValueOrDefault() && model.DistributionMonthDec,
         model.GroupAddressId);
 
     // Matches legacy LoadObjectFromForm: "0"/Weighted -> True, "1"/Pro rata -> False, "2"/Full
@@ -456,7 +466,7 @@ public class ParticipantSchemeController(
     // give the same price... given the weighted plan is the default it is set here"). When the
     // year has no weighted-pricing plan at all, Pro rata (False) is forced regardless of selection.
     private static bool IsWeightedPricing(ParticipantSchemeFormViewModel model) =>
-        model.IsWeightedSchemeAvailable && model.PricingPlan != "ProRata";
+        model.IsWeightedSchemeAvailable && model.PricingPlan != ProRataPricingPlan;
 
     private static ParticipantSchemeFormViewModel ToFormViewModel(ParticipantSchemeResponse participantScheme, Guid customerId, int yearId, bool isReadOnly) => new()
     {

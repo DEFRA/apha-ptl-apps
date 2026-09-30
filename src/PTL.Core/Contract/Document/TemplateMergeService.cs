@@ -131,8 +131,8 @@ public sealed partial class TemplateMergeService : ITemplateMergeService
                     chunkPart.FeedData(chunkStream);
                 }
 
-                var pageBreakRun = new Run(new OpenXmlElement[] { new Break { Type = BreakValues.Page } });
-                var pageBreak = new Paragraph(new OpenXmlElement[] { pageBreakRun });
+                var pageBreakRun = new Run([new Break { Type = BreakValues.Page }]);
+                var pageBreak = new Paragraph([pageBreakRun]);
                 var altChunk = new AltChunk { Id = mainPart.GetIdOfPart(chunkPart) };
 
                 if (sectionProperties is null)
@@ -162,7 +162,7 @@ public sealed partial class TemplateMergeService : ITemplateMergeService
         using (var document = WordprocessingDocument.Create(stream, WordprocessingDocumentType.Document))
         {
             var mainPart = document.AddMainDocumentPart();
-            mainPart.Document = new WordDocument(new OpenXmlElement[] { new Body() });
+            mainPart.Document = new WordDocument([new Body()]);
             mainPart.Document.Save();
         }
 
@@ -232,29 +232,45 @@ public sealed partial class TemplateMergeService : ITemplateMergeService
         {
             foreach (var fieldChar in children[i].Descendants<FieldChar>())
             {
-                var type = fieldChar.FieldCharType?.InnerText;
-                if (string.Equals(type, "begin", StringComparison.OrdinalIgnoreCase))
-                {
-                    if (depth == 0)
-                    {
-                        begin = i;
-                    }
-
-                    depth++;
-                }
-                else if (string.Equals(type, "end", StringComparison.OrdinalIgnoreCase))
-                {
-                    depth = Math.Max(0, depth - 1);
-                    if (depth == 0 && begin >= 0)
-                    {
-                        spans.Add(children.GetRange(begin, i - begin + 1));
-                        begin = -1;
-                    }
-                }
+                TrackFieldCharBoundary(fieldChar, i, children, spans, ref depth, ref begin);
             }
         }
 
         return spans;
+    }
+
+    // Tracks nested field begin/end markers so only a fully-closed top-level span is captured.
+    private static void TrackFieldCharBoundary(
+        FieldChar fieldChar,
+        int index,
+        List<OpenXmlElement> children,
+        List<List<OpenXmlElement>> spans,
+        ref int depth,
+        ref int begin)
+    {
+        var type = fieldChar.FieldCharType?.InnerText;
+        if (string.Equals(type, "begin", StringComparison.OrdinalIgnoreCase))
+        {
+            if (depth == 0)
+            {
+                begin = index;
+            }
+
+            depth++;
+            return;
+        }
+
+        if (!string.Equals(type, "end", StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        depth = Math.Max(0, depth - 1);
+        if (depth == 0 && begin >= 0)
+        {
+            spans.Add(children.GetRange(begin, index - begin + 1));
+            begin = -1;
+        }
     }
 
     // Compatibility shim for templates authored with {{Token}} placeholders rather than merge fields.
