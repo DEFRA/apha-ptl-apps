@@ -681,10 +681,8 @@ public class ContractControllerTests
         Assert.False(controller.ModelState.IsValid);
     }
 
-    private static Microsoft.AspNetCore.Mvc.ViewFeatures.ITempDataDictionary CreateTempData() =>
-        new Microsoft.AspNetCore.Mvc.ViewFeatures.TempDataDictionary(
-            new Microsoft.AspNetCore.Http.DefaultHttpContext(),
-            new FakeTempDataProvider());
+    private static Microsoft.AspNetCore.Mvc.ViewFeatures.TempDataDictionary CreateTempData() =>
+        new(new Microsoft.AspNetCore.Http.DefaultHttpContext(), new FakeTempDataProvider());
 
     private static ContractItemsResponse EmptyItems(Guid contractId) => new(
         contractId, "A", DateTime.UtcNow.Year, "QAL/00001", "£",
