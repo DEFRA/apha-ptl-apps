@@ -1029,12 +1029,20 @@ jobs:
               >/dev/null
           fi
 
-          RELEASE_DIGEST="$(aws ecr describe-images \
-            --registry-id "${EXPECTED_AWS_ACCOUNT_ID}" \
-            --repository-name "${ECR_REPOSITORY}" \
-            --image-ids imageTag="${RELEASE_TAG}" \
-            --query 'imageDetails[0].imageDigest' \
-            --output text)"
+          RELEASE_DIGEST=""
+          for ATTEMPT in $(seq 1 10); do
+            RELEASE_DIGEST="$(aws ecr describe-images \
+              --registry-id "${EXPECTED_AWS_ACCOUNT_ID}" \
+              --repository-name "${ECR_REPOSITORY}" \
+              --image-ids imageTag="${RELEASE_TAG}" \
+              --query 'imageDetails[0].imageDigest' \
+              --output text 2>/dev/null || true)"
+
+            [[ "${RELEASE_DIGEST}" == "${IMAGE_DIGEST}" ]] && break
+
+            echo "Waiting for ECR to reflect the ${RELEASE_TAG} tag (attempt ${ATTEMPT}/10)..."
+            sleep 3
+          done
 
           if [[ "${RELEASE_DIGEST}" != "${IMAGE_DIGEST}" ]]; then
             echo "::error::Release tag digest does not match the validated candidate digest."
