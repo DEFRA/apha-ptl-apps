@@ -1,7 +1,9 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging.Abstractions;
 using PTL.Contracts.Contract;
+using PTL.Contracts.Lookup;
 using PTL.Contracts.Participant;
+using PTL.Contracts.Scheme;
 using PTL.InternalWeb.Features.ParticipantScheme;
 using PTL.InternalWeb.Tests.TestSupport;
 
@@ -112,6 +114,84 @@ public class ParticipantSchemeControllerTests
         var model = Assert.IsType<ParticipantSchemeDetailsViewModel>(view.Model);
         Assert.True(model.IsReadOnly);
     }
+
+    [Fact]
+    public async Task Details_SchemeMatchesParticipantSelection_OffersFullSchemePricingOnly()
+    {
+        var participantSchemeId = Guid.NewGuid();
+        var contractId = Guid.NewGuid();
+        var yearId = DateTime.UtcNow.Year;
+        var schemeId = Guid.NewGuid();
+        var participantSchemeApiClient = new FakeParticipantSchemeApiClient { ParticipantSchemeResponse = SampleParticipantScheme(participantSchemeId, contractId) with { SchemeId = schemeId } };
+        var contractApiClient = new FakeContractApiClient { ContractResponse = SampleContract(contractId, Guid.NewGuid()) with { YearId = yearId } };
+        var schemeApiClient = new FakeSchemeApiClient { SchemeResponse = SampleScheme(schemeId, yearId, jan: true, feb: false) };
+        var lookupApiClient = new FakeLookupApiClient { WeightedPricingYears = [new YearResponse(yearId, $"{yearId}/{yearId + 1}")] };
+        var controller = CreateController(participantSchemeApiClient, contractApiClient, schemeApiClient: schemeApiClient, lookupApiClient: lookupApiClient);
+
+        var result = await controller.Details(participantSchemeId, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<ParticipantSchemeDetailsViewModel>(view.Model);
+        Assert.Equal("Full", model.Fields.PricingPlan);
+        Assert.Single(model.Fields.PricingPlanOptions);
+    }
+
+    [Fact]
+    public async Task Details_PartialSelection_OffersWeightedAndProRataOptions()
+    {
+        var participantSchemeId = Guid.NewGuid();
+        var contractId = Guid.NewGuid();
+        var yearId = DateTime.UtcNow.Year;
+        var schemeId = Guid.NewGuid();
+        var participantSchemeApiClient = new FakeParticipantSchemeApiClient
+        {
+            ParticipantSchemeResponse = SampleParticipantScheme(participantSchemeId, contractId) with { SchemeId = schemeId, IsWeightedPricing = true }
+        };
+        var contractApiClient = new FakeContractApiClient { ContractResponse = SampleContract(contractId, Guid.NewGuid()) with { YearId = yearId } };
+        var schemeApiClient = new FakeSchemeApiClient { SchemeResponse = SampleScheme(schemeId, yearId, jan: true, feb: true) };
+        var lookupApiClient = new FakeLookupApiClient { WeightedPricingYears = [new YearResponse(yearId, $"{yearId}/{yearId + 1}")] };
+        var controller = CreateController(participantSchemeApiClient, contractApiClient, schemeApiClient: schemeApiClient, lookupApiClient: lookupApiClient);
+
+        var result = await controller.Details(participantSchemeId, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<ParticipantSchemeDetailsViewModel>(view.Model);
+        Assert.Equal(2, model.Fields.PricingPlanOptions.Count());
+        Assert.Equal("Weighted", model.Fields.PricingPlan);
+    }
+
+    [Fact]
+    public async Task Details_NoWeightedPricingForYear_ForcesProRataAndHidesOptions()
+    {
+        var participantSchemeId = Guid.NewGuid();
+        var contractId = Guid.NewGuid();
+        var participantSchemeApiClient = new FakeParticipantSchemeApiClient { ParticipantSchemeResponse = SampleParticipantScheme(participantSchemeId, contractId) };
+        var contractApiClient = new FakeContractApiClient { ContractResponse = SampleContract(contractId, Guid.NewGuid()) };
+        var controller = CreateController(participantSchemeApiClient, contractApiClient);
+
+        var result = await controller.Details(participantSchemeId, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<ParticipantSchemeDetailsViewModel>(view.Model);
+        Assert.Equal("ProRata", model.Fields.PricingPlan);
+        Assert.Empty(model.Fields.PricingPlanOptions);
+        Assert.False(model.Fields.IsWeightedSchemeAvailable);
+    }
+
+    private static SchemeResponse SampleScheme(Guid schemeId, int yearId, bool jan, bool feb) => new(
+        schemeId, Guid.NewGuid(), yearId, "S1", "Salmonella", Guid.NewGuid(), Guid.NewGuid(), null,
+        DistributionMonthApr: false, DistributionMonthMay: false, DistributionMonthJun: false, DistributionMonthJul: false,
+        DistributionMonthAug: false, DistributionMonthSep: false, DistributionAsAvailable: false, DistributionMonthOct: false,
+        DistributionMonthNov: false, DistributionMonthDec: false, DistributionMonthJan: jan, DistributionMonthFeb: feb,
+        DistributionMonthMar: false, WeekNumber: 0, DayOfWeekId: Guid.NewGuid(), NumberOfSamples: 1, SampleNoSequence: null,
+        SampleOrigin: string.Empty, Deadline: 0, Subcontractor: string.Empty, CombinedPackaging: false, Postage: null,
+        CustomsVolume: null, SamplePackingInstructions: string.Empty, RequiresAssessment: false, CommentsRequired: false,
+        Pilot: false, LimitedSampleAvailability: false, Accredited: false, NoVLALabs: false, ComerciallyAvailable: false,
+        CustomsDescription: null, DataConsentDeclarationActive: false, DataConsentDeclarationText: null, Instructions: string.Empty,
+        DateOfReceipt: false, StorageConditions: false, ConditionOnReceipt: false, TestConsultant1: null, TestConsultant2: null,
+        TestConsultant3: null, TestConsultantTabulationId: null, UseExternalReference: false, StoreRatings: false,
+        Assessor1: null, Assessor2: null, Assessor3: null, Assessor4: null, StandardTabulationText: null,
+        LastModified: DateTime.UtcNow, IsReadOnly: false);
 
     [Fact]
     public async Task Create_Get_UnknownContract_ReturnsNotFound()

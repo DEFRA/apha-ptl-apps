@@ -166,6 +166,32 @@ public class TemplateMergeServiceTests
     }
 
     [Fact]
+    public void MergeTemplate_RegionNameNotFoundInTemplate_LeavesTemplateUnchanged()
+    {
+        using var fixture = new TemplateFixture(body => body.AppendChild(Para(new Run(new Text("No regions here")))));
+
+        var bytes = new TemplateMergeService().MergeTemplate(
+            fixture.Path,
+            new Dictionary<string, string>(),
+            new Dictionary<string, IReadOnlyList<IReadOnlyDictionary<string, string>>>
+            {
+                ["UnknownRegion"] = [new Dictionary<string, string> { ["SchemeName"] = "Salmonella" }]
+            });
+
+        Assert.Equal("No regions here", InnerText(bytes));
+    }
+
+    [Fact]
+    public void MergeTemplateMany_WithNoDocuments_ReturnsEmptyDocument()
+    {
+        var bytes = new TemplateMergeService().MergeTemplateMany("unused.docx", []);
+
+        using var stream = new MemoryStream(bytes);
+        using var document = WordprocessingDocument.Open(stream, false);
+        Assert.Empty(document.MainDocumentPart!.Document.Body!.ChildElements);
+    }
+
+    [Fact]
     public void MergeTemplateMany_WithSingleDocument_ProducesSameOutputAsSingleMerge()
     {
         using var fixture = new TemplateFixture(body => body.AppendChild(Para(MergeField("QalNumber"))));

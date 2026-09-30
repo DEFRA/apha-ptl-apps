@@ -58,6 +58,24 @@ public sealed class RenewContractsServiceTests
     }
 
     [Fact]
+    public async Task GetRenewableContractsAsync_WhenMergeAllowedButNoCurrentYearContracts_ReturnsNoContractsBlockedReason()
+    {
+        var customerId = Guid.NewGuid();
+        var merge = new ContractMergeData([], []);
+
+        var (service, _) = CreateService(
+            merge,
+            contractSummaries: [],
+            settings: new SystemSettingsEntity { NextYearWithDelayId = 2027 });
+
+        var result = await service.GetRenewableContractsAsync(customerId);
+
+        Assert.False(result.Eligibility.IsAllowed);
+        Assert.Equal(RenewContractsService.NoCurrentYearContractsMessage, result.Eligibility.BlockedReason);
+        Assert.Empty(result.Contracts);
+    }
+
+    [Fact]
     public async Task RenewContractsAsync_WhenDuplicateSelectionIsMerged_UsesMergedDistributionMonthsAndCreatesOneNewParticipantScheme()
     {
         var customerId = Guid.NewGuid();
@@ -222,6 +240,67 @@ public sealed class RenewContractsServiceTests
         Assert.False(result.Success);
         Assert.Null(result.NewContractId);
         Assert.Equal(RenewContractsService.WeightedPricingUnavailableMessage, result.ErrorMessage);
+    }
+
+    [Fact]
+    public async Task RenewContractsAsync_WhenSelectedParticipantSchemeRecordIsMissing_SkipsItAndStillSucceeds()
+    {
+        var customerId = Guid.NewGuid();
+        var contractId = Guid.NewGuid();
+        var missingParticipantSchemeId = Guid.NewGuid();
+
+        var merge = new ContractMergeData(
+        [
+            new RenewableContractEntity { ContractId = contractId, ContractSignatory = "Alice Example" }
+        ],
+        [
+            new RenewableContractItemEntity { ContractId = contractId, Suffix = "A", ParticipantSchemeId = missingParticipantSchemeId, LabCode = "LAB", OldSchemeIdentifier = "OLD-003", OldSchemeName = "Old Scheme" }
+        ]);
+
+        // No ParticipantSchemeRecord seeded for missingParticipantSchemeId - GetByIdAsync returns null.
+        var (service, participantRepository) = CreateService(
+            merge,
+            [new ContractSummaryEntity { ContractId = contractId, CustomerId = customerId, YearId = 2026, IsActive = true, Suffix = "A" }],
+            [],
+            [],
+            new SystemSettingsEntity { NextYearWithDelayId = 2027, UTNumber = "UT3/306" });
+
+        var result = await service.RenewContractsAsync(customerId, [contractId], [missingParticipantSchemeId], "Alice Example");
+
+        Assert.True(result.Success);
+        Assert.Empty(participantRepository.CreatedRecords);
+    }
+
+    [Fact]
+    public async Task RenewContractsAsync_WhenNoNextYearSchemeExists_SkipsThatSelectionAndStillSucceeds()
+    {
+        var customerId = Guid.NewGuid();
+        var contractId = Guid.NewGuid();
+        var oldSchemeId = Guid.NewGuid();
+        var participantSchemeId = Guid.NewGuid();
+
+        // Only the old scheme exists - GetSummariesBySchemeIdAsync resolves no NextSchemeId.
+        var oldScheme = new CoreScheme { SchemeId = oldSchemeId, SharedId = Guid.NewGuid(), YearId = 2026, Identifier = "OLD-004", Name = "Old Scheme" };
+
+        var merge = new ContractMergeData(
+        [
+            new RenewableContractEntity { ContractId = contractId, ContractSignatory = "Alice Example" }
+        ],
+        [
+            new RenewableContractItemEntity { ContractId = contractId, Suffix = "A", ParticipantSchemeId = participantSchemeId, LabCode = "LAB", OldSchemeIdentifier = "OLD-004", OldSchemeName = "Old Scheme" }
+        ]);
+
+        var (service, participantRepository) = CreateService(
+            merge,
+            [new ContractSummaryEntity { ContractId = contractId, CustomerId = customerId, YearId = 2026, IsActive = true, Suffix = "A" }],
+            [new ParticipantSchemeRecord { ParticipantSchemeId = participantSchemeId, ContractId = contractId, ParticipantId = Guid.NewGuid(), SchemeId = oldSchemeId }],
+            [oldScheme],
+            new SystemSettingsEntity { NextYearWithDelayId = 2027, UTNumber = "UT3/306" });
+
+        var result = await service.RenewContractsAsync(customerId, [contractId], [participantSchemeId], "Alice Example");
+
+        Assert.True(result.Success);
+        Assert.Empty(participantRepository.CreatedRecords);
     }
 
     private static (RenewContractsService Service, TestParticipantSchemeRepository ParticipantRepository) CreateService(
