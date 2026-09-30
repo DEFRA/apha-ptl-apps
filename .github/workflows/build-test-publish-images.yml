@@ -344,8 +344,10 @@ jobs:
           & $env:SONAR_SCANNER_PATH begin `
             "/k:${{ vars.SONAR_PROJECT_KEY }}" `
             "/o:${{ vars.SONAR_ORGANIZATION }}" `
+            "/s:${{ github.workspace }}\SonarQube.Analysis.xml" `
             "/d:sonar.token=$env:SONAR_TOKEN" `
             "/d:sonar.host.url=https://sonarcloud.io" `
+            "/d:sonar.coverage.exclusions=**/*.yml,**/*.yaml" `
             "/d:sonar.qualitygate.wait=true"
 
           dotnet restore PTL.slnx
