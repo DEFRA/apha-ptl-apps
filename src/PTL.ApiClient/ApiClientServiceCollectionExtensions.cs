@@ -99,6 +99,18 @@ public static class ApiClientServiceCollectionExtensions
         })
             .AddStandardResilienceHandler();
 
+        services.AddHttpClient<IAdministrationChargeApiClient, AdministrationChargeApiClient>(client =>
+        {
+            client.BaseAddress = new Uri(apiBaseUrl);
+        })
+            .AddStandardResilienceHandler();
+
+        services.AddHttpClient<IWeightedPricingPlanApiClient, WeightedPricingPlanApiClient>(client =>
+        {
+            client.BaseAddress = new Uri(apiBaseUrl);
+        })
+            .AddStandardResilienceHandler();
+
         services.AddHealthChecks()
             .AddCheck<ApiConnectivityHealthCheck>("api-connectivity");
 

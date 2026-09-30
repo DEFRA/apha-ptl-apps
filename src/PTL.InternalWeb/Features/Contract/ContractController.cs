@@ -91,6 +91,11 @@ public class ContractController(IContractApiClient contractApiClient, ICustomerA
             new EventId(13, nameof(LogExportNoDataMessage)),
             "Export produced no data for contract {ContractId} document type {DocumentType}");
 
+    // Landing page for the Manage Contracts section (moved from the removed Menu feature) -
+    // mirrors legacy Contracts Admin/MenuContracts.aspx; the left nav (SideNavigationProvider)
+    // supplies the actual section contents.
+    public IActionResult ManageContracts() => View();
+
     public async Task<IActionResult> Index(
         Guid customerId,
         int? yearId,

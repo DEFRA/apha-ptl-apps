@@ -55,6 +55,11 @@ public class SchemeController(ISchemeApiClient schemeApiClient, ILookupApiClient
             new EventId(7, nameof(LogSchemeHistoryMessage)),
             "Displayed scheme family history for {SharedId}");
 
+    // Landing page for the Manage Schemes section (moved from the removed Menu feature) -
+    // mirrors legacy Scheme Admin/MenuSchemes.aspx; the left nav (SideNavigationProvider)
+    // supplies the actual section contents.
+    public IActionResult ManageSchemes() => View();
+
     public async Task<IActionResult> Index(int? yearId, string? searchTerm = null, int page = 1, int pageSize = PTL.InternalWeb.Pagination.PaginationModel.DefaultPageSize, CancellationToken cancellationToken = default)
     {
         var years = await lookupApiClient.GetCurrentYearsAsync(cancellationToken);

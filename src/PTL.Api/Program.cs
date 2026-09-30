@@ -4,6 +4,7 @@ using PTL.Api.Features.Health;
 using PTL.Api.Infrastructure;
 using PTL.Common.Correlation;
 using PTL.Common.Health;
+using PTL.Core.AdministrationCharge;
 using PTL.Core.Contract;
 using PTL.Core.Contract.ImportPermit;
 using PTL.Core.Contract.Renew;
@@ -14,6 +15,8 @@ using PTL.Core.GroupAddress;
 using PTL.Core.Lookup;
 using PTL.Core.Participant;
 using PTL.Core.Scheme;
+using PTL.Core.WeightedPricingPlan;
+using PTL.Data.AdministrationCharge;
 using PTL.Data.Contract;
 using PTL.Data.Contract.ImportPermit;
 using PTL.Data.Contract.Renew;
@@ -25,6 +28,7 @@ using PTL.Data.Infrastructure;
 using PTL.Data.Lookup;
 using PTL.Data.Participant;
 using PTL.Data.Scheme;
+using PTL.Data.WeightedPricingPlan;
 using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -91,6 +95,12 @@ builder.Services.AddScoped<ISchemeService, SchemeService>();
 
 builder.Services.AddScoped<ILookupRepository, LookupRepository>();
 builder.Services.AddScoped<ILookupService, LookupService>();
+
+builder.Services.AddScoped<IAdministrationChargeRepository, AdministrationChargeRepository>();
+builder.Services.AddScoped<IAdministrationChargeService, AdministrationChargeService>();
+
+builder.Services.AddScoped<IWeightedPricingPlanRepository, WeightedPricingPlanRepository>();
+builder.Services.AddScoped<IWeightedPricingPlanService, WeightedPricingPlanService>();
 
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<PTL.Api.Infrastructure.GlobalExceptionHandler>();

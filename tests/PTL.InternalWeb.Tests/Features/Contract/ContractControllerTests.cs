@@ -437,4 +437,14 @@ public class ContractControllerTests
 
         Assert.IsType<RedirectToActionResult>(result);
     }
+
+    [Fact]
+    public void ManageContracts_ReturnsView()
+    {
+        var controller = CreateController(new FakeContractApiClient());
+
+        var result = controller.ManageContracts();
+
+        Assert.IsType<ViewResult>(result);
+    }
 }

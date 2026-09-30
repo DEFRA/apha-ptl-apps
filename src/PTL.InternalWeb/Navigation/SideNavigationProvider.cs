@@ -25,6 +25,8 @@ public static class SideNavigationProvider
     private const string ParticipantControllerName = "Participant";
     private const string ContractControllerName = "Contract";
     private const string GroupAddressControllerName = "GroupAddress";
+    private const string SchemeControllerName = "Scheme";
+    private const string SystemAdministrationControllerName = "SystemAdministration";
 
     // Placeholder for a menu entry whose page hasn't been migrated yet - see class remarks.
     private static SideNavigationItem Disabled(string text) => new() { Text = text, IsEnabled = false };
@@ -35,8 +37,8 @@ public static class SideNavigationProvider
         new SideNavigationItem
         {
             Text = "System Administration",
-            ControllerName = "Menu",
-            ActionName = "SystemAdministration",
+            ControllerName = SystemAdministrationControllerName,
+            ActionName = SystemAdministrationControllerName,
             Children =
             [
                 Disabled("Create User"),
@@ -47,15 +49,15 @@ public static class SideNavigationProvider
                 Disabled("Viewer Management"),
                 Disabled("Country Management"),
                 Disabled("External Site Management"),
-                Disabled("Administration Charges Management"),
-                Disabled("Weighted Charging Plan"),
+                new SideNavigationItem { Text = "Administration Charges Management", ControllerName = SystemAdministrationControllerName, ActionName = "AdministrationCharge" },
+                new SideNavigationItem { Text = "Weighted Charging Plan", ControllerName = SystemAdministrationControllerName, ActionName = "WeightedPricingPlan" },
                 Disabled("Postage Pricing Plan")
             ]
         },
         new SideNavigationItem
         {
             Text = "Manage Contracts",
-            ControllerName = "Menu",
+            ControllerName = ContractControllerName,
             ActionName = "ManageContracts",
             Children =
             [
@@ -128,7 +130,7 @@ public static class SideNavigationProvider
         new SideNavigationItem
         {
             Text = "Manage Schemes",
-            ControllerName = "Menu",
+            ControllerName = SchemeControllerName,
             ActionName = "ManageSchemes",
             Children =
             [

@@ -3,83 +3,26 @@ using Microsoft.AspNetCore.Mvc.Testing;
 
 namespace PTL.InternalWeb.Tests.Integration;
 
-/// <summary>
-/// Enhanced Menu and Home route tests to exercise all navigation and error handling paths.
-/// Ensures menu and home views have complete code path coverage.
-/// </summary>
-public class MenuAndHomeRouteSmokeTests : IClassFixture<WebApplicationFactory<Program>>
+public class HomeRouteSmokeTests : IClassFixture<WebApplicationFactory<Program>>
 {
     private readonly WebApplicationFactory<Program> _factory;
 
-    public MenuAndHomeRouteSmokeTests(WebApplicationFactory<Program> factory)
+    public HomeRouteSmokeTests(WebApplicationFactory<Program> factory)
     {
         _factory = factory;
     }
 
+    // Default route pattern is {controller=Account}/{action=Login}/{id?}, so "/" itself resolves
+    // to Account.Login, not Home.Index - kept separate from Home_Index_ReturnsSuccess below, which
+    // hits Home.Index explicitly.
     [Fact]
-    public async Task Menu_SystemAdministration_ReturnsSuccess()
+    public async Task Root_ReturnsSuccess()
     {
         var client = _factory.CreateClient();
 
-        var response = await client.GetAsync("/Menu/SystemAdministration");
+        var response = await client.GetAsync("/");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-    }
-
-    [Fact]
-    public async Task Menu_SystemAdministration_RendersHeading()
-    {
-        var client = _factory.CreateClient();
-
-        var response = await client.GetAsync("/Menu/SystemAdministration");
-        var body = await response.Content.ReadAsStringAsync();
-
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.Contains("govuk-heading", body, StringComparison.OrdinalIgnoreCase);
-    }
-
-    [Fact]
-    public async Task Menu_ManageContracts_ReturnsSuccess()
-    {
-        var client = _factory.CreateClient();
-
-        var response = await client.GetAsync("/Menu/ManageContracts");
-
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-    }
-
-    [Fact]
-    public async Task Menu_ManageSchemes_ReturnsSuccess()
-    {
-        var client = _factory.CreateClient();
-
-        var response = await client.GetAsync("/Menu/ManageSchemes");
-
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-    }
-
-    [Fact]
-    public async Task Menu_ManageContracts_RendersHeading()
-    {
-        var client = _factory.CreateClient();
-
-        var response = await client.GetAsync("/Menu/ManageContracts");
-        var body = await response.Content.ReadAsStringAsync();
-
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.Contains("govuk-heading", body, StringComparison.OrdinalIgnoreCase);
-    }
-
-    [Fact]
-    public async Task Menu_ManageSchemes_RendersHeading()
-    {
-        var client = _factory.CreateClient();
-
-        var response = await client.GetAsync("/Menu/ManageSchemes");
-        var body = await response.Content.ReadAsStringAsync();
-
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.Contains("govuk-heading", body, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -87,7 +30,7 @@ public class MenuAndHomeRouteSmokeTests : IClassFixture<WebApplicationFactory<Pr
     {
         var client = _factory.CreateClient();
 
-        var response = await client.GetAsync("/");
+        var response = await client.GetAsync("/Home/Index");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }

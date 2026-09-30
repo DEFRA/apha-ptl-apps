@@ -1,0 +1,74 @@
+@model PTL.InternalWeb.Features.SystemAdministration.AdministrationChargeListViewModel
+@{
+    ViewData["Title"] = "Administration Charges";
+
+    var errors = ViewData.ModelState
+        .Where(entry => entry.Value?.Errors.Count > 0)
+        .SelectMany(entry => entry.Value!.Errors.Select(error => (Field: entry.Key, Message: error.ErrorMessage)))
+        .ToList();
+
+    string? FirstError(int i, int j) =>
+        ViewData.ModelState.TryGetValue($"Charges[{i}].Prices[{j}].Price", out var entry) && entry.Errors.Count > 0
+            ? entry.Errors[0].ErrorMessage
+            : null;
+}
+
+<h1 class="govuk-heading-l">Administration Charges</h1>
+
+<govuk-error-summary errors="@errors" />
+
+@if (Model.Charges.Count == 0)
+{
+    <p class="govuk-body">There are no administration charges to display.</p>
+}
+else
+{
+    <form method="post" asp-action="AdministrationCharge" novalidate>
+        <table class="govuk-table">
+            <thead class="govuk-table__head">
+                <tr class="govuk-table__row">
+                    <th scope="col" class="govuk-table__header">Charge</th>
+                    @foreach (var price in Model.Charges[0].Prices)
+                    {
+                        <th scope="col" class="govuk-table__header">@price.CurrencyLabel</th>
+                    }
+                </tr>
+            </thead>
+            <tbody class="govuk-table__body">
+                @for (var i = 0; i < Model.Charges.Count; i++)
+                {
+                    var charge = Model.Charges[i];
+                    <tr class="govuk-table__row">
+                        <td class="govuk-table__cell">
+                            @charge.Name
+                            <input type="hidden" asp-for="Charges[i].AdministrationChargeId" />
+                            <input type="hidden" asp-for="Charges[i].Name" />
+                        </td>
+                        @for (var j = 0; j < charge.Prices.Count; j++)
+                        {
+                            var error = FirstError(i, j);
+                            <td class="govuk-table__cell">
+                                <div class="govuk-form-group @(error is null ? "" : "govuk-form-group--error")">
+                                    @if (error is not null)
+                                    {
+                                        <p class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @error</p>
+                                    }
+                                    <input type="hidden" asp-for="Charges[i].Prices[j].CurrencyId" />
+                                    <input type="hidden" asp-for="Charges[i].Prices[j].CurrencyLabel" />
+                                    <input asp-for="Charges[i].Prices[j].Price"
+                                           class="govuk-input govuk-input--width-5 @(error is null ? "" : "govuk-input--error")"
+                                           aria-label="@($"{charge.Name} price in {charge.Prices[j].CurrencyLabel}")" />
+                                </div>
+                            </td>
+                        }
+                    </tr>
+                }
+            </tbody>
+        </table>
+
+        <div class="govuk-button-group">
+            <button class="govuk-button" data-module="govuk-button" type="submit">Save</button>
+            <a class="govuk-button govuk-button--secondary" data-module="govuk-button" asp-action="AdministrationCharge">Cancel</a>
+        </div>
+    </form>
+}
