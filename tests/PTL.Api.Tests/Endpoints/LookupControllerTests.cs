@@ -42,6 +42,24 @@ public class LookupControllerTests
     }
 
     [Fact]
+    public async Task GetGroupAddresses_ReturnsMappedResponses()
+    {
+        var groupAddressId = Guid.NewGuid();
+        var countryId = Guid.NewGuid();
+        var repository = new FakeLookupRepository { GroupAddresses = [new GroupAddressEntity { GroupAddressId = groupAddressId, Identifier = "PTL-001", Address1 = "1 Sample Street", CountryId = countryId }] };
+        var controller = CreateController(repository);
+
+        var result = await controller.GetGroupAddresses(CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var groupAddresses = Assert.IsType<IReadOnlyList<PTL.Contracts.Lookup.GroupAddressResponse>>(ok.Value, exactMatch: false);
+        Assert.Single(groupAddresses);
+        Assert.Equal(groupAddressId, groupAddresses[0].GroupAddressId);
+        Assert.Equal("PTL-001", groupAddresses[0].Identifier);
+        Assert.Equal(countryId, groupAddresses[0].CountryId);
+    }
+
+    [Fact]
     public async Task GetCustomerTypes_ReturnsMappedResponses()
     {
         var customerTypeId = Guid.NewGuid();

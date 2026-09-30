@@ -107,6 +107,56 @@ public class ContractDocumentMergeMapperTests
         Assert.Equal("31/03/2024", request.MergeValues["CompletionDate"]);
     }
 
+    [Fact]
+    public void Contract_WithNoCommencementDate_LeavesCompletionDateEmpty()
+    {
+        var context = CreateContext(ContractDocumentTypes.Contract);
+        context = context with { Contract = context.Contract with { CommencementDate = null } };
+
+        var request = ContractDocumentMergeMapper.Build(context);
+
+        Assert.Equal(string.Empty, request.MergeValues["CompletionDate"]);
+    }
+
+    [Fact]
+    public void Contract_ResolvesCountryAndVatRatingNamesFromLookupLists()
+    {
+        var countryId = Guid.NewGuid();
+        var invoiceCountryId = Guid.NewGuid();
+        var vatRatingId = Guid.NewGuid();
+        var customer = new PTL.Contracts.Customer.CustomerResponse(
+            CustomerId: Guid.NewGuid(), QalNumber: "QAL/00001", RegisteredFileNumber: string.Empty, Name: "Sample Laboratories Ltd",
+            PreviousName: string.Empty, CustomerTypeId: Guid.Empty, VatNumber: string.Empty, VatRatingId: vatRatingId,
+            AccountNumber: string.Empty, CustomerFinanceId: string.Empty, ContactName: "Alice Example", Organisation: "Sample Laboratories Ltd",
+            Address1: string.Empty, Address2: string.Empty, Address3: string.Empty, Address4: string.Empty, Address5: string.Empty,
+            CountryId: countryId, Telephone: string.Empty, Telephone2: string.Empty, Fax: string.Empty, Email: string.Empty,
+            CurrencyId: Guid.Empty, Comments: string.Empty, InitialStartDate: DateTime.UtcNow, PostageArrangements: string.Empty,
+            PaymentNonUK: false, InvoiceName: string.Empty, InvoiceOrganisation: string.Empty, InvoiceAddress1: string.Empty,
+            InvoiceAddress2: string.Empty, InvoiceAddress3: string.Empty, InvoiceAddress4: string.Empty, InvoiceAddress5: string.Empty,
+            InvoiceCountryId: invoiceCountryId, InvoiceTelephone: string.Empty, InvoiceTelephone2: string.Empty, InvoiceFax: string.Empty,
+            InvoiceEmail: string.Empty, IsActive: true, CanOrderOnline: true, InactiveDate: null, CustomerStatusId: null);
+        var context = CreateContext(ContractDocumentTypes.Contract) with
+        {
+            Customer = customer,
+            Countries = [new PTL.Contracts.Lookup.CountryResponse(countryId, "United Kingdom"), new PTL.Contracts.Lookup.CountryResponse(invoiceCountryId, "France")],
+            VatRatings = [new PTL.Contracts.Lookup.VatRatingResponse(vatRatingId, "Standard")]
+        };
+
+        var request = ContractDocumentMergeMapper.Build(context);
+
+        Assert.Equal("United Kingdom", request.MergeValues["Country"]);
+        Assert.Equal("France", request.MergeValues["InvoiceCountry"]);
+        Assert.Equal("Standard", request.MergeValues["VatRating"]);
+    }
+
+    [Fact]
+    public void Build_UnsupportedDocumentType_ThrowsArgumentOutOfRangeException()
+    {
+        var context = CreateContext("UnsupportedType");
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => ContractDocumentMergeMapper.Build(context));
+    }
+
     private static SampleAddressResponse SampleAddress(string labCode, string[] feePaying, string[] nonFeePaying) => new(
         Guid.NewGuid(), Guid.NewGuid(), "QAL/00001", labCode, "Alice Example", "Sample Laboratories Ltd",
         "1 High Street", "Testville", string.Empty, string.Empty, string.Empty, "United Kingdom",

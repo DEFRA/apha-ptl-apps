@@ -29,6 +29,13 @@ internal sealed class FakeDbConnection : DbConnection
     public void RespondToQuery(string commandText, DataTable table) =>
         _readerFactories[commandText] = _ => table.CreateDataReader();
 
+    // Configures a multi-result-set reader (one table per result set, in order) for a
+    // QueryMultipleAsync call against this exact command text - DataSet.CreateDataReader() yields
+    // a DbDataReader whose NextResult()/NextResultAsync() steps between the DataSet's tables,
+    // matching what Dapper's SqlMapper.GridReader expects from a real multi-result-set query.
+    public void RespondToQuery(string commandText, DataSet dataSet) =>
+        _readerFactories[commandText] = _ => dataSet.CreateDataReader();
+
     // Configures the rows-affected count an ExecuteAsync (insert/update) call against this exact
     // command text should return.
     public void RespondToNonQuery(string commandText, int rowsAffected) =>

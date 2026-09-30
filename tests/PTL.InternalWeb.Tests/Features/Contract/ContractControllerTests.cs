@@ -345,4 +345,96 @@ public class ContractControllerTests
         Assert.Equal("Details", redirect.ActionName);
         Assert.Equal(contractId, redirect.RouteValues!["id"]);
     }
+
+    [Fact]
+    public async Task RenewContracts_Get_Allowed_ReturnsViewWithSelectableContractsAndItems()
+    {
+        var customerId = Guid.NewGuid();
+        var contractId = Guid.NewGuid();
+        var participantSchemeId = Guid.NewGuid();
+        var contractRenewalApiClient = new FakeContractRenewalApiClient
+        {
+            ContractsResponse = new RenewableContractsResponse(true, null, ["Alice Example"],
+                [new RenewableContractDto(contractId, "A", "Alice Example", "Renewal info", string.Empty, true, 1)]),
+            ItemsResponse = new RenewableContractItemsResponse(
+                [new RenewableContractItemDto(contractId, "A", participantSchemeId, "LAB1", "Lab One", "S1", "Old Scheme", "S2", "New Scheme", true, "S1")])
+        };
+        var controller = CreateController(new FakeContractApiClient(), contractRenewalApiClient: contractRenewalApiClient);
+
+        var result = await controller.RenewContracts(customerId, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<PTL.InternalWeb.Features.Contract.RenewContractsViewModel>(view.Model);
+        Assert.True(model.IsAllowed);
+        Assert.Single(model.Contracts);
+        Assert.Single(model.Items);
+        Assert.Contains(contractId, model.SelectedContractIds);
+        Assert.Contains(participantSchemeId, model.SelectedParticipantSchemeIds);
+    }
+
+    [Fact]
+    public async Task RenewContracts_Get_NotAllowed_ReturnsViewWithBlockedReasonAndNoItems()
+    {
+        var contractRenewalApiClient = new FakeContractRenewalApiClient
+        {
+            ContractsResponse = new RenewableContractsResponse(false, "There are no contracts for the current year.", [], [])
+        };
+        var controller = CreateController(new FakeContractApiClient(), contractRenewalApiClient: contractRenewalApiClient);
+
+        var result = await controller.RenewContracts(Guid.NewGuid(), CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<PTL.InternalWeb.Features.Contract.RenewContractsViewModel>(view.Model);
+        Assert.False(model.IsAllowed);
+        Assert.Equal("There are no contracts for the current year.", model.BlockedReason);
+        Assert.Empty(model.Items);
+    }
+
+    [Fact]
+    public async Task RenewContracts_Post_Success_RedirectsToIndex()
+    {
+        var customerId = Guid.NewGuid();
+        var contractRenewalApiClient = new FakeContractRenewalApiClient { RenewResult = new RenewContractResponse(true, Guid.NewGuid(), null) };
+        var controller = CreateController(new FakeContractApiClient(), contractRenewalApiClient: contractRenewalApiClient);
+
+        var result = await controller.RenewContracts(customerId, [Guid.NewGuid()], [Guid.NewGuid()], "Alice Example", CancellationToken.None);
+
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal("Index", redirect.ActionName);
+        Assert.Equal(customerId, redirect.RouteValues!["customerId"]);
+    }
+
+    [Fact]
+    public async Task RenewContracts_Post_Failure_RedisplaysWithErrorAndPreservedSelections()
+    {
+        var customerId = Guid.NewGuid();
+        var selectedContractId = Guid.NewGuid();
+        var selectedParticipantSchemeId = Guid.NewGuid();
+        var contractRenewalApiClient = new FakeContractRenewalApiClient
+        {
+            ContractsResponse = new RenewableContractsResponse(true, null, [], []),
+            RenewResult = new RenewContractResponse(false, null, "There are no Items on the selected Contracts.")
+        };
+        var controller = CreateController(new FakeContractApiClient(), contractRenewalApiClient: contractRenewalApiClient);
+
+        var result = await controller.RenewContracts(customerId, [selectedContractId], [selectedParticipantSchemeId], "Alice Example", CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<PTL.InternalWeb.Features.Contract.RenewContractsViewModel>(view.Model);
+        Assert.Equal("There are no Items on the selected Contracts.", model.ErrorMessage);
+        Assert.Contains(selectedContractId, model.SelectedContractIds);
+        Assert.Contains(selectedParticipantSchemeId, model.SelectedParticipantSchemeIds);
+        Assert.Equal("Alice Example", model.NewContractSignatory);
+    }
+
+    [Fact]
+    public async Task RenewContracts_Post_NullSelections_TreatedAsEmptyLists()
+    {
+        var contractRenewalApiClient = new FakeContractRenewalApiClient { RenewResult = new RenewContractResponse(true, Guid.NewGuid(), null) };
+        var controller = CreateController(new FakeContractApiClient(), contractRenewalApiClient: contractRenewalApiClient);
+
+        var result = await controller.RenewContracts(Guid.NewGuid(), null!, null!, null, CancellationToken.None);
+
+        Assert.IsType<RedirectToActionResult>(result);
+    }
 }

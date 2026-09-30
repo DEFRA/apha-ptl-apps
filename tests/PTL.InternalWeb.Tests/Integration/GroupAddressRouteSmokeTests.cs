@@ -20,12 +20,13 @@ public class GroupAddressRouteSmokeTests : IClassFixture<WebApplicationFactory<P
 
     public GroupAddressRouteSmokeTests(WebApplicationFactory<Program> factory)
     {
+        var pagedGroupAddresses = Enumerable.Range(0, 25)
+            .Select(i => new GroupAddressDataResponse(Guid.NewGuid(), $"PTL-{i + 1:000}", "1 Sample Street", "Second Line", "Third Line", "Fourth Line", "Fifth Line", Guid.Empty, "020 1234 5678", "Fragile"))
+            .ToList();
+
         _fakeApiClient = new FakeGroupAddressApiClient
         {
-            GroupAddresses =
-            [
-                new GroupAddressDataResponse(_groupAddressId, "PTL-001", "1 Sample Street", "Second Line", "Third Line", "Fourth Line", "Fifth Line", Guid.Empty, "020 1234 5678", "Fragile")
-            ],
+            GroupAddresses = pagedGroupAddresses,
             GroupAddress = new GroupAddressDataResponse(_groupAddressId, "PTL-001", "1 Sample Street", "Second Line", "Third Line", "Fourth Line", "Fifth Line", Guid.Empty, "020 1234 5678", "Fragile")
         };
 
