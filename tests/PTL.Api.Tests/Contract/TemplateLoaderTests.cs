@@ -21,7 +21,10 @@ public class TemplateLoaderTests
         }
         finally
         {
-            if (Directory.Exists(tempRoot)) Directory.Delete(tempRoot, true);
+            if (Directory.Exists(tempRoot))
+            {
+                Directory.Delete(tempRoot, true);
+            }
         }
     }
 

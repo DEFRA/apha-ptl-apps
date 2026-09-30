@@ -46,7 +46,7 @@ internal static class MergeValueFormatting
         }
 
         var year = commencement.Month < 4 ? commencement.Year : commencement.Year + 1;
-        return new DateTime(year, 3, 31).ToString(DateFormat, CultureInfo.InvariantCulture);
+        return new DateTime(year, 3, 31, 0, 0, 0, DateTimeKind.Utc).ToString(DateFormat, CultureInfo.InvariantCulture);
     }
 
     /// <summary>

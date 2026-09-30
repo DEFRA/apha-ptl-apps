@@ -46,7 +46,10 @@ public sealed partial class TemplateMergeService : ITemplateMergeService
             var mainPart = document.MainDocumentPart
                 ?? throw new InvalidDataException($"Template '{templatePath}' has no main document part.");
 
-            var body = mainPart.Document.Body
+            var mainDocument = mainPart.Document
+                ?? throw new InvalidDataException($"Template '{templatePath}' has no document content.");
+
+            var body = mainDocument.Body
                 ?? throw new InvalidDataException($"Template '{templatePath}' has no document body.");
 
             if (regions is not null)
@@ -61,18 +64,22 @@ public sealed partial class TemplateMergeService : ITemplateMergeService
             cancellationToken.ThrowIfCancellationRequested();
 
             // Headers and footers carry the APHA/VETQAS branding plus several address merge fields.
-            MergeInto(mainPart.Document, mergeValues);
+            MergeInto(mainDocument, mergeValues);
             foreach (var header in mainPart.HeaderParts)
             {
-                MergeInto(header.Header, mergeValues);
+                var headerElement = header.Header
+                    ?? throw new InvalidDataException($"Template '{templatePath}' has a header part with no header content.");
+                MergeInto(headerElement, mergeValues);
             }
 
             foreach (var footer in mainPart.FooterParts)
             {
-                MergeInto(footer.Footer, mergeValues);
+                var footerElement = footer.Footer
+                    ?? throw new InvalidDataException($"Template '{templatePath}' has a footer part with no footer content.");
+                MergeInto(footerElement, mergeValues);
             }
 
-            mainPart.Document.Save();
+            mainDocument.Save();
         }
 
         return stream.ToArray();
@@ -104,7 +111,10 @@ public sealed partial class TemplateMergeService : ITemplateMergeService
         using (var document = WordprocessingDocument.Open(stream, isEditable: true))
         {
             var mainPart = document.MainDocumentPart!;
-            var body = mainPart.Document.Body!;
+            var mainDocument = mainPart.Document
+                ?? throw new InvalidDataException("Merged document has no document content.");
+            var body = mainDocument.Body
+                ?? throw new InvalidDataException("Merged document has no document body.");
 
             // Section properties must stay the last body element, so everything is inserted before it.
             var sectionProperties = body.Elements<SectionProperties>().LastOrDefault();
@@ -121,7 +131,8 @@ public sealed partial class TemplateMergeService : ITemplateMergeService
                     chunkPart.FeedData(chunkStream);
                 }
 
-                var pageBreak = new Paragraph(new Run(new Break { Type = BreakValues.Page }));
+                var pageBreakRun = new Run(new OpenXmlElement[] { new Break { Type = BreakValues.Page } });
+                var pageBreak = new Paragraph(new OpenXmlElement[] { pageBreakRun });
                 var altChunk = new AltChunk { Id = mainPart.GetIdOfPart(chunkPart) };
 
                 if (sectionProperties is null)
@@ -136,7 +147,7 @@ public sealed partial class TemplateMergeService : ITemplateMergeService
                 }
             }
 
-            mainPart.Document.Save();
+            mainDocument.Save();
         }
 
         return stream.ToArray();
@@ -151,7 +162,7 @@ public sealed partial class TemplateMergeService : ITemplateMergeService
         using (var document = WordprocessingDocument.Create(stream, WordprocessingDocumentType.Document))
         {
             var mainPart = document.AddMainDocumentPart();
-            mainPart.Document = new WordDocument(new Body());
+            mainPart.Document = new WordDocument(new OpenXmlElement[] { new Body() });
             mainPart.Document.Save();
         }
 
@@ -249,12 +260,9 @@ public sealed partial class TemplateMergeService : ITemplateMergeService
     // Compatibility shim for templates authored with {{Token}} placeholders rather than merge fields.
     private static void ReplacePlainTokens(OpenXmlElement root, IReadOnlyDictionary<string, string> values)
     {
-        foreach (var text in root.Descendants<Text>())
+        foreach (var text in root.Descendants<Text>().Where(t => t.Text.Contains("{{", StringComparison.Ordinal)))
         {
-            if (text.Text.Contains("{{", StringComparison.Ordinal))
-            {
-                text.Text = ApplyTokens(text.Text, values);
-            }
+            text.Text = ApplyTokens(text.Text, values);
         }
 
         // A token Word has split across runs only resolves once those runs are joined.

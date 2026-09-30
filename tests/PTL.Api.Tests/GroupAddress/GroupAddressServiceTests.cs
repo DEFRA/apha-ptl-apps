@@ -1,4 +1,3 @@
-using Microsoft.Extensions.Logging.Abstractions;
 using PTL.Core.GroupAddress;
 
 namespace PTL.Api.Tests.GroupAddress;
@@ -8,7 +7,7 @@ public class GroupAddressServiceTests
     private static (GroupAddressService Service, FakeGroupAddressRepository Repository) CreateService()
     {
         var repository = new FakeGroupAddressRepository();
-        return (new GroupAddressService(repository, NullLogger<GroupAddressService>.Instance), repository);
+        return (new GroupAddressService(repository), repository);
     }
 
     private static PTL.Core.GroupAddress.GroupAddress ValidGroupAddress(string identifier = "PTL-001") => new()

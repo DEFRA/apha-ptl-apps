@@ -59,8 +59,8 @@ else
                         <td class="govuk-table__cell">
                             <div class="govuk-checkboxes govuk-checkboxes--small">
                                 <div class="govuk-checkboxes__item">
-                                    <input class="govuk-checkboxes__input contract-checkbox" type="checkbox" name="selectedContractIds" value="@contract.ContractId" checked="@(isChecked ? "checked" : null)" />
-                                    <label class="govuk-label govuk-checkboxes__label" for=""></label>
+                                    <input class="govuk-checkboxes__input contract-checkbox" type="checkbox" id="contract-select-@contract.ContractId" name="selectedContractIds" value="@contract.ContractId" checked="@(isChecked ? "checked" : null)" />
+                                    <label class="govuk-label govuk-checkboxes__label govuk-visually-hidden" for="contract-select-@contract.ContractId">Select contract @contract.Suffix</label>
                                 </div>
                             </div>
                         </td>
@@ -100,9 +100,10 @@ else
             @foreach (var item in Model.Items)
             {
                 var itemChecked = Model.SelectedParticipantSchemeIds.Contains(item.ParticipantSchemeId);
-                <input type="checkbox" class="item-input" name="selectedParticipantSchemeIds" value="@item.ParticipantSchemeId"
+                <input type="checkbox" class="item-input" id="item-input-@item.ParticipantSchemeId" name="selectedParticipantSchemeIds" value="@item.ParticipantSchemeId"
                        data-identifier="@item.Identifier" data-contract-id="@item.ContractId" data-renewable="@item.IsRenewable.ToString().ToLowerInvariant()"
                        checked="@(itemChecked ? "checked" : null)" hidden />
+                <label class="govuk-visually-hidden" for="item-input-@item.ParticipantSchemeId">Select scheme item @item.Identifier</label>
             }
 
             <table class="govuk-table">
@@ -126,8 +127,8 @@ else
                             <td class="govuk-table__cell">
                                 <div class="govuk-checkboxes govuk-checkboxes--small">
                                     <div class="govuk-checkboxes__item">
-                                        <input class="govuk-checkboxes__input item-row-checkbox" type="checkbox" data-identifier="@row.Identifier" checked="@(isChecked ? "checked" : null)" disabled="@(item.IsRenewable ? null : "disabled")" />
-                                        <label class="govuk-label govuk-checkboxes__label" for=""></label>
+                                        <input class="govuk-checkboxes__input item-row-checkbox" type="checkbox" id="item-row-select-@row.First.ParticipantSchemeId" data-identifier="@row.Identifier" checked="@(isChecked ? "checked" : null)" disabled="@(item.IsRenewable ? null : "disabled")" />
+                                        <label class="govuk-label govuk-checkboxes__label govuk-visually-hidden" for="item-row-select-@row.First.ParticipantSchemeId">Select item @row.Identifier</label>
                                     </div>
                                 </div>
                             </td>

@@ -32,10 +32,13 @@ public sealed class RenewContractsViewModel
 
     public string? ErrorMessage { get; set; }
 
+    private IReadOnlyList<RenewContractsItemRow>? _itemRows;
+
     // Legacy MergeContractsViewModel.GetDisplayModel(): duplicate Identifiers collapse to one row,
-    // ordered by lab code then old scheme.
+    // ordered by lab code then old scheme. Computed once and cached, since Items does not change
+    // after the view model is built - a property must not silently re-copy the collection on every access.
     public IReadOnlyList<RenewContractsItemRow> ItemRows =>
-        Items
+        _itemRows ??= Items
             .GroupBy(i => i.Identifier, StringComparer.Ordinal)
             .Select(g => new RenewContractsItemRow(g.Key, g.First(), g.ToList()))
             .OrderBy(r => int.TryParse(r.First.LabCode, out var labCode) ? labCode : int.MaxValue)

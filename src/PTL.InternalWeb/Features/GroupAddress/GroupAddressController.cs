@@ -136,7 +136,7 @@ public sealed class GroupAddressController(IGroupAddressApiClient groupAddressAp
         model.Address3 ?? string.Empty,
         model.Address4 ?? string.Empty,
         model.Address5 ?? string.Empty,
-        model.CountryId,
+        model.CountryId.GetValueOrDefault(),
         model.Telephone ?? string.Empty,
         model.PackingInstructions ?? string.Empty);
 

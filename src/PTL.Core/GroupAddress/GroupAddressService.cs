@@ -2,7 +2,7 @@ using Microsoft.Extensions.Logging;
 
 namespace PTL.Core.GroupAddress;
 
-public sealed class GroupAddressService(IGroupAddressRepository groupAddressRepository, ILogger<GroupAddressService> logger) : IGroupAddressService
+public sealed class GroupAddressService(IGroupAddressRepository groupAddressRepository) : IGroupAddressService
 {
     public Task<IReadOnlyList<GroupAddress>> GetAllAsync(CancellationToken cancellationToken = default) =>
         groupAddressRepository.GetAllAsync(cancellationToken);
@@ -48,7 +48,7 @@ public sealed class GroupAddressService(IGroupAddressRepository groupAddressRepo
         return await groupAddressRepository.UpdateAsync(groupAddressId, groupAddress, cancellationToken);
     }
 
-    private void Validate(GroupAddress groupAddress)
+    private static void Validate(GroupAddress groupAddress)
     {
         var result = GroupAddressValidator.Validate(groupAddress);
         if (!result.IsValid)

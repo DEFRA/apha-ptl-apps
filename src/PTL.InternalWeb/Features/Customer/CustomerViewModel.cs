@@ -203,13 +203,13 @@ public sealed class CustomerFormViewModel : IValidatableObject
     // Fields whose only PTL.Core.CustomerValidator rules are unconditional primitives (required/
     // length/format) already fully covered by the DataAnnotations above - forwarding them here
     // would just duplicate the same message under a different wording.
-    private static readonly HashSet<string> PrimitiveOnlyFields = new()
-    {
+    private static readonly HashSet<string> PrimitiveOnlyFields =
+    [
         "Name", "RegisteredFileNumber", "Telephone2", "Fax", "InvoiceName", "InvoiceTelephone",
         "InvoiceTelephone2", "InvoiceFax", "VatNumber", "AccountNumber", "CustomerFinanceId",
         "Comments", "PostageArrangements", "Address3", "Address4", "Address5",
         "InvoiceAddress3", "InvoiceAddress4", "InvoiceAddress5", "CustomerTypeId"
-    };
+    ];
 
     // Some fields (e.g. ContactName, Address1, Email) are BOTH an unconditional primitive check
     // (already covered above) AND a conditional-required-when-active business rule (not copied -

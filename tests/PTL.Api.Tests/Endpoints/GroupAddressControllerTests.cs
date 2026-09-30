@@ -1,5 +1,4 @@
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Logging.Abstractions;
 using PTL.Api.Controllers;
 using PTL.Api.Tests.GroupAddress;
 using PTL.Contracts.GroupAddress;
@@ -12,8 +11,8 @@ public class GroupAddressControllerTests
     private static (PTL.Api.Controllers.GroupAddressController Controller, FakeGroupAddressRepository Repository) CreateController()
     {
         var repository = new FakeGroupAddressRepository();
-        var service = new GroupAddressService(repository, NullLogger<GroupAddressService>.Instance);
-        return (new PTL.Api.Controllers.GroupAddressController(service, NullLogger<PTL.Api.Controllers.GroupAddressController>.Instance), repository);
+        var service = new GroupAddressService(repository);
+        return (new PTL.Api.Controllers.GroupAddressController(service), repository);
     }
 
     private static PTL.Core.GroupAddress.GroupAddress ValidGroupAddress(string identifier = "PTL-001") => new()

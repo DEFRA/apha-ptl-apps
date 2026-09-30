@@ -6,7 +6,7 @@ namespace PTL.Api.Controllers;
 
 [ApiController]
 [Route("api/group-addresses")]
-public sealed class GroupAddressController(IGroupAddressService groupAddressService, ILogger<GroupAddressController> logger) : ControllerBase
+public sealed class GroupAddressController(IGroupAddressService groupAddressService) : ControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<GroupAddressResponse>>> GetGroupAddresses(CancellationToken cancellationToken)

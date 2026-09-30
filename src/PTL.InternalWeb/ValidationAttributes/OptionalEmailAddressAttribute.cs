@@ -6,6 +6,7 @@ namespace PTL.InternalWeb.ValidationAttributes;
 // model binding posts "" - not null - for a blank text input, so an optional email field would be
 // wrongly flagged invalid on a normal empty submission. This treats null/blank the same way
 // PTL.Core's format checks already do (skip when empty, validate only when a value is present).
+[AttributeUsage(AttributeTargets.Property | AttributeTargets.Field, AllowMultiple = false)]
 public sealed class OptionalEmailAddressAttribute : ValidationAttribute
 {
     private static readonly EmailAddressAttribute InnerAttribute = new();

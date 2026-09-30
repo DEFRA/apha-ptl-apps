@@ -33,6 +33,19 @@ public static class DapperColumnMappings
     private const string ColName = "fldName";
     private const string ColIsActive = "fldIsActive";
     private const string ColYearId = "fldYearId";
+    private const string ColAddress1 = "fldAddress1";
+    private const string ColAddress2 = "fldAddress2";
+    private const string ColAddress3 = "fldAddress3";
+    private const string ColAddress4 = "fldAddress4";
+    private const string ColAddress5 = "fldAddress5";
+    private const string ColCountryId = "fldCountryId";
+    private const string ColTelephone = "fldTelephone";
+    private const string ColContactName = "fldContactName";
+    private const string ColOrganisation = "fldOrganisation";
+    private const string ColParticipantId = "fldParticipantId";
+    private const string ColLabCode = "fldLabCode";
+    private const string ColIdentifier = "fldIdentifier";
+    private const string ColContractId = "fldContractId";
 
     public static void Register()
     {
@@ -48,15 +61,15 @@ public static class DapperColumnMappings
             ["fldVatRatingId"] = nameof(CoreCustomer.VatRatingId),
             ["fldAccountNumber"] = nameof(CoreCustomer.AccountNumber),
             ["fldCustomerFinanceId"] = nameof(CoreCustomer.CustomerFinanceId),
-            ["fldContactName"] = nameof(CoreCustomer.ContactName),
-            ["fldOrganisation"] = nameof(CoreCustomer.Organisation),
-            ["fldAddress1"] = nameof(CoreCustomer.Address1),
-            ["fldAddress2"] = nameof(CoreCustomer.Address2),
-            ["fldAddress3"] = nameof(CoreCustomer.Address3),
-            ["fldAddress4"] = nameof(CoreCustomer.Address4),
-            ["fldAddress5"] = nameof(CoreCustomer.Address5),
-            ["fldCountryId"] = nameof(CoreCustomer.CountryId),
-            ["fldTelephone"] = nameof(CoreCustomer.Telephone),
+            [ColContactName] = nameof(CoreCustomer.ContactName),
+            [ColOrganisation] = nameof(CoreCustomer.Organisation),
+            [ColAddress1] = nameof(CoreCustomer.Address1),
+            [ColAddress2] = nameof(CoreCustomer.Address2),
+            [ColAddress3] = nameof(CoreCustomer.Address3),
+            [ColAddress4] = nameof(CoreCustomer.Address4),
+            [ColAddress5] = nameof(CoreCustomer.Address5),
+            [ColCountryId] = nameof(CoreCustomer.CountryId),
+            [ColTelephone] = nameof(CoreCustomer.Telephone),
             ["fldTelephone2"] = nameof(CoreCustomer.Telephone2),
             ["fldFax"] = nameof(CoreCustomer.Fax),
             ["fldEmail"] = nameof(CoreCustomer.Email),
@@ -88,27 +101,27 @@ public static class DapperColumnMappings
             [ColCustomerId] = nameof(CustomerSummaryEntity.CustomerId),
             ["fldQalNumber"] = nameof(CustomerSummaryEntity.QalNumber),
             [ColName] = nameof(CustomerSummaryEntity.Name),
-            ["fldOrganisation"] = nameof(CustomerSummaryEntity.Organisation),
+            [ColOrganisation] = nameof(CustomerSummaryEntity.Organisation),
             [ColIsActive] = nameof(CustomerSummaryEntity.IsActive),
         });
 
         Map<CoreParticipant>(new(StringComparer.OrdinalIgnoreCase)
         {
-            ["fldParticipantId"] = nameof(CoreParticipant.ParticipantId),
+            [ColParticipantId] = nameof(CoreParticipant.ParticipantId),
             ["fldSsoId"] = nameof(CoreParticipant.SsoId),
             [ColCustomerId] = nameof(CoreParticipant.CustomerId),
-            ["fldLabCode"] = nameof(CoreParticipant.LabCode),
+            [ColLabCode] = nameof(CoreParticipant.LabCode),
             ["fldLabName"] = nameof(CoreParticipant.LabName),
             ["fldLabTypeId"] = nameof(CoreParticipant.LabTypeId),
-            ["fldContactName"] = nameof(CoreParticipant.ContactName),
-            ["fldOrganisation"] = nameof(CoreParticipant.Organisation),
-            ["fldAddress1"] = nameof(CoreParticipant.Address1),
-            ["fldAddress2"] = nameof(CoreParticipant.Address2),
-            ["fldAddress3"] = nameof(CoreParticipant.Address3),
-            ["fldAddress4"] = nameof(CoreParticipant.Address4),
-            ["fldAddress5"] = nameof(CoreParticipant.Address5),
-            ["fldCountryId"] = nameof(CoreParticipant.CountryId),
-            ["fldTelephone"] = nameof(CoreParticipant.Telephone),
+            [ColContactName] = nameof(CoreParticipant.ContactName),
+            [ColOrganisation] = nameof(CoreParticipant.Organisation),
+            [ColAddress1] = nameof(CoreParticipant.Address1),
+            [ColAddress2] = nameof(CoreParticipant.Address2),
+            [ColAddress3] = nameof(CoreParticipant.Address3),
+            [ColAddress4] = nameof(CoreParticipant.Address4),
+            [ColAddress5] = nameof(CoreParticipant.Address5),
+            [ColCountryId] = nameof(CoreParticipant.CountryId),
+            [ColTelephone] = nameof(CoreParticipant.Telephone),
             ["fldFax"] = nameof(CoreParticipant.Fax),
             ["fldEmail"] = nameof(CoreParticipant.Email),
             ["fldEmail2"] = nameof(CoreParticipant.Email2),
@@ -121,17 +134,17 @@ public static class DapperColumnMappings
 
         Map<ParticipantSummaryEntity>(new(StringComparer.OrdinalIgnoreCase)
         {
-            ["fldParticipantId"] = nameof(ParticipantSummaryEntity.ParticipantId),
+            [ColParticipantId] = nameof(ParticipantSummaryEntity.ParticipantId),
             [ColCustomerId] = nameof(ParticipantSummaryEntity.CustomerId),
-            ["fldLabCode"] = nameof(ParticipantSummaryEntity.LabCode),
+            [ColLabCode] = nameof(ParticipantSummaryEntity.LabCode),
             ["fldLabName"] = nameof(ParticipantSummaryEntity.LabName),
-            ["fldContactName"] = nameof(ParticipantSummaryEntity.ContactName),
+            [ColContactName] = nameof(ParticipantSummaryEntity.ContactName),
             [ColIsActive] = nameof(ParticipantSummaryEntity.IsActive),
         });
 
         Map<CoreContract>(new(StringComparer.OrdinalIgnoreCase)
         {
-            ["fldContractId"] = nameof(CoreContract.ContractId),
+            [ColContractId] = nameof(CoreContract.ContractId),
             [ColCustomerId] = nameof(CoreContract.CustomerId),
             ["fldCustomerName"] = nameof(CoreContract.CustomerName),
             ["fldQALNumber"] = nameof(CoreContract.QalNumber),
@@ -175,7 +188,7 @@ public static class DapperColumnMappings
         // spgContractMerge result set 1 (legacy ContractMergeInfo).
         Map<RenewableContractEntity>(new(StringComparer.OrdinalIgnoreCase)
         {
-            ["fldContractId"] = nameof(RenewableContractEntity.ContractId),
+            [ColContractId] = nameof(RenewableContractEntity.ContractId),
             ["fldSuffix"] = nameof(RenewableContractEntity.Suffix),
             ["fldContractSignatory"] = nameof(RenewableContractEntity.ContractSignatory),
             ["fldRenewalInformation"] = nameof(RenewableContractEntity.RenewalInformation),
@@ -188,9 +201,9 @@ public static class DapperColumnMappings
         // column - it is copied from the parent contract by ContractMergeRepository.
         Map<RenewableContractItemEntity>(new(StringComparer.OrdinalIgnoreCase)
         {
-            ["fldContractId"] = nameof(RenewableContractItemEntity.ContractId),
+            [ColContractId] = nameof(RenewableContractItemEntity.ContractId),
             ["fldParticipantSchemeId"] = nameof(RenewableContractItemEntity.ParticipantSchemeId),
-            ["fldLabCode"] = nameof(RenewableContractItemEntity.LabCode),
+            [ColLabCode] = nameof(RenewableContractItemEntity.LabCode),
             ["fldLabName"] = nameof(RenewableContractItemEntity.LabName),
             ["fldOldSchemeIdentifier"] = nameof(RenewableContractItemEntity.OldSchemeIdentifier),
             ["fldOldSchemeName"] = nameof(RenewableContractItemEntity.OldSchemeName),
@@ -200,7 +213,7 @@ public static class DapperColumnMappings
 
         Map<ContractSummaryEntity>(new(StringComparer.OrdinalIgnoreCase)
         {
-            ["fldContractId"] = nameof(ContractSummaryEntity.ContractId),
+            [ColContractId] = nameof(ContractSummaryEntity.ContractId),
             [ColCustomerId] = nameof(ContractSummaryEntity.CustomerId),
             [ColYearId] = nameof(ContractSummaryEntity.YearId),
             [ColIsActive] = nameof(ContractSummaryEntity.IsActive),
@@ -223,7 +236,7 @@ public static class DapperColumnMappings
             ["fldSchemeId"] = nameof(CoreScheme.SchemeId),
             ["fldSharedId"] = nameof(CoreScheme.SharedId),
             [ColYearId] = nameof(CoreScheme.YearId),
-            ["fldIdentifier"] = nameof(CoreScheme.Identifier),
+            [ColIdentifier] = nameof(CoreScheme.Identifier),
             [ColName] = nameof(CoreScheme.Name),
             ["fldScheduleId"] = nameof(CoreScheme.ScheduleId),
             ["fldScheduleCodeId"] = nameof(CoreScheme.ScheduleCodeId),
@@ -327,7 +340,7 @@ public static class DapperColumnMappings
 
         Map<CountryEntity>(new(StringComparer.OrdinalIgnoreCase)
         {
-            ["fldCountryId"] = nameof(CountryEntity.CountryId),
+            [ColCountryId] = nameof(CountryEntity.CountryId),
             ["fldCountry"] = nameof(CountryEntity.Country),
         });
 
@@ -365,40 +378,40 @@ public static class DapperColumnMappings
         Map<GroupAddressEntity>(new(StringComparer.OrdinalIgnoreCase)
         {
             ["fldGroupAddressId"] = nameof(GroupAddressEntity.GroupAddressId),
-            ["fldIdentifier"] = nameof(GroupAddressEntity.Identifier),
-            ["fldAddress1"] = nameof(GroupAddressEntity.Address1),
-            ["fldCountryId"] = nameof(GroupAddressEntity.CountryId),
+            [ColIdentifier] = nameof(GroupAddressEntity.Identifier),
+            [ColAddress1] = nameof(GroupAddressEntity.Address1),
+            [ColCountryId] = nameof(GroupAddressEntity.CountryId),
         });
 
         Map<CoreGroupAddress>(new(StringComparer.OrdinalIgnoreCase)
         {
             ["fldGroupAddressId"] = nameof(CoreGroupAddress.GroupAddressId),
-            ["fldIdentifier"] = nameof(CoreGroupAddress.Identifier),
-            ["fldAddress1"] = nameof(CoreGroupAddress.Address1),
-            ["fldAddress2"] = nameof(CoreGroupAddress.Address2),
-            ["fldAddress3"] = nameof(CoreGroupAddress.Address3),
-            ["fldAddress4"] = nameof(CoreGroupAddress.Address4),
-            ["fldAddress5"] = nameof(CoreGroupAddress.Address5),
-            ["fldCountryId"] = nameof(CoreGroupAddress.CountryId),
-            ["fldTelephone"] = nameof(CoreGroupAddress.Telephone),
+            [ColIdentifier] = nameof(CoreGroupAddress.Identifier),
+            [ColAddress1] = nameof(CoreGroupAddress.Address1),
+            [ColAddress2] = nameof(CoreGroupAddress.Address2),
+            [ColAddress3] = nameof(CoreGroupAddress.Address3),
+            [ColAddress4] = nameof(CoreGroupAddress.Address4),
+            [ColAddress5] = nameof(CoreGroupAddress.Address5),
+            [ColCountryId] = nameof(CoreGroupAddress.CountryId),
+            [ColTelephone] = nameof(CoreGroupAddress.Telephone),
             ["fldPackingInstructions"] = nameof(CoreGroupAddress.PackingInstructions),
         });
 
         Map<SampleAddressEntity>(new(StringComparer.OrdinalIgnoreCase)
         {
-            ["fldContractId"] = nameof(SampleAddressEntity.ContractId),
-            ["fldParticipantId"] = nameof(SampleAddressEntity.ParticipantId),
+            [ColContractId] = nameof(SampleAddressEntity.ContractId),
+            [ColParticipantId] = nameof(SampleAddressEntity.ParticipantId),
             ["fldQalNumber"] = nameof(SampleAddressEntity.QalNumber),
-            ["fldLabCode"] = nameof(SampleAddressEntity.LabCode),
-            ["fldContactName"] = nameof(SampleAddressEntity.ContactName),
-            ["fldOrganisation"] = nameof(SampleAddressEntity.Organisation),
-            ["fldAddress1"] = nameof(SampleAddressEntity.Address1),
-            ["fldAddress2"] = nameof(SampleAddressEntity.Address2),
-            ["fldAddress3"] = nameof(SampleAddressEntity.Address3),
-            ["fldAddress4"] = nameof(SampleAddressEntity.Address4),
-            ["fldAddress5"] = nameof(SampleAddressEntity.Address5),
+            [ColLabCode] = nameof(SampleAddressEntity.LabCode),
+            [ColContactName] = nameof(SampleAddressEntity.ContactName),
+            [ColOrganisation] = nameof(SampleAddressEntity.Organisation),
+            [ColAddress1] = nameof(SampleAddressEntity.Address1),
+            [ColAddress2] = nameof(SampleAddressEntity.Address2),
+            [ColAddress3] = nameof(SampleAddressEntity.Address3),
+            [ColAddress4] = nameof(SampleAddressEntity.Address4),
+            [ColAddress5] = nameof(SampleAddressEntity.Address5),
             ["fldCountry"] = nameof(SampleAddressEntity.Country),
-            ["fldTelephone"] = nameof(SampleAddressEntity.Telephone),
+            [ColTelephone] = nameof(SampleAddressEntity.Telephone),
             ["fldFax"] = nameof(SampleAddressEntity.Fax),
             ["fldEmail"] = nameof(SampleAddressEntity.Email),
             ["fldVatNumber"] = nameof(SampleAddressEntity.VatNumber),
@@ -409,11 +422,11 @@ public static class DapperColumnMappings
 
         Map<SampleAddressSchemeEntity>(new(StringComparer.OrdinalIgnoreCase)
         {
-            ["fldContractId"] = nameof(SampleAddressSchemeEntity.ContractId),
-            ["fldParticipantId"] = nameof(SampleAddressSchemeEntity.ParticipantId),
+            [ColContractId] = nameof(SampleAddressSchemeEntity.ContractId),
+            [ColParticipantId] = nameof(SampleAddressSchemeEntity.ParticipantId),
             ["fldParticipantSchemeId"] = nameof(SampleAddressSchemeEntity.ParticipantSchemeId),
             [ColName] = nameof(SampleAddressSchemeEntity.SchemeName),
-            ["fldIdentifier"] = nameof(SampleAddressSchemeEntity.SchemeIdentifier),
+            [ColIdentifier] = nameof(SampleAddressSchemeEntity.SchemeIdentifier),
             ["fldMonthsActive"] = nameof(SampleAddressSchemeEntity.MonthsActive),
             ["fldWeekNumber"] = nameof(SampleAddressSchemeEntity.WeekNumber),
         });
@@ -422,16 +435,16 @@ public static class DapperColumnMappings
         // spgaExportContractRenewal and carry no fld prefix.
         Map<ContractRenewalEntity>(new(StringComparer.OrdinalIgnoreCase)
         {
-            ["fldContractId"] = nameof(ContractRenewalEntity.ContractId),
+            [ColContractId] = nameof(ContractRenewalEntity.ContractId),
             [ColCustomerId] = nameof(ContractRenewalEntity.CustomerId),
             ["fldQALNumber"] = nameof(ContractRenewalEntity.QalNumber),
-            ["fldOrganisation"] = nameof(ContractRenewalEntity.OrganisationName),
-            ["fldContactName"] = nameof(ContractRenewalEntity.ContactName),
-            ["fldAddress1"] = nameof(ContractRenewalEntity.Address1),
-            ["fldAddress2"] = nameof(ContractRenewalEntity.Address2),
-            ["fldAddress3"] = nameof(ContractRenewalEntity.Address3),
-            ["fldAddress4"] = nameof(ContractRenewalEntity.Address4),
-            ["fldAddress5"] = nameof(ContractRenewalEntity.Address5),
+            [ColOrganisation] = nameof(ContractRenewalEntity.OrganisationName),
+            [ColContactName] = nameof(ContractRenewalEntity.ContactName),
+            [ColAddress1] = nameof(ContractRenewalEntity.Address1),
+            [ColAddress2] = nameof(ContractRenewalEntity.Address2),
+            [ColAddress3] = nameof(ContractRenewalEntity.Address3),
+            [ColAddress4] = nameof(ContractRenewalEntity.Address4),
+            [ColAddress5] = nameof(ContractRenewalEntity.Address5),
             ["fldCountry"] = nameof(ContractRenewalEntity.Country),
             ["ContractStartDate"] = nameof(ContractRenewalEntity.ContractStartDate),
             ["ContractEndDate"] = nameof(ContractRenewalEntity.ContractEndDate),

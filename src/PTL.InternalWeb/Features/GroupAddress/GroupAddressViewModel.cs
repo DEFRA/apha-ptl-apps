@@ -22,7 +22,7 @@ public sealed record GroupAddressDetailsViewModel(PTL.Contracts.GroupAddress.Gro
 // remains the authoritative check enforced by the API (GroupAddressService), unchanged.
 public sealed class GroupAddressFormViewModel
 {
-    public Guid GroupAddressId { get; set; }
+    public Guid? GroupAddressId { get; set; }
 
     [Required(ErrorMessage = "Enter an identifier")]
     [StringLength(50, ErrorMessage = "Identifier must not exceed 50 characters")]
@@ -46,7 +46,7 @@ public sealed class GroupAddressFormViewModel
     public string? Address5 { get; set; }
 
     [NotEmptyGuid(ErrorMessage = "Select a country")]
-    public Guid CountryId { get; set; }
+    public Guid? CountryId { get; set; }
 
     [StringLength(20, ErrorMessage = "Telephone must not exceed 20 characters")]
     [RegularExpression(@"^[ 0-9\+\-\(\)\*\#]*$", ErrorMessage = "Telephone contains characters that are not allowed")]

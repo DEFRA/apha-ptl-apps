@@ -39,7 +39,7 @@ public class ContractDocumentServiceTests
 
             using var stream = new MemoryStream(result.DocumentBytes);
             using var doc = WordprocessingDocument.Open(stream, false);
-            var text = doc.MainDocumentPart?.Document.Body?.InnerText ?? string.Empty;
+            var text = doc.MainDocumentPart?.Document?.Body?.InnerText ?? string.Empty;
             Assert.Contains("UT-0001", text);
             Assert.Contains("Sample Laboratories Ltd", text);
             Assert.DoesNotContain("{{ContractNumber}}", text, StringComparison.OrdinalIgnoreCase);
@@ -47,7 +47,10 @@ public class ContractDocumentServiceTests
         }
         finally
         {
-            if (Directory.Exists(tempDir)) Directory.Delete(tempDir, true);
+            if (Directory.Exists(tempDir))
+            {
+                Directory.Delete(tempDir, true);
+            }
         }
     }
 
@@ -83,7 +86,10 @@ public class ContractDocumentServiceTests
         }
         finally
         {
-            if (Directory.Exists(tempDir)) Directory.Delete(tempDir, true);
+            if (Directory.Exists(tempDir))
+            {
+                Directory.Delete(tempDir, true);
+            }
         }
     }
 
@@ -121,7 +127,10 @@ public class ContractDocumentServiceTests
         }
         finally
         {
-            if (Directory.Exists(tempDir)) Directory.Delete(tempDir, true);
+            if (Directory.Exists(tempDir))
+            {
+                Directory.Delete(tempDir, true);
+            }
         }
     }
 

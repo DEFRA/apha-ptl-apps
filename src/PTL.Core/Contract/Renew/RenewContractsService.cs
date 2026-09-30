@@ -1,3 +1,4 @@
+using System.Text;
 using PTL.Contracts.Contract;
 using PTL.Core.Lookup;
 using PTL.Core.Participant;
@@ -128,13 +129,16 @@ public sealed class RenewContractsService(
             .OrderBy(id => suffixByParticipantSchemeId[id], StringComparer.Ordinal)
             .ToList();
 
-        var actionsRequired = string.Empty;
-        var renewalInformation = string.Empty;
+        var actionsRequiredBuilder = new StringBuilder();
+        var renewalInformationBuilder = new StringBuilder();
         foreach (var contractId in contractIds.Where(contractById.ContainsKey))
         {
-            actionsRequired += contractById[contractId].ActionsRequired + Environment.NewLine;
-            renewalInformation += contractById[contractId].RenewalInformation + Environment.NewLine;
+            actionsRequiredBuilder.Append(contractById[contractId].ActionsRequired).Append(Environment.NewLine);
+            renewalInformationBuilder.Append(contractById[contractId].RenewalInformation).Append(Environment.NewLine);
         }
+
+        var actionsRequired = actionsRequiredBuilder.ToString();
+        var renewalInformation = renewalInformationBuilder.ToString();
 
         var systemSettings = await lookupRepository.GetSystemSettingsAsync(cancellationToken);
         var yearId = systemSettings.NextYearWithDelayId;
@@ -191,7 +195,7 @@ public sealed class RenewContractsService(
             ContractSignatory = newContractSignatory ?? string.Empty,
             ActionsRequired = actionsRequired,
             RenewalInformation = renewalInformation,
-            CommencementDate = new DateTime(yearId, 4, 1),
+            CommencementDate = new DateTime(yearId, 4, 1, 0, 0, 0, DateTimeKind.Utc),
             IsActive = true
         };
 
