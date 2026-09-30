@@ -1,10 +1,12 @@
 using System.Reflection;
 using Dapper;
+using PTL.Core.AdministrationCharge;
 using PTL.Core.Contract;
 using PTL.Core.Customer;
 using PTL.Core.Lookup;
 using PTL.Core.Participant;
 using PTL.Core.Scheme;
+using PTL.Core.WeightedPricingPlan;
 using CoreContract = PTL.Core.Contract.Contract;
 using CoreCustomer = PTL.Core.Customer.Customer;
 using CoreParticipant = PTL.Core.Participant.Participant;
@@ -27,6 +29,7 @@ public static class DapperColumnMappings
     private const string ColName = "fldName";
     private const string ColIsActive = "fldIsActive";
     private const string ColYearId = "fldYearId";
+    private const string ColCurrencyId = "fldCurrencyId";
 
     public static void Register()
     {
@@ -54,7 +57,7 @@ public static class DapperColumnMappings
             ["fldTelephone2"] = nameof(CoreCustomer.Telephone2),
             ["fldFax"] = nameof(CoreCustomer.Fax),
             ["fldEmail"] = nameof(CoreCustomer.Email),
-            ["fldCurrencyId"] = nameof(CoreCustomer.CurrencyId),
+            [ColCurrencyId] = nameof(CoreCustomer.CurrencyId),
             ["fldComments"] = nameof(CoreCustomer.Comments),
             ["fldInitialStartDate"] = nameof(CoreCustomer.InitialStartDate),
             ["fldPostageArrangements"] = nameof(CoreCustomer.PostageArrangements),
@@ -265,7 +268,7 @@ public static class DapperColumnMappings
         {
             ["fldSchemeCurrencyId"] = nameof(SchemeCurrencyEntity.SchemeCurrencyId),
             ["fldSchemeId"] = nameof(SchemeCurrencyEntity.SchemeId),
-            ["fldCurrencyId"] = nameof(SchemeCurrencyEntity.CurrencyId),
+            [ColCurrencyId] = nameof(SchemeCurrencyEntity.CurrencyId),
             ["fldPrice"] = nameof(SchemeCurrencyEntity.Price),
             ["fldCurrencyName"] = nameof(SchemeCurrencyEntity.CurrencyName),
             ["fldCurrencySymbol"] = nameof(SchemeCurrencyEntity.CurrencySymbol),
@@ -289,7 +292,7 @@ public static class DapperColumnMappings
 
         Map<CurrencyEntity>(new(StringComparer.OrdinalIgnoreCase)
         {
-            ["fldCurrencyId"] = nameof(CurrencyEntity.CurrencyId),
+            [ColCurrencyId] = nameof(CurrencyEntity.CurrencyId),
             [ColName] = nameof(CurrencyEntity.Name),
             ["fldSymbol"] = nameof(CurrencyEntity.Symbol),
         });
@@ -316,6 +319,29 @@ public static class DapperColumnMappings
         {
             [ColYearId] = nameof(YearEntity.YearId),
             ["fldYear"] = nameof(YearEntity.Year),
+        });
+
+        Map<AdministrationChargeEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldAdministrationChargeId"] = nameof(AdministrationChargeEntity.AdministrationChargeId),
+            ["fldAdministrationCharge"] = nameof(AdministrationChargeEntity.Name),
+        });
+
+        Map<AdministrationChargeCurrencyEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldAdministrationChargeCurrencyId"] = nameof(AdministrationChargeCurrencyEntity.AdministrationChargeCurrencyId),
+            ["fldAdministrationChargeId"] = nameof(AdministrationChargeCurrencyEntity.AdministrationChargeId),
+            [ColCurrencyId] = nameof(AdministrationChargeCurrencyEntity.CurrencyId),
+            ["fldPrice"] = nameof(AdministrationChargeCurrencyEntity.Price),
+        });
+
+        Map<PricingPercentageEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldPricingPercentageId"] = nameof(PricingPercentageEntity.PricingPercentageId),
+            [ColYearId] = nameof(PricingPercentageEntity.YearId),
+            ["fldNumberOfDistributionsOnScheme"] = nameof(PricingPercentageEntity.NumberOfDistributionsOnScheme),
+            ["fldNumberOfDistributionsChosen"] = nameof(PricingPercentageEntity.NumberOfDistributionsChosen),
+            ["fldWeight"] = nameof(PricingPercentageEntity.Weight),
         });
     }
 

@@ -144,4 +144,26 @@ public class ContractRouteSmokeTests : IClassFixture<WebApplicationFactory<Progr
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Contains("There are no contracts to display.", body);
     }
+
+    [Fact]
+    public async Task ManageContracts_ReturnsSuccess()
+    {
+        var client = _factory.CreateClient();
+
+        var response = await client.GetAsync("/Contract/ManageContracts");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task ManageContracts_RendersHeading()
+    {
+        var client = _factory.CreateClient();
+
+        var response = await client.GetAsync("/Contract/ManageContracts");
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("govuk-heading", body, StringComparison.OrdinalIgnoreCase);
+    }
 }
