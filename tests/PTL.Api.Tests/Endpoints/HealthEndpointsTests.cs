@@ -8,10 +8,26 @@ namespace PTL.Api.Tests.Endpoints;
 
 public class HealthEndpointsTests : IClassFixture<WebApplicationFactory<Program>>
 {
+    private const string ReadinessKey = "local-dev-readiness-key";
+
     private readonly WebApplicationFactory<Program> _factory;
 
     public HealthEndpointsTests(WebApplicationFactory<Program> factory)
     {
+        // The API's startup checks (StartupChecks.RequireDatabaseOptions/RequireReadinessKey) run
+        // as top-level statements in Program.cs, reading builder.Configuration before the host is
+        // built - too early for WithWebHostBuilder's ConfigureAppConfiguration hook, which only
+        // takes effect once the deferred host is built. Environment variables, however, are
+        // already picked up by WebApplication.CreateBuilder itself, so they're set here instead.
+        // Normally these come from appsettings.Development.json locally or ECS-injected
+        // Database__*/HealthCheck__ReadinessKey variables in a deployed environment, neither of
+        // which exists in a fresh CI checkout.
+        Environment.SetEnvironmentVariable("Database__Host", "localhost");
+        Environment.SetEnvironmentVariable("Database__Name", "ProficiencyTesting");
+        Environment.SetEnvironmentVariable("Database__IntegratedSecurity", "true");
+        Environment.SetEnvironmentVariable("Database__TrustServerCertificate", "true");
+        Environment.SetEnvironmentVariable("HealthCheck__ReadinessKey", ReadinessKey);
+
         _factory = factory;
     }
 
@@ -77,7 +93,7 @@ public class HealthEndpointsTests : IClassFixture<WebApplicationFactory<Program>
                 ["Database:TrustServerCertificate"] = "true"
             })));
         var client = factory.CreateClient();
-        client.DefaultRequestHeaders.Add(ReadinessKeyFilter.HeaderName, "local-dev-readiness-key");
+        client.DefaultRequestHeaders.Add(ReadinessKeyFilter.HeaderName, ReadinessKey);
 
         var response = await client.GetAsync("/health/ready");
 
