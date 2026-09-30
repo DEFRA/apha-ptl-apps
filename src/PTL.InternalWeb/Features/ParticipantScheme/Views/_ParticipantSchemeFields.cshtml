@@ -11,13 +11,10 @@
     </thead>
     <tbody class="govuk-table__body">
         @{
-            // GOV.UK checkboxes render an invisible native <input> (govuk-frontend CSS sets
-            // .govuk-checkboxes__input { opacity: 0 }) and draw the visible box/tick via the
-            // adjacent .govuk-checkboxes__label's ::before/::after pseudo-elements, inside a
-            // .govuk-checkboxes__item wrapper - a bare <input class="govuk-checkboxes__input">
-            // with no wrapper/label is therefore genuinely invisible, not just unstyled. Every
-            // month/override checkbox below must use this same div > div.item > input + label
-            // structure already used further down this page for the plain checkbox fields.
+            // GOV.UK checkboxes require the standard container, input, and label structure to
+            // render correctly. A standalone checkbox input will not be displayed as expected.
+            // Ensure all month and override checkboxes use the same pattern already applied to
+            // the other checkbox fields on this page.
         }
         <tr class="govuk-table__row">
             <td class="govuk-table__cell">January</td>
@@ -175,18 +172,18 @@
         // Matches legacy ButtonOverride_Click + AddOverrideSingleSelectionScript: entering
         // "override mode" unlocks any already-posted (disabled) month checkbox, clears it, and
         // while in this mode checking one month unchecks every other month (single selection only).
-        (function () {
+        (function() {
             var button = document.getElementById('ptl-override-button');
             var overrideModeField = document.getElementById('OverrideModeActiveField');
             if (!button) { return; }
 
-            button.addEventListener('click', function () {
+            button.addEventListener('click', function() {
                 var enteringOverrideMode = overrideModeField.value !== 'true';
                 overrideModeField.value = enteringOverrideMode ? 'true' : 'false';
                 button.textContent = enteringOverrideMode ? 'Cancel' : 'Override';
 
                 var monthCheckboxes = document.querySelectorAll('.ptl-month-checkbox');
-                monthCheckboxes.forEach(function (checkbox) {
+                monthCheckboxes.forEach(function(checkbox) {
                     if (enteringOverrideMode && checkbox.disabled) {
                         checkbox.disabled = false;
                         checkbox.checked = false;
@@ -194,10 +191,10 @@
                 });
             });
 
-            document.querySelectorAll('.ptl-month-checkbox').forEach(function (checkbox) {
-                checkbox.addEventListener('change', function () {
+            document.querySelectorAll('.ptl-month-checkbox').forEach(function(checkbox) {
+                checkbox.addEventListener('change', function() {
                     if (overrideModeField.value === 'true' && checkbox.checked) {
-                        document.querySelectorAll('.ptl-month-checkbox').forEach(function (other) {
+                        document.querySelectorAll('.ptl-month-checkbox').forEach(function(other) {
                             if (other !== checkbox) {
                                 other.checked = false;
                             }
@@ -211,7 +208,7 @@
         // Matches legacy Button1 (Select a Group Address) + lnkSelectGroupAddress_Click /
         // ButtonClearGroupAddress_Click: choosing an option fills the read-only Identifier/Address 1/
         // Country display fields and the hidden GroupAddressId; Clear blanks all four.
-        (function () {
+        (function() {
             var selector = document.getElementById('GroupAddressSelector');
             var selectButton = document.getElementById('SelectGroupAddressButton');
             var clearButton = document.getElementById('ClearGroupAddressButton');
@@ -221,7 +218,7 @@
             var countryField = document.getElementById('GroupAddressCountry');
             if (!selector || !selectButton || !clearButton) { return; }
 
-            selectButton.addEventListener('click', function () {
+            selectButton.addEventListener('click', function() {
                 var option = selector.options[selector.selectedIndex];
                 if (!option || !option.value) { return; }
 
@@ -231,7 +228,7 @@
                 countryField.value = option.dataset.country || '';
             });
 
-            clearButton.addEventListener('click', function () {
+            clearButton.addEventListener('click', function() {
                 selector.selectedIndex = 0;
                 idField.value = '';
                 identifierField.value = '';

@@ -90,44 +90,6 @@ public sealed class ParticipantSchemeController(IParticipantSchemeService partic
         return record;
     }
 
-    // CreateParticipantSchemeRequest carries every UpdateParticipantSchemeRequest field plus the
-    // Scheme/Participant/Contract selected once at Add time - reuse the Update mapping for them.
-    private static UpdateParticipantSchemeRequest ToUpdateRequest(CreateParticipantSchemeRequest request) => new(
-        request.DistributionMonthJan,
-        request.DistributionMonthFeb,
-        request.DistributionMonthMar,
-        request.DistributionMonthApr,
-        request.DistributionMonthMay,
-        request.DistributionMonthJun,
-        request.DistributionMonthJul,
-        request.DistributionMonthAug,
-        request.DistributionMonthSep,
-        request.DistributionMonthOct,
-        request.DistributionMonthNov,
-        request.DistributionMonthDec,
-        request.NumberOfSetsRequired,
-        request.ExternalReference,
-        request.Contact,
-        request.ImportExportLicenceRequired,
-        request.CustomsCertificateRequired,
-        request.NonFeePaying,
-        request.PackingInstructions,
-        request.IsWeightedPricing,
-        request.DataConsentDeclarationGiven,
-        request.IsOverrideJan,
-        request.IsOverrideFeb,
-        request.IsOverrideMar,
-        request.IsOverrideApr,
-        request.IsOverrideMay,
-        request.IsOverrideJun,
-        request.IsOverrideJul,
-        request.IsOverrideAug,
-        request.IsOverrideSep,
-        request.IsOverrideOct,
-        request.IsOverrideNov,
-        request.IsOverrideDec,
-        request.GroupAddressId);
-
     private static ParticipantSchemeRecord ToEntity(Guid participantSchemeId, UpdateParticipantSchemeRequest request) => new()
     {
         ParticipantSchemeId = participantSchemeId,
@@ -166,6 +128,44 @@ public sealed class ParticipantSchemeController(IParticipantSchemeService partic
         IsOverrideDec = request.IsOverrideDec,
         GroupAddressId = request.GroupAddressId
     };
+
+    // CreateParticipantSchemeRequest carries every UpdateParticipantSchemeRequest field plus the
+    // Scheme/Participant/Contract selected once at Add time - reuse the Update mapping for them.
+    private static UpdateParticipantSchemeRequest ToUpdateRequest(CreateParticipantSchemeRequest request) => new(
+        request.DistributionMonthJan,
+        request.DistributionMonthFeb,
+        request.DistributionMonthMar,
+        request.DistributionMonthApr,
+        request.DistributionMonthMay,
+        request.DistributionMonthJun,
+        request.DistributionMonthJul,
+        request.DistributionMonthAug,
+        request.DistributionMonthSep,
+        request.DistributionMonthOct,
+        request.DistributionMonthNov,
+        request.DistributionMonthDec,
+        request.NumberOfSetsRequired,
+        request.ExternalReference,
+        request.Contact,
+        request.ImportExportLicenceRequired,
+        request.CustomsCertificateRequired,
+        request.NonFeePaying,
+        request.PackingInstructions,
+        request.IsWeightedPricing,
+        request.DataConsentDeclarationGiven,
+        request.IsOverrideJan,
+        request.IsOverrideFeb,
+        request.IsOverrideMar,
+        request.IsOverrideApr,
+        request.IsOverrideMay,
+        request.IsOverrideJun,
+        request.IsOverrideJul,
+        request.IsOverrideAug,
+        request.IsOverrideSep,
+        request.IsOverrideOct,
+        request.IsOverrideNov,
+        request.IsOverrideDec,
+        request.GroupAddressId);
 
     private static ParticipantSchemeResponse ToResponse(ParticipantSchemeRecord record) => new(
         record.ParticipantSchemeId,

@@ -131,8 +131,10 @@ public sealed partial class TemplateMergeService : ITemplateMergeService
                     chunkPart.FeedData(chunkStream);
                 }
 
-                var pageBreakRun = new Run([new Break { Type = BreakValues.Page }]);
-                var pageBreak = new Paragraph([pageBreakRun]);
+                var pageBreakRun = new Run();
+                pageBreakRun.AppendChild(new Break { Type = BreakValues.Page });
+                var pageBreak = new Paragraph();
+                pageBreak.AppendChild(pageBreakRun);
                 var altChunk = new AltChunk { Id = mainPart.GetIdOfPart(chunkPart) };
 
                 if (sectionProperties is null)
@@ -162,7 +164,9 @@ public sealed partial class TemplateMergeService : ITemplateMergeService
         using (var document = WordprocessingDocument.Create(stream, WordprocessingDocumentType.Document))
         {
             var mainPart = document.AddMainDocumentPart();
-            mainPart.Document = new WordDocument([new Body()]);
+            var mainDocument = new WordDocument();
+            mainDocument.AppendChild(new Body());
+            mainPart.Document = mainDocument;
             mainPart.Document.Save();
         }
 

@@ -171,7 +171,11 @@ public sealed class ParticipantSchemeFormViewModel
 
     public bool? IsWeightedPricing { get; set; } = true;
 
+    // Real GOV.UK checkbox - stays non-nullable bool (see the DistributionMonth group above for
+    // why). Known S6964 false positive.
+#pragma warning disable S6964
     public bool DataConsentDeclarationGiven { get; set; }
+#pragma warning restore S6964
 
     // Only rendered when the selected scheme's DataConsentDeclarationActive is true - matches
     // legacy's CheckBoxDataConsent/LblConsentBox visibility toggle. Recomputed server-side before

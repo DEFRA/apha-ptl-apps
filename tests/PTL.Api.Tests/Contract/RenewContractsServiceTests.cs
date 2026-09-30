@@ -303,6 +303,43 @@ public sealed class RenewContractsServiceTests
         Assert.Empty(participantRepository.CreatedRecords);
     }
 
+    [Fact]
+    public async Task RenewContractsAsync_WhenNextSchemeIdPointsToAMissingScheme_SkipsThatSelectionAndStillSucceeds()
+    {
+        var customerId = Guid.NewGuid();
+        var contractId = Guid.NewGuid();
+        var oldSchemeId = Guid.NewGuid();
+        var missingNextSchemeId = Guid.NewGuid();
+        var participantSchemeId = Guid.NewGuid();
+
+        var oldScheme = new CoreScheme { SchemeId = oldSchemeId, SharedId = Guid.NewGuid(), YearId = 2026, Identifier = "OLD-005", Name = "Old Scheme" };
+
+        var merge = new ContractMergeData(
+        [
+            new RenewableContractEntity { ContractId = contractId, ContractSignatory = "Alice Example" }
+        ],
+        [
+            new RenewableContractItemEntity { ContractId = contractId, Suffix = "A", ParticipantSchemeId = participantSchemeId, LabCode = "LAB", OldSchemeIdentifier = "OLD-005", OldSchemeName = "Old Scheme" }
+        ]);
+
+        var contractRepository = new TestContractRepository([new ContractSummaryEntity { ContractId = contractId, CustomerId = customerId, YearId = 2026, IsActive = true, Suffix = "A" }]);
+        var (participantSchemeRepository, lookupRepository) = (
+            new TestParticipantSchemeRepository([new ParticipantSchemeRecord { ParticipantSchemeId = participantSchemeId, ContractId = contractId, ParticipantId = Guid.NewGuid(), SchemeId = oldSchemeId }]),
+            new TestLookupRepository(new SystemSettingsEntity { NextYearWithDelayId = 2027, UTNumber = "UT3/306" }, []));
+
+        var service = new RenewContractsService(
+            new TestContractMergeRepository(merge),
+            contractRepository,
+            participantSchemeRepository,
+            new SchemeRepositoryWithMissingNextScheme(oldScheme, missingNextSchemeId),
+            lookupRepository);
+
+        var result = await service.RenewContractsAsync(customerId, [contractId], [participantSchemeId], "Alice Example");
+
+        Assert.True(result.Success);
+        Assert.Empty(participantSchemeRepository.CreatedRecords);
+    }
+
     private static (RenewContractsService Service, TestParticipantSchemeRepository ParticipantRepository) CreateService(
         ContractMergeData? mergeData = null,
         IReadOnlyList<ContractSummaryEntity>? contractSummaries = null,
@@ -424,6 +461,42 @@ public sealed class RenewContractsServiceTests
             _schemes[scheme.SchemeId] = scheme;
             return Task.FromResult<CoreScheme?>(scheme);
         }
+    }
+
+    // Simulates SchemeInfoCollection resolving a NextSchemeId that no longer has a matching Scheme
+    // row (e.g. the next-year scheme was subsequently deleted) - GetByIdAsync(newSchemeId) is null.
+    private sealed class SchemeRepositoryWithMissingNextScheme(CoreScheme oldScheme, Guid missingNextSchemeId) : ISchemeRepository
+    {
+        public Task<CoreScheme?> GetByIdAsync(Guid schemeId, CancellationToken cancellationToken = default) =>
+            Task.FromResult(schemeId == oldScheme.SchemeId ? oldScheme : null);
+
+        public Task<IReadOnlyList<SchemeSummaryEntity>> GetSummariesByYearAsync(int yearId, CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<SchemeSummaryEntity>>([]);
+
+        public Task<IReadOnlyList<SchemeSummaryEntity>> GetSummariesBySchemeIdAsync(Guid schemeId, CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<SchemeSummaryEntity>>(schemeId == oldScheme.SchemeId
+                ?
+                [
+                    new SchemeSummaryEntity
+                    {
+                        SharedId = oldScheme.SharedId,
+                        YearId = oldScheme.YearId,
+                        CurrentSchemeId = oldScheme.SchemeId,
+                        CurrentIdentifier = oldScheme.Identifier,
+                        CurrentName = oldScheme.Name,
+                        NextSchemeId = missingNextSchemeId,
+                        NextIdentifier = "MISSING",
+                        NextName = "Missing Next Scheme"
+                    }
+                ]
+                : []);
+
+        public Task<IReadOnlyList<SchemeHistoryEntity>> GetHistoryAsync(Guid sharedId, CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<SchemeHistoryEntity>>([]);
+
+        public Task<CoreScheme> CreateAsync(CoreScheme scheme, CancellationToken cancellationToken = default) => Task.FromResult(scheme);
+
+        public Task<CoreScheme?> UpdateAsync(CoreScheme scheme, CancellationToken cancellationToken = default) => Task.FromResult<CoreScheme?>(scheme);
     }
 
     private sealed class TestLookupRepository(SystemSettingsEntity settings, IReadOnlyList<YearEntity> weightedPricingYears) : ILookupRepository

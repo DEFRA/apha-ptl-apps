@@ -72,8 +72,8 @@ public class TemplateMergeServiceTests
         using var stream = new MemoryStream(bytes);
         using var document = WordprocessingDocument.Open(stream, false);
         var main = document.MainDocumentPart!;
-        Assert.Equal("Sample Labs", main.HeaderParts.Single().Header.InnerText);
-        Assert.Equal("Sample Labs", main.FooterParts.Single().Footer.InnerText);
+        Assert.Equal("Sample Labs", main.HeaderParts.Single().Header!.InnerText);
+        Assert.Equal("Sample Labs", main.FooterParts.Single().Footer!.InnerText);
     }
 
     [Fact]
@@ -227,6 +227,31 @@ public class TemplateMergeServiceTests
         Assert.Equal("QAL/00001", document.MainDocumentPart!.Document!.Body!.Descendants<Text>().First().Text);
         Assert.Equal(2, document.MainDocumentPart.AlternativeFormatImportParts.Count());
         Assert.Equal(2, document.MainDocumentPart.Document!.Body!.Descendants<AltChunk>().Count());
+    }
+
+    [Fact]
+    public void MergeTemplateMany_WithSectionProperties_InsertsChunksBeforeSectionProperties()
+    {
+        using var fixture = new TemplateFixture(body =>
+        {
+            body.AppendChild(Para(MergeField("QalNumber")));
+            body.AppendChild(new SectionProperties());
+        });
+
+        var bytes = new TemplateMergeService().MergeTemplateMany(
+            fixture.Path,
+            [
+                new ContractDocumentMergeData(new Dictionary<string, string> { ["QalNumber"] = "QAL/00001" }, null),
+                new ContractDocumentMergeData(new Dictionary<string, string> { ["QalNumber"] = "QAL/00002" }, null)
+            ]);
+
+        using var stream = new MemoryStream(bytes);
+        using var document = WordprocessingDocument.Open(stream, false);
+        var body = document.MainDocumentPart!.Document!.Body!;
+
+        // Section properties must remain the final body element even after the AltChunk is inserted.
+        Assert.IsType<SectionProperties>(body.LastChild);
+        Assert.Single(document.MainDocumentPart.AlternativeFormatImportParts);
     }
 
     [Fact]

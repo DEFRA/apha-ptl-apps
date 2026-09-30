@@ -121,14 +121,14 @@ public sealed class ContractRepository(IDbConnectionFactory connectionFactory) :
             YearId = Convert.ToInt32(headerRow["fldYearId"], CultureInfo.InvariantCulture),
             QalNumber = headerRow["fldQalNumber"] as string ?? string.Empty,
             Symbol = headerRow["fldSymbol"] as string ?? string.Empty,
-            DiscountRate = Convert.ToDecimal(headerRow["fldDiscountRate"]),
-            AdministrationCharge = Convert.ToDecimal(headerRow["fldAdministrationCharge"]),
+            DiscountRate = Convert.ToDecimal(headerRow["fldDiscountRate"], CultureInfo.InvariantCulture),
+            AdministrationCharge = Convert.ToDecimal(headerRow["fldAdministrationCharge"], CultureInfo.InvariantCulture),
             NumberCourier = Convert.ToInt32(headerRow["fldNumberCourier"], CultureInfo.InvariantCulture),
-            CourierPrice = Convert.ToDecimal(headerRow["fldCourierPrice"]),
+            CourierPrice = Convert.ToDecimal(headerRow["fldCourierPrice"], CultureInfo.InvariantCulture),
             NumberPostage = Convert.ToInt32(headerRow["fldNumberPostage"], CultureInfo.InvariantCulture),
-            PostagePrice = Convert.ToDecimal(headerRow["fldPostagePrice"]),
+            PostagePrice = Convert.ToDecimal(headerRow["fldPostagePrice"], CultureInfo.InvariantCulture),
             NumberSpecialDelivery = Convert.ToInt32(headerRow["fldNumberSpecialDelivery"], CultureInfo.InvariantCulture),
-            SpecialDeliveryPrice = Convert.ToDecimal(headerRow["fldSpecialDeliveryPrice"]),
+            SpecialDeliveryPrice = Convert.ToDecimal(headerRow["fldSpecialDeliveryPrice"], CultureInfo.InvariantCulture),
             IsReadOnly = GetBool(headerRow, "fldIsReadOnly")
         };
 
@@ -178,7 +178,7 @@ public sealed class ContractRepository(IDbConnectionFactory connectionFactory) :
                 LabCode = row["fldLabCode"] as string ?? string.Empty,
                 LabName = row["fldLabName"] as string ?? string.Empty,
                 NumberOfDistributions = Convert.ToInt32(row["fldNumberOfDistributions"], CultureInfo.InvariantCulture),
-                Price = Convert.ToDecimal(row["fldPrice"]),
+                Price = Convert.ToDecimal(row["fldPrice"], CultureInfo.InvariantCulture),
                 NonFeePaying = GetBool(row, "fldNonFeePaying"),
                 HasOverride = overrideMonthColumns.Any(column => GetBool(row, column))
             });

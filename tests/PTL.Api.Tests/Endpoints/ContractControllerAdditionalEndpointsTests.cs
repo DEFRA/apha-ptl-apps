@@ -121,7 +121,7 @@ public class ContractControllerAdditionalEndpointsTests
         var result = await controller.RemoveContractItem(contractId, Guid.NewGuid(), CancellationToken.None);
 
         var problem = Assert.IsType<BadRequestObjectResult>(result);
-        Assert.IsAssignableFrom<Microsoft.AspNetCore.Mvc.ValidationProblemDetails>(problem.Value);
+        Assert.IsType<Microsoft.AspNetCore.Mvc.ValidationProblemDetails>(problem.Value, exactMatch: false);
     }
 
     [Fact]

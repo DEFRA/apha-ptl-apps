@@ -77,9 +77,20 @@ else
                     }
                     else
                     {
-                        var receivedText = permit.ImportPermitRequired
-                            ? (permit.ImportPermitReceived ? "Yes" : "No")
-                            : "N/A";
+                        string receivedText;
+                        if (!permit.ImportPermitRequired)
+                        {
+                            receivedText = "N/A";
+                        }
+                        else if (permit.ImportPermitReceived)
+                        {
+                            receivedText = "Yes";
+                        }
+                        else
+                        {
+                            receivedText = "No";
+                        }
+
                         <td class="govuk-table__cell">
                             @receivedText
                         </td>

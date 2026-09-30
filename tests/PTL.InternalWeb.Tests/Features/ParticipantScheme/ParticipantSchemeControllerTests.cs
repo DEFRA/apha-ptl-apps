@@ -252,6 +252,26 @@ public class ParticipantSchemeControllerTests
     }
 
     [Fact]
+    public async Task Create_Post_ApiFailure_WithKnownScheme_PopulatesSchemeDisplayNameAndDataConsent()
+    {
+        var schemeId = Guid.NewGuid();
+        var yearId = DateTime.UtcNow.Year;
+        var participantSchemeApiClient = new FakeParticipantSchemeApiClient
+        {
+            SaveResult = new ParticipantSchemeSaveResult(false, null, new Dictionary<string, string[]> { ["SchemeId"] = ["This participant is already on this scheme"] })
+        };
+        var schemeApiClient = new FakeSchemeApiClient { SchemeResponse = SampleScheme(schemeId, yearId, jan: true, feb: false) };
+        var controller = CreateController(participantSchemeApiClient, schemeApiClient: schemeApiClient);
+        var model = new ParticipantSchemeFormViewModel { ContractId = Guid.NewGuid(), CustomerId = Guid.NewGuid(), ParticipantId = Guid.NewGuid(), SchemeId = schemeId };
+
+        var result = await controller.Create(model, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var viewModel = Assert.IsType<ParticipantSchemeFormViewModel>(view.Model);
+        Assert.Equal("S1: Salmonella", viewModel.SchemeDisplayName);
+    }
+
+    [Fact]
     public async Task Create_Post_Success_RedirectsToContractItems()
     {
         var contractId = Guid.NewGuid();

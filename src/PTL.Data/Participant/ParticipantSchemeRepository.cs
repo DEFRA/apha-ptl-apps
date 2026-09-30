@@ -90,7 +90,7 @@ public sealed class ParticipantSchemeRepository(IDbConnectionFactory connectionF
     // missing pricing plan setup) - Convert.ToDecimal/ToInt32(DBNull.Value) throw InvalidCastException,
     // so these default to a safe value instead of failing the whole read.
     private static decimal GetDecimal(IDictionary<string, object> row, string column) =>
-        row.TryGetValue(column, out var value) && value is not null && value is not DBNull ? Convert.ToDecimal(value) : 0m;
+        row.TryGetValue(column, out var value) && value is not null && value is not DBNull ? Convert.ToDecimal(value, CultureInfo.InvariantCulture) : 0m;
 
     private static int GetInt(IDictionary<string, object> row, string column, int defaultValue) =>
         row.TryGetValue(column, out var value) && value is not null && value is not DBNull ? Convert.ToInt32(value, CultureInfo.InvariantCulture) : defaultValue;

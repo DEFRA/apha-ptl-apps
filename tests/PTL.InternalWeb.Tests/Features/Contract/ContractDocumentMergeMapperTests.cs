@@ -88,6 +88,44 @@ public class ContractDocumentMergeMapperTests
     }
 
     [Fact]
+    public void JobSheet_WithKnownCustomer_PopulatesCustomerFieldsFromCustomerRecord()
+    {
+        var countryId = Guid.NewGuid();
+        var vatRatingId = Guid.NewGuid();
+        var customer = new PTL.Contracts.Customer.CustomerResponse(
+            CustomerId: Guid.NewGuid(), QalNumber: "QAL/00001", RegisteredFileNumber: string.Empty, Name: "Sample Laboratories Ltd",
+            PreviousName: string.Empty, CustomerTypeId: Guid.Empty, VatNumber: "GB123456789", VatRatingId: vatRatingId,
+            AccountNumber: "ACC001", CustomerFinanceId: string.Empty, ContactName: "Alice Example", Organisation: "Sample Laboratories Ltd",
+            Address1: "1 High Street", Address2: "Testville", Address3: string.Empty, Address4: string.Empty, Address5: string.Empty,
+            CountryId: countryId, Telephone: "01234 567890", Telephone2: string.Empty, Fax: "01234 567891", Email: "alice@example.test",
+            CurrencyId: Guid.Empty, Comments: string.Empty, InitialStartDate: DateTime.UtcNow, PostageArrangements: string.Empty,
+            PaymentNonUK: false, InvoiceName: string.Empty, InvoiceOrganisation: string.Empty, InvoiceAddress1: string.Empty,
+            InvoiceAddress2: string.Empty, InvoiceAddress3: string.Empty, InvoiceAddress4: string.Empty, InvoiceAddress5: string.Empty,
+            InvoiceCountryId: countryId, InvoiceTelephone: string.Empty, InvoiceTelephone2: string.Empty, InvoiceFax: string.Empty,
+            InvoiceEmail: string.Empty, IsActive: true, CanOrderOnline: true, InactiveDate: null, CustomerStatusId: null);
+
+        var context = CreateContext(ContractDocumentTypes.JobSheet) with
+        {
+            Customer = customer,
+            Countries = [new PTL.Contracts.Lookup.CountryResponse(countryId, "United Kingdom")],
+            VatRatings = [new PTL.Contracts.Lookup.VatRatingResponse(vatRatingId, "Standard")]
+        };
+
+        var request = ContractDocumentMergeMapper.Build(context);
+
+        Assert.Equal("Alice Example", request.MergeValues["ContactName"]);
+        Assert.Equal("Sample Laboratories Ltd", request.MergeValues["Organisation"]);
+        Assert.Equal("1 High Street", request.MergeValues["AddressLine1"]);
+        Assert.Equal("United Kingdom", request.MergeValues["Country"]);
+        Assert.Equal("01234 567890", request.MergeValues["Telephone"]);
+        Assert.Equal("01234 567891", request.MergeValues["Fax"]);
+        Assert.Equal("alice@example.test", request.MergeValues["Email"]);
+        Assert.Equal("ACC001", request.MergeValues["AccountNumber"]);
+        Assert.Equal("GB123456789", request.MergeValues["VatNumber"]);
+        Assert.Equal("Standard", request.MergeValues["VatRating"]);
+    }
+
+    [Fact]
     public void Contract_DerivesCompletionDateAsEndOfFinancialYear()
     {
         var context = CreateContext(ContractDocumentTypes.Contract, commencementDate: new DateTime(2024, 6, 1));
