@@ -125,4 +125,70 @@ public sealed class ParticipantSchemeServiceTests
 
         Assert.False(removed);
     }
+
+    [Fact]
+    public async Task CreateParticipantSchemeAsync_ParticipantAlreadyOnSchemeInSameContract_ThrowsLegacyValidationError()
+    {
+        var (service, _, contracts) = CreateService();
+        var contractId = Guid.NewGuid();
+        contracts.Seed(ActiveContract(contractId));
+        var record = ValidRecord(contractId);
+        contracts.ContractItems = ItemsWith(contractId, record.SchemeId, record.ParticipantId, existingParticipantSchemeId: Guid.NewGuid());
+
+        var ex = await Assert.ThrowsAsync<ParticipantSchemeValidationException>(() => service.CreateParticipantSchemeAsync(record));
+
+        Assert.Contains(ex.Errors, e => e.Field == "ParticipantId"
+            && e.Message == "This participant is already on this scheme, on this contract. You should edit the existing contract item.");
+    }
+
+    [Fact]
+    public async Task UpdateParticipantSchemeAsync_SameItemAlreadyOnScheme_IsNotTreatedAsDuplicate()
+    {
+        var (service, repository, contracts) = CreateService();
+        var contractId = Guid.NewGuid();
+        contracts.Seed(ActiveContract(contractId));
+        var created = await service.CreateParticipantSchemeAsync(ValidRecord(contractId));
+        contracts.ContractItems = ItemsWith(contractId, created.SchemeId, created.ParticipantId, created.ParticipantSchemeId);
+
+        created.NumberOfSetsRequired = 3;
+        var updated = await service.UpdateParticipantSchemeAsync(created.ParticipantSchemeId, created);
+
+        Assert.Equal(3, updated!.NumberOfSetsRequired);
+        Assert.Equal(3, (await repository.GetByIdAsync(created.ParticipantSchemeId))!.NumberOfSetsRequired);
+    }
+
+    [Fact]
+    public async Task CreateParticipantSchemeAsync_DifferentParticipantOnSameScheme_IsAllowed()
+    {
+        var (service, _, contracts) = CreateService();
+        var contractId = Guid.NewGuid();
+        contracts.Seed(ActiveContract(contractId));
+        var record = ValidRecord(contractId);
+        contracts.ContractItems = ItemsWith(contractId, record.SchemeId, Guid.NewGuid(), Guid.NewGuid());
+
+        var created = await service.CreateParticipantSchemeAsync(record);
+
+        Assert.NotEqual(Guid.Empty, created.ParticipantSchemeId);
+    }
+
+    private static PTL.Core.Contract.ContractItemsAggregate ItemsWith(
+        Guid contractId, Guid schemeId, Guid participantId, Guid existingParticipantSchemeId) => new()
+        {
+            ContractId = contractId,
+            Schemes =
+            [
+                new PTL.Core.Contract.ContractItemSchemeGroup
+                {
+                    SchemeId = schemeId,
+                    Participants =
+                    [
+                        new PTL.Core.Contract.ContractItemLine
+                        {
+                            ParticipantSchemeId = existingParticipantSchemeId,
+                            ParticipantId = participantId
+                        }
+                    ]
+                }
+            ]
+        };
 }

@@ -376,4 +376,189 @@ public class ParticipantSchemeControllerTests
         Assert.Equal("Details", redirect.ActionName);
         Assert.Equal(participantSchemeId, redirect.RouteValues!["id"]);
     }
+
+    [Fact]
+    public async Task Create_Post_SaveThrows_AddsGenericErrorAndReturnsView()
+    {
+        var participantSchemeApiClient = new FakeParticipantSchemeApiClient { ExceptionToThrow = new InvalidOperationException("boom") };
+        var controller = CreateController(participantSchemeApiClient);
+        var model = new ParticipantSchemeFormViewModel { ContractId = Guid.NewGuid(), CustomerId = Guid.NewGuid(), ParticipantId = Guid.NewGuid(), SchemeId = Guid.NewGuid() };
+
+        var result = await controller.Create(model, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        Assert.Same(model, view.Model);
+        Assert.Contains("The contract item could not be saved. Please try again.", AllErrorMessages(controller));
+    }
+
+    [Fact]
+    public async Task Edit_Post_SaveThrows_AddsGenericErrorAndReturnsView()
+    {
+        var participantSchemeApiClient = new FakeParticipantSchemeApiClient { ExceptionToThrow = new InvalidOperationException("boom") };
+        var controller = CreateController(participantSchemeApiClient);
+        var model = new ParticipantSchemeFormViewModel { ContractId = Guid.NewGuid() };
+
+        var result = await controller.Edit(Guid.NewGuid(), model, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        Assert.Same(model, view.Model);
+        Assert.Contains("The contract item could not be saved. Please try again.", AllErrorMessages(controller));
+    }
+
+    [Fact]
+    public async Task Create_Get_BuildsParticipantOptionsFromCustomerParticipants()
+    {
+        var contractId = Guid.NewGuid();
+        var customerId = Guid.NewGuid();
+        var participantId = Guid.NewGuid();
+        var participantApiClient = new FakeParticipantApiClient
+        {
+            SearchResponse = new ParticipantSearchResponse(
+                [new ParticipantSummaryResponse(participantId, customerId, "LAB1", "Lab One", "Bob Example", true)], 1, 1, 20)
+        };
+        var contractApiClient = new FakeContractApiClient { ContractResponse = SampleContract(contractId, customerId) };
+        var controller = CreateController(contractApiClient: contractApiClient, participantApiClient: participantApiClient);
+
+        var result = await controller.Create(contractId, customerId);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<ParticipantSchemeFormViewModel>(view.Model);
+        var option = Assert.Single(model.ParticipantOptions);
+        Assert.Equal("LAB1: Lab One", option.Text);
+        Assert.Equal(participantId.ToString(), option.Value);
+    }
+
+    [Fact]
+    public async Task Create_Get_BuildsGroupAddressOptionsWithResolvedCountryName()
+    {
+        var contractId = Guid.NewGuid();
+        var customerId = Guid.NewGuid();
+        var groupAddressId = Guid.NewGuid();
+        var countryId = Guid.NewGuid();
+        var contractApiClient = new FakeContractApiClient { ContractResponse = SampleContract(contractId, customerId) };
+        var lookupApiClient = new FakeLookupApiClient
+        {
+            GroupAddresses = [new GroupAddressResponse(groupAddressId, "GA1", "1 Group Street", countryId)],
+            Countries = [new CountryResponse(countryId, "United Kingdom")]
+        };
+        var controller = CreateController(contractApiClient: contractApiClient, lookupApiClient: lookupApiClient);
+
+        var result = await controller.Create(contractId, customerId);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<ParticipantSchemeFormViewModel>(view.Model);
+        var option = Assert.Single(model.GroupAddressOptions);
+        Assert.Equal("GA1", option.Identifier);
+        Assert.Equal("1 Group Street", option.Address1);
+        Assert.Equal("United Kingdom", option.CountryName);
+
+        // Nothing selected on a fresh Create, so the read-only display fields stay empty.
+        Assert.Null(model.GroupAddressIdentifier);
+        Assert.Null(model.GroupAddressAddress1);
+        Assert.Null(model.GroupAddressCountry);
+    }
+
+    [Fact]
+    public async Task Edit_Get_SelectedGroupAddress_PopulatesDisplayFields()
+    {
+        var participantSchemeId = Guid.NewGuid();
+        var contractId = Guid.NewGuid();
+        var groupAddressId = Guid.NewGuid();
+        var countryId = Guid.NewGuid();
+        var participantSchemeApiClient = new FakeParticipantSchemeApiClient
+        {
+            ParticipantSchemeResponse = SampleParticipantScheme(participantSchemeId, contractId) with { GroupAddressId = groupAddressId }
+        };
+        var contractApiClient = new FakeContractApiClient { ContractResponse = SampleContract(contractId, Guid.NewGuid()) };
+        var lookupApiClient = new FakeLookupApiClient
+        {
+            GroupAddresses = [new GroupAddressResponse(groupAddressId, "GA1", "1 Group Street", countryId)],
+            Countries = [new CountryResponse(countryId, "United Kingdom")]
+        };
+        var controller = CreateController(participantSchemeApiClient, contractApiClient, lookupApiClient: lookupApiClient);
+
+        var result = await controller.Edit(participantSchemeId, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<ParticipantSchemeFormViewModel>(view.Model);
+        Assert.Equal("GA1", model.GroupAddressIdentifier);
+        Assert.Equal("1 Group Street", model.GroupAddressAddress1);
+        Assert.Equal("United Kingdom", model.GroupAddressCountry);
+    }
+
+    [Fact]
+    public async Task Create_Get_EverySchemeMonthAvailable_OffersFullSchemePricingOnly()
+    {
+        var contractId = Guid.NewGuid();
+        var customerId = Guid.NewGuid();
+        var schemeId = Guid.NewGuid();
+        var yearId = DateTime.UtcNow.Year;
+        var contractApiClient = new FakeContractApiClient { ContractResponse = SampleContract(contractId, customerId) with { YearId = yearId } };
+        var schemeApiClient = new FakeSchemeApiClient { SchemeResponse = SampleScheme(schemeId, yearId, jan: true, feb: true) };
+        var lookupApiClient = new FakeLookupApiClient { WeightedPricingYears = [new YearResponse(yearId, $"{yearId}/{yearId + 1}")] };
+        var controller = CreateController(contractApiClient: contractApiClient, schemeApiClient: schemeApiClient, lookupApiClient: lookupApiClient);
+
+        var result = await controller.Create(contractId, customerId, participantId: Guid.NewGuid(), schemeId: schemeId);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<ParticipantSchemeFormViewModel>(view.Model);
+        Assert.True(model.IsWeightedSchemeAvailable);
+        Assert.Equal("Full", model.PricingPlan);
+        Assert.Single(model.PricingPlanOptions);
+    }
+
+    [Fact]
+    public async Task Details_ExistingItemNotWeightedPriced_DefaultsToProRataPricingPlan()
+    {
+        var participantSchemeId = Guid.NewGuid();
+        var contractId = Guid.NewGuid();
+        var schemeId = Guid.NewGuid();
+        var yearId = DateTime.UtcNow.Year;
+        var participantSchemeApiClient = new FakeParticipantSchemeApiClient
+        {
+            ParticipantSchemeResponse = SampleParticipantScheme(participantSchemeId, contractId) with { SchemeId = schemeId, IsWeightedPricing = false }
+        };
+        var contractApiClient = new FakeContractApiClient { ContractResponse = SampleContract(contractId, Guid.NewGuid()) with { YearId = yearId } };
+        var schemeApiClient = new FakeSchemeApiClient { SchemeResponse = SampleScheme(schemeId, yearId, jan: true, feb: true) };
+        var lookupApiClient = new FakeLookupApiClient { WeightedPricingYears = [new YearResponse(yearId, $"{yearId}/{yearId + 1}")] };
+        var controller = CreateController(participantSchemeApiClient, contractApiClient, schemeApiClient: schemeApiClient, lookupApiClient: lookupApiClient);
+
+        var result = await controller.Details(participantSchemeId, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<ParticipantSchemeDetailsViewModel>(view.Model);
+        Assert.Equal("ProRata", model.Fields.PricingPlan);
+    }
+
+    [Fact]
+    public async Task Create_Get_WithoutSchemeId_PopulatesSchemeSearchOptions()
+    {
+        var contractId = Guid.NewGuid();
+        var customerId = Guid.NewGuid();
+        var yearId = DateTime.UtcNow.Year;
+        var contractApiClient = new FakeContractApiClient { ContractResponse = SampleContract(contractId, customerId) with { YearId = yearId } };
+        var schemeApiClient = new FakeSchemeApiClient
+        {
+            SearchResponse = new SchemeSearchResponse(
+                [new SchemeSummaryResponse(Guid.NewGuid(), yearId, Guid.NewGuid(), "S1", "Salmonella", null, null, null, null, null, null)], 1, 1, 25)
+        };
+        var controller = CreateController(contractApiClient: contractApiClient, schemeApiClient: schemeApiClient);
+
+        var result = await controller.Create(contractId, customerId, schemeSearchTerm: "sal");
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<ParticipantSchemeFormViewModel>(view.Model);
+        Assert.Single(model.SchemeOptions);
+        Assert.Equal(1, model.SchemeOptionsTotalCount);
+
+        var pagination = model.SchemePagination;
+        Assert.Equal(1, pagination.CurrentPage);
+        Assert.Equal(1, pagination.TotalRecords);
+        Assert.Equal("Create", pagination.Action);
+        Assert.Equal(contractId, pagination.RouteValues["contractId"]);
+        Assert.Equal("sal", pagination.RouteValues["schemeSearchTerm"]);
+    }
+
+    private static IEnumerable<string> AllErrorMessages(ParticipantSchemeController controller) =>
+        controller.ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage);
 }

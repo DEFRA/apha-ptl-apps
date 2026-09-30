@@ -1,6 +1,11 @@
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Razor;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
 
 namespace PTL.ApiClient.Tests;
 
@@ -86,9 +91,9 @@ public class PtlWebApplicationExtensionsTests
         Assert.Contains("http://", ex.Message);
     }
 
-    private static WebApplicationBuilder CreateFrontEndBuilder()
+    private static WebApplicationBuilder CreateFrontEndBuilder(string environmentName = "Production")
     {
-        var builder = WebApplication.CreateBuilder();
+        var builder = WebApplication.CreateBuilder(new WebApplicationOptions { EnvironmentName = environmentName });
         builder.Configuration["Api:BaseUrl"] = "http://localhost:5252";
         return builder;
     }
@@ -103,5 +108,54 @@ public class PtlWebApplicationExtensionsTests
         Assert.Same(builder, result);
         using var provider = builder.Services.BuildServiceProvider();
         Assert.NotNull(provider.GetService<ICustomerApiClient>());
+    }
+
+    [Fact]
+    public void AddPtlWebFrontEnd_ConfiguresFriendlyModelBindingMessages()
+    {
+        var builder = CreateFrontEndBuilder();
+        builder.AddPtlWebFrontEnd();
+        using var provider = builder.Services.BuildServiceProvider();
+
+        var mvcOptions = provider.GetRequiredService<IOptions<MvcOptions>>().Value;
+
+        Assert.True(mvcOptions.ValidateComplexTypesIfChildValidationFails);
+        var messages = mvcOptions.ModelBindingMessageProvider;
+        Assert.Equal("Enter a valid value for Number of courier items", messages.AttemptedValueIsInvalidAccessor("abc", "Number of courier items"));
+        Assert.Equal("Enter a valid value for Number of courier items", messages.ValueMustNotBeNullAccessor("Number of courier items"));
+        Assert.Equal("Enter a valid value for Number of courier items", messages.ValueMustBeANumberAccessor("Number of courier items"));
+    }
+
+    [Fact]
+    public void AddPtlWebFrontEnd_AddsFeatureFolderViewLocationsAndCookiePaths()
+    {
+        var builder = CreateFrontEndBuilder();
+        builder.AddPtlWebFrontEnd();
+        using var provider = builder.Services.BuildServiceProvider();
+
+        var razorOptions = provider.GetRequiredService<IOptions<RazorViewEngineOptions>>().Value;
+
+        Assert.Equal("/Features/{1}/Views/{0}.cshtml", razorOptions.ViewLocationFormats[0]);
+        Assert.Equal("/Features/Shared/{0}.cshtml", razorOptions.ViewLocationFormats[1]);
+
+        var cookieOptions = provider.GetRequiredService<IOptionsMonitor<CookieAuthenticationOptions>>()
+            .Get(CookieAuthenticationDefaults.AuthenticationScheme);
+
+        Assert.Equal("/Account/Login", cookieOptions.LoginPath);
+        Assert.Equal("/Account/Logout", cookieOptions.LogoutPath);
+    }
+
+    [Theory]
+    [InlineData("Development")]
+    [InlineData("Production")]
+    public void UsePtlWebFrontEnd_BuildsPipelineForEveryEnvironment(string environmentName)
+    {
+        var builder = CreateFrontEndBuilder(environmentName);
+        builder.AddPtlWebFrontEnd();
+        var app = builder.Build();
+
+        var result = app.UsePtlWebFrontEnd();
+
+        Assert.Same(app, result);
     }
 }

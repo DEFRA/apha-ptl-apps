@@ -292,6 +292,146 @@ public class TemplateMergeServiceTests
         }
     }
 
+    [Fact]
+    public void MergeTemplate_ReplacesPlainDoubleBraceTokenSplitAcrossRuns()
+    {
+        // Word routinely splits a typed placeholder across runs; the token only resolves once joined.
+        using var fixture = new TemplateFixture(body => body.AppendChild(new Paragraph(
+            new Run(new Text("Contract {{Contract")),
+            new Run(new Text("Number}} end")))));
+
+        Assert.Equal("Contract UT3/306 end", MergedText(fixture.Path, new() { ["ContractNumber"] = "UT3/306" }));
+    }
+
+    [Fact]
+    public void MergeTemplate_LeavesUnknownPlainTokenSplitAcrossRunsUnchanged()
+    {
+        using var fixture = new TemplateFixture(body => body.AppendChild(new Paragraph(
+            new Run(new Text("Value: {{Not")),
+            new Run(new Text("Supplied}}")))));
+
+        Assert.Equal("Value: {{NotSupplied}}", MergedText(fixture.Path, []));
+    }
+
+    [Fact]
+    public void MergeTemplate_LeavesMultiRunParagraphWithoutTokensUnchanged()
+    {
+        using var fixture = new TemplateFixture(body => body.AppendChild(new Paragraph(
+            new Run(new Text("No tokens ")),
+            new Run(new Text("at all")))));
+
+        Assert.Equal("No tokens at all", MergedText(fixture.Path, new() { ["ContractNumber"] = "UT3/306" }));
+    }
+
+    [Fact]
+    public void MergeTemplate_IgnoresSimpleFieldsWithNoInstruction()
+    {
+        using var fixture = new TemplateFixture(body => body.AppendChild(new Paragraph(
+            new SimpleField(new Run(new Text("unchanged"))))));
+
+        Assert.Equal("unchanged", MergedText(fixture.Path, new() { ["ContractNumber"] = "UT3/306" }));
+    }
+
+    [Fact]
+    public void MergeTemplate_ReplacesPlainDoubleBraceTokens()
+    {
+        using var fixture = new TemplateFixture(body => body.AppendChild(new Paragraph(
+            new Run(new Text("Contract {{ContractNumber}} for "), new Text("{{CustomerOrganisation}}")))));
+
+        var text = MergedText(fixture.Path, new()
+        {
+            ["ContractNumber"] = "UT3/306",
+            ["CustomerOrganisation"] = "Sample Laboratories Ltd"
+        });
+
+        Assert.Equal("Contract UT3/306 for Sample Laboratories Ltd", text);
+    }
+
+    [Fact]
+    public void MergeTemplate_LeavesUnknownPlainTokenUnchanged()
+    {
+        using var fixture = new TemplateFixture(body => body.AppendChild(new Paragraph(
+            new Run(new Text("Value: {{NotSupplied}}")))));
+
+        Assert.Equal("Value: {{NotSupplied}}", MergedText(fixture.Path, []));
+    }
+
+    [Fact]
+    public void MergeTemplate_LeavesParagraphsWithoutPlainTokensUnchanged()
+    {
+        using var fixture = new TemplateFixture(body => body.AppendChild(new Paragraph(
+            new Run(new Text("No single-run tokens")))));
+
+        Assert.Equal("No single-run tokens", MergedText(fixture.Path, new() { ["ContractNumber"] = "UT3/306" }));
+    }
+
+    [Fact]
+    public void MergeTemplate_IgnoresSimpleFieldsThatAreNotMergeFields()
+    {
+        using var fixture = new TemplateFixture(body => body.AppendChild(new Paragraph(
+            new SimpleField(new Run(new Text("1"))) { Instruction = " PAGE " })));
+
+        var bytes = new TemplateMergeService().MergeTemplate(fixture.Path, new Dictionary<string, string>());
+
+        using var stream = new MemoryStream(bytes);
+        using var document = WordprocessingDocument.Open(stream, false);
+        var field = Assert.Single(document.MainDocumentPart!.Document!.Body!.Descendants<SimpleField>());
+        Assert.Equal(" PAGE ", field.Instruction?.Value);
+    }
+
+    [Fact]
+    public void MergeTemplate_FindsRegionMarkersWrittenAsSimpleFields()
+    {
+        using var fixture = new TemplateFixture(body => body.AppendChild(new Table(
+            new TableRow(new TableCell(new Paragraph(
+                SimpleMergeField("TableStart:ContractItems"),
+                SimpleMergeField("SchemeName"),
+                SimpleMergeField("TableEnd:ContractItems")))))));
+
+        var bytes = new TemplateMergeService().MergeTemplate(
+            fixture.Path,
+            new Dictionary<string, string>(),
+            new Dictionary<string, IReadOnlyList<IReadOnlyDictionary<string, string>>>
+            {
+                ["ContractItems"] =
+                [
+                    new Dictionary<string, string> { ["SchemeName"] = "Salmonella" },
+                    new Dictionary<string, string> { ["SchemeName"] = "Campylobacter" }
+                ]
+            });
+
+        using var stream = new MemoryStream(bytes);
+        using var document = WordprocessingDocument.Open(stream, false);
+        var rows = document.MainDocumentPart!.Document!.Body!.Descendants<TableRow>().ToList();
+
+        Assert.Equal(2, rows.Count);
+        Assert.Equal("Salmonella", rows[0].InnerText);
+        Assert.Equal("Campylobacter", rows[1].InnerText);
+    }
+
+    [Fact]
+    public void MergeTemplate_RegionEndRowBeforeStartRow_LeavesTemplateUnchanged()
+    {
+        using var fixture = new TemplateFixture(body => body.AppendChild(new Table(
+            new TableRow(Cell(MergeField("TableEnd:ContractItems"))),
+            new TableRow(Cell(MergeField("TableStart:ContractItems"), MergeField("SchemeName"))))));
+
+        var bytes = new TemplateMergeService().MergeTemplate(
+            fixture.Path,
+            new Dictionary<string, string>(),
+            new Dictionary<string, IReadOnlyList<IReadOnlyDictionary<string, string>>>
+            {
+                ["ContractItems"] = [new Dictionary<string, string> { ["SchemeName"] = "Salmonella" }]
+            });
+
+        using var stream = new MemoryStream(bytes);
+        using var document = WordprocessingDocument.Open(stream, false);
+        Assert.Equal(2, document.MainDocumentPart!.Document!.Body!.Descendants<TableRow>().Count());
+    }
+
+    private static SimpleField SimpleMergeField(string name) =>
+        new(new Run(new Text($"\u00ab{name}\u00bb"))) { Instruction = $" MERGEFIELD  {name}  \\* MERGEFORMAT " };
+
     private static string MergedText(string templatePath, Dictionary<string, string> values) =>
         InnerText(new TemplateMergeService().MergeTemplate(templatePath, values));
 

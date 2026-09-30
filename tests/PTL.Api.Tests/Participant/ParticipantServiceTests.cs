@@ -39,6 +39,18 @@ public class ParticipantServiceTests
     }
 
     [Fact]
+    public async Task CreateParticipantAsync_WithoutSsoId_GeneratesOne()
+    {
+        var service = CreateService(new FakeParticipantRepository());
+        var participant = ValidActiveParticipant();
+        participant.SsoId = Guid.Empty;
+
+        var created = await service.CreateParticipantAsync(participant);
+
+        Assert.NotEqual(Guid.Empty, created.SsoId);
+    }
+
+    [Fact]
     public async Task UpdateParticipantAsync_SetIsActiveFalse_StampsInactiveDate()
     {
         var repository = new FakeParticipantRepository();

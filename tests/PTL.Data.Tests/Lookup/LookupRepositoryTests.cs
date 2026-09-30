@@ -172,6 +172,42 @@ public class LookupRepositoryTests
     }
 
     [Fact]
+    public async Task GetWeightedPricingYearsAsync_ReturnsMappedYears()
+    {
+        var (repository, connection) = CreateRepository();
+        var table = new DataTable();
+        table.Columns.Add("fldYearId", typeof(int));
+        table.Columns.Add("fldYear", typeof(string));
+        table.Rows.Add(2026, "2026/27");
+        connection.RespondToQuery("EXEC dbo.spgaWeightedPricingYear", table);
+
+        var result = await repository.GetWeightedPricingYearsAsync();
+
+        Assert.Single(result);
+        Assert.Equal("2026/27", result[0].Year);
+    }
+
+    [Fact]
+    public async Task GetGroupAddressesAsync_ReturnsMappedGroupAddresses()
+    {
+        var (repository, connection) = CreateRepository();
+        var countryId = Guid.NewGuid();
+        var table = new DataTable();
+        table.Columns.Add("fldGroupAddressId", typeof(Guid));
+        table.Columns.Add("fldIdentifier", typeof(string));
+        table.Columns.Add("fldAddress1", typeof(string));
+        table.Columns.Add("fldCountryId", typeof(Guid));
+        table.Rows.Add(Guid.NewGuid(), "GA1", "1 Group Street", countryId);
+        connection.RespondToQuery("EXEC dbo.spgaGroupAddress", table);
+
+        var result = await repository.GetGroupAddressesAsync();
+
+        Assert.Single(result);
+        Assert.Equal("GA1", result[0].Identifier);
+        Assert.Equal(countryId, result[0].CountryId);
+    }
+
+    [Fact]
     public async Task GetSystemSettingsAsync_ReturnsMappedSettings()
     {
         var (repository, connection) = CreateRepository();

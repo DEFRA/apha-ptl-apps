@@ -217,4 +217,48 @@ public class ParticipantControllerTests
         var ok = Assert.IsType<OkObjectResult>(result.Result);
         Assert.True(((ParticipantResponse)ok.Value!).IsActive);
     }
+
+    [Fact]
+    public async Task DeactivateParticipant_StoredParticipantFailsValidation_ReturnsValidationProblem()
+    {
+        var repository = new FakeParticipantRepository();
+        var controller = CreateController(repository);
+        var participantId = await SeedInvalidParticipantAsync(repository);
+
+        var result = await controller.DeactivateParticipant(participantId, CancellationToken.None);
+
+        var objectResult = Assert.IsType<BadRequestObjectResult>(result.Result);
+        Assert.IsType<ValidationProblemDetails>(objectResult.Value);
+    }
+
+    [Fact]
+    public async Task ReactivateParticipant_StoredParticipantFailsValidation_ReturnsValidationProblem()
+    {
+        var repository = new FakeParticipantRepository();
+        var controller = CreateController(repository);
+        var participantId = await SeedInvalidParticipantAsync(repository);
+
+        var result = await controller.ReactivateParticipant(participantId, CancellationToken.None);
+
+        var objectResult = Assert.IsType<BadRequestObjectResult>(result.Result);
+        Assert.IsType<ValidationProblemDetails>(objectResult.Value);
+    }
+
+    // Writes straight to the repository so the row bypasses ParticipantService's validation and the
+    // later Deactivate/Reactivate re-validation fails, as it would for legacy data missing a lab name.
+    private static async Task<Guid> SeedInvalidParticipantAsync(FakeParticipantRepository repository)
+    {
+        var participant = new PTL.Core.Participant.Participant
+        {
+            ParticipantId = Guid.NewGuid(),
+            SsoId = Guid.NewGuid(),
+            CustomerId = Guid.NewGuid(),
+            LabCode = "LAB-001",
+            LabName = string.Empty,
+            IsActive = true
+        };
+
+        var created = await repository.CreateAsync(participant, CancellationToken.None);
+        return created.ParticipantId;
+    }
 }

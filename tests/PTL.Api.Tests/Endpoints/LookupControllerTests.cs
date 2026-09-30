@@ -133,6 +133,21 @@ public class LookupControllerTests
     }
 
     [Fact]
+    public async Task GetWeightedPricingYears_ReturnsMappedResponses()
+    {
+        var repository = new FakeLookupRepository { WeightedPricingYears = [new YearEntity { YearId = 2027, Year = "2027/28" }] };
+        var controller = CreateController(repository);
+
+        var result = await controller.GetWeightedPricingYears(CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var years = Assert.IsType<IReadOnlyList<PTL.Contracts.Lookup.YearResponse>>(ok.Value, exactMatch: false);
+        Assert.Single(years);
+        Assert.Equal(2027, years[0].YearId);
+        Assert.Equal("2027/28", years[0].Year);
+    }
+
+    [Fact]
     public async Task GetSchemeCurrencies_ReturnsMappedResponses()
     {
         var schemeId = Guid.NewGuid();

@@ -115,6 +115,36 @@ public class ParticipantSchemeControllerTests
     }
 
     [Fact]
+    public async Task UpdateParticipantScheme_ReadOnlyContract_ReturnsValidationProblem()
+    {
+        var (controller, repository, contracts) = CreateController();
+        var contractId = Guid.NewGuid();
+        contracts.Seed(new CoreContract { ContractId = contractId, CustomerId = Guid.NewGuid(), YearId = DateTime.UtcNow.Year, IsReadOnly = true });
+        var existing = new ParticipantSchemeRecord { ParticipantSchemeId = Guid.NewGuid(), ContractId = contractId, ParticipantId = Guid.NewGuid(), SchemeId = Guid.NewGuid(), NumberOfSetsRequired = 1 };
+        repository.Add(existing);
+
+        var result = await controller.UpdateParticipantScheme(existing.ParticipantSchemeId, ValidUpdateRequest(), CancellationToken.None);
+
+        var badRequest = Assert.IsType<BadRequestObjectResult>(result.Result);
+        Assert.NotNull(badRequest.Value);
+    }
+
+    [Fact]
+    public async Task DeleteParticipantScheme_ReadOnlyContract_ReturnsValidationProblem()
+    {
+        var (controller, repository, contracts) = CreateController();
+        var contractId = Guid.NewGuid();
+        contracts.Seed(new CoreContract { ContractId = contractId, CustomerId = Guid.NewGuid(), YearId = DateTime.UtcNow.Year, IsReadOnly = true });
+        var existing = new ParticipantSchemeRecord { ParticipantSchemeId = Guid.NewGuid(), ContractId = contractId, ParticipantId = Guid.NewGuid(), SchemeId = Guid.NewGuid(), NumberOfSetsRequired = 1 };
+        repository.Add(existing);
+
+        var result = await controller.DeleteParticipantScheme(existing.ParticipantSchemeId, CancellationToken.None);
+
+        var badRequest = Assert.IsType<BadRequestObjectResult>(result);
+        Assert.NotNull(badRequest.Value);
+    }
+
+    [Fact]
     public async Task DeleteParticipantScheme_UnknownId_ReturnsNotFound()
     {
         var (controller, _, _) = CreateController();

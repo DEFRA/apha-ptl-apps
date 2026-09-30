@@ -28,9 +28,16 @@ public class ApiClientServiceCollectionExtensionsTests
         Assert.IsType<ApiClient>(provider.GetRequiredService<IApiClient>());
         Assert.IsType<CustomerApiClient>(provider.GetRequiredService<ICustomerApiClient>());
         Assert.IsType<ParticipantApiClient>(provider.GetRequiredService<IParticipantApiClient>());
+        Assert.IsType<ParticipantSchemeApiClient>(provider.GetRequiredService<IParticipantSchemeApiClient>());
         Assert.IsType<ContractApiClient>(provider.GetRequiredService<IContractApiClient>());
+        Assert.IsType<GroupAddressApiClient>(provider.GetRequiredService<IGroupAddressApiClient>());
         Assert.IsType<SchemeApiClient>(provider.GetRequiredService<ISchemeApiClient>());
         Assert.IsType<LookupApiClient>(provider.GetRequiredService<ILookupApiClient>());
+        Assert.IsType<ImportPermitApiClient>(provider.GetRequiredService<IImportPermitApiClient>());
+        Assert.IsType<ContractExportApiClient>(provider.GetRequiredService<IContractExportApiClient>());
+        Assert.IsType<ContractRenewalApiClient>(provider.GetRequiredService<IContractRenewalApiClient>());
+        Assert.IsType<AdministrationChargeApiClient>(provider.GetRequiredService<IAdministrationChargeApiClient>());
+        Assert.IsType<WeightedPricingPlanApiClient>(provider.GetRequiredService<IWeightedPricingPlanApiClient>());
     }
 
     [Theory]

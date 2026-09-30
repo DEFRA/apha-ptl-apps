@@ -119,6 +119,24 @@ public class GroupAddressControllerTests
     }
 
     [Fact]
+    public async Task Create_Post_ApiFailureWithoutFieldName_AddsModelLevelError()
+    {
+        var apiClient = new FakeGroupAddressApiClient
+        {
+            SaveResult = new GroupAddressSaveResult(false, null, new Dictionary<string, string[]> { [string.Empty] = ["The group address could not be saved."] })
+        };
+        var controller = CreateController(apiClient);
+        var model = new GroupAddressFormViewModel { Identifier = "PTL-001", Address1 = "1 Sample Street", CountryId = Guid.NewGuid() };
+
+        var result = await controller.Create(model, CancellationToken.None);
+
+        Assert.IsType<ViewResult>(result);
+        Assert.Contains(
+            controller.ModelState[string.Empty]!.Errors.Select(e => e.ErrorMessage),
+            message => message == "The group address could not be saved.");
+    }
+
+    [Fact]
     public async Task Edit_Get_UnknownGroupAddress_ReturnsNotFound()
     {
         var controller = CreateController();

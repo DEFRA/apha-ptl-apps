@@ -244,6 +244,20 @@ public class SchemeControllerTests
     }
 
     [Fact]
+    public async Task UpdateScheme_InvalidRequest_ReturnsValidationProblem()
+    {
+        var controller = CreateController(new FakeSchemeRepository());
+        var created = await controller.CreateScheme(ValidCreateRequest(), CancellationToken.None);
+        var schemeId = ((SchemeResponse)((CreatedAtActionResult)created.Result!).Value!).SchemeId;
+        var invalidRequest = ToUpdateRequest(ValidCreateRequest()) with { Name = string.Empty };
+
+        var result = await controller.UpdateScheme(schemeId, invalidRequest, CancellationToken.None);
+
+        var objectResult = Assert.IsType<BadRequestObjectResult>(result.Result);
+        Assert.IsType<ValidationProblemDetails>(objectResult.Value);
+    }
+
+    [Fact]
     public async Task GetSchemeFamilyHistory_ReturnsCreatedScheme()
     {
         var controller = CreateController(new FakeSchemeRepository());

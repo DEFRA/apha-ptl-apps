@@ -68,4 +68,22 @@ public class TempDataNotificationExtensionsTests
 
         Assert.Null(tempData!.GetNotification());
     }
+
+    [Fact]
+    public void GetNotification_NonStringPayload_ReturnsNull()
+    {
+        var tempData = CreateTempData();
+        tempData["PTL.Notification"] = 42;
+
+        Assert.Null(tempData.GetNotification());
+    }
+
+    [Fact]
+    public void GetNotification_MalformedJsonPayload_ReturnsNull()
+    {
+        var tempData = CreateTempData();
+        tempData["PTL.Notification"] = "{not-json";
+
+        Assert.Null(tempData.GetNotification());
+    }
 }

@@ -105,6 +105,18 @@ public class LookupApiClientTests
     }
 
     [Fact]
+    public async Task GetWeightedPricingYearsAsync_ReturnsDeserializedList()
+    {
+        const string json = """[{"yearId":2026,"year":"2026/27"}]""";
+        var client = CreateClient(HttpStatusCode.OK, json);
+
+        var result = await client.GetWeightedPricingYearsAsync();
+
+        Assert.Single(result);
+        Assert.Equal("2026/27", result[0].Year);
+    }
+
+    [Fact]
     public async Task GetSchemeCurrenciesAsync_ReturnsDeserializedList()
     {
         const string json = """[{"schemeCurrencyId":"66666666-6666-6666-6666-666666666666","schemeId":"77777777-7777-7777-7777-777777777777","currencyId":"22222222-2222-2222-2222-222222222222","price":12.5,"currencyName":"British Pound","currencySymbol":"£"}]""";

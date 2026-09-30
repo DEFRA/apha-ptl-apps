@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging.Abstractions;
 using PTL.Contracts.Contract;
 using PTL.Core.Contract.Document;
+using PTL.InternalWeb.Notifications;
 using PTL.InternalWeb.Tests.TestSupport;
 
 namespace PTL.InternalWeb.Tests.Features.Contract;
@@ -447,4 +448,258 @@ public class ContractControllerTests
 
         Assert.IsType<ViewResult>(result);
     }
+
+    [Fact]
+    public async Task ContractItems_ExistingContract_ReturnsViewWithItemsAndCustomerId()
+    {
+        var contractId = Guid.NewGuid();
+        var customerId = Guid.NewGuid();
+        var apiClient = new FakeContractApiClient
+        {
+            ContractResponse = SampleContract(contractId, customerId),
+            ItemsResponse = EmptyItems(contractId)
+        };
+        var controller = CreateController(apiClient);
+
+        var result = await controller.ContractItems(contractId, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<PTL.InternalWeb.Features.Contract.ContractItemsViewModel>(view.Model);
+        Assert.Equal(contractId, model.Items.ContractId);
+        Assert.Equal(customerId, model.CustomerId);
+    }
+
+    [Fact]
+    public async Task ContractItems_UnknownItems_ReturnsNotFound()
+    {
+        var controller = CreateController(new FakeContractApiClient { ItemsResponse = null });
+
+        var result = await controller.ContractItems(Guid.NewGuid(), CancellationToken.None);
+
+        Assert.IsType<NotFoundResult>(result);
+    }
+
+    [Fact]
+    public async Task ContractItems_UnknownContract_ReturnsNotFound()
+    {
+        var contractId = Guid.NewGuid();
+        var controller = CreateController(new FakeContractApiClient
+        {
+            ItemsResponse = EmptyItems(contractId),
+            ContractResponse = null
+        });
+
+        var result = await controller.ContractItems(contractId, CancellationToken.None);
+
+        Assert.IsType<NotFoundResult>(result);
+    }
+
+    [Fact]
+    public async Task RemoveContractItem_Success_SetsSuccessNotificationAndRedirects()
+    {
+        var contractId = Guid.NewGuid();
+        var controller = CreateController(new FakeContractApiClient { RemovalResult = new ContractItemRemovalResult(true, false, null) });
+        controller.TempData = CreateTempData();
+
+        var result = await controller.RemoveContractItem(contractId, Guid.NewGuid(), CancellationToken.None);
+
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal("ContractItems", redirect.ActionName);
+        Assert.Equal(contractId, redirect.RouteValues!["id"]);
+        var notification = controller.TempData.GetNotification();
+        Assert.Equal(NotificationType.Success, notification!.Type);
+        Assert.Equal("Contract item removed successfully.", notification.Message);
+    }
+
+    [Fact]
+    public async Task RemoveContractItem_Failure_SetsErrorNotificationAndRedirects()
+    {
+        var contractId = Guid.NewGuid();
+        var controller = CreateController(new FakeContractApiClient { RemovalResult = new ContractItemRemovalResult(false, false, "Item is in use") });
+        controller.TempData = CreateTempData();
+
+        var result = await controller.RemoveContractItem(contractId, Guid.NewGuid(), CancellationToken.None);
+
+        Assert.IsType<RedirectToActionResult>(result);
+        var notification = controller.TempData.GetNotification();
+        Assert.Equal(NotificationType.Error, notification!.Type);
+        Assert.Equal("Item is in use", notification.Message);
+    }
+
+    [Fact]
+    public async Task RemoveContractItem_FailureWithoutMessage_UsesFallbackMessage()
+    {
+        var controller = CreateController(new FakeContractApiClient { RemovalResult = new ContractItemRemovalResult(false, true, null) });
+        controller.TempData = CreateTempData();
+
+        await controller.RemoveContractItem(Guid.NewGuid(), Guid.NewGuid(), CancellationToken.None);
+
+        Assert.Equal("The contract item could not be removed.", controller.TempData.GetNotification()!.Message);
+    }
+
+    [Fact]
+    public async Task Export_JobSheetWithZeroTotalPrice_WarnsAndRedirectsToIndex()
+    {
+        var contractId = Guid.NewGuid();
+        var customerId = Guid.NewGuid();
+        var apiClient = new FakeContractApiClient
+        {
+            ContractResponse = SampleContract(contractId, customerId),
+            ItemsResponse = EmptyItems(contractId)
+        };
+        var controller = CreateController(apiClient, new FakeCustomerApiClient { CustomerResponse = SampleCustomer(customerId) });
+        controller.TempData = CreateTempData();
+
+        var result = await controller.Export(contractId, "Job Sheet", CancellationToken.None);
+
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal("Index", redirect.ActionName);
+        Assert.Equal(customerId, redirect.RouteValues!["customerId"]);
+        var notification = controller.TempData.GetNotification();
+        Assert.Equal(NotificationType.Warning, notification!.Type);
+        Assert.Equal("Total Price of this contract is 0 or there is no data set.", notification.Message);
+    }
+
+    [Fact]
+    public async Task Export_AddressConfirmationWithNoSampleAddresses_WarnsAndRedirectsToIndex()
+    {
+        var contractId = Guid.NewGuid();
+        var controller = CreateController(
+            new FakeContractApiClient { ContractResponse = SampleContract(contractId, Guid.NewGuid()) },
+            contractExportApiClient: new FakeContractExportApiClient { SampleAddresses = [] });
+        controller.TempData = CreateTempData();
+
+        var result = await controller.Export(contractId, "Address Confirmation", CancellationToken.None);
+
+        Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal("There is no data set", controller.TempData.GetNotification()!.Message);
+    }
+
+    [Fact]
+    public async Task Export_AddressConfirmationWithSampleAddresses_GeneratesDocument()
+    {
+        var contractId = Guid.NewGuid();
+        var documentService = new FakeContractDocumentService
+        {
+            Response = new ContractDocumentResponse("AddressConfirmation.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", [0x50])
+        };
+        var controller = CreateController(
+            new FakeContractApiClient { ContractResponse = SampleContract(contractId, Guid.NewGuid()) },
+            documentService: documentService,
+            contractExportApiClient: new FakeContractExportApiClient { SampleAddresses = [SampleAddress(contractId)] });
+        controller.TempData = CreateTempData();
+
+        var result = await controller.Export(contractId, "Address Confirmation", CancellationToken.None);
+
+        var file = Assert.IsType<FileContentResult>(result);
+        Assert.Equal("AddressConfirmation.docx", file.FileDownloadName);
+        Assert.Equal("AddressConfirmationExampleTemplate", documentService.LastRequest!.TemplateName);
+    }
+
+    [Fact]
+    public async Task Export_RenewalLetterWithoutRenewalData_WarnsAndRedirectsToIndex()
+    {
+        var contractId = Guid.NewGuid();
+        var controller = CreateController(
+            new FakeContractApiClient { ContractResponse = SampleContract(contractId, Guid.NewGuid()) },
+            contractExportApiClient: new FakeContractExportApiClient { Renewal = null });
+        controller.TempData = CreateTempData();
+
+        var result = await controller.Export(contractId, "Renewal Letter", CancellationToken.None);
+
+        Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal("There is no data set", controller.TempData.GetNotification()!.Message);
+    }
+
+    [Fact]
+    public async Task Export_RenewalLetterWithRenewalData_GeneratesDocument()
+    {
+        var contractId = Guid.NewGuid();
+        var customerId = Guid.NewGuid();
+        var documentService = new FakeContractDocumentService
+        {
+            Response = new ContractDocumentResponse("RenewalLetter.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", [0x50])
+        };
+        var controller = CreateController(
+            new FakeContractApiClient { ContractResponse = SampleContract(contractId, customerId) },
+            documentService: documentService,
+            contractExportApiClient: new FakeContractExportApiClient { Renewal = SampleRenewal(contractId, customerId) });
+        controller.TempData = CreateTempData();
+
+        var result = await controller.Export(contractId, "Renewal Letter", CancellationToken.None);
+
+        Assert.IsType<FileContentResult>(result);
+        Assert.Equal("ContractRenewalExampleTemplate", documentService.LastRequest!.TemplateName);
+    }
+
+    [Fact]
+    public async Task Edit_Get_ExistingContract_ReturnsPopulatedFormViewModel()
+    {
+        var contractId = Guid.NewGuid();
+        var customerId = Guid.NewGuid();
+        var controller = CreateController(
+            new FakeContractApiClient { ContractResponse = SampleContract(contractId, customerId) },
+            new FakeCustomerApiClient { CustomerResponse = SampleCustomer(customerId) },
+            new FakeLookupApiClient { Years = [new PTL.Contracts.Lookup.YearResponse(DateTime.UtcNow.Year + 1, "2026/27")] });
+
+        var result = await controller.Edit(contractId, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<PTL.InternalWeb.Features.Contract.ContractFormViewModel>(view.Model);
+        Assert.Equal(contractId, model.ContractId);
+        Assert.Equal(customerId, model.CustomerId);
+        Assert.Single(model.YearOptions);
+    }
+
+    [Fact]
+    public async Task Edit_Post_InvalidModelState_ReturnsViewWithModel()
+    {
+        var controller = CreateController(new FakeContractApiClient());
+        controller.ModelState.AddModelError("YearId", "Select a year");
+        var model = new PTL.InternalWeb.Features.Contract.ContractFormViewModel { CustomerId = Guid.NewGuid() };
+
+        var result = await controller.Edit(Guid.NewGuid(), model, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        Assert.Same(model, view.Model);
+    }
+
+    [Fact]
+    public async Task Edit_Post_ApiFailure_AddsErrorsAndReturnsView()
+    {
+        var apiClient = new FakeContractApiClient
+        {
+            SaveResult = new PTL.Contracts.Contract.ContractSaveResult(false, null, new Dictionary<string, string[]> { ["UTNumber"] = ["Enter a UT number"] })
+        };
+        var controller = CreateController(apiClient);
+        var model = new PTL.InternalWeb.Features.Contract.ContractFormViewModel { YearId = 2027, UTNumber = "UT3/306", CustomerId = Guid.NewGuid() };
+
+        var result = await controller.Edit(Guid.NewGuid(), model, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        Assert.Same(model, view.Model);
+        Assert.False(controller.ModelState.IsValid);
+    }
+
+    private static Microsoft.AspNetCore.Mvc.ViewFeatures.ITempDataDictionary CreateTempData() =>
+        new Microsoft.AspNetCore.Mvc.ViewFeatures.TempDataDictionary(
+            new Microsoft.AspNetCore.Http.DefaultHttpContext(),
+            new FakeTempDataProvider());
+
+    private static ContractItemsResponse EmptyItems(Guid contractId) => new(
+        contractId, "A", DateTime.UtcNow.Year, "QAL/00001", "£",
+        0m, 0m, 0, 0m, 0m, 0, 0m, 0m, 0, 0m, 0m, 0m, 0m, 0m, false, []);
+
+    private static SampleAddressResponse SampleAddress(Guid contractId) => new(
+        contractId, Guid.NewGuid(), "QAL/00001", "LAB1", "Alice Example", "Lab One Ltd",
+        "1 Test Street", "Testville", string.Empty, string.Empty, string.Empty, "United Kingdom",
+        "01234 567890", string.Empty, "alice@example.com", "GB123", "ACC-1", "Standard", "PO-1",
+        [], []);
+
+    private static ContractRenewalResponse SampleRenewal(Guid contractId, Guid customerId) => new(
+        contractId, customerId, "QAL/00001", "Sample Organisation", "Alice Example",
+        "1 Test Street", "Testville", string.Empty, string.Empty, string.Empty, "United Kingdom",
+        new DateTime(2026, 4, 1, 0, 0, 0, DateTimeKind.Utc),
+        new DateTime(2027, 3, 31, 0, 0, 0, DateTimeKind.Utc),
+        "Renewal information");
 }

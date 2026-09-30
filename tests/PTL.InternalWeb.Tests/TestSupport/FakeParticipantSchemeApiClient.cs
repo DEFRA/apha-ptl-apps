@@ -10,14 +10,17 @@ internal sealed class FakeParticipantSchemeApiClient : IParticipantSchemeApiClie
     public ParticipantSchemeResponse? ParticipantSchemeResponse { get; set; }
     public ParticipantSchemeSaveResult SaveResult { get; set; } = new(true, null, new Dictionary<string, string[]>());
 
+    // Set to make Create/Update throw, exercising the controller's save-error catch blocks.
+    public Exception? ExceptionToThrow { get; set; }
+
     public Task<ParticipantSchemeResponse?> GetParticipantSchemeAsync(Guid participantSchemeId, CancellationToken cancellationToken = default) =>
         Task.FromResult(ParticipantSchemeResponse);
 
     public Task<ParticipantSchemeSaveResult> CreateParticipantSchemeAsync(CreateParticipantSchemeRequest request, CancellationToken cancellationToken = default) =>
-        Task.FromResult(SaveResult);
+        ExceptionToThrow is not null ? Task.FromException<ParticipantSchemeSaveResult>(ExceptionToThrow) : Task.FromResult(SaveResult);
 
     public Task<ParticipantSchemeSaveResult> UpdateParticipantSchemeAsync(Guid participantSchemeId, UpdateParticipantSchemeRequest request, CancellationToken cancellationToken = default) =>
-        Task.FromResult(SaveResult);
+        ExceptionToThrow is not null ? Task.FromException<ParticipantSchemeSaveResult>(ExceptionToThrow) : Task.FromResult(SaveResult);
 
     public Task<ParticipantSchemeSaveResult> DeleteParticipantSchemeAsync(Guid participantSchemeId, CancellationToken cancellationToken = default) =>
         Task.FromResult(SaveResult);
