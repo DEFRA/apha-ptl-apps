@@ -12,12 +12,25 @@ public class HomeRouteSmokeTests : IClassFixture<WebApplicationFactory<Program>>
         _factory = factory;
     }
 
+    // Default route pattern is {controller=Account}/{action=Login}/{id?}, so "/" itself resolves
+    // to Account.Login, not Home.Index - kept separate from Home_Index_ReturnsSuccess below, which
+    // hits Home.Index explicitly.
+    [Fact]
+    public async Task Root_ReturnsSuccess()
+    {
+        var client = _factory.CreateClient();
+
+        var response = await client.GetAsync("/");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
     [Fact]
     public async Task Home_Index_ReturnsSuccess()
     {
         var client = _factory.CreateClient();
 
-        var response = await client.GetAsync("/");
+        var response = await client.GetAsync("/Home/Index");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }

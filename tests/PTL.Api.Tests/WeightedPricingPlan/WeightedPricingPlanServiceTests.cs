@@ -58,6 +58,27 @@ public class WeightedPricingPlanServiceTests
         Assert.False(result.CanRenew);
     }
 
+    // Covers the early-return branch: spgaYearCurrent hasn't been configured with both a current
+    // and next financial year (e.g. mid system-setup), so there's nothing to compare against and
+    // renewal must be reported as unavailable rather than throwing on currentYears[1].
+    [Fact]
+    public async Task GetYearsAsync_FewerThanTwoCurrentYearsConfigured_ReturnsCannotRenewWithNoNextYear()
+    {
+        var repository = new FakeWeightedPricingPlanRepository { YearsWithPercentages = [new YearEntity { YearId = 2026, Year = "2026/27" }] };
+        var lookupService = new FakeLookupServiceForWeightedPricingPlan
+        {
+            CurrentYears = [new YearEntity { YearId = 2026, Year = "2026/27" }]
+        };
+        var service = CreateService(repository, lookupService);
+
+        var result = await service.GetYearsAsync();
+
+        Assert.False(result.CanRenew);
+        Assert.Null(result.NextYearId);
+        Assert.Null(result.NextYearLabel);
+        Assert.Same(repository.YearsWithPercentages, result.AvailableYears);
+    }
+
     [Fact]
     public async Task GetPercentagesForYearAsync_ReturnsRepositoryResult()
     {
