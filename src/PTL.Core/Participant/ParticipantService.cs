@@ -1,10 +1,13 @@
 using Microsoft.Extensions.Logging;
+using PTL.Core.Viewer;
 
 namespace PTL.Core.Participant;
 
 public sealed class ParticipantService(
     IParticipantRepository participantRepository,
     IPendingParticipantUpdateRepository pendingParticipantUpdateRepository,
+    IParticipantViewerRepository participantViewerRepository,
+    IViewerRepository viewerRepository,
     ILogger<ParticipantService> logger) : IParticipantService
 {
     private static readonly Action<ILogger, Guid, string, Exception?> LogCreatedParticipantMessage =
@@ -194,6 +197,50 @@ public sealed class ParticipantService(
     {
         var pending = await pendingParticipantUpdateRepository.GetByParticipantIdAsync(participantId, cancellationToken);
         return pending is not null && await pendingParticipantUpdateRepository.MarkDecidedAsync(participantId, pending.PendingParticipantUpdateId, cancellationToken);
+    }
+
+    public async Task<ParticipantViewerAssignment?> GetParticipantViewersAsync(Guid participantId, CancellationToken cancellationToken = default)
+    {
+        var participant = await participantRepository.GetByIdAsync(participantId, cancellationToken);
+        if (participant is null)
+        {
+            return null;
+        }
+
+        var allViewers = await viewerRepository.GetAllAsync(cancellationToken);
+        var assigned = await participantViewerRepository.GetByParticipantIdAsync(participantId, cancellationToken);
+        var assignedViewerIds = assigned.Select(a => a.ViewerId).ToHashSet();
+
+        // Legacy PopulateViewersListBoxes: Available = every viewer not already in the collection.
+        var available = allViewers.Where(v => !assignedViewerIds.Contains(v.ViewerId)).ToList();
+
+        return new ParticipantViewerAssignment(participant.CustomerId, participant.LabCode, participant.LabName, participant.IsActive, available, assigned);
+    }
+
+    public async Task<bool> UpdateParticipantViewersAsync(Guid participantId, IReadOnlyList<Guid> targetViewerIds, CancellationToken cancellationToken = default)
+    {
+        var participant = await participantRepository.GetByIdAsync(participantId, cancellationToken);
+        if (participant is null)
+        {
+            return false;
+        }
+
+        var requestedViewerIds = (targetViewerIds ?? []).Distinct().ToArray();
+        var current = await participantViewerRepository.GetByParticipantIdAsync(participantId, cancellationToken);
+        var targetIds = requestedViewerIds.ToHashSet();
+
+        foreach (var removed in current.Where(c => !targetIds.Contains(c.ViewerId)))
+        {
+            await participantViewerRepository.RemoveAsync(removed.ViewerParticipantId, cancellationToken);
+        }
+
+        var currentViewerIds = current.Select(c => c.ViewerId).ToHashSet();
+        foreach (var addedViewerId in targetIds.Where(id => !currentViewerIds.Contains(id)))
+        {
+            await participantViewerRepository.AddAsync(Guid.NewGuid(), addedViewerId, participantId, cancellationToken);
+        }
+
+        return true;
     }
 
     private static void ApplyPendingFields(Participant participant, PendingParticipantUpdate pending)

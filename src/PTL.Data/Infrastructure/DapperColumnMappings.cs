@@ -14,6 +14,7 @@ using PTL.Core.GroupAddress;
 using PTL.Core.Lookup;
 using PTL.Core.Participant;
 using PTL.Core.Scheme;
+using PTL.Core.Viewer;
 using PTL.Core.WeightedPricingPlan;
 using CoreContract = PTL.Core.Contract.Contract;
 using CoreCustomer = PTL.Core.Customer.Customer;
@@ -197,6 +198,22 @@ public static class DapperColumnMappings
             [ColLabName] = nameof(ParticipantSummaryEntity.LabName),
             [ColContactName] = nameof(ParticipantSummaryEntity.ContactName),
             [ColIsActive] = nameof(ParticipantSummaryEntity.IsActive),
+        });
+
+        Map<ViewerEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldViewerId"] = nameof(ViewerEntity.ViewerId),
+            [ColName] = nameof(ViewerEntity.Name),
+            [ColEmail] = nameof(ViewerEntity.Email),
+            ["fldSsoId"] = nameof(ViewerEntity.SsoId),
+        });
+
+        Map<ParticipantViewerEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldViewerParticipantId"] = nameof(ParticipantViewerEntity.ViewerParticipantId),
+            ["fldViewerId"] = nameof(ParticipantViewerEntity.ViewerId),
+            [ColParticipantId] = nameof(ParticipantViewerEntity.ParticipantId),
+            [ColName] = nameof(ParticipantViewerEntity.Name),
         });
 
         Map<PendingParticipantUpdateSummaryEntity>(new(StringComparer.OrdinalIgnoreCase)

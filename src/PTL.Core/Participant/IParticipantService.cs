@@ -25,4 +25,12 @@ public interface IParticipantService
 
     // Soft-deletes the pending update without changing the live participant record.
     Task<bool> DeclinePendingParticipantUpdateAsync(Guid participantId, CancellationToken cancellationToken = default);
+
+    // Legacy ParticipantViewers.aspx. Returns null when the participant does not exist.
+    Task<ParticipantViewerAssignment?> GetParticipantViewersAsync(Guid participantId, CancellationToken cancellationToken = default);
+
+    // Diffs targetViewerIds against the participant's current assignments, inserting/removing only
+    // the difference (matches legacy BtnSave_Click's ViewerParticipantCollection.Save()). Returns
+    // false when the participant does not exist.
+    Task<bool> UpdateParticipantViewersAsync(Guid participantId, IReadOnlyList<Guid> targetViewerIds, CancellationToken cancellationToken = default);
 }

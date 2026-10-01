@@ -18,6 +18,7 @@ using PTL.Core.GroupAddress;
 using PTL.Core.Lookup;
 using PTL.Core.Participant;
 using PTL.Core.Scheme;
+using PTL.Core.Viewer;
 using PTL.Core.WeightedPricingPlan;
 using PTL.Data.AdministrationCharge;
 using PTL.Data.Contract;
@@ -34,6 +35,7 @@ using PTL.Data.Lookup;
 using PTL.Data.Participant;
 using PTL.Data.Scheme;
 using PTL.Data.Storage;
+using PTL.Data.Viewer;
 using PTL.Data.WeightedPricingPlan;
 using Serilog;
 
@@ -79,6 +81,8 @@ builder.Services.AddScoped<IGroupAddressService, GroupAddressService>();
 
 builder.Services.AddScoped<IParticipantRepository, ParticipantRepository>();
 builder.Services.AddScoped<IPendingParticipantUpdateRepository, PendingParticipantUpdateRepository>();
+builder.Services.AddScoped<IParticipantViewerRepository, ParticipantViewerRepository>();
+builder.Services.AddScoped<IViewerRepository, ViewerRepository>();
 builder.Services.AddScoped<IParticipantService, ParticipantService>();
 builder.Services.AddScoped<IParticipantSchemeRepository, ParticipantSchemeRepository>();
 builder.Services.AddScoped<IParticipantSchemeService, ParticipantSchemeService>();

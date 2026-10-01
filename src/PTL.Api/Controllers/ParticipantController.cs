@@ -146,6 +146,34 @@ public sealed class ParticipantController(IParticipantService participantService
         return declined ? NoContent() : NotFound();
     }
 
+    // Legacy ParticipantViewers.aspx.
+    [HttpGet("participants/{participantId:guid}/viewers")]
+    public async Task<ActionResult<ParticipantViewerAssignmentResponse>> GetParticipantViewers(Guid participantId, CancellationToken cancellationToken)
+    {
+        var assignment = await participantService.GetParticipantViewersAsync(participantId, cancellationToken);
+        if (assignment is null)
+        {
+            LogParticipantNotFoundMessage(logger, participantId, null);
+            return NotFound();
+        }
+
+        return Ok(new ParticipantViewerAssignmentResponse(
+            assignment.CustomerId,
+            assignment.LabCode,
+            assignment.LabName,
+            assignment.IsActive,
+            [.. assignment.AvailableViewers.Select(v => new ViewerResponse(v.ViewerId, v.Name, v.Email))],
+            [.. assignment.AssignedViewers.Select(v => new ViewerResponse(v.ViewerId, v.Name, string.Empty))]));
+    }
+
+    [HttpPut("participants/{participantId:guid}/viewers")]
+    public async Task<IActionResult> UpdateParticipantViewers(Guid participantId, [FromBody] UpdateParticipantViewersRequest? request, CancellationToken cancellationToken)
+    {
+        var viewerIds = (request?.ViewerIds ?? []).Distinct().ToArray();
+        var updated = await participantService.UpdateParticipantViewersAsync(participantId, viewerIds, cancellationToken);
+        return updated ? NoContent() : NotFound();
+    }
+
     private static PendingParticipantUpdate? ToPendingEntity(Guid participantId, PendingParticipantUpdateSaveRequest? request) => request is null ? null : new PendingParticipantUpdate
     {
         ParticipantId = participantId,
