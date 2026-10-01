@@ -109,7 +109,7 @@ jobs:
               - 'Directory.Packages.props'
               - 'NuGet.config'
               - 'global.json'
-              '.github/workflows/build-test-publish-images.yml'
+              - '.github/workflows/build-test-publish-images.yml'
 
 
       - name: Resolve affected components
