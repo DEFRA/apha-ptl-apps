@@ -87,6 +87,7 @@ jobs:
               - 'Directory.Packages.props'
               - 'NuGet.config'
               - 'global.json'
+              - '.github/workflows/build-test-publish-images.yml'
             internalweb:
               - 'src/PTL.InternalWeb/**'
               - 'src/PTL.ApiClient/**'
@@ -97,6 +98,7 @@ jobs:
               - 'Directory.Packages.props'
               - 'NuGet.config'
               - 'global.json'
+              - '.github/workflows/build-test-publish-images.yml'
             externalweb:
               - 'src/PTL.ExternalWeb/**'
               - 'src/PTL.ApiClient/**'
