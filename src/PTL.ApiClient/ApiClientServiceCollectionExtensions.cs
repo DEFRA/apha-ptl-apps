@@ -93,6 +93,18 @@ public static class ApiClientServiceCollectionExtensions
         })
             .AddStandardResilienceHandler();
 
+        services.AddHttpClient<IExportTemplateApiClient, ExportTemplateApiClient>(client =>
+        {
+            client.BaseAddress = new Uri(apiBaseUrl);
+        })
+            .AddStandardResilienceHandler();
+
+        services.AddHttpClient<IBulkExportApiClient, BulkExportApiClient>(client =>
+        {
+            client.BaseAddress = new Uri(apiBaseUrl);
+        })
+            .AddStandardResilienceHandler();
+
         services.AddHttpClient<IContractRenewalApiClient, ContractRenewalApiClient>(client =>
         {
             client.BaseAddress = new Uri(apiBaseUrl);

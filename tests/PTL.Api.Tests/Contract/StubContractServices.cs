@@ -1,3 +1,5 @@
+using PTL.Core.Contract.Export.Bulk;
+using PTL.Core.Contract.Export.Templates;
 using PTL.Core.Contract.PendingOrder;
 using PTL.Core.Contract.Renew;
 using PTL.Core.Contract.Renewal;
@@ -52,4 +54,35 @@ internal sealed class StubPendingOrderService : IPendingOrderService
 
     public Task<bool> DeclinePendingOrderAsync(Guid pendingContractId, CancellationToken cancellationToken = default) =>
         Task.FromResult(false);
+}
+
+internal sealed class StubExportTemplateService : IExportTemplateService
+{
+    public Task<IReadOnlyList<UploadedTemplate>> GetTemplatesAsync(string documentType, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<UploadedTemplate>>([]);
+
+    public Task<UploadedTemplate?> GetActiveTemplateAsync(string documentType, CancellationToken cancellationToken = default) =>
+        Task.FromResult<UploadedTemplate?>(null);
+
+    public Task<ExportTemplateUploadResult> UploadAsync(string documentType, string fileName, byte[] content, CancellationToken cancellationToken = default) =>
+        Task.FromResult(new ExportTemplateUploadResult(false, "File not found", null));
+
+    public Task<ExportTemplateContent?> DownloadAsync(Guid fileId, CancellationToken cancellationToken = default) =>
+        Task.FromResult<ExportTemplateContent?>(null);
+
+    public Task<bool> SelectAsync(Guid fileId, CancellationToken cancellationToken = default) => Task.FromResult(false);
+
+    public Task<bool> DeleteAsync(Guid fileId, CancellationToken cancellationToken = default) => Task.FromResult(false);
+}
+
+internal sealed class StubBulkExportService : IBulkExportService
+{
+    public Task<IReadOnlyList<BulkContractEntity>> GetExportableContractsAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<BulkContractEntity>>([]);
+
+    public Task<IReadOnlyList<SampleAddressEntity>> GetSampleAddressesAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<SampleAddressEntity>>([]);
+
+    public Task<IReadOnlyList<ContractRenewalEntity>> GetRenewalsAsync(bool nonUk, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<ContractRenewalEntity>>([]);
 }

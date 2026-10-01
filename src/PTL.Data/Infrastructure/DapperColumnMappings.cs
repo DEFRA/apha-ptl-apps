@@ -2,6 +2,8 @@ using System.Reflection;
 using Dapper;
 using PTL.Core.AdministrationCharge;
 using PTL.Core.Contract;
+using PTL.Core.Contract.Export.Bulk;
+using PTL.Core.Contract.Export.Templates;
 using PTL.Core.Contract.ImportPermit;
 using PTL.Core.Contract.PendingOrder;
 using PTL.Core.Contract.Renew;
@@ -382,6 +384,75 @@ public static class DapperColumnMappings
             ["fldImportExportLicenceRequired"] = nameof(ImportPermitEntity.ImportPermitRequired),
             ["fldImportPermitReceived"] = nameof(ImportPermitEntity.ImportPermitReceived),
             ["fldImportPermitExpiry"] = nameof(ImportPermitEntity.ImportPermitExpiry),
+        });
+
+        Map<UploadedTemplate>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldFileId"] = nameof(UploadedTemplate.FileId),
+            ["fldFilename"] = nameof(UploadedTemplate.Filename),
+            ["fldUploadedDate"] = nameof(UploadedTemplate.UploadedDate),
+            ["fldDocumentType"] = nameof(UploadedTemplate.DocumentType),
+            ["fldSelectedTemplate"] = nameof(UploadedTemplate.Selected),
+        });
+
+        Map<BulkContractEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldContractId"] = nameof(BulkContractEntity.ContractId),
+            [ColCustomerId] = nameof(BulkContractEntity.CustomerId),
+            ["fldContractNumber"] = nameof(BulkContractEntity.ContractNumber),
+            ["fldSuffix"] = nameof(BulkContractEntity.Suffix),
+            [ColYearId] = nameof(BulkContractEntity.YearId),
+            ["fldSymbol"] = nameof(BulkContractEntity.Symbol),
+            ["fldAdministrationCharge"] = nameof(BulkContractEntity.AdministrationCharge),
+            ["fldDiscountRate"] = nameof(BulkContractEntity.DiscountRate),
+            ["fldNumberPostage"] = nameof(BulkContractEntity.NumberPostage),
+            ["fldNumberCourier"] = nameof(BulkContractEntity.NumberCourier),
+            ["fldNumberSpecialDelivery"] = nameof(BulkContractEntity.NumberSpecialDelivery),
+            ["fldPostagePrice"] = nameof(BulkContractEntity.PostagePrice),
+            ["fldCourierPrice"] = nameof(BulkContractEntity.CourierPrice),
+            ["fldSpecialDeliveryPrice"] = nameof(BulkContractEntity.SpecialDeliveryPrice),
+            ["fldCommencementDate"] = nameof(BulkContractEntity.CommencementDate),
+            ["fldQalNumber"] = nameof(BulkContractEntity.QalNumber),
+            ["fldContactName"] = nameof(BulkContractEntity.ContactName),
+            ["fldOrganisation"] = nameof(BulkContractEntity.Organisation),
+            [ColAddress1] = nameof(BulkContractEntity.Address1),
+            [ColAddress2] = nameof(BulkContractEntity.Address2),
+            ["fldAddress3"] = nameof(BulkContractEntity.Address3),
+            ["fldAddress4"] = nameof(BulkContractEntity.Address4),
+            ["fldAddress5"] = nameof(BulkContractEntity.Address5),
+            ["fldCountry"] = nameof(BulkContractEntity.Country),
+            ["fldTelephone"] = nameof(BulkContractEntity.Telephone),
+            ["fldFax"] = nameof(BulkContractEntity.Fax),
+            ["fldEmail"] = nameof(BulkContractEntity.Email),
+            ["fldInvoiceName"] = nameof(BulkContractEntity.InvoiceName),
+            ["fldInvoiceOrganisation"] = nameof(BulkContractEntity.InvoiceOrganisation),
+            ["fldInvoiceAddress1"] = nameof(BulkContractEntity.InvoiceAddress1),
+            ["fldInvoiceAddress2"] = nameof(BulkContractEntity.InvoiceAddress2),
+            ["fldInvoiceAddress3"] = nameof(BulkContractEntity.InvoiceAddress3),
+            ["fldInvoiceAddress4"] = nameof(BulkContractEntity.InvoiceAddress4),
+            ["fldInvoiceAddress5"] = nameof(BulkContractEntity.InvoiceAddress5),
+            ["fldInvoiceCountry"] = nameof(BulkContractEntity.InvoiceCountry),
+            ["fldInvoiceTelephone"] = nameof(BulkContractEntity.InvoiceTelephone),
+            ["fldInvoiceFax"] = nameof(BulkContractEntity.InvoiceFax),
+            ["fldInvoiceEmail"] = nameof(BulkContractEntity.InvoiceEmail),
+            ["fldAccountNumber"] = nameof(BulkContractEntity.AccountNumber),
+            ["fldVatNumber"] = nameof(BulkContractEntity.VatNumber),
+            ["fldVatRating"] = nameof(BulkContractEntity.VatRating),
+            ["fldPurchaseOrderNumber"] = nameof(BulkContractEntity.PurchaseOrderNumber),
+        });
+
+        Map<BulkContractItemEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldContractId"] = nameof(BulkContractItemEntity.ContractId),
+            ["fldParticipantSchemeId"] = nameof(BulkContractItemEntity.ParticipantSchemeId),
+            ["fldParticipantId"] = nameof(BulkContractItemEntity.ParticipantId),
+            ["fldSchemeId"] = nameof(BulkContractItemEntity.SchemeId),
+            [ColIdentifier] = nameof(BulkContractItemEntity.Identifier),
+            ["fldSchemeName"] = nameof(BulkContractItemEntity.SchemeName),
+            ["fldLabCode"] = nameof(BulkContractItemEntity.LabCode),
+            ["fldLabName"] = nameof(BulkContractItemEntity.LabName),
+            ["fldNoOfDistributions"] = nameof(BulkContractItemEntity.NoOfDistributions),
+            ["fldPrice"] = nameof(BulkContractItemEntity.Price),
         });
 
         Map<CoreScheme>(new(StringComparer.OrdinalIgnoreCase)

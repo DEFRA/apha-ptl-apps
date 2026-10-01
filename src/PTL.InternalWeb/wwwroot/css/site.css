@@ -91,6 +91,12 @@ body {
   background-color: #add5eb;
 }
 
+/* The active mail merge template. Legacy ExportBase gave the row the "basiccell selected" class. */
+.ptl-template-selected td {
+  background-color: #d8eeda;
+  font-weight: bold;
+}
+
 .ptl-comparison-row--changed td:last-child {
   font-weight: bold;
 }

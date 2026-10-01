@@ -11,9 +11,17 @@ public static class RenewalLetterMergeMapper
 {
     public static ContractDocumentRequest Build(ContractDocumentContext context)
     {
-        var renewal = context.Renewal;
+        var values = BuildValues(context.Renewal);
 
-        var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        return new ContractDocumentRequest(
+            context.CanonicalDocumentType,
+            context.TemplateKey,
+            MergeValueFormatting.FileName(context.CanonicalDocumentType, context.Contract.QalNumber, context.Contract.Suffix),
+            values);
+    }
+
+    public static Dictionary<string, string> BuildValues(ContractRenewalResponse? renewal) =>
+        new(StringComparer.OrdinalIgnoreCase)
         {
             ["QalNumber"] = renewal?.QalNumber ?? string.Empty,
             ["OrganisationName"] = renewal?.OrganisationName ?? string.Empty,
@@ -28,11 +36,4 @@ public static class RenewalLetterMergeMapper
             ["CurrentContractEndDate"] = MergeValueFormatting.LongDate(renewal?.ContractEndDate),
             ["AdditionalLetterInfo"] = renewal?.RenewalInformation ?? string.Empty,
         };
-
-        return new ContractDocumentRequest(
-            context.CanonicalDocumentType,
-            context.TemplateKey,
-            MergeValueFormatting.FileName(context.CanonicalDocumentType, context.Contract.QalNumber, context.Contract.Suffix),
-            values);
-    }
 }

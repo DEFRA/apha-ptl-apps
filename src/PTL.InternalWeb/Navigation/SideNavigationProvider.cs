@@ -151,7 +151,19 @@ public static class SideNavigationProvider
                         new SideNavigationItem { Text = "Edit Group Address", ControllerName = GroupAddressControllerName, ActionName = EditAction, IsHidden = true }
                     ]
                 },
-                Disabled("Exports"),
+                new SideNavigationItem
+                {
+                    Text = "Exports",
+                    ControllerName = ContractControllerName,
+                    ActionName = "Exports",
+                    Children =
+                    [
+                        new SideNavigationItem { Text = "Export Contracts", ControllerName = ContractControllerName, ActionName = "ExportContracts" },
+                        new SideNavigationItem { Text = "Export Job Sheets", ControllerName = ContractControllerName, ActionName = "ExportJobSheets" },
+                        new SideNavigationItem { Text = "Export Renewal Letters", ControllerName = ContractControllerName, ActionName = "ExportRenewalLetters" },
+                        new SideNavigationItem { Text = "Export Address Confirmation Letters", ControllerName = ContractControllerName, ActionName = "ExportAddressConfirmationLetters" }
+                    ]
+                },
                 Disabled("Invoice Generation")
             ]
         },

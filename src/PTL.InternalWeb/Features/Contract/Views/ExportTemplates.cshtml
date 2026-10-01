@@ -1,0 +1,83 @@
+@model PTL.InternalWeb.Features.Contract.ExportTemplatesViewModel
+@using PTL.InternalWeb.Features.Contract
+@{
+    ViewData["Title"] = Model.Title;
+}
+
+<h1 class="govuk-heading-l">@Model.Title</h1>
+
+<p class="govuk-body">@ExportTemplatesViewModel.UploadInstructions</p>
+
+<form method="post" asp-action="UploadExportTemplate" asp-route-documentType="@Model.DocumentType" enctype="multipart/form-data">
+    <div class="govuk-form-group">
+        <label class="govuk-label" for="file">Upload a template</label>
+        <input class="govuk-file-upload" id="file" name="file" type="file" accept=".doc,.docx" />
+    </div>
+    <button class="govuk-button govuk-button--secondary" data-module="govuk-button" type="submit">Upload</button>
+</form>
+
+<hr class="govuk-section-break govuk-section-break--visible govuk-section-break--l" />
+
+<p class="govuk-body">@Model.Instructions</p>
+
+@if (Model.Templates.Count > 0)
+{
+    <table class="govuk-table">
+        <thead class="govuk-table__head">
+            <tr class="govuk-table__row">
+                <th scope="col" class="govuk-table__header">Filename</th>
+                <th scope="col" class="govuk-table__header">Upload Date</th>
+                <th scope="col" class="govuk-table__header">Open</th>
+                <th scope="col" class="govuk-table__header">Delete</th>
+                <th scope="col" class="govuk-table__header">Select</th>
+            </tr>
+        </thead>
+        <tbody class="govuk-table__body">
+            @foreach (var template in Model.Templates)
+            {
+                <tr class="govuk-table__row @(template.Selected ? "ptl-template-selected" : null)">
+                    <td class="govuk-table__cell">@template.Filename</td>
+                    <td class="govuk-table__cell">@template.UploadedDate.ToString("dd/MM/yyyy")</td>
+                    <td class="govuk-table__cell">
+                        <a class="govuk-link" asp-action="DownloadExportTemplate"
+                           asp-route-fileId="@template.FileId" asp-route-documentType="@Model.DocumentType">Open</a>
+                    </td>
+                    <td class="govuk-table__cell">
+                        <form class="ptl-inline-form" method="post" asp-action="DeleteExportTemplate"
+                              asp-route-fileId="@template.FileId" asp-route-documentType="@Model.DocumentType">
+                            <button class="govuk-link ptl-link-button" type="submit"
+                                    onclick="return confirm('@ExportTemplatesViewModel.DeleteConfirmation');">Delete</button>
+                        </form>
+                    </td>
+                    <td class="govuk-table__cell">
+                        <form class="ptl-inline-form" method="post" asp-action="SelectExportTemplate"
+                              asp-route-fileId="@template.FileId" asp-route-documentType="@Model.DocumentType">
+                            <button class="govuk-link ptl-link-button" type="submit">Select</button>
+                        </form>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@* Legacy disabled the export buttons until a template was selected, showing the reason as a tooltip. *@
+<form method="post" asp-action="RunExport" asp-route-documentType="@Model.DocumentType">
+    <div class="govuk-button-group">
+        @if (Model.IsRenewalLetters)
+        {
+            <button class="govuk-button" data-module="govuk-button" type="submit" name="nonUk" value="false"
+                    disabled="@(!Model.HasSelectedTemplate)"
+                    title="@(Model.HasSelectedTemplate ? null : ExportTemplatesViewModel.ExportDisabledTooltip)">Export UK Customers</button>
+            <button class="govuk-button" data-module="govuk-button" type="submit" name="nonUk" value="true"
+                    disabled="@(!Model.HasSelectedTemplate)"
+                    title="@(Model.HasSelectedTemplate ? null : ExportTemplatesViewModel.ExportDisabledTooltip)">Export Non-UK Customers</button>
+        }
+        else
+        {
+            <button class="govuk-button" data-module="govuk-button" type="submit"
+                    disabled="@(!Model.HasSelectedTemplate)"
+                    title="@(Model.HasSelectedTemplate ? null : ExportTemplatesViewModel.ExportDisabledTooltip)">Export</button>
+        }
+    </div>
+</form>

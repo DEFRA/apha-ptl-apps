@@ -33,24 +33,39 @@ public sealed partial class TemplateMergeService : ITemplateMergeService
                 $"Legacy template '{templatePath}' is {(string.IsNullOrEmpty(extension) ? "no extension" : extension)}. DOCX templates are required to preserve DOCX output; legacy .doc templates must be converted before merge.");
         }
 
-        var stream = new MemoryStream();
-        using (var source = File.OpenRead(templatePath))
-        {
-            source.CopyTo(stream);
-        }
+        return MergeContent(File.ReadAllBytes(templatePath), templatePath, mergeValues, regions, cancellationToken);
+    }
 
+    public byte[] MergeTemplateContent(
+        byte[] templateContent,
+        IReadOnlyDictionary<string, string> mergeValues,
+        IReadOnlyDictionary<string, IReadOnlyList<IReadOnlyDictionary<string, string>>>? regions = null,
+        CancellationToken cancellationToken = default) =>
+        MergeContent(templateContent, "uploaded template", mergeValues, regions, cancellationToken);
+
+    private static byte[] MergeContent(
+        byte[] templateContent,
+        string templateDescription,
+        IReadOnlyDictionary<string, string> mergeValues,
+        IReadOnlyDictionary<string, IReadOnlyList<IReadOnlyDictionary<string, string>>>? regions,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var stream = new MemoryStream();
+        stream.Write(templateContent, 0, templateContent.Length);
         stream.Position = 0;
 
         using (var document = WordprocessingDocument.Open(stream, isEditable: true))
         {
             var mainPart = document.MainDocumentPart
-                ?? throw new InvalidDataException($"Template '{templatePath}' has no main document part.");
+                ?? throw new InvalidDataException($"Template '{templateDescription}' has no main document part.");
 
             var mainDocument = mainPart.Document
-                ?? throw new InvalidDataException($"Template '{templatePath}' has no document content.");
+                ?? throw new InvalidDataException($"Template '{templateDescription}' has no document content.");
 
             var body = mainDocument.Body
-                ?? throw new InvalidDataException($"Template '{templatePath}' has no document body.");
+                ?? throw new InvalidDataException($"Template '{templateDescription}' has no document body.");
 
             if (regions is not null)
             {
@@ -68,14 +83,14 @@ public sealed partial class TemplateMergeService : ITemplateMergeService
             foreach (var header in mainPart.HeaderParts)
             {
                 var headerElement = header.Header
-                    ?? throw new InvalidDataException($"Template '{templatePath}' has a header part with no header content.");
+                    ?? throw new InvalidDataException($"Template '{templateDescription}' has a header part with no header content.");
                 MergeInto(headerElement, mergeValues);
             }
 
             foreach (var footer in mainPart.FooterParts)
             {
                 var footerElement = footer.Footer
-                    ?? throw new InvalidDataException($"Template '{templatePath}' has a footer part with no footer content.");
+                    ?? throw new InvalidDataException($"Template '{templateDescription}' has a footer part with no footer content.");
                 MergeInto(footerElement, mergeValues);
             }
 
@@ -88,7 +103,19 @@ public sealed partial class TemplateMergeService : ITemplateMergeService
     public byte[] MergeTemplateMany(
         string templatePath,
         IReadOnlyList<ContractDocumentMergeData> documents,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default) =>
+        MergeMany(documents, (values, regions) => MergeTemplate(templatePath, values, regions, cancellationToken), cancellationToken);
+
+    public byte[] MergeTemplateContentMany(
+        byte[] templateContent,
+        IReadOnlyList<ContractDocumentMergeData> documents,
+        CancellationToken cancellationToken = default) =>
+        MergeMany(documents, (values, regions) => MergeTemplateContent(templateContent, values, regions, cancellationToken), cancellationToken);
+
+    private static byte[] MergeMany(
+        IReadOnlyList<ContractDocumentMergeData> documents,
+        Func<IReadOnlyDictionary<string, string>, IReadOnlyDictionary<string, IReadOnlyList<IReadOnlyDictionary<string, string>>>?, byte[]> mergeOne,
+        CancellationToken cancellationToken)
     {
         if (documents.Count == 0)
         {
@@ -99,10 +126,10 @@ public sealed partial class TemplateMergeService : ITemplateMergeService
         // must stay byte-for-byte what a single merge produces - no concatenation wrapper.
         if (documents.Count == 1)
         {
-            return MergeTemplate(templatePath, documents[0].MergeValues, documents[0].Regions, cancellationToken);
+            return mergeOne(documents[0].MergeValues, documents[0].Regions);
         }
 
-        var first = MergeTemplate(templatePath, documents[0].MergeValues, documents[0].Regions, cancellationToken);
+        var first = mergeOne(documents[0].MergeValues, documents[0].Regions);
 
         var stream = new MemoryStream();
         stream.Write(first, 0, first.Length);
@@ -123,7 +150,7 @@ public sealed partial class TemplateMergeService : ITemplateMergeService
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
-                var merged = MergeTemplate(templatePath, documents[i].MergeValues, documents[i].Regions, cancellationToken);
+                var merged = mergeOne(documents[i].MergeValues, documents[i].Regions);
 
                 var chunkPart = mainPart.AddAlternativeFormatImportPart(AlternativeFormatImportPartType.WordprocessingML);
                 using (var chunkStream = new MemoryStream(merged, writable: false))

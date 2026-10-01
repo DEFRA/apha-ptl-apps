@@ -27,7 +27,7 @@ public static class AddressConfirmationMergeMapper
             letters.Skip(1).ToList());
     }
 
-    private static ContractDocumentMergeData BuildLetter(SampleAddressResponse address)
+    private static ContractDocumentMergeData BuildLetterInternal(SampleAddressResponse address)
     {
         var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
@@ -60,6 +60,8 @@ public static class AddressConfirmationMergeMapper
 
         return new ContractDocumentMergeData(values, regions);
     }
+
+    public static ContractDocumentMergeData BuildLetter(SampleAddressResponse address) => BuildLetterInternal(address);
 
     private static List<IReadOnlyDictionary<string, string>> SchemeRows(IReadOnlyList<SampleAddressSchemeResponse> schemes) =>
         schemes.Select(scheme =>

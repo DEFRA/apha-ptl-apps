@@ -105,6 +105,8 @@ public class ContractControllerPendingOrderTests
             new StubContractRenewalService(),
             new StubRenewContractsService(),
             pendingOrderService,
+            new StubExportTemplateService(),
+            new StubBulkExportService(),
             NullLogger<ContractController>.Instance);
 
         var services = new ServiceCollection().AddMvc().Services.BuildServiceProvider();

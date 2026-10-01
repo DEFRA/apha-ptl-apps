@@ -5,14 +5,27 @@ using Microsoft.Extensions.Logging;
 using PTL.ApiClient;
 using PTL.Contracts.Contract;
 using PTL.Core.Contract.Document;
+using PTL.Core.Contract.Export.Templates;
 using PTL.InternalWeb.Notifications;
 
 namespace PTL.InternalWeb.Features.Contract;
 
 // Authentication/authorization are out of scope for this phase - assume the current user is
 // already authenticated with full access to Contract functionality. Policies will be added later.
-public class ContractController(IContractApiClient contractApiClient, ICustomerApiClient customerApiClient, ILookupApiClient lookupApiClient, IImportPermitApiClient importPermitApiClient, ILogger<ContractController> logger, IContractDocumentService documentService, IContractExportApiClient contractExportApiClient, IContractRenewalApiClient contractRenewalApiClient) : Controller
+public class ContractController(IContractApiClient contractApiClient, ICustomerApiClient customerApiClient, ILookupApiClient lookupApiClient, IImportPermitApiClient importPermitApiClient, ILogger<ContractController> logger, IContractDocumentService documentService, IContractExportApiClient contractExportApiClient, IContractRenewalApiClient contractRenewalApiClient, IExportTemplateApiClient exportTemplateApiClient, IBulkExportApiClient bulkExportApiClient, ITemplateMergeService templateMergeService) : Controller
 {
+    private static readonly Action<ILogger, string, int, Exception?> LogBulkExportedMessage =
+        LoggerMessage.Define<string, int>(
+            LogLevel.Information,
+            new EventId(30, nameof(LogBulkExportedMessage)),
+            "Bulk export completed: documentType={DocumentType} records={RecordCount}");
+
+    private static readonly Action<ILogger, string, Exception?> LogBulkExportFailedMessage =
+        LoggerMessage.Define<string>(
+            LogLevel.Error,
+            new EventId(31, nameof(LogBulkExportFailedMessage)),
+            "Bulk export failed during mail merge: documentType={DocumentType}");
+
     private static readonly Action<ILogger, Guid, int?, string?, int, int, Exception?> LogDisplayedContractListMessage =
         LoggerMessage.Define<Guid, int?, string?, int, int>(
             LogLevel.Information,
@@ -213,6 +226,195 @@ public class ContractController(IContractApiClient contractApiClient, ICustomerA
 
         LogExportedContractDocumentMessage(logger, id, canonicalType, null);
         return File(document.DocumentBytes, document.ContentType, document.FileName);
+    }
+
+    [HttpGet]
+    public IActionResult Exports() => View(new ExportsMenuViewModel(
+    [
+        new ExportsMenuItem("Export Contracts", nameof(ExportContracts)),
+        new ExportsMenuItem("Export Job Sheets", nameof(ExportJobSheets)),
+        new ExportsMenuItem("Export Renewal Letters", nameof(ExportRenewalLetters)),
+        new ExportsMenuItem("Export Address Confirmation Letters", nameof(ExportAddressConfirmationLetters))
+    ]));
+
+    // The four export screens are separate actions rather than one parameterised action so that the
+    // side navigation and breadcrumbs, which resolve on controller + action, can tell them apart.
+    [HttpGet]
+    public Task<IActionResult> ExportContracts(CancellationToken cancellationToken = default) =>
+        ExportTemplatesViewAsync(ExportDocumentTypes.Contracts, nameof(ExportContracts), cancellationToken);
+
+    [HttpGet]
+    public Task<IActionResult> ExportJobSheets(CancellationToken cancellationToken = default) =>
+        ExportTemplatesViewAsync(ExportDocumentTypes.JobSheets, nameof(ExportJobSheets), cancellationToken);
+
+    [HttpGet]
+    public Task<IActionResult> ExportRenewalLetters(CancellationToken cancellationToken = default) =>
+        ExportTemplatesViewAsync(ExportDocumentTypes.RenewalLetters, nameof(ExportRenewalLetters), cancellationToken);
+
+    [HttpGet]
+    public Task<IActionResult> ExportAddressConfirmationLetters(CancellationToken cancellationToken = default) =>
+        ExportTemplatesViewAsync(ExportDocumentTypes.AddressConfirmationLetters, nameof(ExportAddressConfirmationLetters), cancellationToken);
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> UploadExportTemplate(string documentType, IFormFile? file, CancellationToken cancellationToken = default)
+    {
+        if (!ExportDocumentTypes.TryResolve(documentType, out var storageName, out _))
+        {
+            return NotFound();
+        }
+
+        if (file is null || file.Length == 0)
+        {
+            TempData.SetNotification(NotificationType.Error, "File not found");
+            return RedirectToAction(ExportActionFor(storageName));
+        }
+
+        await using var stream = file.OpenReadStream();
+        var result = await exportTemplateApiClient.UploadTemplateAsync(storageName, file.FileName, stream, cancellationToken);
+
+        TempData.SetNotification(
+            result.Success ? NotificationType.Success : NotificationType.Error,
+            result.Success
+                ? "Press the select link to allocate a template. The allocated template is highlighted in the table below:"
+                : result.ErrorMessage ?? "File could not be saved");
+
+        return RedirectToAction(ExportActionFor(storageName));
+    }
+
+    // Legacy "Open" - downloads the stored template file itself, it never renders a PDF.
+    [HttpGet]
+    public async Task<IActionResult> DownloadExportTemplate(Guid fileId, string documentType, CancellationToken cancellationToken = default)
+    {
+        var template = await exportTemplateApiClient.DownloadTemplateAsync(fileId, cancellationToken);
+        if (template is not null)
+        {
+            return File(template.Content, template.ContentType, template.FileName);
+        }
+
+        TempData.SetNotification(NotificationType.Error, "File not found");
+        return RedirectToAction(ExportActionFor(documentType));
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> SelectExportTemplate(Guid fileId, string documentType, CancellationToken cancellationToken = default)
+    {
+        var selected = await exportTemplateApiClient.SelectTemplateAsync(fileId, cancellationToken);
+
+        TempData.SetNotification(
+            selected ? NotificationType.Success : NotificationType.Error,
+            selected ? "Template selected successfully." : "File not found");
+
+        return RedirectToAction(ExportActionFor(documentType));
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> DeleteExportTemplate(Guid fileId, string documentType, CancellationToken cancellationToken = default)
+    {
+        var deleted = await exportTemplateApiClient.DeleteTemplateAsync(fileId, cancellationToken);
+
+        TempData.SetNotification(
+            deleted ? NotificationType.Success : NotificationType.Error,
+            deleted ? "Template deleted successfully." : "File not found");
+
+        return RedirectToAction(ExportActionFor(documentType));
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> RunExport(string documentType, bool nonUk = false, CancellationToken cancellationToken = default)
+    {
+        if (!ExportDocumentTypes.TryResolve(documentType, out var storageName, out _))
+        {
+            return NotFound();
+        }
+
+        var templates = await exportTemplateApiClient.GetTemplatesAsync(storageName, cancellationToken);
+        var selected = templates?.Templates.FirstOrDefault(t => t.Selected);
+        if (selected is null)
+        {
+            TempData.SetNotification(NotificationType.Error, ExportTemplatesViewModel.ExportDisabledTooltip);
+            return RedirectToAction(ExportActionFor(storageName));
+        }
+
+        var template = await exportTemplateApiClient.DownloadTemplateAsync(selected.FileId, cancellationToken);
+        if (template is null)
+        {
+            TempData.SetNotification(NotificationType.Error, "File not found");
+            return RedirectToAction(ExportActionFor(storageName));
+        }
+
+        var documents = await BuildBulkMergeDataAsync(storageName, nonUk, cancellationToken);
+
+        byte[] merged;
+        try
+        {
+            merged = templateMergeService.MergeTemplateContentMany(template.Content, documents, cancellationToken);
+        }
+        catch (Exception ex) when (ex is InvalidDataException or NotSupportedException)
+        {
+            LogBulkExportFailedMessage(logger, storageName, ex);
+            TempData.SetNotification(NotificationType.Error, "There was a problem with the Mail Merge");
+            return RedirectToAction(ExportActionFor(storageName));
+        }
+
+        LogBulkExportedMessage(logger, storageName, documents.Count, null);
+        return File(merged, ExportTemplateService.DocxContentType, BulkExportFileName(storageName, nonUk));
+    }
+
+    private async Task<List<ContractDocumentMergeData>> BuildBulkMergeDataAsync(string storageName, bool nonUk, CancellationToken cancellationToken) =>
+        storageName switch
+        {
+            ExportDocumentTypes.AddressConfirmationLetters =>
+                BulkExportMergeMapper.AddressConfirmationLetters(await bulkExportApiClient.GetSampleAddressesAsync(cancellationToken)),
+            ExportDocumentTypes.RenewalLetters =>
+                BulkExportMergeMapper.RenewalLetters(await bulkExportApiClient.GetRenewalsAsync(nonUk, cancellationToken)),
+            _ => BulkExportMergeMapper.Contracts(await bulkExportApiClient.GetContractsAsync(cancellationToken)),
+        };
+
+    // Legacy export filenames, including their inconsistent use of the underscore separator.
+    private static string BulkExportFileName(string storageName, bool nonUk)
+    {
+        var today = DateTime.Now;
+        var stamp = string.Create(CultureInfo.InvariantCulture, $"{today.Year}_{today.Month}_{today.Day}");
+
+        return storageName switch
+        {
+            ExportDocumentTypes.JobSheets => $"JobSheetExport{stamp}.docx",
+            ExportDocumentTypes.AddressConfirmationLetters => $"AddressConfirmationLettersExport{stamp}.docx",
+            ExportDocumentTypes.RenewalLetters => nonUk
+                ? $"RenewalLettersNonUKExport_{stamp}.docx"
+                : $"RenewalLettersUKExport_{stamp}.docx",
+            _ => $"ContractExport_{stamp}.docx",
+        };
+    }
+
+    private async Task<IActionResult> ExportTemplatesViewAsync(string documentType, string actionName, CancellationToken cancellationToken)
+    {
+        var templates = await exportTemplateApiClient.GetTemplatesAsync(documentType, cancellationToken);
+        var rows = templates?.Templates ?? [];
+
+        return View("ExportTemplates", new ExportTemplatesViewModel(
+            documentType,
+            templates?.DisplayName ?? ExportDocumentTypes.DisplayNameFor(documentType),
+            actionName,
+            rows,
+            rows.Any(t => t.Selected)));
+    }
+
+    private static string ExportActionFor(string documentType)
+    {
+        ExportDocumentTypes.TryResolve(documentType, out var storageName, out _);
+
+        return storageName switch
+        {
+            ExportDocumentTypes.JobSheets => nameof(ExportJobSheets),
+            ExportDocumentTypes.RenewalLetters => nameof(ExportRenewalLetters),
+            ExportDocumentTypes.AddressConfirmationLetters => nameof(ExportAddressConfirmationLetters),
+            _ => nameof(ExportContracts)
+        };
     }
 
     // Only the data the requested document actually needs is fetched.

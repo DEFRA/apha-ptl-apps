@@ -2,6 +2,8 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using PTL.Contracts.Contract;
 using PTL.Core.Contract;
+using PTL.Core.Contract.Export.Bulk;
+using PTL.Core.Contract.Export.Templates;
 using PTL.Core.Contract.ImportPermit;
 using PTL.Core.Contract.PendingOrder;
 using PTL.Core.Contract.Renew;
@@ -22,6 +24,8 @@ public sealed class ContractController(
     IContractRenewalService contractRenewalService,
     IRenewContractsService renewContractsService,
     IPendingOrderService pendingOrderService,
+    IExportTemplateService exportTemplateService,
+    IBulkExportService bulkExportService,
     ILogger<ContractController> logger) : ControllerBase
 {
     private static readonly Action<ILogger, Guid, Exception?> LogContractNotFoundMessage =
@@ -42,6 +46,129 @@ public sealed class ContractController(
 
         return Ok(ToResponse(contract));
     }
+
+    [HttpGet("export-templates/{documentType}")]
+    public async Task<ActionResult<ExportTemplateListResponse>> GetExportTemplates(string documentType, CancellationToken cancellationToken)
+    {
+        if (!ExportDocumentTypes.TryResolve(documentType, out var storageName, out var displayName))
+        {
+            return NotFound();
+        }
+
+        var templates = await exportTemplateService.GetTemplatesAsync(storageName, cancellationToken);
+        return Ok(new ExportTemplateListResponse(storageName, displayName, [.. templates.Select(ToExportTemplateResponse)]));
+    }
+
+    [HttpPost("export-templates/{documentType}")]
+    public async Task<ActionResult<ExportTemplateUploadResponse>> UploadExportTemplate(string documentType, IFormFile? file, CancellationToken cancellationToken)
+    {
+        if (!ExportDocumentTypes.TryResolve(documentType, out var storageName, out _))
+        {
+            return NotFound();
+        }
+
+        if (file is null || file.Length == 0)
+        {
+            return Ok(new ExportTemplateUploadResponse(false, "File not found", null));
+        }
+
+        using var buffer = new MemoryStream();
+        await file.CopyToAsync(buffer, cancellationToken);
+
+        var result = await exportTemplateService.UploadAsync(storageName, file.FileName, buffer.ToArray(), cancellationToken);
+        return Ok(new ExportTemplateUploadResponse(
+            result.Success,
+            result.ErrorMessage,
+            result.Template is null ? null : ToExportTemplateResponse(result.Template)));
+    }
+
+    [HttpGet("export-templates/{fileId:guid}/content")]
+    public async Task<IActionResult> DownloadExportTemplate(Guid fileId, CancellationToken cancellationToken)
+    {
+        var content = await exportTemplateService.DownloadAsync(fileId, cancellationToken);
+        return content is null ? NotFound() : File(content.Content, content.ContentType, content.FileName);
+    }
+
+    [HttpPost("export-templates/{fileId:guid}/select")]
+    public async Task<IActionResult> SelectExportTemplate(Guid fileId, CancellationToken cancellationToken) =>
+        await exportTemplateService.SelectAsync(fileId, cancellationToken) ? NoContent() : NotFound();
+
+    [HttpDelete("export-templates/{fileId:guid}")]
+    public async Task<IActionResult> DeleteExportTemplate(Guid fileId, CancellationToken cancellationToken) =>
+        await exportTemplateService.DeleteAsync(fileId, cancellationToken) ? NoContent() : NotFound();
+
+    private static ExportTemplateResponse ToExportTemplateResponse(UploadedTemplate template) =>
+        new(template.FileId, template.Filename, template.UploadedDate, template.DocumentType, template.Selected);
+
+    // Bulk export datasets. Legacy loads each in a single call and merges the lot into one document.
+    [HttpGet("exports/contracts")]
+    public async Task<ActionResult<IReadOnlyList<BulkContractResponse>>> GetBulkContracts(CancellationToken cancellationToken)
+    {
+        var contracts = await bulkExportService.GetExportableContractsAsync(cancellationToken);
+        return Ok(contracts.Select(ToBulkContractResponse).ToList());
+    }
+
+    [HttpGet("exports/sample-addresses")]
+    public async Task<ActionResult<IReadOnlyList<SampleAddressResponse>>> GetBulkSampleAddresses(CancellationToken cancellationToken)
+    {
+        var addresses = await bulkExportService.GetSampleAddressesAsync(cancellationToken);
+        return Ok(addresses.Select(ToResponse).ToList());
+    }
+
+    [HttpGet("exports/renewals")]
+    public async Task<ActionResult<IReadOnlyList<ContractRenewalResponse>>> GetBulkRenewals([FromQuery] bool nonUk, CancellationToken cancellationToken)
+    {
+        var renewals = await bulkExportService.GetRenewalsAsync(nonUk, cancellationToken);
+        return Ok(renewals.Select(ToResponse).ToList());
+    }
+
+    private static BulkContractResponse ToBulkContractResponse(BulkContractEntity contract) => new(
+        contract.ContractId,
+        contract.CustomerId,
+        contract.ContractNumber,
+        contract.Suffix,
+        contract.YearId,
+        contract.Symbol,
+        contract.AdministrationCharge,
+        contract.DiscountRate,
+        contract.NumberPostage,
+        contract.NumberCourier,
+        contract.NumberSpecialDelivery,
+        contract.PostagePrice,
+        contract.CourierPrice,
+        contract.SpecialDeliveryPrice,
+        contract.CommencementDate,
+        contract.QalNumber,
+        contract.ContactName,
+        contract.Organisation,
+        contract.Address1,
+        contract.Address2,
+        contract.Address3,
+        contract.Address4,
+        contract.Address5,
+        contract.Country,
+        contract.Telephone,
+        contract.Fax,
+        contract.Email,
+        contract.InvoiceName,
+        contract.InvoiceOrganisation,
+        contract.InvoiceAddress1,
+        contract.InvoiceAddress2,
+        contract.InvoiceAddress3,
+        contract.InvoiceAddress4,
+        contract.InvoiceAddress5,
+        contract.InvoiceCountry,
+        contract.InvoiceTelephone,
+        contract.InvoiceFax,
+        contract.InvoiceEmail,
+        contract.AccountNumber,
+        contract.VatNumber,
+        contract.VatRating,
+        contract.PurchaseOrderNumber,
+        contract.TotalPriceItems,
+        contract.DiscountPrice,
+        contract.TotalPrice,
+        [.. contract.Items.Select(i => new BulkContractItemResponse(i.Identifier, i.SchemeName, i.LabCode, i.LabName, i.NoOfDistributions, i.Price))]);
 
     // GET /api/contracts/pending-orders - Review Pending Orders, split by contract year.
     [HttpGet("contracts/pending-orders")]

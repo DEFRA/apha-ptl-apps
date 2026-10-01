@@ -23,4 +23,17 @@ public interface ITemplateMergeService
         string templatePath,
         IReadOnlyList<ContractDocumentMergeData> documents,
         CancellationToken cancellationToken = default);
+
+    /// <summary>As <see cref="MergeTemplate"/>, for a template held in object storage.</summary>
+    byte[] MergeTemplateContent(
+        byte[] templateContent,
+        IReadOnlyDictionary<string, string> mergeValues,
+        IReadOnlyDictionary<string, IReadOnlyList<IReadOnlyDictionary<string, string>>>? regions = null,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>As <see cref="MergeTemplateMany"/>, for a template held in object storage.</summary>
+    byte[] MergeTemplateContentMany(
+        byte[] templateContent,
+        IReadOnlyList<ContractDocumentMergeData> documents,
+        CancellationToken cancellationToken = default);
 }

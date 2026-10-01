@@ -21,6 +21,8 @@ public class ContractControllerTests
             new StubContractRenewalService(),
             new StubRenewContractsService(),
             new StubPendingOrderService(),
+            new StubExportTemplateService(),
+            new StubBulkExportService(),
             NullLogger<ContractController>.Instance);
 
         // ValidationProblem() resolves ProblemDetailsFactory from HttpContext.RequestServices,

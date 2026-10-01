@@ -91,7 +91,10 @@ public class ContractExportEndToEndTests : IDisposable
             NullLogger<PTL.InternalWeb.Features.Contract.ContractController>.Instance,
             documentService,
             new FakeContractExportApiClient(),
-            new FakeContractRenewalApiClient());
+            new FakeContractRenewalApiClient(),
+            new FakeExportTemplateApiClient(),
+            new FakeBulkExportApiClient(),
+            new PTL.Core.Contract.Document.TemplateMergeService());
     }
 
     private static PTL.Contracts.Customer.CustomerResponse SampleCustomer(Guid customerId) => new(

@@ -35,6 +35,8 @@ public class ContractControllerAdditionalEndpointsTests
             contractRenewalService ?? new StubContractRenewalService(),
             renewContractsService ?? new StubRenewContractsService(),
             pendingOrderService ?? new StubPendingOrderService(),
+            new StubExportTemplateService(),
+            new StubBulkExportService(),
             NullLogger<ContractController>.Instance);
 
         var services = new ServiceCollection().AddMvc().Services.BuildServiceProvider();

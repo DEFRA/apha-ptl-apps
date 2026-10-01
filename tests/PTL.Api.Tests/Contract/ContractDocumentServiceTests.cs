@@ -156,6 +156,25 @@ public class ContractDocumentServiceTests
             LastRegions = documents.Count > 0 ? documents[0].Regions : null;
             return [0x50, 0x4B];
         }
+
+        public byte[] MergeTemplateContent(
+            byte[] templateContent,
+            IReadOnlyDictionary<string, string> mergeValues,
+            IReadOnlyDictionary<string, IReadOnlyList<IReadOnlyDictionary<string, string>>>? regions = null,
+            CancellationToken cancellationToken = default)
+        {
+            LastRegions = regions;
+            return [0x50, 0x4B];
+        }
+
+        public byte[] MergeTemplateContentMany(
+            byte[] templateContent,
+            IReadOnlyList<ContractDocumentMergeData> documents,
+            CancellationToken cancellationToken = default)
+        {
+            LastRegions = documents.Count > 0 ? documents[0].Regions : null;
+            return [0x50, 0x4B];
+        }
     }
 
     private sealed class FakeTemplateRepository(DocumentTemplate? template = null) : ITemplateRepository

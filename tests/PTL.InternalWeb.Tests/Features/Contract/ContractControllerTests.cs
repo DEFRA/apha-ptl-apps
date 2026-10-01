@@ -9,8 +9,8 @@ namespace PTL.InternalWeb.Tests.Features.Contract;
 
 public class ContractControllerTests
 {
-    private static PTL.InternalWeb.Features.Contract.ContractController CreateController(FakeContractApiClient apiClient, FakeCustomerApiClient? customerApiClient = null, FakeLookupApiClient? lookupApiClient = null, FakeImportPermitApiClient? importPermitApiClient = null, FakeContractDocumentService? documentService = null, FakeContractExportApiClient? contractExportApiClient = null, FakeContractRenewalApiClient? contractRenewalApiClient = null) =>
-        new(apiClient, customerApiClient ?? new FakeCustomerApiClient(), lookupApiClient ?? new FakeLookupApiClient(), importPermitApiClient ?? new FakeImportPermitApiClient(), NullLogger<PTL.InternalWeb.Features.Contract.ContractController>.Instance, documentService ?? new FakeContractDocumentService(), contractExportApiClient ?? new FakeContractExportApiClient(), contractRenewalApiClient ?? new FakeContractRenewalApiClient());
+    private static PTL.InternalWeb.Features.Contract.ContractController CreateController(FakeContractApiClient apiClient, FakeCustomerApiClient? customerApiClient = null, FakeLookupApiClient? lookupApiClient = null, FakeImportPermitApiClient? importPermitApiClient = null, FakeContractDocumentService? documentService = null, FakeContractExportApiClient? contractExportApiClient = null, FakeContractRenewalApiClient? contractRenewalApiClient = null, FakeExportTemplateApiClient? exportTemplateApiClient = null, FakeBulkExportApiClient? bulkExportApiClient = null) =>
+        new(apiClient, customerApiClient ?? new FakeCustomerApiClient(), lookupApiClient ?? new FakeLookupApiClient(), importPermitApiClient ?? new FakeImportPermitApiClient(), NullLogger<PTL.InternalWeb.Features.Contract.ContractController>.Instance, documentService ?? new FakeContractDocumentService(), contractExportApiClient ?? new FakeContractExportApiClient(), contractRenewalApiClient ?? new FakeContractRenewalApiClient(), exportTemplateApiClient ?? new FakeExportTemplateApiClient(), bulkExportApiClient ?? new FakeBulkExportApiClient(), new TemplateMergeService());
 
     private static ContractResponse SampleContract(Guid contractId, Guid customerId, bool isReadOnly = false) => new(
         contractId, customerId, "Sample Laboratories Ltd", "QAL/00001", DateTime.UtcNow.Year + 1, "UT12345",
@@ -121,7 +121,10 @@ public class ContractControllerTests
             NullLogger<PTL.InternalWeb.Features.Contract.ContractController>.Instance,
             documentService,
             new FakeContractExportApiClient(),
-            new FakeContractRenewalApiClient());
+            new FakeContractRenewalApiClient(),
+            new FakeExportTemplateApiClient(),
+            new FakeBulkExportApiClient(),
+            new TemplateMergeService());
 
         var result = await controller.Export(contractId, "Contract", CancellationToken.None);
 
