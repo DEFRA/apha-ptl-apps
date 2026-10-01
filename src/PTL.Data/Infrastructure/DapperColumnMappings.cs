@@ -11,6 +11,7 @@ using PTL.Core.Contract.Renewal;
 using PTL.Core.Contract.SampleAddress;
 using PTL.Core.Customer;
 using PTL.Core.GroupAddress;
+using PTL.Core.Invoice;
 using PTL.Core.Lookup;
 using PTL.Core.Participant;
 using PTL.Core.Scheme;
@@ -737,6 +738,51 @@ public static class DapperColumnMappings
             ["fldNumberOfDistributionsOnScheme"] = nameof(PricingPercentageEntity.NumberOfDistributionsOnScheme),
             ["fldNumberOfDistributionsChosen"] = nameof(PricingPercentageEntity.NumberOfDistributionsChosen),
             ["fldWeight"] = nameof(PricingPercentageEntity.Weight),
+        });
+
+        // spgaExportContractDetailsForAutomaticInvoicing's first result set (docs/analysis/
+        // invoice-analysis.md) - only the columns InvoiceCsvBuilder/InvoiceService actually need
+        // are mapped; every other column the procedure returns is left unmapped and silently skipped.
+        Map<InvoiceContractEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            [ColContractId] = nameof(InvoiceContractEntity.ContractId),
+            [ColCustomerId] = nameof(InvoiceContractEntity.CustomerId),
+            [ColSuffix] = nameof(InvoiceContractEntity.Suffix),
+            [ColYearId] = nameof(InvoiceContractEntity.YearId),
+            ["fldAdministrationCharge"] = nameof(InvoiceContractEntity.AdministrationCharge),
+            ["fldDiscountRate"] = nameof(InvoiceContractEntity.DiscountRate),
+            ["fldNumberPostage"] = nameof(InvoiceContractEntity.NumberPostage),
+            ["fldPostagePrice"] = nameof(InvoiceContractEntity.PostagePrice),
+            ["fldNumberCourier"] = nameof(InvoiceContractEntity.NumberCourier),
+            ["fldCourierPrice"] = nameof(InvoiceContractEntity.CourierPrice),
+            ["fldNumberSpecialDelivery"] = nameof(InvoiceContractEntity.NumberSpecialDelivery),
+            ["fldSpecialDeliveryPrice"] = nameof(InvoiceContractEntity.SpecialDeliveryPrice),
+            [ColQalNumber] = nameof(InvoiceContractEntity.QalNumber),
+            ["fldInvoiceOrganisation"] = nameof(InvoiceContractEntity.InvoiceOrganisation),
+            ["fldInvoiceAddress1"] = nameof(InvoiceContractEntity.InvoiceAddress1),
+            ["fldInvoiceAddress2"] = nameof(InvoiceContractEntity.InvoiceAddress2),
+            ["fldInvoiceAddress3"] = nameof(InvoiceContractEntity.InvoiceAddress3),
+            ["fldInvoiceAddress4"] = nameof(InvoiceContractEntity.InvoiceAddress4),
+            ["fldInvoiceAddress5"] = nameof(InvoiceContractEntity.InvoiceAddress5),
+            ["fldInvoiceCountry"] = nameof(InvoiceContractEntity.InvoiceCountry),
+            ["fldVatNumber"] = nameof(InvoiceContractEntity.VatNumber),
+            ["fldVatRating"] = nameof(InvoiceContractEntity.VatRating),
+            [ColPurchaseOrderNumber] = nameof(InvoiceContractEntity.PurchaseOrderNumber),
+            ["fldCustomerNumber"] = nameof(InvoiceContractEntity.CustomerNumber),
+            ["fldCustomerType"] = nameof(InvoiceContractEntity.CustomerType),
+            ["fldOptOutOfInvoiceGeneration"] = nameof(InvoiceContractEntity.OptOutOfInvoiceGeneration),
+        });
+
+        // spgaExportContractDetailsForAutomaticInvoicing's second result set.
+        Map<InvoiceContractItemEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            [ColContractId] = nameof(InvoiceContractItemEntity.ContractId),
+            ["fldParticipantSchemeId"] = nameof(InvoiceContractItemEntity.ParticipantSchemeId),
+            [ColIdentifier] = nameof(InvoiceContractItemEntity.SchemeIdentifier),
+            ["fldSchemeName"] = nameof(InvoiceContractItemEntity.SchemeName),
+            [ColPrice] = nameof(InvoiceContractItemEntity.Price),
+            ["fldNonFeePaying"] = nameof(InvoiceContractItemEntity.NonFeePaying),
+            ["fldHasOverride"] = nameof(InvoiceContractItemEntity.HasOverride),
         });
     }
 

@@ -15,7 +15,9 @@ using PTL.Core.Contract.Renewal;
 using PTL.Core.Contract.SampleAddress;
 using PTL.Core.Customer;
 using PTL.Core.GroupAddress;
+using PTL.Core.Invoice;
 using PTL.Core.Lookup;
+using PTL.Core.Notifications;
 using PTL.Core.Participant;
 using PTL.Core.Scheme;
 using PTL.Core.Viewer;
@@ -31,7 +33,9 @@ using PTL.Data.Contract.SampleAddress;
 using PTL.Data.Customer;
 using PTL.Data.GroupAddress;
 using PTL.Data.Infrastructure;
+using PTL.Data.Invoice;
 using PTL.Data.Lookup;
+using PTL.Data.Notifications;
 using PTL.Data.Participant;
 using PTL.Data.Scheme;
 using PTL.Data.Storage;
@@ -110,16 +114,18 @@ builder.Services.AddScoped<IExportTemplateService, ExportTemplateService>();
 builder.Services.AddScoped<IBulkExportRepository, BulkExportRepository>();
 builder.Services.AddScoped<IBulkExportService, BulkExportService>();
 
-// The S3 client is only resolved when a template is actually read or written, so the application
-// starts and every test runs without AWS credentials or bucket access.
+// The S3 client is only resolved when a template/invoice CSV is actually read or written, so the
+// application starts and every test runs without AWS credentials or bucket access. Registered once,
+// unconditionally, since either TemplateStorage or InvoiceStorage alone may select the S3 provider.
+builder.Services.AddDefaultAWSOptions(builder.Configuration.GetAWSOptions());
+builder.Services.AddAWSService<Amazon.S3.IAmazonS3>();
+
 if (string.Equals(builder.Configuration[$"{TemplateStorageOptions.SectionName}:Provider"], "InMemory", StringComparison.OrdinalIgnoreCase))
 {
     builder.Services.AddSingleton<ITemplateStorageService, InMemoryTemplateStorageService>();
 }
 else
 {
-    builder.Services.AddDefaultAWSOptions(builder.Configuration.GetAWSOptions());
-    builder.Services.AddAWSService<Amazon.S3.IAmazonS3>();
     builder.Services.AddScoped<ITemplateStorageService, S3TemplateStorageService>();
 }
 
@@ -134,6 +140,29 @@ builder.Services.AddScoped<IAdministrationChargeService, AdministrationChargeSer
 
 builder.Services.AddScoped<IWeightedPricingPlanRepository, WeightedPricingPlanRepository>();
 builder.Services.AddScoped<IWeightedPricingPlanService, WeightedPricingPlanService>();
+
+builder.Services.AddScoped<IInvoiceRepository, InvoiceRepository>();
+builder.Services.AddScoped<IInvoiceService, InvoiceService>();
+
+builder.Services.Configure<InvoiceStorageOptions>(builder.Configuration.GetSection(InvoiceStorageOptions.SectionName));
+if (string.Equals(builder.Configuration[$"{InvoiceStorageOptions.SectionName}:Provider"], "InMemory", StringComparison.OrdinalIgnoreCase))
+{
+    builder.Services.AddSingleton<IInvoiceStorageService, InMemoryInvoiceStorageService>();
+}
+else
+{
+    builder.Services.AddScoped<IInvoiceStorageService, S3InvoiceStorageService>();
+}
+
+// Shared GOV.UK Notify client - every feature needing outbound notifications depends on
+// INotifyClient only, never SMTP/EmailHelper (docs/migration/email-notification-migration.md).
+builder.Services.Configure<NotifyOptions>(builder.Configuration.GetSection(NotifyOptions.SectionName));
+builder.Services.Configure<InvoiceNotificationOptions>(builder.Configuration.GetSection(InvoiceNotificationOptions.SectionName));
+builder.Services.AddHttpClient<INotifyClient, NotifyClient>(client =>
+{
+    var notifyBaseUrl = builder.Configuration[$"{NotifyOptions.SectionName}:BaseUrl"];
+    client.BaseAddress = new Uri(string.IsNullOrWhiteSpace(notifyBaseUrl) ? "https://api.notifications.service.gov.uk" : notifyBaseUrl);
+});
 
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<PTL.Api.Infrastructure.GlobalExceptionHandler>();

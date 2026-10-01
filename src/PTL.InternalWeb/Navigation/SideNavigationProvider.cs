@@ -165,7 +165,16 @@ public static class SideNavigationProvider
                         new SideNavigationItem { Text = "Export Address Confirmation Letters", ControllerName = ContractControllerName, ActionName = "ExportAddressConfirmationLetters" }
                     ]
                 },
-                Disabled("Invoice Generation")
+                new SideNavigationItem
+                {
+                    Text = "Invoice Generation",
+                    ControllerName = "Invoice",
+                    ActionName = IndexAction,
+                    Children =
+                    [
+                        new SideNavigationItem { Text = "Invoice Audit History", ControllerName = "Invoice", ActionName = "AuditHistory", IsHidden = true }
+                    ]
+                }
             ]
         },
         new SideNavigationItem
