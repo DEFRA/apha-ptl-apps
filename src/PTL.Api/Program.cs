@@ -22,6 +22,7 @@ using PTL.Core.Invoice;
 using PTL.Core.Lookup;
 using PTL.Core.Notifications;
 using PTL.Core.Participant;
+using PTL.Core.PostagePricingPlan;
 using PTL.Core.Scheme;
 using PTL.Core.TestConsultant;
 using PTL.Core.Viewer;
@@ -42,6 +43,7 @@ using PTL.Data.Invoice;
 using PTL.Data.Lookup;
 using PTL.Data.Notifications;
 using PTL.Data.Participant;
+using PTL.Data.PostagePricingPlan;
 using PTL.Data.Scheme;
 using PTL.Data.Storage;
 using PTL.Data.TestConsultant;
@@ -167,6 +169,9 @@ builder.Services.AddScoped<IAdministrationChargeService, AdministrationChargeSer
 
 builder.Services.AddScoped<IWeightedPricingPlanRepository, WeightedPricingPlanRepository>();
 builder.Services.AddScoped<IWeightedPricingPlanService, WeightedPricingPlanService>();
+
+builder.Services.AddScoped<IPostagePricingPlanRepository, PostagePricingPlanRepository>();
+builder.Services.AddScoped<IPostagePricingPlanService, PostagePricingPlanService>();
 
 builder.Services.AddScoped<IInvoiceRepository, InvoiceRepository>();
 builder.Services.AddScoped<IInvoiceService, InvoiceService>();

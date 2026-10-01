@@ -137,6 +137,12 @@ public static class ApiClientServiceCollectionExtensions
         })
             .AddStandardResilienceHandler();
 
+        services.AddHttpClient<IPostagePricingPlanApiClient, PostagePricingPlanApiClient>(client =>
+        {
+            client.BaseAddress = new Uri(apiBaseUrl);
+        })
+            .AddStandardResilienceHandler();
+
         services.AddHttpClient<IInvoiceApiClient, InvoiceApiClient>(client =>
         {
             client.BaseAddress = new Uri(apiBaseUrl);
