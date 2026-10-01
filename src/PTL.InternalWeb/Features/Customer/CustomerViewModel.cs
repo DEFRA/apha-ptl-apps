@@ -47,7 +47,9 @@ public sealed record PendingCustomerUpdateDetailsViewModel(
 // currency and status fields on Customer Edit have no pending-record columns.
 public sealed class PendingCustomerUpdateFormViewModel
 {
-    public Guid CustomerId { get; set; }
+    // Display-only hidden field; the route's customerId parameter is the value the controller
+    // actually trusts, so this stays nullable rather than defaulting to Guid.Empty on under-posting.
+    public Guid? CustomerId { get; set; }
 
     public string? QalNumber { get; set; }
 

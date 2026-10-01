@@ -242,30 +242,6 @@ public class ParticipantController(IParticipantApiClient participantApiClient, I
         return View(model);
     }
 
-    // Only approved changes update the live participant record - declined changes do not.
-    [HttpPost]
-    [ValidateAntiForgeryToken]
-    public async Task<IActionResult> ApprovePendingParticipantUpdate(Guid participantId, CancellationToken cancellationToken)
-    {
-        var result = await participantApiClient.ApprovePendingParticipantUpdateAsync(participantId, request: null, cancellationToken);
-        if (result.NotFound)
-        {
-            return NotFound();
-        }
-
-        if (!result.Success)
-        {
-            // The stored pending values break a participant business rule - the reviewer must amend
-            // them on the Edit page before the update can be approved.
-            var messages = string.Join(" ", result.FieldErrors.SelectMany(e => e.Value));
-            TempData.SetNotification(NotificationType.Error, $"Participant update could not be approved. {messages}");
-            return RedirectToAction(nameof(EditPendingParticipantUpdate), new { participantId });
-        }
-
-        TempData.SetNotification(NotificationType.Success, "Participant update approved successfully.");
-        return RedirectToAction(nameof(ReviewPendingParticipantUpdates));
-    }
-
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> EditPendingParticipantUpdate(Guid participantId, PendingParticipantUpdateFormViewModel model, CancellationToken cancellationToken)
@@ -287,6 +263,30 @@ public class ParticipantController(IParticipantApiClient participantApiClient, I
             AddErrors(result.FieldErrors);
             await PopulatePendingCountryOptionsAsync(model, cancellationToken);
             return View(model);
+        }
+
+        TempData.SetNotification(NotificationType.Success, "Participant update approved successfully.");
+        return RedirectToAction(nameof(ReviewPendingParticipantUpdates));
+    }
+
+    // Only approved changes update the live participant record - declined changes do not.
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ApprovePendingParticipantUpdate(Guid participantId, CancellationToken cancellationToken)
+    {
+        var result = await participantApiClient.ApprovePendingParticipantUpdateAsync(participantId, request: null, cancellationToken);
+        if (result.NotFound)
+        {
+            return NotFound();
+        }
+
+        if (!result.Success)
+        {
+            // The stored pending values break a participant business rule - the reviewer must amend
+            // them on the Edit page before the update can be approved.
+            var messages = string.Join(" ", result.FieldErrors.SelectMany(e => e.Value));
+            TempData.SetNotification(NotificationType.Error, $"Participant update could not be approved. {messages}");
+            return RedirectToAction(nameof(EditPendingParticipantUpdate), new { participantId });
         }
 
         TempData.SetNotification(NotificationType.Success, "Participant update approved successfully.");

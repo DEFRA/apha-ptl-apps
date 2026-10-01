@@ -11,6 +11,9 @@ namespace PTL.InternalWeb.Features.Customer;
 // already authenticated with full access to Customer functionality. Policies will be added later.
 public class CustomerController(ICustomerApiClient customerApiClient, ILookupApiClient lookupApiClient, ILogger<CustomerController> logger) : Controller
 {
+    // Legacy DropDownXxx.Items.Insert(0, New ListItem("- Please Select -", Guid.Empty)) placeholder.
+    private const string PleaseSelectOptionText = "- Please Select -";
+
     private static readonly Action<ILogger, string?, CustomerStatusFilter, int, int, Exception?> LogDisplayedCustomerListMessage =
         LoggerMessage.Define<string?, CustomerStatusFilter, int, int>(
             LogLevel.Information,
@@ -199,30 +202,6 @@ public class CustomerController(ICustomerApiClient customerApiClient, ILookupApi
         return View(model);
     }
 
-    // Only approved changes update the live customer record - declined changes do not.
-    [HttpPost]
-    [ValidateAntiForgeryToken]
-    public async Task<IActionResult> ApprovePendingCustomerUpdate(Guid customerId, CancellationToken cancellationToken)
-    {
-        var result = await customerApiClient.ApprovePendingCustomerUpdateAsync(customerId, request: null, cancellationToken);
-        if (result.NotFound)
-        {
-            return NotFound();
-        }
-
-        if (!result.Success)
-        {
-            // The stored pending values break a customer business rule - the reviewer must amend
-            // them on the Edit page before the update can be approved.
-            var messages = string.Join(" ", result.FieldErrors.SelectMany(e => e.Value));
-            TempData.SetNotification(NotificationType.Error, $"Customer update could not be approved. {messages}");
-            return RedirectToAction(nameof(EditPendingCustomerUpdate), new { customerId });
-        }
-
-        TempData.SetNotification(NotificationType.Success, "Customer update approved successfully.");
-        return RedirectToAction(nameof(ReviewPendingCustomerUpdates));
-    }
-
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> EditPendingCustomerUpdate(Guid customerId, PendingCustomerUpdateFormViewModel model, CancellationToken cancellationToken)
@@ -244,6 +223,30 @@ public class CustomerController(ICustomerApiClient customerApiClient, ILookupApi
             AddErrors(result.FieldErrors);
             await PopulatePendingCountryOptionsAsync(model, cancellationToken);
             return View(model);
+        }
+
+        TempData.SetNotification(NotificationType.Success, "Customer update approved successfully.");
+        return RedirectToAction(nameof(ReviewPendingCustomerUpdates));
+    }
+
+    // Only approved changes update the live customer record - declined changes do not.
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ApprovePendingCustomerUpdate(Guid customerId, CancellationToken cancellationToken)
+    {
+        var result = await customerApiClient.ApprovePendingCustomerUpdateAsync(customerId, request: null, cancellationToken);
+        if (result.NotFound)
+        {
+            return NotFound();
+        }
+
+        if (!result.Success)
+        {
+            // The stored pending values break a customer business rule - the reviewer must amend
+            // them on the Edit page before the update can be approved.
+            var messages = string.Join(" ", result.FieldErrors.SelectMany(e => e.Value));
+            TempData.SetNotification(NotificationType.Error, $"Customer update could not be approved. {messages}");
+            return RedirectToAction(nameof(EditPendingCustomerUpdate), new { customerId });
         }
 
         TempData.SetNotification(NotificationType.Success, "Customer update approved successfully.");
@@ -275,7 +278,7 @@ public class CustomerController(ICustomerApiClient customerApiClient, ILookupApi
         var countries = await lookupApiClient.GetCountriesAsync(cancellationToken);
         var options = countries
             .Select(c => new SelectListItem(c.Country, c.CountryId.ToString()))
-            .Prepend(new SelectListItem("- Please Select -", Guid.Empty.ToString()))
+            .Prepend(new SelectListItem(PleaseSelectOptionText, Guid.Empty.ToString()))
             .ToList();
         model.CountryOptions = options;
         model.InvoiceCountryOptions = options;
@@ -413,7 +416,7 @@ public class CustomerController(ICustomerApiClient customerApiClient, ILookupApi
         // DropDownCountry.Items.Insert(0, New ListItem("- Please Select -", Guid.Empty)).
         var countryOptions = countriesTask.Result
             .Select(c => new SelectListItem(c.Country, c.CountryId.ToString()))
-            .Prepend(new SelectListItem("- Please Select -", Guid.Empty.ToString()))
+            .Prepend(new SelectListItem(PleaseSelectOptionText, Guid.Empty.ToString()))
             .ToList();
         model.CountryOptions = countryOptions;
         model.InvoiceCountryOptions = countryOptions;
@@ -428,13 +431,13 @@ public class CustomerController(ICustomerApiClient customerApiClient, ILookupApi
         // the legacy ValidCustomerType rule, so a blank option is offered to force an explicit choice.
         model.CustomerTypeOptions = customerTypesTask.Result
             .Select(c => new SelectListItem(c.CustomerType, c.CustomerTypeId.ToString()))
-            .Prepend(new SelectListItem("- Please Select -", Guid.Empty.ToString()))
+            .Prepend(new SelectListItem(PleaseSelectOptionText, Guid.Empty.ToString()))
             .ToList();
 
         // VatRatingId is not validated as required anywhere, so a blank option is offered.
         model.VatRatingOptions = vatRatingsTask.Result
             .Select(v => new SelectListItem(v.VatRating, v.VatRatingId.ToString()))
-            .Prepend(new SelectListItem("- Please Select -", Guid.Empty.ToString()))
+            .Prepend(new SelectListItem(PleaseSelectOptionText, Guid.Empty.ToString()))
             .ToList();
     }
 

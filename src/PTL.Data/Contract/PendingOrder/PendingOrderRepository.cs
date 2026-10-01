@@ -53,18 +53,18 @@ public sealed class PendingOrderRepository(IDbConnectionFactory connectionFactor
         await connection.ExecuteAsync(UpdateSchemeSql, new
         {
             scheme.PendingParticipantSchemeId,
-            DistributionMonthJan = scheme.DistributionMonthJan,
-            DistributionMonthFeb = scheme.DistributionMonthFeb,
-            DistributionMonthMar = scheme.DistributionMonthMar,
-            DistributionMonthApr = scheme.DistributionMonthApr,
-            DistributionMonthMay = scheme.DistributionMonthMay,
-            DistributionMonthJun = scheme.DistributionMonthJun,
-            DistributionMonthJul = scheme.DistributionMonthJul,
-            DistributionMonthAug = scheme.DistributionMonthAug,
-            DistributionMonthSep = scheme.DistributionMonthSep,
-            DistributionMonthOct = scheme.DistributionMonthOct,
-            DistributionMonthNov = scheme.DistributionMonthNov,
-            DistributionMonthDec = scheme.DistributionMonthDec,
+            scheme.DistributionMonthJan,
+            scheme.DistributionMonthFeb,
+            scheme.DistributionMonthMar,
+            scheme.DistributionMonthApr,
+            scheme.DistributionMonthMay,
+            scheme.DistributionMonthJun,
+            scheme.DistributionMonthJul,
+            scheme.DistributionMonthAug,
+            scheme.DistributionMonthSep,
+            scheme.DistributionMonthOct,
+            scheme.DistributionMonthNov,
+            scheme.DistributionMonthDec,
             scheme.IsRemoved,
             scheme.ImportExportLicenceRequired,
             scheme.IsSelected,
@@ -101,8 +101,8 @@ public sealed class PendingOrderRepository(IDbConnectionFactory connectionFactor
             {
                 PendingContractId = pendingContractId,
                 existing.YearId,
-                IsSubmitted = existing.IsSubmitted,
-                IsDeleted = existing.IsDeleted,
+                existing.IsSubmitted,
+                existing.IsDeleted,
                 PurchaseOrderNumber = purchaseOrderNumber
             });
     }

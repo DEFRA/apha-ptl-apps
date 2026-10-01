@@ -52,13 +52,24 @@ public static class DapperColumnMappings
     private const string ColIdentifier = "fldIdentifier";
     private const string ColContractId = "fldContractId";
     private const string ColCurrencyId = "fldCurrencyId";
+    private const string ColQalNumber = "fldQalNumber";
+    private const string ColFax = "fldFax";
+    private const string ColEmail = "fldEmail";
+    private const string ColIsSubmitted = "fldIsSubmitted";
+    private const string ColIsDeleted = "fldIsDeleted";
+    private const string ColLabName = "fldLabName";
+    private const string ColSuffix = "fldSuffix";
+    private const string ColPurchaseOrderNumber = "fldPurchaseOrderNumber";
+    private const string ColSchemeId = "fldSchemeId";
+    private const string ColPrice = "fldPrice";
+    private const string ColCountry = "fldCountry";
 
     public static void Register()
     {
         Map<CoreCustomer>(new(StringComparer.OrdinalIgnoreCase)
         {
             [ColCustomerId] = nameof(CoreCustomer.CustomerId),
-            ["fldQalNumber"] = nameof(CoreCustomer.QalNumber),
+            [ColQalNumber] = nameof(CoreCustomer.QalNumber),
             ["fldRegisteredFileNumber"] = nameof(CoreCustomer.RegisteredFileNumber),
             [ColName] = nameof(CoreCustomer.Name),
             ["fldPreviousName"] = nameof(CoreCustomer.PreviousName),
@@ -77,8 +88,8 @@ public static class DapperColumnMappings
             [ColCountryId] = nameof(CoreCustomer.CountryId),
             [ColTelephone] = nameof(CoreCustomer.Telephone),
             ["fldTelephone2"] = nameof(CoreCustomer.Telephone2),
-            ["fldFax"] = nameof(CoreCustomer.Fax),
-            ["fldEmail"] = nameof(CoreCustomer.Email),
+            [ColFax] = nameof(CoreCustomer.Fax),
+            [ColEmail] = nameof(CoreCustomer.Email),
             [ColCurrencyId] = nameof(CoreCustomer.CurrencyId),
             ["fldComments"] = nameof(CoreCustomer.Comments),
             ["fldInitialStartDate"] = nameof(CoreCustomer.InitialStartDate),
@@ -105,7 +116,7 @@ public static class DapperColumnMappings
         Map<CustomerSummaryEntity>(new(StringComparer.OrdinalIgnoreCase)
         {
             [ColCustomerId] = nameof(CustomerSummaryEntity.CustomerId),
-            ["fldQalNumber"] = nameof(CustomerSummaryEntity.QalNumber),
+            [ColQalNumber] = nameof(CustomerSummaryEntity.QalNumber),
             [ColName] = nameof(CustomerSummaryEntity.Name),
             [ColOrganisation] = nameof(CustomerSummaryEntity.Organisation),
             [ColIsActive] = nameof(CustomerSummaryEntity.IsActive),
@@ -115,7 +126,7 @@ public static class DapperColumnMappings
         {
             [ColCustomerId] = nameof(PendingCustomerUpdateSummaryEntity.CustomerId),
             ["fldPendingCustomerDetailsEditId"] = nameof(PendingCustomerUpdateSummaryEntity.PendingCustomerUpdateId),
-            ["fldQalNumber"] = nameof(PendingCustomerUpdateSummaryEntity.QalNumber),
+            [ColQalNumber] = nameof(PendingCustomerUpdateSummaryEntity.QalNumber),
             [ColName] = nameof(PendingCustomerUpdateSummaryEntity.Name),
         });
 
@@ -133,8 +144,8 @@ public static class DapperColumnMappings
             [ColCountryId] = nameof(PendingCustomerUpdate.CountryId),
             [ColTelephone] = nameof(PendingCustomerUpdate.Telephone),
             ["fldTelephone2"] = nameof(PendingCustomerUpdate.Telephone2),
-            ["fldFax"] = nameof(PendingCustomerUpdate.Fax),
-            ["fldEmail"] = nameof(PendingCustomerUpdate.Email),
+            [ColFax] = nameof(PendingCustomerUpdate.Fax),
+            [ColEmail] = nameof(PendingCustomerUpdate.Email),
             ["fldInvoiceName"] = nameof(PendingCustomerUpdate.InvoiceName),
             ["fldInvoiceOrganisation"] = nameof(PendingCustomerUpdate.InvoiceOrganisation),
             ["fldInvoiceAddress1"] = nameof(PendingCustomerUpdate.InvoiceAddress1),
@@ -147,8 +158,8 @@ public static class DapperColumnMappings
             ["fldInvoiceTelephone2"] = nameof(PendingCustomerUpdate.InvoiceTelephone2),
             ["fldInvoiceFax"] = nameof(PendingCustomerUpdate.InvoiceFax),
             ["fldInvoiceEmail"] = nameof(PendingCustomerUpdate.InvoiceEmail),
-            ["fldIsSubmitted"] = nameof(PendingCustomerUpdate.IsSubmitted),
-            ["fldIsDeleted"] = nameof(PendingCustomerUpdate.IsDeleted),
+            [ColIsSubmitted] = nameof(PendingCustomerUpdate.IsSubmitted),
+            [ColIsDeleted] = nameof(PendingCustomerUpdate.IsDeleted),
         });
 
         Map<CoreParticipant>(new(StringComparer.OrdinalIgnoreCase)
@@ -157,7 +168,7 @@ public static class DapperColumnMappings
             ["fldSsoId"] = nameof(CoreParticipant.SsoId),
             [ColCustomerId] = nameof(CoreParticipant.CustomerId),
             [ColLabCode] = nameof(CoreParticipant.LabCode),
-            ["fldLabName"] = nameof(CoreParticipant.LabName),
+            [ColLabName] = nameof(CoreParticipant.LabName),
             ["fldLabTypeId"] = nameof(CoreParticipant.LabTypeId),
             [ColContactName] = nameof(CoreParticipant.ContactName),
             [ColOrganisation] = nameof(CoreParticipant.Organisation),
@@ -168,8 +179,8 @@ public static class DapperColumnMappings
             [ColAddress5] = nameof(CoreParticipant.Address5),
             [ColCountryId] = nameof(CoreParticipant.CountryId),
             [ColTelephone] = nameof(CoreParticipant.Telephone),
-            ["fldFax"] = nameof(CoreParticipant.Fax),
-            ["fldEmail"] = nameof(CoreParticipant.Email),
+            [ColFax] = nameof(CoreParticipant.Fax),
+            [ColEmail] = nameof(CoreParticipant.Email),
             ["fldEmail2"] = nameof(CoreParticipant.Email2),
             ["fldComments"] = nameof(CoreParticipant.Comments),
             [ColIsActive] = nameof(CoreParticipant.IsActive),
@@ -183,7 +194,7 @@ public static class DapperColumnMappings
             [ColParticipantId] = nameof(ParticipantSummaryEntity.ParticipantId),
             [ColCustomerId] = nameof(ParticipantSummaryEntity.CustomerId),
             [ColLabCode] = nameof(ParticipantSummaryEntity.LabCode),
-            ["fldLabName"] = nameof(ParticipantSummaryEntity.LabName),
+            [ColLabName] = nameof(ParticipantSummaryEntity.LabName),
             [ColContactName] = nameof(ParticipantSummaryEntity.ContactName),
             [ColIsActive] = nameof(ParticipantSummaryEntity.IsActive),
         });
@@ -193,7 +204,7 @@ public static class DapperColumnMappings
             [ColParticipantId] = nameof(PendingParticipantUpdateSummaryEntity.ParticipantId),
             ["fldPendingParticipantDetailsEditId"] = nameof(PendingParticipantUpdateSummaryEntity.PendingParticipantUpdateId),
             [ColLabCode] = nameof(PendingParticipantUpdateSummaryEntity.LabCode),
-            ["fldLabName"] = nameof(PendingParticipantUpdateSummaryEntity.LabName),
+            [ColLabName] = nameof(PendingParticipantUpdateSummaryEntity.LabName),
         });
 
         Map<PendingParticipantUpdate>(new(StringComparer.OrdinalIgnoreCase)
@@ -211,11 +222,11 @@ public static class DapperColumnMappings
             [ColAddress5] = nameof(PendingParticipantUpdate.Address5),
             [ColCountryId] = nameof(PendingParticipantUpdate.CountryId),
             [ColTelephone] = nameof(PendingParticipantUpdate.Telephone),
-            ["fldFax"] = nameof(PendingParticipantUpdate.Fax),
-            ["fldEmail"] = nameof(PendingParticipantUpdate.Email),
+            [ColFax] = nameof(PendingParticipantUpdate.Fax),
+            [ColEmail] = nameof(PendingParticipantUpdate.Email),
             ["fldEmail2"] = nameof(PendingParticipantUpdate.Email2),
-            ["fldIsSubmitted"] = nameof(PendingParticipantUpdate.IsSubmitted),
-            ["fldIsDeleted"] = nameof(PendingParticipantUpdate.IsDeleted),
+            [ColIsSubmitted] = nameof(PendingParticipantUpdate.IsSubmitted),
+            [ColIsDeleted] = nameof(PendingParticipantUpdate.IsDeleted),
         });
 
         Map<CoreContract>(new(StringComparer.OrdinalIgnoreCase)
@@ -245,9 +256,9 @@ public static class DapperColumnMappings
             ["fldDateOfLeaving"] = nameof(CoreContract.DateOfLeaving),
             [ColIsActive] = nameof(CoreContract.IsActive),
             ["Readonly"] = nameof(CoreContract.IsReadOnly),
-            ["fldSuffix"] = nameof(CoreContract.Suffix),
+            [ColSuffix] = nameof(CoreContract.Suffix),
             ["fldCommencementDate"] = nameof(CoreContract.CommencementDate),
-            ["fldPurchaseOrderNumber"] = nameof(CoreContract.PurchaseOrderNumber),
+            [ColPurchaseOrderNumber] = nameof(CoreContract.PurchaseOrderNumber),
             ["fldOptOutOfInvoiceGeneration"] = nameof(CoreContract.OptOutOfInvoiceGeneration),
             ["fldIsInvoiceSent"] = nameof(CoreContract.IsInvoiceSent),
             ["fldIsOnlineOrder"] = nameof(CoreContract.IsOnlineOrder),
@@ -267,7 +278,7 @@ public static class DapperColumnMappings
         Map<RenewableContractEntity>(new(StringComparer.OrdinalIgnoreCase)
         {
             [ColContractId] = nameof(RenewableContractEntity.ContractId),
-            ["fldSuffix"] = nameof(RenewableContractEntity.Suffix),
+            [ColSuffix] = nameof(RenewableContractEntity.Suffix),
             ["fldContractSignatory"] = nameof(RenewableContractEntity.ContractSignatory),
             ["fldRenewalInformation"] = nameof(RenewableContractEntity.RenewalInformation),
             ["fldActionsRequired"] = nameof(RenewableContractEntity.ActionsRequired),
@@ -282,7 +293,7 @@ public static class DapperColumnMappings
             [ColContractId] = nameof(RenewableContractItemEntity.ContractId),
             ["fldParticipantSchemeId"] = nameof(RenewableContractItemEntity.ParticipantSchemeId),
             [ColLabCode] = nameof(RenewableContractItemEntity.LabCode),
-            ["fldLabName"] = nameof(RenewableContractItemEntity.LabName),
+            [ColLabName] = nameof(RenewableContractItemEntity.LabName),
             ["fldOldSchemeIdentifier"] = nameof(RenewableContractItemEntity.OldSchemeIdentifier),
             ["fldOldSchemeName"] = nameof(RenewableContractItemEntity.OldSchemeName),
             ["fldNewSchemeIdentifier"] = nameof(RenewableContractItemEntity.NewSchemeIdentifier),
@@ -295,7 +306,7 @@ public static class DapperColumnMappings
             [ColCustomerId] = nameof(ContractSummaryEntity.CustomerId),
             [ColYearId] = nameof(ContractSummaryEntity.YearId),
             [ColIsActive] = nameof(ContractSummaryEntity.IsActive),
-            ["fldSuffix"] = nameof(ContractSummaryEntity.Suffix),
+            [ColSuffix] = nameof(ContractSummaryEntity.Suffix),
         });
 
         Map<PendingOrderSummaryEntity>(new(StringComparer.OrdinalIgnoreCase)
@@ -303,11 +314,11 @@ public static class DapperColumnMappings
             ["fldPendingContractId"] = nameof(PendingOrderSummaryEntity.PendingContractId),
             [ColCustomerId] = nameof(PendingOrderSummaryEntity.CustomerId),
             [ColYearId] = nameof(PendingOrderSummaryEntity.YearId),
-            ["fldIsSubmitted"] = nameof(PendingOrderSummaryEntity.IsSubmitted),
-            ["fldIsDeleted"] = nameof(PendingOrderSummaryEntity.IsDeleted),
+            [ColIsSubmitted] = nameof(PendingOrderSummaryEntity.IsSubmitted),
+            [ColIsDeleted] = nameof(PendingOrderSummaryEntity.IsDeleted),
             ["fldOrderSubmitDate"] = nameof(PendingOrderSummaryEntity.OrderSubmitDate),
             [ColName] = nameof(PendingOrderSummaryEntity.CustomerName),
-            ["fldQalNumber"] = nameof(PendingOrderSummaryEntity.QalNumber),
+            [ColQalNumber] = nameof(PendingOrderSummaryEntity.QalNumber),
         });
 
         Map<PendingOrderEntity>(new(StringComparer.OrdinalIgnoreCase)
@@ -315,9 +326,9 @@ public static class DapperColumnMappings
             ["fldPendingContractId"] = nameof(PendingOrderEntity.PendingContractId),
             [ColCustomerId] = nameof(PendingOrderEntity.CustomerId),
             [ColYearId] = nameof(PendingOrderEntity.YearId),
-            ["fldIsSubmitted"] = nameof(PendingOrderEntity.IsSubmitted),
-            ["fldIsDeleted"] = nameof(PendingOrderEntity.IsDeleted),
-            ["fldPurchaseOrderNumber"] = nameof(PendingOrderEntity.PurchaseOrderNumber),
+            [ColIsSubmitted] = nameof(PendingOrderEntity.IsSubmitted),
+            [ColIsDeleted] = nameof(PendingOrderEntity.IsDeleted),
+            [ColPurchaseOrderNumber] = nameof(PendingOrderEntity.PurchaseOrderNumber),
             ["fldOrderSubmitDate"] = nameof(PendingOrderEntity.OrderSubmitDate),
             [ColName] = nameof(PendingOrderEntity.CustomerName),
             ["fldSymbol"] = nameof(PendingOrderEntity.CurrencySymbol),
@@ -329,7 +340,7 @@ public static class DapperColumnMappings
             ["fldPendingContractId"] = nameof(PendingOrderSchemeEntity.PendingContractId),
             [ColParticipantId] = nameof(PendingOrderSchemeEntity.ParticipantId),
             ["fldParticipantName"] = nameof(PendingOrderSchemeEntity.ParticipantName),
-            ["fldSchemeId"] = nameof(PendingOrderSchemeEntity.SchemeId),
+            [ColSchemeId] = nameof(PendingOrderSchemeEntity.SchemeId),
             ["fldSchemeName"] = nameof(PendingOrderSchemeEntity.SchemeName),
             [ColIdentifier] = nameof(PendingOrderSchemeEntity.SchemeIdentifier),
             ["fldJan"] = nameof(PendingOrderSchemeEntity.DistributionMonthJan),
@@ -348,7 +359,7 @@ public static class DapperColumnMappings
             ["fldIsSelected"] = nameof(PendingOrderSchemeEntity.IsSelected),
             ["fldIsRemoved"] = nameof(PendingOrderSchemeEntity.IsRemoved),
             ["fldDataConsentDeclarationGiven"] = nameof(PendingOrderSchemeEntity.DataConsentDeclarationGiven),
-            ["fldPrice"] = nameof(PendingOrderSchemeEntity.Price),
+            [ColPrice] = nameof(PendingOrderSchemeEntity.Price),
             ["fldCanEditJan"] = nameof(PendingOrderSchemeEntity.CanEditJan),
             ["fldCanEditFeb"] = nameof(PendingOrderSchemeEntity.CanEditFeb),
             ["fldCanEditMar"] = nameof(PendingOrderSchemeEntity.CanEditMar),
@@ -400,7 +411,7 @@ public static class DapperColumnMappings
             ["fldContractId"] = nameof(BulkContractEntity.ContractId),
             [ColCustomerId] = nameof(BulkContractEntity.CustomerId),
             ["fldContractNumber"] = nameof(BulkContractEntity.ContractNumber),
-            ["fldSuffix"] = nameof(BulkContractEntity.Suffix),
+            [ColSuffix] = nameof(BulkContractEntity.Suffix),
             [ColYearId] = nameof(BulkContractEntity.YearId),
             ["fldSymbol"] = nameof(BulkContractEntity.Symbol),
             ["fldAdministrationCharge"] = nameof(BulkContractEntity.AdministrationCharge),
@@ -412,7 +423,7 @@ public static class DapperColumnMappings
             ["fldCourierPrice"] = nameof(BulkContractEntity.CourierPrice),
             ["fldSpecialDeliveryPrice"] = nameof(BulkContractEntity.SpecialDeliveryPrice),
             ["fldCommencementDate"] = nameof(BulkContractEntity.CommencementDate),
-            ["fldQalNumber"] = nameof(BulkContractEntity.QalNumber),
+            [ColQalNumber] = nameof(BulkContractEntity.QalNumber),
             ["fldContactName"] = nameof(BulkContractEntity.ContactName),
             ["fldOrganisation"] = nameof(BulkContractEntity.Organisation),
             [ColAddress1] = nameof(BulkContractEntity.Address1),
@@ -420,10 +431,10 @@ public static class DapperColumnMappings
             ["fldAddress3"] = nameof(BulkContractEntity.Address3),
             ["fldAddress4"] = nameof(BulkContractEntity.Address4),
             ["fldAddress5"] = nameof(BulkContractEntity.Address5),
-            ["fldCountry"] = nameof(BulkContractEntity.Country),
+            [ColCountry] = nameof(BulkContractEntity.Country),
             ["fldTelephone"] = nameof(BulkContractEntity.Telephone),
-            ["fldFax"] = nameof(BulkContractEntity.Fax),
-            ["fldEmail"] = nameof(BulkContractEntity.Email),
+            [ColFax] = nameof(BulkContractEntity.Fax),
+            [ColEmail] = nameof(BulkContractEntity.Email),
             ["fldInvoiceName"] = nameof(BulkContractEntity.InvoiceName),
             ["fldInvoiceOrganisation"] = nameof(BulkContractEntity.InvoiceOrganisation),
             ["fldInvoiceAddress1"] = nameof(BulkContractEntity.InvoiceAddress1),
@@ -438,7 +449,7 @@ public static class DapperColumnMappings
             ["fldAccountNumber"] = nameof(BulkContractEntity.AccountNumber),
             ["fldVatNumber"] = nameof(BulkContractEntity.VatNumber),
             ["fldVatRating"] = nameof(BulkContractEntity.VatRating),
-            ["fldPurchaseOrderNumber"] = nameof(BulkContractEntity.PurchaseOrderNumber),
+            [ColPurchaseOrderNumber] = nameof(BulkContractEntity.PurchaseOrderNumber),
         });
 
         Map<BulkContractItemEntity>(new(StringComparer.OrdinalIgnoreCase)
@@ -446,18 +457,18 @@ public static class DapperColumnMappings
             ["fldContractId"] = nameof(BulkContractItemEntity.ContractId),
             ["fldParticipantSchemeId"] = nameof(BulkContractItemEntity.ParticipantSchemeId),
             ["fldParticipantId"] = nameof(BulkContractItemEntity.ParticipantId),
-            ["fldSchemeId"] = nameof(BulkContractItemEntity.SchemeId),
+            [ColSchemeId] = nameof(BulkContractItemEntity.SchemeId),
             [ColIdentifier] = nameof(BulkContractItemEntity.Identifier),
             ["fldSchemeName"] = nameof(BulkContractItemEntity.SchemeName),
             ["fldLabCode"] = nameof(BulkContractItemEntity.LabCode),
-            ["fldLabName"] = nameof(BulkContractItemEntity.LabName),
+            [ColLabName] = nameof(BulkContractItemEntity.LabName),
             ["fldNoOfDistributions"] = nameof(BulkContractItemEntity.NoOfDistributions),
-            ["fldPrice"] = nameof(BulkContractItemEntity.Price),
+            [ColPrice] = nameof(BulkContractItemEntity.Price),
         });
 
         Map<CoreScheme>(new(StringComparer.OrdinalIgnoreCase)
         {
-            ["fldSchemeId"] = nameof(CoreScheme.SchemeId),
+            [ColSchemeId] = nameof(CoreScheme.SchemeId),
             ["fldSharedId"] = nameof(CoreScheme.SharedId),
             [ColYearId] = nameof(CoreScheme.YearId),
             [ColIdentifier] = nameof(CoreScheme.Identifier),
@@ -557,9 +568,9 @@ public static class DapperColumnMappings
         Map<SchemeCurrencyEntity>(new(StringComparer.OrdinalIgnoreCase)
         {
             ["fldSchemeCurrencyId"] = nameof(SchemeCurrencyEntity.SchemeCurrencyId),
-            ["fldSchemeId"] = nameof(SchemeCurrencyEntity.SchemeId),
+            [ColSchemeId] = nameof(SchemeCurrencyEntity.SchemeId),
             [ColCurrencyId] = nameof(SchemeCurrencyEntity.CurrencyId),
-            ["fldPrice"] = nameof(SchemeCurrencyEntity.Price),
+            [ColPrice] = nameof(SchemeCurrencyEntity.Price),
             ["fldCurrencyName"] = nameof(SchemeCurrencyEntity.CurrencyName),
             ["fldCurrencySymbol"] = nameof(SchemeCurrencyEntity.CurrencySymbol),
         });
@@ -577,7 +588,7 @@ public static class DapperColumnMappings
         Map<CountryEntity>(new(StringComparer.OrdinalIgnoreCase)
         {
             [ColCountryId] = nameof(CountryEntity.CountryId),
-            ["fldCountry"] = nameof(CountryEntity.Country),
+            [ColCountry] = nameof(CountryEntity.Country),
             ["fldCountryType"] = nameof(CountryEntity.CountryType),
         });
 
@@ -638,7 +649,7 @@ public static class DapperColumnMappings
         {
             [ColContractId] = nameof(SampleAddressEntity.ContractId),
             [ColParticipantId] = nameof(SampleAddressEntity.ParticipantId),
-            ["fldQalNumber"] = nameof(SampleAddressEntity.QalNumber),
+            [ColQalNumber] = nameof(SampleAddressEntity.QalNumber),
             [ColLabCode] = nameof(SampleAddressEntity.LabCode),
             [ColContactName] = nameof(SampleAddressEntity.ContactName),
             [ColOrganisation] = nameof(SampleAddressEntity.Organisation),
@@ -647,14 +658,14 @@ public static class DapperColumnMappings
             [ColAddress3] = nameof(SampleAddressEntity.Address3),
             [ColAddress4] = nameof(SampleAddressEntity.Address4),
             [ColAddress5] = nameof(SampleAddressEntity.Address5),
-            ["fldCountry"] = nameof(SampleAddressEntity.Country),
+            [ColCountry] = nameof(SampleAddressEntity.Country),
             [ColTelephone] = nameof(SampleAddressEntity.Telephone),
-            ["fldFax"] = nameof(SampleAddressEntity.Fax),
-            ["fldEmail"] = nameof(SampleAddressEntity.Email),
+            [ColFax] = nameof(SampleAddressEntity.Fax),
+            [ColEmail] = nameof(SampleAddressEntity.Email),
             ["fldVatNumber"] = nameof(SampleAddressEntity.VatNumber),
             ["fldAccountNumber"] = nameof(SampleAddressEntity.AccountNumber),
             ["fldVatRating"] = nameof(SampleAddressEntity.VatRating),
-            ["fldPurchaseOrderNumber"] = nameof(SampleAddressEntity.PurchaseOrderNumber),
+            [ColPurchaseOrderNumber] = nameof(SampleAddressEntity.PurchaseOrderNumber),
         });
 
         Map<SampleAddressSchemeEntity>(new(StringComparer.OrdinalIgnoreCase)
@@ -682,7 +693,7 @@ public static class DapperColumnMappings
             [ColAddress3] = nameof(ContractRenewalEntity.Address3),
             [ColAddress4] = nameof(ContractRenewalEntity.Address4),
             [ColAddress5] = nameof(ContractRenewalEntity.Address5),
-            ["fldCountry"] = nameof(ContractRenewalEntity.Country),
+            [ColCountry] = nameof(ContractRenewalEntity.Country),
             ["ContractStartDate"] = nameof(ContractRenewalEntity.ContractStartDate),
             ["ContractEndDate"] = nameof(ContractRenewalEntity.ContractEndDate),
             ["RenewalInformation"] = nameof(ContractRenewalEntity.RenewalInformation),
@@ -699,7 +710,7 @@ public static class DapperColumnMappings
             ["fldAdministrationChargeCurrencyId"] = nameof(AdministrationChargeCurrencyEntity.AdministrationChargeCurrencyId),
             ["fldAdministrationChargeId"] = nameof(AdministrationChargeCurrencyEntity.AdministrationChargeId),
             [ColCurrencyId] = nameof(AdministrationChargeCurrencyEntity.CurrencyId),
-            ["fldPrice"] = nameof(AdministrationChargeCurrencyEntity.Price),
+            [ColPrice] = nameof(AdministrationChargeCurrencyEntity.Price),
         });
 
         Map<PricingPercentageEntity>(new(StringComparer.OrdinalIgnoreCase)

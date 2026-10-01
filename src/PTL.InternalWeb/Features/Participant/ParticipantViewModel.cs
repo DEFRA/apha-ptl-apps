@@ -41,7 +41,9 @@ public sealed record PendingParticipantUpdateDetailsViewModel(
 // Labels, field order, lengths and character rules mirror that page's LoadLabelNames() exactly.
 public sealed class PendingParticipantUpdateFormViewModel
 {
-    public Guid ParticipantId { get; set; }
+    // Display-only hidden field; the route's participantId parameter is the value the controller
+    // actually trusts, so this stays nullable rather than defaulting to Guid.Empty on under-posting.
+    public Guid? ParticipantId { get; set; }
 
     public string? LabCode { get; set; }
 

@@ -212,10 +212,10 @@ public class PendingOrderRepositoryTests
         var command = Assert.Single(connection.ExecutedCommands, c => c.CommandText.Contains("spuPendingContractByPendingContractID", StringComparison.Ordinal));
         Assert.Contains("@PurchaseOrderNumber = @PurchaseOrderNumber", command.CommandText, StringComparison.Ordinal);
         Assert.Contains("@IsDeleted = @IsDeleted", command.CommandText, StringComparison.Ordinal);
-        Assert.Equal("PO-2", command.ParameterValue("PurchaseOrderNumber"));
-        Assert.Equal(false, command.ParameterValue("IsDeleted"));
-        Assert.Equal(true, command.ParameterValue("IsSubmitted"));
-        Assert.Equal(2026, command.ParameterValue("YearId"));
+        Assert.Equal("PO-2", (string?)command.ParameterValue("PurchaseOrderNumber"));
+        Assert.Equal(false, (bool?)command.ParameterValue("IsDeleted"));
+        Assert.Equal(true, (bool?)command.ParameterValue("IsSubmitted"));
+        Assert.Equal(2026, (int?)command.ParameterValue("YearId"));
     }
 
     // Same reasoning as above - 17 arguments makes a positional mismatch easy to introduce.
@@ -239,11 +239,11 @@ public class PendingOrderRepositoryTests
 
         var command = Assert.Single(connection.ExecutedCommands);
         Assert.Contains("@DataConsentDeclarationGiven = @DataConsentDeclarationGiven", command.CommandText, StringComparison.Ordinal);
-        Assert.Equal(pendingParticipantSchemeId, command.ParameterValue("PendingParticipantSchemeId"));
-        Assert.Equal(true, command.ParameterValue("DistributionMonthApr"));
-        Assert.Equal(false, command.ParameterValue("DistributionMonthMay"));
-        Assert.Equal(true, command.ParameterValue("ImportExportLicenceRequired"));
-        Assert.Equal(false, command.ParameterValue("IsRemoved"));
-        Assert.Equal(true, command.ParameterValue("DataConsentDeclarationGiven"));
+        Assert.Equal(pendingParticipantSchemeId, (Guid?)command.ParameterValue("PendingParticipantSchemeId"));
+        Assert.Equal(true, (bool?)command.ParameterValue("DistributionMonthApr"));
+        Assert.Equal(false, (bool?)command.ParameterValue("DistributionMonthMay"));
+        Assert.Equal(true, (bool?)command.ParameterValue("ImportExportLicenceRequired"));
+        Assert.Equal(false, (bool?)command.ParameterValue("IsRemoved"));
+        Assert.Equal(true, (bool?)command.ParameterValue("DataConsentDeclarationGiven"));
     }
 }

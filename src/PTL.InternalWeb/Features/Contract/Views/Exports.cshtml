@@ -6,9 +6,3 @@
 <h1 class="govuk-heading-l">Exports</h1>
 <p class="govuk-body">Exports for Mail Merges</p>
 
-<ul class="govuk-list">
-    @foreach (var item in Model.Items)
-    {
-        <li><a class="govuk-link" asp-action="@item.ActionName">@item.Text</a></li>
-    }
-</ul>

@@ -14,6 +14,9 @@ namespace PTL.InternalWeb.Features.Contract;
 // already authenticated with full access to Contract functionality. Policies will be added later.
 public class ContractController(IContractApiClient contractApiClient, ICustomerApiClient customerApiClient, ILookupApiClient lookupApiClient, IImportPermitApiClient importPermitApiClient, ILogger<ContractController> logger, IContractDocumentService documentService, IContractExportApiClient contractExportApiClient, IContractRenewalApiClient contractRenewalApiClient, IExportTemplateApiClient exportTemplateApiClient, IBulkExportApiClient bulkExportApiClient, ITemplateMergeService templateMergeService) : Controller
 {
+    // Legacy ExportBase.ShowError text, reused verbatim across upload/open/select/delete/export.
+    private const string FileNotFound = "File not found";
+
     private static readonly Action<ILogger, string, int, Exception?> LogBulkExportedMessage =
         LoggerMessage.Define<string, int>(
             LogLevel.Information,
@@ -266,7 +269,7 @@ public class ContractController(IContractApiClient contractApiClient, ICustomerA
 
         if (file is null || file.Length == 0)
         {
-            TempData.SetNotification(NotificationType.Error, "File not found");
+            TempData.SetNotification(NotificationType.Error, FileNotFound);
             return RedirectToAction(ExportActionFor(storageName));
         }
 
@@ -292,7 +295,7 @@ public class ContractController(IContractApiClient contractApiClient, ICustomerA
             return File(template.Content, template.ContentType, template.FileName);
         }
 
-        TempData.SetNotification(NotificationType.Error, "File not found");
+        TempData.SetNotification(NotificationType.Error, FileNotFound);
         return RedirectToAction(ExportActionFor(documentType));
     }
 
@@ -304,7 +307,7 @@ public class ContractController(IContractApiClient contractApiClient, ICustomerA
 
         TempData.SetNotification(
             selected ? NotificationType.Success : NotificationType.Error,
-            selected ? "Template selected successfully." : "File not found");
+            selected ? "Template selected successfully." : FileNotFound);
 
         return RedirectToAction(ExportActionFor(documentType));
     }
@@ -317,7 +320,7 @@ public class ContractController(IContractApiClient contractApiClient, ICustomerA
 
         TempData.SetNotification(
             deleted ? NotificationType.Success : NotificationType.Error,
-            deleted ? "Template deleted successfully." : "File not found");
+            deleted ? "Template deleted successfully." : FileNotFound);
 
         return RedirectToAction(ExportActionFor(documentType));
     }
@@ -342,7 +345,7 @@ public class ContractController(IContractApiClient contractApiClient, ICustomerA
         var template = await exportTemplateApiClient.DownloadTemplateAsync(selected.FileId, cancellationToken);
         if (template is null)
         {
-            TempData.SetNotification(NotificationType.Error, "File not found");
+            TempData.SetNotification(NotificationType.Error, FileNotFound);
             return RedirectToAction(ExportActionFor(storageName));
         }
 

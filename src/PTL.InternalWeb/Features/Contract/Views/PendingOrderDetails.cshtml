@@ -98,12 +98,12 @@ else
     </table>
 
     @* One form per row, declared outside the table so the row's inputs can reference it by id. *@
-    @foreach (var scheme in order.Schemes)
+    @foreach (var pendingParticipantSchemeId in order.Schemes.Select(scheme => scheme.PendingParticipantSchemeId))
     {
-        <form method="post" id="scheme-@scheme.PendingParticipantSchemeId"
+        <form method="post" id="scheme-@pendingParticipantSchemeId"
               asp-action="UpdatePendingOrderScheme"
               asp-route-pendingContractId="@order.PendingContractId"
-              asp-route-pendingParticipantSchemeId="@scheme.PendingParticipantSchemeId"></form>
+              asp-route-pendingParticipantSchemeId="@pendingParticipantSchemeId"></form>
     }
 }
 
