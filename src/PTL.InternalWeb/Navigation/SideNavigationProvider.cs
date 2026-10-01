@@ -50,7 +50,7 @@ public static class SideNavigationProvider
                 Disabled("External Site Management"),
                 new SideNavigationItem { Text = "Administration Charges Management", ControllerName = SystemAdministrationControllerName, ActionName = "AdministrationCharge" },
                 new SideNavigationItem { Text = "Weighted Charging Plan", ControllerName = SystemAdministrationControllerName, ActionName = "WeightedPricingPlan" },
-                Disabled("Postage Pricing Plan")
+                new SideNavigationItem { Text = "Postage Pricing Plan", ControllerName = SystemAdministrationControllerName, ActionName = "PostagePricingPlan" }
             ]
         },
         new SideNavigationItem

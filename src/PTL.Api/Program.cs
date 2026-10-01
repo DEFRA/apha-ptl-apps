@@ -17,6 +17,7 @@ using PTL.Core.Customer;
 using PTL.Core.GroupAddress;
 using PTL.Core.Lookup;
 using PTL.Core.Participant;
+using PTL.Core.PostagePricingPlan;
 using PTL.Core.Scheme;
 using PTL.Core.WeightedPricingPlan;
 using PTL.Data.AdministrationCharge;
@@ -32,6 +33,7 @@ using PTL.Data.GroupAddress;
 using PTL.Data.Infrastructure;
 using PTL.Data.Lookup;
 using PTL.Data.Participant;
+using PTL.Data.PostagePricingPlan;
 using PTL.Data.Scheme;
 using PTL.Data.Storage;
 using PTL.Data.WeightedPricingPlan;
@@ -130,6 +132,9 @@ builder.Services.AddScoped<IAdministrationChargeService, AdministrationChargeSer
 
 builder.Services.AddScoped<IWeightedPricingPlanRepository, WeightedPricingPlanRepository>();
 builder.Services.AddScoped<IWeightedPricingPlanService, WeightedPricingPlanService>();
+
+builder.Services.AddScoped<IPostagePricingPlanRepository, PostagePricingPlanRepository>();
+builder.Services.AddScoped<IPostagePricingPlanService, PostagePricingPlanService>();
 
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<PTL.Api.Infrastructure.GlobalExceptionHandler>();

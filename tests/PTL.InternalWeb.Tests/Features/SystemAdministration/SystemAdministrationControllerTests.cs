@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging.Abstractions;
 using PTL.Contracts.AdministrationCharge;
 using PTL.Contracts.Lookup;
+using PTL.Contracts.PostagePricingPlan;
 using PTL.Contracts.WeightedPricingPlan;
 using PTL.InternalWeb.Features.SystemAdministration;
 using PTL.InternalWeb.Tests.TestSupport;
@@ -13,10 +14,12 @@ public class SystemAdministrationControllerTests
     private static SystemAdministrationController CreateController(
         FakeAdministrationChargeApiClient? administrationChargeApiClient = null,
         FakeWeightedPricingPlanApiClient? weightedPricingPlanApiClient = null,
+        FakePostagePricingPlanApiClient? postagePricingPlanApiClient = null,
         FakeLookupApiClient? lookupApiClient = null) =>
         new(
             administrationChargeApiClient ?? new FakeAdministrationChargeApiClient(),
             weightedPricingPlanApiClient ?? new FakeWeightedPricingPlanApiClient(),
+            postagePricingPlanApiClient ?? new FakePostagePricingPlanApiClient(),
             lookupApiClient ?? new FakeLookupApiClient(),
             NullLogger<SystemAdministrationController>.Instance);
 
@@ -238,6 +241,218 @@ public class SystemAdministrationControllerTests
 
         var view = Assert.IsType<ViewResult>(result);
         var model = Assert.IsType<WeightedPricingPlanViewModel>(view.Model);
+        Assert.False(model.MessageIsError);
+        Assert.Contains("2026/27", model.Message);
+        Assert.Equal(1, apiClient.RenewCallCount);
+    }
+
+    [Fact]
+    public async Task PostagePricingPlan_NoYearsConfigured_ShowsBannerInsteadOfGrid()
+    {
+        var apiClient = new FakePostagePricingPlanApiClient { Years = new PostagePricingPlanYearsResponse([], false, null, null) };
+        var controller = CreateController(postagePricingPlanApiClient: apiClient);
+
+        var result = await controller.PostagePricingPlan(null, null, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<PostagePricingPlanViewModel>(view.Model);
+        Assert.True(model.HasNoYears);
+    }
+
+    [Fact]
+    public async Task PostagePricingPlan_NoYearIdRequested_DefaultsToCurrentFinancialYearWhenItHasAPlan()
+    {
+        var postageId = Guid.NewGuid();
+        var apiClient = new FakePostagePricingPlanApiClient
+        {
+            Years = new PostagePricingPlanYearsResponse([new YearResponse(2025, "2025/26"), new YearResponse(2026, "2026/27")], true, 2027, "2027/28")
+        };
+        var lookupApiClient = new FakeLookupApiClient
+        {
+            Years = [new YearResponse(2026, "2026/27"), new YearResponse(2027, "2027/28")],
+            PostagePricingPlans = [new PostagePricingPlanResponse(postageId, "Courier", 10m, 20m, 30m, 2026)]
+        };
+        var controller = CreateController(postagePricingPlanApiClient: apiClient, lookupApiClient: lookupApiClient);
+
+        var result = await controller.PostagePricingPlan(null, null, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<PostagePricingPlanViewModel>(view.Model);
+        Assert.Equal(2026, model.SelectedYearId);
+        var row = Assert.Single(model.Rows);
+        Assert.Equal("Courier", row.Name);
+        Assert.False(row.IsEditing);
+    }
+
+    [Fact]
+    public async Task PostagePricingPlan_CurrentYearHasNoPlan_FallsBackToEarliestAvailableYear()
+    {
+        var apiClient = new FakePostagePricingPlanApiClient
+        {
+            Years = new PostagePricingPlanYearsResponse([new YearResponse(2024, "2024/25")], false, null, null)
+        };
+        var lookupApiClient = new FakeLookupApiClient { Years = [new YearResponse(2026, "2026/27"), new YearResponse(2027, "2027/28")] };
+        var controller = CreateController(postagePricingPlanApiClient: apiClient, lookupApiClient: lookupApiClient);
+
+        var result = await controller.PostagePricingPlan(null, null, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<PostagePricingPlanViewModel>(view.Model);
+        Assert.Equal(2024, model.SelectedYearId);
+    }
+
+    [Fact]
+    public async Task PostagePricingPlan_EditIdMatchesRow_MarksThatRowAsEditingAndOthersReadOnly()
+    {
+        var editingId = Guid.NewGuid();
+        var otherId = Guid.NewGuid();
+        var apiClient = new FakePostagePricingPlanApiClient
+        {
+            Years = new PostagePricingPlanYearsResponse([new YearResponse(2026, "2026/27")], false, null, null)
+        };
+        var lookupApiClient = new FakeLookupApiClient
+        {
+            Years = [new YearResponse(2026, "2026/27")],
+            PostagePricingPlans =
+            [
+                new PostagePricingPlanResponse(editingId, "Biofreeze", 10m, 20m, 30m, 2026),
+                new PostagePricingPlanResponse(otherId, "Courier", 5m, 15m, 25m, 2026)
+            ]
+        };
+        var controller = CreateController(postagePricingPlanApiClient: apiClient, lookupApiClient: lookupApiClient);
+
+        var result = await controller.PostagePricingPlan(2026, editingId, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<PostagePricingPlanViewModel>(view.Model);
+        Assert.True(model.Rows.Single(r => r.PostageId == editingId).IsEditing);
+        Assert.False(model.Rows.Single(r => r.PostageId == otherId).IsEditing);
+    }
+
+    [Fact]
+    public async Task PostagePricingPlanSave_ValidModel_SavesAndRedirects()
+    {
+        var postageId = Guid.NewGuid();
+        var apiClient = new FakePostagePricingPlanApiClient();
+        var controller = CreateController(postagePricingPlanApiClient: apiClient);
+        var model = new PostagePricingPlanEditViewModel { PostageId = postageId, YearId = 2026, UKPrice = 5m, EUPrice = 10m, NonEUPrice = 15m };
+
+        var result = await controller.PostagePricingPlanSave(model, CancellationToken.None);
+
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal(nameof(SystemAdministrationController.PostagePricingPlan), redirect.ActionName);
+        Assert.Equal(postageId, apiClient.LastSetPriceRequest?.PostageId);
+    }
+
+    [Fact]
+    public async Task PostagePricingPlanSave_InvalidModel_RedisplaysRowInEditModeWithoutSaving()
+    {
+        var postageId = Guid.NewGuid();
+        var apiClient = new FakePostagePricingPlanApiClient
+        {
+            Years = new PostagePricingPlanYearsResponse([new YearResponse(2026, "2026/27")], false, null, null)
+        };
+        var lookupApiClient = new FakeLookupApiClient
+        {
+            Years = [new YearResponse(2026, "2026/27")],
+            PostagePricingPlans = [new PostagePricingPlanResponse(postageId, "Biofreeze", 10m, 20m, 30m, 2026)]
+        };
+        var controller = CreateController(postagePricingPlanApiClient: apiClient, lookupApiClient: lookupApiClient);
+        controller.ModelState.AddModelError("UKPrice", "A UK Price is required and must not be negative");
+        var model = new PostagePricingPlanEditViewModel { PostageId = postageId, YearId = 2026, UKPrice = -1m, EUPrice = 20m, NonEUPrice = 30m };
+
+        var result = await controller.PostagePricingPlanSave(model, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var resultModel = Assert.IsType<PostagePricingPlanViewModel>(view.Model);
+        var row = Assert.Single(resultModel.Rows);
+        Assert.True(row.IsEditing);
+        Assert.Equal(-1m, row.UKPrice);
+        Assert.Null(apiClient.LastSetPriceRequest);
+    }
+
+    [Fact]
+    public async Task PostagePricingPlanSave_ApiSaveFails_ReturnsViewWithError()
+    {
+        var postageId = Guid.NewGuid();
+        var apiClient = new FakePostagePricingPlanApiClient
+        {
+            Years = new PostagePricingPlanYearsResponse([new YearResponse(2026, "2026/27")], false, null, null),
+            SaveResult = new PostagePricingPlanSaveResult(false, new Dictionary<string, string[]> { ["UKPrice"] = ["A UK Price must not be negative"] })
+        };
+        var lookupApiClient = new FakeLookupApiClient
+        {
+            Years = [new YearResponse(2026, "2026/27")],
+            PostagePricingPlans = [new PostagePricingPlanResponse(postageId, "Biofreeze", 10m, 20m, 30m, 2026)]
+        };
+        var controller = CreateController(postagePricingPlanApiClient: apiClient, lookupApiClient: lookupApiClient);
+        var model = new PostagePricingPlanEditViewModel { PostageId = postageId, YearId = 2026, UKPrice = -1m, EUPrice = 20m, NonEUPrice = 30m };
+
+        var result = await controller.PostagePricingPlanSave(model, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        Assert.False(controller.ModelState.IsValid);
+        Assert.IsType<PostagePricingPlanViewModel>(view.Model);
+    }
+
+    // The legacy screen displays "Dry Ice" even though the stored fldName value has no space -
+    // DisplayName must cosmetically rename it without touching the underlying Name.
+    [Fact]
+    public async Task PostagePricingPlan_RowNamedDryice_DisplayNameIsCosmeticallyRenamed()
+    {
+        var postageId = Guid.NewGuid();
+        var apiClient = new FakePostagePricingPlanApiClient
+        {
+            Years = new PostagePricingPlanYearsResponse([new YearResponse(2026, "2026/27")], false, null, null)
+        };
+        var lookupApiClient = new FakeLookupApiClient
+        {
+            Years = [new YearResponse(2026, "2026/27")],
+            PostagePricingPlans = [new PostagePricingPlanResponse(postageId, "Dryice", 5m, 10m, 15m, 2026)]
+        };
+        var controller = CreateController(postagePricingPlanApiClient: apiClient, lookupApiClient: lookupApiClient);
+
+        var result = await controller.PostagePricingPlan(2026, null, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<PostagePricingPlanViewModel>(view.Model);
+        var row = Assert.Single(model.Rows);
+        Assert.Equal("Dryice", row.Name);
+        Assert.Equal("Dry Ice", row.DisplayName);
+    }
+
+    [Fact]
+    public async Task PostagePricingPlanRenew_Blocked_RedisplaysWithErrorMessageAndSameYear()
+    {
+        var apiClient = new FakePostagePricingPlanApiClient
+        {
+            Years = new PostagePricingPlanYearsResponse([new YearResponse(2025, "2025/26")], false, null, null),
+            RenewResponse = new PostagePricingPlanRenewResponse(false, "No postage pricing plan has been entered for the current financial year, so the plan cannot be renewed.")
+        };
+        var controller = CreateController(postagePricingPlanApiClient: apiClient);
+
+        var result = await controller.PostagePricingPlanRenew(2025, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<PostagePricingPlanViewModel>(view.Model);
+        Assert.True(model.MessageIsError);
+        Assert.Equal(2025, model.SelectedYearId);
+    }
+
+    [Fact]
+    public async Task PostagePricingPlanRenew_Succeeds_RedisplaysWithSuccessMessage()
+    {
+        var apiClient = new FakePostagePricingPlanApiClient
+        {
+            Years = new PostagePricingPlanYearsResponse([new YearResponse(2025, "2025/26")], false, null, null),
+            RenewResponse = new PostagePricingPlanRenewResponse(true, "The postage pricing plan has successfully been renewed for the financial year 2026/27.")
+        };
+        var controller = CreateController(postagePricingPlanApiClient: apiClient);
+
+        var result = await controller.PostagePricingPlanRenew(2025, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<PostagePricingPlanViewModel>(view.Model);
         Assert.False(model.MessageIsError);
         Assert.Contains("2026/27", model.Message);
         Assert.Equal(1, apiClient.RenewCallCount);
