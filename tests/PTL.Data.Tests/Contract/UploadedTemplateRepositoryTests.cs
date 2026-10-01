@@ -88,10 +88,10 @@ public class UploadedTemplateRepositoryTests
         });
 
         var command = Assert.Single(connection.ExecutedCommands, c => c.CommandText == CreateSql);
-        Assert.Equal(fileId, command.ParameterValue("FileId"));
-        Assert.Equal("Contract Template.docx", command.ParameterValue("Filename"));
-        Assert.Equal("Contracts", command.ParameterValue("DocumentType"));
-        Assert.Equal(false, command.ParameterValue("Selected"));
+        Assert.Equal(fileId, (Guid?)command.ParameterValue("FileId"));
+        Assert.Equal("Contract Template.docx", (string?)command.ParameterValue("Filename"));
+        Assert.Equal("Contracts", (string?)command.ParameterValue("DocumentType"));
+        Assert.Equal(false, (bool?)command.ParameterValue("Selected"));
     }
 
     [Fact]
@@ -104,8 +104,8 @@ public class UploadedTemplateRepositoryTests
         await repository.SetSelectedAsync(fileId, true);
 
         var command = Assert.Single(connection.ExecutedCommands, c => c.CommandText == SelectSql);
-        Assert.Equal(fileId, command.ParameterValue("FileId"));
-        Assert.Equal(true, command.ParameterValue("Selected"));
+        Assert.Equal(fileId, (Guid?)command.ParameterValue("FileId"));
+        Assert.Equal(true, (bool?)command.ParameterValue("Selected"));
     }
 
     [Fact]
