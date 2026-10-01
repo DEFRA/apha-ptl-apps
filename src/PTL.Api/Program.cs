@@ -6,18 +6,34 @@ using PTL.Common.Correlation;
 using PTL.Common.Health;
 using PTL.Core.AdministrationCharge;
 using PTL.Core.Contract;
+using PTL.Core.Contract.Export.Bulk;
+using PTL.Core.Contract.Export.Templates;
+using PTL.Core.Contract.ImportPermit;
+using PTL.Core.Contract.PendingOrder;
+using PTL.Core.Contract.Renew;
+using PTL.Core.Contract.Renewal;
+using PTL.Core.Contract.SampleAddress;
 using PTL.Core.Customer;
+using PTL.Core.GroupAddress;
 using PTL.Core.Lookup;
 using PTL.Core.Participant;
 using PTL.Core.Scheme;
 using PTL.Core.WeightedPricingPlan;
 using PTL.Data.AdministrationCharge;
 using PTL.Data.Contract;
+using PTL.Data.Contract.Export;
+using PTL.Data.Contract.ImportPermit;
+using PTL.Data.Contract.PendingOrder;
+using PTL.Data.Contract.Renew;
+using PTL.Data.Contract.Renewal;
+using PTL.Data.Contract.SampleAddress;
 using PTL.Data.Customer;
+using PTL.Data.GroupAddress;
 using PTL.Data.Infrastructure;
 using PTL.Data.Lookup;
 using PTL.Data.Participant;
 using PTL.Data.Scheme;
+using PTL.Data.Storage;
 using PTL.Data.WeightedPricingPlan;
 using Serilog;
 
@@ -55,13 +71,53 @@ builder.Services.AddHealthChecks()
 builder.Services.AddControllers();
 
 builder.Services.AddScoped<ICustomerRepository, CustomerRepository>();
+builder.Services.AddScoped<IPendingCustomerUpdateRepository, PendingCustomerUpdateRepository>();
 builder.Services.AddScoped<ICustomerService, CustomerService>();
 
+builder.Services.AddScoped<IGroupAddressRepository, GroupAddressRepository>();
+builder.Services.AddScoped<IGroupAddressService, GroupAddressService>();
+
 builder.Services.AddScoped<IParticipantRepository, ParticipantRepository>();
+builder.Services.AddScoped<IPendingParticipantUpdateRepository, PendingParticipantUpdateRepository>();
 builder.Services.AddScoped<IParticipantService, ParticipantService>();
+builder.Services.AddScoped<IParticipantSchemeRepository, ParticipantSchemeRepository>();
+builder.Services.AddScoped<IParticipantSchemeService, ParticipantSchemeService>();
 
 builder.Services.AddScoped<IContractRepository, ContractRepository>();
 builder.Services.AddScoped<IContractService, ContractService>();
+
+builder.Services.AddScoped<IImportPermitRepository, ImportPermitRepository>();
+builder.Services.AddScoped<IImportPermitService, ImportPermitService>();
+
+builder.Services.AddScoped<ISampleAddressRepository, SampleAddressRepository>();
+builder.Services.AddScoped<ISampleAddressService, SampleAddressService>();
+
+builder.Services.AddScoped<IContractRenewalRepository, ContractRenewalRepository>();
+builder.Services.AddScoped<IContractRenewalService, ContractRenewalService>();
+
+builder.Services.AddScoped<IContractMergeRepository, ContractMergeRepository>();
+builder.Services.AddScoped<IRenewContractsService, RenewContractsService>();
+builder.Services.AddScoped<IPendingOrderRepository, PendingOrderRepository>();
+builder.Services.AddScoped<IPendingOrderService, PendingOrderService>();
+
+builder.Services.Configure<TemplateStorageOptions>(builder.Configuration.GetSection(TemplateStorageOptions.SectionName));
+builder.Services.AddScoped<IUploadedTemplateRepository, UploadedTemplateRepository>();
+builder.Services.AddScoped<IExportTemplateService, ExportTemplateService>();
+builder.Services.AddScoped<IBulkExportRepository, BulkExportRepository>();
+builder.Services.AddScoped<IBulkExportService, BulkExportService>();
+
+// The S3 client is only resolved when a template is actually read or written, so the application
+// starts and every test runs without AWS credentials or bucket access.
+if (string.Equals(builder.Configuration[$"{TemplateStorageOptions.SectionName}:Provider"], "InMemory", StringComparison.OrdinalIgnoreCase))
+{
+    builder.Services.AddSingleton<ITemplateStorageService, InMemoryTemplateStorageService>();
+}
+else
+{
+    builder.Services.AddDefaultAWSOptions(builder.Configuration.GetAWSOptions());
+    builder.Services.AddAWSService<Amazon.S3.IAmazonS3>();
+    builder.Services.AddScoped<ITemplateStorageService, S3TemplateStorageService>();
+}
 
 builder.Services.AddScoped<ISchemeRepository, SchemeRepository>();
 builder.Services.AddScoped<ISchemeService, SchemeService>();

@@ -20,10 +20,11 @@ public static class SideNavigationProvider
     private const string CreateAction = "Create";
     private const string EditAction = "Edit";
     private const string DetailsAction = "Details";
+    private const string SchemeControllerName = "Scheme";
     private const string CustomerControllerName = "Customer";
     private const string ParticipantControllerName = "Participant";
     private const string ContractControllerName = "Contract";
-    private const string SchemeControllerName = "Scheme";
+    private const string GroupAddressControllerName = "GroupAddress";
     private const string SystemAdministrationControllerName = "SystemAdministration";
 
     // Placeholder for a menu entry whose page hasn't been migrated yet - see class remarks.
@@ -67,16 +68,42 @@ public static class SideNavigationProvider
                     Children =
                     [
                         new SideNavigationItem { Text = "Create Customer", ControllerName = CustomerControllerName, ActionName = CreateAction },
-                        Disabled("Review Pending Customer Updates"),
-                        Disabled("Review Pending Participant Updates"),
-                        Disabled("Review Pending Orders"),
+                        new SideNavigationItem
+                        {
+                            Text = "Review Pending Customer Updates",
+                            ControllerName = CustomerControllerName,
+                            ActionName = "ReviewPendingCustomerUpdates",
+                            Children =
+                            [
+                                new SideNavigationItem { Text = "Pending Customer Update Details", ControllerName = CustomerControllerName, ActionName = "PendingCustomerUpdateDetails", IsHidden = true },
+                                new SideNavigationItem { Text = "Edit Pending Customer Update", ControllerName = CustomerControllerName, ActionName = "EditPendingCustomerUpdate", IsHidden = true }
+                            ]
+                        },
+                        new SideNavigationItem
+                        {
+                            Text = "Review Pending Participant Updates",
+                            ControllerName = ParticipantControllerName,
+                            ActionName = "ReviewPendingParticipantUpdates",
+                            Children =
+                            [
+                                new SideNavigationItem { Text = "Pending Participant Update Details", ControllerName = ParticipantControllerName, ActionName = "PendingParticipantUpdateDetails", IsHidden = true },
+                                new SideNavigationItem { Text = "Edit Pending Participant Update", ControllerName = ParticipantControllerName, ActionName = "EditPendingParticipantUpdate", IsHidden = true }
+                            ]
+                        },
+                        new SideNavigationItem
+                        {
+                            Text = "Review Pending Orders",
+                            ControllerName = ContractControllerName,
+                            ActionName = "ReviewPendingOrders",
+                            Children =
+                            [
+                                new SideNavigationItem { Text = "Pending Order Details", ControllerName = ContractControllerName, ActionName = "PendingOrderDetails", IsHidden = true }
+                            ]
+                        },
 
-                        // Hidden: only reached via a specific customer row's "View" link - lets the
-                        // breadcrumb trail resolve to Manage Contracts > Customers > Customer Details
-                        // instead of falling back to a plain controller/action crumb.
+                        // Hidden: not a menu entry, but present so Details/Edit pages resolve a full
+                        // breadcrumb trail instead of a plain controller/action crumb.
                         new SideNavigationItem { Text = "Customer Details", ControllerName = CustomerControllerName, ActionName = DetailsAction, IsHidden = true },
-
-                        // Hidden: same reasoning as "Customer Details" above, for the Edit page.
                         new SideNavigationItem { Text = "Edit Customer", ControllerName = CustomerControllerName, ActionName = EditAction, IsHidden = true },
 
                         // Hidden: only reached from within a specific customer (Customer Details'
@@ -104,6 +131,7 @@ public static class SideNavigationProvider
                             Children =
                             [
                                 new SideNavigationItem { Text = "Create Contract", ControllerName = ContractControllerName, ActionName = CreateAction },
+                                new SideNavigationItem { Text = "Renew Contracts", ControllerName = ContractControllerName, ActionName = "RenewContracts" },
                                 new SideNavigationItem { Text = "Contract Details", ControllerName = ContractControllerName, ActionName = DetailsAction, IsHidden = true },
                                 new SideNavigationItem { Text = "Edit Contract", ControllerName = ContractControllerName, ActionName = EditAction, IsHidden = true }
                             ]
@@ -111,8 +139,31 @@ public static class SideNavigationProvider
                     ]
                 },
                 Disabled("Search"),
-                Disabled("Group Addresses"),
-                Disabled("Exports"),
+                new SideNavigationItem
+                {
+                    Text = "Group Addresses",
+                    ControllerName = GroupAddressControllerName,
+                    ActionName = IndexAction,
+                    Children =
+                    [
+                        new SideNavigationItem { Text = "Create Group Address", ControllerName = GroupAddressControllerName, ActionName = CreateAction },
+                        new SideNavigationItem { Text = "Group Address Details", ControllerName = GroupAddressControllerName, ActionName = DetailsAction, IsHidden = true },
+                        new SideNavigationItem { Text = "Edit Group Address", ControllerName = GroupAddressControllerName, ActionName = EditAction, IsHidden = true }
+                    ]
+                },
+                new SideNavigationItem
+                {
+                    Text = "Exports",
+                    ControllerName = ContractControllerName,
+                    ActionName = "Exports",
+                    Children =
+                    [
+                        new SideNavigationItem { Text = "Export Contracts", ControllerName = ContractControllerName, ActionName = "ExportContracts" },
+                        new SideNavigationItem { Text = "Export Job Sheets", ControllerName = ContractControllerName, ActionName = "ExportJobSheets" },
+                        new SideNavigationItem { Text = "Export Renewal Letters", ControllerName = ContractControllerName, ActionName = "ExportRenewalLetters" },
+                        new SideNavigationItem { Text = "Export Address Confirmation Letters", ControllerName = ContractControllerName, ActionName = "ExportAddressConfirmationLetters" }
+                    ]
+                },
                 Disabled("Invoice Generation")
             ]
         },
@@ -132,16 +183,14 @@ public static class SideNavigationProvider
                     [
                         new SideNavigationItem { Text = "Create Scheme", ControllerName = SchemeControllerName, ActionName = CreateAction },
 
+                        // Hidden: not menu entries, but present so Details/Edit pages resolve a full
+                        // breadcrumb trail instead of a plain controller/action crumb.
+                        new SideNavigationItem { Text = "Scheme Details", ControllerName = SchemeControllerName, ActionName = DetailsAction, IsHidden = true },
+                        new SideNavigationItem { Text = "Edit Scheme", ControllerName = SchemeControllerName, ActionName = EditAction, IsHidden = true },
+
                         // Hidden: only reached from a specific scheme's Details page ("View family
                         // history" link), not listed as a Scheme List child - same hidden pattern.
-                        new SideNavigationItem { Text = "Scheme History", ControllerName = SchemeControllerName, ActionName = "History", IsHidden = true },
-
-                        // Hidden: lets the breadcrumb trail resolve to Manage Schemes > Scheme >
-                        // Scheme Details instead of falling back to a plain controller/action crumb.
-                        new SideNavigationItem { Text = "Scheme Details", ControllerName = SchemeControllerName, ActionName = DetailsAction, IsHidden = true },
-
-                        // Hidden: same reasoning as "Scheme Details" above, for the Edit page.
-                        new SideNavigationItem { Text = "Edit Scheme", ControllerName = SchemeControllerName, ActionName = EditAction, IsHidden = true }
+                        new SideNavigationItem { Text = "Scheme History", ControllerName = SchemeControllerName, ActionName = "History", IsHidden = true }
                     ]
                 },
                 Disabled("Search"),
@@ -202,5 +251,11 @@ public static class SideNavigationProvider
 
         return null;
     }
+
+    public static SideNavigationItem? FindActiveNode(IReadOnlyList<SideNavigationItem> items, string controllerName, string actionName) =>
+        FindNode(items, controllerName, actionName);
+
+    public static IReadOnlyList<SideNavigationItem>? FindActivePath(IReadOnlyList<SideNavigationItem> items, string controllerName, string actionName) =>
+        FindPath(items, controllerName, actionName);
 }
 

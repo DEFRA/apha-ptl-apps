@@ -32,6 +32,16 @@
     <Using Include="Xunit" />
   </ItemGroup>
 
+  <!-- UsePtlWebFrontEnd calls MapStaticAssets, which demands a "{ApplicationName}.staticwebassets.
+       endpoints.json" next to the entry assembly. Under dotnet test the application name is
+       "testhost", so an empty manifest is shipped to the output directory under that name. -->
+  <ItemGroup>
+    <None Include="TestSupport\testhost.staticwebassets.endpoints.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Link>testhost.staticwebassets.endpoints.json</Link>
+    </None>
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\..\src\PTL.ApiClient\PTL.ApiClient.csproj" />
   </ItemGroup>

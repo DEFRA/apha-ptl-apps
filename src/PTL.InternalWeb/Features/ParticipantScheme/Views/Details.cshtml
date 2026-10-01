@@ -1,0 +1,18 @@
+@model PTL.InternalWeb.Features.ParticipantScheme.ParticipantSchemeDetailsViewModel
+@{
+    ViewData["Title"] = Model.IsReadOnly ? "Contract Item (Removed)" : "Contract Item Details";
+}
+
+<a class="govuk-back-link" asp-controller="Contract" asp-action="ContractItems" asp-route-id="@Model.Fields.ContractId">Back</a>
+
+<h1 class="govuk-heading-l">@ViewData["Title"]</h1>
+
+<p class="govuk-body"><strong>Participant:</strong> @Model.Fields.ParticipantDisplayName</p>
+<p class="govuk-body"><strong>Scheme:</strong> @Model.Fields.SchemeDisplayName</p>
+
+<partial name="_ParticipantSchemeFields" model="Model.Fields" />
+
+@if (!Model.IsReadOnly)
+{
+    <a class="govuk-button" data-module="govuk-button" asp-action="Edit" asp-route-id="@Model.Fields.ParticipantSchemeId">Edit</a>
+}

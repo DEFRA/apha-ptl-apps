@@ -39,6 +39,8 @@ public class ContractRouteSmokeTests : IClassFixture<WebApplicationFactory<Progr
                 services.AddSingleton<ILookupApiClient>(new FakeLookupApiClient());
                 services.RemoveAll<ICustomerApiClient>();
                 services.AddSingleton<ICustomerApiClient>(new FakeCustomerApiClient { CustomerResponse = SampleCustomer(customerId) });
+                services.RemoveAll<IImportPermitApiClient>();
+                services.AddSingleton<IImportPermitApiClient>(new FakeImportPermitApiClient());
             }));
     }
 

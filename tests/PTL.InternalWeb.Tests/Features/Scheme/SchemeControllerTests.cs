@@ -186,4 +186,53 @@ public class SchemeControllerTests
 
         Assert.IsType<ViewResult>(result);
     }
+
+    [Fact]
+    public async Task Create_Post_SuccessWithoutSchemePayload_ReturnsViewWithGenericError()
+    {
+        var apiClient = new FakeSchemeApiClient
+        {
+            SaveResult = new SchemeSaveResult(true, null, new Dictionary<string, string[]>())
+        };
+        var controller = CreateController(apiClient);
+        var model = new PTL.InternalWeb.Features.Scheme.SchemeFormViewModel { YearId = 2027, Identifier = "PT1234", Name = "Test Scheme" };
+
+        var result = await controller.Create(model, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        Assert.Same(model, view.Model);
+        Assert.Contains(
+            controller.ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage),
+            message => message == "The scheme could not be created.");
+    }
+
+    [Fact]
+    public async Task Edit_Post_InvalidModelState_ReturnsViewWithModel()
+    {
+        var controller = CreateController(new FakeSchemeApiClient());
+        controller.ModelState.AddModelError("Identifier", "Enter an identifier");
+        var model = new PTL.InternalWeb.Features.Scheme.SchemeFormViewModel();
+
+        var result = await controller.Edit(Guid.NewGuid(), model, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        Assert.Same(model, view.Model);
+    }
+
+    [Fact]
+    public async Task Edit_Post_ApiFailure_AddsErrorsAndReturnsView()
+    {
+        var apiClient = new FakeSchemeApiClient
+        {
+            SaveResult = new SchemeSaveResult(false, null, new Dictionary<string, string[]> { ["Identifier"] = ["Identifier is required"] })
+        };
+        var controller = CreateController(apiClient);
+        var model = new PTL.InternalWeb.Features.Scheme.SchemeFormViewModel { YearId = 2027, Identifier = "PT1234", Name = "Test Scheme" };
+
+        var result = await controller.Edit(Guid.NewGuid(), model, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        Assert.Same(model, view.Model);
+        Assert.False(controller.ModelState.IsValid);
+    }
 }

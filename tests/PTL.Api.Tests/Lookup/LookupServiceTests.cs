@@ -35,6 +35,23 @@ public class LookupServiceTests
     }
 
     [Fact]
+    public async Task GetGroupAddressesAsync_ReturnsRepositoryResult()
+    {
+        var groupAddressId = Guid.NewGuid();
+        var repository = new FakeLookupRepository
+        {
+            GroupAddresses = [new GroupAddressEntity { GroupAddressId = groupAddressId, Identifier = "PTL-001", Address1 = "1 Sample Street" }]
+        };
+        var service = new LookupService(repository);
+
+        var result = await service.GetGroupAddressesAsync();
+
+        Assert.Single(result);
+        Assert.Equal(groupAddressId, result[0].GroupAddressId);
+        Assert.Equal("PTL-001", result[0].Identifier);
+    }
+
+    [Fact]
     public async Task GetCustomerTypesAsync_ReturnsRepositoryResult()
     {
         var repository = new FakeLookupRepository

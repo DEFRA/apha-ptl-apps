@@ -90,4 +90,26 @@ public class ParticipantValidatorTests
 
         Assert.Contains(result.Errors, e => e.Field == "Email");
     }
+
+    [Fact]
+    public void Validate_InvalidAlternativeEmailFormat_ReturnsError()
+    {
+        var participant = ValidActiveParticipant();
+        participant.Email2 = "not-an-email";
+
+        var result = ParticipantValidator.Validate(participant);
+
+        Assert.Contains(result.Errors, e => e.Field == "Email2");
+    }
+
+    [Fact]
+    public void Validate_ValidAlternativeEmail_ReturnsNoError()
+    {
+        var participant = ValidActiveParticipant();
+        participant.Email2 = "alice.alt@example.com";
+
+        var result = ParticipantValidator.Validate(participant);
+
+        Assert.True(result.IsValid);
+    }
 }

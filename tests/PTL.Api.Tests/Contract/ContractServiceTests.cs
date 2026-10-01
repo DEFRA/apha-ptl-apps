@@ -1,13 +1,14 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using PTL.Contracts.Contract;
 using PTL.Core.Contract;
+using PTL.Core.Participant;
 
 namespace PTL.Api.Tests.Contract;
 
 public class ContractServiceTests
 {
-    private static ContractService CreateService(FakeContractRepository repository) =>
-        new(repository, NullLogger<ContractService>.Instance);
+    private static ContractService CreateService(FakeContractRepository repository, FakeParticipantSchemeRepository? participantSchemeRepository = null) =>
+        new(repository, participantSchemeRepository ?? new FakeParticipantSchemeRepository(), NullLogger<ContractService>.Instance);
 
     private static PTL.Core.Contract.Contract ValidContract(Guid? customerId = null, int? yearId = null) => new()
     {
@@ -167,5 +168,113 @@ public class ContractServiceTests
 
         Assert.NotNull(updated);
         Assert.False(updated!.IsOnlineOrder);
+    }
+
+    private static ContractItemsAggregate ValidItems(Guid contractId, bool isReadOnly = false) => new()
+    {
+        ContractId = contractId,
+        Suffix = "A",
+        YearId = DateTime.UtcNow.Year,
+        QalNumber = "QAL/00001",
+        Symbol = "£",
+        DiscountRate = 0.1m,
+        AdministrationCharge = 5m,
+        NumberCourier = 2,
+        CourierPrice = 10m,
+        NumberPostage = 1,
+        PostagePrice = 3m,
+        NumberSpecialDelivery = 0,
+        SpecialDeliveryPrice = 0m,
+        IsReadOnly = isReadOnly
+    };
+
+    [Fact]
+    public async Task GetContractItemsAsync_ExistingContract_ReturnsAggregate()
+    {
+        var repository = new FakeContractRepository { ContractItems = ValidItems(Guid.NewGuid()) };
+        var service = CreateService(repository);
+
+        var items = await service.GetContractItemsAsync(repository.ContractItems!.ContractId);
+
+        Assert.NotNull(items);
+        Assert.Equal(20m, items!.CourierPriceTotal);
+    }
+
+    [Fact]
+    public async Task GetContractItemsAsync_UnknownContract_ReturnsNull()
+    {
+        var service = CreateService(new FakeContractRepository());
+
+        var items = await service.GetContractItemsAsync(Guid.NewGuid());
+
+        Assert.Null(items);
+    }
+
+    [Fact]
+    public async Task RemoveContractItemAsync_UnknownContract_ReturnsFalse()
+    {
+        var service = CreateService(new FakeContractRepository());
+
+        var removed = await service.RemoveContractItemAsync(Guid.NewGuid(), Guid.NewGuid());
+
+        Assert.False(removed);
+    }
+
+    [Fact]
+    public async Task RemoveContractItemAsync_ReadOnlyContract_ThrowsContractValidationException()
+    {
+        var repository = new FakeContractRepository();
+        var contractId = Guid.NewGuid();
+        repository.Seed(new PTL.Core.Contract.Contract { ContractId = contractId, IsReadOnly = true });
+        var service = CreateService(repository);
+
+        await Assert.ThrowsAsync<ContractValidationException>(() => service.RemoveContractItemAsync(contractId, Guid.NewGuid()));
+    }
+
+    [Fact]
+    public async Task RemoveContractItemAsync_ItemNotFound_ReturnsFalse()
+    {
+        var repository = new FakeContractRepository();
+        var contractId = Guid.NewGuid();
+        repository.Seed(new PTL.Core.Contract.Contract { ContractId = contractId, IsReadOnly = false });
+        var service = CreateService(repository);
+
+        var removed = await service.RemoveContractItemAsync(contractId, Guid.NewGuid());
+
+        Assert.False(removed);
+    }
+
+    [Fact]
+    public async Task RemoveContractItemAsync_ItemBelongsToDifferentContract_ReturnsFalse()
+    {
+        var repository = new FakeContractRepository();
+        var contractId = Guid.NewGuid();
+        repository.Seed(new PTL.Core.Contract.Contract { ContractId = contractId, IsReadOnly = false });
+        var participantSchemeRepository = new FakeParticipantSchemeRepository();
+        var participantSchemeId = Guid.NewGuid();
+        participantSchemeRepository.Add(new ParticipantSchemeRecord { ParticipantSchemeId = participantSchemeId, ContractId = Guid.NewGuid() });
+        var service = CreateService(repository, participantSchemeRepository);
+
+        var removed = await service.RemoveContractItemAsync(contractId, participantSchemeId);
+
+        Assert.False(removed);
+    }
+
+    [Fact]
+    public async Task RemoveContractItemAsync_ValidItem_SoftDeletesAndReturnsTrue()
+    {
+        var repository = new FakeContractRepository();
+        var contractId = Guid.NewGuid();
+        repository.Seed(new PTL.Core.Contract.Contract { ContractId = contractId, IsReadOnly = false });
+        var participantSchemeRepository = new FakeParticipantSchemeRepository();
+        var participantSchemeId = Guid.NewGuid();
+        participantSchemeRepository.Add(new ParticipantSchemeRecord { ParticipantSchemeId = participantSchemeId, ContractId = contractId });
+        var service = CreateService(repository, participantSchemeRepository);
+
+        var removed = await service.RemoveContractItemAsync(contractId, participantSchemeId);
+
+        Assert.True(removed);
+        var record = await participantSchemeRepository.GetByIdAsync(participantSchemeId);
+        Assert.True(record!.IsRemoved);
     }
 }

@@ -62,6 +62,24 @@ public sealed class LookupController(ILookupService lookupService) : ControllerB
         return Ok(years.Select(y => new YearResponse(y.YearId, y.Year)).ToList());
     }
 
+    // GET /api/lookups/years/weighted-pricing - years that have a weighted-pricing plan configured
+    // (matches legacy WeightedPricingYearCollection.PricingPlanExists, used by ParticipantScheme.
+    // aspx.vb's LoadPricingOptions to decide which Pricing Plan options to offer).
+    [HttpGet("years/weighted-pricing")]
+    public async Task<ActionResult<IReadOnlyList<YearResponse>>> GetWeightedPricingYears(CancellationToken cancellationToken)
+    {
+        var years = await lookupService.GetWeightedPricingYearsAsync(cancellationToken);
+        return Ok(years.Select(y => new YearResponse(y.YearId, y.Year)).ToList());
+    }
+
+    // GET /api/lookups/group-addresses - see ParticipantScheme.aspx's "Select a Group Address" popup.
+    [HttpGet("group-addresses")]
+    public async Task<ActionResult<IReadOnlyList<GroupAddressResponse>>> GetGroupAddresses(CancellationToken cancellationToken)
+    {
+        var groupAddresses = await lookupService.GetGroupAddressesAsync(cancellationToken);
+        return Ok(groupAddresses.Select(g => new GroupAddressResponse(g.GroupAddressId, g.Identifier, g.Address1, g.CountryId)).ToList());
+    }
+
     // GET /api/lookups/schemes/{schemeId}/currencies - see docs/analysis/scheme-analysis.md,
     // "Scheme Currency Read Operations".
     [HttpGet("schemes/{schemeId:guid}/currencies")]

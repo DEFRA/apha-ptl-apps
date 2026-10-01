@@ -3,7 +3,10 @@ using PTL.Contracts.Customer;
 
 namespace PTL.Core.Customer;
 
-public sealed class CustomerService(ICustomerRepository customerRepository, ILogger<CustomerService> logger) : ICustomerService
+public sealed class CustomerService(
+    ICustomerRepository customerRepository,
+    IPendingCustomerUpdateRepository pendingCustomerUpdateRepository,
+    ILogger<CustomerService> logger) : ICustomerService
 {
     private static readonly Action<ILogger, string?, CustomerStatusFilter, int, int, int, Exception?> LogCustomerSearchMessage =
         LoggerMessage.Define<string?, CustomerStatusFilter, int, int, int>(
@@ -129,5 +132,68 @@ public sealed class CustomerService(ICustomerRepository customerRepository, ILog
             LogCustomerValidationFailedMessage(logger, customer.CustomerId, string.Join("; ", result.Errors.Select(e => e.Message)), null);
             throw new CustomerValidationException(result.Errors);
         }
+    }
+
+    public Task<IReadOnlyList<PendingCustomerUpdateSummaryEntity>> GetPendingCustomerUpdatesAsync(CancellationToken cancellationToken = default) =>
+        pendingCustomerUpdateRepository.GetSummariesAsync(cancellationToken);
+
+    public async Task<(Customer Current, PendingCustomerUpdate Pending)?> GetPendingCustomerUpdateAsync(Guid customerId, CancellationToken cancellationToken = default)
+    {
+        var current = await customerRepository.GetByIdAsync(customerId, cancellationToken);
+        var pending = await pendingCustomerUpdateRepository.GetByCustomerIdAsync(customerId, cancellationToken);
+        return current is null || pending is null ? null : (current, pending);
+    }
+
+    // Only approved changes update the live customer record - matches
+    // PendingCustomerUpdateDetails.aspx's ButtonApprove_Click (mCustomer.Save() then
+    // mPendingCustomerUpdate.Save() with IsDeleted=True), including its mcustomer.IsValid check.
+    public async Task<bool> ApprovePendingCustomerUpdateAsync(Guid customerId, PendingCustomerUpdate? editedFields = null, CancellationToken cancellationToken = default)
+    {
+        var existing = await customerRepository.GetByIdAsync(customerId, cancellationToken);
+        var pending = await pendingCustomerUpdateRepository.GetByCustomerIdAsync(customerId, cancellationToken);
+        if (existing is null || pending is null)
+        {
+            return false;
+        }
+
+        ApplyPendingFields(existing, editedFields ?? pending);
+        Validate(existing);
+        await customerRepository.UpdateAsync(existing, cancellationToken);
+        return await pendingCustomerUpdateRepository.MarkDecidedAsync(customerId, pending.PendingCustomerUpdateId, cancellationToken);
+    }
+
+    // Declined changes do not update the live record - only the pending row is soft-deleted.
+    public async Task<bool> DeclinePendingCustomerUpdateAsync(Guid customerId, CancellationToken cancellationToken = default)
+    {
+        var pending = await pendingCustomerUpdateRepository.GetByCustomerIdAsync(customerId, cancellationToken);
+        return pending is not null && await pendingCustomerUpdateRepository.MarkDecidedAsync(customerId, pending.PendingCustomerUpdateId, cancellationToken);
+    }
+
+    private static void ApplyPendingFields(Customer customer, PendingCustomerUpdate pending)
+    {
+        customer.ContactName = pending.ContactName;
+        customer.Organisation = pending.Organisation;
+        customer.Address1 = pending.Address1;
+        customer.Address2 = pending.Address2;
+        customer.Address3 = pending.Address3;
+        customer.Address4 = pending.Address4;
+        customer.Address5 = pending.Address5;
+        customer.CountryId = pending.CountryId;
+        customer.Telephone = pending.Telephone;
+        customer.Telephone2 = pending.Telephone2;
+        customer.Fax = pending.Fax;
+        customer.Email = pending.Email;
+        customer.InvoiceName = pending.InvoiceName;
+        customer.InvoiceOrganisation = pending.InvoiceOrganisation;
+        customer.InvoiceAddress1 = pending.InvoiceAddress1;
+        customer.InvoiceAddress2 = pending.InvoiceAddress2;
+        customer.InvoiceAddress3 = pending.InvoiceAddress3;
+        customer.InvoiceAddress4 = pending.InvoiceAddress4;
+        customer.InvoiceAddress5 = pending.InvoiceAddress5;
+        customer.InvoiceCountryId = pending.InvoiceCountryId;
+        customer.InvoiceTelephone = pending.InvoiceTelephone;
+        customer.InvoiceTelephone2 = pending.InvoiceTelephone2;
+        customer.InvoiceFax = pending.InvoiceFax;
+        customer.InvoiceEmail = pending.InvoiceEmail;
     }
 }

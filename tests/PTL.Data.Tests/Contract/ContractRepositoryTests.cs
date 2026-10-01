@@ -153,4 +153,120 @@ public class ContractRepositoryTests
 
         Assert.Null(result);
     }
+
+    private const string GetContractItemsSql = "EXEC dbo.spgContractItems @ContractId";
+
+    private static DataSet ContractItemsDataSet(Guid contractId, Guid schemeId, Guid participantSchemeId, Guid participantId, bool isRemoved = false)
+    {
+        var header = new DataTable();
+        header.Columns.Add("fldContractId", typeof(Guid));
+        header.Columns.Add("fldSuffix", typeof(string));
+        header.Columns.Add("fldYearId", typeof(int));
+        header.Columns.Add("fldQalNumber", typeof(string));
+        header.Columns.Add("fldSymbol", typeof(string));
+        header.Columns.Add("fldDiscountRate", typeof(decimal));
+        header.Columns.Add("fldAdministrationCharge", typeof(decimal));
+        header.Columns.Add("fldNumberCourier", typeof(int));
+        header.Columns.Add("fldCourierPrice", typeof(decimal));
+        header.Columns.Add("fldNumberPostage", typeof(int));
+        header.Columns.Add("fldPostagePrice", typeof(decimal));
+        header.Columns.Add("fldNumberSpecialDelivery", typeof(int));
+        header.Columns.Add("fldSpecialDeliveryPrice", typeof(decimal));
+        header.Columns.Add("fldIsReadOnly", typeof(bool));
+        header.Rows.Add(contractId, "A", 2026, "QAL/00001", "\u00a3", 0.1m, 25m, 2, 5m, 3, 4m, 1, 6m, false);
+
+        var schemes = new DataTable();
+        schemes.Columns.Add("fldSchemeId", typeof(Guid));
+        schemes.Columns.Add("fldName", typeof(string));
+        schemes.Columns.Add("fldIdentifier", typeof(string));
+        schemes.Rows.Add(schemeId, "Salmonella", "S1");
+
+        var participants = new DataTable();
+        participants.Columns.Add("fldParticipantSchemeId", typeof(Guid));
+        participants.Columns.Add("fldParticipantId", typeof(Guid));
+        participants.Columns.Add("fldSchemeId", typeof(Guid));
+        participants.Columns.Add("fldLabCode", typeof(string));
+        participants.Columns.Add("fldLabName", typeof(string));
+        participants.Columns.Add("fldNumberOfDistributions", typeof(int));
+        participants.Columns.Add("fldPrice", typeof(decimal));
+        participants.Columns.Add("fldNonFeePaying", typeof(bool));
+        participants.Columns.Add("fldIsRemoved", typeof(bool));
+        foreach (var month in new[] { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" })
+        {
+            participants.Columns.Add($"fldIsOverride{month}", typeof(bool));
+        }
+        var row = participants.NewRow();
+        row["fldParticipantSchemeId"] = participantSchemeId;
+        row["fldParticipantId"] = participantId;
+        row["fldSchemeId"] = schemeId;
+        row["fldLabCode"] = "LAB1";
+        row["fldLabName"] = "Lab One";
+        row["fldNumberOfDistributions"] = 4;
+        row["fldPrice"] = 42.5m;
+        row["fldNonFeePaying"] = false;
+        row["fldIsRemoved"] = isRemoved;
+        foreach (var month in new[] { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" })
+        {
+            row[$"fldIsOverride{month}"] = false;
+        }
+        participants.Rows.Add(row);
+
+        var dataSet = new DataSet();
+        dataSet.Tables.Add(header);
+        dataSet.Tables.Add(schemes);
+        dataSet.Tables.Add(participants);
+        return dataSet;
+    }
+
+    [Fact]
+    public async Task GetContractItemsAsync_ReturnsAggregateWithSchemesAndParticipants()
+    {
+        var (repository, connection) = CreateRepository();
+        var contractId = Guid.NewGuid();
+        var schemeId = Guid.NewGuid();
+        var participantSchemeId = Guid.NewGuid();
+        var participantId = Guid.NewGuid();
+        connection.RespondToQuery(GetContractItemsSql, ContractItemsDataSet(contractId, schemeId, participantSchemeId, participantId));
+
+        var result = await repository.GetContractItemsAsync(contractId);
+
+        Assert.NotNull(result);
+        Assert.Equal(contractId, result!.ContractId);
+        Assert.Equal("A", result.Suffix);
+        Assert.Equal(2026, result.YearId);
+        Assert.Equal("QAL/00001", result.QalNumber);
+        Assert.False(result.IsReadOnly);
+        var scheme = Assert.Single(result.Schemes);
+        Assert.Equal("S1", scheme.SchemeIdentifier);
+        var participant = Assert.Single(scheme.Participants);
+        Assert.Equal(participantSchemeId, participant.ParticipantSchemeId);
+        Assert.Equal("LAB1", participant.LabCode);
+        Assert.False(participant.HasOverride);
+    }
+
+    [Fact]
+    public async Task GetContractItemsAsync_RemovedParticipant_IsExcluded()
+    {
+        var (repository, connection) = CreateRepository();
+        var contractId = Guid.NewGuid();
+        connection.RespondToQuery(GetContractItemsSql, ContractItemsDataSet(contractId, Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), isRemoved: true));
+
+        var result = await repository.GetContractItemsAsync(contractId);
+
+        Assert.NotNull(result);
+        Assert.Empty(result!.Schemes);
+    }
+
+    [Fact]
+    public async Task GetContractItemsAsync_NoHeaderRow_ReturnsNull()
+    {
+        var (repository, connection) = CreateRepository();
+        var dataSet = ContractItemsDataSet(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
+        dataSet.Tables[0]!.Rows.Clear();
+        connection.RespondToQuery(GetContractItemsSql, dataSet);
+
+        var result = await repository.GetContractItemsAsync(Guid.NewGuid());
+
+        Assert.Null(result);
+    }
 }

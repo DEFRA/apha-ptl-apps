@@ -6,8 +6,15 @@ public interface ISchemeRepository
 {
     Task<Scheme?> GetByIdAsync(Guid schemeId, CancellationToken cancellationToken = default);
 
-    // Uses spgSchemeInfoByYearId (one row per scheme family active in that year).
+    // Uses spgSchemeInfoByYearId (one row per scheme family active in that year). NOTE: that
+    // procedure returns NULL for every fldNextSchemeId/fldRecentSchemeId column - use
+    // GetSummariesBySchemeIdAsync when the next-year scheme is required.
     Task<IReadOnlyList<SchemeSummaryEntity>> GetSummariesByYearAsync(int yearId, CancellationToken cancellationToken = default);
+
+    // Uses spgSchemeInfoBySchemeId - the only procedure that resolves a scheme's next-year
+    // equivalent (self-join on fldSharedId with fldYearId + 1). Legacy
+    // SchemeInfoCollection.FetchSchemeInfoCollectionBySchemeId.
+    Task<IReadOnlyList<SchemeSummaryEntity>> GetSummariesBySchemeIdAsync(Guid schemeId, CancellationToken cancellationToken = default);
 
     // Uses spgSchemeInfoBySharedId (family history, newest year first).
     Task<IReadOnlyList<SchemeHistoryEntity>> GetHistoryAsync(Guid sharedId, CancellationToken cancellationToken = default);

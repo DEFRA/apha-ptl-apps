@@ -1,0 +1,218 @@
+@model PTL.InternalWeb.Features.Contract.RenewContractsViewModel
+@{
+    ViewData["Title"] = "Renew Contracts";
+}
+
+<h1 class="govuk-heading-l">Renew Contracts</h1>
+
+@if (!string.IsNullOrEmpty(Model.ErrorMessage))
+{
+    <div class="govuk-error-summary" data-module="govuk-error-summary" role="alert">
+        <div class="govuk-error-summary__body">
+            <p class="govuk-body"><strong>@Model.ErrorMessage</strong></p>
+        </div>
+    </div>
+}
+
+@* Section 1: Customer Name and Location *@
+<p class="govuk-body">@Model.QalNumber, @Model.CustomerName, @Model.CustomerOrganisation</p>
+
+@if (!Model.IsAllowed)
+{
+    <p class="govuk-body">@Model.BlockedReason</p>
+}
+else
+{
+    <form method="post" asp-action="RenewContracts">
+        <input type="hidden" name="customerId" value="@Model.CustomerId" />
+
+        <h2 class="govuk-heading-m">Select the Contract(s) that are to be merged and renewed</h2>
+
+        <div class="govuk-checkboxes govuk-checkboxes--small govuk-!-margin-bottom-2">
+            <div class="govuk-checkboxes__item">
+                <input class="govuk-checkboxes__input" type="checkbox" id="ContractSelectAllCheckBox" checked />
+                <label class="govuk-label govuk-checkboxes__label" for="ContractSelectAllCheckBox">Select All</label>
+            </div>
+        </div>
+
+        <table class="govuk-table">
+            <thead class="govuk-table__head">
+                <tr class="govuk-table__row">
+                    <th scope="col" class="govuk-table__header">Suffix</th>
+                    <th scope="col" class="govuk-table__header">Signatory</th>
+                    <th scope="col" class="govuk-table__header">Number Of Items</th>
+                    <th scope="col" class="govuk-table__header">Is Active</th>
+                    <th scope="col" class="govuk-table__header">Renewal Information</th>
+                    <th scope="col" class="govuk-table__header">Select</th>
+                </tr>
+            </thead>
+            <tbody class="govuk-table__body">
+                @foreach (var contract in Model.Contracts)
+                {
+                    var isChecked = Model.SelectedContractIds.Contains(contract.ContractId);
+                    <tr class="govuk-table__row">
+                        <td class="govuk-table__cell">@contract.Suffix</td>
+                        <td class="govuk-table__cell">@contract.ContractSignatory</td>
+                        <td class="govuk-table__cell">@contract.NoOfItems</td>
+                        <td class="govuk-table__cell">@(contract.IsActive ? "Yes" : "No")</td>
+                        <td class="govuk-table__cell">@contract.RenewalInformation</td>
+                        <td class="govuk-table__cell">
+                            <div class="govuk-checkboxes govuk-checkboxes--small">
+                                <div class="govuk-checkboxes__item">
+                                    <input class="govuk-checkboxes__input contract-checkbox" type="checkbox" id="contract-select-@contract.ContractId" name="selectedContractIds" value="@contract.ContractId" checked="@(isChecked ? "checked" : null)" />
+                                    <label class="govuk-label govuk-checkboxes__label govuk-visually-hidden" for="contract-select-@contract.ContractId">Select contract @contract.Suffix</label>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+
+        <h2 class="govuk-heading-m">New Contract Signatory</h2>
+
+        <div class="govuk-form-group">
+            <label class="govuk-label" for="newContractSignatory">New Contract Signatory:</label>
+            <select class="govuk-select" id="newContractSignatory" name="newContractSignatory">
+                <option value="">Not Specified</option>
+                @foreach (var signatory in Model.ExistingSignatories)
+                {
+                    var selected = signatory == Model.NewContractSignatory ? "selected" : null;
+                    <option value="@signatory" selected="@selected">@signatory</option>
+                }
+            </select>
+        </div>
+
+        <h2 class="govuk-heading-m">Select the Items that are to appear on the new Contract</h2>
+
+        <p class="govuk-body" id="NoItemsPanel" hidden="@(!Model.HasNoItems)">There are no Items on the selected Contracts.</p>
+
+        <div id="ItemsPanel" hidden="@(Model.HasNoItems)">
+            <div class="govuk-checkboxes govuk-checkboxes--small govuk-!-margin-bottom-2">
+                <div class="govuk-checkboxes__item">
+                    <input class="govuk-checkboxes__input" type="checkbox" id="SchemeSelectAllCheckBox" checked />
+                    <label class="govuk-label govuk-checkboxes__label" for="SchemeSelectAllCheckBox">Select All</label>
+                </div>
+            </div>
+
+            @* One hidden input per underlying participant scheme - the visible table shows one row
+               per Identifier, matching legacy GetDisplayModel(). *@
+            @foreach (var item in Model.Items)
+            {
+                var itemChecked = Model.SelectedParticipantSchemeIds.Contains(item.ParticipantSchemeId);
+                <input type="checkbox" class="item-input" id="item-input-@item.ParticipantSchemeId" name="selectedParticipantSchemeIds" value="@item.ParticipantSchemeId"
+                       data-identifier="@item.Identifier" data-contract-id="@item.ContractId" data-renewable="@item.IsRenewable.ToString().ToLowerInvariant()"
+                       checked="@(itemChecked ? "checked" : null)" hidden />
+                <label class="govuk-visually-hidden" for="item-input-@item.ParticipantSchemeId">Select scheme item @item.Identifier</label>
+            }
+
+            <table class="govuk-table">
+                <thead class="govuk-table__head">
+                    <tr class="govuk-table__row">
+                        <th scope="col" class="govuk-table__header">Participant</th>
+                        <th scope="col" class="govuk-table__header">Old Scheme</th>
+                        <th scope="col" class="govuk-table__header">New Scheme</th>
+                        <th scope="col" class="govuk-table__header">Select</th>
+                    </tr>
+                </thead>
+                <tbody class="govuk-table__body">
+                    @foreach (var row in Model.ItemRows)
+                    {
+                        var item = row.First;
+                        var isChecked = row.Items.Any(i => Model.SelectedParticipantSchemeIds.Contains(i.ParticipantSchemeId));
+                        <tr class="govuk-table__row item-row" data-identifier="@row.Identifier" hidden="@(!Model.IsRowVisible(row))">
+                            <td class="govuk-table__cell">@item.LabCode: @item.LabName</td>
+                            <td class="govuk-table__cell">@item.OldSchemeIdentifier: @item.OldSchemeName</td>
+                            <td class="govuk-table__cell">@(item.IsRenewable ? $"{item.NewSchemeIdentifier}: {item.NewSchemeName}" : "Scheme Not Available")</td>
+                            <td class="govuk-table__cell">
+                                <div class="govuk-checkboxes govuk-checkboxes--small">
+                                    <div class="govuk-checkboxes__item">
+                                        <input class="govuk-checkboxes__input item-row-checkbox" type="checkbox" id="item-row-select-@row.First.ParticipantSchemeId" data-identifier="@row.Identifier" checked="@(isChecked ? "checked" : null)" disabled="@(item.IsRenewable ? null : "disabled")" />
+                                        <label class="govuk-label govuk-checkboxes__label govuk-visually-hidden" for="item-row-select-@row.First.ParticipantSchemeId">Select item @row.Identifier</label>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <div class="govuk-button-group">
+            <button class="govuk-button" data-module="govuk-button" type="submit">Save</button>
+            <a class="govuk-button govuk-button--secondary" data-module="govuk-button" asp-controller="Contract" asp-action="Index" asp-route-customerId="@Model.CustomerId">Back</a>
+        </div>
+    </form>
+
+    <script>
+        (function () {
+            var contractCheckboxes = Array.prototype.slice.call(document.querySelectorAll('.contract-checkbox'));
+            var itemInputs = Array.prototype.slice.call(document.querySelectorAll('.item-input'));
+            var itemRows = Array.prototype.slice.call(document.querySelectorAll('.item-row'));
+            var rowCheckboxes = Array.prototype.slice.call(document.querySelectorAll('.item-row-checkbox'));
+            var itemsPanel = document.getElementById('ItemsPanel');
+            var noItemsPanel = document.getElementById('NoItemsPanel');
+
+            function rowCheckboxFor(identifier) {
+                return rowCheckboxes.filter(function (cb) { return cb.dataset.identifier === identifier; })[0];
+            }
+
+            // Mirrors MergeContractsViewModel: an item is visible only while its contract is
+            // selected, and selected only when its display row is ticked and a new scheme exists.
+            function sync() {
+                var selectedContracts = {};
+                contractCheckboxes.forEach(function (cb) { if (cb.checked) { selectedContracts[cb.value] = true; } });
+
+                itemInputs.forEach(function (input) {
+                    var rowCheckbox = rowCheckboxFor(input.dataset.identifier);
+                    input.checked = !!rowCheckbox && rowCheckbox.checked
+                        && input.dataset.renewable === 'true'
+                        && selectedContracts[input.dataset.contractId] === true;
+                });
+
+                itemRows.forEach(function (row) {
+                    row.hidden = !itemInputs.some(function (input) {
+                        return input.dataset.identifier === row.dataset.identifier
+                            && selectedContracts[input.dataset.contractId] === true;
+                    });
+                });
+
+                var anyVisible = itemRows.some(function (row) { return !row.hidden; });
+                itemsPanel.hidden = !anyVisible;
+                noItemsPanel.hidden = anyVisible;
+            }
+
+            contractCheckboxes.forEach(function (cb) {
+                cb.addEventListener('change', function () {
+                    // Legacy ContractUpdate re-selects the affected items when a contract is
+                    // selected, and leaves them alone when it is deselected.
+                    if (cb.checked) {
+                        itemInputs
+                            .filter(function (input) { return input.dataset.contractId === cb.value && input.dataset.renewable === 'true'; })
+                            .forEach(function (input) {
+                                var rowCheckbox = rowCheckboxFor(input.dataset.identifier);
+                                if (rowCheckbox) { rowCheckbox.checked = true; }
+                            });
+                    }
+                    sync();
+                });
+            });
+
+            rowCheckboxes.forEach(function (cb) { cb.addEventListener('change', sync); });
+
+            document.getElementById('ContractSelectAllCheckBox')?.addEventListener('change', function (e) {
+                contractCheckboxes.forEach(function (cb) {
+                    cb.checked = e.target.checked;
+                    cb.dispatchEvent(new Event('change'));
+                });
+            });
+
+            document.getElementById('SchemeSelectAllCheckBox')?.addEventListener('change', function (e) {
+                rowCheckboxes.forEach(function (cb) { if (!cb.disabled) { cb.checked = e.target.checked; } });
+                sync();
+            });
+
+            sync();
+        })();
+    </script>
+}

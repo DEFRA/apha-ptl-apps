@@ -30,4 +30,13 @@ public interface ILookupRepository
 
     // spgaSystemSettings - single-row system settings (only UTNumber is modelled).
     Task<SystemSettingsEntity> GetSystemSettingsAsync(CancellationToken cancellationToken = default);
+
+    // spgaWeightedPricingYear - years for which a weighted-pricing plan (tblPricingPercentage) is
+    // configured; matches legacy WeightedPricingYearCollection.PricingPlanExists(yearId) used by
+    // ParticipantScheme.aspx.vb's LoadPricingOptions to decide which Pricing Plan options to offer.
+    Task<IReadOnlyList<YearEntity>> GetWeightedPricingYearsAsync(CancellationToken cancellationToken = default);
+
+    // spgaGroupAddress - matches legacy GroupAddressCollection.FetchGroupAddressCollection(), used
+    // by ParticipantScheme.aspx's "Select a Group Address" popup.
+    Task<IReadOnlyList<GroupAddressEntity>> GetGroupAddressesAsync(CancellationToken cancellationToken = default);
 }

@@ -6,8 +6,8 @@ namespace PTL.Api.Tests.Participant;
 
 public class ParticipantServiceTests
 {
-    private static ParticipantService CreateService(FakeParticipantRepository repository) =>
-        new(repository, NullLogger<ParticipantService>.Instance);
+    private static ParticipantService CreateService(FakeParticipantRepository repository, FakePendingParticipantUpdateRepository? pendingRepository = null) =>
+        new(repository, pendingRepository ?? new FakePendingParticipantUpdateRepository(), NullLogger<ParticipantService>.Instance);
 
     private static ParticipantEntity ValidActiveParticipant(string labName = "Alpha Lab") => new()
     {
@@ -36,6 +36,18 @@ public class ParticipantServiceTests
         Assert.NotEqual(Guid.Empty, created.ParticipantId);
         Assert.True(created.IsActive);
         Assert.Equal("001", created.LabCode);
+    }
+
+    [Fact]
+    public async Task CreateParticipantAsync_WithoutSsoId_GeneratesOne()
+    {
+        var service = CreateService(new FakeParticipantRepository());
+        var participant = ValidActiveParticipant();
+        participant.SsoId = Guid.Empty;
+
+        var created = await service.CreateParticipantAsync(participant);
+
+        Assert.NotEqual(Guid.Empty, created.SsoId);
     }
 
     [Fact]

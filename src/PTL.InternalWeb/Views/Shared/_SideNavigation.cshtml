@@ -10,8 +10,25 @@
 
     var topLevel = SideNavigationProvider.Build();
     var isHome = string.Equals(currentController, "Home", StringComparison.OrdinalIgnoreCase);
-    var currentNode = isHome ? null : SideNavigationProvider.FindNode(topLevel, currentController, currentAction);
-    var visibleItems = currentNode is null ? topLevel : currentNode.Children.Where(child => !child.IsHidden).ToList();
+    var homeNode = SideNavigationProvider.FindNode(topLevel, "Home", "Index");
+    var currentNode = isHome ? homeNode : SideNavigationProvider.FindActiveNode(topLevel, currentController, currentAction);
+
+    IReadOnlyList<SideNavigationItem> visibleItems;
+    if (isHome)
+    {
+        visibleItems = topLevel.Where(item =>
+            !(string.Equals(item.ControllerName, "Home", StringComparison.OrdinalIgnoreCase)
+              && string.Equals(item.ActionName, "Index", StringComparison.OrdinalIgnoreCase)))
+            .ToList();
+    }
+    else if (currentNode is null)
+    {
+        visibleItems = topLevel;
+    }
+    else
+    {
+        visibleItems = currentNode.Children.Where(child => !child.IsHidden).ToList();
+    }
 }
 
 <nav aria-label="Primary navigation" class="app-side-navigation">

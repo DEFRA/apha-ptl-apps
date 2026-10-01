@@ -1,6 +1,8 @@
 using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using PTL.Contracts.Scheme;
+using PTL.Core.Scheme;
+using CoreScheme = PTL.Core.Scheme.Scheme;
 
 namespace PTL.InternalWeb.Features.Scheme;
 
@@ -115,6 +117,7 @@ public sealed class SchemeFormViewModel : IValidatableObject
 
     public IEnumerable<SelectListItem> PostageOptions { get; set; } = [];
 
+    [Required(ErrorMessage = "Enter the customs volume")]
     [StringLength(20, ErrorMessage = "Customs volume must not exceed 20 characters")]
     public string? CustomsVolume { get; set; }
 
@@ -135,6 +138,7 @@ public sealed class SchemeFormViewModel : IValidatableObject
     public bool ComerciallyAvailable { get; set; }
 #pragma warning restore S6964
 
+    [Required(ErrorMessage = "Enter the customs description")]
     [StringLength(500, ErrorMessage = "Customs description must not exceed 500 characters")]
     public string? CustomsDescription { get; set; }
 
@@ -169,21 +173,55 @@ public sealed class SchemeFormViewModel : IValidatableObject
     [StringLength(500, ErrorMessage = "Standard tabulation text must not exceed 500 characters")]
     public string? StandardTabulationText { get; set; }
 
-    // Preserves ValidateDistribution/ValidateDataConsentDeclaration.
+    // Forwards only PTL.Core.Scheme.SchemeValidator's domain/cross-field rules (distribution XOR,
+    // conditional consent text) - every primitive rule is already covered by the DataAnnotations
+    // above, so those are filtered out to avoid a duplicate message.
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
     {
-        var hasAnyMonth = DistributionMonthJan || DistributionMonthFeb || DistributionMonthMar
-            || DistributionMonthApr || DistributionMonthMay || DistributionMonthJun
-            || DistributionMonthJul || DistributionMonthAug || DistributionMonthSep
-            || DistributionMonthOct || DistributionMonthNov || DistributionMonthDec;
-        if (hasAnyMonth == DistributionAsAvailable)
+        var scheme = new CoreScheme
         {
-            yield return new ValidationResult("Select either specific distribution months or 'as available', but not both", [nameof(DistributionAsAvailable)]);
-        }
+            Identifier = Identifier ?? string.Empty,
+            Name = Name ?? string.Empty,
+            Deadline = Deadline.GetValueOrDefault(),
+            SampleOrigin = SampleOrigin ?? string.Empty,
+            NumberOfSamples = NumberOfSamples.GetValueOrDefault(),
+            Instructions = Instructions ?? string.Empty,
+            CustomsDescription = CustomsDescription,
+            CustomsVolume = CustomsVolume,
+            Subcontractor = Subcontractor ?? string.Empty,
+            SamplePackingInstructions = SamplePackingInstructions ?? string.Empty,
+            StandardTabulationText = StandardTabulationText,
+            DataConsentDeclarationActive = DataConsentDeclarationActive,
+            DataConsentDeclarationText = DataConsentDeclarationText,
+            DistributionMonthJan = DistributionMonthJan,
+            DistributionMonthFeb = DistributionMonthFeb,
+            DistributionMonthMar = DistributionMonthMar,
+            DistributionMonthApr = DistributionMonthApr,
+            DistributionMonthMay = DistributionMonthMay,
+            DistributionMonthJun = DistributionMonthJun,
+            DistributionMonthJul = DistributionMonthJul,
+            DistributionMonthAug = DistributionMonthAug,
+            DistributionMonthSep = DistributionMonthSep,
+            DistributionMonthOct = DistributionMonthOct,
+            DistributionMonthNov = DistributionMonthNov,
+            DistributionMonthDec = DistributionMonthDec,
+            DistributionAsAvailable = DistributionAsAvailable
+        };
 
-        if (DataConsentDeclarationActive && string.IsNullOrWhiteSpace(DataConsentDeclarationText))
+        var result = SchemeValidator.Validate(scheme);
+        foreach (var error in result.Errors)
         {
-            yield return new ValidationResult("Enter the consent text when the Data Consent Declaration is active", [nameof(DataConsentDeclarationText)]);
+            if (error.Field is not (nameof(DistributionAsAvailable) or nameof(DataConsentDeclarationText)))
+            {
+                continue;
+            }
+
+            if (error.Field == nameof(DataConsentDeclarationText) && error.Message.Contains("must not exceed", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            yield return new ValidationResult(error.Message, [error.Field]);
         }
     }
 }
