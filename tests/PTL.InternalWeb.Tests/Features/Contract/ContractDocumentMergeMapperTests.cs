@@ -65,6 +65,30 @@ public class ContractDocumentMergeMapperTests
     }
 
     [Fact]
+    public void RenewalLetter_MapsLegacyFieldsIntoTheFinalTemplateValues()
+    {
+        var renewal = new ContractRenewalResponse(
+            Guid.NewGuid(), Guid.NewGuid(), "QAL/00042", "Sample Laboratories Ltd", "Alice Example",
+            "1 High Street", "Testville", "County", "Region", "Postcode", "United Kingdom",
+            new DateTime(2024, 4, 1), new DateTime(2025, 3, 31), "Renew soon.");
+
+        var request = ContractDocumentMergeMapper.Build(CreateContext(ContractDocumentTypes.RenewalLetter, renewal: renewal));
+
+        Assert.Equal("QAL/00042", request.MergeValues["QalNumber"]);
+        Assert.Equal("Sample Laboratories Ltd", request.MergeValues["OrganisationName"]);
+        Assert.Equal("Alice Example", request.MergeValues["ContactName"]);
+        Assert.Equal("1 High Street", request.MergeValues["AddressLine1"]);
+        Assert.Equal("Testville", request.MergeValues["AddressLine2"]);
+        Assert.Equal("County", request.MergeValues["AddressLine3"]);
+        Assert.Equal("Region", request.MergeValues["AddressLine4"]);
+        Assert.Equal("Postcode", request.MergeValues["AddressLine5"]);
+        Assert.Equal("United Kingdom", request.MergeValues["Country"]);
+        Assert.Equal(new DateTime(2024, 4, 1).ToLongDateString(), request.MergeValues["CurrentContractStartDate"]);
+        Assert.Equal(new DateTime(2025, 3, 31).ToLongDateString(), request.MergeValues["CurrentContractEndDate"]);
+        Assert.Equal("Renew soon.", request.MergeValues["AdditionalLetterInfo"]);
+    }
+
+    [Fact]
     public void JobSheet_ExposesBothPrefixedAndUnprefixedAliases()
     {
         var contractId = Guid.NewGuid();

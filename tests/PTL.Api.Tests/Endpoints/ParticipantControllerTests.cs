@@ -11,9 +11,20 @@ namespace PTL.Api.Tests.Endpoints;
 
 public class ParticipantControllerTests
 {
-    private static ParticipantController CreateController(FakeParticipantRepository repository, FakePendingParticipantUpdateRepository? pendingRepository = null)
+    private static ParticipantController CreateController(
+        FakeParticipantRepository repository,
+        FakePendingParticipantUpdateRepository? pendingRepository = null,
+        FakeParticipantViewerRepository? participantViewerRepository = null,
+        FakeViewerRepository? viewerRepository = null)
     {
-        var controller = new ParticipantController(new ParticipantService(repository, pendingRepository ?? new FakePendingParticipantUpdateRepository(), NullLogger<ParticipantService>.Instance), NullLogger<ParticipantController>.Instance);
+        var controller = new ParticipantController(
+            new ParticipantService(
+                repository,
+                pendingRepository ?? new FakePendingParticipantUpdateRepository(),
+                participantViewerRepository ?? new FakeParticipantViewerRepository(),
+                viewerRepository ?? new FakeViewerRepository(),
+                NullLogger<ParticipantService>.Instance),
+            NullLogger<ParticipantController>.Instance);
 
         var services = new ServiceCollection().AddMvc().Services.BuildServiceProvider();
         controller.ControllerContext = new ControllerContext
@@ -260,5 +271,90 @@ public class ParticipantControllerTests
 
         var created = await repository.CreateAsync(participant, CancellationToken.None);
         return created.ParticipantId;
+    }
+
+    [Fact]
+    public async Task GetParticipantViewers_UnknownParticipant_ReturnsNotFound()
+    {
+        var controller = CreateController(new FakeParticipantRepository());
+
+        var result = await controller.GetParticipantViewers(Guid.NewGuid(), CancellationToken.None);
+
+        Assert.IsType<NotFoundResult>(result.Result);
+    }
+
+    [Fact]
+    public async Task GetParticipantViewers_ExistingParticipant_ReturnsOkWithViewers()
+    {
+        var repository = new FakeParticipantRepository();
+        var participant = await repository.CreateAsync(new PTL.Core.Participant.Participant
+        {
+            ParticipantId = Guid.NewGuid(),
+            SsoId = Guid.NewGuid(),
+            CustomerId = Guid.NewGuid(),
+            LabCode = "LAB-001",
+            LabName = "Sample Lab",
+            LabTypeId = Guid.NewGuid(),
+            ContactName = "Alice Example",
+            Organisation = "Sample Lab",
+            Address1 = "1 Sample Street",
+            Address2 = "Sample District",
+            CountryId = Guid.NewGuid(),
+            Telephone = "01234 567890",
+            Email = "alice@example.com",
+            IsActive = true
+        }, CancellationToken.None);
+        var viewerRepository = new FakeViewerRepository();
+        viewerRepository.Viewers.Add(new PTL.Core.Viewer.ViewerEntity { ViewerId = Guid.NewGuid(), Name = "Viewer One", Email = "one@example.com" });
+        var controller = CreateController(repository, viewerRepository: viewerRepository);
+
+        var result = await controller.GetParticipantViewers(participant.ParticipantId, CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var response = Assert.IsType<ParticipantViewerAssignmentResponse>(ok.Value);
+        Assert.Equal(participant.CustomerId, response.CustomerId);
+        Assert.Equal("LAB-001", response.LabCode);
+        Assert.Equal("Sample Lab", response.LabName);
+        Assert.True(response.IsActive);
+        Assert.Single(response.AvailableViewers);
+        Assert.Empty(response.AssignedViewers);
+    }
+
+    [Fact]
+    public async Task UpdateParticipantViewers_UnknownParticipant_ReturnsNotFound()
+    {
+        var controller = CreateController(new FakeParticipantRepository());
+
+        var result = await controller.UpdateParticipantViewers(Guid.NewGuid(), new UpdateParticipantViewersRequest([]), CancellationToken.None);
+
+        Assert.IsType<NotFoundResult>(result);
+    }
+
+    [Fact]
+    public async Task UpdateParticipantViewers_ExistingParticipant_ReturnsNoContent()
+    {
+        var repository = new FakeParticipantRepository();
+        var participant = await repository.CreateAsync(new PTL.Core.Participant.Participant
+        {
+            ParticipantId = Guid.NewGuid(),
+            SsoId = Guid.NewGuid(),
+            CustomerId = Guid.NewGuid(),
+            LabCode = "LAB-001",
+            LabName = "Sample Lab",
+            LabTypeId = Guid.NewGuid(),
+            ContactName = "Alice Example",
+            Organisation = "Sample Lab",
+            Address1 = "1 Sample Street",
+            Address2 = "Sample District",
+            CountryId = Guid.NewGuid(),
+            Telephone = "01234 567890",
+            Email = "alice@example.com",
+            IsActive = true
+        }, CancellationToken.None);
+        var controller = CreateController(repository);
+
+        var result = await controller.UpdateParticipantViewers(participant.ParticipantId, new UpdateParticipantViewersRequest([Guid.NewGuid()]), CancellationToken.None);
+
+        Assert.IsType<NoContentResult>(result);
     }
 }

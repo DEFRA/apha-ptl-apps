@@ -307,6 +307,41 @@ public class ParticipantController(IParticipantApiClient participantApiClient, I
         return RedirectToAction(nameof(ReviewPendingParticipantUpdates));
     }
 
+    // Legacy ParticipantViewers.aspx.
+    [HttpGet]
+    public async Task<IActionResult> Viewers(Guid participantId, CancellationToken cancellationToken)
+    {
+        var assignment = await participantApiClient.GetParticipantViewersAsync(participantId, cancellationToken);
+        if (assignment is null)
+        {
+            LogParticipantNotFoundMessage(logger, participantId, null);
+            return NotFound();
+        }
+
+        return View(new ParticipantViewerFormViewModel(
+            participantId, assignment.CustomerId, assignment.LabCode, assignment.LabName, assignment.IsActive,
+            assignment.AvailableViewers, assignment.AssignedViewers));
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Viewers(Guid participantId, Guid customerId, [FromForm] Guid[]? viewerIds, CancellationToken cancellationToken)
+    {
+        var requestedViewerIds = (viewerIds ?? []).Distinct().ToArray();
+        var updated = await participantApiClient.UpdateParticipantViewersAsync(participantId, requestedViewerIds, cancellationToken);
+        if (!updated)
+        {
+            LogParticipantNotFoundMessage(logger, participantId, null);
+            return NotFound();
+        }
+
+        TempData.SetNotification(NotificationType.Success, "Participant viewers updated successfully.");
+
+        // Legacy ParticipantViewers.aspx.vb BtnSave_Click calls LeavePage(), returning to the
+        // participant list - not back to this screen.
+        return RedirectToAction(nameof(Index), new { customerId });
+    }
+
     private async Task PopulatePendingCountryOptionsAsync(PendingParticipantUpdateFormViewModel model, CancellationToken cancellationToken)
     {
         var countries = await lookupApiClient.GetCountriesAsync(cancellationToken);

@@ -92,6 +92,31 @@ public sealed class ParticipantApiClient(HttpClient httpClient) : IParticipantAp
         return response.IsSuccessStatusCode;
     }
 
+    public async Task<ParticipantViewerAssignmentResponse?> GetParticipantViewersAsync(Guid participantId, CancellationToken cancellationToken = default)
+    {
+        var response = await httpClient.GetAsync($"/api/participants/{participantId}/viewers", cancellationToken);
+        if (response.StatusCode == HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<ParticipantViewerAssignmentResponse>(cancellationToken);
+    }
+
+    public async Task<bool> UpdateParticipantViewersAsync(Guid participantId, IReadOnlyList<Guid> viewerIds, CancellationToken cancellationToken = default)
+    {
+        var request = new UpdateParticipantViewersRequest((viewerIds ?? []).Distinct().ToArray());
+        var response = await httpClient.PutAsJsonAsync($"/api/participants/{participantId}/viewers", request, cancellationToken);
+        if (response.StatusCode == HttpStatusCode.NotFound)
+        {
+            return false;
+        }
+
+        response.EnsureSuccessStatusCode();
+        return true;
+    }
+
     public async Task<ParticipantSaveResult> UpdateParticipantAsync(Guid participantId, ParticipantRequest request, CancellationToken cancellationToken = default)
     {
         var response = await httpClient.PutAsJsonAsync($"/api/participants/{participantId}", request, cancellationToken);

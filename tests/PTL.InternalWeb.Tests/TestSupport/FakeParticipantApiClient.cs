@@ -86,4 +86,19 @@ internal sealed class FakeParticipantApiClient : IParticipantApiClient
 
     public Task<bool> DeclinePendingParticipantUpdateAsync(Guid participantId, CancellationToken cancellationToken = default) =>
         Task.FromResult(DeclinePendingParticipantUpdateResult);
+
+    public ParticipantViewerAssignmentResponse? ParticipantViewerAssignmentResponse { get; set; }
+    public bool UpdateParticipantViewersResult { get; set; } = true;
+    public Guid? LastUpdateParticipantViewersParticipantId { get; private set; }
+    public IReadOnlyList<Guid>? LastUpdateParticipantViewersViewerIds { get; private set; }
+
+    public Task<ParticipantViewerAssignmentResponse?> GetParticipantViewersAsync(Guid participantId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(ParticipantViewerAssignmentResponse);
+
+    public Task<bool> UpdateParticipantViewersAsync(Guid participantId, IReadOnlyList<Guid> viewerIds, CancellationToken cancellationToken = default)
+    {
+        LastUpdateParticipantViewersParticipantId = participantId;
+        LastUpdateParticipantViewersViewerIds = viewerIds;
+        return Task.FromResult(UpdateParticipantViewersResult);
+    }
 }

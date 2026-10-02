@@ -1,0 +1,47 @@
+@model PTL.InternalWeb.Features.Invoice.InvoiceGenerationViewModel
+@using PTL.InternalWeb.Features.Invoice
+@{
+    ViewData["Title"] = "Invoice Generation";
+}
+
+<h1 class="govuk-heading-l">Invoice Generation</h1>
+
+<dl class="govuk-summary-list">
+    <govuk-summary-row label="Financial Year">@Model.FinancialYear</govuk-summary-row>
+    <govuk-summary-row label="Notification Recipients">
+        @(Model.NotificationRecipients.Count > 0 ? string.Join(", ", Model.NotificationRecipients) : "Not configured")
+    </govuk-summary-row>
+</dl>
+
+<h2 class="govuk-heading-m">Preview</h2>
+<p class="govuk-body">
+    Opt Out Of Invoice Generation and Non Fee Paying are informational only - they do not exclude a
+    contract or item from generation. All eligible contracts are included.
+</p>
+<dl class="govuk-summary-list">
+    <govuk-summary-row label="Number Of Eligible Contracts">@Model.EligibleContractCount</govuk-summary-row>
+    <govuk-summary-row label="Financial Year">@Model.FinancialYear</govuk-summary-row>
+    <govuk-summary-row label="Number Of Opt Out Contracts">@Model.OptOutContractCount</govuk-summary-row>
+    <govuk-summary-row label="Number Of Non Fee Paying Items">@Model.NonFeePayingItemCount</govuk-summary-row>
+</dl>
+
+<form method="post" asp-action="Generate">
+    @Html.AntiForgeryToken()
+    <button class="govuk-button" data-module="govuk-button" type="submit"
+            onclick="return confirm('@InvoiceGenerationViewModel.GenerateConfirmation');">
+        Generate Invoices
+    </button>
+</form>
+
+@if (Model.CanReset)
+{
+    <form method="post" asp-action="Reset">
+        @Html.AntiForgeryToken()
+        <button class="govuk-button govuk-button--warning" data-module="govuk-button" type="submit"
+                onclick="return confirm('Are you sure you want to reset all invoices? (UAT only)');">
+            Reset All Invoices (UAT only)
+        </button>
+    </form>
+}
+
+<p class="govuk-body"><a class="govuk-link" asp-action="AuditHistory">View invoice audit history</a></p>

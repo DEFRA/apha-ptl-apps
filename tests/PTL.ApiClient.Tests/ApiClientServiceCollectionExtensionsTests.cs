@@ -38,6 +38,9 @@ public class ApiClientServiceCollectionExtensionsTests
         Assert.IsType<ContractRenewalApiClient>(provider.GetRequiredService<IContractRenewalApiClient>());
         Assert.IsType<AdministrationChargeApiClient>(provider.GetRequiredService<IAdministrationChargeApiClient>());
         Assert.IsType<WeightedPricingPlanApiClient>(provider.GetRequiredService<IWeightedPricingPlanApiClient>());
+        Assert.IsType<ExportTemplateApiClient>(provider.GetRequiredService<IExportTemplateApiClient>());
+        Assert.IsType<BulkExportApiClient>(provider.GetRequiredService<IBulkExportApiClient>());
+        Assert.IsType<InvoiceApiClient>(provider.GetRequiredService<IInvoiceApiClient>());
     }
 
     [Theory]

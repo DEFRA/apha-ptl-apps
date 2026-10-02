@@ -119,7 +119,8 @@ public static class SideNavigationProvider
                             [
                                 new SideNavigationItem { Text = "Create Participant", ControllerName = ParticipantControllerName, ActionName = CreateAction },
                                 new SideNavigationItem { Text = "Participant Details", ControllerName = ParticipantControllerName, ActionName = DetailsAction, IsHidden = true },
-                                new SideNavigationItem { Text = "Edit Participant", ControllerName = ParticipantControllerName, ActionName = EditAction, IsHidden = true }
+                                new SideNavigationItem { Text = "Edit Participant", ControllerName = ParticipantControllerName, ActionName = EditAction, IsHidden = true },
+                                new SideNavigationItem { Text = "Participant Viewers", ControllerName = ParticipantControllerName, ActionName = "Viewers", IsHidden = true }
                             ]
                         },
                         new SideNavigationItem
@@ -164,7 +165,16 @@ public static class SideNavigationProvider
                         new SideNavigationItem { Text = "Export Address Confirmation Letters", ControllerName = ContractControllerName, ActionName = "ExportAddressConfirmationLetters" }
                     ]
                 },
-                Disabled("Invoice Generation")
+                new SideNavigationItem
+                {
+                    Text = "Invoice Generation",
+                    ControllerName = "Invoice",
+                    ActionName = IndexAction,
+                    Children =
+                    [
+                        new SideNavigationItem { Text = "Invoice Audit History", ControllerName = "Invoice", ActionName = "AuditHistory", IsHidden = true }
+                    ]
+                }
             ]
         },
         new SideNavigationItem

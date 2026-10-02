@@ -11,9 +11,11 @@ using PTL.Core.Contract.Renewal;
 using PTL.Core.Contract.SampleAddress;
 using PTL.Core.Customer;
 using PTL.Core.GroupAddress;
+using PTL.Core.Invoice;
 using PTL.Core.Lookup;
 using PTL.Core.Participant;
 using PTL.Core.Scheme;
+using PTL.Core.Viewer;
 using PTL.Core.WeightedPricingPlan;
 using CoreContract = PTL.Core.Contract.Contract;
 using CoreCustomer = PTL.Core.Customer.Customer;
@@ -63,6 +65,16 @@ public static class DapperColumnMappings
     private const string ColSchemeId = "fldSchemeId";
     private const string ColPrice = "fldPrice";
     private const string ColCountry = "fldCountry";
+    private const string ColVatNumber = "fldVatNumber";
+    private const string ColInvoiceOrganisation = "fldInvoiceOrganisation";
+    private const string ColInvoiceAddress1 = "fldInvoiceAddress1";
+    private const string ColInvoiceAddress2 = "fldInvoiceAddress2";
+    private const string ColInvoiceAddress3 = "fldInvoiceAddress3";
+    private const string ColInvoiceAddress4 = "fldInvoiceAddress4";
+    private const string ColInvoiceAddress5 = "fldInvoiceAddress5";
+    private const string ColAdministrationCharge = "fldAdministrationCharge";
+    private const string ColParticipantSchemeId = "fldParticipantSchemeId";
+    private const string ColVatRating = "fldVatRating";
 
     public static void Register()
     {
@@ -74,7 +86,7 @@ public static class DapperColumnMappings
             [ColName] = nameof(CoreCustomer.Name),
             ["fldPreviousName"] = nameof(CoreCustomer.PreviousName),
             ["fldCustomerTypeID"] = nameof(CoreCustomer.CustomerTypeId),
-            ["fldVatNumber"] = nameof(CoreCustomer.VatNumber),
+            [ColVatNumber] = nameof(CoreCustomer.VatNumber),
             ["fldVatRatingId"] = nameof(CoreCustomer.VatRatingId),
             ["fldAccountNumber"] = nameof(CoreCustomer.AccountNumber),
             ["fldCustomerFinanceId"] = nameof(CoreCustomer.CustomerFinanceId),
@@ -96,12 +108,12 @@ public static class DapperColumnMappings
             ["fldPostageArrangements"] = nameof(CoreCustomer.PostageArrangements),
             ["fldPaymentNonUK"] = nameof(CoreCustomer.PaymentNonUK),
             ["fldInvoiceName"] = nameof(CoreCustomer.InvoiceName),
-            ["fldInvoiceOrganisation"] = nameof(CoreCustomer.InvoiceOrganisation),
-            ["fldInvoiceAddress1"] = nameof(CoreCustomer.InvoiceAddress1),
-            ["fldInvoiceAddress2"] = nameof(CoreCustomer.InvoiceAddress2),
-            ["fldInvoiceAddress3"] = nameof(CoreCustomer.InvoiceAddress3),
-            ["fldInvoiceAddress4"] = nameof(CoreCustomer.InvoiceAddress4),
-            ["fldInvoiceAddress5"] = nameof(CoreCustomer.InvoiceAddress5),
+            [ColInvoiceOrganisation] = nameof(CoreCustomer.InvoiceOrganisation),
+            [ColInvoiceAddress1] = nameof(CoreCustomer.InvoiceAddress1),
+            [ColInvoiceAddress2] = nameof(CoreCustomer.InvoiceAddress2),
+            [ColInvoiceAddress3] = nameof(CoreCustomer.InvoiceAddress3),
+            [ColInvoiceAddress4] = nameof(CoreCustomer.InvoiceAddress4),
+            [ColInvoiceAddress5] = nameof(CoreCustomer.InvoiceAddress5),
             ["fldInvoiceCountryId"] = nameof(CoreCustomer.InvoiceCountryId),
             ["fldInvoiceTelephone"] = nameof(CoreCustomer.InvoiceTelephone),
             ["fldInvoiceTelephone2"] = nameof(CoreCustomer.InvoiceTelephone2),
@@ -147,12 +159,12 @@ public static class DapperColumnMappings
             [ColFax] = nameof(PendingCustomerUpdate.Fax),
             [ColEmail] = nameof(PendingCustomerUpdate.Email),
             ["fldInvoiceName"] = nameof(PendingCustomerUpdate.InvoiceName),
-            ["fldInvoiceOrganisation"] = nameof(PendingCustomerUpdate.InvoiceOrganisation),
-            ["fldInvoiceAddress1"] = nameof(PendingCustomerUpdate.InvoiceAddress1),
-            ["fldInvoiceAddress2"] = nameof(PendingCustomerUpdate.InvoiceAddress2),
-            ["fldInvoiceAddress3"] = nameof(PendingCustomerUpdate.InvoiceAddress3),
-            ["fldInvoiceAddress4"] = nameof(PendingCustomerUpdate.InvoiceAddress4),
-            ["fldInvoiceAddress5"] = nameof(PendingCustomerUpdate.InvoiceAddress5),
+            [ColInvoiceOrganisation] = nameof(PendingCustomerUpdate.InvoiceOrganisation),
+            [ColInvoiceAddress1] = nameof(PendingCustomerUpdate.InvoiceAddress1),
+            [ColInvoiceAddress2] = nameof(PendingCustomerUpdate.InvoiceAddress2),
+            [ColInvoiceAddress3] = nameof(PendingCustomerUpdate.InvoiceAddress3),
+            [ColInvoiceAddress4] = nameof(PendingCustomerUpdate.InvoiceAddress4),
+            [ColInvoiceAddress5] = nameof(PendingCustomerUpdate.InvoiceAddress5),
             ["fldInvoiceCountryId"] = nameof(PendingCustomerUpdate.InvoiceCountryId),
             ["fldInvoiceTelephone"] = nameof(PendingCustomerUpdate.InvoiceTelephone),
             ["fldInvoiceTelephone2"] = nameof(PendingCustomerUpdate.InvoiceTelephone2),
@@ -199,6 +211,22 @@ public static class DapperColumnMappings
             [ColIsActive] = nameof(ParticipantSummaryEntity.IsActive),
         });
 
+        Map<ViewerEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldViewerId"] = nameof(ViewerEntity.ViewerId),
+            [ColName] = nameof(ViewerEntity.Name),
+            [ColEmail] = nameof(ViewerEntity.Email),
+            ["fldSsoId"] = nameof(ViewerEntity.SsoId),
+        });
+
+        Map<ParticipantViewerEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldViewerParticipantId"] = nameof(ParticipantViewerEntity.ViewerParticipantId),
+            ["fldViewerId"] = nameof(ParticipantViewerEntity.ViewerId),
+            [ColParticipantId] = nameof(ParticipantViewerEntity.ParticipantId),
+            [ColName] = nameof(ParticipantViewerEntity.Name),
+        });
+
         Map<PendingParticipantUpdateSummaryEntity>(new(StringComparer.OrdinalIgnoreCase)
         {
             [ColParticipantId] = nameof(PendingParticipantUpdateSummaryEntity.ParticipantId),
@@ -242,7 +270,7 @@ public static class DapperColumnMappings
             ["fldActionsRequired"] = nameof(CoreContract.ActionsRequired),
             ["fldRenewalInformation"] = nameof(CoreContract.RenewalInformation),
             ["fldDiscountRate"] = nameof(CoreContract.DiscountRate),
-            ["fldAdministrationCharge"] = nameof(CoreContract.AdministrationCharge),
+            [ColAdministrationCharge] = nameof(CoreContract.AdministrationCharge),
             ["fldNumberCourier"] = nameof(CoreContract.NumberCourier),
             ["fldCourierPrice"] = nameof(CoreContract.CourierPrice),
             ["fldNumberPostage"] = nameof(CoreContract.NumberPostage),
@@ -291,7 +319,7 @@ public static class DapperColumnMappings
         Map<RenewableContractItemEntity>(new(StringComparer.OrdinalIgnoreCase)
         {
             [ColContractId] = nameof(RenewableContractItemEntity.ContractId),
-            ["fldParticipantSchemeId"] = nameof(RenewableContractItemEntity.ParticipantSchemeId),
+            [ColParticipantSchemeId] = nameof(RenewableContractItemEntity.ParticipantSchemeId),
             [ColLabCode] = nameof(RenewableContractItemEntity.LabCode),
             [ColLabName] = nameof(RenewableContractItemEntity.LabName),
             ["fldOldSchemeIdentifier"] = nameof(RenewableContractItemEntity.OldSchemeIdentifier),
@@ -414,7 +442,7 @@ public static class DapperColumnMappings
             [ColSuffix] = nameof(BulkContractEntity.Suffix),
             [ColYearId] = nameof(BulkContractEntity.YearId),
             ["fldSymbol"] = nameof(BulkContractEntity.Symbol),
-            ["fldAdministrationCharge"] = nameof(BulkContractEntity.AdministrationCharge),
+            [ColAdministrationCharge] = nameof(BulkContractEntity.AdministrationCharge),
             ["fldDiscountRate"] = nameof(BulkContractEntity.DiscountRate),
             ["fldNumberPostage"] = nameof(BulkContractEntity.NumberPostage),
             ["fldNumberCourier"] = nameof(BulkContractEntity.NumberCourier),
@@ -436,26 +464,26 @@ public static class DapperColumnMappings
             [ColFax] = nameof(BulkContractEntity.Fax),
             [ColEmail] = nameof(BulkContractEntity.Email),
             ["fldInvoiceName"] = nameof(BulkContractEntity.InvoiceName),
-            ["fldInvoiceOrganisation"] = nameof(BulkContractEntity.InvoiceOrganisation),
-            ["fldInvoiceAddress1"] = nameof(BulkContractEntity.InvoiceAddress1),
-            ["fldInvoiceAddress2"] = nameof(BulkContractEntity.InvoiceAddress2),
-            ["fldInvoiceAddress3"] = nameof(BulkContractEntity.InvoiceAddress3),
-            ["fldInvoiceAddress4"] = nameof(BulkContractEntity.InvoiceAddress4),
-            ["fldInvoiceAddress5"] = nameof(BulkContractEntity.InvoiceAddress5),
+            [ColInvoiceOrganisation] = nameof(BulkContractEntity.InvoiceOrganisation),
+            [ColInvoiceAddress1] = nameof(BulkContractEntity.InvoiceAddress1),
+            [ColInvoiceAddress2] = nameof(BulkContractEntity.InvoiceAddress2),
+            [ColInvoiceAddress3] = nameof(BulkContractEntity.InvoiceAddress3),
+            [ColInvoiceAddress4] = nameof(BulkContractEntity.InvoiceAddress4),
+            [ColInvoiceAddress5] = nameof(BulkContractEntity.InvoiceAddress5),
             ["fldInvoiceCountry"] = nameof(BulkContractEntity.InvoiceCountry),
             ["fldInvoiceTelephone"] = nameof(BulkContractEntity.InvoiceTelephone),
             ["fldInvoiceFax"] = nameof(BulkContractEntity.InvoiceFax),
             ["fldInvoiceEmail"] = nameof(BulkContractEntity.InvoiceEmail),
             ["fldAccountNumber"] = nameof(BulkContractEntity.AccountNumber),
-            ["fldVatNumber"] = nameof(BulkContractEntity.VatNumber),
-            ["fldVatRating"] = nameof(BulkContractEntity.VatRating),
+            [ColVatNumber] = nameof(BulkContractEntity.VatNumber),
+            [ColVatRating] = nameof(BulkContractEntity.VatRating),
             [ColPurchaseOrderNumber] = nameof(BulkContractEntity.PurchaseOrderNumber),
         });
 
         Map<BulkContractItemEntity>(new(StringComparer.OrdinalIgnoreCase)
         {
             ["fldContractId"] = nameof(BulkContractItemEntity.ContractId),
-            ["fldParticipantSchemeId"] = nameof(BulkContractItemEntity.ParticipantSchemeId),
+            [ColParticipantSchemeId] = nameof(BulkContractItemEntity.ParticipantSchemeId),
             ["fldParticipantId"] = nameof(BulkContractItemEntity.ParticipantId),
             [ColSchemeId] = nameof(BulkContractItemEntity.SchemeId),
             [ColIdentifier] = nameof(BulkContractItemEntity.Identifier),
@@ -608,7 +636,7 @@ public static class DapperColumnMappings
         Map<VatRatingEntity>(new(StringComparer.OrdinalIgnoreCase)
         {
             ["fldVatRatingId"] = nameof(VatRatingEntity.VatRatingId),
-            ["fldVatRating"] = nameof(VatRatingEntity.VatRating),
+            [ColVatRating] = nameof(VatRatingEntity.VatRating),
         });
 
         Map<LabTypeEntity>(new(StringComparer.OrdinalIgnoreCase)
@@ -662,9 +690,9 @@ public static class DapperColumnMappings
             [ColTelephone] = nameof(SampleAddressEntity.Telephone),
             [ColFax] = nameof(SampleAddressEntity.Fax),
             [ColEmail] = nameof(SampleAddressEntity.Email),
-            ["fldVatNumber"] = nameof(SampleAddressEntity.VatNumber),
+            [ColVatNumber] = nameof(SampleAddressEntity.VatNumber),
             ["fldAccountNumber"] = nameof(SampleAddressEntity.AccountNumber),
-            ["fldVatRating"] = nameof(SampleAddressEntity.VatRating),
+            [ColVatRating] = nameof(SampleAddressEntity.VatRating),
             [ColPurchaseOrderNumber] = nameof(SampleAddressEntity.PurchaseOrderNumber),
         });
 
@@ -672,7 +700,7 @@ public static class DapperColumnMappings
         {
             [ColContractId] = nameof(SampleAddressSchemeEntity.ContractId),
             [ColParticipantId] = nameof(SampleAddressSchemeEntity.ParticipantId),
-            ["fldParticipantSchemeId"] = nameof(SampleAddressSchemeEntity.ParticipantSchemeId),
+            [ColParticipantSchemeId] = nameof(SampleAddressSchemeEntity.ParticipantSchemeId),
             [ColName] = nameof(SampleAddressSchemeEntity.SchemeName),
             [ColIdentifier] = nameof(SampleAddressSchemeEntity.SchemeIdentifier),
             ["fldMonthsActive"] = nameof(SampleAddressSchemeEntity.MonthsActive),
@@ -702,7 +730,7 @@ public static class DapperColumnMappings
         Map<AdministrationChargeEntity>(new(StringComparer.OrdinalIgnoreCase)
         {
             ["fldAdministrationChargeId"] = nameof(AdministrationChargeEntity.AdministrationChargeId),
-            ["fldAdministrationCharge"] = nameof(AdministrationChargeEntity.Name),
+            [ColAdministrationCharge] = nameof(AdministrationChargeEntity.Name),
         });
 
         Map<AdministrationChargeCurrencyEntity>(new(StringComparer.OrdinalIgnoreCase)
@@ -720,6 +748,51 @@ public static class DapperColumnMappings
             ["fldNumberOfDistributionsOnScheme"] = nameof(PricingPercentageEntity.NumberOfDistributionsOnScheme),
             ["fldNumberOfDistributionsChosen"] = nameof(PricingPercentageEntity.NumberOfDistributionsChosen),
             ["fldWeight"] = nameof(PricingPercentageEntity.Weight),
+        });
+
+        // spgaExportContractDetailsForAutomaticInvoicing's first result set (docs/analysis/
+        // invoice-analysis.md) - only the columns InvoiceCsvBuilder/InvoiceService actually need
+        // are mapped; every other column the procedure returns is left unmapped and silently skipped.
+        Map<InvoiceContractEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            [ColContractId] = nameof(InvoiceContractEntity.ContractId),
+            [ColCustomerId] = nameof(InvoiceContractEntity.CustomerId),
+            [ColSuffix] = nameof(InvoiceContractEntity.Suffix),
+            [ColYearId] = nameof(InvoiceContractEntity.YearId),
+            [ColAdministrationCharge] = nameof(InvoiceContractEntity.AdministrationCharge),
+            ["fldDiscountRate"] = nameof(InvoiceContractEntity.DiscountRate),
+            ["fldNumberPostage"] = nameof(InvoiceContractEntity.NumberPostage),
+            ["fldPostagePrice"] = nameof(InvoiceContractEntity.PostagePrice),
+            ["fldNumberCourier"] = nameof(InvoiceContractEntity.NumberCourier),
+            ["fldCourierPrice"] = nameof(InvoiceContractEntity.CourierPrice),
+            ["fldNumberSpecialDelivery"] = nameof(InvoiceContractEntity.NumberSpecialDelivery),
+            ["fldSpecialDeliveryPrice"] = nameof(InvoiceContractEntity.SpecialDeliveryPrice),
+            [ColQalNumber] = nameof(InvoiceContractEntity.QalNumber),
+            [ColInvoiceOrganisation] = nameof(InvoiceContractEntity.InvoiceOrganisation),
+            [ColInvoiceAddress1] = nameof(InvoiceContractEntity.InvoiceAddress1),
+            [ColInvoiceAddress2] = nameof(InvoiceContractEntity.InvoiceAddress2),
+            [ColInvoiceAddress3] = nameof(InvoiceContractEntity.InvoiceAddress3),
+            [ColInvoiceAddress4] = nameof(InvoiceContractEntity.InvoiceAddress4),
+            [ColInvoiceAddress5] = nameof(InvoiceContractEntity.InvoiceAddress5),
+            ["fldInvoiceCountry"] = nameof(InvoiceContractEntity.InvoiceCountry),
+            [ColVatNumber] = nameof(InvoiceContractEntity.VatNumber),
+            [ColVatRating] = nameof(InvoiceContractEntity.VatRating),
+            [ColPurchaseOrderNumber] = nameof(InvoiceContractEntity.PurchaseOrderNumber),
+            ["fldCustomerNumber"] = nameof(InvoiceContractEntity.CustomerNumber),
+            ["fldCustomerType"] = nameof(InvoiceContractEntity.CustomerType),
+            ["fldOptOutOfInvoiceGeneration"] = nameof(InvoiceContractEntity.OptOutOfInvoiceGeneration),
+        });
+
+        // spgaExportContractDetailsForAutomaticInvoicing's second result set.
+        Map<InvoiceContractItemEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            [ColContractId] = nameof(InvoiceContractItemEntity.ContractId),
+            [ColParticipantSchemeId] = nameof(InvoiceContractItemEntity.ParticipantSchemeId),
+            [ColIdentifier] = nameof(InvoiceContractItemEntity.SchemeIdentifier),
+            ["fldSchemeName"] = nameof(InvoiceContractItemEntity.SchemeName),
+            [ColPrice] = nameof(InvoiceContractItemEntity.Price),
+            ["fldNonFeePaying"] = nameof(InvoiceContractItemEntity.NonFeePaying),
+            ["fldHasOverride"] = nameof(InvoiceContractItemEntity.HasOverride),
         });
     }
 

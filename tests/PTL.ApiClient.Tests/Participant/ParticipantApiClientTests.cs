@@ -195,4 +195,48 @@ public class ParticipantApiClientTests
         Guid.NewGuid(), Guid.NewGuid(), "LAB001", "Lab 1", Guid.NewGuid(), "John", "Org",
         "Address 1", "Address 2", string.Empty, string.Empty, string.Empty, Guid.NewGuid(),
         "01234567890", string.Empty, "lab@example.com", string.Empty, string.Empty, true);
+
+    [Fact]
+    public async Task GetParticipantViewersAsync_NotFound_ReturnsNull()
+    {
+        var client = CreateClient(HttpStatusCode.NotFound, null);
+
+        var result = await client.GetParticipantViewersAsync(Guid.NewGuid());
+
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public async Task GetParticipantViewersAsync_Found_ReturnsDeserializedAssignment()
+    {
+        const string json = """{"customerId":"11111111-1111-1111-1111-111111111111","labCode":"LAB001","labName":"Lab 1","isActive":true,"availableViewers":[{"viewerId":"22222222-2222-2222-2222-222222222222","name":"Viewer One","email":"one@example.com"}],"assignedViewers":[]}""";
+        var client = CreateClient(HttpStatusCode.OK, json);
+
+        var result = await client.GetParticipantViewersAsync(Guid.NewGuid());
+
+        Assert.NotNull(result);
+        Assert.Equal("LAB001", result!.LabCode);
+        Assert.Single(result.AvailableViewers);
+        Assert.Empty(result.AssignedViewers);
+    }
+
+    [Fact]
+    public async Task UpdateParticipantViewersAsync_NotFound_ReturnsFalse()
+    {
+        var client = CreateClient(HttpStatusCode.NotFound, null);
+
+        var result = await client.UpdateParticipantViewersAsync(Guid.NewGuid(), [Guid.NewGuid()]);
+
+        Assert.False(result);
+    }
+
+    [Fact]
+    public async Task UpdateParticipantViewersAsync_Success_ReturnsTrue()
+    {
+        var client = CreateClient(HttpStatusCode.NoContent, null);
+
+        var result = await client.UpdateParticipantViewersAsync(Guid.NewGuid(), [Guid.NewGuid()]);
+
+        Assert.True(result);
+    }
 }

@@ -13,7 +13,7 @@ public class PendingParticipantUpdateControllerTests
 {
     private static ParticipantController CreateController(FakeParticipantRepository repository, FakePendingParticipantUpdateRepository pendingRepository)
     {
-        var controller = new ParticipantController(new ParticipantService(repository, pendingRepository, NullLogger<ParticipantService>.Instance), NullLogger<ParticipantController>.Instance);
+        var controller = new ParticipantController(new ParticipantService(repository, pendingRepository, new FakeParticipantViewerRepository(), new FakeViewerRepository(), NullLogger<ParticipantService>.Instance), NullLogger<ParticipantController>.Instance);
 
         var services = new ServiceCollection().AddMvc().Services.BuildServiceProvider();
         controller.ControllerContext = new ControllerContext

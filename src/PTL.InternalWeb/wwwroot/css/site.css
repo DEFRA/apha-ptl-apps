@@ -177,3 +177,13 @@ span.app-side-navigation__link--disabled {
   color: #6f777b;
   cursor: not-allowed;
 }
+
+/* .govuk-select hard-codes height:40px for single-line dropdowns, which also clips
+   multi-row listboxes (size="10") down to one row. Participant Viewers' Available/
+   Participant transfer lists need their native row count back to match the legacy
+   ParticipantViewers.aspx ListBox viewing area, so let height grow with the options. */
+.ptl-viewer-select {
+  width: 100%;
+  height: auto;
+  min-height: 15rem;
+}
