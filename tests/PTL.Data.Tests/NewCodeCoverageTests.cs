@@ -39,7 +39,7 @@ public class NewCodeCoverageTests
         var options = new NotifyOptions();
 
         Assert.Equal("GovUkNotify", NotifyOptions.SectionName);
-        Assert.Equal("https://api.notifications.service.gov.uk", options.BaseUrl);
+        Assert.Equal(string.Empty, options.BaseUrl);
         Assert.Equal(string.Empty, options.ApiKey);
     }
 

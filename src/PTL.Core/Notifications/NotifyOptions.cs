@@ -5,9 +5,6 @@ public sealed class NotifyOptions
 {
     public const string SectionName = "GovUkNotify";
 
-    /// <summary>Default GOV.UK Notify API endpoint, used when BaseUrl is not configured.</summary>
-    public const string DefaultBaseUrl = "https://api.notifications.service.gov.uk";
-
     /// <summary>
     /// The full API key copied from the GOV.UK Notify portal, in its
     /// "{name}-{serviceId guid}-{secret guid}" form - never hardcoded, always from
@@ -15,5 +12,8 @@ public sealed class NotifyOptions
     /// </summary>
     public string ApiKey { get; set; } = string.Empty;
 
-    public string BaseUrl { get; set; } = DefaultBaseUrl;
+    // No in-code default - always sourced from appsettings.json/environment (GovUkNotify:BaseUrl),
+    // so the endpoint can be changed per-environment without a code change or redeploy.
+    public string BaseUrl { get; set; } = string.Empty;
 }
+
