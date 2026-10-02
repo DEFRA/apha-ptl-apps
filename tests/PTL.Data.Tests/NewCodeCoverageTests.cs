@@ -101,7 +101,8 @@ public class NewCodeCoverageTests
         table.Columns.Add("fldName", typeof(string));
         table.Columns.Add("fldEmail", typeof(string));
         table.Columns.Add("fldSsoId", typeof(Guid));
-        table.Rows.Add(Guid.NewGuid(), "Alpha", "alpha@example.com", Guid.NewGuid());
+        var ssoId = Guid.NewGuid();
+        table.Rows.Add(Guid.NewGuid(), "Alpha", "alpha@example.com", ssoId);
         table.Rows.Add(Guid.NewGuid(), "Beta", "beta@example.com", Guid.NewGuid());
         connection.RespondToQuery("EXEC dbo.spgaViewers", table);
 
@@ -111,6 +112,7 @@ public class NewCodeCoverageTests
 
         Assert.Equal(2, result.Count);
         Assert.Equal("Alpha", result[0].Name);
+        Assert.Equal(ssoId, result[0].SsoId);
         Assert.Equal("beta@example.com", result[1].Email);
     }
 

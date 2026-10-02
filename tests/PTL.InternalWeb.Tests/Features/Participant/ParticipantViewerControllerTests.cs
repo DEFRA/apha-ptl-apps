@@ -46,6 +46,8 @@ public class ParticipantViewerControllerTests
         var model = Assert.IsType<PTL.InternalWeb.Features.Participant.ParticipantViewerFormViewModel>(view.Model);
         Assert.Equal(participantId, model.ParticipantId);
         Assert.Equal(customerId, model.CustomerId);
+        Assert.Equal("LAB-01", model.LabCode);
+        Assert.Equal("Sample Laboratory", model.LabName);
         Assert.Single(model.AvailableViewers);
         Assert.Single(model.AssignedViewers);
     }

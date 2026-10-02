@@ -312,6 +312,10 @@ public class ParticipantControllerTests
 
         var ok = Assert.IsType<OkObjectResult>(result.Result);
         var response = Assert.IsType<ParticipantViewerAssignmentResponse>(ok.Value);
+        Assert.Equal(participant.CustomerId, response.CustomerId);
+        Assert.Equal("LAB-001", response.LabCode);
+        Assert.Equal("Sample Lab", response.LabName);
+        Assert.True(response.IsActive);
         Assert.Single(response.AvailableViewers);
         Assert.Empty(response.AssignedViewers);
     }
