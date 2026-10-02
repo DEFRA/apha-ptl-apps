@@ -44,7 +44,9 @@ public class InvoiceApiClientTests
     {
         var client = CreateClient(HttpStatusCode.OK, null);
 
-        await client.ResetAsync();
+        var exception = await Record.ExceptionAsync(() => client.ResetAsync());
+
+        Assert.Null(exception);
     }
 
     [Fact]

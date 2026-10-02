@@ -11,7 +11,7 @@
         <div class="govuk-grid-column-one-third">
             <div class="govuk-form-group">
                 <label class="govuk-label govuk-label--s" for="availableViewers">Available Viewers</label>
-                <select class="govuk-select ptl-viewer-select" id="availableViewers" multiple size="10" aria-label="Available Viewers">
+                <select class="govuk-select ptl-viewer-select" id="availableViewers" multiple size="10">
                     @foreach (var viewer in Model.AvailableViewers)
                     {
                         <option value="@viewer.ViewerId">@viewer.Name</option>
@@ -36,7 +36,7 @@
         <div class="govuk-grid-column-one-third">
             <div class="govuk-form-group">
                 <label class="govuk-label govuk-label--s" for="participantViewers">Participant Viewers</label>
-                <select class="govuk-select ptl-viewer-select" id="participantViewers" name="viewerIds" multiple size="10" aria-label="Participant Viewers">
+                <select class="govuk-select ptl-viewer-select" id="participantViewers" name="viewerIds" multiple size="10">
                     @foreach (var viewer in Model.AssignedViewers)
                     {
                         <option value="@viewer.ViewerId">@viewer.Name</option>

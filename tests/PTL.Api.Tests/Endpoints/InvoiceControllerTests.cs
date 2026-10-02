@@ -103,7 +103,7 @@ public class InvoiceControllerTests
         var result = await controller.GetAuditHistory(CancellationToken.None);
 
         var response = Assert.IsType<Microsoft.AspNetCore.Mvc.OkObjectResult>(result.Result).Value;
-        var history = Assert.IsAssignableFrom<IReadOnlyList<PTL.Contracts.Invoice.InvoiceAuditRecordResponse>>(response);
+        var history = Assert.IsType<IReadOnlyList<PTL.Contracts.Invoice.InvoiceAuditRecordResponse>>(response, exactMatch: false);
         Assert.Single(history);
         Assert.Equal("test.user", history[0].AuditWho);
     }

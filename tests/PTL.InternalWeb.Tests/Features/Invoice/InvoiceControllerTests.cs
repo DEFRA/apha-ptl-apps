@@ -132,7 +132,7 @@ public class InvoiceControllerTests
         var result = await controller.AuditHistory(CancellationToken.None);
 
         var view = Assert.IsType<ViewResult>(result);
-        var model = Assert.IsAssignableFrom<IReadOnlyList<InvoiceAuditRecordResponse>>(view.Model);
+        var model = Assert.IsType<IReadOnlyList<InvoiceAuditRecordResponse>>(view.Model, exactMatch: false);
         Assert.Single(model);
     }
 }

@@ -1,4 +1,5 @@
 using System.Reflection;
+using Microsoft.Extensions.Options;
 using Microsoft.OpenApi;
 using PTL.Api.Features.Health;
 using PTL.Api.Infrastructure;
@@ -158,10 +159,12 @@ else
 // INotifyClient only, never SMTP/EmailHelper (docs/migration/email-notification-migration.md).
 builder.Services.Configure<NotifyOptions>(builder.Configuration.GetSection(NotifyOptions.SectionName));
 builder.Services.Configure<InvoiceNotificationOptions>(builder.Configuration.GetSection(InvoiceNotificationOptions.SectionName));
-builder.Services.AddHttpClient<INotifyClient, NotifyClient>(client =>
+builder.Services.AddHttpClient<INotifyClient, NotifyClient>((services, client) =>
 {
-    var notifyBaseUrl = builder.Configuration[$"{NotifyOptions.SectionName}:BaseUrl"];
-    client.BaseAddress = new Uri(string.IsNullOrWhiteSpace(notifyBaseUrl) ? "https://api.notifications.service.gov.uk" : notifyBaseUrl);
+    // BaseUrl comes from NotifyOptions - configured via appsettings.json (GovUkNotify:BaseUrl) and
+    // overridable per-environment, falling back to NotifyOptions.BaseUrl's own default if unset.
+    var notifyOptions = services.GetRequiredService<IOptions<NotifyOptions>>().Value;
+    client.BaseAddress = new Uri(notifyOptions.BaseUrl);
 });
 
 builder.Services.AddProblemDetails();
