@@ -12,10 +12,15 @@ namespace PTL.InternalWeb.Features.Contract;
 
 // Authentication/authorization are out of scope for this phase - assume the current user is
 // already authenticated with full access to Contract functionality. Policies will be added later.
-public class ContractController(IContractApiClient contractApiClient, ICustomerApiClient customerApiClient, ILookupApiClient lookupApiClient, IImportPermitApiClient importPermitApiClient, ILogger<ContractController> logger, IContractDocumentService documentService, IContractExportApiClient contractExportApiClient, IContractRenewalApiClient contractRenewalApiClient, IExportTemplateApiClient exportTemplateApiClient, IBulkExportApiClient bulkExportApiClient, ITemplateMergeService templateMergeService) : Controller
+public class ContractController(IContractApiClient contractApiClient, ICustomerApiClient customerApiClient, ILookupApiClient lookupApiClient, IImportPermitApiClient importPermitApiClient, ILogger<ContractController> logger, IContractExportApiClient contractExportApiClient, IContractRenewalApiClient contractRenewalApiClient, IExportTemplateApiClient exportTemplateApiClient, IBulkExportApiClient bulkExportApiClient, ITemplateMergeService templateMergeService) : Controller
 {
     // Legacy ExportBase.ShowError text, reused verbatim across upload/open/select/delete/export.
     private const string FileNotFound = "File not found";
+
+    // Legacy ContractList.aspx.vb text when no row for the document type has fldSelectedTemplate = 1.
+    private const string NoSelectedTemplate = "Template file not found";
+
+    private const string MailMergeFailed = "There was a problem with the Mail Merge";
 
     private static readonly Action<ILogger, string, int, Exception?> LogBulkExportedMessage =
         LoggerMessage.Define<string, int>(
@@ -188,7 +193,8 @@ public class ContractController(IContractApiClient contractApiClient, ICustomerA
     [HttpGet]
     public async Task<IActionResult> Export(Guid id, string documentType, CancellationToken cancellationToken = default)
     {
-        if (!ContractDocumentTypes.TryResolve(documentType, out var canonicalType, out var templateKey))
+        if (!ContractDocumentTypes.TryResolve(documentType, out var canonicalType)
+            || !ExportDocumentTypes.TryResolve(documentType, out var storageName, out _))
         {
             return View("FeatureNotAvailable", documentType);
         }
@@ -200,7 +206,17 @@ public class ContractController(IContractApiClient contractApiClient, ICustomerA
             return NotFound();
         }
 
-        var context = await BuildDocumentContextAsync(canonicalType, templateKey, contract, cancellationToken);
+        // Legacy resolves the selected template before gathering any data and abandons the export
+        // outright when there is none, so the same check runs first here.
+        var (template, noneSelected) = await LoadSelectedTemplateAsync(storageName, cancellationToken);
+        if (template is null)
+        {
+            LogMissingTemplateMessage(logger, id, canonicalType, null);
+            TempData.SetNotification(NotificationType.Error, noneSelected ? NoSelectedTemplate : FileNotFound);
+            return RedirectToAction(nameof(Index), new { customerId = contract.CustomerId });
+        }
+
+        var context = await BuildDocumentContextAsync(canonicalType, template.FileName, contract, cancellationToken);
 
         // Legacy no-data guards: MailMergeJobSheet returns False when TotalPrice is 0, and
         // MailMergeSampleAddressLetter/RenewalLetter when their collection yields nothing. Contract
@@ -215,20 +231,25 @@ public class ContractController(IContractApiClient contractApiClient, ICustomerA
 
         var request = ContractDocumentMergeMapper.Build(context);
 
-        ContractDocumentResponse document;
+        byte[] merged;
         try
         {
-            document = await documentService.GenerateAsync(request, cancellationToken);
+            merged = request.AdditionalDocuments is { Count: > 0 }
+                ? templateMergeService.MergeTemplateContentMany(
+                    template.Content,
+                    [new ContractDocumentMergeData(request.MergeValues, request.Regions), .. request.AdditionalDocuments],
+                    cancellationToken)
+                : templateMergeService.MergeTemplateContent(template.Content, request.MergeValues, request.Regions, cancellationToken);
         }
-        catch (Exception ex) when (ex is FileNotFoundException or NotSupportedException)
+        catch (Exception ex) when (ex is InvalidDataException or NotSupportedException or FileFormatException)
         {
-            // The converted .docx template has not been committed yet - see docs/migration.
             LogMissingTemplateMessage(logger, id, canonicalType, ex);
-            return View("FeatureNotAvailable", documentType);
+            TempData.SetNotification(NotificationType.Error, MailMergeFailed);
+            return RedirectToAction(nameof(Index), new { customerId = contract.CustomerId });
         }
 
         LogExportedContractDocumentMessage(logger, id, canonicalType, null);
-        return File(document.DocumentBytes, document.ContentType, document.FileName);
+        return File(merged, ExportTemplateService.DocxContentType, request.FileName);
     }
 
     [HttpGet]
@@ -334,18 +355,10 @@ public class ContractController(IContractApiClient contractApiClient, ICustomerA
             return NotFound();
         }
 
-        var templates = await exportTemplateApiClient.GetTemplatesAsync(storageName, cancellationToken);
-        var selected = templates?.Templates.FirstOrDefault(t => t.Selected);
-        if (selected is null)
-        {
-            TempData.SetNotification(NotificationType.Error, ExportTemplatesViewModel.ExportDisabledTooltip);
-            return RedirectToAction(ExportActionFor(storageName));
-        }
-
-        var template = await exportTemplateApiClient.DownloadTemplateAsync(selected.FileId, cancellationToken);
+        var (template, noneSelected) = await LoadSelectedTemplateAsync(storageName, cancellationToken);
         if (template is null)
         {
-            TempData.SetNotification(NotificationType.Error, FileNotFound);
+            TempData.SetNotification(NotificationType.Error, noneSelected ? ExportTemplatesViewModel.ExportDisabledTooltip : FileNotFound);
             return RedirectToAction(ExportActionFor(storageName));
         }
 
@@ -356,15 +369,32 @@ public class ContractController(IContractApiClient contractApiClient, ICustomerA
         {
             merged = templateMergeService.MergeTemplateContentMany(template.Content, documents, cancellationToken);
         }
-        catch (Exception ex) when (ex is InvalidDataException or NotSupportedException)
+        catch (Exception ex) when (ex is InvalidDataException or NotSupportedException or FileFormatException)
         {
             LogBulkExportFailedMessage(logger, storageName, ex);
-            TempData.SetNotification(NotificationType.Error, "There was a problem with the Mail Merge");
+            TempData.SetNotification(NotificationType.Error, MailMergeFailed);
             return RedirectToAction(ExportActionFor(storageName));
         }
 
         LogBulkExportedMessage(logger, storageName, documents.Count, null);
         return File(merged, ExportTemplateService.DocxContentType, BulkExportFileName(storageName, nonUk));
+    }
+
+    // Legacy template resolution, shared by the per-contract and bulk exports: the one row for this
+    // document type with fldSelectedTemplate = 1, whose bytes live in S3. Callers report their own
+    // legacy message, so "none selected" is distinguished from "selected but its file is gone".
+    private async Task<(ExportTemplateDownload? Template, bool NoneSelected)> LoadSelectedTemplateAsync(
+        string storageName,
+        CancellationToken cancellationToken)
+    {
+        var templates = await exportTemplateApiClient.GetTemplatesAsync(storageName, cancellationToken);
+        var selected = templates?.Templates.FirstOrDefault(t => t.Selected);
+        if (selected is null)
+        {
+            return (null, true);
+        }
+
+        return (await exportTemplateApiClient.DownloadTemplateAsync(selected.FileId, cancellationToken), false);
     }
 
     private async Task<List<ContractDocumentMergeData>> BuildBulkMergeDataAsync(string storageName, bool nonUk, CancellationToken cancellationToken) =>
@@ -423,20 +453,20 @@ public class ContractController(IContractApiClient contractApiClient, ICustomerA
     // Only the data the requested document actually needs is fetched.
     private async Task<ContractDocumentContext> BuildDocumentContextAsync(
         string canonicalType,
-        string templateKey,
+        string templateName,
         ContractResponse contract,
         CancellationToken cancellationToken)
     {
         if (canonicalType == ContractDocumentTypes.AddressConfirmation)
         {
             var sampleAddresses = await contractExportApiClient.GetSampleAddressesAsync(contract.ContractId, cancellationToken);
-            return new ContractDocumentContext(canonicalType, templateKey, contract, null, null, [], [], sampleAddresses, null);
+            return new ContractDocumentContext(canonicalType, templateName, contract, null, null, [], [], sampleAddresses, null);
         }
 
         if (canonicalType == ContractDocumentTypes.RenewalLetter)
         {
             var renewal = await contractExportApiClient.GetRenewalAsync(contract.ContractId, cancellationToken);
-            return new ContractDocumentContext(canonicalType, templateKey, contract, null, null, [], [], [], renewal);
+            return new ContractDocumentContext(canonicalType, templateName, contract, null, null, [], [], [], renewal);
         }
 
         var items = await contractApiClient.GetContractItemsAsync(contract.ContractId, cancellationToken);
@@ -444,7 +474,7 @@ public class ContractController(IContractApiClient contractApiClient, ICustomerA
         var countries = await lookupApiClient.GetCountriesAsync(cancellationToken);
         var vatRatings = await lookupApiClient.GetVatRatingsAsync(cancellationToken);
 
-        return new ContractDocumentContext(canonicalType, templateKey, contract, items, customer, countries, vatRatings, [], null);
+        return new ContractDocumentContext(canonicalType, templateName, contract, items, customer, countries, vatRatings, [], null);
     }
 
     private static string? NoDataMessageFor(string canonicalType, ContractDocumentContext context) => canonicalType switch

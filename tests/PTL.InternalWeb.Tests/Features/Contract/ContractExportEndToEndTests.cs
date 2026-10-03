@@ -1,37 +1,45 @@
-using DocumentFormat.OpenXml;
 using DocumentFormat.OpenXml.Packaging;
 using DocumentFormat.OpenXml.Wordprocessing;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ViewFeatures;
 using Microsoft.Extensions.Logging.Abstractions;
 using PTL.Contracts.Contract;
 using PTL.Core.Contract.Document;
+using PTL.Core.Contract.Export.Templates;
+using PTL.InternalWeb.Notifications;
 using PTL.InternalWeb.Tests.TestSupport;
 
 namespace PTL.InternalWeb.Tests.Features.Contract;
 
 /// <summary>
-/// Exercises the real template loader, repository, merge service and document service behind
-/// <see cref="PTL.InternalWeb.Features.Contract.ContractController.Export"/> - only the API clients
-/// are faked - so a break anywhere in the chain fails here rather than only in production.
+/// Exercises the real merge service behind
+/// <see cref="PTL.InternalWeb.Features.Contract.ContractController.Export"/> against the template
+/// selected in <c>tblUploadedTemplate</c> - only the API clients are faked - so a break anywhere in
+/// the chain fails here rather than only in production.
 /// </summary>
-public class ContractExportEndToEndTests : IDisposable
+public class ContractExportEndToEndTests
 {
-    private readonly string _templateRoot = Path.Combine(Path.GetTempPath(), $"ptl-export-{Guid.NewGuid():N}");
-
     [Fact]
-    public async Task Export_ProducesADownloadableDocxWithMergedValues()
+    public async Task Export_MergesTheSelectedUploadedTemplate()
     {
-        WriteContractTemplate();
-
         var contractId = Guid.NewGuid();
         var customerId = Guid.NewGuid();
-        var controller = CreateController(contractId, customerId);
+        var selectedFileId = Guid.NewGuid();
+
+        var templateApiClient = new FakeExportTemplateApiClient()
+            .WithSelectedTemplate(ExportDocumentTypes.Contracts, selectedFileId, "QM092Ed4Contract120110.docx", MergeTemplateFactory.ContractTemplate());
+
+        var controller = CreateController(contractId, customerId, templateApiClient);
 
         var result = await controller.Export(contractId, "Contract", CancellationToken.None);
 
         var file = Assert.IsType<FileContentResult>(result);
-        Assert.Equal("application/vnd.openxmlformats-officedocument.wordprocessingml.document", file.ContentType);
+        Assert.Equal(ExportTemplateService.DocxContentType, file.ContentType);
         Assert.Equal("Contract-QAL00001A.docx", file.FileDownloadName);
+
+        // The selected row drove the download, not a filename convention.
+        Assert.Equal(selectedFileId, templateApiClient.LastDownloadedFileId);
 
         using var stream = new MemoryStream(file.FileContents);
         using var document = WordprocessingDocument.Open(stream, false);
@@ -48,24 +56,30 @@ public class ContractExportEndToEndTests : IDisposable
     }
 
     [Fact]
-    public async Task Export_FallsBackWhenTheConvertedTemplateIsMissing()
+    public async Task Export_NoSelectedTemplate_ReportsTheLegacyError()
     {
-        Directory.CreateDirectory(_templateRoot);
-
         var contractId = Guid.NewGuid();
-        var controller = CreateController(contractId, Guid.NewGuid());
+        var customerId = Guid.NewGuid();
+
+        // Nothing selected for this document type - legacy's istemplateUploaded = False branch.
+        var controller = CreateController(contractId, customerId, new FakeExportTemplateApiClient());
 
         var result = await controller.Export(contractId, "Contract", CancellationToken.None);
 
-        Assert.Equal("FeatureNotAvailable", Assert.IsType<ViewResult>(result).ViewName);
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal("Index", redirect.ActionName);
+        Assert.Equal(customerId, redirect.RouteValues!["customerId"]);
+
+        var notification = controller.TempData.GetNotification();
+        Assert.Equal(NotificationType.Error, notification?.Type);
+        Assert.Equal("Template file not found", notification?.Message);
     }
 
-    private PTL.InternalWeb.Features.Contract.ContractController CreateController(Guid contractId, Guid customerId)
+    private static PTL.InternalWeb.Features.Contract.ContractController CreateController(
+        Guid contractId,
+        Guid customerId,
+        FakeExportTemplateApiClient templateApiClient)
     {
-        var documentService = new ContractDocumentService(
-            new FileTemplateRepository(new FileTemplateLoader(_templateRoot)),
-            new TemplateMergeService());
-
         var apiClient = new FakeContractApiClient
         {
             ContractResponse = new ContractResponse(
@@ -89,12 +103,14 @@ public class ContractExportEndToEndTests : IDisposable
             new FakeLookupApiClient(),
             new FakeImportPermitApiClient(),
             NullLogger<PTL.InternalWeb.Features.Contract.ContractController>.Instance,
-            documentService,
             new FakeContractExportApiClient(),
             new FakeContractRenewalApiClient(),
-            new FakeExportTemplateApiClient(),
+            templateApiClient,
             new FakeBulkExportApiClient(),
-            new PTL.Core.Contract.Document.TemplateMergeService());
+            new TemplateMergeService())
+        {
+            TempData = new TempDataDictionary(new DefaultHttpContext(), new FakeTempDataProvider())
+        };
     }
 
     private static PTL.Contracts.Customer.CustomerResponse SampleCustomer(Guid customerId) => new(
@@ -108,50 +124,4 @@ public class ContractExportEndToEndTests : IDisposable
         InvoiceAddress2: string.Empty, InvoiceAddress3: string.Empty, InvoiceAddress4: string.Empty, InvoiceAddress5: string.Empty,
         InvoiceCountryId: Guid.Empty, InvoiceTelephone: string.Empty, InvoiceTelephone2: string.Empty, InvoiceFax: string.Empty,
         InvoiceEmail: string.Empty, IsActive: true, CanOrderOnline: true, InactiveDate: null, CustomerStatusId: null);
-
-    private void WriteContractTemplate()
-    {
-        Directory.CreateDirectory(_templateRoot);
-        var path = Path.Combine(_templateRoot, "ContractExampleTemplate.docx");
-
-        using var document = WordprocessingDocument.Create(path, WordprocessingDocumentType.Document);
-        var mainPart = document.AddMainDocumentPart();
-
-        var heading = new Paragraph();
-        heading.Append(MergeField("ContractNumber"));
-        heading.Append(MergeField("CustomerOrganisation"));
-
-        var itemRow = new TableRow();
-        var itemCell = new TableCell();
-        var itemParagraph = new Paragraph();
-        itemParagraph.Append(MergeField("TableStart:ContractItems"));
-        itemParagraph.Append(MergeField("SchemeName"));
-        itemParagraph.Append(MergeField("Price"));
-        itemParagraph.Append(MergeField("TableEnd:ContractItems"));
-        itemCell.AppendChild(itemParagraph);
-        itemRow.AppendChild(itemCell);
-
-        var headerRow = new TableRow(new TableCell(new Paragraph(new Run(new Text("Scheme")))));
-
-        mainPart.Document = new Document(new Body(heading, new Table(headerRow, itemRow)));
-    }
-
-    private static OpenXmlElement[] MergeField(string name) =>
-    [
-        new Run(new FieldChar { FieldCharType = FieldCharValues.Begin }),
-        new Run(new FieldCode($" MERGEFIELD  {name}  \\* MERGEFORMAT ")),
-        new Run(new FieldChar { FieldCharType = FieldCharValues.Separate }),
-        new Run(new Text($"\u00ab{name}\u00bb")),
-        new Run(new FieldChar { FieldCharType = FieldCharValues.End })
-    ];
-
-    public void Dispose()
-    {
-        if (Directory.Exists(_templateRoot))
-        {
-            Directory.Delete(_templateRoot, true);
-        }
-
-        GC.SuppressFinalize(this);
-    }
 }

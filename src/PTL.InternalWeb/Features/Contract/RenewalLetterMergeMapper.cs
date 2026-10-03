@@ -15,7 +15,7 @@ public static class RenewalLetterMergeMapper
 
         return new ContractDocumentRequest(
             context.CanonicalDocumentType,
-            context.TemplateKey,
+            context.TemplateName,
             MergeValueFormatting.FileName(context.CanonicalDocumentType, context.Contract.QalNumber, context.Contract.Suffix),
             values);
     }

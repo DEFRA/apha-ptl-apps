@@ -1,9 +1,9 @@
+using System.Diagnostics;
 using Amazon.S3;
 using Amazon.S3.Model;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using PTL.Core.Contract.Export.Templates;
-using System.Diagnostics;
 
 namespace PTL.Data.Storage;
 

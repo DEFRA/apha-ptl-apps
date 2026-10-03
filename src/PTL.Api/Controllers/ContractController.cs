@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using PTL.Contracts.Contract;
@@ -9,7 +10,6 @@ using PTL.Core.Contract.PendingOrder;
 using PTL.Core.Contract.Renew;
 using PTL.Core.Contract.Renewal;
 using PTL.Core.Contract.SampleAddress;
-using System.Diagnostics;
 
 namespace PTL.Api.Controllers;
 

@@ -72,7 +72,7 @@ public static class JobSheetMergeMapper
 
         return new ContractDocumentRequest(
             context.CanonicalDocumentType,
-            context.TemplateKey,
+            context.TemplateName,
             MergeValueFormatting.FileName(context.CanonicalDocumentType, contract.QalNumber, contract.Suffix),
             values,
             regions);

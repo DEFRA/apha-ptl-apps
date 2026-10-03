@@ -17,9 +17,25 @@ public sealed class FakeExportTemplateApiClient : IExportTemplateApiClient
 
     public string? LastUploadedFileName { get; private set; }
 
+    public Guid? LastDownloadedFileId { get; private set; }
+
     public Guid? LastSelectedFileId { get; private set; }
 
     public Guid? LastDeletedFileId { get; private set; }
+
+    /// <summary>Seeds a document type with several templates, exactly one of them selected.</summary>
+    public FakeExportTemplateApiClient WithSelectedTemplate(string documentType, Guid selectedFileId, string fileName, byte[] content)
+    {
+        Templates = new ExportTemplateListResponse(documentType, documentType,
+        [
+            new ExportTemplateResponse(Guid.NewGuid(), "TemplateA.docx", DateTime.UtcNow.AddDays(-2), documentType, false),
+            new ExportTemplateResponse(selectedFileId, fileName, DateTime.UtcNow.AddDays(-1), documentType, true),
+            new ExportTemplateResponse(Guid.NewGuid(), "TemplateC.docx", DateTime.UtcNow, documentType, false)
+        ]);
+
+        Download = new ExportTemplateDownload(fileName, "application/vnd.openxmlformats-officedocument.wordprocessingml.document", content);
+        return this;
+    }
 
     public Task<ExportTemplateListResponse?> GetTemplatesAsync(string documentType, CancellationToken cancellationToken = default) =>
         Task.FromResult(Templates);
@@ -30,8 +46,11 @@ public sealed class FakeExportTemplateApiClient : IExportTemplateApiClient
         return Task.FromResult(UploadResponse);
     }
 
-    public Task<ExportTemplateDownload?> DownloadTemplateAsync(Guid fileId, CancellationToken cancellationToken = default) =>
-        Task.FromResult(Download);
+    public Task<ExportTemplateDownload?> DownloadTemplateAsync(Guid fileId, CancellationToken cancellationToken = default)
+    {
+        LastDownloadedFileId = fileId;
+        return Task.FromResult(Download);
+    }
 
     public Task<bool> SelectTemplateAsync(Guid fileId, CancellationToken cancellationToken = default)
     {

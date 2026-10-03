@@ -1,8 +1,9 @@
 namespace PTL.Core.Contract.Document;
 
 /// <summary>
-/// Single source of truth mapping a legacy <c>UploadedTemplateCollection.DocumentType</c> to the
-/// converted <c>.docx</c> template asset committed under <c>Documents/Templates</c>.
+/// Canonical names for the four per-contract document types and the merge-region names their
+/// templates use. Which template file is merged is never decided here - that comes from the
+/// selected row in <c>tblUploadedTemplate</c>, exactly as in legacy.
 /// </summary>
 public static class ContractDocumentTypes
 {
@@ -19,41 +20,37 @@ public static class ContractDocumentTypes
 
     public const string NonFeePayingSchemesRegion = "NonFeePayingSchemes";
 
-    private static readonly Dictionary<string, (string Canonical, string TemplateKey)> Map =
+    private static readonly Dictionary<string, string> Map =
         new(StringComparer.OrdinalIgnoreCase)
         {
-            ["contract"] = (Contract, "ContractExampleTemplate"),
-            ["contracts"] = (Contract, "ContractExampleTemplate"),
-            ["addressconfirmation"] = (AddressConfirmation, "AddressConfirmationExampleTemplate"),
-            ["addressconfirmationletters"] = (AddressConfirmation, "AddressConfirmationExampleTemplate"),
-            ["jobsheet"] = (JobSheet, "JobSheetExampleTemplate"),
-            ["jobsheets"] = (JobSheet, "JobSheetExampleTemplate"),
-            ["renewalletter"] = (RenewalLetter, "ContractRenewalExampleTemplate"),
-            ["renewalletters"] = (RenewalLetter, "ContractRenewalExampleTemplate"),
-            ["contractrenewal"] = (RenewalLetter, "ContractRenewalExampleTemplate")
+            ["contract"] = Contract,
+            ["contracts"] = Contract,
+            ["addressconfirmation"] = AddressConfirmation,
+            ["addressconfirmationletters"] = AddressConfirmation,
+            ["jobsheet"] = JobSheet,
+            ["jobsheets"] = JobSheet,
+            ["renewalletter"] = RenewalLetter,
+            ["renewalletters"] = RenewalLetter,
+            ["contractrenewal"] = RenewalLetter
         };
 
-    public static bool TryResolve(string? documentType, out string canonicalName, out string templateKey)
+    public static bool TryResolve(string? documentType, out string canonicalName)
     {
         canonicalName = string.Empty;
-        templateKey = string.Empty;
 
         if (string.IsNullOrWhiteSpace(documentType))
         {
             return false;
         }
 
-        if (!Map.TryGetValue(Normalise(documentType), out var entry))
+        if (!Map.TryGetValue(Normalise(documentType), out var canonical))
         {
             return false;
         }
 
-        (canonicalName, templateKey) = entry;
+        canonicalName = canonical;
         return true;
     }
-
-    public static string? GetTemplateKey(string? documentType) =>
-        TryResolve(documentType, out _, out var templateKey) ? templateKey : null;
 
     // "Address Confirmation", "AddressConfirmation" and "address-confirmation" are all the same type.
     private static string Normalise(string documentType) =>
