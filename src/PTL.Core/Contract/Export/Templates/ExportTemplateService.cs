@@ -1,4 +1,6 @@
+using System.Diagnostics;
 using System.Text.RegularExpressions;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace PTL.Core.Contract.Export.Templates;
@@ -26,7 +28,8 @@ public sealed record ExportTemplateContent(string FileName, string ContentType, 
 public sealed partial class ExportTemplateService(
     IUploadedTemplateRepository repository,
     ITemplateStorageService storage,
-    IOptions<TemplateStorageOptions> options) : IExportTemplateService
+    IOptions<TemplateStorageOptions> options,
+    ILogger<ExportTemplateService> logger) : IExportTemplateService
 {
     public const string DocxContentType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
@@ -62,6 +65,9 @@ public sealed partial class ExportTemplateService(
 
     public async Task<ExportTemplateUploadResult> UploadAsync(string documentType, string fileName, byte[] content, CancellationToken cancellationToken = default)
     {
+        var total = Stopwatch.StartNew();
+
+        var validation = Stopwatch.StartNew();
         if (!ExportDocumentTypes.TryResolve(documentType, out var storageName, out _))
         {
             return new ExportTemplateUploadResult(false, FileNotFound, null);
@@ -83,9 +89,12 @@ public sealed partial class ExportTemplateService(
         {
             return new ExportTemplateUploadResult(false, WrongExtension, null);
         }
+        validation.Stop();
 
         // Legacy kept every template in one folder, so a name must be unique across all four types.
+        var duplicateCheck = Stopwatch.StartNew();
         var existing = await repository.GetAllAsync(cancellationToken);
+        duplicateCheck.Stop();
         if (existing.Any(t => string.Equals(t.Filename, safeName, StringComparison.OrdinalIgnoreCase)))
         {
             return new ExportTemplateUploadResult(false, DuplicateName, null);
@@ -100,16 +109,32 @@ public sealed partial class ExportTemplateService(
             Selected = false
         };
 
+        var s3Upload = Stopwatch.StartNew();
         try
         {
             await storage.SaveAsync(StorageKeyFor(template), content, DocxContentType, cancellationToken);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
+            s3Upload.Stop();
+            total.Stop();
+            logger.LogError(
+                ex,
+                "ExportTemplateUpload failed for {DocumentType}/{FileName}: Validation={ValidationMs}ms DuplicateCheck={DuplicateCheckMs}ms S3Upload={S3UploadMs}ms Total={TotalMs}ms ExceptionType={ExceptionType}",
+                storageName, safeName, validation.ElapsedMilliseconds, duplicateCheck.ElapsedMilliseconds, s3Upload.ElapsedMilliseconds, total.ElapsedMilliseconds, ex.GetType().Name);
             return new ExportTemplateUploadResult(false, SaveFailed, null);
         }
+        s3Upload.Stop();
 
+        var metadataPersist = Stopwatch.StartNew();
         await repository.CreateAsync(template, cancellationToken);
+        metadataPersist.Stop();
+
+        total.Stop();
+        logger.LogInformation(
+            "ExportTemplateUpload timing for {DocumentType}/{FileName}: Validation={ValidationMs}ms DuplicateCheck={DuplicateCheckMs}ms S3Upload={S3UploadMs}ms MetadataPersist={MetadataPersistMs}ms Total={TotalMs}ms",
+            storageName, safeName, validation.ElapsedMilliseconds, duplicateCheck.ElapsedMilliseconds, s3Upload.ElapsedMilliseconds, metadataPersist.ElapsedMilliseconds, total.ElapsedMilliseconds);
+
         return new ExportTemplateUploadResult(true, null, template);
     }
 
@@ -161,11 +186,30 @@ public sealed partial class ExportTemplateService(
         (await repository.GetAllAsync(cancellationToken)).FirstOrDefault(t => t.FileId == fileId);
 
     // The legacy table has no storage-key column, so the key is derived and therefore stable.
+    // Bucket layout must follow the required S3 folders under templates/ without altering the
+    // database metadata values already persisted by the legacy model.
     private string StorageKeyFor(UploadedTemplate template)
     {
-        var prefix = string.IsNullOrWhiteSpace(_options.Prefix) ? string.Empty : _options.Prefix.Trim('/') + "/";
-        return $"{prefix}{template.DocumentType}/{template.FileId}{Path.GetExtension(template.Filename).ToLowerInvariant()}";
+        var prefix = string.IsNullOrWhiteSpace(_options.Prefix) ? string.Empty : _options.Prefix.Trim('/');
+        var folder = DocumentTypeFolderName(template.DocumentType);
+        var extension = Path.GetExtension(template.Filename).ToLowerInvariant();
+
+        if (string.IsNullOrWhiteSpace(prefix))
+        {
+            return $"{folder}/{template.FileId}{extension}";
+        }
+
+        return $"{prefix}/{folder}/{template.FileId}{extension}";
     }
+
+    private static string DocumentTypeFolderName(string documentType) => documentType switch
+    {
+        ExportDocumentTypes.Contracts => "contracts",
+        ExportDocumentTypes.JobSheets => "job-sheets",
+        ExportDocumentTypes.RenewalLetters => "renewal-letters",
+        ExportDocumentTypes.AddressConfirmationLetters => "address-confirmation",
+        _ => documentType.Trim('/').ToLowerInvariant()
+    };
 
     [GeneratedRegex(@"^\w[\w\s]*\.(doc|docx)$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex TemplateFileNamePattern();

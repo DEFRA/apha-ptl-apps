@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using PTL.Core.Contract.Export.Templates;
 
@@ -13,7 +14,7 @@ public class ExportTemplateServiceTests
         var storage = new FakeTemplateStorageService();
         var options = Options.Create(new TemplateStorageOptions { Prefix = "templates", MaxUploadBytes = maxUploadBytes });
 
-        return (new ExportTemplateService(repository, storage, options), repository, storage);
+        return (new ExportTemplateService(repository, storage, options, NullLogger<ExportTemplateService>.Instance), repository, storage);
     }
 
     [Fact]
@@ -42,7 +43,7 @@ public class ExportTemplateServiceTests
         await service.UploadAsync(ExportDocumentTypes.JobSheets, "Job Sheet.docx", [1]);
 
         var fileId = repository.Templates[0].FileId;
-        Assert.Contains($"templates/{ExportDocumentTypes.JobSheets}/{fileId}.docx", storage.Files.Keys);
+        Assert.Contains($"templates/job-sheets/{fileId}.docx", storage.Files.Keys);
     }
 
     [Theory]

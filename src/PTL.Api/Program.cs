@@ -115,11 +115,17 @@ builder.Services.AddScoped<IExportTemplateService, ExportTemplateService>();
 builder.Services.AddScoped<IBulkExportRepository, BulkExportRepository>();
 builder.Services.AddScoped<IBulkExportService, BulkExportService>();
 
-// The S3 client is only resolved when a template/invoice CSV is actually read or written, so the
-// application starts and every test runs without AWS credentials or bucket access. Registered once,
-// unconditionally, since either TemplateStorage or InvoiceStorage alone may select the S3 provider.
-builder.Services.AddDefaultAWSOptions(builder.Configuration.GetAWSOptions());
-builder.Services.AddAWSService<Amazon.S3.IAmazonS3>();
+// Use the AWS SDK default credential chain rather than hardcoded keys or appsettings credentials.
+// Local development resolves the authenticated IAM Identity Center profile; deployed environments
+// resolve the task/instance role automatically from the runtime environment.
+builder.Services.AddSingleton<Amazon.S3.IAmazonS3>(_ =>
+{
+    var templateRegion = builder.Configuration[$"{TemplateStorageOptions.SectionName}:Region"];
+    var invoiceRegion = builder.Configuration[$"{InvoiceStorageOptions.SectionName}:Region"];
+    var region = string.IsNullOrWhiteSpace(templateRegion) ? invoiceRegion : templateRegion;
+
+    return AwsS3ClientFactory.Create(region);
+});
 
 if (string.Equals(builder.Configuration[$"{TemplateStorageOptions.SectionName}:Provider"], "InMemory", StringComparison.OrdinalIgnoreCase))
 {
@@ -215,6 +221,26 @@ builder.Services.AddSwaggerGen(options =>
 });
 
 var app = builder.Build();
+
+// TEMPORARY DIAGNOSTIC - remove once SSO credential resolution is confirmed fixed in every
+// environment. Logs only the resolved credential provider type and a masked key prefix - never
+// the secret key or session token - to prove which link of the default credential chain resolved.
+try
+{
+    var s3Client = app.Services.GetRequiredService<Amazon.S3.IAmazonS3>();
+#pragma warning disable CS0618 // FallbackCredentialsFactory is obsolete but still the simplest way to surface which provider resolved
+    var resolvedCredentials = Amazon.Runtime.FallbackCredentialsFactory.GetCredentials(s3Client.Config);
+#pragma warning restore CS0618
+    var immutableCredentials = resolvedCredentials.GetCredentials();
+    var maskedAccessKey = immutableCredentials.AccessKey is { Length: > 4 } key ? $"{key[..4]}***" : "unknown";
+    app.Logger.LogInformation(
+        "AWS credential resolution diagnostic: ProviderType={ProviderType} AccessKeyPrefix={AccessKeyPrefix} UsesSessionToken={UsesSessionToken}",
+        resolvedCredentials.GetType().Name, maskedAccessKey, !string.IsNullOrEmpty(immutableCredentials.Token));
+}
+catch (Exception ex)
+{
+    app.Logger.LogWarning(ex, "AWS credential resolution diagnostic failed at startup.");
+}
 
 app.UseExceptionHandler();
 

@@ -9,6 +9,7 @@ using PTL.Core.Contract.PendingOrder;
 using PTL.Core.Contract.Renew;
 using PTL.Core.Contract.Renewal;
 using PTL.Core.Contract.SampleAddress;
+using System.Diagnostics;
 
 namespace PTL.Api.Controllers;
 
@@ -62,6 +63,9 @@ public sealed class ContractController(
     [HttpPost("export-templates/{documentType}")]
     public async Task<ActionResult<ExportTemplateUploadResponse>> UploadExportTemplate(string documentType, IFormFile? file, CancellationToken cancellationToken)
     {
+        var requestEntry = Stopwatch.GetTimestamp();
+        var total = Stopwatch.StartNew();
+
         if (!ExportDocumentTypes.TryResolve(documentType, out var storageName, out _))
         {
             return NotFound();
@@ -72,14 +76,28 @@ public sealed class ContractController(
             return Ok(new ExportTemplateUploadResponse(false, "File not found", null));
         }
 
+        var fileRead = Stopwatch.StartNew();
         using var buffer = new MemoryStream();
         await file.CopyToAsync(buffer, cancellationToken);
+        fileRead.Stop();
 
+        var serviceCall = Stopwatch.StartNew();
         var result = await exportTemplateService.UploadAsync(storageName, file.FileName, buffer.ToArray(), cancellationToken);
-        return Ok(new ExportTemplateUploadResponse(
+        serviceCall.Stop();
+
+        var responseBuild = Stopwatch.StartNew();
+        var response = Ok(new ExportTemplateUploadResponse(
             result.Success,
             result.ErrorMessage,
             result.Template is null ? null : ToExportTemplateResponse(result.Template)));
+        responseBuild.Stop();
+
+        total.Stop();
+        logger.LogInformation(
+            "UploadExportTemplate timing for {DocumentType}: FileRead={FileReadMs}ms ServiceCall={ServiceCallMs}ms ResponseBuild={ResponseBuildMs}ms Total={TotalMs}ms (RequestEntryTimestamp={RequestEntryTimestamp})",
+            storageName, fileRead.ElapsedMilliseconds, serviceCall.ElapsedMilliseconds, responseBuild.ElapsedMilliseconds, total.ElapsedMilliseconds, requestEntry);
+
+        return response;
     }
 
     [HttpGet("export-templates/{fileId:guid}/content")]

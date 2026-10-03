@@ -19,8 +19,11 @@
     <PackageReference Include="Serilog.Enrichers.Environment" Version="3.0.1" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="10.2.3" />
     <PackageReference Include="AWSSDK.Extensions.NETCore.Setup" Version="4.0.2" />
-    <!-- AWSSDK.Core 4.0.1.3 carries GHSA-9cvc-h2w8-phrp; 4.0.3.3 is the patched release. -->
-    <PackageReference Include="AWSSDK.Core" Version="4.0.3.3" />
+    <!-- AWSSDK.SSOOIDC 4.0.100.16 requires AWSSDK.Core >= 4.0.102.8; this also carries the GHSA-9cvc-h2w8-phrp fix. -->
+    <PackageReference Include="AWSSDK.Core" Version="4.0.102.8" />
+    <!-- Required for the AWS SDK's SSO token-provider credential flow used by local IAM Identity Center profiles. -->
+    <PackageReference Include="AWSSDK.SSOOIDC" Version="4.0.100.16" />
+    <PackageReference Include="AWSSDK.SSO" Version="4.0.100.16" />
   </ItemGroup>
 
   <ItemGroup>
