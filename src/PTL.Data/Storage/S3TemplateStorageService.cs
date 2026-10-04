@@ -16,6 +16,60 @@ public sealed class S3TemplateStorageService(IAmazonS3 s3Client, IOptions<Templa
 {
     private readonly TemplateStorageOptions _options = options.Value;
 
+    private static readonly Action<ILogger, string, long, long, Exception?> LogSaveTimingMessage =
+        LoggerMessage.Define<string, long, long>(
+            LogLevel.Information,
+            new EventId(1, nameof(LogSaveTimingMessage)),
+            "S3TemplateStorage timing for {Key}: PrefixCheck={PrefixCheckMs}ms Upload={UploadMs}ms");
+
+    private static readonly Action<ILogger, string, string, long, long, string, Exception?> LogSaveFailedMessage =
+        LoggerMessage.Define<string, string, long, long, string>(
+            LogLevel.Error,
+            new EventId(2, nameof(LogSaveFailedMessage)),
+            "Unable to upload template '{Key}' to bucket '{Bucket}'. PrefixCheck={PrefixCheckMs}ms Upload={UploadMs}ms ExceptionType={ExceptionType}");
+
+    private static readonly Action<ILogger, string, string, Exception?> LogReadFailedMessage =
+        LoggerMessage.Define<string, string>(
+            LogLevel.Warning,
+            new EventId(3, nameof(LogReadFailedMessage)),
+            "Unable to read template '{Key}' from bucket '{Bucket}'.");
+
+    private static readonly Action<ILogger, string, string, Exception?> LogDeleteFailedMessage =
+        LoggerMessage.Define<string, string>(
+            LogLevel.Warning,
+            new EventId(4, nameof(LogDeleteFailedMessage)),
+            "Unable to delete template '{Key}' from bucket '{Bucket}'.");
+
+    private static readonly Action<ILogger, string, string, Exception?> LogListFailedMessage =
+        LoggerMessage.Define<string, string>(
+            LogLevel.Warning,
+            new EventId(5, nameof(LogListFailedMessage)),
+            "Unable to list objects in bucket '{Bucket}' using prefix '{Prefix}'.");
+
+    private static readonly Action<ILogger, string, long, Exception?> LogFolderMarkerExistsMessage =
+        LoggerMessage.Define<string, long>(
+            LogLevel.Information,
+            new EventId(6, nameof(LogFolderMarkerExistsMessage)),
+            "S3 prefix check for '{FolderMarker}': HeadCheck={HeadCheckMs}ms (marker already existed)");
+
+    private static readonly Action<ILogger, string, long, long, Exception?> LogFolderMarkerCreatedMessage =
+        LoggerMessage.Define<string, long, long>(
+            LogLevel.Information,
+            new EventId(7, nameof(LogFolderMarkerCreatedMessage)),
+            "S3 prefix creation for '{FolderMarker}': HeadCheck={HeadCheckMs}ms MarkerCreate={MarkerCreateMs}ms");
+
+    private static readonly Action<ILogger, string, string, long, Exception?> LogFolderMarkerFailedMessage =
+        LoggerMessage.Define<string, string, long>(
+            LogLevel.Warning,
+            new EventId(8, nameof(LogFolderMarkerFailedMessage)),
+            "Unable to ensure folder marker '{FolderMarker}' exists in bucket '{Bucket}'. HeadCheck={HeadCheckMs}ms");
+
+    private static readonly Action<ILogger, string, string, long, string, Exception?> LogFolderMarkerUnreachableMessage =
+        LoggerMessage.Define<string, string, long, string>(
+            LogLevel.Warning,
+            new EventId(9, nameof(LogFolderMarkerUnreachableMessage)),
+            "Unable to reach S3 while checking folder marker '{FolderMarker}' in bucket '{Bucket}'. HeadCheck={HeadCheckMs}ms ExceptionType={ExceptionType}");
+
     public async Task SaveAsync(string storageKey, byte[] content, string contentType, CancellationToken cancellationToken = default)
     {
         var prefixCheck = Stopwatch.StartNew();
@@ -39,18 +93,13 @@ public sealed class S3TemplateStorageService(IAmazonS3 s3Client, IOptions<Templa
                 cancellationToken);
             upload.Stop();
 
-            logger.LogInformation(
-                "S3TemplateStorage timing for {Key}: PrefixCheck={PrefixCheckMs}ms Upload={UploadMs}ms",
-                storageKey, prefixCheck.ElapsedMilliseconds, upload.ElapsedMilliseconds);
+            LogSaveTimingMessage(logger, storageKey, prefixCheck.ElapsedMilliseconds, upload.ElapsedMilliseconds, null);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             prefixCheck.Stop();
             upload.Stop();
-            logger.LogError(
-                ex,
-                "Unable to upload template '{Key}' to bucket '{Bucket}'. PrefixCheck={PrefixCheckMs}ms Upload={UploadMs}ms ExceptionType={ExceptionType}",
-                storageKey, BucketName(), prefixCheck.ElapsedMilliseconds, upload.ElapsedMilliseconds, ex.GetType().Name);
+            LogSaveFailedMessage(logger, storageKey, BucketName(), prefixCheck.ElapsedMilliseconds, upload.ElapsedMilliseconds, ex.GetType().Name, ex);
             throw;
         }
     }
@@ -70,7 +119,7 @@ public sealed class S3TemplateStorageService(IAmazonS3 s3Client, IOptions<Templa
         }
         catch (AmazonS3Exception ex)
         {
-            logger.LogWarning(ex, "Unable to read template '{Key}' from bucket '{Bucket}'.", storageKey, BucketName());
+            LogReadFailedMessage(logger, storageKey, BucketName(), ex);
             return null;
         }
     }
@@ -83,7 +132,7 @@ public sealed class S3TemplateStorageService(IAmazonS3 s3Client, IOptions<Templa
         }
         catch (AmazonS3Exception ex)
         {
-            logger.LogWarning(ex, "Unable to delete template '{Key}' from bucket '{Bucket}'.", storageKey, BucketName());
+            LogDeleteFailedMessage(logger, storageKey, BucketName(), ex);
             throw;
         }
     }
@@ -109,7 +158,7 @@ public sealed class S3TemplateStorageService(IAmazonS3 s3Client, IOptions<Templa
         }
         catch (AmazonS3Exception ex)
         {
-            logger.LogWarning(ex, "Unable to list objects in bucket '{Bucket}' using prefix '{Prefix}'.", BucketName(), listPrefix);
+            LogListFailedMessage(logger, BucketName(), listPrefix, ex);
             return [];
         }
     }
@@ -130,7 +179,7 @@ public sealed class S3TemplateStorageService(IAmazonS3 s3Client, IOptions<Templa
         {
             await s3Client.GetObjectMetadataAsync(bucketName, folderMarkerKey, cancellationToken);
             headCheck.Stop();
-            logger.LogInformation("S3 prefix check for '{FolderMarker}': HeadCheck={HeadCheckMs}ms (marker already existed)", folderMarkerKey, headCheck.ElapsedMilliseconds);
+            LogFolderMarkerExistsMessage(logger, folderMarkerKey, headCheck.ElapsedMilliseconds, null);
             return;
         }
         catch (AmazonS3Exception ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
@@ -147,26 +196,18 @@ public sealed class S3TemplateStorageService(IAmazonS3 s3Client, IOptions<Templa
                 },
                 cancellationToken);
             markerCreate.Stop();
-            logger.LogInformation(
-                "S3 prefix creation for '{FolderMarker}': HeadCheck={HeadCheckMs}ms MarkerCreate={MarkerCreateMs}ms",
-                folderMarkerKey, headCheck.ElapsedMilliseconds, markerCreate.ElapsedMilliseconds);
+            LogFolderMarkerCreatedMessage(logger, folderMarkerKey, headCheck.ElapsedMilliseconds, markerCreate.ElapsedMilliseconds, null);
         }
         catch (AmazonS3Exception ex)
         {
             headCheck.Stop();
-            logger.LogWarning(
-                ex,
-                "Unable to ensure folder marker '{FolderMarker}' exists in bucket '{Bucket}'. HeadCheck={HeadCheckMs}ms",
-                folderMarkerKey, bucketName, headCheck.ElapsedMilliseconds);
+            LogFolderMarkerFailedMessage(logger, folderMarkerKey, bucketName, headCheck.ElapsedMilliseconds, ex);
             throw;
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             headCheck.Stop();
-            logger.LogWarning(
-                ex,
-                "Unable to reach S3 while checking folder marker '{FolderMarker}' in bucket '{Bucket}'. HeadCheck={HeadCheckMs}ms ExceptionType={ExceptionType}",
-                folderMarkerKey, bucketName, headCheck.ElapsedMilliseconds, ex.GetType().Name);
+            LogFolderMarkerUnreachableMessage(logger, folderMarkerKey, bucketName, headCheck.ElapsedMilliseconds, ex.GetType().Name, ex);
             throw;
         }
     }

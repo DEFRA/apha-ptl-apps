@@ -65,6 +65,7 @@ public static class DapperColumnMappings
     private const string ColSchemeId = "fldSchemeId";
     private const string ColPrice = "fldPrice";
     private const string ColCountry = "fldCountry";
+    private const string ColAccountNumber = "fldAccountNumber";
     private const string ColVatNumber = "fldVatNumber";
     private const string ColInvoiceOrganisation = "fldInvoiceOrganisation";
     private const string ColInvoiceAddress1 = "fldInvoiceAddress1";
@@ -88,7 +89,7 @@ public static class DapperColumnMappings
             ["fldCustomerTypeID"] = nameof(CoreCustomer.CustomerTypeId),
             [ColVatNumber] = nameof(CoreCustomer.VatNumber),
             ["fldVatRatingId"] = nameof(CoreCustomer.VatRatingId),
-            ["fldAccountNumber"] = nameof(CoreCustomer.AccountNumber),
+            [ColAccountNumber] = nameof(CoreCustomer.AccountNumber),
             ["fldCustomerFinanceId"] = nameof(CoreCustomer.CustomerFinanceId),
             [ColContactName] = nameof(CoreCustomer.ContactName),
             [ColOrganisation] = nameof(CoreCustomer.Organisation),
@@ -132,7 +133,7 @@ public static class DapperColumnMappings
             [ColName] = nameof(CustomerSummaryEntity.Name),
             [ColOrganisation] = nameof(CustomerSummaryEntity.Organisation),
             [ColContactName] = nameof(CustomerSummaryEntity.ContactName),
-            ["fldAccountNumber"] = nameof(CustomerSummaryEntity.AccountNumber),
+            [ColAccountNumber] = nameof(CustomerSummaryEntity.AccountNumber),
             [ColCountry] = nameof(CustomerSummaryEntity.Country),
             [ColIsActive] = nameof(CustomerSummaryEntity.IsActive),
         });
@@ -477,7 +478,7 @@ public static class DapperColumnMappings
             ["fldInvoiceTelephone"] = nameof(BulkContractEntity.InvoiceTelephone),
             ["fldInvoiceFax"] = nameof(BulkContractEntity.InvoiceFax),
             ["fldInvoiceEmail"] = nameof(BulkContractEntity.InvoiceEmail),
-            ["fldAccountNumber"] = nameof(BulkContractEntity.AccountNumber),
+            [ColAccountNumber] = nameof(BulkContractEntity.AccountNumber),
             [ColVatNumber] = nameof(BulkContractEntity.VatNumber),
             [ColVatRating] = nameof(BulkContractEntity.VatRating),
             [ColPurchaseOrderNumber] = nameof(BulkContractEntity.PurchaseOrderNumber),
@@ -694,7 +695,7 @@ public static class DapperColumnMappings
             [ColFax] = nameof(SampleAddressEntity.Fax),
             [ColEmail] = nameof(SampleAddressEntity.Email),
             [ColVatNumber] = nameof(SampleAddressEntity.VatNumber),
-            ["fldAccountNumber"] = nameof(SampleAddressEntity.AccountNumber),
+            [ColAccountNumber] = nameof(SampleAddressEntity.AccountNumber),
             [ColVatRating] = nameof(SampleAddressEntity.VatRating),
             [ColPurchaseOrderNumber] = nameof(SampleAddressEntity.PurchaseOrderNumber),
         });

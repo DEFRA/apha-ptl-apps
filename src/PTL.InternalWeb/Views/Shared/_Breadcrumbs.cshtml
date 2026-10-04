@@ -29,8 +29,7 @@
         return Regex.Replace(value, "([a-z])([A-Z])", "$1 $2", RegexOptions.None, TimeSpan.FromMilliseconds(100));
     }
 
-    // Only the Home landing page suppresses the trail - it is already the first crumb. Other Home
-    // actions (Privacy) still resolve their own node below.
+    // Only the Home landing page suppresses the trail - it is already the first crumb.
     var isHome = string.Equals(controller, "Home", StringComparison.OrdinalIgnoreCase)
         && string.Equals(action, "Index", StringComparison.OrdinalIgnoreCase);
 

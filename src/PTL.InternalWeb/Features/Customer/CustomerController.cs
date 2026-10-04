@@ -277,14 +277,14 @@ public class CustomerController(ICustomerApiClient customerApiClient, ILookupApi
     public Task<IActionResult> PrintContactLabel(CustomerFormViewModel model, CancellationToken cancellationToken) =>
         PrintCustomerLabelAsync(model, invoice: false, cancellationToken);
 
+    [HttpGet]
+    public Task<IActionResult> PrintContactLabel(Guid id, CancellationToken cancellationToken) =>
+        PrintSavedCustomerLabelAsync(id, invoice: false, cancellationToken);
+
     [HttpPost]
     [ValidateAntiForgeryToken]
     public Task<IActionResult> PrintInvoiceLabel(CustomerFormViewModel model, CancellationToken cancellationToken) =>
         PrintCustomerLabelAsync(model, invoice: true, cancellationToken);
-
-    [HttpGet]
-    public Task<IActionResult> PrintContactLabel(Guid id, CancellationToken cancellationToken) =>
-        PrintSavedCustomerLabelAsync(id, invoice: false, cancellationToken);
 
     [HttpGet]
     public Task<IActionResult> PrintInvoiceLabel(Guid id, CancellationToken cancellationToken) =>
@@ -298,17 +298,31 @@ public class CustomerController(ICustomerApiClient customerApiClient, ILookupApi
         }
 
         var countryNames = await GetCountryNamesAsync(cancellationToken);
-        var label = invoice
-            ? AddressLabelComposer.CustomerAddress(
-                model.InvoiceName, model.InvoiceOrganisation,
-                model.InvoiceAddress1, model.InvoiceAddress2, model.InvoiceAddress3, model.InvoiceAddress4, model.InvoiceAddress5,
-                CountryName(countryNames, model.InvoiceCountryId))
-            : AddressLabelComposer.CustomerAddress(
-                model.ContactName, model.Organisation,
-                model.Address1, model.Address2, model.Address3, model.Address4, model.Address5,
-                CountryName(countryNames, model.CountryId));
+        var fields = invoice
+            ? new AddressLabelFields
+            {
+                ContactName = model.InvoiceName,
+                Organisation = model.InvoiceOrganisation,
+                Address1 = model.InvoiceAddress1,
+                Address2 = model.InvoiceAddress2,
+                Address3 = model.InvoiceAddress3,
+                Address4 = model.InvoiceAddress4,
+                Address5 = model.InvoiceAddress5,
+                Country = CountryName(countryNames, model.InvoiceCountryId)
+            }
+            : new AddressLabelFields
+            {
+                ContactName = model.ContactName,
+                Organisation = model.Organisation,
+                Address1 = model.Address1,
+                Address2 = model.Address2,
+                Address3 = model.Address3,
+                Address4 = model.Address4,
+                Address5 = model.Address5,
+                Country = CountryName(countryNames, model.CountryId)
+            };
 
-        return LabelPdf(label, invoice);
+        return LabelPdf(AddressLabelComposer.CustomerAddress(fields), invoice);
     }
 
     private async Task<IActionResult> PrintSavedCustomerLabelAsync(Guid id, bool invoice, CancellationToken cancellationToken)
@@ -321,17 +335,31 @@ public class CustomerController(ICustomerApiClient customerApiClient, ILookupApi
         }
 
         var countryNames = await GetCountryNamesAsync(cancellationToken);
-        var label = invoice
-            ? AddressLabelComposer.CustomerAddress(
-                customer.InvoiceName, customer.InvoiceOrganisation,
-                customer.InvoiceAddress1, customer.InvoiceAddress2, customer.InvoiceAddress3, customer.InvoiceAddress4, customer.InvoiceAddress5,
-                CountryName(countryNames, customer.InvoiceCountryId))
-            : AddressLabelComposer.CustomerAddress(
-                customer.ContactName, customer.Organisation,
-                customer.Address1, customer.Address2, customer.Address3, customer.Address4, customer.Address5,
-                CountryName(countryNames, customer.CountryId));
+        var fields = invoice
+            ? new AddressLabelFields
+            {
+                ContactName = customer.InvoiceName,
+                Organisation = customer.InvoiceOrganisation,
+                Address1 = customer.InvoiceAddress1,
+                Address2 = customer.InvoiceAddress2,
+                Address3 = customer.InvoiceAddress3,
+                Address4 = customer.InvoiceAddress4,
+                Address5 = customer.InvoiceAddress5,
+                Country = CountryName(countryNames, customer.InvoiceCountryId)
+            }
+            : new AddressLabelFields
+            {
+                ContactName = customer.ContactName,
+                Organisation = customer.Organisation,
+                Address1 = customer.Address1,
+                Address2 = customer.Address2,
+                Address3 = customer.Address3,
+                Address4 = customer.Address4,
+                Address5 = customer.Address5,
+                Country = CountryName(countryNames, customer.CountryId)
+            };
 
-        return LabelPdf(label, invoice);
+        return LabelPdf(AddressLabelComposer.CustomerAddress(fields), invoice);
     }
 
     private FileContentResult LabelPdf(AddressLabel label, bool invoice) =>

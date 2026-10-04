@@ -32,9 +32,9 @@ public static class AddressLabelPdfRenderer
     {
         var content = new StringBuilder();
         content.Append("BT\n");
-        content.Append(FormattableString.Invariant($"/F1 {FontSizePoints} Tf\n"));
-        content.Append(FormattableString.Invariant($"{LeadingPoints} TL\n"));
-        content.Append(FormattableString.Invariant($"{MarginPoints} {PageHeightPoints - MarginPoints - FontSizePoints} Td\n"));
+        content.Append(string.Create(CultureInfo.InvariantCulture, $"/F1 {FontSizePoints} Tf\n"));
+        content.Append(string.Create(CultureInfo.InvariantCulture, $"{LeadingPoints} TL\n"));
+        content.Append(string.Create(CultureInfo.InvariantCulture, $"{MarginPoints} {PageHeightPoints - MarginPoints - FontSizePoints} Td\n"));
 
         for (var i = 0; i < lines.Count; i++)
         {
@@ -88,11 +88,11 @@ public static class AddressLabelPdfRenderer
         [
             encoding.GetBytes("<< /Type /Catalog /Pages 2 0 R >>"),
             encoding.GetBytes("<< /Type /Pages /Kids [3 0 R] /Count 1 >>"),
-            encoding.GetBytes(FormattableString.Invariant(
+            encoding.GetBytes(string.Create(CultureInfo.InvariantCulture,
                 $"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {PageWidthPoints} {PageHeightPoints}] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>")),
             encoding.GetBytes("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>"),
             [
-                .. encoding.GetBytes(FormattableString.Invariant($"<< /Length {contentBytes.Length} >>\nstream\n")),
+                .. encoding.GetBytes(string.Create(CultureInfo.InvariantCulture, $"<< /Length {contentBytes.Length} >>\nstream\n")),
                 .. contentBytes,
                 .. encoding.GetBytes("\nendstream")
             ]
@@ -105,20 +105,20 @@ public static class AddressLabelPdfRenderer
         for (var i = 0; i < objects.Length; i++)
         {
             offsets[i] = buffer.Position;
-            Write(buffer, encoding, FormattableString.Invariant($"{i + 1} 0 obj\n"));
+            Write(buffer, encoding, string.Create(CultureInfo.InvariantCulture, $"{i + 1} 0 obj\n"));
             buffer.Write(objects[i]);
             Write(buffer, encoding, "\nendobj\n");
         }
 
         var startXref = buffer.Position;
-        Write(buffer, encoding, FormattableString.Invariant($"xref\n0 {objects.Length + 1}\n"));
+        Write(buffer, encoding, string.Create(CultureInfo.InvariantCulture, $"xref\n0 {objects.Length + 1}\n"));
         Write(buffer, encoding, "0000000000 65535 f \n");
         foreach (var offset in offsets)
         {
             Write(buffer, encoding, offset.ToString("0000000000", CultureInfo.InvariantCulture) + " 00000 n \n");
         }
 
-        Write(buffer, encoding, FormattableString.Invariant(
+        Write(buffer, encoding, string.Create(CultureInfo.InvariantCulture,
             $"trailer\n<< /Size {objects.Length + 1} /Root 1 0 R >>\nstartxref\n{startXref}\n%%EOF\n"));
 
         return buffer.ToArray();

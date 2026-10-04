@@ -25,20 +25,52 @@ public class AddressLabelTests
     [Fact]
     public void CustomerAddress_UsesLegacyFieldOrder()
     {
-        var label = AddressLabelComposer.CustomerAddress(
-            "Alice Example", "Sample Labs", "Line 1", "Line 2", "Line 3", "Line 4", "Line 5", "United Kingdom");
+        var label = AddressLabelComposer.CustomerAddress(new AddressLabelFields
+        {
+            ContactName = "Alice Example",
+            Organisation = "Sample Labs",
+            Address1 = "Line 1",
+            Address2 = "Line 2",
+            Address3 = "Line 3",
+            Address4 = "Line 4",
+            Address5 = "Line 5",
+            Country = "United Kingdom"
+        });
 
         Assert.Equal(
             ["Alice Example", "Sample Labs", "Line 1", "Line 2", "Line 3", "Line 4", "Line 5", "United Kingdom"],
             label.Lines);
     }
 
+    // A telephone set on a customer label is ignored - only participant labels carry it.
+    [Fact]
+    public void CustomerAddress_DoesNotEmitTelephone()
+    {
+        var label = AddressLabelComposer.CustomerAddress(new AddressLabelFields
+        {
+            ContactName = "Alice Example",
+            Telephone = "01234 567890"
+        });
+
+        Assert.Equal(["Alice Example"], label.Lines);
+    }
+
     // Legacy LabelParticipantAddress.SetLabelString appends Telephone after Country.
     [Fact]
     public void ParticipantAddress_AppendsTelephoneAfterCountry()
     {
-        var label = AddressLabelComposer.ParticipantAddress(
-            "Alice Example", "Sample Labs", "Line 1", "Line 2", "Line 3", "Line 4", "Line 5", "United Kingdom", "01234 567890");
+        var label = AddressLabelComposer.ParticipantAddress(new AddressLabelFields
+        {
+            ContactName = "Alice Example",
+            Organisation = "Sample Labs",
+            Address1 = "Line 1",
+            Address2 = "Line 2",
+            Address3 = "Line 3",
+            Address4 = "Line 4",
+            Address5 = "Line 5",
+            Country = "United Kingdom",
+            Telephone = "01234 567890"
+        });
 
         Assert.Equal(
             ["Alice Example", "Sample Labs", "Line 1", "Line 2", "Line 3", "Line 4", "Line 5", "United Kingdom", "01234 567890"],

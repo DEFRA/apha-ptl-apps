@@ -58,31 +58,52 @@ internal sealed class StubPendingOrderService : IPendingOrderService
 
 internal sealed class StubExportTemplateService : IExportTemplateService
 {
+    public IReadOnlyList<UploadedTemplate> Templates { get; set; } = [];
+
+    public ExportTemplateContent? Download { get; set; }
+
+    public ExportTemplateUploadResult UploadResult { get; set; } = new(false, "File not found", null);
+
+    public bool SelectResult { get; set; }
+
+    public bool DeleteResult { get; set; }
+
     public Task<IReadOnlyList<UploadedTemplate>> GetTemplatesAsync(string documentType, CancellationToken cancellationToken = default) =>
-        Task.FromResult<IReadOnlyList<UploadedTemplate>>([]);
+        Task.FromResult(Templates);
 
     public Task<UploadedTemplate?> GetActiveTemplateAsync(string documentType, CancellationToken cancellationToken = default) =>
         Task.FromResult<UploadedTemplate?>(null);
 
     public Task<ExportTemplateUploadResult> UploadAsync(string documentType, string fileName, byte[] content, CancellationToken cancellationToken = default) =>
-        Task.FromResult(new ExportTemplateUploadResult(false, "File not found", null));
+        Task.FromResult(UploadResult);
 
     public Task<ExportTemplateContent?> DownloadAsync(Guid fileId, CancellationToken cancellationToken = default) =>
-        Task.FromResult<ExportTemplateContent?>(null);
+        Task.FromResult(Download);
 
-    public Task<bool> SelectAsync(Guid fileId, CancellationToken cancellationToken = default) => Task.FromResult(false);
+    public Task<bool> SelectAsync(Guid fileId, CancellationToken cancellationToken = default) => Task.FromResult(SelectResult);
 
-    public Task<bool> DeleteAsync(Guid fileId, CancellationToken cancellationToken = default) => Task.FromResult(false);
+    public Task<bool> DeleteAsync(Guid fileId, CancellationToken cancellationToken = default) => Task.FromResult(DeleteResult);
 }
 
 internal sealed class StubBulkExportService : IBulkExportService
 {
+    public IReadOnlyList<BulkContractEntity> Contracts { get; set; } = [];
+
+    public IReadOnlyList<SampleAddressEntity> SampleAddresses { get; set; } = [];
+
+    public IReadOnlyList<ContractRenewalEntity> Renewals { get; set; } = [];
+
+    public bool? LastNonUk { get; private set; }
+
     public Task<IReadOnlyList<BulkContractEntity>> GetExportableContractsAsync(CancellationToken cancellationToken = default) =>
-        Task.FromResult<IReadOnlyList<BulkContractEntity>>([]);
+        Task.FromResult(Contracts);
 
     public Task<IReadOnlyList<SampleAddressEntity>> GetSampleAddressesAsync(CancellationToken cancellationToken = default) =>
-        Task.FromResult<IReadOnlyList<SampleAddressEntity>>([]);
+        Task.FromResult(SampleAddresses);
 
-    public Task<IReadOnlyList<ContractRenewalEntity>> GetRenewalsAsync(bool nonUk, CancellationToken cancellationToken = default) =>
-        Task.FromResult<IReadOnlyList<ContractRenewalEntity>>([]);
+    public Task<IReadOnlyList<ContractRenewalEntity>> GetRenewalsAsync(bool nonUk, CancellationToken cancellationToken = default)
+    {
+        LastNonUk = nonUk;
+        return Task.FromResult(Renewals);
+    }
 }

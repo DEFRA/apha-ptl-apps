@@ -70,7 +70,7 @@ public sealed class InvoiceService(
             var data = await repository.GetPendingInvoiceDataAsync(cancellationToken);
 
             var financialYears = string.Join(",", data.Contracts.Select(c => c.YearId).Distinct());
-            LogDiagnosticMessage(logger, $"Stage=ContractRetrieval FinancialYear(s)=[{financialYears}] ContractCount={data.Contracts.Count}", null);
+            LogDiagnosticMessage(logger, $"Stage={stage} FinancialYear(s)=[{financialYears}] ContractCount={data.Contracts.Count}", null);
 
             // Captured once so the storage key's year partition and the notification's
             // generationDateTime personalisation refer to the exact same instant.
@@ -80,7 +80,7 @@ public sealed class InvoiceService(
             var csv = InvoiceCsvBuilder.Build(data);
             var csvBytes = Encoding.UTF8.GetBytes(csv);
             var storageKey = BuildStorageKey(generatedAt);
-            LogDiagnosticMessage(logger, $"Stage=CsvGenerationAndS3Upload GeneratedCsvSizeBytes={csvBytes.Length} S3ObjectKey={storageKey}", null);
+            LogDiagnosticMessage(logger, $"Stage={stage} GeneratedCsvSizeBytes={csvBytes.Length} S3ObjectKey={storageKey}", null);
             await storage.SaveAsync(storageKey, csvBytes, "text/csv", cancellationToken);
 
             // Mirrors legacy's single TransactionScope around sppUpdateInvoiceItems +
@@ -89,13 +89,13 @@ public sealed class InvoiceService(
             // eligible by the SQL-level criteria and is still marked invoiced, exactly as legacy's
             // SQL-only sppUpdateInvoiceItems does).
             stage = "MarkInvoicedAndAudit";
-            LogDiagnosticMessage(logger, $"Stage=MarkInvoicedAndAudit ContractCount={data.Contracts.Count} AuditWho={generatedBy}", null);
+            LogDiagnosticMessage(logger, $"Stage={stage} ContractCount={data.Contracts.Count} AuditWho={generatedBy}", null);
             await repository.MarkInvoicedAndRecordAuditAsync(generatedBy, cancellationToken);
 
             LogGeneratedMessage(logger, data.Contracts.Count, storageKey, null);
 
             stage = "Notify";
-            await NotifyRecipientsAsync(storageKey, csvBytes, generatedAt, cancellationToken);
+            await NotifyRecipientsAsync(stage, storageKey, csvBytes, generatedAt, cancellationToken);
 
             return new InvoiceGenerationOutcome(Success: true, ContractCount: data.Contracts.Count, CsvStorageKey: storageKey, ErrorMessage: null);
         }
@@ -112,10 +112,10 @@ public sealed class InvoiceService(
     public Task<IReadOnlyList<InvoiceAuditEntity>> GetAuditHistoryAsync(CancellationToken cancellationToken = default) =>
         repository.GetAuditHistoryAsync(cancellationToken);
 
-    private async Task NotifyRecipientsAsync(string storageKey, byte[] csvBytes, DateTime generatedAt, CancellationToken cancellationToken)
+    private async Task NotifyRecipientsAsync(string stage, string storageKey, byte[] csvBytes, DateTime generatedAt, CancellationToken cancellationToken)
     {
         var options = notificationOptions.Value;
-        LogDiagnosticMessage(logger, $"Stage=Notify TemplateId={options.TemplateId} RecipientCount={options.Recipients.Count}", null);
+        LogDiagnosticMessage(logger, $"Stage={stage} TemplateId={options.TemplateId} RecipientCount={options.Recipients.Count}", null);
         if (string.IsNullOrWhiteSpace(options.TemplateId) || options.Recipients.Count == 0)
         {
             return;
@@ -123,7 +123,7 @@ public sealed class InvoiceService(
 
         if (csvBytes.Length > NotifyFileAttachment.MaxFileSizeBytes)
         {
-            LogDiagnosticMessage(logger, $"Stage=Notify WARNING CsvSizeBytes={csvBytes.Length} exceeds GOV.UK Notify's {NotifyFileAttachment.MaxFileSizeBytes}-byte file limit - send will likely be rejected by Notify", null);
+            LogDiagnosticMessage(logger, $"Stage={stage} WARNING CsvSizeBytes={csvBytes.Length} exceeds GOV.UK Notify's {NotifyFileAttachment.MaxFileSizeBytes}-byte file limit - send will likely be rejected by Notify", null);
         }
 
         // Legacy subject/body: "FAO IT Unit Weybridge - Proficiency Testing Invoice File" /
@@ -159,14 +159,14 @@ public sealed class InvoiceService(
                     cancellationToken);
                 // NotifyClient.SendEmailWithFileAsync does not expose the HTTP response body/status -
                 // only whether it threw is observable here, so "response" is logged as Accepted/Failed.
-                LogDiagnosticMessage(logger, $"Stage=Notify NotifyResponse=Accepted Recipient={recipient}", null);
+                LogDiagnosticMessage(logger, $"Stage={stage} NotifyResponse=Accepted Recipient={recipient}", null);
             }
             catch (Exception ex)
             {
                 // A notification failure does not roll back generation - the invoices are already
                 // marked sent and audited; this only means staff must be told some other way.
                 LogNotificationFailedMessage(logger, recipient, ex);
-                LogDiagnosticMessage(logger, $"Stage=Notify NotifyResponse=Failed Recipient={recipient} Exception={ex.GetType().Name}", null);
+                LogDiagnosticMessage(logger, $"Stage={stage} NotifyResponse=Failed Recipient={recipient} Exception={ex.GetType().Name}", null);
             }
         }
     }

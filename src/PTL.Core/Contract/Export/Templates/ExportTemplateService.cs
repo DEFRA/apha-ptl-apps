@@ -42,6 +42,13 @@ public sealed partial class ExportTemplateService(
 
     private readonly TemplateStorageOptions _options = options.Value;
 
+    // Source-generated rather than LoggerMessage.Define, which caps at six message parameters.
+    [LoggerMessage(EventId = 1, Level = LogLevel.Error, Message = "ExportTemplateUpload failed for {DocumentType}/{FileName}: Validation={ValidationMs}ms DuplicateCheck={DuplicateCheckMs}ms S3Upload={S3UploadMs}ms Total={TotalMs}ms ExceptionType={ExceptionType}")]
+    private static partial void LogUploadFailedMessage(ILogger logger, string documentType, string fileName, long validationMs, long duplicateCheckMs, long s3UploadMs, long totalMs, string exceptionType, Exception exception);
+
+    [LoggerMessage(EventId = 2, Level = LogLevel.Information, Message = "ExportTemplateUpload timing for {DocumentType}/{FileName}: Validation={ValidationMs}ms DuplicateCheck={DuplicateCheckMs}ms S3Upload={S3UploadMs}ms MetadataPersist={MetadataPersistMs}ms Total={TotalMs}ms")]
+    private static partial void LogUploadTimingMessage(ILogger logger, string documentType, string fileName, long validationMs, long duplicateCheckMs, long s3UploadMs, long metadataPersistMs, long totalMs);
+
     public async Task<IReadOnlyList<UploadedTemplate>> GetTemplatesAsync(string documentType, CancellationToken cancellationToken = default)
     {
         if (!ExportDocumentTypes.TryResolve(documentType, out var storageName, out _))
@@ -118,10 +125,16 @@ public sealed partial class ExportTemplateService(
         {
             s3Upload.Stop();
             total.Stop();
-            logger.LogError(
-                ex,
-                "ExportTemplateUpload failed for {DocumentType}/{FileName}: Validation={ValidationMs}ms DuplicateCheck={DuplicateCheckMs}ms S3Upload={S3UploadMs}ms Total={TotalMs}ms ExceptionType={ExceptionType}",
-                storageName, safeName, validation.ElapsedMilliseconds, duplicateCheck.ElapsedMilliseconds, s3Upload.ElapsedMilliseconds, total.ElapsedMilliseconds, ex.GetType().Name);
+            LogUploadFailedMessage(
+                logger,
+                storageName,
+                safeName,
+                validation.ElapsedMilliseconds,
+                duplicateCheck.ElapsedMilliseconds,
+                s3Upload.ElapsedMilliseconds,
+                total.ElapsedMilliseconds,
+                ex.GetType().Name,
+                ex);
             return new ExportTemplateUploadResult(false, SaveFailed, null);
         }
         s3Upload.Stop();
@@ -131,9 +144,15 @@ public sealed partial class ExportTemplateService(
         metadataPersist.Stop();
 
         total.Stop();
-        logger.LogInformation(
-            "ExportTemplateUpload timing for {DocumentType}/{FileName}: Validation={ValidationMs}ms DuplicateCheck={DuplicateCheckMs}ms S3Upload={S3UploadMs}ms MetadataPersist={MetadataPersistMs}ms Total={TotalMs}ms",
-            storageName, safeName, validation.ElapsedMilliseconds, duplicateCheck.ElapsedMilliseconds, s3Upload.ElapsedMilliseconds, metadataPersist.ElapsedMilliseconds, total.ElapsedMilliseconds);
+        LogUploadTimingMessage(
+            logger,
+            storageName,
+            safeName,
+            validation.ElapsedMilliseconds,
+            duplicateCheck.ElapsedMilliseconds,
+            s3Upload.ElapsedMilliseconds,
+            metadataPersist.ElapsedMilliseconds,
+            total.ElapsedMilliseconds);
 
         return new ExportTemplateUploadResult(true, null, template);
     }

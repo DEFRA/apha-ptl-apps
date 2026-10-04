@@ -471,11 +471,18 @@ public class ParticipantController(IParticipantApiClient participantApiClient, I
             return await RedisplayParticipantFormAsync(model, cancellationToken);
         }
 
-        var label = AddressLabelComposer.ParticipantAddress(
-            model.ContactName, model.Organisation,
-            model.Address1, model.Address2, model.Address3, model.Address4, model.Address5,
-            await CountryNameAsync(model.CountryId, cancellationToken),
-            model.Telephone);
+        var label = AddressLabelComposer.ParticipantAddress(new AddressLabelFields
+        {
+            ContactName = model.ContactName,
+            Organisation = model.Organisation,
+            Address1 = model.Address1,
+            Address2 = model.Address2,
+            Address3 = model.Address3,
+            Address4 = model.Address4,
+            Address5 = model.Address5,
+            Country = await CountryNameAsync(model.CountryId, cancellationToken),
+            Telephone = model.Telephone
+        });
 
         return LabelPdf(label);
     }
@@ -490,11 +497,18 @@ public class ParticipantController(IParticipantApiClient participantApiClient, I
             return NotFound();
         }
 
-        var label = AddressLabelComposer.ParticipantAddress(
-            participant.ContactName, participant.Organisation,
-            participant.Address1, participant.Address2, participant.Address3, participant.Address4, participant.Address5,
-            await CountryNameAsync(participant.CountryId, cancellationToken),
-            participant.Telephone);
+        var label = AddressLabelComposer.ParticipantAddress(new AddressLabelFields
+        {
+            ContactName = participant.ContactName,
+            Organisation = participant.Organisation,
+            Address1 = participant.Address1,
+            Address2 = participant.Address2,
+            Address3 = participant.Address3,
+            Address4 = participant.Address4,
+            Address5 = participant.Address5,
+            Country = await CountryNameAsync(participant.CountryId, cancellationToken),
+            Telephone = participant.Telephone
+        });
 
         return LabelPdf(label);
     }

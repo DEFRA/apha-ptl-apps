@@ -19,16 +19,6 @@ public class HomeControllerTests
     }
 
     [Fact]
-    public void Privacy_ReturnsView()
-    {
-        var controller = new HomeController(new FakeApiClient());
-
-        var result = controller.Privacy();
-
-        Assert.IsType<ViewResult>(result);
-    }
-
-    [Fact]
     public async Task ApiStatus_ReturnsJsonFromApiClient()
     {
         var expected = new ApiHealthResponse("Healthy", 42, DateTime.UtcNow);

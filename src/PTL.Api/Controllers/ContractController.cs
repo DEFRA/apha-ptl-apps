@@ -35,6 +35,12 @@ public sealed class ContractController(
             new EventId(1, nameof(LogContractNotFoundMessage)),
             "Contract {ContractId} not found");
 
+    private static readonly Action<ILogger, string, long, long, long, long, long, Exception?> LogUploadTimingMessage =
+        LoggerMessage.Define<string, long, long, long, long, long>(
+            LogLevel.Information,
+            new EventId(2, nameof(LogUploadTimingMessage)),
+            "UploadExportTemplate timing for {DocumentType}: FileRead={FileReadMs}ms ServiceCall={ServiceCallMs}ms ResponseBuild={ResponseBuildMs}ms Total={TotalMs}ms (RequestEntryTimestamp={RequestEntryTimestamp})");
+
     [HttpGet("contracts/{contractId:guid}")]
     public async Task<ActionResult<ContractResponse>> GetContract(Guid contractId, CancellationToken cancellationToken)
     {
@@ -93,9 +99,15 @@ public sealed class ContractController(
         responseBuild.Stop();
 
         total.Stop();
-        logger.LogInformation(
-            "UploadExportTemplate timing for {DocumentType}: FileRead={FileReadMs}ms ServiceCall={ServiceCallMs}ms ResponseBuild={ResponseBuildMs}ms Total={TotalMs}ms (RequestEntryTimestamp={RequestEntryTimestamp})",
-            storageName, fileRead.ElapsedMilliseconds, serviceCall.ElapsedMilliseconds, responseBuild.ElapsedMilliseconds, total.ElapsedMilliseconds, requestEntry);
+        LogUploadTimingMessage(
+            logger,
+            storageName,
+            fileRead.ElapsedMilliseconds,
+            serviceCall.ElapsedMilliseconds,
+            responseBuild.ElapsedMilliseconds,
+            total.ElapsedMilliseconds,
+            requestEntry,
+            null);
 
         return response;
     }

@@ -241,21 +241,34 @@ var app = builder.Build();
 // TEMPORARY DIAGNOSTIC - remove once SSO credential resolution is confirmed fixed in every
 // environment. Logs only the resolved credential provider type and a masked key prefix - never
 // the secret key or session token - to prove which link of the default credential chain resolved.
+var logCredentialDiagnostic = LoggerMessage.Define<string, string, bool>(
+    LogLevel.Information,
+    new EventId(1, "AwsCredentialDiagnostic"),
+    "AWS credential resolution diagnostic: ProviderType={ProviderType} AccessKeyPrefix={AccessKeyPrefix} UsesSessionToken={UsesSessionToken}");
+
+var logCredentialDiagnosticFailed = LoggerMessage.Define(
+    LogLevel.Warning,
+    new EventId(2, "AwsCredentialDiagnosticFailed"),
+    "AWS credential resolution diagnostic failed at startup.");
+
 try
 {
     var s3Client = app.Services.GetRequiredService<Amazon.S3.IAmazonS3>();
 #pragma warning disable CS0618 // FallbackCredentialsFactory is obsolete but still the simplest way to surface which provider resolved
     var resolvedCredentials = Amazon.Runtime.FallbackCredentialsFactory.GetCredentials(s3Client.Config);
 #pragma warning restore CS0618
-    var immutableCredentials = resolvedCredentials.GetCredentials();
+    var immutableCredentials = await resolvedCredentials.GetCredentialsAsync();
     var maskedAccessKey = immutableCredentials.AccessKey is { Length: > 4 } key ? $"{key[..4]}***" : "unknown";
-    app.Logger.LogInformation(
-        "AWS credential resolution diagnostic: ProviderType={ProviderType} AccessKeyPrefix={AccessKeyPrefix} UsesSessionToken={UsesSessionToken}",
-        resolvedCredentials.GetType().Name, maskedAccessKey, !string.IsNullOrEmpty(immutableCredentials.Token));
+    logCredentialDiagnostic(
+        app.Logger,
+        resolvedCredentials.GetType().Name,
+        maskedAccessKey,
+        !string.IsNullOrEmpty(immutableCredentials.Token),
+        null);
 }
 catch (Exception ex)
 {
-    app.Logger.LogWarning(ex, "AWS credential resolution diagnostic failed at startup.");
+    logCredentialDiagnosticFailed(app.Logger, ex);
 }
 
 app.UseExceptionHandler();

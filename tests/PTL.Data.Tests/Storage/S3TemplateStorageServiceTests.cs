@@ -17,8 +17,15 @@ internal sealed class FakeTemplateAmazonS3Client() : AmazonS3Client(new BasicAWS
     public byte[]? GetObjectContent { get; set; }
     public bool ThrowNotFoundOnGet { get; set; }
     public bool ThrowNotFoundOnHead { get; set; }
+    public bool ThrowServerErrorOnGet { get; set; }
+    public bool ThrowServerErrorOnHead { get; set; }
+    public bool ThrowTimeoutOnHead { get; set; }
+    public bool ThrowOnPut { get; set; }
+    public bool ThrowOnDelete { get; set; }
+    public bool ThrowOnList { get; set; }
     public List<string> DeleteKeys { get; } = [];
     public List<string> ListedKeys { get; } = [];
+    public string? LastListPrefix { get; private set; }
 
     public override Task<PutObjectResponse> PutObjectAsync(PutObjectRequest request, CancellationToken cancellationToken = default)
     {
@@ -29,6 +36,11 @@ internal sealed class FakeTemplateAmazonS3Client() : AmazonS3Client(new BasicAWS
         if (!string.IsNullOrWhiteSpace(request.Key) && request.Key.EndsWith("/.folder-marker", StringComparison.OrdinalIgnoreCase))
         {
             LastFolderMarkerKey = request.Key;
+        }
+
+        if (ThrowOnPut)
+        {
+            throw new AmazonS3Exception("Upload failed") { StatusCode = System.Net.HttpStatusCode.ServiceUnavailable };
         }
 
         return Task.FromResult(new PutObjectResponse());
@@ -44,6 +56,11 @@ internal sealed class FakeTemplateAmazonS3Client() : AmazonS3Client(new BasicAWS
             throw new AmazonS3Exception("Not found") { StatusCode = System.Net.HttpStatusCode.NotFound };
         }
 
+        if (ThrowServerErrorOnGet)
+        {
+            throw new AmazonS3Exception("Server error") { StatusCode = System.Net.HttpStatusCode.InternalServerError };
+        }
+
         var stream = new MemoryStream(GetObjectContent ?? []);
         return Task.FromResult(new GetObjectResponse { ResponseStream = stream });
     }
@@ -53,6 +70,12 @@ internal sealed class FakeTemplateAmazonS3Client() : AmazonS3Client(new BasicAWS
         LastBucketName = bucketName;
         LastKey = key;
         DeleteKeys.Add(key);
+
+        if (ThrowOnDelete)
+        {
+            throw new AmazonS3Exception("Delete failed") { StatusCode = System.Net.HttpStatusCode.Forbidden };
+        }
+
         return Task.FromResult(new DeleteObjectResponse());
     }
 
@@ -66,13 +89,29 @@ internal sealed class FakeTemplateAmazonS3Client() : AmazonS3Client(new BasicAWS
             throw new AmazonS3Exception("Not found") { StatusCode = System.Net.HttpStatusCode.NotFound };
         }
 
+        if (ThrowServerErrorOnHead)
+        {
+            throw new AmazonS3Exception("Server error") { StatusCode = System.Net.HttpStatusCode.InternalServerError };
+        }
+
+        if (ThrowTimeoutOnHead)
+        {
+            throw new TimeoutException("S3 unreachable");
+        }
+
         return Task.FromResult(new GetObjectMetadataResponse());
     }
 
     public override Task<ListObjectsV2Response> ListObjectsV2Async(ListObjectsV2Request request, CancellationToken cancellationToken = default)
     {
         LastBucketName = request.BucketName;
+        LastListPrefix = request.Prefix;
         ListedKeys.Clear();
+
+        if (ThrowOnList)
+        {
+            throw new AmazonS3Exception("List failed") { StatusCode = System.Net.HttpStatusCode.Forbidden };
+        }
 
         var keys = request.Prefix is null || request.Prefix == "templates/contracts/"
             ? new[] { "templates/contracts/file-1.docx", "templates/contracts/file-2.docx" }
@@ -85,7 +124,7 @@ internal sealed class FakeTemplateAmazonS3Client() : AmazonS3Client(new BasicAWS
 
 public class S3TemplateStorageServiceTests
 {
-    private static S3TemplateStorageService CreateService(FakeTemplateAmazonS3Client s3Client, string bucketName = "devldnptl-env", string? prefix = "templates") =>
+    private static S3TemplateStorageService CreateService(FakeTemplateAmazonS3Client s3Client, string bucketName = "devldnptl-env", string prefix = "templates") =>
         new(s3Client, Options.Create(new TemplateStorageOptions { BucketName = bucketName, Prefix = prefix }), NullLogger<S3TemplateStorageService>.Instance);
 
     [Fact]
@@ -175,5 +214,106 @@ public class S3TemplateStorageServiceTests
 
         Assert.NotNull(client);
         Assert.Equal("eu-west-2", client.Config.RegionEndpoint.SystemName);
+    }
+
+    [Fact]
+    public async Task SaveAsync_UploadFails_LogsAndRethrows()
+    {
+        var s3Client = new FakeTemplateAmazonS3Client { ThrowOnPut = true };
+        var service = CreateService(s3Client);
+
+        await Assert.ThrowsAsync<AmazonS3Exception>(() => service.SaveAsync("templates/contracts/file.docx", [1], "application/octet-stream"));
+    }
+
+    // A key with no folder segment has no prefix to create, so the marker check is skipped entirely.
+    [Fact]
+    public async Task SaveAsync_KeyWithoutFolderSegment_SkipsFolderMarkerCreation()
+    {
+        var s3Client = new FakeTemplateAmazonS3Client { ThrowNotFoundOnHead = true };
+        var service = CreateService(s3Client);
+
+        await service.SaveAsync("file.docx", [1], "application/octet-stream");
+
+        Assert.Null(s3Client.LastFolderMarkerKey);
+        Assert.Equal("file.docx", s3Client.LastKey);
+    }
+
+    [Fact]
+    public async Task SaveAsync_FolderMarkerAlreadyExists_DoesNotRecreateIt()
+    {
+        var s3Client = new FakeTemplateAmazonS3Client();
+        var service = CreateService(s3Client);
+
+        await service.SaveAsync("templates/contracts/file.docx", [1], "application/octet-stream");
+
+        Assert.Null(s3Client.LastFolderMarkerKey);
+    }
+
+    [Fact]
+    public async Task SaveAsync_FolderMarkerCheckFailsWithS3Error_Rethrows()
+    {
+        var s3Client = new FakeTemplateAmazonS3Client { ThrowServerErrorOnHead = true };
+        var service = CreateService(s3Client);
+
+        await Assert.ThrowsAsync<AmazonS3Exception>(() => service.SaveAsync("templates/contracts/file.docx", [1], "application/octet-stream"));
+    }
+
+    [Fact]
+    public async Task SaveAsync_FolderMarkerCheckTimesOut_Rethrows()
+    {
+        var s3Client = new FakeTemplateAmazonS3Client { ThrowTimeoutOnHead = true };
+        var service = CreateService(s3Client);
+
+        await Assert.ThrowsAsync<TimeoutException>(() => service.SaveAsync("templates/contracts/file.docx", [1], "application/octet-stream"));
+    }
+
+    // A read failure other than 404 is logged and swallowed so the Exports screen still renders.
+    [Fact]
+    public async Task GetAsync_S3Error_ReturnsNull()
+    {
+        var s3Client = new FakeTemplateAmazonS3Client { ThrowServerErrorOnGet = true };
+        var service = CreateService(s3Client);
+
+        Assert.Null(await service.GetAsync("templates/contracts/file.docx"));
+    }
+
+    [Fact]
+    public async Task DeleteAsync_S3Error_LogsAndRethrows()
+    {
+        var s3Client = new FakeTemplateAmazonS3Client { ThrowOnDelete = true };
+        var service = CreateService(s3Client);
+
+        await Assert.ThrowsAsync<AmazonS3Exception>(() => service.DeleteAsync("templates/contracts/file.docx"));
+    }
+
+    [Fact]
+    public async Task ListAsync_S3Error_ReturnsEmpty()
+    {
+        var s3Client = new FakeTemplateAmazonS3Client { ThrowOnList = true };
+        var service = CreateService(s3Client);
+
+        Assert.Empty(await service.ListAsync("templates/contracts/"));
+    }
+
+    [Fact]
+    public async Task ListAsync_NoPrefixSupplied_FallsBackToConfiguredPrefix()
+    {
+        var s3Client = new FakeTemplateAmazonS3Client();
+        var service = CreateService(s3Client, prefix: "templates");
+
+        await service.ListAsync();
+
+        Assert.Equal("templates/", s3Client.LastListPrefix);
+    }
+
+    [Fact]
+    public async Task ListAsync_NoPrefixConfiguredOrSupplied_ListsWholeBucket()
+    {
+        var s3Client = new FakeTemplateAmazonS3Client();
+        var service = CreateService(s3Client, prefix: string.Empty);
+
+        await service.ListAsync();
+
+        Assert.Equal(string.Empty, s3Client.LastListPrefix);
     }
 }

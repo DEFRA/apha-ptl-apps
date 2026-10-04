@@ -34,7 +34,6 @@ public static class SideNavigationProvider
     public static IReadOnlyList<SideNavigationItem> Build() =>
     [
         new SideNavigationItem { Text = "Home", ControllerName = "Home", ActionName = IndexAction },
-        new SideNavigationItem { Text = "Privacy", ControllerName = "Home", ActionName = "Privacy", IsHidden = true },
         new SideNavigationItem
         {
             Text = "System Administration",
