@@ -10,6 +10,9 @@
 
     <div class="govuk-button-group">
         <button class="govuk-button" data-module="govuk-button" type="submit">Create Customer</button>
+        @* Legacy Customer.aspx print buttons - submit the form so validation runs, but return a PDF instead of saving. *@
+        <button class="govuk-button govuk-button--secondary" data-module="govuk-button" type="submit" formaction="@Url.Action("PrintContactLabel")">Print Contact Address Label</button>
+        <button class="govuk-button govuk-button--secondary" data-module="govuk-button" type="submit" formaction="@Url.Action("PrintInvoiceLabel")">Print Invoice Address Label</button>
         <a class="govuk-button govuk-button--secondary" data-module="govuk-button" asp-controller="Customer" asp-action="Index">Cancel</a>
     </div>
 </form>

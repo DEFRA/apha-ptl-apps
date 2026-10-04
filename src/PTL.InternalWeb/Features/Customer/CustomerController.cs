@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.Extensions.Logging;
 using PTL.ApiClient;
 using PTL.Contracts.Customer;
+using PTL.Core.Labels;
 using PTL.InternalWeb.Notifications;
 
 namespace PTL.InternalWeb.Features.Customer;
@@ -265,6 +266,99 @@ public class CustomerController(ICustomerApiClient customerApiClient, ILookupApi
 
         TempData.SetNotification(NotificationType.Success, "Customer update declined successfully.");
         return RedirectToAction(nameof(ReviewPendingCustomerUpdates));
+    }
+
+    // Legacy Customer.aspx ButtonPrintContactLabel / ButtonPrintInvoiceLabel. Both handlers called
+    // LoadObjectFromForm() and never Save(), so the label is produced from the current form values
+    // and works on Create before the customer exists. Neither button set CausesValidation="False",
+    // so the page validators had to pass first - ModelState here plays the same role.
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public Task<IActionResult> PrintContactLabel(CustomerFormViewModel model, CancellationToken cancellationToken) =>
+        PrintCustomerLabelAsync(model, invoice: false, cancellationToken);
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public Task<IActionResult> PrintInvoiceLabel(CustomerFormViewModel model, CancellationToken cancellationToken) =>
+        PrintCustomerLabelAsync(model, invoice: true, cancellationToken);
+
+    [HttpGet]
+    public Task<IActionResult> PrintContactLabel(Guid id, CancellationToken cancellationToken) =>
+        PrintSavedCustomerLabelAsync(id, invoice: false, cancellationToken);
+
+    [HttpGet]
+    public Task<IActionResult> PrintInvoiceLabel(Guid id, CancellationToken cancellationToken) =>
+        PrintSavedCustomerLabelAsync(id, invoice: true, cancellationToken);
+
+    private async Task<IActionResult> PrintCustomerLabelAsync(CustomerFormViewModel model, bool invoice, CancellationToken cancellationToken)
+    {
+        if (!ModelState.IsValid)
+        {
+            return await RedisplayCustomerFormAsync(model, cancellationToken);
+        }
+
+        var countryNames = await GetCountryNamesAsync(cancellationToken);
+        var label = invoice
+            ? AddressLabelComposer.CustomerAddress(
+                model.InvoiceName, model.InvoiceOrganisation,
+                model.InvoiceAddress1, model.InvoiceAddress2, model.InvoiceAddress3, model.InvoiceAddress4, model.InvoiceAddress5,
+                CountryName(countryNames, model.InvoiceCountryId))
+            : AddressLabelComposer.CustomerAddress(
+                model.ContactName, model.Organisation,
+                model.Address1, model.Address2, model.Address3, model.Address4, model.Address5,
+                CountryName(countryNames, model.CountryId));
+
+        return LabelPdf(label, invoice);
+    }
+
+    private async Task<IActionResult> PrintSavedCustomerLabelAsync(Guid id, bool invoice, CancellationToken cancellationToken)
+    {
+        var customer = await customerApiClient.GetCustomerAsync(id, cancellationToken);
+        if (customer is null)
+        {
+            LogCustomerNotFoundMessage(logger, id, null);
+            return NotFound();
+        }
+
+        var countryNames = await GetCountryNamesAsync(cancellationToken);
+        var label = invoice
+            ? AddressLabelComposer.CustomerAddress(
+                customer.InvoiceName, customer.InvoiceOrganisation,
+                customer.InvoiceAddress1, customer.InvoiceAddress2, customer.InvoiceAddress3, customer.InvoiceAddress4, customer.InvoiceAddress5,
+                CountryName(countryNames, customer.InvoiceCountryId))
+            : AddressLabelComposer.CustomerAddress(
+                customer.ContactName, customer.Organisation,
+                customer.Address1, customer.Address2, customer.Address3, customer.Address4, customer.Address5,
+                CountryName(countryNames, customer.CountryId));
+
+        return LabelPdf(label, invoice);
+    }
+
+    private FileContentResult LabelPdf(AddressLabel label, bool invoice) =>
+        File(
+            AddressLabelPdfRenderer.Render(label),
+            AddressLabelPdfRenderer.ContentType,
+            invoice ? "invoice-address-label.pdf" : "contact-address-label.pdf");
+
+    // Legacy took the country from DropDownCountry.SelectedItem.Text - the name shown on the form,
+    // not a saved value - so the lookup list is the faithful equivalent for unsaved form state.
+    private static string CountryName(Dictionary<Guid, string> countryNames, Guid? countryId) =>
+        countryNames.GetValueOrDefault(countryId.GetValueOrDefault(), string.Empty);
+
+    // Customer.aspx was a single page switching on CustomerId, so an invalid print post returns to
+    // whichever form the user was on.
+    private async Task<IActionResult> RedisplayCustomerFormAsync(CustomerFormViewModel model, CancellationToken cancellationToken)
+    {
+        if (model.CustomerId is Guid customerId)
+        {
+            await RestoreDisplayOnlyFieldsAsync(model, customerId, cancellationToken);
+            await PopulateLookupOptionsAsync(model, cancellationToken);
+            return View(nameof(Edit), model);
+        }
+
+        model.InitialStartDate = DateTime.UtcNow;
+        await PopulateLookupOptionsAsync(model, cancellationToken);
+        return View(nameof(Create), model);
     }
 
     private async Task<Dictionary<Guid, string>> GetCountryNamesAsync(CancellationToken cancellationToken)

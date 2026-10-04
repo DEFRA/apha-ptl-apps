@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.Extensions.Logging;
 using PTL.ApiClient;
 using PTL.Contracts.Participant;
+using PTL.Core.Labels;
 using PTL.InternalWeb.Notifications;
 
 namespace PTL.InternalWeb.Features.Participant;
@@ -451,7 +452,83 @@ public class ParticipantController(IParticipantApiClient participantApiClient, I
         InactiveDate = participant.InactiveDate
     };
 
-    // SsoId is a disabled field (server-generated/preserved, never user-editable - see
+    // Legacy Participant.aspx ButtonPrintContactLabel ("Print Address Label"). The handler called
+    // LoadObjectFromForm() and never Save(), so the label is produced from the current form values
+    // and works on Create before the participant exists. The button did not set
+    // CausesValidation="False", so the page validators had to pass first.
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> PrintAddressLabel(ParticipantFormViewModel model, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(model);
+
+        if (!ModelState.IsValid)
+        {
+            return await RedisplayParticipantFormAsync(model, cancellationToken);
+        }
+
+        var label = AddressLabelComposer.ParticipantAddress(
+            model.ContactName, model.Organisation,
+            model.Address1, model.Address2, model.Address3, model.Address4, model.Address5,
+            await CountryNameAsync(model.CountryId, cancellationToken),
+            model.Telephone);
+
+        return LabelPdf(label);
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> PrintAddressLabel(Guid id, CancellationToken cancellationToken)
+    {
+        var participant = await participantApiClient.GetParticipantAsync(id, cancellationToken);
+        if (participant is null)
+        {
+            LogParticipantNotFoundMessage(logger, id, null);
+            return NotFound();
+        }
+
+        var label = AddressLabelComposer.ParticipantAddress(
+            participant.ContactName, participant.Organisation,
+            participant.Address1, participant.Address2, participant.Address3, participant.Address4, participant.Address5,
+            await CountryNameAsync(participant.CountryId, cancellationToken),
+            participant.Telephone);
+
+        return LabelPdf(label);
+    }
+
+    private FileContentResult LabelPdf(AddressLabel label) =>
+        File(AddressLabelPdfRenderer.Render(label), AddressLabelPdfRenderer.ContentType, "address-label.pdf");
+
+    // Legacy took the country from DropDownCountry.SelectedItem.Text - the name shown on the form,
+    // not a saved value - so the lookup list is the faithful equivalent for unsaved form state.
+    private async Task<string> CountryNameAsync(Guid? countryId, CancellationToken cancellationToken)
+    {
+        var countries = await lookupApiClient.GetCountriesAsync(cancellationToken);
+        return countries.FirstOrDefault(c => c.CountryId == countryId.GetValueOrDefault())?.Country ?? string.Empty;
+    }
+
+    // Participant.aspx was a single page switching on ParticipantId, so an invalid print post
+    // returns to whichever form the user was on.
+    private async Task<IActionResult> RedisplayParticipantFormAsync(ParticipantFormViewModel model, CancellationToken cancellationToken)
+    {
+        var customerId = model.CustomerId.GetValueOrDefault();
+        await PopulateLookupOptionsAsync(model, cancellationToken);
+        await PopulateCustomerContactAsync(model, customerId, cancellationToken);
+
+        if (model.ParticipantId is Guid participantId)
+        {
+            await RestoreDisplayOnlyFieldsAsync(model, participantId, cancellationToken);
+            return View(nameof(Edit), model);
+        }
+
+        if (string.IsNullOrWhiteSpace(model.LabCode))
+        {
+            model.LabCode = await GenerateLabCodeAsync(customerId, cancellationToken);
+        }
+
+        return View(nameof(Create), model);
+    }
+
+    // SsoId has no form input on Create (it is assigned by the API on first external sign-in via
     // ParticipantService.UpdateParticipantAsync/CreateParticipantAsync) and InactiveDate has no
     // form input at all, so a posted-back model on a failed Edit submission has them blank/default -
     // re-fetch the persisted participant to restore them for redisplay.

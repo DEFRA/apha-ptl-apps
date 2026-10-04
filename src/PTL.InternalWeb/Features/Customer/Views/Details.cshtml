@@ -78,6 +78,12 @@
     <govuk-summary-row label="Comments">@customer.Comments</govuk-summary-row>
 </dl>
 
+@* Legacy Customer.aspx ButtonPrintContactLabel / ButtonPrintInvoiceLabel. *@
+<div class="govuk-button-group">
+    <a class="govuk-button govuk-button--secondary" data-module="govuk-button" asp-action="PrintContactLabel" asp-route-id="@customer.CustomerId">Print Contact Address Label</a>
+    <a class="govuk-button govuk-button--secondary" data-module="govuk-button" asp-action="PrintInvoiceLabel" asp-route-id="@customer.CustomerId">Print Invoice Address Label</a>
+</div>
+
 @* Legacy Customer.aspx btnParticipantList / btnContractList - both scoped to the current customer. *@
 <div class="govuk-button-group">
     <a class="govuk-button govuk-button--secondary" data-module="govuk-button" asp-controller="Participant" asp-action="Index" asp-route-customerId="@customer.CustomerId">Go to Participants Page</a>
