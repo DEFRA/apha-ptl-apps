@@ -131,6 +131,9 @@ public static class DapperColumnMappings
             [ColQalNumber] = nameof(CustomerSummaryEntity.QalNumber),
             [ColName] = nameof(CustomerSummaryEntity.Name),
             [ColOrganisation] = nameof(CustomerSummaryEntity.Organisation),
+            [ColContactName] = nameof(CustomerSummaryEntity.ContactName),
+            ["fldAccountNumber"] = nameof(CustomerSummaryEntity.AccountNumber),
+            [ColCountry] = nameof(CustomerSummaryEntity.Country),
             [ColIsActive] = nameof(CustomerSummaryEntity.IsActive),
         });
 

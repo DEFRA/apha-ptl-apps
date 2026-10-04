@@ -99,6 +99,52 @@ public class CustomerServiceTests
         Assert.Single(pagedResults.Items);
     }
 
+    // Field set mirrors legacy dbo.spgSearchCustomer (Contracts Admin/Search.aspx).
+    [Theory]
+    [InlineData("Alpha Labs")]
+    [InlineData("QAL/00001")]
+    [InlineData("ACC-12345")]
+    [InlineData("United Kingdom")]
+    [InlineData("Alice Example")]
+    public async Task SearchCustomersAsync_MatchesEverySearchableField(string searchTerm)
+    {
+        var repository = new FakeCustomerRepository();
+        var service = CreateService(repository);
+        var countryId = Guid.NewGuid();
+        repository.CountryNames[countryId] = "United Kingdom";
+
+        var match = ValidActiveCustomer("Alpha Labs");
+        match.AccountNumber = "ACC-12345";
+        match.CountryId = countryId;
+        await service.CreateCustomerAsync(match);
+        var other = ValidActiveCustomer("Beta Labs");
+        other.ContactName = "Bob Other";
+        await service.CreateCustomerAsync(other);
+
+        var results = await service.SearchCustomersAsync(searchTerm, CustomerStatusFilter.All, page: 1, pageSize: 20);
+
+        Assert.Single(results.Items);
+        Assert.Equal("Alpha Labs", results.Items[0].Name);
+    }
+
+    [Fact]
+    public async Task SearchCustomersAsync_IsCaseInsensitiveOnTheNewFields()
+    {
+        var repository = new FakeCustomerRepository();
+        var service = CreateService(repository);
+        var countryId = Guid.NewGuid();
+        repository.CountryNames[countryId] = "United Kingdom";
+
+        var customer = ValidActiveCustomer("Alpha Labs");
+        customer.AccountNumber = "ACC-12345";
+        customer.CountryId = countryId;
+        await service.CreateCustomerAsync(customer);
+
+        Assert.Single((await service.SearchCustomersAsync("acc-123", CustomerStatusFilter.All, 1, 20)).Items);
+        Assert.Single((await service.SearchCustomersAsync("united", CustomerStatusFilter.All, 1, 20)).Items);
+        Assert.Single((await service.SearchCustomersAsync("alice", CustomerStatusFilter.All, 1, 20)).Items);
+    }
+
     [Fact]
     public async Task UpdateCustomerAsync_SetIsActiveFalse_StampsInactiveDate()
     {

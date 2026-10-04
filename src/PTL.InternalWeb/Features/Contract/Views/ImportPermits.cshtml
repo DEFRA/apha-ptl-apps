@@ -4,8 +4,6 @@
     var errors = ViewData.ModelState.Where(kvp => kvp.Value?.Errors.Count > 0).SelectMany(kvp => kvp.Value!.Errors.Select(e => (Field: kvp.Key, e.ErrorMessage))).ToList();
 }
 
-<a class="govuk-back-link" asp-action="ContractItems" asp-route-id="@Model.ContractId">Back</a>
-
 <h1 class="govuk-heading-l">Import Permit(s)</h1>
 
 <govuk-error-summary errors="@errors" />
