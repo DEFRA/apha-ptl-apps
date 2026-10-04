@@ -14,11 +14,6 @@
 
 <h1 class="govuk-heading-l">Participants</h1>
 
-<div class="govuk-button-group">
-    <a class="govuk-button govuk-button--secondary" data-module="govuk-button" asp-controller="Contract" asp-action="Index" asp-route-customerId="@Model.CustomerId">Go to Contracts Page</a>
-    <a class="govuk-button govuk-button--secondary" data-module="govuk-button" asp-controller="Customer" asp-action="Details" asp-route-id="@Model.CustomerId">Go to Customer Details</a>
-</div>
-
 <form method="get" asp-action="Index" class="govuk-!-margin-bottom-6">
     <input type="hidden" name="customerId" value="@Model.CustomerId" />
     <div class="govuk-form-group">
@@ -80,3 +75,9 @@ else
 
     <govuk-pagination model="pagination" />
 }
+
+@* Legacy ParticipantList.aspx btnContractList / btnCustomerDetails - both scoped to the current customer. *@
+<div class="govuk-button-group">
+    <a class="govuk-button govuk-button--secondary" data-module="govuk-button" asp-controller="Contract" asp-action="Index" asp-route-customerId="@Model.CustomerId">Go to Contracts Page</a>
+    <a class="govuk-button govuk-button--secondary" data-module="govuk-button" asp-controller="Customer" asp-action="Details" asp-route-id="@Model.CustomerId">Go to Customer Details</a>
+</div>

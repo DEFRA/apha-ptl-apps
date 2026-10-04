@@ -80,3 +80,12 @@ else
 
     <govuk-pagination model="pagination" />
 }
+
+@* Legacy ContractList.aspx btnParticipantList / btnCustomerDetails - both scoped to the current customer. *@
+@if (Model.Search.CustomerId != Guid.Empty)
+{
+    <div class="govuk-button-group">
+        <a class="govuk-button govuk-button--secondary" data-module="govuk-button" asp-controller="Participant" asp-action="Index" asp-route-customerId="@Model.Search.CustomerId">Go to Participants Page</a>
+        <a class="govuk-button govuk-button--secondary" data-module="govuk-button" asp-controller="Customer" asp-action="Details" asp-route-id="@Model.Search.CustomerId">Go to Customer Details</a>
+    </div>
+}
