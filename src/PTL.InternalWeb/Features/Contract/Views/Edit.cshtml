@@ -1,15 +1,15 @@
 @model PTL.InternalWeb.Features.Contract.ContractFormViewModel
 @{
-    ViewData["Title"] = $"Edit contract - {Model.YearId}";
+    ViewData["Title"] = $"Edit Contract - {Model.YearId}";
 }
 
-<h1 class="govuk-heading-l">Edit contract</h1>
+<h1 class="govuk-heading-l">Edit Contract</h1>
 
 <form method="post" asp-action="Edit" asp-route-id="@Model.ContractId" novalidate>
     @await Html.PartialAsync("_ContractForm", Model)
 
     <div class="govuk-button-group">
-        <button class="govuk-button" data-module="govuk-button" type="submit">Save changes</button>
+        <button class="govuk-button" data-module="govuk-button" type="submit">Save Changes</button>
         <a class="govuk-button govuk-button--secondary" data-module="govuk-button" asp-controller="Contract" asp-action="Index" asp-route-customerId="@Model.CustomerId">Cancel</a>
     </div>
 </form>

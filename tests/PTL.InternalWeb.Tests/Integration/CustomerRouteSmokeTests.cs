@@ -98,7 +98,7 @@ public partial class CustomerRouteSmokeTests : IClassFixture<WebApplicationFacto
         var body = await response.Content.ReadAsStringAsync();
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.Contains("Inactive date", body);
+        Assert.Contains("Inactive date", body, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

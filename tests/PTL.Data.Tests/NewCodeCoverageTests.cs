@@ -93,6 +93,40 @@ public class NewCodeCoverageTests
     }
 
     [Fact]
+    public async Task NotifyClient_SendEmailWithFileAsync_SendsBase64FileAsPersonalisationValue()
+    {
+        var handler = new CapturingHandler();
+        using var httpClient = new HttpClient(handler)
+        {
+            BaseAddress = new Uri("https://api.notifications.service.gov.uk/")
+        };
+
+        var apiKey = new string('a', 36) + "-" + new string('b', 36);
+        var client = new NotifyClient(httpClient, Options.Create(new NotifyOptions { ApiKey = apiKey }));
+        var content = "Customer,Total\r\n\"QAL001\",\"100.00\""u8.ToArray();
+
+        await client.SendEmailWithFileAsync(new NotifyFileEmailRequest(
+            "template-123",
+            "user@example.com",
+            "link_to_file",
+            content,
+            "PT_Invoices_2026-10-03-21-23-16.csv")
+        {
+            Personalisation = new Dictionary<string, string> { ["generationDateTime"] = "2026/10/03 21:23:16" },
+            Reference = "ref-123"
+        });
+
+        Assert.NotNull(handler.LastRequest);
+        var payload = handler.LastPayload;
+        Assert.False(string.IsNullOrEmpty(payload));
+        Assert.Contains("template-123", payload);
+        Assert.Contains("link_to_file", payload);
+        Assert.Contains("PT_Invoices_2026-10-03-21-23-16.csv", payload);
+        Assert.Contains(Convert.ToBase64String(content), payload);
+        Assert.Contains("generationDateTime", payload);
+    }
+
+    [Fact]
     public async Task ViewerRepository_GetAllAsync_MapsEachViewerRow()
     {
         var connection = new FakeDbConnection();

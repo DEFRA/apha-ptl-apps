@@ -109,19 +109,34 @@ builder.Services.AddScoped<IRenewContractsService, RenewContractsService>();
 builder.Services.AddScoped<IPendingOrderRepository, PendingOrderRepository>();
 builder.Services.AddScoped<IPendingOrderService, PendingOrderService>();
 
-builder.Services.Configure<TemplateStorageOptions>(builder.Configuration.GetSection(TemplateStorageOptions.SectionName));
+// Single shared S3 configuration root for every S3-backed feature (export templates, invoice
+// archives) - one bucket/region, one prefix per feature (docs/migration/invoice-migration.md).
+builder.Services.Configure<PTL.Core.Storage.S3Options>(builder.Configuration.GetSection(PTL.Core.Storage.S3Options.SectionName));
+
+builder.Services.AddOptions<TemplateStorageOptions>()
+    .Configure<IOptions<PTL.Core.Storage.S3Options>>((options, s3) =>
+    {
+        options.Provider = s3.Value.Provider;
+        options.BucketName = s3.Value.BucketName;
+        options.Region = s3.Value.Region;
+        options.Prefix = s3.Value.Templates.Prefix;
+        options.MaxUploadBytes = s3.Value.Templates.MaxUploadBytes;
+    });
 builder.Services.AddScoped<IUploadedTemplateRepository, UploadedTemplateRepository>();
 builder.Services.AddScoped<IExportTemplateService, ExportTemplateService>();
 builder.Services.AddScoped<IBulkExportRepository, BulkExportRepository>();
 builder.Services.AddScoped<IBulkExportService, BulkExportService>();
 
-// The S3 client is only resolved when a template/invoice CSV is actually read or written, so the
-// application starts and every test runs without AWS credentials or bucket access. Registered once,
-// unconditionally, since either TemplateStorage or InvoiceStorage alone may select the S3 provider.
-builder.Services.AddDefaultAWSOptions(builder.Configuration.GetAWSOptions());
-builder.Services.AddAWSService<Amazon.S3.IAmazonS3>();
+// Use the AWS SDK default credential chain rather than hardcoded keys or appsettings credentials.
+// Local development resolves the authenticated IAM Identity Center profile; deployed environments
+// resolve the task/instance role automatically from the runtime environment.
+builder.Services.AddSingleton<Amazon.S3.IAmazonS3>(_ =>
+{
+    var region = builder.Configuration[$"{PTL.Core.Storage.S3Options.SectionName}:Region"];
+    return AwsS3ClientFactory.Create(region);
+});
 
-if (string.Equals(builder.Configuration[$"{TemplateStorageOptions.SectionName}:Provider"], "InMemory", StringComparison.OrdinalIgnoreCase))
+if (string.Equals(builder.Configuration[$"{PTL.Core.Storage.S3Options.SectionName}:Provider"], "InMemory", StringComparison.OrdinalIgnoreCase))
 {
     builder.Services.AddSingleton<ITemplateStorageService, InMemoryTemplateStorageService>();
 }
@@ -145,8 +160,15 @@ builder.Services.AddScoped<IWeightedPricingPlanService, WeightedPricingPlanServi
 builder.Services.AddScoped<IInvoiceRepository, InvoiceRepository>();
 builder.Services.AddScoped<IInvoiceService, InvoiceService>();
 
-builder.Services.Configure<InvoiceStorageOptions>(builder.Configuration.GetSection(InvoiceStorageOptions.SectionName));
-if (string.Equals(builder.Configuration[$"{InvoiceStorageOptions.SectionName}:Provider"], "InMemory", StringComparison.OrdinalIgnoreCase))
+builder.Services.AddOptions<InvoiceStorageOptions>()
+    .Configure<IOptions<PTL.Core.Storage.S3Options>>((options, s3) =>
+    {
+        options.Provider = s3.Value.Provider;
+        options.BucketName = s3.Value.BucketName;
+        options.Region = s3.Value.Region;
+        options.Prefix = s3.Value.Invoices.Prefix;
+    });
+if (string.Equals(builder.Configuration[$"{PTL.Core.Storage.S3Options.SectionName}:Provider"], "InMemory", StringComparison.OrdinalIgnoreCase))
 {
     builder.Services.AddSingleton<IInvoiceStorageService, InMemoryInvoiceStorageService>();
 }
@@ -215,6 +237,39 @@ builder.Services.AddSwaggerGen(options =>
 });
 
 var app = builder.Build();
+
+// TEMPORARY DIAGNOSTIC - remove once SSO credential resolution is confirmed fixed in every
+// environment. Logs only the resolved credential provider type and a masked key prefix - never
+// the secret key or session token - to prove which link of the default credential chain resolved.
+var logCredentialDiagnostic = LoggerMessage.Define<string, string, bool>(
+    LogLevel.Information,
+    new EventId(1, "AwsCredentialDiagnostic"),
+    "AWS credential resolution diagnostic: ProviderType={ProviderType} AccessKeyPrefix={AccessKeyPrefix} UsesSessionToken={UsesSessionToken}");
+
+var logCredentialDiagnosticFailed = LoggerMessage.Define(
+    LogLevel.Warning,
+    new EventId(2, "AwsCredentialDiagnosticFailed"),
+    "AWS credential resolution diagnostic failed at startup.");
+
+try
+{
+    var s3Client = app.Services.GetRequiredService<Amazon.S3.IAmazonS3>();
+#pragma warning disable CS0618 // FallbackCredentialsFactory is obsolete but still the simplest way to surface which provider resolved
+    var resolvedCredentials = Amazon.Runtime.FallbackCredentialsFactory.GetCredentials(s3Client.Config);
+#pragma warning restore CS0618
+    var immutableCredentials = await resolvedCredentials.GetCredentialsAsync();
+    var maskedAccessKey = immutableCredentials.AccessKey is { Length: > 4 } key ? $"{key[..4]}***" : "unknown";
+    logCredentialDiagnostic(
+        app.Logger,
+        resolvedCredentials.GetType().Name,
+        maskedAccessKey,
+        !string.IsNullOrEmpty(immutableCredentials.Token),
+        null);
+}
+catch (Exception ex)
+{
+    logCredentialDiagnosticFailed(app.Logger, ex);
+}
 
 app.UseExceptionHandler();
 

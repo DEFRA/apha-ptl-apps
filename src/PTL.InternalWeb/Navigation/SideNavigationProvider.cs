@@ -25,6 +25,7 @@ public static class SideNavigationProvider
     private const string ParticipantControllerName = "Participant";
     private const string ContractControllerName = "Contract";
     private const string GroupAddressControllerName = "GroupAddress";
+    private const string ParticipantSchemeControllerName = "ParticipantScheme";
     private const string SystemAdministrationControllerName = "SystemAdministration";
 
     // Placeholder for a menu entry whose page hasn't been migrated yet - see class remarks.
@@ -115,6 +116,8 @@ public static class SideNavigationProvider
                             ControllerName = ParticipantControllerName,
                             ActionName = IndexAction,
                             IsHidden = true,
+                            LinkRouteParameter = BreadcrumbRouteValues.CustomerIdKey,
+                            LinkRouteValueKey = BreadcrumbRouteValues.CustomerIdKey,
                             Children =
                             [
                                 new SideNavigationItem { Text = "Create Participant", ControllerName = ParticipantControllerName, ActionName = CreateAction },
@@ -129,12 +132,37 @@ public static class SideNavigationProvider
                             ControllerName = ContractControllerName,
                             ActionName = IndexAction,
                             IsHidden = true,
+                            LinkRouteParameter = BreadcrumbRouteValues.CustomerIdKey,
+                            LinkRouteValueKey = BreadcrumbRouteValues.CustomerIdKey,
                             Children =
                             [
                                 new SideNavigationItem { Text = "Create Contract", ControllerName = ContractControllerName, ActionName = CreateAction },
                                 new SideNavigationItem { Text = "Renew Contracts", ControllerName = ContractControllerName, ActionName = "RenewContracts" },
                                 new SideNavigationItem { Text = "Contract Details", ControllerName = ContractControllerName, ActionName = DetailsAction, IsHidden = true },
-                                new SideNavigationItem { Text = "Edit Contract", ControllerName = ContractControllerName, ActionName = EditAction, IsHidden = true }
+                                new SideNavigationItem { Text = "Edit Contract", ControllerName = ContractControllerName, ActionName = EditAction, IsHidden = true },
+
+                                // Hidden: reached from the Contracts list and from Contract Details.
+                                // Its own children all return here via their Back/Cancel buttons.
+                                new SideNavigationItem
+                                {
+                                    Text = "Contract Items",
+                                    ControllerName = ContractControllerName,
+                                    ActionName = "ContractItems",
+                                    IsHidden = true,
+                                    LinkRouteParameter = "id",
+                                    LinkRouteValueKey = BreadcrumbRouteValues.ContractIdKey,
+                                    Children =
+                                    [
+                                        new SideNavigationItem { Text = "Contract Item Details", ControllerName = ParticipantSchemeControllerName, ActionName = DetailsAction, IsHidden = true },
+                                        new SideNavigationItem { Text = "Add Contract Item", ControllerName = ParticipantSchemeControllerName, ActionName = CreateAction, IsHidden = true },
+                                        new SideNavigationItem { Text = "Edit Contract Item", ControllerName = ParticipantSchemeControllerName, ActionName = EditAction, IsHidden = true },
+                                        new SideNavigationItem { Text = "Import Permits", ControllerName = ContractControllerName, ActionName = "ImportPermits", IsHidden = true }
+                                    ]
+                                },
+
+                                // Hidden: a download action that only renders a page when the
+                                // requested document type has no template (FeatureNotAvailable).
+                                new SideNavigationItem { Text = "Export", ControllerName = ContractControllerName, ActionName = "Export", IsHidden = true }
                             ]
                         }
                     ]
@@ -169,11 +197,7 @@ public static class SideNavigationProvider
                 {
                     Text = "Invoice Generation",
                     ControllerName = "Invoice",
-                    ActionName = IndexAction,
-                    Children =
-                    [
-                        new SideNavigationItem { Text = "Invoice Audit History", ControllerName = "Invoice", ActionName = "AuditHistory", IsHidden = true }
-                    ]
+                    ActionName = IndexAction
                 }
             ]
         },

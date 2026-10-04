@@ -73,12 +73,18 @@ public class InvoiceServiceTests
         Assert.True(outcome.Success);
         Assert.Equal(1, outcome.ContractCount);
         Assert.NotNull(outcome.CsvStorageKey);
-        Assert.StartsWith("invoices/PT_Invoices_", outcome.CsvStorageKey);
+        Assert.Matches(@"^invoices/\d{4}/PT_Invoices_", outcome.CsvStorageKey);
         Assert.True(repository.MarkInvoicedCalled);
         Assert.Equal("test.user", repository.LastAuditWho);
         Assert.Equal(storage.LastStorageKey, outcome.CsvStorageKey);
         Assert.NotNull(storage.LastContent);
         Assert.Equal(["ops@example.com", "finance@example.com"], notify.SentTo);
+        Assert.NotNull(notify.LastPersonalisation);
+        Assert.Equal(outcome.CsvStorageKey, notify.LastPersonalisation!["csv_reference"]);
+        Assert.Contains("generationDateTime", notify.LastPersonalisation.Keys);
+        Assert.Equal("link_to_file", notify.LastFilePersonalisationKey);
+        Assert.Equal(storage.LastContent, notify.LastFileContent);
+        Assert.Equal(outcome.CsvStorageKey![(outcome.CsvStorageKey.LastIndexOf('/') + 1)..], notify.LastFilename);
     }
 
     [Fact]

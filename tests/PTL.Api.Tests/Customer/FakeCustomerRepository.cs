@@ -11,6 +11,9 @@ internal sealed class FakeCustomerRepository : ICustomerRepository
 
     public IReadOnlyDictionary<Guid, PTL.Core.Customer.Customer> Customers => _customers;
 
+    // Stands in for the summary query's LEFT JOIN on tblCountry; unmapped ids resolve to empty.
+    public Dictionary<Guid, string> CountryNames { get; } = [];
+
     public Task<PTL.Core.Customer.Customer?> GetByIdAsync(Guid customerId, CancellationToken cancellationToken = default) =>
         Task.FromResult(_customers.TryGetValue(customerId, out var customer) ? Clone(customer) : null);
 
@@ -24,7 +27,17 @@ internal sealed class FakeCustomerRepository : ICustomerRepository
         });
 
         IReadOnlyList<CustomerSummaryEntity> summaries = filtered
-            .Select(c => new CustomerSummaryEntity { CustomerId = c.CustomerId, QalNumber = c.QalNumber, Name = c.Name, Organisation = c.Organisation, IsActive = c.IsActive })
+            .Select(c => new CustomerSummaryEntity
+            {
+                CustomerId = c.CustomerId,
+                QalNumber = c.QalNumber,
+                Name = c.Name,
+                Organisation = c.Organisation,
+                ContactName = c.ContactName,
+                AccountNumber = c.AccountNumber,
+                Country = CountryNames.GetValueOrDefault(c.CountryId, string.Empty),
+                IsActive = c.IsActive
+            })
             .ToList();
 
         return Task.FromResult(summaries);

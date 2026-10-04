@@ -36,16 +36,6 @@ public class HomeRouteSmokeTests : IClassFixture<WebApplicationFactory<Program>>
     }
 
     [Fact]
-    public async Task Home_Privacy_ReturnsSuccess()
-    {
-        var client = _factory.CreateClient();
-
-        var response = await client.GetAsync("/Home/Privacy");
-
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-    }
-
-    [Fact]
     public async Task Home_Error_ReturnsSuccess()
     {
         var client = _factory.CreateClient();
@@ -65,18 +55,6 @@ public class HomeRouteSmokeTests : IClassFixture<WebApplicationFactory<Program>>
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Contains("An error occurred", body, StringComparison.OrdinalIgnoreCase);
-    }
-
-    [Fact]
-    public async Task Home_Privacy_RendersContent()
-    {
-        var client = _factory.CreateClient();
-
-        var response = await client.GetAsync("/Home/Privacy");
-        var body = await response.Content.ReadAsStringAsync();
-
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.True(body.Length > 0, "Privacy page should have content");
     }
 
     [Fact]

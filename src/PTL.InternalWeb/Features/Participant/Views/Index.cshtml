@@ -1,5 +1,4 @@
 @model PTL.InternalWeb.Features.Participant.ParticipantListViewModel
-@using PTL.Contracts.Participant
 @using PTL.InternalWeb.Pagination
 @{
     ViewData["Title"] = "Participants";
@@ -14,16 +13,11 @@
 
 <h1 class="govuk-heading-l">Participants</h1>
 
-<div class="govuk-button-group">
-    <a class="govuk-button govuk-button--secondary" data-module="govuk-button" asp-controller="Contract" asp-action="Index" asp-route-customerId="@Model.CustomerId">Go to Contracts Page</a>
-    <a class="govuk-button govuk-button--secondary" data-module="govuk-button" asp-controller="Customer" asp-action="Details" asp-route-id="@Model.CustomerId">Go to Customer Details</a>
-</div>
-
 <form method="get" asp-action="Index" class="govuk-!-margin-bottom-6">
     <input type="hidden" name="customerId" value="@Model.CustomerId" />
     <div class="govuk-form-group">
         <label class="govuk-label" for="searchTerm">Search</label>
-        <div class="govuk-hint">Matches lab code, lab name, or contact name.</div>
+        <div class="govuk-hint">Matches Lab Code, Lab Name, or Contact Name.</div>
         <input class="govuk-input" id="searchTerm" name="searchTerm" value="@Model.SearchTerm" />
     </div>
     <div class="govuk-form-group">
@@ -47,9 +41,9 @@ else
     <table class="govuk-table">
         <thead class="govuk-table__head">
             <tr class="govuk-table__row">
-                <th scope="col" class="govuk-table__header">Lab code</th>
-                <th scope="col" class="govuk-table__header">Lab name</th>
-                <th scope="col" class="govuk-table__header">Contact</th>
+                <th scope="col" class="govuk-table__header">Lab Code</th>
+                <th scope="col" class="govuk-table__header">Lab Name</th>
+                <th scope="col" class="govuk-table__header">Contact Name</th>
                 <th scope="col" class="govuk-table__header">Status</th>
                 <th scope="col" class="govuk-table__header">Details</th>
                 <th scope="col" class="govuk-table__header">Viewers</th>
@@ -80,3 +74,9 @@ else
 
     <govuk-pagination model="pagination" />
 }
+
+@* Legacy ParticipantList.aspx btnContractList / btnCustomerDetails - both scoped to the current customer. *@
+<div class="govuk-button-group">
+    <a class="govuk-button govuk-button--secondary" data-module="govuk-button" asp-controller="Contract" asp-action="Index" asp-route-customerId="@Model.CustomerId">Go to Contracts Page</a>
+    <a class="govuk-button govuk-button--secondary" data-module="govuk-button" asp-controller="Customer" asp-action="Details" asp-route-id="@Model.CustomerId">Go to Customer Details</a>
+</div>

@@ -19,7 +19,7 @@ public class ContractControllerExportsTests
         FakeBulkExportApiClient? bulkExportApiClient = null) =>
         new(new FakeContractApiClient(), new FakeCustomerApiClient(), new FakeLookupApiClient(),
             new FakeImportPermitApiClient(), NullLogger<ContractController>.Instance,
-            new FakeContractDocumentService(), new FakeContractExportApiClient(), new FakeContractRenewalApiClient(),
+            new FakeContractExportApiClient(), new FakeContractRenewalApiClient(),
             exportTemplateApiClient ?? new FakeExportTemplateApiClient(),
             bulkExportApiClient ?? new FakeBulkExportApiClient(),
             new TemplateMergeService())

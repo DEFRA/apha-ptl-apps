@@ -1,7 +1,11 @@
+using DocumentFormat.OpenXml.Packaging;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ViewFeatures;
 using Microsoft.Extensions.Logging.Abstractions;
 using PTL.Contracts.Contract;
 using PTL.Core.Contract.Document;
+using PTL.Core.Contract.Export.Templates;
 using PTL.InternalWeb.Notifications;
 using PTL.InternalWeb.Tests.TestSupport;
 
@@ -9,11 +13,17 @@ namespace PTL.InternalWeb.Tests.Features.Contract;
 
 public class ContractControllerTests
 {
-    private static PTL.InternalWeb.Features.Contract.ContractController CreateController(FakeContractApiClient apiClient, FakeCustomerApiClient? customerApiClient = null, FakeLookupApiClient? lookupApiClient = null, FakeImportPermitApiClient? importPermitApiClient = null, FakeContractDocumentService? documentService = null, FakeContractExportApiClient? contractExportApiClient = null, FakeContractRenewalApiClient? contractRenewalApiClient = null, FakeExportTemplateApiClient? exportTemplateApiClient = null, FakeBulkExportApiClient? bulkExportApiClient = null) =>
-        new(apiClient, customerApiClient ?? new FakeCustomerApiClient(), lookupApiClient ?? new FakeLookupApiClient(), importPermitApiClient ?? new FakeImportPermitApiClient(), NullLogger<PTL.InternalWeb.Features.Contract.ContractController>.Instance, documentService ?? new FakeContractDocumentService(), contractExportApiClient ?? new FakeContractExportApiClient(), contractRenewalApiClient ?? new FakeContractRenewalApiClient(), exportTemplateApiClient ?? new FakeExportTemplateApiClient(), bulkExportApiClient ?? new FakeBulkExportApiClient(), new TemplateMergeService());
+    private static PTL.InternalWeb.Features.Contract.ContractController CreateController(FakeContractApiClient apiClient, FakeCustomerApiClient? customerApiClient = null, FakeLookupApiClient? lookupApiClient = null, FakeImportPermitApiClient? importPermitApiClient = null, FakeContractExportApiClient? contractExportApiClient = null, FakeContractRenewalApiClient? contractRenewalApiClient = null, FakeExportTemplateApiClient? exportTemplateApiClient = null, FakeBulkExportApiClient? bulkExportApiClient = null) =>
+        new(apiClient, customerApiClient ?? new FakeCustomerApiClient(), lookupApiClient ?? new FakeLookupApiClient(), importPermitApiClient ?? new FakeImportPermitApiClient(), NullLogger<PTL.InternalWeb.Features.Contract.ContractController>.Instance, contractExportApiClient ?? new FakeContractExportApiClient(), contractRenewalApiClient ?? new FakeContractRenewalApiClient(), exportTemplateApiClient ?? new FakeExportTemplateApiClient(), bulkExportApiClient ?? new FakeBulkExportApiClient(), new TemplateMergeService())
+        {
+            TempData = new TempDataDictionary(new DefaultHttpContext(), new FakeTempDataProvider())
+        };
 
-    private static ContractResponse SampleContract(Guid contractId, Guid customerId, bool isReadOnly = false) => new(
-        contractId, customerId, "Sample Laboratories Ltd", "QAL/00001", DateTime.UtcNow.Year + 1, "UT12345",
+    private static FakeExportTemplateApiClient SelectedTemplateFor(string documentType) =>
+        new FakeExportTemplateApiClient()
+            .WithSelectedTemplate(documentType, Guid.NewGuid(), "Selected.docx", MergeTemplateFactory.ContractTemplate());
+
+    private static ContractResponse SampleContract(Guid contractId, Guid customerId, bool isReadOnly = false) => new(contractId, customerId, "Sample Laboratories Ltd", "QAL/00001", DateTime.UtcNow.Year + 1, "UT12345",
         string.Empty, "Alice Example", string.Empty, string.Empty, 0, 0, 0, 0, 0, 0, 0, 0,
         DateTime.UtcNow, DateTime.UtcNow, DateTime.UtcNow, string.Empty, DateTime.UtcNow, true, isReadOnly, "A",
         DateTime.UtcNow, string.Empty, false, false, false, null, null);
@@ -109,29 +119,19 @@ public class ContractControllerTests
         };
 
         var customerApiClient = new FakeCustomerApiClient { CustomerResponse = SampleCustomer(customerId) };
-        var documentService = new FakeContractDocumentService
-        {
-            Response = new ContractDocumentResponse("Contract-ABC.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", [0x50, 0x4B, 0x03, 0x04])
-        };
-        var controller = new PTL.InternalWeb.Features.Contract.ContractController(
-            apiClient,
-            customerApiClient,
-            new FakeLookupApiClient(),
-            new FakeImportPermitApiClient(),
-            NullLogger<PTL.InternalWeb.Features.Contract.ContractController>.Instance,
-            documentService,
-            new FakeContractExportApiClient(),
-            new FakeContractRenewalApiClient(),
-            new FakeExportTemplateApiClient(),
-            new FakeBulkExportApiClient(),
-            new TemplateMergeService());
+        var selectedFileId = Guid.NewGuid();
+        var templateApiClient = new FakeExportTemplateApiClient()
+            .WithSelectedTemplate(ExportDocumentTypes.Contracts, selectedFileId, "QM092Ed4Contract120110.docx", MergeTemplateFactory.ContractTemplate());
+
+        var controller = CreateController(apiClient, customerApiClient, exportTemplateApiClient: templateApiClient);
 
         var result = await controller.Export(contractId, "Contract", CancellationToken.None);
 
         var file = Assert.IsType<FileContentResult>(result);
-        Assert.Equal("Contract-ABC.docx", file.FileDownloadName);
-        Assert.Equal("application/vnd.openxmlformats-officedocument.wordprocessingml.document", file.ContentType);
-        Assert.Equal(new byte[] { 0x50, 0x4B, 0x03, 0x04 }, file.FileContents);
+        Assert.Equal("Contract-QAL00001A.docx", file.FileDownloadName);
+        Assert.Equal(ExportTemplateService.DocxContentType, file.ContentType);
+        Assert.Equal(selectedFileId, templateApiClient.LastDownloadedFileId);
+        Assert.NotEmpty(file.FileContents);
     }
 
     [Fact]
@@ -167,17 +167,55 @@ public class ContractControllerTests
     }
 
     [Fact]
-    public async Task Export_MissingTemplate_FallsBackToFeatureNotAvailable()
+    public async Task Export_NoSelectedTemplate_ReportsTemplateFileNotFound()
     {
         var contractId = Guid.NewGuid();
-        var controller = CreateController(
-            new FakeContractApiClient { ContractResponse = SampleContract(contractId, Guid.NewGuid()) },
-            documentService: new FakeContractDocumentService { ExceptionToThrow = new FileNotFoundException("no template") });
+        var customerId = Guid.NewGuid();
+        var controller = CreateController(new FakeContractApiClient { ContractResponse = SampleContract(contractId, customerId) });
 
         var result = await controller.Export(contractId, "Contract", CancellationToken.None);
 
-        var view = Assert.IsType<ViewResult>(result);
-        Assert.Equal("FeatureNotAvailable", view.ViewName);
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal("Index", redirect.ActionName);
+        Assert.Equal(customerId, redirect.RouteValues!["customerId"]);
+        Assert.Equal("Template file not found", controller.TempData.GetNotification()?.Message);
+    }
+
+    [Fact]
+    public async Task Export_SelectedTemplateContentMissing_ReportsFileNotFound()
+    {
+        var contractId = Guid.NewGuid();
+        var customerId = Guid.NewGuid();
+        var templateApiClient = new FakeExportTemplateApiClient()
+            .WithSelectedTemplate(ExportDocumentTypes.Contracts, Guid.NewGuid(), "Selected.docx", []);
+        templateApiClient.Download = null;
+
+        var controller = CreateController(
+            new FakeContractApiClient { ContractResponse = SampleContract(contractId, customerId) },
+            exportTemplateApiClient: templateApiClient);
+
+        var result = await controller.Export(contractId, "Contract", CancellationToken.None);
+
+        Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal("File not found", controller.TempData.GetNotification()?.Message);
+    }
+
+    [Fact]
+    public async Task Export_SelectedTemplateIsNotADocx_ReportsMailMergeFailure()
+    {
+        var contractId = Guid.NewGuid();
+        var customerId = Guid.NewGuid();
+        var templateApiClient = new FakeExportTemplateApiClient()
+            .WithSelectedTemplate(ExportDocumentTypes.Contracts, Guid.NewGuid(), "Legacy.doc", [0x00, 0x01, 0x02, 0x03]);
+
+        var controller = CreateController(
+            new FakeContractApiClient { ContractResponse = SampleContract(contractId, customerId) },
+            exportTemplateApiClient: templateApiClient);
+
+        var result = await controller.Export(contractId, "Contract", CancellationToken.None);
+
+        Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal("There was a problem with the Mail Merge", controller.TempData.GetNotification()?.Message);
     }
 
     [Fact]
@@ -212,10 +250,12 @@ public class ContractControllerTests
             ContactName = "Alice Example"
         };
 
-        var documentService = new FakeContractDocumentService
-        {
-            Response = new ContractDocumentResponse("Contract-QAL00001A.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", [0x50])
-        };
+        var templateApiClient = new FakeExportTemplateApiClient()
+            .WithSelectedTemplate(
+                ExportDocumentTypes.Contracts,
+                Guid.NewGuid(),
+                "Selected.docx",
+                MergeTemplateFactory.ContractTemplate("AccountNumber", "VatRating", "Country", "AdminCharge", "ContractTotal", "DiscountRate"));
 
         var controller = CreateController(
             apiClient,
@@ -225,28 +265,27 @@ public class ContractControllerTests
                 Countries = [new PTL.Contracts.Lookup.CountryResponse(countryId, "United Kingdom")],
                 VatRatings = [new PTL.Contracts.Lookup.VatRatingResponse(vatRatingId, "Standard")]
             },
-            documentService: documentService);
+            exportTemplateApiClient: templateApiClient);
 
-        await controller.Export(contractId, "Contract", CancellationToken.None);
+        var result = await controller.Export(contractId, "Contract", CancellationToken.None);
 
-        var request = Assert.IsType<ContractDocumentRequest>(documentService.LastRequest);
-        Assert.Equal("Contract", request.DocumentType);
-        Assert.Equal("ContractExampleTemplate", request.TemplateName);
-        Assert.Equal("QAL/00001", request.MergeValues["ContractNumber"]);
-        Assert.Equal("ACC-1", request.MergeValues["AccountNumber"]);
-        Assert.Equal("Standard", request.MergeValues["VatRating"]);
-        Assert.Equal("United Kingdom", request.MergeValues["Country"]);
-        Assert.Equal("£25.00", request.MergeValues["AdminCharge"]);
-        Assert.Equal("£95.50", request.MergeValues["ContractTotal"]);
-        Assert.Equal("10.00", request.MergeValues["DiscountRate"]);
+        var file = Assert.IsType<FileContentResult>(result);
+        using var stream = new MemoryStream(file.FileContents);
+        using var document = WordprocessingDocument.Open(stream, false);
+        var body = document.MainDocumentPart!.Document!.Body!;
+        var text = body.InnerText;
 
-        var rows = Assert.IsType<IReadOnlyList<IReadOnlyDictionary<string, string>>>(
-            request.Regions!["ContractItems"], exactMatch: false);
-        var row = Assert.Single(rows);
-        Assert.Equal("Salmonella", row["SchemeName"]);
-        Assert.Equal("Lab One Ltd", row["ParticipantName"]);
-        Assert.Equal("4", row["NumberOfDistributions"]);
-        Assert.Equal("£42.50", row["Price"]);
+        Assert.Contains("QAL/00001", text, StringComparison.Ordinal);
+        Assert.Contains("ACC-1", text, StringComparison.Ordinal);
+        Assert.Contains("Standard", text, StringComparison.Ordinal);
+        Assert.Contains("United Kingdom", text, StringComparison.Ordinal);
+        Assert.Contains("£25.00", text, StringComparison.Ordinal);
+        Assert.Contains("£95.50", text, StringComparison.Ordinal);
+        Assert.Contains("10.00", text, StringComparison.Ordinal);
+
+        var itemRow = body.Descendants<DocumentFormat.OpenXml.Wordprocessing.TableRow>().Last();
+        Assert.Contains("Salmonella", itemRow.InnerText, StringComparison.Ordinal);
+        Assert.Contains("£42.50", itemRow.InnerText, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -550,7 +589,10 @@ public class ContractControllerTests
             ContractResponse = SampleContract(contractId, customerId),
             ItemsResponse = EmptyItems(contractId)
         };
-        var controller = CreateController(apiClient, new FakeCustomerApiClient { CustomerResponse = SampleCustomer(customerId) });
+        var controller = CreateController(
+            apiClient,
+            new FakeCustomerApiClient { CustomerResponse = SampleCustomer(customerId) },
+            exportTemplateApiClient: SelectedTemplateFor(ExportDocumentTypes.JobSheets));
         controller.TempData = CreateTempData();
 
         var result = await controller.Export(contractId, "Job Sheet", CancellationToken.None);
@@ -569,6 +611,7 @@ public class ContractControllerTests
         var contractId = Guid.NewGuid();
         var controller = CreateController(
             new FakeContractApiClient { ContractResponse = SampleContract(contractId, Guid.NewGuid()) },
+            exportTemplateApiClient: SelectedTemplateFor(ExportDocumentTypes.AddressConfirmationLetters),
             contractExportApiClient: new FakeContractExportApiClient { SampleAddresses = [] });
         controller.TempData = CreateTempData();
 
@@ -582,21 +625,20 @@ public class ContractControllerTests
     public async Task Export_AddressConfirmationWithSampleAddresses_GeneratesDocument()
     {
         var contractId = Guid.NewGuid();
-        var documentService = new FakeContractDocumentService
-        {
-            Response = new ContractDocumentResponse("AddressConfirmation.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", [0x50])
-        };
+        var selectedFileId = Guid.NewGuid();
+        var templateApiClient = new FakeExportTemplateApiClient()
+            .WithSelectedTemplate(ExportDocumentTypes.AddressConfirmationLetters, selectedFileId, "AddressLetter.docx", MergeTemplateFactory.ContractTemplate());
         var controller = CreateController(
             new FakeContractApiClient { ContractResponse = SampleContract(contractId, Guid.NewGuid()) },
-            documentService: documentService,
+            exportTemplateApiClient: templateApiClient,
             contractExportApiClient: new FakeContractExportApiClient { SampleAddresses = [SampleAddress(contractId)] });
         controller.TempData = CreateTempData();
 
         var result = await controller.Export(contractId, "Address Confirmation", CancellationToken.None);
 
         var file = Assert.IsType<FileContentResult>(result);
-        Assert.Equal("AddressConfirmation.docx", file.FileDownloadName);
-        Assert.Equal("AddressConfirmationExampleTemplate", documentService.LastRequest!.TemplateName);
+        Assert.Equal(ExportTemplateService.DocxContentType, file.ContentType);
+        Assert.Equal(selectedFileId, templateApiClient.LastDownloadedFileId);
     }
 
     [Fact]
@@ -605,6 +647,7 @@ public class ContractControllerTests
         var contractId = Guid.NewGuid();
         var controller = CreateController(
             new FakeContractApiClient { ContractResponse = SampleContract(contractId, Guid.NewGuid()) },
+            exportTemplateApiClient: SelectedTemplateFor(ExportDocumentTypes.RenewalLetters),
             contractExportApiClient: new FakeContractExportApiClient { Renewal = null });
         controller.TempData = CreateTempData();
 
@@ -619,20 +662,19 @@ public class ContractControllerTests
     {
         var contractId = Guid.NewGuid();
         var customerId = Guid.NewGuid();
-        var documentService = new FakeContractDocumentService
-        {
-            Response = new ContractDocumentResponse("RenewalLetter.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", [0x50])
-        };
+        var selectedFileId = Guid.NewGuid();
+        var templateApiClient = new FakeExportTemplateApiClient()
+            .WithSelectedTemplate(ExportDocumentTypes.RenewalLetters, selectedFileId, "RenewalLetter.docx", MergeTemplateFactory.ContractTemplate());
         var controller = CreateController(
             new FakeContractApiClient { ContractResponse = SampleContract(contractId, customerId) },
-            documentService: documentService,
+            exportTemplateApiClient: templateApiClient,
             contractExportApiClient: new FakeContractExportApiClient { Renewal = SampleRenewal(contractId, customerId) });
         controller.TempData = CreateTempData();
 
         var result = await controller.Export(contractId, "Renewal Letter", CancellationToken.None);
 
         Assert.IsType<FileContentResult>(result);
-        Assert.Equal("ContractRenewalExampleTemplate", documentService.LastRequest!.TemplateName);
+        Assert.Equal(selectedFileId, templateApiClient.LastDownloadedFileId);
     }
 
     [Fact]

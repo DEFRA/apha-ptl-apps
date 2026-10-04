@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ViewFeatures;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using PTL.Contracts.Invoice;
 using PTL.InternalWeb.Features.Invoice;
 using PTL.InternalWeb.Notifications;
@@ -14,7 +15,11 @@ public class InvoiceControllerTests
     private static InvoiceController CreateController(
         FakeInvoiceApiClient? apiClient = null,
         string environmentName = "Development") =>
-        new(apiClient ?? new FakeInvoiceApiClient(), new FakeHostEnvironment(environmentName), NullLogger<InvoiceController>.Instance)
+        new(
+            apiClient ?? new FakeInvoiceApiClient(),
+            new FakeHostEnvironment(environmentName),
+            Options.Create(new InvoiceNotificationDisplayOptions { FromEmail = "from@example.com", ToEmail = "to@example.com" }),
+            NullLogger<InvoiceController>.Instance)
         {
             TempData = new TempDataDictionary(new DefaultHttpContext(), new FakeTempDataProvider())
         };
@@ -36,7 +41,24 @@ public class InvoiceControllerTests
         Assert.Equal(10, model.EligibleContractCount);
         Assert.Equal(2, model.OptOutContractCount);
         Assert.Equal(3, model.NonFeePayingItemCount);
-        Assert.Equal(["ops@example.com"], model.NotificationRecipients);
+        Assert.Equal("from@example.com", model.NotificationFromEmail);
+        Assert.Equal("to@example.com", model.NotificationToEmail);
+        Assert.True(model.CanGenerate);
+    }
+
+    [Fact]
+    public async Task Index_NoEligibleContracts_CanGenerateIsFalse()
+    {
+        var apiClient = new FakeInvoiceApiClient
+        {
+            Pending = new PendingInvoiceSummaryResponse(2026, "2025/26", 0, 0, 0, ["ops@example.com"])
+        };
+        var controller = CreateController(apiClient);
+
+        var view = Assert.IsType<ViewResult>(await controller.Index(CancellationToken.None));
+        var model = Assert.IsType<InvoiceGenerationViewModel>(view.Model);
+
+        Assert.False(model.CanGenerate);
     }
 
     [Fact]
@@ -66,6 +88,7 @@ public class InvoiceControllerTests
     {
         var apiClient = new FakeInvoiceApiClient
         {
+            Pending = new PendingInvoiceSummaryResponse(2026, "2025/26", 5, 0, 0, ["ops@example.com"]),
             GenerateResult = new InvoiceGenerationResponse(true, 5, "invoices/PT_Invoices_2026-01-01-00-00-00.csv", null)
         };
         var controller = CreateController(apiClient);
@@ -83,6 +106,7 @@ public class InvoiceControllerTests
     {
         var apiClient = new FakeInvoiceApiClient
         {
+            Pending = new PendingInvoiceSummaryResponse(2026, "2025/26", 5, 0, 0, ["ops@example.com"]),
             GenerateResult = new InvoiceGenerationResponse(false, 0, null, "Invoices could not be generated. Please try again later.")
         };
         var controller = CreateController(apiClient);
@@ -94,6 +118,25 @@ public class InvoiceControllerTests
         Assert.NotNull(notification);
         Assert.Equal(NotificationType.Error, notification!.Type);
         Assert.Equal("Invoices could not be generated. Please try again later.", notification.Message);
+    }
+
+    [Fact]
+    public async Task Generate_NoEligibleContracts_DoesNotCallGenerateAndSetsErrorNotification()
+    {
+        var apiClient = new FakeInvoiceApiClient
+        {
+            Pending = new PendingInvoiceSummaryResponse(2026, "2025/26", 0, 0, 0, ["ops@example.com"])
+        };
+        var controller = CreateController(apiClient);
+
+        var result = await controller.Generate(CancellationToken.None);
+
+        Assert.IsType<RedirectToActionResult>(result);
+        Assert.False(apiClient.GenerateCalled);
+        var notification = controller.TempData.GetNotification();
+        Assert.NotNull(notification);
+        Assert.Equal(NotificationType.Error, notification!.Type);
+        Assert.Equal("There are no outstanding invoices to generate.", notification.Message);
     }
 
     [Fact]
@@ -118,21 +161,5 @@ public class InvoiceControllerTests
 
         Assert.IsType<NotFoundResult>(result);
         Assert.False(apiClient.ResetCalled);
-    }
-
-    [Fact]
-    public async Task AuditHistory_ReturnsViewWithHistory()
-    {
-        var apiClient = new FakeInvoiceApiClient
-        {
-            AuditHistory = [new InvoiceAuditRecordResponse(Guid.NewGuid(), "test.user", DateTime.UtcNow)]
-        };
-        var controller = CreateController(apiClient);
-
-        var result = await controller.AuditHistory(CancellationToken.None);
-
-        var view = Assert.IsType<ViewResult>(result);
-        var model = Assert.IsType<IReadOnlyList<InvoiceAuditRecordResponse>>(view.Model, exactMatch: false);
-        Assert.Single(model);
     }
 }

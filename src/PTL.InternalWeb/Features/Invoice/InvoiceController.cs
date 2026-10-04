@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
 using PTL.ApiClient;
 using PTL.InternalWeb.Notifications;
 
@@ -9,7 +10,11 @@ namespace PTL.InternalWeb.Features.Invoice;
 // a batch-processing workflow with its own audit/CSV/notification concerns, deliberately not merged
 // into ContractController. Authentication/authorization are out of scope for this phase, consistent
 // with every other InternalWeb controller.
-public class InvoiceController(IInvoiceApiClient invoiceApiClient, IHostEnvironment hostEnvironment, ILogger<InvoiceController> logger) : Controller
+public class InvoiceController(
+    IInvoiceApiClient invoiceApiClient,
+    IHostEnvironment hostEnvironment,
+    IOptions<InvoiceNotificationDisplayOptions> notificationDisplayOptions,
+    ILogger<InvoiceController> logger) : Controller
 {
     private static readonly Action<ILogger, int, Exception?> LogGeneratedMessage =
         LoggerMessage.Define<int>(
@@ -26,7 +31,7 @@ public class InvoiceController(IInvoiceApiClient invoiceApiClient, IHostEnvironm
     public async Task<IActionResult> Index(CancellationToken cancellationToken)
     {
         var pending = await invoiceApiClient.GetPendingAsync(cancellationToken);
-        return View(InvoiceGenerationViewModel.From(pending, CanReset()));
+        return View(InvoiceGenerationViewModel.From(pending, CanReset(), notificationDisplayOptions.Value));
     }
 
     // Legacy BtnGenerateInvoices_Click - one confirm dialog, then generate/mark-invoiced/audit/
@@ -35,6 +40,13 @@ public class InvoiceController(IInvoiceApiClient invoiceApiClient, IHostEnvironm
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Generate(CancellationToken cancellationToken)
     {
+        var pending = await invoiceApiClient.GetPendingAsync(cancellationToken);
+        if (pending is not { EligibleContractCount: > 0 })
+        {
+            TempData.SetNotification(NotificationType.Error, "There are no outstanding invoices to generate.");
+            return RedirectToAction(nameof(Index));
+        }
+
         var result = await invoiceApiClient.GenerateAsync(cancellationToken);
 
         if (result is { Success: true })
@@ -66,12 +78,6 @@ public class InvoiceController(IInvoiceApiClient invoiceApiClient, IHostEnvironm
         await invoiceApiClient.ResetAsync(cancellationToken);
         TempData.SetNotification(NotificationType.Success, "Invoices were reset.");
         return RedirectToAction(nameof(Index));
-    }
-
-    public async Task<IActionResult> AuditHistory(CancellationToken cancellationToken)
-    {
-        var history = await invoiceApiClient.GetAuditHistoryAsync(cancellationToken);
-        return View(history);
     }
 
     private bool CanReset() => !hostEnvironment.IsProduction();

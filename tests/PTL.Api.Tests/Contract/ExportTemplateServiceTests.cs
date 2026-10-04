@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using PTL.Core.Contract.Export.Templates;
 
@@ -7,13 +8,59 @@ public class ExportTemplateServiceTests
 {
     private const string Docx = "Contract Template.docx";
 
-    private static (ExportTemplateService Service, FakeUploadedTemplateRepository Repository, FakeTemplateStorageService Storage) CreateService(long maxUploadBytes = 4 * 1024 * 1024)
+    private static (ExportTemplateService Service, FakeUploadedTemplateRepository Repository, FakeTemplateStorageService Storage) CreateService(long maxUploadBytes = 4 * 1024 * 1024, string prefix = "templates")
     {
         var repository = new FakeUploadedTemplateRepository();
         var storage = new FakeTemplateStorageService();
-        var options = Options.Create(new TemplateStorageOptions { Prefix = "templates", MaxUploadBytes = maxUploadBytes });
+        var options = Options.Create(new TemplateStorageOptions { Prefix = prefix, MaxUploadBytes = maxUploadBytes });
 
-        return (new ExportTemplateService(repository, storage, options), repository, storage);
+        return (new ExportTemplateService(repository, storage, options, NullLogger<ExportTemplateService>.Instance), repository, storage);
+    }
+
+    [Fact]
+    public async Task UploadAsync_UnknownDocumentType_IsRejected()
+    {
+        var (service, repository, storage) = CreateService();
+
+        var result = await service.UploadAsync("Not A Document Type", Docx, [1]);
+
+        Assert.False(result.Success);
+        Assert.Empty(repository.Templates);
+        Assert.Empty(storage.Files);
+    }
+
+    [Fact]
+    public async Task UploadAsync_EmptyContent_IsRejected()
+    {
+        var (service, repository, _) = CreateService();
+
+        var result = await service.UploadAsync(ExportDocumentTypes.Contracts, Docx, []);
+
+        Assert.False(result.Success);
+        Assert.Empty(repository.Templates);
+    }
+
+    // With no configured prefix the key starts at the document-type folder.
+    [Fact]
+    public async Task UploadAsync_NoConfiguredPrefix_OmitsItFromTheStorageKey()
+    {
+        var (service, repository, storage) = CreateService(prefix: string.Empty);
+
+        await service.UploadAsync(ExportDocumentTypes.Contracts, Docx, [1]);
+
+        var fileId = repository.Templates[0].FileId;
+        Assert.Contains($"contracts/{fileId}.docx", storage.Files.Keys);
+    }
+
+    [Fact]
+    public async Task UploadAsync_AddressConfirmationLetters_UsesItsOwnFolder()
+    {
+        var (service, repository, storage) = CreateService();
+
+        await service.UploadAsync(ExportDocumentTypes.AddressConfirmationLetters, "Address Confirmation.docx", [1]);
+
+        var fileId = repository.Templates[0].FileId;
+        Assert.Contains($"templates/address-confirmation/{fileId}.docx", storage.Files.Keys);
     }
 
     [Fact]
@@ -42,7 +89,7 @@ public class ExportTemplateServiceTests
         await service.UploadAsync(ExportDocumentTypes.JobSheets, "Job Sheet.docx", [1]);
 
         var fileId = repository.Templates[0].FileId;
-        Assert.Contains($"templates/{ExportDocumentTypes.JobSheets}/{fileId}.docx", storage.Files.Keys);
+        Assert.Contains($"templates/job-sheets/{fileId}.docx", storage.Files.Keys);
     }
 
     [Theory]

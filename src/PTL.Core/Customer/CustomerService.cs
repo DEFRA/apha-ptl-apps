@@ -51,12 +51,17 @@ public sealed class CustomerService(
 
         var all = await customerRepository.GetSummariesAsync(status, cancellationToken);
 
+        // Field set matches legacy dbo.spgSearchCustomer (Search.aspx), except that a single term
+        // is ORed across the fields rather than ANDed across separate inputs.
         var filtered = string.IsNullOrWhiteSpace(searchTerm)
             ? all
             : all.Where(c =>
                 c.Name.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
                 c.QalNumber.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
-                c.Organisation.Contains(searchTerm, StringComparison.OrdinalIgnoreCase))
+                c.Organisation.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+                c.ContactName.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+                c.AccountNumber.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+                c.Country.Contains(searchTerm, StringComparison.OrdinalIgnoreCase))
                 .ToList();
 
         var totalCount = filtered.Count;

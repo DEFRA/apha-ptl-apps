@@ -16,4 +16,10 @@ public sealed class SideNavigationItem
     // sitemap's hidden="true" attribute) but remain reachable via FindNode/FindPath.
     public bool IsHidden { get; init; }
     public IReadOnlyList<SideNavigationItem> Children { get; init; } = [];
+
+    // Set when this node's route needs a parameter to resolve to a usable page - e.g. the
+    // Contracts list is per-customer. LinkRouteParameter is the route parameter to emit;
+    // LinkRouteValueKey names the ambient value that supplies it (see BreadcrumbRouteValues).
+    public string? LinkRouteParameter { get; init; }
+    public string? LinkRouteValueKey { get; init; }
 }

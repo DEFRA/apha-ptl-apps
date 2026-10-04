@@ -7,6 +7,10 @@ namespace PTL.Api.Tests.Invoice;
 internal sealed class FakeNotifyClient : INotifyClient
 {
     public List<string> SentTo { get; } = [];
+    public IReadOnlyDictionary<string, string>? LastPersonalisation { get; private set; }
+    public string? LastFilePersonalisationKey { get; private set; }
+    public byte[]? LastFileContent { get; private set; }
+    public string? LastFilename { get; private set; }
     public string? ThrowForEmailAddress { get; set; }
 
     public Task SendEmailAsync(
@@ -21,7 +25,25 @@ internal sealed class FakeNotifyClient : INotifyClient
             throw new InvalidOperationException("Simulated GOV.UK Notify failure.");
         }
 
+        LastPersonalisation = personalisation;
         SentTo.Add(emailAddress);
+        return Task.CompletedTask;
+    }
+
+    public Task SendEmailWithFileAsync(NotifyFileEmailRequest request, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        if (request.EmailAddress == ThrowForEmailAddress)
+        {
+            throw new InvalidOperationException("Simulated GOV.UK Notify failure.");
+        }
+
+        LastPersonalisation = request.Personalisation;
+        LastFilePersonalisationKey = request.FilePersonalisationKey;
+        LastFileContent = request.FileContent;
+        LastFilename = request.Filename;
+        SentTo.Add(request.EmailAddress);
         return Task.CompletedTask;
     }
 }

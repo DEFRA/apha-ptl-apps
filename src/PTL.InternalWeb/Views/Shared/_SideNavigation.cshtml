@@ -17,7 +17,8 @@
     if (isHome)
     {
         visibleItems = topLevel.Where(item =>
-            !(string.Equals(item.ControllerName, "Home", StringComparison.OrdinalIgnoreCase)
+            !item.IsHidden
+            && !(string.Equals(item.ControllerName, "Home", StringComparison.OrdinalIgnoreCase)
               && string.Equals(item.ActionName, "Index", StringComparison.OrdinalIgnoreCase)))
             .ToList();
     }

@@ -32,9 +32,32 @@ public sealed class CustomerRepository(IDbConnectionFactory connectionFactory) :
         };
 
         return (await connection.QueryAsync<CustomerSummaryEntity>(
-            "EXEC dbo.spgaCustomerInfo @IsActive",
+            SummariesSql,
             new { IsActive = isActive })).ToList();
     }
+
+    // Reproduces dbo.spgaCustomerInfo, plus fldAccountNumber and the tblCountry join, so the
+    // Customers list can be searched by Account Number and Country. Inline rather than an altered
+    // stored procedure because the legacy database objects are owned by the legacy application.
+    // LEFT JOIN, not INNER: customers with no country must still appear in the list.
+    private const string SummariesSql =
+        """
+        SELECT
+            c.fldCustomerId,
+            c.fldQalNumber,
+            c.fldName,
+            c.fldOrganisation,
+            ISNULL(c.fldContactName, '') AS fldContactName,
+            ISNULL(c.fldAccountNumber, '') AS fldAccountNumber,
+            ISNULL(ct.fldCountry, '') AS fldCountry,
+            c.fldIsActive
+        FROM dbo.tblCustomer c
+        LEFT JOIN dbo.tblCountry ct ON c.fldCountryId = ct.fldCountryId
+        WHERE (@IsActive IS NULL OR c.fldIsActive = @IsActive)
+        ORDER BY
+            c.fldIsActive DESC,
+            CONVERT(int, SUBSTRING(c.fldQalNumber, 5, LEN(c.fldQalNumber)))
+        """;
 
     public async Task<CoreCustomer> CreateAsync(CoreCustomer customer, CancellationToken cancellationToken = default)
     {

@@ -21,7 +21,7 @@
 <form method="get" asp-action="Index" class="govuk-!-margin-bottom-6">
     <div class="govuk-form-group">
         <label class="govuk-label" for="searchTerm">Search</label>
-        <div class="govuk-hint">Matches name, QAL number, or organisation.</div>
+        <div class="govuk-hint">Matches Name, QAL Number, Organisation, Contact Name, Account Number, Country.</div>
         <input class="govuk-input" id="searchTerm" name="searchTerm" value="@Model.SearchTerm" />
     </div>
     <div class="govuk-form-group">
@@ -46,7 +46,7 @@ else
     <table class="govuk-table">
         <thead class="govuk-table__head">
             <tr class="govuk-table__row">
-                <th scope="col" class="govuk-table__header">QAL number</th>
+                <th scope="col" class="govuk-table__header">QAL Number</th>
                 <th scope="col" class="govuk-table__header">Name</th>
                 <th scope="col" class="govuk-table__header">Organisation</th>
                 <th scope="col" class="govuk-table__header">Status</th>

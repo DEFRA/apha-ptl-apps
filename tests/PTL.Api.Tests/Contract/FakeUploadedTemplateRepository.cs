@@ -62,4 +62,8 @@ internal sealed class FakeTemplateStorageService : ITemplateStorageService
         Files.Remove(storageKey);
         return Task.CompletedTask;
     }
+
+    public Task<IReadOnlyList<string>> ListAsync(string? prefix = null, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<string>>(
+            [.. Files.Keys.Where(key => string.IsNullOrEmpty(prefix) || key.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))]);
 }

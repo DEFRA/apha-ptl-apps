@@ -12,8 +12,6 @@ public abstract class HomeControllerBase(IApiClient apiClient) : Controller
 {
     public IActionResult Index() => View();
 
-    public IActionResult Privacy() => View();
-
     // Diagnostic endpoint proving Web -> Api connectivity; useful as a smoke-test in any environment.
     public async Task<IActionResult> ApiStatus(CancellationToken cancellationToken)
     {

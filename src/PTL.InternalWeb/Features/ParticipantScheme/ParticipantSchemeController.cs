@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using PTL.ApiClient;
 using PTL.Contracts.Participant;
 using PTL.Contracts.Scheme;
+using PTL.InternalWeb.Navigation;
 using PTL.InternalWeb.Notifications;
 
 namespace PTL.InternalWeb.Features.ParticipantScheme;
@@ -77,8 +78,17 @@ public class ParticipantSchemeController(
         await PopulateDataConsentAsync(fields, cancellationToken);
         await PopulatePricingPlanAsync(fields, isFreshLoad: true, cancellationToken);
         await PopulateGroupAddressOptionsAsync(fields, cancellationToken);
+        SetBreadcrumbContext(contract.CustomerId, participantScheme.ContractId);
 
         return View(new ParticipantSchemeDetailsViewModel(fields, participantScheme.IsRemoved || contract.IsReadOnly));
+    }
+
+    // Contract Items is this page's breadcrumb parent and Contracts its grandparent; neither id is
+    // in the route here.
+    private void SetBreadcrumbContext(Guid customerId, Guid contractId)
+    {
+        ViewData[BreadcrumbRouteValues.CustomerId] = customerId;
+        ViewData[BreadcrumbRouteValues.ContractId] = contractId;
     }
 
     [HttpGet]
@@ -113,6 +123,7 @@ public class ParticipantSchemeController(
         await PopulateSchemeContextAsync(model, cancellationToken);
         await PopulatePricingPlanAsync(model, isFreshLoad: true, cancellationToken);
         await PopulateGroupAddressOptionsAsync(model, cancellationToken);
+        SetBreadcrumbContext(customerId, contractId);
         return View(model);
     }
 
@@ -188,6 +199,7 @@ public class ParticipantSchemeController(
         await PopulateDataConsentAsync(model, cancellationToken);
         await PopulatePricingPlanAsync(model, isFreshLoad: true, cancellationToken);
         await PopulateGroupAddressOptionsAsync(model, cancellationToken);
+        SetBreadcrumbContext(contract.CustomerId, participantScheme.ContractId);
         return View(model);
     }
 

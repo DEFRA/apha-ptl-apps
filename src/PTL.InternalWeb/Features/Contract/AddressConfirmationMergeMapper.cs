@@ -20,7 +20,7 @@ public static class AddressConfirmationMergeMapper
 
         return new ContractDocumentRequest(
             context.CanonicalDocumentType,
-            context.TemplateKey,
+            context.TemplateName,
             MergeValueFormatting.FileName(context.CanonicalDocumentType, context.Contract.QalNumber, context.Contract.Suffix),
             primary.MergeValues,
             primary.Regions,
