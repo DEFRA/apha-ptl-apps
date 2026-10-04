@@ -17,6 +17,9 @@ internal sealed class FakeDbConnection : DbConnection
 
     public List<FakeDbCommand> ExecutedCommands { get; } = [];
 
+    // Set by a test wanting to assert MarkInvoicedAndRecordAuditAsync's transaction was committed.
+    public FakeDbTransaction? LastTransaction { get; private set; }
+
     [System.Diagnostics.CodeAnalysis.AllowNull]
     public override string ConnectionString { get; set; } = string.Empty;
     public override string Database => "FakeDatabase";
@@ -28,6 +31,13 @@ internal sealed class FakeDbConnection : DbConnection
     // against this exact "EXEC dbo.spXxx ..." command text should return.
     public void RespondToQuery(string commandText, DataTable table) =>
         _readerFactories[commandText] = _ => table.CreateDataReader();
+
+    // Configures a multi-result-set reader (one table per result set, in order) for a
+    // QueryMultipleAsync call against this exact command text - DataSet.CreateDataReader() yields
+    // a DbDataReader whose NextResult()/NextResultAsync() steps between the DataSet's tables,
+    // matching what Dapper's SqlMapper.GridReader expects from a real multi-result-set query.
+    public void RespondToQuery(string commandText, DataSet dataSet) =>
+        _readerFactories[commandText] = _ => dataSet.CreateDataReader();
 
     // Configures the rows-affected count an ExecuteAsync (insert/update) call against this exact
     // command text should return.
@@ -57,8 +67,11 @@ internal sealed class FakeDbConnection : DbConnection
     public override void ChangeDatabase(string databaseName) =>
         throw new NotSupportedException("Not used by any repository under test.");
 
-    protected override DbTransaction BeginDbTransaction(IsolationLevel isolationLevel) =>
-        throw new NotSupportedException("No repository under test uses transactions.");
+    protected override DbTransaction BeginDbTransaction(IsolationLevel isolationLevel)
+    {
+        LastTransaction = new FakeDbTransaction(this);
+        return LastTransaction;
+    }
 
     protected override DbCommand CreateDbCommand() => new FakeDbCommand(this);
 

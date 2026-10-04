@@ -33,6 +33,18 @@ public class LookupApiClientTests
     }
 
     [Fact]
+    public async Task GetGroupAddressesAsync_ReturnsDeserializedList()
+    {
+        const string json = """[{"groupAddressId":"66666666-6666-6666-6666-666666666666","identifier":"PTL-001","address1":"1 Sample Street","countryId":"77777777-7777-7777-7777-777777777777"}]""";
+        var client = CreateClient(HttpStatusCode.OK, json);
+
+        var result = await client.GetGroupAddressesAsync();
+
+        Assert.Single(result);
+        Assert.Equal("PTL-001", result[0].Identifier);
+    }
+
+    [Fact]
     public async Task GetCustomerTypesAsync_ReturnsDeserializedList()
     {
         const string json = """[{"customerTypeId":"33333333-3333-3333-3333-333333333333","customerType":"Commercial"}]""";
@@ -90,6 +102,18 @@ public class LookupApiClientTests
 
         Assert.Single(result);
         Assert.Equal("2020/21", result[0].Year);
+    }
+
+    [Fact]
+    public async Task GetWeightedPricingYearsAsync_ReturnsDeserializedList()
+    {
+        const string json = """[{"yearId":2026,"year":"2026/27"}]""";
+        var client = CreateClient(HttpStatusCode.OK, json);
+
+        var result = await client.GetWeightedPricingYearsAsync();
+
+        Assert.Single(result);
+        Assert.Equal("2026/27", result[0].Year);
     }
 
     [Fact]

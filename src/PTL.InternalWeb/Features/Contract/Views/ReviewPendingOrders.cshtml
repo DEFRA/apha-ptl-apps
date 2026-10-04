@@ -1,0 +1,51 @@
+@model PTL.InternalWeb.Features.Contract.PendingOrderListViewModel
+@{
+    ViewData["Title"] = "Review Pending Orders";
+}
+
+@functions {
+    // Both grids are identical apart from their heading and empty-state message. Must be async
+    // because the Details link is rendered by a tag helper.
+    async Task RenderOrders(IReadOnlyList<PTL.Contracts.Contract.PendingOrderSummaryResponse> orders, string emptyMessage)
+    {
+        if (orders.Count == 0)
+        {
+            <p class="govuk-body">@emptyMessage</p>
+            return;
+        }
+
+        <table class="govuk-table">
+            <thead class="govuk-table__head">
+                <tr class="govuk-table__row">
+                    <th scope="col" class="govuk-table__header">QAL Number</th>
+                    <th scope="col" class="govuk-table__header">Customer Name</th>
+                    <th scope="col" class="govuk-table__header">Year</th>
+                    <th scope="col" class="govuk-table__header">Details</th>
+                    <th scope="col" class="govuk-table__header">Order Submitted</th>
+                </tr>
+            </thead>
+            <tbody class="govuk-table__body">
+                @foreach (var order in orders)
+                {
+                    <tr class="govuk-table__row">
+                        <td class="govuk-table__cell">@order.QalNumber</td>
+                        <td class="govuk-table__cell">@order.CustomerName</td>
+                        <td class="govuk-table__cell">@order.Year</td>
+                        <td class="govuk-table__cell">
+                            <a class="govuk-link" asp-action="PendingOrderDetails" asp-route-pendingContractId="@order.PendingContractId">Details</a>
+                        </td>
+                        <td class="govuk-table__cell">@order.OrderSubmitDate?.ToString("dd/MM/yyyy")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+}
+
+<h1 class="govuk-heading-l">Review Pending Orders</h1>
+
+<h2 class="govuk-heading-m">Current Year Orders</h2>
+@{ await RenderOrders(Model.CurrentYearOrders, "There are no pending current year orders to display."); }
+
+<h2 class="govuk-heading-m">Next Year Orders</h2>
+@{ await RenderOrders(Model.NextYearOrders, "There are no pending next year orders to display."); }

@@ -1,0 +1,19 @@
+@model PTL.InternalWeb.Features.GroupAddress.GroupAddressFormViewModel
+@{
+    ViewData["Title"] = "Edit Group Address";
+}
+
+<h1 class="govuk-heading-l">Edit Group Address</h1>
+
+<form method="post" asp-action="Edit" asp-route-id="@Model.GroupAddressId" novalidate>
+    @await Html.PartialAsync("_GroupAddressForm", Model)
+
+    <div class="govuk-button-group">
+        <button type="submit" class="govuk-button" data-module="govuk-button">Save changes</button>
+        <a class="govuk-button govuk-button--secondary" data-module="govuk-button" asp-action="Index">Cancel</a>
+    </div>
+</form>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

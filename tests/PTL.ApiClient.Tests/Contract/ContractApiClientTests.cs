@@ -113,6 +113,77 @@ public class ContractApiClientTests
         Assert.NotNull(result.Contract);
     }
 
+    [Fact]
+    public async Task GetContractItemsAsync_NotFound_ReturnsNull()
+    {
+        var client = CreateClient(HttpStatusCode.NotFound, null);
+
+        var result = await client.GetContractItemsAsync(Guid.NewGuid());
+
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public async Task GetContractItemsAsync_Success_ReturnsDeserializedResponse()
+    {
+        const string json = """
+            {"contractId":"11111111-1111-1111-1111-111111111111","suffix":"A","yearId":2026,"qalNumber":"QAL0001","symbol":"£","discountRate":0.1,"administrationCharge":25,"numberCourier":2,"courierPrice":5,"courierPriceTotal":10,"numberPostage":3,"postagePrice":4,"postagePriceTotal":12,"numberSpecialDelivery":1,"specialDeliveryPrice":6,"specialDeliveryPriceTotal":6,"discountPrice":9.5,"totalPriceItems":85,"totalPrice":95.5,"isReadOnly":false,"schemes":[]}
+            """;
+        var client = CreateClient(HttpStatusCode.OK, json);
+
+        var result = await client.GetContractItemsAsync(Guid.NewGuid());
+
+        Assert.NotNull(result);
+        Assert.Equal("A", result!.Suffix);
+        Assert.Equal(95.5m, result.TotalPrice);
+    }
+
+    [Fact]
+    public async Task RemoveContractItemAsync_NotFound_ReturnsNotFoundResult()
+    {
+        var client = CreateClient(HttpStatusCode.NotFound, null);
+
+        var result = await client.RemoveContractItemAsync(Guid.NewGuid(), Guid.NewGuid());
+
+        Assert.False(result.Success);
+        Assert.True(result.NotFound);
+    }
+
+    [Fact]
+    public async Task RemoveContractItemAsync_BadRequest_ReturnsBusinessRuleError()
+    {
+        const string problemJson = """{"errors":{"ContractId":["This contract is read-only."]}}""";
+        var client = CreateClient(HttpStatusCode.BadRequest, problemJson);
+
+        var result = await client.RemoveContractItemAsync(Guid.NewGuid(), Guid.NewGuid());
+
+        Assert.False(result.Success);
+        Assert.False(result.NotFound);
+        Assert.Equal("This contract is read-only.", result.ErrorMessage);
+    }
+
+    [Fact]
+    public async Task RemoveContractItemAsync_BadRequestWithNoErrors_ReturnsGenericMessage()
+    {
+        var client = CreateClient(HttpStatusCode.BadRequest, "{}");
+
+        var result = await client.RemoveContractItemAsync(Guid.NewGuid(), Guid.NewGuid());
+
+        Assert.Equal("The request was invalid.", result.ErrorMessage);
+    }
+
+    [Fact]
+    public async Task RemoveContractItemAsync_Success_ReturnsSuccessResult()
+    {
+        var client = CreateClient(HttpStatusCode.OK, null);
+
+        var result = await client.RemoveContractItemAsync(Guid.NewGuid(), Guid.NewGuid());
+
+        Assert.True(result.Success);
+        Assert.False(result.NotFound);
+        Assert.Null(result.ErrorMessage);
+    }
+
     private static string FullContractJson() => """
         {
             "contractId":"11111111-1111-1111-1111-111111111111",

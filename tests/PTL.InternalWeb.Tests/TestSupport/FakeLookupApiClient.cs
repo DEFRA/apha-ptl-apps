@@ -15,9 +15,11 @@ internal sealed class FakeLookupApiClient : ILookupApiClient
     public IReadOnlyList<LabTypeResponse> LabTypes { get; set; } = [];
     public IReadOnlyList<YearResponse> Years { get; set; } = [];
     public IReadOnlyList<YearResponse> AllYears { get; set; } = [];
+    public IReadOnlyList<YearResponse> WeightedPricingYears { get; set; } = [];
     public IReadOnlyList<SchemeCurrencyResponse> SchemeCurrencies { get; set; } = [];
     public IReadOnlyList<PostagePricingPlanResponse> PostagePricingPlans { get; set; } = [];
     public SystemSettingsResponse SystemSettings { get; set; } = new(string.Empty);
+    public IReadOnlyList<GroupAddressResponse> GroupAddresses { get; set; } = [];
 
     public Task<IReadOnlyList<CountryResponse>> GetCountriesAsync(CancellationToken cancellationToken = default) =>
         Task.FromResult(Countries);
@@ -40,6 +42,9 @@ internal sealed class FakeLookupApiClient : ILookupApiClient
     public Task<IReadOnlyList<YearResponse>> GetAllYearsAsync(CancellationToken cancellationToken = default) =>
         Task.FromResult(AllYears);
 
+    public Task<IReadOnlyList<YearResponse>> GetWeightedPricingYearsAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult(WeightedPricingYears);
+
     public Task<IReadOnlyList<SchemeCurrencyResponse>> GetSchemeCurrenciesAsync(Guid schemeId, CancellationToken cancellationToken = default) =>
         Task.FromResult(SchemeCurrencies);
 
@@ -48,4 +53,7 @@ internal sealed class FakeLookupApiClient : ILookupApiClient
 
     public Task<SystemSettingsResponse> GetSystemSettingsAsync(CancellationToken cancellationToken = default) =>
         Task.FromResult(SystemSettings);
+
+    public Task<IReadOnlyList<GroupAddressResponse>> GetGroupAddressesAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult(GroupAddresses);
 }

@@ -1,0 +1,95 @@
+@model PTL.InternalWeb.Features.Participant.ParticipantViewerFormViewModel
+@{
+    ViewData["Title"] = "Participant Viewers";
+}
+
+<h1 class="govuk-heading-l">@Model.LabCode: @Model.LabName</h1>
+
+<form method="post" asp-action="Viewers" asp-route-participantId="@Model.ParticipantId">
+    <input type="hidden" name="customerId" value="@Model.CustomerId" />
+    <div class="govuk-grid-row">
+        <div class="govuk-grid-column-one-third">
+            <div class="govuk-form-group">
+                <label class="govuk-label govuk-label--s" for="availableViewers">Available Viewers</label>
+                <select class="govuk-select ptl-viewer-select" id="availableViewers" multiple size="10">
+                    @foreach (var viewer in Model.AvailableViewers)
+                    {
+                        <option value="@viewer.ViewerId">@viewer.Name</option>
+                    }
+                </select>
+            </div>
+        </div>
+        <div class="govuk-grid-column-one-third govuk-!-text-align-centre">
+            <div class="govuk-form-group govuk-!-margin-top-6">
+                <p class="govuk-body govuk-!-font-weight-bold govuk-!-margin-bottom-3">Actions</p>
+                <div class="govuk-button-group govuk-button-group--vertical ptl-viewer-transfer-buttons">
+                    @* Legacy Add/Remove transfer workflow: nothing is persisted until Save. The Add button is
+                       hidden for inactive participants to match the original ParticipantViewers.aspx logic. *@
+                    @if (Model.IsActive)
+                    {
+                        <button type="button" id="btnAddViewer" class="govuk-button govuk-button--secondary" data-module="govuk-button">Add</button>
+                    }
+                    <button type="button" id="btnRemoveViewer" class="govuk-button govuk-button--secondary" data-module="govuk-button">Remove</button>
+                </div>
+            </div>
+        </div>
+        <div class="govuk-grid-column-one-third">
+            <div class="govuk-form-group">
+                <label class="govuk-label govuk-label--s" for="participantViewers">Participant Viewers</label>
+                <select class="govuk-select ptl-viewer-select" id="participantViewers" name="viewerIds" multiple size="10">
+                    @foreach (var viewer in Model.AssignedViewers)
+                    {
+                        <option value="@viewer.ViewerId">@viewer.Name</option>
+                    }
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <div class="govuk-button-group">
+        <button class="govuk-button" data-module="govuk-button" type="submit">Save</button>
+        <a class="govuk-button govuk-button--secondary" data-module="govuk-button" asp-controller="Participant" asp-action="Index" asp-route-customerId="@Model.CustomerId">Cancel</a>
+    </div>
+</form>
+
+@section Scripts {
+    <script>
+        (function () {
+            var available = document.getElementById('availableViewers');
+            var selected = document.getElementById('participantViewers');
+            var addButton = document.getElementById('btnAddViewer');
+            var removeButton = document.getElementById('btnRemoveViewer');
+
+            function moveSelected(from, to) {
+                if (!from || !to) {
+                    return;
+                }
+
+                Array.from(from.selectedOptions).forEach(function (option) {
+                    to.appendChild(option);
+                    option.selected = false;
+                });
+            }
+
+            if (addButton) {
+                addButton.addEventListener('click', function () {
+                    moveSelected(available, selected);
+                });
+            }
+
+            if (removeButton) {
+                removeButton.addEventListener('click', function () {
+                    moveSelected(selected, available);
+                });
+            }
+
+            // Scoped to this select's own form - document.querySelector('form') would match the
+            // header's sign-out form instead, since it appears earlier in the DOM.
+            selected.form.addEventListener('submit', function () {
+                Array.from(selected.options).forEach(function (option) {
+                    option.selected = true;
+                });
+            });
+        })();
+    </script>
+}

@@ -26,6 +26,15 @@ public sealed class SchemeRepository(IDbConnectionFactory connectionFactory) : I
             new { YearId = yearId })).ToList();
     }
 
+    public async Task<IReadOnlyList<SchemeSummaryEntity>> GetSummariesBySchemeIdAsync(Guid schemeId, CancellationToken cancellationToken = default)
+    {
+        using var connection = connectionFactory.CreateConnection();
+
+        return (await connection.QueryAsync<SchemeSummaryEntity>(
+            "EXEC dbo.spgSchemeInfoBySchemeId @SchemeId",
+            new { SchemeId = schemeId })).ToList();
+    }
+
     public async Task<IReadOnlyList<SchemeHistoryEntity>> GetHistoryAsync(Guid sharedId, CancellationToken cancellationToken = default)
     {
         using var connection = connectionFactory.CreateConnection();

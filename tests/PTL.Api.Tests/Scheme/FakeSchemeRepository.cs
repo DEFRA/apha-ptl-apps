@@ -28,6 +28,26 @@ internal sealed class FakeSchemeRepository : ISchemeRepository
         return Task.FromResult(summaries);
     }
 
+    public Task<IReadOnlyList<SchemeSummaryEntity>> GetSummariesBySchemeIdAsync(Guid schemeId, CancellationToken cancellationToken = default)
+    {
+        IReadOnlyList<SchemeSummaryEntity> summaries = _schemes.TryGetValue(schemeId, out var scheme)
+            ?
+            [
+                new SchemeSummaryEntity
+                {
+                    SharedId = scheme.SharedId,
+                    YearId = scheme.YearId,
+                    CurrentSchemeId = scheme.SchemeId,
+                    CurrentIdentifier = scheme.Identifier,
+                    CurrentName = scheme.Name,
+                    NextSchemeId = _schemes.Values.FirstOrDefault(s => s.SharedId == scheme.SharedId && s.YearId == scheme.YearId + 1)?.SchemeId
+                }
+            ]
+            : [];
+
+        return Task.FromResult(summaries);
+    }
+
     public Task<IReadOnlyList<SchemeHistoryEntity>> GetHistoryAsync(Guid sharedId, CancellationToken cancellationToken = default)
     {
         IReadOnlyList<SchemeHistoryEntity> history = _schemes.Values
@@ -90,6 +110,18 @@ internal sealed class FakeSchemeRepository : ISchemeRepository
         DistributionMonthJan = source.DistributionMonthJan,
         DistributionMonthFeb = source.DistributionMonthFeb,
         DistributionMonthMar = source.DistributionMonthMar,
+        CanEditApr = source.CanEditApr,
+        CanEditMay = source.CanEditMay,
+        CanEditJun = source.CanEditJun,
+        CanEditJul = source.CanEditJul,
+        CanEditAug = source.CanEditAug,
+        CanEditSep = source.CanEditSep,
+        CanEditOct = source.CanEditOct,
+        CanEditNov = source.CanEditNov,
+        CanEditDec = source.CanEditDec,
+        CanEditJan = source.CanEditJan,
+        CanEditFeb = source.CanEditFeb,
+        CanEditMar = source.CanEditMar,
         WeekNumber = source.WeekNumber,
         DayOfWeekId = source.DayOfWeekId,
         NumberOfSamples = source.NumberOfSamples,

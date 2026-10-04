@@ -131,4 +131,26 @@ public class SchemeRouteSmokeTests : IClassFixture<WebApplicationFactory<Program
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Contains("There are no schemes to display", body);
     }
+
+    [Fact]
+    public async Task ManageSchemes_ReturnsSuccess()
+    {
+        var client = _factory.CreateClient();
+
+        var response = await client.GetAsync("/Scheme/ManageSchemes");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task ManageSchemes_RendersHeading()
+    {
+        var client = _factory.CreateClient();
+
+        var response = await client.GetAsync("/Scheme/ManageSchemes");
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("govuk-heading", body, StringComparison.OrdinalIgnoreCase);
+    }
 }

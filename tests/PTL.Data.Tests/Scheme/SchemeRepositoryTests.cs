@@ -15,6 +15,7 @@ public class SchemeRepositoryTests
 
     private const string GetByIdSql = "EXEC dbo.spgSchemeBySchemeId @SchemeId";
     private const string GetSummariesSql = "EXEC dbo.spgSchemeInfoByYearId @YearId";
+    private const string GetSummariesBySchemeIdSql = "EXEC dbo.spgSchemeInfoBySchemeId @SchemeId";
     private const string GetHistorySql = "EXEC dbo.spgSchemeInfoBySharedId @SharedId";
     private const string InsertSql =
         "EXEC dbo.spiScheme @SchemeId, @SharedId, @YearId, @Identifier, @Name, @ScheduleId, @ScheduleCodeId, @StartDate, @DistributionMonthJan, @DistributionMonthFeb, @DistributionMonthMar, @DistributionMonthApr, @DistributionMonthMay, @DistributionMonthJun, @DistributionMonthJul, @DistributionMonthAug, @DistributionMonthSep, @DistributionMonthOct, @DistributionMonthNov, @DistributionMonthDec, @DistributionAsAvailable, @WeekNumber, @DayOfWeekId, @Deadline, @Pilot, @Accredited, @ComerciallyAvailable, @LimitedSampleAvailability, @NoVLALabs, @CombinedPackaging, @SampleOrigin, @Subcontractor, @NumberOfSamples, @SamplePackingInstructions, @TestConsultant1, @TestConsultant2, @TestConsultant3, @CommentsRequired, @DateOfReceipt, @StorageConditions, @ConditionOnReceipt, @Instructions, @TestConsultantTabulationId, @UseExternalReference, @LastModified, @StoreRatings, @Assessor1, @Assessor2, @Assessor3, @Assessor4, @RequiresAssessment, @StandardTabulationText, @Postage, @CustomsDocumentDescription, @CustomsDocumentVolume, @DataConsentDeclarationActive, @DataConsentDeclarationText";
@@ -62,6 +63,27 @@ public class SchemeRepositoryTests
         var result = await repository.GetByIdAsync(Guid.NewGuid());
 
         Assert.Null(result);
+    }
+
+    [Fact]
+    public async Task GetSummariesBySchemeIdAsync_ReturnsMappedSummaries()
+    {
+        var (repository, connection) = CreateRepository();
+        var sharedId = Guid.NewGuid();
+        var table = new DataTable();
+        table.Columns.Add("fldSharedId", typeof(Guid));
+        table.Columns.Add("fldYearId", typeof(int));
+        table.Columns.Add("fldNextSchemeId", typeof(Guid));
+        table.Columns.Add("fldNextIdentifier", typeof(string));
+        table.Columns.Add("fldNextName", typeof(string));
+        table.Rows.Add(sharedId, 2026, Guid.NewGuid(), "PT0002", "Next Scheme");
+        connection.RespondToQuery(GetSummariesBySchemeIdSql, table);
+
+        var result = await repository.GetSummariesBySchemeIdAsync(Guid.NewGuid());
+
+        Assert.Single(result);
+        Assert.Equal(sharedId, result[0].SharedId);
+        Assert.Equal("Next Scheme", result[0].NextName);
     }
 
     [Fact]

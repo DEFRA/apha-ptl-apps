@@ -1,10 +1,29 @@
 using Microsoft.Extensions.Logging;
 using PTL.Contracts.Contract;
+using PTL.Core.Participant;
 
 namespace PTL.Core.Contract;
 
-public sealed class ContractService(IContractRepository contractRepository, ILogger<ContractService> logger) : IContractService
+public sealed class ContractService(IContractRepository contractRepository, IParticipantSchemeRepository participantSchemeRepository, ILogger<ContractService> logger) : IContractService
 {
+    private static readonly Action<ILogger, Guid, Exception?> LogContractItemsNotFoundMessage =
+        LoggerMessage.Define<Guid>(
+            LogLevel.Information,
+            new EventId(6, nameof(LogContractItemsNotFoundMessage)),
+            "Contract items requested for unknown contract {ContractId}");
+
+    private static readonly Action<ILogger, Guid, Guid, Exception?> LogRemovedContractItemMessage =
+        LoggerMessage.Define<Guid, Guid>(
+            LogLevel.Information,
+            new EventId(7, nameof(LogRemovedContractItemMessage)),
+            "Removed contract item {ParticipantSchemeId} from contract {ContractId}");
+
+    private static readonly Action<ILogger, Guid, Guid, Exception?> LogContractItemNotFoundMessage =
+        LoggerMessage.Define<Guid, Guid>(
+            LogLevel.Information,
+            new EventId(8, nameof(LogContractItemNotFoundMessage)),
+            "Contract item {ParticipantSchemeId} not found on contract {ContractId}");
+
     private static readonly Action<ILogger, Guid, int?, string?, int, int, Exception?> LogContractSearchMessage =
         LoggerMessage.Define<Guid, int?, string?, int, int>(
             LogLevel.Information,
@@ -139,5 +158,49 @@ public sealed class ContractService(IContractRepository contractRepository, ILog
             LogContractValidationFailedMessage(logger, contract.ContractId, string.Join("; ", result.Errors.Select(e => e.Message)), null);
             throw new ContractValidationException(result.Errors);
         }
+    }
+
+    public async Task<ContractItemsAggregate?> GetContractItemsAsync(Guid contractId, CancellationToken cancellationToken = default)
+    {
+        var items = await contractRepository.GetContractItemsAsync(contractId, cancellationToken);
+        if (items is null)
+        {
+            LogContractItemsNotFoundMessage(logger, contractId, null);
+        }
+
+        return items;
+    }
+
+    public async Task<bool> RemoveContractItemAsync(Guid contractId, Guid participantSchemeId, CancellationToken cancellationToken = default)
+    {
+        var contract = await contractRepository.GetByIdAsync(contractId, cancellationToken);
+        if (contract is null)
+        {
+            LogContractItemsNotFoundMessage(logger, contractId, null);
+            return false;
+        }
+
+        if (contract.IsReadOnly)
+        {
+            // Mirrors legacy ContractItems.aspx.vb hiding LnkRemove/BtnAddItem when mContract.IsReadOnly
+            // is true, made an explicit server-side rule (see UpdateContractAsync's equivalent check).
+            throw new ContractValidationException([new ContractValidationError(string.Empty, "This contract belongs to a closed year and cannot be edited.")]);
+        }
+
+        var item = await participantSchemeRepository.GetByIdAsync(participantSchemeId, cancellationToken);
+        if (item is null || item.ContractId != contractId)
+        {
+            LogContractItemNotFoundMessage(logger, contractId, participantSchemeId, null);
+            return false;
+        }
+
+        item.IsRemoved = true;
+        var removed = await participantSchemeRepository.UpdateAsync(item, cancellationToken);
+        if (removed)
+        {
+            LogRemovedContractItemMessage(logger, contractId, participantSchemeId, null);
+        }
+
+        return removed;
     }
 }

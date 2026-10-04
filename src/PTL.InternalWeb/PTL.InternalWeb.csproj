@@ -21,4 +21,10 @@
     <Content Include="..\Shared\Views\Account\Login.cshtml" Link="Features\Account\Views\Login.cshtml" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Only the merge templates are needed at runtime; the legacy uploads and image assets beside
+         them are kept in source control for provenance but are not deployed. -->
+    <Content Include="Documents\Templates\**\*.docx" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

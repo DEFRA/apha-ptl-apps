@@ -41,6 +41,15 @@ public static class PtlWebApplicationExtensions
             // with a friendlier message using the field's [Display(Name)] where one is set.
             options.ModelBindingMessageProvider.SetAttemptedValueIsInvalidAccessor(
                 (_, field) => $"Enter a valid value for {field}");
+
+            // A blank/unparsable number (e.g. an empty or non-numeric decimal field) hits these two
+            // accessors instead of AttemptedValueIsInvalidAccessor above - without overriding them too,
+            // leaving a numeric field empty shows a different, more technical message ("The value ''
+            // is invalid.") than typing letters into it does. Same friendly wording for all three.
+            options.ModelBindingMessageProvider.SetValueMustNotBeNullAccessor(
+                field => $"Enter a valid value for {field}");
+            options.ModelBindingMessageProvider.SetValueMustBeANumberAccessor(
+                field => $"Enter a valid value for {field}");
         });
         // Also enable Razor Pages (some projects in the solution use Razor Pages)
         builder.Services.AddRazorPages();

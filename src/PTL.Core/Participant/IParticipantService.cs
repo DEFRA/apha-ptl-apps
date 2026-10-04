@@ -9,4 +9,28 @@ public interface IParticipantService
     Task<Participant?> UpdateParticipantAsync(Guid participantId, Participant updatedFields, CancellationToken cancellationToken = default);
     Task<Participant?> DeactivateParticipantAsync(Guid participantId, CancellationToken cancellationToken = default);
     Task<Participant?> ReactivateParticipantAsync(Guid participantId, CancellationToken cancellationToken = default);
+
+    // spgaPendingParticipantDetailsEditInfo - every outstanding pending participant update.
+    Task<IReadOnlyList<PendingParticipantUpdateSummaryEntity>> GetPendingParticipantUpdatesAsync(CancellationToken cancellationToken = default);
+
+    // Returns null when the participant or its pending update does not exist.
+    Task<(Participant Current, PendingParticipantUpdate Pending)?> GetPendingParticipantUpdateAsync(Guid participantId, CancellationToken cancellationToken = default);
+
+    // Applies the pending contact fields onto the live participant record, then soft-deletes the
+    // pending update. When editedFields is supplied those values are applied in place of the stored
+    // pending values (legacy ButtonApprove_Click writes the on-screen values to both records).
+    // Returns false when no matching pending update exists. Throws ParticipantValidationException
+    // when the resulting participant breaks business rules.
+    Task<bool> ApprovePendingParticipantUpdateAsync(Guid participantId, PendingParticipantUpdate? editedFields = null, CancellationToken cancellationToken = default);
+
+    // Soft-deletes the pending update without changing the live participant record.
+    Task<bool> DeclinePendingParticipantUpdateAsync(Guid participantId, CancellationToken cancellationToken = default);
+
+    // Legacy ParticipantViewers.aspx. Returns null when the participant does not exist.
+    Task<ParticipantViewerAssignment?> GetParticipantViewersAsync(Guid participantId, CancellationToken cancellationToken = default);
+
+    // Diffs targetViewerIds against the participant's current assignments, inserting/removing only
+    // the difference (matches legacy BtnSave_Click's ViewerParticipantCollection.Save()). Returns
+    // false when the participant does not exist.
+    Task<bool> UpdateParticipantViewersAsync(Guid participantId, IReadOnlyList<Guid> targetViewerIds, CancellationToken cancellationToken = default);
 }

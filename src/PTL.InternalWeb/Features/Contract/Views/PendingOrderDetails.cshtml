@@ -1,0 +1,156 @@
+@model PTL.InternalWeb.Features.Contract.PendingOrderDetailsViewModel
+@using PTL.InternalWeb.Features.Contract
+@{
+    var order = Model.Order;
+    ViewData["Title"] = $"Pending Order - {order.CustomerName}";
+    var symbol = order.CurrencySymbol;
+}
+
+<h1 class="govuk-heading-l">@order.QalNumber, @order.CustomerName</h1>
+<p class="govuk-body">This page shows a pending order which can be updated, approved or declined</p>
+
+<h2 class="govuk-heading-m">Schemes</h2>
+
+@if (order.Schemes.Count == 0)
+{
+    <p class="govuk-body">There are no schemes on this order.</p>
+}
+else
+{
+    <table class="govuk-table">
+        <thead class="govuk-table__head">
+            <tr class="govuk-table__row">
+                <th scope="col" class="govuk-table__header">Scheme</th>
+                @foreach (var month in order.Schemes[0].Months)
+                {
+                    <th scope="col" class="govuk-table__header">@month.Label</th>
+                }
+                <th scope="col" class="govuk-table__header">Import/Export Licence</th>
+                <th scope="col" class="govuk-table__header">Postage</th>
+                <th scope="col" class="govuk-table__header">Scheme Price</th>
+                <th scope="col" class="govuk-table__header">Total</th>
+                <th scope="col" class="govuk-table__header">Actions</th>
+            </tr>
+        </thead>
+        <tbody class="govuk-table__body">
+            @foreach (var scheme in order.Schemes)
+            {
+                var formId = $"scheme-{scheme.PendingParticipantSchemeId}";
+                <tr class="govuk-table__row @(scheme.IsRemoved ? "ptl-inactive-row" : null)">
+                    <td class="govuk-table__cell" title="@scheme.SchemeName">@scheme.SchemeIdentifier</td>
+                    @foreach (var month in scheme.Months)
+                    {
+                        // Legacy enables a month only when the scheme offers it, the year's distribution
+                        // is not yet defined and nothing has been posted. Months already covered by a live
+                        // contract are ticked, locked and highlighted.
+                        var editable = month.Enabled && !scheme.IsRemoved;
+                        <td class="govuk-table__cell @(month.AlreadyParticipating ? "ptl-month-contracted" : null)"
+                            title="@(month.AlreadyParticipating ? "Already participating" : null)">
+                            <div class="govuk-checkboxes govuk-checkboxes--small" data-module="govuk-checkboxes">
+                                <div class="govuk-checkboxes__item">
+                                    <input class="govuk-checkboxes__input ptl-autosubmit" type="checkbox" form="@formId"
+                                           id="@(formId)-@month.Label" name="@(editable ? $"DistributionMonth{month.Label}" : null)" value="true"
+                                           checked="@month.Selected" disabled="@(!editable)" />
+                                    <label class="govuk-label govuk-checkboxes__label" for="@(formId)-@month.Label">
+                                        <span class="govuk-visually-hidden">@month.Label</span>
+                                    </label>
+                                </div>
+                            </div>
+                            @* A disabled checkbox posts nothing, so the hidden field carries the month's
+                               current value through the round trip rather than clearing it. *@
+                            <input type="hidden" form="@formId" name="DistributionMonth@(month.Label)"
+                                   value="@((!editable && month.Selected).ToString().ToLowerInvariant())" />
+                        </td>
+                    }
+                    <td class="govuk-table__cell">
+                        <div class="govuk-checkboxes govuk-checkboxes--small" data-module="govuk-checkboxes">
+                            <div class="govuk-checkboxes__item">
+                                <input class="govuk-checkboxes__input ptl-autosubmit" type="checkbox" form="@formId"
+                                       id="@(formId)-licence" name="ImportExportLicenceRequired" value="true"
+                                       checked="@scheme.ImportExportLicenceRequired" disabled="@scheme.IsRemoved" />
+                                <label class="govuk-label govuk-checkboxes__label" for="@(formId)-licence">
+                                    <span class="govuk-visually-hidden">Import/Export Licence</span>
+                                </label>
+                            </div>
+                        </div>
+                        <input type="hidden" form="@formId" name="ImportExportLicenceRequired"
+                               value="@((scheme.IsRemoved && scheme.ImportExportLicenceRequired).ToString().ToLowerInvariant())" />
+                    </td>
+                    <td class="govuk-table__cell">@symbol@scheme.PostagePrice.ToString("N2")</td>
+                    <td class="govuk-table__cell">@symbol@scheme.Price.ToString("N2")</td>
+                    <td class="govuk-table__cell">@symbol@scheme.TotalPrice.ToString("N2")</td>
+                    <td class="govuk-table__cell">
+                        <input type="hidden" form="@formId" name="IsRemoved" value="@scheme.IsRemoved.ToString().ToLowerInvariant()" />
+                        <button class="govuk-button govuk-button--secondary" type="submit" form="@formId" formnovalidate
+                                formaction="@Url.Action("RemovePendingOrderScheme", new { pendingContractId = order.PendingContractId, pendingParticipantSchemeId = scheme.PendingParticipantSchemeId })">
+                            @(scheme.IsRemoved ? "Add" : "Remove")
+                        </button>
+                        @* Legacy relied on AutoPostBack for the checkboxes; this button is the
+                           equivalent for anyone without JavaScript. *@
+                        <noscript>
+                            <button class="govuk-button govuk-button--secondary govuk-button--small" data-module="govuk-button"
+                                    type="submit" form="@formId">Update</button>
+                        </noscript>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+
+    @* One form per row, declared outside the table so the row's inputs can reference it by id. *@
+    @foreach (var pendingParticipantSchemeId in order.Schemes.Select(scheme => scheme.PendingParticipantSchemeId))
+    {
+        <form method="post" id="scheme-@pendingParticipantSchemeId"
+              asp-action="UpdatePendingOrderScheme"
+              asp-route-pendingContractId="@order.PendingContractId"
+              asp-route-pendingParticipantSchemeId="@pendingParticipantSchemeId"></form>
+    }
+}
+
+<h2 class="govuk-heading-m">Order details:</h2>
+
+<form method="post" asp-action="ApprovePendingOrder" asp-route-pendingContractId="@order.PendingContractId">
+    <dl class="govuk-summary-list">
+        <govuk-summary-row label="QAL Number">@order.QalNumber</govuk-summary-row>
+        <govuk-summary-row label="Contract Year">@order.Year</govuk-summary-row>
+    </dl>
+
+    <div class="govuk-form-group">
+        <label class="govuk-label" for="purchaseOrderNumber">Purchase Order Number:</label>
+        <input class="govuk-input" id="purchaseOrderNumber" name="purchaseOrderNumber" maxlength="255" value="@order.PurchaseOrderNumber" />
+    </div>
+
+    <dl class="govuk-summary-list">
+        <govuk-summary-row label="Total Scheme Price (@symbol)">@order.TotalSchemePrice.ToString("N2")</govuk-summary-row>
+        <govuk-summary-row label="Total postage (@symbol)">@order.TotalPostagePrice.ToString("N2")</govuk-summary-row>
+        <govuk-summary-row label="Total (@symbol)">@order.Total.ToString("N2")</govuk-summary-row>
+    </dl>
+
+    <h2 class="govuk-heading-m">Comments</h2>
+    <div class="govuk-form-group">
+        <label class="govuk-label" for="Comments">Comments:</label>
+        <textarea class="govuk-textarea" id="Comments" name="Comments" rows="5" maxlength="2000"></textarea>
+    </div>
+
+    <div class="govuk-button-group">
+        <button class="govuk-button" data-module="govuk-button" type="submit">Approve</button>
+        <button class="govuk-button govuk-button--warning" data-module="govuk-button" type="submit" formnovalidate
+                formaction="@Url.Action("DeclinePendingOrder", new { pendingContractId = order.PendingContractId })">Decline</button>
+        <a class="govuk-button govuk-button--secondary" data-module="govuk-button" asp-action="ReviewPendingOrders">Cancel</a>
+    </div>
+</form>
+
+@section Scripts {
+    @* Legacy marked every month and licence checkbox AutoPostBack="True", so each tick saved the
+       row immediately. This reproduces that without a dedicated Update button. *@
+    <script>
+        document.querySelectorAll('.ptl-autosubmit').forEach(function (checkbox) {
+            checkbox.addEventListener('change', function () {
+                var form = checkbox.form || document.getElementById(checkbox.getAttribute('form'));
+                if (form) {
+                    form.submit();
+                }
+            });
+        });
+    </script>
+}

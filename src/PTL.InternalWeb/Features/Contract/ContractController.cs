@@ -4,13 +4,31 @@ using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.Extensions.Logging;
 using PTL.ApiClient;
 using PTL.Contracts.Contract;
+using PTL.Core.Contract.Document;
+using PTL.Core.Contract.Export.Templates;
+using PTL.InternalWeb.Notifications;
 
 namespace PTL.InternalWeb.Features.Contract;
 
 // Authentication/authorization are out of scope for this phase - assume the current user is
 // already authenticated with full access to Contract functionality. Policies will be added later.
-public class ContractController(IContractApiClient contractApiClient, ICustomerApiClient customerApiClient, ILookupApiClient lookupApiClient, ILogger<ContractController> logger) : Controller
+public class ContractController(IContractApiClient contractApiClient, ICustomerApiClient customerApiClient, ILookupApiClient lookupApiClient, IImportPermitApiClient importPermitApiClient, ILogger<ContractController> logger, IContractDocumentService documentService, IContractExportApiClient contractExportApiClient, IContractRenewalApiClient contractRenewalApiClient, IExportTemplateApiClient exportTemplateApiClient, IBulkExportApiClient bulkExportApiClient, ITemplateMergeService templateMergeService) : Controller
 {
+    // Legacy ExportBase.ShowError text, reused verbatim across upload/open/select/delete/export.
+    private const string FileNotFound = "File not found";
+
+    private static readonly Action<ILogger, string, int, Exception?> LogBulkExportedMessage =
+        LoggerMessage.Define<string, int>(
+            LogLevel.Information,
+            new EventId(30, nameof(LogBulkExportedMessage)),
+            "Bulk export completed: documentType={DocumentType} records={RecordCount}");
+
+    private static readonly Action<ILogger, string, Exception?> LogBulkExportFailedMessage =
+        LoggerMessage.Define<string>(
+            LogLevel.Error,
+            new EventId(31, nameof(LogBulkExportFailedMessage)),
+            "Bulk export failed during mail merge: documentType={DocumentType}");
+
     private static readonly Action<ILogger, Guid, int?, string?, int, int, Exception?> LogDisplayedContractListMessage =
         LoggerMessage.Define<Guid, int?, string?, int, int>(
             LogLevel.Information,
@@ -47,6 +65,53 @@ public class ContractController(IContractApiClient contractApiClient, ICustomerA
             new EventId(6, nameof(LogUpdatedContractMessage)),
             "Updated contract {ContractId}");
 
+    private static readonly Action<ILogger, Guid, int, Exception?> LogDisplayedContractItemsMessage =
+        LoggerMessage.Define<Guid, int>(
+            LogLevel.Information,
+            new EventId(7, nameof(LogDisplayedContractItemsMessage)),
+            "Displayed contract items: contractId={ContractId} totalSchemes={TotalSchemeCount}");
+
+    private static readonly Action<ILogger, Guid, Guid, Exception?> LogRemovedContractItemMessage =
+        LoggerMessage.Define<Guid, Guid>(
+            LogLevel.Information,
+            new EventId(8, nameof(LogRemovedContractItemMessage)),
+            "Removed contract item {ParticipantSchemeId} from contract {ContractId}");
+
+    private static readonly Action<ILogger, Guid, Guid, string?, Exception?> LogRemoveContractItemFailedMessage =
+        LoggerMessage.Define<Guid, Guid, string?>(
+            LogLevel.Warning,
+            new EventId(9, nameof(LogRemoveContractItemFailedMessage)),
+            "Failed to remove contract item {ParticipantSchemeId} from contract {ContractId}: {Error}");
+
+    private static readonly Action<ILogger, Guid, int, Exception?> LogDisplayedImportPermitsMessage =
+        LoggerMessage.Define<Guid, int>(
+            LogLevel.Information,
+            new EventId(10, nameof(LogDisplayedImportPermitsMessage)),
+            "Displayed import permits: contractId={ContractId} totalPermits={TotalPermitCount}");
+
+    private static readonly Action<ILogger, Guid, string, Exception?> LogExportedContractDocumentMessage =
+        LoggerMessage.Define<Guid, string>(
+            LogLevel.Information,
+            new EventId(11, nameof(LogExportedContractDocumentMessage)),
+            "Exported contract document: contractId={ContractId} documentType={DocumentType}");
+
+    private static readonly Action<ILogger, Guid, string, Exception?> LogMissingTemplateMessage =
+        LoggerMessage.Define<Guid, string>(
+            LogLevel.Warning,
+            new EventId(12, nameof(LogMissingTemplateMessage)),
+            "No merge template available for contract {ContractId} document type {DocumentType}");
+
+    private static readonly Action<ILogger, Guid, string, Exception?> LogExportNoDataMessage =
+        LoggerMessage.Define<Guid, string>(
+            LogLevel.Information,
+            new EventId(13, nameof(LogExportNoDataMessage)),
+            "Export produced no data for contract {ContractId} document type {DocumentType}");
+
+    // Landing page for the Manage Contracts section (moved from the removed Menu feature) -
+    // mirrors legacy Contracts Admin/MenuContracts.aspx; the left nav (SideNavigationProvider)
+    // supplies the actual section contents.
+    public IActionResult ManageContracts() => View();
+
     public async Task<IActionResult> Index(
         Guid customerId,
         int? yearId,
@@ -70,15 +135,463 @@ public class ContractController(IContractApiClient contractApiClient, ICustomerA
         return View(new ContractListViewModel(search, result.TotalCount, result.Items, customer, yearNames));
     }
 
-    // Legacy ContractItems.aspx (priced scheme line items) has not been migrated yet - see
-    // docs/migration/contract-migration.md "Feature Breakdown" Phase 1/3. Stub keeps the Contract
-    // list's column/link parity without reimplementing that separate, larger feature.
-    public IActionResult ContractItems(Guid id) => View("FeatureNotAvailable", "Contract items");
+    // Legacy ContractItems.aspx (priced scheme line items) - see docs/migration/contract-migration.md
+    // "Feature Breakdown" Phase 1/3. A single unpaginated page per contract, matching legacy exactly -
+    // no search/filtering/paging (legacy has none).
+    [HttpGet]
+    public async Task<IActionResult> ContractItems(Guid id, CancellationToken cancellationToken = default)
+    {
+        var items = await contractApiClient.GetContractItemsAsync(id, cancellationToken);
+        if (items is null)
+        {
+            LogContractNotFoundMessage(logger, id, null);
+            return NotFound();
+        }
 
-    // Legacy mail-merge export (Contract/Address Confirmation/Job Sheet/Renewal Letter/Import
-    // Permit(s)) depends on template-upload infrastructure explicitly deferred to a later phase
-    // per docs/migration/contract-migration.md. Stub keeps the Export column's link parity.
-    public IActionResult Export(Guid id, string documentType) => View("FeatureNotAvailable", documentType);
+        var contract = await contractApiClient.GetContractAsync(id, cancellationToken);
+        if (contract is null)
+        {
+            LogContractNotFoundMessage(logger, id, null);
+            return NotFound();
+        }
+
+        var model = new ContractItemsViewModel(items, contract.CustomerId);
+        LogDisplayedContractItemsMessage(logger, id, items.Schemes.Count, null);
+        return View(model);
+    }
+
+    // Explicit REST mutation replacing legacy ContractItems.aspx's deferred "mark removed, save
+    // later" flow - removes immediately, then redisplays the Contract Items page.
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> RemoveContractItem(Guid id, Guid participantSchemeId, CancellationToken cancellationToken)
+    {
+        var result = await contractApiClient.RemoveContractItemAsync(id, participantSchemeId, cancellationToken);
+        if (!result.Success)
+        {
+            LogRemoveContractItemFailedMessage(logger, id, participantSchemeId, result.ErrorMessage, null);
+            TempData.SetNotification(NotificationType.Error, result.ErrorMessage ?? "The contract item could not be removed.");
+        }
+        else
+        {
+            LogRemovedContractItemMessage(logger, id, participantSchemeId, null);
+            TempData.SetNotification(NotificationType.Success, "Contract item removed successfully.");
+        }
+
+        return RedirectToAction(nameof(ContractItems), new { id });
+    }
+
+    // Replaces legacy ContractList.aspx's MailMergeContract/MailMergeSampleAddressLetter/
+    // MailMergeJobSheet/MailMergeRenewalLetter row commands, which streamed a merged Word document
+    // back to the browser. Output is DOCX rather than the legacy binary DOC. Import Permit(s) is NOT
+    // a document export - see the dedicated ImportPermits action below.
+    [HttpGet]
+    public async Task<IActionResult> Export(Guid id, string documentType, CancellationToken cancellationToken = default)
+    {
+        if (!ContractDocumentTypes.TryResolve(documentType, out var canonicalType, out var templateKey))
+        {
+            return View("FeatureNotAvailable", documentType);
+        }
+
+        var contract = await contractApiClient.GetContractAsync(id, cancellationToken);
+        if (contract is null)
+        {
+            LogContractNotFoundMessage(logger, id, null);
+            return NotFound();
+        }
+
+        var context = await BuildDocumentContextAsync(canonicalType, templateKey, contract, cancellationToken);
+
+        // Legacy no-data guards: MailMergeJobSheet returns False when TotalPrice is 0, and
+        // MailMergeSampleAddressLetter/RenewalLetter when their collection yields nothing. Contract
+        // deliberately has no guard - its TotalPrice check was commented out in the legacy source.
+        var noDataMessage = NoDataMessageFor(canonicalType, context);
+        if (noDataMessage is not null)
+        {
+            LogExportNoDataMessage(logger, id, canonicalType, null);
+            TempData.SetNotification(NotificationType.Warning, noDataMessage);
+            return RedirectToAction(nameof(Index), new { customerId = contract.CustomerId });
+        }
+
+        var request = ContractDocumentMergeMapper.Build(context);
+
+        ContractDocumentResponse document;
+        try
+        {
+            document = await documentService.GenerateAsync(request, cancellationToken);
+        }
+        catch (Exception ex) when (ex is FileNotFoundException or NotSupportedException)
+        {
+            // The converted .docx template has not been committed yet - see docs/migration.
+            LogMissingTemplateMessage(logger, id, canonicalType, ex);
+            return View("FeatureNotAvailable", documentType);
+        }
+
+        LogExportedContractDocumentMessage(logger, id, canonicalType, null);
+        return File(document.DocumentBytes, document.ContentType, document.FileName);
+    }
+
+    [HttpGet]
+    public IActionResult Exports() => View(new ExportsMenuViewModel(
+    [
+        new ExportsMenuItem("Export Contracts", nameof(ExportContracts)),
+        new ExportsMenuItem("Export Job Sheets", nameof(ExportJobSheets)),
+        new ExportsMenuItem("Export Renewal Letters", nameof(ExportRenewalLetters)),
+        new ExportsMenuItem("Export Address Confirmation Letters", nameof(ExportAddressConfirmationLetters))
+    ]));
+
+    // The four export screens are separate actions rather than one parameterised action so that the
+    // side navigation and breadcrumbs, which resolve on controller + action, can tell them apart.
+    [HttpGet]
+    public Task<IActionResult> ExportContracts(CancellationToken cancellationToken = default) =>
+        ExportTemplatesViewAsync(ExportDocumentTypes.Contracts, nameof(ExportContracts), cancellationToken);
+
+    [HttpGet]
+    public Task<IActionResult> ExportJobSheets(CancellationToken cancellationToken = default) =>
+        ExportTemplatesViewAsync(ExportDocumentTypes.JobSheets, nameof(ExportJobSheets), cancellationToken);
+
+    [HttpGet]
+    public Task<IActionResult> ExportRenewalLetters(CancellationToken cancellationToken = default) =>
+        ExportTemplatesViewAsync(ExportDocumentTypes.RenewalLetters, nameof(ExportRenewalLetters), cancellationToken);
+
+    [HttpGet]
+    public Task<IActionResult> ExportAddressConfirmationLetters(CancellationToken cancellationToken = default) =>
+        ExportTemplatesViewAsync(ExportDocumentTypes.AddressConfirmationLetters, nameof(ExportAddressConfirmationLetters), cancellationToken);
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> UploadExportTemplate(string documentType, IFormFile? file, CancellationToken cancellationToken = default)
+    {
+        if (!ExportDocumentTypes.TryResolve(documentType, out var storageName, out _))
+        {
+            return NotFound();
+        }
+
+        if (file is null || file.Length == 0)
+        {
+            TempData.SetNotification(NotificationType.Error, FileNotFound);
+            return RedirectToAction(ExportActionFor(storageName));
+        }
+
+        await using var stream = file.OpenReadStream();
+        var result = await exportTemplateApiClient.UploadTemplateAsync(storageName, file.FileName, stream, cancellationToken);
+
+        TempData.SetNotification(
+            result.Success ? NotificationType.Success : NotificationType.Error,
+            result.Success
+                ? "Press the select link to allocate a template. The allocated template is highlighted in the table below:"
+                : result.ErrorMessage ?? "File could not be saved");
+
+        return RedirectToAction(ExportActionFor(storageName));
+    }
+
+    // Legacy "Open" - downloads the stored template file itself, it never renders a PDF.
+    [HttpGet]
+    public async Task<IActionResult> DownloadExportTemplate(Guid fileId, string documentType, CancellationToken cancellationToken = default)
+    {
+        var template = await exportTemplateApiClient.DownloadTemplateAsync(fileId, cancellationToken);
+        if (template is not null)
+        {
+            return File(template.Content, template.ContentType, template.FileName);
+        }
+
+        TempData.SetNotification(NotificationType.Error, FileNotFound);
+        return RedirectToAction(ExportActionFor(documentType));
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> SelectExportTemplate(Guid fileId, string documentType, CancellationToken cancellationToken = default)
+    {
+        var selected = await exportTemplateApiClient.SelectTemplateAsync(fileId, cancellationToken);
+
+        TempData.SetNotification(
+            selected ? NotificationType.Success : NotificationType.Error,
+            selected ? "Template selected successfully." : FileNotFound);
+
+        return RedirectToAction(ExportActionFor(documentType));
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> DeleteExportTemplate(Guid fileId, string documentType, CancellationToken cancellationToken = default)
+    {
+        var deleted = await exportTemplateApiClient.DeleteTemplateAsync(fileId, cancellationToken);
+
+        TempData.SetNotification(
+            deleted ? NotificationType.Success : NotificationType.Error,
+            deleted ? "Template deleted successfully." : FileNotFound);
+
+        return RedirectToAction(ExportActionFor(documentType));
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> RunExport(string documentType, bool nonUk = false, CancellationToken cancellationToken = default)
+    {
+        if (!ExportDocumentTypes.TryResolve(documentType, out var storageName, out _))
+        {
+            return NotFound();
+        }
+
+        var templates = await exportTemplateApiClient.GetTemplatesAsync(storageName, cancellationToken);
+        var selected = templates?.Templates.FirstOrDefault(t => t.Selected);
+        if (selected is null)
+        {
+            TempData.SetNotification(NotificationType.Error, ExportTemplatesViewModel.ExportDisabledTooltip);
+            return RedirectToAction(ExportActionFor(storageName));
+        }
+
+        var template = await exportTemplateApiClient.DownloadTemplateAsync(selected.FileId, cancellationToken);
+        if (template is null)
+        {
+            TempData.SetNotification(NotificationType.Error, FileNotFound);
+            return RedirectToAction(ExportActionFor(storageName));
+        }
+
+        var documents = await BuildBulkMergeDataAsync(storageName, nonUk, cancellationToken);
+
+        byte[] merged;
+        try
+        {
+            merged = templateMergeService.MergeTemplateContentMany(template.Content, documents, cancellationToken);
+        }
+        catch (Exception ex) when (ex is InvalidDataException or NotSupportedException)
+        {
+            LogBulkExportFailedMessage(logger, storageName, ex);
+            TempData.SetNotification(NotificationType.Error, "There was a problem with the Mail Merge");
+            return RedirectToAction(ExportActionFor(storageName));
+        }
+
+        LogBulkExportedMessage(logger, storageName, documents.Count, null);
+        return File(merged, ExportTemplateService.DocxContentType, BulkExportFileName(storageName, nonUk));
+    }
+
+    private async Task<List<ContractDocumentMergeData>> BuildBulkMergeDataAsync(string storageName, bool nonUk, CancellationToken cancellationToken) =>
+        storageName switch
+        {
+            ExportDocumentTypes.AddressConfirmationLetters =>
+                BulkExportMergeMapper.AddressConfirmationLetters(await bulkExportApiClient.GetSampleAddressesAsync(cancellationToken)),
+            ExportDocumentTypes.RenewalLetters =>
+                BulkExportMergeMapper.RenewalLetters(await bulkExportApiClient.GetRenewalsAsync(nonUk, cancellationToken)),
+            _ => BulkExportMergeMapper.Contracts(await bulkExportApiClient.GetContractsAsync(cancellationToken)),
+        };
+
+    // Legacy export filenames, including their inconsistent use of the underscore separator.
+    private static string BulkExportFileName(string storageName, bool nonUk)
+    {
+        var today = DateTime.Now;
+        var stamp = string.Create(CultureInfo.InvariantCulture, $"{today.Year}_{today.Month}_{today.Day}");
+
+        return storageName switch
+        {
+            ExportDocumentTypes.JobSheets => $"JobSheetExport{stamp}.docx",
+            ExportDocumentTypes.AddressConfirmationLetters => $"AddressConfirmationLettersExport{stamp}.docx",
+            ExportDocumentTypes.RenewalLetters => nonUk
+                ? $"RenewalLettersNonUKExport_{stamp}.docx"
+                : $"RenewalLettersUKExport_{stamp}.docx",
+            _ => $"ContractExport_{stamp}.docx",
+        };
+    }
+
+    private async Task<IActionResult> ExportTemplatesViewAsync(string documentType, string actionName, CancellationToken cancellationToken)
+    {
+        var templates = await exportTemplateApiClient.GetTemplatesAsync(documentType, cancellationToken);
+        var rows = templates?.Templates ?? [];
+
+        return View("ExportTemplates", new ExportTemplatesViewModel(
+            documentType,
+            templates?.DisplayName ?? ExportDocumentTypes.DisplayNameFor(documentType),
+            actionName,
+            rows,
+            rows.Any(t => t.Selected)));
+    }
+
+    private static string ExportActionFor(string documentType)
+    {
+        ExportDocumentTypes.TryResolve(documentType, out var storageName, out _);
+
+        return storageName switch
+        {
+            ExportDocumentTypes.JobSheets => nameof(ExportJobSheets),
+            ExportDocumentTypes.RenewalLetters => nameof(ExportRenewalLetters),
+            ExportDocumentTypes.AddressConfirmationLetters => nameof(ExportAddressConfirmationLetters),
+            _ => nameof(ExportContracts)
+        };
+    }
+
+    // Only the data the requested document actually needs is fetched.
+    private async Task<ContractDocumentContext> BuildDocumentContextAsync(
+        string canonicalType,
+        string templateKey,
+        ContractResponse contract,
+        CancellationToken cancellationToken)
+    {
+        if (canonicalType == ContractDocumentTypes.AddressConfirmation)
+        {
+            var sampleAddresses = await contractExportApiClient.GetSampleAddressesAsync(contract.ContractId, cancellationToken);
+            return new ContractDocumentContext(canonicalType, templateKey, contract, null, null, [], [], sampleAddresses, null);
+        }
+
+        if (canonicalType == ContractDocumentTypes.RenewalLetter)
+        {
+            var renewal = await contractExportApiClient.GetRenewalAsync(contract.ContractId, cancellationToken);
+            return new ContractDocumentContext(canonicalType, templateKey, contract, null, null, [], [], [], renewal);
+        }
+
+        var items = await contractApiClient.GetContractItemsAsync(contract.ContractId, cancellationToken);
+        var customer = await customerApiClient.GetCustomerAsync(contract.CustomerId, cancellationToken);
+        var countries = await lookupApiClient.GetCountriesAsync(cancellationToken);
+        var vatRatings = await lookupApiClient.GetVatRatingsAsync(cancellationToken);
+
+        return new ContractDocumentContext(canonicalType, templateKey, contract, items, customer, countries, vatRatings, [], null);
+    }
+
+    private static string? NoDataMessageFor(string canonicalType, ContractDocumentContext context) => canonicalType switch
+    {
+        ContractDocumentTypes.JobSheet when (context.Items?.TotalPrice ?? 0m) == 0m =>
+            "Total Price of this contract is 0 or there is no data set.",
+        ContractDocumentTypes.AddressConfirmation when context.SampleAddresses.Count == 0 =>
+            "There is no data set",
+        ContractDocumentTypes.RenewalLetter when context.Renewal is null =>
+            "There is no data set",
+        _ => null,
+    };
+
+    // Legacy ImportPermit.aspx GridViewImportPermits: a CommandField "Actions" column with an Edit
+    // button per row; clicking it switches that row into edit mode (Update/Cancel). Only the
+    // "Import Permit Received"/"Import Permit Expiry" cells have an EditItemTemplate - "Import
+    // Permit Required" has none, so it stays the same read-only, disabled checkbox in both view and
+    // edit mode (it is never itself editable - see ImportPermitViewModel.cs). editParticipantSchemeId
+    // carries which single row is in edit mode across the GET, replacing WebForms' GridView.EditIndex
+    // ViewState.
+    [HttpGet]
+    public async Task<IActionResult> ImportPermits(Guid id, Guid? editParticipantSchemeId, CancellationToken cancellationToken)
+    {
+        var permits = await importPermitApiClient.GetImportPermitsAsync(id, cancellationToken);
+        LogDisplayedImportPermitsMessage(logger, id, permits.Count, null);
+        var model = ToImportPermitsViewModel(id, permits);
+        model.EditParticipantSchemeId = editParticipantSchemeId;
+        return View(model);
+    }
+
+    // Matches legacy GridViewImportPermits_RowUpdating - commits the single edited row and returns
+    // to view mode (EditIndex = -1). Received/Expiry are posted as individual values (not the whole
+    // list) since only one row is ever editable at a time.
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> UpdateImportPermit(Guid id, Guid participantSchemeId, bool importPermitReceived, string? importPermitExpiry, CancellationToken cancellationToken)
+    {
+        var expiry = ParseExpiry(importPermitExpiry);
+        if (importPermitReceived && expiry is null)
+        {
+            ModelState.AddModelError(
+                nameof(importPermitExpiry),
+                string.IsNullOrWhiteSpace(importPermitExpiry) ? "Expiry date required" : "Invalid date. Please enter a valid date in dd/mm/yyyy format.");
+
+            var permits = await importPermitApiClient.GetImportPermitsAsync(id, cancellationToken);
+            var model = ToImportPermitsViewModel(id, permits);
+            model.EditParticipantSchemeId = participantSchemeId;
+
+            // Redisplay the row still in edit mode with what the user actually typed, not the
+            // last-saved value, matching legacy redisplaying the postback's own EditItemTemplate values.
+            var row = model.Permits.FirstOrDefault(p => p.ParticipantSchemeId == participantSchemeId);
+            if (row is not null)
+            {
+                row.ImportPermitReceived = importPermitReceived;
+                row.ImportPermitExpiry = importPermitExpiry;
+            }
+
+            return View(nameof(ImportPermits), model);
+        }
+
+        await importPermitApiClient.UpdateImportPermitAsync(participantSchemeId, new UpdateImportPermitRequest(importPermitReceived, expiry), cancellationToken);
+        TempData.SetNotification(NotificationType.Success, "Import permit updated successfully.");
+        return RedirectToAction(nameof(ImportPermits), new { id });
+    }
+
+    // Matches legacy validatePermitExpiry()/cvPermitExpiry_ServerValidate's exact dd/MM/yyyy format.
+    private static DateTime? ParseExpiry(string? text) =>
+        !string.IsNullOrWhiteSpace(text) &&
+        DateTime.TryParseExact(text.Trim(), "dd/MM/yyyy", CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsed)
+            ? parsed
+            : null;
+
+    private static ImportPermitsViewModel ToImportPermitsViewModel(Guid contractId, IReadOnlyList<ImportPermitResponse> permits) => new()
+    {
+        ContractId = contractId,
+        Permits = permits.Select(p => new ImportPermitRowViewModel
+        {
+            ParticipantSchemeId = p.ParticipantSchemeId,
+            SchemeNumber = p.SchemeNumber,
+            SchemeName = p.SchemeName,
+            LabId = p.LabId,
+            ImportPermitRequired = p.ImportPermitRequired,
+            ImportPermitReceived = p.ImportPermitReceived,
+            ImportPermitExpiry = p.ImportPermitExpiry?.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture)
+        }).ToList()
+    };
+
+    // Legacy MergeContracts.aspx - screen users know as "Renew Contracts".
+    [HttpGet]
+    public async Task<IActionResult> RenewContracts(Guid customerId, CancellationToken cancellationToken)
+    {
+        var model = await BuildRenewContractsModelAsync(customerId, cancellationToken);
+        return View(model);
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> RenewContracts(
+        Guid customerId,
+        List<Guid> selectedContractIds,
+        List<Guid> selectedParticipantSchemeIds,
+        string? newContractSignatory,
+        CancellationToken cancellationToken)
+    {
+        selectedContractIds ??= [];
+        selectedParticipantSchemeIds ??= [];
+
+        var request = new RenewContractRequest(selectedContractIds, selectedParticipantSchemeIds, newContractSignatory);
+        var result = await contractRenewalApiClient.RenewContractsAsync(customerId, request, cancellationToken);
+
+        if (!result.Success)
+        {
+            var model = await BuildRenewContractsModelAsync(customerId, cancellationToken);
+            model.SelectedContractIds = selectedContractIds;
+            model.SelectedParticipantSchemeIds = selectedParticipantSchemeIds;
+            model.NewContractSignatory = newContractSignatory;
+            model.ErrorMessage = result.ErrorMessage;
+            return View(model);
+        }
+
+        TempData.SetNotification(NotificationType.Success, "Contract renewed successfully.");
+        return RedirectToAction(nameof(Index), new { customerId });
+    }
+
+    private async Task<RenewContractsViewModel> BuildRenewContractsModelAsync(Guid customerId, CancellationToken cancellationToken)
+    {
+        var customer = await customerApiClient.GetCustomerAsync(customerId, cancellationToken);
+        var contracts = await contractRenewalApiClient.GetRenewableContractsAsync(customerId, cancellationToken);
+        var items = contracts.IsAllowed
+            ? await contractRenewalApiClient.GetRenewableItemsAsync(customerId, cancellationToken)
+            : new RenewableContractItemsResponse([]);
+
+        return new RenewContractsViewModel
+        {
+            CustomerId = customerId,
+            CustomerName = customer?.Name ?? string.Empty,
+            CustomerOrganisation = customer?.Organisation ?? string.Empty,
+            QalNumber = customer?.QalNumber ?? string.Empty,
+            IsAllowed = contracts.IsAllowed,
+            BlockedReason = contracts.BlockedReason,
+            Contracts = contracts.Contracts,
+            Items = items.Items,
+            ExistingSignatories = contracts.ExistingSignatories,
+            SelectedContractIds = contracts.Contracts.Select(c => c.ContractId).ToList(),
+            SelectedParticipantSchemeIds = items.Items.Where(i => i.IsRenewable).Select(i => i.ParticipantSchemeId).ToList()
+        };
+    }
 
     public async Task<IActionResult> Details(Guid id, CancellationToken cancellationToken)
     {
@@ -133,6 +646,7 @@ public class ContractController(IContractApiClient contractApiClient, ICustomerA
 
         ArgumentNullException.ThrowIfNull(result.Contract);
         LogCreatedContractMessage(logger, result.Contract.ContractId, null);
+        TempData.SetNotification(NotificationType.Success, "Contract created successfully.");
         return RedirectToAction(nameof(Details), new { id = result.Contract.ContractId });
     }
 
@@ -173,7 +687,101 @@ public class ContractController(IContractApiClient contractApiClient, ICustomerA
         }
 
         LogUpdatedContractMessage(logger, id, null);
+        TempData.SetNotification(NotificationType.Success, "Contract updated successfully.");
         return RedirectToAction(nameof(Details), new { id });
+    }
+
+    // Review Pending Orders (legacy ReviewPendingOrders.aspx) - two grids, current and next year.
+    public async Task<IActionResult> ReviewPendingOrders(CancellationToken cancellationToken)
+    {
+        var orders = await contractApiClient.GetPendingOrdersAsync(cancellationToken);
+        return View(new PendingOrderListViewModel(orders.CurrentYearOrders, orders.NextYearOrders));
+    }
+
+    // Pending Order Details (legacy PendingContractOrder.aspx).
+    public async Task<IActionResult> PendingOrderDetails(Guid pendingContractId, CancellationToken cancellationToken)
+    {
+        var order = await contractApiClient.GetPendingOrderAsync(pendingContractId, cancellationToken);
+        return order is null ? NotFound() : View(new PendingOrderDetailsViewModel(order));
+    }
+
+    // Legacy toggles a month / the Import-Export Licence checkbox with an AutoPostBack that saves
+    // the row and re-totals the order; here the whole row posts back at once.
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> UpdatePendingOrderScheme(
+        Guid pendingContractId,
+        Guid pendingParticipantSchemeId,
+        PendingOrderSchemeUpdateRequest request,
+        CancellationToken cancellationToken)
+    {
+        var updated = await contractApiClient.UpdatePendingOrderSchemeAsync(pendingContractId, pendingParticipantSchemeId, request, cancellationToken);
+        if (!updated)
+        {
+            return NotFound();
+        }
+
+        return RedirectToAction(nameof(PendingOrderDetails), new { pendingContractId });
+    }
+
+    // Legacy's per-row Add/Remove link - flips fldIsRemoved, leaving every other value intact.
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> RemovePendingOrderScheme(
+        Guid pendingContractId,
+        Guid pendingParticipantSchemeId,
+        PendingOrderSchemeUpdateRequest request,
+        CancellationToken cancellationToken)
+    {
+        var updated = await contractApiClient.UpdatePendingOrderSchemeAsync(
+            pendingContractId,
+            pendingParticipantSchemeId,
+            request with { IsRemoved = !request.IsRemoved },
+            cancellationToken);
+
+        if (!updated)
+        {
+            return NotFound();
+        }
+
+        return RedirectToAction(nameof(PendingOrderDetails), new { pendingContractId });
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ApprovePendingOrder(Guid pendingContractId, string? purchaseOrderNumber, CancellationToken cancellationToken)
+    {
+        var result = await contractApiClient.ApprovePendingOrderAsync(
+            pendingContractId, new PendingOrderApproveRequest(purchaseOrderNumber ?? string.Empty), cancellationToken);
+
+        if (result.NotFound)
+        {
+            return NotFound();
+        }
+
+        if (!result.Success)
+        {
+            var messages = string.Join(" ", result.FieldErrors.SelectMany(e => e.Value));
+            TempData.SetNotification(NotificationType.Error, $"Order could not be approved. {messages}");
+            return RedirectToAction(nameof(PendingOrderDetails), new { pendingContractId });
+        }
+
+        TempData.SetNotification(NotificationType.Success, "Order approved successfully.");
+        return RedirectToAction(nameof(ReviewPendingOrders));
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> DeclinePendingOrder(Guid pendingContractId, CancellationToken cancellationToken)
+    {
+        var declined = await contractApiClient.DeclinePendingOrderAsync(pendingContractId, cancellationToken);
+        if (!declined)
+        {
+            return NotFound();
+        }
+
+        TempData.SetNotification(NotificationType.Success, "Order declined successfully.");
+        return RedirectToAction(nameof(ReviewPendingOrders));
     }
 
     private void AddErrors(IReadOnlyDictionary<string, string[]> fieldErrors) => this.AddFieldErrors(fieldErrors);

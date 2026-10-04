@@ -11,9 +11,9 @@ namespace PTL.Api.Tests.Endpoints;
 
 public class CustomerControllerTests
 {
-    private static CustomerController CreateController(FakeCustomerRepository repository)
+    private static CustomerController CreateController(FakeCustomerRepository repository, FakePendingCustomerUpdateRepository? pendingRepository = null)
     {
-        var controller = new CustomerController(new CustomerService(repository, NullLogger<CustomerService>.Instance), NullLogger<CustomerController>.Instance);
+        var controller = new CustomerController(new CustomerService(repository, pendingRepository ?? new FakePendingCustomerUpdateRepository(), NullLogger<CustomerService>.Instance), NullLogger<CustomerController>.Instance);
 
         // ValidationProblem() resolves ProblemDetailsFactory from HttpContext.RequestServices,
         // which a bare controller instance does not have without this wiring.
@@ -201,5 +201,169 @@ public class CustomerControllerTests
 
         var ok = Assert.IsType<OkObjectResult>(result.Result);
         Assert.True(((CustomerResponse)ok.Value!).IsActive);
+    }
+
+    [Fact]
+    public async Task GetPendingCustomerUpdates_ReturnsSummaries()
+    {
+        var repository = new FakeCustomerRepository();
+        var pendingRepository = new FakePendingCustomerUpdateRepository();
+        var controller = CreateController(repository, pendingRepository);
+        var created = await controller.CreateCustomer(ValidCreateRequest(), CancellationToken.None);
+        var customerId = ((CustomerResponse)((CreatedAtActionResult)created.Result!).Value!).CustomerId;
+        pendingRepository.Seed(new PendingCustomerUpdate { PendingCustomerUpdateId = Guid.NewGuid(), CustomerId = customerId, IsSubmitted = true });
+
+        var result = await controller.GetPendingCustomerUpdates(CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var summaries = Assert.IsType<List<PendingCustomerUpdateSummaryResponse>>(ok.Value);
+        Assert.Single(summaries);
+        Assert.Equal(customerId, summaries[0].CustomerId);
+    }
+
+    [Fact]
+    public async Task GetPendingCustomerUpdate_NoPendingUpdate_ReturnsNotFound()
+    {
+        var repository = new FakeCustomerRepository();
+        var controller = CreateController(repository);
+        var created = await controller.CreateCustomer(ValidCreateRequest(), CancellationToken.None);
+        var customerId = ((CustomerResponse)((CreatedAtActionResult)created.Result!).Value!).CustomerId;
+
+        var result = await controller.GetPendingCustomerUpdate(customerId, CancellationToken.None);
+
+        Assert.IsType<NotFoundResult>(result.Result);
+    }
+
+    [Fact]
+    public async Task GetPendingCustomerUpdate_PendingUpdateExists_ReturnsComparison()
+    {
+        var repository = new FakeCustomerRepository();
+        var pendingRepository = new FakePendingCustomerUpdateRepository();
+        var controller = CreateController(repository, pendingRepository);
+        var created = await controller.CreateCustomer(ValidCreateRequest(), CancellationToken.None);
+        var customerId = ((CustomerResponse)((CreatedAtActionResult)created.Result!).Value!).CustomerId;
+        pendingRepository.Seed(new PendingCustomerUpdate { PendingCustomerUpdateId = Guid.NewGuid(), CustomerId = customerId, ContactName = "New Contact", IsSubmitted = true });
+
+        var result = await controller.GetPendingCustomerUpdate(customerId, CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var comparison = Assert.IsType<PendingCustomerUpdateComparisonResponse>(ok.Value);
+        Assert.Equal(customerId, comparison.Current.CustomerId);
+        Assert.Equal("New Contact", comparison.Pending.ContactName);
+    }
+
+    [Fact]
+    public async Task ApprovePendingCustomerUpdate_NoPendingUpdate_ReturnsNotFound()
+    {
+        var controller = CreateController(new FakeCustomerRepository());
+
+        var result = await controller.ApprovePendingCustomerUpdate(Guid.NewGuid(), request: null, CancellationToken.None);
+
+        Assert.IsType<NotFoundResult>(result);
+    }
+
+    [Fact]
+    public async Task ApprovePendingCustomerUpdate_PendingUpdateExists_AppliesChangesAndReturnsNoContent()
+    {
+        var repository = new FakeCustomerRepository();
+        var pendingRepository = new FakePendingCustomerUpdateRepository();
+        var controller = CreateController(repository, pendingRepository);
+        var created = await controller.CreateCustomer(ValidCreateRequest(), CancellationToken.None);
+        var customer = (CustomerResponse)((CreatedAtActionResult)created.Result!).Value!;
+        pendingRepository.Seed(ValidPendingUpdate(customer, "New Contact"));
+
+        var result = await controller.ApprovePendingCustomerUpdate(customer.CustomerId, request: null, CancellationToken.None);
+
+        Assert.IsType<NoContentResult>(result);
+        var updated = await controller.GetCustomer(customer.CustomerId, CancellationToken.None);
+        Assert.Equal("New Contact", ((CustomerResponse)((OkObjectResult)updated.Result!).Value!).ContactName);
+    }
+
+    [Fact]
+    public async Task ApprovePendingCustomerUpdate_AmendedValuesSupplied_AppliesAmendedValues()
+    {
+        var repository = new FakeCustomerRepository();
+        var pendingRepository = new FakePendingCustomerUpdateRepository();
+        var controller = CreateController(repository, pendingRepository);
+        var created = await controller.CreateCustomer(ValidCreateRequest(), CancellationToken.None);
+        var customer = (CustomerResponse)((CreatedAtActionResult)created.Result!).Value!;
+        pendingRepository.Seed(ValidPendingUpdate(customer, "New Contact"));
+
+        var result = await controller.ApprovePendingCustomerUpdate(customer.CustomerId, AmendedPendingRequest(customer, "Amended Contact"), CancellationToken.None);
+
+        Assert.IsType<NoContentResult>(result);
+        var updated = await controller.GetCustomer(customer.CustomerId, CancellationToken.None);
+        Assert.Equal("Amended Contact", ((CustomerResponse)((OkObjectResult)updated.Result!).Value!).ContactName);
+    }
+
+    [Fact]
+    public async Task ApprovePendingCustomerUpdate_AmendedValuesBreakBusinessRules_ReturnsValidationProblem()
+    {
+        var repository = new FakeCustomerRepository();
+        var pendingRepository = new FakePendingCustomerUpdateRepository();
+        var controller = CreateController(repository, pendingRepository);
+        var created = await controller.CreateCustomer(ValidCreateRequest(), CancellationToken.None);
+        var customer = (CustomerResponse)((CreatedAtActionResult)created.Result!).Value!;
+        pendingRepository.Seed(new PendingCustomerUpdate { PendingCustomerUpdateId = Guid.NewGuid(), CustomerId = customer.CustomerId, ContactName = "New Contact", IsSubmitted = true });
+
+        var result = await controller.ApprovePendingCustomerUpdate(customer.CustomerId, AmendedPendingRequest(customer, string.Empty), CancellationToken.None);
+
+        var badRequest = Assert.IsType<ObjectResult>(result, exactMatch: false);
+        Assert.Equal(400, badRequest.StatusCode);
+    }
+
+    private static PendingCustomerUpdateSaveRequest AmendedPendingRequest(CustomerResponse customer, string contactName) => new(
+        contactName, customer.Organisation, customer.Address1, customer.Address2, customer.Address3, customer.Address4,
+        customer.Address5, customer.CountryId, customer.Telephone, customer.Telephone2, customer.Fax, customer.Email,
+        customer.InvoiceName, customer.InvoiceOrganisation, customer.InvoiceAddress1, customer.InvoiceAddress2,
+        customer.InvoiceAddress3, customer.InvoiceAddress4, customer.InvoiceAddress5, customer.InvoiceCountryId,
+        customer.InvoiceTelephone, customer.InvoiceTelephone2, customer.InvoiceFax, customer.InvoiceEmail);
+
+    // Approve runs CustomerValidator against the resulting customer (legacy mcustomer.IsValid), so
+    // a seeded pending update must carry every required field, not just the amended one.
+    private static PendingCustomerUpdate ValidPendingUpdate(CustomerResponse customer, string contactName) => new()
+    {
+        PendingCustomerUpdateId = Guid.NewGuid(),
+        CustomerId = customer.CustomerId,
+        ContactName = contactName,
+        Organisation = customer.Organisation,
+        Address1 = customer.Address1,
+        Address2 = customer.Address2,
+        CountryId = customer.CountryId,
+        Telephone = customer.Telephone,
+        Email = customer.Email,
+        InvoiceOrganisation = customer.InvoiceOrganisation,
+        InvoiceAddress1 = customer.InvoiceAddress1,
+        InvoiceAddress2 = customer.InvoiceAddress2,
+        InvoiceCountryId = customer.InvoiceCountryId,
+        InvoiceEmail = customer.InvoiceEmail,
+        IsSubmitted = true
+    };
+
+    [Fact]
+    public async Task DeclinePendingCustomerUpdate_NoPendingUpdate_ReturnsNotFound()
+    {
+        var controller = CreateController(new FakeCustomerRepository());
+
+        var result = await controller.DeclinePendingCustomerUpdate(Guid.NewGuid(), CancellationToken.None);
+
+        Assert.IsType<NotFoundResult>(result);
+    }
+
+    [Fact]
+    public async Task DeclinePendingCustomerUpdate_PendingUpdateExists_DoesNotChangeCustomerAndReturnsNoContent()
+    {
+        var repository = new FakeCustomerRepository();
+        var pendingRepository = new FakePendingCustomerUpdateRepository();
+        var controller = CreateController(repository, pendingRepository);
+        var created = await controller.CreateCustomer(ValidCreateRequest(), CancellationToken.None);
+        var customerId = ((CustomerResponse)((CreatedAtActionResult)created.Result!).Value!).CustomerId;
+        pendingRepository.Seed(new PendingCustomerUpdate { PendingCustomerUpdateId = Guid.NewGuid(), CustomerId = customerId, ContactName = "New Contact", IsSubmitted = true });
+
+        var result = await controller.DeclinePendingCustomerUpdate(customerId, CancellationToken.None);
+
+        Assert.IsType<NoContentResult>(result);
+        var updated = await controller.GetCustomer(customerId, CancellationToken.None);
+        Assert.Equal("Alice Example", ((CustomerResponse)((OkObjectResult)updated.Result!).Value!).ContactName);
     }
 }

@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.Extensions.Logging;
 using PTL.ApiClient;
 using PTL.Contracts.Scheme;
+using PTL.InternalWeb.Notifications;
 
 namespace PTL.InternalWeb.Features.Scheme;
 
@@ -53,6 +54,11 @@ public class SchemeController(ISchemeApiClient schemeApiClient, ILookupApiClient
             LogLevel.Information,
             new EventId(7, nameof(LogSchemeHistoryMessage)),
             "Displayed scheme family history for {SharedId}");
+
+    // Landing page for the Manage Schemes section (moved from the removed Menu feature) -
+    // mirrors legacy Scheme Admin/MenuSchemes.aspx; the left nav (SideNavigationProvider)
+    // supplies the actual section contents.
+    public IActionResult ManageSchemes() => View();
 
     public async Task<IActionResult> Index(int? yearId, string? searchTerm = null, int page = 1, int pageSize = PTL.InternalWeb.Pagination.PaginationModel.DefaultPageSize, CancellationToken cancellationToken = default)
     {
@@ -126,6 +132,7 @@ public class SchemeController(ISchemeApiClient schemeApiClient, ILookupApiClient
         }
 
         LogCreatedSchemeMessage(logger, result.Scheme.SchemeId, null);
+        TempData.SetNotification(NotificationType.Success, "Scheme created successfully.");
         return RedirectToAction(nameof(Details), new { id = result.Scheme.SchemeId });
     }
 
@@ -166,6 +173,7 @@ public class SchemeController(ISchemeApiClient schemeApiClient, ILookupApiClient
         }
 
         LogUpdatedSchemeMessage(logger, id, null);
+        TempData.SetNotification(NotificationType.Success, "Scheme updated successfully.");
         return RedirectToAction(nameof(Details), new { id });
     }
 

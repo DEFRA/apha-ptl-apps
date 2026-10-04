@@ -65,4 +65,40 @@ internal sealed class FakeParticipantApiClient : IParticipantApiClient
             request.Email2, request.Comments, request.IsActive, null, false, null);
         return Task.FromResult(new ParticipantSaveResult(true, participant, new Dictionary<string, string[]>()));
     }
+
+    public IReadOnlyList<PendingParticipantUpdateSummaryResponse> PendingParticipantUpdates { get; set; } = [];
+    public PendingParticipantUpdateComparisonResponse? PendingParticipantUpdateComparison { get; set; }
+    public PendingParticipantUpdateDecisionResult ApprovePendingParticipantUpdateResult { get; set; } = new(true, false, new Dictionary<string, string[]>());
+    public bool DeclinePendingParticipantUpdateResult { get; set; } = true;
+    public PendingParticipantUpdateSaveRequest? LastApproveRequest { get; private set; }
+
+    public Task<IReadOnlyList<PendingParticipantUpdateSummaryResponse>> GetPendingParticipantUpdatesAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult(PendingParticipantUpdates);
+
+    public Task<PendingParticipantUpdateComparisonResponse?> GetPendingParticipantUpdateAsync(Guid participantId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(PendingParticipantUpdateComparison);
+
+    public Task<PendingParticipantUpdateDecisionResult> ApprovePendingParticipantUpdateAsync(Guid participantId, PendingParticipantUpdateSaveRequest? request = null, CancellationToken cancellationToken = default)
+    {
+        LastApproveRequest = request;
+        return Task.FromResult(ApprovePendingParticipantUpdateResult);
+    }
+
+    public Task<bool> DeclinePendingParticipantUpdateAsync(Guid participantId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(DeclinePendingParticipantUpdateResult);
+
+    public ParticipantViewerAssignmentResponse? ParticipantViewerAssignmentResponse { get; set; }
+    public bool UpdateParticipantViewersResult { get; set; } = true;
+    public Guid? LastUpdateParticipantViewersParticipantId { get; private set; }
+    public IReadOnlyList<Guid>? LastUpdateParticipantViewersViewerIds { get; private set; }
+
+    public Task<ParticipantViewerAssignmentResponse?> GetParticipantViewersAsync(Guid participantId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(ParticipantViewerAssignmentResponse);
+
+    public Task<bool> UpdateParticipantViewersAsync(Guid participantId, IReadOnlyList<Guid> viewerIds, CancellationToken cancellationToken = default)
+    {
+        LastUpdateParticipantViewersParticipantId = participantId;
+        LastUpdateParticipantViewersViewerIds = viewerIds;
+        return Task.FromResult(UpdateParticipantViewersResult);
+    }
 }

@@ -30,6 +30,22 @@ public class Scheme
     public bool DistributionMonthFeb { get; set; }
     public bool DistributionMonthMar { get; set; }
 
+    // spgSchemeBySchemeId's fldCanEditJan..Dec (dbo.fnIsDistributionNotDefined) - false once that
+    // month's distribution has been defined for the year, which locks the month on the Pending
+    // Order screen. Distinct from ParticipantSchemeRecord.CanEditX (fnIsDistributionNotPosted).
+    public bool CanEditJan { get; set; } = true;
+    public bool CanEditFeb { get; set; } = true;
+    public bool CanEditMar { get; set; } = true;
+    public bool CanEditApr { get; set; } = true;
+    public bool CanEditMay { get; set; } = true;
+    public bool CanEditJun { get; set; } = true;
+    public bool CanEditJul { get; set; } = true;
+    public bool CanEditAug { get; set; } = true;
+    public bool CanEditSep { get; set; } = true;
+    public bool CanEditOct { get; set; } = true;
+    public bool CanEditNov { get; set; } = true;
+    public bool CanEditDec { get; set; } = true;
+
     public int WeekNumber { get; set; }
     public Guid DayOfWeekId { get; set; }
     public int NumberOfSamples { get; set; }

@@ -2,6 +2,7 @@ using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using PTL.Contracts.Customer;
 using PTL.Core.Customer;
+using PTL.InternalWeb.ValidationAttributes;
 using CoreCustomer = PTL.Core.Customer.Customer;
 
 namespace PTL.InternalWeb.Features.Customer;
@@ -21,6 +22,151 @@ public sealed record CustomerDetailsViewModel(
     string CustomerTypeName,
     string CountryName,
     string InvoiceCountryName);
+
+// Review Pending Customer Updates list (legacy ReviewPendingCustomerUpdates.aspx).
+public sealed record PendingCustomerUpdateListViewModel(IReadOnlyList<PendingCustomerUpdateSummaryResponse> Updates);
+
+// One aligned comparison row - the label appears once and both values sit on the same line,
+// replacing legacy's "editable pending value with the current value in green beside it".
+public sealed record PendingCustomerUpdateComparisonRow(string Label, string CurrentValue, string PendingValue)
+{
+    public bool HasChanged => !string.Equals(CurrentValue?.Trim(), PendingValue?.Trim(), StringComparison.Ordinal);
+}
+
+// Pending Customer Update Details comparison page (legacy PendingCustomerUpdateDetails.aspx).
+public sealed record PendingCustomerUpdateDetailsViewModel(
+    Guid CustomerId,
+    string QalNumber,
+    string CustomerName,
+    IReadOnlyList<PendingCustomerUpdateComparisonRow> CustomerDetails,
+    IReadOnlyList<PendingCustomerUpdateComparisonRow> InvoiceDetails);
+
+// Edit Pending Customer Update (legacy PendingCustomerUpdateDetails.aspx's editable form). Labels,
+// field order, lengths and character rules mirror that page's LoadLabelNames() exactly. Only the
+// contact and invoice-contact fields a participant can propose are editable - the financial,
+// currency and status fields on Customer Edit have no pending-record columns.
+public sealed class PendingCustomerUpdateFormViewModel
+{
+    // Display-only hidden field; the route's customerId parameter is the value the controller
+    // actually trusts, so this stays nullable rather than defaulting to Guid.Empty on under-posting.
+    public Guid? CustomerId { get; set; }
+
+    public string? QalNumber { get; set; }
+
+    public string? CustomerName { get; set; }
+
+    [Required(ErrorMessage = "Enter a contact name")]
+    [StringLength(50, ErrorMessage = "Contact Name must not exceed 50 characters")]
+    [RegularExpression(@"^[a-zA-Z0-9_%&().',/\s\-]*$", ErrorMessage = "Contact Name contains characters that are not allowed")]
+    public string? ContactName { get; set; }
+
+    [Required(ErrorMessage = "Enter an organisation name")]
+    [StringLength(50, ErrorMessage = "Organisation Name must not exceed 50 characters")]
+    [RegularExpression(@"^[a-zA-Z0-9_%&().',/\s\-]*$", ErrorMessage = "Organisation Name contains characters that are not allowed")]
+    public string? Organisation { get; set; }
+
+    [Required(ErrorMessage = "Enter address 1")]
+    [StringLength(100, ErrorMessage = "Address 1 must not exceed 100 characters")]
+    [RegularExpression(@"^[a-zA-Z0-9_%&().',/\s\-]*$", ErrorMessage = "Address 1 contains characters that are not allowed")]
+    public string? Address1 { get; set; }
+
+    [Required(ErrorMessage = "Enter address 2")]
+    [StringLength(100, ErrorMessage = "Address 2 must not exceed 100 characters")]
+    [RegularExpression(@"^[a-zA-Z0-9_%&().',/\s\-]*$", ErrorMessage = "Address 2 contains characters that are not allowed")]
+    public string? Address2 { get; set; }
+
+    [StringLength(100, ErrorMessage = "Address 3 must not exceed 100 characters")]
+    [RegularExpression(@"^[a-zA-Z0-9_%&().',/\s\-]*$", ErrorMessage = "Address 3 contains characters that are not allowed")]
+    public string? Address3 { get; set; }
+
+    [StringLength(100, ErrorMessage = "Address 4 must not exceed 100 characters")]
+    [RegularExpression(@"^[a-zA-Z0-9_%&().',/\s\-]*$", ErrorMessage = "Address 4 contains characters that are not allowed")]
+    public string? Address4 { get; set; }
+
+    [StringLength(100, ErrorMessage = "Address 5 must not exceed 100 characters")]
+    [RegularExpression(@"^[a-zA-Z0-9_%&().',/\s\-]*$", ErrorMessage = "Address 5 contains characters that are not allowed")]
+    public string? Address5 { get; set; }
+
+    [NotEmptyGuid(ErrorMessage = "Select a country")]
+    public Guid? CountryId { get; set; }
+
+    public IEnumerable<SelectListItem> CountryOptions { get; set; } = [];
+
+    [Required(ErrorMessage = "Enter a telephone number")]
+    [StringLength(20, ErrorMessage = "Telephone must not exceed 20 characters")]
+    [RegularExpression(@"^[ 0-9\+\-\(\)\*\#]*$", ErrorMessage = "Telephone contains characters that are not allowed")]
+    public string? Telephone { get; set; }
+
+    [StringLength(20, ErrorMessage = "Telephone 2 must not exceed 20 characters")]
+    [RegularExpression(@"^[ 0-9\+\-\(\)\*\#]*$", ErrorMessage = "Telephone 2 contains characters that are not allowed")]
+    public string? Telephone2 { get; set; }
+
+    [StringLength(20, ErrorMessage = "Fax must not exceed 20 characters")]
+    [RegularExpression(@"^[ 0-9\+\-\(\)\*\#]*$", ErrorMessage = "Fax contains characters that are not allowed")]
+    public string? Fax { get; set; }
+
+    [Required(ErrorMessage = "Enter an email address")]
+    [StringLength(150, ErrorMessage = "Email must not exceed 150 characters")]
+    [OptionalEmailAddress(ErrorMessage = "Enter a valid email address")]
+    public string? Email { get; set; }
+
+    [StringLength(50, ErrorMessage = "Invoice Contact Name must not exceed 50 characters")]
+    [RegularExpression(@"^[a-zA-Z0-9_%&().',/\s\-]*$", ErrorMessage = "Invoice Contact Name contains characters that are not allowed")]
+    public string? InvoiceName { get; set; }
+
+    [Required(ErrorMessage = "Enter an invoice organisation name")]
+    [StringLength(50, ErrorMessage = "Invoice Organisation Name must not exceed 50 characters")]
+    [RegularExpression(@"^[a-zA-Z0-9_%&().',/\s\-]*$", ErrorMessage = "Invoice Organisation Name contains characters that are not allowed")]
+    public string? InvoiceOrganisation { get; set; }
+
+    [Required(ErrorMessage = "Enter invoice address 1")]
+    [StringLength(100, ErrorMessage = "Invoice Address 1 must not exceed 100 characters")]
+    [RegularExpression(@"^[a-zA-Z0-9_%&().',/\s\-]*$", ErrorMessage = "Invoice Address 1 contains characters that are not allowed")]
+    public string? InvoiceAddress1 { get; set; }
+
+    [Required(ErrorMessage = "Enter invoice address 2")]
+    [StringLength(100, ErrorMessage = "Invoice Address 2 must not exceed 100 characters")]
+    [RegularExpression(@"^[a-zA-Z0-9_%&().',/\s\-]*$", ErrorMessage = "Invoice Address 2 contains characters that are not allowed")]
+    public string? InvoiceAddress2 { get; set; }
+
+    [StringLength(100, ErrorMessage = "Invoice Address 3 must not exceed 100 characters")]
+    [RegularExpression(@"^[a-zA-Z0-9_%&().',/\s\-]*$", ErrorMessage = "Invoice Address 3 contains characters that are not allowed")]
+    public string? InvoiceAddress3 { get; set; }
+
+    [StringLength(100, ErrorMessage = "Invoice Address 4 must not exceed 100 characters")]
+    [RegularExpression(@"^[a-zA-Z0-9_%&().',/\s\-]*$", ErrorMessage = "Invoice Address 4 contains characters that are not allowed")]
+    public string? InvoiceAddress4 { get; set; }
+
+    [StringLength(100, ErrorMessage = "Invoice Address 5 must not exceed 100 characters")]
+    [RegularExpression(@"^[a-zA-Z0-9_%&().',/\s\-]*$", ErrorMessage = "Invoice Address 5 contains characters that are not allowed")]
+    public string? InvoiceAddress5 { get; set; }
+
+    [NotEmptyGuid(ErrorMessage = "Select an invoice country")]
+    public Guid? InvoiceCountryId { get; set; }
+
+    public IEnumerable<SelectListItem> InvoiceCountryOptions { get; set; } = [];
+
+    [StringLength(20, ErrorMessage = "Invoice Telephone must not exceed 20 characters")]
+    [RegularExpression(@"^[ 0-9\+\-\(\)\*\#]*$", ErrorMessage = "Invoice Telephone contains characters that are not allowed")]
+    public string? InvoiceTelephone { get; set; }
+
+    [StringLength(20, ErrorMessage = "Invoice Telephone 2 must not exceed 20 characters")]
+    [RegularExpression(@"^[ 0-9\+\-\(\)\*\#]*$", ErrorMessage = "Invoice Telephone 2 contains characters that are not allowed")]
+    public string? InvoiceTelephone2 { get; set; }
+
+    [StringLength(20, ErrorMessage = "Invoice Fax must not exceed 20 characters")]
+    [RegularExpression(@"^[ 0-9\+\-\(\)\*\#]*$", ErrorMessage = "Invoice Fax contains characters that are not allowed")]
+    public string? InvoiceFax { get; set; }
+
+    [StringLength(150, ErrorMessage = "Invoice Email must not exceed 150 characters")]
+    [OptionalEmailAddress(ErrorMessage = "Enter a valid invoice email address")]
+    public string? InvoiceEmail { get; set; }
+
+    // Legacy captures Comments purely to include in the approval/decline notification email
+    // (EmailUpdateNotifications). Email notification is not migrated - [NEEDS INVESTIGATION].
+    [StringLength(2000, ErrorMessage = "Comments must not exceed 2000 characters")]
+    public string? Comments { get; set; }
+}
 
 
 // Shared by Create.cshtml and Edit.cshtml. Validation attributes mirror
@@ -56,7 +202,9 @@ public sealed class CustomerFormViewModel : IValidatableObject
     [RegularExpression(@"^(QAL/[0-9]*)?$", ErrorMessage = "Registered file number must match the format QAL/nnnnn")]
     public string? RegisteredFileNumber { get; set; }
 
-    [Required(ErrorMessage = "Select a customer type")]
+    // Plain [Required] never fires here - the dropdown's "- Please Select -" option posts
+    // Guid.Empty, not null, so a dedicated empty-Guid check is needed.
+    [NotEmptyGuid(ErrorMessage = "Select a customer type")]
     public Guid? CustomerTypeId { get; set; }
 
     // Populated by CustomerController before the view is rendered (GET, and re-populated on a
@@ -117,7 +265,7 @@ public sealed class CustomerFormViewModel : IValidatableObject
     public string? Fax { get; set; }
 
     [StringLength(150, ErrorMessage = "Email must not exceed 150 characters")]
-    [EmailAddress(ErrorMessage = "Enter a valid email address")]
+    [OptionalEmailAddress(ErrorMessage = "Enter a valid email address")]
     public string? Email { get; set; }
 
     public Guid? CurrencyId { get; set; }
@@ -179,7 +327,7 @@ public sealed class CustomerFormViewModel : IValidatableObject
     public string? InvoiceFax { get; set; }
 
     [StringLength(150, ErrorMessage = "Invoice email must not exceed 150 characters")]
-    [EmailAddress(ErrorMessage = "Enter a valid invoice email address")]
+    [OptionalEmailAddress(ErrorMessage = "Enter a valid invoice email address")]
     public string? InvoiceEmail { get; set; }
 
 #pragma warning disable S6964
@@ -197,10 +345,28 @@ public sealed class CustomerFormViewModel : IValidatableObject
     // procedure; only meaningful while IsActive is false (mirrors the legacy "inactive error" flag).
     public Guid? CustomerStatusId { get; set; }
 
-    // Runs PTL.Core's CustomerValidator (the same rules PTL.Api enforces - not duplicated) as part
-    // of the normal MVC ModelState validation pass, so conditional-required-when-active fields and
-    // the CustomerTypeId-not-empty rule are caught on the same submit as the DataAnnotations above,
-    // instead of only surfacing after a round trip to the API.
+    // Fields whose only PTL.Core.CustomerValidator rules are unconditional primitives (required/
+    // length/format) already fully covered by the DataAnnotations above - forwarding them here
+    // would just duplicate the same message under a different wording.
+    private static readonly HashSet<string> PrimitiveOnlyFields =
+    [
+        "Name", "RegisteredFileNumber", "Telephone2", "Fax", "InvoiceName", "InvoiceTelephone",
+        "InvoiceTelephone2", "InvoiceFax", "VatNumber", "AccountNumber", "CustomerFinanceId",
+        "Comments", "PostageArrangements", "Address3", "Address4", "Address5",
+        "InvoiceAddress3", "InvoiceAddress4", "InvoiceAddress5", "CustomerTypeId"
+    ];
+
+    // Some fields (e.g. ContactName, Address1, Email) are BOTH an unconditional primitive check
+    // (already covered above) AND a conditional-required-when-active business rule (not copied -
+    // stays in Core). For those, only the primitive-shaped messages are filtered out here.
+    private static bool IsPrimitiveDuplicateMessage(string message) =>
+        message.Contains("must not exceed", StringComparison.Ordinal) ||
+        message.Contains("contains characters that are not allowed", StringComparison.Ordinal) ||
+        message.Contains("must be a valid", StringComparison.Ordinal);
+
+    // Runs PTL.Core's CustomerValidator as part of the normal MVC ModelState validation pass so
+    // conditional-required-when-active and other cross-field/domain rules are caught on the same
+    // submit as the DataAnnotations above, instead of only surfacing after a round trip to the API.
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
     {
         var customer = new CoreCustomer
@@ -249,6 +415,11 @@ public sealed class CustomerFormViewModel : IValidatableObject
         var result = CustomerValidator.Validate(customer);
         foreach (var error in result.Errors)
         {
+            if (PrimitiveOnlyFields.Contains(error.Field) || IsPrimitiveDuplicateMessage(error.Message))
+            {
+                continue;
+            }
+
             yield return new ValidationResult(error.Message, [error.Field]);
         }
     }

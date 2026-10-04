@@ -9,6 +9,8 @@ public interface ILookupService
     Task<IReadOnlyList<LabTypeEntity>> GetLabTypesAsync(CancellationToken cancellationToken = default);
     Task<IReadOnlyList<YearEntity>> GetCurrentYearsAsync(CancellationToken cancellationToken = default);
     Task<IReadOnlyList<YearEntity>> GetAllYearsAsync(CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<YearEntity>> GetWeightedPricingYearsAsync(CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<GroupAddressEntity>> GetGroupAddressesAsync(CancellationToken cancellationToken = default);
 
     // Returns only the currency prices linked to the given scheme (spgaSchemeCurrency, filtered
     // in-memory - see docs/analysis/scheme-analysis.md, "Scheme Currency Read Operations").

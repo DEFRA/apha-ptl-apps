@@ -1,0 +1,75 @@
+@model PTL.InternalWeb.Features.Customer.PendingCustomerUpdateFormViewModel
+@{
+    ViewData["Title"] = $"Edit Pending Customer Update - {Model.CustomerName}";
+
+    string[] fieldOrder =
+    [
+        "ContactName", "Organisation", "Address1", "Address2", "Address3", "Address4", "Address5",
+        "CountryId", "Telephone", "Telephone2", "Fax", "Email",
+        "InvoiceName", "InvoiceOrganisation", "InvoiceAddress1", "InvoiceAddress2", "InvoiceAddress3",
+        "InvoiceAddress4", "InvoiceAddress5", "InvoiceCountryId", "InvoiceTelephone", "InvoiceTelephone2",
+        "InvoiceFax", "InvoiceEmail", "Comments"
+    ];
+
+    var errors = ViewData.ModelState
+        .Where(entry => entry.Value?.Errors.Count > 0)
+        .SelectMany(entry => entry.Value!.Errors.Select(error => (Field: entry.Key, Message: error.ErrorMessage)))
+        .OrderBy(error => Array.IndexOf(fieldOrder, error.Field) is var idx && idx == -1 ? -1 : idx)
+        .ToList();
+}
+
+<h1 class="govuk-heading-l">Customer Details</h1>
+
+<form method="post" asp-action="EditPendingCustomerUpdate" asp-route-customerId="@Model.CustomerId">
+    <govuk-error-summary errors="@errors" />
+
+    <input type="hidden" asp-for="CustomerId" />
+
+    <div class="govuk-form-group">
+        <p class="govuk-label govuk-label--s">QAL Number</p>
+        <p class="govuk-body">@Model.QalNumber</p>
+    </div>
+
+    <h2 class="govuk-heading-m">Customer Details</h2>
+
+    <govuk-input asp-for="ContactName" label="Contact Name" />
+    <govuk-input asp-for="Organisation" label="Organisation Name" />
+    <govuk-input asp-for="Address1" label="Address 1" />
+    <govuk-input asp-for="Address2" label="Address 2" />
+    <govuk-input asp-for="Address3" label="Address 3" />
+    <govuk-input asp-for="Address4" label="Address 4" />
+    <govuk-input asp-for="Address5" label="Address 5" />
+    <govuk-select asp-for="CountryId" label="Country" asp-items="Model.CountryOptions" />
+    <govuk-input asp-for="Telephone" label="Telephone" />
+    <govuk-input asp-for="Telephone2" label="Telephone 2" />
+    <govuk-input asp-for="Fax" label="Fax" />
+    <govuk-input asp-for="Email" label="Email" />
+
+    <h2 class="govuk-heading-m">Invoice Details</h2>
+
+    <govuk-input asp-for="InvoiceName" label="Invoice Contact Name" />
+    <govuk-input asp-for="InvoiceOrganisation" label="Invoice Organisation Name" />
+    <govuk-input asp-for="InvoiceAddress1" label="Invoice Address 1" />
+    <govuk-input asp-for="InvoiceAddress2" label="Invoice Address 2" />
+    <govuk-input asp-for="InvoiceAddress3" label="Invoice Address 3" />
+    <govuk-input asp-for="InvoiceAddress4" label="Invoice Address 4" />
+    <govuk-input asp-for="InvoiceAddress5" label="Invoice Address 5" />
+    <govuk-select asp-for="InvoiceCountryId" label="Invoice Country" asp-items="Model.InvoiceCountryOptions" />
+    <govuk-input asp-for="InvoiceTelephone" label="Invoice Telephone" />
+    <govuk-input asp-for="InvoiceTelephone2" label="Invoice Telephone 2" />
+    <govuk-input asp-for="InvoiceFax" label="Invoice Fax" />
+    <govuk-input asp-for="InvoiceEmail" label="Invoice Email" />
+
+    <h2 class="govuk-heading-m">Comments</h2>
+    <div class="govuk-form-group">
+        <label class="govuk-label" asp-for="Comments">Comments</label>
+        <textarea class="govuk-textarea" asp-for="Comments" rows="5" maxlength="2000"></textarea>
+    </div>
+
+    <div class="govuk-button-group">
+        <button class="govuk-button" data-module="govuk-button" type="submit">Approve</button>
+        <button class="govuk-button govuk-button--warning" data-module="govuk-button" type="submit" formnovalidate
+                formaction="@Url.Action("DeclinePendingCustomerUpdate", new { customerId = Model.CustomerId })">Decline</button>
+        <a class="govuk-button govuk-button--secondary" data-module="govuk-button" asp-action="ReviewPendingCustomerUpdates">Cancel</a>
+    </div>
+</form>

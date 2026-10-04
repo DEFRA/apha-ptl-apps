@@ -32,7 +32,9 @@ public class GovUkPaginationTagHelper(IUrlHelperFactory urlHelperFactory) : TagH
     {
         if (Model.TotalPages <= 1)
         {
-            output.SuppressOutput();
+            output.TagName = null;
+            output.Content.Clear();
+            output.Attributes.Clear();
             return;
         }
 

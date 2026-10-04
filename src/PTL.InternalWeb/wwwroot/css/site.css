@@ -78,6 +78,29 @@ body {
   text-decoration: line-through;
 }
 
+/* Pending update comparison: a changed field is tinted so differences are visible at a glance,
+   replacing legacy PendingCustomerUpdateDetails.aspx's green current-value labels. */
+.ptl-comparison-row--changed td,
+.ptl-comparison-row--changed th {
+  background-color: #f3f9f1;
+}
+
+/* A pending order month the participant is already contracted for. Legacy PendingContractOrder
+   FlagCheckboxAsAlreadyParticipating set the cell's BgColor to #add5eb and locked the checkbox. */
+.ptl-month-contracted {
+  background-color: #add5eb;
+}
+
+/* The active mail merge template. Legacy ExportBase gave the row the "basiccell selected" class. */
+.ptl-template-selected td {
+  background-color: #d8eeda;
+  font-weight: bold;
+}
+
+.ptl-comparison-row--changed td:last-child {
+  font-weight: bold;
+}
+
 /* "Items per page" selector sits right-aligned directly above the table on every list page. */
 .ptl-page-size-selector {
   display: flex;
@@ -98,6 +121,23 @@ body {
 .ptl-page-size-selector .govuk-select {
   width: auto;
 }
+
+/* Contract Items' "Remove" action must look identical to the "View / Edit" link beside it (matches
+   legacy's LinkButton) - reset the native <button> chrome so only .govuk-link's styling shows, and
+   keep the wrapping <form> inline so "Remove" sits on the same line as "View / Edit". */
+.ptl-inline-form {
+  display: inline;
+}
+
+.ptl-link-button {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  cursor: pointer;
+}
+
 
 /* Left-hand PTLIMS navigation - see PTL.InternalWeb/Navigation/SideNavigationProvider.cs
    for the legacy menu mapping this preserves. Context-based, not a permanent tree: each
@@ -136,4 +176,14 @@ span.app-side-navigation__link--disabled {
   padding: 8px 5px;
   color: #6f777b;
   cursor: not-allowed;
+}
+
+/* .govuk-select hard-codes height:40px for single-line dropdowns, which also clips
+   multi-row listboxes (size="10") down to one row. Participant Viewers' Available/
+   Participant transfer lists need their native row count back to match the legacy
+   ParticipantViewers.aspx ListBox viewing area, so let height grow with the options. */
+.ptl-viewer-select {
+  width: 100%;
+  height: auto;
+  min-height: 15rem;
 }

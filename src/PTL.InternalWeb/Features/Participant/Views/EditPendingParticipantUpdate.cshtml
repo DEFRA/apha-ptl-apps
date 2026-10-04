@@ -1,0 +1,57 @@
+@model PTL.InternalWeb.Features.Participant.PendingParticipantUpdateFormViewModel
+@{
+    ViewData["Title"] = $"Edit Pending Participant Update - {Model.LabName}";
+
+    string[] fieldOrder =
+    [
+        "ContactName", "Organisation", "Address1", "Address2", "Address3", "Address4", "Address5",
+        "CountryId", "Telephone", "Fax", "Email", "Email2", "Comments"
+    ];
+
+    var errors = ViewData.ModelState
+        .Where(entry => entry.Value?.Errors.Count > 0)
+        .SelectMany(entry => entry.Value!.Errors.Select(error => (Field: entry.Key, Message: error.ErrorMessage)))
+        .OrderBy(error => Array.IndexOf(fieldOrder, error.Field) is var idx && idx == -1 ? -1 : idx)
+        .ToList();
+}
+
+<h1 class="govuk-heading-l">Participant Details</h1>
+
+<form method="post" asp-action="EditPendingParticipantUpdate" asp-route-participantId="@Model.ParticipantId">
+    <govuk-error-summary errors="@errors" />
+
+    <input type="hidden" asp-for="ParticipantId" />
+
+    <div class="govuk-form-group">
+        <p class="govuk-label govuk-label--s">LAB Code</p>
+        <p class="govuk-body">@Model.LabCode</p>
+    </div>
+
+    <h2 class="govuk-heading-m">Participant Details</h2>
+
+    <govuk-input asp-for="ContactName" label="Contact Name" />
+    <govuk-input asp-for="Organisation" label="Organisation Name" />
+    <govuk-input asp-for="Address1" label="Address 1" />
+    <govuk-input asp-for="Address2" label="Address 2" />
+    <govuk-input asp-for="Address3" label="Address 3" />
+    <govuk-input asp-for="Address4" label="Address 4" />
+    <govuk-input asp-for="Address5" label="Address 5" />
+    <govuk-select asp-for="CountryId" label="Country" asp-items="Model.CountryOptions" />
+    <govuk-input asp-for="Telephone" label="Telephone" />
+    <govuk-input asp-for="Fax" label="Fax" />
+    <govuk-input asp-for="Email" label="Email (Primary)" />
+    <govuk-input asp-for="Email2" label="Email (Secondary)" />
+
+    <h2 class="govuk-heading-m">Comments</h2>
+    <div class="govuk-form-group">
+        <label class="govuk-label" asp-for="Comments">Comments</label>
+        <textarea class="govuk-textarea" asp-for="Comments" rows="5" maxlength="2000"></textarea>
+    </div>
+
+    <div class="govuk-button-group">
+        <button class="govuk-button" data-module="govuk-button" type="submit">Approve</button>
+        <button class="govuk-button govuk-button--warning" data-module="govuk-button" type="submit" formnovalidate
+                formaction="@Url.Action("DeclinePendingParticipantUpdate", new { participantId = Model.ParticipantId })">Decline</button>
+        <a class="govuk-button govuk-button--secondary" data-module="govuk-button" asp-action="ReviewPendingParticipantUpdates">Cancel</a>
+    </div>
+</form>

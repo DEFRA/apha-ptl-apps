@@ -1,8 +1,14 @@
 using Microsoft.Extensions.Logging;
+using PTL.Core.Viewer;
 
 namespace PTL.Core.Participant;
 
-public sealed class ParticipantService(IParticipantRepository participantRepository, ILogger<ParticipantService> logger) : IParticipantService
+public sealed class ParticipantService(
+    IParticipantRepository participantRepository,
+    IPendingParticipantUpdateRepository pendingParticipantUpdateRepository,
+    IParticipantViewerRepository participantViewerRepository,
+    IViewerRepository viewerRepository,
+    ILogger<ParticipantService> logger) : IParticipantService
 {
     private static readonly Action<ILogger, Guid, string, Exception?> LogCreatedParticipantMessage =
         LoggerMessage.Define<Guid, string>(
@@ -157,5 +163,99 @@ public sealed class ParticipantService(IParticipantRepository participantReposit
         {
             throw new ParticipantValidationException(result.Errors);
         }
+    }
+
+    public Task<IReadOnlyList<PendingParticipantUpdateSummaryEntity>> GetPendingParticipantUpdatesAsync(CancellationToken cancellationToken = default) =>
+        pendingParticipantUpdateRepository.GetSummariesAsync(cancellationToken);
+
+    public async Task<(Participant Current, PendingParticipantUpdate Pending)?> GetPendingParticipantUpdateAsync(Guid participantId, CancellationToken cancellationToken = default)
+    {
+        var current = await participantRepository.GetByIdAsync(participantId, cancellationToken);
+        var pending = await pendingParticipantUpdateRepository.GetByParticipantIdAsync(participantId, cancellationToken);
+        return current is null || pending is null ? null : (current, pending);
+    }
+
+    // Only approved changes update the live participant record - matches
+    // PendingParticipantUpdateDetails.aspx's ButtonApprove_Click, including its mParticipant.IsValid check.
+    public async Task<bool> ApprovePendingParticipantUpdateAsync(Guid participantId, PendingParticipantUpdate? editedFields = null, CancellationToken cancellationToken = default)
+    {
+        var existing = await participantRepository.GetByIdAsync(participantId, cancellationToken);
+        var pending = await pendingParticipantUpdateRepository.GetByParticipantIdAsync(participantId, cancellationToken);
+        if (existing is null || pending is null)
+        {
+            return false;
+        }
+
+        ApplyPendingFields(existing, editedFields ?? pending);
+        Validate(existing);
+        await participantRepository.UpdateAsync(existing, cancellationToken);
+        return await pendingParticipantUpdateRepository.MarkDecidedAsync(participantId, pending.PendingParticipantUpdateId, cancellationToken);
+    }
+
+    // Declined changes do not update the live record - only the pending row is soft-deleted.
+    public async Task<bool> DeclinePendingParticipantUpdateAsync(Guid participantId, CancellationToken cancellationToken = default)
+    {
+        var pending = await pendingParticipantUpdateRepository.GetByParticipantIdAsync(participantId, cancellationToken);
+        return pending is not null && await pendingParticipantUpdateRepository.MarkDecidedAsync(participantId, pending.PendingParticipantUpdateId, cancellationToken);
+    }
+
+    public async Task<ParticipantViewerAssignment?> GetParticipantViewersAsync(Guid participantId, CancellationToken cancellationToken = default)
+    {
+        var participant = await participantRepository.GetByIdAsync(participantId, cancellationToken);
+        if (participant is null)
+        {
+            return null;
+        }
+
+        var allViewers = await viewerRepository.GetAllAsync(cancellationToken);
+        var assigned = await participantViewerRepository.GetByParticipantIdAsync(participantId, cancellationToken);
+        var assignedViewerIds = assigned.Select(a => a.ViewerId).ToHashSet();
+
+        // Legacy PopulateViewersListBoxes: Available = every viewer not already in the collection.
+        var available = allViewers.Where(v => !assignedViewerIds.Contains(v.ViewerId)).ToList();
+
+        return new ParticipantViewerAssignment(participant.CustomerId, participant.LabCode, participant.LabName, participant.IsActive, available, assigned);
+    }
+
+    public async Task<bool> UpdateParticipantViewersAsync(Guid participantId, IReadOnlyList<Guid> targetViewerIds, CancellationToken cancellationToken = default)
+    {
+        var participant = await participantRepository.GetByIdAsync(participantId, cancellationToken);
+        if (participant is null)
+        {
+            return false;
+        }
+
+        var requestedViewerIds = (targetViewerIds ?? []).Distinct().ToArray();
+        var current = await participantViewerRepository.GetByParticipantIdAsync(participantId, cancellationToken);
+        var targetIds = requestedViewerIds.ToHashSet();
+
+        foreach (var removed in current.Where(c => !targetIds.Contains(c.ViewerId)))
+        {
+            await participantViewerRepository.RemoveAsync(removed.ViewerParticipantId, cancellationToken);
+        }
+
+        var currentViewerIds = current.Select(c => c.ViewerId).ToHashSet();
+        foreach (var addedViewerId in targetIds.Where(id => !currentViewerIds.Contains(id)))
+        {
+            await participantViewerRepository.AddAsync(Guid.NewGuid(), addedViewerId, participantId, cancellationToken);
+        }
+
+        return true;
+    }
+
+    private static void ApplyPendingFields(Participant participant, PendingParticipantUpdate pending)
+    {
+        participant.ContactName = pending.ContactName;
+        participant.Organisation = pending.Organisation;
+        participant.Address1 = pending.Address1;
+        participant.Address2 = pending.Address2;
+        participant.Address3 = pending.Address3;
+        participant.Address4 = pending.Address4;
+        participant.Address5 = pending.Address5;
+        participant.CountryId = pending.CountryId;
+        participant.Telephone = pending.Telephone;
+        participant.Fax = pending.Fax;
+        participant.Email = pending.Email;
+        participant.Email2 = pending.Email2;
     }
 }

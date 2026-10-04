@@ -50,10 +50,23 @@ public static class ApiClientServiceCollectionExtensions
             .AddHttpMessageHandler<CorrelationIdDelegatingHandler>()
             .AddStandardResilienceHandler();
 
+        services.AddHttpClient<IParticipantSchemeApiClient, ParticipantSchemeApiClient>(client =>
+        {
+            client.BaseAddress = new Uri(apiBaseUrl);
+        })
+            .AddStandardResilienceHandler();
+
         services.AddHttpClient<IContractApiClient, ContractApiClient>(client =>
         {
             client.BaseAddress = new Uri(apiBaseUrl);
         })
+            .AddStandardResilienceHandler();
+
+        services.AddHttpClient<IGroupAddressApiClient, GroupAddressApiClient>(client =>
+        {
+            client.BaseAddress = new Uri(apiBaseUrl);
+        })
+            .AddHttpMessageHandler<CorrelationIdDelegatingHandler>()
             .AddStandardResilienceHandler();
 
         services.AddHttpClient<ISchemeApiClient, SchemeApiClient>(client =>
@@ -63,6 +76,54 @@ public static class ApiClientServiceCollectionExtensions
             .AddStandardResilienceHandler();
 
         services.AddHttpClient<ILookupApiClient, LookupApiClient>(client =>
+        {
+            client.BaseAddress = new Uri(apiBaseUrl);
+        })
+            .AddStandardResilienceHandler();
+
+        services.AddHttpClient<IImportPermitApiClient, ImportPermitApiClient>(client =>
+        {
+            client.BaseAddress = new Uri(apiBaseUrl);
+        })
+            .AddStandardResilienceHandler();
+
+        services.AddHttpClient<IContractExportApiClient, ContractExportApiClient>(client =>
+        {
+            client.BaseAddress = new Uri(apiBaseUrl);
+        })
+            .AddStandardResilienceHandler();
+
+        services.AddHttpClient<IExportTemplateApiClient, ExportTemplateApiClient>(client =>
+        {
+            client.BaseAddress = new Uri(apiBaseUrl);
+        })
+            .AddStandardResilienceHandler();
+
+        services.AddHttpClient<IBulkExportApiClient, BulkExportApiClient>(client =>
+        {
+            client.BaseAddress = new Uri(apiBaseUrl);
+        })
+            .AddStandardResilienceHandler();
+
+        services.AddHttpClient<IContractRenewalApiClient, ContractRenewalApiClient>(client =>
+        {
+            client.BaseAddress = new Uri(apiBaseUrl);
+        })
+            .AddStandardResilienceHandler();
+
+        services.AddHttpClient<IAdministrationChargeApiClient, AdministrationChargeApiClient>(client =>
+        {
+            client.BaseAddress = new Uri(apiBaseUrl);
+        })
+            .AddStandardResilienceHandler();
+
+        services.AddHttpClient<IWeightedPricingPlanApiClient, WeightedPricingPlanApiClient>(client =>
+        {
+            client.BaseAddress = new Uri(apiBaseUrl);
+        })
+            .AddStandardResilienceHandler();
+
+        services.AddHttpClient<IInvoiceApiClient, InvoiceApiClient>(client =>
         {
             client.BaseAddress = new Uri(apiBaseUrl);
         })

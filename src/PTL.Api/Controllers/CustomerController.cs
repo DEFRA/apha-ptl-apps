@@ -88,6 +88,111 @@ public sealed class CustomerController(ICustomerService customerService, ILogger
         return ValidationProblem(ModelState);
     }
 
+    // GET /api/customers/pending-updates - Review Pending Customer Updates list.
+    [HttpGet("pending-updates")]
+    public async Task<ActionResult<IReadOnlyList<PendingCustomerUpdateSummaryResponse>>> GetPendingCustomerUpdates(CancellationToken cancellationToken)
+    {
+        var pending = await customerService.GetPendingCustomerUpdatesAsync(cancellationToken);
+        return Ok(pending.Select(p => new PendingCustomerUpdateSummaryResponse(p.CustomerId, p.QalNumber, p.Name)).ToList());
+    }
+
+    // GET /api/customers/{customerId}/pending-update - Pending Customer Update Details comparison.
+    [HttpGet("{customerId:guid}/pending-update")]
+    public async Task<ActionResult<PendingCustomerUpdateComparisonResponse>> GetPendingCustomerUpdate(Guid customerId, CancellationToken cancellationToken)
+    {
+        var result = await customerService.GetPendingCustomerUpdateAsync(customerId, cancellationToken);
+        if (result is null)
+        {
+            return NotFound();
+        }
+
+        var (current, pending) = result.Value;
+        return Ok(new PendingCustomerUpdateComparisonResponse(ToResponse(current), ToPendingResponse(pending)));
+    }
+
+    // POST /api/customers/{customerId}/pending-update/approve - applies the pending changes to the
+    // live customer record, then soft-deletes the pending update. An optional body carries amended
+    // values, matching legacy PendingCustomerUpdateDetails.aspx's editable Approve.
+    [HttpPost("{customerId:guid}/pending-update/approve")]
+    public async Task<IActionResult> ApprovePendingCustomerUpdate(Guid customerId, [FromBody] PendingCustomerUpdateSaveRequest? request, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var approved = await customerService.ApprovePendingCustomerUpdateAsync(customerId, ToPendingEntity(customerId, request), cancellationToken);
+            return approved ? NoContent() : NotFound();
+        }
+        catch (CustomerValidationException ex)
+        {
+            return ToValidationProblem(ex);
+        }
+    }
+
+    // POST /api/customers/{customerId}/pending-update/decline - soft-deletes the pending update
+    // without changing the live customer record.
+    [HttpPost("{customerId:guid}/pending-update/decline")]
+    public async Task<IActionResult> DeclinePendingCustomerUpdate(Guid customerId, CancellationToken cancellationToken)
+    {
+        var declined = await customerService.DeclinePendingCustomerUpdateAsync(customerId, cancellationToken);
+        return declined ? NoContent() : NotFound();
+    }
+
+    private static PendingCustomerUpdate? ToPendingEntity(Guid customerId, PendingCustomerUpdateSaveRequest? request) => request is null ? null : new PendingCustomerUpdate
+    {
+        CustomerId = customerId,
+        ContactName = request.ContactName,
+        Organisation = request.Organisation,
+        Address1 = request.Address1,
+        Address2 = request.Address2,
+        Address3 = request.Address3,
+        Address4 = request.Address4,
+        Address5 = request.Address5,
+        CountryId = request.CountryId,
+        Telephone = request.Telephone,
+        Telephone2 = request.Telephone2,
+        Fax = request.Fax,
+        Email = request.Email,
+        InvoiceName = request.InvoiceName,
+        InvoiceOrganisation = request.InvoiceOrganisation,
+        InvoiceAddress1 = request.InvoiceAddress1,
+        InvoiceAddress2 = request.InvoiceAddress2,
+        InvoiceAddress3 = request.InvoiceAddress3,
+        InvoiceAddress4 = request.InvoiceAddress4,
+        InvoiceAddress5 = request.InvoiceAddress5,
+        InvoiceCountryId = request.InvoiceCountryId,
+        InvoiceTelephone = request.InvoiceTelephone,
+        InvoiceTelephone2 = request.InvoiceTelephone2,
+        InvoiceFax = request.InvoiceFax,
+        InvoiceEmail = request.InvoiceEmail
+    };
+
+    private static PendingCustomerUpdateResponse ToPendingResponse(PendingCustomerUpdate pending) => new(
+        pending.CustomerId,
+        pending.ContactName,
+        pending.Organisation,
+        pending.Address1,
+        pending.Address2,
+        pending.Address3,
+        pending.Address4,
+        pending.Address5,
+        pending.CountryId,
+        pending.Telephone,
+        pending.Telephone2,
+        pending.Fax,
+        pending.Email,
+        pending.InvoiceName,
+        pending.InvoiceOrganisation,
+        pending.InvoiceAddress1,
+        pending.InvoiceAddress2,
+        pending.InvoiceAddress3,
+        pending.InvoiceAddress4,
+        pending.InvoiceAddress5,
+        pending.InvoiceCountryId,
+        pending.InvoiceTelephone,
+        pending.InvoiceTelephone2,
+        pending.InvoiceFax,
+        pending.InvoiceEmail);
+
+
     private static Customer ToEntity(Guid customerId, CustomerSaveRequest request) => new()
     {
         CustomerId = customerId,

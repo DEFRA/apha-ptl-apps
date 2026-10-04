@@ -39,6 +39,84 @@ public sealed class ParticipantApiClient(HttpClient httpClient) : IParticipantAp
         return await ToSaveResultAsync(response, cancellationToken);
     }
 
+    public async Task<IReadOnlyList<PendingParticipantUpdateSummaryResponse>> GetPendingParticipantUpdatesAsync(CancellationToken cancellationToken = default)
+    {
+        var pending = await httpClient.GetFromJsonAsync<IReadOnlyList<PendingParticipantUpdateSummaryResponse>>(
+            "/api/participants/pending-updates", cancellationToken);
+        return pending ?? [];
+    }
+
+    public async Task<PendingParticipantUpdateComparisonResponse?> GetPendingParticipantUpdateAsync(Guid participantId, CancellationToken cancellationToken = default)
+    {
+        var response = await httpClient.GetAsync($"/api/participants/{participantId}/pending-update", cancellationToken);
+        if (response.StatusCode == HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<PendingParticipantUpdateComparisonResponse>(cancellationToken);
+    }
+
+    public async Task<PendingParticipantUpdateDecisionResult> ApprovePendingParticipantUpdateAsync(Guid participantId, PendingParticipantUpdateSaveRequest? request = null, CancellationToken cancellationToken = default)
+    {
+        var url = $"/api/participants/{participantId}/pending-update/approve";
+
+        // Approving without amendments posts no body at all rather than a JSON "null" literal, so
+        // the endpoint's optional [FromBody] parameter binds cleanly.
+        var response = request is null
+            ? await httpClient.PostAsync(url, content: null, cancellationToken)
+            : await httpClient.PostAsJsonAsync(url, request, cancellationToken);
+
+        if (response.StatusCode == HttpStatusCode.NotFound)
+        {
+            return new PendingParticipantUpdateDecisionResult(false, true, new Dictionary<string, string[]>());
+        }
+
+        if (response.StatusCode == HttpStatusCode.BadRequest)
+        {
+            var problem = await response.Content.ReadFromJsonAsync<ValidationProblemDetails>(cancellationToken);
+            var errors = problem?.Errors is { Count: > 0 }
+                ? problem.Errors.ToDictionary(e => e.Key, e => e.Value)
+                : new Dictionary<string, string[]> { [string.Empty] = ["The request was invalid."] };
+            return new PendingParticipantUpdateDecisionResult(false, false, errors);
+        }
+
+        response.EnsureSuccessStatusCode();
+        return new PendingParticipantUpdateDecisionResult(true, false, new Dictionary<string, string[]>());
+    }
+
+    public async Task<bool> DeclinePendingParticipantUpdateAsync(Guid participantId, CancellationToken cancellationToken = default)
+    {
+        var response = await httpClient.PostAsync($"/api/participants/{participantId}/pending-update/decline", content: null, cancellationToken);
+        return response.IsSuccessStatusCode;
+    }
+
+    public async Task<ParticipantViewerAssignmentResponse?> GetParticipantViewersAsync(Guid participantId, CancellationToken cancellationToken = default)
+    {
+        var response = await httpClient.GetAsync($"/api/participants/{participantId}/viewers", cancellationToken);
+        if (response.StatusCode == HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<ParticipantViewerAssignmentResponse>(cancellationToken);
+    }
+
+    public async Task<bool> UpdateParticipantViewersAsync(Guid participantId, IReadOnlyList<Guid> viewerIds, CancellationToken cancellationToken = default)
+    {
+        var request = new UpdateParticipantViewersRequest((viewerIds ?? []).Distinct().ToArray());
+        var response = await httpClient.PutAsJsonAsync($"/api/participants/{participantId}/viewers", request, cancellationToken);
+        if (response.StatusCode == HttpStatusCode.NotFound)
+        {
+            return false;
+        }
+
+        response.EnsureSuccessStatusCode();
+        return true;
+    }
+
     public async Task<ParticipantSaveResult> UpdateParticipantAsync(Guid participantId, ParticipantRequest request, CancellationToken cancellationToken = default)
     {
         var response = await httpClient.PutAsJsonAsync($"/api/participants/{participantId}", request, cancellationToken);

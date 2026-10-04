@@ -1,0 +1,61 @@
+namespace PTL.Contracts.Contract;
+
+/// <summary>
+/// One contract in a bulk export (legacy <c>spgaExportContractDetails</c>). Carries the merge
+/// fields the Contract and Job Sheet templates use, already totalled.
+/// </summary>
+public sealed record BulkContractResponse(
+    Guid ContractId,
+    Guid CustomerId,
+    string ContractNumber,
+    string Suffix,
+    int YearId,
+    string Symbol,
+    decimal AdministrationCharge,
+    decimal DiscountRate,
+    int NumberPostage,
+    int NumberCourier,
+    int NumberSpecialDelivery,
+    decimal PostagePrice,
+    decimal CourierPrice,
+    decimal SpecialDeliveryPrice,
+    DateTime CommencementDate,
+    string QalNumber,
+    string ContactName,
+    string Organisation,
+    string Address1,
+    string Address2,
+    string Address3,
+    string Address4,
+    string Address5,
+    string Country,
+    string Telephone,
+    string Fax,
+    string Email,
+    string InvoiceName,
+    string InvoiceOrganisation,
+    string InvoiceAddress1,
+    string InvoiceAddress2,
+    string InvoiceAddress3,
+    string InvoiceAddress4,
+    string InvoiceAddress5,
+    string InvoiceCountry,
+    string InvoiceTelephone,
+    string InvoiceFax,
+    string InvoiceEmail,
+    string AccountNumber,
+    string VatNumber,
+    string VatRating,
+    string PurchaseOrderNumber,
+    decimal TotalPriceItems,
+    decimal DiscountPrice,
+    decimal TotalPrice,
+    IReadOnlyList<BulkContractItemResponse> Items);
+
+public sealed record BulkContractItemResponse(
+    string Identifier,
+    string SchemeName,
+    string LabCode,
+    string LabName,
+    int NoOfDistributions,
+    decimal Price);

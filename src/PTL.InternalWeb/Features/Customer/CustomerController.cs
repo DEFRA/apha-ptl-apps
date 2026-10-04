@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.Extensions.Logging;
 using PTL.ApiClient;
 using PTL.Contracts.Customer;
+using PTL.InternalWeb.Notifications;
 
 namespace PTL.InternalWeb.Features.Customer;
 
@@ -10,6 +11,9 @@ namespace PTL.InternalWeb.Features.Customer;
 // already authenticated with full access to Customer functionality. Policies will be added later.
 public class CustomerController(ICustomerApiClient customerApiClient, ILookupApiClient lookupApiClient, ILogger<CustomerController> logger) : Controller
 {
+    // Legacy DropDownXxx.Items.Insert(0, New ListItem("- Please Select -", Guid.Empty)) placeholder.
+    private const string PleaseSelectOptionText = "- Please Select -";
+
     private static readonly Action<ILogger, string?, CustomerStatusFilter, int, int, Exception?> LogDisplayedCustomerListMessage =
         LoggerMessage.Define<string?, CustomerStatusFilter, int, int>(
             LogLevel.Information,
@@ -117,6 +121,7 @@ public class CustomerController(ICustomerApiClient customerApiClient, ILookupApi
         }
 
         LogCreatedCustomerMessage(logger, result.Customer.CustomerId, null);
+        TempData.SetNotification(NotificationType.Success, "Customer created successfully.");
         return RedirectToAction(nameof(Details), new { id = result.Customer.CustomerId });
     }
 
@@ -156,8 +161,232 @@ public class CustomerController(ICustomerApiClient customerApiClient, ILookupApi
         }
 
         LogUpdatedCustomerMessage(logger, id, null);
+        TempData.SetNotification(NotificationType.Success, "Customer updated successfully.");
         return RedirectToAction(nameof(Details), new { id });
     }
+
+    // Review Pending Customer Updates (legacy ReviewPendingCustomerUpdates.aspx).
+    public async Task<IActionResult> ReviewPendingCustomerUpdates(CancellationToken cancellationToken)
+    {
+        var updates = await customerApiClient.GetPendingCustomerUpdatesAsync(cancellationToken);
+        return View(new PendingCustomerUpdateListViewModel(updates));
+    }
+
+    // Pending Customer Update Details (legacy PendingCustomerUpdateDetails.aspx) - current vs
+    // pending comparison, Approve/Decline/Cancel.
+    public async Task<IActionResult> PendingCustomerUpdateDetails(Guid customerId, CancellationToken cancellationToken)
+    {
+        var comparison = await customerApiClient.GetPendingCustomerUpdateAsync(customerId, cancellationToken);
+        if (comparison is null)
+        {
+            return NotFound();
+        }
+
+        var countryNames = await GetCountryNamesAsync(cancellationToken);
+        return View(BuildPendingCustomerUpdateDetailsViewModel(comparison, countryNames));
+    }
+
+    // Edit Pending Customer Update (legacy PendingCustomerUpdateDetails.aspx's editable form) -
+    // lets the reviewer amend the proposed values before approving.
+    [HttpGet]
+    public async Task<IActionResult> EditPendingCustomerUpdate(Guid customerId, CancellationToken cancellationToken)
+    {
+        var comparison = await customerApiClient.GetPendingCustomerUpdateAsync(customerId, cancellationToken);
+        if (comparison is null)
+        {
+            return NotFound();
+        }
+
+        var model = ToPendingFormViewModel(comparison);
+        await PopulatePendingCountryOptionsAsync(model, cancellationToken);
+        return View(model);
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> EditPendingCustomerUpdate(Guid customerId, PendingCustomerUpdateFormViewModel model, CancellationToken cancellationToken)
+    {
+        if (!ModelState.IsValid)
+        {
+            await PopulatePendingCountryOptionsAsync(model, cancellationToken);
+            return View(model);
+        }
+
+        var result = await customerApiClient.ApprovePendingCustomerUpdateAsync(customerId, ToPendingSaveRequest(model), cancellationToken);
+        if (result.NotFound)
+        {
+            return NotFound();
+        }
+
+        if (!result.Success)
+        {
+            AddErrors(result.FieldErrors);
+            await PopulatePendingCountryOptionsAsync(model, cancellationToken);
+            return View(model);
+        }
+
+        TempData.SetNotification(NotificationType.Success, "Customer update approved successfully.");
+        return RedirectToAction(nameof(ReviewPendingCustomerUpdates));
+    }
+
+    // Only approved changes update the live customer record - declined changes do not.
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ApprovePendingCustomerUpdate(Guid customerId, CancellationToken cancellationToken)
+    {
+        var result = await customerApiClient.ApprovePendingCustomerUpdateAsync(customerId, request: null, cancellationToken);
+        if (result.NotFound)
+        {
+            return NotFound();
+        }
+
+        if (!result.Success)
+        {
+            // The stored pending values break a customer business rule - the reviewer must amend
+            // them on the Edit page before the update can be approved.
+            var messages = string.Join(" ", result.FieldErrors.SelectMany(e => e.Value));
+            TempData.SetNotification(NotificationType.Error, $"Customer update could not be approved. {messages}");
+            return RedirectToAction(nameof(EditPendingCustomerUpdate), new { customerId });
+        }
+
+        TempData.SetNotification(NotificationType.Success, "Customer update approved successfully.");
+        return RedirectToAction(nameof(ReviewPendingCustomerUpdates));
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> DeclinePendingCustomerUpdate(Guid customerId, CancellationToken cancellationToken)
+    {
+        var declined = await customerApiClient.DeclinePendingCustomerUpdateAsync(customerId, cancellationToken);
+        if (!declined)
+        {
+            return NotFound();
+        }
+
+        TempData.SetNotification(NotificationType.Success, "Customer update declined successfully.");
+        return RedirectToAction(nameof(ReviewPendingCustomerUpdates));
+    }
+
+    private async Task<Dictionary<Guid, string>> GetCountryNamesAsync(CancellationToken cancellationToken)
+    {
+        var countries = await lookupApiClient.GetCountriesAsync(cancellationToken);
+        return countries.ToDictionary(c => c.CountryId, c => c.Country);
+    }
+
+    private async Task PopulatePendingCountryOptionsAsync(PendingCustomerUpdateFormViewModel model, CancellationToken cancellationToken)
+    {
+        var countries = await lookupApiClient.GetCountriesAsync(cancellationToken);
+        var options = countries
+            .Select(c => new SelectListItem(c.Country, c.CountryId.ToString()))
+            .Prepend(new SelectListItem(PleaseSelectOptionText, Guid.Empty.ToString()))
+            .ToList();
+        model.CountryOptions = options;
+        model.InvoiceCountryOptions = options;
+    }
+
+    // Field order and labels reproduce legacy PendingCustomerUpdateDetails.aspx exactly.
+    private static PendingCustomerUpdateDetailsViewModel BuildPendingCustomerUpdateDetailsViewModel(
+        PendingCustomerUpdateComparisonResponse comparison,
+        Dictionary<Guid, string> countryNames)
+    {
+        var current = comparison.Current;
+        var pending = comparison.Pending;
+
+        List<PendingCustomerUpdateComparisonRow> customerDetails =
+        [
+            new("Contact Name", current.ContactName, pending.ContactName),
+            new("Organisation Name", current.Organisation, pending.Organisation),
+            new("Address 1", current.Address1, pending.Address1),
+            new("Address 2", current.Address2, pending.Address2),
+            new("Address 3", current.Address3, pending.Address3),
+            new("Address 4", current.Address4, pending.Address4),
+            new("Address 5", current.Address5, pending.Address5),
+            new("Country", countryNames.GetValueOrDefault(current.CountryId, string.Empty), countryNames.GetValueOrDefault(pending.CountryId, string.Empty)),
+            new("Telephone", current.Telephone, pending.Telephone),
+            new("Telephone 2", current.Telephone2, pending.Telephone2),
+            new("Fax", current.Fax, pending.Fax),
+            new("Email", current.Email, pending.Email)
+        ];
+
+        List<PendingCustomerUpdateComparisonRow> invoiceDetails =
+        [
+            new("Invoice Contact Name", current.InvoiceName, pending.InvoiceName),
+            new("Invoice Organisation Name", current.InvoiceOrganisation, pending.InvoiceOrganisation),
+            new("Invoice Address 1", current.InvoiceAddress1, pending.InvoiceAddress1),
+            new("Invoice Address 2", current.InvoiceAddress2, pending.InvoiceAddress2),
+            new("Invoice Address 3", current.InvoiceAddress3, pending.InvoiceAddress3),
+            new("Invoice Address 4", current.InvoiceAddress4, pending.InvoiceAddress4),
+            new("Invoice Address 5", current.InvoiceAddress5, pending.InvoiceAddress5),
+            new("Invoice Country", countryNames.GetValueOrDefault(current.InvoiceCountryId, string.Empty), countryNames.GetValueOrDefault(pending.InvoiceCountryId, string.Empty)),
+            new("Invoice Telephone", current.InvoiceTelephone, pending.InvoiceTelephone),
+            new("Invoice Telephone 2", current.InvoiceTelephone2, pending.InvoiceTelephone2),
+            new("Invoice Fax", current.InvoiceFax, pending.InvoiceFax),
+            new("Invoice Email", current.InvoiceEmail, pending.InvoiceEmail)
+        ];
+
+        return new PendingCustomerUpdateDetailsViewModel(current.CustomerId, current.QalNumber, current.Name, customerDetails, invoiceDetails);
+    }
+
+    private static PendingCustomerUpdateFormViewModel ToPendingFormViewModel(PendingCustomerUpdateComparisonResponse comparison)
+    {
+        var pending = comparison.Pending;
+        return new PendingCustomerUpdateFormViewModel
+        {
+            CustomerId = comparison.Current.CustomerId,
+            QalNumber = comparison.Current.QalNumber,
+            CustomerName = comparison.Current.Name,
+            ContactName = pending.ContactName,
+            Organisation = pending.Organisation,
+            Address1 = pending.Address1,
+            Address2 = pending.Address2,
+            Address3 = pending.Address3,
+            Address4 = pending.Address4,
+            Address5 = pending.Address5,
+            CountryId = pending.CountryId,
+            Telephone = pending.Telephone,
+            Telephone2 = pending.Telephone2,
+            Fax = pending.Fax,
+            Email = pending.Email,
+            InvoiceName = pending.InvoiceName,
+            InvoiceOrganisation = pending.InvoiceOrganisation,
+            InvoiceAddress1 = pending.InvoiceAddress1,
+            InvoiceAddress2 = pending.InvoiceAddress2,
+            InvoiceAddress3 = pending.InvoiceAddress3,
+            InvoiceAddress4 = pending.InvoiceAddress4,
+            InvoiceAddress5 = pending.InvoiceAddress5,
+            InvoiceCountryId = pending.InvoiceCountryId,
+            InvoiceTelephone = pending.InvoiceTelephone,
+            InvoiceTelephone2 = pending.InvoiceTelephone2,
+            InvoiceFax = pending.InvoiceFax,
+            InvoiceEmail = pending.InvoiceEmail
+        };
+    }
+
+    private static PendingCustomerUpdateSaveRequest ToPendingSaveRequest(PendingCustomerUpdateFormViewModel model) => new(
+        model.ContactName ?? string.Empty,
+        model.Organisation ?? string.Empty,
+        model.Address1 ?? string.Empty,
+        model.Address2 ?? string.Empty,
+        model.Address3 ?? string.Empty,
+        model.Address4 ?? string.Empty,
+        model.Address5 ?? string.Empty,
+        model.CountryId.GetValueOrDefault(),
+        model.Telephone ?? string.Empty,
+        model.Telephone2 ?? string.Empty,
+        model.Fax ?? string.Empty,
+        model.Email ?? string.Empty,
+        model.InvoiceName ?? string.Empty,
+        model.InvoiceOrganisation ?? string.Empty,
+        model.InvoiceAddress1 ?? string.Empty,
+        model.InvoiceAddress2 ?? string.Empty,
+        model.InvoiceAddress3 ?? string.Empty,
+        model.InvoiceAddress4 ?? string.Empty,
+        model.InvoiceAddress5 ?? string.Empty,
+        model.InvoiceCountryId.GetValueOrDefault(),
+        model.InvoiceTelephone ?? string.Empty,
+        model.InvoiceTelephone2 ?? string.Empty,
+        model.InvoiceFax ?? string.Empty,
+        model.InvoiceEmail ?? string.Empty);
 
     private void AddErrors(IReadOnlyDictionary<string, string[]> fieldErrors)
     {
@@ -187,7 +416,7 @@ public class CustomerController(ICustomerApiClient customerApiClient, ILookupApi
         // DropDownCountry.Items.Insert(0, New ListItem("- Please Select -", Guid.Empty)).
         var countryOptions = countriesTask.Result
             .Select(c => new SelectListItem(c.Country, c.CountryId.ToString()))
-            .Prepend(new SelectListItem("- Please Select -", Guid.Empty.ToString()))
+            .Prepend(new SelectListItem(PleaseSelectOptionText, Guid.Empty.ToString()))
             .ToList();
         model.CountryOptions = countryOptions;
         model.InvoiceCountryOptions = countryOptions;
@@ -202,13 +431,13 @@ public class CustomerController(ICustomerApiClient customerApiClient, ILookupApi
         // the legacy ValidCustomerType rule, so a blank option is offered to force an explicit choice.
         model.CustomerTypeOptions = customerTypesTask.Result
             .Select(c => new SelectListItem(c.CustomerType, c.CustomerTypeId.ToString()))
-            .Prepend(new SelectListItem("- Please Select -", Guid.Empty.ToString()))
+            .Prepend(new SelectListItem(PleaseSelectOptionText, Guid.Empty.ToString()))
             .ToList();
 
         // VatRatingId is not validated as required anywhere, so a blank option is offered.
         model.VatRatingOptions = vatRatingsTask.Result
             .Select(v => new SelectListItem(v.VatRating, v.VatRatingId.ToString()))
-            .Prepend(new SelectListItem("- Please Select -", Guid.Empty.ToString()))
+            .Prepend(new SelectListItem(PleaseSelectOptionText, Guid.Empty.ToString()))
             .ToList();
     }
 
