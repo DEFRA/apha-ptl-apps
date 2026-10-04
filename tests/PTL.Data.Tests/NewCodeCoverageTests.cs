@@ -105,14 +105,16 @@ public class NewCodeCoverageTests
         var client = new NotifyClient(httpClient, Options.Create(new NotifyOptions { ApiKey = apiKey }));
         var content = "Customer,Total\r\n\"QAL001\",\"100.00\""u8.ToArray();
 
-        await client.SendEmailWithFileAsync(
+        await client.SendEmailWithFileAsync(new NotifyFileEmailRequest(
             "template-123",
             "user@example.com",
             "link_to_file",
             content,
-            "PT_Invoices_2026-10-03-21-23-16.csv",
-            new Dictionary<string, string> { ["generationDateTime"] = "2026/10/03 21:23:16" },
-            "ref-123");
+            "PT_Invoices_2026-10-03-21-23-16.csv")
+        {
+            Personalisation = new Dictionary<string, string> { ["generationDateTime"] = "2026/10/03 21:23:16" },
+            Reference = "ref-123"
+        });
 
         Assert.NotNull(handler.LastRequest);
         var payload = handler.LastPayload;

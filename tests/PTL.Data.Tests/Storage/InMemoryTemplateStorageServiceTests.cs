@@ -53,8 +53,11 @@ public class InMemoryTemplateStorageServiceTests
     public async Task DeleteAsync_UnknownKey_DoesNotThrow()
     {
         var service = new InMemoryTemplateStorageService();
+        await service.SaveAsync("kept", Bytes("doc"), "application/octet-stream");
 
         await service.DeleteAsync("missing");
+
+        Assert.Equal(["kept"], await service.ListAsync());
     }
 
     [Fact]

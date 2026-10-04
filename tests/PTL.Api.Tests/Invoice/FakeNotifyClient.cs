@@ -30,26 +30,20 @@ internal sealed class FakeNotifyClient : INotifyClient
         return Task.CompletedTask;
     }
 
-    public Task SendEmailWithFileAsync(
-        string templateId,
-        string emailAddress,
-        string filePersonalisationKey,
-        byte[] fileContent,
-        string filename,
-        IReadOnlyDictionary<string, string>? personalisation = null,
-        string? reference = null,
-        CancellationToken cancellationToken = default)
+    public Task SendEmailWithFileAsync(NotifyFileEmailRequest request, CancellationToken cancellationToken = default)
     {
-        if (emailAddress == ThrowForEmailAddress)
+        ArgumentNullException.ThrowIfNull(request);
+
+        if (request.EmailAddress == ThrowForEmailAddress)
         {
             throw new InvalidOperationException("Simulated GOV.UK Notify failure.");
         }
 
-        LastPersonalisation = personalisation;
-        LastFilePersonalisationKey = filePersonalisationKey;
-        LastFileContent = fileContent;
-        LastFilename = filename;
-        SentTo.Add(emailAddress);
+        LastPersonalisation = request.Personalisation;
+        LastFilePersonalisationKey = request.FilePersonalisationKey;
+        LastFileContent = request.FileContent;
+        LastFilename = request.Filename;
+        SentTo.Add(request.EmailAddress);
         return Task.CompletedTask;
     }
 }

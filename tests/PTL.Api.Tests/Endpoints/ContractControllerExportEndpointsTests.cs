@@ -100,7 +100,7 @@ public class ContractControllerExportEndpointsTests
         var result = await controller.GetBulkContracts(CancellationToken.None);
 
         var ok = Assert.IsType<OkObjectResult>(result.Result);
-        var contracts = Assert.IsAssignableFrom<IReadOnlyList<BulkContractResponse>>(ok.Value);
+        var contracts = Assert.IsType<IReadOnlyList<BulkContractResponse>>(ok.Value, exactMatch: false);
         var contract = Assert.Single(contracts);
 
         Assert.Equal(contractId, contract.ContractId);
@@ -125,7 +125,7 @@ public class ContractControllerExportEndpointsTests
         var result = await controller.GetBulkContracts(CancellationToken.None);
 
         var ok = Assert.IsType<OkObjectResult>(result.Result);
-        var contract = Assert.Single(Assert.IsAssignableFrom<IReadOnlyList<BulkContractResponse>>(ok.Value));
+        var contract = Assert.Single(Assert.IsType<IReadOnlyList<BulkContractResponse>>(ok.Value, exactMatch: false));
 
         Assert.Equal(entity.TotalPriceItems, contract.TotalPriceItems);
         Assert.Equal(entity.DiscountPrice, contract.DiscountPrice);
@@ -147,7 +147,7 @@ public class ContractControllerExportEndpointsTests
         var result = await controller.GetBulkContracts(CancellationToken.None);
 
         var ok = Assert.IsType<OkObjectResult>(result.Result);
-        Assert.Empty(Assert.IsAssignableFrom<IReadOnlyList<BulkContractResponse>>(ok.Value));
+        Assert.Empty(Assert.IsType<IReadOnlyList<BulkContractResponse>>(ok.Value, exactMatch: false));
     }
 
     [Fact]
@@ -174,7 +174,7 @@ public class ContractControllerExportEndpointsTests
         var result = await controller.GetBulkSampleAddresses(CancellationToken.None);
 
         var ok = Assert.IsType<OkObjectResult>(result.Result);
-        var address = Assert.Single(Assert.IsAssignableFrom<IReadOnlyList<SampleAddressResponse>>(ok.Value));
+        var address = Assert.Single(Assert.IsType<IReadOnlyList<SampleAddressResponse>>(ok.Value, exactMatch: false));
         Assert.Equal("LAB-01", address.LabCode);
         Assert.Equal("United Kingdom", address.Country);
     }
@@ -202,7 +202,7 @@ public class ContractControllerExportEndpointsTests
         var result = await controller.GetBulkRenewals(nonUk, CancellationToken.None);
 
         var ok = Assert.IsType<OkObjectResult>(result.Result);
-        var renewal = Assert.Single(Assert.IsAssignableFrom<IReadOnlyList<ContractRenewalResponse>>(ok.Value));
+        var renewal = Assert.Single(Assert.IsType<IReadOnlyList<ContractRenewalResponse>>(ok.Value, exactMatch: false));
         Assert.Equal("QAL/00001", renewal.QalNumber);
         Assert.Equal(nonUk, bulk.LastNonUk);
     }

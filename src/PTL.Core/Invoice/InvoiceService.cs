@@ -149,13 +149,16 @@ public sealed class InvoiceService(
                     $"recipient={recipient} templateId={options.TemplateId} filename={filename} personalisation=[{string.Join(", ", personalisation.Select(p => $"{p.Key}={p.Value}"))}]",
                     null);
                 await notifyClient.SendEmailWithFileAsync(
-                    options.TemplateId,
-                    recipient,
-                    options.FilePersonalisationKey,
-                    csvBytes,
-                    filename,
-                    personalisation,
-                    reference: storageKey,
+                    new NotifyFileEmailRequest(
+                        options.TemplateId,
+                        recipient,
+                        options.FilePersonalisationKey,
+                        csvBytes,
+                        filename)
+                    {
+                        Personalisation = personalisation,
+                        Reference = storageKey
+                    },
                     cancellationToken);
                 // NotifyClient.SendEmailWithFileAsync does not expose the HTTP response body/status -
                 // only whether it threw is observable here, so "response" is logged as Accepted/Failed.

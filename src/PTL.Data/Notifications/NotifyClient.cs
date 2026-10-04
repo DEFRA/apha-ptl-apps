@@ -42,41 +42,35 @@ public sealed class NotifyClient(HttpClient httpClient, IOptions<NotifyOptions> 
         await EnsureSuccessOrThrowWithBodyAsync(response, cancellationToken);
     }
 
-    public async Task SendEmailWithFileAsync(
-        string templateId,
-        string emailAddress,
-        string filePersonalisationKey,
-        byte[] fileContent,
-        string filename,
-        IReadOnlyDictionary<string, string>? personalisation = null,
-        string? reference = null,
-        CancellationToken cancellationToken = default)
+    public async Task SendEmailWithFileAsync(NotifyFileEmailRequest request, CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(request);
+
         var merged = new Dictionary<string, object>(StringComparer.Ordinal);
-        if (personalisation is not null)
+        if (request.Personalisation is not null)
         {
-            foreach (var (key, value) in personalisation)
+            foreach (var (key, value) in request.Personalisation)
             {
                 merged[key] = value;
             }
         }
 
-        merged[filePersonalisationKey] = PTL.Core.Notifications.NotifyFileAttachment.Build(fileContent, filename);
+        merged[request.FilePersonalisationKey] = PTL.Core.Notifications.NotifyFileAttachment.Build(request.FileContent, request.Filename);
 
-        using var request = new HttpRequestMessage(HttpMethod.Post, "v2/notifications/email")
+        using var httpRequest = new HttpRequestMessage(HttpMethod.Post, "v2/notifications/email")
         {
             Content = JsonContent.Create(new
             {
-                email_address = emailAddress,
-                template_id = templateId,
+                email_address = request.EmailAddress,
+                template_id = request.TemplateId,
                 personalisation = merged,
-                reference
+                reference = request.Reference
             })
         };
 
-        request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", BuildToken());
+        httpRequest.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", BuildToken());
 
-        using var response = await httpClient.SendAsync(request, cancellationToken);
+        using var response = await httpClient.SendAsync(httpRequest, cancellationToken);
         await EnsureSuccessOrThrowWithBodyAsync(response, cancellationToken);
     }
 
