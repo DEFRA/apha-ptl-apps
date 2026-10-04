@@ -43,12 +43,13 @@ public sealed partial class ExportTemplateService(
     private readonly TemplateStorageOptions _options = options.Value;
 
     // Source-generated rather than LoggerMessage.Define, which caps at six message parameters.
-    // Timings are pre-formatted into one value to keep the parameter list readable.
-    [LoggerMessage(EventId = 1, Level = LogLevel.Error, Message = "ExportTemplateUpload failed for {DocumentType}/{FileName}: {Timings} ExceptionType={ExceptionType}")]
-    private static partial void LogUploadFailedMessage(ILogger logger, string documentType, string fileName, string timings, string exceptionType, Exception exception);
+    // Only the timings the try block actually covers are reported on failure - validation and the
+    // duplicate check have already succeeded by then.
+    [LoggerMessage(EventId = 1, Level = LogLevel.Error, Message = "ExportTemplateUpload failed for {DocumentType}/{FileName}: S3Upload={S3UploadMs}ms Total={TotalMs}ms ExceptionType={ExceptionType}")]
+    private static partial void LogUploadFailedMessage(ILogger logger, string documentType, string fileName, long s3UploadMs, long totalMs, string exceptionType, Exception exception);
 
-    [LoggerMessage(EventId = 2, Level = LogLevel.Information, Message = "ExportTemplateUpload timing for {DocumentType}/{FileName}: {Timings}")]
-    private static partial void LogUploadTimingMessage(ILogger logger, string documentType, string fileName, string timings);
+    [LoggerMessage(EventId = 2, Level = LogLevel.Information, Message = "ExportTemplateUpload timing for {DocumentType}: Validation={ValidationMs}ms DuplicateCheck={DuplicateCheckMs}ms S3Upload={S3UploadMs}ms MetadataPersist={MetadataPersistMs}ms Total={TotalMs}ms")]
+    private static partial void LogUploadTimingMessage(ILogger logger, string documentType, long validationMs, long duplicateCheckMs, long s3UploadMs, long metadataPersistMs, long totalMs);
 
     public async Task<IReadOnlyList<UploadedTemplate>> GetTemplatesAsync(string documentType, CancellationToken cancellationToken = default)
     {
@@ -130,9 +131,8 @@ public sealed partial class ExportTemplateService(
                 logger,
                 storageName,
                 safeName,
-                string.Create(
-                    System.Globalization.CultureInfo.InvariantCulture,
-                    $"Validation={validation.ElapsedMilliseconds}ms DuplicateCheck={duplicateCheck.ElapsedMilliseconds}ms S3Upload={s3Upload.ElapsedMilliseconds}ms Total={total.ElapsedMilliseconds}ms"),
+                s3Upload.ElapsedMilliseconds,
+                total.ElapsedMilliseconds,
                 ex.GetType().Name,
                 ex);
             return new ExportTemplateUploadResult(false, SaveFailed, null);
@@ -147,10 +147,11 @@ public sealed partial class ExportTemplateService(
         LogUploadTimingMessage(
             logger,
             storageName,
-            safeName,
-            string.Create(
-                System.Globalization.CultureInfo.InvariantCulture,
-                $"Validation={validation.ElapsedMilliseconds}ms DuplicateCheck={duplicateCheck.ElapsedMilliseconds}ms S3Upload={s3Upload.ElapsedMilliseconds}ms MetadataPersist={metadataPersist.ElapsedMilliseconds}ms Total={total.ElapsedMilliseconds}ms"));
+            validation.ElapsedMilliseconds,
+            duplicateCheck.ElapsedMilliseconds,
+            s3Upload.ElapsedMilliseconds,
+            metadataPersist.ElapsedMilliseconds,
+            total.ElapsedMilliseconds);
 
         return new ExportTemplateUploadResult(true, null, template);
     }
