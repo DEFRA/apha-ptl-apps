@@ -187,7 +187,7 @@ public sealed class CustomerFormViewModel : IValidatableObject
     // TextboxInitialStartDate.Enabled = False.
     public DateTime? InitialStartDate { get; set; }
 
-    [Required(ErrorMessage = "Enter a name")]
+    [Required(ErrorMessage = "Enter Name")]
     [StringLength(50, ErrorMessage = "Name must not exceed 50 characters")]
     public string Name { get; set; } = string.Empty;
 
@@ -204,7 +204,7 @@ public sealed class CustomerFormViewModel : IValidatableObject
 
     // Plain [Required] never fires here - the dropdown's "- Please Select -" option posts
     // Guid.Empty, not null, so a dedicated empty-Guid check is needed.
-    [NotEmptyGuid(ErrorMessage = "Select a customer type")]
+    [NotEmptyGuid(ErrorMessage = "Select a Customer Type")]
     public Guid? CustomerTypeId { get; set; }
 
     // Populated by CustomerController before the view is rendered (GET, and re-populated on a

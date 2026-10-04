@@ -9,22 +9,22 @@
         <h1 class="govuk-heading-l">@customer.Name</h1>
     </div>
     <div class="govuk-grid-column-one-third govuk-!-text-align-right">
-        <a class="govuk-button" data-module="govuk-button" asp-action="Edit" asp-route-id="@customer.CustomerId">Edit customer</a>
+        <a class="govuk-button" data-module="govuk-button" asp-action="Edit" asp-route-id="@customer.CustomerId">Edit Customer</a>
     </div>
 </div>
 
-<h2 class="govuk-heading-m">Customer details</h2>
+<h2 class="govuk-heading-m">Customer Details</h2>
 <dl class="govuk-summary-list">
-    <govuk-summary-row label="QAL number">@customer.QalNumber</govuk-summary-row>
+    <govuk-summary-row label="QAL Number">@customer.QalNumber</govuk-summary-row>
     <govuk-summary-row label="Name">@customer.Name</govuk-summary-row>
     <govuk-summary-row label="Initial start date">@customer.InitialStartDate.ToString("d MMMM yyyy")</govuk-summary-row>
     <govuk-summary-row label="Payment (non-UK)">@(customer.PaymentNonUK ? "Yes" : "No")</govuk-summary-row>
-    <govuk-summary-row label="Customer type">@Model.CustomerTypeName</govuk-summary-row>
-    <govuk-summary-row label="VAT number">@customer.VatNumber</govuk-summary-row>
-    <govuk-summary-row label="Account number">@customer.AccountNumber</govuk-summary-row>
+    <govuk-summary-row label="Customer Type">@Model.CustomerTypeName</govuk-summary-row>
+    <govuk-summary-row label="VAT Number">@customer.VatNumber</govuk-summary-row>
+    <govuk-summary-row label="Account Number">@customer.AccountNumber</govuk-summary-row>
     <govuk-summary-row label="Customer ID">@customer.CustomerFinanceId</govuk-summary-row>
-    <govuk-summary-row label="Registered file number">@customer.RegisteredFileNumber</govuk-summary-row>
-    <govuk-summary-row label="Order online">@(customer.CanOrderOnline ? "Yes" : "No")</govuk-summary-row>
+    <govuk-summary-row label="Registered File Number">@customer.RegisteredFileNumber</govuk-summary-row>
+    <govuk-summary-row label="Order Online">@(customer.CanOrderOnline ? "Yes" : "No")</govuk-summary-row>
     <govuk-summary-row label="Status">
         <strong class="govuk-tag @(customer.IsActive ? "govuk-tag--green" : "govuk-tag--grey")">
             @(customer.IsActive ? "Active" : "Inactive")
@@ -32,13 +32,13 @@
     </govuk-summary-row>
     @if (customer.InactiveDate is not null)
     {
-        <govuk-summary-row label="Inactive date">@customer.InactiveDate.Value.ToString("d MMMM yyyy")</govuk-summary-row>
+        <govuk-summary-row label="Inactive Date">@customer.InactiveDate.Value.ToString("d MMMM yyyy")</govuk-summary-row>
     }
 </dl>
 
-<h2 class="govuk-heading-m">Contact details</h2>
+<h2 class="govuk-heading-m">Contact Details</h2>
 <dl class="govuk-summary-list">
-    <govuk-summary-row label="Contact name">@customer.ContactName</govuk-summary-row>
+    <govuk-summary-row label="Contact Name">@customer.ContactName</govuk-summary-row>
     <govuk-summary-row label="Organisation">@customer.Organisation</govuk-summary-row>
     <govuk-summary-row label="Address">
         @customer.Address1<br />
@@ -49,16 +49,16 @@
     </govuk-summary-row>
     <govuk-summary-row label="Country">@Model.CountryName</govuk-summary-row>
     <govuk-summary-row label="Telephone">@customer.Telephone</govuk-summary-row>
-    <govuk-summary-row label="Telephone (alternative)">@customer.Telephone2</govuk-summary-row>
+    <govuk-summary-row label="Telephone 2">@customer.Telephone2</govuk-summary-row>
     <govuk-summary-row label="Fax">@customer.Fax</govuk-summary-row>
     <govuk-summary-row label="Email">@customer.Email</govuk-summary-row>
 </dl>
 
-<h2 class="govuk-heading-m">Invoice details</h2>
+<h2 class="govuk-heading-m">Invoice Details</h2>
 <dl class="govuk-summary-list">
-    <govuk-summary-row label="Invoice name">@customer.InvoiceName</govuk-summary-row>
-    <govuk-summary-row label="Invoice organisation">@customer.InvoiceOrganisation</govuk-summary-row>
-    <govuk-summary-row label="Invoice address">
+    <govuk-summary-row label="Invoice Name">@customer.InvoiceName</govuk-summary-row>
+    <govuk-summary-row label="Invoice Organisation">@customer.InvoiceOrganisation</govuk-summary-row>
+    <govuk-summary-row label="Invoice Address">
         @customer.InvoiceAddress1<br />
         @customer.InvoiceAddress2<br />
         @customer.InvoiceAddress3<br />
@@ -66,14 +66,14 @@
         @customer.InvoiceAddress5
     </govuk-summary-row>
     <govuk-summary-row label="Invoice country">@Model.InvoiceCountryName</govuk-summary-row>
-    <govuk-summary-row label="Invoice telephone">@customer.InvoiceTelephone</govuk-summary-row>
-    <govuk-summary-row label="Invoice telephone (alternative)">@customer.InvoiceTelephone2</govuk-summary-row>
-    <govuk-summary-row label="Invoice fax">@customer.InvoiceFax</govuk-summary-row>
-    <govuk-summary-row label="Invoice email">@customer.InvoiceEmail</govuk-summary-row>
+    <govuk-summary-row label="Invoice Telephone">@customer.InvoiceTelephone</govuk-summary-row>
+    <govuk-summary-row label="Invoice Telephone 2">@customer.InvoiceTelephone2</govuk-summary-row>
+    <govuk-summary-row label="Invoice Fax">@customer.InvoiceFax</govuk-summary-row>
+    <govuk-summary-row label="Invoice Email">@customer.InvoiceEmail</govuk-summary-row>
 </dl>
 
 <h2 class="govuk-heading-m">Other</h2>
 <dl class="govuk-summary-list">
-    <govuk-summary-row label="Postage arrangements">@customer.PostageArrangements</govuk-summary-row>
+    <govuk-summary-row label="Postage Arrangements">@customer.PostageArrangements</govuk-summary-row>
     <govuk-summary-row label="Comments">@customer.Comments</govuk-summary-row>
 </dl>

@@ -25,14 +25,14 @@ public static partial class CustomerValidator
     private static readonly Dictionary<string, string> FieldLabels = new()
     {
         ["Name"] = "Name",
-        ["ContactName"] = "Contact name",
-        [OrganisationField] = "Organisation",
+        ["ContactName"] = "Contact Name",
+        [OrganisationField] = "Organisation Name",
         [RegisteredFileNumberField] = "Registered file number",
-        ["Address1"] = "Address line 1",
-        ["Address2"] = "Address line 2",
-        ["Address3"] = "Address line 3",
-        ["Address4"] = "Address line 4",
-        ["Address5"] = "Address line 5",
+        ["Address1"] = "Address 1",
+        ["Address2"] = "Address 2",
+        ["Address3"] = "Address 3",
+        ["Address4"] = "Address 4",
+        ["Address5"] = "Address 5",
         [TelephoneField] = "Telephone",
         ["Telephone2"] = "Telephone (alternative)",
         ["Fax"] = "Fax",
@@ -40,22 +40,22 @@ public static partial class CustomerValidator
         ["Comments"] = "Comments",
         ["PostageArrangements"] = "Postage arrangements",
         ["InvoiceName"] = "Invoice name",
-        ["InvoiceOrganisation"] = "Invoice organisation",
-        ["InvoiceAddress1"] = "Invoice address line 1",
-        ["InvoiceAddress2"] = "Invoice address line 2",
-        ["InvoiceAddress3"] = "Invoice address line 3",
-        ["InvoiceAddress4"] = "Invoice address line 4",
-        ["InvoiceAddress5"] = "Invoice address line 5",
-        ["InvoiceTelephone"] = "Invoice telephone",
-        ["InvoiceTelephone2"] = "Invoice telephone (alternative)",
+        ["InvoiceOrganisation"] = "Invoice Organisation Name",
+        ["InvoiceAddress1"] = "Invoice line 1",
+        ["InvoiceAddress2"] = "Invoice line 2",
+        ["InvoiceAddress3"] = "Invoice line 3",
+        ["InvoiceAddress4"] = "Invoice line 4",
+        ["InvoiceAddress5"] = "Invoice line 5",
+        ["InvoiceTelephone"] = "Invoice Telephone",
+        ["InvoiceTelephone2"] = "Invoice Telephone 2",
         ["InvoiceFax"] = "Invoice fax",
-        [InvoiceEmailField] = "Invoice email",
+        [InvoiceEmailField] = "Invoice Email",
         ["CountryId"] = "Country",
-        ["InvoiceCountryId"] = "Invoice country",
-        ["VatNumber"] = "VAT number",
-        ["AccountNumber"] = "Account number",
-        ["CustomerFinanceId"] = "Customer finance ID",
-        ["CustomerTypeId"] = "Customer type"
+        ["InvoiceCountryId"] = "Invoice Country",
+        ["VatNumber"] = "VAT Number",
+        ["AccountNumber"] = "Account Number",
+        ["CustomerFinanceId"] = "Customer Finance ID",
+        ["CustomerTypeId"] = "Customer Type"
     };
 
     private static string Label(string field) => FieldLabels.GetValueOrDefault(field, field);
@@ -146,7 +146,7 @@ public static partial class CustomerValidator
     {
         if (string.IsNullOrWhiteSpace(value))
         {
-            errors.Add(new CustomerValidationError(field, $"{Label(field)} is required"));
+            errors.Add(new CustomerValidationError(field, $"Enter {Label(field)}"));
         }
     }
 
@@ -154,7 +154,7 @@ public static partial class CustomerValidator
     {
         if (value == Guid.Empty)
         {
-            errors.Add(new CustomerValidationError(field, $"{Label(field)} must be selected"));
+            errors.Add(new CustomerValidationError(field, $"Select {Label(field)}"));
         }
     }
 
@@ -190,7 +190,7 @@ public static partial class CustomerValidator
         }
         catch (FormatException)
         {
-            errors.Add(new CustomerValidationError(field, $"{Label(field)} must be a valid email address"));
+            errors.Add(new CustomerValidationError(field, $"Enter{Label(field)} a valid email address"));
         }
     }
 }

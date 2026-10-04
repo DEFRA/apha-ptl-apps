@@ -17,7 +17,7 @@
     @await Html.PartialAsync("_ParticipantForm", Model)
 
     <div class="govuk-button-group">
-        <button class="govuk-button" data-module="govuk-button" type="submit">Create participant</button>
+        <button class="govuk-button" data-module="govuk-button" type="submit">Create Participant</button>
         <a class="govuk-button govuk-button--secondary" data-module="govuk-button" asp-controller="Participant" asp-action="Index" asp-route-customerId="@Model.CustomerId">Cancel</a>
     </div>
 </form>

@@ -3,13 +3,13 @@
     ViewData["Title"] = "Create customer";
 }
 
-<h1 class="govuk-heading-l">Create customer</h1>
+<h1 class="govuk-heading-l">Create Customer</h1>
 
 <form method="post" asp-action="Create" novalidate>
     @await Html.PartialAsync("_CustomerForm", Model)
 
     <div class="govuk-button-group">
-        <button class="govuk-button" data-module="govuk-button" type="submit">Create customer</button>
+        <button class="govuk-button" data-module="govuk-button" type="submit">Create Customer</button>
         <a class="govuk-button govuk-button--secondary" data-module="govuk-button" asp-controller="Customer" asp-action="Index">Cancel</a>
     </div>
 </form>
