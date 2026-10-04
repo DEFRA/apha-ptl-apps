@@ -14,4 +14,16 @@ public interface INotifyClient
         IReadOnlyDictionary<string, string>? personalisation = null,
         string? reference = null,
         CancellationToken cancellationToken = default);
+
+    // GOV.UK Notify's "send a file by email" feature - the file is delivered as a single
+    // personalisation value (see NotifyFileAttachment), not a separate upload call/endpoint.
+    Task SendEmailWithFileAsync(
+        string templateId,
+        string emailAddress,
+        string filePersonalisationKey,
+        byte[] fileContent,
+        string filename,
+        IReadOnlyDictionary<string, string>? personalisation = null,
+        string? reference = null,
+        CancellationToken cancellationToken = default);
 }

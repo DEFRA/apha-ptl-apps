@@ -169,11 +169,7 @@ public static class SideNavigationProvider
                 {
                     Text = "Invoice Generation",
                     ControllerName = "Invoice",
-                    ActionName = IndexAction,
-                    Children =
-                    [
-                        new SideNavigationItem { Text = "Invoice Audit History", ControllerName = "Invoice", ActionName = "AuditHistory", IsHidden = true }
-                    ]
+                    ActionName = IndexAction
                 }
             ]
         },

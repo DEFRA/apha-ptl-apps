@@ -109,7 +109,19 @@ builder.Services.AddScoped<IRenewContractsService, RenewContractsService>();
 builder.Services.AddScoped<IPendingOrderRepository, PendingOrderRepository>();
 builder.Services.AddScoped<IPendingOrderService, PendingOrderService>();
 
-builder.Services.Configure<TemplateStorageOptions>(builder.Configuration.GetSection(TemplateStorageOptions.SectionName));
+// Single shared S3 configuration root for every S3-backed feature (export templates, invoice
+// archives) - one bucket/region, one prefix per feature (docs/migration/invoice-migration.md).
+builder.Services.Configure<PTL.Core.Storage.S3Options>(builder.Configuration.GetSection(PTL.Core.Storage.S3Options.SectionName));
+
+builder.Services.AddOptions<TemplateStorageOptions>()
+    .Configure<IOptions<PTL.Core.Storage.S3Options>>((options, s3) =>
+    {
+        options.Provider = s3.Value.Provider;
+        options.BucketName = s3.Value.BucketName;
+        options.Region = s3.Value.Region;
+        options.Prefix = s3.Value.Templates.Prefix;
+        options.MaxUploadBytes = s3.Value.Templates.MaxUploadBytes;
+    });
 builder.Services.AddScoped<IUploadedTemplateRepository, UploadedTemplateRepository>();
 builder.Services.AddScoped<IExportTemplateService, ExportTemplateService>();
 builder.Services.AddScoped<IBulkExportRepository, BulkExportRepository>();
@@ -120,14 +132,11 @@ builder.Services.AddScoped<IBulkExportService, BulkExportService>();
 // resolve the task/instance role automatically from the runtime environment.
 builder.Services.AddSingleton<Amazon.S3.IAmazonS3>(_ =>
 {
-    var templateRegion = builder.Configuration[$"{TemplateStorageOptions.SectionName}:Region"];
-    var invoiceRegion = builder.Configuration[$"{InvoiceStorageOptions.SectionName}:Region"];
-    var region = string.IsNullOrWhiteSpace(templateRegion) ? invoiceRegion : templateRegion;
-
+    var region = builder.Configuration[$"{PTL.Core.Storage.S3Options.SectionName}:Region"];
     return AwsS3ClientFactory.Create(region);
 });
 
-if (string.Equals(builder.Configuration[$"{TemplateStorageOptions.SectionName}:Provider"], "InMemory", StringComparison.OrdinalIgnoreCase))
+if (string.Equals(builder.Configuration[$"{PTL.Core.Storage.S3Options.SectionName}:Provider"], "InMemory", StringComparison.OrdinalIgnoreCase))
 {
     builder.Services.AddSingleton<ITemplateStorageService, InMemoryTemplateStorageService>();
 }
@@ -151,8 +160,15 @@ builder.Services.AddScoped<IWeightedPricingPlanService, WeightedPricingPlanServi
 builder.Services.AddScoped<IInvoiceRepository, InvoiceRepository>();
 builder.Services.AddScoped<IInvoiceService, InvoiceService>();
 
-builder.Services.Configure<InvoiceStorageOptions>(builder.Configuration.GetSection(InvoiceStorageOptions.SectionName));
-if (string.Equals(builder.Configuration[$"{InvoiceStorageOptions.SectionName}:Provider"], "InMemory", StringComparison.OrdinalIgnoreCase))
+builder.Services.AddOptions<InvoiceStorageOptions>()
+    .Configure<IOptions<PTL.Core.Storage.S3Options>>((options, s3) =>
+    {
+        options.Provider = s3.Value.Provider;
+        options.BucketName = s3.Value.BucketName;
+        options.Region = s3.Value.Region;
+        options.Prefix = s3.Value.Invoices.Prefix;
+    });
+if (string.Equals(builder.Configuration[$"{PTL.Core.Storage.S3Options.SectionName}:Provider"], "InMemory", StringComparison.OrdinalIgnoreCase))
 {
     builder.Services.AddSingleton<IInvoiceStorageService, InMemoryInvoiceStorageService>();
 }

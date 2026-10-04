@@ -10,10 +10,15 @@ internal sealed class FakeInvoiceApiClient : IInvoiceApiClient
     public InvoiceGenerationResponse? GenerateResult { get; set; }
     public IReadOnlyList<InvoiceAuditRecordResponse> AuditHistory { get; set; } = [];
     public bool ResetCalled { get; private set; }
+    public bool GenerateCalled { get; private set; }
 
     public Task<PendingInvoiceSummaryResponse?> GetPendingAsync(CancellationToken cancellationToken = default) => Task.FromResult(Pending);
 
-    public Task<InvoiceGenerationResponse?> GenerateAsync(CancellationToken cancellationToken = default) => Task.FromResult(GenerateResult);
+    public Task<InvoiceGenerationResponse?> GenerateAsync(CancellationToken cancellationToken = default)
+    {
+        GenerateCalled = true;
+        return Task.FromResult(GenerateResult);
+    }
 
     public Task ResetAsync(CancellationToken cancellationToken = default)
     {

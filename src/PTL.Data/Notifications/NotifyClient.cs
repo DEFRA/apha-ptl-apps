@@ -39,7 +39,59 @@ public sealed class NotifyClient(HttpClient httpClient, IOptions<NotifyOptions> 
         request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", BuildToken());
 
         using var response = await httpClient.SendAsync(request, cancellationToken);
-        response.EnsureSuccessStatusCode();
+        await EnsureSuccessOrThrowWithBodyAsync(response, cancellationToken);
+    }
+
+    public async Task SendEmailWithFileAsync(
+        string templateId,
+        string emailAddress,
+        string filePersonalisationKey,
+        byte[] fileContent,
+        string filename,
+        IReadOnlyDictionary<string, string>? personalisation = null,
+        string? reference = null,
+        CancellationToken cancellationToken = default)
+    {
+        var merged = new Dictionary<string, object>(StringComparer.Ordinal);
+        if (personalisation is not null)
+        {
+            foreach (var (key, value) in personalisation)
+            {
+                merged[key] = value;
+            }
+        }
+
+        merged[filePersonalisationKey] = PTL.Core.Notifications.NotifyFileAttachment.Build(fileContent, filename);
+
+        using var request = new HttpRequestMessage(HttpMethod.Post, "v2/notifications/email")
+        {
+            Content = JsonContent.Create(new
+            {
+                email_address = emailAddress,
+                template_id = templateId,
+                personalisation = merged,
+                reference
+            })
+        };
+
+        request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", BuildToken());
+
+        using var response = await httpClient.SendAsync(request, cancellationToken);
+        await EnsureSuccessOrThrowWithBodyAsync(response, cancellationToken);
+    }
+
+    // GOV.UK Notify puts the actual validation reason (e.g. "personalisation ... missing") in the
+    // response body - EnsureSuccessStatusCode() discards it, leaving only a generic "400 (BAD
+    // REQUEST)" with no way to diagnose the real cause from logs.
+    private static async Task EnsureSuccessOrThrowWithBodyAsync(HttpResponseMessage response, CancellationToken cancellationToken)
+    {
+        if (response.IsSuccessStatusCode)
+        {
+            return;
+        }
+
+        var body = await response.Content.ReadAsStringAsync(cancellationToken);
+        throw new HttpRequestException($"GOV.UK Notify request failed: {(int)response.StatusCode} {response.ReasonPhrase} - {body}");
     }
 
     // GOV.UK Notify API keys are copied as "{name}-{serviceId guid}-{secret guid}" - the last 73

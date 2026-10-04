@@ -6,42 +6,34 @@
 
 <h1 class="govuk-heading-l">Invoice Generation</h1>
 
-<dl class="govuk-summary-list">
-    <govuk-summary-row label="Financial Year">@Model.FinancialYear</govuk-summary-row>
-    <govuk-summary-row label="Notification Recipients">
-        @(Model.NotificationRecipients.Count > 0 ? string.Join(", ", Model.NotificationRecipients) : "Not configured")
-    </govuk-summary-row>
-</dl>
-
-<h2 class="govuk-heading-m">Preview</h2>
 <p class="govuk-body">
-    Opt Out Of Invoice Generation and Non Fee Paying are informational only - they do not exclude a
-    contract or item from generation. All eligible contracts are included.
+    The invoices for year @Model.FinancialYear will be sent from '@Model.NotificationFromEmail' to '@Model.NotificationToEmail'.
 </p>
-<dl class="govuk-summary-list">
-    <govuk-summary-row label="Number Of Eligible Contracts">@Model.EligibleContractCount</govuk-summary-row>
-    <govuk-summary-row label="Financial Year">@Model.FinancialYear</govuk-summary-row>
-    <govuk-summary-row label="Number Of Opt Out Contracts">@Model.OptOutContractCount</govuk-summary-row>
-    <govuk-summary-row label="Number Of Non Fee Paying Items">@Model.NonFeePayingItemCount</govuk-summary-row>
-</dl>
 
 <form method="post" asp-action="Generate">
     @Html.AntiForgeryToken()
-    <button class="govuk-button" data-module="govuk-button" type="submit"
-            onclick="return confirm('@InvoiceGenerationViewModel.GenerateConfirmation');">
-        Generate Invoices
-    </button>
+    @if (Model.CanGenerate)
+    {
+        <button class="govuk-button" data-module="govuk-button" type="submit"
+                onclick="return confirm('@InvoiceGenerationViewModel.GenerateConfirmation');">
+            Generate Invoices
+        </button>
+    }
+    else
+    {
+        <button class="govuk-button" data-module="govuk-button" type="submit" disabled="disabled" aria-disabled="true">
+            Generate Invoices
+        </button>
+        <p class="govuk-body govuk-hint">There are no outstanding invoices to generate. Use Reset All Invoices to make them available again.</p>
+    }
 </form>
 
 @if (Model.CanReset)
 {
     <form method="post" asp-action="Reset">
         @Html.AntiForgeryToken()
-        <button class="govuk-button govuk-button--warning" data-module="govuk-button" type="submit"
-                onclick="return confirm('Are you sure you want to reset all invoices? (UAT only)');">
-            Reset All Invoices (UAT only)
+        <button class="govuk-button govuk-button--warning" data-module="govuk-button" type="submit">
+            Reset All Invoices
         </button>
     </form>
 }
-
-<p class="govuk-body"><a class="govuk-link" asp-action="AuditHistory">View invoice audit history</a></p>
