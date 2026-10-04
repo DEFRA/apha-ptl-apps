@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
@@ -8,6 +8,7 @@
     <!-- CS1591 (missing XML comment) is informational only - Swagger falls back to the member
          name for undocumented actions/DTOs, so this is not treated as a build warning. -->
     <NoWarn>$(NoWarn);CS1591</NoWarn>
+    <UserSecretsId>3b9f1198-6849-4b97-aada-c2e3668438a4</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>
