@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using PTL.ApiClient;
 using PTL.Contracts.Participant;
 using PTL.Core.Labels;
+using PTL.InternalWeb.Navigation;
 using PTL.InternalWeb.Notifications;
 
 namespace PTL.InternalWeb.Features.Participant;
@@ -71,6 +72,7 @@ public class ParticipantController(IParticipantApiClient participantApiClient, I
         var countryName = countriesTask.Result.FirstOrDefault(c => c.CountryId == participant.CountryId)?.Country ?? string.Empty;
 
         var model = new ParticipantDetailsViewModel(participant, labTypeName, countryName);
+        ViewData[BreadcrumbRouteValues.CustomerId] = participant.CustomerId;
         return View(model);
     }
 
@@ -150,6 +152,7 @@ public class ParticipantController(IParticipantApiClient participantApiClient, I
         var model = ToFormViewModel(participant);
         await PopulateLookupOptionsAsync(model, cancellationToken);
         await PopulateCustomerContactAsync(model, participant.CustomerId, cancellationToken);
+        ViewData[BreadcrumbRouteValues.CustomerId] = participant.CustomerId;
         return View(model);
     }
 
@@ -319,6 +322,7 @@ public class ParticipantController(IParticipantApiClient participantApiClient, I
             return NotFound();
         }
 
+        ViewData[BreadcrumbRouteValues.CustomerId] = assignment.CustomerId;
         return View(new ParticipantViewerFormViewModel(
             participantId, assignment.CustomerId, assignment.LabCode, assignment.LabName, assignment.IsActive,
             assignment.AvailableViewers, assignment.AssignedViewers));

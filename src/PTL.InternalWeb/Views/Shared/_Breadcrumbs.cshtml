@@ -3,8 +3,21 @@
 @{
     var controller = (ViewContext.RouteData.Values["controller"]?.ToString() ?? string.Empty).Trim();
     var action = (ViewContext.RouteData.Values["action"]?.ToString() ?? string.Empty).Trim();
-    var customerId = ViewContext.HttpContext.Request.Query["customerId"].FirstOrDefault()
-        ?? ViewContext.RouteData.Values["customerId"]?.ToString();
+
+    // Ancestor links such as Contracts and Contract Items are parameterised routes. Take the id
+    // from the current request where present, otherwise from whatever the page published (see
+    // BreadcrumbRouteValues) - /Contract/Details/{id} knows the contract but carries no customerId.
+    var ambient = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase)
+    {
+        [BreadcrumbRouteValues.CustomerIdKey] =
+            ViewContext.HttpContext.Request.Query[BreadcrumbRouteValues.CustomerIdKey].FirstOrDefault()
+            ?? ViewContext.RouteData.Values[BreadcrumbRouteValues.CustomerIdKey]?.ToString()
+            ?? ViewData[BreadcrumbRouteValues.CustomerId]?.ToString(),
+        [BreadcrumbRouteValues.ContractIdKey] =
+            ViewContext.HttpContext.Request.Query[BreadcrumbRouteValues.ContractIdKey].FirstOrDefault()
+            ?? ViewContext.RouteData.Values[BreadcrumbRouteValues.ContractIdKey]?.ToString()
+            ?? ViewData[BreadcrumbRouteValues.ContractId]?.ToString()
+    };
 
     static string ToDisplay(string value)
     {
@@ -16,7 +29,10 @@
         return Regex.Replace(value, "([a-z])([A-Z])", "$1 $2", RegexOptions.None, TimeSpan.FromMilliseconds(100));
     }
 
-    var isHome = string.Equals(controller, "Home", StringComparison.OrdinalIgnoreCase);
+    // Only the Home landing page suppresses the trail - it is already the first crumb. Other Home
+    // actions (Privacy) still resolve their own node below.
+    var isHome = string.Equals(controller, "Home", StringComparison.OrdinalIgnoreCase)
+        && string.Equals(action, "Index", StringComparison.OrdinalIgnoreCase);
 
     // Mirrors the current page's node in the left nav (_SideNavigation.cshtml) - the breadcrumb
     // trail is the exact reverse of the drill-down journey: Home > ... > current page. Falls back
@@ -36,18 +52,28 @@
             {
                 var node = path[i];
                 var isLast = i == path.Count - 1;
+
+                var routeData = new Dictionary<string, string>();
+                if (node.LinkRouteParameter is not null
+                    && node.LinkRouteValueKey is not null
+                    && ambient.TryGetValue(node.LinkRouteValueKey, out var routeValue)
+                    && !string.IsNullOrEmpty(routeValue))
+                {
+                    routeData[node.LinkRouteParameter] = routeValue;
+                }
+
+                // A node needing a route parameter we could not resolve would link to an empty or
+                // erroring page, so it renders as plain text instead.
+                var isUnresolvedLink = node.LinkRouteParameter is not null && routeData.Count == 0;
+
                 <li class="govuk-breadcrumbs__list-item">
-                    @if (isLast)
+                    @if (isLast || isUnresolvedLink)
                     {
                         @node.Text
                     }
-                    else if (node.ControllerName is "Participant" or "Contract" && customerId is not null)
-                    {
-                        <a class="govuk-breadcrumbs__link" asp-controller="@node.ControllerName" asp-action="@node.ActionName" asp-route-customerId="@customerId">@node.Text</a>
-                    }
                     else
                     {
-                        <a class="govuk-breadcrumbs__link" asp-controller="@node.ControllerName" asp-action="@node.ActionName">@node.Text</a>
+                        <a class="govuk-breadcrumbs__link" asp-controller="@node.ControllerName" asp-action="@node.ActionName" asp-all-route-data="routeData">@node.Text</a>
                     }
                 </li>
             }

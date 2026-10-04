@@ -6,6 +6,7 @@ using PTL.ApiClient;
 using PTL.Contracts.Contract;
 using PTL.Core.Contract.Document;
 using PTL.Core.Contract.Export.Templates;
+using PTL.InternalWeb.Navigation;
 using PTL.InternalWeb.Notifications;
 
 namespace PTL.InternalWeb.Features.Contract;
@@ -161,6 +162,8 @@ public class ContractController(IContractApiClient contractApiClient, ICustomerA
         }
 
         var model = new ContractItemsViewModel(items, contract.CustomerId);
+        ViewData[BreadcrumbRouteValues.CustomerId] = contract.CustomerId;
+        ViewData[BreadcrumbRouteValues.ContractId] = id;
         LogDisplayedContractItemsMessage(logger, id, items.Schemes.Count, null);
         return View(model);
     }
@@ -502,6 +505,7 @@ public class ContractController(IContractApiClient contractApiClient, ICustomerA
         LogDisplayedImportPermitsMessage(logger, id, permits.Count, null);
         var model = ToImportPermitsViewModel(id, permits);
         model.EditParticipantSchemeId = editParticipantSchemeId;
+        ViewData[BreadcrumbRouteValues.ContractId] = id;
         return View(model);
     }
 
@@ -632,6 +636,7 @@ public class ContractController(IContractApiClient contractApiClient, ICustomerA
             return NotFound();
         }
 
+        ViewData[BreadcrumbRouteValues.CustomerId] = contract.CustomerId;
         return View(contract);
     }
 
@@ -692,6 +697,7 @@ public class ContractController(IContractApiClient contractApiClient, ICustomerA
         var model = ToFormViewModel(contract);
         await PopulateYearOptionsAsync(model, cancellationToken);
         await PopulateCustomerContextAsync(model, contract.CustomerId, cancellationToken);
+        ViewData[BreadcrumbRouteValues.CustomerId] = contract.CustomerId;
         return View(model);
     }
 

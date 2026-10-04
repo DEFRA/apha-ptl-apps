@@ -133,6 +133,29 @@ public partial class ParticipantRouteSmokeTests : IClassFixture<WebApplicationFa
         Assert.Contains("Participant Details", body);
     }
 
+    // The Participants list is per-customer, and the Details route carries only the participant id,
+    // so the crumb has to pick the customer up from the page itself.
+    [Fact]
+    public async Task Details_WithoutCustomerIdInUrl_StillLinksParticipantsBreadcrumbToTheCustomer()
+    {
+        var client = _factory.CreateClient();
+
+        var response = await client.GetAsync($"/Participant/Details/{_participantId}");
+        var body = await response.Content.ReadAsStringAsync();
+        var breadcrumbs = BreadcrumbSection(body);
+
+        Assert.Contains($"customerId={_customerId}", breadcrumbs, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain($"customerId={Guid.Empty}", breadcrumbs, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string BreadcrumbSection(string body)
+    {
+        var start = body.IndexOf("govuk-breadcrumbs", StringComparison.Ordinal);
+        Assert.True(start >= 0, "No breadcrumbs rendered.");
+        var end = body.IndexOf("</nav>", start, StringComparison.Ordinal);
+        return body[start..end];
+    }
+
     [Fact]
     public async Task Details_InactiveParticipant_RendersInactiveDateRow()
     {
