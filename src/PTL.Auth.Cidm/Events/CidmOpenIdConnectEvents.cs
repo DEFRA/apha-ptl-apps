@@ -93,6 +93,16 @@ public sealed partial class CidmOpenIdConnectEvents : OpenIdConnectEvents
             return;
         }
 
+        // The base handler only protects Properties into ProtocolMessage.State *after* this event
+        // returns, as the very last step before it would normally issue the redirect itself - since
+        // HandleResponse() below skips that step entirely, State is still empty at this point and must
+        // be set here, or the round trip back to our own /signout-oidc (SignedOutCallbackPath) would
+        // never be able to recover Properties.RedirectUri (/Account/SignedOut).
+        if (string.IsNullOrEmpty(context.ProtocolMessage.State))
+        {
+            context.ProtocolMessage.State = context.Options.StateDataFormat.Protect(context.Properties);
+        }
+
         context.HandleResponse();
         context.Response.ContentType = "text/html; charset=utf-8";
         await context.Response.WriteAsync(CidmSignOutFormWriter.WriteForm(

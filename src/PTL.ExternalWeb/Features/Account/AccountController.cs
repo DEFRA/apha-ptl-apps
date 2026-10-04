@@ -49,6 +49,16 @@ namespace PTL.ExternalWeb.Features.Account
         [ValidateAntiForgeryToken]
         public override async Task<IActionResult> Logout()
         {
+            // Capture id_token_hint BEFORE clearing the cookie. OpenIdConnectHandler.HandleSignOutAsync
+            // only reads id_token_hint from the AuthenticationProperties passed to SignOut() (empty
+            // here) or, failing that, falls back to re-authenticating against the cookie scheme - which
+            // finds nothing once the cookie below has already been cleared. Without id_token_hint, CIDM
+            // (Azure AD B2C) ignores post_logout_redirect_uri entirely and shows its own default
+            // sign-out page instead of redirecting back to /Account/SignedOut - this was the root cause
+            // of sign-out landing on CIDM's page instead of ours.
+            var cookieResult = await HttpContext.AuthenticateAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+            var idToken = cookieResult?.Properties?.GetTokenValue("id_token");
+
             // Signed out separately (not via a single SignOut(cookie, oidc) call sharing one
             // AuthenticationProperties): CookieAuthenticationHandler.SignOutAsync also honours
             // RedirectUri and issues its own redirect immediately, which would hijack the response
@@ -58,6 +68,11 @@ namespace PTL.ExternalWeb.Features.Account
             await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
 
             var properties = new AuthenticationProperties { RedirectUri = Url.Action(nameof(SignedOut), "Account") };
+            if (!string.IsNullOrEmpty(idToken))
+            {
+                properties.StoreTokens([new AuthenticationToken { Name = "id_token", Value = idToken }]);
+            }
+
             return SignOut(properties, CidmAuthenticationDefaults.AuthenticationScheme);
         }
 

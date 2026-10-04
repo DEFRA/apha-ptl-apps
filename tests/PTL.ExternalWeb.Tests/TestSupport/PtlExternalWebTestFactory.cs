@@ -27,6 +27,7 @@ public sealed class PtlExternalWebTestFactory : WebApplicationFactory<Program>
     public const string FakeAuthorizationEndpoint = "https://cidm.test/oauth2/v2.0/authorize";
     public const string FakeEndSessionEndpoint = "https://cidm.test/signout";
     public const string TestSignInPath = "/__test/sign-in";
+    public const string TestIdToken = "test-id-token";
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -80,7 +81,9 @@ public sealed class PtlExternalWebTestFactory : WebApplicationFactory<Program>
                     var identity = new ClaimsIdentity(
                         [new Claim(ClaimTypes.Name, "test-user")],
                         CookieAuthenticationDefaults.AuthenticationScheme);
-                    await context.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(identity));
+                    var properties = new AuthenticationProperties();
+                    properties.StoreTokens([new AuthenticationToken { Name = "id_token", Value = TestIdToken }]);
+                    await context.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(identity), properties);
                     context.Response.StatusCode = StatusCodes.Status204NoContent;
                     return;
                 }

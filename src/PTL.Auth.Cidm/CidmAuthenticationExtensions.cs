@@ -87,9 +87,15 @@ public static class CidmAuthenticationExtensions
 
                 if (useLocalHttpFriendlyOidcSettings)
                 {
-                    // query mode's callback is a top-level GET redirect - SameSite=Lax (ASP.NET Core's
-                    // own default) already covers it, so no override needed for local HTTP.
+                    // query mode's callback is a top-level GET redirect, which SameSite=Lax covers. Lax
+                    // must be set explicitly: the OIDC handler's correlation/nonce cookies default to
+                    // SameSite=None, and browsers drop SameSite=None cookies that aren't Secure - which
+                    // over plain HTTP means the cookies never come back on /signin-oidc, "Correlation
+                    // failed" is raised, and RemoteFailure sends the user to /Home/Error right after a
+                    // successful CIDM login.
+                    options.CorrelationCookie.SameSite = SameSiteMode.Lax;
                     options.CorrelationCookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+                    options.NonceCookie.SameSite = SameSiteMode.Lax;
                     options.NonceCookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
                 }
                 else

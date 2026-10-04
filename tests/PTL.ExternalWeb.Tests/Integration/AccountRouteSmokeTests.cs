@@ -55,6 +55,7 @@ public partial class AccountRouteSmokeTests : IClassFixture<PtlExternalWebTestFa
         Assert.Contains("You have signed out", body);
         Assert.Contains("govuk-button", body);
         Assert.Contains("Sign in again", body);
+        Assert.Contains("href=\"/\"", body);
     }
 
     [Fact]
@@ -95,6 +96,8 @@ public partial class AccountRouteSmokeTests : IClassFixture<PtlExternalWebTestFa
         Assert.Equal(HttpStatusCode.OK, logoutResponse.StatusCode);
         Assert.Contains($"action=\"{PtlExternalWebTestFactory.FakeEndSessionEndpoint}\"", logoutBody);
         Assert.Contains("id_token_hint", logoutBody);
+        Assert.Contains($"name=\"id_token_hint\" value=\"{PtlExternalWebTestFactory.TestIdToken}\"", logoutBody);
+        Assert.Contains("name=\"post_logout_redirect_uri\" value=\"http://localhost/signout-oidc\"", logoutBody);
     }
 
     private static void CaptureCookies(HttpResponseMessage response, Dictionary<string, string> cookies)

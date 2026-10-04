@@ -1,4 +1,5 @@
 using System.Net;
+using Microsoft.AspNetCore.Hosting;
 using PTL.ExternalWeb.Tests.TestSupport;
 
 namespace PTL.ExternalWeb.Tests.Integration;
@@ -64,6 +65,23 @@ public class SmokeTests : IClassFixture<PtlExternalWebTestFactory>
 
         Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
         Assert.StartsWith(PtlExternalWebTestFactory.FakeAuthorizationEndpoint, response.Headers.Location!.ToString());
+    }
+
+    [Fact]
+    public async Task AccountLogin_Development_CorrelationAndNonceCookiesAreSameSiteLax()
+    {
+        // Over plain HTTP (local dev) browsers drop SameSite=None cookies that aren't Secure, which
+        // makes the CIDM callback fail with "Correlation failed" and land the user on /Home/Error.
+        using var devFactory = _factory.WithWebHostBuilder(builder => builder.UseEnvironment("Development"));
+        var client = devFactory.CreateClient(new() { AllowAutoRedirect = false });
+ 
+        var response = await client.GetAsync("/Account/Login?returnUrl=%2FHome%2FPrivacy");
+ 
+        var setCookies = response.Headers.GetValues("Set-Cookie").ToList();
+        var correlation = Assert.Single(setCookies, c => c.StartsWith(".AspNetCore.Correlation.", StringComparison.Ordinal));
+        var nonce = Assert.Single(setCookies, c => c.StartsWith(".AspNetCore.OpenIdConnect.Nonce.", StringComparison.Ordinal));
+        Assert.Contains("samesite=lax", correlation, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("samesite=lax", nonce, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
