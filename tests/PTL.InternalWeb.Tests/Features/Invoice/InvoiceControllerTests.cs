@@ -2,7 +2,6 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ViewFeatures;
 using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.Extensions.Options;
 using PTL.Contracts.Invoice;
 using PTL.InternalWeb.Features.Invoice;
 using PTL.InternalWeb.Notifications;
@@ -18,7 +17,6 @@ public class InvoiceControllerTests
         new(
             apiClient ?? new FakeInvoiceApiClient(),
             new FakeHostEnvironment(environmentName),
-            Options.Create(new InvoiceNotificationDisplayOptions { FromEmail = "from@example.com", ToEmail = "to@example.com" }),
             NullLogger<InvoiceController>.Instance)
         {
             TempData = new TempDataDictionary(new DefaultHttpContext(), new FakeTempDataProvider())
@@ -41,8 +39,6 @@ public class InvoiceControllerTests
         Assert.Equal(10, model.EligibleContractCount);
         Assert.Equal(2, model.OptOutContractCount);
         Assert.Equal(3, model.NonFeePayingItemCount);
-        Assert.Equal("from@example.com", model.NotificationFromEmail);
-        Assert.Equal("to@example.com", model.NotificationToEmail);
         Assert.True(model.CanGenerate);
     }
 
@@ -161,5 +157,35 @@ public class InvoiceControllerTests
 
         Assert.IsType<NotFoundResult>(result);
         Assert.False(apiClient.ResetCalled);
+    }
+
+    [Fact]
+    public async Task Download_ExistingCsv_ReturnsFileResult()
+    {
+        var apiClient = new FakeInvoiceApiClient
+        {
+            CsvDownload = new InvoiceCsvDownloadResponse("PT_Invoices_2026-01-01.csv", [1, 2, 3])
+        };
+        var controller = CreateController(apiClient);
+        var generationId = Guid.NewGuid();
+
+        var result = await controller.Download(generationId, CancellationToken.None);
+
+        var fileResult = Assert.IsType<FileContentResult>(result);
+        Assert.Equal("text/csv", fileResult.ContentType);
+        Assert.Equal(new byte[] { 1, 2, 3 }, fileResult.FileContents);
+        Assert.Equal("PT_Invoices_2026-01-01.csv", fileResult.FileDownloadName);
+        Assert.Equal(generationId, apiClient.LastDownloadedGenerationId);
+    }
+
+    [Fact]
+    public async Task Download_MissingCsv_ReturnsNotFound()
+    {
+        var apiClient = new FakeInvoiceApiClient { CsvDownload = null };
+        var controller = CreateController(apiClient);
+
+        var result = await controller.Download(Guid.NewGuid(), CancellationToken.None);
+
+        Assert.IsType<NotFoundResult>(result);
     }
 }

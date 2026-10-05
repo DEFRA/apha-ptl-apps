@@ -38,7 +38,7 @@ public class NewCodeCoverageTests
     {
         var options = new NotifyOptions();
 
-        Assert.Equal("GovUkNotify", NotifyOptions.SectionName);
+        Assert.Equal("Notification", NotifyOptions.SectionName);
         Assert.Equal(string.Empty, options.BaseUrl);
         Assert.Equal(string.Empty, options.ApiKey);
     }
@@ -89,11 +89,11 @@ public class NewCodeCoverageTests
         var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
             client.SendEmailAsync("template", "user@example.com"));
 
-        Assert.Contains("GovUkNotify:ApiKey", ex.Message);
+        Assert.Contains("Notification:ApiKey", ex.Message);
     }
 
     [Fact]
-    public async Task NotifyClient_SendEmailWithFileAsync_SendsBase64FileAsPersonalisationValue()
+    public async Task NotifyClient_SendEmailAsync_SendsPersonalisationIncludingDownloadUrl()
     {
         var handler = new CapturingHandler();
         using var httpClient = new HttpClient(handler)
@@ -103,27 +103,24 @@ public class NewCodeCoverageTests
 
         var apiKey = new string('a', 36) + "-" + new string('b', 36);
         var client = new NotifyClient(httpClient, Options.Create(new NotifyOptions { ApiKey = apiKey }));
-        var content = "Customer,Total\r\n\"QAL001\",\"100.00\""u8.ToArray();
 
-        await client.SendEmailWithFileAsync(new NotifyFileEmailRequest(
+        await client.SendEmailAsync(
             "template-123",
             "user@example.com",
-            "link_to_file",
-            content,
-            "PT_Invoices_2026-10-03-21-23-16.csv")
-        {
-            Personalisation = new Dictionary<string, string> { ["generationDateTime"] = "2026/10/03 21:23:16" },
-            Reference = "ref-123"
-        });
+            new Dictionary<string, string>
+            {
+                ["generationDateTime"] = "2026/10/03 21:23:16",
+                ["downloadUrl"] = "https://ptlims.example/Invoice/Download/11111111-1111-1111-1111-111111111111"
+            },
+            "ref-123");
 
         Assert.NotNull(handler.LastRequest);
         var payload = handler.LastPayload;
         Assert.False(string.IsNullOrEmpty(payload));
         Assert.Contains("template-123", payload);
-        Assert.Contains("link_to_file", payload);
-        Assert.Contains("PT_Invoices_2026-10-03-21-23-16.csv", payload);
-        Assert.Contains(Convert.ToBase64String(content), payload);
         Assert.Contains("generationDateTime", payload);
+        Assert.Contains("downloadUrl", payload);
+        Assert.Contains("/Invoice/Download/11111111-1111-1111-1111-111111111111", payload);
     }
 
     [Fact]

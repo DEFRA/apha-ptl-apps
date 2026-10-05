@@ -28,4 +28,10 @@ internal sealed class FakeInvoiceStorageService : IInvoiceStorageService
 
     public Task<byte[]?> GetAsync(string storageKey, CancellationToken cancellationToken = default) =>
         Task.FromResult(_content.TryGetValue(storageKey, out var value) ? value : null);
+
+    public Task<IReadOnlyList<string>> ListAsync(string prefix, CancellationToken cancellationToken = default)
+    {
+        IReadOnlyList<string> keys = [.. _content.Keys.Where(key => key.StartsWith(prefix, StringComparison.Ordinal)).OrderBy(key => key, StringComparer.Ordinal)];
+        return Task.FromResult(keys);
+    }
 }

@@ -11,4 +11,7 @@ public interface IInvoiceStorageService
 
     /// <summary>Returns null when the key does not exist.</summary>
     Task<byte[]?> GetAsync(string storageKey, CancellationToken cancellationToken = default);
+
+    /// <summary>Keys under a prefix. A generation's CSV is found by listing its own id prefix.</summary>
+    Task<IReadOnlyList<string>> ListAsync(string prefix, CancellationToken cancellationToken = default);
 }

@@ -13,3 +13,5 @@ public sealed record PendingInvoiceSummaryResponse(
 public sealed record InvoiceGenerationResponse(bool Success, int ContractCount, string? CsvStorageKey, string? ErrorMessage);
 
 public sealed record InvoiceAuditRecordResponse(Guid AuditInvoiceGenerationId, string AuditWho, DateTime AuditDate);
+
+public sealed record InvoiceCsvDownloadResponse(string FileName, byte[] Content);

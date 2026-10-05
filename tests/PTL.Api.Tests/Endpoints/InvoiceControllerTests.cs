@@ -107,4 +107,37 @@ public class InvoiceControllerTests
         Assert.Single(history);
         Assert.Equal("test.user", history[0].AuditWho);
     }
+
+    [Fact]
+    public async Task DownloadCsv_ExistingGeneration_ReturnsFileResult()
+    {
+        var repository = new FakeInvoiceRepository();
+        var storage = new FakeInvoiceStorageService();
+        var service = new InvoiceService(
+            repository,
+            storage,
+            new FakeNotifyClient(),
+            Options.Create(new InvoiceStorageOptions()),
+            Options.Create(new InvoiceNotificationOptions { TemplateId = "template-1", Recipients = ["ops@example.com"] }),
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<InvoiceService>.Instance);
+        var generationId = Guid.NewGuid();
+        await storage.SaveAsync($"invoices/{generationId}/PT_Invoices_2026-01-01.csv", [1, 2, 3], "text/csv");
+        var controller = new InvoiceController(service, new FakeLookupServiceForInvoice(), Options.Create(new InvoiceNotificationOptions()));
+
+        var result = await controller.DownloadCsv(generationId, CancellationToken.None);
+
+        var fileResult = Assert.IsType<Microsoft.AspNetCore.Mvc.FileContentResult>(result);
+        Assert.Equal("text/csv", fileResult.ContentType);
+        Assert.Equal(new byte[] { 1, 2, 3 }, fileResult.FileContents);
+    }
+
+    [Fact]
+    public async Task DownloadCsv_MissingGeneration_ReturnsNotFound()
+    {
+        var controller = CreateController(new FakeInvoiceRepository());
+
+        var result = await controller.DownloadCsv(Guid.NewGuid(), CancellationToken.None);
+
+        Assert.IsType<Microsoft.AspNetCore.Mvc.NotFoundResult>(result);
+    }
 }

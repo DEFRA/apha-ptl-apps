@@ -183,7 +183,7 @@ builder.Services.Configure<NotifyOptions>(builder.Configuration.GetSection(Notif
 builder.Services.Configure<InvoiceNotificationOptions>(builder.Configuration.GetSection(InvoiceNotificationOptions.SectionName));
 builder.Services.AddHttpClient<INotifyClient, NotifyClient>((services, client) =>
 {
-    // BaseUrl is always sourced from appsettings.json/environment (GovUkNotify:BaseUrl) - no
+    // BaseUrl is always sourced from appsettings.json/environment (Notification:BaseUrl) - no
     // in-code fallback, so the endpoint can be changed per-environment without a code change.
     var notifyOptions = services.GetRequiredService<IOptions<NotifyOptions>>().Value;
     client.BaseAddress = new Uri(notifyOptions.BaseUrl);
