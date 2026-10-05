@@ -8,8 +8,6 @@ public sealed class InvoiceGenerationViewModel
     public int EligibleContractCount { get; init; }
     public int OptOutContractCount { get; init; }
     public int NonFeePayingItemCount { get; init; }
-    public string NotificationFromEmail { get; init; } = string.Empty;
-    public string NotificationToEmail { get; init; } = string.Empty;
     public bool CanReset { get; init; }
 
     // Generate is only meaningful while there are pending (not-yet-invoiced) contracts. Every
@@ -20,14 +18,12 @@ public sealed class InvoiceGenerationViewModel
     // Legacy BtnGenerateInvoices.OnClientClick wording - preserved exactly.
     public const string GenerateConfirmation = "Are you sure you want to create an invoice for the latest billing period?";
 
-    public static InvoiceGenerationViewModel From(PendingInvoiceSummaryResponse? pending, bool canReset, InvoiceNotificationDisplayOptions notificationDisplay) => new()
+    public static InvoiceGenerationViewModel From(PendingInvoiceSummaryResponse? pending, bool canReset) => new()
     {
         FinancialYear = pending?.FinancialYear ?? string.Empty,
         EligibleContractCount = pending?.EligibleContractCount ?? 0,
         OptOutContractCount = pending?.OptOutContractCount ?? 0,
         NonFeePayingItemCount = pending?.NonFeePayingItemCount ?? 0,
-        NotificationFromEmail = notificationDisplay.FromEmail,
-        NotificationToEmail = notificationDisplay.ToEmail,
         CanReset = canReset
     };
 }

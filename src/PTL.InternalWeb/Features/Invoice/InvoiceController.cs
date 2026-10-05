@@ -1,6 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Options;
 using PTL.ApiClient;
 using PTL.InternalWeb.Notifications;
 
@@ -13,7 +12,6 @@ namespace PTL.InternalWeb.Features.Invoice;
 public class InvoiceController(
     IInvoiceApiClient invoiceApiClient,
     IHostEnvironment hostEnvironment,
-    IOptions<InvoiceNotificationDisplayOptions> notificationDisplayOptions,
     ILogger<InvoiceController> logger) : Controller
 {
     private static readonly Action<ILogger, int, Exception?> LogGeneratedMessage =
@@ -37,7 +35,7 @@ public class InvoiceController(
     public async Task<IActionResult> Index(CancellationToken cancellationToken)
     {
         var pending = await invoiceApiClient.GetPendingAsync(cancellationToken);
-        return View(InvoiceGenerationViewModel.From(pending, CanReset(), notificationDisplayOptions.Value));
+        return View(InvoiceGenerationViewModel.From(pending, CanReset()));
     }
 
     // Legacy BtnGenerateInvoices_Click - one confirm dialog, then generate/mark-invoiced/audit/

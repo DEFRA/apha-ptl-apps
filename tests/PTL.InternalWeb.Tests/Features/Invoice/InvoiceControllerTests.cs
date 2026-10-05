@@ -2,7 +2,6 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ViewFeatures;
 using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.Extensions.Options;
 using PTL.Contracts.Invoice;
 using PTL.InternalWeb.Features.Invoice;
 using PTL.InternalWeb.Notifications;
@@ -18,7 +17,6 @@ public class InvoiceControllerTests
         new(
             apiClient ?? new FakeInvoiceApiClient(),
             new FakeHostEnvironment(environmentName),
-            Options.Create(new InvoiceNotificationDisplayOptions { FromEmail = "from@example.com", ToEmail = "to@example.com" }),
             NullLogger<InvoiceController>.Instance)
         {
             TempData = new TempDataDictionary(new DefaultHttpContext(), new FakeTempDataProvider())
@@ -41,8 +39,6 @@ public class InvoiceControllerTests
         Assert.Equal(10, model.EligibleContractCount);
         Assert.Equal(2, model.OptOutContractCount);
         Assert.Equal(3, model.NonFeePayingItemCount);
-        Assert.Equal("from@example.com", model.NotificationFromEmail);
-        Assert.Equal("to@example.com", model.NotificationToEmail);
         Assert.True(model.CanGenerate);
     }
 
