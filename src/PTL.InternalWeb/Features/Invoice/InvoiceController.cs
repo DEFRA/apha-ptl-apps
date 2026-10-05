@@ -28,6 +28,12 @@ public class InvoiceController(
             new EventId(2, nameof(LogGenerationFailedMessage)),
             "Invoice generation failed");
 
+    private static readonly Action<ILogger, Guid, Exception?> LogDownloadNotFoundMessage =
+        LoggerMessage.Define<Guid>(
+            LogLevel.Information,
+            new EventId(3, nameof(LogDownloadNotFoundMessage)),
+            "No generated invoice CSV found for generation {GenerationId}");
+
     public async Task<IActionResult> Index(CancellationToken cancellationToken)
     {
         var pending = await invoiceApiClient.GetPendingAsync(cancellationToken);
@@ -78,6 +84,21 @@ public class InvoiceController(
         await invoiceApiClient.ResetAsync(cancellationToken);
         TempData.SetNotification(NotificationType.Success, "Invoices were reset.");
         return RedirectToAction(nameof(Index));
+    }
+
+    // Target of the downloadUrl emailed by GOV.UK Notify. The CSV is streamed from S3 via the API,
+    // so the bucket is never exposed and every download goes through PTLIMS.
+    [HttpGet]
+    public async Task<IActionResult> Download(Guid id, CancellationToken cancellationToken)
+    {
+        var download = await invoiceApiClient.DownloadCsvAsync(id, cancellationToken);
+        if (download is null)
+        {
+            LogDownloadNotFoundMessage(logger, id, null);
+            return NotFound();
+        }
+
+        return File(download.Content, "text/csv", download.FileName);
     }
 
     private bool CanReset() => !hostEnvironment.IsProduction();

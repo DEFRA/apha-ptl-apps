@@ -19,4 +19,10 @@ public sealed class InMemoryInvoiceStorageService : IInvoiceStorageService
 
     public Task<byte[]?> GetAsync(string storageKey, CancellationToken cancellationToken = default) =>
         Task.FromResult(_files.TryGetValue(storageKey, out var content) ? content : null);
+
+    public Task<IReadOnlyList<string>> ListAsync(string prefix, CancellationToken cancellationToken = default)
+    {
+        IReadOnlyList<string> keys = [.. _files.Keys.Where(key => key.StartsWith(prefix, StringComparison.Ordinal)).OrderBy(key => key, StringComparer.Ordinal)];
+        return Task.FromResult(keys);
+    }
 }

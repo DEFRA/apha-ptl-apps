@@ -9,6 +9,9 @@ public interface IInvoiceApiClient
     Task<InvoiceGenerationResponse?> GenerateAsync(CancellationToken cancellationToken = default);
     Task ResetAsync(CancellationToken cancellationToken = default);
     Task<IReadOnlyList<InvoiceAuditRecordResponse>> GetAuditHistoryAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>Returns null when no CSV exists for the id.</summary>
+    Task<InvoiceCsvDownloadResponse?> DownloadCsvAsync(Guid generationId, CancellationToken cancellationToken = default);
 }
 
 // Thin typed HttpClient wrapper around PTL.Api's /api/invoices endpoints, used only by
@@ -35,5 +38,21 @@ public sealed class InvoiceApiClient(HttpClient httpClient) : IInvoiceApiClient
     {
         var history = await httpClient.GetFromJsonAsync<IReadOnlyList<InvoiceAuditRecordResponse>>("/api/invoices/audit-history", cancellationToken);
         return history ?? [];
+    }
+
+    public async Task<InvoiceCsvDownloadResponse?> DownloadCsvAsync(Guid generationId, CancellationToken cancellationToken = default)
+    {
+        using var response = await httpClient.GetAsync($"/api/invoices/{generationId}/csv", cancellationToken);
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+
+        response.EnsureSuccessStatusCode();
+        var fileName = response.Content.Headers.ContentDisposition?.FileNameStar
+            ?? response.Content.Headers.ContentDisposition?.FileName?.Trim('"')
+            ?? $"PT_Invoices_{generationId}.csv";
+
+        return new InvoiceCsvDownloadResponse(fileName, await response.Content.ReadAsByteArrayAsync(cancellationToken));
     }
 }

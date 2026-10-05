@@ -72,14 +72,19 @@ public sealed class InvoiceService(
             var financialYears = string.Join(",", data.Contracts.Select(c => c.YearId).Distinct());
             LogDiagnosticMessage(logger, $"Stage={stage} FinancialYear(s)=[{financialYears}] ContractCount={data.Contracts.Count}", null);
 
-            // Captured once so the storage key's year partition and the notification's
+            // Captured once so the storage key's partition and the notification's
             // generationDateTime personalisation refer to the exact same instant.
             var generatedAt = DateTime.UtcNow;
+
+            // Legacy persisted no link between tblAuditInvoiceGeneration and the CSV (the path was
+            // a local variable), so the download identifier is application-generated rather than
+            // read back from the audit row - no schema or stored-procedure change is implied.
+            var generationId = Guid.NewGuid();
 
             stage = "CsvGenerationAndS3Upload";
             var csv = InvoiceCsvBuilder.Build(data);
             var csvBytes = Encoding.UTF8.GetBytes(csv);
-            var storageKey = BuildStorageKey(generatedAt);
+            var storageKey = BuildStorageKey(generationId, generatedAt);
             LogDiagnosticMessage(logger, $"Stage={stage} GeneratedCsvSizeBytes={csvBytes.Length} S3ObjectKey={storageKey}", null);
             await storage.SaveAsync(storageKey, csvBytes, "text/csv", cancellationToken);
 
@@ -95,7 +100,7 @@ public sealed class InvoiceService(
             LogGeneratedMessage(logger, data.Contracts.Count, storageKey, null);
 
             stage = "Notify";
-            await NotifyRecipientsAsync(stage, storageKey, csvBytes, generatedAt, cancellationToken);
+            await NotifyRecipientsAsync(stage, generationId, storageKey, generatedAt, cancellationToken);
 
             return new InvoiceGenerationOutcome(Success: true, ContractCount: data.Contracts.Count, CsvStorageKey: storageKey, ErrorMessage: null);
         }
@@ -109,10 +114,26 @@ public sealed class InvoiceService(
     public Task ResetInvoicedFlagsAsync(CancellationToken cancellationToken = default) =>
         repository.ResetInvoicedFlagsAsync(cancellationToken);
 
+    // The CSV lives under its own generation-id prefix, so the single object below it is the file.
+    public async Task<InvoiceCsvDownload?> GetGeneratedCsvAsync(Guid generationId, CancellationToken cancellationToken = default)
+    {
+        var keys = await storage.ListAsync(BuildGenerationPrefix(generationId), cancellationToken);
+        var storageKey = keys.FirstOrDefault();
+        if (storageKey is null)
+        {
+            return null;
+        }
+
+        var content = await storage.GetAsync(storageKey, cancellationToken);
+        return content is null
+            ? null
+            : new InvoiceCsvDownload(storageKey[(storageKey.LastIndexOf('/') + 1)..], content);
+    }
+
     public Task<IReadOnlyList<InvoiceAuditEntity>> GetAuditHistoryAsync(CancellationToken cancellationToken = default) =>
         repository.GetAuditHistoryAsync(cancellationToken);
 
-    private async Task NotifyRecipientsAsync(string stage, string storageKey, byte[] csvBytes, DateTime generatedAt, CancellationToken cancellationToken)
+    private async Task NotifyRecipientsAsync(string stage, Guid generationId, string storageKey, DateTime generatedAt, CancellationToken cancellationToken)
     {
         var options = notificationOptions.Value;
         LogDiagnosticMessage(logger, $"Stage={stage} TemplateId={options.TemplateId} RecipientCount={options.Recipients.Count}", null);
@@ -121,24 +142,15 @@ public sealed class InvoiceService(
             return;
         }
 
-        if (csvBytes.Length > NotifyFileAttachment.MaxFileSizeBytes)
-        {
-            LogDiagnosticMessage(logger, $"Stage={stage} WARNING CsvSizeBytes={csvBytes.Length} exceeds GOV.UK Notify's {NotifyFileAttachment.MaxFileSizeBytes}-byte file limit - send will likely be rejected by Notify", null);
-        }
-
         // Legacy subject/body: "FAO IT Unit Weybridge - Proficiency Testing Invoice File" /
         // "The attached invoices were generated from the Proficiency Testing system on
-        // {generationDateTime}" (DateTime.Now.ToString("yyyy/MM/dd HH:mm:ss")) - the Notify portal
-        // template referenced by TemplateId supplies this wording plus the file-download placeholder.
+        // {generationDateTime}" - the Notify portal template referenced by TemplateId supplies this
+        // wording, now with a download link in place of the attachment.
         var personalisation = new Dictionary<string, string>
         {
-            ["csv_reference"] = storageKey,
-            ["generationDateTime"] = generatedAt.ToString("yyyy/MM/dd HH:mm:ss", CultureInfo.InvariantCulture)
+            ["generationDateTime"] = generatedAt.ToString("yyyy/MM/dd HH:mm:ss", CultureInfo.InvariantCulture),
+            ["downloadUrl"] = BuildDownloadUrl(options.DownloadBaseUrl, generationId)
         };
-
-        // Legacy's System.Net.Mail.Attachment(path) names the attachment after the file itself, not
-        // its full archive path - the S3 key's last segment reproduces that exactly.
-        var filename = storageKey[(storageKey.LastIndexOf('/') + 1)..];
 
         foreach (var recipient in options.Recipients)
         {
@@ -146,22 +158,11 @@ public sealed class InvoiceService(
             {
                 LogNotifySendingMessage(
                     logger,
-                    $"recipient={recipient} templateId={options.TemplateId} filename={filename} personalisation=[{string.Join(", ", personalisation.Select(p => $"{p.Key}={p.Value}"))}]",
+                    $"recipient={recipient} templateId={options.TemplateId} generationId={generationId} personalisation=[{string.Join(", ", personalisation.Select(p => $"{p.Key}={p.Value}"))}]",
                     null);
-                await notifyClient.SendEmailWithFileAsync(
-                    new NotifyFileEmailRequest(
-                        options.TemplateId,
-                        recipient,
-                        options.FilePersonalisationKey,
-                        csvBytes,
-                        filename)
-                    {
-                        Personalisation = personalisation,
-                        Reference = storageKey
-                    },
-                    cancellationToken);
-                // NotifyClient.SendEmailWithFileAsync does not expose the HTTP response body/status -
-                // only whether it threw is observable here, so "response" is logged as Accepted/Failed.
+                await notifyClient.SendEmailAsync(options.TemplateId, recipient, personalisation, reference: storageKey, cancellationToken);
+                // The Notify client surfaces only whether the send threw, so "response" is logged
+                // as Accepted/Failed rather than an HTTP status.
                 LogDiagnosticMessage(logger, $"Stage={stage} NotifyResponse=Accepted Recipient={recipient}", null);
             }
             catch (Exception ex)
@@ -174,10 +175,20 @@ public sealed class InvoiceService(
         }
     }
 
-    private string BuildStorageKey(DateTime generatedAt)
+    private static string BuildDownloadUrl(string downloadBaseUrl, Guid generationId) =>
+        $"{downloadBaseUrl.TrimEnd('/')}/Invoice/Download/{generationId}";
+
+    private string BuildGenerationPrefix(Guid generationId)
     {
         var prefix = string.IsNullOrWhiteSpace(storageOptions.Value.Prefix) ? string.Empty : storageOptions.Value.Prefix.Trim('/') + "/";
+        return $"{prefix}{generationId}/";
+    }
+
+    // Legacy filename (PT_Invoices_{timestamp}.csv) is preserved as the object's own name; the
+    // generation id partitions it so a download needs only that id.
+    private string BuildStorageKey(Guid generationId, DateTime generatedAt)
+    {
         var timestamp = generatedAt.ToString("yyyy-MM-dd-HH-mm-ss", CultureInfo.InvariantCulture);
-        return $"{prefix}{generatedAt:yyyy}/PT_Invoices_{timestamp}.csv";
+        return $"{BuildGenerationPrefix(generationId)}PT_Invoices_{timestamp}.csv";
     }
 }

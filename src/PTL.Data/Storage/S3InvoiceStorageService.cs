@@ -44,6 +44,22 @@ public sealed class S3InvoiceStorageService(IAmazonS3 s3Client, IOptions<Invoice
         }
     }
 
+    public async Task<IReadOnlyList<string>> ListAsync(string prefix, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var response = await s3Client.ListObjectsV2Async(
+                new ListObjectsV2Request { BucketName = BucketName(), Prefix = prefix },
+                cancellationToken);
+
+            return [.. response.S3Objects.Select(item => item.Key).Where(key => !string.IsNullOrWhiteSpace(key))];
+        }
+        catch (AmazonS3Exception)
+        {
+            return [];
+        }
+    }
+
     private string BucketName() =>
         string.IsNullOrWhiteSpace(_options.BucketName)
             ? throw new InvalidOperationException($"Configuration value '{InvoiceStorageOptions.SectionName}:BucketName' is required.")

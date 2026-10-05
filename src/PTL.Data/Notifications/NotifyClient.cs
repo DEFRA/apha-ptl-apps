@@ -42,38 +42,6 @@ public sealed class NotifyClient(HttpClient httpClient, IOptions<NotifyOptions> 
         await EnsureSuccessOrThrowWithBodyAsync(response, cancellationToken);
     }
 
-    public async Task SendEmailWithFileAsync(NotifyFileEmailRequest request, CancellationToken cancellationToken = default)
-    {
-        ArgumentNullException.ThrowIfNull(request);
-
-        var merged = new Dictionary<string, object>(StringComparer.Ordinal);
-        if (request.Personalisation is not null)
-        {
-            foreach (var (key, value) in request.Personalisation)
-            {
-                merged[key] = value;
-            }
-        }
-
-        merged[request.FilePersonalisationKey] = PTL.Core.Notifications.NotifyFileAttachment.Build(request.FileContent, request.Filename);
-
-        using var httpRequest = new HttpRequestMessage(HttpMethod.Post, "v2/notifications/email")
-        {
-            Content = JsonContent.Create(new
-            {
-                email_address = request.EmailAddress,
-                template_id = request.TemplateId,
-                personalisation = merged,
-                reference = request.Reference
-            })
-        };
-
-        httpRequest.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", BuildToken());
-
-        using var response = await httpClient.SendAsync(httpRequest, cancellationToken);
-        await EnsureSuccessOrThrowWithBodyAsync(response, cancellationToken);
-    }
-
     // GOV.UK Notify puts the actual validation reason (e.g. "personalisation ... missing") in the
     // response body - EnsureSuccessStatusCode() discards it, leaving only a generic "400 (BAD
     // REQUEST)" with no way to diagnose the real cause from logs.
