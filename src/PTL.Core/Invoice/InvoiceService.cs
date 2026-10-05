@@ -118,7 +118,7 @@ public sealed class InvoiceService(
     public async Task<InvoiceCsvDownload?> GetGeneratedCsvAsync(Guid generationId, CancellationToken cancellationToken = default)
     {
         var keys = await storage.ListAsync(BuildGenerationPrefix(generationId), cancellationToken);
-        var storageKey = keys.FirstOrDefault();
+        var storageKey = keys.Count > 0 ? keys[0] : null;
         if (storageKey is null)
         {
             return null;
