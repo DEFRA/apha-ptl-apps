@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using PTL.Contracts.Contract;
@@ -34,6 +35,12 @@ public sealed class ContractController(
             new EventId(1, nameof(LogContractNotFoundMessage)),
             "Contract {ContractId} not found");
 
+    private static readonly Action<ILogger, string, long, long, long, long, long, Exception?> LogUploadTimingMessage =
+        LoggerMessage.Define<string, long, long, long, long, long>(
+            LogLevel.Information,
+            new EventId(2, nameof(LogUploadTimingMessage)),
+            "UploadExportTemplate timing for {DocumentType}: FileRead={FileReadMs}ms ServiceCall={ServiceCallMs}ms ResponseBuild={ResponseBuildMs}ms Total={TotalMs}ms (RequestEntryTimestamp={RequestEntryTimestamp})");
+
     [HttpGet("contracts/{contractId:guid}")]
     public async Task<ActionResult<ContractResponse>> GetContract(Guid contractId, CancellationToken cancellationToken)
     {
@@ -62,6 +69,9 @@ public sealed class ContractController(
     [HttpPost("export-templates/{documentType}")]
     public async Task<ActionResult<ExportTemplateUploadResponse>> UploadExportTemplate(string documentType, IFormFile? file, CancellationToken cancellationToken)
     {
+        var requestEntry = Stopwatch.GetTimestamp();
+        var total = Stopwatch.StartNew();
+
         if (!ExportDocumentTypes.TryResolve(documentType, out var storageName, out _))
         {
             return NotFound();
@@ -72,14 +82,34 @@ public sealed class ContractController(
             return Ok(new ExportTemplateUploadResponse(false, "File not found", null));
         }
 
+        var fileRead = Stopwatch.StartNew();
         using var buffer = new MemoryStream();
         await file.CopyToAsync(buffer, cancellationToken);
+        fileRead.Stop();
 
+        var serviceCall = Stopwatch.StartNew();
         var result = await exportTemplateService.UploadAsync(storageName, file.FileName, buffer.ToArray(), cancellationToken);
-        return Ok(new ExportTemplateUploadResponse(
+        serviceCall.Stop();
+
+        var responseBuild = Stopwatch.StartNew();
+        var response = Ok(new ExportTemplateUploadResponse(
             result.Success,
             result.ErrorMessage,
             result.Template is null ? null : ToExportTemplateResponse(result.Template)));
+        responseBuild.Stop();
+
+        total.Stop();
+        LogUploadTimingMessage(
+            logger,
+            storageName,
+            fileRead.ElapsedMilliseconds,
+            serviceCall.ElapsedMilliseconds,
+            responseBuild.ElapsedMilliseconds,
+            total.ElapsedMilliseconds,
+            requestEntry,
+            null);
+
+        return response;
     }
 
     [HttpGet("export-templates/{fileId:guid}/content")]

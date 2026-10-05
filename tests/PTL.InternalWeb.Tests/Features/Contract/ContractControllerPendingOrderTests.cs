@@ -12,7 +12,7 @@ public class ContractControllerPendingOrderTests
 {
     private static PTL.InternalWeb.Features.Contract.ContractController CreateController(FakeContractApiClient apiClient) =>
         new(apiClient, new FakeCustomerApiClient(), new FakeLookupApiClient(), new FakeImportPermitApiClient(),
-            NullLogger<PTL.InternalWeb.Features.Contract.ContractController>.Instance, new FakeContractDocumentService(),
+            NullLogger<PTL.InternalWeb.Features.Contract.ContractController>.Instance,
             new FakeContractExportApiClient(), new FakeContractRenewalApiClient(),
             new FakeExportTemplateApiClient(), new FakeBulkExportApiClient(),
             new PTL.Core.Contract.Document.TemplateMergeService())

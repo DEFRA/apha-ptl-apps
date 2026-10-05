@@ -14,8 +14,11 @@ internal sealed class FakeAmazonS3Client() : AmazonS3Client(new BasicAWSCredenti
     public string? LastBucketName { get; private set; }
     public string? LastKey { get; private set; }
     public string? LastContentType { get; private set; }
+    public string? LastListPrefix { get; private set; }
     public byte[]? GetObjectContent { get; set; }
     public bool ThrowNotFoundOnGet { get; set; }
+    public bool ThrowOnList { get; set; }
+    public List<string> ListKeys { get; set; } = [];
 
     public override Task<PutObjectResponse> PutObjectAsync(PutObjectRequest request, CancellationToken cancellationToken = default)
     {
@@ -37,6 +40,22 @@ internal sealed class FakeAmazonS3Client() : AmazonS3Client(new BasicAWSCredenti
 
         var stream = new MemoryStream(GetObjectContent ?? []);
         return Task.FromResult(new GetObjectResponse { ResponseStream = stream });
+    }
+
+    public override Task<ListObjectsV2Response> ListObjectsV2Async(ListObjectsV2Request request, CancellationToken cancellationToken = default)
+    {
+        LastBucketName = request.BucketName;
+        LastListPrefix = request.Prefix;
+
+        if (ThrowOnList)
+        {
+            throw new AmazonS3Exception("Simulated list failure.");
+        }
+
+        return Task.FromResult(new ListObjectsV2Response
+        {
+            S3Objects = [.. ListKeys.Select(key => new S3Object { Key = key })]
+        });
     }
 }
 
@@ -88,5 +107,40 @@ public class S3InvoiceStorageServiceTests
         var result = await service.GetAsync("missing.csv");
 
         Assert.Null(result);
+    }
+
+    [Fact]
+    public async Task ListAsync_ReturnsKeysFromBucket()
+    {
+        var s3Client = new FakeAmazonS3Client { ListKeys = ["invoices/a/PT_Invoices_1.csv", "invoices/a/PT_Invoices_2.csv"] };
+        var service = CreateService(s3Client);
+
+        var result = await service.ListAsync("invoices/a/");
+
+        Assert.Equal(["invoices/a/PT_Invoices_1.csv", "invoices/a/PT_Invoices_2.csv"], result);
+        Assert.Equal("invoices-bucket", s3Client.LastBucketName);
+        Assert.Equal("invoices/a/", s3Client.LastListPrefix);
+    }
+
+    [Fact]
+    public async Task ListAsync_FiltersOutBlankKeys()
+    {
+        var s3Client = new FakeAmazonS3Client { ListKeys = ["invoices/a/PT_Invoices_1.csv", "", "   "] };
+        var service = CreateService(s3Client);
+
+        var result = await service.ListAsync("invoices/a/");
+
+        Assert.Equal(["invoices/a/PT_Invoices_1.csv"], result);
+    }
+
+    [Fact]
+    public async Task ListAsync_OnException_ReturnsEmptyList()
+    {
+        var s3Client = new FakeAmazonS3Client { ThrowOnList = true };
+        var service = CreateService(s3Client);
+
+        var result = await service.ListAsync("invoices/a/");
+
+        Assert.Empty(result);
     }
 }

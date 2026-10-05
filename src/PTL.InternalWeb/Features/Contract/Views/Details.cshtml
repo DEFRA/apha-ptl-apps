@@ -15,69 +15,69 @@
         }
         else
         {
-            <a class="govuk-button" data-module="govuk-button" asp-action="Edit" asp-route-id="@Model.ContractId">Edit contract</a>
+            <a class="govuk-button" data-module="govuk-button" asp-action="Edit" asp-route-id="@Model.ContractId">Edit Contract</a>
         }
     </div>
 </div>
 
-<h2 class="govuk-heading-m">Contract details</h2>
+<h2 class="govuk-heading-m">Contract Details</h2>
 <dl class="govuk-summary-list">
     <govuk-summary-row label="Customer">@Model.CustomerName (@Model.QalNumber)</govuk-summary-row>
-    <govuk-summary-row label="Contract type">@(isUt ? "UT" : "FT")</govuk-summary-row>
+    <govuk-summary-row label="Contract Type">@(isUt ? "UT" : "FT")</govuk-summary-row>
     @if (isUt)
     {
-        <govuk-summary-row label="UT number">@Model.UTNumber</govuk-summary-row>
+        <govuk-summary-row label="UT Number">@Model.UTNumber</govuk-summary-row>
     }
     else
     {
-        <govuk-summary-row label="FT number">@Model.FTNumber</govuk-summary-row>
+        <govuk-summary-row label="FT Number">@Model.FTNumber</govuk-summary-row>
     }
-    <govuk-summary-row label="Commencement date">@(Model.CommencementDate?.ToString("d MMMM yyyy") ?? "Not set")</govuk-summary-row>
+    <govuk-summary-row label="Commencement Date">@(Model.CommencementDate?.ToString("d MMMM yyyy") ?? "Not set")</govuk-summary-row>
     <govuk-summary-row label="Suffix">@Model.Suffix</govuk-summary-row>
     <govuk-summary-row label="Year">@Model.YearId</govuk-summary-row>
-    <govuk-summary-row label="Contract signatory">@Model.ContractSignatory</govuk-summary-row>
-    <govuk-summary-row label="Discount rate">@Model.DiscountRate.ToString("P2")</govuk-summary-row>
-    <govuk-summary-row label="Administration charge">@Model.AdministrationCharge.ToString("N2")</govuk-summary-row>
-    <govuk-summary-row label="Purchase order number">@Model.PurchaseOrderNumber</govuk-summary-row>
-    <govuk-summary-row label="Online order">@(Model.IsOnlineOrder ? "Yes" : "No")</govuk-summary-row>
+    <govuk-summary-row label="Contract Signatory">@Model.ContractSignatory</govuk-summary-row>
+    <govuk-summary-row label="Discount Rate">@Model.DiscountRate.ToString("P2")</govuk-summary-row>
+    <govuk-summary-row label="Administration Charge">@Model.AdministrationCharge.ToString("N2")</govuk-summary-row>
+    <govuk-summary-row label="Purchase Order Number">@Model.PurchaseOrderNumber</govuk-summary-row>
+    <govuk-summary-row label="Online Order">@(Model.IsOnlineOrder ? "Yes" : "No")</govuk-summary-row>
 </dl>
 
-<h2 class="govuk-heading-m">Postage and packaging</h2>
+<h2 class="govuk-heading-m">Postage and Packaging</h2>
 <dl class="govuk-summary-list">
-    <govuk-summary-row label="Number of courier items">@Model.NumberCourier</govuk-summary-row>
-    <govuk-summary-row label="Courier price per item">@Model.CourierPrice.ToString("N2")</govuk-summary-row>
-    <govuk-summary-row label="Number of postage items">@Model.NumberPostage</govuk-summary-row>
-    <govuk-summary-row label="Postage price per item">@Model.PostagePrice.ToString("N2")</govuk-summary-row>
-    <govuk-summary-row label="Number of special delivery items">@Model.NumberSpecialDelivery</govuk-summary-row>
-    <govuk-summary-row label="Special delivery price per item">@Model.SpecialDeliveryPrice.ToString("N2")</govuk-summary-row>
+    <govuk-summary-row label="Number of Courier Items">@Model.NumberCourier</govuk-summary-row>
+    <govuk-summary-row label="Courier Price per Item">@Model.CourierPrice.ToString("N2")</govuk-summary-row>
+    <govuk-summary-row label="Number of Postage Items">@Model.NumberPostage</govuk-summary-row>
+    <govuk-summary-row label="Postage Price per Item">@Model.PostagePrice.ToString("N2")</govuk-summary-row>
+    <govuk-summary-row label="Number of Special Delivery Items">@Model.NumberSpecialDelivery</govuk-summary-row>
+    <govuk-summary-row label="Special Delivery Price per Item">@Model.SpecialDeliveryPrice.ToString("N2")</govuk-summary-row>
 </dl>
 
-<h2 class="govuk-heading-m">Contract setup</h2>
+<h2 class="govuk-heading-m">Contract Setup</h2>
 <dl class="govuk-summary-list">
-    <govuk-summary-row label="Acknowledgement posted date">@(Model.AcknowledgementPostedDate?.ToString("d MMMM yyyy") ?? "Not set")</govuk-summary-row>
-    <govuk-summary-row label="Acknowledgement returned date">@(Model.AcknowledgementReturnedDate?.ToString("d MMMM yyyy") ?? "Not set")</govuk-summary-row>
-    <govuk-summary-row label="Job sheet sent date">@(Model.JobSheetPostedDate?.ToString("d MMMM yyyy") ?? "Not set")</govuk-summary-row>
+    <govuk-summary-row label="Acknowledgement Posted Date">@(Model.AcknowledgementPostedDate?.ToString("d MMMM yyyy") ?? "Not set")</govuk-summary-row>
+    <govuk-summary-row label="Acknowledgement Returned Date">@(Model.AcknowledgementReturnedDate?.ToString("d MMMM yyyy") ?? "Not set")</govuk-summary-row>
+    <govuk-summary-row label="Job Sheet Sent Date">@(Model.JobSheetPostedDate?.ToString("d MMMM yyyy") ?? "Not set")</govuk-summary-row>
 </dl>
 
-<h2 class="govuk-heading-m">Contract status</h2>
+<h2 class="govuk-heading-m">Contract Status</h2>
 <dl class="govuk-summary-list">
     <govuk-summary-row label="Status">
         <strong class="govuk-tag @(Model.IsActive ? "govuk-tag--green" : "govuk-tag--grey")">
             @(Model.IsActive ? "Active" : "Inactive")
         </strong>
     </govuk-summary-row>
-    <govuk-summary-row label="Cancellation date">@(Model.DateOfLeaving?.ToString("d MMMM yyyy") ?? "Not set")</govuk-summary-row>
+    <govuk-summary-row label="Cancellation Date">@(Model.DateOfLeaving?.ToString("d MMMM yyyy") ?? "Not set")</govuk-summary-row>
 </dl>
 
-<h2 class="govuk-heading-m">Invoice generation</h2>
+<h2 class="govuk-heading-m">Invoice Generation</h2>
 <dl class="govuk-summary-list">
-    <govuk-summary-row label="Opt out of invoice generation">@(Model.OptOutOfInvoiceGeneration ? "Yes" : "No")</govuk-summary-row>
-    <govuk-summary-row label="Has been invoiced">@(Model.IsInvoiceSent ? "Yes" : "No")</govuk-summary-row>
+    <govuk-summary-row label="Opt Out of Invoice Generation">@(Model.OptOutOfInvoiceGeneration ? "Yes" : "No")</govuk-summary-row>
+    <govuk-summary-row label="Has Been Invoiced">@(Model.IsInvoiceSent ? "Yes" : "No")</govuk-summary-row>
 </dl>
 
 <h2 class="govuk-heading-m">Others</h2>
 <dl class="govuk-summary-list">
-    <govuk-summary-row label="Actions required">@Model.ActionsRequired</govuk-summary-row>
-    <govuk-summary-row label="Renewal information">@Model.RenewalInformation</govuk-summary-row>
-    <govuk-summary-row label="Cancellation reason">@Model.ReasonForClosure</govuk-summary-row>
+    <govuk-summary-row label="Actions Required">@Model.ActionsRequired</govuk-summary-row>
+    <govuk-summary-row label="Renewal Information">@Model.RenewalInformation</govuk-summary-row>
+    <govuk-summary-row label="Cancellation Reason">@Model.ReasonForClosure</govuk-summary-row>
 </dl>

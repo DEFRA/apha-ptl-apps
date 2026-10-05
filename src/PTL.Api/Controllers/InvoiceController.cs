@@ -45,6 +45,14 @@ public sealed class InvoiceController(IInvoiceService invoiceService, ILookupSer
         return NoContent();
     }
 
+    // The bucket stays private - the CSV is streamed through the API, never linked to directly.
+    [HttpGet("{generationId:guid}/csv")]
+    public async Task<IActionResult> DownloadCsv(Guid generationId, CancellationToken cancellationToken)
+    {
+        var download = await invoiceService.GetGeneratedCsvAsync(generationId, cancellationToken);
+        return download is null ? NotFound() : File(download.Content, "text/csv", download.FileName);
+    }
+
     [HttpGet("audit-history")]
     public async Task<ActionResult<IReadOnlyList<InvoiceAuditRecordResponse>>> GetAuditHistory(CancellationToken cancellationToken)
     {

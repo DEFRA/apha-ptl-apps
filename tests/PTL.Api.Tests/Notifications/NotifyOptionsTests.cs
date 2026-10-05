@@ -11,7 +11,7 @@ public class NotifyOptionsTests
     {
         var options = new NotifyOptions();
 
-        Assert.Equal("GovUkNotify", NotifyOptions.SectionName);
+        Assert.Equal("Notification", NotifyOptions.SectionName);
         Assert.Equal(string.Empty, options.BaseUrl);
         Assert.Equal(string.Empty, options.ApiKey);
     }

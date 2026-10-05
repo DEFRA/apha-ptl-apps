@@ -100,6 +100,29 @@ public class ContractRouteSmokeTests : IClassFixture<WebApplicationFactory<Progr
         Assert.Contains("Contract Details", body);
     }
 
+    // The Contracts list is per-customer, and the Details route carries only the contract id, so
+    // the crumb has to pick the customer up from the page itself.
+    [Fact]
+    public async Task Details_LinksContractsBreadcrumbToTheOwningCustomer()
+    {
+        var client = _factory.CreateClient();
+
+        var response = await client.GetAsync($"/Contract/Details/{ContractId}");
+        var body = await response.Content.ReadAsStringAsync();
+        var breadcrumbs = BreadcrumbSection(body);
+
+        Assert.Contains($"customerId={CustomerId}", breadcrumbs, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain($"customerId={Guid.Empty}", breadcrumbs, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string BreadcrumbSection(string body)
+    {
+        var start = body.IndexOf("govuk-breadcrumbs", StringComparison.Ordinal);
+        Assert.True(start >= 0, "No breadcrumbs rendered.");
+        var end = body.IndexOf("</nav>", start, StringComparison.Ordinal);
+        return body[start..end];
+    }
+
     [Fact]
     public async Task Create_ReturnsSuccess()
     {

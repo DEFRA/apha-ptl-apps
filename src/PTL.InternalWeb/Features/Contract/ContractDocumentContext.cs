@@ -10,7 +10,8 @@ namespace PTL.InternalWeb.Features.Contract;
 /// </summary>
 public sealed record ContractDocumentContext(
     string CanonicalDocumentType,
-    string TemplateKey,
+    // Filename of the selected tblUploadedTemplate row actually being merged.
+    string TemplateName,
     ContractResponse Contract,
     ContractItemsResponse? Items,
     CustomerResponse? Customer,

@@ -4,8 +4,6 @@
     var items = Model.Items;
 }
 
-<a class="govuk-back-link" asp-action="Index" asp-route-customerId="@Model.CustomerId">Back</a>
-
 <h1 class="govuk-heading-l">@items.QalNumber@(string.IsNullOrEmpty(items.Suffix) ? "" : items.Suffix), @items.YearId</h1>
 
 <p class="govuk-body">The table below lists all the items on this Contract.</p>

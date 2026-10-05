@@ -15,7 +15,26 @@ public class CustomerRepositoryTests
     public CustomerRepositoryTests() => DapperColumnMappings.Register();
 
     private const string GetByIdSql = "EXEC dbo.spgCustomerByCustomerId @CustomerId";
-    private const string GetSummariesSql = "EXEC dbo.spgaCustomerInfo @IsActive";
+
+    // Must stay byte-identical to CustomerRepository.SummariesSql - the fake connection matches on text.
+    private const string GetSummariesSql =
+        """
+        SELECT
+            c.fldCustomerId,
+            c.fldQalNumber,
+            c.fldName,
+            c.fldOrganisation,
+            ISNULL(c.fldContactName, '') AS fldContactName,
+            ISNULL(c.fldAccountNumber, '') AS fldAccountNumber,
+            ISNULL(ct.fldCountry, '') AS fldCountry,
+            c.fldIsActive
+        FROM dbo.tblCustomer c
+        LEFT JOIN dbo.tblCountry ct ON c.fldCountryId = ct.fldCountryId
+        WHERE (@IsActive IS NULL OR c.fldIsActive = @IsActive)
+        ORDER BY
+            c.fldIsActive DESC,
+            CONVERT(int, SUBSTRING(c.fldQalNumber, 5, LEN(c.fldQalNumber)))
+        """;
     private const string InsertSql =
         "EXEC dbo.spiCustomer @CustomerId, @RegisteredFileNumber, @Name, @PreviousName, @CustomerTypeID, @VatNumber, @VatRatingId, @AccountNumber, @CustomerFinanceId, @ContactName, @Organisation, @Address1, @Address2, @Address3, @Address4, @Address5, @CountryId, @Telephone, @Telephone2, @Fax, @Email, @CurrencyId, @Comments, @PostageArrangements, @PaymentNonUK, @InvoiceName, @InvoiceOrganisation, @InvoiceAddress1, @InvoiceAddress2, @InvoiceAddress3, @InvoiceAddress4, @InvoiceAddress5, @InvoiceCountryId, @InvoiceTelephone, @InvoiceTelephone2, @InvoiceFax, @InvoiceEmail, @InitialStartDate, @IsActive, @CanOrderOnline, @InactiveDate, @CustomerStatusId";
     private const string UpdateSql =
@@ -30,6 +49,21 @@ public class CustomerRepositoryTests
         table.Columns.Add("fldOrganisation", typeof(string));
         table.Columns.Add("fldIsActive", typeof(bool));
         table.Rows.Add(customerId, "QAL0001", "Test Customer", "Test Org", isActive);
+        return table;
+    }
+
+    private static DataTable SummaryTable(Guid customerId, bool isActive = true)
+    {
+        var table = new DataTable();
+        table.Columns.Add("fldCustomerId", typeof(Guid));
+        table.Columns.Add("fldQalNumber", typeof(string));
+        table.Columns.Add("fldName", typeof(string));
+        table.Columns.Add("fldOrganisation", typeof(string));
+        table.Columns.Add("fldContactName", typeof(string));
+        table.Columns.Add("fldAccountNumber", typeof(string));
+        table.Columns.Add("fldCountry", typeof(string));
+        table.Columns.Add("fldIsActive", typeof(bool));
+        table.Rows.Add(customerId, "QAL0001", "Test Customer", "Test Org", "Alice Example", "ACC-12345", "United Kingdom", isActive);
         return table;
     }
 
@@ -69,12 +103,15 @@ public class CustomerRepositoryTests
     public async Task GetSummariesAsync_ReturnsMappedSummaries()
     {
         var (repository, connection) = CreateRepository();
-        connection.RespondToQuery(GetSummariesSql, CustomerTable(Guid.NewGuid()));
+        connection.RespondToQuery(GetSummariesSql, SummaryTable(Guid.NewGuid()));
 
         var result = await repository.GetSummariesAsync(CustomerStatusFilter.Active);
 
         Assert.Single(result);
         Assert.Equal("Test Customer", result[0].Name);
+        Assert.Equal("Alice Example", result[0].ContactName);
+        Assert.Equal("ACC-12345", result[0].AccountNumber);
+        Assert.Equal("United Kingdom", result[0].Country);
     }
 
     [Fact]

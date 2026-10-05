@@ -3,7 +3,7 @@ namespace PTL.Core.Notifications;
 /// <summary>Connection settings for the shared GOV.UK Notify client - key and endpoint only.</summary>
 public sealed class NotifyOptions
 {
-    public const string SectionName = "GovUkNotify";
+    public const string SectionName = "Notification";
 
     /// <summary>
     /// The full API key copied from the GOV.UK Notify portal, in its
@@ -12,7 +12,7 @@ public sealed class NotifyOptions
     /// </summary>
     public string ApiKey { get; set; } = string.Empty;
 
-    // No in-code default - always sourced from appsettings.json/environment (GovUkNotify:BaseUrl),
+    // No in-code default - always sourced from appsettings.json/environment (Notification:BaseUrl),
     // so the endpoint can be changed per-environment without a code change or redeploy.
     public string BaseUrl { get; set; } = string.Empty;
 }

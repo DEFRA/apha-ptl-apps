@@ -13,4 +13,6 @@ public interface ITemplateStorageService
     Task<byte[]?> GetAsync(string storageKey, CancellationToken cancellationToken = default);
 
     Task DeleteAsync(string storageKey, CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<string>> ListAsync(string? prefix = null, CancellationToken cancellationToken = default);
 }

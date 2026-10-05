@@ -18,7 +18,12 @@ public class InvoiceServiceTests
             storage,
             notify,
             Options.Create(new InvoiceStorageOptions { Prefix = "invoices" }),
-            Options.Create(new InvoiceNotificationOptions { TemplateId = templateId, Recipients = recipients ?? ["ops@example.com"] }),
+            Options.Create(new InvoiceNotificationOptions
+            {
+                TemplateId = templateId,
+                Recipients = recipients ?? ["ops@example.com"],
+                DownloadBaseUrl = "https://ptlims.example"
+            }),
             NullLogger<InvoiceService>.Instance);
 
         return (service, repository, storage, notify);
@@ -73,12 +78,21 @@ public class InvoiceServiceTests
         Assert.True(outcome.Success);
         Assert.Equal(1, outcome.ContractCount);
         Assert.NotNull(outcome.CsvStorageKey);
-        Assert.StartsWith("invoices/PT_Invoices_", outcome.CsvStorageKey);
+
+        // The CSV is partitioned by an application-generated generation id, which is what the
+        // emailed download link carries - legacy persisted no audit-to-CSV relationship.
+        Assert.Matches(@"^invoices/[0-9a-f-]{36}/PT_Invoices_\d{4}-\d{2}-\d{2}-\d{2}-\d{2}-\d{2}\.csv$", outcome.CsvStorageKey);
         Assert.True(repository.MarkInvoicedCalled);
         Assert.Equal("test.user", repository.LastAuditWho);
         Assert.Equal(storage.LastStorageKey, outcome.CsvStorageKey);
         Assert.NotNull(storage.LastContent);
         Assert.Equal(["ops@example.com", "finance@example.com"], notify.SentTo);
+        Assert.NotNull(notify.LastPersonalisation);
+        Assert.Contains("generationDateTime", notify.LastPersonalisation!.Keys);
+
+        // The notification links back into PTLIMS, never to S3 directly.
+        var generationId = outcome.CsvStorageKey!.Split('/')[1];
+        Assert.Equal($"https://ptlims.example/Invoice/Download/{generationId}", notify.LastPersonalisation["downloadUrl"]);
     }
 
     [Fact]
@@ -158,6 +172,34 @@ public class InvoiceServiceTests
 
         Assert.Single(history);
         Assert.Equal("test.user", history[0].AuditWho);
+    }
+
+    // The emailed link carries only the generation id, so the CSV must be resolvable from it alone.
+    [Fact]
+    public async Task GetGeneratedCsvAsync_ReturnsTheCsvStoredForThatGeneration()
+    {
+        var (service, repository, storage, _) = CreateService();
+        var contractId = Guid.NewGuid();
+        repository.PendingData = new InvoicePendingData([Contract(contractId)], [Item(contractId)]);
+
+        var outcome = await service.GenerateInvoicesAsync("test.user");
+        var generationId = Guid.Parse(outcome.CsvStorageKey!.Split('/')[1]);
+
+        var download = await service.GetGeneratedCsvAsync(generationId);
+
+        Assert.NotNull(download);
+        Assert.Equal(storage.LastContent, download!.Content);
+        Assert.StartsWith("PT_Invoices_", download.FileName);
+        Assert.EndsWith(".csv", download.FileName);
+        Assert.DoesNotContain('/', download.FileName);
+    }
+
+    [Fact]
+    public async Task GetGeneratedCsvAsync_UnknownGeneration_ReturnsNull()
+    {
+        var (service, _, _, _) = CreateService();
+
+        Assert.Null(await service.GetGeneratedCsvAsync(Guid.NewGuid()));
     }
 
     [Fact]

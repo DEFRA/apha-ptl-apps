@@ -1,15 +1,18 @@
 @model PTL.InternalWeb.Features.Customer.CustomerFormViewModel
 @{
-    ViewData["Title"] = $"Edit customer - {Model.Name}";
+    ViewData["Title"] = $"Edit Customer - {Model.Name}";
 }
 
-<h1 class="govuk-heading-l">Edit customer</h1>
+<h1 class="govuk-heading-l">Edit Customer</h1>
 
 <form method="post" asp-action="Edit" asp-route-id="@Model.CustomerId" novalidate>
     @await Html.PartialAsync("_CustomerForm", Model)
 
     <div class="govuk-button-group">
-        <button class="govuk-button" data-module="govuk-button" type="submit">Save changes</button>
+        <button class="govuk-button" data-module="govuk-button" type="submit">Save Changes</button>
+        @* Legacy Customer.aspx print buttons - submit the form so validation runs, but return a PDF instead of saving. *@
+        <button class="govuk-button govuk-button--secondary" data-module="govuk-button" type="submit" formaction="@Url.Action("PrintContactLabel")">Print Contact Address Label</button>
+        <button class="govuk-button govuk-button--secondary" data-module="govuk-button" type="submit" formaction="@Url.Action("PrintInvoiceLabel")">Print Invoice Address Label</button>
         <a class="govuk-button govuk-button--secondary" data-module="govuk-button" asp-controller="Customer" asp-action="Index">Cancel</a>
     </div>
 </form>

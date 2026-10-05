@@ -36,7 +36,7 @@
 <h2 class="govuk-heading-m">Contract details</h2>
 
 <div class="govuk-form-group">
-    <label class="govuk-label" asp-for="ContractType">Contract type</label>
+    <label class="govuk-label" asp-for="ContractType">Contract Type</label>
     <select class="govuk-select" asp-for="ContractType" onchange="ptlContractTypeChanged()">
         <option value="UT">UT</option>
         <option value="FT">FT</option>
@@ -44,7 +44,7 @@
 </div>
 
 <div class="@FormGroupClass("UTNumber")" id="UTNumberGroup" hidden="@(!isUt ? "hidden" : null)">
-    <label class="govuk-label" asp-for="UTNumber" id="UTNumberLabel">UT number</label>
+    <label class="govuk-label" asp-for="UTNumber" id="UTNumberLabel">UT Number</label>
     @if (HasError("UTNumber"))
     {
         <p id="UTNumber-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @FirstError("UTNumber")</p>
@@ -64,7 +64,7 @@
 @if (Model.ContractId is not null)
 {
     <div class="govuk-form-group">
-        <label class="govuk-label" for="CommencementDateDisplay">Commencement date</label>
+        <label class="govuk-label" for="CommencementDateDisplay">Commencement Date</label>
         <input class="govuk-input govuk-input--width-10" id="CommencementDateDisplay" value="@Model.CommencementDate?.ToString("d MMMM yyyy")" disabled />
     </div>
 }
@@ -73,13 +73,13 @@
 
 <govuk-select asp-for="YearId" label="Year" asp-items="Model.YearOptions" />
 
-<govuk-input asp-for="ContractSignatory" label="Contract signatory" />
+<govuk-input asp-for="ContractSignatory" label="Contract Signatory" />
 
 <govuk-input asp-for="DiscountRate" label="Discount rate (%)" input-class="govuk-input govuk-input--width-5" />
 
 <govuk-input asp-for="AdministrationCharge" label="@($"Administration charge ({currency})")" input-class="govuk-input govuk-input--width-5" />
 
-<govuk-input asp-for="PurchaseOrderNumber" label="Purchase order number" />
+<govuk-input asp-for="PurchaseOrderNumber" label="Purchase Order Number" />
 
 <div class="govuk-form-group">
     <div class="govuk-checkboxes__item">
@@ -89,27 +89,27 @@
 </div>
 <input type="hidden" asp-for="IsOnlineOrder" />
 
-<h2 class="govuk-heading-m">Postage and packaging</h2>
+<h2 class="govuk-heading-m">Postage and Packaging</h2>
 
-<govuk-input asp-for="NumberCourier" label="Number of courier items" input-class="govuk-input govuk-input--width-5" />
+<govuk-input asp-for="NumberCourier" label="Number of Courier Items" input-class="govuk-input govuk-input--width-5" />
 
-<govuk-input asp-for="CourierPrice" label="@($"Courier price per item ({currency})")" input-class="govuk-input govuk-input--width-5" />
+<govuk-input asp-for="CourierPrice" label="@($"Courier Price per Item ({currency})")" input-class="govuk-input govuk-input--width-5" />
 
-<govuk-input asp-for="NumberPostage" label="Number of postage items" input-class="govuk-input govuk-input--width-5" />
+<govuk-input asp-for="NumberPostage" label="Number of Postage Items" input-class="govuk-input govuk-input--width-5" />
 
-<govuk-input asp-for="PostagePrice" label="@($"Postage price per item ({currency})")" input-class="govuk-input govuk-input--width-5" />
+<govuk-input asp-for="PostagePrice" label="@($"Postage Price per Item ({currency})")" input-class="govuk-input govuk-input--width-5" />
 
-<govuk-input asp-for="NumberSpecialDelivery" label="Number of special delivery items" input-class="govuk-input govuk-input--width-5" />
+<govuk-input asp-for="NumberSpecialDelivery" label="Number of Special Delivery Items" input-class="govuk-input govuk-input--width-5" />
 
-<govuk-input asp-for="SpecialDeliveryPrice" label="@($"Special delivery price per item ({currency})")" input-class="govuk-input govuk-input--width-5" />
+<govuk-input asp-for="SpecialDeliveryPrice" label="@($"Special Delivery Price per Item ({currency})")" input-class="govuk-input govuk-input--width-5" />
 
 <h2 class="govuk-heading-m">Contract setup</h2>
 
-<govuk-input asp-for="AcknowledgementPostedDate" label="Acknowledgement posted date" input-class="govuk-input govuk-input--width-10" type="date" />
+<govuk-input asp-for="AcknowledgementPostedDate" label="Acknowledgement Posted Date" input-class="govuk-input govuk-input--width-10" type="date" />
 
-<govuk-input asp-for="AcknowledgementReturnedDate" label="Acknowledgement returned date" input-class="govuk-input govuk-input--width-10" type="date" />
+<govuk-input asp-for="AcknowledgementReturnedDate" label="Acknowledgement Returned Date" input-class="govuk-input govuk-input--width-10" type="date" />
 
-<govuk-input asp-for="JobSheetPostedDate" label="Job sheet sent date" input-class="govuk-input govuk-input--width-10" type="date" />
+<govuk-input asp-for="JobSheetPostedDate" label="Job Sheet Sent Date" input-class="govuk-input govuk-input--width-10" type="date" />
 
 <h2 class="govuk-heading-m">Contract status</h2>
 
@@ -122,26 +122,26 @@
 
 <govuk-input asp-for="DateOfLeaving" label="Cancellation date" input-class="govuk-input govuk-input--width-10" type="date" />
 
-<h2 class="govuk-heading-m">Invoice generation</h2>
+<h2 class="govuk-heading-m">Invoice Generation</h2>
 
 <div class="govuk-form-group">
     <div class="govuk-checkboxes__item">
         <input class="govuk-checkboxes__input" asp-for="OptOutOfInvoiceGeneration" />
-        <label class="govuk-label govuk-checkboxes__label" asp-for="OptOutOfInvoiceGeneration">Opt out of invoice generation</label>
+        <label class="govuk-label govuk-checkboxes__label" asp-for="OptOutOfInvoiceGeneration">Opt Out of Invoice Generation</label>
     </div>
 </div>
 
 <div class="govuk-form-group">
     <div class="govuk-checkboxes__item">
         <input class="govuk-checkboxes__input" type="checkbox" id="IsInvoiceSentDisplay" checked="@(Model.IsInvoiceSent == true ? "checked" : null)" disabled />
-        <label class="govuk-label govuk-checkboxes__label" for="IsInvoiceSentDisplay">Has been invoiced</label>
+        <label class="govuk-label govuk-checkboxes__label" for="IsInvoiceSentDisplay">Has Been Invoiced</label>
     </div>
 </div>
 
 <h2 class="govuk-heading-m">Others</h2>
 
 <div class="@FormGroupClass("ActionsRequired")">
-    <label class="govuk-label" asp-for="ActionsRequired">Actions required</label>
+    <label class="govuk-label" asp-for="ActionsRequired">Actions Required</label>
     @if (HasError("ActionsRequired"))
     {
         <p id="ActionsRequired-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @FirstError("ActionsRequired")</p>
@@ -150,7 +150,7 @@
 </div>
 
 <div class="@FormGroupClass("RenewalInformation")">
-    <label class="govuk-label" asp-for="RenewalInformation">Renewal information</label>
+    <label class="govuk-label" asp-for="RenewalInformation">Renewal Information</label>
     @if (HasError("RenewalInformation"))
     {
         <p id="RenewalInformation-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @FirstError("RenewalInformation")</p>
@@ -158,7 +158,7 @@
     <textarea class="@InputClass("govuk-textarea", "RenewalInformation")" asp-for="RenewalInformation" aria-describedby="@DescribedBy("RenewalInformation")"></textarea>
 </div>
 
-<govuk-input asp-for="ReasonForClosure" label="Cancellation reason" />
+<govuk-input asp-for="ReasonForClosure" label="Cancellation Reason" />
 
 <script>
     function ptlContractTypeChanged() {

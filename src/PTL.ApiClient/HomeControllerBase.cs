@@ -14,9 +14,6 @@ public abstract class HomeControllerBase(IApiClient apiClient) : Controller
     // Requires authentication (via the app's default authorization policy) - the signed-in landing page.
     public IActionResult Index() => View();
 
-    [AllowAnonymous]
-    public IActionResult Privacy() => View();
-
     // Diagnostic endpoint proving Web -> Api connectivity; useful as a smoke-test in any environment.
     [AllowAnonymous]
     public async Task<IActionResult> ApiStatus(CancellationToken cancellationToken)

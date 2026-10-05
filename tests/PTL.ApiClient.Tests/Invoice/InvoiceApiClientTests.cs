@@ -70,4 +70,52 @@ public class InvoiceApiClientTests
 
         Assert.Empty(result);
     }
+
+    [Fact]
+    public async Task DownloadCsvAsync_NotFound_ReturnsNull()
+    {
+        var client = CreateClient(HttpStatusCode.NotFound, null);
+
+        var result = await client.DownloadCsvAsync(Guid.NewGuid());
+
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public async Task DownloadCsvAsync_UsesContentDispositionFileName()
+    {
+        var client = new InvoiceApiClient(new HttpClient(new StubHttpMessageHandler(() =>
+        {
+            var response = new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new ByteArrayContent([1, 2, 3])
+            };
+            response.Content.Headers.ContentDisposition = new System.Net.Http.Headers.ContentDispositionHeaderValue("attachment")
+            {
+                FileName = "PT_Invoices_2026-01-01.csv"
+            };
+            return response;
+        }))
+        { BaseAddress = new Uri("http://localhost") });
+
+        var result = await client.DownloadCsvAsync(Guid.NewGuid());
+
+        Assert.NotNull(result);
+        Assert.Equal("PT_Invoices_2026-01-01.csv", result!.FileName);
+        Assert.Equal(new byte[] { 1, 2, 3 }, result.Content);
+    }
+
+    [Fact]
+    public async Task DownloadCsvAsync_NoContentDisposition_FallsBackToGeneratedFileName()
+    {
+        var generationId = Guid.NewGuid();
+        var client = new InvoiceApiClient(new HttpClient(new StubHttpMessageHandler(() =>
+            new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent([4, 5]) }))
+        { BaseAddress = new Uri("http://localhost") });
+
+        var result = await client.DownloadCsvAsync(generationId);
+
+        Assert.NotNull(result);
+        Assert.Equal($"PT_Invoices_{generationId}.csv", result!.FileName);
+    }
 }

@@ -9,7 +9,7 @@ namespace PTL.InternalWeb.Tests.Features.Contract;
 public class ContractControllerImportPermitTests
 {
     private static ContractController CreateController(FakeImportPermitApiClient importPermitApiClient) =>
-        new(new FakeContractApiClient(), new FakeCustomerApiClient(), new FakeLookupApiClient(), importPermitApiClient, NullLogger<ContractController>.Instance, new FakeContractDocumentService(), new FakeContractExportApiClient(), new FakeContractRenewalApiClient(), new FakeExportTemplateApiClient(), new FakeBulkExportApiClient(), new PTL.Core.Contract.Document.TemplateMergeService());
+        new(new FakeContractApiClient(), new FakeCustomerApiClient(), new FakeLookupApiClient(), importPermitApiClient, NullLogger<ContractController>.Instance, new FakeContractExportApiClient(), new FakeContractRenewalApiClient(), new FakeExportTemplateApiClient(), new FakeBulkExportApiClient(), new PTL.Core.Contract.Document.TemplateMergeService());
 
     [Fact]
     public async Task ImportPermits_Get_ReturnsViewWithPermits()

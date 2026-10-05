@@ -25,4 +25,15 @@ public sealed class InMemoryTemplateStorageService : ITemplateStorageService
         _files.TryRemove(storageKey, out _);
         return Task.CompletedTask;
     }
+
+    public Task<IReadOnlyList<string>> ListAsync(string? prefix = null, CancellationToken cancellationToken = default)
+    {
+        var normalized = prefix?.Trim('/') ?? string.Empty;
+        var keys = _files.Keys
+            .Where(key => string.IsNullOrEmpty(normalized) || key.StartsWith(normalized, StringComparison.OrdinalIgnoreCase))
+            .OrderBy(key => key, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        return Task.FromResult<IReadOnlyList<string>>(keys);
+    }
 }

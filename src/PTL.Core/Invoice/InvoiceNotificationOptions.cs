@@ -8,9 +8,15 @@ namespace PTL.Core.Invoice;
 /// </summary>
 public sealed class InvoiceNotificationOptions
 {
-    public const string SectionName = "InvoiceNotification";
+    // Nested under the shared Notification section - one notification configuration root for the
+    // whole application, not a sibling top-level section per feature.
+    public const string SectionName = "Notification:InvoiceNotification";
 
     public string TemplateId { get; set; } = string.Empty;
 
     public IReadOnlyList<string> Recipients { get; set; } = [];
+
+    // Public base URL of PTLIMS (PTL.InternalWeb). The API cannot derive the web front-end's
+    // address, so the download link emailed by Notify is built from this.
+    public string DownloadBaseUrl { get; set; } = string.Empty;
 }

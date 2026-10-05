@@ -39,7 +39,7 @@
     </div>
 }
 
-<h2 class="govuk-heading-m">Customer details</h2>
+<h2 class="govuk-heading-m">Customer Details</h2>
 
 <govuk-input asp-for="Name" label="Name" />
 
@@ -48,7 +48,7 @@
 <input type="hidden" asp-for="PreviousName" />
 
 <div class="govuk-form-group">
-    <label class="govuk-label" for="InitialStartDate">Initial start date</label>
+    <label class="govuk-label" for="InitialStartDate">Initial Start Date</label>
     <div class="govuk-hint">Set automatically and cannot be changed.</div>
     <input id="InitialStartDate" class="govuk-input govuk-input--width-10" value="@Model.InitialStartDate?.ToString("d MMMM yyyy")" disabled />
 </div>
@@ -60,21 +60,21 @@
     <label class="govuk-label govuk-checkboxes__label" asp-for="PaymentNonUK">Payment (non-UK)</label>
 </div>
 
-<govuk-select asp-for="CustomerTypeId" label="Customer type" asp-items="Model.CustomerTypeOptions" />
+<govuk-select asp-for="CustomerTypeId" label="Customer Type" asp-items="Model.CustomerTypeOptions" />
 
-<govuk-input asp-for="VatNumber" label="VAT number" />
+<govuk-input asp-for="VatNumber" label="VAT Number" />
 
-<govuk-input asp-for="AccountNumber" label="Account number" />
+<govuk-input asp-for="AccountNumber" label="Account Number" />
 
 <govuk-input asp-for="CustomerFinanceId" label="Customer ID" />
 
 <govuk-select asp-for="VatRatingId" label="VAT rating" asp-items="Model.VatRatingOptions" />
 
-<govuk-input asp-for="RegisteredFileNumber" label="Registered file number"/>
+<govuk-input asp-for="RegisteredFileNumber" label="Registered File Number"/>
 
 <div class="govuk-checkboxes__item">
     <input class="govuk-checkboxes__input" asp-for="CanOrderOnline" />
-    <label class="govuk-label govuk-checkboxes__label" asp-for="CanOrderOnline">Order online</label>
+    <label class="govuk-label govuk-checkboxes__label" asp-for="CanOrderOnline">Order Online</label>
 </div>
 
 <div class="govuk-checkboxes__item">
@@ -95,27 +95,27 @@
      customer is inactive) when other Customer details are saved. -->
 <input type="hidden" asp-for="CustomerStatusId" />
 
-<h2 class="govuk-heading-m">Contact details</h2>
+<h2 class="govuk-heading-m">Contact Details</h2>
 
-<govuk-input asp-for="ContactName" label="Contact name" />
+<govuk-input asp-for="ContactName" label="Contact Name" />
 
-<govuk-input asp-for="Organisation" label="Organisation name" />
+<govuk-input asp-for="Organisation" label="Organisation Name" />
 
-<govuk-input asp-for="Address1" label="Address line 1" />
+<govuk-input asp-for="Address1" label="Address 1" />
 
-<govuk-input asp-for="Address2" label="Address line 2" />
+<govuk-input asp-for="Address2" label="Address 2" />
 
-<govuk-input asp-for="Address3" label="Address line 3" />
+<govuk-input asp-for="Address3" label="Address 3" />
 
-<govuk-input asp-for="Address4" label="Address line 4" />
+<govuk-input asp-for="Address4" label="Address 4" />
 
-<govuk-input asp-for="Address5" label="Address line 5" />
+<govuk-input asp-for="Address5" label="Address 5" />
 
 <govuk-select asp-for="CountryId" label="Country" asp-items="Model.CountryOptions" />
 
 <govuk-input asp-for="Telephone" label="Telephone" />
 
-<govuk-input asp-for="Telephone2" label="Telephone (alternative)" />
+<govuk-input asp-for="Telephone2" label="Telephone 2" />
 
 <govuk-input asp-for="Fax" label="Fax" />
 
@@ -123,36 +123,36 @@
 
 <h2 class="govuk-heading-m">
     Invoice details
-    <button type="button" class="govuk-button govuk-button--secondary govuk-!-margin-left-3" data-module="govuk-button" id="CopyFromContactButton">Copy from contact details</button>
+    <button type="button" class="govuk-button govuk-button--secondary govuk-!-margin-left-3" data-module="govuk-button" id="CopyFromContactButton">Copy from Customer Contact</button>
 </h2>
 
-<govuk-input asp-for="InvoiceName" label="Invoice name" />
+<govuk-input asp-for="InvoiceName" label="Invoice Contact Name" />
 
-<govuk-input asp-for="InvoiceOrganisation" label="Invoice organisation name" />
+<govuk-input asp-for="InvoiceOrganisation" label="Invoice Organisation Name" />
 
-<govuk-input asp-for="InvoiceAddress1" label="Invoice address line 1" />
+<govuk-input asp-for="InvoiceAddress1" label="Invoice Address 1" />
 
-<govuk-input asp-for="InvoiceAddress2" label="Invoice address line 2" />
+<govuk-input asp-for="InvoiceAddress2" label="Invoice Address 2" />
 
-<govuk-input asp-for="InvoiceAddress3" label="Invoice address line 3" />
+<govuk-input asp-for="InvoiceAddress3" label="Invoice address 3" />
 
-<govuk-input asp-for="InvoiceAddress4" label="Invoice address line 4" />
+<govuk-input asp-for="InvoiceAddress4" label="Invoice Address 4" />
 
-<govuk-input asp-for="InvoiceAddress5" label="Invoice address line 5" />
+<govuk-input asp-for="InvoiceAddress5" label="Invoice Address 5" />
 
 <govuk-select asp-for="InvoiceCountryId" label="Invoice country" asp-items="Model.InvoiceCountryOptions" />
 
-<govuk-input asp-for="InvoiceTelephone" label="Invoice telephone" />
+<govuk-input asp-for="InvoiceTelephone" label="Invoice Telephone" />
 
-<govuk-input asp-for="InvoiceTelephone2" label="Invoice telephone (alternative)" />
+<govuk-input asp-for="InvoiceTelephone2" label="Invoice Telephone 2" />
 
-<govuk-input asp-for="InvoiceFax" label="Invoice fax" />
+<govuk-input asp-for="InvoiceFax" label="Invoice Fax" />
 
-<govuk-input asp-for="InvoiceEmail" label="Invoice email" />
+<govuk-input asp-for="InvoiceEmail" label="Invoice Email" />
 
 <h2 class="govuk-heading-m">Other</h2>
 
-<govuk-textarea asp-for="PostageArrangements" label="Postage arrangements" />
+<govuk-textarea asp-for="PostageArrangements" label="Postage Arrangements" />
 
 <govuk-textarea asp-for="Comments" label="Comments" />
 
