@@ -82,10 +82,94 @@ public class SchemeControllerTests
     {
         var controller = CreateController(new FakeSchemeApiClient());
 
-        var result = await controller.Create(CancellationToken.None);
+        var result = await controller.Create(cancellationToken: CancellationToken.None);
 
         var view = Assert.IsType<ViewResult>(result);
         Assert.IsType<PTL.InternalWeb.Features.Scheme.SchemeFormViewModel>(view.Model);
+    }
+
+    [Fact]
+    public async Task Create_Get_DefaultsToNextYearAndDerivesStartDate()
+    {
+        var lookup = new FakeLookupApiClient
+        {
+            Years = [new PTL.Contracts.Lookup.YearResponse(2025, "2025/26"), new PTL.Contracts.Lookup.YearResponse(2026, "2026/27")],
+            AllYears = [new PTL.Contracts.Lookup.YearResponse(2025, "2025/26"), new PTL.Contracts.Lookup.YearResponse(2026, "2026/27")],
+            SystemSettings = new PTL.Contracts.Lookup.SystemSettingsResponse(string.Empty, new DateTime(2025, 4, 1))
+        };
+        var controller = CreateController(new FakeSchemeApiClient(), lookup);
+
+        var result = await controller.Create(cancellationToken: CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<PTL.InternalWeb.Features.Scheme.SchemeFormViewModel>(view.Model);
+        Assert.Equal(2026, model.YearId);
+        Assert.Equal("2026/27", model.YearLabel);
+        Assert.Equal(new DateTime(2026, 4, 1), model.StartDate);
+    }
+
+    [Fact]
+    public async Task Create_Get_LocksMonthsWhoseDistributionIsAlreadyInitialised()
+    {
+        var lookup = new FakeLookupApiClient
+        {
+            Years = [new PTL.Contracts.Lookup.YearResponse(2025, "2025/26"), new PTL.Contracts.Lookup.YearResponse(2026, "2026/27")],
+            SchemeMonthEditability = new PTL.Contracts.Scheme.SchemeMonthEditabilityResponse(
+                Jan: true, Feb: true, Mar: true, Apr: true, May: true, Jun: false,
+                Jul: true, Aug: true, Sep: true, Oct: true, Nov: true, Dec: true)
+        };
+        var controller = CreateController(new FakeSchemeApiClient(), lookup);
+
+        var result = await controller.Create(cancellationToken: CancellationToken.None);
+
+        var model = Assert.IsType<PTL.InternalWeb.Features.Scheme.SchemeFormViewModel>(Assert.IsType<ViewResult>(result).Model);
+        Assert.False(model.CanEditJun);
+        Assert.True(model.CanEditApr);
+    }
+
+    [Fact]
+    public async Task CreateForCurrentYear_Get_DefaultsToCurrentYearAndRendersTheCreateView()
+    {
+        var lookup = new FakeLookupApiClient
+        {
+            Years = [new PTL.Contracts.Lookup.YearResponse(2025, "2025/26"), new PTL.Contracts.Lookup.YearResponse(2026, "2026/27")],
+            AllYears = [new PTL.Contracts.Lookup.YearResponse(2025, "2025/26"), new PTL.Contracts.Lookup.YearResponse(2026, "2026/27")],
+            SystemSettings = new PTL.Contracts.Lookup.SystemSettingsResponse(string.Empty, new DateTime(2025, 4, 1))
+        };
+        var controller = CreateController(new FakeSchemeApiClient(), lookup);
+
+        var result = await controller.CreateForCurrentYear(CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<PTL.InternalWeb.Features.Scheme.SchemeFormViewModel>(view.Model);
+        Assert.Equal(2025, model.YearId);
+        Assert.Equal("2025/26", model.YearLabel);
+
+        // Both entry points share the one Create form, as both legacy menu items share Scheme.aspx.
+        Assert.Equal("Create", view.ViewName);
+    }
+
+    [Fact]
+    public async Task Edit_Get_KeepsSampleNoSequenceAndDerivesStartDate()
+    {
+        var schemeId = Guid.NewGuid();
+        var scheduleId = Guid.NewGuid();
+        var scheme = SampleScheme(schemeId, Guid.NewGuid()) with { YearId = 2026, ScheduleId = scheduleId, SampleNoSequence = 7 };
+        var lookup = new FakeLookupApiClient
+        {
+            Years = [new PTL.Contracts.Lookup.YearResponse(2025, "2025/26"), new PTL.Contracts.Lookup.YearResponse(2026, "2026/27")],
+            SystemSettings = new PTL.Contracts.Lookup.SystemSettingsResponse(string.Empty, new DateTime(2025, 4, 1)),
+            Schedules = [new PTL.Contracts.Lookup.ScheduleResponse(scheduleId, "Routine")]
+        };
+        var controller = CreateController(new FakeSchemeApiClient { SchemeResponse = scheme }, lookup);
+
+        var result = await controller.Edit(schemeId, CancellationToken.None);
+
+        var model = Assert.IsType<PTL.InternalWeb.Features.Scheme.SchemeFormViewModel>(Assert.IsType<ViewResult>(result).Model);
+        Assert.Equal(7, model.SampleNoSequence);
+
+        // SampleScheme selects April only, and April is on or after the contract start month.
+        Assert.Equal(new DateTime(2026, 4, 1), model.StartDate);
     }
 
     [Fact]
@@ -95,7 +179,7 @@ public class SchemeControllerTests
         controller.ModelState.AddModelError("Identifier", "Enter the scheme identifier.");
         var model = new PTL.InternalWeb.Features.Scheme.SchemeFormViewModel();
 
-        var result = await controller.Create(model, CancellationToken.None);
+        var result = await controller.Create(model, cancellationToken: CancellationToken.None);
 
         var view = Assert.IsType<ViewResult>(result);
         Assert.Same(model, view.Model);
@@ -111,7 +195,7 @@ public class SchemeControllerTests
         var controller = CreateController(apiClient);
         var model = new PTL.InternalWeb.Features.Scheme.SchemeFormViewModel { YearId = 2027 };
 
-        var result = await controller.Create(model, CancellationToken.None);
+        var result = await controller.Create(model, cancellationToken: CancellationToken.None);
 
         var view = Assert.IsType<ViewResult>(result);
         Assert.False(controller.ModelState.IsValid);
@@ -129,7 +213,7 @@ public class SchemeControllerTests
         var controller = CreateController(apiClient);
         var model = new PTL.InternalWeb.Features.Scheme.SchemeFormViewModel { YearId = 2027, Identifier = "PT1234", Name = "Test Scheme" };
 
-        var result = await controller.Create(model, CancellationToken.None);
+        var result = await controller.Create(model, cancellationToken: CancellationToken.None);
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
         Assert.Equal("Details", redirect.ActionName);
@@ -170,7 +254,7 @@ public class SchemeControllerTests
         var controller = CreateController(apiClient);
         var model = new PTL.InternalWeb.Features.Scheme.SchemeFormViewModel { YearId = 2027, Identifier = "PT1234", Name = "Test Scheme" };
 
-        var result = await controller.Edit(schemeId, model, CancellationToken.None);
+        var result = await controller.Edit(schemeId, model, cancellationToken: CancellationToken.None);
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
         Assert.Equal("Details", redirect.ActionName);
@@ -197,7 +281,7 @@ public class SchemeControllerTests
         var controller = CreateController(apiClient);
         var model = new PTL.InternalWeb.Features.Scheme.SchemeFormViewModel { YearId = 2027, Identifier = "PT1234", Name = "Test Scheme" };
 
-        var result = await controller.Create(model, CancellationToken.None);
+        var result = await controller.Create(model, cancellationToken: CancellationToken.None);
 
         var view = Assert.IsType<ViewResult>(result);
         Assert.Same(model, view.Model);
@@ -213,7 +297,7 @@ public class SchemeControllerTests
         controller.ModelState.AddModelError("Identifier", "Enter an identifier");
         var model = new PTL.InternalWeb.Features.Scheme.SchemeFormViewModel();
 
-        var result = await controller.Edit(Guid.NewGuid(), model, CancellationToken.None);
+        var result = await controller.Edit(Guid.NewGuid(), model, cancellationToken: CancellationToken.None);
 
         var view = Assert.IsType<ViewResult>(result);
         Assert.Same(model, view.Model);
@@ -229,7 +313,7 @@ public class SchemeControllerTests
         var controller = CreateController(apiClient);
         var model = new PTL.InternalWeb.Features.Scheme.SchemeFormViewModel { YearId = 2027, Identifier = "PT1234", Name = "Test Scheme" };
 
-        var result = await controller.Edit(Guid.NewGuid(), model, CancellationToken.None);
+        var result = await controller.Edit(Guid.NewGuid(), model, cancellationToken: CancellationToken.None);
 
         var view = Assert.IsType<ViewResult>(result);
         Assert.Same(model, view.Model);

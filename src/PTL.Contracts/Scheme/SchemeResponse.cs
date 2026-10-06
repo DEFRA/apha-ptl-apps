@@ -63,4 +63,17 @@ public sealed record SchemeResponse(
     Guid? Assessor4,
     string? StandardTabulationText,
     DateTime LastModified,
-    bool IsReadOnly);
+    bool IsReadOnly,
+    IReadOnlyList<SchemeCurrencyPriceResponse>? Prices = null,
+    SchemeMonthEditabilityResponse? CanEdit = null,
+    IReadOnlyList<Guid>? ViewerIds = null,
+    IReadOnlyList<SchemeTestResponse>? Tests = null,
+    IReadOnlyList<SchemeTabulationResponse>? Tabulations = null);
+
+public sealed record SchemeCurrencyPriceResponse(Guid SchemeCurrencyId, Guid CurrencyId, decimal Price, string CurrencyName, string CurrencySymbol);
+
+// dbo.fnIsDistributionNotDefined per month (fldCanEditJan..Dec on spgSchemeBySchemeId) - false
+// once that month's distribution has been initialised, which locks the checkbox in the UI.
+public sealed record SchemeMonthEditabilityResponse(
+    bool Jan, bool Feb, bool Mar, bool Apr, bool May, bool Jun,
+    bool Jul, bool Aug, bool Sep, bool Oct, bool Nov, bool Dec);

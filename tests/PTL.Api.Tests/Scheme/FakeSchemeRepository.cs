@@ -159,6 +159,10 @@ internal sealed class FakeSchemeRepository : ISchemeRepository
         Assessor4 = source.Assessor4,
         StandardTabulationText = source.StandardTabulationText,
         LastModified = source.LastModified,
-        IsReadOnly = source.IsReadOnly
+        IsReadOnly = source.IsReadOnly,
+        Prices = [.. source.Prices],
+        ViewerIds = [.. source.ViewerIds],
+        Tests = [.. source.Tests],
+        Tabulations = [.. source.Tabulations]
     };
 }

@@ -1,8 +1,14 @@
 using Microsoft.Extensions.Logging;
+using PTL.Core.Lookup;
+using PTL.Core.Viewer;
 
 namespace PTL.Core.Scheme;
 
-public sealed class SchemeService(ISchemeRepository schemeRepository, ILogger<SchemeService> logger) : ISchemeService
+public sealed class SchemeService(
+    ISchemeRepository schemeRepository,
+    ILookupRepository lookupRepository,
+    IViewerRepository viewerRepository,
+    ILogger<SchemeService> logger) : ISchemeService
 {
     private static readonly Action<ILogger, int, string?, int, int, Exception?> LogSchemeSearchMessage =
         LoggerMessage.Define<int, string?, int, int>(
@@ -41,7 +47,20 @@ public sealed class SchemeService(ISchemeRepository schemeRepository, ILogger<Sc
             "Displayed scheme family history for {SharedId}");
 
     public Task<Scheme?> GetSchemeAsync(Guid schemeId, CancellationToken cancellationToken = default) =>
-        schemeRepository.GetByIdAsync(schemeId, cancellationToken);
+        LoadWithViewersAsync(schemeId, cancellationToken);
+
+    private async Task<Scheme?> LoadWithViewersAsync(Guid schemeId, CancellationToken cancellationToken)
+    {
+        var scheme = await schemeRepository.GetByIdAsync(schemeId, cancellationToken);
+        if (scheme is null)
+        {
+            return null;
+        }
+
+        var links = await viewerRepository.GetSchemeViewersAsync(schemeId, cancellationToken);
+        scheme.ViewerIds = links.Select(link => link.ViewerId).ToList();
+        return scheme;
+    }
 
     public async Task<SchemeSearchResult> SearchSchemesAsync(int yearId, string? searchTerm, int page, int pageSize, CancellationToken cancellationToken = default)
     {
@@ -84,9 +103,11 @@ public sealed class SchemeService(ISchemeRepository schemeRepository, ILogger<Sc
         scheme.SharedId = Guid.NewGuid();
         scheme.LastModified = DateTime.UtcNow;
 
-        Validate(scheme);
+        await ValidateAsync(scheme, existing: null, cancellationToken);
 
         var created = await schemeRepository.CreateAsync(scheme, cancellationToken);
+        await SyncViewersAsync(created.SchemeId, scheme.ViewerIds, cancellationToken);
+        created.ViewerIds = scheme.ViewerIds;
         LogCreatedSchemeMessage(logger, created.SchemeId, created.YearId, created.Identifier, null);
         return created;
     }
@@ -115,20 +136,126 @@ public sealed class SchemeService(ISchemeRepository schemeRepository, ILogger<Sc
         updatedFields.RequiresAssessment = existing.RequiresAssessment;
         updatedFields.LastModified = DateTime.UtcNow;
 
-        Validate(updatedFields);
+        await ValidateAsync(updatedFields, existing, cancellationToken);
 
         var updated = await schemeRepository.UpdateAsync(updatedFields, cancellationToken);
+        if (updated is null)
+        {
+            return null;
+        }
+
+        await SyncViewersAsync(schemeId, updatedFields.ViewerIds, cancellationToken);
+        updated.ViewerIds = updatedFields.ViewerIds;
         LogUpdatedSchemeMessage(logger, schemeId, null);
         return updated;
     }
 
-    private void Validate(Scheme scheme)
+    // Legacy ViewerSchemeCollection.Update: delete the links that were removed, insert the ones
+    // that were added, leave the rest alone. tlnkViewerScheme has no update procedure.
+    private async Task SyncViewersAsync(Guid schemeId, IList<Guid> viewerIds, CancellationToken cancellationToken)
     {
-        var result = SchemeValidator.Validate(scheme);
-        if (!result.IsValid)
+        var existing = await viewerRepository.GetSchemeViewersAsync(schemeId, cancellationToken);
+        var requested = viewerIds.ToHashSet();
+
+        foreach (var link in existing.Where(link => !requested.Contains(link.ViewerId)))
         {
-            LogSchemeValidationFailedMessage(logger, scheme.SchemeId, string.Join("; ", result.Errors.Select(e => e.Message)), null);
-            throw new SchemeValidationException(result.Errors);
+            await viewerRepository.RemoveSchemeViewerAsync(link.ViewerSchemeId, cancellationToken);
+        }
+
+        var alreadyLinked = existing.Select(link => link.ViewerId).ToHashSet();
+        foreach (var viewerId in requested.Where(id => !alreadyLinked.Contains(id)))
+        {
+            await viewerRepository.AddSchemeViewerAsync(Guid.NewGuid(), viewerId, schemeId, cancellationToken);
+        }
+    }
+
+    // Values legacy derives rather than asking the user for, applied before validation so the
+    // saved record and the redisplayed form agree.
+    private async Task ApplyDerivedFieldsAsync(Scheme scheme, Scheme? existing, CancellationToken cancellationToken)
+    {
+        scheme.Identifier = SchemeIdentifier.Normalise(scheme.Identifier);
+        // CheckBoxCheckChangedShowRatings: ticking Show Ratings Table on any tabulation turns on
+        // Score Samples for the scheme.
+        if (scheme.Tabulations.Any(t => t.ShowRatings))
+        {
+            scheme.StoreRatings = true;
+        }
+
+        // Combined packaging schemes are despatched in week 1.
+        if (scheme.CombinedPackaging)
+        {
+            scheme.WeekNumber = 1;
+        }
+
+        // RequiresAssessment setter: switching mode discards the staffing that no longer applies.
+        if (scheme.RequiresAssessment)
+        {
+            scheme.TestConsultant1 = null;
+            scheme.TestConsultant2 = null;
+            scheme.TestConsultant3 = null;
+        }
+        else
+        {
+            scheme.Assessor1 = null;
+            scheme.Assessor2 = null;
+            scheme.Assessor3 = null;
+            scheme.Assessor4 = null;
+
+            // Categories and criteria only exist on assessment schemes (RemoveAllCategories).
+            foreach (var test in scheme.Tests)
+            {
+                test.Categories.Clear();
+            }
+        }
+
+        var settings = await lookupRepository.GetSystemSettingsAsync(cancellationToken);
+
+        // Legacy's DistributionMonthX setters refuse an assignment while that month is locked, so a
+        // locked month keeps whatever it already had no matter what was posted.
+        var distributions = await lookupRepository.GetMonthlyDistributionsAsync(cancellationToken);
+        var editability = SchemeDistributionMonths.CalculateEditability(scheme.YearId, settings.ContractStartDate.Month, distributions);
+        SchemeDistributionMonths.RestoreLockedMonths(scheme, editability, existing);
+        SchemeDistributionMonths.ApplyEditability(scheme, editability);
+
+        scheme.StartDate = SchemeStartDate.Calculate(scheme, settings.ContractStartDate);
+    }
+
+    private async Task ValidateAsync(Scheme scheme, Scheme? existing, CancellationToken cancellationToken)
+    {
+        await ApplyDerivedFieldsAsync(scheme, existing, cancellationToken);
+
+        var result = SchemeValidator.Validate(scheme);
+        var errors = result.Errors.ToList();
+
+        // Legacy UniquePTNumberValidator (Scheme.aspx.vb): the identifier must not already be in
+        // use by a different scheme, in any year. The scheme's own row is excluded so re-saving
+        // an unchanged identifier stays valid.
+        if (!string.IsNullOrWhiteSpace(scheme.Identifier))
+        {
+            var existingIdentifiers = await lookupRepository.GetPTNumbersAsync(cancellationToken);
+            if (existingIdentifiers.Any(pt =>
+                    pt.SchemeId != scheme.SchemeId &&
+                    string.Equals(pt.Identifier, scheme.Identifier, StringComparison.OrdinalIgnoreCase)))
+            {
+                errors.Add(new SchemeValidationError(nameof(Scheme.Identifier), "This PT number already exists. Please choose a unique PT number"));
+            }
+        }
+
+        // Legacy populates the Primary Test Consultant dropdown from internal users only; the
+        // Deputy and Secondary lists also include external consultants.
+        if (!scheme.RequiresAssessment && scheme.TestConsultant1 is { } primary && primary != Guid.Empty)
+        {
+            var consultants = await lookupRepository.GetTestConsultantsAsync(cancellationToken);
+            if (consultants.Any(c => c.UserId == primary && c.IsExternal))
+            {
+                errors.Add(new SchemeValidationError(nameof(Scheme.TestConsultant1), "The Primary Test Consultant must be an internal Test Consultant"));
+            }
+        }
+
+        if (errors.Count > 0)
+        {
+            LogSchemeValidationFailedMessage(logger, scheme.SchemeId, string.Join("; ", errors.Select(e => e.Message)), null);
+            throw new SchemeValidationException(errors);
         }
     }
 }

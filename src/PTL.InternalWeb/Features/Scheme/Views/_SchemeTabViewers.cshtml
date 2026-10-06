@@ -1,0 +1,73 @@
+@model PTL.InternalWeb.Features.Scheme.SchemeFormViewModel
+@{
+    var assigned = Model.ViewerIds.ToHashSet();
+    var assignedViewers = Model.ViewerOptions.Where(v => assigned.Contains(Guid.Parse(v.Value))).ToList();
+    var availableViewers = Model.ViewerOptions.Where(v => !assigned.Contains(Guid.Parse(v.Value))).ToList();
+}
+
+<h2 class="govuk-heading-m">Viewers</h2>
+
+<div class="govuk-grid-row">
+    <div class="govuk-grid-column-one-third">
+        <div class="govuk-form-group">
+            <label class="govuk-label govuk-label--s" for="availableViewers">Available Viewers</label>
+            <select class="govuk-select ptl-viewer-select" id="availableViewers" multiple size="10">
+                @foreach (var viewer in availableViewers)
+                {
+                    <option value="@viewer.Value">@viewer.Text</option>
+                }
+            </select>
+        </div>
+    </div>
+    <div class="govuk-grid-column-one-third govuk-!-text-align-centre">
+        <div class="govuk-form-group govuk-!-margin-top-6">
+            <p class="govuk-body govuk-!-font-weight-bold govuk-!-margin-bottom-3">Actions</p>
+            @* Legacy Add/Remove transfer workflow - nothing is persisted until Save. *@
+            <div class="govuk-button-group govuk-button-group--vertical ptl-viewer-transfer-buttons">
+                <button type="button" id="btnAddSchemeViewer" class="govuk-button govuk-button--secondary" data-module="govuk-button">Add</button>
+                <button type="button" id="btnRemoveSchemeViewer" class="govuk-button govuk-button--secondary" data-module="govuk-button">Remove</button>
+            </div>
+        </div>
+    </div>
+    <div class="govuk-grid-column-one-third">
+        <div class="govuk-form-group">
+            <label class="govuk-label govuk-label--s" for="schemeViewers">Scheme Viewers</label>
+            <select class="govuk-select ptl-viewer-select" id="schemeViewers" name="ViewerIds" multiple size="10">
+                @foreach (var viewer in assignedViewers)
+                {
+                    <option value="@viewer.Value">@viewer.Text</option>
+                }
+            </select>
+        </div>
+    </div>
+</div>
+
+<script>
+    (function () {
+        var available = document.getElementById('availableViewers');
+        var selected = document.getElementById('schemeViewers');
+
+        function moveSelected(from, to) {
+            Array.from(from.selectedOptions).forEach(function (option) {
+                to.appendChild(option);
+                option.selected = false;
+            });
+        }
+
+        document.getElementById('btnAddSchemeViewer').addEventListener('click', function () {
+            moveSelected(available, selected);
+        });
+
+        document.getElementById('btnRemoveSchemeViewer').addEventListener('click', function () {
+            moveSelected(selected, available);
+        });
+
+        // Only selected options are posted, so every assigned viewer is selected on submit.
+        // Scoped to this select's own form - the header's sign-out form appears earlier in the DOM.
+        selected.form.addEventListener('submit', function () {
+            Array.from(selected.options).forEach(function (option) {
+                option.selected = true;
+            });
+        });
+    })();
+</script>

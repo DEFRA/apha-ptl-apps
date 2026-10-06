@@ -1,0 +1,60 @@
+@model PTL.InternalWeb.Features.Scheme.SchemeTestItemListViewModel
+
+<h4 class="govuk-heading-s">@Model.Heading</h4>
+
+<div class="govuk-form-group">
+    <div class="item-picker">
+        <select class="govuk-select" id="@Model.PickerId" data-item-type-picker>
+            <option value="">- Please Select -</option>
+            @foreach (var option in Model.TypeOptions)
+            {
+                <option value="@option.Value">@option.Text</option>
+            }
+        </select>
+        <button type="submit"
+                class="govuk-button govuk-button--primary govuk-!-margin-top-1"
+                data-module="govuk-button"
+                name="testCommand"
+                value="@Model.AddCommand"
+                data-picker="@Model.PickerId">
+            @Model.AddLabel
+        </button>
+    </div>
+</div>
+
+@if (Model.Items.Count == 0)
+{
+    <p class="govuk-body">@Model.EmptyMessage</p>
+}
+else
+{
+    <table class="govuk-table">
+        <tbody class="govuk-table__body">
+            @for (var i = 0; i < Model.Items.Count; i++)
+            {
+                var item = Model.Items[i];
+                <tr class="govuk-table__row">
+                    <td class="govuk-table__cell govuk-!-width-one-quarter">
+                        @if (i > 0)
+                        {
+                            <button type="submit" class="govuk-link ptl-link-button" name="testCommand" value="@(Model.MoveUpCommand):@i">Up</button>
+                        }
+                        @if (i < Model.Items.Count - 1)
+                        {
+                            <button type="submit" class="govuk-link ptl-link-button govuk-!-margin-left-2" name="testCommand" value="@(Model.MoveDownCommand):@i">Down</button>
+                        }
+                    </td>
+                    <td class="govuk-table__cell">
+                        @item.Name
+                        <input type="hidden" name="@(Model.FieldPrefix)[@i].ItemId" value="@item.ItemId" />
+                        <input type="hidden" name="@(Model.FieldPrefix)[@i].ItemTypeId" value="@item.ItemTypeId" />
+                        <input type="hidden" name="@(Model.FieldPrefix)[@i].Name" value="@item.Name" />
+                    </td>
+                    <td class="govuk-table__cell govuk-!-width-one-quarter">
+                        <button type="submit" class="govuk-link ptl-link-button" name="testCommand" value="@(Model.RemoveCommand):@i">Remove</button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}

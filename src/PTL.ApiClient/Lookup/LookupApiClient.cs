@@ -15,6 +15,14 @@ public interface ILookupApiClient
     Task<IReadOnlyList<YearResponse>> GetWeightedPricingYearsAsync(CancellationToken cancellationToken = default);
     Task<IReadOnlyList<GroupAddressResponse>> GetGroupAddressesAsync(CancellationToken cancellationToken = default);
     Task<IReadOnlyList<SchemeCurrencyResponse>> GetSchemeCurrenciesAsync(Guid schemeId, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<ScheduleResponse>> GetSchedulesAsync(CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<ScheduleCodeResponse>> GetScheduleCodesAsync(CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<DayResponse>> GetDaysAsync(CancellationToken cancellationToken = default);
+    Task<PTL.Contracts.Scheme.SchemeMonthEditabilityResponse> GetSchemeMonthEditabilityAsync(int yearId, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<SchemeUserResponse>> GetTestConsultantsAsync(CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<SchemeUserResponse>> GetAssessorsAsync(CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<PTL.Contracts.Participant.ViewerResponse>> GetViewersAsync(CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<SchemeItemTypeResponse>> GetSchemeItemTypesAsync(SchemeItemTypeKind kind, int yearId, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<PostagePricingPlanResponse>> GetPostagePricingPlansForYearAsync(int yearId, CancellationToken cancellationToken = default);
     Task<SystemSettingsResponse> GetSystemSettingsAsync(CancellationToken cancellationToken = default);
 }
@@ -81,6 +89,56 @@ public sealed class LookupApiClient(HttpClient httpClient) : ILookupApiClient
     {
         var currencies = await httpClient.GetFromJsonAsync<IReadOnlyList<SchemeCurrencyResponse>>($"/api/lookups/schemes/{schemeId}/currencies", cancellationToken);
         return currencies ?? [];
+    }
+
+    public async Task<IReadOnlyList<ScheduleResponse>> GetSchedulesAsync(CancellationToken cancellationToken = default)
+    {
+        var schedules = await httpClient.GetFromJsonAsync<IReadOnlyList<ScheduleResponse>>("/api/lookups/schedules", cancellationToken);
+        return schedules ?? [];
+    }
+
+    public async Task<IReadOnlyList<ScheduleCodeResponse>> GetScheduleCodesAsync(CancellationToken cancellationToken = default)
+    {
+        var scheduleCodes = await httpClient.GetFromJsonAsync<IReadOnlyList<ScheduleCodeResponse>>("/api/lookups/schedule-codes", cancellationToken);
+        return scheduleCodes ?? [];
+    }
+
+    public async Task<IReadOnlyList<DayResponse>> GetDaysAsync(CancellationToken cancellationToken = default)
+    {
+        var days = await httpClient.GetFromJsonAsync<IReadOnlyList<DayResponse>>("/api/lookups/days", cancellationToken);
+        return days ?? [];
+    }
+
+    public async Task<PTL.Contracts.Scheme.SchemeMonthEditabilityResponse> GetSchemeMonthEditabilityAsync(int yearId, CancellationToken cancellationToken = default)
+    {
+        var editability = await httpClient.GetFromJsonAsync<PTL.Contracts.Scheme.SchemeMonthEditabilityResponse>(
+            $"/api/lookups/scheme-month-editability?year={yearId}", cancellationToken);
+        return editability ?? new PTL.Contracts.Scheme.SchemeMonthEditabilityResponse(true, true, true, true, true, true, true, true, true, true, true, true);
+    }
+
+    public async Task<IReadOnlyList<SchemeUserResponse>> GetTestConsultantsAsync(CancellationToken cancellationToken = default)
+    {
+        var consultants = await httpClient.GetFromJsonAsync<IReadOnlyList<SchemeUserResponse>>("/api/lookups/test-consultants", cancellationToken);
+        return consultants ?? [];
+    }
+
+    public async Task<IReadOnlyList<SchemeUserResponse>> GetAssessorsAsync(CancellationToken cancellationToken = default)
+    {
+        var assessors = await httpClient.GetFromJsonAsync<IReadOnlyList<SchemeUserResponse>>("/api/lookups/assessors", cancellationToken);
+        return assessors ?? [];
+    }
+
+    public async Task<IReadOnlyList<PTL.Contracts.Participant.ViewerResponse>> GetViewersAsync(CancellationToken cancellationToken = default)
+    {
+        var viewers = await httpClient.GetFromJsonAsync<IReadOnlyList<PTL.Contracts.Participant.ViewerResponse>>("/api/lookups/viewers", cancellationToken);
+        return viewers ?? [];
+    }
+
+    public async Task<IReadOnlyList<SchemeItemTypeResponse>> GetSchemeItemTypesAsync(SchemeItemTypeKind kind, int yearId, CancellationToken cancellationToken = default)
+    {
+        var itemTypes = await httpClient.GetFromJsonAsync<IReadOnlyList<SchemeItemTypeResponse>>(
+            $"/api/lookups/scheme-item-types?kind={kind}&year={yearId}", cancellationToken);
+        return itemTypes ?? [];
     }
 
     public async Task<IReadOnlyList<PostagePricingPlanResponse>> GetPostagePricingPlansForYearAsync(int yearId, CancellationToken cancellationToken = default)

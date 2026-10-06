@@ -11,9 +11,10 @@ namespace PTL.Api.Tests.Endpoints;
 
 public class SchemeControllerTests
 {
+    private static readonly Guid TestConsultantTabulationId = Guid.NewGuid();
     private static SchemeController CreateController(FakeSchemeRepository repository)
     {
-        var controller = new SchemeController(new SchemeService(repository, NullLogger<SchemeService>.Instance), NullLogger<SchemeController>.Instance);
+        var controller = new SchemeController(new SchemeService(repository, new PTL.Api.Tests.Lookup.FakeLookupRepository(), new PTL.Api.Tests.Participant.FakeViewerRepository(), NullLogger<SchemeService>.Instance), NullLogger<SchemeController>.Instance);
 
         // ValidationProblem() resolves ProblemDetailsFactory from HttpContext.RequestServices,
         // which a bare controller instance does not have without this wiring.
@@ -70,17 +71,24 @@ public class SchemeControllerTests
         DateOfReceipt: false,
         StorageConditions: false,
         ConditionOnReceipt: false,
-        TestConsultant1: null,
+        TestConsultant1: Guid.NewGuid(),
         TestConsultant2: null,
         TestConsultant3: null,
-        TestConsultantTabulationId: null,
+        TestConsultantTabulationId: TestConsultantTabulationId,
         UseExternalReference: false,
         StoreRatings: false,
         Assessor1: null,
         Assessor2: null,
         Assessor3: null,
         Assessor4: null,
-        StandardTabulationText: null);
+        StandardTabulationText: null,
+        // A non-assessment scheme needs one tabulation for the Test Consultant and one that can
+        // be published.
+        Tabulations:
+        [
+            new SchemeTabulationRequest(TestConsultantTabulationId, "Test Consultant", false, false, false, true, true, [], []),
+            new SchemeTabulationRequest(Guid.NewGuid(), "Published", false, false, false, true, true, [], [])
+        ]);
 
     private static SchemeRequest ToUpdateRequest(SchemeRequest request) => request;
 
@@ -150,7 +158,9 @@ public class SchemeControllerTests
         Assert.Equal(request.Name, response.Name);
         Assert.Equal(request.ScheduleId, response.ScheduleId);
         Assert.Equal(request.ScheduleCodeId, response.ScheduleCodeId);
-        Assert.Equal(request.StartDate, response.StartDate);
+        // StartDate is derived from the distribution months (legacy RecalucalateStartDate), not
+        // the posted value - the fixture distributes in April, so the scheme starts 1 April.
+        Assert.Equal(new DateTime(request.YearId, 4, 1), response.StartDate);
         Assert.Equal(request.DistributionMonthApr, response.DistributionMonthApr);
         Assert.Equal(request.DistributionMonthMay, response.DistributionMonthMay);
         Assert.Equal(request.DistributionMonthJun, response.DistributionMonthJun);

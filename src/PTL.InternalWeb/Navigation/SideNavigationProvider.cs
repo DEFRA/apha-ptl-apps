@@ -215,7 +215,11 @@ public static class SideNavigationProvider
                     ActionName = IndexAction,
                     Children =
                     [
-                        new SideNavigationItem { Text = "Create Scheme", ControllerName = SchemeControllerName, ActionName = CreateAction },
+                        // Legacy's two separate entry points: Web.sitemap's "Create Scheme for Next
+                        // Year" and the "Create Scheme for Current Year" item SchemeList.aspx adds.
+                                                new SideNavigationItem { Text = "Create Scheme for Current Year", ControllerName = SchemeControllerName, ActionName = "CreateForCurrentYear" },
+                        new SideNavigationItem { Text = "Create Scheme for Next Year", ControllerName = SchemeControllerName, ActionName = CreateAction },
+
 
                         // Hidden: not menu entries, but present so Details/Edit pages resolve a full
                         // breadcrumb trail instead of a plain controller/action crumb.

@@ -8,7 +8,7 @@ namespace PTL.Api.Tests.Endpoints;
 public class LookupControllerTests
 {
     private static LookupController CreateController(FakeLookupRepository repository) =>
-        new(new LookupService(repository));
+        new(new LookupService(repository), new PTL.Api.Tests.Participant.FakeViewerRepository());
 
     [Fact]
     public async Task GetCountries_ReturnsMappedResponses()
@@ -39,6 +39,53 @@ public class LookupControllerTests
         var currencies = Assert.IsType<IReadOnlyList<PTL.Contracts.Lookup.CurrencyResponse>>(ok.Value, exactMatch: false);
         Assert.Single(currencies);
         Assert.Equal("£ - British Pound", currencies[0].LongName);
+    }
+
+    [Fact]
+    public async Task GetTestConsultants_ExcludesInactiveAndFlagsExternalConsultants()
+    {
+        var internalId = Guid.NewGuid();
+        var externalId = Guid.NewGuid();
+        var repository = new FakeLookupRepository
+        {
+            TestConsultants =
+            [
+                new SchemeUserEntity { UserId = internalId, FriendlyName = "Internal TC", IsExternal = false },
+                new SchemeUserEntity { UserId = externalId, FriendlyName = "External TC", IsExternal = true },
+                new SchemeUserEntity { UserId = Guid.NewGuid(), FriendlyName = "Retired TC", IsInactive = true }
+            ]
+        };
+        var controller = CreateController(repository);
+
+        var result = await controller.GetTestConsultants(CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var consultants = Assert.IsType<IReadOnlyList<PTL.Contracts.Lookup.SchemeUserResponse>>(ok.Value, exactMatch: false);
+        Assert.Equal(2, consultants.Count);
+        Assert.False(consultants.Single(c => c.UserId == internalId).IsExternal);
+        Assert.True(consultants.Single(c => c.UserId == externalId).IsExternal);
+    }
+
+    [Fact]
+    public async Task GetAssessors_ExcludesInactiveAssessors()
+    {
+        var assessorId = Guid.NewGuid();
+        var repository = new FakeLookupRepository
+        {
+            Assessors =
+            [
+                new SchemeUserEntity { UserId = assessorId, FriendlyName = "Active Assessor" },
+                new SchemeUserEntity { UserId = Guid.NewGuid(), FriendlyName = "Retired Assessor", IsInactive = true }
+            ]
+        };
+        var controller = CreateController(repository);
+
+        var result = await controller.GetAssessors(CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var assessors = Assert.IsType<IReadOnlyList<PTL.Contracts.Lookup.SchemeUserResponse>>(ok.Value, exactMatch: false);
+        var assessor = Assert.Single(assessors);
+        Assert.Equal(assessorId, assessor.UserId);
     }
 
     [Fact]

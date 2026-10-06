@@ -64,6 +64,7 @@ public static class DapperColumnMappings
     private const string ColPurchaseOrderNumber = "fldPurchaseOrderNumber";
     private const string ColSchemeId = "fldSchemeId";
     private const string ColPrice = "fldPrice";
+    private const string ColOrder = "fldOrder";
     private const string ColCountry = "fldCountry";
     private const string ColAccountNumber = "fldAccountNumber";
     private const string ColVatNumber = "fldVatNumber";
@@ -304,6 +305,7 @@ public static class DapperColumnMappings
             ["NextYearWithDelayId"] = nameof(SystemSettingsEntity.NextYearWithDelayId),
             ["CurrentYearId"] = nameof(SystemSettingsEntity.CurrentYearId),
             ["NextYearId"] = nameof(SystemSettingsEntity.NextYearId),
+            ["fldContractStartDate"] = nameof(SystemSettingsEntity.ContractStartDate),
         });
 
         // spgContractMerge result set 1 (legacy ContractMergeInfo).
@@ -605,6 +607,141 @@ public static class DapperColumnMappings
             [ColPrice] = nameof(SchemeCurrencyEntity.Price),
             ["fldCurrencyName"] = nameof(SchemeCurrencyEntity.CurrencyName),
             ["fldCurrencySymbol"] = nameof(SchemeCurrencyEntity.CurrencySymbol),
+        });
+
+        Map<SchemeCurrencyPrice>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldSchemeCurrencyId"] = nameof(SchemeCurrencyPrice.SchemeCurrencyId),
+            [ColCurrencyId] = nameof(SchemeCurrencyPrice.CurrencyId),
+            [ColPrice] = nameof(SchemeCurrencyPrice.Price),
+            ["fldCurrencyName"] = nameof(SchemeCurrencyPrice.CurrencyName),
+            ["fldCurrencySymbol"] = nameof(SchemeCurrencyPrice.CurrencySymbol),
+        });
+
+        Map<ScheduleEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldScheduleId"] = nameof(ScheduleEntity.ScheduleId),
+            ["fldSchedule"] = nameof(ScheduleEntity.Schedule),
+        });
+
+        Map<ScheduleCodeEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldScheduleCodeId"] = nameof(ScheduleCodeEntity.ScheduleCodeId),
+            ["fldScheduleCode"] = nameof(ScheduleCodeEntity.ScheduleCode),
+        });
+
+        Map<MonthlyDistributionEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            [ColYearId] = nameof(MonthlyDistributionEntity.YearId),
+            ["fldMonthId"] = nameof(MonthlyDistributionEntity.MonthId),
+        });
+
+        Map<DayEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldDayId"] = nameof(DayEntity.DayId),
+            ["fldDay"] = nameof(DayEntity.Day),
+        });
+
+        Map<PTNumberEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            [ColSchemeId] = nameof(PTNumberEntity.SchemeId),
+            ["fldIdentifier"] = nameof(PTNumberEntity.Identifier),
+        });
+
+        Map<SchemeUserEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldUserId"] = nameof(SchemeUserEntity.UserId),
+            ["fldFriendlyName"] = nameof(SchemeUserEntity.FriendlyName),
+            ["fldIsInactive"] = nameof(SchemeUserEntity.IsInactive),
+        });
+
+        Map<SchemeViewerEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldViewerSchemeId"] = nameof(SchemeViewerEntity.ViewerSchemeId),
+            ["fldViewerId"] = nameof(SchemeViewerEntity.ViewerId),
+            [ColSchemeId] = nameof(SchemeViewerEntity.SchemeId),
+        });
+
+        Map<SchemeTest>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldTestId"] = nameof(SchemeTest.TestId),
+            ["fldTestTypeId"] = nameof(SchemeTest.TestTypeId),
+            ["fldTestType"] = nameof(SchemeTest.TestType),
+            [ColSchemeId] = nameof(SchemeTest.SchemeId),
+            [ColOrder] = nameof(SchemeTest.Order),
+        });
+
+        Map<SchemeTestResultItem>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldTestResultItemId"] = nameof(SchemeTestResultItem.TestResultItemId),
+            ["fldTestResultItemTypeId"] = nameof(SchemeTestResultItem.TestResultItemTypeId),
+            ["fldTestResultItemType"] = nameof(SchemeTestResultItem.TestResultItemType),
+            ["fldTestId"] = nameof(SchemeTestResultItem.TestId),
+            [ColOrder] = nameof(SchemeTestResultItem.Order),
+        });
+
+        Map<SchemeTestMethodItem>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldTestMethodItemId"] = nameof(SchemeTestMethodItem.TestMethodItemId),
+            ["fldTestMethodItemTypeId"] = nameof(SchemeTestMethodItem.TestMethodItemTypeId),
+            ["fldTestMethodItemType"] = nameof(SchemeTestMethodItem.TestMethodItemType),
+            ["fldTestId"] = nameof(SchemeTestMethodItem.TestId),
+            [ColOrder] = nameof(SchemeTestMethodItem.Order),
+        });
+
+        Map<SchemeCategoryItem>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldCategoryItemId"] = nameof(SchemeCategoryItem.CategoryItemId),
+            ["fldCategoryItemTypeId"] = nameof(SchemeCategoryItem.CategoryItemTypeId),
+            [ColName] = nameof(SchemeCategoryItem.Name),
+            ["fldTestId"] = nameof(SchemeCategoryItem.TestId),
+            [ColOrder] = nameof(SchemeCategoryItem.Order),
+        });
+
+        Map<SchemeCriterionItem>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldCriterionItemId"] = nameof(SchemeCriterionItem.CriterionItemId),
+            ["fldCriterionItemTypeId"] = nameof(SchemeCriterionItem.CriterionItemTypeId),
+            [ColName] = nameof(SchemeCriterionItem.Name),
+            ["fldCategoryItemId"] = nameof(SchemeCriterionItem.CategoryItemId),
+            [ColOrder] = nameof(SchemeCriterionItem.Order),
+        });
+
+        Map<SchemeTabulation>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldTabulationId"] = nameof(SchemeTabulation.TabulationId),
+            [ColSchemeId] = nameof(SchemeTabulation.SchemeId),
+            [ColName] = nameof(SchemeTabulation.Name),
+            ["fldIntendedResultsOnly"] = nameof(SchemeTabulation.IntendedResultsOnly),
+            ["fldSingleParticipantTabulation"] = nameof(SchemeTabulation.SingleParticipantTabulation),
+            ["fldShowRatings"] = nameof(SchemeTabulation.ShowRatings),
+            ["fldAvailableToParticipants"] = nameof(SchemeTabulation.AvailableToParticipants),
+            ["fldAvailableToViewers"] = nameof(SchemeTabulation.AvailableToViewers),
+        });
+
+        // Both tabulation link tables share this shape; each result set only carries its own
+        // column names, so all four map onto the same two properties.
+        Map<SchemeTabulationItemLink>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldTabulationTestResultItemId"] = nameof(SchemeTabulationItemLink.LinkId),
+            ["fldTabulationTestMethodItemId"] = nameof(SchemeTabulationItemLink.LinkId),
+            ["fldTabulationId"] = nameof(SchemeTabulationItemLink.TabulationId),
+            ["fldTestResultItemId"] = nameof(SchemeTabulationItemLink.ItemId),
+            ["fldTestMethodItemId"] = nameof(SchemeTabulationItemLink.ItemId),
+        });
+
+        Map<SchemeItemTypeEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldTestTypeId"] = nameof(SchemeItemTypeEntity.ItemTypeId),
+            ["fldTestType"] = nameof(SchemeItemTypeEntity.Name),
+            ["fldTestResultItemTypeId"] = nameof(SchemeItemTypeEntity.ItemTypeId),
+            ["fldTestResultItemType"] = nameof(SchemeItemTypeEntity.Name),
+            ["fldTestMethodItemTypeId"] = nameof(SchemeItemTypeEntity.ItemTypeId),
+            ["fldTestMethodItemType"] = nameof(SchemeItemTypeEntity.Name),
+            ["fldCategoryItemTypeId"] = nameof(SchemeItemTypeEntity.ItemTypeId),
+            ["fldCriterionItemTypeId"] = nameof(SchemeItemTypeEntity.ItemTypeId),
+            [ColName] = nameof(SchemeItemTypeEntity.Name),
+            ["fldNoLongerInUse"] = nameof(SchemeItemTypeEntity.NoLongerInUse),
         });
 
         Map<PostagePricingPlanEntity>(new(StringComparer.OrdinalIgnoreCase)

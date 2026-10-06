@@ -45,6 +45,74 @@ public class LookupApiClientTests
     }
 
     [Fact]
+    public async Task GetSchedulesAsync_ReturnsDeserializedList()
+    {
+        const string json = """[{"scheduleId":"11111111-1111-1111-1111-111111111111","schedule":"Monthly"}]""";
+        var client = CreateClient(HttpStatusCode.OK, json);
+
+        var result = await client.GetSchedulesAsync();
+
+        Assert.Equal("Monthly", Assert.Single(result).Schedule);
+    }
+
+    [Fact]
+    public async Task GetScheduleCodesAsync_ReturnsDeserializedList()
+    {
+        const string json = """[{"scheduleCodeId":"22222222-2222-2222-2222-222222222222","scheduleCode":"M1"}]""";
+        var client = CreateClient(HttpStatusCode.OK, json);
+
+        var result = await client.GetScheduleCodesAsync();
+
+        Assert.Equal("M1", Assert.Single(result).ScheduleCode);
+    }
+
+    [Fact]
+    public async Task GetDaysAsync_ReturnsDeserializedList()
+    {
+        const string json = """[{"dayId":"33333333-3333-3333-3333-333333333333","day":"Monday"}]""";
+        var client = CreateClient(HttpStatusCode.OK, json);
+
+        var result = await client.GetDaysAsync();
+
+        Assert.Equal("Monday", Assert.Single(result).Day);
+    }
+
+    [Fact]
+    public async Task GetTestConsultantsAsync_ReturnsDeserializedList()
+    {
+        const string json = """[{"userId":"44444444-4444-4444-4444-444444444444","friendlyName":"Internal TC","isExternal":false}]""";
+        var client = CreateClient(HttpStatusCode.OK, json);
+
+        var result = await client.GetTestConsultantsAsync();
+
+        var consultant = Assert.Single(result);
+        Assert.Equal("Internal TC", consultant.FriendlyName);
+        Assert.False(consultant.IsExternal);
+    }
+
+    [Fact]
+    public async Task GetAssessorsAsync_ReturnsDeserializedList()
+    {
+        const string json = """[{"userId":"55555555-5555-5555-5555-555555555555","friendlyName":"Assessor One","isExternal":false}]""";
+        var client = CreateClient(HttpStatusCode.OK, json);
+
+        var result = await client.GetAssessorsAsync();
+
+        Assert.Equal("Assessor One", Assert.Single(result).FriendlyName);
+    }
+
+    [Fact]
+    public async Task GetViewersAsync_ReturnsDeserializedList()
+    {
+        const string json = """[{"viewerId":"66666666-6666-6666-6666-666666666666","name":"Viewer One","email":"viewer@example.com"}]""";
+        var client = CreateClient(HttpStatusCode.OK, json);
+
+        var result = await client.GetViewersAsync();
+
+        Assert.Equal("Viewer One", Assert.Single(result).Name);
+    }
+
+    [Fact]
     public async Task GetCustomerTypesAsync_ReturnsDeserializedList()
     {
         const string json = """[{"customerTypeId":"33333333-3333-3333-3333-333333333333","customerType":"Commercial"}]""";

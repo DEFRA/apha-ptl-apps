@@ -155,7 +155,47 @@ public sealed class SchemeController(ISchemeService schemeService, ILogger<Schem
         Assessor2 = request.Assessor2,
         Assessor3 = request.Assessor3,
         Assessor4 = request.Assessor4,
-        StandardTabulationText = request.StandardTabulationText
+        StandardTabulationText = request.StandardTabulationText,
+        Prices = (request.Prices ?? [])
+            .Select(p => new SchemeCurrencyPrice
+            {
+                SchemeCurrencyId = p.SchemeCurrencyId,
+                CurrencyId = p.CurrencyId,
+                Price = p.Price,
+            })
+            .ToList(),
+        ViewerIds = (request.ViewerIds ?? []).ToList(),
+        Tests = (request.Tests ?? [])
+            .Select(t => new SchemeTest
+            {
+                TestId = t.TestId,
+                TestTypeId = t.TestTypeId,
+                ResultItems = t.ResultItems.Select(i => new SchemeTestResultItem { TestResultItemId = i.ItemId, TestResultItemTypeId = i.ItemTypeId }).ToList<SchemeTestResultItem>(),
+                MethodItems = t.MethodItems.Select(i => new SchemeTestMethodItem { TestMethodItemId = i.ItemId, TestMethodItemTypeId = i.ItemTypeId }).ToList<SchemeTestMethodItem>(),
+                Categories = t.Categories
+                    .Select(c => new SchemeCategoryItem
+                    {
+                        CategoryItemId = c.CategoryItemId,
+                        CategoryItemTypeId = c.CategoryItemTypeId,
+                        Criteria = c.Criteria.Select(cr => new SchemeCriterionItem { CriterionItemId = cr.ItemId, CriterionItemTypeId = cr.ItemTypeId }).ToList<SchemeCriterionItem>(),
+                    })
+                    .ToList<SchemeCategoryItem>(),
+            })
+            .ToList<SchemeTest>(),
+        Tabulations = (request.Tabulations ?? [])
+            .Select(t => new SchemeTabulation
+            {
+                TabulationId = t.TabulationId,
+                Name = t.Name,
+                IntendedResultsOnly = t.IntendedResultsOnly,
+                SingleParticipantTabulation = t.SingleParticipantTabulation,
+                ShowRatings = t.ShowRatings,
+                AvailableToParticipants = t.AvailableToParticipants,
+                AvailableToViewers = t.AvailableToViewers,
+                ResultItemIds = t.ResultItemIds.ToList(),
+                MethodItemIds = t.MethodItemIds.ToList(),
+            })
+            .ToList<SchemeTabulation>()
     };
 
     private static SchemeResponse ToResponse(Scheme scheme) => new(
@@ -217,7 +257,42 @@ public sealed class SchemeController(ISchemeService schemeService, ILogger<Schem
         scheme.Assessor4,
         scheme.StandardTabulationText,
         scheme.LastModified,
-        scheme.IsReadOnly);
+        scheme.IsReadOnly,
+        scheme.Prices
+            .Select(p => new SchemeCurrencyPriceResponse(p.SchemeCurrencyId, p.CurrencyId, p.Price, p.CurrencyName, p.CurrencySymbol))
+            .ToList(),
+        new SchemeMonthEditabilityResponse(
+            scheme.CanEditJan, scheme.CanEditFeb, scheme.CanEditMar, scheme.CanEditApr,
+            scheme.CanEditMay, scheme.CanEditJun, scheme.CanEditJul, scheme.CanEditAug,
+            scheme.CanEditSep, scheme.CanEditOct, scheme.CanEditNov, scheme.CanEditDec),
+        scheme.ViewerIds.ToList(),
+        scheme.Tests
+            .Select(t => new SchemeTestResponse(
+                t.TestId,
+                t.TestTypeId,
+                t.TestType,
+                t.Order,
+                [.. t.ResultItems.Select(i => new SchemeTestItemResponse(i.TestResultItemId, i.TestResultItemTypeId, i.TestResultItemType, i.Order))],
+                [.. t.MethodItems.Select(i => new SchemeTestItemResponse(i.TestMethodItemId, i.TestMethodItemTypeId, i.TestMethodItemType, i.Order))],
+                [.. t.Categories.Select(c => new SchemeCategoryItemResponse(
+                    c.CategoryItemId,
+                    c.CategoryItemTypeId,
+                    c.Name,
+                    c.Order,
+                    [.. c.Criteria.Select(cr => new SchemeTestItemResponse(cr.CriterionItemId, cr.CriterionItemTypeId, cr.Name, cr.Order))]))]))
+            .ToList(),
+        scheme.Tabulations
+            .Select(t => new SchemeTabulationResponse(
+                t.TabulationId,
+                t.Name,
+                t.IntendedResultsOnly,
+                t.SingleParticipantTabulation,
+                t.ShowRatings,
+                t.AvailableToParticipants,
+                t.AvailableToViewers,
+                [.. t.ResultItemIds],
+                [.. t.MethodItemIds]))
+            .ToList());
 
     private static SchemeSummaryResponse ToSummaryResponse(SchemeSummaryEntity scheme) => new(
         scheme.SharedId,

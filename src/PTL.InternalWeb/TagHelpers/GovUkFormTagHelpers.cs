@@ -84,6 +84,10 @@ public class GovUkSelectTagHelper(IHtmlGenerator generator) : TagHelper
     [HtmlAttributeName("asp-items")]
     public IEnumerable<SelectListItem> Items { get; set; } = [];
 
+    /// <summary>Renders a leading empty-valued option (legacy's "- Please Select -" entry) when set.</summary>
+    [HtmlAttributeName("option-label")]
+    public string? OptionLabel { get; set; }
+
     [ViewContext]
     [HtmlAttributeNotBound]
     public ViewContext ViewContext { get; set; } = default!;
@@ -101,7 +105,7 @@ public class GovUkSelectTagHelper(IHtmlGenerator generator) : TagHelper
             htmlAttributes["aria-describedby"] = describedBy;
         }
 
-        var select = generator.GenerateSelect(ViewContext, For.ModelExplorer, optionLabel: null, field, Items, allowMultiple: false, htmlAttributes);
+        var select = generator.GenerateSelect(ViewContext, For.ModelExplorer, OptionLabel, field, Items, allowMultiple: false, htmlAttributes);
         output.Content.AppendHtml(select);
     }
 }

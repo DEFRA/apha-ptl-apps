@@ -1,0 +1,13 @@
+@model PTL.InternalWeb.Features.Scheme.SchemeFormViewModel
+
+<h2 class="govuk-heading-m">Assessors</h2>
+
+<p class="govuk-body">Assessors apply to schemes that require assessment. At least two must be selected.</p>
+
+<govuk-select asp-for="Assessor1" label="Primary Assessor" asp-items="Model.AssessorOptions" />
+
+<govuk-select asp-for="Assessor2" label="Secondary Assessor" asp-items="Model.AssessorOptions" />
+
+<govuk-select asp-for="Assessor3" label="Tertiary Assessor" asp-items="Model.AssessorOptions" />
+
+<govuk-select asp-for="Assessor4" label="Quaternary Assessor" asp-items="Model.AssessorOptions" />

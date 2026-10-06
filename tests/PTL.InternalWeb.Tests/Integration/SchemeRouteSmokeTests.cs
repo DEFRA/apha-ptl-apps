@@ -66,6 +66,75 @@ public class SchemeRouteSmokeTests : IClassFixture<WebApplicationFactory<Program
     }
 
     [Fact]
+    public async Task Create_RendersTheSevenLegacyTabsInOrder()
+    {
+        var client = _factory.CreateClient();
+
+        var html = await client.GetStringAsync("/Scheme/Create");
+
+        var expectedTabs = new[]
+        {
+            "Details", "Tests", "Distribution Level Data", "Results Tabulations",
+            "Test Consultants", "Assessors", "Viewers"
+        };
+
+        var position = 0;
+        foreach (var tab in expectedTabs)
+        {
+            var marker = $"govuk-tabs__tab\" href=\"#tab-";
+            var index = html.IndexOf($">{tab}</a>", position, StringComparison.Ordinal);
+            Assert.True(index > 0, $"Tab '{tab}' was not rendered after the preceding tab. Marker: {marker}");
+            position = index;
+        }
+    }
+
+    [Fact]
+    public async Task Create_HidesTheAssessorsTabWhileAssessmentIsNotRequired()
+    {
+        var client = _factory.CreateClient();
+
+        var html = await client.GetStringAsync("/Scheme/Create");
+
+        // Requires Assessment defaults to false on a new scheme, so Test Consultants is the
+        // visible tab and Assessors is hidden (legacy EnableAssessor).
+        Assert.Contains("id=\"tab-list-item-assessors\" hidden", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("id=\"tab-list-item-test-consultants\" hidden", html, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Create_RendersTheTabulationControlsAndTheTestConsultantSelector()
+    {
+        var client = _factory.CreateClient();
+
+        var html = await client.GetStringAsync("/Scheme/Create");
+
+        Assert.Contains("Add New Tabulation", html, StringComparison.Ordinal);
+        Assert.Contains("No Tabulations Defined", html, StringComparison.Ordinal);
+        Assert.Contains("Standard Tabulation Text", html, StringComparison.Ordinal);
+        Assert.Contains("External reference used on Tabulations", html, StringComparison.Ordinal);
+        Assert.Contains("Score Samples", html, StringComparison.Ordinal);
+
+        // Assessment is not required by default, so the Test Consultant tabulation selector shows.
+        Assert.Contains("Select the Tabulation that will be sent to the Test Consultants", html, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Create_RendersStaffingSelectorsAndTheViewerTransferLists()
+    {
+        var client = _factory.CreateClient();
+
+        var html = await client.GetStringAsync("/Scheme/Create");
+
+        Assert.Contains("Primary Test Consultant", html, StringComparison.Ordinal);
+        Assert.Contains("Deputy Test Consultant", html, StringComparison.Ordinal);
+        Assert.Contains("Secondary Test Consultant", html, StringComparison.Ordinal);
+        Assert.Contains("Primary Assessor", html, StringComparison.Ordinal);
+        Assert.Contains("Quaternary Assessor", html, StringComparison.Ordinal);
+        Assert.Contains("id=\"availableViewers\"", html, StringComparison.Ordinal);
+        Assert.Contains("id=\"schemeViewers\"", html, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Details_ReturnsSuccess()
     {
         var client = _factory.CreateClient();

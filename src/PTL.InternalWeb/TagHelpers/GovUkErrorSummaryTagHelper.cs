@@ -1,4 +1,5 @@
 using System.Net;
+using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.AspNetCore.Razor.TagHelpers;
 
 namespace PTL.InternalWeb.TagHelpers;
@@ -35,7 +36,10 @@ public class GovUkErrorSummaryTagHelper : TagHelper
         var items = string.Concat(errors.Select(error =>
             string.IsNullOrEmpty(error.Field)
                 ? $"<li>{WebUtility.HtmlEncode(error.Message)}</li>"
-                : $"<li><a href=\"#{WebUtility.HtmlEncode(error.Field)}\">{WebUtility.HtmlEncode(error.Message)}</a></li>"));
+                // The model-state key is not always a usable anchor: collection/nested keys such as
+                // "Prices[0].Price" are rendered with the sanitised id "Prices_0__Price", so the link
+                // has to be sanitised the same way the control's id was.
+                : $"<li><a href=\"#{WebUtility.HtmlEncode(TagBuilder.CreateSanitizedId(error.Field, "_"))}\">{WebUtility.HtmlEncode(error.Message)}</a></li>"));
 
         output.Content.SetHtmlContent(
             "<div role=\"alert\">" +

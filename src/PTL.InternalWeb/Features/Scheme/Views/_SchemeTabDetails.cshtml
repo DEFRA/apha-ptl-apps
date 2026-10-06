@@ -1,0 +1,287 @@
+@model PTL.InternalWeb.Features.Scheme.SchemeFormViewModel
+@using System.Globalization
+@{
+    bool HasError(string field) => ViewData.ModelState.TryGetValue(field, out var entry) && entry.Errors.Count > 0;
+    string? FirstError(string field) => ViewData.ModelState.TryGetValue(field, out var entry) && entry.Errors.Count > 0 ? entry.Errors[0].ErrorMessage : null;
+
+    // Legacy renders the months in two rows of six, financial-year order, with "As Available"
+    // alongside the second row. Each month is locked once its distribution has been initialised.
+    var months = new (string Property, string Label, bool CanEdit)[]
+    {
+        (nameof(Model.DistributionMonthApr), "Apr", Model.CanEditApr),
+        (nameof(Model.DistributionMonthMay), "May", Model.CanEditMay),
+        (nameof(Model.DistributionMonthJun), "Jun", Model.CanEditJun),
+        (nameof(Model.DistributionMonthJul), "Jul", Model.CanEditJul),
+        (nameof(Model.DistributionMonthAug), "Aug", Model.CanEditAug),
+        (nameof(Model.DistributionMonthSep), "Sep", Model.CanEditSep),
+        (nameof(Model.DistributionMonthOct), "Oct", Model.CanEditOct),
+        (nameof(Model.DistributionMonthNov), "Nov", Model.CanEditNov),
+        (nameof(Model.DistributionMonthDec), "Dec", Model.CanEditDec),
+        (nameof(Model.DistributionMonthJan), "Jan", Model.CanEditJan),
+        (nameof(Model.DistributionMonthFeb), "Feb", Model.CanEditFeb),
+        (nameof(Model.DistributionMonthMar), "Mar", Model.CanEditMar),
+    };
+
+    var monthValues = new Dictionary<string, bool>(StringComparer.Ordinal)
+    {
+        [nameof(Model.DistributionMonthApr)] = Model.DistributionMonthApr,
+        [nameof(Model.DistributionMonthMay)] = Model.DistributionMonthMay,
+        [nameof(Model.DistributionMonthJun)] = Model.DistributionMonthJun,
+        [nameof(Model.DistributionMonthJul)] = Model.DistributionMonthJul,
+        [nameof(Model.DistributionMonthAug)] = Model.DistributionMonthAug,
+        [nameof(Model.DistributionMonthSep)] = Model.DistributionMonthSep,
+        [nameof(Model.DistributionMonthOct)] = Model.DistributionMonthOct,
+        [nameof(Model.DistributionMonthNov)] = Model.DistributionMonthNov,
+        [nameof(Model.DistributionMonthDec)] = Model.DistributionMonthDec,
+        [nameof(Model.DistributionMonthJan)] = Model.DistributionMonthJan,
+        [nameof(Model.DistributionMonthFeb)] = Model.DistributionMonthFeb,
+        [nameof(Model.DistributionMonthMar)] = Model.DistributionMonthMar,
+    };
+}
+
+<govuk-input asp-for="Identifier" label="Identifier" input-class="govuk-input govuk-input--width-10" />
+
+<govuk-input asp-for="Name" label="Name" />
+
+<div class="govuk-form-group">
+    <label class="govuk-label govuk-label--s" for="YearLabel">Year</label>
+    <input id="YearLabel" class="govuk-input govuk-input--width-10" type="text" value="@Model.YearLabel" readonly />
+    <input type="hidden" asp-for="YearId" />
+</div>
+
+<div class="govuk-form-group">
+    <label class="govuk-label govuk-label--s" for="StartDate">Start Date</label>
+    <input id="StartDate" class="govuk-input govuk-input--width-10" type="text" value="@(Model.StartDate?.ToString("d MMMM yyyy") ?? string.Empty)" readonly />
+</div>
+
+<govuk-select asp-for="ScheduleId" label="Schedule" asp-items="Model.ScheduleOptions" option-label="- Please Select -" />
+
+<govuk-select asp-for="ScheduleCodeId" label="Schedule Code" asp-items="Model.ScheduleCodeOptions" option-label="- Please Select -" />
+
+@if (Model.SchemeId is not null)
+{
+    <div class="govuk-form-group">
+        <p class="govuk-label govuk-label--s">Scheme version</p>
+        <p class="govuk-body">@(Model.LastModified?.ToString("d MMMM yyyy HH:mm") ?? "Not set")</p>
+    </div>
+}
+
+<div class="govuk-form-group @(HasError(nameof(Model.DistributionAsAvailable)) ? "govuk-form-group--error" : null)">
+    <fieldset class="govuk-fieldset" aria-describedby="@(HasError(nameof(Model.DistributionAsAvailable)) ? "DistributionAsAvailable-error" : null)">
+        <legend class="govuk-fieldset__legend govuk-fieldset__legend--s">Distribution months</legend>
+        @if (HasError(nameof(Model.DistributionAsAvailable)))
+        {
+            <p id="DistributionAsAvailable-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @FirstError(nameof(Model.DistributionAsAvailable))</p>
+        }
+        <div class="govuk-checkboxes govuk-checkboxes--small" data-module="govuk-checkboxes">
+            @foreach (var month in months)
+            {
+                @* The tick is drawn by ".govuk-checkboxes__input:checked + .govuk-checkboxes__label",
+                   an adjacent sibling selector - nothing may sit between the checkbox and its label,
+                   so the hidden companion goes after the label. *@
+                <div class="govuk-checkboxes__item">
+                    @if (month.CanEdit)
+                    {
+                        <input class="govuk-checkboxes__input" type="checkbox" id="@month.Property" name="@month.Property" value="true" checked="@monthValues[month.Property]" />
+                        <label class="govuk-label govuk-checkboxes__label" for="@month.Property">@month.Label</label>
+                        <input type="hidden" name="@month.Property" value="false" />
+                    }
+                    else
+                    {
+                        @* A disabled checkbox posts nothing, so the hidden field carries the
+                           month's current value rather than a hard-coded false. *@
+                        <input class="govuk-checkboxes__input" type="checkbox" id="@month.Property" checked="@monthValues[month.Property]" disabled />
+                        <label class="govuk-label govuk-checkboxes__label" for="@month.Property">@month.Label</label>
+                        <input type="hidden" name="@month.Property" value="@(monthValues[month.Property] ? "true" : "false")" />
+                    }
+                </div>
+            }
+            <div class="govuk-checkboxes__item">
+                <input class="govuk-checkboxes__input" asp-for="DistributionAsAvailable" />
+                <label class="govuk-label govuk-checkboxes__label" asp-for="DistributionAsAvailable">As Available</label>
+            </div>
+        </div>
+    </fieldset>
+</div>
+
+@* Legacy locks a month once its distribution has been initialised (fnIsDistributionNotDefined on
+   the scheme's year). Nothing else posts these flags back, so without them a refresh or a failed
+   save would silently unlock every month. *@
+<input type="hidden" asp-for="CanEditApr" />
+<input type="hidden" asp-for="CanEditMay" />
+<input type="hidden" asp-for="CanEditJun" />
+<input type="hidden" asp-for="CanEditJul" />
+<input type="hidden" asp-for="CanEditAug" />
+<input type="hidden" asp-for="CanEditSep" />
+<input type="hidden" asp-for="CanEditOct" />
+<input type="hidden" asp-for="CanEditNov" />
+<input type="hidden" asp-for="CanEditDec" />
+<input type="hidden" asp-for="CanEditJan" />
+<input type="hidden" asp-for="CanEditFeb" />
+<input type="hidden" asp-for="CanEditMar" />
+
+<govuk-select asp-for="WeekNumber" label="Week No" asp-items="PTL.InternalWeb.Features.Scheme.SchemeFormViewModel.WeekNumberOptions" />
+
+<govuk-select asp-for="DayOfWeekId" label="Day of Week" asp-items="Model.DayOfWeekOptions" />
+
+<govuk-input asp-for="NumberOfSamples" label="Number of Samples" input-class="govuk-input govuk-input--width-5" />
+
+<div class="govuk-form-group">
+    <label class="govuk-label govuk-label--s" for="SampleNoSequence">Sample No Sequence</label>
+    @* Read-only, so the visible input posts nothing - the hidden companion carries it through a
+       failed save. The value belongs to the scheme's schedule and only spgSchemeBySchemeId exposes
+       it, so a scheme that has not been saved yet shows legacy's unset default of 0. *@
+    <input id="SampleNoSequence" class="govuk-input govuk-input--width-5" type="text" value="@(Model.SampleNoSequence?.ToString(CultureInfo.InvariantCulture) ?? "0")" readonly />
+    <input type="hidden" asp-for="SampleNoSequence" id="SampleNoSequenceValue" />
+</div>
+
+<govuk-input asp-for="SampleOrigin" label="Sample Origin" />
+
+<govuk-input asp-for="Subcontractor" label="Subcontractor" />
+
+<govuk-input asp-for="Deadline" label="Deadline (days)" input-class="govuk-input govuk-input--width-5" />
+
+<div class="govuk-form-group">
+    <div class="govuk-checkboxes" data-module="govuk-checkboxes">
+        <div class="govuk-checkboxes__item">
+            <input class="govuk-checkboxes__input" asp-for="CombinedPackaging" />
+            <label class="govuk-label govuk-checkboxes__label" asp-for="CombinedPackaging">Combined Packaging</label>
+        </div>
+    </div>
+</div>
+
+<govuk-textarea asp-for="SamplePackingInstructions" label="Sample Packing Instructions" rows="5" />
+
+<govuk-select asp-for="Postage" label="Postage Type" asp-items="Model.PostageOptions" option-label="- Please Select -" />
+
+<govuk-input asp-for="CustomsVolume" label="Sample Volume" input-class="govuk-input govuk-input--width-10" />
+
+<div class="govuk-form-group">
+    <div class="govuk-checkboxes" data-module="govuk-checkboxes">
+        <div class="govuk-checkboxes__item">
+            <input class="govuk-checkboxes__input" asp-for="CommentsRequired" />
+            <label class="govuk-label govuk-checkboxes__label" asp-for="CommentsRequired">Ext. Comments Required</label>
+        </div>
+        <div class="govuk-checkboxes__item">
+            <input class="govuk-checkboxes__input" asp-for="Pilot" />
+            <label class="govuk-label govuk-checkboxes__label" asp-for="Pilot">Pilot Scheme</label>
+        </div>
+        <div class="govuk-checkboxes__item">
+            <input class="govuk-checkboxes__input" asp-for="LimitedSampleAvailability" />
+            <label class="govuk-label govuk-checkboxes__label" asp-for="LimitedSampleAvailability">Limited Sample Availability</label>
+        </div>
+        <div class="govuk-checkboxes__item">
+            <input class="govuk-checkboxes__input" asp-for="Accredited" />
+            <label class="govuk-label govuk-checkboxes__label" asp-for="Accredited">Accredited</label>
+        </div>
+        <div class="govuk-checkboxes__item">
+            <input class="govuk-checkboxes__input" asp-for="NoVLALabs" />
+            <label class="govuk-label govuk-checkboxes__label" asp-for="NoVLALabs">No VLA Labs</label>
+        </div>
+        <div class="govuk-checkboxes__item">
+            <input class="govuk-checkboxes__input" asp-for="ComerciallyAvailable" />
+            <label class="govuk-label govuk-checkboxes__label" asp-for="ComerciallyAvailable">Commercially available</label>
+        </div>
+    </div>
+</div>
+
+<div class="govuk-form-group">
+    <div class="govuk-checkboxes" data-module="govuk-checkboxes">
+        <div class="govuk-checkboxes__item">
+            @if (Model.SchemeId is not null)
+            {
+                <input type="hidden" asp-for="RequiresAssessment" />
+                <input class="govuk-checkboxes__input" asp-for="RequiresAssessment" disabled />
+            }
+            else
+            {
+                <input class="govuk-checkboxes__input" asp-for="RequiresAssessment" />
+            }
+            <label class="govuk-label govuk-checkboxes__label" asp-for="RequiresAssessment">Requires Assessment</label>
+        </div>
+    </div>
+</div>
+@if (Model.Prices.Count == 0)
+{
+    <p class="govuk-body">No currencies are configured.</p>
+}
+else
+{
+    <table class="govuk-table">
+        <thead class="govuk-table__head">
+            <tr class="govuk-table__row">
+                <th scope="col" class="govuk-table__header">Currency</th>
+                <th scope="col" class="govuk-table__header">Price</th>
+            </tr>
+        </thead>
+        <tbody class="govuk-table__body">
+            @for (var i = 0; i < Model.Prices.Count; i++)
+            {
+                var priceField = $"Prices[{i}].Price";
+                <tr class="govuk-table__row">
+                    <td class="govuk-table__cell">
+                        @Model.Prices[i].CurrencyName
+                        <input type="hidden" asp-for="Prices[i].SchemeCurrencyId" />
+                        <input type="hidden" asp-for="Prices[i].CurrencyId" />
+                        <input type="hidden" asp-for="Prices[i].CurrencyName" />
+                        <input type="hidden" asp-for="Prices[i].CurrencySymbol" />
+                    </td>
+                    <td class="govuk-table__cell">
+                        <div class="govuk-form-group @(HasError(priceField) ? "govuk-form-group--error" : null)">
+                            <label class="govuk-visually-hidden" asp-for="Prices[i].Price">Price in @Model.Prices[i].CurrencyName</label>
+                            @if (HasError(priceField))
+                            {
+                                <p class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @FirstError(priceField)</p>
+                            }
+                            <div class="govuk-input__wrapper">
+                                <div class="govuk-input__prefix" aria-hidden="true">@Model.Prices[i].CurrencySymbol</div>
+                                <input class="govuk-input govuk-input--width-10 @(HasError(priceField) ? "govuk-input--error" : null)" asp-for="Prices[i].Price" inputmode="decimal" />
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+<govuk-textarea asp-for="CustomsDescription" label="Customs Description" rows="4" />
+
+<h3 class="govuk-heading-s">Data Consent Declaration</h3>
+
+<div class="govuk-form-group">
+    <div class="govuk-checkboxes" data-module="govuk-checkboxes">
+        <div class="govuk-checkboxes__item">
+            <input class="govuk-checkboxes__input" asp-for="DataConsentDeclarationActive" />
+            <label class="govuk-label govuk-checkboxes__label" asp-for="DataConsentDeclarationActive">Data Consent Declaration active</label>
+        </div>
+    </div>
+</div>
+
+<div id="data-consent-text-container" @(Model.DataConsentDeclarationActive ? null : "hidden")>
+    <govuk-textarea asp-for="DataConsentDeclarationText" label="Consent text" rows="5" />
+</div>
+
+<script>
+    (function () {
+        var identifier = document.getElementById('Identifier');
+        if (identifier) {
+            identifier.addEventListener('change', function () {
+                identifier.value = identifier.value.toUpperCase();
+                if (/^[0-9]{1,4}$/.test(identifier.value)) {
+                    identifier.value = 'PT' + identifier.value;
+                }
+            });
+        }
+
+        var consentActive = document.getElementById('DataConsentDeclarationActive');
+        var consentText = document.getElementById('data-consent-text-container');
+        if (consentActive && consentText) {
+            var syncConsentText = function () {
+                consentText.hidden = !consentActive.checked;
+            };
+            consentActive.addEventListener('change', syncConsentText);
+            syncConsentText();
+        }
+    })();
+</script>
