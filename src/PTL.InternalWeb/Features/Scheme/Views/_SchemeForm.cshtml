@@ -108,6 +108,34 @@
 </div>
 
 <script>
+    // The Tests and Results Tabulations Add/Remove/Up/Down commands re-render the whole form, which
+    // would otherwise drop the user back on the first tab. Carrying the open tab in the URL
+    // fragment survives the post and is what the GOV.UK tabs component reads on load.
+    (function () {
+        var tabs = document.getElementById('scheme-tabs');
+        var form = tabs && tabs.closest('form');
+        if (!form) {
+            return;
+        }
+
+        form.addEventListener('submit', function () {
+            var selected = tabs.querySelector('.govuk-tabs__list-item--selected .govuk-tabs__tab');
+            if (selected) {
+                form.action = form.action.split('#')[0] + selected.getAttribute('href');
+            }
+        });
+
+        // Restore explicitly rather than relying on the tabs component, whose hash handling runs
+        // before this form is enhanced. The pattern check keeps the hash out of a selector.
+        var hash = window.location.hash;
+        if (/^#tab-[a-z-]+$/.test(hash)) {
+            var tab = tabs.querySelector('.govuk-tabs__tab[href="' + hash + '"]');
+            if (tab) {
+                tab.click();
+            }
+        }
+    })();
+
     // Mirrors Scheme.aspx.vb EnableAssessor(): Requires Assessment swaps the Test Consultants and
     // Assessors tabs. Requires Assessment is only editable while creating a scheme, so on Edit the
     // server-rendered state is already final and this listener never fires.

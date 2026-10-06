@@ -138,6 +138,61 @@ body {
   cursor: pointer;
 }
 
+/* A table that gains a column per record (Results Tabulations) outgrows the page once there are a
+   few of them. Scroll it horizontally instead of letting it overflow the layout; width:auto lets
+   the columns keep their natural size rather than being squeezed by the container. */
+.ptl-table-scroll {
+  overflow-x: auto;
+  margin-bottom: 20px;
+}
+
+.ptl-table-scroll > .govuk-table {
+  width: auto;
+  min-width: 100%;
+  margin-bottom: 0;
+}
+
+.ptl-table-scroll .govuk-select,
+.ptl-table-scroll .govuk-input {
+  width: auto;
+}
+
+.ptl-table-scroll:focus-visible {
+  outline: 3px solid #ffdd00;
+}
+
+/* The Scheme form keeps legacy Scheme.aspx's seven tabs, which do not fit on one row. The GOV.UK
+   tabs component floats its items and draws a single border under the <ul>, so once the list wraps
+   the first row loses its underline and the selected tab's "joins to the panel" notch lands in the
+   middle of the list. Lay the rows out with flex and give every item its own bottom border. */
+.govuk-frontend-supported #scheme-tabs .govuk-tabs__list {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  row-gap: 5px;
+  border-bottom: 0;
+}
+
+.govuk-frontend-supported #scheme-tabs .govuk-tabs__list::after {
+  content: none;
+}
+
+.govuk-frontend-supported #scheme-tabs .govuk-tabs__list-item {
+  float: none;
+  margin-top: 0;
+  margin-bottom: 0;
+  padding: 10px 20px;
+  border: 1px solid transparent;
+  border-bottom-color: var(--govuk-border-colour, #cecece);
+}
+
+.govuk-frontend-supported #scheme-tabs .govuk-tabs__list-item--selected {
+  padding: 10px 20px;
+  border-color: var(--govuk-border-colour, #cecece);
+  border-bottom-color: var(--govuk-body-background-colour, #fff);
+  background-color: var(--govuk-body-background-colour, #fff);
+}
+
 
 /* Left-hand PTLIMS navigation - see PTL.InternalWeb/Navigation/SideNavigationProvider.cs
    for the legacy menu mapping this preserves. Context-based, not a permanent tree: each

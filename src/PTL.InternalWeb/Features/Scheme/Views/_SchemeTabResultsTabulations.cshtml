@@ -16,6 +16,10 @@
 }
 else
 {
+    @* The grid gains a column per tabulation, so it outgrows the page once there are a few of
+       them - scroll it rather than letting it break the layout. role/tabindex make a scrollable
+       region reachable by keyboard. *@
+    <div class="ptl-table-scroll" role="region" aria-label="Results tabulations" tabindex="0">
     <table class="govuk-table">
         <thead class="govuk-table__head">
             <tr class="govuk-table__row">
@@ -163,6 +167,7 @@ else
             </tr>
         </tfoot>
     </table>
+    </div>
 }
 
 <div class="govuk-form-group">
@@ -174,11 +179,11 @@ else
     </button>
 </div>
 
-<govuk-textarea asp-for="StandardTabulationText" label="Standard Tabulation Text" rows="5" />
+<govuk-textarea asp-for="StandardTabulationText" label="Standard Tabulation Text" rows="5" label-class="govuk-label govuk-label--s" />
 
 @if (!Model.RequiresAssessment)
 {
-    <govuk-select asp-for="TestConsultantTabulationId" label="Select the Tabulation that will be sent to the Test Consultants" asp-items="tabulationOptions" />
+    <govuk-select asp-for="TestConsultantTabulationId" label="Select the Tabulation that will be sent to the Test Consultants" asp-items="tabulationOptions" option-label="- Please Select -" />
 }
 else
 {

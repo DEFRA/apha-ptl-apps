@@ -130,6 +130,10 @@ public class GovUkTextareaTagHelper(IHtmlGenerator generator) : TagHelper
     /// <summary>Rendered &lt;textarea&gt; rows; 0 (the default) omits the attribute, matching the browser default.</summary>
     public int Rows { get; set; }
 
+    /// <summary>Set to "govuk-label govuk-label--s" to match the bold labels on hand-written form groups.</summary>
+    [HtmlAttributeName("label-class")]
+    public string LabelCssClass { get; set; } = "govuk-label";
+
     [ViewContext]
     [HtmlAttributeNotBound]
     public ViewContext ViewContext { get; set; } = default!;
@@ -138,7 +142,7 @@ public class GovUkTextareaTagHelper(IHtmlGenerator generator) : TagHelper
     {
         var field = For.Name;
         var hasError = ViewContext.ViewData.ModelState.TryGetValue(field, out var entry) && entry.Errors.Count > 0;
-        var describedBy = GovUkFormGroupMarkup.Render(output, ViewContext, field, Label, Hint, hasError, entry);
+        var describedBy = GovUkFormGroupMarkup.Render(output, ViewContext, field, Label, Hint, hasError, entry, LabelCssClass);
 
         var htmlAttributes = new Dictionary<string, object>
         {
@@ -163,14 +167,14 @@ public class GovUkTextareaTagHelper(IHtmlGenerator generator) : TagHelper
 internal static class GovUkFormGroupMarkup
 {
     /// <summary>Renders the wrapper markup into <paramref name="output"/> and returns the aria-describedby id to apply to the control, or null.</summary>
-    public static string? Render(TagHelperOutput output, ViewContext viewContext, string field, string label, string? hint, bool hasError, ModelStateEntry? entry)
+    public static string? Render(TagHelperOutput output, ViewContext viewContext, string field, string label, string? hint, bool hasError, ModelStateEntry? entry, string labelCssClass = "govuk-label")
     {
         output.TagName = "div";
         output.TagMode = TagMode.StartTagAndEndTag;
         output.Attributes.SetAttribute("class", hasError ? "govuk-form-group govuk-form-group--error" : "govuk-form-group");
 
         var labelTag = new TagBuilder("label");
-        labelTag.AddCssClass("govuk-label");
+        labelTag.AddCssClass(labelCssClass);
         labelTag.Attributes["for"] = TagBuilder.CreateSanitizedId(field, "_");
         labelTag.InnerHtml.Append(label);
         output.Content.AppendHtml(labelTag);

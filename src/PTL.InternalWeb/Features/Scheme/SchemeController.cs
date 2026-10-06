@@ -153,7 +153,7 @@ public class SchemeController(ISchemeApiClient schemeApiClient, ILookupApiClient
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Create(SchemeFormViewModel model, string? testCommand = null, Guid selectedItemTypeId = default, CancellationToken cancellationToken = default)
+    public async Task<IActionResult> Create(SchemeFormViewModel model, string? testCommand = null, Guid? selectedItemTypeId = null, CancellationToken cancellationToken = default)
     {
         if (await TryHandleTestCommandAsync(model, testCommand, selectedItemTypeId, cancellationToken))
         {
@@ -204,7 +204,7 @@ public class SchemeController(ISchemeApiClient schemeApiClient, ILookupApiClient
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Edit(Guid id, SchemeFormViewModel model, string? testCommand = null, Guid selectedItemTypeId = default, CancellationToken cancellationToken = default)
+    public async Task<IActionResult> Edit(Guid id, SchemeFormViewModel model, string? testCommand = null, Guid? selectedItemTypeId = null, CancellationToken cancellationToken = default)
     {
         if (await TryHandleTestCommandAsync(model, testCommand, selectedItemTypeId, cancellationToken))
         {
@@ -234,14 +234,16 @@ public class SchemeController(ISchemeApiClient schemeApiClient, ILookupApiClient
     // Tests tab Add/Remove/Up/Down: mutate the staged tree and re-render without saving or
     // validating, mirroring legacy's ViewState-only behaviour. ModelState is cleared so the
     // re-rendered tree reflects the mutated model rather than the posted values.
-    private async Task<bool> TryHandleTestCommandAsync(SchemeFormViewModel model, string? testCommand, Guid selectedItemTypeId, CancellationToken cancellationToken)
+    // The Tests tab always posts its hidden picker field, empty unless an Add button filled it,
+    // so it has to be nullable or every Save fails to bind it.
+    private async Task<bool> TryHandleTestCommandAsync(SchemeFormViewModel model, string? testCommand, Guid? selectedItemTypeId, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(testCommand))
         {
             return false;
         }
 
-        SchemeTestCommands.TryApply(model, testCommand, selectedItemTypeId);
+        SchemeTestCommands.TryApply(model, testCommand, selectedItemTypeId ?? Guid.Empty);
         ModelState.Clear();
         await PopulateFormAsync(model, cancellationToken);
         return true;
