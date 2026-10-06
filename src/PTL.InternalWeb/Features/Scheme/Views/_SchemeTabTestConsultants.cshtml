@@ -1,10 +1,8 @@
 @model PTL.InternalWeb.Features.Scheme.SchemeFormViewModel
 
-<h2 class="govuk-heading-m">Test Consultants</h2>
 
-<p class="govuk-body">Test Consultants apply to schemes that do not require assessment.</p>
 
-<govuk-select asp-for="TestConsultant1" label="Primary Test Consultant" hint="Only internal Test Consultants can be the Primary Test Consultant." asp-items="Model.PrimaryTestConsultantOptions" />
+<govuk-select asp-for="TestConsultant1" label="Primary Test Consultant" asp-items="Model.PrimaryTestConsultantOptions" />
 
 <govuk-select asp-for="TestConsultant2" label="Deputy Test Consultant" asp-items="Model.TestConsultantOptions" />
 

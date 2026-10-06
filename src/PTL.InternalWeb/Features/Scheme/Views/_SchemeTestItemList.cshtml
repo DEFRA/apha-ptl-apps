@@ -4,7 +4,7 @@
 
 <div class="govuk-form-group">
     <div class="item-picker">
-        <select class="govuk-select" id="@Model.PickerId" data-item-type-picker>
+        <select class="govuk-select govuk-!-width-one-quarter" id="@Model.PickerId" data-item-type-picker>
             <option value="">- Please Select -</option>
             @foreach (var option in Model.TypeOptions)
             {
@@ -12,7 +12,7 @@
             }
         </select>
         <button type="submit"
-                class="govuk-button govuk-button--primary govuk-!-margin-top-1"
+                class="govuk-button govuk-button--primary"
                 data-module="govuk-button"
                 name="testCommand"
                 value="@Model.AddCommand"

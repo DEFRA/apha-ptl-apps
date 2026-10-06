@@ -161,6 +161,29 @@ body {
   outline: 3px solid #ffdd00;
 }
 
+/* GOV.UK caps the page at 960px, which leaves roughly 690px for content once the side navigation
+   takes its quarter - tight for PTLIMS's data-dense admin screens. Applied to govuk-width-container
+   rather than app-width-container because the header, service bar, phase banner and footer all use
+   the GOV.UK class, and widening only the content would leave them misaligned. GOV.UK centres the
+   container from 1020px (960 + 2x30 gutters), so that breakpoint has to move with the width. */
+.govuk-width-container {
+  max-width: 1300px;
+}
+
+@media (min-width: 1020px) and (max-width: 1359.98px) {
+  .govuk-width-container {
+    margin-right: 30px;
+    margin-left: 30px;
+  }
+}
+
+@media (min-width: 1360px) {
+  .govuk-width-container {
+    margin-right: auto;
+    margin-left: auto;
+  }
+}
+
 /* The Scheme form keeps legacy Scheme.aspx's seven tabs, which do not fit on one row. The GOV.UK
    tabs component floats its items and draws a single border under the <ul>, so once the list wraps
    the first row loses its underline and the selected tab's "joins to the panel" notch lands in the
