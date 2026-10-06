@@ -1,7 +1,10 @@
 @model PTL.InternalWeb.Features.Scheme.SchemeFormViewModel
 
+@* Legacy tab order: Scheme Instructions, rule, Data items to be collected, rule. Save/Cancel sit
+   at the foot of the form, shared by every tab. *@
+<govuk-rich-text asp-for="Instructions" label="Scheme Instructions" height="400" />
 
-<govuk-textarea asp-for="Instructions" label="Scheme Instructions" rows="12" />
+<hr class="govuk-section-break govuk-section-break--visible govuk-section-break--m" />
 
 <div class="govuk-form-group">
     <fieldset class="govuk-fieldset">
@@ -22,3 +25,5 @@
         </div>
     </fieldset>
 </div>
+
+<hr class="govuk-section-break govuk-section-break--visible govuk-section-break--m" />

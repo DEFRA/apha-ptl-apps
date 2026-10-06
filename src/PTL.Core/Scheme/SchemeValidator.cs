@@ -50,7 +50,9 @@ public static partial class SchemeValidator
 
         Range(scheme.NumberOfSamples, 1, 999, "NumberOfSamples", errors);
 
-        RequireNotEmpty(scheme.Instructions, "Instructions", errors);
+        // Legacy validated TBEdit through its ValidationProperty("TextPlain"), so markup that
+        // renders as nothing - an empty paragraph, say - never satisfied the required rule.
+        RequireNotEmpty(SchemeInstructions.ToPlainText(scheme.Instructions), "Instructions", errors);
         MaxLength(scheme.Instructions, 50000, "Instructions", errors);
 
         RequireNotEmpty(scheme.CustomsDescription, "CustomsDescription", errors);

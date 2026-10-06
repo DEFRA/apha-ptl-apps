@@ -174,6 +174,11 @@ public sealed class SchemeService(
     private async Task ApplyDerivedFieldsAsync(Scheme scheme, Scheme? existing, CancellationToken cancellationToken)
     {
         scheme.Identifier = SchemeIdentifier.Normalise(scheme.Identifier);
+
+        // Legacy sanitised the instructions markup in the editor's Text setter, so whatever was
+        // posted was cleaned before it reached the business object.
+        scheme.Instructions = SchemeInstructions.Sanitise(scheme.Instructions);
+
         // CheckBoxCheckChangedShowRatings: ticking Show Ratings Table on any tabulation turns on
         // Score Samples for the scheme.
         if (scheme.Tabulations.Any(t => t.ShowRatings))

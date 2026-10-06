@@ -10,15 +10,6 @@
         .ToList();
 }
 
-<h2 class="govuk-heading-m">Results Tabulations</h2>
-
-<div class="govuk-form-group">
-    <label class="govuk-label govuk-label--s" for="NewTabulationName">Add New Tabulation</label>
-    <input class="govuk-input govuk-input--width-20" asp-for="NewTabulationName" />
-    <button type="submit" class="govuk-button govuk-button--secondary govuk-!-margin-left-2" data-module="govuk-button"
-            name="testCommand" value="add-tabulation">Add New Tabulation</button>
-</div>
-
 @if (tabulations.Count == 0)
 {
     <p class="govuk-body">No Tabulations Defined - Click 'Add New Tabulation'</p>
@@ -174,6 +165,17 @@ else
     </table>
 }
 
+<div class="govuk-form-group">
+    <label class="govuk-label govuk-label--s" for="NewTabulationName">Add New Tabulation</label>
+    <input class="govuk-input govuk-input--width-20" asp-for="NewTabulationName" />
+    <button type="submit" class="govuk-button govuk-button--primary govuk-!-margin-left-2" data-module="govuk-button"
+            name="testCommand" value="add-tabulation">
+        Add New Tabulation
+    </button>
+</div>
+
+<govuk-textarea asp-for="StandardTabulationText" label="Standard Tabulation Text" rows="5" />
+
 @if (!Model.RequiresAssessment)
 {
     <govuk-select asp-for="TestConsultantTabulationId" label="Select the Tabulation that will be sent to the Test Consultants" asp-items="tabulationOptions" />
@@ -183,14 +185,14 @@ else
     <input type="hidden" asp-for="TestConsultantTabulationId" />
 }
 
-<govuk-textarea asp-for="StandardTabulationText" label="Standard Tabulation Text" rows="5" />
+
 
 <div class="govuk-form-group">
     <div class="govuk-checkboxes" data-module="govuk-checkboxes">
         <div class="govuk-checkboxes__item">
             <input class="govuk-checkboxes__input" asp-for="UseExternalReference" />
             <label class="govuk-label govuk-checkboxes__label" asp-for="UseExternalReference">External reference used on Tabulations</label>
-            <div class="govuk-hint">Tabulations identify participants by their contract item external reference rather than lab code.</div>
+
         </div>
         <div class="govuk-checkboxes__item">
             <input class="govuk-checkboxes__input" asp-for="StoreRatings" />

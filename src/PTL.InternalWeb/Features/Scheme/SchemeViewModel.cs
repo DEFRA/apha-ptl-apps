@@ -354,6 +354,13 @@ public sealed class SchemeFormViewModel : IValidatableObject
 
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
     {
+        // [Required] only sees the markup, so an editor left with an empty paragraph would pass.
+        // Legacy measured the visible text instead (TBEdit's TextPlain property).
+        if (!string.IsNullOrWhiteSpace(Instructions) && !PTL.Core.Scheme.SchemeInstructions.HasContent(Instructions))
+        {
+            yield return new ValidationResult("Enter the instructions", [nameof(Instructions)]);
+        }
+
         var scheme = new CoreScheme
         {
             Identifier = CoreSchemeIdentifier.Normalise(Identifier),
