@@ -1,0 +1,9 @@
+namespace PTL.Contracts.ExternalUser;
+
+/// <summary>Response body for <c>POST /api/external-users/resolve</c>.</summary>
+public sealed record ResolveExternalUserResponse(
+    string DisplayName,
+    IReadOnlyList<string> Roles,
+    Guid? ParticipantId,
+    Guid? ViewerId,
+    Guid? TestConsultantId);
