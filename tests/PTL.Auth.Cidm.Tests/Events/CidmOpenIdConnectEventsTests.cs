@@ -13,6 +13,16 @@ namespace PTL.Auth.Cidm.Tests.Events;
 
 public class CidmOpenIdConnectEventsTests
 {
+    // OpenIdConnectPostConfigureOptions normally sets this during DI-based options configuration -
+    // never happens for a bare `new OpenIdConnectOptions()` in a unit test, so RedirectToIdentityProviderForSignOut's
+    // State-protection call would NullReferenceException without it.
+    private sealed class FakeStateDataFormat : ISecureDataFormat<AuthenticationProperties>
+    {
+        public string Protect(AuthenticationProperties data) => "protected-state";
+        public string Protect(AuthenticationProperties data, string? purpose) => "protected-state";
+        public AuthenticationProperties? Unprotect(string? protectedText) => new();
+        public AuthenticationProperties? Unprotect(string? protectedText, string? purpose) => new();
+    }
     private sealed class FakeCidmExternalUserResolver(CidmExternalUserResolution resolution) : ICidmExternalUserResolver
     {
         public ClaimsPrincipal? ReceivedPrincipal { get; private set; }
@@ -169,7 +179,7 @@ public class CidmOpenIdConnectEventsTests
     public async Task RedirectToIdentityProviderForSignOut_RendersHtmlFormWithEndSessionEndpoint()
     {
         var httpContext = new DefaultHttpContext { Response = { Body = new MemoryStream() } };
-        var context = new RedirectContext(httpContext, CreateScheme(), new OpenIdConnectOptions(), new AuthenticationProperties())
+        var context = new RedirectContext(httpContext, CreateScheme(), new OpenIdConnectOptions { StateDataFormat = new FakeStateDataFormat() }, new AuthenticationProperties())
         {
             ProtocolMessage = new OpenIdConnectMessage
             {

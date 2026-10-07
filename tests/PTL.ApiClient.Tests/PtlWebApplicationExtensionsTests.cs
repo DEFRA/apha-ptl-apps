@@ -127,7 +127,7 @@ public class PtlWebApplicationExtensionsTests
     }
 
     [Fact]
-    public void AddPtlWebFrontEnd_AddsFeatureFolderViewLocationsAndCookiePaths()
+    public void AddPtlWebFrontEnd_AddsFeatureFolderViewLocations()
     {
         var builder = CreateFrontEndBuilder();
         builder.AddPtlWebFrontEnd();
@@ -137,6 +137,15 @@ public class PtlWebApplicationExtensionsTests
 
         Assert.Equal("/Features/{1}/Views/{0}.cshtml", razorOptions.ViewLocationFormats[0]);
         Assert.Equal("/Features/Shared/{0}.cshtml", razorOptions.ViewLocationFormats[1]);
+    }
+
+    [Fact]
+    public void AddPtlDefaultCookieAuthentication_ConfiguresLoginAndLogoutPaths()
+    {
+        var builder = CreateFrontEndBuilder();
+        builder.AddPtlWebFrontEnd();
+        builder.AddPtlDefaultCookieAuthentication();
+        using var provider = builder.Services.BuildServiceProvider();
 
         var cookieOptions = provider.GetRequiredService<IOptionsMonitor<CookieAuthenticationOptions>>()
             .Get(CookieAuthenticationDefaults.AuthenticationScheme);

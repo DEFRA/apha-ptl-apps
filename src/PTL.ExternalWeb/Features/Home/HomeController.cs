@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using PTL.ApiClient;
 using PTL.ExternalWeb.Features.Account;
@@ -20,5 +21,8 @@ public class HomeController(IApiClient apiClient) : HomeControllerBase(apiClient
         return View(new HomeIndexViewModel(displayName, roles));
     }
 
+    // Legal/informational page - deliberately anonymous, like PTL.ExternalWeb's other
+    // [AllowAnonymous] pages (ApiStatus, Error), since it must be reachable before sign-in.
+    [AllowAnonymous]
     public IActionResult Privacy() => View();
 }
