@@ -1,9 +1,13 @@
 using PTL.ApiClient;
+using PTL.Auth.Entra;
+using PTL.Auth.Entra.Events;
 using PTL.Core.Contract.Document;
+using PTL.InternalWeb.Features.Account;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.AddPtlWebFrontEnd();
-builder.AddPtlDefaultCookieAuthentication();
+builder.AddEntraAuthentication();
+builder.Services.AddScoped<IEntraInternalUserResolver, InternalUserResolver>();
 
 // Mail merge runs in-process in this app; the template bytes come from S3 via PTL.Api's
 // export-template endpoints, so nothing here touches the file system.
