@@ -9,6 +9,7 @@
     <Project Path="src/PTL.Api/PTL.Api.csproj" />
     <Project Path="src/PTL.ApiClient/PTL.ApiClient.csproj" />
     <Project Path="src/PTL.Auth.Cidm/PTL.Auth.Cidm.csproj" />
+    <Project Path="src/PTL.Auth.Entra/PTL.Auth.Entra.csproj" />
     <Project Path="src/PTL.Common/PTL.Common.csproj" />
     <Project Path="src/PTL.InternalWeb/PTL.InternalWeb.csproj" />
     <Project Path="src/PTL.Contracts/PTL.Contracts.csproj" />
@@ -20,6 +21,7 @@
     <Project Path="tests/PTL.Api.Tests/PTL.Api.Tests.csproj" />
     <Project Path="tests/PTL.ApiClient.Tests/PTL.ApiClient.Tests.csproj" />
     <Project Path="tests/PTL.Auth.Cidm.Tests/PTL.Auth.Cidm.Tests.csproj" />
+    <Project Path="tests/PTL.Auth.Entra.Tests/PTL.Auth.Entra.Tests.csproj" />
     <Project Path="tests/PTL.Data.Tests/PTL.Data.Tests.csproj" />
     <Project Path="tests/PTL.InternalWeb.Tests/PTL.InternalWeb.Tests.csproj" />
     <Project Path="tests/PTL.ExternalWeb.Tests/PTL.ExternalWeb.Tests.csproj" />
