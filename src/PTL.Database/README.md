@@ -22,6 +22,9 @@ There is no journal table, so track what has been run here:
 | 0005-CreateSpgViewerByEmail.sql | | | | |
 | 0006-ExtendTestConsultantProceduresForSsoIdExt.sql | | | | |
 | 0007-CreateSpgTestConsultantByEmail.sql | | | | |
+| 0008-AddSsoIdIntToUsers.sql | Y | | | |
+| 0009-ExtendSppAuthenticateForSsoIdInt.sql | Y | | | |
+| 0010-CreateSpuUserSsoIdInt.sql | Y | | | |
 
 If this grows to the point where manually tracking applied scripts becomes error-prone, introduce
 a proper migration tool (e.g. DbUp) pointed at this same `Scripts` folder rather than changing how
