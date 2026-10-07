@@ -242,13 +242,27 @@ jobs:
       - name: Build solution
         run: dotnet build PTL.slnx --configuration Release --no-restore --warnaserror
       - name: Test solution
-        run: >-
-          dotnet test PTL.slnx
-          --configuration Release
-          --no-build
-          --no-restore
-          --logger "trx;LogFilePrefix=ptl-tests"
-          --results-directory "${{ runner.temp }}/test-results"
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          # coverlet.msbuild 10.0.1 intermittently throws "Unable to read beyond the end of the
+          # stream" while calculating coverage results on .NET 10 SDK runners - all tests still
+          # pass, only coverlet's own post-test report generation fails (confirmed upstream, closed
+          # "not planned": https://github.com/coverlet-coverage/coverlet/issues/1957). Retry rather
+          # than fail the build on this known, transient third-party issue.
+          $maxAttempts = 3
+          for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
+            dotnet test PTL.slnx `
+              --configuration Release `
+              --no-build `
+              --no-restore `
+              --logger "trx;LogFilePrefix=ptl-tests" `
+              --results-directory "${{ runner.temp }}/test-results"
+            if ($LASTEXITCODE -eq 0) { exit 0 }
+            if ($attempt -eq $maxAttempts) { exit $LASTEXITCODE }
+            Write-Warning "dotnet test failed (attempt $attempt of $maxAttempts, exit code $LASTEXITCODE) - retrying."
+            Start-Sleep -Seconds 5
+          }
 
   # SonarCloud behavior is retained from the supplied workflow.
   sonarcloud:
