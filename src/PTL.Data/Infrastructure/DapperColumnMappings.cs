@@ -12,6 +12,7 @@ using PTL.Core.Contract.SampleAddress;
 using PTL.Core.Customer;
 using PTL.Core.GroupAddress;
 using PTL.Core.Invoice;
+using PTL.Core.InternalUser;
 using PTL.Core.Lookup;
 using PTL.Core.Participant;
 using PTL.Core.Scheme;
@@ -20,6 +21,7 @@ using PTL.Core.WeightedPricingPlan;
 using CoreContract = PTL.Core.Contract.Contract;
 using CoreCustomer = PTL.Core.Customer.Customer;
 using CoreGroupAddress = PTL.Core.GroupAddress.GroupAddress;
+using CoreInternalUser = PTL.Core.InternalUser.InternalUser;
 using CoreParticipant = PTL.Core.Participant.Participant;
 using CoreScheme = PTL.Core.Scheme.Scheme;
 
@@ -811,6 +813,21 @@ public static class DapperColumnMappings
             [ColPrice] = nameof(InvoiceContractItemEntity.Price),
             ["fldNonFeePaying"] = nameof(InvoiceContractItemEntity.NonFeePaying),
             ["fldHasOverride"] = nameof(InvoiceContractItemEntity.HasOverride),
+        });
+
+        // sppAuthenticate's first result set.
+        Map<CoreInternalUser>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldUserId"] = nameof(CoreInternalUser.UserId),
+            ["fldUsername"] = nameof(CoreInternalUser.Username),
+            ["fldFriendlyName"] = nameof(CoreInternalUser.FriendlyName),
+            ["fldFirstName"] = nameof(CoreInternalUser.FirstName),
+            ["fldLastName"] = nameof(CoreInternalUser.LastName),
+            [ColEmail] = nameof(CoreInternalUser.Email),
+            ["fldDepartment"] = nameof(CoreInternalUser.Department),
+            ["fldIsInactive"] = nameof(CoreInternalUser.IsInactive),
+            ["fldInactiveDate"] = nameof(CoreInternalUser.InactiveDate),
+            ["fldSsoIdInt"] = nameof(CoreInternalUser.SsoIdInt),
         });
     }
 

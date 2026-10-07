@@ -17,6 +17,7 @@ using PTL.Core.Contract.SampleAddress;
 using PTL.Core.Customer;
 using PTL.Core.ExternalUser;
 using PTL.Core.GroupAddress;
+using PTL.Core.InternalUser;
 using PTL.Core.Invoice;
 using PTL.Core.Lookup;
 using PTL.Core.Notifications;
@@ -36,6 +37,7 @@ using PTL.Data.Contract.SampleAddress;
 using PTL.Data.Customer;
 using PTL.Data.GroupAddress;
 using PTL.Data.Infrastructure;
+using PTL.Data.InternalUser;
 using PTL.Data.Invoice;
 using PTL.Data.Lookup;
 using PTL.Data.Notifications;
@@ -97,6 +99,9 @@ builder.Services.AddScoped<IParticipantSchemeService, ParticipantSchemeService>(
 
 builder.Services.AddScoped<ITestConsultantRepository, TestConsultantRepository>();
 builder.Services.AddScoped<IExternalUserService, ExternalUserService>();
+
+builder.Services.AddScoped<IInternalUserRepository, InternalUserRepository>();
+builder.Services.AddScoped<IInternalUserService, InternalUserService>();
 
 builder.Services.AddScoped<IContractRepository, ContractRepository>();
 builder.Services.AddScoped<IContractService, ContractService>();
