@@ -1,7 +1,7 @@
 using System.Data;
 using PTL.Data.Infrastructure;
-using PTL.Data.Tests.Fakes;
 using PTL.Data.TestConsultant;
+using PTL.Data.Tests.Fakes;
 using CoreTestConsultant = PTL.Core.TestConsultant.TestConsultant;
 
 namespace PTL.Data.Tests.TestConsultant;

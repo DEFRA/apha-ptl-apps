@@ -74,9 +74,9 @@ public class SmokeTests : IClassFixture<PtlExternalWebTestFactory>
         // makes the CIDM callback fail with "Correlation failed" and land the user on /Home/Error.
         using var devFactory = _factory.WithWebHostBuilder(builder => builder.UseEnvironment("Development"));
         var client = devFactory.CreateClient(new() { AllowAutoRedirect = false });
- 
+
         var response = await client.GetAsync("/Account/Login?returnUrl=%2FHome%2FPrivacy");
- 
+
         var setCookies = response.Headers.GetValues("Set-Cookie").ToList();
         var correlation = Assert.Single(setCookies, c => c.StartsWith(".AspNetCore.Correlation.", StringComparison.Ordinal));
         var nonce = Assert.Single(setCookies, c => c.StartsWith(".AspNetCore.OpenIdConnect.Nonce.", StringComparison.Ordinal));

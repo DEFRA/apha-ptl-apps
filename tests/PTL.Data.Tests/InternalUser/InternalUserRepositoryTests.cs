@@ -1,6 +1,6 @@
 using System.Data;
-using PTL.Data.InternalUser;
 using PTL.Data.Infrastructure;
+using PTL.Data.InternalUser;
 using PTL.Data.Tests.Fakes;
 using CoreInternalUser = PTL.Core.InternalUser.InternalUser;
 
