@@ -2,28 +2,40 @@
 
 @* Legacy tab order: Scheme Instructions, rule, Data items to be collected, rule. Save/Cancel sit
    at the foot of the form, shared by every tab. *@
-<govuk-rich-text asp-for="Instructions" label="Scheme Instructions" height="400" />
+<govuk-rich-text asp-for="Instructions" label="Scheme Instructions" height="400" view-mode="@Model.IsViewMode" />
 
 <hr class="govuk-section-break govuk-section-break--visible govuk-section-break--m" />
 
-<div class="govuk-form-group">
-    <fieldset class="govuk-fieldset">
-        <legend class="govuk-fieldset__legend govuk-fieldset__legend--s">Data items to be collected</legend>
-        <div class="govuk-checkboxes" data-module="govuk-checkboxes">
-            <div class="govuk-checkboxes__item">
-                <input class="govuk-checkboxes__input" asp-for="DateOfReceipt" />
-                <label class="govuk-label govuk-checkboxes__label" asp-for="DateOfReceipt">Date of receipt</label>
+@if (Model.IsViewMode)
+{
+    <dl class="govuk-summary-list">
+        <govuk-summary-row label="Date of receipt">@(Model.DateOfReceipt ? "Yes" : "No")</govuk-summary-row>
+        <govuk-summary-row label="Storage Conditions">@(Model.StorageConditions ? "Yes" : "No")</govuk-summary-row>
+        <govuk-summary-row label="Condition on Receipt">@(Model.ConditionOnReceipt ? "Yes" : "No")</govuk-summary-row>
+    </dl>
+}
+else
+{
+    <div class="govuk-form-group">
+        <fieldset class="govuk-fieldset">
+            <legend class="govuk-fieldset__legend govuk-fieldset__legend--s">Data items to be collected</legend>
+            <div class="govuk-checkboxes" data-module="govuk-checkboxes">
+                <div class="govuk-checkboxes__item">
+                    <input class="govuk-checkboxes__input" asp-for="DateOfReceipt" />
+                    <label class="govuk-label govuk-checkboxes__label" asp-for="DateOfReceipt">Date of receipt</label>
+                </div>
+                <div class="govuk-checkboxes__item">
+                    <input class="govuk-checkboxes__input" asp-for="StorageConditions" />
+                    <label class="govuk-label govuk-checkboxes__label" asp-for="StorageConditions">Storage Conditions</label>
+                </div>
+                <div class="govuk-checkboxes__item">
+                    <input class="govuk-checkboxes__input" asp-for="ConditionOnReceipt" />
+                    <label class="govuk-label govuk-checkboxes__label" asp-for="ConditionOnReceipt">Condition on Receipt</label>
+                </div>
             </div>
-            <div class="govuk-checkboxes__item">
-                <input class="govuk-checkboxes__input" asp-for="StorageConditions" />
-                <label class="govuk-label govuk-checkboxes__label" asp-for="StorageConditions">Storage Conditions</label>
-            </div>
-            <div class="govuk-checkboxes__item">
-                <input class="govuk-checkboxes__input" asp-for="ConditionOnReceipt" />
-                <label class="govuk-label govuk-checkboxes__label" asp-for="ConditionOnReceipt">Condition on Receipt</label>
-            </div>
-        </div>
-    </fieldset>
-</div>
+        </fieldset>
+    </div>
+}
 
 <hr class="govuk-section-break govuk-section-break--visible govuk-section-break--m" />
+

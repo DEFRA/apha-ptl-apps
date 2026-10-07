@@ -8,6 +8,13 @@
         .Where(t => t.TabulationId != Guid.Empty)
         .Select(t => new Microsoft.AspNetCore.Mvc.Rendering.SelectListItem(t.Name, t.TabulationId.ToString()))
         .ToList();
+
+    string AvailabilityText(SchemeTabulationAvailability availability) => availability switch
+    {
+        SchemeTabulationAvailability.All => "All",
+        SchemeTabulationAvailability.ParticipantsOnly => "Participants Only",
+        _ => "Viewers and TCs Only",
+    };
 }
 
 @if (tabulations.Count == 0)
@@ -27,9 +34,17 @@ else
                 @for (var i = 0; i < tabulations.Count; i++)
                 {
                     <th scope="col" class="govuk-table__header">
-                        @* The name is editable in place; legacy uses a Rename popup. *@
-                        <label class="govuk-visually-hidden" asp-for="Tabulations[i].Name">Tabulation name</label>
-                        <input class="govuk-input govuk-input--width-10" asp-for="Tabulations[i].Name" />
+                        @if (Model.IsViewMode)
+                        {
+                            @tabulations[i].Name
+                            <input type="hidden" asp-for="Tabulations[i].Name" />
+                        }
+                        else
+                        {
+                            @* The name is editable in place; legacy uses a Rename popup. *@
+                            <label class="govuk-visually-hidden" asp-for="Tabulations[i].Name">Tabulation name</label>
+                            <input class="govuk-input govuk-input--width-10" asp-for="Tabulations[i].Name" />
+                        }
                     </th>
                 }
             </tr>
@@ -41,14 +56,22 @@ else
                 {
                     <td class="govuk-table__cell">
                         <input type="hidden" asp-for="Tabulations[i].TabulationId" />
-                        <div class="govuk-checkboxes govuk-checkboxes--small" data-module="govuk-checkboxes">
-                            <div class="govuk-checkboxes__item">
-                                <input class="govuk-checkboxes__input" asp-for="Tabulations[i].IntendedResultsOnly" />
-                                <label class="govuk-label govuk-checkboxes__label" asp-for="Tabulations[i].IntendedResultsOnly">
-                                    <span class="govuk-visually-hidden">Intended Results Only for @tabulations[i].Name</span>
-                                </label>
+                        @if (Model.IsViewMode)
+                        {
+                            @(tabulations[i].IntendedResultsOnly ? "Yes" : "No")
+                            <input type="hidden" asp-for="Tabulations[i].IntendedResultsOnly" />
+                        }
+                        else
+                        {
+                            <div class="govuk-checkboxes govuk-checkboxes--small" data-module="govuk-checkboxes">
+                                <div class="govuk-checkboxes__item">
+                                    <input class="govuk-checkboxes__input" asp-for="Tabulations[i].IntendedResultsOnly" />
+                                    <label class="govuk-label govuk-checkboxes__label" asp-for="Tabulations[i].IntendedResultsOnly">
+                                        <span class="govuk-visually-hidden">Intended Results Only for @tabulations[i].Name</span>
+                                    </label>
+                                </div>
                             </div>
-                        </div>
+                        }
                     </td>
                 }
             </tr>
@@ -57,14 +80,22 @@ else
                 @for (var i = 0; i < tabulations.Count; i++)
                 {
                     <td class="govuk-table__cell">
-                        <div class="govuk-checkboxes govuk-checkboxes--small" data-module="govuk-checkboxes">
-                            <div class="govuk-checkboxes__item">
-                                <input class="govuk-checkboxes__input" asp-for="Tabulations[i].SingleParticipantTabulation" />
-                                <label class="govuk-label govuk-checkboxes__label" asp-for="Tabulations[i].SingleParticipantTabulation">
-                                    <span class="govuk-visually-hidden">Single Participant Tabulation for @tabulations[i].Name</span>
-                                </label>
+                        @if (Model.IsViewMode)
+                        {
+                            @(tabulations[i].SingleParticipantTabulation ? "Yes" : "No")
+                            <input type="hidden" asp-for="Tabulations[i].SingleParticipantTabulation" />
+                        }
+                        else
+                        {
+                            <div class="govuk-checkboxes govuk-checkboxes--small" data-module="govuk-checkboxes">
+                                <div class="govuk-checkboxes__item">
+                                    <input class="govuk-checkboxes__input" asp-for="Tabulations[i].SingleParticipantTabulation" />
+                                    <label class="govuk-label govuk-checkboxes__label" asp-for="Tabulations[i].SingleParticipantTabulation">
+                                        <span class="govuk-visually-hidden">Single Participant Tabulation for @tabulations[i].Name</span>
+                                    </label>
+                                </div>
                             </div>
-                        </div>
+                        }
                     </td>
                 }
             </tr>
@@ -73,15 +104,23 @@ else
                 @for (var i = 0; i < tabulations.Count; i++)
                 {
                     <td class="govuk-table__cell">
-                        @* Ticking this turns on Score Samples for the scheme when it is saved. *@
-                        <div class="govuk-checkboxes govuk-checkboxes--small" data-module="govuk-checkboxes">
-                            <div class="govuk-checkboxes__item">
-                                <input class="govuk-checkboxes__input ptl-show-ratings" asp-for="Tabulations[i].ShowRatings" />
-                                <label class="govuk-label govuk-checkboxes__label" asp-for="Tabulations[i].ShowRatings">
-                                    <span class="govuk-visually-hidden">Show Ratings Table for @tabulations[i].Name</span>
-                                </label>
+                        @if (Model.IsViewMode)
+                        {
+                            @(tabulations[i].ShowRatings ? "Yes" : "No")
+                            <input type="hidden" asp-for="Tabulations[i].ShowRatings" />
+                        }
+                        else
+                        {
+                            @* Ticking this turns on Score Samples for the scheme when it is saved. *@
+                            <div class="govuk-checkboxes govuk-checkboxes--small" data-module="govuk-checkboxes">
+                                <div class="govuk-checkboxes__item">
+                                    <input class="govuk-checkboxes__input ptl-show-ratings" asp-for="Tabulations[i].ShowRatings" />
+                                    <label class="govuk-label govuk-checkboxes__label" asp-for="Tabulations[i].ShowRatings">
+                                        <span class="govuk-visually-hidden">Show Ratings Table for @tabulations[i].Name</span>
+                                    </label>
+                                </div>
                             </div>
-                        </div>
+                        }
                     </td>
                 }
             </tr>
@@ -90,11 +129,19 @@ else
                 @for (var i = 0; i < tabulations.Count; i++)
                 {
                     <td class="govuk-table__cell">
-                        <select class="govuk-select" asp-for="Tabulations[i].Availability">
-                            <option value="@SchemeTabulationAvailability.All">All</option>
-                            <option value="@SchemeTabulationAvailability.ParticipantsOnly">Participants Only</option>
-                            <option value="@SchemeTabulationAvailability.ViewersAndTestConsultantsOnly">Viewers and TCs Only</option>
-                        </select>
+                        @if (Model.IsViewMode)
+                        {
+                            @AvailabilityText(tabulations[i].Availability)
+                            <input type="hidden" asp-for="Tabulations[i].Availability" />
+                        }
+                        else
+                        {
+                            <select class="govuk-select" asp-for="Tabulations[i].Availability">
+                                <option value="@SchemeTabulationAvailability.All">All</option>
+                                <option value="@SchemeTabulationAvailability.ParticipantsOnly">Participants Only</option>
+                                <option value="@SchemeTabulationAvailability.ViewersAndTestConsultantsOnly">Viewers and TCs Only</option>
+                            </select>
+                        }
                     </td>
                 }
             </tr>
@@ -122,7 +169,8 @@ else
                                     FieldName: $"Tabulations[{i}].ResultItemIds",
                                     ItemId: item.ItemId,
                                     Selected: tabulations[i].ResultItemIds.Contains(item.ItemId),
-                                    Label: $"{item.Name} in {tabulations[i].Name}"))" />
+                                    Label: $"{item.Name} in {tabulations[i].Name}",
+                                    IsViewMode: Model.IsViewMode))" />
                             </td>
                         }
                     </tr>
@@ -148,79 +196,101 @@ else
                                     FieldName: $"Tabulations[{i}].MethodItemIds",
                                     ItemId: item.ItemId,
                                     Selected: tabulations[i].MethodItemIds.Contains(item.ItemId),
-                                    Label: $"{item.Name} in {tabulations[i].Name}"))" />
+                                    Label: $"{item.Name} in {tabulations[i].Name}",
+                                    IsViewMode: Model.IsViewMode))" />
                             </td>
                         }
                     </tr>
                 }
             }
         </tbody>
-        <tfoot class="govuk-table__foot">
-            <tr class="govuk-table__row">
-                <td class="govuk-table__cell"></td>
-                @for (var i = 0; i < tabulations.Count; i++)
-                {
-                    <td class="govuk-table__cell">
-                        <button type="submit" class="govuk-link ptl-link-button" name="testCommand" value="remove-tabulation:@i">Remove</button>
-                    </td>
-                }
-            </tr>
-        </tfoot>
+        @if (!Model.IsViewMode)
+        {
+            <tfoot class="govuk-table__foot">
+                <tr class="govuk-table__row">
+                    <td class="govuk-table__cell"></td>
+                    @for (var i = 0; i < tabulations.Count; i++)
+                    {
+                        <td class="govuk-table__cell">
+                            <button type="submit" class="govuk-link ptl-link-button" name="testCommand" value="remove-tabulation:@i">Remove</button>
+                        </td>
+                    }
+                </tr>
+            </tfoot>
+        }
     </table>
     </div>
 }
 
-<div class="govuk-form-group">
-    <label class="govuk-label govuk-label--s" for="NewTabulationName">Add New Tabulation</label>
-    <input class="govuk-input govuk-input--width-20" asp-for="NewTabulationName" />
-    <button type="submit" class="govuk-button govuk-button--primary govuk-!-margin-left-2" data-module="govuk-button"
-            name="testCommand" value="add-tabulation">
-        Add New Tabulation
-    </button>
-</div>
-
-<govuk-textarea asp-for="StandardTabulationText" label="Standard Tabulation Text" rows="5" label-class="govuk-label govuk-label--s" />
-
-@if (!Model.RequiresAssessment)
+@if (!Model.IsViewMode)
 {
-    <govuk-select asp-for="TestConsultantTabulationId" label="Select the Tabulation that will be sent to the Test Consultants" asp-items="tabulationOptions" option-label="- Please Select -" />
+    <div class="govuk-form-group">
+        <label class="govuk-label govuk-label--s" for="NewTabulationName">Add New Tabulation</label>
+        <input class="govuk-input govuk-input--width-20" asp-for="NewTabulationName" />
+        <button type="submit" class="govuk-button govuk-button--primary govuk-!-margin-left-2" data-module="govuk-button"
+                name="testCommand" value="add-tabulation">
+            Add New Tabulation
+        </button>
+    </div>
+}
+
+@if (Model.IsViewMode)
+{
+    <dl class="govuk-summary-list">
+        <govuk-summary-row label="Standard Tabulation Text">@Model.StandardTabulationText</govuk-summary-row>
+        @if (!Model.RequiresAssessment)
+        {
+            <govuk-summary-row label="Select the Tabulation that will be sent to the Test Consultants">@(tabulationOptions.FirstOrDefault(o => o.Value == Model.TestConsultantTabulationId.ToString())?.Text)</govuk-summary-row>
+        }
+        <govuk-summary-row label="External reference used on Tabulations">@(Model.UseExternalReference ? "Yes" : "No")</govuk-summary-row>
+        <govuk-summary-row label="Score Samples">@(Model.StoreRatings ? "Yes" : "No")</govuk-summary-row>
+    </dl>
+    <input type="hidden" asp-for="TestConsultantTabulationId" />
 }
 else
 {
-    <input type="hidden" asp-for="TestConsultantTabulationId" />
-}
+    <govuk-textarea asp-for="StandardTabulationText" label="Standard Tabulation Text" rows="5" label-class="govuk-label govuk-label--s" />
 
+    @if (!Model.RequiresAssessment)
+    {
+        <govuk-select asp-for="TestConsultantTabulationId" label="Select the Tabulation that will be sent to the Test Consultants" asp-items="tabulationOptions" option-label="- Please Select -" />
+    }
+    else
+    {
+        <input type="hidden" asp-for="TestConsultantTabulationId" />
+    }
 
+    <div class="govuk-form-group">
+        <div class="govuk-checkboxes" data-module="govuk-checkboxes">
+            <div class="govuk-checkboxes__item">
+                <input class="govuk-checkboxes__input" asp-for="UseExternalReference" />
+                <label class="govuk-label govuk-checkboxes__label" asp-for="UseExternalReference">External reference used on Tabulations</label>
 
-<div class="govuk-form-group">
-    <div class="govuk-checkboxes" data-module="govuk-checkboxes">
-        <div class="govuk-checkboxes__item">
-            <input class="govuk-checkboxes__input" asp-for="UseExternalReference" />
-            <label class="govuk-label govuk-checkboxes__label" asp-for="UseExternalReference">External reference used on Tabulations</label>
-
-        </div>
-        <div class="govuk-checkboxes__item">
-            <input class="govuk-checkboxes__input" asp-for="StoreRatings" />
-            <label class="govuk-label govuk-checkboxes__label" asp-for="StoreRatings">Score Samples</label>
+            </div>
+            <div class="govuk-checkboxes__item">
+                <input class="govuk-checkboxes__input" asp-for="StoreRatings" />
+                <label class="govuk-label govuk-checkboxes__label" asp-for="StoreRatings">Score Samples</label>
+            </div>
         </div>
     </div>
-</div>
 
-<script>
-    // Legacy turns Score Samples on as soon as any tabulation shows its ratings table; the server
-    // applies the same rule on save, this just reflects it immediately.
-    (function () {
-        var storeRatings = document.getElementById('StoreRatings');
-        if (!storeRatings) {
-            return;
-        }
+    <script>
+        // Legacy turns Score Samples on as soon as any tabulation shows its ratings table; the server
+        // applies the same rule on save, this just reflects it immediately.
+        (function () {
+            var storeRatings = document.getElementById('StoreRatings');
+            if (!storeRatings) {
+                return;
+            }
 
-        document.querySelectorAll('.ptl-show-ratings').forEach(function (checkbox) {
-            checkbox.addEventListener('change', function () {
-                if (checkbox.checked) {
-                    storeRatings.checked = true;
-                }
+            document.querySelectorAll('.ptl-show-ratings').forEach(function (checkbox) {
+                checkbox.addEventListener('change', function () {
+                    if (checkbox.checked) {
+                        storeRatings.checked = true;
+                    }
+                });
             });
-        });
-    })();
-</script>
+        })();
+    </script>
+}
+

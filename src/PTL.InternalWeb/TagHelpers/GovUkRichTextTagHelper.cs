@@ -34,12 +34,25 @@ public class GovUkRichTextTagHelper(IHtmlGenerator generator) : TagHelper
     [HtmlAttributeName("readonly")]
     public bool IsReadOnly { get; set; }
 
+    /// <summary>When set, renders the field's value as plain rendered HTML (the stored markup is
+    /// already sanitised server-side) with no textarea and no TinyMCE toolbar at all - used by the
+    /// Details ("view mode") screen, as distinct from <see cref="IsReadOnly"/> which still renders
+    /// an editor, just a disabled one.</summary>
+    [HtmlAttributeName("view-mode")]
+    public bool ViewMode { get; set; }
+
     [ViewContext]
     [HtmlAttributeNotBound]
     public ViewContext ViewContext { get; set; } = default!;
 
     public override void Process(TagHelperContext context, TagHelperOutput output)
     {
+        if (ViewMode)
+        {
+            RenderViewMode(output);
+            return;
+        }
+
         var field = For.Name;
         var hasError = ViewContext.ViewData.ModelState.TryGetValue(field, out var entry) && entry.Errors.Count > 0;
         var describedBy = GovUkFormGroupMarkup.Render(output, ViewContext, field, Label, Hint, hasError, entry);
@@ -65,4 +78,22 @@ public class GovUkRichTextTagHelper(IHtmlGenerator generator) : TagHelper
 
         output.Content.AppendHtml(generator.GenerateTextArea(ViewContext, For.ModelExplorer, field, rows: 12, columns: 0, htmlAttributes));
     }
+
+    private void RenderViewMode(TagHelperOutput output)
+    {
+        output.TagName = "div";
+        output.TagMode = TagMode.StartTagAndEndTag;
+        output.Attributes.SetAttribute("class", "govuk-form-group");
+
+        var labelTag = new TagBuilder("p");
+        labelTag.AddCssClass("govuk-label govuk-label--s");
+        labelTag.InnerHtml.Append(Label);
+        output.Content.AppendHtml(labelTag);
+
+        var contentTag = new TagBuilder("div");
+        contentTag.AddCssClass("govuk-body");
+        contentTag.InnerHtml.AppendHtml((string?)For.Model ?? string.Empty);
+        output.Content.AppendHtml(contentTag);
+    }
 }
+

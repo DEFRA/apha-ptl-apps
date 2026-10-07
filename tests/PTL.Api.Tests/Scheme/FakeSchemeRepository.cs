@@ -11,6 +11,27 @@ internal sealed class FakeSchemeRepository : ISchemeRepository
     public Task<PTL.Core.Scheme.Scheme?> GetByIdAsync(Guid schemeId, CancellationToken cancellationToken = default) =>
         Task.FromResult(_schemes.TryGetValue(schemeId, out var scheme) ? Clone(scheme) : null);
 
+    public Task<IReadOnlyList<SchemeSummaryEntity>> GetAllSummariesAsync(CancellationToken cancellationToken = default)
+    {
+        IReadOnlyList<SchemeSummaryEntity> summaries = _schemes.Values
+            .GroupBy(s => s.SharedId)
+            .Select(family =>
+            {
+                var mostRecent = family.OrderByDescending(s => s.YearId).First();
+                return new SchemeSummaryEntity
+                {
+                    SharedId = family.Key,
+                    YearId = mostRecent.YearId,
+                    RecentSchemeId = mostRecent.SchemeId,
+                    RecentIdentifier = mostRecent.Identifier,
+                    RecentName = mostRecent.Name
+                };
+            })
+            .ToList();
+
+        return Task.FromResult(summaries);
+    }
+
     public Task<IReadOnlyList<SchemeSummaryEntity>> GetSummariesByYearAsync(int yearId, CancellationToken cancellationToken = default)
     {
         IReadOnlyList<SchemeSummaryEntity> summaries = _schemes.Values

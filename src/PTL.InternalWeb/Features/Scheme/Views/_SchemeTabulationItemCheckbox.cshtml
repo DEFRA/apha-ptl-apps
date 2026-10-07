@@ -1,12 +1,20 @@
 @model PTL.InternalWeb.Features.Scheme.SchemeTabulationItemCheckboxViewModel
 
-@* A checkbox posting the item id into a Guid list. Only checked boxes post, so an unchecked
-   item simply drops out of the list - no hidden companion input is wanted here. *@
-<div class="govuk-checkboxes govuk-checkboxes--small" data-module="govuk-checkboxes">
-    <div class="govuk-checkboxes__item">
-        <input class="govuk-checkboxes__input" type="checkbox" id="@Model.CheckboxId" name="@Model.FieldName" value="@Model.ItemId" checked="@Model.Selected" />
-        <label class="govuk-label govuk-checkboxes__label" for="@Model.CheckboxId">
-            <span class="govuk-visually-hidden">@Model.Label</span>
-        </label>
+@if (Model.IsViewMode)
+{
+    <span class="govuk-visually-hidden">@Model.Label: </span>@(Model.Selected ? "Yes" : "No")
+}
+else
+{
+    @* A checkbox posting the item id into a Guid list. Only checked boxes post, so an unchecked
+       item simply drops out of the list - no hidden companion input is wanted here. *@
+    <div class="govuk-checkboxes govuk-checkboxes--small" data-module="govuk-checkboxes">
+        <div class="govuk-checkboxes__item">
+            <input class="govuk-checkboxes__input" type="checkbox" id="@Model.CheckboxId" name="@Model.FieldName" value="@Model.ItemId" checked="@Model.Selected" />
+            <label class="govuk-label govuk-checkboxes__label" for="@Model.CheckboxId">
+                <span class="govuk-visually-hidden">@Model.Label</span>
+            </label>
+        </div>
     </div>
-</div>
+}
+

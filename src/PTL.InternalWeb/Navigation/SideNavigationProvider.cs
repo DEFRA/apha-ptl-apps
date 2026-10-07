@@ -219,6 +219,7 @@ public static class SideNavigationProvider
                         // Year" and the "Create Scheme for Current Year" item SchemeList.aspx adds.
                                                 new SideNavigationItem { Text = "Create Scheme for Current Year", ControllerName = SchemeControllerName, ActionName = "CreateForCurrentYear" },
                         new SideNavigationItem { Text = "Create Scheme for Next Year", ControllerName = SchemeControllerName, ActionName = CreateAction },
+                        Disabled("Printable Schemes"),
 
 
                         // Hidden: not menu entries, but present so Details/Edit pages resolve a full

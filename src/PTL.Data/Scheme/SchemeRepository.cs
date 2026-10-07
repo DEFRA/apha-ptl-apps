@@ -82,6 +82,13 @@ public sealed class SchemeRepository(IDbConnectionFactory connectionFactory) : I
             new { YearId = yearId })).ToList();
     }
 
+    public async Task<IReadOnlyList<SchemeSummaryEntity>> GetAllSummariesAsync(CancellationToken cancellationToken = default)
+    {
+        using var connection = connectionFactory.CreateConnection();
+
+        return (await connection.QueryAsync<SchemeSummaryEntity>("EXEC dbo.spgaSchemeInfo")).ToList();
+    }
+
     public async Task<IReadOnlyList<SchemeSummaryEntity>> GetSummariesBySchemeIdAsync(Guid schemeId, CancellationToken cancellationToken = default)
     {
         using var connection = connectionFactory.CreateConnection();

@@ -26,7 +26,8 @@ public class SchemeRouteSmokeTests : IClassFixture<WebApplicationFactory<Program
         {
             SchemeResponse = scheme,
             SearchResponse = new SchemeSearchResponse([new SchemeSummaryResponse(sharedId, scheme.YearId, schemeId, scheme.Identifier, scheme.Name, null, null, null, null, null, null)], 1, 1, 20),
-            HistoryResponse = [new SchemeHistoryResponse(schemeId, sharedId, scheme.YearId, scheme.Identifier, scheme.Name)]
+            HistoryResponse = [new SchemeHistoryResponse(schemeId, sharedId, scheme.YearId, scheme.Identifier, scheme.Name)],
+            RenewResponse = scheme with { SchemeId = Guid.Empty, YearId = scheme.YearId + 1 }
         };
 
         SchemeId = schemeId;
@@ -145,6 +146,19 @@ public class SchemeRouteSmokeTests : IClassFixture<WebApplicationFactory<Program
     }
 
     [Fact]
+    public async Task Renew_RendersTheCreateFormWithoutSaveAffordancesMissing()
+    {
+        var client = _factory.CreateClient();
+
+        var response = await client.GetAsync($"/Scheme/Renew/{SchemeId}");
+        var html = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("type=\"submit\"", html, StringComparison.Ordinal);
+        Assert.Contains($"value=\"{SharedId}\"", html, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task Details_RendersFullBreadcrumbTrail()
     {
         var client = _factory.CreateClient();
@@ -154,6 +168,47 @@ public class SchemeRouteSmokeTests : IClassFixture<WebApplicationFactory<Program
 
         Assert.Contains("Manage Schemes", body);
         Assert.Contains("Scheme Details", body);
+    }
+
+    [Fact]
+    public async Task Details_RendersTheSevenLegacyTabsAsReadOnlyContent()
+    {
+        var client = _factory.CreateClient();
+
+        var html = await client.GetStringAsync($"/Scheme/Details/{SchemeId}");
+
+        var expectedTabs = new[]
+        {
+            "Details", "Tests", "Distribution Level Data", "Results Tabulations",
+            "Test Consultants", "Viewers"
+        };
+
+        var position = 0;
+        foreach (var tab in expectedTabs)
+        {
+            var index = html.IndexOf($">{tab}</a>", position, StringComparison.Ordinal);
+            Assert.True(index > 0, $"Tab '{tab}' was not rendered after the preceding tab.");
+            position = index;
+        }
+
+        // Details tab fields render as plain summary-list text in view mode.
+        Assert.Contains("govuk-summary-list__key\">Identifier</dt>", html, StringComparison.Ordinal);
+        Assert.Contains("PT1234", html, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Details_DoesNotRenderEditOrSaveAffordances()
+    {
+        var client = _factory.CreateClient();
+
+        var html = await client.GetStringAsync($"/Scheme/Details/{SchemeId}");
+
+        Assert.DoesNotContain("type=\"submit\"", html, StringComparison.Ordinal);
+        Assert.DoesNotContain(">Save<", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("name=\"testCommand\"", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("id=\"NewTabulationName\"", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("class=\"govuk-input\" id=\"Identifier\"", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("ptl-rich-text", html, StringComparison.Ordinal);
     }
 
     [Fact]

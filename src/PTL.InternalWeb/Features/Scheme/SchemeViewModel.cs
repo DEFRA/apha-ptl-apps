@@ -7,14 +7,18 @@ using CoreSchemeIdentifier = PTL.Core.Scheme.SchemeIdentifier;
 
 namespace PTL.InternalWeb.Features.Scheme;
 
-// Search-criteria portion of the Index view, bound directly from the query string.
-public sealed record SchemeSearchViewModel(int YearId, string? SearchTerm, int Page, int PageSize);
-
+// Legacy SchemeList.aspx has no year filter; the Scheme Name search box is carried over from the
+// legacy Scheme Admin/Search.aspx page, which this screen now absorbs.
 public sealed record SchemeListViewModel(
-    SchemeSearchViewModel Search,
+    int Page,
+    int PageSize,
     int TotalCount,
-    IEnumerable<SelectListItem> YearOptions,
+    string? SearchTerm,
     IReadOnlyList<SchemeSummaryResponse> Schemes);
+
+// Legacy SchemeHistory.aspx.vb GetYearNameFromYearId() resolves each row's YearId against
+// YearCollection and displays the "2026/27"-style label, not the raw integer.
+public sealed record SchemeHistoryRowViewModel(Guid SchemeId, string YearLabel, string Identifier, string Name);
 
 // One row of the Details tab's currency pricing grid. CurrencyName/CurrencySymbol are display
 // only; SchemeCurrencyId is Guid.Empty for a currency the scheme has no price row for yet.
@@ -93,7 +97,7 @@ public enum SchemeTabulationAvailability
 }
 
 // One cell of the Results Tabulations inclusion matrix.
-public sealed record SchemeTabulationItemCheckboxViewModel(string FieldName, Guid ItemId, bool Selected, string Label)
+public sealed record SchemeTabulationItemCheckboxViewModel(string FieldName, Guid ItemId, bool Selected, string Label, bool IsViewMode = false)
 {
     public string CheckboxId { get; } = $"{FieldName.Replace("[", "_", StringComparison.Ordinal).Replace("]", "_", StringComparison.Ordinal).Replace(".", "_", StringComparison.Ordinal)}{ItemId:N}";
 }
@@ -111,7 +115,8 @@ public sealed record SchemeTestItemListViewModel(
     string AddLabel,
     string EmptyMessage,
     string PickerId,
-    IEnumerable<SelectListItem> TypeOptions);
+    IEnumerable<SelectListItem> TypeOptions,
+    bool IsViewMode = false);
 
 // Shared by Create.cshtml and Edit.cshtml, which render it across the seven legacy tabs
 // (Details, Tests, Distribution Level Data, Results Tabulations, Test Consultants, Assessors,
@@ -125,6 +130,11 @@ public sealed record SchemeTestItemListViewModel(
 public sealed class SchemeFormViewModel : IValidatableObject
 {
     public Guid? SchemeId { get; set; }
+
+    // Set by SchemeController.Details so _SchemeForm and its tab partials render every field as
+    // plain read-only text instead of form controls, with no Save/Add/Remove/Move/rich-text-editor
+    // affordances - the same tabbed layout used for Create/Edit, reused for viewing.
+    public bool IsViewMode { get; set; }
 
     // Read-only display fields, not posted back.
     public Guid? SharedId { get; set; }

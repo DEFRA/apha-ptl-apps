@@ -63,17 +63,12 @@ public class SchemeController(ISchemeApiClient schemeApiClient, ILookupApiClient
     // supplies the actual section contents.
     public IActionResult ManageSchemes() => View();
 
-    public async Task<IActionResult> Index(int? yearId, string? searchTerm = null, int page = 1, int pageSize = PTL.InternalWeb.Pagination.PaginationModel.DefaultPageSize, CancellationToken cancellationToken = default)
+    public async Task<IActionResult> Index(int page = 1, int pageSize = PTL.InternalWeb.Pagination.PaginationModel.DefaultPageSize, string? searchTerm = null, CancellationToken cancellationToken = default)
     {
-        var years = await lookupApiClient.GetCurrentYearsAsync(cancellationToken);
-        var resolvedYearId = yearId ?? (years.Count > 0 ? years[0].YearId : 0);
+        var result = await schemeApiClient.GetSchemeFamiliesAsync(page, pageSize, searchTerm, cancellationToken);
+        LogDisplayedSchemeListMessage(logger, 0, searchTerm, result.Page, result.TotalCount, null);
 
-        var result = await schemeApiClient.GetSchemesForYearAsync(new SchemeSearchRequest(resolvedYearId, searchTerm, page, pageSize), cancellationToken);
-        LogDisplayedSchemeListMessage(logger, resolvedYearId, searchTerm, page, result.TotalCount, null);
-
-        var yearOptions = years.Select(y => new SelectListItem(y.Year, y.YearId.ToString(CultureInfo.InvariantCulture))).ToList();
-        var search = new SchemeSearchViewModel(resolvedYearId, searchTerm, result.Page, result.PageSize);
-        return View(new SchemeListViewModel(search, result.TotalCount, yearOptions, result.Items));
+        return View(new SchemeListViewModel(result.Page, result.PageSize, result.TotalCount, searchTerm, result.Items));
     }
 
     public async Task<IActionResult> Details(Guid id, CancellationToken cancellationToken)
@@ -85,14 +80,52 @@ public class SchemeController(ISchemeApiClient schemeApiClient, ILookupApiClient
             return NotFound();
         }
 
-        return View(scheme);
+        var model = ToFormViewModel(scheme);
+        model.IsViewMode = true;
+        await PopulateFormAsync(model, cancellationToken);
+        return View(model);
     }
 
     public async Task<IActionResult> History(Guid sharedId, CancellationToken cancellationToken)
     {
         var history = await schemeApiClient.GetSchemeHistoryAsync(sharedId, cancellationToken);
+        var years = await lookupApiClient.GetAllYearsAsync(cancellationToken);
+        var yearLabels = years.ToDictionary(y => y.YearId, y => y.Year);
+
+        var rows = history
+            .Select(scheme => new SchemeHistoryRowViewModel(
+                scheme.SchemeId,
+                yearLabels.GetValueOrDefault(scheme.YearId, scheme.YearId.ToString(CultureInfo.InvariantCulture)),
+                scheme.Identifier,
+                scheme.Name))
+            .ToList();
+
         LogSchemeHistoryMessage(logger, sharedId, null);
-        return View(history);
+        return View(rows);
+    }
+
+    // The Scheme List's Next Year column offers Renew against the most recent scheme when next
+    // year's does not exist yet (legacy Scheme.aspx?SchemeId=..&renewal=true -> Scheme.RenewScheme).
+    // Reuses the Create view and its POST action - the draft is only persisted when the user Saves.
+    [HttpGet]
+    public async Task<IActionResult> Renew(Guid schemeId, CancellationToken cancellationToken)
+    {
+        var renewed = await schemeApiClient.RenewSchemeAsync(schemeId, cancellationToken);
+        if (renewed is null)
+        {
+            LogSchemeNotFoundMessage(logger, schemeId, null);
+            return NotFound();
+        }
+
+        var model = ToFormViewModel(renewed);
+
+        // The draft is not yet saved - SchemeId must be null so the form posts to Create (which
+        // server-generates it), while SharedId is preserved so the saved scheme joins the
+        // existing family instead of starting a new one.
+        model.SchemeId = null;
+
+        await PopulateFormAsync(model, cancellationToken);
+        return View("Create", model);
     }
 
     // Legacy has two separate entry points into Scheme.aspx, and the year is never chosen on the
@@ -487,7 +520,8 @@ public class SchemeController(ISchemeApiClient schemeApiClient, ILookupApiClient
                 t.Availability is SchemeTabulationAvailability.All or SchemeTabulationAvailability.ViewersAndTestConsultantsOnly,
                 t.ResultItemIds,
                 t.MethodItemIds))
-            .ToList());
+            .ToList(),
+        model.SharedId);
 
     private static SchemeFormViewModel ToFormViewModel(SchemeResponse scheme) => new()
     {

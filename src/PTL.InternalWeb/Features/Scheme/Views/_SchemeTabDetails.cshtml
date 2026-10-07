@@ -1,8 +1,12 @@
 @model PTL.InternalWeb.Features.Scheme.SchemeFormViewModel
 @using System.Globalization
+@using Microsoft.AspNetCore.Mvc.Rendering
 @{
     bool HasError(string field) => ViewData.ModelState.TryGetValue(field, out var entry) && entry.Errors.Count > 0;
     string? FirstError(string field) => ViewData.ModelState.TryGetValue(field, out var entry) && entry.Errors.Count > 0 ? entry.Errors[0].ErrorMessage : null;
+    string YesNo(bool value) => value ? "Yes" : "No";
+    string OptionText(IEnumerable<SelectListItem> options, Guid? value) =>
+        value is null ? string.Empty : options.FirstOrDefault(o => o.Value == value.Value.ToString())?.Text ?? string.Empty;
 
     // Legacy renders the months in two rows of six, financial-year order, with "As Available"
     // alongside the second row. Each month is locked once its distribution has been initialised.
@@ -37,9 +41,88 @@
         [nameof(Model.DistributionMonthFeb)] = Model.DistributionMonthFeb,
         [nameof(Model.DistributionMonthMar)] = Model.DistributionMonthMar,
     };
+
+    var distributionText = Model.DistributionAsAvailable
+        ? "As Available"
+        : string.Join(", ", months.Where(m => monthValues[m.Property]).Select(m => m.Label));
 }
 
-<govuk-input asp-for="Identifier" label="Identifier" input-class="govuk-input govuk-input--width-10" />
+@if (Model.IsViewMode)
+{
+    <dl class="govuk-summary-list">
+        <govuk-summary-row label="Identifier">@Model.Identifier</govuk-summary-row>
+        <govuk-summary-row label="Name">@Model.Name</govuk-summary-row>
+        <govuk-summary-row label="Year">@Model.YearLabel</govuk-summary-row>
+        <govuk-summary-row label="Start Date">@(Model.StartDate?.ToString("d MMMM yyyy") ?? "Not set")</govuk-summary-row>
+        <govuk-summary-row label="Schedule">@OptionText(Model.ScheduleOptions, Model.ScheduleId)</govuk-summary-row>
+        <govuk-summary-row label="Schedule Code">@OptionText(Model.ScheduleCodeOptions, Model.ScheduleCodeId)</govuk-summary-row>
+        @if (Model.SchemeId is not null)
+        {
+            <govuk-summary-row label="Scheme version">@(Model.LastModified?.ToString("d MMMM yyyy HH:mm") ?? "Not set")</govuk-summary-row>
+        }
+        <govuk-summary-row label="Distribution months">@(string.IsNullOrEmpty(distributionText) ? "None" : distributionText)</govuk-summary-row>
+        <govuk-summary-row label="Week No">@Model.WeekNumber</govuk-summary-row>
+        <govuk-summary-row label="Day of Week">@OptionText(Model.DayOfWeekOptions, Model.DayOfWeekId)</govuk-summary-row>
+        <govuk-summary-row label="Number of Samples">@Model.NumberOfSamples</govuk-summary-row>
+        <govuk-summary-row label="Sample No Sequence">@(Model.SampleNoSequence?.ToString(CultureInfo.InvariantCulture) ?? "0")</govuk-summary-row>
+        <govuk-summary-row label="Sample Origin">@Model.SampleOrigin</govuk-summary-row>
+        <govuk-summary-row label="Subcontractor">@Model.Subcontractor</govuk-summary-row>
+        <govuk-summary-row label="Deadline (days)">@Model.Deadline</govuk-summary-row>
+        <govuk-summary-row label="Combined Packaging">@YesNo(Model.CombinedPackaging)</govuk-summary-row>
+        <govuk-summary-row label="Sample Packing Instructions">@Model.SamplePackingInstructions</govuk-summary-row>
+        <govuk-summary-row label="Postage Type">@OptionText(Model.PostageOptions, Model.Postage)</govuk-summary-row>
+        <govuk-summary-row label="Sample Volume">@Model.CustomsVolume</govuk-summary-row>
+        <govuk-summary-row label="Ext. Comments Required">@YesNo(Model.CommentsRequired)</govuk-summary-row>
+        <govuk-summary-row label="Pilot Scheme">@YesNo(Model.Pilot)</govuk-summary-row>
+        <govuk-summary-row label="Limited Sample Availability">@YesNo(Model.LimitedSampleAvailability)</govuk-summary-row>
+        <govuk-summary-row label="Accredited">@YesNo(Model.Accredited)</govuk-summary-row>
+        <govuk-summary-row label="No VLA Labs">@YesNo(Model.NoVLALabs)</govuk-summary-row>
+        <govuk-summary-row label="Commercially available">@YesNo(Model.ComerciallyAvailable)</govuk-summary-row>
+        <govuk-summary-row label="Requires Assessment">@YesNo(Model.RequiresAssessment)</govuk-summary-row>
+    </dl>
+
+    <h3 class="govuk-heading-s">Prices</h3>
+    @if (Model.Prices.Count == 0)
+    {
+        <p class="govuk-body">No currencies are configured.</p>
+    }
+    else
+    {
+        <table class="govuk-table">
+            <thead class="govuk-table__head">
+                <tr class="govuk-table__row">
+                    <th scope="col" class="govuk-table__header">Currency</th>
+                    <th scope="col" class="govuk-table__header">Price</th>
+                </tr>
+            </thead>
+            <tbody class="govuk-table__body">
+                @foreach (var price in Model.Prices)
+                {
+                    <tr class="govuk-table__row">
+                        <td class="govuk-table__cell">@price.CurrencyName</td>
+                        <td class="govuk-table__cell">@(price.Price is null ? string.Empty : $"{price.CurrencySymbol}{price.Price}")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+
+    <dl class="govuk-summary-list">
+        <govuk-summary-row label="Customs Description">@Model.CustomsDescription</govuk-summary-row>
+    </dl>
+
+    <h3 class="govuk-heading-s">Data Consent Declaration</h3>
+    <dl class="govuk-summary-list">
+        <govuk-summary-row label="Active">@YesNo(Model.DataConsentDeclarationActive)</govuk-summary-row>
+        @if (Model.DataConsentDeclarationActive)
+        {
+            <govuk-summary-row label="Consent text">@Model.DataConsentDeclarationText</govuk-summary-row>
+        }
+    </dl>
+}
+else
+{
+    <govuk-input asp-for="Identifier" label="Identifier" input-class="govuk-input govuk-input--width-10" />
 
 <govuk-input asp-for="Name" label="Name" />
 
@@ -285,3 +368,4 @@ else
         }
     })();
 </script>
+}

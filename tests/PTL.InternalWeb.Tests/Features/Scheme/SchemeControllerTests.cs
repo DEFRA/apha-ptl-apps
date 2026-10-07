@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging.Abstractions;
+using PTL.Contracts.Lookup;
 using PTL.Contracts.Scheme;
 using PTL.InternalWeb.Tests.TestSupport;
 
@@ -20,22 +21,24 @@ public class SchemeControllerTests
         DateTime.UtcNow, isReadOnly);
 
     [Fact]
-    public async Task Index_ReturnsViewWithSearchResults()
+    public async Task Index_ReturnsEverySchemeFamily()
     {
         var sharedId = Guid.NewGuid();
         var schemeId = Guid.NewGuid();
         var apiClient = new FakeSchemeApiClient
         {
-            SearchResponse = new SchemeSearchResponse([new SchemeSummaryResponse(sharedId, 2027, schemeId, "PT1234", "Test Scheme", null, null, null, null, null, null)], 1, 1, 20)
+            SearchResponse = new SchemeSearchResponse([new SchemeSummaryResponse(sharedId, 2027, schemeId, "PT1234", "Test Scheme", null, null, null, null, null, null, "PT1234", "Test Scheme")], 1, 1, 15)
         };
         var controller = CreateController(apiClient);
 
-        var result = await controller.Index(2027, null, 1, 20, CancellationToken.None);
+        var result = await controller.Index(1, 15, null, CancellationToken.None);
 
         var view = Assert.IsType<ViewResult>(result);
         var model = Assert.IsType<PTL.InternalWeb.Features.Scheme.SchemeListViewModel>(view.Model);
-        Assert.Single(model.Schemes);
+        var scheme = Assert.Single(model.Schemes);
+        Assert.Equal("PT1234", scheme.Identifier);
         Assert.Equal(1, model.TotalCount);
+        Assert.Equal(15, model.PageSize);
     }
 
     [Fact]
@@ -57,7 +60,36 @@ public class SchemeControllerTests
         var result = await controller.Details(schemeId, CancellationToken.None);
 
         var view = Assert.IsType<ViewResult>(result);
-        Assert.Equal(schemeId, Assert.IsType<SchemeResponse>(view.Model).SchemeId);
+        var model = Assert.IsType<PTL.InternalWeb.Features.Scheme.SchemeFormViewModel>(view.Model);
+        Assert.Equal(schemeId, model.SchemeId);
+        Assert.True(model.IsViewMode);
+    }
+
+    [Fact]
+    public async Task Renew_UnknownScheme_ReturnsNotFound()
+    {
+        var controller = CreateController(new FakeSchemeApiClient { RenewResponse = null });
+
+        var result = await controller.Renew(Guid.NewGuid(), CancellationToken.None);
+
+        Assert.IsType<NotFoundResult>(result);
+    }
+
+    [Fact]
+    public async Task Renew_ExistingScheme_ReturnsCreateViewWithDraftKeepingTheFamilyButNoSchemeId()
+    {
+        var sharedId = Guid.NewGuid();
+        var renewed = SampleScheme(Guid.Empty, sharedId) with { YearId = 2028 };
+        var controller = CreateController(new FakeSchemeApiClient { RenewResponse = renewed });
+
+        var result = await controller.Renew(Guid.NewGuid(), CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        Assert.Equal("Create", view.ViewName);
+        var model = Assert.IsType<PTL.InternalWeb.Features.Scheme.SchemeFormViewModel>(view.Model);
+        Assert.Null(model.SchemeId);
+        Assert.Equal(sharedId, model.SharedId);
+        Assert.Equal(2028, model.YearId);
     }
 
     [Fact]
@@ -73,8 +105,26 @@ public class SchemeControllerTests
         var result = await controller.History(sharedId, CancellationToken.None);
 
         var view = Assert.IsType<ViewResult>(result);
-        var model = Assert.IsType<IReadOnlyList<SchemeHistoryResponse>>(view.Model, exactMatch: false);
+        var model = Assert.IsType<IReadOnlyList<PTL.InternalWeb.Features.Scheme.SchemeHistoryRowViewModel>>(view.Model, exactMatch: false);
         Assert.Single(model);
+    }
+
+    [Fact]
+    public async Task History_FormatsYearAsTheLegacyFinancialYearLabel()
+    {
+        var sharedId = Guid.NewGuid();
+        var apiClient = new FakeSchemeApiClient
+        {
+            HistoryResponse = [new SchemeHistoryResponse(Guid.NewGuid(), sharedId, 2026, "PT1234", "Test Scheme")]
+        };
+        var lookupApiClient = new FakeLookupApiClient { AllYears = [new YearResponse(2026, "2026/27")] };
+        var controller = CreateController(apiClient, lookupApiClient);
+
+        var result = await controller.History(sharedId, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<IReadOnlyList<PTL.InternalWeb.Features.Scheme.SchemeHistoryRowViewModel>>(view.Model, exactMatch: false);
+        Assert.Equal("2026/27", Assert.Single(model).YearLabel);
     }
 
     [Fact]

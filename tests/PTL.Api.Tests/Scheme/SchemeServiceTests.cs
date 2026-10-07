@@ -14,6 +14,9 @@ public class SchemeServiceTests
     private static SchemeService CreateService(FakeSchemeRepository repository, FakeLookupRepository lookupRepository) =>
         new(repository, lookupRepository, new PTL.Api.Tests.Participant.FakeViewerRepository(), NullLogger<SchemeService>.Instance);
 
+    private static SchemeService CreateService(FakeSchemeRepository repository, FakeLookupRepository lookupRepository, PTL.Api.Tests.Participant.FakeViewerRepository viewerRepository) =>
+        new(repository, lookupRepository, viewerRepository, NullLogger<SchemeService>.Instance);
+
     private static PTL.Core.Scheme.Scheme ValidScheme(int? yearId = null) => new()
     {
         YearId = yearId ?? DateTime.UtcNow.Year + 1,
@@ -324,6 +327,24 @@ public class SchemeServiceTests
     }
 
     [Fact]
+    public async Task GetSchemeFamiliesAsync_FiltersByNameOnly_SimpleSubstringMatch()
+    {
+        var repository = new FakeSchemeRepository();
+        var service = CreateService(repository);
+        var scheme1 = ValidScheme();
+        scheme1.Name = "Salmonella Scheme";
+        await service.CreateSchemeAsync(scheme1);
+        var scheme2 = ValidScheme();
+        scheme2.Name = "Listeria Scheme";
+        await service.CreateSchemeAsync(scheme2);
+
+        var result = await service.GetSchemeFamiliesAsync(1, 20, "salmonella");
+
+        Assert.Single(result.Items);
+        Assert.Equal("Salmonella Scheme", result.Items[0].Name);
+    }
+
+    [Fact]
     public async Task GetSchemeFamilyHistoryAsync_ReturnsSchemesForSharedId()
     {
         var repository = new FakeSchemeRepository();
@@ -334,5 +355,208 @@ public class SchemeServiceTests
 
         Assert.Single(history);
         Assert.Equal(created.SchemeId, history[0].SchemeId);
+    }
+
+    [Fact]
+    public async Task RenewSchemeAsync_UnknownScheme_ReturnsNull()
+    {
+        var service = CreateService(new FakeSchemeRepository());
+
+        var renewed = await service.RenewSchemeAsync(Guid.NewGuid());
+
+        Assert.Null(renewed);
+    }
+
+    [Fact]
+    public async Task RenewSchemeAsync_CopiesScalarFieldsAndKeepsTheFamilyTogether()
+    {
+        var repository = new FakeSchemeRepository();
+        var service = CreateService(repository);
+        var original = ValidScheme();
+        original.DistributionMonthApr = true;
+        var created = await service.CreateSchemeAsync(original);
+
+        var renewed = await service.RenewSchemeAsync(created.SchemeId);
+
+        Assert.NotNull(renewed);
+        Assert.Equal(created.SharedId, renewed.SharedId);
+        Assert.Equal(created.YearId + 1, renewed.YearId);
+        Assert.Equal(created.Identifier, renewed.Identifier);
+        Assert.Equal(created.Name, renewed.Name);
+        Assert.True(renewed.DistributionMonthApr);
+        Assert.Equal(Guid.Empty, renewed.SchemeId);
+    }
+
+    [Fact]
+    public async Task RenewSchemeAsync_MatchingNamedPostagePlanExistsNextYear_ResolvesItsId()
+    {
+        var oldPostageId = Guid.NewGuid();
+        var nextYearPostageId = Guid.NewGuid();
+        var year = DateTime.UtcNow.Year + 1;
+        var lookupRepository = new FakeLookupRepository
+        {
+            PostagePricingPlans =
+            [
+                new PostagePricingPlanEntity { PostageId = oldPostageId, Name = "Standard", YearId = year },
+                new PostagePricingPlanEntity { PostageId = nextYearPostageId, Name = "Standard", YearId = year + 1 }
+            ]
+        };
+        var repository = new FakeSchemeRepository();
+        var service = CreateService(repository, lookupRepository);
+        var original = ValidScheme(year);
+        original.Postage = oldPostageId;
+        var created = await service.CreateSchemeAsync(original);
+
+        var renewed = await service.RenewSchemeAsync(created.SchemeId);
+
+        Assert.Equal(nextYearPostageId, renewed!.Postage);
+    }
+
+    [Fact]
+    public async Task RenewSchemeAsync_NoMatchingNamedPostagePlanNextYear_ResolvesToNullWithoutThrowing()
+    {
+        var oldPostageId = Guid.NewGuid();
+        var year = DateTime.UtcNow.Year + 1;
+        var lookupRepository = new FakeLookupRepository
+        {
+            PostagePricingPlans = [new PostagePricingPlanEntity { PostageId = oldPostageId, Name = "Standard", YearId = year }]
+        };
+        var repository = new FakeSchemeRepository();
+        var service = CreateService(repository, lookupRepository);
+        var original = ValidScheme(year);
+        original.Postage = oldPostageId;
+        var created = await service.CreateSchemeAsync(original);
+
+        var renewed = await service.RenewSchemeAsync(created.SchemeId);
+
+        Assert.Null(renewed!.Postage);
+    }
+
+    [Fact]
+    public async Task RenewSchemeAsync_CopiesTestsAndTabulationsWithFreshIdsAndRemapsReferences()
+    {
+        var repository = new FakeSchemeRepository();
+        var service = CreateService(repository);
+        var resultItemId = Guid.NewGuid();
+        var original = ValidScheme();
+        original.Tests =
+        [
+            new SchemeTest
+            {
+                TestId = Guid.NewGuid(),
+                TestTypeId = Guid.NewGuid(),
+                TestType = "Serology",
+                ResultItems = [new SchemeTestResultItem { TestResultItemId = resultItemId, TestResultItemTypeId = Guid.NewGuid(), TestResultItemType = "Positive" }]
+            }
+        ];
+        var publishedTabulationId = original.Tabulations.Single(t => t.Name == "Published").TabulationId;
+        original.Tabulations =
+        [
+            .. original.Tabulations.Where(t => t.TabulationId != publishedTabulationId),
+            new SchemeTabulation { TabulationId = publishedTabulationId, Name = "Published", ResultItemIds = [resultItemId] }
+        ];
+        var created = await service.CreateSchemeAsync(original);
+
+        var renewed = await service.RenewSchemeAsync(created.SchemeId);
+
+        var renewedTest = Assert.Single(renewed!.Tests);
+        var renewedResultItem = Assert.Single(renewedTest.ResultItems);
+        Assert.NotEqual(resultItemId, renewedResultItem.TestResultItemId);
+
+        var renewedTabulation = Assert.Single(renewed.Tabulations, t => t.Name == "Published");
+        Assert.NotEqual(publishedTabulationId, renewedTabulation.TabulationId);
+        Assert.Equal(renewedResultItem.TestResultItemId, Assert.Single(renewedTabulation.ResultItemIds));
+
+        // The Test Consultant tabulation selection follows the same remap.
+        var renewedConsultantTabulation = Assert.Single(renewed.Tabulations, t => t.Name == "Test Consultant");
+        Assert.Equal(renewedConsultantTabulation.TabulationId, renewed.TestConsultantTabulationId);
+    }
+
+    [Fact]
+    public async Task RenewSchemeAsync_CopiesViewers()
+    {
+        var repository = new FakeSchemeRepository();
+        var viewerRepository = new PTL.Api.Tests.Participant.FakeViewerRepository();
+        var service = CreateService(repository, new FakeLookupRepository(), viewerRepository);
+        var viewerId = Guid.NewGuid();
+        var original = ValidScheme();
+        original.ViewerIds = [viewerId];
+        var created = await service.CreateSchemeAsync(original);
+
+        var renewed = await service.RenewSchemeAsync(created.SchemeId);
+
+        Assert.Equal(viewerId, Assert.Single(renewed!.ViewerIds));
+    }
+
+    [Fact]
+    public async Task CreateSchemeAsync_SharedIdSupplied_PreservesItInsteadOfGeneratingANewOne()
+    {
+        var service = CreateService(new FakeSchemeRepository());
+        var scheme = ValidScheme();
+        var existingSharedId = Guid.NewGuid();
+        scheme.SharedId = existingSharedId;
+
+        var created = await service.CreateSchemeAsync(scheme);
+
+        Assert.Equal(existingSharedId, created.SharedId);
+    }
+
+    [Fact]
+    public async Task CreateSchemeAsync_RenewalReusesItsOwnFamilysIdentifier_DoesNotFlagItAsADuplicate()
+    {
+        var repository = new FakeSchemeRepository();
+        var created = await CreateService(repository).CreateSchemeAsync(ValidScheme());
+        var lookupRepository = new FakeLookupRepository
+        {
+            // The original scheme's own PT number is already on record under its own SchemeId -
+            // exactly what a genuine family member looks like to the uniqueness check.
+            PTNumbers = [new PTNumberEntity { SchemeId = created.SchemeId, Identifier = "PT1234" }]
+        };
+        var service = CreateService(repository, lookupRepository);
+
+        // A Renew draft carries the same SharedId and the same (unchanged) Identifier forward.
+        var renewalDraft = ValidScheme(created.YearId + 1);
+        renewalDraft.SharedId = created.SharedId;
+
+        var renewed = await service.CreateSchemeAsync(renewalDraft);
+
+        Assert.Equal("PT1234", renewed.Identifier);
+    }
+
+    [Fact]
+    public async Task CreateSchemeAsync_IdentifierCollidesWithADifferentFamily_StillThrows()
+    {
+        var lookupRepository = new FakeLookupRepository
+        {
+            PTNumbers = [new PTNumberEntity { SchemeId = Guid.NewGuid(), Identifier = "PT1234" }]
+        };
+        var service = CreateService(new FakeSchemeRepository(), lookupRepository);
+
+        await Assert.ThrowsAsync<SchemeValidationException>(() => service.CreateSchemeAsync(ValidScheme()));
+    }
+
+    [Fact]
+    public async Task CreateSchemeAsync_RenewalWithALockedMonth_RestoresItsInheritedValueInsteadOfWipingItFalse()
+    {
+        var lookupRepository = new FakeLookupRepository
+        {
+            SystemSettings = new SystemSettingsEntity { ContractStartDate = new DateTime(2026, 4, 1) },
+            // The new (renewed) year's April is already locked system-wide.
+            MonthlyDistributions = [new MonthlyDistributionEntity { YearId = 2027, MonthId = 4 }]
+        };
+        var repository = new FakeSchemeRepository();
+        var service = CreateService(repository, lookupRepository);
+        var original = ValidScheme(2026);
+        original.DistributionMonthApr = true;
+        var created = await service.CreateSchemeAsync(original);
+
+        var renewalDraft = ValidScheme(2027);
+        renewalDraft.SharedId = created.SharedId;
+        renewalDraft.DistributionMonthApr = true;
+
+        var renewed = await service.CreateSchemeAsync(renewalDraft);
+
+        Assert.False(renewed.CanEditApr);
+        Assert.True(renewed.DistributionMonthApr);
     }
 }

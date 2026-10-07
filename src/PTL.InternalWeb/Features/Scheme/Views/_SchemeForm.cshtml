@@ -53,6 +53,11 @@
 @if (Model.SchemeId is not null)
 {
     <input type="hidden" asp-for="SchemeId" />
+}
+@* A Renew draft has no SchemeId yet (it is created fresh on Save) but must carry its existing
+   family's SharedId forward, so this renders independently of the SchemeId check above. *@
+@if (Model.SharedId is not null)
+{
     <input type="hidden" asp-for="SharedId" />
 }
 

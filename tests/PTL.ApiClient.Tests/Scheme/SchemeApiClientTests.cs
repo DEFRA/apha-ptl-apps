@@ -56,6 +56,27 @@ public class SchemeApiClientTests
     }
 
     [Fact]
+    public async Task RenewSchemeAsync_NotFound_ReturnsNull()
+    {
+        var client = CreateClient(HttpStatusCode.NotFound, null);
+
+        var result = await client.RenewSchemeAsync(Guid.NewGuid());
+
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public async Task RenewSchemeAsync_Success_ReturnsDeserializedDraft()
+    {
+        var client = CreateClient(HttpStatusCode.OK, FullSchemeJson());
+
+        var result = await client.RenewSchemeAsync(Guid.NewGuid());
+
+        Assert.NotNull(result);
+        Assert.Equal("PT1234", result!.Identifier);
+    }
+
+    [Fact]
     public async Task CreateSchemeAsync_Success_ReturnsSavedScheme()
     {
         var client = CreateClient(HttpStatusCode.OK, FullSchemeJson());

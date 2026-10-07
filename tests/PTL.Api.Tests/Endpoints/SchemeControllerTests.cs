@@ -127,6 +127,34 @@ public class SchemeControllerTests
     }
 
     [Fact]
+    public async Task RenewScheme_UnknownScheme_ReturnsNotFound()
+    {
+        var controller = CreateController(new FakeSchemeRepository());
+
+        var result = await controller.RenewScheme(Guid.NewGuid(), CancellationToken.None);
+
+        Assert.IsType<NotFoundResult>(result.Result);
+    }
+
+    [Fact]
+    public async Task RenewScheme_ExistingScheme_ReturnsOkWithDraftForNextYear()
+    {
+        var controller = CreateController(new FakeSchemeRepository());
+        var request = ValidCreateRequest();
+        var created = await controller.CreateScheme(request, CancellationToken.None);
+        var original = (SchemeResponse)((CreatedAtActionResult)created.Result!).Value!;
+
+        var result = await controller.RenewScheme(original.SchemeId, CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var renewed = Assert.IsType<SchemeResponse>(ok.Value);
+        Assert.Equal(Guid.Empty, renewed.SchemeId);
+        Assert.Equal(original.SharedId, renewed.SharedId);
+        Assert.Equal(original.YearId + 1, renewed.YearId);
+        Assert.Equal(original.Identifier, renewed.Identifier);
+    }
+
+    [Fact]
     public async Task GetScheme_ExistingScheme_ReturnsOk()
     {
         var controller = CreateController(new FakeSchemeRepository());

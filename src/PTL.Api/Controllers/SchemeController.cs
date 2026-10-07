@@ -52,11 +52,40 @@ public sealed class SchemeController(ISchemeService schemeService, ILogger<Schem
         return Ok(new SchemeSearchResponse(result.Items.Select(ToSummaryResponse).ToList(), result.TotalCount, page, pageSize));
     }
 
+    // GET /api/schemes/families[?page=&pageSize=&searchTerm=] - spgaSchemeInfo, every scheme family
+    // with no year filter, filtered only by the Scheme List screen's optional Scheme Name search box.
+    [HttpGet("schemes/families")]
+    public async Task<ActionResult<SchemeSearchResponse>> GetSchemeFamilies(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20,
+        [FromQuery] string? searchTerm = null,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await schemeService.GetSchemeFamiliesAsync(page, pageSize, searchTerm, cancellationToken);
+        return Ok(new SchemeSearchResponse(result.Items.Select(ToSummaryResponse).ToList(), result.TotalCount, page, pageSize));
+    }
+
     [HttpGet("schemes/families/{sharedId:guid}/history")]
     public async Task<ActionResult<IReadOnlyList<SchemeHistoryResponse>>> GetSchemeFamilyHistory(Guid sharedId, CancellationToken cancellationToken)
     {
         var history = await schemeService.GetSchemeFamilyHistoryAsync(sharedId, cancellationToken);
         return Ok(history.Select(ToHistoryResponse).ToList());
+    }
+
+    // GET /api/schemes/{schemeId}/renew - legacy Scheme.aspx?SchemeId=..&renewal=true: builds an
+    // unsaved draft for the following year, carried by the same SharedId. The draft is then saved
+    // through the normal POST /api/schemes - it isn't persisted here.
+    [HttpGet("schemes/{schemeId:guid}/renew")]
+    public async Task<ActionResult<SchemeResponse>> RenewScheme(Guid schemeId, CancellationToken cancellationToken)
+    {
+        var renewed = await schemeService.RenewSchemeAsync(schemeId, cancellationToken);
+        if (renewed is null)
+        {
+            LogSchemeNotFoundMessage(logger, schemeId, null);
+            return NotFound();
+        }
+
+        return Ok(ToResponse(renewed));
     }
 
     [HttpPost("schemes")]
@@ -102,6 +131,7 @@ public sealed class SchemeController(ISchemeService schemeService, ILogger<Schem
     private static Scheme ToEntity(Guid schemeId, SchemeRequest request) => new()
     {
         SchemeId = schemeId,
+        SharedId = request.SharedId ?? Guid.Empty,
         YearId = request.YearId,
         Identifier = request.Identifier,
         Name = request.Name,
@@ -305,7 +335,9 @@ public sealed class SchemeController(ISchemeService schemeService, ILogger<Schem
         scheme.NextName,
         scheme.RecentSchemeId,
         scheme.RecentIdentifier,
-        scheme.RecentName);
+        scheme.RecentName,
+        scheme.Identifier,
+        scheme.Name);
 
     private static SchemeHistoryResponse ToHistoryResponse(SchemeHistoryEntity scheme) => new(
         scheme.SchemeId,

@@ -2,29 +2,45 @@
 
 <h4 class="govuk-heading-s">@Model.Heading</h4>
 
-<div class="govuk-form-group">
-    <div class="item-picker">
-        <select class="govuk-select govuk-!-width-one-quarter" id="@Model.PickerId" data-item-type-picker>
-            <option value="">- Please Select -</option>
-            @foreach (var option in Model.TypeOptions)
-            {
-                <option value="@option.Value">@option.Text</option>
-            }
-        </select>
-        <button type="submit"
-                class="govuk-button govuk-button--primary"
-                data-module="govuk-button"
-                name="testCommand"
-                value="@Model.AddCommand"
-                data-picker="@Model.PickerId">
-            @Model.AddLabel
-        </button>
+@if (!Model.IsViewMode)
+{
+    <div class="govuk-form-group">
+        <div class="item-picker">
+            <select class="govuk-select govuk-!-width-one-quarter" id="@Model.PickerId" data-item-type-picker>
+                <option value="">- Please Select -</option>
+                @foreach (var option in Model.TypeOptions)
+                {
+                    <option value="@option.Value">@option.Text</option>
+                }
+            </select>
+            <button type="submit"
+                    class="govuk-button govuk-button--primary"
+                    data-module="govuk-button"
+                    name="testCommand"
+                    value="@Model.AddCommand"
+                    data-picker="@Model.PickerId">
+                @Model.AddLabel
+            </button>
+        </div>
     </div>
-</div>
+}
 
 @if (Model.Items.Count == 0)
 {
     <p class="govuk-body">@Model.EmptyMessage</p>
+}
+else if (Model.IsViewMode)
+{
+    <table class="govuk-table">
+        <tbody class="govuk-table__body">
+            @foreach (var item in Model.Items)
+            {
+                <tr class="govuk-table__row">
+                    <td class="govuk-table__cell">@item.Name</td>
+                </tr>
+            }
+        </tbody>
+    </table>
 }
 else
 {
@@ -58,3 +74,4 @@ else
         </tbody>
     </table>
 }
+

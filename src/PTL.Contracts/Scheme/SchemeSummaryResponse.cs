@@ -14,4 +14,8 @@ public sealed record SchemeSummaryResponse(
     string? NextName,
     Guid? RecentSchemeId,
     string? RecentIdentifier,
-    string? RecentName);
+    string? RecentName,
+    // The family's label - its current-year scheme's values, falling back to next year then the
+    // most recent (legacy SchemeInfo.Identifier / .Name).
+    string Identifier = "",
+    string Name = "");

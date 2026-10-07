@@ -421,6 +421,9 @@ public sealed class RenewContractsServiceTests
         public Task<CoreScheme?> GetByIdAsync(Guid schemeId, CancellationToken cancellationToken = default) =>
             Task.FromResult(_schemes.TryGetValue(schemeId, out var scheme) ? scheme : null);
 
+        public Task<IReadOnlyList<SchemeSummaryEntity>> GetAllSummariesAsync(CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<SchemeSummaryEntity>>([]);
+
         public Task<IReadOnlyList<SchemeSummaryEntity>> GetSummariesByYearAsync(int yearId, CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<SchemeSummaryEntity>>(_schemes.Values.Where(s => s.YearId == yearId).Select(s => new SchemeSummaryEntity { SharedId = s.SharedId, YearId = s.YearId, CurrentSchemeId = s.SchemeId, CurrentIdentifier = s.Identifier, CurrentName = s.Name }).ToList());
 
@@ -469,6 +472,9 @@ public sealed class RenewContractsServiceTests
     {
         public Task<CoreScheme?> GetByIdAsync(Guid schemeId, CancellationToken cancellationToken = default) =>
             Task.FromResult(schemeId == oldScheme.SchemeId ? oldScheme : null);
+
+        public Task<IReadOnlyList<SchemeSummaryEntity>> GetAllSummariesAsync(CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<SchemeSummaryEntity>>([]);
 
         public Task<IReadOnlyList<SchemeSummaryEntity>> GetSummariesByYearAsync(int yearId, CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<SchemeSummaryEntity>>([]);

@@ -4,57 +4,73 @@
     ViewData["Title"] = "Schemes";
     var pagination = new PaginationModel
     {
-        CurrentPage = Model.Search.Page,
-        PageSize = Model.Search.PageSize,
+        CurrentPage = Model.Page,
+        PageSize = Model.PageSize,
         TotalRecords = Model.TotalCount,
-        RouteValues = new Dictionary<string, object?> { ["yearId"] = Model.Search.YearId, ["searchTerm"] = Model.Search.SearchTerm }
+        RouteValues = new Dictionary<string, object?> { ["searchTerm"] = Model.SearchTerm }
     };
 }
 
 <h1 class="govuk-heading-l">Schemes</h1>
 
+@* Legacy Scheme Admin/Search.aspx: "Use the search box below to identify the required Scheme by
+   Scheme Name." - absorbed into the list page as a usability improvement; a plain substring match,
+   no other filtering behaviour. *@
 <form method="get" asp-action="Index" class="govuk-!-margin-bottom-6">
     <div class="govuk-form-group">
-        <label class="govuk-label" for="yearId">Year</label>
-        <select class="govuk-select" id="yearId" name="yearId" asp-items="Model.YearOptions"></select>
-    </div>
-    <div class="govuk-form-group">
-        <label class="govuk-label" for="searchTerm">Search</label>
-        <div class="govuk-hint">Matches scheme identifier or name.</div>
-        <input class="govuk-input" id="searchTerm" name="searchTerm" value="@Model.Search.SearchTerm" />
+        <label class="govuk-label" for="searchTerm">Scheme Name</label>
+        <input class="govuk-input" id="searchTerm" name="searchTerm" value="@Model.SearchTerm" />
     </div>
     <button class="govuk-button" data-module="govuk-button" type="submit">Search</button>
 </form>
 
 @if (Model.Schemes.Count == 0)
 {
-    <p class="govuk-body">There are no schemes to display for this year.</p>
+    <p class="govuk-body">There are no schemes to display.</p>
 }
 else
 {
     <govuk-page-size-selector model="pagination" />
+
 
     <table class="govuk-table">
         <thead class="govuk-table__head">
             <tr class="govuk-table__row">
                 <th scope="col" class="govuk-table__header">Identifier</th>
                 <th scope="col" class="govuk-table__header">Name</th>
-                <th scope="col" class="govuk-table__header"><span class="govuk-visually-hidden">Actions</span></th>
+                <th scope="col" class="govuk-table__header">Current Year</th>
+                <th scope="col" class="govuk-table__header">Next Year</th>
+                <th scope="col" class="govuk-table__header">History</th>
             </tr>
         </thead>
         <tbody class="govuk-table__body">
             @foreach (var scheme in Model.Schemes)
             {
                 <tr class="govuk-table__row">
-                    <td class="govuk-table__cell">@scheme.CurrentIdentifier</td>
-                    <td class="govuk-table__cell">@scheme.CurrentName</td>
+                    <td class="govuk-table__cell">@scheme.Identifier</td>
+                    <td class="govuk-table__cell">@scheme.Name</td>
                     <td class="govuk-table__cell">
-                        @if (scheme.CurrentSchemeId is not null)
+                        @* Legacy GridViewSchemes_RowDataBound hides this link when the family has no
+                           current-year scheme. *@
+                        @if (scheme.CurrentSchemeId is { } currentSchemeId && currentSchemeId != Guid.Empty)
                         {
-                            <a class="govuk-link" asp-action="Details" asp-route-id="@scheme.CurrentSchemeId">View details</a>
-                            <span class="govuk-!-margin-left-2"></span>
-                            <a class="govuk-link" asp-action="History" asp-route-sharedId="@scheme.SharedId">History</a>
+                            <a class="govuk-link" asp-action="Details" asp-route-id="@currentSchemeId">Details</a>
                         }
+                    </td>
+                    <td class="govuk-table__cell">
+                        @* And swaps this one to Renew - against the MOST RECENT scheme, not the
+                           current one - when next year's scheme does not exist yet. *@
+                        @if (scheme.NextSchemeId is { } nextSchemeId && nextSchemeId != Guid.Empty)
+                        {
+                            <a class="govuk-link" asp-action="Details" asp-route-id="@nextSchemeId">Details</a>
+                        }
+                        else if (scheme.RecentSchemeId is { } recentSchemeId && recentSchemeId != Guid.Empty)
+                        {
+                            <a class="govuk-link" asp-action="Renew" asp-route-schemeId="@recentSchemeId">Renew</a>
+                        }
+                    </td>
+                    <td class="govuk-table__cell">
+                        <a class="govuk-link" asp-action="History" asp-route-sharedId="@scheme.SharedId">View</a>
                     </td>
                 </tr>
             }
