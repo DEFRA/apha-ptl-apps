@@ -56,6 +56,13 @@ public static class ApiClientServiceCollectionExtensions
         })
             .AddStandardResilienceHandler();
 
+        services.AddHttpClient<IExternalUserApiClient, ExternalUserApiClient>(client =>
+        {
+            client.BaseAddress = new Uri(apiBaseUrl);
+        })
+            .AddHttpMessageHandler<CorrelationIdDelegatingHandler>()
+            .AddStandardResilienceHandler();
+
         services.AddHttpClient<IContractApiClient, ContractApiClient>(client =>
         {
             client.BaseAddress = new Uri(apiBaseUrl);
