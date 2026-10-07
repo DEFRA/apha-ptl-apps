@@ -22,6 +22,7 @@
     <Project Path="tests/PTL.ApiClient.Tests/PTL.ApiClient.Tests.csproj" />
     <Project Path="tests/PTL.Auth.Cidm.Tests/PTL.Auth.Cidm.Tests.csproj" />
     <Project Path="tests/PTL.Auth.Entra.Tests/PTL.Auth.Entra.Tests.csproj" />
+    <Project Path="tests/PTL.Common.Tests/PTL.Common.Tests.csproj" />
     <Project Path="tests/PTL.Data.Tests/PTL.Data.Tests.csproj" />
     <Project Path="tests/PTL.InternalWeb.Tests/PTL.InternalWeb.Tests.csproj" />
     <Project Path="tests/PTL.ExternalWeb.Tests/PTL.ExternalWeb.Tests.csproj" />

@@ -1,6 +1,8 @@
+using PTL.Common.Auth;
+
 namespace PTL.Auth.Entra.TokenRefresh;
 
-public sealed record EntraTokenRefreshResult(bool Succeeded, string? AccessToken, string? IdToken, string? RefreshToken, DateTimeOffset? ExpiresAt)
+public sealed record EntraTokenRefreshResult(bool Succeeded, string? AccessToken, string? IdToken, string? RefreshToken, DateTimeOffset? ExpiresAt) : ITokenRefreshResult
 {
     public static EntraTokenRefreshResult Failed { get; } = new(false, null, null, null, null);
 }

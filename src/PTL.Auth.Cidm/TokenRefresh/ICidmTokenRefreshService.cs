@@ -1,6 +1,8 @@
+using PTL.Common.Auth;
+
 namespace PTL.Auth.Cidm.TokenRefresh;
 
-public sealed record CidmTokenRefreshResult(bool Succeeded, string? AccessToken, string? IdToken, string? RefreshToken, DateTimeOffset? ExpiresAt)
+public sealed record CidmTokenRefreshResult(bool Succeeded, string? AccessToken, string? IdToken, string? RefreshToken, DateTimeOffset? ExpiresAt) : ITokenRefreshResult
 {
     public static CidmTokenRefreshResult Failed { get; } = new(false, null, null, null, null);
 }

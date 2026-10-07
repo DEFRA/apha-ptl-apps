@@ -51,6 +51,19 @@ public class EntraOpenIdConnectEventsTests
     }
 
     [Fact]
+    public async Task TokenValidated_NoRequestServices_LeavesPrincipalUnchanged()
+    {
+        var identity = new ClaimsIdentity([new Claim(ClaimTypes.Name, "test-user")]);
+        var principal = new ClaimsPrincipal(identity);
+        var context = new TokenValidatedContext(new DefaultHttpContext(), CreateScheme(), new OpenIdConnectOptions(), principal, new AuthenticationProperties());
+
+        var exception = await Record.ExceptionAsync(() => CreateEvents().TokenValidated(context));
+
+        Assert.Null(exception);
+        Assert.Single(principal.Claims);
+    }
+
+    [Fact]
     public async Task TokenValidated_PrincipalWithoutClaimsIdentity_ReturnsWithoutThrowing()
     {
         var principal = new ClaimsPrincipal();

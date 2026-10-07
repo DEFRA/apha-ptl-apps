@@ -9,6 +9,7 @@ using Microsoft.Extensions.Options;
 using PTL.Auth.Cidm.Events;
 using PTL.Auth.Cidm.Options;
 using PTL.Auth.Cidm.TokenRefresh;
+using PTL.Common.Auth;
 
 namespace PTL.Auth.Cidm;
 
@@ -47,16 +48,9 @@ public static class CidmAuthenticationExtensions
         builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
             .AddCookie(options =>
             {
-                options.LoginPath = "/Account/Login";
-                options.LogoutPath = "/Account/Logout";
-                options.SlidingExpiration = true;
-                options.Cookie.HttpOnly = true;
-                options.Cookie.SecurePolicy = useLocalHttpFriendlyOidcSettings
-                    ? CookieSecurePolicy.SameAsRequest
-                    : CookieSecurePolicy.Always;
+                options.ConfigureSharedCookieOptions(useLocalHttpFriendlyOidcSettings);
                 // form_post's callback is a same-site top-level navigation once it lands on our own
                 // /signin-oidc - the app's own session cookie itself doesn't need SameSite=None.
-                options.Cookie.SameSite = SameSiteMode.Lax;
                 options.EventsType = typeof(CidmCookieEvents);
             })
             .AddOpenIdConnect(CidmAuthenticationDefaults.AuthenticationScheme, _ => { });

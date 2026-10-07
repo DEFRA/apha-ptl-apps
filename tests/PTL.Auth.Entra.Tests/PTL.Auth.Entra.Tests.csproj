@@ -7,8 +7,15 @@
     <IsPackable>false</IsPackable>
     <!-- Pure DI wiring, exercised end-to-end via PTL.InternalWeb.Tests' WebApplicationFactory-based
          integration tests (which run the real Program.cs -> AddEntraAuthentication path) rather than
-         here - same rationale as excluding Program.cs itself elsewhere in the solution. -->
-    <ExcludeByFile>**/EntraAuthenticationExtensions.cs</ExcludeByFile>
+         here - same rationale as excluding Program.cs itself elsewhere in the solution. Logging.g.cs
+         is the LoggerMessage source generator's combined output for the whole assembly - its
+         IsEnabled-gated internals are never hit when tests use NullLogger (by design, to keep test
+         output quiet), so it's compiler-generated plumbing rather than something a unit test should
+         be expected to cover. -->
+    <ExcludeByFile>**/EntraAuthenticationExtensions.cs,**/Logging.g.cs</ExcludeByFile>
+    <!-- PTL.Common (referenced for the shared Auth/ helpers) is measured independently by its own
+         PTL.Common.Tests project. -->
+    <Exclude>[PTL.Common]*</Exclude>
   </PropertyGroup>
 
   <ItemGroup>

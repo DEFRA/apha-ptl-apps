@@ -12,7 +12,10 @@
          tests/Directory.Build.props, irrelevant here since this is a class library with no Program.cs) -
          Coverlet's glob-list parser silently stops excluding anything once more than one
          semicolon-separated pattern is present, so this replaces rather than appends. -->
-    <ExcludeByFile>**/CidmAuthenticationExtensions.cs</ExcludeByFile>
+    <ExcludeByFile>**/CidmAuthenticationExtensions.cs,**/Logging.g.cs</ExcludeByFile>
+    <!-- PTL.Common (referenced for the shared Auth/ helpers) is measured independently by its own
+         PTL.Common.Tests project. -->
+    <Exclude>[PTL.Common]*</Exclude>
   </PropertyGroup>
 
   <ItemGroup>

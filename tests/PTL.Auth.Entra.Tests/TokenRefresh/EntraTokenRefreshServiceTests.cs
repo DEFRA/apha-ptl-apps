@@ -109,6 +109,20 @@ public class EntraTokenRefreshServiceTests
     }
 
     [Fact]
+    public async Task RefreshAsync_ResponseBodyIsNullJson_ReturnsFailed()
+    {
+        var handler = new FakeHttpMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent("null", System.Text.Encoding.UTF8, "application/json")
+        });
+        var service = CreateService(handler);
+
+        var result = await service.RefreshAsync("old-refresh-token", "https://app.test/signin-entra");
+
+        Assert.False(result.Succeeded);
+    }
+
+    [Fact]
     public async Task RefreshAsync_SendsExpectedFormFields()
     {
         HttpRequestMessage? capturedRequest = null;

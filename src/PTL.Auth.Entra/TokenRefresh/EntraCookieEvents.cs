@@ -1,10 +1,8 @@
-using System.Globalization;
-using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
-using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using PTL.Auth.Entra.Options;
+using PTL.Common.Auth;
 
 namespace PTL.Auth.Entra.TokenRefresh;
 
@@ -17,11 +15,6 @@ namespace PTL.Auth.Entra.TokenRefresh;
 /// </summary>
 public sealed partial class EntraCookieEvents : CookieAuthenticationEvents
 {
-    private const string ExpiresAtTokenName = "expires_at";
-    private const string RefreshTokenName = "refresh_token";
-    private const string AccessTokenName = "access_token";
-    private const string IdTokenName = "id_token";
-
     private readonly IEntraTokenRefreshService _refreshService;
     private readonly EntraOptions _entraOptions;
     private readonly TimeProvider _timeProvider;
@@ -39,49 +32,14 @@ public sealed partial class EntraCookieEvents : CookieAuthenticationEvents
         _logger = logger;
     }
 
-    public override async Task ValidatePrincipal(CookieValidatePrincipalContext context)
-    {
-        var expiresAtRaw = context.Properties.GetTokenValue(ExpiresAtTokenName);
-        var refreshToken = context.Properties.GetTokenValue(RefreshTokenName);
-
-        if (expiresAtRaw is null || refreshToken is null ||
-            !DateTimeOffset.TryParse(expiresAtRaw, CultureInfo.InvariantCulture, DateTimeStyles.None, out var expiresAt))
-        {
-            // No refreshable token metadata on this cookie - leave the existing principal as-is rather
-            // than forcing a sign-out over something this feature doesn't apply to.
-            return;
-        }
-
-        if (expiresAt - _timeProvider.GetUtcNow() > _entraOptions.RefreshBeforeExpiry)
-        {
-            return;
-        }
-
-        var redirectUri = BuildRedirectUri(context.Request);
-        var result = await _refreshService.RefreshAsync(refreshToken, redirectUri, context.HttpContext.RequestAborted);
-
-        if (!result.Succeeded)
-        {
-            LogRefreshFailed();
-            context.RejectPrincipal();
-            await context.HttpContext.SignOutAsync(context.Scheme.Name);
-            return;
-        }
-
-        context.Properties.UpdateTokenValue(AccessTokenName, result.AccessToken!);
-        if (result.IdToken is not null)
-        {
-            context.Properties.UpdateTokenValue(IdTokenName, result.IdToken);
-        }
-
-        context.Properties.UpdateTokenValue(RefreshTokenName, result.RefreshToken ?? refreshToken);
-        context.Properties.UpdateTokenValue(ExpiresAtTokenName, result.ExpiresAt!.Value.ToString("o", CultureInfo.InvariantCulture));
-
-        context.ShouldRenew = true;
-    }
-
-    private string BuildRedirectUri(HttpRequest request) =>
-        $"{request.Scheme}://{request.Host}{_entraOptions.CallbackPath}";
+    public override Task ValidatePrincipal(CookieValidatePrincipalContext context) =>
+        TokenRefreshCookieEventsHelper.ValidatePrincipalAsync(
+            context,
+            _entraOptions.RefreshBeforeExpiry,
+            _entraOptions.CallbackPath,
+            _timeProvider,
+            _refreshService.RefreshAsync,
+            LogRefreshFailed);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Entra ID token refresh failed for the current session - rejecting the principal")]
     private partial void LogRefreshFailed();

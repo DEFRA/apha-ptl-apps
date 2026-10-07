@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using PTL.Common.Auth;
 
 namespace PTL.Auth.Cidm.Events;
 
@@ -19,7 +20,7 @@ public interface ICidmExternalUserResolver
 }
 
 /// <summary>Outcome of <see cref="ICidmExternalUserResolver.ResolveAsync"/>.</summary>
-public sealed record CidmExternalUserResolution
+public sealed record CidmExternalUserResolution : IIdentityResolution
 {
     /// <summary>Gets a value indicating whether sign-in is permitted.</summary>
     public required bool IsAllowed { get; init; }

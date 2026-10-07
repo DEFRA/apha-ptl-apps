@@ -9,6 +9,7 @@ using Microsoft.Extensions.Options;
 using PTL.Auth.Entra.Events;
 using PTL.Auth.Entra.Options;
 using PTL.Auth.Entra.TokenRefresh;
+using PTL.Common.Auth;
 
 namespace PTL.Auth.Entra;
 
@@ -42,14 +43,7 @@ public static class EntraAuthenticationExtensions
         builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
             .AddCookie(options =>
             {
-                options.LoginPath = "/Account/Login";
-                options.LogoutPath = "/Account/Logout";
-                options.SlidingExpiration = true;
-                options.Cookie.HttpOnly = true;
-                options.Cookie.SecurePolicy = useLocalHttpFriendlyOidcSettings
-                    ? CookieSecurePolicy.SameAsRequest
-                    : CookieSecurePolicy.Always;
-                options.Cookie.SameSite = SameSiteMode.Lax;
+                options.ConfigureSharedCookieOptions(useLocalHttpFriendlyOidcSettings);
                 options.EventsType = typeof(EntraCookieEvents);
             })
             .AddOpenIdConnect(EntraAuthenticationDefaults.AuthenticationScheme, _ => { });
