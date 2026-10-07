@@ -4,6 +4,7 @@ public class Participant
 {
     public Guid ParticipantId { get; set; }
     public Guid SsoId { get; set; }
+    public Guid? SsoIdExt { get; set; }
     public Guid CustomerId { get; set; }
     public string LabCode { get; set; } = string.Empty;
     public string LabName { get; set; } = string.Empty;

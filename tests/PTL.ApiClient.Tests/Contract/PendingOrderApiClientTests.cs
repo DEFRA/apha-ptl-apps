@@ -117,6 +117,17 @@ public class PendingOrderApiClientTests
     }
 
     [Fact]
+    public async Task ApprovePendingOrderAsync_BadRequestWithNullBody_ReturnsDefaultError()
+    {
+        var client = CreateClient(HttpStatusCode.BadRequest, "null");
+
+        var result = await client.ApprovePendingOrderAsync(Guid.NewGuid(), new PendingOrderApproveRequest("PO-2"));
+
+        Assert.False(result.Success);
+        Assert.Equal("The request was invalid.", result.FieldErrors[string.Empty][0]);
+    }
+
+    [Fact]
     public async Task DeclinePendingOrderAsync_Success_ReturnsTrue()
     {
         var client = CreateClient(HttpStatusCode.NoContent, null);

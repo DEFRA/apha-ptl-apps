@@ -72,6 +72,26 @@ public class ContractControllerImportPermitTests
     }
 
     [Fact]
+    public async Task UpdateImportPermit_ReceivedWithUnparsableExpiryText_ReturnsInvalidDateMessage()
+    {
+        var contractId = Guid.NewGuid();
+        var participantSchemeId = Guid.NewGuid();
+        var importPermitApiClient = new FakeImportPermitApiClient
+        {
+            Permits = [new ImportPermitResponse(participantSchemeId, "PT0001", "AHS", "1476", true, false, null)]
+        };
+        var controller = CreateController(importPermitApiClient);
+
+        var result = await controller.UpdateImportPermit(contractId, participantSchemeId, true, "not-a-date", CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        Assert.False(controller.ModelState.IsValid);
+        var error = Assert.Single(controller.ModelState["importPermitExpiry"]!.Errors);
+        Assert.Equal("Invalid date. Please enter a valid date in dd/mm/yyyy format.", error.ErrorMessage);
+        Assert.Empty(importPermitApiClient.UpdateCalls);
+    }
+
+    [Fact]
     public async Task UpdateImportPermit_Valid_UpdatesAndRedirectsToViewMode()
     {
         var contractId = Guid.NewGuid();
@@ -100,5 +120,23 @@ public class ContractControllerImportPermitTests
 
         Assert.IsType<RedirectToActionResult>(result);
         Assert.Single(importPermitApiClient.UpdateCalls);
+    }
+
+    [Fact]
+    public async Task ImportPermits_Get_WithExpiryDate_FormatsExpiryString()
+    {
+        var contractId = Guid.NewGuid();
+        var participantSchemeId = Guid.NewGuid();
+        var importPermitApiClient = new FakeImportPermitApiClient
+        {
+            Permits = [new ImportPermitResponse(participantSchemeId, "PT0001", "AHS", "1476", true, true, new DateTime(2027, 1, 1))]
+        };
+        var controller = CreateController(importPermitApiClient);
+
+        var result = await controller.ImportPermits(contractId, null, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<ImportPermitsViewModel>(view.Model);
+        Assert.Equal("01/01/2027", model.Permits[0].ImportPermitExpiry);
     }
 }

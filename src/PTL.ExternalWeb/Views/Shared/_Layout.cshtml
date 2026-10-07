@@ -34,14 +34,15 @@
 @{
     var currentController = (ViewContext.RouteData.Values["controller"]?.ToString() ?? string.Empty).Trim();
     var currentAction = (ViewContext.RouteData.Values["action"]?.ToString() ?? string.Empty).Trim();
-    var isLoginPage = string.Equals(currentController, "Account", StringComparison.OrdinalIgnoreCase)
-        && string.Equals(currentAction, "Login", StringComparison.OrdinalIgnoreCase);
+    var isAccountFlowPage = string.Equals(currentController, "Account", StringComparison.OrdinalIgnoreCase)
+        && (string.Equals(currentAction, "Login", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(currentAction, "SignedOut", StringComparison.OrdinalIgnoreCase));
 }
 
 @await Html.PartialAsync("_Header", ("Proficiency Testing - External", "height:40px; width:auto;"))
 <div class="govuk-width-container app-width-container">
     <main role="main" class="pb-3">
-        @if (!isLoginPage)
+        @if (!isAccountFlowPage)
         {
             @await Html.PartialAsync("_Breadcrumbs")
         }

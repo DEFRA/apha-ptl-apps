@@ -1,0 +1,18 @@
+@{
+    ViewData["Title"] = "You cannot sign in with this account";
+}
+
+<div class="govuk-grid-row">
+    <div class="govuk-grid-column-two-thirds">
+        <h1 class="govuk-heading-l">You cannot sign in with this account</h1>
+        <p class="govuk-body">This account is not set up to access the Proficiency Testing external service.</p>
+        @* PTL's Logout action is POST-only with antiforgery protection (unlike CDC's GET-based
+           equivalent), so this uses a form+button rather than a plain anchor link. *@
+        <form asp-controller="Account" asp-action="Logout" method="post">
+            @Html.AntiForgeryToken()
+            <button type="submit" class="govuk-button govuk-button--secondary" data-module="govuk-button">
+                Sign out
+            </button>
+        </form>
+    </div>
+</div>

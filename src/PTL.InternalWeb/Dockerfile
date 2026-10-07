@@ -4,12 +4,13 @@
 FROM mcr.microsoft.com/dotnet/sdk:10.0-windowsservercore-ltsc2022 AS build
 WORKDIR /src
 
-# PTL.InternalWeb references the shared PTL.ApiClient library, so its
-# .csproj must be copied here too - otherwise restore fails on the
-# ProjectReference and the cache layer below is never invalidated when
-# PTL.ApiClient changes.
+# PTL.InternalWeb references the shared PTL.ApiClient library and PTL.Auth.Entra (Entra ID
+# OpenID Connect authentication), so their .csproj files must be copied here too - otherwise
+# restore fails on the ProjectReference and the cache layer below is never invalidated when
+# either dependency changes.
 COPY ["src/PTL.InternalWeb/PTL.InternalWeb.csproj", "src/PTL.InternalWeb/"]
 COPY ["src/PTL.ApiClient/PTL.ApiClient.csproj", "src/PTL.ApiClient/"]
+COPY ["src/PTL.Auth.Entra/PTL.Auth.Entra.csproj", "src/PTL.Auth.Entra/"]
 COPY ["src/PTL.Core/PTL.Core.csproj", "src/PTL.Core/"]
 COPY ["src/PTL.Contracts/PTL.Contracts.csproj", "src/PTL.Contracts/"]
 COPY ["src/PTL.Common/PTL.Common.csproj", "src/PTL.Common/"]

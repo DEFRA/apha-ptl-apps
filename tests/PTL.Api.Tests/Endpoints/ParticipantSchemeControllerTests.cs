@@ -50,6 +50,23 @@ public class ParticipantSchemeControllerTests
     }
 
     [Fact]
+    public async Task GetParticipantScheme_ExistingId_ReturnsOkWithResponse()
+    {
+        var (controller, _, contracts) = CreateController();
+        var contractId = Guid.NewGuid();
+        contracts.Seed(new CoreContract { ContractId = contractId, CustomerId = Guid.NewGuid(), YearId = DateTime.UtcNow.Year });
+        var created = await controller.CreateParticipantScheme(ValidCreateRequest(contractId, Guid.NewGuid(), Guid.NewGuid()), CancellationToken.None);
+        var createdResult = Assert.IsType<CreatedAtActionResult>(created.Result);
+        var createdResponse = Assert.IsType<ParticipantSchemeResponse>(createdResult.Value);
+
+        var result = await controller.GetParticipantScheme(createdResponse.ParticipantSchemeId, CancellationToken.None);
+
+        var okResult = Assert.IsType<OkObjectResult>(result.Result);
+        var response = Assert.IsType<ParticipantSchemeResponse>(okResult.Value);
+        Assert.Equal(createdResponse.ParticipantSchemeId, response.ParticipantSchemeId);
+    }
+
+    [Fact]
     public async Task CreateParticipantScheme_ValidRequest_ReturnsCreated()
     {
         var (controller, _, contracts) = CreateController();

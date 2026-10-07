@@ -11,6 +11,7 @@ using PTL.Core.Contract.Renewal;
 using PTL.Core.Contract.SampleAddress;
 using PTL.Core.Customer;
 using PTL.Core.GroupAddress;
+using PTL.Core.InternalUser;
 using PTL.Core.Invoice;
 using PTL.Core.Lookup;
 using PTL.Core.Participant;
@@ -20,6 +21,7 @@ using PTL.Core.WeightedPricingPlan;
 using CoreContract = PTL.Core.Contract.Contract;
 using CoreCustomer = PTL.Core.Customer.Customer;
 using CoreGroupAddress = PTL.Core.GroupAddress.GroupAddress;
+using CoreInternalUser = PTL.Core.InternalUser.InternalUser;
 using CoreParticipant = PTL.Core.Participant.Participant;
 using CoreScheme = PTL.Core.Scheme.Scheme;
 
@@ -76,6 +78,7 @@ public static class DapperColumnMappings
     private const string ColAdministrationCharge = "fldAdministrationCharge";
     private const string ColParticipantSchemeId = "fldParticipantSchemeId";
     private const string ColVatRating = "fldVatRating";
+    private const string ColInactiveDate = "fldInactiveDate";
 
     public static void Register()
     {
@@ -122,7 +125,7 @@ public static class DapperColumnMappings
             ["fldInvoiceEmail"] = nameof(CoreCustomer.InvoiceEmail),
             [ColIsActive] = nameof(CoreCustomer.IsActive),
             ["fldCanOrderOnline"] = nameof(CoreCustomer.CanOrderOnline),
-            ["fldInactiveDate"] = nameof(CoreCustomer.InactiveDate),
+            [ColInactiveDate] = nameof(CoreCustomer.InactiveDate),
             ["fldCustomerStatusId"] = nameof(CoreCustomer.CustomerStatusId),
         });
 
@@ -182,6 +185,7 @@ public static class DapperColumnMappings
         {
             [ColParticipantId] = nameof(CoreParticipant.ParticipantId),
             ["fldSsoId"] = nameof(CoreParticipant.SsoId),
+            ["fldSsoIdExt"] = nameof(CoreParticipant.SsoIdExt),
             [ColCustomerId] = nameof(CoreParticipant.CustomerId),
             [ColLabCode] = nameof(CoreParticipant.LabCode),
             [ColLabName] = nameof(CoreParticipant.LabName),
@@ -200,7 +204,7 @@ public static class DapperColumnMappings
             ["fldEmail2"] = nameof(CoreParticipant.Email2),
             ["fldComments"] = nameof(CoreParticipant.Comments),
             [ColIsActive] = nameof(CoreParticipant.IsActive),
-            ["fldInactiveDate"] = nameof(CoreParticipant.InactiveDate),
+            [ColInactiveDate] = nameof(CoreParticipant.InactiveDate),
             ["fldInactiveError"] = nameof(CoreParticipant.InactiveError),
             ["fldInactiveErrorDate"] = nameof(CoreParticipant.InactiveErrorDate),
         });
@@ -221,6 +225,19 @@ public static class DapperColumnMappings
             [ColName] = nameof(ViewerEntity.Name),
             [ColEmail] = nameof(ViewerEntity.Email),
             ["fldSsoId"] = nameof(ViewerEntity.SsoId),
+            ["fldSsoIdExt"] = nameof(ViewerEntity.SsoIdExt),
+        });
+
+        Map<PTL.Core.TestConsultant.TestConsultant>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldExternalTestConsultantId"] = nameof(PTL.Core.TestConsultant.TestConsultant.ExternalTestConsultantId),
+            [ColName] = nameof(PTL.Core.TestConsultant.TestConsultant.Name),
+            ["fldDepartment"] = nameof(PTL.Core.TestConsultant.TestConsultant.Department),
+            [ColEmail] = nameof(PTL.Core.TestConsultant.TestConsultant.Email),
+            ["fldSsoId"] = nameof(PTL.Core.TestConsultant.TestConsultant.SsoId),
+            ["fldSsoIdExt"] = nameof(PTL.Core.TestConsultant.TestConsultant.SsoIdExt),
+            ["fldIsInactive"] = nameof(PTL.Core.TestConsultant.TestConsultant.IsInactive),
+            [ColInactiveDate] = nameof(PTL.Core.TestConsultant.TestConsultant.InactiveDate),
         });
 
         Map<ParticipantViewerEntity>(new(StringComparer.OrdinalIgnoreCase)
@@ -797,6 +814,21 @@ public static class DapperColumnMappings
             [ColPrice] = nameof(InvoiceContractItemEntity.Price),
             ["fldNonFeePaying"] = nameof(InvoiceContractItemEntity.NonFeePaying),
             ["fldHasOverride"] = nameof(InvoiceContractItemEntity.HasOverride),
+        });
+
+        // sppAuthenticate's first result set.
+        Map<CoreInternalUser>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldUserId"] = nameof(CoreInternalUser.UserId),
+            ["fldUsername"] = nameof(CoreInternalUser.Username),
+            ["fldFriendlyName"] = nameof(CoreInternalUser.FriendlyName),
+            ["fldFirstName"] = nameof(CoreInternalUser.FirstName),
+            ["fldLastName"] = nameof(CoreInternalUser.LastName),
+            [ColEmail] = nameof(CoreInternalUser.Email),
+            ["fldDepartment"] = nameof(CoreInternalUser.Department),
+            ["fldIsInactive"] = nameof(CoreInternalUser.IsInactive),
+            [ColInactiveDate] = nameof(CoreInternalUser.InactiveDate),
+            ["fldSsoIdInt"] = nameof(CoreInternalUser.SsoIdInt),
         });
     }
 

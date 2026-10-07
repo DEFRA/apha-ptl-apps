@@ -15,22 +15,26 @@ public class ParticipantRepositoryTests
 
     private const string GetByIdSql = "EXEC dbo.spgParticipantByParticipantId @ParticipantId";
     private const string GetBySsoIdSql = "EXEC dbo.spgParticipantBySsoId @SsoId";
+    private const string GetBySsoIdExtSql = "EXEC dbo.spgParticipantBySsoId @SsoIdExt=@SsoIdExt";
+    private const string GetByEmailSql = "EXEC dbo.spgParticipantByEmail @Email";
     private const string GetSummariesSql = "EXEC dbo.spgParticipantInfoByCustomerId @CustomerId, @ActiveOnly";
     private const string InsertSql =
-        "EXEC dbo.spiParticipant @ParticipantId, @SsoId, @CustomerId, @LabCode, @LabName, @LabTypeId, @ContactName, @Organisation, @Address1, @Address2, @Address3, @Address4, @Address5, @CountryId, @Telephone, @Fax, @Email, @Email2, @Comments, @IsActive, @InactiveDate, @InactiveError, @InactiveErrorDate";
+        "EXEC dbo.spiParticipant @ParticipantId, @SsoId, @CustomerId, @LabCode, @LabName, @LabTypeId, @ContactName, @Organisation, @Address1, @Address2, @Address3, @Address4, @Address5, @CountryId, @Telephone, @Fax, @Email, @Email2, @Comments, @IsActive, @InactiveDate, @InactiveError, @InactiveErrorDate, @SsoIdExt";
     private const string UpdateSql =
-        "EXEC dbo.spuParticipant @ParticipantId, @SsoId, @CustomerId, @LabCode, @LabName, @LabTypeId, @ContactName, @Organisation, @Address1, @Address2, @Address3, @Address4, @Address5, @CountryId, @Telephone, @Fax, @Email, @Email2, @Comments, @IsActive, @InactiveDate, @InactiveError, @InactiveErrorDate";
+        "EXEC dbo.spuParticipant @ParticipantId, @SsoId, @CustomerId, @LabCode, @LabName, @LabTypeId, @ContactName, @Organisation, @Address1, @Address2, @Address3, @Address4, @Address5, @CountryId, @Telephone, @Fax, @Email, @Email2, @Comments, @IsActive, @InactiveDate, @InactiveError, @InactiveErrorDate, @SsoIdExt";
 
-    private static DataTable ParticipantTable(Guid participantId, Guid customerId, Guid? ssoId = null)
+    private static DataTable ParticipantTable(Guid participantId, Guid customerId, Guid? ssoId = null, Guid? ssoIdExt = null, string email = "")
     {
         var table = new DataTable();
         table.Columns.Add("fldParticipantId", typeof(Guid));
         table.Columns.Add("fldSsoId", typeof(Guid));
+        table.Columns.Add("fldSsoIdExt", typeof(Guid));
         table.Columns.Add("fldCustomerId", typeof(Guid));
         table.Columns.Add("fldLabCode", typeof(string));
         table.Columns.Add("fldLabName", typeof(string));
+        table.Columns.Add("fldEmail", typeof(string));
         table.Columns.Add("fldIsActive", typeof(bool));
-        table.Rows.Add(participantId, ssoId ?? Guid.NewGuid(), customerId, "LAB001", "Test Lab", true);
+        table.Rows.Add(participantId, ssoId ?? Guid.NewGuid(), (object?)ssoIdExt ?? DBNull.Value, customerId, "LAB001", "Test Lab", email, true);
         return table;
     }
 
@@ -82,6 +86,56 @@ public class ParticipantRepositoryTests
     }
 
     [Fact]
+    public async Task GetBySsoIdExtAsync_Found_ReturnsMappedParticipant()
+    {
+        var (repository, connection) = CreateRepository();
+        var participantId = Guid.NewGuid();
+        var ssoIdExt = Guid.NewGuid();
+        connection.RespondToQuery(GetBySsoIdExtSql, ParticipantTable(participantId, Guid.NewGuid(), ssoIdExt: ssoIdExt));
+
+        var result = await repository.GetBySsoIdExtAsync(ssoIdExt);
+
+        Assert.NotNull(result);
+        Assert.Equal(ssoIdExt, result!.SsoIdExt);
+    }
+
+    [Fact]
+    public async Task GetBySsoIdExtAsync_NotFound_ReturnsNull()
+    {
+        var (repository, connection) = CreateRepository();
+        connection.RespondToQuery(GetBySsoIdExtSql, new DataTable());
+
+        var result = await repository.GetBySsoIdExtAsync(Guid.NewGuid());
+
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public async Task GetByEmailAsync_Found_ReturnsMappedParticipant()
+    {
+        var (repository, connection) = CreateRepository();
+        var participantId = Guid.NewGuid();
+        const string email = "participant@example.com";
+        connection.RespondToQuery(GetByEmailSql, ParticipantTable(participantId, Guid.NewGuid(), email: email));
+
+        var result = await repository.GetByEmailAsync(email);
+
+        Assert.NotNull(result);
+        Assert.Equal(email, result!.Email);
+    }
+
+    [Fact]
+    public async Task GetByEmailAsync_NotFound_ReturnsNull()
+    {
+        var (repository, connection) = CreateRepository();
+        connection.RespondToQuery(GetByEmailSql, new DataTable());
+
+        var result = await repository.GetByEmailAsync("missing@example.com");
+
+        Assert.Null(result);
+    }
+
+    [Fact]
     public async Task GetSummariesAsync_ReturnsMappedSummaries()
     {
         var (repository, connection) = CreateRepository();
@@ -108,15 +162,28 @@ public class ParticipantRepositoryTests
         var (repository, connection) = CreateRepository();
         var participantId = Guid.NewGuid();
         var customerId = Guid.NewGuid();
+        var ssoIdExt = Guid.NewGuid();
         connection.RespondToNonQuery(InsertSql, 1);
         connection.RespondToQuery(GetByIdSql, ParticipantTable(participantId, customerId));
-        var participant = new CoreParticipant { ParticipantId = participantId, CustomerId = customerId, LabCode = "LAB001", IsActive = true };
+        var participant = new CoreParticipant { ParticipantId = participantId, CustomerId = customerId, LabCode = "LAB001", IsActive = true, SsoIdExt = ssoIdExt };
 
         var result = await repository.CreateAsync(participant);
 
         Assert.Equal(participantId, result.ParticipantId);
         var insertCommand = Assert.Single(connection.ExecutedCommands, c => c.CommandText == InsertSql);
         Assert.Equal(participantId, insertCommand.ParameterValue("@ParticipantId"));
+        Assert.Equal(ssoIdExt, insertCommand.ParameterValue("@SsoIdExt"));
+    }
+
+    [Fact]
+    public async Task CreateAsync_InsertedButNotReReadable_Throws()
+    {
+        var (repository, connection) = CreateRepository();
+        connection.RespondToNonQuery(InsertSql, 1);
+        connection.RespondToQuery(GetByIdSql, new DataTable());
+        var participant = new CoreParticipant { ParticipantId = Guid.NewGuid(), CustomerId = Guid.NewGuid(), LabCode = "LAB001" };
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => repository.CreateAsync(participant));
     }
 
     [Fact]

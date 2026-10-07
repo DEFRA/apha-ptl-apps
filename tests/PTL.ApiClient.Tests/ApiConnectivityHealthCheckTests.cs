@@ -38,13 +38,21 @@ public class ApiConnectivityHealthCheckTests
         Assert.NotNull(result.Exception);
     }
 
+    [Fact]
+    public async Task CheckHealthAsync_ReturnsDegraded_WhenApiReturnsNullResponse()
+    {
+        var healthCheck = new ApiConnectivityHealthCheck(new FakeApiClient(response: null));
+
+        var result = await healthCheck.CheckHealthAsync(new HealthCheckContext());
+
+        Assert.Equal(HealthStatus.Degraded, result.Status);
+    }
+
     private sealed class FakeApiClient(ApiHealthResponse? response = null, Exception? throwOnGetHealth = null) : IApiClient
     {
-        private readonly ApiHealthResponse? _response = response ?? new ApiHealthResponse("Healthy", 1, DateTime.UtcNow);
-
         public Task<ApiHealthResponse?> GetHealthAsync(CancellationToken cancellationToken = default) =>
             throwOnGetHealth is not null
                 ? Task.FromException<ApiHealthResponse?>(throwOnGetHealth)
-                : Task.FromResult(_response);
+                : Task.FromResult(response);
     }
 }

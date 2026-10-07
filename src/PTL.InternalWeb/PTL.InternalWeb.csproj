@@ -4,10 +4,14 @@
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <!-- Enables dotnet user-secrets for local Entra ID credentials - only loaded automatically by
+         WebApplicationBuilder when running as the Development environment. -->
+    <UserSecretsId>ptl-internalweb-7a4e2b81-3f9c-4d6a-8e1b-2c7d5f8a9b63</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\PTL.ApiClient\PTL.ApiClient.csproj" />
+    <ProjectReference Include="..\PTL.Auth.Entra\PTL.Auth.Entra.csproj" />
     <ProjectReference Include="..\PTL.Core\PTL.Core.csproj" />
     <ProjectReference Include="..\PTL.Common\PTL.Common.csproj" />
   </ItemGroup>

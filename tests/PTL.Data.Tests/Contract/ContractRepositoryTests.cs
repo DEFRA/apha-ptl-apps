@@ -127,6 +127,17 @@ public class ContractRepositoryTests
     }
 
     [Fact]
+    public async Task CreateAsync_InsertedButNotReReadable_Throws()
+    {
+        var (repository, connection) = CreateRepository();
+        connection.RespondToNonQuery(InsertSql, 1);
+        connection.RespondToQuery(GetByIdSql, new DataTable());
+        var contract = new CoreContract { ContractId = Guid.NewGuid(), CustomerId = Guid.NewGuid(), YearId = 2026 };
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => repository.CreateAsync(contract));
+    }
+
+    [Fact]
     public async Task UpdateAsync_ExistingContract_UpdatesAndReReads()
     {
         var (repository, connection) = CreateRepository();
@@ -219,6 +230,38 @@ public class ContractRepositoryTests
     }
 
     [Fact]
+    public async Task GetContractItemsAsync_NullOptionalStringColumns_DefaultToEmptyString()
+    {
+        var (repository, connection) = CreateRepository();
+        var contractId = Guid.NewGuid();
+        var schemeId = Guid.NewGuid();
+        var participantSchemeId = Guid.NewGuid();
+        var participantId = Guid.NewGuid();
+        var dataSet = ContractItemsDataSet(contractId, schemeId, participantSchemeId, participantId);
+        dataSet.Tables[0]!.Rows[0]["fldSuffix"] = DBNull.Value;
+        dataSet.Tables[0]!.Rows[0]["fldQalNumber"] = DBNull.Value;
+        dataSet.Tables[0]!.Rows[0]["fldSymbol"] = DBNull.Value;
+        dataSet.Tables[1]!.Rows[0]["fldName"] = DBNull.Value;
+        dataSet.Tables[1]!.Rows[0]["fldIdentifier"] = DBNull.Value;
+        dataSet.Tables[2]!.Rows[0]["fldLabCode"] = DBNull.Value;
+        dataSet.Tables[2]!.Rows[0]["fldLabName"] = DBNull.Value;
+        connection.RespondToQuery(GetContractItemsSql, dataSet);
+
+        var result = await repository.GetContractItemsAsync(contractId);
+
+        Assert.NotNull(result);
+        Assert.Equal(string.Empty, result!.Suffix);
+        Assert.Equal(string.Empty, result.QalNumber);
+        Assert.Equal(string.Empty, result.Symbol);
+        var scheme = Assert.Single(result.Schemes);
+        Assert.Equal(string.Empty, scheme.SchemeName);
+        Assert.Equal(string.Empty, scheme.SchemeIdentifier);
+        var participant = Assert.Single(scheme.Participants);
+        Assert.Equal(string.Empty, participant.LabCode);
+        Assert.Equal(string.Empty, participant.LabName);
+    }
+
+    [Fact]
     public async Task GetContractItemsAsync_ReturnsAggregateWithSchemesAndParticipants()
     {
         var (repository, connection) = CreateRepository();
@@ -268,5 +311,106 @@ public class ContractRepositoryTests
         var result = await repository.GetContractItemsAsync(Guid.NewGuid());
 
         Assert.Null(result);
+    }
+
+    // Header omits fldIsReadOnly entirely (GetBool's TryGetValue-false path), one scheme has an
+    // override month set (HasOverride true), a second scheme has no participants (excluded via the
+    // Participants.Count > 0 filter), and an orphan participant row references a scheme id that
+    // isn't in the schemes result set (schemesById.TryGetValue-false path).
+    [Fact]
+    public async Task GetContractItemsAsync_OverrideMonthEmptySchemeAndOrphanParticipant_HandledCorrectly()
+    {
+        var (repository, connection) = CreateRepository();
+        var contractId = Guid.NewGuid();
+        var schemeWithParticipants = Guid.NewGuid();
+        var schemeWithoutParticipants = Guid.NewGuid();
+        var unknownSchemeId = Guid.NewGuid();
+        var participantSchemeId = Guid.NewGuid();
+
+        var header = new DataTable();
+        header.Columns.Add("fldContractId", typeof(Guid));
+        header.Columns.Add("fldSuffix", typeof(string));
+        header.Columns.Add("fldYearId", typeof(int));
+        header.Columns.Add("fldQalNumber", typeof(string));
+        header.Columns.Add("fldSymbol", typeof(string));
+        header.Columns.Add("fldDiscountRate", typeof(decimal));
+        header.Columns.Add("fldAdministrationCharge", typeof(decimal));
+        header.Columns.Add("fldNumberCourier", typeof(int));
+        header.Columns.Add("fldCourierPrice", typeof(decimal));
+        header.Columns.Add("fldNumberPostage", typeof(int));
+        header.Columns.Add("fldPostagePrice", typeof(decimal));
+        header.Columns.Add("fldNumberSpecialDelivery", typeof(int));
+        header.Columns.Add("fldSpecialDeliveryPrice", typeof(decimal));
+        header.Rows.Add(contractId, "A", 2026, "QAL/00001", "\u00a3", 0.1m, 25m, 2, 5m, 3, 4m, 1, 6m);
+
+        var schemes = new DataTable();
+        schemes.Columns.Add("fldSchemeId", typeof(Guid));
+        schemes.Columns.Add("fldName", typeof(string));
+        schemes.Columns.Add("fldIdentifier", typeof(string));
+        schemes.Rows.Add(schemeWithParticipants, "Salmonella", "S1");
+        schemes.Rows.Add(schemeWithoutParticipants, "Campylobacter", "S2");
+
+        var participants = new DataTable();
+        participants.Columns.Add("fldParticipantSchemeId", typeof(Guid));
+        participants.Columns.Add("fldParticipantId", typeof(Guid));
+        participants.Columns.Add("fldSchemeId", typeof(Guid));
+        participants.Columns.Add("fldLabCode", typeof(string));
+        participants.Columns.Add("fldLabName", typeof(string));
+        participants.Columns.Add("fldNumberOfDistributions", typeof(int));
+        participants.Columns.Add("fldPrice", typeof(decimal));
+        participants.Columns.Add("fldNonFeePaying", typeof(bool));
+        participants.Columns.Add("fldIsRemoved", typeof(bool));
+        foreach (var month in new[] { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" })
+        {
+            participants.Columns.Add($"fldIsOverride{month}", typeof(bool));
+        }
+
+        var participantRow = participants.NewRow();
+        participantRow["fldParticipantSchemeId"] = participantSchemeId;
+        participantRow["fldParticipantId"] = Guid.NewGuid();
+        participantRow["fldSchemeId"] = schemeWithParticipants;
+        participantRow["fldLabCode"] = "LAB1";
+        participantRow["fldLabName"] = "Lab One";
+        participantRow["fldNumberOfDistributions"] = 4;
+        participantRow["fldPrice"] = 42.5m;
+        participantRow["fldNonFeePaying"] = false;
+        participantRow["fldIsRemoved"] = false;
+        foreach (var month in new[] { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" })
+        {
+            participantRow[$"fldIsOverride{month}"] = month == "Jan";
+        }
+        participants.Rows.Add(participantRow);
+
+        var orphanRow = participants.NewRow();
+        orphanRow["fldParticipantSchemeId"] = Guid.NewGuid();
+        orphanRow["fldParticipantId"] = Guid.NewGuid();
+        orphanRow["fldSchemeId"] = unknownSchemeId;
+        orphanRow["fldLabCode"] = "LAB2";
+        orphanRow["fldLabName"] = "Lab Two";
+        orphanRow["fldNumberOfDistributions"] = 1;
+        orphanRow["fldPrice"] = 10m;
+        orphanRow["fldNonFeePaying"] = false;
+        orphanRow["fldIsRemoved"] = false;
+        foreach (var month in new[] { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" })
+        {
+            orphanRow[$"fldIsOverride{month}"] = false;
+        }
+        participants.Rows.Add(orphanRow);
+
+        var dataSet = new DataSet();
+        dataSet.Tables.Add(header);
+        dataSet.Tables.Add(schemes);
+        dataSet.Tables.Add(participants);
+        connection.RespondToQuery(GetContractItemsSql, dataSet);
+
+        var result = await repository.GetContractItemsAsync(contractId);
+
+        Assert.NotNull(result);
+        Assert.False(result!.IsReadOnly);
+        var scheme = Assert.Single(result.Schemes);
+        Assert.Equal("S1", scheme.SchemeIdentifier);
+        var participant = Assert.Single(scheme.Participants);
+        Assert.Equal(participantSchemeId, participant.ParticipantSchemeId);
+        Assert.True(participant.HasOverride);
     }
 }
