@@ -78,6 +78,7 @@ public static class DapperColumnMappings
     private const string ColAdministrationCharge = "fldAdministrationCharge";
     private const string ColParticipantSchemeId = "fldParticipantSchemeId";
     private const string ColVatRating = "fldVatRating";
+    private const string ColInactiveDate = "fldInactiveDate";
 
     public static void Register()
     {
@@ -124,7 +125,7 @@ public static class DapperColumnMappings
             ["fldInvoiceEmail"] = nameof(CoreCustomer.InvoiceEmail),
             [ColIsActive] = nameof(CoreCustomer.IsActive),
             ["fldCanOrderOnline"] = nameof(CoreCustomer.CanOrderOnline),
-            ["fldInactiveDate"] = nameof(CoreCustomer.InactiveDate),
+            [ColInactiveDate] = nameof(CoreCustomer.InactiveDate),
             ["fldCustomerStatusId"] = nameof(CoreCustomer.CustomerStatusId),
         });
 
@@ -203,7 +204,7 @@ public static class DapperColumnMappings
             ["fldEmail2"] = nameof(CoreParticipant.Email2),
             ["fldComments"] = nameof(CoreParticipant.Comments),
             [ColIsActive] = nameof(CoreParticipant.IsActive),
-            ["fldInactiveDate"] = nameof(CoreParticipant.InactiveDate),
+            [ColInactiveDate] = nameof(CoreParticipant.InactiveDate),
             ["fldInactiveError"] = nameof(CoreParticipant.InactiveError),
             ["fldInactiveErrorDate"] = nameof(CoreParticipant.InactiveErrorDate),
         });
@@ -236,7 +237,7 @@ public static class DapperColumnMappings
             ["fldSsoId"] = nameof(PTL.Core.TestConsultant.TestConsultant.SsoId),
             ["fldSsoIdExt"] = nameof(PTL.Core.TestConsultant.TestConsultant.SsoIdExt),
             ["fldIsInactive"] = nameof(PTL.Core.TestConsultant.TestConsultant.IsInactive),
-            ["fldInactiveDate"] = nameof(PTL.Core.TestConsultant.TestConsultant.InactiveDate),
+            [ColInactiveDate] = nameof(PTL.Core.TestConsultant.TestConsultant.InactiveDate),
         });
 
         Map<ParticipantViewerEntity>(new(StringComparer.OrdinalIgnoreCase)
@@ -826,7 +827,7 @@ public static class DapperColumnMappings
             [ColEmail] = nameof(CoreInternalUser.Email),
             ["fldDepartment"] = nameof(CoreInternalUser.Department),
             ["fldIsInactive"] = nameof(CoreInternalUser.IsInactive),
-            ["fldInactiveDate"] = nameof(CoreInternalUser.InactiveDate),
+            [ColInactiveDate] = nameof(CoreInternalUser.InactiveDate),
             ["fldSsoIdInt"] = nameof(CoreInternalUser.SsoIdInt),
         });
     }

@@ -10,14 +10,14 @@
 -- precedent set for the external-user procedures. @SsoIdInt defaults to NULL, so the legacy app's
 -- existing single-parameter call (@Username only) is unaffected.
 --
--- The original proc wrapped the first SELECT in `IF (@UserId IS NOT NULL) BEGIN ... END`, so when
--- no match was found the client only ever received ONE result set (the empty roles list), not two.
--- That's fine for the legacy VB reader (its "not found" branch never calls dr.NextResult() at all),
--- but makes the result unreliable to consume generically via Dapper's QueryMultipleAsync (the
--- number of result sets would vary). The IF wrapper is removed here - the first SELECT now always
--- runs and simply returns zero rows when @UserId is NULL, so callers always get exactly two result
--- sets. dr.Read() on an empty result set still returns False, so the legacy VB behaviour (and its
--- ordinal reads) is completely unaffected by this change.
+-- The original proc wrapped the first SELECT in a conditional block that only ran when a user was
+-- found, so when no match was found the client only ever received ONE result set (the empty roles
+-- list), not two. That's fine for the legacy VB reader (its "not found" branch never calls
+-- dr.NextResult() at all), but makes the result unreliable to consume generically via Dapper's
+-- QueryMultipleAsync (the number of result sets would vary). That conditional wrapper is removed
+-- here - the first SELECT now always runs and simply returns zero rows when @UserId is NULL, so
+-- callers always get exactly two result sets. dr.Read() on an empty result set still returns False,
+-- so the legacy VB behaviour (and its ordinal reads) is completely unaffected by this change.
 CREATE OR ALTER PROCEDURE [dbo].[sppAuthenticate]
 	@Username varchar(50) = NULL,
 	@SsoIdInt uniqueidentifier = NULL

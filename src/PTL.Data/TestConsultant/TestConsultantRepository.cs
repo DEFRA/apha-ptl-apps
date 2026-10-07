@@ -32,7 +32,7 @@ public sealed class TestConsultantRepository(IDbConnectionFactory connectionFact
             "EXEC dbo.spiExtTestConsultant @ExternalTestConsultantId, @Name, @Department, @Email, @SsoId, @IsInactive, @InactiveDate, @SsoIdExt",
             new
             {
-                ExternalTestConsultantId = testConsultant.ExternalTestConsultantId,
+                testConsultant.ExternalTestConsultantId,
                 testConsultant.Name,
                 testConsultant.Department,
                 testConsultant.Email,
@@ -53,7 +53,7 @@ public sealed class TestConsultantRepository(IDbConnectionFactory connectionFact
             "EXEC dbo.spuExtTestConsultant @ExternalTestConsultantId, @Name, @Department, @Email, @SsoId, @IsInactive, @InactiveDate, @SsoIdExt",
             new
             {
-                ExternalTestConsultantId = testConsultant.ExternalTestConsultantId,
+                testConsultant.ExternalTestConsultantId,
                 testConsultant.Name,
                 testConsultant.Department,
                 testConsultant.Email,
