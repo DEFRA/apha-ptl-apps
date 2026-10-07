@@ -79,5 +79,12 @@ namespace PTL.ExternalWeb.Features.Account
         [HttpGet]
         [AllowAnonymous]
         public IActionResult SignedOut() => View();
+
+        // Reached via ExternalUserResolver's denial redirect when no CIDM role resolves to an
+        // existing record - no local cookie exists at this point, since TokenValidated redirects
+        // here before the OIDC handler ever signs the principal into the cookie scheme.
+        [HttpGet]
+        [AllowAnonymous]
+        public IActionResult NotPermitted() => View();
     }
 }
