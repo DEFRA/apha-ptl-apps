@@ -152,4 +152,58 @@ public class LookupApiClientTests
 
         Assert.Equal("UT3/306", result.UTNumber);
     }
+
+    [Fact]
+    public async Task GetCountriesAsync_NullResponse_ReturnsEmptyList() =>
+        Assert.Empty(await CreateClient(HttpStatusCode.OK, "null").GetCountriesAsync());
+
+    [Fact]
+    public async Task GetCurrenciesAsync_NullResponse_ReturnsEmptyList() =>
+        Assert.Empty(await CreateClient(HttpStatusCode.OK, "null").GetCurrenciesAsync());
+
+    [Fact]
+    public async Task GetGroupAddressesAsync_NullResponse_ReturnsEmptyList() =>
+        Assert.Empty(await CreateClient(HttpStatusCode.OK, "null").GetGroupAddressesAsync());
+
+    [Fact]
+    public async Task GetCustomerTypesAsync_NullResponse_ReturnsEmptyList() =>
+        Assert.Empty(await CreateClient(HttpStatusCode.OK, "null").GetCustomerTypesAsync());
+
+    [Fact]
+    public async Task GetVatRatingsAsync_NullResponse_ReturnsEmptyList() =>
+        Assert.Empty(await CreateClient(HttpStatusCode.OK, "null").GetVatRatingsAsync());
+
+    [Fact]
+    public async Task GetLabTypesAsync_NullResponse_ReturnsEmptyList() =>
+        Assert.Empty(await CreateClient(HttpStatusCode.OK, "null").GetLabTypesAsync());
+
+    [Fact]
+    public async Task GetCurrentYearsAsync_NullResponse_ReturnsEmptyList() =>
+        Assert.Empty(await CreateClient(HttpStatusCode.OK, "null").GetCurrentYearsAsync());
+
+    [Fact]
+    public async Task GetAllYearsAsync_NullResponse_ReturnsEmptyList() =>
+        Assert.Empty(await CreateClient(HttpStatusCode.OK, "null").GetAllYearsAsync());
+
+    [Fact]
+    public async Task GetWeightedPricingYearsAsync_NullResponse_ReturnsEmptyList() =>
+        Assert.Empty(await CreateClient(HttpStatusCode.OK, "null").GetWeightedPricingYearsAsync());
+
+    [Fact]
+    public async Task GetSchemeCurrenciesAsync_NullResponse_ReturnsEmptyList() =>
+        Assert.Empty(await CreateClient(HttpStatusCode.OK, "null").GetSchemeCurrenciesAsync(Guid.NewGuid()));
+
+    [Fact]
+    public async Task GetPostagePricingPlansForYearAsync_NullResponse_ReturnsEmptyList() =>
+        Assert.Empty(await CreateClient(HttpStatusCode.OK, "null").GetPostagePricingPlansForYearAsync(2026));
+
+    [Fact]
+    public async Task GetSystemSettingsAsync_NullResponse_ReturnsDefault()
+    {
+        var client = CreateClient(HttpStatusCode.OK, "null");
+
+        var result = await client.GetSystemSettingsAsync();
+
+        Assert.Equal(string.Empty, result.UTNumber);
+    }
 }

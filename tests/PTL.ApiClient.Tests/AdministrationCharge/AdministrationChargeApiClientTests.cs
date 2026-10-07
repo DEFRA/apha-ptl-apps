@@ -60,4 +60,19 @@ public class AdministrationChargeApiClientTests
         Assert.False(result.Success);
         Assert.True(result.FieldErrors.ContainsKey(string.Empty));
     }
+
+    [Fact]
+    public async Task GetAdministrationChargesAsync_NullResponse_ReturnsEmptyList() =>
+        Assert.Empty(await CreateClient(HttpStatusCode.OK, "null").GetAdministrationChargesAsync());
+
+    [Fact]
+    public async Task SetPriceAsync_BadRequestWithNullBody_ReturnsGenericFieldError()
+    {
+        var client = CreateClient(HttpStatusCode.BadRequest, "null");
+
+        var result = await client.SetPriceAsync(new UpdateAdministrationChargePriceRequest(Guid.NewGuid(), Guid.NewGuid(), -1.00m));
+
+        Assert.False(result.Success);
+        Assert.True(result.FieldErrors.ContainsKey(string.Empty));
+    }
 }

@@ -45,6 +45,17 @@ public class ContractApiClientTests
     }
 
     [Fact]
+    public async Task GetContractsForCustomerAsync_WithoutYearId_ReturnsDeserializedSearchResponse()
+    {
+        const string json = """{"items":[],"totalCount":0,"page":1,"pageSize":20}""";
+        var client = CreateClient(HttpStatusCode.OK, json);
+
+        var result = await client.GetContractsForCustomerAsync(Guid.NewGuid(), new ContractSearchRequest());
+
+        Assert.Empty(result.Items);
+    }
+
+    [Fact]
     public async Task GetContractsForCustomerByYearAsync_ReturnsDeserializedSearchResponse()
     {
         const string json = """{"items":[],"totalCount":0,"page":1,"pageSize":20}""";
@@ -89,6 +100,17 @@ public class ContractApiClientTests
 
         Assert.False(result.Success);
         Assert.True(result.FieldErrors.ContainsKey("UTNumber"));
+    }
+
+    [Fact]
+    public async Task CreateContractAsync_BadRequestWithNullBody_ReturnsGenericFieldError()
+    {
+        var client = CreateClient(HttpStatusCode.BadRequest, "null");
+
+        var result = await client.CreateContractAsync(Guid.NewGuid(), MinimalCreateRequest());
+
+        Assert.False(result.Success);
+        Assert.True(result.FieldErrors.ContainsKey(string.Empty));
     }
 
     [Fact]

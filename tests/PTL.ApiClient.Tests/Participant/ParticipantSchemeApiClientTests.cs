@@ -69,6 +69,28 @@ public class ParticipantSchemeApiClientTests
     }
 
     [Fact]
+    public async Task CreateParticipantSchemeAsync_BadRequestWithNoErrors_ReturnsGenericFieldError()
+    {
+        var client = CreateClient(HttpStatusCode.BadRequest, "{}");
+
+        var result = await client.CreateParticipantSchemeAsync(CreateRequest());
+
+        Assert.False(result.Success);
+        Assert.True(result.FieldErrors.ContainsKey(string.Empty));
+    }
+
+    [Fact]
+    public async Task CreateParticipantSchemeAsync_BadRequestWithNullBody_ReturnsGenericFieldError()
+    {
+        var client = CreateClient(HttpStatusCode.BadRequest, "null");
+
+        var result = await client.CreateParticipantSchemeAsync(CreateRequest());
+
+        Assert.False(result.Success);
+        Assert.True(result.FieldErrors.ContainsKey(string.Empty));
+    }
+
+    [Fact]
     public async Task UpdateParticipantSchemeAsync_NotFound_ReturnsFailureResult()
     {
         var client = CreateClient(HttpStatusCode.NotFound, null);

@@ -56,6 +56,21 @@ public class SchemeApiClientTests
     }
 
     [Fact]
+    public async Task GetSchemeHistoryAsync_NullResponse_ReturnsEmptyList() =>
+        Assert.Empty(await CreateClient(HttpStatusCode.OK, "null").GetSchemeHistoryAsync(Guid.NewGuid()));
+
+    [Fact]
+    public async Task GetSchemesForYearAsync_WithSearchTerm_ReturnsDeserializedSearchResponse()
+    {
+        const string json = "{\"items\":[],\"totalCount\":0,\"page\":1,\"pageSize\":20}";
+        var client = CreateClient(HttpStatusCode.OK, json);
+
+        var result = await client.GetSchemesForYearAsync(new SchemeSearchRequest(2027, "PT1234"));
+
+        Assert.Empty(result.Items);
+    }
+
+    [Fact]
     public async Task CreateSchemeAsync_Success_ReturnsSavedScheme()
     {
         var client = CreateClient(HttpStatusCode.OK, FullSchemeJson());
@@ -88,6 +103,17 @@ public class SchemeApiClientTests
 
         Assert.False(result.Success);
         Assert.True(result.FieldErrors.ContainsKey("Identifier"));
+    }
+
+    [Fact]
+    public async Task CreateSchemeAsync_BadRequestWithNullBody_ReturnsGenericFieldError()
+    {
+        var client = CreateClient(HttpStatusCode.BadRequest, "null");
+
+        var result = await client.CreateSchemeAsync(MinimalCreateRequest());
+
+        Assert.False(result.Success);
+        Assert.True(result.FieldErrors.ContainsKey(string.Empty));
     }
 
     [Fact]

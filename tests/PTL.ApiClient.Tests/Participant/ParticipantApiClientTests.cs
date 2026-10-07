@@ -118,6 +118,17 @@ public class ParticipantApiClientTests
     }
 
     [Fact]
+    public async Task SearchParticipantsAsync_WithNullSearchTerm_ReturnsDeserializedSearchResponse()
+    {
+        const string json = """{"items":[],"totalCount":0,"page":1,"pageSize":20}""";
+        var client = CreateClient(HttpStatusCode.OK, json);
+
+        var result = await client.SearchParticipantsAsync(new ParticipantSearchRequest(Guid.NewGuid()));
+
+        Assert.Empty(result.Items);
+    }
+
+    [Fact]
     public async Task CreateParticipantAsync_Success_ReturnsSuccess()
     {
         const string json = """{"participantId":"22222222-2222-2222-2222-222222222222","ssoId":"33333333-3333-3333-3333-333333333333","customerId":"11111111-1111-1111-1111-111111111111","labCode":"LAB001","labName":"Lab 1","labTypeId":"44444444-4444-4444-4444-444444444444","contactName":"John","organisation":"Org","address1":"St 1","address2":"Town","address3":"","address4":"","address5":"","countryId":"55555555-5555-5555-5555-555555555555","telephone":"01234567890","fax":"","email":"lab@example.com","email2":"","comments":"","isActive":true,"inactiveDate":null,"inactiveError":false,"inactiveErrorDate":null}""";
@@ -151,6 +162,28 @@ public class ParticipantApiClientTests
         var client = CreateClient(HttpStatusCode.InternalServerError, null);
 
         await Assert.ThrowsAsync<HttpRequestException>(() => client.CreateParticipantAsync(MinimalCreateRequest()));
+    }
+
+    [Fact]
+    public async Task CreateParticipantAsync_BadRequestWithNoErrors_ReturnsGenericFieldError()
+    {
+        var client = CreateClient(HttpStatusCode.BadRequest, "{}");
+
+        var result = await client.CreateParticipantAsync(MinimalCreateRequest());
+
+        Assert.False(result.Success);
+        Assert.True(result.FieldErrors.ContainsKey(string.Empty));
+    }
+
+    [Fact]
+    public async Task CreateParticipantAsync_BadRequestWithNullBody_ReturnsGenericFieldError()
+    {
+        var client = CreateClient(HttpStatusCode.BadRequest, "null");
+
+        var result = await client.CreateParticipantAsync(MinimalCreateRequest());
+
+        Assert.False(result.Success);
+        Assert.True(result.FieldErrors.ContainsKey(string.Empty));
     }
 
     [Fact]
