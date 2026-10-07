@@ -127,4 +127,49 @@ public class ExternalUserResolverTests
 
         Assert.Equal(["Viewer"], apiClient.ReceivedRequest!.Roles);
     }
+
+    [Fact]
+    public async Task ResolveAsync_NoEmailClaim_SendsEmptyEmail()
+    {
+        var principal = CreatePrincipal(
+            new Claim(CidmClaimTypes.ContactId, Guid.NewGuid().ToString()),
+            new Claim(ClaimTypes.Role, "Viewer"));
+        var apiClient = new FakeExternalUserApiClient(new ResolveExternalUserResponse("Jane Doe", ["Viewer"], null, Guid.NewGuid(), null));
+        var resolver = new ExternalUserResolver(apiClient);
+
+        await resolver.ResolveAsync(principal, CancellationToken.None);
+
+        Assert.Equal(string.Empty, apiClient.ReceivedRequest!.Email);
+    }
+
+    [Fact]
+    public async Task ResolveAsync_LowercaseEmailClaimOnly_UsesLowercaseEmailClaim()
+    {
+        var principal = CreatePrincipal(
+            new Claim(CidmClaimTypes.ContactId, Guid.NewGuid().ToString()),
+            new Claim("email", "lowercase@example.com"),
+            new Claim(ClaimTypes.Role, "Viewer"));
+        var apiClient = new FakeExternalUserApiClient(new ResolveExternalUserResponse("Jane Doe", ["Viewer"], null, Guid.NewGuid(), null));
+        var resolver = new ExternalUserResolver(apiClient);
+
+        await resolver.ResolveAsync(principal, CancellationToken.None);
+
+        Assert.Equal("lowercase@example.com", apiClient.ReceivedRequest!.Email);
+    }
+
+    [Fact]
+    public async Task ResolveAsync_DisplayName_FallsBackToGivenNameSurnameClaims()
+    {
+        var principal = CreatePrincipal(
+            new Claim(CidmClaimTypes.ContactId, Guid.NewGuid().ToString()),
+            new Claim(ClaimTypes.GivenName, "Jane"),
+            new Claim(ClaimTypes.Surname, "Doe"),
+            new Claim(ClaimTypes.Role, "Viewer"));
+        var apiClient = new FakeExternalUserApiClient(new ResolveExternalUserResponse("Jane Doe", ["Viewer"], null, Guid.NewGuid(), null));
+        var resolver = new ExternalUserResolver(apiClient);
+
+        await resolver.ResolveAsync(principal, CancellationToken.None);
+
+        Assert.Equal("Jane Doe", apiClient.ReceivedRequest!.DisplayName);
+    }
 }

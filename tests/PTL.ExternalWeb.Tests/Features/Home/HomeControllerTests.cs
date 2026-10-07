@@ -62,6 +62,18 @@ public class HomeControllerTests
     }
 
     [Fact]
+    public void Index_NoDisplayNameOrNameClaim_ShowsEmptyDisplayName()
+    {
+        var controller = CreateController();
+
+        var result = controller.Index();
+
+        var viewResult = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<HomeIndexViewModel>(viewResult.Model);
+        Assert.Equal(string.Empty, model.DisplayName);
+    }
+
+    [Fact]
     public void Privacy_ReturnsView()
     {
         var controller = new HomeController(new FakeApiClient());
