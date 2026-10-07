@@ -9,7 +9,26 @@
         return;
     }
 
-    editors.forEach(function (textarea) {
+    // A GOV.UK tab panel that isn't the default-selected one is rendered with
+    // govuk-tabs__panel--hidden (display: none) from the server, on every load including a
+    // validation-failure re-render. Initialising TinyMCE while its textarea is hidden leaves the
+    // raw markup showing as literal text instead of the WYSIWYG view, so initialisation for a
+    // field in a hidden panel is deferred until that panel's hidden class is actually removed.
+    function initEditor(textarea) {
+        if (textarea.dataset.ptlRichTextInitialised === 'true') {
+            return;
+        }
+
+        textarea.dataset.ptlRichTextInitialised = 'true';
+
+        // Chrome/Firefox restore a textarea's own remembered value on a POST-triggered reload,
+        // which wins over the server's freshly rendered value and leaves TinyMCE reading stale,
+        // already-escaped text. data-ptl-server-value isn't subject to that restoration, so force
+        // it back onto the field before TinyMCE ever reads it.
+        if (textarea.dataset.ptlServerValue !== undefined) {
+            textarea.value = textarea.dataset.ptlServerValue;
+        }
+
         tinymce.init({
             target: textarea,
             base_url: '/lib/tinymce',
@@ -41,6 +60,22 @@
                 });
             }
         });
+    }
+
+    editors.forEach(function (textarea) {
+        var panel = textarea.closest('.govuk-tabs__panel');
+        if (!panel || !panel.classList.contains('govuk-tabs__panel--hidden')) {
+            initEditor(textarea);
+            return;
+        }
+
+        var observer = new MutationObserver(function () {
+            if (!panel.classList.contains('govuk-tabs__panel--hidden')) {
+                observer.disconnect();
+                initEditor(textarea);
+            }
+        });
+        observer.observe(panel, { attributes: true, attributeFilter: ['class'] });
     });
 
     // TinyMCE keeps its content in an iframe until asked to write it back.

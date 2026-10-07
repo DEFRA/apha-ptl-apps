@@ -65,6 +65,22 @@ public class SchemeInstructionsTests
         Assert.Equal("<p>4&deg;C&nbsp;max</p>", SchemeInstructions.Sanitise("<p>4&deg;C&nbsp;max</p>"));
     }
 
+    [Fact]
+    public void Sanitise_CollapsesTagDelimitersAccidentallyDoubleEncodedByARoundTrip()
+    {
+        const string doubleEncoded = "<p>&lt;p&gt;Store at 4 &amp;deg;C&lt;/p&gt;</p>";
+
+        Assert.Equal("<p>Store at 4 &deg;C</p>", SchemeInstructions.Sanitise(doubleEncoded));
+    }
+
+    [Fact]
+    public void Sanitise_CollapsesMultipleAccumulatedLayersOfEncoding()
+    {
+        const string tripleEncoded = "<p>&lt;p&gt;&amp;lt;p&amp;gt;Store at 4 &amp;amp;deg;C&amp;lt;/p&amp;gt;&lt;/p&gt;</p>";
+
+        Assert.Equal("<p>Store at 4 &deg;C</p>", SchemeInstructions.Sanitise(tripleEncoded));
+    }
+
     [Theory]
     [InlineData(null)]
     [InlineData("")]

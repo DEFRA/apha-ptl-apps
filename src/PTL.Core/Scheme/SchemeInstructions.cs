@@ -1,3 +1,4 @@
+using System.Net;
 using System.Text.RegularExpressions;
 
 namespace PTL.Core.Scheme;
@@ -45,7 +46,7 @@ public static partial class SchemeInstructions
             return string.Empty;
         }
 
-        var withoutAnchors = AnchorPattern().Replace(html, "$1");
+        var withoutAnchors = AnchorPattern().Replace(CollapseAccidentalDoubleEncoding(html), "$1");
 
         return TagPattern().Replace(withoutAnchors, match =>
         {
@@ -64,6 +65,40 @@ public static partial class SchemeInstructions
                 ? $"<span style=\"{style}\">"
                 : $"<{name}>";
         });
+    }
+
+    // A round trip through the editor can occasionally leave the previous save's tag delimiters -
+    // and anything HTML-escaped alongside them, such as &nbsp; - wrapped as plain text inside a
+    // new real <p>, so the stored markup gains one more layer of escaping each time (&lt;p&gt;
+    // becomes &amp;lt;p&amp;gt;, and so on). Decoding one layer at a time and stopping as soon as
+    // that no longer reveals further allow-listed tags collapses the markup back to the single
+    // real layer, in step with however many extra layers actually exist, without ever touching a
+    // correctly single-encoded entity that was never re-wrapped.
+    private static string CollapseAccidentalDoubleEncoding(string html)
+    {
+        var current = html;
+        var tagCount = TagPattern().Count(current);
+
+        for (var i = 0; i < 10; i++)
+        {
+            var decoded = WebUtility.HtmlDecode(current);
+            var decodedTagCount = TagPattern().Count(decoded);
+            if (decoded == current || decodedTagCount <= tagCount)
+            {
+                break;
+            }
+
+            current = decoded;
+            tagCount = decodedTagCount;
+        }
+
+        // Each accumulated layer wrapped the whole of the previous one in its own new <p>, so
+        // decoding leaves that many redundant nested wrappers around the original content -
+        // collapse a run of identical leading/trailing wrappers down to the single real pair.
+        current = Regex.Replace(current, "^(?:<p>\\s*)+", "<p>", RegexOptions.IgnoreCase);
+        current = Regex.Replace(current, "(?:\\s*</p>)+$", "</p>", RegexOptions.IgnoreCase);
+
+        return current;
     }
 
     private static string? SafeStyle(string tag)

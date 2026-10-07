@@ -62,7 +62,13 @@ public class GovUkRichTextTagHelper(IHtmlGenerator generator) : TagHelper
             ["class"] = hasError ? "govuk-textarea govuk-textarea--error ptl-rich-text" : "govuk-textarea ptl-rich-text",
             ["data-module"] = "ptl-rich-text",
             ["data-toolbar"] = Toolbar,
-            ["data-height"] = Height
+            ["data-height"] = Height,
+            // Chrome/Firefox restore a textarea's own remembered value on a POST-triggered reload,
+            // overriding whatever the server just rendered - autocomplete="off" alone does not
+            // reliably stop this. Carrying the true value in an attribute (which isn't subject to
+            // that restoration) lets the script force it back before TinyMCE reads it.
+            ["autocomplete"] = "off",
+            ["data-ptl-server-value"] = (string?)For.Model ?? string.Empty
         };
 
         if (describedBy is not null)

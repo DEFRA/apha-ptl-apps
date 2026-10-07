@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using PTL.ApiClient;
 using PTL.Contracts.Lookup;
 using PTL.Contracts.Scheme;
+using PTL.Core.Scheme;
 using PTL.InternalWeb.Notifications;
 using CoreScheme = PTL.Core.Scheme.Scheme;
 using SchemeStartDate = PTL.Core.Scheme.SchemeStartDate;
@@ -220,6 +221,7 @@ public class SchemeController(ISchemeApiClient schemeApiClient, ILookupApiClient
 
         if (!ModelState.IsValid)
         {
+            model.Instructions = SchemeInstructions.Sanitise(model.Instructions);
             await PopulateFormAsync(model, cancellationToken);
             return View(model);
         }
@@ -229,6 +231,7 @@ public class SchemeController(ISchemeApiClient schemeApiClient, ILookupApiClient
         {
             LogCreateFailedMessage(logger, null);
             AddErrors(result.FieldErrors);
+            model.Instructions = SchemeInstructions.Sanitise(model.Instructions);
             await PopulateFormAsync(model, cancellationToken);
             return View(model);
         }
@@ -271,6 +274,7 @@ public class SchemeController(ISchemeApiClient schemeApiClient, ILookupApiClient
 
         if (!ModelState.IsValid)
         {
+            model.Instructions = SchemeInstructions.Sanitise(model.Instructions);
             await PopulateFormAsync(model, cancellationToken);
             return View(model);
         }
@@ -280,6 +284,7 @@ public class SchemeController(ISchemeApiClient schemeApiClient, ILookupApiClient
         {
             LogUpdateFailedMessage(logger, id, null);
             AddErrors(result.FieldErrors);
+            model.Instructions = SchemeInstructions.Sanitise(model.Instructions);
             await PopulateFormAsync(model, cancellationToken);
             return View(model);
         }
@@ -303,6 +308,7 @@ public class SchemeController(ISchemeApiClient schemeApiClient, ILookupApiClient
 
         SchemeTestCommands.TryApply(model, testCommand, selectedItemTypeId ?? Guid.Empty);
         ModelState.Clear();
+        model.Instructions = SchemeInstructions.Sanitise(model.Instructions);
         await PopulateFormAsync(model, cancellationToken);
         return true;
     }
