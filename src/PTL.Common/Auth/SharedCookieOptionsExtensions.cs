@@ -5,8 +5,8 @@ namespace PTL.Common.Auth;
 
 /// <summary>
 /// Shared cookie configuration - identical across every PTL OIDC-backed web front-end's
-/// <c>AddCookie</c> setup, aside from <see cref="CookieAuthenticationOptions.EventsType"/>, which
-/// each caller sets afterwards to its own provider-specific events class.
+/// <c>AddCookie</c> setup, aside from <c>EventsType</c>, which each caller sets afterwards to its
+/// own provider-specific events class.
 /// </summary>
 public static class SharedCookieOptionsExtensions
 {

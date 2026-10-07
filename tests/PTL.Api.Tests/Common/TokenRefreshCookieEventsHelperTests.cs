@@ -134,8 +134,7 @@ public class TokenRefreshCookieEventsHelperTests
         var ticket = new AuthenticationTicket(principal, properties, SchemeName);
 
         var context = new CookieValidatePrincipalContext(httpContext, scheme, options, ticket);
-        var called = false;
-        return (context, () => called = true);
+        return (context, () => { });
     }
 
     private sealed class FakeTokenRefreshResult(
