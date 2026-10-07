@@ -46,6 +46,17 @@ public class CustomerApiClientTests
     }
 
     [Fact]
+    public async Task SearchCustomersAsync_WithNullSearchTerm_ReturnsDeserializedSearchResponse()
+    {
+        const string json = """{"items":[],"totalCount":0,"page":1,"pageSize":20}""";
+        var client = CreateClient(HttpStatusCode.OK, json);
+
+        var result = await client.SearchCustomersAsync(new CustomerSearchRequest());
+
+        Assert.Empty(result.Items);
+    }
+
+    [Fact]
     public async Task CreateCustomerAsync_ValidationFailure_ReturnsFieldErrors()
     {
         const string json = """{"errors":{"Name":["Enter a name."]}}""";
@@ -140,6 +151,17 @@ public class CustomerApiClientTests
         Assert.Null(result.Customer);
         Assert.True(result.FieldErrors.ContainsKey(string.Empty));
         Assert.Equal("The request was invalid.", result.FieldErrors[string.Empty][0]);
+    }
+
+    [Fact]
+    public async Task CreateCustomerAsync_BadRequestWithNullBody_ReturnsDefaultError()
+    {
+        var client = CreateClient(HttpStatusCode.BadRequest, "null");
+
+        var result = await client.CreateCustomerAsync(MinimalCreateRequest());
+
+        Assert.False(result.Success);
+        Assert.True(result.FieldErrors.ContainsKey(string.Empty));
     }
 
     [Fact]
@@ -248,6 +270,34 @@ public class CustomerApiClientTests
         Assert.False(result.NotFound);
         Assert.True(result.FieldErrors.ContainsKey("ContactName"));
     }
+
+    [Fact]
+    public async Task ApprovePendingCustomerUpdateAsync_WithAmendments_ReturnsSuccessResult()
+    {
+        var client = CreateClient(HttpStatusCode.NoContent, null);
+
+        var result = await client.ApprovePendingCustomerUpdateAsync(Guid.NewGuid(), AmendedRequest());
+
+        Assert.True(result.Success);
+        Assert.False(result.NotFound);
+    }
+
+    [Fact]
+    public async Task ApprovePendingCustomerUpdateAsync_BadRequestWithNullBody_ReturnsGenericError()
+    {
+        var client = CreateClient(HttpStatusCode.BadRequest, "null");
+
+        var result = await client.ApprovePendingCustomerUpdateAsync(Guid.NewGuid(), AmendedRequest());
+
+        Assert.False(result.Success);
+        Assert.True(result.FieldErrors.ContainsKey(string.Empty));
+    }
+
+    private static PendingCustomerUpdateSaveRequest AmendedRequest() => new(
+        "New Contact", string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty,
+        Guid.NewGuid(), string.Empty, string.Empty, string.Empty, "new@example.com",
+        string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty,
+        Guid.NewGuid(), string.Empty, string.Empty, string.Empty, string.Empty);
 
     [Fact]
     public async Task ApprovePendingCustomerUpdateAsync_BadRequestWithNoErrors_ReturnsDefaultError()

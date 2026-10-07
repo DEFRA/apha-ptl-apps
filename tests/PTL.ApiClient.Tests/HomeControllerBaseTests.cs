@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
@@ -40,6 +41,24 @@ public class HomeControllerBaseTests
         var viewResult = Assert.IsType<ViewResult>(result);
         var model = Assert.IsType<ErrorViewModel>(viewResult.Model);
         Assert.True(model.ShowRequestId);
+    }
+
+    [Fact]
+    public void Error_WithActiveActivity_UsesActivityIdAsRequestId()
+    {
+        var controller = new TestHomeController(new FakeApiClient())
+        {
+            ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() }
+        };
+        using var activity = new Activity("TestActivity");
+        activity.Start();
+
+        var result = controller.Error();
+
+        var viewResult = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<ErrorViewModel>(viewResult.Model);
+        Assert.Equal(activity.Id, model.RequestId);
+        activity.Stop();
     }
 
     private sealed class TestHomeController(IApiClient apiClient) : HomeControllerBase(apiClient);

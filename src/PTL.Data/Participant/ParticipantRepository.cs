@@ -26,6 +26,24 @@ public sealed class ParticipantRepository(IDbConnectionFactory connectionFactory
             new { SsoId = ssoId });
     }
 
+    public async Task<CoreParticipant?> GetBySsoIdExtAsync(Guid ssoIdExt, CancellationToken cancellationToken = default)
+    {
+        using var connection = connectionFactory.CreateConnection();
+
+        return await connection.QuerySingleOrDefaultAsync<CoreParticipant>(
+            "EXEC dbo.spgParticipantBySsoId @SsoIdExt=@SsoIdExt",
+            new { SsoIdExt = ssoIdExt });
+    }
+
+    public async Task<CoreParticipant?> GetByEmailAsync(string email, CancellationToken cancellationToken = default)
+    {
+        using var connection = connectionFactory.CreateConnection();
+
+        return await connection.QuerySingleOrDefaultAsync<CoreParticipant>(
+            "EXEC dbo.spgParticipantByEmail @Email",
+            new { Email = email });
+    }
+
     public async Task<IReadOnlyList<ParticipantSummaryEntity>> GetSummariesAsync(Guid customerId, bool includeInactive = false, CancellationToken cancellationToken = default)
     {
         using var connection = connectionFactory.CreateConnection();
@@ -53,16 +71,17 @@ public sealed class ParticipantRepository(IDbConnectionFactory connectionFactory
     }
 
     private const string InsertSql =
-        "EXEC dbo.spiParticipant @ParticipantId, @SsoId, @CustomerId, @LabCode, @LabName, @LabTypeId, @ContactName, @Organisation, @Address1, @Address2, @Address3, @Address4, @Address5, @CountryId, @Telephone, @Fax, @Email, @Email2, @Comments, @IsActive, @InactiveDate, @InactiveError, @InactiveErrorDate";
+        "EXEC dbo.spiParticipant @ParticipantId, @SsoId, @CustomerId, @LabCode, @LabName, @LabTypeId, @ContactName, @Organisation, @Address1, @Address2, @Address3, @Address4, @Address5, @CountryId, @Telephone, @Fax, @Email, @Email2, @Comments, @IsActive, @InactiveDate, @InactiveError, @InactiveErrorDate, @SsoIdExt";
 
     private const string UpdateSql =
-        "EXEC dbo.spuParticipant @ParticipantId, @SsoId, @CustomerId, @LabCode, @LabName, @LabTypeId, @ContactName, @Organisation, @Address1, @Address2, @Address3, @Address4, @Address5, @CountryId, @Telephone, @Fax, @Email, @Email2, @Comments, @IsActive, @InactiveDate, @InactiveError, @InactiveErrorDate";
+        "EXEC dbo.spuParticipant @ParticipantId, @SsoId, @CustomerId, @LabCode, @LabName, @LabTypeId, @ContactName, @Organisation, @Address1, @Address2, @Address3, @Address4, @Address5, @CountryId, @Telephone, @Fax, @Email, @Email2, @Comments, @IsActive, @InactiveDate, @InactiveError, @InactiveErrorDate, @SsoIdExt";
 
     private static DynamicParameters BuildParameters(CoreParticipant participant)
     {
         var parameters = new DynamicParameters();
         parameters.Add("@ParticipantId", participant.ParticipantId);
         parameters.Add("@SsoId", participant.SsoId);
+        parameters.Add("@SsoIdExt", participant.SsoIdExt);
         parameters.Add("@CustomerId", participant.CustomerId);
         parameters.Add("@LabCode", participant.LabCode);
         parameters.Add("@LabName", participant.LabName);

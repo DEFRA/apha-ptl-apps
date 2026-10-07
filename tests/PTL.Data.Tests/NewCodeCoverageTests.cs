@@ -93,6 +93,41 @@ public class NewCodeCoverageTests
     }
 
     [Fact]
+    public async Task NotifyClient_WithEmptyApiKey_ThrowsMeaningfulException()
+    {
+        var handler = new CapturingHandler();
+        using var httpClient = new HttpClient(handler);
+        var client = new NotifyClient(httpClient, Options.Create(new NotifyOptions { ApiKey = "   " }));
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            client.SendEmailAsync("template", "user@example.com"));
+
+        Assert.Contains("Notification:ApiKey", ex.Message);
+    }
+
+    [Fact]
+    public async Task NotifyClient_NonSuccessResponse_ThrowsWithResponseBody()
+    {
+        var handler = new CapturingHandler
+        {
+            ResponseStatusCode = HttpStatusCode.BadRequest,
+            ResponseBody = "personalisation address_line_1 is missing"
+        };
+        using var httpClient = new HttpClient(handler)
+        {
+            BaseAddress = new Uri("https://api.notifications.service.gov.uk/")
+        };
+        var apiKey = new string('a', 36) + "-" + new string('b', 36);
+        var client = new NotifyClient(httpClient, Options.Create(new NotifyOptions { ApiKey = apiKey }));
+
+        var ex = await Assert.ThrowsAsync<HttpRequestException>(() =>
+            client.SendEmailAsync("template-123", "user@example.com"));
+
+        Assert.Contains("400", ex.Message);
+        Assert.Contains("personalisation address_line_1 is missing", ex.Message);
+    }
+
+    [Fact]
     public async Task NotifyClient_SendEmailAsync_SendsPersonalisationIncludingDownloadUrl()
     {
         var handler = new CapturingHandler();
@@ -243,6 +278,8 @@ public class NewCodeCoverageTests
     {
         public HttpRequestMessage? LastRequest { get; private set; }
         public string LastPayload { get; private set; } = string.Empty;
+        public HttpStatusCode ResponseStatusCode { get; set; } = HttpStatusCode.OK;
+        public string ResponseBody { get; set; } = string.Empty;
 
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
@@ -252,7 +289,7 @@ public class NewCodeCoverageTests
                 LastPayload = await request.Content.ReadAsStringAsync(cancellationToken);
             }
 
-            return new HttpResponseMessage(HttpStatusCode.OK);
+            return new HttpResponseMessage(ResponseStatusCode) { Content = new StringContent(ResponseBody) };
         }
     }
 }

@@ -146,6 +146,33 @@ public class CustomerServiceTests
     }
 
     [Fact]
+    public async Task SearchCustomersAsync_NoMatch_ReturnsEmptyResult()
+    {
+        var repository = new FakeCustomerRepository();
+        var service = CreateService(repository);
+        await service.CreateCustomerAsync(ValidActiveCustomer("Alpha Labs"));
+
+        var result = await service.SearchCustomersAsync("no-such-term", CustomerStatusFilter.All, 1, 20);
+
+        Assert.Empty(result.Items);
+        Assert.Equal(0, result.TotalCount);
+    }
+
+    [Theory]
+    [InlineData(0, 20)]
+    [InlineData(-5, 500)]
+    public async Task SearchCustomersAsync_InvalidPageOrPageSize_NormalisesToDefaults(int page, int pageSize)
+    {
+        var repository = new FakeCustomerRepository();
+        var service = CreateService(repository);
+        await service.CreateCustomerAsync(ValidActiveCustomer("Alpha Labs"));
+
+        var result = await service.SearchCustomersAsync(null, CustomerStatusFilter.All, page, pageSize);
+
+        Assert.Single(result.Items);
+    }
+
+    [Fact]
     public async Task UpdateCustomerAsync_SetIsActiveFalse_StampsInactiveDate()
     {
         var repository = new FakeCustomerRepository();
@@ -159,6 +186,25 @@ public class CustomerServiceTests
         Assert.NotNull(deactivated);
         Assert.False(deactivated!.IsActive);
         Assert.NotNull(deactivated.InactiveDate);
+    }
+
+    [Fact]
+    public async Task UpdateCustomerAsync_AlreadyInactiveWithInactiveDateSet_DoesNotRestampInactiveDate()
+    {
+        var repository = new FakeCustomerRepository();
+        var service = CreateService(repository);
+        var created = await service.CreateCustomerAsync(ValidActiveCustomer());
+        var firstDeactivate = ValidActiveCustomer();
+        firstDeactivate.IsActive = false;
+        var firstResult = await service.UpdateCustomerAsync(created.CustomerId, firstDeactivate);
+        var originalInactiveDate = firstResult!.InactiveDate;
+
+        var secondDeactivate = ValidActiveCustomer();
+        secondDeactivate.IsActive = false;
+        secondDeactivate.InactiveDate = originalInactiveDate;
+        var secondResult = await service.UpdateCustomerAsync(created.CustomerId, secondDeactivate);
+
+        Assert.Equal(originalInactiveDate, secondResult!.InactiveDate);
     }
 
     [Fact]

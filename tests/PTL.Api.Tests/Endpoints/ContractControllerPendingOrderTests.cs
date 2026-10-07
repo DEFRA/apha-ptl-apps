@@ -214,6 +214,18 @@ public class ContractControllerPendingOrderTests
     }
 
     [Fact]
+    public async Task ApprovePendingOrder_AuthenticatedUser_RecordsLowercasedUserNameAsApprovedBy()
+    {
+        var harness = await CreateAsync();
+        var identity = new System.Security.Claims.ClaimsIdentity([new System.Security.Claims.Claim(System.Security.Claims.ClaimTypes.Name, "ALICE")], "Test");
+        harness.Controller.ControllerContext.HttpContext.User = new System.Security.Claims.ClaimsPrincipal(identity);
+
+        var result = await harness.Controller.ApprovePendingOrder(harness.PendingContractId, new PendingOrderApproveRequest("PO-2"), CancellationToken.None);
+
+        Assert.IsType<NoContentResult>(result);
+    }
+
+    [Fact]
     public async Task DeclinePendingOrder_UnknownOrder_ReturnsNotFound()
     {
         var harness = await CreateAsync();

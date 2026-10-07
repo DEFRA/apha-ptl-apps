@@ -80,6 +80,30 @@ public class InvoiceControllerTests
     }
 
     [Fact]
+    public async Task Generate_AuthenticatedUser_PassesUserNameAsGeneratedBy()
+    {
+        var repository = new FakeInvoiceRepository();
+        var contractId = Guid.NewGuid();
+        repository.PendingData = new InvoicePendingData(
+            [new InvoiceContractEntity { ContractId = contractId }],
+            [new InvoiceContractItemEntity { ContractId = contractId }]);
+        var controller = CreateController(repository);
+        var identity = new System.Security.Claims.ClaimsIdentity([new System.Security.Claims.Claim(System.Security.Claims.ClaimTypes.Name, "alice")], "Test");
+        controller.ControllerContext = new Microsoft.AspNetCore.Mvc.ControllerContext
+        {
+            HttpContext = new Microsoft.AspNetCore.Http.DefaultHttpContext
+            {
+                User = new System.Security.Claims.ClaimsPrincipal(identity)
+            }
+        };
+
+        var result = await controller.Generate(CancellationToken.None);
+
+        Assert.IsType<Microsoft.AspNetCore.Mvc.OkObjectResult>(result.Result);
+        Assert.Equal("alice", repository.LastAuditWho);
+    }
+
+    [Fact]
     public async Task Reset_ReturnsNoContent()
     {
         var repository = new FakeInvoiceRepository();

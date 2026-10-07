@@ -109,6 +109,32 @@ public class GroupAddressApiClientTests
     }
 
     [Fact]
+    public async Task CreateGroupAddressAsync_BadRequestWithNoErrors_ReturnsGenericFieldError()
+    {
+        var client = CreateClient(HttpStatusCode.BadRequest, "{}");
+
+        var result = await client.CreateGroupAddressAsync(new GroupAddressSaveRequest(
+            string.Empty, "1 Sample Street", "Second Line", "Third Line", "Fourth Line", "Fifth Line",
+            Guid.NewGuid(), "020 1234 5678", "Fragile"));
+
+        Assert.False(result.Success);
+        Assert.True(result.FieldErrors.ContainsKey(string.Empty));
+    }
+
+    [Fact]
+    public async Task CreateGroupAddressAsync_BadRequestWithNullBody_ReturnsGenericFieldError()
+    {
+        var client = CreateClient(HttpStatusCode.BadRequest, "null");
+
+        var result = await client.CreateGroupAddressAsync(new GroupAddressSaveRequest(
+            string.Empty, "1 Sample Street", "Second Line", "Third Line", "Fourth Line", "Fifth Line",
+            Guid.NewGuid(), "020 1234 5678", "Fragile"));
+
+        Assert.False(result.Success);
+        Assert.True(result.FieldErrors.ContainsKey(string.Empty));
+    }
+
+    [Fact]
     public async Task UpdateGroupAddressAsync_NotFound_ReturnsFailureResult()
     {
         var client = CreateClient(HttpStatusCode.NotFound, null);

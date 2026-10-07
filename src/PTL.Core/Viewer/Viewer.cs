@@ -7,10 +7,20 @@ public sealed class ViewerEntity
     public string Name { get; set; } = string.Empty;
     public string Email { get; set; } = string.Empty;
     public Guid SsoId { get; set; }
+    public Guid? SsoIdExt { get; set; }
 }
 
 public interface IViewerRepository
 {
     // spgaViewers result set 1 - every viewer, ordered by name.
     Task<IReadOnlyList<ViewerEntity>> GetAllAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>Reads the viewer row matching a CIDM contact id via <c>spgViewerBySsoId</c>.</summary>
+    Task<ViewerEntity?> GetBySsoIdExtAsync(Guid ssoIdExt, CancellationToken cancellationToken = default);
+
+    /// <summary>Reads the viewer row matching an email address via <c>spgViewerByEmail</c>, used only as a CIDM fallback.</summary>
+    Task<ViewerEntity?> GetByEmailAsync(string email, CancellationToken cancellationToken = default);
+
+    Task<ViewerEntity> CreateAsync(ViewerEntity viewer, CancellationToken cancellationToken = default);
+    Task<ViewerEntity?> UpdateAsync(ViewerEntity viewer, CancellationToken cancellationToken = default);
 }

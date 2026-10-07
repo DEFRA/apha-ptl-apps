@@ -15,6 +15,7 @@ internal sealed class FakeCustomerApiClient : ICustomerApiClient
     public PendingCustomerUpdateDecisionResult ApprovePendingCustomerUpdateResult { get; set; } = new(true, false, new Dictionary<string, string[]>());
     public bool DeclinePendingCustomerUpdateResult { get; set; } = true;
     public PendingCustomerUpdateSaveRequest? LastApproveRequest { get; private set; }
+    public CustomerSaveRequest? LastSaveRequest { get; private set; }
 
     public Task<IReadOnlyList<CustomerSummaryResponse>> GetCustomersAsync(CustomerStatusFilter status = CustomerStatusFilter.Active, CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<CustomerSummaryResponse>>(SearchResponse.Items);
@@ -25,11 +26,17 @@ internal sealed class FakeCustomerApiClient : ICustomerApiClient
     public Task<CustomerSearchResponse> SearchCustomersAsync(CustomerSearchRequest request, CancellationToken cancellationToken = default) =>
         Task.FromResult(SearchResponse);
 
-    public Task<CustomerSaveResult> CreateCustomerAsync(CustomerSaveRequest request, CancellationToken cancellationToken = default) =>
-        Task.FromResult(SaveResult);
+    public Task<CustomerSaveResult> CreateCustomerAsync(CustomerSaveRequest request, CancellationToken cancellationToken = default)
+    {
+        LastSaveRequest = request;
+        return Task.FromResult(SaveResult);
+    }
 
-    public Task<CustomerSaveResult> UpdateCustomerAsync(Guid customerId, CustomerSaveRequest request, CancellationToken cancellationToken = default) =>
-        Task.FromResult(SaveResult);
+    public Task<CustomerSaveResult> UpdateCustomerAsync(Guid customerId, CustomerSaveRequest request, CancellationToken cancellationToken = default)
+    {
+        LastSaveRequest = request;
+        return Task.FromResult(SaveResult);
+    }
 
     public Task<IReadOnlyList<PendingCustomerUpdateSummaryResponse>> GetPendingCustomerUpdatesAsync(CancellationToken cancellationToken = default) =>
         Task.FromResult(PendingCustomerUpdates);

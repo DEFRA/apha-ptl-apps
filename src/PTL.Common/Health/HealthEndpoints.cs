@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Http;
@@ -27,7 +28,7 @@ public static class HealthEndpoints
                 uptimeSeconds = Math.Round(uptimeSeconds, 0),
                 timestampUtc = DateTime.UtcNow
             });
-        });
+        }).AllowAnonymous();
 
         // Checks whatever this app's registered IHealthCheck(s) report (e.g. DB
         // connectivity in PTL.Api, Api connectivity in PTL.InternalWeb/ExternalWeb).
@@ -36,6 +37,7 @@ public static class HealthEndpoints
         // For on-demand/manual diagnostics and internal monitoring only.
         app.MapGroup("/health/ready")
             .AddEndpointFilter<ReadinessKeyFilter>()
-            .MapHealthChecks("", new HealthCheckOptions { ResponseWriter = HealthCheckResponseWriter.WriteResponse });
+            .MapHealthChecks("", new HealthCheckOptions { ResponseWriter = HealthCheckResponseWriter.WriteResponse })
+            .AllowAnonymous();
     }
 }

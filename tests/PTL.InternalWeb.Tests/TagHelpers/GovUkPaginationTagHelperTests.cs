@@ -117,4 +117,26 @@ public class GovUkPaginationTagHelperTests
         Assert.Contains("aria-label=\"Page 1\"", html, StringComparison.Ordinal);
         Assert.Contains("aria-label=\"Page 4\"", html, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void Process_ManyPagesCurrentPageNearStart_OmitsLeadingEllipsisButKeepsTrailingOne()
+    {
+        // 20 pages, current=2: start=max(2, 1)=2 (no gap after page 1), end=min(19,3)=3 (gap before page 20).
+        var model = new PaginationModel { CurrentPage = 2, PageSize = 10, TotalRecords = 200 };
+
+        var html = Render(model);
+
+        Assert.Single([.. System.Text.RegularExpressions.Regex.Matches(html, "govuk-pagination__item--ellipses")]);
+    }
+
+    [Fact]
+    public void Process_ManyPagesCurrentPageNearEnd_OmitsTrailingEllipsisButKeepsLeadingOne()
+    {
+        // 20 pages, current=19: start=max(2,18)=18 (gap after page 1), end=min(19,20)=19 (no gap before page 20).
+        var model = new PaginationModel { CurrentPage = 19, PageSize = 10, TotalRecords = 200 };
+
+        var html = Render(model);
+
+        Assert.Single([.. System.Text.RegularExpressions.Regex.Matches(html, "govuk-pagination__item--ellipses")]);
+    }
 }

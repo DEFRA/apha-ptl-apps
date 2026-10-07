@@ -128,6 +128,94 @@ public class CustomerControllerTests
     }
 
     [Fact]
+    public async Task Create_Post_AllOptionalFieldsPopulated_SendsEveryFieldOnRequest()
+    {
+        var customerId = Guid.NewGuid();
+        var apiClient = new FakeCustomerApiClient
+        {
+            SaveResult = new CustomerSaveResult(true, SampleCustomer(customerId), new Dictionary<string, string[]>())
+        };
+        var controller = CreateController(apiClient);
+        var model = new PTL.InternalWeb.Features.Customer.CustomerFormViewModel
+        {
+            RegisteredFileNumber = "RFN-1",
+            Name = "Sample Laboratories Ltd",
+            PreviousName = "Old Name Ltd",
+            CustomerTypeId = Guid.NewGuid(),
+            VatNumber = "GB123456789",
+            VatRatingId = Guid.NewGuid(),
+            AccountNumber = "ACC-001",
+            CustomerFinanceId = "FIN-001",
+            ContactName = "Alice Example",
+            Organisation = "Sample Laboratories Ltd",
+            Address1 = "1 Sample Street",
+            Address2 = "Sample District",
+            Address3 = "Sample Town",
+            Address4 = "Sample County",
+            Address5 = "Sample Postcode",
+            CountryId = Guid.NewGuid(),
+            Telephone = "01234 567890",
+            Telephone2 = "01234 567891",
+            Fax = "01234 567892",
+            Email = "alice@example.com",
+            CurrencyId = Guid.NewGuid(),
+            Comments = "Some comments",
+            PostageArrangements = "Courier",
+            PaymentNonUK = true,
+            InvoiceName = "Invoice Name Ltd",
+            InvoiceOrganisation = "Invoice Org Ltd",
+            InvoiceAddress1 = "1 Invoice Street",
+            InvoiceAddress2 = "Invoice District",
+            InvoiceAddress3 = "Invoice Town",
+            InvoiceAddress4 = "Invoice County",
+            InvoiceAddress5 = "Invoice Postcode",
+            InvoiceCountryId = Guid.NewGuid(),
+            InvoiceTelephone = "09876 543210",
+            InvoiceTelephone2 = "09876 543211",
+            InvoiceFax = "09876 543212",
+            InvoiceEmail = "invoices@example.com"
+        };
+
+        await controller.Create(model, CancellationToken.None);
+
+        var request = apiClient.LastSaveRequest!;
+        Assert.Equal("RFN-1", request.RegisteredFileNumber);
+        Assert.Equal("Old Name Ltd", request.PreviousName);
+        Assert.Equal(model.CustomerTypeId, request.CustomerTypeId);
+        Assert.Equal("GB123456789", request.VatNumber);
+        Assert.Equal(model.VatRatingId, request.VatRatingId);
+        Assert.Equal("ACC-001", request.AccountNumber);
+        Assert.Equal("FIN-001", request.CustomerFinanceId);
+        Assert.Equal("Alice Example", request.ContactName);
+        Assert.Equal("1 Sample Street", request.Address1);
+        Assert.Equal("Sample District", request.Address2);
+        Assert.Equal("Sample Town", request.Address3);
+        Assert.Equal("Sample County", request.Address4);
+        Assert.Equal("Sample Postcode", request.Address5);
+        Assert.Equal(model.CountryId, request.CountryId);
+        Assert.Equal("01234 567890", request.Telephone);
+        Assert.Equal("01234 567891", request.Telephone2);
+        Assert.Equal("01234 567892", request.Fax);
+        Assert.Equal("alice@example.com", request.Email);
+        Assert.Equal(model.CurrencyId, request.CurrencyId);
+        Assert.Equal("Some comments", request.Comments);
+        Assert.Equal("Courier", request.PostageArrangements);
+        Assert.True(request.PaymentNonUK);
+        Assert.Equal("Invoice Name Ltd", request.InvoiceName);
+        Assert.Equal("Invoice Org Ltd", request.InvoiceOrganisation);
+        Assert.Equal("1 Invoice Street", request.InvoiceAddress1);
+        Assert.Equal("Invoice District", request.InvoiceAddress2);
+        Assert.Equal("Invoice Town", request.InvoiceAddress3);
+        Assert.Equal("Invoice County", request.InvoiceAddress4);
+        Assert.Equal("Invoice Postcode", request.InvoiceAddress5);
+        Assert.Equal(model.InvoiceCountryId, request.InvoiceCountryId);
+        Assert.Equal("09876 543210", request.InvoiceTelephone);
+        Assert.Equal("09876 543211", request.InvoiceTelephone2);
+        Assert.Equal("09876 543212", request.InvoiceFax);
+        Assert.Equal("invoices@example.com", request.InvoiceEmail);
+    }
+
+    [Fact]
     public async Task Edit_Get_UnknownCustomer_ReturnsNotFound()
     {
         var controller = CreateController(new FakeCustomerApiClient { CustomerResponse = null });
@@ -391,5 +479,101 @@ public class CustomerControllerTests
         var notification = controller.TempData.GetNotification();
         Assert.Equal(NotificationType.Success, notification!.Type);
         Assert.Equal("Customer update declined successfully.", notification.Message);
+    }
+
+    [Fact]
+    public async Task PrintContactLabel_ById_UnknownCustomer_ReturnsNotFound()
+    {
+        var controller = CreateController(new FakeCustomerApiClient { CustomerResponse = null });
+
+        var result = await controller.PrintContactLabel(Guid.NewGuid(), CancellationToken.None);
+
+        Assert.IsType<NotFoundResult>(result);
+    }
+
+    [Fact]
+    public async Task PrintContactLabel_ById_ExistingCustomer_ReturnsContactAddressLabelPdf()
+    {
+        var customerId = Guid.NewGuid();
+        var controller = CreateController(new FakeCustomerApiClient { CustomerResponse = SampleCustomer(customerId) });
+
+        var result = await controller.PrintContactLabel(customerId, CancellationToken.None);
+
+        var file = Assert.IsType<FileContentResult>(result);
+        Assert.Equal("contact-address-label.pdf", file.FileDownloadName);
+    }
+
+    [Fact]
+    public async Task PrintInvoiceLabel_ById_UnknownCustomer_ReturnsNotFound()
+    {
+        var controller = CreateController(new FakeCustomerApiClient { CustomerResponse = null });
+
+        var result = await controller.PrintInvoiceLabel(Guid.NewGuid(), CancellationToken.None);
+
+        Assert.IsType<NotFoundResult>(result);
+    }
+
+    [Fact]
+    public async Task PrintInvoiceLabel_ById_ExistingCustomer_ReturnsInvoiceAddressLabelPdf()
+    {
+        var customerId = Guid.NewGuid();
+        var controller = CreateController(new FakeCustomerApiClient { CustomerResponse = SampleCustomer(customerId) });
+
+        var result = await controller.PrintInvoiceLabel(customerId, CancellationToken.None);
+
+        var file = Assert.IsType<FileContentResult>(result);
+        Assert.Equal("invoice-address-label.pdf", file.FileDownloadName);
+    }
+
+    [Fact]
+    public async Task PrintContactLabel_Post_InvalidModelState_RedisplaysForm()
+    {
+        var controller = CreateController(new FakeCustomerApiClient());
+        controller.ModelState.AddModelError("Name", "Enter a name.");
+        var model = new PTL.InternalWeb.Features.Customer.CustomerFormViewModel();
+
+        var result = await controller.PrintContactLabel(model, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        Assert.Same(model, view.Model);
+    }
+
+    [Fact]
+    public async Task PrintContactLabel_Post_InvalidModelStateWithCustomerId_RedisplaysEditForm()
+    {
+        var customerId = Guid.NewGuid();
+        var controller = CreateController(new FakeCustomerApiClient { CustomerResponse = SampleCustomer(customerId) });
+        controller.ModelState.AddModelError("Name", "Enter a name.");
+        var model = new PTL.InternalWeb.Features.Customer.CustomerFormViewModel { CustomerId = customerId };
+
+        var result = await controller.PrintContactLabel(model, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        Assert.Equal("Edit", view.ViewName);
+        Assert.Same(model, view.Model);
+    }
+
+    [Fact]
+    public async Task PrintContactLabel_Post_ValidModel_ReturnsContactAddressLabelPdf()
+    {
+        var controller = CreateController(new FakeCustomerApiClient());
+        var model = new PTL.InternalWeb.Features.Customer.CustomerFormViewModel { ContactName = "Alice Example" };
+
+        var result = await controller.PrintContactLabel(model, CancellationToken.None);
+
+        var file = Assert.IsType<FileContentResult>(result);
+        Assert.Equal("contact-address-label.pdf", file.FileDownloadName);
+    }
+
+    [Fact]
+    public async Task PrintInvoiceLabel_Post_ValidModel_ReturnsInvoiceAddressLabelPdf()
+    {
+        var controller = CreateController(new FakeCustomerApiClient());
+        var model = new PTL.InternalWeb.Features.Customer.CustomerFormViewModel { InvoiceName = "Alice Example" };
+
+        var result = await controller.PrintInvoiceLabel(model, CancellationToken.None);
+
+        var file = Assert.IsType<FileContentResult>(result);
+        Assert.Equal("invoice-address-label.pdf", file.FileDownloadName);
     }
 }
