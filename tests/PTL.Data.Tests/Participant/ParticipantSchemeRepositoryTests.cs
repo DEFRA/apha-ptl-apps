@@ -175,6 +175,76 @@ public class ParticipantSchemeRepositoryTests
     }
 
     [Fact]
+    public async Task GetByIdAsync_MissingOptionalBoolColumn_DefaultsToFalse()
+    {
+        var (repository, connection) = CreateRepository();
+        var participantSchemeId = Guid.NewGuid();
+        var table = RowTable(participantSchemeId, Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
+        table.Columns.Remove("fldIsWeightedPricing");
+        connection.RespondToQuery(GetByIdSql, table);
+
+        var result = await repository.GetByIdAsync(participantSchemeId);
+
+        Assert.NotNull(result);
+        Assert.False(result!.IsWeightedPricing);
+    }
+
+    [Fact]
+    public async Task GetByIdAsync_NullBoolColumn_DefaultsToFalse()
+    {
+        var (repository, connection) = CreateRepository();
+        var participantSchemeId = Guid.NewGuid();
+        var table = RowTable(participantSchemeId, Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
+        table.Rows[0]["fldIsRemoved"] = DBNull.Value;
+        connection.RespondToQuery(GetByIdSql, table);
+
+        var result = await repository.GetByIdAsync(participantSchemeId);
+
+        Assert.NotNull(result);
+        Assert.False(result!.IsRemoved);
+    }
+
+    [Fact]
+    public async Task GetByIdAsync_NullPriceAndNumberOfSetsRequired_DefaultToZeroAndFallback()
+    {
+        var (repository, connection) = CreateRepository();
+        var participantSchemeId = Guid.NewGuid();
+        var table = RowTable(participantSchemeId, Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
+        table.Rows[0]["fldPrice"] = DBNull.Value;
+        table.Rows[0]["fldNumberOfSetsRequired"] = DBNull.Value;
+        connection.RespondToQuery(GetByIdSql, table);
+
+        var result = await repository.GetByIdAsync(participantSchemeId);
+
+        Assert.NotNull(result);
+        Assert.Equal(0m, result!.Price);
+        Assert.Equal(1, result.NumberOfSetsRequired);
+    }
+
+    [Fact]
+    public async Task CreateAsync_NullOptionalTextFields_CoalescesToEmptyString()
+    {
+        var (repository, connection) = CreateRepository();
+        var participantSchemeId = Guid.NewGuid();
+        var contractId = Guid.NewGuid();
+        var participantId = Guid.NewGuid();
+        var schemeId = Guid.NewGuid();
+        connection.RespondToNonQuery(InsertSql, 1);
+        connection.RespondToQuery(GetByIdSql, RowTable(participantSchemeId, contractId, participantId, schemeId));
+        var record = SampleRecord(participantSchemeId, contractId, participantId, schemeId);
+        record.ExternalReference = null;
+        record.Contact = null;
+        record.PackingInstructions = null;
+
+        await repository.CreateAsync(record);
+
+        var insertCommand = Assert.Single(connection.ExecutedCommands, c => c.CommandText == InsertSql);
+        Assert.Equal(string.Empty, insertCommand.ParameterValue("@ExternalReference"));
+        Assert.Equal(string.Empty, insertCommand.ParameterValue("@Contact"));
+        Assert.Equal(string.Empty, insertCommand.ParameterValue("@PackingInstructions"));
+    }
+
+    [Fact]
     public async Task CreateAsync_InsertsAndReReadsRecord()
     {
         var (repository, connection) = CreateRepository();

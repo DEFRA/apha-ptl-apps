@@ -176,6 +176,17 @@ public class ParticipantRepositoryTests
     }
 
     [Fact]
+    public async Task CreateAsync_InsertedButNotReReadable_Throws()
+    {
+        var (repository, connection) = CreateRepository();
+        connection.RespondToNonQuery(InsertSql, 1);
+        connection.RespondToQuery(GetByIdSql, new DataTable());
+        var participant = new CoreParticipant { ParticipantId = Guid.NewGuid(), CustomerId = Guid.NewGuid(), LabCode = "LAB001" };
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => repository.CreateAsync(participant));
+    }
+
+    [Fact]
     public async Task UpdateAsync_ExistingParticipant_UpdatesAndReReads()
     {
         var (repository, connection) = CreateRepository();

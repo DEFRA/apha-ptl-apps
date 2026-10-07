@@ -186,6 +186,18 @@ public class PendingOrderRepositoryTests
     }
 
     [Fact]
+    public async Task MarkDecidedAsync_OrderNoLongerExists_ReturnsTrue()
+    {
+        var (repository, connection) = CreateRepository();
+        var pendingContractId = Guid.NewGuid();
+        var customerId = Guid.NewGuid();
+        connection.RespondToNonQuery(MarkDecidedSql, -1);
+        connection.RespondToQuery(GetByIdSql, new DataTable());
+
+        Assert.True(await repository.MarkDecidedAsync(customerId, pendingContractId));
+    }
+
+    [Fact]
     public async Task UpdatePurchaseOrderNumberAsync_UnknownOrder_DoesNotExecuteUpdate()
     {
         var (repository, connection) = CreateRepository();
