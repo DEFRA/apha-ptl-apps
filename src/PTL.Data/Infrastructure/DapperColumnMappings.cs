@@ -182,6 +182,7 @@ public static class DapperColumnMappings
         {
             [ColParticipantId] = nameof(CoreParticipant.ParticipantId),
             ["fldSsoId"] = nameof(CoreParticipant.SsoId),
+            ["fldSsoIdExt"] = nameof(CoreParticipant.SsoIdExt),
             [ColCustomerId] = nameof(CoreParticipant.CustomerId),
             [ColLabCode] = nameof(CoreParticipant.LabCode),
             [ColLabName] = nameof(CoreParticipant.LabName),
@@ -221,6 +222,19 @@ public static class DapperColumnMappings
             [ColName] = nameof(ViewerEntity.Name),
             [ColEmail] = nameof(ViewerEntity.Email),
             ["fldSsoId"] = nameof(ViewerEntity.SsoId),
+            ["fldSsoIdExt"] = nameof(ViewerEntity.SsoIdExt),
+        });
+
+        Map<PTL.Core.TestConsultant.TestConsultant>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldExternalTestConsultantId"] = nameof(PTL.Core.TestConsultant.TestConsultant.ExternalTestConsultantId),
+            [ColName] = nameof(PTL.Core.TestConsultant.TestConsultant.Name),
+            ["fldDepartment"] = nameof(PTL.Core.TestConsultant.TestConsultant.Department),
+            [ColEmail] = nameof(PTL.Core.TestConsultant.TestConsultant.Email),
+            ["fldSsoId"] = nameof(PTL.Core.TestConsultant.TestConsultant.SsoId),
+            ["fldSsoIdExt"] = nameof(PTL.Core.TestConsultant.TestConsultant.SsoIdExt),
+            ["fldIsInactive"] = nameof(PTL.Core.TestConsultant.TestConsultant.IsInactive),
+            ["fldInactiveDate"] = nameof(PTL.Core.TestConsultant.TestConsultant.InactiveDate),
         });
 
         Map<ParticipantViewerEntity>(new(StringComparer.OrdinalIgnoreCase)
