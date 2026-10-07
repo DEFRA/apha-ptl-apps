@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
@@ -12,6 +13,29 @@ namespace PTL.Auth.Cidm.Tests.Events;
 
 public class CidmOpenIdConnectEventsTests
 {
+    private sealed class FakeCidmExternalUserResolver(CidmExternalUserResolution resolution) : ICidmExternalUserResolver
+    {
+        public ClaimsPrincipal? ReceivedPrincipal { get; private set; }
+
+        public Task<CidmExternalUserResolution> ResolveAsync(ClaimsPrincipal principal, CancellationToken cancellationToken)
+        {
+            ReceivedPrincipal = principal;
+            return Task.FromResult(resolution);
+        }
+    }
+
+    private static TokenValidatedContext CreateTokenValidatedContext(ClaimsPrincipal principal, ICidmExternalUserResolver? resolver = null)
+    {
+        var services = new ServiceCollection();
+        if (resolver is not null)
+        {
+            services.AddSingleton(resolver);
+        }
+
+        var httpContext = new DefaultHttpContext { RequestServices = services.BuildServiceProvider() };
+        return new TokenValidatedContext(httpContext, CreateScheme(), new OpenIdConnectOptions(), principal, new AuthenticationProperties());
+    }
+
     private static readonly CidmOptions TestCidmOptions = new()
     {
         Address = "https://cidm.test/idphub/b2c",
@@ -175,5 +199,53 @@ public class CidmOpenIdConnectEventsTests
         await CreateEvents().RedirectToIdentityProviderForSignOut(context);
 
         Assert.Equal(0, httpContext.Response.Body.Length);
+    }
+
+    [Fact]
+    public async Task TokenValidated_NoResolverRegistered_LeavesPrincipalUnchanged()
+    {
+        var identity = new ClaimsIdentity([new Claim(ClaimTypes.Name, "test-user")]);
+        var principal = new ClaimsPrincipal(identity);
+        var context = CreateTokenValidatedContext(principal);
+
+        await CreateEvents().TokenValidated(context);
+
+        Assert.Single(principal.Claims);
+        Assert.False(context.Result?.Handled ?? false);
+    }
+
+    [Fact]
+    public async Task TokenValidated_ResolverAllows_AddsReturnedClaims()
+    {
+        var identity = new ClaimsIdentity([new Claim(ClaimTypes.Name, "test-user")]);
+        var principal = new ClaimsPrincipal(identity);
+        var resolver = new FakeCidmExternalUserResolver(CidmExternalUserResolution.Allow(new Dictionary<string, string>
+        {
+            ["displayName"] = "Jane Doe",
+            ["resolvedRoles"] = "Viewer,Participant"
+        }));
+        var context = CreateTokenValidatedContext(principal, resolver);
+
+        await CreateEvents().TokenValidated(context);
+
+        Assert.Contains(identity.Claims, c => c.Type == "displayName" && c.Value == "Jane Doe");
+        Assert.Contains(identity.Claims, c => c.Type == "resolvedRoles" && c.Value == "Viewer,Participant");
+        Assert.Same(principal, resolver.ReceivedPrincipal);
+        Assert.False(context.Result?.Handled ?? false);
+    }
+
+    [Fact]
+    public async Task TokenValidated_ResolverDenies_HandlesResponseAndRedirectsToDenialPath()
+    {
+        var identity = new ClaimsIdentity([new Claim(ClaimTypes.Name, "test-user")]);
+        var principal = new ClaimsPrincipal(identity);
+        var resolver = new FakeCidmExternalUserResolver(CidmExternalUserResolution.Deny("/Account/NotPermitted"));
+        var context = CreateTokenValidatedContext(principal, resolver);
+
+        await CreateEvents().TokenValidated(context);
+
+        Assert.True(context.Result?.Handled);
+        Assert.Equal(StatusCodes.Status302Found, context.HttpContext.Response.StatusCode);
+        Assert.Equal("/Account/NotPermitted", context.HttpContext.Response.Headers.Location.ToString());
     }
 }

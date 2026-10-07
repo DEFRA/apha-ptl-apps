@@ -3,6 +3,7 @@ using System.Text.Json;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using PTL.Auth.Cidm.Claims;
@@ -47,11 +48,11 @@ public sealed partial class CidmOpenIdConnectEvents : OpenIdConnectEvents
         return Task.CompletedTask;
     }
 
-    public override Task TokenValidated(TokenValidatedContext context)
+    public override async Task TokenValidated(TokenValidatedContext context)
     {
         if (context.Principal?.Identity is not ClaimsIdentity identity)
         {
-            return Task.CompletedTask;
+            return;
         }
 
         var rawRelationships = context.Principal.FindAll(CidmClaimTypes.RawRelationships).Select(c => c.Value);
@@ -69,7 +70,29 @@ public sealed partial class CidmOpenIdConnectEvents : OpenIdConnectEvents
             identity.AddClaim(new Claim(CidmClaimTypes.Role, JsonSerializer.Serialize(role)));
         }
 
-        return Task.CompletedTask;
+        // Resolved per-request rather than constructor-injected (this class is a singleton) - if
+        // the consuming app hasn't registered one (or RequestServices isn't set, as in some unit
+        // test contexts), sign-in proceeds exactly as before this hook existed.
+        var resolver = context.HttpContext.RequestServices?.GetService<ICidmExternalUserResolver>();
+        if (resolver is null)
+        {
+            return;
+        }
+
+        var resolution = await resolver.ResolveAsync(context.Principal, context.HttpContext.RequestAborted);
+        if (!resolution.IsAllowed)
+        {
+            // Runs before the OIDC handler ever signs the principal into the cookie scheme, so
+            // denying here means no local session is ever created for this sign-in attempt.
+            context.HandleResponse();
+            context.HttpContext.Response.Redirect(resolution.DenialRedirectPath ?? "/");
+            return;
+        }
+
+        foreach (var (claimType, claimValue) in resolution.Claims ?? new Dictionary<string, string>())
+        {
+            identity.AddClaim(new Claim(claimType, claimValue));
+        }
     }
 
     public override Task RemoteFailure(RemoteFailureContext context)
