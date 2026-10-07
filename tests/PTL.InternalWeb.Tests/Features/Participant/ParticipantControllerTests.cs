@@ -91,6 +91,29 @@ public class ParticipantControllerTests
     }
 
     [Fact]
+    public async Task Details_LabTypeAndCountryMatchLookups_PopulatesTheirNames()
+    {
+        var participantId = Guid.NewGuid();
+        var customerId = Guid.NewGuid();
+        var participant = SampleParticipant(participantId, customerId);
+        var lookupApiClient = new FakeLookupApiClient
+        {
+            LabTypes = [new PTL.Contracts.Lookup.LabTypeResponse(participant.LabTypeId, "Veterinary")],
+            Countries = [new PTL.Contracts.Lookup.CountryResponse(participant.CountryId, "United Kingdom")]
+        };
+        var controller = new PTL.InternalWeb.Features.Participant.ParticipantController(
+            new FakeParticipantApiClient { ParticipantResponse = participant }, new FakeCustomerApiClient(), lookupApiClient,
+            NullLogger<PTL.InternalWeb.Features.Participant.ParticipantController>.Instance);
+
+        var result = await controller.Details(participantId, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<PTL.InternalWeb.Features.Participant.ParticipantDetailsViewModel>(view.Model);
+        Assert.Equal("Veterinary", model.LabTypeName);
+        Assert.Equal("United Kingdom", model.CountryName);
+    }
+
+    [Fact]
     public async Task Create_Get_ReturnsEmptyFormViewModel()
     {
         var controller = CreateController(new FakeParticipantApiClient());
@@ -113,6 +136,38 @@ public class ParticipantControllerTests
 
         var view = Assert.IsType<ViewResult>(result);
         Assert.Same(model, view.Model);
+    }
+
+    [Fact]
+    public async Task Create_Post_InvalidModelState_WithLabCodeAlreadySet_DoesNotRegenerateLabCode()
+    {
+        var customerId = Guid.NewGuid();
+        var controller = CreateController(new FakeParticipantApiClient());
+        controller.ModelState.AddModelError("LabName", "Enter a lab name.");
+        var model = new PTL.InternalWeb.Features.Participant.ParticipantFormViewModel { CustomerId = customerId, LabCode = "LAB-99" };
+
+        var result = await controller.Create(customerId, model, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        Assert.Equal("LAB-99", ((PTL.InternalWeb.Features.Participant.ParticipantFormViewModel)view.Model!).LabCode);
+    }
+
+    [Fact]
+    public async Task Create_Post_ApiReturnsFailure_ReturnsViewWithFieldErrors()
+    {
+        var customerId = Guid.NewGuid();
+        var apiClient = new FakeParticipantApiClient
+        {
+            SaveResult = new ParticipantSaveResult(false, null, new Dictionary<string, string[]> { ["LabCode"] = ["Lab code already in use."] })
+        };
+        var controller = CreateController(apiClient);
+        var model = new PTL.InternalWeb.Features.Participant.ParticipantFormViewModel { CustomerId = customerId, LabCode = "LAB-01", LabName = "Sample Laboratory" };
+
+        var result = await controller.Create(customerId, model, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        Assert.Same(model, view.Model);
+        Assert.False(controller.ModelState.IsValid);
     }
 
     [Fact]
@@ -278,6 +333,36 @@ public class ParticipantControllerTests
         var result = await controller.Edit(participantId, model, CancellationToken.None);
 
         Assert.IsType<NotFoundResult>(result);
+    }
+
+    [Fact]
+    public async Task Edit_Post_ApiReturnsFieldErrors_ReturnsViewWithErrors()
+    {
+        var participantId = Guid.NewGuid();
+        var apiClient = new FakeParticipantApiClient
+        {
+            ParticipantResponse = SampleParticipant(participantId, Guid.NewGuid()),
+            SaveResult = new ParticipantSaveResult(false, null, new Dictionary<string, string[]> { ["LabCode"] = ["Lab code already in use."] })
+        };
+        var controller = CreateController(apiClient);
+        var model = new PTL.InternalWeb.Features.Participant.ParticipantFormViewModel
+        {
+            ParticipantId = participantId,
+            CustomerId = Guid.NewGuid(),
+            LabCode = "LAB-01",
+            LabName = "Sample Laboratory",
+            ContactName = "Alice Example",
+            Organisation = "Sample Laboratory Ltd",
+            Address1 = "1 Sample Street",
+            Email = "alice@example.com",
+            IsActive = true
+        };
+
+        var result = await controller.Edit(participantId, model, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        Assert.Same(model, view.Model);
+        Assert.False(controller.ModelState.IsValid);
     }
 
     [Fact]

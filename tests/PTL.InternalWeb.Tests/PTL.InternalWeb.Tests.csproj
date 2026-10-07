@@ -9,7 +9,7 @@
          PTL.Common, PTL.Contracts, PTL.Core) are measured independently. AspNetCoreGeneratedDocument
          is ASP.NET Core's compiled Razor views — implementation details, not user code. Exclude to
          focus on controllers/models which are testable business logic. -->
-    <Exclude>[PTL.ApiClient]*,[PTL.Common]*,[PTL.Contracts]*,[PTL.Core]*,[PTL.InternalWeb]AspNetCoreGeneratedDocument*</Exclude>
+    <Exclude>[PTL.ApiClient]*,[PTL.Common]*,[PTL.Contracts]*,[PTL.Core]*,[PTL.Auth.Entra]*,[PTL.InternalWeb]AspNetCoreGeneratedDocument*,[PTL.InternalWeb]System.Text.RegularExpressions.Generated.*</Exclude>
   </PropertyGroup>
 
   <ItemGroup>

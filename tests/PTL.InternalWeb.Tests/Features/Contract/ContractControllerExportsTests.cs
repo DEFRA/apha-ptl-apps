@@ -124,6 +124,22 @@ public class ContractControllerExportsTests
     public async Task UploadExportTemplate_UnknownDocumentType_ReturnsNotFound() =>
         Assert.IsType<NotFoundResult>(await CreateController().UploadExportTemplate("Invoices", FormFile("a.docx")));
 
+    [Fact]
+    public async Task UploadExportTemplate_FailureWithoutErrorMessage_UsesFallbackMessage()
+    {
+        var apiClient = new FakeExportTemplateApiClient
+        {
+            UploadResponse = new ExportTemplateUploadResponse(false, null, null)
+        };
+        var controller = CreateController(apiClient);
+
+        await controller.UploadExportTemplate(ExportDocumentTypes.JobSheets, FormFile("Duplicate.docx"));
+
+        var notification = controller.TempData.GetNotification()!;
+        Assert.Equal(NotificationType.Error, notification.Type);
+        Assert.Equal("File could not be saved", notification.Message);
+    }
+
     // Legacy "Open" streams the template file itself, it never renders a PDF.
     [Fact]
     public async Task DownloadExportTemplate_ReturnsTheStoredFile()
@@ -167,6 +183,21 @@ public class ContractControllerExportsTests
     }
 
     [Fact]
+    public async Task SelectExportTemplate_Failure_ReportsFileNotFound()
+    {
+        var apiClient = new FakeExportTemplateApiClient { SelectResult = false };
+        var controller = CreateController(apiClient);
+
+        var result = await controller.SelectExportTemplate(Guid.NewGuid(), ExportDocumentTypes.Contracts);
+
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal("ExportContracts", redirect.ActionName);
+        var notification = controller.TempData.GetNotification()!;
+        Assert.Equal(NotificationType.Error, notification.Type);
+        Assert.Equal("File not found", notification.Message);
+    }
+
+    [Fact]
     public async Task DeleteExportTemplate_Success_NotifiesAndReturnsToTheScreen()
     {
         var apiClient = new FakeExportTemplateApiClient();
@@ -206,6 +237,23 @@ public class ContractControllerExportsTests
     }
 
     [Fact]
+    public async Task RunExport_SelectedTemplateContentMissing_ReportsFileNotFound()
+    {
+        var templateApiClient = new FakeExportTemplateApiClient
+        {
+            Templates = new ExportTemplateListResponse(ExportDocumentTypes.Contracts, "Export Contracts", [Template(selected: true)]),
+            Download = null
+        };
+        var controller = CreateController(templateApiClient);
+
+        var result = await controller.RunExport(ExportDocumentTypes.Contracts);
+
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal("ExportContracts", redirect.ActionName);
+        Assert.Equal("File not found", controller.TempData.GetNotification()!.Message);
+    }
+
+    [Fact]
     public async Task RunExport_RenewalLetters_RequestsTheUkOrNonUkDataset()
     {
         var selected = Template(selected: true);
@@ -218,9 +266,69 @@ public class ContractControllerExportsTests
 
         var result = await CreateController(templateApiClient, bulkApiClient).RunExport(ExportDocumentTypes.RenewalLetters, nonUk: true);
 
-        Assert.IsType<FileContentResult>(result);
+        var file = Assert.IsType<FileContentResult>(result);
         Assert.True(bulkApiClient.LastNonUk);
+        var today = DateTime.Now;
+        Assert.Equal($"RenewalLettersNonUKExport_{today.Year}_{today.Month}_{today.Day}.docx", file.FileDownloadName);
     }
+
+    [Fact]
+    public async Task RunExport_RenewalLetters_Uk_UsesTheUkFilename()
+    {
+        var templateApiClient = new FakeExportTemplateApiClient
+        {
+            Templates = new ExportTemplateListResponse(ExportDocumentTypes.RenewalLetters, "Export Renewal Letters", [Template(selected: true)]),
+            Download = new ExportTemplateDownload("Renewal.docx", ExportTemplateService.DocxContentType, EmptyDocx())
+        };
+
+        var result = await CreateController(templateApiClient).RunExport(ExportDocumentTypes.RenewalLetters, nonUk: false);
+
+        var file = Assert.IsType<FileContentResult>(result);
+        var today = DateTime.Now;
+        Assert.Equal($"RenewalLettersUKExport_{today.Year}_{today.Month}_{today.Day}.docx", file.FileDownloadName);
+    }
+
+    [Fact]
+    public async Task RunExport_JobSheets_UsesTheJobSheetFilename()
+    {
+        var templateApiClient = new FakeExportTemplateApiClient
+        {
+            Templates = new ExportTemplateListResponse(ExportDocumentTypes.JobSheets, "Export Job Sheets", [Template(selected: true)]),
+            Download = new ExportTemplateDownload("JobSheet.docx", ExportTemplateService.DocxContentType, EmptyDocx())
+        };
+
+        var result = await CreateController(templateApiClient).RunExport(ExportDocumentTypes.JobSheets);
+
+        var file = Assert.IsType<FileContentResult>(result);
+        var today = DateTime.Now;
+        Assert.Equal($"JobSheetExport{today.Year}_{today.Month}_{today.Day}.docx", file.FileDownloadName);
+    }
+
+    [Fact]
+    public async Task RunExport_AddressConfirmationLetters_UsesTheLegacyFilename()
+    {
+        var templateApiClient = new FakeExportTemplateApiClient
+        {
+            Templates = new ExportTemplateListResponse(ExportDocumentTypes.AddressConfirmationLetters, "Export Address Confirmation Letters", [Template(selected: true)]),
+            Download = new ExportTemplateDownload("AddressLetter.docx", ExportTemplateService.DocxContentType, EmptyDocx())
+        };
+        var bulkApiClient = new FakeBulkExportApiClient
+        {
+            SampleAddresses = [SampleAddress(Guid.NewGuid())]
+        };
+
+        var result = await CreateController(templateApiClient, bulkApiClient).RunExport(ExportDocumentTypes.AddressConfirmationLetters);
+
+        var file = Assert.IsType<FileContentResult>(result);
+        var today = DateTime.Now;
+        Assert.Equal($"AddressConfirmationLettersExport{today.Year}_{today.Month}_{today.Day}.docx", file.FileDownloadName);
+    }
+
+    private static SampleAddressResponse SampleAddress(Guid contractId) => new(
+        contractId, Guid.NewGuid(), "QAL/00001", "LAB1", "Alice Example", "Lab One Ltd",
+        "1 Test Street", "Testville", string.Empty, string.Empty, string.Empty, "United Kingdom",
+        "01234 567890", string.Empty, "alice@example.com", "GB123", "ACC-1", "Standard", "PO-1",
+        [], []);
 
     [Fact]
     public async Task RunExport_Contracts_ReturnsTheLegacyFilename()
