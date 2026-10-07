@@ -8,7 +8,7 @@ internal sealed class FakeUrlHelper : IUrlHelper
 {
     public ActionContext ActionContext { get; } = new();
 
-    public string? Action(UrlActionContext actionContext) => throw new NotImplementedException();
+    public string? Action(UrlActionContext actionContext) => $"/{actionContext.Controller}/{actionContext.Action}";
 
     public string? Content(string? contentPath) => contentPath;
 
