@@ -24,6 +24,10 @@ public sealed class SchemeTestResultItem
     public string TestResultItemType { get; set; } = string.Empty;
     public Guid TestId { get; set; }
     public int Order { get; set; }
+
+    // tblTestReturnValueType.fldExpectedLength, joined via the item's type - display-only, drives
+    // the Printable Scheme worksheet's column-width packing (legacy ResultsTable.GetColumnWidth).
+    public int ExpectedLength { get; set; }
 }
 
 public sealed class SchemeTestMethodItem
@@ -33,6 +37,9 @@ public sealed class SchemeTestMethodItem
     public string TestMethodItemType { get; set; } = string.Empty;
     public Guid TestId { get; set; }
     public int Order { get; set; }
+
+    // See SchemeTestResultItem.ExpectedLength - same joined column, same display-only purpose.
+    public int ExpectedLength { get; set; }
 }
 
 public sealed class SchemeCategoryItem

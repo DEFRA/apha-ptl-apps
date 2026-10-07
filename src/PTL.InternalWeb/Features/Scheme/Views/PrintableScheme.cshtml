@@ -1,0 +1,121 @@
+@model PTL.InternalWeb.Features.Scheme.PrintableSchemeWorksheet
+@{
+    ViewData["Title"] = Model.SchemeHeading;
+}
+
+@section Styles {
+    <link rel="stylesheet" href="~/css/printable-scheme.css" />
+}
+
+<div class="ptl-worksheet">
+        <table class="tblWorkSheetNoBorder">
+            <tr>
+                <td class="cellWorkSheetLogo">
+                    <img src="~/images/vetqasheader-greyscale.png" alt="" />
+                </td>
+                <td class="cellWorkSheetLabId">
+                    <table class="tableWorkSheetLabId">
+                        <tr><td>@Model.LabIdLabel</td></tr>
+                    </table>
+                </td>
+            </tr>
+            @* LblAhvlaAddress is intentionally blank in legacy - preserved as-is, not invented. *@
+            <tr><td colspan="2"></td></tr>
+        </table>
+        <hr />
+        <table class="tblWorkSheetNoBorder">
+            <tr>
+                @* LblDistribution and LblDate are intentionally blank in legacy - preserved as-is. *@
+                <td></td>
+                <td class="cellWorkSheetRight"></td>
+            </tr>
+            <tr>
+                <td colspan="2">@Model.SchemeHeading</td>
+            </tr>
+        </table>
+
+        @Html.Raw(Model.Instructions)
+
+        @if (Model.ShowDistributionItems)
+        {
+            <table class="tblWorkSheetNoBorder">
+                <tr>
+                    @if (Model.DateOfReceipt)
+                    {
+                        <td class="cellWorkSheetDistItem">Date Of Receipt: _____________</td>
+                    }
+                    @if (Model.ConditionOnReceipt)
+                    {
+                        <td class="cellWorkSheetDistItem">Condition on Receipt: _____________</td>
+                    }
+                    @if (Model.StorageConditions)
+                    {
+                        <td class="cellWorkSheetDistItem">Storage Conditions: _____________</td>
+                    }
+                </tr>
+            </table>
+        }
+
+        @foreach (var test in Model.Tests)
+        {
+            @foreach (var resultsTable in test.ResultsTables)
+            {
+                <div class="PrintableResultsSpacer"></div>
+                <table cellpadding="0" cellspacing="0" class="tablePrintableResults">
+                    @if (resultsTable.ShowTestName)
+                    {
+                        <tr class="rowHeader">
+                            <td style="width:@(resultsTable.SampleColumnWidth)px">@resultsTable.TestTypeName</td>
+                            <td colspan="@Math.Max(resultsTable.Columns.Count, 1)"></td>
+                        </tr>
+                    }
+                    <tr>
+                        <td style="width:@(resultsTable.SampleColumnWidth)px">Sample No.</td>
+                        @if (resultsTable.Columns.Count == 0)
+                        {
+                            <td class="cellNoResultItems">This test has no Result Items</td>
+                        }
+                        else
+                        {
+                            @foreach (var column in resultsTable.Columns)
+                            {
+                                <td style="width:@(column.Width)px">@column.Name</td>
+                            }
+                        }
+                    </tr>
+                    @foreach (var sampleNumber in Model.SampleNumbers)
+                    {
+                        <tr class="rowSample">
+                            <td>@sampleNumber</td>
+                            @if (resultsTable.Columns.Count == 0)
+                            {
+                                <td style="height:20px"></td>
+                            }
+                            else
+                            {
+                                @foreach (var column in resultsTable.Columns)
+                                {
+                                    <td style="height:20px"></td>
+                                }
+                            }
+                        </tr>
+                    }
+                </table>
+            }
+
+            @if (test.MethodTable.MethodItemNames.Count > 0)
+            {
+                <div class="PrintableResultsSpacer"></div>
+                <table cellpadding="0" cellspacing="0" class="tablePrintableResults">
+                    @foreach (var methodItemName in test.MethodTable.MethodItemNames)
+                    {
+                        <tr class="rowMethod"><td>@methodItemName</td></tr>
+                    }
+                </table>
+            }
+        }
+
+        <br />
+        <br />
+        <button type="button" class="govuk-button noprint" data-module="govuk-button" onclick="window.print(); return false;">Print</button>
+    </div>

@@ -42,6 +42,48 @@ public class SchemeControllerTests
     }
 
     [Fact]
+    public async Task PrintableSchemes_ReturnsEverySchemeFamilyWithNoSearchTerm()
+    {
+        var sharedId = Guid.NewGuid();
+        var schemeId = Guid.NewGuid();
+        var apiClient = new FakeSchemeApiClient
+        {
+            SearchResponse = new SchemeSearchResponse([new SchemeSummaryResponse(sharedId, 2027, schemeId, "PT1234", "Test Scheme", null, null, null, null, null, null, "PT1234", "Test Scheme")], 1, 1, 25)
+        };
+        var controller = CreateController(apiClient);
+
+        var result = await controller.PrintableSchemes(1, 25, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<PTL.InternalWeb.Features.Scheme.SchemeListViewModel>(view.Model);
+        Assert.Null(model.SearchTerm);
+        Assert.Single(model.Schemes);
+    }
+
+    [Fact]
+    public async Task PrintableScheme_UnknownScheme_ReturnsNotFound()
+    {
+        var controller = CreateController(new FakeSchemeApiClient { SchemeResponse = null });
+
+        var result = await controller.PrintableScheme(Guid.NewGuid(), CancellationToken.None);
+
+        Assert.IsType<NotFoundResult>(result);
+    }
+
+    [Fact]
+    public async Task PrintableScheme_ExistingScheme_ReturnsWorksheetModel()
+    {
+        var schemeId = Guid.NewGuid();
+        var controller = CreateController(new FakeSchemeApiClient { SchemeResponse = SampleScheme(schemeId, Guid.NewGuid()) });
+
+        var result = await controller.PrintableScheme(schemeId, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<PTL.InternalWeb.Features.Scheme.PrintableSchemeWorksheet>(view.Model);
+        Assert.Equal("PT1234: Test Scheme", model.SchemeHeading);
+    }
+
+    [Fact]
     public async Task Details_UnknownScheme_ReturnsNotFound()
     {
         var controller = CreateController(new FakeSchemeApiClient { SchemeResponse = null });

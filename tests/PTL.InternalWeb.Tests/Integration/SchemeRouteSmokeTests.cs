@@ -136,6 +136,29 @@ public class SchemeRouteSmokeTests : IClassFixture<WebApplicationFactory<Program
     }
 
     [Fact]
+    public async Task PrintableSchemes_ReturnsSuccess()
+    {
+        var client = _factory.CreateClient();
+
+        var response = await client.GetAsync("/Scheme/PrintableSchemes");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task PrintableScheme_ReturnsSuccessAndRendersLogoAndPrintButton()
+    {
+        var client = _factory.CreateClient();
+
+        var response = await client.GetAsync($"/Scheme/PrintableScheme/{SchemeId}");
+        var html = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("vetqasheader-greyscale.png", html, StringComparison.Ordinal);
+        Assert.Contains("window.print()", html, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Details_ReturnsSuccess()
     {
         var client = _factory.CreateClient();

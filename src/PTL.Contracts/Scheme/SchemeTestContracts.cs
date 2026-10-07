@@ -25,7 +25,9 @@ public sealed record SchemeTestResponse(
     IReadOnlyList<SchemeTestItemResponse> MethodItems,
     IReadOnlyList<SchemeCategoryItemResponse> Categories);
 
-public sealed record SchemeTestItemResponse(Guid ItemId, Guid ItemTypeId, string Name, int Order);
+// ExpectedLength is only meaningful for ResultItems/MethodItems (drives the Printable Scheme
+// worksheet's column-width packing); Categories/Criteria always pass the default 0.
+public sealed record SchemeTestItemResponse(Guid ItemId, Guid ItemTypeId, string Name, int Order, int ExpectedLength = 0);
 
 public sealed record SchemeCategoryItemResponse(
     Guid CategoryItemId,

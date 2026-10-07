@@ -678,6 +678,7 @@ public static class DapperColumnMappings
             ["fldTestResultItemType"] = nameof(SchemeTestResultItem.TestResultItemType),
             ["fldTestId"] = nameof(SchemeTestResultItem.TestId),
             [ColOrder] = nameof(SchemeTestResultItem.Order),
+            ["fldExpectedLength"] = nameof(SchemeTestResultItem.ExpectedLength),
         });
 
         Map<SchemeTestMethodItem>(new(StringComparer.OrdinalIgnoreCase)
@@ -687,6 +688,7 @@ public static class DapperColumnMappings
             ["fldTestMethodItemType"] = nameof(SchemeTestMethodItem.TestMethodItemType),
             ["fldTestId"] = nameof(SchemeTestMethodItem.TestId),
             [ColOrder] = nameof(SchemeTestMethodItem.Order),
+            ["fldExpectedLength"] = nameof(SchemeTestMethodItem.ExpectedLength),
         });
 
         Map<SchemeCategoryItem>(new(StringComparer.OrdinalIgnoreCase)

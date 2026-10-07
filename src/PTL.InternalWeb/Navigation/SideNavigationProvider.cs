@@ -219,7 +219,7 @@ public static class SideNavigationProvider
                         // Year" and the "Create Scheme for Current Year" item SchemeList.aspx adds.
                                                 new SideNavigationItem { Text = "Create Scheme for Current Year", ControllerName = SchemeControllerName, ActionName = "CreateForCurrentYear" },
                         new SideNavigationItem { Text = "Create Scheme for Next Year", ControllerName = SchemeControllerName, ActionName = CreateAction },
-                        Disabled("Printable Schemes"),
+                        new SideNavigationItem { Text = "Printable Schemes", ControllerName = SchemeControllerName, ActionName = "PrintableSchemes" },
 
 
                         // Hidden: not menu entries, but present so Details/Edit pages resolve a full
@@ -229,7 +229,11 @@ public static class SideNavigationProvider
 
                         // Hidden: only reached from a specific scheme's Details page ("View family
                         // history" link), not listed as a Scheme List child - same hidden pattern.
-                        new SideNavigationItem { Text = "Scheme History", ControllerName = SchemeControllerName, ActionName = "History", IsHidden = true }
+                        new SideNavigationItem { Text = "Scheme History", ControllerName = SchemeControllerName, ActionName = "History", IsHidden = true },
+
+                        // Hidden: legacy "Printable Scheme" (singular) is a hidden sitemap node too,
+                        // reached only via the Printable Schemes list's View links.
+                        new SideNavigationItem { Text = "Printable Scheme", ControllerName = SchemeControllerName, ActionName = "PrintableScheme", IsHidden = true }
                     ]
                 },
                 Disabled("Search"),

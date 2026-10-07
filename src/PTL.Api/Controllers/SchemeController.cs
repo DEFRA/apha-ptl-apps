@@ -302,8 +302,8 @@ public sealed class SchemeController(ISchemeService schemeService, ILogger<Schem
                 t.TestTypeId,
                 t.TestType,
                 t.Order,
-                [.. t.ResultItems.Select(i => new SchemeTestItemResponse(i.TestResultItemId, i.TestResultItemTypeId, i.TestResultItemType, i.Order))],
-                [.. t.MethodItems.Select(i => new SchemeTestItemResponse(i.TestMethodItemId, i.TestMethodItemTypeId, i.TestMethodItemType, i.Order))],
+                [.. t.ResultItems.Select(i => new SchemeTestItemResponse(i.TestResultItemId, i.TestResultItemTypeId, i.TestResultItemType, i.Order, i.ExpectedLength))],
+                [.. t.MethodItems.Select(i => new SchemeTestItemResponse(i.TestMethodItemId, i.TestMethodItemTypeId, i.TestMethodItemType, i.Order, i.ExpectedLength))],
                 [.. t.Categories.Select(c => new SchemeCategoryItemResponse(
                     c.CategoryItemId,
                     c.CategoryItemTypeId,

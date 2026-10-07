@@ -71,6 +71,31 @@ public class SchemeController(ISchemeApiClient schemeApiClient, ILookupApiClient
         return View(new SchemeListViewModel(result.Page, result.PageSize, result.TotalCount, searchTerm, result.Items));
     }
 
+    // Legacy SchemeListForPrinting.aspx: the same spgaSchemeInfo family list as the main Scheme
+    // List, but with no Search box, no Year filter, and no History column - just Identifier, Name,
+    // and a View link per year that opens that scheme's printable worksheet.
+    public async Task<IActionResult> PrintableSchemes(int page = 1, int pageSize = PTL.InternalWeb.Pagination.PaginationModel.DefaultPageSize, CancellationToken cancellationToken = default)
+    {
+        var result = await schemeApiClient.GetSchemeFamiliesAsync(page, pageSize, searchTerm: null, cancellationToken);
+        LogDisplayedSchemeListMessage(logger, 0, null, result.Page, result.TotalCount, null);
+
+        return View(new SchemeListViewModel(result.Page, result.PageSize, result.TotalCount, null, result.Items));
+    }
+
+    // Legacy PrintableScheme.aspx: a standalone worksheet (no site chrome) built from the same
+    // spgSchemeBySchemeId fetch as Details/Edit, with a browser-native Print button.
+    public async Task<IActionResult> PrintableScheme(Guid schemeId, CancellationToken cancellationToken)
+    {
+        var scheme = await schemeApiClient.GetSchemeAsync(schemeId, cancellationToken);
+        if (scheme is null)
+        {
+            LogSchemeNotFoundMessage(logger, schemeId, null);
+            return NotFound();
+        }
+
+        return View(PrintableSchemeWorksheetBuilder.Build(scheme));
+    }
+
     public async Task<IActionResult> Details(Guid id, CancellationToken cancellationToken)
     {
         var scheme = await schemeApiClient.GetSchemeAsync(id, cancellationToken);
