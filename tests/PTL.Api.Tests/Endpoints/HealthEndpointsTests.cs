@@ -78,6 +78,22 @@ public class HealthEndpointsTests : IClassFixture<WebApplicationFactory<Program>
     }
 
     [Fact]
+    public async Task HealthReady_ReturnsNotFound_WhenReadinessKeyNotConfigured()
+    {
+        var factory = _factory.WithWebHostBuilder(builder =>
+            builder.ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["HealthCheck:ReadinessKey"] = ""
+            })));
+        var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Add(ReadinessKeyFilter.HeaderName, ReadinessKey);
+
+        var response = await client.GetAsync("/health/ready");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
     public async Task HealthReady_ProbesDatabase_WhenKeyCorrect()
     {
         // Deliberately point at an unreachable host (rather than relying on no SQL Server being

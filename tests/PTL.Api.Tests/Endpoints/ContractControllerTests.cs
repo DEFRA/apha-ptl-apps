@@ -221,4 +221,20 @@ public class ContractControllerTests
         var badRequest = Assert.IsType<ObjectResult>(result.Result, exactMatch: false);
         Assert.Equal(400, badRequest.StatusCode);
     }
+
+    [Fact]
+    public async Task UpdateContract_ValidRequest_ReturnsOkWithUpdatedContract()
+    {
+        var repository = new FakeContractRepository();
+        var controller = CreateController(repository);
+        var customerId = Guid.NewGuid();
+        var created = await controller.CreateContract(customerId, ValidCreateRequest(), CancellationToken.None);
+        var contractId = ((ContractResponse)((CreatedAtActionResult)created.Result!).Value!).ContractId;
+
+        var result = await controller.UpdateContract(contractId, ToUpdateRequest(ValidCreateRequest() with { Suffix = "Z" }), CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var response = Assert.IsType<ContractResponse>(ok.Value);
+        Assert.Equal("Z", response.Suffix);
+    }
 }

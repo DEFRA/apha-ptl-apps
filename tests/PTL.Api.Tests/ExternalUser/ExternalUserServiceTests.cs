@@ -104,6 +104,38 @@ public class ExternalUserServiceTests
     }
 
     [Fact]
+    public async Task ResolveAsync_ViewerRole_MatchesByEmailAndBackfillsSsoIdExt()
+    {
+        var ssoIdExt = Guid.NewGuid();
+        const string email = "viewer@example.com";
+        var viewerRepository = new FakeViewerRepository();
+        var viewer = await viewerRepository.CreateAsync(new ViewerEntity { ViewerId = Guid.NewGuid(), Email = email, Name = "Viewer One" });
+        var service = CreateService(viewerRepository: viewerRepository);
+
+        var result = await service.ResolveAsync(ssoIdExt, email, "Jane Doe", ["Viewer"]);
+
+        Assert.Equal(["Viewer"], result.Roles);
+        Assert.Equal(viewer.ViewerId, result.ViewerId);
+        Assert.Equal(ssoIdExt, viewerRepository.Viewers.Single().SsoIdExt);
+    }
+
+    [Fact]
+    public async Task ResolveAsync_TestConsultantRole_MatchesBySsoIdExt()
+    {
+        var ssoIdExt = Guid.NewGuid();
+        var testConsultantId = Guid.NewGuid();
+        var testConsultantRepository = new FakeTestConsultantRepository();
+        testConsultantRepository.Seed(new CoreTestConsultant { ExternalTestConsultantId = testConsultantId, SsoIdExt = ssoIdExt, Name = "Test Consultant One" });
+        var service = CreateService(testConsultantRepository: testConsultantRepository);
+
+        var result = await service.ResolveAsync(ssoIdExt, "consultant@example.com", "Jane Doe", ["Test Consultant"]);
+
+        Assert.Equal(["Test Consultant"], result.Roles);
+        Assert.Equal(testConsultantId, result.TestConsultantId);
+        Assert.Empty(testConsultantRepository.UpdateCalls);
+    }
+
+    [Fact]
     public async Task ResolveAsync_TestConsultantRole_MatchesByEmailAndBackfillsSsoIdExt()
     {
         var testConsultantId = Guid.NewGuid();

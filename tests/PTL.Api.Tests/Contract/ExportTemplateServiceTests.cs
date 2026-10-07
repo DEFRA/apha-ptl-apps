@@ -232,6 +232,31 @@ public class ExportTemplateServiceTests
         Assert.Null(await CreateService().Service.DownloadAsync(Guid.NewGuid()));
 
     [Fact]
+    public async Task DownloadAsync_MetadataExistsButFileIsMissingFromStorage_ReturnsNull()
+    {
+        var (service, repository, storage) = CreateService();
+        await service.UploadAsync(ExportDocumentTypes.Contracts, Docx, [1]);
+        storage.Files.Clear();
+
+        Assert.Null(await service.DownloadAsync(repository.Templates[0].FileId));
+    }
+
+    [Fact]
+    public async Task DownloadAsync_UnrecognisedDocumentType_StillDerivesAStorageKey()
+    {
+        var (service, repository, storage) = CreateService();
+        await service.UploadAsync(ExportDocumentTypes.Contracts, Docx, [1]);
+        repository.Templates[0].DocumentType = "SomeLegacyValue";
+        var fileId = repository.Templates[0].FileId;
+        storage.Files[$"templates/somelegacyvalue/{fileId}.docx"] = [9];
+
+        var content = await service.DownloadAsync(fileId);
+
+        Assert.NotNull(content);
+        Assert.Equal<byte[]>([9], content!.Content);
+    }
+
+    [Fact]
     public async Task DeleteAsync_RemovesBothTheStoredFileAndTheMetadata()
     {
         var (service, repository, storage) = CreateService();
