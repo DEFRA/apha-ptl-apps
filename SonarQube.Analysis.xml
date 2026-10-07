@@ -1,11 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <SonarQubeAnalysisProperties xmlns="http://www.sonarsource.com/msbuild/integration/2015/1">
 
-  <!-- Vendored/generated assets, build output, and test code - test files are still measured for
-       coverage (see sonar.cs.cobertura.reportsPaths below) but excluded from code-smell/bug
-       analysis entirely, since rules like SYSLIB1045 (GeneratedRegex) or S2701 (literal boolean
-       assertions) on test helpers/assertions add noise without real production risk. -->
-  <Property Name="sonar.exclusions">**/bin/**,**/obj/**,**/wwwroot/lib/**,**/wwwroot/js/*.min.js,**/*.yml,**/*.yaml,tests/**</Property>
+  <!-- Vendored/generated assets and build output - excluded from main-code analysis. -->
+  <Property Name="sonar.exclusions">**/bin/**,**/obj/**,**/wwwroot/lib/**,**/wwwroot/js/*.min.js,**/*.yml,**/*.yaml</Property>
+
+  <!-- The SonarScanner for .NET auto-detects test projects and analyses them as a separate "Test"
+       source set (sonar.tests), which sonar.exclusions above does NOT apply to - test files are
+       still measured for coverage (see sonar.cs.cobertura.reportsPaths below) but must be excluded
+       here to drop code-smell/bug analysis entirely, since rules like SYSLIB1045 (GeneratedRegex) or
+       S2701 (literal boolean assertions) on test helpers/assertions add noise without real
+       production risk. -->
+  <Property Name="sonar.test.exclusions">tests/**</Property>
 
   <!-- coverlet excludes Program.cs from instrumentation everywhere (see tests/Directory.Build.props
        ExcludeByFile - WebApplicationFactory-based tests never execute app.Run()/RunAsync(), so it's
@@ -16,10 +21,11 @@
        PTL.ExternalWeb.Tests' WebApplicationFactory-based integration tests (which run the real
        Program.cs -> AddCidmAuthentication path) rather than PTL.Auth.Cidm.Tests - Coverlet's
        ExcludeByFile only affects that project's own pass/fail threshold, not what Sonar sees in the
-       raw cobertura report, so it needs the same explicit exclusion here. tests/** no longer needs
-       to be listed here since sonar.exclusions above already removes test files from analysis
-       entirely (a prior copy-paste left this property declared twice, with the second silently
-       overriding the first and dropping this comment's CidmAuthenticationExtensions.cs entry). -->
+       raw cobertura report, so it needs the same explicit exclusion here. tests/** is NOT excluded
+       here (unlike sonar.exclusions above) because this property only trims the coverage
+       percentage calculation, not issue analysis - coverage for test files themselves is not
+       meaningful anyway since they're excluded from the "Test" source set's coverage goal by
+       convention, not by this property. -->
   <Property Name="sonar.coverage.exclusions">**/Program.cs,**/Properties/AssemblyInfo.cs,**/CidmAuthenticationExtensions.cs</Property>
 
   <!-- Report locations produced by `dotnet test` in the CI pipeline -->
