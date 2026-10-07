@@ -67,6 +67,17 @@ public class AccountControllerTests
     }
 
     [Fact]
+    public async Task Login_Post_InvalidModelState_ReturnsBadRequest()
+    {
+        var controller = new AccountController();
+        controller.ModelState.AddModelError("Username", "Required");
+
+        var result = await controller.Login(new AccountViewModel());
+
+        Assert.IsType<BadRequestObjectResult>(result);
+    }
+
+    [Fact]
     public void CreateLoginModel_ReturnsViewModelWithGivenReturnUrl()
     {
         // CreateLoginModel is required to satisfy PtlAccountControllerBase's abstract contract, but

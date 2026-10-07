@@ -44,6 +44,47 @@ public abstract class PtlAccountControllerBase<T> : Controller where T : class, 
     [ValidateAntiForgeryToken]
     public virtual Task<IActionResult> Logout() => SignOutAndRedirectToHomeAsync();
 
+    /// <summary>
+    /// Redirects to an external identity provider's OIDC challenge - shared by every PTL web
+    /// front-end that signs in via an external IdP (CIDM for external users, Entra ID for internal
+    /// users) instead of this base class's default username/password flow.
+    /// </summary>
+    protected IActionResult ChallengeExternalLogin(string authenticationScheme, string? returnUrl)
+    {
+        var redirectUri = !string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl)
+            ? returnUrl
+            : Url.Action("Index", PostLoginRedirectController);
+
+        return Challenge(new AuthenticationProperties { RedirectUri = redirectUri }, authenticationScheme);
+    }
+
+    /// <summary>
+    /// Signs out of the cookie scheme then redirects to the external identity provider's own
+    /// sign-out endpoint, carrying the captured id_token_hint so the IdP honours
+    /// post_logout_redirect_uri instead of showing its own default sign-out page. Captured BEFORE
+    /// clearing the cookie (OpenIdConnectHandler.HandleSignOutAsync only reads id_token_hint from the
+    /// AuthenticationProperties passed to SignOut() or falls back to re-authenticating against the
+    /// cookie scheme, which finds nothing once the cookie has already been cleared). Signed out
+    /// separately (not via a single SignOut(cookie, oidc) call sharing one AuthenticationProperties)
+    /// since CookieAuthenticationHandler.SignOutAsync also honours RedirectUri and would otherwise
+    /// hijack the response before the OIDC scheme's sign-out event renders the IdP's sign-out form.
+    /// </summary>
+    protected async Task<IActionResult> SignOutViaExternalSchemeAsync(string authenticationScheme)
+    {
+        var cookieResult = await HttpContext.AuthenticateAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+        var idToken = cookieResult?.Properties?.GetTokenValue("id_token");
+
+        await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+
+        var properties = new AuthenticationProperties { RedirectUri = Url.Action("SignedOut", "Account") };
+        if (!string.IsNullOrEmpty(idToken))
+        {
+            properties.StoreTokens([new AuthenticationToken { Name = "id_token", Value = idToken }]);
+        }
+
+        return SignOut(properties, authenticationScheme);
+    }
+
     protected async Task<IActionResult> SignInAndRedirectAsync(IAccountCredentials model)
     {
         var claims = new[] { new Claim(ClaimTypes.Name, model.Username!) };
