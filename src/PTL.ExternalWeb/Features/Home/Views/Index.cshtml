@@ -1,10 +1,23 @@
-﻿@{
+﻿@model PTL.ExternalWeb.Features.Home.HomeIndexViewModel
+@{
     ViewData["Title"] = "Home Page";
 }
 
 <div class="text-center">
-    @* Index requires authentication (the app's default authorization policy), so User.Identity is
-       always authenticated here - no anonymous fallback branch needed. *@
-    <h1 class="display-4">Welcome, @User.Identity!.Name</h1>
+    @* Index requires authentication (the app's default authorization policy), so Model is always
+       populated here - no anonymous fallback branch needed. *@
+    <h1 class="display-4">Welcome, @Model.DisplayName</h1>
+
+    @if (Model.Roles.Count > 0)
+    {
+        <p>Your roles:</p>
+        <ul class="list-unstyled">
+            @foreach (var role in Model.Roles)
+            {
+                <li>@role</li>
+            }
+        </ul>
+    }
+
     <p>Learn about <a href="https://learn.microsoft.com/aspnet/core">building Web apps with ASP.NET Core</a>.</p>
 </div>
