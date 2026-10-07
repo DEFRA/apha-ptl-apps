@@ -20,8 +20,10 @@
             </div>
         </div>
         <div class="govuk-grid-column-one-third govuk-!-text-align-centre">
-            <div class="govuk-form-group govuk-!-margin-top-6">
-                <p class="govuk-body govuk-!-font-weight-bold govuk-!-margin-bottom-3">Actions</p>
+            <p class="govuk-label govuk-label--s">Actions</p>
+            @* ptl-viewer-actions shares --ptl-viewer-list-height with .ptl-viewer-select so the
+               buttons centre in the same vertical space the two listboxes occupy. *@
+            <div class="ptl-viewer-actions">
                 <div class="govuk-button-group govuk-button-group--vertical ptl-viewer-transfer-buttons">
                     @* Legacy Add/Remove transfer workflow: nothing is persisted until Save. The Add button is
                        hidden for inactive participants to match the original ParticipantViewers.aspx logic. *@

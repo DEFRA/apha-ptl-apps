@@ -259,9 +259,28 @@ span.app-side-navigation__link--disabled {
 /* .govuk-select hard-codes height:40px for single-line dropdowns, which also clips
    multi-row listboxes (size="10") down to one row. Participant Viewers' Available/
    Participant transfer lists need their native row count back to match the legacy
-   ParticipantViewers.aspx ListBox viewing area, so let height grow with the options. */
+   ParticipantViewers.aspx ListBox viewing area, so let height grow with the options.
+   govuk-grid-row floats its columns (no flexbox stretch), so the Add/Remove button
+   column has no automatic way to match the lists' height - --ptl-viewer-list-height
+   is the one place that shared height lives, so .ptl-viewer-select and
+   .ptl-viewer-actions can never drift out of sync with each other. */
+:root {
+  --ptl-viewer-list-height: 15rem;
+}
+
 .ptl-viewer-select {
   width: 100%;
   height: auto;
-  min-height: 15rem;
+  min-height: var(--ptl-viewer-list-height);
+}
+
+/* Scheme Viewers and Participant Viewers dual-list transfer: centres the Add/Remove
+   buttons in the same vertical space the two listboxes occupy, regardless of option
+   count, instead of a guessed margin-top. */
+.ptl-viewer-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--ptl-viewer-list-height);
 }

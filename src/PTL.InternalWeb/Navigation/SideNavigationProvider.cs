@@ -227,6 +227,11 @@ public static class SideNavigationProvider
                         new SideNavigationItem { Text = "Scheme Details", ControllerName = SchemeControllerName, ActionName = DetailsAction, IsHidden = true },
                         new SideNavigationItem { Text = "Edit Scheme", ControllerName = SchemeControllerName, ActionName = EditAction, IsHidden = true },
 
+                        // Hidden: Renew reuses the Create view/action but needs its own breadcrumb
+                        // leaf - Home > Manage Schemes > Scheme > Scheme - Renew - rather than
+                        // falling back to a plain controller/action crumb.
+                        new SideNavigationItem { Text = "Scheme - Renew", ControllerName = SchemeControllerName, ActionName = "Renew", IsHidden = true },
+
                         // Hidden: only reached from a specific scheme's Details page ("View family
                         // history" link), not listed as a Scheme List child - same hidden pattern.
                         new SideNavigationItem { Text = "Scheme History", ControllerName = SchemeControllerName, ActionName = "History", IsHidden = true },

@@ -15,6 +15,13 @@
         SchemeTabulationAvailability.ParticipantsOnly => "Participants Only",
         _ => "Viewers and TCs Only",
     };
+
+    // SchemeValidator reports "must define at least N Tabulations" against the plain
+    // "Tabulations" key (the collection as a whole has no single input to attach to). The
+    // Add New Tabulation form group below is the control that actually resolves it, so the
+    // error summary's "#Tabulations" link and message belong there, not floating disconnected
+    // from any control.
+    var tabulationsHasError = ViewContext.ViewData.ModelState.TryGetValue("Tabulations", out var tabulationsEntry) && tabulationsEntry.Errors.Count > 0;
 }
 
 @if (tabulations.Count == 0)
@@ -41,9 +48,23 @@ else
                         }
                         else
                         {
-                            @* The name is editable in place; legacy uses a Rename popup. *@
+                            @* The name is editable in place; legacy uses a Rename popup. Error
+                               state mirrors GovUkFormGroupMarkup's convention (same classes, same
+                               "{field}-error" id) so the error summary link still focuses this
+                               exact input and the visible message matches the rest of the app. *@
+                            var nameField = $"Tabulations[{i}].Name";
+                            var nameHasError = ViewContext.ViewData.ModelState.TryGetValue(nameField, out var nameEntry) && nameEntry.Errors.Count > 0;
+                            var nameErrorId = $"{nameField}-error";
                             <label class="govuk-visually-hidden" asp-for="Tabulations[i].Name">Tabulation name</label>
-                            <input class="govuk-input govuk-input--width-10" asp-for="Tabulations[i].Name" />
+                            <input class="@(nameHasError ? "govuk-input govuk-input--width-10 govuk-input--error" : "govuk-input govuk-input--width-10")"
+                                   asp-for="Tabulations[i].Name"
+                                   aria-describedby="@(nameHasError ? nameErrorId : null)" />
+                            @if (nameHasError)
+                            {
+                                <p class="govuk-error-message" id="@nameErrorId">
+                                    <span class="govuk-visually-hidden">Error:</span> @nameEntry!.Errors[0].ErrorMessage
+                                </p>
+                            }
                         }
                     </th>
                 }
@@ -224,9 +245,18 @@ else
 
 @if (!Model.IsViewMode)
 {
-    <div class="govuk-form-group">
-        <label class="govuk-label govuk-label--s" for="NewTabulationName">Add New Tabulation</label>
-        <input class="govuk-input govuk-input--width-20" asp-for="NewTabulationName" />
+    @* id="Tabulations" sits on the input (not the wrapping div) and the label's for matches it -
+       GOV.UK's error-summary script only calls focus() when it finds a label[for] (or legend)
+       for the linked id, so a wrapping element with no matching label is silently skipped. *@
+    <div class="@(tabulationsHasError ? "govuk-form-group govuk-form-group--error" : "govuk-form-group")">
+        <label class="govuk-label govuk-label--s" for="Tabulations">Add New Tabulation</label>
+        @if (tabulationsHasError)
+        {
+            <p class="govuk-error-message">
+                <span class="govuk-visually-hidden">Error:</span> @tabulationsEntry!.Errors[0].ErrorMessage
+            </p>
+        }
+        <input id="Tabulations" class="@(tabulationsHasError ? "govuk-input govuk-input--width-20 govuk-input--error" : "govuk-input govuk-input--width-20")" asp-for="NewTabulationName" />
         <button type="submit" class="govuk-button govuk-button--primary govuk-!-margin-left-2" data-module="govuk-button"
                 name="testCommand" value="add-tabulation">
             Add New Tabulation
