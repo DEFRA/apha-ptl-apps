@@ -799,6 +799,7 @@ jobs:
     name: Create immutable component Git tags
     needs: [changes, release-version, publish]
     if: >-
+      always() &&
       needs.publish.result == 'success' &&
       needs.release-version.result == 'success' &&
       needs.changes.outputs.components != '[]' &&
