@@ -41,14 +41,14 @@ public static class SideNavigationProvider
             ActionName = SystemAdministrationControllerName,
             Children =
             [
-                Disabled("Create User"),
-                Disabled("Assign Roles to User"),
+                new SideNavigationItem { Text = "Create User", ControllerName = SystemAdministrationControllerName, ActionName = "CreateUser" },
+                new SideNavigationItem { Text = "Assign Roles to User", ControllerName = SystemAdministrationControllerName, ActionName = "ManageUserRoles" },
                 Disabled("Remove User"),
                 Disabled("Internal Test Consultant Department Management"),
                 Disabled("External Test Consultant Management"),
                 Disabled("Viewer Management"),
-                Disabled("Country Management"),
-                Disabled("External Site Management"),
+                new SideNavigationItem { Text = "Country Management", ControllerName = SystemAdministrationControllerName, ActionName = "CountryManagement" },
+                new SideNavigationItem { Text = "External Site Management", ControllerName = SystemAdministrationControllerName, ActionName = "ExternalSiteManagement" },
                 new SideNavigationItem { Text = "Administration Charges Management", ControllerName = SystemAdministrationControllerName, ActionName = "AdministrationCharge" },
                 new SideNavigationItem { Text = "Weighted Charging Plan", ControllerName = SystemAdministrationControllerName, ActionName = "WeightedPricingPlan" },
                 new SideNavigationItem { Text = "Postage Pricing Plan", ControllerName = SystemAdministrationControllerName, ActionName = "PostagePricingPlan" }

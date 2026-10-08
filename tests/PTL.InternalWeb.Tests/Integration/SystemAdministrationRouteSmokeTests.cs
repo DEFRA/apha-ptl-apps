@@ -8,6 +8,12 @@ using PTL.Contracts.AdministrationCharge;
 using PTL.Contracts.Lookup;
 using PTL.Contracts.PostagePricingPlan;
 using PTL.InternalWeb.Tests.TestSupport;
+using CountryResponse = PTL.Contracts.Country.CountryResponse;
+using CountryTypeResponse = PTL.Contracts.Country.CountryTypeResponse;
+using CountryDeleteResponse = PTL.Contracts.Country.CountryDeleteResponse;
+using ExternalSiteMessageResponse = PTL.Contracts.ExternalSiteMessage.ExternalSiteMessageResponse;
+using ExternalSiteMessageSaveResult = PTL.Contracts.ExternalSiteMessage.ExternalSiteMessageSaveResult;
+using PTL.Contracts.User;
 
 namespace PTL.InternalWeb.Tests.Integration;
 
@@ -32,6 +38,14 @@ public partial class SystemAdministrationRouteSmokeTests : IClassFixture<WebAppl
                 services.AddSingleton<IWeightedPricingPlanApiClient>(new FakeWeightedPricingPlanApiClient());
                 services.RemoveAll<IPostagePricingPlanApiClient>();
                 services.AddSingleton<IPostagePricingPlanApiClient>(new FakePostagePricingPlanApiClient());
+                services.RemoveAll<ICountryApiClient>();
+                services.AddSingleton<ICountryApiClient>(new FakeCountryApiClient());
+                services.RemoveAll<IExternalSiteMessageApiClient>();
+                services.AddSingleton<IExternalSiteMessageApiClient>(new FakeExternalSiteMessageApiClient());
+                services.RemoveAll<IUserApiClient>();
+                services.AddSingleton<IUserApiClient>(new FakeUserApiClient());
+                services.RemoveAll<IRoleApiClient>();
+                services.AddSingleton<IRoleApiClient>(new FakeRoleApiClient());
                 services.RemoveAll<ILookupApiClient>();
                 services.AddSingleton<ILookupApiClient>(new FakeLookupApiClient());
             }));
@@ -250,6 +264,316 @@ public partial class SystemAdministrationRouteSmokeTests : IClassFixture<WebAppl
         Assert.Contains("id=\"UKPrice\"", body, StringComparison.Ordinal);
         Assert.Contains("href=\"#UKPrice\"", body, StringComparison.Ordinal);
         Assert.Contains("for=\"UKPrice\"", body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task CountryManagement_ReturnsSuccess()
+    {
+        var client = _factory.CreateClient();
+
+        var response = await client.GetAsync("/SystemAdministration/CountryManagement");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    // The empty-state test above never exercises the @foreach row loop or the edit-mode cells
+    // (form="countryEditForm" cross-element binding, govuk-error-summary) - this is the only test
+    // that renders that markup for real. Seeds a second, non-editing row too, so both the
+    // read-only "Edit"/"Remove" actions and the editing row's "Save"/"Cancel" render on the same
+    // page.
+    [Fact]
+    public async Task CountryManagement_WithEditingRow_RendersTableAndEditForm()
+    {
+        var countryId = Guid.NewGuid();
+        var otherCountryId = Guid.NewGuid();
+        var countryTypeId = Guid.NewGuid();
+        var factory = _factory.WithWebHostBuilder(builder =>
+            builder.ConfigureServices(services =>
+            {
+                services.RemoveAll<ICountryApiClient>();
+                services.AddSingleton<ICountryApiClient>(new FakeCountryApiClient
+                {
+                    Countries =
+                    [
+                        new CountryResponse(countryId, "France", countryTypeId, "EU", 0),
+                        new CountryResponse(otherCountryId, "United Kingdom", countryTypeId, "UK", 3)
+                    ],
+                    CountryTypes = [new CountryTypeResponse(countryTypeId, "EU")]
+                });
+            }));
+        var client = factory.CreateClient();
+
+        var response = await client.GetAsync($"/SystemAdministration/CountryManagement?editId={countryId}");
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("France", body, StringComparison.Ordinal);
+        Assert.Contains("United Kingdom", body, StringComparison.Ordinal);
+        Assert.Contains("countryEditForm", body, StringComparison.Ordinal);
+        Assert.Contains("type=\"submit\">Save</button>", body, StringComparison.Ordinal);
+        Assert.Contains(">Edit</a>", body, StringComparison.Ordinal);
+        Assert.Contains(">Cancel</a>", body, StringComparison.Ordinal);
+        Assert.Contains("govuk-button--secondary", body, StringComparison.Ordinal);
+        Assert.Contains("Remove", body, StringComparison.Ordinal);
+    }
+
+    // Locks in that a blocked removal (country still referenced) surfaces legacy's exact
+    // dependency-count wording as a notification banner, matching "This country is being used by
+    // N customer(s)/participant(s)/Group Addresses." from Admin/ManageCountries.aspx.vb.
+    [Fact]
+    public async Task CountryManagementRemove_Post_CountryInUse_RendersBlockedMessage()
+    {
+        var countryId = Guid.NewGuid();
+        var factory = _factory.WithWebHostBuilder(builder =>
+            builder.ConfigureServices(services =>
+            {
+                services.RemoveAll<ICountryApiClient>();
+                services.AddSingleton<ICountryApiClient>(new FakeCountryApiClient
+                {
+                    Countries = [new CountryResponse(countryId, "France", Guid.NewGuid(), "EU", 8)],
+                    DeleteResponse = new CountryDeleteResponse(false, "This country is being used by 8 customer(s)/participant(s)/Group Addresses.")
+                });
+            }));
+        var client = factory.CreateClient();
+        var (token, cookie) = await GetAntiforgeryAsync(client, "/SystemAdministration/CountryManagement");
+
+        var request = new HttpRequestMessage(HttpMethod.Post, "/SystemAdministration/CountryManagementRemove")
+        {
+            Content = new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["__RequestVerificationToken"] = token,
+                ["countryId"] = countryId.ToString()
+            })
+        };
+        request.Headers.Add("Cookie", cookie);
+
+        var response = await client.SendAsync(request);
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("This country is being used by 8 customer(s)/participant(s)/Group Addresses.", body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ExternalSiteManagement_ReturnsSuccess()
+    {
+        var client = _factory.CreateClient();
+
+        var response = await client.GetAsync("/SystemAdministration/ExternalSiteManagement");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    // Locks in that the saved Further Information/Important Message content actually renders
+    // into the page (inside the TinyMCE-bound textareas) and that the TinyMCE script is wired up.
+    [Fact]
+    public async Task ExternalSiteManagement_RendersSavedContentAndTinyMceScript()
+    {
+        var factory = _factory.WithWebHostBuilder(builder =>
+            builder.ConfigureServices(services =>
+            {
+                services.RemoveAll<IExternalSiteMessageApiClient>();
+                services.AddSingleton<IExternalSiteMessageApiClient>(new FakeExternalSiteMessageApiClient
+                {
+                    Message = new ExternalSiteMessageResponse("<p>Further information body</p>", "<p>Urgent notice</p>", "vetqas@apha.gov.uk")
+                });
+            }));
+        var client = factory.CreateClient();
+
+        var response = await client.GetAsync("/SystemAdministration/ExternalSiteManagement");
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("Further information body", body, StringComparison.Ordinal);
+        Assert.Contains("Urgent notice", body, StringComparison.Ordinal);
+        Assert.Contains("vetqas@apha.gov.uk", body, StringComparison.Ordinal);
+        Assert.Contains("lib/tinymce/tinymce.min.js", body, StringComparison.Ordinal);
+    }
+
+    // Locks in that a blocked save (Important Message over 500 visible characters) surfaces
+    // legacy's exact wording as an error-summary entry with a matching anchor.
+    [Fact]
+    public async Task ExternalSiteManagement_Post_ImportantMessageTooLong_RendersErrorSummaryWithMatchingAnchor()
+    {
+        var factory = _factory.WithWebHostBuilder(builder =>
+            builder.ConfigureServices(services =>
+            {
+                services.RemoveAll<IExternalSiteMessageApiClient>();
+                services.AddSingleton<IExternalSiteMessageApiClient>(new FakeExternalSiteMessageApiClient
+                {
+                    SaveResult = new ExternalSiteMessageSaveResult(false, null, new Dictionary<string, string[]> { ["ImportantMessage"] = ["The Important Message cannot exceed 500 characters."] })
+                });
+            }));
+        var client = factory.CreateClient();
+        var (token, cookie) = await GetAntiforgeryAsync(client, "/SystemAdministration/ExternalSiteManagement");
+
+        var request = new HttpRequestMessage(HttpMethod.Post, "/SystemAdministration/ExternalSiteManagement")
+        {
+            Content = new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["__RequestVerificationToken"] = token,
+                ["Message"] = "Body",
+                ["ImportantMessage"] = new string('a', 600),
+                ["SupportEmailAddress"] = "vetqas@apha.gov.uk"
+            })
+        };
+        request.Headers.Add("Cookie", cookie);
+
+        var response = await client.SendAsync(request);
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("govuk-error-summary", body, StringComparison.Ordinal);
+        Assert.Contains("The Important Message cannot exceed 500 characters.", body, StringComparison.Ordinal);
+        Assert.Contains("href=\"#ImportantMessage\"", body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task CreateUser_ReturnsSuccess()
+    {
+        var client = _factory.CreateClient();
+
+        var response = await client.GetAsync("/SystemAdministration/CreateUser");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    // The default empty-state test above never exercises the results dropdown or the "no valid
+    // search results found" banner - this is the only test that posts a real search and renders
+    // that markup.
+    [Fact]
+    public async Task CreateUserSearch_Post_NoResults_RendersNoValidResultsMessage()
+    {
+        var factory = _factory.WithWebHostBuilder(builder =>
+            builder.ConfigureServices(services =>
+            {
+                services.RemoveAll<IUserApiClient>();
+                services.AddSingleton<IUserApiClient>(new FakeUserApiClient { SearchResults = [] });
+            }));
+        var client = factory.CreateClient();
+        var (token, cookie) = await GetAntiforgeryAsync(client, "/SystemAdministration/CreateUser");
+
+        var request = new HttpRequestMessage(HttpMethod.Post, "/SystemAdministration/CreateUserSearch")
+        {
+            Content = new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["__RequestVerificationToken"] = token,
+                ["SearchTerm"] = "nobody"
+            })
+        };
+        request.Headers.Add("Cookie", cookie);
+
+        var response = await client.SendAsync(request);
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("No valid search results found", body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task CreateUserSearch_Post_ResultsFound_RendersSelectAndDepartmentForm()
+    {
+        var factory = _factory.WithWebHostBuilder(builder =>
+            builder.ConfigureServices(services =>
+            {
+                services.RemoveAll<IUserApiClient>();
+                services.AddSingleton<IUserApiClient>(new FakeUserApiClient
+                {
+                    SearchResults = [new StaffDirectoryUserResponse("m100001", "jane@apha.gov.uk", "Jane Smith", "Jane", "Smith")]
+                });
+            }));
+        var client = factory.CreateClient();
+        var (token, cookie) = await GetAntiforgeryAsync(client, "/SystemAdministration/CreateUser");
+
+        var request = new HttpRequestMessage(HttpMethod.Post, "/SystemAdministration/CreateUserSearch")
+        {
+            Content = new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["__RequestVerificationToken"] = token,
+                ["SearchTerm"] = "jane"
+            })
+        };
+        request.Headers.Add("Cookie", cookie);
+
+        var response = await client.SendAsync(request);
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("Jane Smith : m100001", body, StringComparison.Ordinal);
+        Assert.Contains("CreateUserConfirm", body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ManageUserRoles_ReturnsSuccess()
+    {
+        var client = _factory.CreateClient();
+
+        var response = await client.GetAsync("/SystemAdministration/ManageUserRoles");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    // The default empty-state test above never exercises the role-column headers or the
+    // per-user checkbox grid - this is the only test that renders real rows.
+    [Fact]
+    public async Task ManageUserRoles_WithData_RendersRoleColumnsAndCheckedBox()
+    {
+        var userId = Guid.NewGuid();
+        var roleId = Guid.NewGuid();
+        var factory = _factory.WithWebHostBuilder(builder =>
+            builder.ConfigureServices(services =>
+            {
+                services.RemoveAll<IRoleApiClient>();
+                services.AddSingleton<IRoleApiClient>(new FakeRoleApiClient { Roles = [new RoleResponse(roleId, "Admin")] });
+                services.RemoveAll<IUserApiClient>();
+                services.AddSingleton<IUserApiClient>(new FakeUserApiClient
+                {
+                    UserRoleGrid = [new UserRoleRowResponse(userId, "m100001", "Jane Smith", [roleId])]
+                });
+            }));
+        var client = factory.CreateClient();
+
+        var response = await client.GetAsync("/SystemAdministration/ManageUserRoles");
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("Jane Smith", body, StringComparison.Ordinal);
+        Assert.Contains("type=\"checkbox\"", body, StringComparison.Ordinal);
+        Assert.Contains("checked=\"checked\"", body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ManageUserRoles_Post_BlockedBySelfAdminRule_RendersErrorBanner()
+    {
+        var userId = Guid.NewGuid();
+        var factory = _factory.WithWebHostBuilder(builder =>
+            builder.ConfigureServices(services =>
+            {
+                services.RemoveAll<IUserApiClient>();
+                services.AddSingleton<IUserApiClient>(new FakeUserApiClient
+                {
+                    SetRolesResult = new SetUserRolesResponse(false, "You cannot remove your own Admin access.")
+                });
+            }));
+        var client = factory.CreateClient();
+        var (token, cookie) = await GetAntiforgeryAsync(client, "/SystemAdministration/ManageUserRoles");
+
+        var request = new HttpRequestMessage(HttpMethod.Post, "/SystemAdministration/ManageUserRoles")
+        {
+            Content = new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["__RequestVerificationToken"] = token,
+                ["Rows[0].UserId"] = userId.ToString(),
+                ["Rows[0].FriendlyName"] = "Jane Smith"
+            })
+        };
+        request.Headers.Add("Cookie", cookie);
+
+        var response = await client.SendAsync(request);
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("You cannot remove your own Admin access.", body, StringComparison.Ordinal);
     }
 
     private static async Task<(string Token, string Cookie)> GetAntiforgeryAsync(HttpClient client, string url)

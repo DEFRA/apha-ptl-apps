@@ -1,0 +1,63 @@
+@model PTL.InternalWeb.Features.SystemAdministration.CreateUserViewModel
+@{
+    ViewData["Title"] = "Create User";
+
+    var errors = ViewData.ModelState
+        .Where(entry => entry.Value?.Errors.Count > 0)
+        .SelectMany(entry => entry.Value!.Errors.Select(error => (Field: entry.Key, Message: error.ErrorMessage)))
+        .ToList();
+}
+
+<h1 class="govuk-heading-l">Create User</h1>
+
+@if (Model.IsCreated)
+{
+    <div class="govuk-notification-banner govuk-notification-banner--success" role="region" aria-labelledby="govuk-notification-banner-title" data-module="govuk-notification-banner">
+        <div class="govuk-notification-banner__header">
+            <h2 class="govuk-notification-banner__title" id="govuk-notification-banner-title">Success</h2>
+        </div>
+        <div class="govuk-notification-banner__content">
+            <p class="govuk-notification-banner__heading">@Model.Message</p>
+        </div>
+    </div>
+
+    <a class="govuk-button" data-module="govuk-button" asp-action="CreateUser">Create Another</a>
+
+    @* "Setup Roles" (legacy Button_SetupRoles) will link here once the Assign Roles to User
+       screen exists - not yet built, see Navigation/SideNavigationProvider.cs. *@
+}
+else
+{
+    @if (Model.Message is not null)
+    {
+        var bannerType = Model.MessageIsError ? "" : "govuk-notification-banner--success";
+        <div class="govuk-notification-banner @bannerType" role="@(Model.MessageIsError ? "alert" : "region")" aria-labelledby="govuk-notification-banner-title" data-module="govuk-notification-banner">
+            <div class="govuk-notification-banner__header">
+                <h2 class="govuk-notification-banner__title" id="govuk-notification-banner-title">@(Model.MessageIsError ? "Important" : "Success")</h2>
+            </div>
+            <div class="govuk-notification-banner__content">
+                <p class="govuk-notification-banner__heading">@Model.Message</p>
+            </div>
+        </div>
+    }
+
+    <govuk-error-summary errors="@errors" />
+
+    <form method="post" asp-action="CreateUserSearch">
+        <govuk-input asp-for="SearchTerm" label="Search for a user"
+                      hint="Type in the Employee Number (e.g. m123456), Forename or Surname of the user to be created." />
+        <button class="govuk-button" data-module="govuk-button" type="submit">Search</button>
+    </form>
+
+    @if (Model.HasSearched && Model.ResultOptions.Count > 0)
+    {
+        <hr />
+
+        <form method="post" asp-action="CreateUserConfirm">
+            <input type="hidden" asp-for="SearchTerm" />
+            <govuk-select asp-for="SelectedCandidate" label="Select a user" asp-items="Model.ResultOptions" />
+            <govuk-input asp-for="Department" label="Department" />
+            <button class="govuk-button" data-module="govuk-button" type="submit">Create User</button>
+        </form>
+    }
+}

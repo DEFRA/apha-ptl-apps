@@ -6,6 +6,13 @@ using PTL.Contracts.PostagePricingPlan;
 using PTL.Contracts.WeightedPricingPlan;
 using PTL.InternalWeb.Features.SystemAdministration;
 using PTL.InternalWeb.Tests.TestSupport;
+using CountryResponse = PTL.Contracts.Country.CountryResponse;
+using CountryTypeResponse = PTL.Contracts.Country.CountryTypeResponse;
+using CountrySaveResult = PTL.Contracts.Country.CountrySaveResult;
+using CountryDeleteResponse = PTL.Contracts.Country.CountryDeleteResponse;
+using ExternalSiteMessageResponse = PTL.Contracts.ExternalSiteMessage.ExternalSiteMessageResponse;
+using ExternalSiteMessageSaveResult = PTL.Contracts.ExternalSiteMessage.ExternalSiteMessageSaveResult;
+using PTL.Contracts.User;
 
 namespace PTL.InternalWeb.Tests.Features.SystemAdministration;
 
@@ -15,11 +22,19 @@ public class SystemAdministrationControllerTests
         FakeAdministrationChargeApiClient? administrationChargeApiClient = null,
         FakeWeightedPricingPlanApiClient? weightedPricingPlanApiClient = null,
         FakePostagePricingPlanApiClient? postagePricingPlanApiClient = null,
+        FakeCountryApiClient? countryApiClient = null,
+        FakeExternalSiteMessageApiClient? externalSiteMessageApiClient = null,
+        FakeUserApiClient? userApiClient = null,
+        FakeRoleApiClient? roleApiClient = null,
         FakeLookupApiClient? lookupApiClient = null) =>
         new(
             administrationChargeApiClient ?? new FakeAdministrationChargeApiClient(),
             weightedPricingPlanApiClient ?? new FakeWeightedPricingPlanApiClient(),
             postagePricingPlanApiClient ?? new FakePostagePricingPlanApiClient(),
+            countryApiClient ?? new FakeCountryApiClient(),
+            externalSiteMessageApiClient ?? new FakeExternalSiteMessageApiClient(),
+            userApiClient ?? new FakeUserApiClient(),
+            roleApiClient ?? new FakeRoleApiClient(),
             lookupApiClient ?? new FakeLookupApiClient(),
             NullLogger<SystemAdministrationController>.Instance);
 
@@ -456,6 +471,386 @@ public class SystemAdministrationControllerTests
         Assert.False(model.MessageIsError);
         Assert.Contains("2026/27", model.Message);
         Assert.Equal(1, apiClient.RenewCallCount);
+    }
+
+    [Fact]
+    public async Task CountryManagement_Get_BuildsRowsAndTypeOptions()
+    {
+        var countryId = Guid.NewGuid();
+        var countryTypeId = Guid.NewGuid();
+        var apiClient = new FakeCountryApiClient
+        {
+            Countries = [new CountryResponse(countryId, "France", countryTypeId, "EU", 2)],
+            CountryTypes = [new CountryTypeResponse(countryTypeId, "EU")]
+        };
+        var controller = CreateController(countryApiClient: apiClient);
+
+        var result = await controller.CountryManagement(null, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<CountryManagementViewModel>(view.Model);
+        var row = Assert.Single(model.Rows);
+        Assert.Equal("France", row.Country);
+        Assert.Equal(2, row.AllocationCount);
+        Assert.False(row.IsEditing);
+        Assert.Single(model.CountryTypeOptions);
+    }
+
+    [Fact]
+    public async Task CountryManagement_Get_WithEditId_MarksMatchingRowAsEditing()
+    {
+        var editingId = Guid.NewGuid();
+        var otherId = Guid.NewGuid();
+        var apiClient = new FakeCountryApiClient
+        {
+            Countries =
+            [
+                new CountryResponse(editingId, "France", Guid.NewGuid(), "EU", 0),
+                new CountryResponse(otherId, "Germany", Guid.NewGuid(), "EU", 0)
+            ]
+        };
+        var controller = CreateController(countryApiClient: apiClient);
+
+        var result = await controller.CountryManagement(editingId, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<CountryManagementViewModel>(view.Model);
+        Assert.True(model.Rows.Single(r => r.CountryId == editingId).IsEditing);
+        Assert.False(model.Rows.Single(r => r.CountryId == otherId).IsEditing);
+    }
+
+    [Fact]
+    public async Task CountryManagementAdd_ValidModel_CreatesAndRedirects()
+    {
+        var apiClient = new FakeCountryApiClient();
+        var controller = CreateController(countryApiClient: apiClient);
+        var model = new CountryManagementAddViewModel { Country = "France", CountryTypeId = Guid.NewGuid() };
+
+        var result = await controller.CountryManagementAdd(model, CancellationToken.None);
+
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal(nameof(SystemAdministrationController.CountryManagement), redirect.ActionName);
+        Assert.Equal("France", apiClient.LastCreateRequest?.Country);
+    }
+
+    [Fact]
+    public async Task CountryManagementAdd_ApiRejectsDuplicateName_ReturnsViewWithPrefixedError()
+    {
+        var apiClient = new FakeCountryApiClient
+        {
+            SaveResult = new CountrySaveResult(false, null, new Dictionary<string, string[]> { ["Country"] = ["This country already exists. Please try with different name."] })
+        };
+        var controller = CreateController(countryApiClient: apiClient);
+        var model = new CountryManagementAddViewModel { Country = "France", CountryTypeId = Guid.NewGuid() };
+
+        var result = await controller.CountryManagementAdd(model, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        Assert.IsType<CountryManagementViewModel>(view.Model);
+        Assert.True(controller.ModelState.ContainsKey("Add.Country"));
+    }
+
+    [Fact]
+    public async Task CountryManagementSave_ValidModel_UpdatesAndRedirects()
+    {
+        var countryId = Guid.NewGuid();
+        var apiClient = new FakeCountryApiClient();
+        var controller = CreateController(countryApiClient: apiClient);
+        var model = new CountryManagementEditViewModel { CountryId = countryId, Country = "French Republic", CountryTypeId = Guid.NewGuid() };
+
+        var result = await controller.CountryManagementSave(model, CancellationToken.None);
+
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal(nameof(SystemAdministrationController.CountryManagement), redirect.ActionName);
+        Assert.Equal(countryId, apiClient.LastUpdateRequest?.CountryId);
+    }
+
+    [Fact]
+    public async Task CountryManagementSave_ApiSaveFails_RedisplaysRowInEditModeWithPrefixedError()
+    {
+        var countryId = Guid.NewGuid();
+        var apiClient = new FakeCountryApiClient
+        {
+            Countries = [new CountryResponse(countryId, "France", Guid.NewGuid(), "EU", 0)],
+            SaveResult = new CountrySaveResult(false, null, new Dictionary<string, string[]> { ["Country"] = ["This country already exists. Please try with different name."] })
+        };
+        var controller = CreateController(countryApiClient: apiClient);
+        var model = new CountryManagementEditViewModel { CountryId = countryId, Country = "Germany", CountryTypeId = Guid.NewGuid() };
+
+        var result = await controller.CountryManagementSave(model, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var resultModel = Assert.IsType<CountryManagementViewModel>(view.Model);
+        Assert.True(resultModel.Rows.Single(r => r.CountryId == countryId).IsEditing);
+        Assert.True(controller.ModelState.ContainsKey("Edit.Country"));
+    }
+
+    [Fact]
+    public async Task CountryManagementRemove_CountryInUse_RedisplaysWithBlockedMessage()
+    {
+        var countryId = Guid.NewGuid();
+        var apiClient = new FakeCountryApiClient
+        {
+            Countries = [new CountryResponse(countryId, "France", Guid.NewGuid(), "EU", 8)],
+            DeleteResponse = new CountryDeleteResponse(false, "This country is being used by 8 customer(s)/participant(s)/Group Addresses.")
+        };
+        var controller = CreateController(countryApiClient: apiClient);
+
+        var result = await controller.CountryManagementRemove(countryId, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<CountryManagementViewModel>(view.Model);
+        Assert.True(model.MessageIsError);
+        Assert.Equal("This country is being used by 8 customer(s)/participant(s)/Group Addresses.", model.Message);
+        Assert.Equal(countryId, apiClient.LastDeletedCountryId);
+    }
+
+    [Fact]
+    public async Task CountryManagementRemove_NoDependencies_RedisplaysWithSuccessMessage()
+    {
+        var countryId = Guid.NewGuid();
+        var apiClient = new FakeCountryApiClient { DeleteResponse = new CountryDeleteResponse(true, null) };
+        var controller = CreateController(countryApiClient: apiClient);
+
+        var result = await controller.CountryManagementRemove(countryId, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<CountryManagementViewModel>(view.Model);
+        Assert.False(model.MessageIsError);
+        Assert.Null(model.Message);
+    }
+
+    [Fact]
+    public async Task ExternalSiteManagement_Get_BuildsViewModelFromApiResponse()
+    {
+        var apiClient = new FakeExternalSiteMessageApiClient
+        {
+            Message = new ExternalSiteMessageResponse("<p>Body</p>", "<p>Notice</p>", "vetqas@apha.gov.uk")
+        };
+        var controller = CreateController(externalSiteMessageApiClient: apiClient);
+
+        var result = await controller.ExternalSiteManagement(CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<ExternalSiteManagementViewModel>(view.Model);
+        Assert.Equal("<p>Body</p>", model.Message);
+        Assert.Equal("vetqas@apha.gov.uk", model.SupportEmailAddress);
+    }
+
+    [Fact]
+    public async Task ExternalSiteManagement_Post_ValidModel_SavesAndRedirects()
+    {
+        var apiClient = new FakeExternalSiteMessageApiClient();
+        var controller = CreateController(externalSiteMessageApiClient: apiClient);
+        var model = new ExternalSiteManagementViewModel { Message = "Body", ImportantMessage = "Notice", SupportEmailAddress = "vetqas@apha.gov.uk" };
+
+        var result = await controller.ExternalSiteManagement(model, CancellationToken.None);
+
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal(nameof(SystemAdministrationController.ExternalSiteManagement), redirect.ActionName);
+        Assert.Equal("vetqas@apha.gov.uk", apiClient.LastSaveRequest?.SupportEmailAddress);
+    }
+
+    [Fact]
+    public async Task ExternalSiteManagement_Post_InvalidModelState_DoesNotCallApi()
+    {
+        var apiClient = new FakeExternalSiteMessageApiClient();
+        var controller = CreateController(externalSiteMessageApiClient: apiClient);
+        controller.ModelState.AddModelError("SupportEmailAddress", "The Email Address is required");
+        var model = new ExternalSiteManagementViewModel { Message = "Body", ImportantMessage = "Notice", SupportEmailAddress = string.Empty };
+
+        var result = await controller.ExternalSiteManagement(model, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        Assert.IsType<ExternalSiteManagementViewModel>(view.Model);
+        Assert.Null(apiClient.LastSaveRequest);
+    }
+
+    [Fact]
+    public async Task ExternalSiteManagement_Post_ApiRejectsImportantMessage_ReturnsViewWithError()
+    {
+        var apiClient = new FakeExternalSiteMessageApiClient
+        {
+            SaveResult = new ExternalSiteMessageSaveResult(false, null, new Dictionary<string, string[]> { ["ImportantMessage"] = ["The Important Message cannot exceed 500 characters."] })
+        };
+        var controller = CreateController(externalSiteMessageApiClient: apiClient);
+        var model = new ExternalSiteManagementViewModel { Message = "Body", ImportantMessage = new string('a', 600), SupportEmailAddress = "vetqas@apha.gov.uk" };
+
+        var result = await controller.ExternalSiteManagement(model, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        Assert.False(controller.ModelState.IsValid);
+        Assert.IsType<ExternalSiteManagementViewModel>(view.Model);
+    }
+
+    [Fact]
+    public void CreateUser_Get_ReturnsFreshSearchView()
+    {
+        var controller = CreateController();
+
+        var result = controller.CreateUser();
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<CreateUserViewModel>(view.Model);
+        Assert.False(model.HasSearched);
+    }
+
+    [Fact]
+    public async Task CreateUserSearch_ResultsFound_PopulatesOptions()
+    {
+        var apiClient = new FakeUserApiClient
+        {
+            SearchResults = [new StaffDirectoryUserResponse("m100001", "jane@apha.gov.uk", "Jane Smith", "Jane", "Smith")]
+        };
+        var controller = CreateController(userApiClient: apiClient);
+        var model = new CreateUserViewModel { SearchTerm = "jane" };
+
+        var result = await controller.CreateUserSearch(model, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var resultModel = Assert.IsType<CreateUserViewModel>(view.Model);
+        Assert.True(resultModel.HasSearched);
+        Assert.Single(resultModel.ResultOptions);
+        Assert.Null(resultModel.Message);
+        Assert.Equal("jane", apiClient.LastSearchTerm);
+    }
+
+    [Fact]
+    public async Task CreateUserSearch_NoResults_ShowsNoValidResultsMessage()
+    {
+        var apiClient = new FakeUserApiClient { SearchResults = [] };
+        var controller = CreateController(userApiClient: apiClient);
+        var model = new CreateUserViewModel { SearchTerm = "nobody" };
+
+        var result = await controller.CreateUserSearch(model, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var resultModel = Assert.IsType<CreateUserViewModel>(view.Model);
+        Assert.Equal("No valid search results found", resultModel.Message);
+        Assert.True(resultModel.MessageIsError);
+    }
+
+    [Fact]
+    public async Task CreateUserSearch_MissingSearchTerm_ReturnsViewWithoutCallingApi()
+    {
+        var apiClient = new FakeUserApiClient();
+        var controller = CreateController(userApiClient: apiClient);
+        controller.ModelState.AddModelError("SearchTerm", "Enter an Employee Number, Forename or Surname");
+        var model = new CreateUserViewModel { SearchTerm = string.Empty };
+
+        var result = await controller.CreateUserSearch(model, CancellationToken.None);
+
+        Assert.IsType<ViewResult>(result);
+        Assert.Null(apiClient.LastSearchTerm);
+    }
+
+    [Fact]
+    public async Task CreateUserConfirm_ValidSelection_CreatesAndShowsSuccess()
+    {
+        var apiClient = new FakeUserApiClient();
+        var controller = CreateController(userApiClient: apiClient);
+        var model = new CreateUserViewModel
+        {
+            SearchTerm = "jane",
+            SelectedCandidate = "m100001|jane@apha.gov.uk|Jane Smith|Jane|Smith",
+            Department = "Science"
+        };
+
+        var result = await controller.CreateUserConfirm(model, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var resultModel = Assert.IsType<CreateUserViewModel>(view.Model);
+        Assert.True(resultModel.IsCreated);
+        Assert.Equal("m100001", apiClient.LastCreateRequest?.Username);
+        Assert.Equal("Science", apiClient.LastCreateRequest?.Department);
+    }
+
+    [Fact]
+    public async Task CreateUserConfirm_ApiRejectsNoEmail_RedisplaysResultsWithError()
+    {
+        var apiClient = new FakeUserApiClient
+        {
+            SaveResult = new CreateUserSaveResult(false, null, new Dictionary<string, string[]> { ["Email"] = ["The selected User has no Email Address stored in Active Directory and cannot be added."] }),
+            SearchResults = [new StaffDirectoryUserResponse("m100003", string.Empty, "Sam Taylor", "Sam", "Taylor")]
+        };
+        var controller = CreateController(userApiClient: apiClient);
+        var model = new CreateUserViewModel
+        {
+            SearchTerm = "sam",
+            SelectedCandidate = "m100003||Sam Taylor|Sam|Taylor",
+            Department = "Science"
+        };
+
+        var result = await controller.CreateUserConfirm(model, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        Assert.False(controller.ModelState.IsValid);
+        var resultModel = Assert.IsType<CreateUserViewModel>(view.Model);
+        Assert.False(resultModel.IsCreated);
+        Assert.True(resultModel.HasSearched);
+    }
+
+    [Fact]
+    public async Task ManageUserRoles_Get_BuildsRolesAndRows()
+    {
+        var roleId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        var roleApiClient = new FakeRoleApiClient { Roles = [new RoleResponse(roleId, "Admin")] };
+        var userApiClient = new FakeUserApiClient { UserRoleGrid = [new UserRoleRowResponse(userId, "m100001", "Jane Smith", [roleId])] };
+        var controller = CreateController(userApiClient: userApiClient, roleApiClient: roleApiClient);
+
+        var result = await controller.ManageUserRoles(CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<ManageUserRolesViewModel>(view.Model);
+        Assert.Single(model.Roles);
+        var row = Assert.Single(model.Rows);
+        Assert.Contains(roleId, row.SelectedRoleIds);
+    }
+
+    [Fact]
+    public async Task ManageUserRoles_Post_SavesEachRowAndShowsSuccess()
+    {
+        var userId = Guid.NewGuid();
+        var roleId = Guid.NewGuid();
+        var userApiClient = new FakeUserApiClient();
+        var controller = CreateController(userApiClient: userApiClient);
+        var model = new ManageUserRolesViewModel
+        {
+            Rows = [new UserRoleRowViewModel { UserId = userId, FriendlyName = "Jane Smith", SelectedRoleIds = [roleId] }]
+        };
+
+        var result = await controller.ManageUserRoles(model, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var resultModel = Assert.IsType<ManageUserRolesViewModel>(view.Model);
+        Assert.False(resultModel.MessageIsError);
+        Assert.Equal("Role assignments updated successfully.", resultModel.Message);
+        var call = Assert.Single(userApiClient.SetRolesCalls);
+        Assert.Equal(userId, call.UserId);
+        Assert.Contains(roleId, call.Request.RoleIds);
+    }
+
+    [Fact]
+    public async Task ManageUserRoles_Post_BlockedBySelfAdminRule_ShowsErrorMessage()
+    {
+        var userId = Guid.NewGuid();
+        var userApiClient = new FakeUserApiClient
+        {
+            SetRolesResult = new SetUserRolesResponse(false, "You cannot remove your own Admin access.")
+        };
+        var controller = CreateController(userApiClient: userApiClient);
+        var model = new ManageUserRolesViewModel
+        {
+            Rows = [new UserRoleRowViewModel { UserId = userId, FriendlyName = "Jane Smith", SelectedRoleIds = [] }]
+        };
+
+        var result = await controller.ManageUserRoles(model, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var resultModel = Assert.IsType<ManageUserRolesViewModel>(view.Model);
+        Assert.True(resultModel.MessageIsError);
+        Assert.Contains("You cannot remove your own Admin access.", resultModel.Message);
     }
 }
 

@@ -9,21 +9,27 @@ using PTL.Core.Contract.PendingOrder;
 using PTL.Core.Contract.Renew;
 using PTL.Core.Contract.Renewal;
 using PTL.Core.Contract.SampleAddress;
+using PTL.Core.Country;
 using PTL.Core.Customer;
+using PTL.Core.ExternalSiteMessage;
 using PTL.Core.GroupAddress;
 using PTL.Core.InternalUser;
 using PTL.Core.Invoice;
 using PTL.Core.Lookup;
 using PTL.Core.Participant;
 using PTL.Core.Scheme;
+using PTL.Core.User;
 using PTL.Core.Viewer;
 using PTL.Core.WeightedPricingPlan;
 using CoreContract = PTL.Core.Contract.Contract;
+using CoreCountry = PTL.Core.Country.Country;
 using CoreCustomer = PTL.Core.Customer.Customer;
+using CoreExternalSiteMessage = PTL.Core.ExternalSiteMessage.ExternalSiteMessage;
 using CoreGroupAddress = PTL.Core.GroupAddress.GroupAddress;
 using CoreInternalUser = PTL.Core.InternalUser.InternalUser;
 using CoreParticipant = PTL.Core.Participant.Participant;
 using CoreScheme = PTL.Core.Scheme.Scheme;
+using CoreUser = PTL.Core.User.User;
 
 namespace PTL.Data.Infrastructure;
 
@@ -639,6 +645,54 @@ public static class DapperColumnMappings
             [ColCountryId] = nameof(CountryEntity.CountryId),
             [ColCountry] = nameof(CountryEntity.Country),
             ["fldCountryType"] = nameof(CountryEntity.CountryType),
+        });
+
+        Map<CoreCountry>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            [ColCountryId] = nameof(CoreCountry.CountryId),
+            [ColCountry] = nameof(CoreCountry.CountryName),
+            ["fldCountryTypeId"] = nameof(CoreCountry.CountryTypeId),
+            ["fldCountryType"] = nameof(CoreCountry.CountryType),
+            ["fldAllocationCount"] = nameof(CoreCountry.AllocationCount),
+        });
+
+        Map<CountryTypeEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldCountryTypeId"] = nameof(CountryTypeEntity.CountryTypeId),
+            ["fldCountryType"] = nameof(CountryTypeEntity.CountryType),
+        });
+
+        Map<CoreExternalSiteMessage>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldMessage"] = nameof(CoreExternalSiteMessage.Message),
+            ["fldImportantMessage"] = nameof(CoreExternalSiteMessage.ImportantMessage),
+            ["fldSupportEmailAddress"] = nameof(CoreExternalSiteMessage.SupportEmailAddress),
+        });
+
+        Map<CoreUser>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldUserId"] = nameof(CoreUser.UserId),
+            ["fldUsername"] = nameof(CoreUser.Username),
+            ["fldFriendlyName"] = nameof(CoreUser.FriendlyName),
+            ["fldFirstName"] = nameof(CoreUser.FirstName),
+            ["fldLastName"] = nameof(CoreUser.LastName),
+            [ColEmail] = nameof(CoreUser.Email),
+            ["fldDepartment"] = nameof(CoreUser.Department),
+            ["fldIsInactive"] = nameof(CoreUser.IsInactive),
+            ["fldInactiveDate"] = nameof(CoreUser.InactiveDate),
+        });
+
+        Map<Role>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldRoleId"] = nameof(Role.RoleId),
+            ["fldRole"] = nameof(Role.Name),
+        });
+
+        Map<UserRoleAssignment>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldUserRoleId"] = nameof(UserRoleAssignment.UserRoleId),
+            ["fldUserId"] = nameof(UserRoleAssignment.UserId),
+            ["fldRoleId"] = nameof(UserRoleAssignment.RoleId),
         });
 
         Map<CurrencyEntity>(new(StringComparer.OrdinalIgnoreCase)
