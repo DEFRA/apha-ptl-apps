@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using Microsoft.Extensions.Logging;
 using PTL.ApiClient;
 using PTL.Auth.Cidm.Claims;
 using PTL.Auth.Cidm.Events;
@@ -14,7 +15,8 @@ namespace PTL.ExternalWeb.Features.Account;
 /// PTL.Api again to know who the user is.
 /// </summary>
 /// <param name="externalUserApiClient">Calls PTL.Api's external-user resolve endpoint.</param>
-public sealed class ExternalUserResolver(IExternalUserApiClient externalUserApiClient) : ICidmExternalUserResolver
+/// <param name="logger">Logs why a sign-in was denied, for support/diagnostics.</param>
+public sealed class ExternalUserResolver(IExternalUserApiClient externalUserApiClient, ILogger<ExternalUserResolver> logger) : ICidmExternalUserResolver
 {
     /// <inheritdoc />
     public async Task<CidmExternalUserResolution> ResolveAsync(ClaimsPrincipal principal, CancellationToken cancellationToken)
@@ -25,6 +27,7 @@ public sealed class ExternalUserResolver(IExternalUserApiClient externalUserApiC
         // organisation/relationship they're currently acting under.
         if (!Guid.TryParse(principal.FindFirst(CidmClaimTypes.ContactId)?.Value, out var ssoIdExt))
         {
+            logger.LogWarning("CIDM resolve denied: no parseable {Claim} claim present", CidmClaimTypes.ContactId);
             return CidmExternalUserResolution.Deny("/Account/NotPermitted");
         }
 

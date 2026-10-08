@@ -10,7 +10,9 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Protocols;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
+using PTL.ApiClient;
 using PTL.Auth.Cidm;
+using PTL.ExternalWeb.Features.Account;
 
 namespace PTL.ExternalWeb.Tests.TestSupport;
 
@@ -62,6 +64,10 @@ public sealed class PtlExternalWebTestFactory : WebApplicationFactory<Program>
                 });
 
             services.AddSingleton<IStartupFilter, TestSignInStartupFilter>();
+
+            // HomeController.Index() calls this on every request - without a fake, every Home
+            // smoke test would attempt a real HTTP call to the non-existent Api__BaseUrl host.
+            services.AddScoped<ISystemMessageApiClient>(_ => new FakeSystemMessageApiClient());
         });
     }
 
@@ -78,9 +84,21 @@ public sealed class PtlExternalWebTestFactory : WebApplicationFactory<Program>
             {
                 if (context.Request.Path == TestSignInPath)
                 {
-                    var identity = new ClaimsIdentity(
-                        [new Claim(ClaimTypes.Name, "test-user")],
-                        CookieAuthenticationDefaults.AuthenticationScheme);
+                    var claims = new List<Claim> { new(ClaimTypes.Name, "test-user") };
+
+                    var displayName = context.Request.Query["displayName"].FirstOrDefault();
+                    if (!string.IsNullOrEmpty(displayName))
+                    {
+                        claims.Add(new Claim(ExternalUserClaimTypes.DisplayName, displayName));
+                    }
+
+                    var roles = context.Request.Query["roles"].FirstOrDefault();
+                    if (!string.IsNullOrEmpty(roles))
+                    {
+                        claims.Add(new Claim(ExternalUserClaimTypes.ResolvedRoles, roles));
+                    }
+
+                    var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
                     var properties = new AuthenticationProperties();
                     properties.StoreTokens([new AuthenticationToken { Name = "id_token", Value = TestIdToken }]);
                     await context.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(identity), properties);

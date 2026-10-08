@@ -23,6 +23,7 @@ using PTL.Core.Lookup;
 using PTL.Core.Notifications;
 using PTL.Core.Participant;
 using PTL.Core.Scheme;
+using PTL.Core.SystemMessage;
 using PTL.Core.TestConsultant;
 using PTL.Core.Viewer;
 using PTL.Core.WeightedPricingPlan;
@@ -44,6 +45,7 @@ using PTL.Data.Notifications;
 using PTL.Data.Participant;
 using PTL.Data.Scheme;
 using PTL.Data.Storage;
+using PTL.Data.SystemMessage;
 using PTL.Data.TestConsultant;
 using PTL.Data.Viewer;
 using PTL.Data.WeightedPricingPlan;
@@ -99,6 +101,9 @@ builder.Services.AddScoped<IParticipantSchemeService, ParticipantSchemeService>(
 
 builder.Services.AddScoped<ITestConsultantRepository, TestConsultantRepository>();
 builder.Services.AddScoped<IExternalUserService, ExternalUserService>();
+
+builder.Services.AddScoped<ISystemMessageRepository, SystemMessageRepository>();
+builder.Services.AddScoped<ISystemMessageService, SystemMessageService>();
 
 builder.Services.AddScoped<IInternalUserRepository, InternalUserRepository>();
 builder.Services.AddScoped<IInternalUserService, InternalUserService>();

@@ -41,6 +41,7 @@ public class ApiClientServiceCollectionExtensionsTests
         Assert.IsType<ExportTemplateApiClient>(provider.GetRequiredService<IExportTemplateApiClient>());
         Assert.IsType<BulkExportApiClient>(provider.GetRequiredService<IBulkExportApiClient>());
         Assert.IsType<InvoiceApiClient>(provider.GetRequiredService<IInvoiceApiClient>());
+        Assert.IsType<SystemMessageApiClient>(provider.GetRequiredService<ISystemMessageApiClient>());
     }
 
     [Theory]

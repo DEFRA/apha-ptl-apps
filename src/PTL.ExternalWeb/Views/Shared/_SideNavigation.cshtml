@@ -1,0 +1,37 @@
+@using PTL.ExternalWeb.Features.Account
+@using PTL.ExternalWeb.Navigation
+@{
+    var roles = User.GetResolvedExternalRoles();
+    var visibleGroups = NavigationProvider.Build()
+        .Where(item => item.RequiredRole is null || roles.Contains(item.RequiredRole, StringComparer.OrdinalIgnoreCase))
+        .ToList();
+}
+
+<nav aria-label="Primary navigation" class="app-side-navigation">
+    @if (visibleGroups.Count > 0)
+    {
+        @foreach (var group in visibleGroups)
+        {
+            <div class="govuk-body app-side-navigation__title">@group.Text</div>
+            <ul class="govuk-list app-side-navigation__list">
+                @foreach (var item in group.Children)
+                {
+                    <li class="app-side-navigation__item">
+                        @if (!item.IsEnabled || item.ControllerName is null)
+                        {
+                            <span class="govuk-body app-side-navigation__link app-side-navigation__link--disabled" aria-disabled="true">@item.Text</span>
+                        }
+                        else
+                        {
+                            <a class="govuk-link app-side-navigation__link" asp-controller="@item.ControllerName" asp-action="@item.ActionName">@item.Text</a>
+                        }
+                    </li>
+                }
+            </ul>
+        }
+    }
+    else
+    {
+        <p class="govuk-body">No menu items are available for your account yet.</p>
+    }
+</nav>

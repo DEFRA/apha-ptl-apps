@@ -138,6 +138,26 @@ public class CidmOpenIdConnectEventsTests
     }
 
     [Fact]
+    public async Task TokenValidated_RawRoleClaimAlreadyMappedToClaimTypesRole_StillParsesCleanRoleName()
+    {
+        // Mirrors real CIDM tokens: ASP.NET Core's default inbound claim-type map renames the "role"
+        // JWT claim straight to ClaimTypes.Role before TokenValidated runs, so the raw unparsed
+        // "relationshipId:roleName:status" string arrives under ClaimTypes.Role, not "roles".
+        var identity = new ClaimsIdentity(
+        [
+            new Claim(ClaimTypes.Role, "23950a2d-c37d-43da-9fcb-0a4ce9aa11ee:Participant:3")
+        ]);
+        var principal = new ClaimsPrincipal(identity);
+        var context = new TokenValidatedContext(new DefaultHttpContext(), CreateScheme(), new OpenIdConnectOptions(), principal, new AuthenticationProperties());
+
+        await CreateEvents().TokenValidated(context);
+
+        Assert.Contains(identity.Claims, c => c.Type == ClaimTypes.Role && c.Value == "Participant");
+        Assert.DoesNotContain(identity.Claims, c => c.Type == ClaimTypes.Role && c.Value.Contains(':'));
+        Assert.Contains(identity.Claims, c => c.Type == "cidm:role");
+    }
+
+    [Fact]
     public async Task TokenValidated_NoRelationshipsOrRoles_AddsNoExtraClaims()
     {
         var identity = new ClaimsIdentity([new Claim(ClaimTypes.Name, "test-user")]);

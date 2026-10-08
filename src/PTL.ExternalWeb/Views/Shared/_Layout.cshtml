@@ -21,6 +21,26 @@
         .app-service-bar { background: #ffffff; border-bottom: 1px solid #b1b4b6; }
         .app-service-bar__container { min-height: 70px; display: flex; align-items: center; }
         .app-account-panel { margin-left: auto; display: flex; align-items: center; gap: 1rem; }
+        .app-side-navigation__title { font-weight: 700; margin-top: 1rem; }
+        .app-side-navigation__list { margin-bottom: 1.5rem; }
+        .app-side-navigation__link--disabled { color: #505a5f; }
+        /* Quick-link tiles on Home - structure follows the DfE Frontend Card component
+           (github.com/DFE-Digital/dfe-frontend, packages/components/card), recoloured with
+           GOV.UK's own link/focus tokens instead of DfE's blue, since this is an APHA/Defra
+           service, not a DfE one. */
+        .app-card-group { display: flex; flex-direction: column; gap: 15px; margin-bottom: 30px; }
+        @@media (min-width: 40.0625em) {
+            .app-card-group { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 30px; }
+        }
+        .app-card { position: relative; display: flex; flex-direction: column; background-color: #ffffff; border: 1px solid var(--govuk-border-colour, #b1b4b6); }
+        .app-card-container { padding: 15px; display: flex; flex-grow: 1; flex-direction: column; }
+        .app-card-container > :last-child { margin-top: auto; margin-bottom: 0; }
+        .app-card:hover, .app-card:focus-within { background-color: var(--govuk-link-colour, #1d70b8); }
+        .app-card:hover a, .app-card:hover p, .app-card:hover .govuk-heading-m,
+        .app-card:focus-within a, .app-card:focus-within p, .app-card:focus-within .govuk-heading-m { color: #ffffff; }
+        .app-card:focus-within { outline: 3px solid #ffdd00; }
+        .app-card-link--header { text-decoration: none; color: var(--govuk-link-colour, #1d70b8); }
+        .app-card-link--header::after { content: ""; position: absolute; inset: 0; }
     </style>
 </head>
 
@@ -41,12 +61,22 @@
 
 @await Html.PartialAsync("_Header", ("Proficiency Testing - External", "height:40px; width:auto;"))
 <div class="govuk-width-container app-width-container">
-    <main role="main" class="pb-3">
+    <main role="main" class="pb-3" id="main-content">
         @if (!isAccountFlowPage)
         {
             @await Html.PartialAsync("_Breadcrumbs")
         }
-        @RenderBody()
+        <div class="govuk-grid-row">
+            @if (!isAccountFlowPage)
+            {
+                <div class="govuk-grid-column-one-quarter">
+                    @await Html.PartialAsync("_SideNavigation")
+                </div>
+            }
+            <div class="@(isAccountFlowPage ? "govuk-grid-column-full" : "govuk-grid-column-three-quarters")">
+                @RenderBody()
+            </div>
+        </div>
     </main>
 </div>
 @await Html.PartialAsync("_Footer", "#")

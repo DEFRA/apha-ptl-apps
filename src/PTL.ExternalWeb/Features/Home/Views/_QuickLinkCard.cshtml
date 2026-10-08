@@ -1,0 +1,11 @@
+@model string
+@* Structure follows the DfE Frontend Card component (github.com/DFE-Digital/dfe-frontend,
+   packages/components/card/template.njk) - no official govuk-frontend card component exists.
+   No real link target yet, so the heading stays plain text (not the stretched-link pattern)
+   until this item's own migration slice lands. *@
+<div class="app-card">
+    <div class="app-card-container">
+        <h3 class="govuk-heading-m">@Model</h3>
+        <p class="govuk-body-s">Cannot start yet</p>
+    </div>
+</div>

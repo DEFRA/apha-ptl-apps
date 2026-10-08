@@ -1,23 +1,51 @@
 ﻿@model PTL.ExternalWeb.Features.Home.HomeIndexViewModel
+@using PTL.ExternalWeb.Features.Account
+@using PTL.ExternalWeb.Navigation
 @{
-    ViewData["Title"] = "Home Page";
+    ViewData["Title"] = "Home";
+    var roles = User.GetResolvedExternalRoles();
+    var visibleSections = NavigationProvider.Build()
+        .Where(group => group.RequiredRole is null || roles.Contains(group.RequiredRole, StringComparer.OrdinalIgnoreCase))
+        .ToList();
 }
 
-<div class="text-center">
-    @* Index requires authentication (the app's default authorization policy), so Model is always
-       populated here - no anonymous fallback branch needed. *@
-    <h1 class="display-4">Welcome, @Model.DisplayName</h1>
+@* Index requires authentication (the app's default authorization policy), so Model is always
+   populated here - no anonymous fallback branch needed. Navigation is the side nav
+   (_SideNavigation.cshtml, driven by the same NavigationProvider); each section's sub-items are
+   also shown here as quick-link cards for fast access from Home - none of the linked screens
+   exist yet, so every card is flagged "Cannot start yet" until its own migration slice lands. *@
 
-    @if (Model.Roles.Count > 0)
-    {
-        <p>Your roles:</p>
-        <ul class="list-unstyled">
-            @foreach (var role in Model.Roles)
-            {
-                <li>@role</li>
-            }
-        </ul>
-    }
+@if (!string.IsNullOrWhiteSpace(Model.ImportantMessageHtml))
+{
+    @* govuk-notification-banner is the GDS equivalent of legacy Home.aspx's ImportantMessage
+       banner. Html.Raw preserves the admin-authored formatting (AC: "formatting is preserved") -
+       safe here because this content is never user-supplied: it's written by internal staff via
+       ProficiencyTestingWeb/Admin/EditMessageOnWebsite.aspx, which already sanitises it on save. *@
+    <div class="govuk-notification-banner" role="region" aria-labelledby="important-message-title" data-module="govuk-notification-banner">
+        <div class="govuk-notification-banner__header">
+            <h2 class="govuk-notification-banner__title" id="important-message-title">Important</h2>
+        </div>
+        <div class="govuk-notification-banner__content">
+            @Html.Raw(Model.ImportantMessageHtml)
+        </div>
+    </div>
+}
 
-    <p>Learn about <a href="https://learn.microsoft.com/aspnet/core">building Web apps with ASP.NET Core</a>.</p>
-</div>
+<h1 class="govuk-heading-xl">Welcome, @Model.DisplayName</h1>
+
+@if (visibleSections.Count == 0)
+{
+    <p class="govuk-body">No roles are available for your account yet. Contact APHA if you believe this is incorrect.</p>
+}
+
+@foreach (var group in visibleSections)
+{
+    <h2 class="govuk-heading-l">@group.Text</h2>
+    <div class="app-card-group">
+        @foreach (var item in group.Children)
+        {
+            @await Html.PartialAsync("_QuickLinkCard", item.Text)
+        }
+    </div>
+}
+

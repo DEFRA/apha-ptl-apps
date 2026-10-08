@@ -10,8 +10,8 @@ namespace PTL.ExternalWeb.Tests.Features.Home;
 
 public class HomeControllerTests
 {
-    private static HomeController CreateController(params Claim[] claims) =>
-        new(new FakeApiClient())
+    private static HomeController CreateController(string? importantMessage = null, params Claim[] claims) =>
+        new(new FakeApiClient(), new FakeSystemMessageApiClient(importantMessage))
         {
             ControllerContext = new ControllerContext
             {
@@ -23,13 +23,15 @@ public class HomeControllerTests
         };
 
     [Fact]
-    public void Index_DisplayNameAndResolvedRolesClaimsPresent_ShowsBoth()
+    public async Task Index_DisplayNameAndResolvedRolesClaimsPresent_ShowsBoth()
     {
-        var controller = CreateController(
+        var controller = CreateController(claims:
+        [
             new Claim(ExternalUserClaimTypes.DisplayName, "Jane Doe"),
-            new Claim(ExternalUserClaimTypes.ResolvedRoles, "Viewer,Participant"));
+            new Claim(ExternalUserClaimTypes.ResolvedRoles, "Viewer,Participant")
+        ]);
 
-        var result = controller.Index();
+        var result = await controller.Index();
 
         var viewResult = Assert.IsType<ViewResult>(result);
         var model = Assert.IsType<HomeIndexViewModel>(viewResult.Model);
@@ -38,11 +40,11 @@ public class HomeControllerTests
     }
 
     [Fact]
-    public void Index_NoResolvedRolesClaim_ShowsNoRoles()
+    public async Task Index_NoResolvedRolesClaim_ShowsNoRoles()
     {
-        var controller = CreateController(new Claim(ExternalUserClaimTypes.DisplayName, "Jane Doe"));
+        var controller = CreateController(claims: new Claim(ExternalUserClaimTypes.DisplayName, "Jane Doe"));
 
-        var result = controller.Index();
+        var result = await controller.Index();
 
         var viewResult = Assert.IsType<ViewResult>(result);
         var model = Assert.IsType<HomeIndexViewModel>(viewResult.Model);
@@ -50,11 +52,25 @@ public class HomeControllerTests
     }
 
     [Fact]
-    public void Index_NoDisplayNameClaim_FallsBackToIdentityName()
+    public async Task Index_ResolvedRolesClaim_SetsMatchingRoleFlags()
     {
-        var controller = CreateController(new Claim(ClaimTypes.Name, "fallback-name"));
+        var controller = CreateController(claims: new Claim(ExternalUserClaimTypes.ResolvedRoles, "Participant,Test Consultant"));
 
-        var result = controller.Index();
+        var result = await controller.Index();
+
+        var viewResult = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<HomeIndexViewModel>(viewResult.Model);
+        Assert.True(model.IsParticipant);
+        Assert.True(model.IsTestConsultant);
+        Assert.False(model.IsViewer);
+    }
+
+    [Fact]
+    public async Task Index_NoDisplayNameClaim_FallsBackToIdentityName()
+    {
+        var controller = CreateController(claims: new Claim(ClaimTypes.Name, "fallback-name"));
+
+        var result = await controller.Index();
 
         var viewResult = Assert.IsType<ViewResult>(result);
         var model = Assert.IsType<HomeIndexViewModel>(viewResult.Model);
@@ -62,11 +78,11 @@ public class HomeControllerTests
     }
 
     [Fact]
-    public void Index_NoDisplayNameOrNameClaim_ShowsEmptyDisplayName()
+    public async Task Index_NoDisplayNameOrNameClaim_ShowsEmptyDisplayName()
     {
         var controller = CreateController();
 
-        var result = controller.Index();
+        var result = await controller.Index();
 
         var viewResult = Assert.IsType<ViewResult>(result);
         var model = Assert.IsType<HomeIndexViewModel>(viewResult.Model);
@@ -74,9 +90,33 @@ public class HomeControllerTests
     }
 
     [Fact]
+    public async Task Index_ImportantMessagePublished_PassesHtmlToViewModel()
+    {
+        var controller = CreateController(importantMessage: "<p>Planned maintenance <strong>Friday</strong></p>");
+
+        var result = await controller.Index();
+
+        var viewResult = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<HomeIndexViewModel>(viewResult.Model);
+        Assert.Equal("<p>Planned maintenance <strong>Friday</strong></p>", model.ImportantMessageHtml);
+    }
+
+    [Fact]
+    public async Task Index_NoImportantMessagePublished_ViewModelHasNullMessage()
+    {
+        var controller = CreateController();
+
+        var result = await controller.Index();
+
+        var viewResult = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<HomeIndexViewModel>(viewResult.Model);
+        Assert.Null(model.ImportantMessageHtml);
+    }
+
+    [Fact]
     public void Privacy_ReturnsView()
     {
-        var controller = new HomeController(new FakeApiClient());
+        var controller = new HomeController(new FakeApiClient(), new FakeSystemMessageApiClient());
 
         var result = controller.Privacy();
 
@@ -87,7 +127,7 @@ public class HomeControllerTests
     public async Task ApiStatus_ReturnsJsonFromApiClient()
     {
         var expected = new ApiHealthResponse("Healthy", 42, DateTime.UtcNow);
-        var controller = new HomeController(new FakeApiClient(expected));
+        var controller = new HomeController(new FakeApiClient(expected), new FakeSystemMessageApiClient());
 
         var result = await controller.ApiStatus(CancellationToken.None);
 
@@ -98,7 +138,7 @@ public class HomeControllerTests
     [Fact]
     public void Error_ReturnsViewWithRequestId()
     {
-        var controller = new HomeController(new FakeApiClient())
+        var controller = new HomeController(new FakeApiClient(), new FakeSystemMessageApiClient())
         {
             ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() }
         };
