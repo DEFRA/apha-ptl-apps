@@ -31,7 +31,7 @@ public class SchemeControllerTests
         };
         var controller = CreateController(apiClient);
 
-        var result = await controller.Index(1, 15, null, CancellationToken.None);
+        var result = await controller.Index(null, null, 1, 15, CancellationToken.None);
 
         var view = Assert.IsType<ViewResult>(result);
         var model = Assert.IsType<PTL.InternalWeb.Features.Scheme.SchemeListViewModel>(view.Model);
@@ -97,6 +97,7 @@ public class SchemeControllerTests
 
         var view = Assert.IsType<ViewResult>(result);
         var model = Assert.IsType<PTL.InternalWeb.Features.Scheme.SchemeListViewModel>(view.Model);
+        Assert.NotNull(model.Search);
         Assert.Equal(2027, model.Search.YearId);
     }
 
@@ -113,6 +114,7 @@ public class SchemeControllerTests
 
         var view = Assert.IsType<ViewResult>(result);
         var model = Assert.IsType<PTL.InternalWeb.Features.Scheme.SchemeListViewModel>(view.Model);
+        Assert.NotNull(model.Search);
         Assert.Equal(0, model.Search.YearId);
     }
 

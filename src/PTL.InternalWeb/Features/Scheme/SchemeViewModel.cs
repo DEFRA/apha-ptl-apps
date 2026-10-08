@@ -8,13 +8,19 @@ using CoreSchemeIdentifier = PTL.Core.Scheme.SchemeIdentifier;
 namespace PTL.InternalWeb.Features.Scheme;
 
 // Legacy SchemeList.aspx has no year filter; the Scheme Name search box is carried over from the
-// legacy Scheme Admin/Search.aspx page, which this screen now absorbs.
+// legacy Scheme Admin/Search.aspx page, which this screen now absorbs. Search is only populated
+// by Index (the Year filter); PrintableSchemes has no year filter so leaves it null.
 public sealed record SchemeListViewModel(
     int Page,
     int PageSize,
     int TotalCount,
     string? SearchTerm,
-    IReadOnlyList<SchemeSummaryResponse> Schemes);
+    IReadOnlyList<SchemeSummaryResponse> Schemes,
+    SchemeYearSearchViewModel? Search = null);
+
+// Index's Year dropdown - YearId is whatever was resolved (posted value, or the first current
+// year when none was posted), YearOptions backs the <select>.
+public sealed record SchemeYearSearchViewModel(int YearId, IReadOnlyList<SelectListItem> YearOptions);
 
 // Legacy SchemeHistory.aspx.vb GetYearNameFromYearId() resolves each row's YearId against
 // YearCollection and displays the "2026/27"-style label, not the raw integer.

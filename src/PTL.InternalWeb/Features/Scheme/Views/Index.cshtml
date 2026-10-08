@@ -7,7 +7,7 @@
         CurrentPage = Model.Page,
         PageSize = Model.PageSize,
         TotalRecords = Model.TotalCount,
-        RouteValues = new Dictionary<string, object?> { ["searchTerm"] = Model.SearchTerm }
+        RouteValues = new Dictionary<string, object?> { ["searchTerm"] = Model.SearchTerm, ["yearId"] = Model.Search?.YearId }
     };
 }
 
@@ -17,6 +17,18 @@
    Scheme Name." - absorbed into the list page as a usability improvement; a plain substring match,
    no other filtering behaviour. *@
 <form method="get" asp-action="Index" class="govuk-!-margin-bottom-6">
+    @if (Model.Search is { } search)
+    {
+        <div class="govuk-form-group">
+            <label class="govuk-label" for="yearId">Year</label>
+            <select class="govuk-select" id="yearId" name="yearId">
+                @foreach (var year in search.YearOptions)
+                {
+                    <option value="@year.Value" selected="@(year.Value == search.YearId.ToString(System.Globalization.CultureInfo.InvariantCulture) ? "selected" : null)">@year.Text</option>
+                }
+            </select>
+        </div>
+    }
     <div class="govuk-form-group">
         <label class="govuk-label" for="searchTerm">Scheme Name</label>
         <input class="govuk-input" id="searchTerm" name="searchTerm" value="@Model.SearchTerm" />
