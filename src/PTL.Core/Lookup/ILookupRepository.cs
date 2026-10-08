@@ -1,3 +1,5 @@
+using PTL.Contracts.Lookup;
+
 namespace PTL.Core.Lookup;
 
 // Defined in Core (not Data) so ILookupService can depend on the abstraction without Core
@@ -39,4 +41,31 @@ public interface ILookupRepository
     // spgaGroupAddress - matches legacy GroupAddressCollection.FetchGroupAddressCollection(), used
     // by ParticipantScheme.aspx's "Select a Group Address" popup.
     Task<IReadOnlyList<GroupAddressEntity>> GetGroupAddressesAsync(CancellationToken cancellationToken = default);
+
+    // spgaSchedule / spgaScheduleCode / spgaDay - the three Scheme "Details" tab dropdowns.
+    Task<IReadOnlyList<ScheduleEntity>> GetSchedulesAsync(CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<ScheduleCodeEntity>> GetScheduleCodesAsync(CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<DayEntity>> GetDaysAsync(CancellationToken cancellationToken = default);
+
+    // spgaMonthlyDistributionInfo - every monthly distribution on record. The Scheme screen uses
+    // the year/month pairs to lock distribution months that have already been initialised
+    // (legacy Scheme.SetEditPermissions / dbo.fnIsDistributionNotDefined).
+    Task<IReadOnlyList<MonthlyDistributionEntity>> GetMonthlyDistributionsAsync(CancellationToken cancellationToken = default);
+
+    // spgaPTNumbers - every scheme identifier on record, backing the Scheme identifier
+    // uniqueness check (legacy UniquePTNumberValidator).
+    Task<IReadOnlyList<PTNumberEntity>> GetPTNumbersAsync(CancellationToken cancellationToken = default);
+
+    // spgaUserAllTestConsultant - internal users holding the Test Consultant role (result set 1)
+    // followed by external test consultants (result set 2), flagged via IsExternal.
+    Task<IReadOnlyList<SchemeUserEntity>> GetTestConsultantsAsync(CancellationToken cancellationToken = default);
+
+    // spgaUserAssessor - internal users holding the Assessor role. Legacy has no external
+    // assessors.
+    Task<IReadOnlyList<SchemeUserEntity>> GetAssessorsAsync(CancellationToken cancellationToken = default);
+
+    // spgTestTypeByYearId / spgTestResultItemTypeByYearId / spgTestMethodItemTypeByYearId /
+    // spgCategoryItemTypeByYearId / spgCriterionItemTypeByYearId - only types valid for the
+    // scheme's year are offered, matching the Tests tab's year-scoped ObjectDataSources.
+    Task<IReadOnlyList<SchemeItemTypeEntity>> GetSchemeItemTypesAsync(SchemeItemTypeKind kind, int yearId, CancellationToken cancellationToken = default);
 }

@@ -1,34 +1,51 @@
 @model PTL.InternalWeb.Features.Scheme.SchemeFormViewModel
 @{
-    // Hand-rolled to match the GOV.UK Design System error summary exactly - see
-    // PTL.InternalWeb/Features/Customer/Views/_CustomerForm.cshtml for the reference pattern this follows.
+    // Error-summary ordering follows the visual top-to-bottom order of the Details tab, then the
+    // remaining tabs in legacy tab order.
     var fieldOrder = new[]
     {
-        nameof(Model.YearId), nameof(Model.Identifier), nameof(Model.Name), nameof(Model.StartDate),
+        nameof(Model.Identifier), nameof(Model.Name), nameof(Model.YearId), nameof(Model.StartDate),
         nameof(Model.ScheduleId), nameof(Model.ScheduleCodeId),
         nameof(Model.DistributionAsAvailable),
-        nameof(Model.WeekNumber), nameof(Model.NumberOfSamples), nameof(Model.SampleOrigin), nameof(Model.Deadline),
-        nameof(Model.Subcontractor), nameof(Model.CombinedPackaging), nameof(Model.Postage), nameof(Model.CustomsVolume),
-        nameof(Model.SamplePackingInstructions),
-        nameof(Model.RequiresAssessment),
+        nameof(Model.WeekNumber), nameof(Model.DayOfWeekId),
+        nameof(Model.NumberOfSamples), nameof(Model.SampleOrigin), nameof(Model.Subcontractor),
+        nameof(Model.Deadline), nameof(Model.CombinedPackaging), nameof(Model.SamplePackingInstructions),
+        nameof(Model.Postage), nameof(Model.CustomsVolume),
         nameof(Model.CommentsRequired), nameof(Model.Pilot), nameof(Model.LimitedSampleAvailability),
         nameof(Model.Accredited), nameof(Model.NoVLALabs), nameof(Model.ComerciallyAvailable),
+        nameof(Model.RequiresAssessment),
+        nameof(Model.Prices),
         nameof(Model.CustomsDescription),
         nameof(Model.DataConsentDeclarationActive), nameof(Model.DataConsentDeclarationText),
-        nameof(Model.Instructions), nameof(Model.StandardTabulationText)
+        nameof(Model.Instructions),
+        nameof(Model.StandardTabulationText), nameof(Model.TestConsultantTabulationId), nameof(Model.Tabulations),
+        nameof(Model.TestConsultant1), nameof(Model.TestConsultant2), nameof(Model.TestConsultant3),
+        nameof(Model.Assessor1), nameof(Model.Assessor2), nameof(Model.Assessor3), nameof(Model.Assessor4)
     };
+
+    // Collection members are reported under keys like "Prices[0].Price", so an exact match would
+    // push every one of them to the bottom of the summary instead of next to its own field.
+    int FieldRank(string field)
+    {
+        for (var index = 0; index < fieldOrder.Length; index++)
+        {
+            var candidate = fieldOrder[index];
+            if (field.Equals(candidate, StringComparison.Ordinal)
+                || field.StartsWith(candidate + "[", StringComparison.Ordinal)
+                || field.StartsWith(candidate + ".", StringComparison.Ordinal))
+            {
+                return index;
+            }
+        }
+
+        return int.MaxValue;
+    }
 
     var errors = ViewData.ModelState
         .Where(entry => entry.Value?.Errors.Count > 0)
         .SelectMany(entry => entry.Value!.Errors.Select(error => (Field: entry.Key, Message: error.ErrorMessage)))
-        .OrderBy(error => Array.IndexOf(fieldOrder, error.Field) is var idx && idx == -1 ? int.MaxValue : idx)
+        .OrderBy(error => FieldRank(error.Field))
         .ToList();
-
-    bool HasError(string field) => ViewData.ModelState.TryGetValue(field, out var entry) && entry.Errors.Count > 0;
-    string? FirstError(string field) => ViewData.ModelState.TryGetValue(field, out var entry) && entry.Errors.Count > 0 ? entry.Errors[0].ErrorMessage : null;
-    string FormGroupClass(string field) => HasError(field) ? "govuk-form-group govuk-form-group--error" : "govuk-form-group";
-    string InputClass(string baseClass, string field) => HasError(field) ? $"{baseClass} {baseClass}--error" : baseClass;
-    string? DescribedBy(string field) => HasError(field) ? $"{field}-error" : null;
 }
 
 <govuk-error-summary errors="@errors" />
@@ -36,266 +53,135 @@
 @if (Model.SchemeId is not null)
 {
     <input type="hidden" asp-for="SchemeId" />
+}
+@* A Renew draft has no SchemeId yet (it is created fresh on Save) but must carry its existing
+   family's SharedId forward, so this renders independently of the SchemeId check above. *@
+@if (Model.SharedId is not null)
+{
     <input type="hidden" asp-for="SharedId" />
 }
 
-<h2 class="govuk-heading-m">Scheme details</h2>
+@* Seven tabs in legacy Scheme.aspx TabContainer1 order. Test Consultants and Assessors are
+   mutually exclusive, driven by Requires Assessment on the Details tab. *@
+<div class="govuk-tabs" data-module="govuk-tabs" id="scheme-tabs">
+    <h2 class="govuk-tabs__title">Contents</h2>
+    <ul class="govuk-tabs__list">
+        <li class="govuk-tabs__list-item govuk-tabs__list-item--selected">
+            <a class="govuk-tabs__tab" href="#tab-details">Details</a>
+        </li>
+        <li class="govuk-tabs__list-item">
+            <a class="govuk-tabs__tab" href="#tab-tests">Tests</a>
+        </li>
+        <li class="govuk-tabs__list-item">
+            <a class="govuk-tabs__tab" href="#tab-distribution-level-data">Distribution Level Data</a>
+        </li>
+        <li class="govuk-tabs__list-item">
+            <a class="govuk-tabs__tab" href="#tab-results-tabulations">Results Tabulations</a>
+        </li>
+        <li class="govuk-tabs__list-item" id="tab-list-item-test-consultants" hidden="@Model.RequiresAssessment">
+            <a class="govuk-tabs__tab" href="#tab-test-consultants">Test Consultants</a>
+        </li>
+        <li class="govuk-tabs__list-item" id="tab-list-item-assessors" hidden="@(!Model.RequiresAssessment)">
+            <a class="govuk-tabs__tab" href="#tab-assessors">Assessors</a>
+        </li>
+        <li class="govuk-tabs__list-item">
+            <a class="govuk-tabs__tab" href="#tab-viewers">Viewers</a>
+        </li>
+    </ul>
 
-<govuk-select asp-for="YearId" label="Year" asp-items="Model.YearOptions" />
-
-<govuk-input asp-for="Identifier" label="Identifier" hint="Format: PT followed by 4 digits (e.g. PT1234)." input-class="govuk-input govuk-input--width-10" />
-
-<govuk-input asp-for="Name" label="Name" />
-
-<govuk-input asp-for="StartDate" label="Start date" input-class="govuk-input govuk-input--width-10" type="date" />
-
-@if (Model.SchemeId is not null)
-{
-    <div class="govuk-form-group">
-        <p class="govuk-label govuk-label--s">Scheme version</p>
-        <p class="govuk-body">@(Model.LastModified?.ToString("d MMMM yyyy HH:mm") ?? "Not set")</p>
+    <div class="govuk-tabs__panel" id="tab-details">
+        <partial name="_SchemeTabDetails" model="Model" />
     </div>
-}
-
-<govuk-input asp-for="ScheduleId" label="Schedule" />
-
-<govuk-input asp-for="ScheduleCodeId" label="Schedule code" />
-
-<h2 class="govuk-heading-m">Distribution months</h2>
-<div class="@FormGroupClass("DistributionAsAvailable")">
-    @if (HasError("DistributionAsAvailable"))
-    {
-        <p id="DistributionAsAvailable-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @FirstError("DistributionAsAvailable")</p>
-    }
-    <div class="govuk-checkboxes" data-module="govuk-checkboxes">
-        <div class="govuk-checkboxes__item">
-            <input class="govuk-checkboxes__input" asp-for="DistributionMonthApr" />
-            <label class="govuk-label govuk-checkboxes__label" asp-for="DistributionMonthApr">April</label>
-        </div>
-        <div class="govuk-checkboxes__item">
-            <input class="govuk-checkboxes__input" asp-for="DistributionMonthMay" />
-            <label class="govuk-label govuk-checkboxes__label" asp-for="DistributionMonthMay">May</label>
-        </div>
-        <div class="govuk-checkboxes__item">
-            <input class="govuk-checkboxes__input" asp-for="DistributionMonthJun" />
-            <label class="govuk-label govuk-checkboxes__label" asp-for="DistributionMonthJun">June</label>
-        </div>
-        <div class="govuk-checkboxes__item">
-            <input class="govuk-checkboxes__input" asp-for="DistributionMonthJul" />
-            <label class="govuk-label govuk-checkboxes__label" asp-for="DistributionMonthJul">July</label>
-        </div>
-        <div class="govuk-checkboxes__item">
-            <input class="govuk-checkboxes__input" asp-for="DistributionMonthAug" />
-            <label class="govuk-label govuk-checkboxes__label" asp-for="DistributionMonthAug">August</label>
-        </div>
-        <div class="govuk-checkboxes__item">
-            <input class="govuk-checkboxes__input" asp-for="DistributionMonthSep" />
-            <label class="govuk-label govuk-checkboxes__label" asp-for="DistributionMonthSep">September</label>
-        </div>
-        <div class="govuk-checkboxes__item">
-            <input class="@InputClass("govuk-checkboxes__input", "DistributionAsAvailable")" asp-for="DistributionAsAvailable" aria-describedby="@DescribedBy("DistributionAsAvailable")" />
-            <label class="govuk-label govuk-checkboxes__label" asp-for="DistributionAsAvailable">As available</label>
-        </div>
-        <div class="govuk-checkboxes__item">
-            <input class="govuk-checkboxes__input" asp-for="DistributionMonthOct" />
-            <label class="govuk-label govuk-checkboxes__label" asp-for="DistributionMonthOct">October</label>
-        </div>
-        <div class="govuk-checkboxes__item">
-            <input class="govuk-checkboxes__input" asp-for="DistributionMonthNov" />
-            <label class="govuk-label govuk-checkboxes__label" asp-for="DistributionMonthNov">November</label>
-        </div>
-        <div class="govuk-checkboxes__item">
-            <input class="govuk-checkboxes__input" asp-for="DistributionMonthDec" />
-            <label class="govuk-label govuk-checkboxes__label" asp-for="DistributionMonthDec">December</label>
-        </div>
-        <div class="govuk-checkboxes__item">
-            <input class="govuk-checkboxes__input" asp-for="DistributionMonthJan" />
-            <label class="govuk-label govuk-checkboxes__label" asp-for="DistributionMonthJan">January</label>
-        </div>
-        <div class="govuk-checkboxes__item">
-            <input class="govuk-checkboxes__input" asp-for="DistributionMonthFeb" />
-            <label class="govuk-label govuk-checkboxes__label" asp-for="DistributionMonthFeb">February</label>
-        </div>
-        <div class="govuk-checkboxes__item">
-            <input class="govuk-checkboxes__input" asp-for="DistributionMonthMar" />
-            <label class="govuk-label govuk-checkboxes__label" asp-for="DistributionMonthMar">March</label>
-        </div>
+    <div class="govuk-tabs__panel govuk-tabs__panel--hidden" id="tab-tests">
+        <partial name="_SchemeTabTests" model="Model" />
+    </div>
+    <div class="govuk-tabs__panel govuk-tabs__panel--hidden" id="tab-distribution-level-data">
+        <partial name="_SchemeTabDistributionLevelData" model="Model" />
+    </div>
+    <div class="govuk-tabs__panel govuk-tabs__panel--hidden" id="tab-results-tabulations">
+        <partial name="_SchemeTabResultsTabulations" model="Model" />
+    </div>
+    <div class="govuk-tabs__panel govuk-tabs__panel--hidden" id="tab-test-consultants">
+        <partial name="_SchemeTabTestConsultants" model="Model" />
+    </div>
+    <div class="govuk-tabs__panel govuk-tabs__panel--hidden" id="tab-assessors">
+        <partial name="_SchemeTabAssessors" model="Model" />
+    </div>
+    <div class="govuk-tabs__panel govuk-tabs__panel--hidden" id="tab-viewers">
+        <partial name="_SchemeTabViewers" model="Model" />
     </div>
 </div>
 
-<h2 class="govuk-heading-m">Schedule &amp; logistics</h2>
+<script>
+    // The Tests and Results Tabulations Add/Remove/Up/Down commands re-render the whole form, which
+    // would otherwise drop the user back on the first tab. Carrying the open tab in the URL
+    // fragment survives the post and is what the GOV.UK tabs component reads on load.
+    (function () {
+        var tabs = document.getElementById('scheme-tabs');
+        var form = tabs && tabs.closest('form');
+        if (!form) {
+            return;
+        }
 
-<govuk-input asp-for="WeekNumber" label="Week number" input-class="govuk-input govuk-input--width-5" />
-
-<govuk-input asp-for="DayOfWeekId" label="Day of week" />
-
-<govuk-input asp-for="NumberOfSamples" label="Number of samples" input-class="govuk-input govuk-input--width-5" />
-
-@if (Model.SchemeId is not null)
-{
-    <div class="govuk-form-group">
-        <p class="govuk-label govuk-label--s">Sample number sequence</p>
-        <p class="govuk-body">@Model.SampleNoSequence</p>
-    </div>
-}
-
-<govuk-input asp-for="SampleOrigin" label="Sample origin" />
-
-<govuk-input asp-for="Deadline" label="Deadline" input-class="govuk-input govuk-input--width-5" />
-
-<govuk-input asp-for="Subcontractor" label="Subcontractor" />
-
-<div class="govuk-form-group">
-    <div class="govuk-checkboxes" data-module="govuk-checkboxes">
-        <div class="govuk-checkboxes__item">
-            <input class="govuk-checkboxes__input" asp-for="CombinedPackaging" />
-            <label class="govuk-label govuk-checkboxes__label" asp-for="CombinedPackaging">Combined packaging</label>
-        </div>
-    </div>
-</div>
-
-<govuk-select asp-for="Postage" label="Postage pricing plan" asp-items="Model.PostageOptions" />
-
-<govuk-input asp-for="CustomsVolume" label="Customs volume" input-class="govuk-input govuk-input--width-10" />
-
-<div class="@FormGroupClass("SamplePackingInstructions")">
-    <label class="govuk-label" asp-for="SamplePackingInstructions">Sample packing instructions</label>
-    @if (HasError("SamplePackingInstructions"))
-    {
-        <p id="SamplePackingInstructions-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @FirstError("SamplePackingInstructions")</p>
-    }
-    <textarea class="@InputClass("govuk-textarea", "SamplePackingInstructions")" asp-for="SamplePackingInstructions" aria-describedby="@DescribedBy("SamplePackingInstructions")"></textarea>
-</div>
-
-<h2 class="govuk-heading-m">Assessment</h2>
-<div class="govuk-form-group">
-    <div class="govuk-checkboxes" data-module="govuk-checkboxes">
-        <div class="govuk-checkboxes__item">
-            @if (Model.SchemeId is not null)
-            {
-                <input type="hidden" asp-for="RequiresAssessment" />
-                <input class="govuk-checkboxes__input" asp-for="RequiresAssessment" disabled />
+        form.addEventListener('submit', function () {
+            var selected = tabs.querySelector('.govuk-tabs__list-item--selected .govuk-tabs__tab');
+            if (selected) {
+                form.action = form.action.split('#')[0] + selected.getAttribute('href');
             }
-            else
-            {
-                <input class="govuk-checkboxes__input" asp-for="RequiresAssessment" />
+        });
+
+        // Restore explicitly rather than relying on the tabs component, whose hash handling runs
+        // before this form is enhanced. The pattern check keeps the hash out of a selector.
+        var hash = window.location.hash;
+        if (/^#tab-[a-z-]+$/.test(hash)) {
+            var tab = tabs.querySelector('.govuk-tabs__tab[href="' + hash + '"]');
+            if (tab) {
+                tab.click();
             }
-            <label class="govuk-label govuk-checkboxes__label" asp-for="RequiresAssessment">Requires assessment</label>
-            @if (Model.SchemeId is not null)
-            {
-                <div class="govuk-hint">This can only be set when the scheme is created.</div>
+        }
+    })();
+
+    // Mirrors Scheme.aspx.vb EnableAssessor(): Requires Assessment swaps the Test Consultants and
+    // Assessors tabs. Requires Assessment is only editable while creating a scheme, so on Edit the
+    // server-rendered state is already final and this listener never fires.
+    (function () {
+        var requiresAssessment = document.getElementById('RequiresAssessment');
+        var consultantsTab = document.getElementById('tab-list-item-test-consultants');
+        var assessorsTab = document.getElementById('tab-list-item-assessors');
+        if (!requiresAssessment || !consultantsTab || !assessorsTab) {
+            return;
+        }
+
+        requiresAssessment.addEventListener('change', function () {
+            consultantsTab.hidden = requiresAssessment.checked;
+            assessorsTab.hidden = !requiresAssessment.checked;
+        });
+    })();
+
+    // An error summary link only scrolls to its field if that field's tab is open, so opening the
+    // containing tab first is what makes every link work and not just the Details ones.
+    (function () {
+        var summary = document.querySelector('.govuk-error-summary');
+        if (!summary) {
+            return;
+        }
+
+        summary.addEventListener('click', function (event) {
+            var link = event.target.closest('a[href^="#"]');
+            if (!link) {
+                return;
             }
-        </div>
-    </div>
-</div>
 
-<h2 class="govuk-heading-m">Classification</h2>
-<div class="govuk-form-group">
-    <div class="govuk-checkboxes" data-module="govuk-checkboxes">
-        <div class="govuk-checkboxes__item">
-            <input class="govuk-checkboxes__input" asp-for="CommentsRequired" />
-            <label class="govuk-label govuk-checkboxes__label" asp-for="CommentsRequired">Comments required</label>
-        </div>
-        <div class="govuk-checkboxes__item">
-            <input class="govuk-checkboxes__input" asp-for="Pilot" />
-            <label class="govuk-label govuk-checkboxes__label" asp-for="Pilot">Pilot</label>
-        </div>
-        <div class="govuk-checkboxes__item">
-            <input class="govuk-checkboxes__input" asp-for="LimitedSampleAvailability" />
-            <label class="govuk-label govuk-checkboxes__label" asp-for="LimitedSampleAvailability">Limited sample availability</label>
-        </div>
-        <div class="govuk-checkboxes__item">
-            <input class="govuk-checkboxes__input" asp-for="Accredited" />
-            <label class="govuk-label govuk-checkboxes__label" asp-for="Accredited">Accredited</label>
-        </div>
-        <div class="govuk-checkboxes__item">
-            <input class="govuk-checkboxes__input" asp-for="NoVLALabs" />
-            <label class="govuk-label govuk-checkboxes__label" asp-for="NoVLALabs">No VLA labs</label>
-        </div>
-        <div class="govuk-checkboxes__item">
-            <input class="govuk-checkboxes__input" asp-for="ComerciallyAvailable" />
-            <label class="govuk-label govuk-checkboxes__label" asp-for="ComerciallyAvailable">Commercially available</label>
-        </div>
-    </div>
-</div>
+            var field = document.getElementById(decodeURIComponent(link.getAttribute('href').substring(1)));
+            var panel = field && field.closest('.govuk-tabs__panel');
+            if (!panel) {
+                return;
+            }
 
-<h2 class="govuk-heading-m">Customs</h2>
-
-<govuk-input asp-for="CustomsDescription" label="Customs description" />
-
-<h2 class="govuk-heading-m">Data Consent Declaration</h2>
-<div class="govuk-form-group">
-    <div class="govuk-checkboxes" data-module="govuk-checkboxes">
-        <div class="govuk-checkboxes__item">
-            <input class="govuk-checkboxes__input" asp-for="DataConsentDeclarationActive" />
-            <label class="govuk-label govuk-checkboxes__label" asp-for="DataConsentDeclarationActive">Data Consent Declaration active</label>
-        </div>
-    </div>
-</div>
-
-<div class="@FormGroupClass("DataConsentDeclarationText")">
-    <label class="govuk-label" asp-for="DataConsentDeclarationText">Consent text</label>
-    @if (HasError("DataConsentDeclarationText"))
-    {
-        <p id="DataConsentDeclarationText-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @FirstError("DataConsentDeclarationText")</p>
-    }
-    <textarea class="@InputClass("govuk-textarea", "DataConsentDeclarationText")" asp-for="DataConsentDeclarationText" rows="5" aria-describedby="@DescribedBy("DataConsentDeclarationText")"></textarea>
-</div>
-
-<h2 class="govuk-heading-m">Additional configuration</h2>
-<div class="govuk-hint">
-    These fields were not visually located in the reviewed legacy screen region and are placed
-    here pending confirmation of their exact legacy position.
-</div>
-
-<div class="@FormGroupClass("Instructions")">
-    <label class="govuk-label" asp-for="Instructions">Instructions</label>
-    @if (HasError("Instructions"))
-    {
-        <p id="Instructions-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @FirstError("Instructions")</p>
-    }
-    <textarea class="@InputClass("govuk-textarea", "Instructions")" asp-for="Instructions" rows="8" aria-describedby="@DescribedBy("Instructions")"></textarea>
-</div>
-
-<div class="govuk-form-group">
-    <div class="govuk-checkboxes" data-module="govuk-checkboxes">
-        <div class="govuk-checkboxes__item">
-            <input class="govuk-checkboxes__input" asp-for="DateOfReceipt" />
-            <label class="govuk-label govuk-checkboxes__label" asp-for="DateOfReceipt">Date of receipt</label>
-        </div>
-        <div class="govuk-checkboxes__item">
-            <input class="govuk-checkboxes__input" asp-for="StorageConditions" />
-            <label class="govuk-label govuk-checkboxes__label" asp-for="StorageConditions">Storage conditions</label>
-        </div>
-        <div class="govuk-checkboxes__item">
-            <input class="govuk-checkboxes__input" asp-for="ConditionOnReceipt" />
-            <label class="govuk-label govuk-checkboxes__label" asp-for="ConditionOnReceipt">Condition on receipt</label>
-        </div>
-        <div class="govuk-checkboxes__item">
-            <input class="govuk-checkboxes__input" asp-for="UseExternalReference" />
-            <label class="govuk-label govuk-checkboxes__label" asp-for="UseExternalReference">Use external reference</label>
-        </div>
-        <div class="govuk-checkboxes__item">
-            <input class="govuk-checkboxes__input" asp-for="StoreRatings" />
-            <label class="govuk-label govuk-checkboxes__label" asp-for="StoreRatings">Store ratings</label>
-        </div>
-    </div>
-</div>
-
-<govuk-input asp-for="TestConsultant1" label="Test consultant 1" />
-<govuk-input asp-for="TestConsultant2" label="Test consultant 2" />
-<govuk-input asp-for="TestConsultant3" label="Test consultant 3" />
-<govuk-input asp-for="TestConsultantTabulationId" label="Test consultant tabulation" />
-<govuk-input asp-for="Assessor1" label="Assessor 1" />
-<govuk-input asp-for="Assessor2" label="Assessor 2" />
-<govuk-input asp-for="Assessor3" label="Assessor 3" />
-<govuk-input asp-for="Assessor4" label="Assessor 4" />
-
-<div class="@FormGroupClass("StandardTabulationText")">
-    <label class="govuk-label" asp-for="StandardTabulationText">Standard tabulation text</label>
-    @if (HasError("StandardTabulationText"))
-    {
-        <p id="StandardTabulationText-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @FirstError("StandardTabulationText")</p>
-    }
-    <textarea class="@InputClass("govuk-textarea", "StandardTabulationText")" asp-for="StandardTabulationText" aria-describedby="@DescribedBy("StandardTabulationText")"></textarea>
-</div>
+            var tab = document.querySelector('#scheme-tabs .govuk-tabs__tab[href="#' + panel.id + '"]');
+            if (tab && panel.classList.contains('govuk-tabs__panel--hidden')) {
+                tab.click();
+            }
+        });
+    })();
+</script>

@@ -1,0 +1,333 @@
+@model PTL.InternalWeb.Features.Scheme.SchemeFormViewModel
+@using PTL.InternalWeb.Features.Scheme
+@{
+    var tabulations = Model.Tabulations;
+
+    // Legacy shows the Test Consultant tabulation selector only for non-assessment schemes.
+    var tabulationOptions = tabulations
+        .Where(t => t.TabulationId != Guid.Empty)
+        .Select(t => new Microsoft.AspNetCore.Mvc.Rendering.SelectListItem(t.Name, t.TabulationId.ToString()))
+        .ToList();
+
+    string AvailabilityText(SchemeTabulationAvailability availability) => availability switch
+    {
+        SchemeTabulationAvailability.All => "All",
+        SchemeTabulationAvailability.ParticipantsOnly => "Participants Only",
+        _ => "Viewers and TCs Only",
+    };
+
+    // SchemeValidator reports "must define at least N Tabulations" against the plain
+    // "Tabulations" key (the collection as a whole has no single input to attach to). The
+    // Add New Tabulation form group below is the control that actually resolves it, so the
+    // error summary's "#Tabulations" link and message belong there, not floating disconnected
+    // from any control.
+    var tabulationsHasError = ViewContext.ViewData.ModelState.TryGetValue("Tabulations", out var tabulationsEntry) && tabulationsEntry.Errors.Count > 0;
+}
+
+@* The many type="hidden" inputs throughout this grid (TabulationId, item-level flags, etc.)
+   intentionally have no associated <label> - a hidden input is never exposed to the accessibility
+   tree or to assistive technology, so the "input without a label" rule does not apply to them. *@
+
+@if (tabulations.Count == 0)
+{
+    <p class="govuk-body">No Tabulations Defined - Click 'Add New Tabulation'</p>
+}
+else
+{
+    @* The grid gains a column per tabulation, so it outgrows the page once there are a few of
+       them - scroll it rather than letting it break the layout. A native <section> with an
+       aria-label gives the region its accessible name without a redundant role, and keyboard
+       users still reach every cell because every interactive one (inputs/selects/buttons) is
+       itself focusable, so no tabindex is needed on the non-interactive wrapper. *@
+    <section class="ptl-table-scroll" aria-label="Results tabulations">
+    <table class="govuk-table">
+        <thead class="govuk-table__head">
+            <tr class="govuk-table__row">
+                <th scope="col" class="govuk-table__header"></th>
+                @for (var i = 0; i < tabulations.Count; i++)
+                {
+                    <th scope="col" class="govuk-table__header">
+                        @if (Model.IsViewMode)
+                        {
+                            @tabulations[i].Name
+                            <input type="hidden" asp-for="Tabulations[i].Name" />
+                        }
+                        else
+                        {
+                            @* The name is editable in place; legacy uses a Rename popup. Error
+                               state mirrors GovUkFormGroupMarkup's convention (same classes, same
+                               "{field}-error" id) so the error summary link still focuses this
+                               exact input and the visible message matches the rest of the app. *@
+                            var nameField = $"Tabulations[{i}].Name";
+                            var nameHasError = ViewContext.ViewData.ModelState.TryGetValue(nameField, out var nameEntry) && nameEntry.Errors.Count > 0;
+                            var nameErrorId = $"{nameField}-error";
+                            <label class="govuk-visually-hidden" asp-for="Tabulations[i].Name">Tabulation name</label>
+                            <input class="@(nameHasError ? "govuk-input govuk-input--width-10 govuk-input--error" : "govuk-input govuk-input--width-10")"
+                                   asp-for="Tabulations[i].Name"
+                                   aria-describedby="@(nameHasError ? nameErrorId : null)" />
+                            @if (nameHasError)
+                            {
+                                <p class="govuk-error-message" id="@nameErrorId">
+                                    <span class="govuk-visually-hidden">Error:</span> @nameEntry!.Errors[0].ErrorMessage
+                                </p>
+                            }
+                        }
+                    </th>
+                }
+            </tr>
+        </thead>
+        <tbody class="govuk-table__body">
+            <tr class="govuk-table__row">
+                <th scope="row" class="govuk-table__header">Intended Results Only</th>
+                @for (var i = 0; i < tabulations.Count; i++)
+                {
+                    <td class="govuk-table__cell">
+                        <input type="hidden" asp-for="Tabulations[i].TabulationId" />
+                        @if (Model.IsViewMode)
+                        {
+                            @(tabulations[i].IntendedResultsOnly ? "Yes" : "No")
+                            <input type="hidden" asp-for="Tabulations[i].IntendedResultsOnly" />
+                        }
+                        else
+                        {
+                            <div class="govuk-checkboxes govuk-checkboxes--small" data-module="govuk-checkboxes">
+                                <div class="govuk-checkboxes__item">
+                                    <input class="govuk-checkboxes__input" asp-for="Tabulations[i].IntendedResultsOnly" />
+                                    <label class="govuk-label govuk-checkboxes__label" asp-for="Tabulations[i].IntendedResultsOnly">
+                                        <span class="govuk-visually-hidden">Intended Results Only for @tabulations[i].Name</span>
+                                    </label>
+                                </div>
+                            </div>
+                        }
+                    </td>
+                }
+            </tr>
+            <tr class="govuk-table__row">
+                <th scope="row" class="govuk-table__header">Single Participant Tabulation</th>
+                @for (var i = 0; i < tabulations.Count; i++)
+                {
+                    <td class="govuk-table__cell">
+                        @if (Model.IsViewMode)
+                        {
+                            @(tabulations[i].SingleParticipantTabulation ? "Yes" : "No")
+                            <input type="hidden" asp-for="Tabulations[i].SingleParticipantTabulation" />
+                        }
+                        else
+                        {
+                            <div class="govuk-checkboxes govuk-checkboxes--small" data-module="govuk-checkboxes">
+                                <div class="govuk-checkboxes__item">
+                                    <input class="govuk-checkboxes__input" asp-for="Tabulations[i].SingleParticipantTabulation" />
+                                    <label class="govuk-label govuk-checkboxes__label" asp-for="Tabulations[i].SingleParticipantTabulation">
+                                        <span class="govuk-visually-hidden">Single Participant Tabulation for @tabulations[i].Name</span>
+                                    </label>
+                                </div>
+                            </div>
+                        }
+                    </td>
+                }
+            </tr>
+            <tr class="govuk-table__row">
+                <th scope="row" class="govuk-table__header">Show Ratings Table</th>
+                @for (var i = 0; i < tabulations.Count; i++)
+                {
+                    <td class="govuk-table__cell">
+                        @if (Model.IsViewMode)
+                        {
+                            @(tabulations[i].ShowRatings ? "Yes" : "No")
+                            <input type="hidden" asp-for="Tabulations[i].ShowRatings" />
+                        }
+                        else
+                        {
+                            @* Ticking this turns on Score Samples for the scheme when it is saved. *@
+                            <div class="govuk-checkboxes govuk-checkboxes--small" data-module="govuk-checkboxes">
+                                <div class="govuk-checkboxes__item">
+                                    <input class="govuk-checkboxes__input ptl-show-ratings" asp-for="Tabulations[i].ShowRatings" />
+                                    <label class="govuk-label govuk-checkboxes__label" asp-for="Tabulations[i].ShowRatings">
+                                        <span class="govuk-visually-hidden">Show Ratings Table for @tabulations[i].Name</span>
+                                    </label>
+                                </div>
+                            </div>
+                        }
+                    </td>
+                }
+            </tr>
+            <tr class="govuk-table__row">
+                <th scope="row" class="govuk-table__header">Availability</th>
+                @for (var i = 0; i < tabulations.Count; i++)
+                {
+                    <td class="govuk-table__cell">
+                        @if (Model.IsViewMode)
+                        {
+                            @AvailabilityText(tabulations[i].Availability)
+                            <input type="hidden" asp-for="Tabulations[i].Availability" />
+                        }
+                        else
+                        {
+                            <label class="govuk-visually-hidden" asp-for="Tabulations[i].Availability">Availability for @tabulations[i].Name</label>
+                            <select class="govuk-select" asp-for="Tabulations[i].Availability">
+                                <option value="@SchemeTabulationAvailability.All">All</option>
+                                <option value="@SchemeTabulationAvailability.ParticipantsOnly">Participants Only</option>
+                                <option value="@SchemeTabulationAvailability.ViewersAndTestConsultantsOnly">Viewers and TCs Only</option>
+                            </select>
+                        }
+                    </td>
+                }
+            </tr>
+
+            @* One section per test: which of its result and method items each tabulation includes. *@
+            @foreach (var test in Model.Tests)
+            {
+                <tr class="govuk-table__row">
+                    <th scope="row" class="govuk-table__header" colspan="@(tabulations.Count + 1)">@test.TestType - Result Items</th>
+                </tr>
+                @if (test.ResultItems.Count == 0)
+                {
+                    <tr class="govuk-table__row">
+                        <td class="govuk-table__cell" colspan="@(tabulations.Count + 1)">There are no Result Items for this Test</td>
+                    </tr>
+                }
+                @foreach (var item in test.ResultItems)
+                {
+                    <tr class="govuk-table__row">
+                        <td class="govuk-table__cell">@item.Name</td>
+                        @for (var i = 0; i < tabulations.Count; i++)
+                        {
+                            <td class="govuk-table__cell">
+                                <partial name="_SchemeTabulationItemCheckbox" model="@(new SchemeTabulationItemCheckboxViewModel(
+                                    FieldName: $"Tabulations[{i}].ResultItemIds",
+                                    ItemId: item.ItemId,
+                                    Selected: tabulations[i].ResultItemIds.Contains(item.ItemId),
+                                    Label: $"{item.Name} in {tabulations[i].Name}",
+                                    IsViewMode: Model.IsViewMode))" />
+                            </td>
+                        }
+                    </tr>
+                }
+
+                <tr class="govuk-table__row">
+                    <th scope="row" class="govuk-table__header" colspan="@(tabulations.Count + 1)">@test.TestType - Method Items</th>
+                </tr>
+                @if (test.MethodItems.Count == 0)
+                {
+                    <tr class="govuk-table__row">
+                        <td class="govuk-table__cell" colspan="@(tabulations.Count + 1)">There are no Method Items for this Test</td>
+                    </tr>
+                }
+                @foreach (var item in test.MethodItems)
+                {
+                    <tr class="govuk-table__row">
+                        <td class="govuk-table__cell">@item.Name</td>
+                        @for (var i = 0; i < tabulations.Count; i++)
+                        {
+                            <td class="govuk-table__cell">
+                                <partial name="_SchemeTabulationItemCheckbox" model="@(new SchemeTabulationItemCheckboxViewModel(
+                                    FieldName: $"Tabulations[{i}].MethodItemIds",
+                                    ItemId: item.ItemId,
+                                    Selected: tabulations[i].MethodItemIds.Contains(item.ItemId),
+                                    Label: $"{item.Name} in {tabulations[i].Name}",
+                                    IsViewMode: Model.IsViewMode))" />
+                            </td>
+                        }
+                    </tr>
+                }
+            }
+        </tbody>
+        @if (!Model.IsViewMode)
+        {
+            <tfoot class="govuk-table__foot">
+                <tr class="govuk-table__row">
+                    <td class="govuk-table__cell"></td>
+                    @for (var i = 0; i < tabulations.Count; i++)
+                    {
+                        <td class="govuk-table__cell">
+                            <button type="submit" class="govuk-link ptl-link-button" name="testCommand" value="remove-tabulation:@i">Remove</button>
+                        </td>
+                    }
+                </tr>
+            </tfoot>
+        }
+    </table>
+    </section>
+}
+
+@if (!Model.IsViewMode)
+{
+    @* id="Tabulations" sits on the input (not the wrapping div) and the label's for matches it -
+       GOV.UK's error-summary script only calls focus() when it finds a label[for] (or legend)
+       for the linked id, so a wrapping element with no matching label is silently skipped. *@
+    <div class="@(tabulationsHasError ? "govuk-form-group govuk-form-group--error" : "govuk-form-group")">
+        <label class="govuk-label govuk-label--s" for="Tabulations">Add New Tabulation</label>
+        @if (tabulationsHasError)
+        {
+            <p class="govuk-error-message">
+                <span class="govuk-visually-hidden">Error:</span> @tabulationsEntry!.Errors[0].ErrorMessage
+            </p>
+        }
+        <input id="Tabulations" class="@(tabulationsHasError ? "govuk-input govuk-input--width-20 govuk-input--error" : "govuk-input govuk-input--width-20")" asp-for="NewTabulationName" />
+        <button type="submit" class="govuk-button govuk-button--primary govuk-!-margin-left-2" data-module="govuk-button"
+                name="testCommand" value="add-tabulation">
+            Add New Tabulation
+        </button>
+    </div>
+}
+
+@if (Model.IsViewMode)
+{
+    <dl class="govuk-summary-list">
+        <govuk-summary-row label="Standard Tabulation Text">@Model.StandardTabulationText</govuk-summary-row>
+        @if (!Model.RequiresAssessment)
+        {
+            <govuk-summary-row label="Select the Tabulation that will be sent to the Test Consultants">@(tabulationOptions.FirstOrDefault(o => o.Value == Model.TestConsultantTabulationId.ToString())?.Text)</govuk-summary-row>
+        }
+        <govuk-summary-row label="External reference used on Tabulations">@(Model.UseExternalReference ? "Yes" : "No")</govuk-summary-row>
+        <govuk-summary-row label="Score Samples">@(Model.StoreRatings ? "Yes" : "No")</govuk-summary-row>
+    </dl>
+    <input type="hidden" asp-for="TestConsultantTabulationId" />
+}
+else
+{
+    <govuk-textarea asp-for="StandardTabulationText" label="Standard Tabulation Text" rows="5" label-class="govuk-label govuk-label--s" />
+
+    @if (!Model.RequiresAssessment)
+    {
+        <govuk-select asp-for="TestConsultantTabulationId" label="Select the Tabulation that will be sent to the Test Consultants" asp-items="tabulationOptions" option-label="- Please Select -" />
+    }
+    else
+    {
+        <input type="hidden" asp-for="TestConsultantTabulationId" />
+    }
+
+    <div class="govuk-form-group">
+        <div class="govuk-checkboxes" data-module="govuk-checkboxes">
+            <div class="govuk-checkboxes__item">
+                <input class="govuk-checkboxes__input" asp-for="UseExternalReference" />
+                <label class="govuk-label govuk-checkboxes__label" asp-for="UseExternalReference">External reference used on Tabulations</label>
+
+            </div>
+            <div class="govuk-checkboxes__item">
+                <input class="govuk-checkboxes__input" asp-for="StoreRatings" />
+                <label class="govuk-label govuk-checkboxes__label" asp-for="StoreRatings">Score Samples</label>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Legacy turns Score Samples on as soon as any tabulation shows its ratings table; the server
+        // applies the same rule on save, this just reflects it immediately.
+        (function () {
+            var storeRatings = document.getElementById('StoreRatings');
+            if (!storeRatings) {
+                return;
+            }
+
+            document.querySelectorAll('.ptl-show-ratings').forEach(function (checkbox) {
+                checkbox.addEventListener('change', function () {
+                    if (checkbox.checked) {
+                        storeRatings.checked = true;
+                    }
+                });
+            });
+        })();
+    </script>
+}
+

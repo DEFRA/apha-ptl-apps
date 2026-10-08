@@ -421,6 +421,9 @@ public sealed class RenewContractsServiceTests
         public Task<CoreScheme?> GetByIdAsync(Guid schemeId, CancellationToken cancellationToken = default) =>
             Task.FromResult(_schemes.TryGetValue(schemeId, out var scheme) ? scheme : null);
 
+        public Task<IReadOnlyList<SchemeSummaryEntity>> GetAllSummariesAsync(CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<SchemeSummaryEntity>>([]);
+
         public Task<IReadOnlyList<SchemeSummaryEntity>> GetSummariesByYearAsync(int yearId, CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<SchemeSummaryEntity>>(_schemes.Values.Where(s => s.YearId == yearId).Select(s => new SchemeSummaryEntity { SharedId = s.SharedId, YearId = s.YearId, CurrentSchemeId = s.SchemeId, CurrentIdentifier = s.Identifier, CurrentName = s.Name }).ToList());
 
@@ -470,6 +473,9 @@ public sealed class RenewContractsServiceTests
         public Task<CoreScheme?> GetByIdAsync(Guid schemeId, CancellationToken cancellationToken = default) =>
             Task.FromResult(schemeId == oldScheme.SchemeId ? oldScheme : null);
 
+        public Task<IReadOnlyList<SchemeSummaryEntity>> GetAllSummariesAsync(CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<SchemeSummaryEntity>>([]);
+
         public Task<IReadOnlyList<SchemeSummaryEntity>> GetSummariesByYearAsync(int yearId, CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<SchemeSummaryEntity>>([]);
 
@@ -513,5 +519,21 @@ public sealed class RenewContractsServiceTests
         public Task<SystemSettingsEntity> GetSystemSettingsAsync(CancellationToken cancellationToken = default) => Task.FromResult(settings);
         public Task<IReadOnlyList<YearEntity>> GetWeightedPricingYearsAsync(CancellationToken cancellationToken = default) => Task.FromResult(weightedPricingYears);
         public Task<IReadOnlyList<GroupAddressEntity>> GetGroupAddressesAsync(CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<GroupAddressEntity>>([]);
+
+        public Task<IReadOnlyList<ScheduleEntity>> GetSchedulesAsync(CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<ScheduleEntity>>([]);
+
+        public Task<IReadOnlyList<ScheduleCodeEntity>> GetScheduleCodesAsync(CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<ScheduleCodeEntity>>([]);
+
+        public Task<IReadOnlyList<DayEntity>> GetDaysAsync(CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<DayEntity>>([]);
+
+        public Task<IReadOnlyList<MonthlyDistributionEntity>> GetMonthlyDistributionsAsync(CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<MonthlyDistributionEntity>>([]);
+
+        public Task<IReadOnlyList<PTNumberEntity>> GetPTNumbersAsync(CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<PTNumberEntity>>([]);
+
+        public Task<IReadOnlyList<SchemeUserEntity>> GetTestConsultantsAsync(CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<SchemeUserEntity>>([]);
+
+        public Task<IReadOnlyList<SchemeUserEntity>> GetAssessorsAsync(CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<SchemeUserEntity>>([]);
+
+        public Task<IReadOnlyList<SchemeItemTypeEntity>> GetSchemeItemTypesAsync(PTL.Contracts.Lookup.SchemeItemTypeKind kind, int yearId, CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<SchemeItemTypeEntity>>([]);
     }
 }

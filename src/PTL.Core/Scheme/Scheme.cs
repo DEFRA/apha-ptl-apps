@@ -99,4 +99,17 @@ public class Scheme
 
     // Computed by spgSchemeBySchemeId (YearId < current-year), never sent in requests.
     public bool IsReadOnly { get; set; }
+
+    // Details tab currency pricing grid - second result set of spgSchemeBySchemeId, written back
+    // via spiSchemeCurrency / spuSchemeCurrency.
+    public IList<SchemeCurrencyPrice> Prices { get; set; } = [];
+
+    // Viewers tab - tlnkViewerScheme links, reconciled by SchemeService on save.
+    public IList<Guid> ViewerIds { get; set; } = [];
+
+    // Tests tab - the whole test tree, replaced wholesale on save (legacy writes it from ViewState).
+    public IList<SchemeTest> Tests { get; set; } = [];
+
+    // Results Tabulations tab, also replaced wholesale on save.
+    public IList<SchemeTabulation> Tabulations { get; set; } = [];
 }

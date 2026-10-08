@@ -1,0 +1,33 @@
+@model PTL.InternalWeb.Features.Scheme.SchemeFormViewModel
+@using Microsoft.AspNetCore.Mvc.Rendering
+@{
+    string OptionText(IEnumerable<SelectListItem> options, Guid? value) =>
+        value is null ? string.Empty : options.FirstOrDefault(o => o.Value == value.Value.ToString())?.Text ?? string.Empty;
+}
+
+<h2 class="govuk-heading-m">Assessors</h2>
+
+@if (!Model.IsViewMode)
+{
+    <p class="govuk-body">Assessors apply to schemes that require assessment. At least two must be selected.</p>
+}
+
+@if (Model.IsViewMode)
+{
+    <dl class="govuk-summary-list">
+        <govuk-summary-row label="Primary Assessor">@OptionText(Model.AssessorOptions, Model.Assessor1)</govuk-summary-row>
+        <govuk-summary-row label="Secondary Assessor">@OptionText(Model.AssessorOptions, Model.Assessor2)</govuk-summary-row>
+        <govuk-summary-row label="Tertiary Assessor">@OptionText(Model.AssessorOptions, Model.Assessor3)</govuk-summary-row>
+        <govuk-summary-row label="Quaternary Assessor">@OptionText(Model.AssessorOptions, Model.Assessor4)</govuk-summary-row>
+    </dl>
+}
+else
+{
+    <govuk-select asp-for="Assessor1" label="Primary Assessor" asp-items="Model.AssessorOptions" />
+
+    <govuk-select asp-for="Assessor2" label="Secondary Assessor" asp-items="Model.AssessorOptions" />
+
+    <govuk-select asp-for="Assessor3" label="Tertiary Assessor" asp-items="Model.AssessorOptions" />
+
+    <govuk-select asp-for="Assessor4" label="Quaternary Assessor" asp-items="Model.AssessorOptions" />
+}

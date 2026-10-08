@@ -1,6 +1,9 @@
 using Microsoft.AspNetCore.Mvc;
 using PTL.Contracts.Lookup;
+using PTL.Contracts.Participant;
+using PTL.Contracts.Scheme;
 using PTL.Core.Lookup;
+using PTL.Core.Viewer;
 
 namespace PTL.Api.Controllers;
 
@@ -9,8 +12,15 @@ namespace PTL.Api.Controllers;
 // these lists are maintained elsewhere (not exposed anywhere in the legacy Web Forms UI either).
 [ApiController]
 [Route("api/lookups")]
-public sealed class LookupController(ILookupService lookupService) : ControllerBase
+public sealed class LookupController(ILookupService lookupService, IViewerRepository viewerRepository) : ControllerBase
 {
+    // GET /api/lookups/viewers - tblViewer master list, used by the Scheme Viewers tab.
+    [HttpGet("viewers")]
+    public async Task<ActionResult<IReadOnlyList<ViewerResponse>>> GetViewers(CancellationToken cancellationToken)
+    {
+        var viewers = await viewerRepository.GetAllAsync(cancellationToken);
+        return Ok(viewers.Select(v => new ViewerResponse(v.ViewerId, v.Name, v.Email)).ToList());
+    }
     [HttpGet("countries")]
     public async Task<ActionResult<IReadOnlyList<CountryResponse>>> GetCountries(CancellationToken cancellationToken)
     {
@@ -89,6 +99,68 @@ public sealed class LookupController(ILookupService lookupService) : ControllerB
         return Ok(currencies.Select(c => new SchemeCurrencyResponse(c.SchemeCurrencyId, c.SchemeId, c.CurrencyId, c.Price, c.CurrencyName, c.CurrencySymbol)).ToList());
     }
 
+    // GET /api/lookups/schedules | /schedule-codes | /days - the three Scheme "Details" tab
+    // dropdowns (legacy DropDownSchedule / DropDownScheduleCode / DropDownDayOfWeek).
+    [HttpGet("schedules")]
+    public async Task<ActionResult<IReadOnlyList<ScheduleResponse>>> GetSchedules(CancellationToken cancellationToken)
+    {
+        var schedules = await lookupService.GetSchedulesAsync(cancellationToken);
+        return Ok(schedules.Select(s => new ScheduleResponse(s.ScheduleId, s.Schedule)).ToList());
+    }
+
+    [HttpGet("schedule-codes")]
+    public async Task<ActionResult<IReadOnlyList<ScheduleCodeResponse>>> GetScheduleCodes(CancellationToken cancellationToken)
+    {
+        var scheduleCodes = await lookupService.GetScheduleCodesAsync(cancellationToken);
+        return Ok(scheduleCodes.Select(s => new ScheduleCodeResponse(s.ScheduleCodeId, s.ScheduleCode)).ToList());
+    }
+
+    [HttpGet("days")]
+    public async Task<ActionResult<IReadOnlyList<DayResponse>>> GetDays(CancellationToken cancellationToken)
+    {
+        var days = await lookupService.GetDaysAsync(cancellationToken);
+        return Ok(days.Select(d => new DayResponse(d.DayId, d.Day)).ToList());
+    }
+
+    // GET /api/lookups/scheme-month-editability?year={yearId} - which distribution months a scheme
+    // in that year may still change (legacy Scheme.SetEditPermissions). The equivalent flags for an
+    // existing scheme already arrive on SchemeResponse.CanEdit; this serves the Create screen,
+    // which has no scheme to read them from yet.
+    [HttpGet("scheme-month-editability")]
+    public async Task<ActionResult<SchemeMonthEditabilityResponse>> GetSchemeMonthEditability([FromQuery] int year, CancellationToken cancellationToken)
+    {
+        var editability = await lookupService.GetSchemeMonthEditabilityAsync(year, cancellationToken);
+        return Ok(new SchemeMonthEditabilityResponse(
+            editability.Jan, editability.Feb, editability.Mar, editability.Apr,
+            editability.May, editability.Jun, editability.Jul, editability.Aug,
+            editability.Sep, editability.Oct, editability.Nov, editability.Dec));
+    }
+
+    // GET /api/lookups/test-consultants | /assessors - the Scheme screen's Test Consultants and
+    // Assessors tabs. Inactive people are already filtered out by LookupService.
+    [HttpGet("test-consultants")]
+    public async Task<ActionResult<IReadOnlyList<SchemeUserResponse>>> GetTestConsultants(CancellationToken cancellationToken)
+    {
+        var consultants = await lookupService.GetTestConsultantsAsync(cancellationToken);
+        return Ok(consultants.Select(c => new SchemeUserResponse(c.UserId, c.FriendlyName, c.IsExternal)).ToList());
+    }
+
+    [HttpGet("assessors")]
+    public async Task<ActionResult<IReadOnlyList<SchemeUserResponse>>> GetAssessors(CancellationToken cancellationToken)
+    {
+        var assessors = await lookupService.GetAssessorsAsync(cancellationToken);
+        return Ok(assessors.Select(a => new SchemeUserResponse(a.UserId, a.FriendlyName, a.IsExternal)).ToList());
+    }
+
+    // GET /api/lookups/scheme-item-types?kind={kind}&year={yearId} - the Tests tab "Add"
+    // dropdowns, scoped to the scheme's year.
+    [HttpGet("scheme-item-types")]
+    public async Task<ActionResult<IReadOnlyList<SchemeItemTypeResponse>>> GetSchemeItemTypes([FromQuery] SchemeItemTypeKind kind, [FromQuery] int year, CancellationToken cancellationToken)
+    {
+        var itemTypes = await lookupService.GetSchemeItemTypesAsync(kind, year, cancellationToken);
+        return Ok(itemTypes.Select(t => new SchemeItemTypeResponse(t.ItemTypeId, t.Name, t.NoLongerInUse)).ToList());
+    }
+
     // GET /api/lookups/postage-pricing-plans?year={yearId} - see docs/analysis/scheme-analysis.md,
     // "Postage Pricing Plan Read Operations".
     [HttpGet("postage-pricing-plans")]
@@ -104,6 +176,6 @@ public sealed class LookupController(ILookupService lookupService) : ControllerB
     public async Task<ActionResult<SystemSettingsResponse>> GetSystemSettings(CancellationToken cancellationToken)
     {
         var settings = await lookupService.GetSystemSettingsAsync(cancellationToken);
-        return Ok(new SystemSettingsResponse(settings.UTNumber));
+        return Ok(new SystemSettingsResponse(settings.UTNumber, settings.ContractStartDate, settings.CurrentYearId, settings.NextYearId));
     }
 }

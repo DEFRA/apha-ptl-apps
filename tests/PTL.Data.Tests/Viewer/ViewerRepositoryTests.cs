@@ -138,4 +138,69 @@ public class ViewerRepositoryTests
 
         Assert.Null(result);
     }
+
+    [Fact]
+    public async Task GetSchemeViewersAsync_ReturnsOnlyLinksForTheRequestedScheme()
+    {
+        var (repository, connection) = CreateRepository();
+        var schemeId = Guid.NewGuid();
+        var viewerSchemeId = Guid.NewGuid();
+        var viewerId = Guid.NewGuid();
+
+        // spgaViewers' 3 result sets: viewers (discarded by GetSchemeViewersAsync), viewer-scheme
+        // links (filtered down to the requested scheme), viewer-participants (never read here).
+        var viewersTable = new DataTable();
+        viewersTable.Columns.Add("fldViewerId", typeof(Guid));
+        viewersTable.Rows.Add(viewerId);
+
+        var linksTable = new DataTable();
+        linksTable.Columns.Add("fldViewerSchemeId", typeof(Guid));
+        linksTable.Columns.Add("fldViewerId", typeof(Guid));
+        linksTable.Columns.Add("fldSchemeId", typeof(Guid));
+        linksTable.Rows.Add(viewerSchemeId, viewerId, schemeId);
+        linksTable.Rows.Add(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
+
+        var dataSet = new DataSet();
+        dataSet.Tables.Add(viewersTable);
+        dataSet.Tables.Add(linksTable);
+        connection.RespondToQuery(GetAllSql, dataSet);
+
+        var result = await repository.GetSchemeViewersAsync(schemeId);
+
+        var link = Assert.Single(result);
+        Assert.Equal(viewerSchemeId, link.ViewerSchemeId);
+        Assert.Equal(viewerId, link.ViewerId);
+    }
+
+    [Fact]
+    public async Task AddSchemeViewerAsync_ExecutesInsertWithTheGivenIds()
+    {
+        var (repository, connection) = CreateRepository();
+        var viewerSchemeId = Guid.NewGuid();
+        var viewerId = Guid.NewGuid();
+        var schemeId = Guid.NewGuid();
+        const string insertLinkSql = "EXEC dbo.spiViewerScheme @ViewerSchemeId = @ViewerSchemeId, @ViewerId = @ViewerId, @SchemeId = @SchemeId";
+        connection.RespondToNonQuery(insertLinkSql, 1);
+
+        await repository.AddSchemeViewerAsync(viewerSchemeId, viewerId, schemeId);
+
+        var command = Assert.Single(connection.ExecutedCommands, c => c.CommandText == insertLinkSql);
+        Assert.Equal(viewerSchemeId, command.ParameterValue("@ViewerSchemeId"));
+        Assert.Equal(viewerId, command.ParameterValue("@ViewerId"));
+        Assert.Equal(schemeId, command.ParameterValue("@SchemeId"));
+    }
+
+    [Fact]
+    public async Task RemoveSchemeViewerAsync_ExecutesDeleteWithTheGivenId()
+    {
+        var (repository, connection) = CreateRepository();
+        var viewerSchemeId = Guid.NewGuid();
+        const string deleteLinkSql = "EXEC dbo.spdViewerScheme @ViewerSchemeId";
+        connection.RespondToNonQuery(deleteLinkSql, 1);
+
+        await repository.RemoveSchemeViewerAsync(viewerSchemeId);
+
+        var command = Assert.Single(connection.ExecutedCommands, c => c.CommandText == deleteLinkSql);
+        Assert.Equal(viewerSchemeId, command.ParameterValue("@ViewerSchemeId"));
+    }
 }

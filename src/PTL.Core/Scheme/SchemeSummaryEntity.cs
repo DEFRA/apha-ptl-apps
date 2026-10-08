@@ -15,4 +15,20 @@ public class SchemeSummaryEntity
     public Guid? RecentSchemeId { get; set; }
     public string? RecentIdentifier { get; set; }
     public string? RecentName { get; set; }
+
+    // Legacy SchemeInfo.Fetch labels the family from its current-year scheme, falling back to next
+    // year and then the most recent - a family with no current-year scheme still has to show a name.
+    public string Identifier => FirstNonEmpty(CurrentIdentifier, NextIdentifier, RecentIdentifier);
+
+    public string Name => FirstNonEmpty(CurrentName, NextName, RecentName);
+
+    private static string FirstNonEmpty(string? current, string? next, string? recent)
+    {
+        if (!string.IsNullOrEmpty(current))
+        {
+            return current;
+        }
+
+        return string.IsNullOrEmpty(next) ? next ?? recent ?? string.Empty : next;
+    }
 }

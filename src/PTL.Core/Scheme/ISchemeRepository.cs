@@ -11,6 +11,11 @@ public interface ISchemeRepository
     // GetSummariesBySchemeIdAsync when the next-year scheme is required.
     Task<IReadOnlyList<SchemeSummaryEntity>> GetSummariesByYearAsync(int yearId, CancellationToken cancellationToken = default);
 
+    // Uses spgaSchemeInfo - every scheme family, with its current, next and most recent scheme.
+    // This is what the Scheme List screen shows; legacy
+    // SchemeInfoCollection.FetchSchemeInfoCollection() takes no year and filters nothing.
+    Task<IReadOnlyList<SchemeSummaryEntity>> GetAllSummariesAsync(CancellationToken cancellationToken = default);
+
     // Uses spgSchemeInfoBySchemeId - the only procedure that resolves a scheme's next-year
     // equivalent (self-join on fldSharedId with fldYearId + 1). Legacy
     // SchemeInfoCollection.FetchSchemeInfoCollectionBySchemeId.
