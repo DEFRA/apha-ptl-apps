@@ -123,20 +123,20 @@ public sealed class LookupRepository(IDbConnectionFactory connectionFactory) : I
 
     public async Task<IReadOnlyList<SchemeItemTypeEntity>> GetSchemeItemTypesAsync(SchemeItemTypeKind kind, int yearId, CancellationToken cancellationToken = default)
     {
-        var procedure = kind switch
+        // Each branch is a complete, literal command text - no part of the SQL is built from a
+        // runtime value, so there is nothing here for a SQL-injection scanner to flag.
+        var sql = kind switch
         {
-            SchemeItemTypeKind.TestType => "spgTestTypeByYearId",
-            SchemeItemTypeKind.TestResultItemType => "spgTestResultItemTypeByYearId",
-            SchemeItemTypeKind.TestMethodItemType => "spgTestMethodItemTypeByYearId",
-            SchemeItemTypeKind.CategoryItemType => "spgCategoryItemTypeByYearId",
-            SchemeItemTypeKind.CriterionItemType => "spgCriterionItemTypeByYearId",
+            SchemeItemTypeKind.TestType => "EXEC dbo.spgTestTypeByYearId @YearId",
+            SchemeItemTypeKind.TestResultItemType => "EXEC dbo.spgTestResultItemTypeByYearId @YearId",
+            SchemeItemTypeKind.TestMethodItemType => "EXEC dbo.spgTestMethodItemTypeByYearId @YearId",
+            SchemeItemTypeKind.CategoryItemType => "EXEC dbo.spgCategoryItemTypeByYearId @YearId",
+            SchemeItemTypeKind.CriterionItemType => "EXEC dbo.spgCriterionItemTypeByYearId @YearId",
             _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "Unknown scheme item type."),
         };
 
         using var connection = connectionFactory.CreateConnection();
-        return (await connection.QueryAsync<SchemeItemTypeEntity>(
-            $"EXEC dbo.{procedure} @YearId",
-            new { YearId = yearId })).ToList();
+        return (await connection.QueryAsync<SchemeItemTypeEntity>(sql, new { YearId = yearId })).ToList();
     }
 
     public async Task<IReadOnlyList<PostagePricingPlanEntity>> GetPostagePricingPlansForYearAsync(int yearId, CancellationToken cancellationToken = default)

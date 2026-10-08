@@ -42,7 +42,7 @@ public class GovUkInputTagHelper(IHtmlGenerator generator) : TagHelper
     {
         var field = For.Name;
         var hasError = ViewContext.ViewData.ModelState.TryGetValue(field, out var entry) && entry.Errors.Count > 0;
-        var describedBy = GovUkFormGroupMarkup.Render(output, ViewContext, field, Label, Hint, hasError, entry);
+        var describedBy = GovUkFormGroupMarkup.Render(output, ViewContext, field, Label, Hint, entry);
 
         var htmlAttributes = new Dictionary<string, object>
         {
@@ -96,7 +96,7 @@ public class GovUkSelectTagHelper(IHtmlGenerator generator) : TagHelper
     {
         var field = For.Name;
         var hasError = ViewContext.ViewData.ModelState.TryGetValue(field, out var entry) && entry.Errors.Count > 0;
-        var describedBy = GovUkFormGroupMarkup.Render(output, ViewContext, field, Label, Hint, hasError, entry);
+        var describedBy = GovUkFormGroupMarkup.Render(output, ViewContext, field, Label, Hint, entry);
 
         var cssClass = hasError ? "govuk-select govuk-select--error" : "govuk-select";
         var htmlAttributes = new Dictionary<string, object> { ["class"] = cssClass };
@@ -142,7 +142,7 @@ public class GovUkTextareaTagHelper(IHtmlGenerator generator) : TagHelper
     {
         var field = For.Name;
         var hasError = ViewContext.ViewData.ModelState.TryGetValue(field, out var entry) && entry.Errors.Count > 0;
-        var describedBy = GovUkFormGroupMarkup.Render(output, ViewContext, field, Label, Hint, hasError, entry, LabelCssClass);
+        var describedBy = GovUkFormGroupMarkup.Render(output, ViewContext, field, Label, Hint, entry, LabelCssClass);
 
         var htmlAttributes = new Dictionary<string, object>
         {
@@ -167,8 +167,10 @@ public class GovUkTextareaTagHelper(IHtmlGenerator generator) : TagHelper
 internal static class GovUkFormGroupMarkup
 {
     /// <summary>Renders the wrapper markup into <paramref name="output"/> and returns the aria-describedby id to apply to the control, or null.</summary>
-    public static string? Render(TagHelperOutput output, ViewContext viewContext, string field, string label, string? hint, bool hasError, ModelStateEntry? entry, string labelCssClass = "govuk-label")
+    public static string? Render(TagHelperOutput output, ViewContext viewContext, string field, string label, string? hint, ModelStateEntry? entry, string labelCssClass = "govuk-label")
     {
+        var hasError = entry is not null && entry.Errors.Count > 0;
+
         output.TagName = "div";
         output.TagMode = TagMode.StartTagAndEndTag;
         output.Attributes.SetAttribute("class", hasError ? "govuk-form-group govuk-form-group--error" : "govuk-form-group");

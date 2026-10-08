@@ -127,6 +127,38 @@ public class SchemeControllerTests
     }
 
     [Fact]
+    public async Task CreateScheme_WithTestsAndCategories_RoundTripsTheWholeTree()
+    {
+        var controller = CreateController(new FakeSchemeRepository());
+        var testId = Guid.NewGuid();
+        var resultItem = new SchemeTestItemRequest(Guid.NewGuid(), Guid.NewGuid());
+        var methodItem = new SchemeTestItemRequest(Guid.NewGuid(), Guid.NewGuid());
+        var criterion = new SchemeTestItemRequest(Guid.NewGuid(), Guid.NewGuid());
+        var category = new SchemeCategoryItemRequest(Guid.NewGuid(), Guid.NewGuid(), [criterion]);
+        var request = ValidCreateRequest() with
+        {
+            RequiresAssessment = true,
+            Assessor1 = Guid.NewGuid(),
+            Assessor2 = Guid.NewGuid(),
+            Tests = [new SchemeTestRequest(testId, Guid.NewGuid(), [resultItem], [methodItem], [category])]
+        };
+
+        var created = await controller.CreateScheme(request, CancellationToken.None);
+
+        var schemeId = ((SchemeResponse)((CreatedAtActionResult)created.Result!).Value!).SchemeId;
+        var result = await controller.GetScheme(schemeId, CancellationToken.None);
+        var response = Assert.IsType<SchemeResponse>(Assert.IsType<OkObjectResult>(result.Result).Value);
+
+        var test = Assert.Single(response.Tests!);
+        Assert.Equal(testId, test.TestId);
+        Assert.Equal(resultItem.ItemId, Assert.Single(test.ResultItems).ItemId);
+        Assert.Equal(methodItem.ItemId, Assert.Single(test.MethodItems).ItemId);
+        var returnedCategory = Assert.Single(test.Categories);
+        Assert.Equal(category.CategoryItemId, returnedCategory.CategoryItemId);
+        Assert.Equal(criterion.ItemId, Assert.Single(returnedCategory.Criteria).ItemId);
+    }
+
+    [Fact]
     public async Task RenewScheme_UnknownScheme_ReturnsNotFound()
     {
         var controller = CreateController(new FakeSchemeRepository());

@@ -24,6 +24,10 @@
     var tabulationsHasError = ViewContext.ViewData.ModelState.TryGetValue("Tabulations", out var tabulationsEntry) && tabulationsEntry.Errors.Count > 0;
 }
 
+@* The many type="hidden" inputs throughout this grid (TabulationId, item-level flags, etc.)
+   intentionally have no associated <label> - a hidden input is never exposed to the accessibility
+   tree or to assistive technology, so the "input without a label" rule does not apply to them. *@
+
 @if (tabulations.Count == 0)
 {
     <p class="govuk-body">No Tabulations Defined - Click 'Add New Tabulation'</p>
@@ -31,8 +35,10 @@
 else
 {
     @* The grid gains a column per tabulation, so it outgrows the page once there are a few of
-       them - scroll it rather than letting it break the layout. role/tabindex make a scrollable
-       region reachable by keyboard. *@
+       them - scroll it rather than letting it break the layout. tabindex="0" + role="region" +
+       aria-label is the WCAG technique (SCR29) for making a scrollable content region reachable
+       and operable by keyboard; it is intentional here, not a stray tabindex on a non-interactive
+       element, so it is retained as-is. *@
     <div class="ptl-table-scroll" role="region" aria-label="Results tabulations" tabindex="0">
     <table class="govuk-table">
         <thead class="govuk-table__head">
@@ -157,6 +163,7 @@ else
                         }
                         else
                         {
+                            <label class="govuk-visually-hidden" asp-for="Tabulations[i].Availability">Availability for @tabulations[i].Name</label>
                             <select class="govuk-select" asp-for="Tabulations[i].Availability">
                                 <option value="@SchemeTabulationAvailability.All">All</option>
                                 <option value="@SchemeTabulationAvailability.ParticipantsOnly">Participants Only</option>

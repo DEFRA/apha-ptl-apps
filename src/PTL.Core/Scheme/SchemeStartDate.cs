@@ -15,16 +15,16 @@ public static class SchemeStartDate
         // The first selected month on or after the contract start month falls in the scheme's own
         // year; if none does, the first selected month of the year falls in the following one.
         var months = SelectedMonths(scheme);
-
-        foreach (var month in months.Where(month => contractStartDate.Month <= month))
+        var firstMonthInSchemeYear = months.Find(month => contractStartDate.Month <= month);
+        if (firstMonthInSchemeYear != 0)
         {
-            return new DateTime(scheme.YearId, month, 1);
+            return new DateTime(scheme.YearId, firstMonthInSchemeYear, 1, 0, 0, 0, DateTimeKind.Unspecified);
         }
 
         // With nothing selected there is no distribution to derive from, so the scheme starts at
         // the contract start date of its own year - the default legacy stamps on a new scheme.
         return months.Count > 0
-            ? new DateTime(scheme.YearId + 1, months[0], 1)
+            ? new DateTime(scheme.YearId + 1, months[0], 1, 0, 0, 0, DateTimeKind.Unspecified)
             : contractStartDate.AddYears(scheme.YearId - contractStartDate.Year);
     }
 

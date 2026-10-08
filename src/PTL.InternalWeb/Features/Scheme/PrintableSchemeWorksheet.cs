@@ -63,9 +63,12 @@ public static class PrintableSchemeWorksheetBuilder
             Tests: tests);
     }
 
+    // List, not IReadOnlyList: this is a private helper with one call site that immediately wraps
+    // the result into the public record's IReadOnlyList<string> property, so the concrete type
+    // avoids an interface indirection with no abstraction lost at the actual public boundary.
     // Legacy: "00/" + "000" + i for i < 10, "00/" + "00" + i otherwise - preserved exactly,
     // including its lack of a third digit tier for i >= 100.
-    private static IReadOnlyList<string> BuildSampleNumbers(int numberOfSamples)
+    private static List<string> BuildSampleNumbers(int numberOfSamples)
     {
         var numbers = new List<string>();
         for (var i = 1; i <= numberOfSamples; i++)
@@ -87,7 +90,11 @@ public static class PrintableSchemeWorksheetBuilder
     // Legacy ResultsTable.AddColumn: pack columns left-to-right, starting a new table once adding
     // the next column would exceed the width budget by more than the tolerance - but never split a
     // table that has no columns yet (an oversized single column still gets its own table).
-    private static IReadOnlyList<PrintableResultsTable> PackColumns(string testTypeName, IReadOnlyList<SchemeTestItemResponse> resultItems)
+    // List, not IReadOnlyList for the parameter and return type: the sole call site already passes
+    // a List (BuildTestWorksheet's .ToList()) and stores the result straight into the public
+    // record's IReadOnlyList<PrintableResultsTable> property - the real abstraction boundary for
+    // consumers of this builder - so narrowing here avoids interface indirection with no caller impact.
+    private static List<PrintableResultsTable> PackColumns(string testTypeName, List<SchemeTestItemResponse> resultItems)
     {
         var budget = (TableWidth - SampleColumnWidth) * (1 + Tolerance);
         var tables = new List<(List<SchemeTestItemResponse> Items, int RawWidth)>();
@@ -131,7 +138,9 @@ public static class PrintableSchemeWorksheetBuilder
     // the table fills the full available width; the last column absorbs any rounding remainder
     // instead of being computed from the stretch factor, and every column loses one pixel for its
     // border.
-    private static List<PrintableResultsColumn> StretchColumnWidths(IReadOnlyList<SchemeTestItemResponse> items, int rawWidth)
+    // List, not IReadOnlyList: the sole call site (above) always passes a List, and the indexer
+    // in the loop below benefits from the concrete type - again no caller ever needed the interface.
+    private static List<PrintableResultsColumn> StretchColumnWidths(List<SchemeTestItemResponse> items, int rawWidth)
     {
         if (items.Count == 0)
         {

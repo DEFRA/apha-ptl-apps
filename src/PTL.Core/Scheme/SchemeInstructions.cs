@@ -32,6 +32,13 @@ public static partial class SchemeInstructions
     [GeneratedRegex("^\\s*(text-decoration\\s*:\\s*(underline|line-through)\\s*;?\\s*)+$", RegexOptions.IgnoreCase, 1000)]
     private static partial Regex SafeStylePattern();
 
+    // Collapses a run of identical leading/trailing <p> wrappers left by CollapseAccidentalDoubleEncoding.
+    [GeneratedRegex("^(?:<p>\\s*)+", RegexOptions.IgnoreCase, 1000)]
+    private static partial Regex LeadingParagraphWrapperPattern();
+
+    [GeneratedRegex("(?:\\s*</p>)+$", RegexOptions.IgnoreCase, 1000)]
+    private static partial Regex TrailingParagraphWrapperPattern();
+
     /// <summary>
     /// Drops every tag outside the allow-list and every attribute except a text-decoration style
     /// on a span. Legacy intended to throw "Potentially Dangerous Input" here, but its guard regex
@@ -95,8 +102,8 @@ public static partial class SchemeInstructions
         // Each accumulated layer wrapped the whole of the previous one in its own new <p>, so
         // decoding leaves that many redundant nested wrappers around the original content -
         // collapse a run of identical leading/trailing wrappers down to the single real pair.
-        current = Regex.Replace(current, "^(?:<p>\\s*)+", "<p>", RegexOptions.IgnoreCase);
-        current = Regex.Replace(current, "(?:\\s*</p>)+$", "</p>", RegexOptions.IgnoreCase);
+        current = LeadingParagraphWrapperPattern().Replace(current, "<p>");
+        current = TrailingParagraphWrapperPattern().Replace(current, "</p>");
 
         return current;
     }

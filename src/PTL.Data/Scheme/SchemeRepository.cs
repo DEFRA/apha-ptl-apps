@@ -32,6 +32,20 @@ public sealed class SchemeRepository(IDbConnectionFactory connectionFactory) : I
             return scheme;
         }
 
+        scheme.Tests = await ReadTestsAsync(reader);
+        if (reader.IsConsumed)
+        {
+            return scheme;
+        }
+
+        scheme.Tabulations = await ReadTabulationsAsync(reader);
+        return scheme;
+    }
+
+    // Test, TestMethodItem, TestResultItem, CategoryItem, CriterionItem result sets, assembled
+    // into the Tests tree - split out of GetByIdAsync to keep that method's branching readable.
+    private static async Task<List<SchemeTest>> ReadTestsAsync(SqlMapper.GridReader reader)
+    {
         var tests = (await reader.ReadAsync<SchemeTest>()).ToList();
         var methodItems = (await reader.ReadAsync<SchemeTestMethodItem>()).ToList();
         var resultItems = (await reader.ReadAsync<SchemeTestResultItem>()).ToList();
@@ -50,13 +64,13 @@ public sealed class SchemeRepository(IDbConnectionFactory connectionFactory) : I
             test.Categories = categories.Where(c => c.TestId == test.TestId).OrderBy(c => c.Order).ToList();
         }
 
-        scheme.Tests = [.. tests.OrderBy(t => t.Order)];
+        return [.. tests.OrderBy(t => t.Order)];
+    }
 
-        if (reader.IsConsumed)
-        {
-            return scheme;
-        }
-
+    // Tabulation, TabulationTestMethodItem, TabulationTestResultItem result sets, assembled into
+    // the Results Tabulations tree - split out of GetByIdAsync for the same reason as ReadTestsAsync.
+    private static async Task<List<SchemeTabulation>> ReadTabulationsAsync(SqlMapper.GridReader reader)
+    {
         var tabulations = (await reader.ReadAsync<SchemeTabulation>()).ToList();
         var methodLinks = (await reader.ReadAsync<SchemeTabulationItemLink>()).ToList();
         var resultLinks = (await reader.ReadAsync<SchemeTabulationItemLink>()).ToList();
@@ -69,8 +83,7 @@ public sealed class SchemeRepository(IDbConnectionFactory connectionFactory) : I
             tabulation.ResultItemIds = tabulation.ResultItemLinks.Select(l => l.ItemId).ToList();
         }
 
-        scheme.Tabulations = tabulations;
-        return scheme;
+        return tabulations;
     }
 
     public async Task<IReadOnlyList<SchemeSummaryEntity>> GetSummariesByYearAsync(int yearId, CancellationToken cancellationToken = default)
@@ -193,8 +206,9 @@ public sealed class SchemeRepository(IDbConnectionFactory connectionFactory) : I
                 test.TestId = Guid.NewGuid();
             }
 
-            await UpsertAsync(connection, !existingTestIds.Contains(test.TestId), "Test",
-                "@TestId = @TestId, @TestTypeId = @TestTypeId, @SchemeId = @SchemeId, @Order = @Order",
+            await UpsertAsync(connection, !existingTestIds.Contains(test.TestId),
+                "EXEC dbo.spiTest @TestId = @TestId, @TestTypeId = @TestTypeId, @SchemeId = @SchemeId, @Order = @Order",
+                "EXEC dbo.spuTest @TestId = @TestId, @TestTypeId = @TestTypeId, @SchemeId = @SchemeId, @Order = @Order",
                 () => new { test.TestId, test.TestTypeId, test.SchemeId, test.Order });
 
             await SaveTestChildrenAsync(connection, test, existingResultItemIds, existingMethodItemIds, existingCategoryIds, existingCriterionIds);
@@ -215,8 +229,9 @@ public sealed class SchemeRepository(IDbConnectionFactory connectionFactory) : I
             }
 
             var isNew = existingTabulations.All(t => t.TabulationId != tabulation.TabulationId);
-            await UpsertAsync(connection, isNew, "Tabulation",
-                "@TabulationId = @TabulationId, @SchemeId = @SchemeId, @Name = @Name, @IntendedResultsOnly = @IntendedResultsOnly, @SingleParticipantTabulation = @SingleParticipantTabulation, @ShowRatings = @ShowRatings, @AvailableToParticipants = @AvailableToParticipants, @AvailableToViewers = @AvailableToViewers",
+            await UpsertAsync(connection, isNew,
+                "EXEC dbo.spiTabulation @TabulationId = @TabulationId, @SchemeId = @SchemeId, @Name = @Name, @IntendedResultsOnly = @IntendedResultsOnly, @SingleParticipantTabulation = @SingleParticipantTabulation, @ShowRatings = @ShowRatings, @AvailableToParticipants = @AvailableToParticipants, @AvailableToViewers = @AvailableToViewers",
+                "EXEC dbo.spuTabulation @TabulationId = @TabulationId, @SchemeId = @SchemeId, @Name = @Name, @IntendedResultsOnly = @IntendedResultsOnly, @SingleParticipantTabulation = @SingleParticipantTabulation, @ShowRatings = @ShowRatings, @AvailableToParticipants = @AvailableToParticipants, @AvailableToViewers = @AvailableToViewers",
                 () => new
                 {
                     tabulation.TabulationId,
@@ -231,9 +246,11 @@ public sealed class SchemeRepository(IDbConnectionFactory connectionFactory) : I
 
             var existingLinks = existingTabulations.FirstOrDefault(t => t.TabulationId == tabulation.TabulationId);
             await SyncItemLinksAsync(connection, tabulation.TabulationId, tabulation.ResultItemIds, existingLinks?.ResultItemLinks ?? [],
-                "TabulationTestResultItem", "@TabulationTestResultItemId", "@TestResultItemId");
+                "EXEC dbo.spdTabulationTestResultItem @TabulationTestResultItemId = @LinkId",
+                "EXEC dbo.spiTabulationTestResultItem @TabulationTestResultItemId = @LinkId, @TabulationId = @TabulationId, @TestResultItemId = @ItemId");
             await SyncItemLinksAsync(connection, tabulation.TabulationId, tabulation.MethodItemIds, existingLinks?.MethodItemLinks ?? [],
-                "TabulationTestMethodItem", "@TabulationTestMethodItemId", "@TestMethodItemId");
+                "EXEC dbo.spdTabulationTestMethodItem @TabulationTestMethodItemId = @LinkId",
+                "EXEC dbo.spiTabulationTestMethodItem @TabulationTestMethodItemId = @LinkId, @TabulationId = @TabulationId, @TestMethodItemId = @ItemId");
         }
 
         var keptTabulations = scheme.Tabulations.Select(t => t.TabulationId).ToHashSet();
@@ -244,28 +261,28 @@ public sealed class SchemeRepository(IDbConnectionFactory connectionFactory) : I
         }
     }
 
+    // Deletes/inserts a tabulation's item links (TabulationTestResultItem/TabulationTestMethodItem).
+    // The delete and insert SQL are complete literal command texts supplied by the caller - this
+    // method only chooses between them and binds parameters, so there is no dynamically built SQL.
     private static async Task SyncItemLinksAsync(
         System.Data.IDbConnection connection,
         Guid tabulationId,
         IList<Guid> requestedItemIds,
         IList<SchemeTabulationItemLink> existingLinks,
-        string entity,
-        string linkIdParameter,
-        string itemIdParameter)
+        string deleteSql,
+        string insertSql)
     {
         var requested = requestedItemIds.ToHashSet();
 
         foreach (var link in existingLinks.Where(l => !requested.Contains(l.ItemId)))
         {
-            await connection.ExecuteAsync($"EXEC dbo.spd{entity} {linkIdParameter} = @LinkId", new { LinkId = link.LinkId });
+            await connection.ExecuteAsync(deleteSql, new { LinkId = link.LinkId });
         }
 
         var alreadyLinked = existingLinks.Select(l => l.ItemId).ToHashSet();
         foreach (var itemId in requested.Where(id => !alreadyLinked.Contains(id)))
         {
-            await connection.ExecuteAsync(
-                $"EXEC dbo.spi{entity} {linkIdParameter} = @LinkId, @TabulationId = @TabulationId, {itemIdParameter} = @ItemId",
-                new { LinkId = Guid.NewGuid(), TabulationId = tabulationId, ItemId = itemId });
+            await connection.ExecuteAsync(insertSql, new { LinkId = Guid.NewGuid(), TabulationId = tabulationId, ItemId = itemId });
         }
     }
 
@@ -287,8 +304,9 @@ public sealed class SchemeRepository(IDbConnectionFactory connectionFactory) : I
                 item.TestResultItemId = Guid.NewGuid();
             }
 
-            await UpsertAsync(connection, !existingResultItemIds.Contains(item.TestResultItemId), "TestResultItem",
-                "@TestResultItemId = @TestResultItemId, @TestResultItemTypeId = @TestResultItemTypeId, @TestId = @TestId, @Order = @Order",
+            await UpsertAsync(connection, !existingResultItemIds.Contains(item.TestResultItemId),
+                "EXEC dbo.spiTestResultItem @TestResultItemId = @TestResultItemId, @TestResultItemTypeId = @TestResultItemTypeId, @TestId = @TestId, @Order = @Order",
+                "EXEC dbo.spuTestResultItem @TestResultItemId = @TestResultItemId, @TestResultItemTypeId = @TestResultItemTypeId, @TestId = @TestId, @Order = @Order",
                 () => new { item.TestResultItemId, item.TestResultItemTypeId, item.TestId, item.Order });
         }
 
@@ -302,8 +320,9 @@ public sealed class SchemeRepository(IDbConnectionFactory connectionFactory) : I
                 item.TestMethodItemId = Guid.NewGuid();
             }
 
-            await UpsertAsync(connection, !existingMethodItemIds.Contains(item.TestMethodItemId), "TestMethodItem",
-                "@TestMethodItemId = @TestMethodItemId, @TestMethodItemTypeId = @TestMethodItemTypeId, @TestId = @TestId, @Order = @Order",
+            await UpsertAsync(connection, !existingMethodItemIds.Contains(item.TestMethodItemId),
+                "EXEC dbo.spiTestMethodItem @TestMethodItemId = @TestMethodItemId, @TestMethodItemTypeId = @TestMethodItemTypeId, @TestId = @TestId, @Order = @Order",
+                "EXEC dbo.spuTestMethodItem @TestMethodItemId = @TestMethodItemId, @TestMethodItemTypeId = @TestMethodItemTypeId, @TestId = @TestId, @Order = @Order",
                 () => new { item.TestMethodItemId, item.TestMethodItemTypeId, item.TestId, item.Order });
         }
 
@@ -358,11 +377,10 @@ public sealed class SchemeRepository(IDbConnectionFactory connectionFactory) : I
         }
     }
 
-    private static async Task UpsertAsync(System.Data.IDbConnection connection, bool isNew, string entity, string arguments, Func<object> parameters)
-    {
-        var prefix = isNew ? "spi" : "spu";
-        await connection.ExecuteAsync($"EXEC dbo.{prefix}{entity} {arguments}", parameters());
-    }
+    // The insert and update SQL are complete literal command texts supplied by the caller - this
+    // method only chooses between them, so there is no dynamically built SQL to flag.
+    private static async Task UpsertAsync(System.Data.IDbConnection connection, bool isNew, string insertSql, string updateSql, Func<object> parameters) =>
+        await connection.ExecuteAsync(isNew ? insertSql : updateSql, parameters());
 
     private static async Task DeleteRemovedAsync(System.Data.IDbConnection connection, CoreScheme scheme, IList<SchemeTest> existingTests)
     {

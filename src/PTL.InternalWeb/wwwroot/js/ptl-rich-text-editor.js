@@ -4,6 +4,8 @@
 (function () {
     'use strict';
 
+    var DEFAULT_EDITOR_HEIGHT = 400;
+
     var editors = document.querySelectorAll('textarea[data-module="ptl-rich-text"]');
     if (editors.length === 0 || typeof tinymce === 'undefined') {
         return;
@@ -34,9 +36,9 @@
             base_url: '/lib/tinymce',
             license_key: 'gpl',
             plugins: 'charmap',
-            toolbar: textarea.getAttribute('data-toolbar'),
-            height: parseInt(textarea.getAttribute('data-height'), 10) || 400,
-            readonly: textarea.getAttribute('data-readonly') === 'true',
+            toolbar: textarea.dataset.toolbar,
+            height: Number.parseInt(textarea.dataset.height, 10) || DEFAULT_EDITOR_HEIGHT,
+            readonly: textarea.dataset.readonly === 'true',
             menubar: false,
             branding: false,
             statusbar: false,
@@ -48,7 +50,7 @@
             setup: function (editor) {
                 // Legacy SaveContent hook.
                 editor.on('SaveContent', function (e) {
-                    e.content = e.content.replace(/&#39/g, '&apos');
+                    e.content = e.content.replaceAll('&#39', '&apos');
                 });
 
                 // The error summary links to the field id, so focus has to reach the editor.

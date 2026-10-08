@@ -6,11 +6,14 @@ namespace PTL.Core.Scheme;
 // Rules" section) verbatim - no additional rules invented beyond what is documented there.
 public static partial class SchemeValidator
 {
+    // Field key shared by the Dictionary below and every validation call against Identifier.
+    private const string IdentifierField = "Identifier";
+
     // Human-readable labels for error messages - error Field keys stay as the property name so
     // ModelState mapping and error-summary hrefs keep working.
     private static readonly Dictionary<string, string> FieldLabels = new(StringComparer.Ordinal)
     {
-        ["Identifier"] = "Identifier",
+        [IdentifierField] = "Identifier",
         ["Name"] = "Scheme name",
         ["Deadline"] = "Deadline",
         ["SampleOrigin"] = "Sample origin",
@@ -33,11 +36,11 @@ public static partial class SchemeValidator
     {
         var errors = new List<SchemeValidationError>();
 
-        RequireNotEmpty(scheme.Identifier, "Identifier", errors);
-        MaxLength(scheme.Identifier, 6, "Identifier", errors);
+        RequireNotEmpty(scheme.Identifier, IdentifierField, errors);
+        MaxLength(scheme.Identifier, 6, IdentifierField, errors);
         if (!string.IsNullOrEmpty(scheme.Identifier) && !IdentifierPattern().IsMatch(scheme.Identifier))
         {
-            errors.Add(new SchemeValidationError("Identifier", "Identifier must match the format PT followed by 4 digits (e.g. PT1234)"));
+            errors.Add(new SchemeValidationError(IdentifierField, "Identifier must match the format PT followed by 4 digits (e.g. PT1234)"));
         }
 
         RequireNotEmpty(scheme.Name, "Name", errors);
@@ -113,11 +116,11 @@ public static partial class SchemeValidator
             return;
         }
 
-        if (scheme.TestConsultantTabulationId is not { } selected || selected == Guid.Empty)
-        {
-            errors.Add(new SchemeValidationError("TestConsultantTabulationId", "A Tabulation must be selected to send to the test consultants"));
-        }
-        else if (scheme.Tabulations.All(t => t.TabulationId != selected))
+        // Both failure cases (nothing selected, or a selection that doesn't match any tabulation)
+        // report the same message against the same field, so they are one condition rather than
+        // two branches with identical bodies.
+        var selectionIsValid = scheme.TestConsultantTabulationId is { } selected && selected != Guid.Empty && scheme.Tabulations.Any(t => t.TabulationId == selected);
+        if (!selectionIsValid)
         {
             errors.Add(new SchemeValidationError("TestConsultantTabulationId", "A Tabulation must be selected to send to the test consultants"));
         }

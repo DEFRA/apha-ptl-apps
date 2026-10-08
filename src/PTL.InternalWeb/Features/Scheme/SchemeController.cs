@@ -172,50 +172,6 @@ public class SchemeController(ISchemeApiClient schemeApiClient, ILookupApiClient
     public Task<IActionResult> CreateForCurrentYear(CancellationToken cancellationToken) =>
         CreateForYearAsync(currentYear: true, cancellationToken);
 
-    private async Task<IActionResult> CreateForYearAsync(bool currentYear, CancellationToken cancellationToken)
-    {
-        var settings = await lookupApiClient.GetSystemSettingsAsync(cancellationToken);
-        var years = await lookupApiClient.GetCurrentYearsAsync(cancellationToken);
-
-        // GetCurrentYearsAsync returns the current year followed by the next one, so it stands in
-        // for the system settings year ids when those are not configured.
-        var defaultYearId = currentYear
-            ? settings.CurrentYearId > 0 ? settings.CurrentYearId : years.Count > 0 ? years[0].YearId : 0
-            : settings.NextYearId > 0 ? settings.NextYearId : years.Count > 0 ? years[^1].YearId : 0;
-
-        var model = new SchemeFormViewModel
-        {
-            RequiresAssessment = false,
-            YearId = defaultYearId > 0 ? defaultYearId : null,
-        };
-
-        // An existing scheme carries its month locks on SchemeResponse.CanEdit; a new one has to
-        // ask for them (legacy Scheme.NewScheme runs SetEditPermissions for the same reason).
-        if (model.YearId is { } yearId)
-        {
-            ApplyMonthEditability(model, await lookupApiClient.GetSchemeMonthEditabilityAsync(yearId, cancellationToken));
-        }
-
-        await PopulateFormAsync(model, cancellationToken);
-        return View("Create", model);
-    }
-
-    private static void ApplyMonthEditability(SchemeFormViewModel model, SchemeMonthEditabilityResponse editability)
-    {
-        model.CanEditJan = editability.Jan;
-        model.CanEditFeb = editability.Feb;
-        model.CanEditMar = editability.Mar;
-        model.CanEditApr = editability.Apr;
-        model.CanEditMay = editability.May;
-        model.CanEditJun = editability.Jun;
-        model.CanEditJul = editability.Jul;
-        model.CanEditAug = editability.Aug;
-        model.CanEditSep = editability.Sep;
-        model.CanEditOct = editability.Oct;
-        model.CanEditNov = editability.Nov;
-        model.CanEditDec = editability.Dec;
-    }
-
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Create(SchemeFormViewModel model, string? testCommand = null, Guid? selectedItemTypeId = null, CancellationToken cancellationToken = default)
@@ -253,6 +209,67 @@ public class SchemeController(ISchemeApiClient schemeApiClient, ILookupApiClient
         LogCreatedSchemeMessage(logger, result.Scheme.SchemeId, null);
         TempData.SetNotification(NotificationType.Success, "Scheme created successfully.");
         return RedirectToAction(nameof(Details), new { id = result.Scheme.SchemeId });
+    }
+
+    private async Task<IActionResult> CreateForYearAsync(bool currentYear, CancellationToken cancellationToken)
+    {
+        var settings = await lookupApiClient.GetSystemSettingsAsync(cancellationToken);
+        var years = await lookupApiClient.GetCurrentYearsAsync(cancellationToken);
+
+        // GetCurrentYearsAsync returns the current year followed by the next one, so it stands in
+        // for the system settings year ids when those are not configured.
+        var defaultYearId = currentYear
+            ? ResolveYearId(settings.CurrentYearId, years, useFirst: true)
+            : ResolveYearId(settings.NextYearId, years, useFirst: false);
+
+        var model = new SchemeFormViewModel
+        {
+            RequiresAssessment = false,
+            YearId = defaultYearId > 0 ? defaultYearId : null,
+        };
+
+        // An existing scheme carries its month locks on SchemeResponse.CanEdit; a new one has to
+        // ask for them (legacy Scheme.NewScheme runs SetEditPermissions for the same reason).
+        if (model.YearId is { } yearId)
+        {
+            ApplyMonthEditability(model, await lookupApiClient.GetSchemeMonthEditabilityAsync(yearId, cancellationToken));
+        }
+
+        await PopulateFormAsync(model, cancellationToken);
+        return View("Create", model);
+    }
+
+    // Single-level conditions only, deliberately: configuredYearId wins when set, otherwise the
+    // first (current year) or last (next year) entry of the current-years list, otherwise 0.
+    private static int ResolveYearId(int configuredYearId, IReadOnlyList<YearResponse> years, bool useFirst)
+    {
+        if (configuredYearId > 0)
+        {
+            return configuredYearId;
+        }
+
+        if (years.Count == 0)
+        {
+            return 0;
+        }
+
+        return useFirst ? years[0].YearId : years[^1].YearId;
+    }
+
+    private static void ApplyMonthEditability(SchemeFormViewModel model, SchemeMonthEditabilityResponse editability)
+    {
+        model.CanEditJan = editability.Jan;
+        model.CanEditFeb = editability.Feb;
+        model.CanEditMar = editability.Mar;
+        model.CanEditApr = editability.Apr;
+        model.CanEditMay = editability.May;
+        model.CanEditJun = editability.Jun;
+        model.CanEditJul = editability.Jul;
+        model.CanEditAug = editability.Aug;
+        model.CanEditSep = editability.Sep;
+        model.CanEditOct = editability.Oct;
+        model.CanEditNov = editability.Nov;
+        model.CanEditDec = editability.Dec;
     }
 
     [HttpGet]

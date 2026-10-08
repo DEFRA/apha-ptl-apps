@@ -55,9 +55,18 @@
     padding: 0.3em;
 }
 
+/* th cells (added for table-header accessibility) must render identically to the td cells they
+   replaced in the header row - inherit lets a plain header row pick up body-default weight/align
+   while a .rowHeader row's own bold/white styling (below) still cascades through unaffected. */
+.tablePrintableResults th {
+    border: solid 1px black;
+    padding: 0.3em;
+    font-weight: inherit;
+    text-align: inherit;
+}
+
 .rowHeader {
-    background-color: #8c4040;
-    color: #ffffff;
+    background-color: #f9f6e6;
     font-weight: bold;
 }
 

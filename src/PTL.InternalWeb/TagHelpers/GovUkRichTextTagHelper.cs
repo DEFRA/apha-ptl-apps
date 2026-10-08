@@ -55,7 +55,7 @@ public class GovUkRichTextTagHelper(IHtmlGenerator generator) : TagHelper
 
         var field = For.Name;
         var hasError = ViewContext.ViewData.ModelState.TryGetValue(field, out var entry) && entry.Errors.Count > 0;
-        var describedBy = GovUkFormGroupMarkup.Render(output, ViewContext, field, Label, Hint, hasError, entry);
+        var describedBy = GovUkFormGroupMarkup.Render(output, ViewContext, field, Label, Hint, entry);
 
         var htmlAttributes = new Dictionary<string, object>
         {
