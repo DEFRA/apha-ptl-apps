@@ -85,6 +85,129 @@ public class SchemeRepositoryTests
     }
 
     [Fact]
+    public async Task GetByIdAsync_WithTestsAndTabulations_AssemblesTheFullTreeInOrder()
+    {
+        var (repository, connection) = CreateRepository();
+        var schemeId = Guid.NewGuid();
+        var testId = Guid.NewGuid();
+        var categoryId = Guid.NewGuid();
+        var resultItemId = Guid.NewGuid();
+        var methodItemId = Guid.NewGuid();
+        var criterionId = Guid.NewGuid();
+        var tabulationId = Guid.NewGuid();
+
+        var priceTable = new DataTable();
+        priceTable.Columns.Add("fldSchemeCurrencyId", typeof(Guid));
+        priceTable.Columns.Add("fldCurrencyId", typeof(Guid));
+        priceTable.Columns.Add("fldPrice", typeof(decimal));
+        priceTable.Columns.Add("fldCurrencyName", typeof(string));
+        priceTable.Columns.Add("fldCurrencySymbol", typeof(string));
+        priceTable.Rows.Add(Guid.NewGuid(), Guid.NewGuid(), 12.5m, "British Pound", "£");
+
+        // Two tests out of order (fldOrder 2 then 1) so ReadTestsAsync's final OrderBy is genuinely exercised.
+        var testTable = new DataTable();
+        testTable.Columns.Add("fldTestId", typeof(Guid));
+        testTable.Columns.Add("fldTestTypeId", typeof(Guid));
+        testTable.Columns.Add("fldTestType", typeof(string));
+        testTable.Columns.Add("fldSchemeId", typeof(Guid));
+        testTable.Columns.Add("fldOrder", typeof(int));
+        var secondTestId = Guid.NewGuid();
+        testTable.Rows.Add(secondTestId, Guid.NewGuid(), "Bacteriology", schemeId, 2);
+        testTable.Rows.Add(testId, Guid.NewGuid(), "Serology", schemeId, 1);
+
+        var methodItemTable = new DataTable();
+        methodItemTable.Columns.Add("fldTestMethodItemId", typeof(Guid));
+        methodItemTable.Columns.Add("fldTestMethodItemTypeId", typeof(Guid));
+        methodItemTable.Columns.Add("fldTestMethodItemType", typeof(string));
+        methodItemTable.Columns.Add("fldTestId", typeof(Guid));
+        methodItemTable.Columns.Add("fldOrder", typeof(int));
+        methodItemTable.Columns.Add("fldExpectedLength", typeof(int));
+        methodItemTable.Rows.Add(methodItemId, Guid.NewGuid(), "ELISA", testId, 1, 0);
+
+        var resultItemTable = new DataTable();
+        resultItemTable.Columns.Add("fldTestResultItemId", typeof(Guid));
+        resultItemTable.Columns.Add("fldTestResultItemTypeId", typeof(Guid));
+        resultItemTable.Columns.Add("fldTestResultItemType", typeof(string));
+        resultItemTable.Columns.Add("fldTestId", typeof(Guid));
+        resultItemTable.Columns.Add("fldOrder", typeof(int));
+        resultItemTable.Columns.Add("fldExpectedLength", typeof(int));
+        resultItemTable.Rows.Add(resultItemId, Guid.NewGuid(), "Titre", testId, 1, 3);
+
+        var categoryTable = new DataTable();
+        categoryTable.Columns.Add("fldCategoryItemId", typeof(Guid));
+        categoryTable.Columns.Add("fldCategoryItemTypeId", typeof(Guid));
+        categoryTable.Columns.Add("fldName", typeof(string));
+        categoryTable.Columns.Add("fldTestId", typeof(Guid));
+        categoryTable.Columns.Add("fldOrder", typeof(int));
+        categoryTable.Rows.Add(categoryId, Guid.NewGuid(), "Accuracy", testId, 1);
+
+        var criterionTable = new DataTable();
+        criterionTable.Columns.Add("fldCriterionItemId", typeof(Guid));
+        criterionTable.Columns.Add("fldCriterionItemTypeId", typeof(Guid));
+        criterionTable.Columns.Add("fldName", typeof(string));
+        criterionTable.Columns.Add("fldCategoryItemId", typeof(Guid));
+        criterionTable.Columns.Add("fldOrder", typeof(int));
+        criterionTable.Rows.Add(criterionId, Guid.NewGuid(), "Within range", categoryId, 1);
+
+        var tabulationTable = new DataTable();
+        tabulationTable.Columns.Add("fldTabulationId", typeof(Guid));
+        tabulationTable.Columns.Add("fldSchemeId", typeof(Guid));
+        tabulationTable.Columns.Add("fldName", typeof(string));
+        tabulationTable.Columns.Add("fldIntendedResultsOnly", typeof(bool));
+        tabulationTable.Columns.Add("fldSingleParticipantTabulation", typeof(bool));
+        tabulationTable.Columns.Add("fldShowRatings", typeof(bool));
+        tabulationTable.Columns.Add("fldAvailableToParticipants", typeof(bool));
+        tabulationTable.Columns.Add("fldAvailableToViewers", typeof(bool));
+        tabulationTable.Rows.Add(tabulationId, schemeId, "Published", false, false, false, true, true);
+
+        var tabulationMethodLinkTable = new DataTable();
+        tabulationMethodLinkTable.Columns.Add("fldTabulationTestMethodItemId", typeof(Guid));
+        tabulationMethodLinkTable.Columns.Add("fldTabulationId", typeof(Guid));
+        tabulationMethodLinkTable.Columns.Add("fldTestMethodItemId", typeof(Guid));
+        tabulationMethodLinkTable.Rows.Add(Guid.NewGuid(), tabulationId, methodItemId);
+
+        var tabulationResultLinkTable = new DataTable();
+        tabulationResultLinkTable.Columns.Add("fldTabulationTestResultItemId", typeof(Guid));
+        tabulationResultLinkTable.Columns.Add("fldTabulationId", typeof(Guid));
+        tabulationResultLinkTable.Columns.Add("fldTestResultItemId", typeof(Guid));
+        tabulationResultLinkTable.Rows.Add(Guid.NewGuid(), tabulationId, resultItemId);
+
+        var dataSet = new DataSet();
+        dataSet.Tables.Add(SchemeTable(schemeId));
+        dataSet.Tables.Add(priceTable);
+        dataSet.Tables.Add(testTable);
+        dataSet.Tables.Add(methodItemTable);
+        dataSet.Tables.Add(resultItemTable);
+        dataSet.Tables.Add(categoryTable);
+        dataSet.Tables.Add(criterionTable);
+        dataSet.Tables.Add(tabulationTable);
+        dataSet.Tables.Add(tabulationMethodLinkTable);
+        dataSet.Tables.Add(tabulationResultLinkTable);
+        connection.RespondToQuery(GetByIdSql, dataSet);
+
+        var result = await repository.GetByIdAsync(schemeId);
+
+        Assert.NotNull(result);
+        Assert.Equal(12.5m, Assert.Single(result!.Prices).Price);
+
+        Assert.Equal(2, result.Tests.Count);
+        Assert.Equal("Serology", result.Tests[0].TestType);
+        Assert.Equal("Bacteriology", result.Tests[1].TestType);
+
+        var serology = result.Tests[0];
+        Assert.Equal("Titre", Assert.Single(serology.ResultItems).TestResultItemType);
+        Assert.Equal("ELISA", Assert.Single(serology.MethodItems).TestMethodItemType);
+        var category = Assert.Single(serology.Categories);
+        Assert.Equal("Accuracy", category.Name);
+        Assert.Equal("Within range", Assert.Single(category.Criteria).Name);
+
+        var tabulation = Assert.Single(result.Tabulations);
+        Assert.Equal("Published", tabulation.Name);
+        Assert.Equal(resultItemId, Assert.Single(tabulation.ResultItemIds));
+        Assert.Equal(methodItemId, Assert.Single(tabulation.MethodItemIds));
+    }
+
+    [Fact]
     public async Task GetSummariesBySchemeIdAsync_ReturnsMappedSummaries()
     {
         var (repository, connection) = CreateRepository();

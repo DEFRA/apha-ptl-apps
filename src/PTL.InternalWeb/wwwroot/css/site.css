@@ -157,10 +157,6 @@ body {
   width: auto;
 }
 
-.ptl-table-scroll:focus-visible {
-  outline: 3px solid #ffdd00;
-}
-
 /* GOV.UK caps the page at 960px, which leaves roughly 690px for content once the side navigation
    takes its quarter - tight for PTLIMS's data-dense admin screens. Applied to govuk-width-container
    rather than app-width-container because the header, service bar, phase banner and footer all use

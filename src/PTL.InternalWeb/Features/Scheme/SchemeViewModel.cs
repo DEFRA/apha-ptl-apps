@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using PTL.Contracts.Scheme;
 using PTL.Core.Scheme;
@@ -8,19 +9,14 @@ using CoreSchemeIdentifier = PTL.Core.Scheme.SchemeIdentifier;
 namespace PTL.InternalWeb.Features.Scheme;
 
 // Legacy SchemeList.aspx has no year filter; the Scheme Name search box is carried over from the
-// legacy Scheme Admin/Search.aspx page, which this screen now absorbs. Search is only populated
-// by Index (the Year filter); PrintableSchemes has no year filter so leaves it null.
+// legacy Scheme Admin/Search.aspx page, which this screen now absorbs - a plain substring match,
+// no other filtering behaviour.
 public sealed record SchemeListViewModel(
     int Page,
     int PageSize,
     int TotalCount,
     string? SearchTerm,
-    IReadOnlyList<SchemeSummaryResponse> Schemes,
-    SchemeYearSearchViewModel? Search = null);
-
-// Index's Year dropdown - YearId is whatever was resolved (posted value, or the first current
-// year when none was posted), YearOptions backs the <select>.
-public sealed record SchemeYearSearchViewModel(int YearId, IReadOnlyList<SelectListItem> YearOptions);
+    IReadOnlyList<SchemeSummaryResponse> Schemes);
 
 // Legacy SchemeHistory.aspx.vb GetYearNameFromYearId() resolves each row's YearId against
 // YearCollection and displays the "2026/27"-style label, not the raw integer.
@@ -139,7 +135,10 @@ public sealed class SchemeFormViewModel : IValidatableObject
 
     // Set by SchemeController.Details so _SchemeForm and its tab partials render every field as
     // plain read-only text instead of form controls, with no Save/Add/Remove/Move/rich-text-editor
-    // affordances - the same tabbed layout used for Create/Edit, reused for viewing.
+    // affordances - the same tabbed layout used for Create/Edit, reused for viewing. Never posted
+    // back by any form field, so it is excluded from model binding entirely rather than left as an
+    // under-posting-prone non-nullable bool.
+    [BindNever]
     public bool IsViewMode { get; set; }
 
     // Read-only display fields, not posted back.

@@ -64,7 +64,7 @@
             @foreach (var resultsTable in test.ResultsTables)
             {
                 <div class="PrintableResultsSpacer"></div>
-                <table cellpadding="0" cellspacing="0" class="tablePrintableResults">
+                <table class="tablePrintableResults">
                     <thead>
                         @if (resultsTable.ShowTestName)
                         {
@@ -115,7 +115,7 @@
                 <div class="PrintableResultsSpacer"></div>
                 @* One column of method names with no header in the legacy design - role="presentation"
                    keeps it out of the accessibility tree as a layout list rather than a data table. *@
-                <table cellpadding="0" cellspacing="0" class="tablePrintableResults" role="presentation">
+                <table class="tablePrintableResults" role="presentation">
                     @foreach (var methodItemName in test.MethodTable.MethodItemNames)
                     {
                         <tr class="rowMethod"><td>@methodItemName</td></tr>

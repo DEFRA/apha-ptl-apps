@@ -80,6 +80,7 @@ public static class DapperColumnMappings
     private const string ColParticipantSchemeId = "fldParticipantSchemeId";
     private const string ColVatRating = "fldVatRating";
     private const string ColInactiveDate = "fldInactiveDate";
+    private const string ColTestId = "fldTestId";
 
     public static void Register()
     {
@@ -681,7 +682,7 @@ public static class DapperColumnMappings
 
         Map<SchemeTest>(new(StringComparer.OrdinalIgnoreCase)
         {
-            ["fldTestId"] = nameof(SchemeTest.TestId),
+            [ColTestId] = nameof(SchemeTest.TestId),
             ["fldTestTypeId"] = nameof(SchemeTest.TestTypeId),
             ["fldTestType"] = nameof(SchemeTest.TestType),
             [ColSchemeId] = nameof(SchemeTest.SchemeId),
@@ -693,7 +694,7 @@ public static class DapperColumnMappings
             ["fldTestResultItemId"] = nameof(SchemeTestResultItem.TestResultItemId),
             ["fldTestResultItemTypeId"] = nameof(SchemeTestResultItem.TestResultItemTypeId),
             ["fldTestResultItemType"] = nameof(SchemeTestResultItem.TestResultItemType),
-            ["fldTestId"] = nameof(SchemeTestResultItem.TestId),
+            [ColTestId] = nameof(SchemeTestResultItem.TestId),
             [ColOrder] = nameof(SchemeTestResultItem.Order),
             ["fldExpectedLength"] = nameof(SchemeTestResultItem.ExpectedLength),
         });
@@ -703,7 +704,7 @@ public static class DapperColumnMappings
             ["fldTestMethodItemId"] = nameof(SchemeTestMethodItem.TestMethodItemId),
             ["fldTestMethodItemTypeId"] = nameof(SchemeTestMethodItem.TestMethodItemTypeId),
             ["fldTestMethodItemType"] = nameof(SchemeTestMethodItem.TestMethodItemType),
-            ["fldTestId"] = nameof(SchemeTestMethodItem.TestId),
+            [ColTestId] = nameof(SchemeTestMethodItem.TestId),
             [ColOrder] = nameof(SchemeTestMethodItem.Order),
             ["fldExpectedLength"] = nameof(SchemeTestMethodItem.ExpectedLength),
         });
@@ -713,7 +714,7 @@ public static class DapperColumnMappings
             ["fldCategoryItemId"] = nameof(SchemeCategoryItem.CategoryItemId),
             ["fldCategoryItemTypeId"] = nameof(SchemeCategoryItem.CategoryItemTypeId),
             [ColName] = nameof(SchemeCategoryItem.Name),
-            ["fldTestId"] = nameof(SchemeCategoryItem.TestId),
+            [ColTestId] = nameof(SchemeCategoryItem.TestId),
             [ColOrder] = nameof(SchemeCategoryItem.Order),
         });
 

@@ -184,4 +184,161 @@ public class SchemeTestCommandsTests
 
         Assert.Equal("Serology", model.Tests[0].TestType);
     }
+
+    [Fact]
+    public void TryApply_AddTabulation_AppendsAndClearsTheStagedName()
+    {
+        var model = new SchemeFormViewModel { NewTabulationName = "  Published  " };
+
+        Assert.True(SchemeTestCommands.TryApply(model, "add-tabulation", Guid.Empty));
+
+        var tabulation = Assert.Single(model.Tabulations);
+        Assert.Equal("Published", tabulation.Name);
+        Assert.NotEqual(Guid.Empty, tabulation.TabulationId);
+        Assert.Null(model.NewTabulationName);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void TryApply_AddTabulationWithoutAName_IsIgnored(string? name)
+    {
+        var model = new SchemeFormViewModel { NewTabulationName = name };
+
+        Assert.False(SchemeTestCommands.TryApply(model, "add-tabulation", Guid.Empty));
+        Assert.Empty(model.Tabulations);
+    }
+
+    [Fact]
+    public void TryApply_RemoveTabulation_DropsIt()
+    {
+        var model = new SchemeFormViewModel();
+        model.Tabulations.Add(new SchemeTabulationViewModel { Name = "Published" });
+
+        Assert.True(SchemeTestCommands.TryApply(model, "remove-tabulation:0", Guid.Empty));
+        Assert.Empty(model.Tabulations);
+    }
+
+    [Theory]
+    [InlineData("add-category")]
+    public void TryApply_AddCategory_AppendsUnderTheTest(string action)
+    {
+        var model = ModelWithOneTest();
+        var categoryTypeId = Guid.NewGuid();
+
+        Assert.True(SchemeTestCommands.TryApply(model, $"{action}:0", categoryTypeId));
+
+        Assert.Equal(categoryTypeId, Assert.Single(model.Tests[0].Categories).CategoryItemTypeId);
+    }
+
+    [Fact]
+    public void TryApply_AddCategoryWithoutASelection_IsIgnored()
+    {
+        var model = ModelWithOneTest();
+
+        Assert.False(SchemeTestCommands.TryApply(model, "add-category:0", Guid.Empty));
+        Assert.Empty(model.Tests[0].Categories);
+    }
+
+    [Fact]
+    public void TryApply_RemoveCategory_DropsIt()
+    {
+        var model = ModelWithOneTest();
+        model.Tests[0].Categories.Add(new SchemeCategoryItemViewModel { Name = "Accuracy" });
+
+        Assert.True(SchemeTestCommands.TryApply(model, "remove-category:0:0", Guid.Empty));
+        Assert.Empty(model.Tests[0].Categories);
+    }
+
+    [Fact]
+    public void TryApply_MoveCategoryDown_SwapsWithTheNextCategory()
+    {
+        var model = ModelWithOneTest();
+        model.Tests[0].Categories.Add(new SchemeCategoryItemViewModel { Name = "Accuracy" });
+        model.Tests[0].Categories.Add(new SchemeCategoryItemViewModel { Name = "Precision" });
+
+        Assert.True(SchemeTestCommands.TryApply(model, "move-category-down:0:0", Guid.Empty));
+
+        Assert.Equal("Precision", model.Tests[0].Categories[0].Name);
+    }
+
+    [Fact]
+    public void TryApply_MoveFirstCategoryUp_IsIgnored()
+    {
+        var model = ModelWithOneTest();
+        model.Tests[0].Categories.Add(new SchemeCategoryItemViewModel { Name = "Accuracy" });
+
+        Assert.False(SchemeTestCommands.TryApply(model, "move-category-up:0:0", Guid.Empty));
+    }
+
+    [Theory]
+    [InlineData("move-method-up")]
+    [InlineData("move-method-down")]
+    public void TryApply_MoveMethodItem_ReordersWithinTheTest(string action)
+    {
+        var model = ModelWithOneTest();
+        model.Tests[0].MethodItems.Add(new SchemeTestItemViewModel { Name = "First" });
+        model.Tests[0].MethodItems.Add(new SchemeTestItemViewModel { Name = "Second" });
+        var index = action.EndsWith("up", StringComparison.Ordinal) ? 1 : 0;
+
+        Assert.True(SchemeTestCommands.TryApply(model, $"{action}:0:{index}", Guid.Empty));
+
+        Assert.Equal("Second", model.Tests[0].MethodItems[0].Name);
+    }
+
+    [Fact]
+    public void TryApply_RemoveMethodItem_DropsIt()
+    {
+        var model = ModelWithOneTest();
+        model.Tests[0].MethodItems.Add(new SchemeTestItemViewModel { Name = "ELISA" });
+
+        Assert.True(SchemeTestCommands.TryApply(model, "remove-method:0:0", Guid.Empty));
+        Assert.Empty(model.Tests[0].MethodItems);
+    }
+
+    [Fact]
+    public void TryApply_RemoveCriterion_DropsIt()
+    {
+        var model = ModelWithOneTest();
+        model.Tests[0].Categories.Add(new SchemeCategoryItemViewModel { Name = "Accuracy" });
+        model.Tests[0].Categories[0].Criteria.Add(new SchemeTestItemViewModel { Name = "Within range" });
+
+        Assert.True(SchemeTestCommands.TryApply(model, "remove-criterion:0:0:0", Guid.Empty));
+        Assert.Empty(model.Tests[0].Categories[0].Criteria);
+    }
+
+    [Theory]
+    [InlineData("move-criterion-up")]
+    [InlineData("move-criterion-down")]
+    public void TryApply_MoveCriterion_ReordersWithinTheCategory(string action)
+    {
+        var model = ModelWithOneTest();
+        model.Tests[0].Categories.Add(new SchemeCategoryItemViewModel { Name = "Accuracy" });
+        model.Tests[0].Categories[0].Criteria.Add(new SchemeTestItemViewModel { Name = "First" });
+        model.Tests[0].Categories[0].Criteria.Add(new SchemeTestItemViewModel { Name = "Second" });
+        var index = action.EndsWith("up", StringComparison.Ordinal) ? 1 : 0;
+
+        Assert.True(SchemeTestCommands.TryApply(model, $"{action}:0:0:{index}", Guid.Empty));
+
+        Assert.Equal("Second", model.Tests[0].Categories[0].Criteria[0].Name);
+    }
+
+    [Fact]
+    public void TryApply_CriterionCommandWithOutOfRangeCategoryIndex_IsIgnored()
+    {
+        var model = ModelWithOneTest();
+        model.Tests[0].Categories.Add(new SchemeCategoryItemViewModel { Name = "Accuracy" });
+
+        Assert.False(SchemeTestCommands.TryApply(model, "add-criterion:0:5", Guid.NewGuid()));
+    }
+
+    [Fact]
+    public void TryApply_UnknownCriterionCommand_IsIgnored()
+    {
+        var model = ModelWithOneTest();
+        model.Tests[0].Categories.Add(new SchemeCategoryItemViewModel { Name = "Accuracy" });
+
+        Assert.False(SchemeTestCommands.TryApply(model, "detonate:0:0", Guid.Empty));
+    }
 }

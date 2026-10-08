@@ -54,10 +54,12 @@
                 });
 
                 // The error summary links to the field id, so focus has to reach the editor.
+                // container.dataset assignment (not optional chaining) is required here since the
+                // guard protects an assignment target, and `container?.dataset.x = y` is invalid JS.
                 editor.on('init', function () {
                     var container = editor.getContainer();
                     if (container) {
-                        container.setAttribute('data-editor-for', textarea.id);
+                        container.dataset.editorFor = textarea.id;
                     }
                 });
             }

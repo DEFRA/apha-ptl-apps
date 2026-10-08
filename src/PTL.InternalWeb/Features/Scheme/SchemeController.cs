@@ -64,18 +64,14 @@ public class SchemeController(ISchemeApiClient schemeApiClient, ILookupApiClient
     // supplies the actual section contents.
     public IActionResult ManageSchemes() => View();
 
-    public async Task<IActionResult> Index(int? yearId = null, string? searchTerm = null, int page = 1, int pageSize = PTL.InternalWeb.Pagination.PaginationModel.DefaultPageSize, CancellationToken cancellationToken = default)
+    // Legacy SchemeList.aspx has no year filter - the Scheme Name search box is the only filter,
+    // searching across every scheme family regardless of year.
+    public async Task<IActionResult> Index(string? searchTerm = null, int page = 1, int pageSize = PTL.InternalWeb.Pagination.PaginationModel.DefaultPageSize, CancellationToken cancellationToken = default)
     {
-        var years = await lookupApiClient.GetCurrentYearsAsync(cancellationToken);
-        var resolvedYearId = yearId ?? (years.Count > 0 ? years[0].YearId : 0);
+        var result = await schemeApiClient.GetSchemeFamiliesAsync(page, pageSize, searchTerm, cancellationToken);
+        LogDisplayedSchemeListMessage(logger, 0, searchTerm, result.Page, result.TotalCount, null);
 
-        var result = await schemeApiClient.GetSchemesForYearAsync(new SchemeSearchRequest(resolvedYearId, searchTerm, page, pageSize), cancellationToken);
-        LogDisplayedSchemeListMessage(logger, resolvedYearId, searchTerm, result.Page, result.TotalCount, null);
-
-        var yearOptions = years.Select(y => new SelectListItem(y.Year, y.YearId.ToString(CultureInfo.InvariantCulture))).ToList();
-        var search = new SchemeYearSearchViewModel(resolvedYearId, yearOptions);
-
-        return View(new SchemeListViewModel(result.Page, result.PageSize, result.TotalCount, searchTerm, result.Items, search));
+        return View(new SchemeListViewModel(result.Page, result.PageSize, result.TotalCount, searchTerm, result.Items));
     }
 
     // Legacy SchemeListForPrinting.aspx: the same spgaSchemeInfo family list as the main Scheme

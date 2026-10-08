@@ -31,7 +31,7 @@ public class SchemeControllerTests
         };
         var controller = CreateController(apiClient);
 
-        var result = await controller.Index(null, null, 1, 15, CancellationToken.None);
+        var result = await controller.Index(null, 1, 15, CancellationToken.None);
 
         var view = Assert.IsType<ViewResult>(result);
         var model = Assert.IsType<PTL.InternalWeb.Features.Scheme.SchemeListViewModel>(view.Model);
@@ -84,25 +84,7 @@ public class SchemeControllerTests
     }
 
     [Fact]
-    public async Task Index_NoYearIdProvided_ResolvesToFirstCurrentYear()
-    {
-        var apiClient = new FakeSchemeApiClient
-        {
-            SearchResponse = new SchemeSearchResponse([], 0, 1, 20)
-        };
-        var lookupApiClient = new FakeLookupApiClient { Years = [new YearResponse(2027, "2026/27")] };
-        var controller = CreateController(apiClient, lookupApiClient);
-
-        var result = await controller.Index(null, null, 1, 20, CancellationToken.None);
-
-        var view = Assert.IsType<ViewResult>(result);
-        var model = Assert.IsType<PTL.InternalWeb.Features.Scheme.SchemeListViewModel>(view.Model);
-        Assert.NotNull(model.Search);
-        Assert.Equal(2027, model.Search.YearId);
-    }
-
-    [Fact]
-    public async Task Index_NoYearIdAndNoCurrentYears_ResolvesToZero()
+    public async Task Index_SearchTermProvided_FiltersBySchemeName()
     {
         var apiClient = new FakeSchemeApiClient
         {
@@ -110,12 +92,11 @@ public class SchemeControllerTests
         };
         var controller = CreateController(apiClient);
 
-        var result = await controller.Index(null, null, 1, 20, CancellationToken.None);
+        var result = await controller.Index("PT1234", 1, 20, CancellationToken.None);
 
         var view = Assert.IsType<ViewResult>(result);
         var model = Assert.IsType<PTL.InternalWeb.Features.Scheme.SchemeListViewModel>(view.Model);
-        Assert.NotNull(model.Search);
-        Assert.Equal(0, model.Search.YearId);
+        Assert.Equal("PT1234", model.SearchTerm);
     }
 
     [Fact]
@@ -445,5 +426,114 @@ public class SchemeControllerTests
         var view = Assert.IsType<ViewResult>(result);
         Assert.Same(model, view.Model);
         Assert.False(controller.ModelState.IsValid);
+    }
+
+    [Fact]
+    public async Task Edit_Get_ExistingScheme_MapsTheFullTestsAndTabulationsTree()
+    {
+        var schemeId = Guid.NewGuid();
+        var testId = Guid.NewGuid();
+        var resultItemId = Guid.NewGuid();
+        var categoryId = Guid.NewGuid();
+        var criterionId = Guid.NewGuid();
+        var tabulationId = Guid.NewGuid();
+        var currencyId = Guid.NewGuid();
+        var viewerId = Guid.NewGuid();
+        var scheme = SampleScheme(schemeId, Guid.NewGuid()) with
+        {
+            ViewerIds = [viewerId],
+            Prices = [new SchemeCurrencyPriceResponse(Guid.NewGuid(), currencyId, 12.5m, "British Pound", "£")],
+            Tests =
+            [
+                new SchemeTestResponse(
+                    testId, Guid.NewGuid(), "Serology", 1,
+                    ResultItems: [new SchemeTestItemResponse(resultItemId, Guid.NewGuid(), "Titre", 1)],
+                    MethodItems: [],
+                    Categories:
+                    [
+                        new SchemeCategoryItemResponse(categoryId, Guid.NewGuid(), "Accuracy", 1,
+                            Criteria: [new SchemeTestItemResponse(criterionId, Guid.NewGuid(), "Within range", 1)])
+                    ])
+            ],
+            Tabulations =
+            [
+                new SchemeTabulationResponse(tabulationId, "Published", false, false, false, true, true, [resultItemId], [])
+            ]
+        };
+        var controller = CreateController(
+            new FakeSchemeApiClient { SchemeResponse = scheme },
+            new FakeLookupApiClient { Currencies = [new CurrencyResponse(currencyId, "British Pound", "£", "£ - British Pound")] });
+
+        var result = await controller.Edit(schemeId, CancellationToken.None);
+
+        var model = Assert.IsType<PTL.InternalWeb.Features.Scheme.SchemeFormViewModel>(Assert.IsType<ViewResult>(result).Model);
+        Assert.Equal(viewerId, Assert.Single(model.ViewerIds));
+        Assert.Equal(12.5m, Assert.Single(model.Prices).Price);
+
+        var test = Assert.Single(model.Tests);
+        Assert.Equal("Serology", test.TestType);
+        Assert.Equal("Titre", Assert.Single(test.ResultItems).Name);
+        var category = Assert.Single(test.Categories);
+        Assert.Equal("Accuracy", category.Name);
+        Assert.Equal("Within range", Assert.Single(category.Criteria).Name);
+
+        var tabulation = Assert.Single(model.Tabulations);
+        Assert.Equal("Published", tabulation.Name);
+        Assert.Equal(PTL.InternalWeb.Features.Scheme.SchemeTabulationAvailability.All, tabulation.Availability);
+        Assert.Equal(resultItemId, Assert.Single(tabulation.ResultItemIds));
+    }
+
+    [Fact]
+    public async Task Create_Post_TestCommand_MutatesTheStagedTreeAndRedisplaysWithoutSaving()
+    {
+        var apiClient = new FakeSchemeApiClient();
+        var controller = CreateController(apiClient);
+        var model = new PTL.InternalWeb.Features.Scheme.SchemeFormViewModel { YearId = 2027 };
+        var testTypeId = Guid.NewGuid();
+
+        var result = await controller.Create(model, testCommand: "add-test", selectedItemTypeId: testTypeId, cancellationToken: CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        Assert.Same(model, view.Model);
+        Assert.Equal(testTypeId, Assert.Single(model.Tests).TestTypeId);
+    }
+
+    [Fact]
+    public async Task Edit_Post_TestCommand_MutatesTheStagedTreeAndRedisplaysWithoutSaving()
+    {
+        var controller = CreateController(new FakeSchemeApiClient());
+        var model = new PTL.InternalWeb.Features.Scheme.SchemeFormViewModel { YearId = 2027 };
+        model.Tests.Add(new PTL.InternalWeb.Features.Scheme.SchemeTestViewModel { TestTypeId = Guid.NewGuid(), TestType = "Serology" });
+
+        var result = await controller.Edit(Guid.NewGuid(), model, testCommand: "remove-test:0", cancellationToken: CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        Assert.Same(model, view.Model);
+        Assert.Empty(model.Tests);
+    }
+
+    [Fact]
+    public async Task Edit_Get_PostedPriceMergesOntoItsCurrencyRow()
+    {
+        var schemeId = Guid.NewGuid();
+        var currencyId = Guid.NewGuid();
+        var schemeCurrencyId = Guid.NewGuid();
+        var scheme = SampleScheme(schemeId, Guid.NewGuid()) with
+        {
+            Prices = [new SchemeCurrencyPriceResponse(schemeCurrencyId, currencyId, 42m, "British Pound", "£")]
+        };
+        var lookup = new FakeLookupApiClient
+        {
+            Currencies = [new CurrencyResponse(currencyId, "British Pound", "£", "£ - British Pound")]
+        };
+        var controller = CreateController(new FakeSchemeApiClient { SchemeResponse = scheme }, lookup);
+
+        var result = await controller.Edit(schemeId, CancellationToken.None);
+
+        var model = Assert.IsType<PTL.InternalWeb.Features.Scheme.SchemeFormViewModel>(Assert.IsType<ViewResult>(result).Model);
+        var price = Assert.Single(model.Prices);
+        Assert.Equal(schemeCurrencyId, price.SchemeCurrencyId);
+        Assert.Equal(42m, price.Price);
+        Assert.Equal("British Pound", price.CurrencyName);
     }
 }

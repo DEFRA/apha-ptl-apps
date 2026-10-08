@@ -45,6 +45,18 @@ public class SchemeApiClientTests
     }
 
     [Fact]
+    public async Task GetSchemesForYearAsync_NullResponse_ReturnsEmptyResultEchoingThePagingRequest()
+    {
+        var client = CreateClient(HttpStatusCode.OK, "null");
+
+        var result = await client.GetSchemesForYearAsync(new SchemeSearchRequest(2027, Page: 2, PageSize: 10));
+
+        Assert.Empty(result.Items);
+        Assert.Equal(2, result.Page);
+        Assert.Equal(10, result.PageSize);
+    }
+
+    [Fact]
     public async Task GetSchemeHistoryAsync_ReturnsDeserializedList()
     {
         const string json = "[]";

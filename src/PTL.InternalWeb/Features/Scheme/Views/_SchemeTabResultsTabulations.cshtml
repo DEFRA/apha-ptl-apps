@@ -35,11 +35,11 @@
 else
 {
     @* The grid gains a column per tabulation, so it outgrows the page once there are a few of
-       them - scroll it rather than letting it break the layout. tabindex="0" + role="region" +
-       aria-label is the WCAG technique (SCR29) for making a scrollable content region reachable
-       and operable by keyboard; it is intentional here, not a stray tabindex on a non-interactive
-       element, so it is retained as-is. *@
-    <div class="ptl-table-scroll" role="region" aria-label="Results tabulations" tabindex="0">
+       them - scroll it rather than letting it break the layout. A native <section> with an
+       aria-label gives the region its accessible name without a redundant role, and keyboard
+       users still reach every cell because every interactive one (inputs/selects/buttons) is
+       itself focusable, so no tabindex is needed on the non-interactive wrapper. *@
+    <section class="ptl-table-scroll" aria-label="Results tabulations">
     <table class="govuk-table">
         <thead class="govuk-table__head">
             <tr class="govuk-table__row">
@@ -247,7 +247,7 @@ else
             </tfoot>
         }
     </table>
-    </div>
+    </section>
 }
 
 @if (!Model.IsViewMode)

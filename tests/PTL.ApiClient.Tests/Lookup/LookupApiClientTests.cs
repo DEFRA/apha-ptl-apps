@@ -211,6 +211,22 @@ public class LookupApiClientTests
     }
 
     [Fact]
+    public async Task GetSchemeItemTypesAsync_ReturnsDeserializedList()
+    {
+        const string json = """[{"itemTypeId":"99999999-9999-9999-9999-999999999999","name":"Antibody","noLongerInUse":false}]""";
+        var client = CreateClient(HttpStatusCode.OK, json);
+
+        var result = await client.GetSchemeItemTypesAsync(PTL.Contracts.Lookup.SchemeItemTypeKind.TestType, 2026);
+
+        Assert.Single(result);
+        Assert.Equal("Antibody", result[0].Name);
+    }
+
+    [Fact]
+    public async Task GetSchemeItemTypesAsync_NullResponse_ReturnsEmptyList() =>
+        Assert.Empty(await CreateClient(HttpStatusCode.OK, "null").GetSchemeItemTypesAsync(PTL.Contracts.Lookup.SchemeItemTypeKind.TestType, 2026));
+
+    [Fact]
     public async Task GetSystemSettingsAsync_ReturnsDeserializedResponse()
     {
         const string json = """{"utNumber":"UT3/306"}""";

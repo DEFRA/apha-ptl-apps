@@ -149,7 +149,7 @@ public sealed class SchemeRepository(IDbConnectionFactory connectionFactory) : I
     // Legacy SchemeCurrencyCollection.Update: insert rows that have no id yet, update the rest.
     // There is no spdSchemeCurrency, so a currency link is never deleted. Arguments are bound by
     // name - a positional EXEC would silently depend on the procedure's declaration order.
-    private static async Task SavePricesAsync(System.Data.IDbConnection connection, CoreScheme scheme)
+    private static async Task SavePricesAsync(IDbConnection connection, CoreScheme scheme)
     {
         foreach (var price in scheme.Prices)
         {
@@ -176,7 +176,7 @@ public sealed class SchemeRepository(IDbConnectionFactory connectionFactory) : I
     // The Tests and Results Tabulations tabs are staged in the form and written as a unit, in
     // legacy's order: Tests.UpdateNotDelete, then Tabulations.Update, then Tests.UpdateDeleteOnly.
     // Deleting tests last matters because tabulation link rows reference their items.
-    private async Task SaveChildCollectionsAsync(System.Data.IDbConnection connection, CoreScheme scheme, CancellationToken cancellationToken)
+    private async Task SaveChildCollectionsAsync(IDbConnection connection, CoreScheme scheme, CancellationToken cancellationToken)
     {
         var existing = await GetByIdAsync(scheme.SchemeId, cancellationToken);
         var existingTests = existing?.Tests ?? [];
@@ -188,7 +188,7 @@ public sealed class SchemeRepository(IDbConnectionFactory connectionFactory) : I
 
     // Ids are generated client-side when an item is staged (legacy does the same), so a row is
     // new when it is not already present rather than when its id is empty.
-    private static async Task SaveTestsAsync(System.Data.IDbConnection connection, CoreScheme scheme, IList<SchemeTest> existingTests)
+    private static async Task SaveTestsAsync(IDbConnection connection, CoreScheme scheme, IList<SchemeTest> existingTests)
     {
         var existingTestIds = existingTests.Select(t => t.TestId).ToHashSet();
         var existingResultItemIds = existingTests.SelectMany(t => t.ResultItems).Select(i => i.TestResultItemId).ToHashSet();
@@ -218,7 +218,7 @@ public sealed class SchemeRepository(IDbConnectionFactory connectionFactory) : I
     // Legacy TabulationCollection.Update: upsert each tabulation, reconcile its item links by
     // insert/delete (neither link table has an update procedure), then delete tabulations that
     // are no longer present.
-    private static async Task SaveTabulationsAsync(System.Data.IDbConnection connection, CoreScheme scheme, IList<SchemeTabulation> existingTabulations)
+    private static async Task SaveTabulationsAsync(IDbConnection connection, CoreScheme scheme, IList<SchemeTabulation> existingTabulations)
     {
         foreach (var tabulation in scheme.Tabulations)
         {
@@ -265,7 +265,7 @@ public sealed class SchemeRepository(IDbConnectionFactory connectionFactory) : I
     // The delete and insert SQL are complete literal command texts supplied by the caller - this
     // method only chooses between them and binds parameters, so there is no dynamically built SQL.
     private static async Task SyncItemLinksAsync(
-        System.Data.IDbConnection connection,
+        IDbConnection connection,
         Guid tabulationId,
         IList<Guid> requestedItemIds,
         IList<SchemeTabulationItemLink> existingLinks,
@@ -287,12 +287,19 @@ public sealed class SchemeRepository(IDbConnectionFactory connectionFactory) : I
     }
 
     private static async Task SaveTestChildrenAsync(
-        System.Data.IDbConnection connection,
+        IDbConnection connection,
         SchemeTest test,
         HashSet<Guid> existingResultItemIds,
         HashSet<Guid> existingMethodItemIds,
         HashSet<Guid> existingCategoryIds,
         HashSet<Guid> existingCriterionIds)
+    {
+        await SaveResultItemsAsync(connection, test, existingResultItemIds);
+        await SaveMethodItemsAsync(connection, test, existingMethodItemIds);
+        await SaveCategoriesAsync(connection, test, existingCategoryIds, existingCriterionIds);
+    }
+
+    private static async Task SaveResultItemsAsync(IDbConnection connection, SchemeTest test, HashSet<Guid> existingResultItemIds)
     {
         for (var i = 0; i < test.ResultItems.Count; i++)
         {
@@ -309,7 +316,10 @@ public sealed class SchemeRepository(IDbConnectionFactory connectionFactory) : I
                 "EXEC dbo.spuTestResultItem @TestResultItemId = @TestResultItemId, @TestResultItemTypeId = @TestResultItemTypeId, @TestId = @TestId, @Order = @Order",
                 () => new { item.TestResultItemId, item.TestResultItemTypeId, item.TestId, item.Order });
         }
+    }
 
+    private static async Task SaveMethodItemsAsync(IDbConnection connection, SchemeTest test, HashSet<Guid> existingMethodItemIds)
+    {
         for (var i = 0; i < test.MethodItems.Count; i++)
         {
             var item = test.MethodItems[i];
@@ -325,7 +335,16 @@ public sealed class SchemeRepository(IDbConnectionFactory connectionFactory) : I
                 "EXEC dbo.spuTestMethodItem @TestMethodItemId = @TestMethodItemId, @TestMethodItemTypeId = @TestMethodItemTypeId, @TestId = @TestId, @Order = @Order",
                 () => new { item.TestMethodItemId, item.TestMethodItemTypeId, item.TestId, item.Order });
         }
+    }
 
+    // spuCategoryItem / spuCriterionItem only take the id and the order - the type and parent are
+    // fixed at insert time.
+    private static async Task SaveCategoriesAsync(
+        IDbConnection connection,
+        SchemeTest test,
+        HashSet<Guid> existingCategoryIds,
+        HashSet<Guid> existingCriterionIds)
+    {
         for (var i = 0; i < test.Categories.Count; i++)
         {
             var category = test.Categories[i];
@@ -336,8 +355,6 @@ public sealed class SchemeRepository(IDbConnectionFactory connectionFactory) : I
                 category.CategoryItemId = Guid.NewGuid();
             }
 
-            // spuCategoryItem / spuCriterionItem only take the id and the order - the type and
-            // parent are fixed at insert time.
             if (!existingCategoryIds.Contains(category.CategoryItemId))
             {
                 await connection.ExecuteAsync(
@@ -351,38 +368,43 @@ public sealed class SchemeRepository(IDbConnectionFactory connectionFactory) : I
                     new { category.CategoryItemId, category.Order });
             }
 
-            for (var j = 0; j < category.Criteria.Count; j++)
-            {
-                var criterion = category.Criteria[j];
-                criterion.CategoryItemId = category.CategoryItemId;
-                criterion.Order = j + 1;
-                if (criterion.CriterionItemId == Guid.Empty)
-                {
-                    criterion.CriterionItemId = Guid.NewGuid();
-                }
+            await SaveCriteriaAsync(connection, category, existingCriterionIds);
+        }
+    }
 
-                if (!existingCriterionIds.Contains(criterion.CriterionItemId))
-                {
-                    await connection.ExecuteAsync(
-                        "EXEC dbo.spiCriterionItem @CriterionItemId = @CriterionItemId, @CriterionItemTypeId = @CriterionItemTypeId, @CategoryItemId = @CategoryItemId, @Order = @Order",
-                        new { criterion.CriterionItemId, criterion.CriterionItemTypeId, criterion.CategoryItemId, criterion.Order });
-                }
-                else
-                {
-                    await connection.ExecuteAsync(
-                        "EXEC dbo.spuCriterionItem @CriterionItemId = @CriterionItemId, @Order = @Order",
-                        new { criterion.CriterionItemId, criterion.Order });
-                }
+    private static async Task SaveCriteriaAsync(IDbConnection connection, SchemeCategoryItem category, HashSet<Guid> existingCriterionIds)
+    {
+        for (var j = 0; j < category.Criteria.Count; j++)
+        {
+            var criterion = category.Criteria[j];
+            criterion.CategoryItemId = category.CategoryItemId;
+            criterion.Order = j + 1;
+            if (criterion.CriterionItemId == Guid.Empty)
+            {
+                criterion.CriterionItemId = Guid.NewGuid();
+            }
+
+            if (!existingCriterionIds.Contains(criterion.CriterionItemId))
+            {
+                await connection.ExecuteAsync(
+                    "EXEC dbo.spiCriterionItem @CriterionItemId = @CriterionItemId, @CriterionItemTypeId = @CriterionItemTypeId, @CategoryItemId = @CategoryItemId, @Order = @Order",
+                    new { criterion.CriterionItemId, criterion.CriterionItemTypeId, criterion.CategoryItemId, criterion.Order });
+            }
+            else
+            {
+                await connection.ExecuteAsync(
+                    "EXEC dbo.spuCriterionItem @CriterionItemId = @CriterionItemId, @Order = @Order",
+                    new { criterion.CriterionItemId, criterion.Order });
             }
         }
     }
 
     // The insert and update SQL are complete literal command texts supplied by the caller - this
     // method only chooses between them, so there is no dynamically built SQL to flag.
-    private static async Task UpsertAsync(System.Data.IDbConnection connection, bool isNew, string insertSql, string updateSql, Func<object> parameters) =>
+    private static async Task UpsertAsync(IDbConnection connection, bool isNew, string insertSql, string updateSql, Func<object> parameters) =>
         await connection.ExecuteAsync(isNew ? insertSql : updateSql, parameters());
 
-    private static async Task DeleteRemovedAsync(System.Data.IDbConnection connection, CoreScheme scheme, IList<SchemeTest> existingTests)
+    private static async Task DeleteRemovedAsync(IDbConnection connection, CoreScheme scheme, IList<SchemeTest> existingTests)
     {
         var keptTests = scheme.Tests.Select(t => t.TestId).ToHashSet();
         var keptResultItems = scheme.Tests.SelectMany(t => t.ResultItems).Select(i => i.TestResultItemId).ToHashSet();
