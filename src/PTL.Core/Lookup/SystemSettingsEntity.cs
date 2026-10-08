@@ -17,4 +17,8 @@ public class SystemSettingsEntity
     public int CurrentYearId { get; set; }
 
     public int NextYearId { get; set; }
+
+    // tblSystemSettings.fldContractStartDate - the month of this date decides whether a scheme's
+    // derived start date falls in its own year or the next one (legacy Scheme.RecalucalateStartDate).
+    public DateTime ContractStartDate { get; set; }
 }

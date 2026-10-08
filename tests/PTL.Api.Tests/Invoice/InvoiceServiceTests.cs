@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using PTL.Core.Configuration;
 using PTL.Core.Invoice;
 
 namespace PTL.Api.Tests.Invoice;
@@ -7,8 +8,7 @@ namespace PTL.Api.Tests.Invoice;
 public class InvoiceServiceTests
 {
     private static (InvoiceService Service, FakeInvoiceRepository Repository, FakeInvoiceStorageService Storage, FakeNotifyClient Notify) CreateService(
-        IReadOnlyList<string>? recipients = null,
-        string templateId = "template-1")
+        IReadOnlyList<string>? recipients = null)
     {
         var repository = new FakeInvoiceRepository();
         var storage = new FakeInvoiceStorageService();
@@ -20,10 +20,9 @@ public class InvoiceServiceTests
             Options.Create(new InvoiceStorageOptions { Prefix = "invoices" }),
             Options.Create(new InvoiceNotificationOptions
             {
-                TemplateId = templateId,
-                Recipients = recipients ?? ["ops@example.com"],
-                DownloadBaseUrl = "https://ptlims.example"
+                Recipients = recipients ?? ["ops@example.com"]
             }),
+            Options.Create(new InternalOptions { AppUrl = "https://ptlims.example" }),
             NullLogger<InvoiceService>.Instance);
 
         return (service, repository, storage, notify);

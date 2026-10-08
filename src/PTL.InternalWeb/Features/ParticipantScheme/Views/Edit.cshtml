@@ -19,6 +19,6 @@
         {
             <button class="govuk-button" data-module="govuk-button" type="submit">Save</button>
         }
-        <a class="govuk-button govuk-button--secondary" data-module="govuk-button" asp-action="Details" asp-route-id="@Model.ParticipantSchemeId">Cancel</a>
+        <a class="govuk-button govuk-button--secondary" data-module="govuk-button" asp-controller="Contract" asp-action="ContractItems" asp-route-id="@Model.ContractId">Cancel</a>
     </div>
 </form>

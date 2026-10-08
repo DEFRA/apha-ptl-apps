@@ -2,14 +2,14 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using PTL.ApiClient;
 using PTL.Contracts.GroupAddress;
-using PTL.InternalWeb.Notifications;
+using PTL.SharedUI.Notifications;
 
 namespace PTL.InternalWeb.Features.GroupAddress;
 
 public sealed class GroupAddressController(IGroupAddressApiClient groupAddressApiClient, ILookupApiClient lookupApiClient) : Controller
 {
     [HttpGet]
-    public async Task<IActionResult> Index(int page = 1, int pageSize = PTL.InternalWeb.Pagination.PaginationModel.DefaultPageSize, CancellationToken cancellationToken = default)
+    public async Task<IActionResult> Index(int page = 1, int pageSize = PTL.SharedUI.Pagination.PaginationModel.DefaultPageSize, CancellationToken cancellationToken = default)
     {
         var result = await groupAddressApiClient.SearchGroupAddressesAsync(new GroupAddressSearchRequest(page, pageSize), cancellationToken);
 

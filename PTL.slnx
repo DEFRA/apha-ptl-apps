@@ -16,6 +16,7 @@
     <Project Path="src/PTL.Core/PTL.Core.csproj" />
     <Project Path="src/PTL.Data/PTL.Data.csproj" />
     <Project Path="src/PTL.ExternalWeb/PTL.ExternalWeb.csproj" />
+    <Project Path="src/PTL.SharedUI/PTL.SharedUI.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/PTL.Api.Tests/PTL.Api.Tests.csproj" />
@@ -26,5 +27,6 @@
     <Project Path="tests/PTL.Data.Tests/PTL.Data.Tests.csproj" />
     <Project Path="tests/PTL.InternalWeb.Tests/PTL.InternalWeb.Tests.csproj" />
     <Project Path="tests/PTL.ExternalWeb.Tests/PTL.ExternalWeb.Tests.csproj" />
+    <Project Path="tests/PTL.SharedUI.Tests/PTL.SharedUI.Tests.csproj" />
   </Folder>
 </Solution>

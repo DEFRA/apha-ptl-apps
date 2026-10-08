@@ -1,0 +1,102 @@
+/* Printable Scheme worksheet - legacy PrintableScheme.aspx (style/Print.css + PackagingSheet.css),
+   reproduced with modern CSS. break-inside/page-break-inside: avoid replace the legacy JS
+   offsetHeight/page-break-after hack - same objective (don't split a table across a printed page)
+   without the pixel-measurement workaround.
+
+   Unlike legacy (which hid the master header/footer even on screen), the page keeps the normal
+   GOV.UK header/breadcrumbs/navigation/footer for on-screen viewing - they are only suppressed
+   under @media print, below, so the printed output still matches legacy exactly. */
+
+.ptl-worksheet {
+    width: 195mm;
+    margin: 0 auto;
+    font-family: verdana, arial, helvetica, sans-serif;
+    font-size: small;
+    color: black;
+}
+
+.tblWorkSheetNoBorder {
+    width: 100%;
+}
+
+.cellWorkSheetLogo img {
+    max-height: 60px;
+}
+
+.cellWorkSheetLabId {
+    width: 200px;
+    text-align: right;
+}
+
+.tableWorkSheetLabId {
+    border: 1px solid black;
+    height: 20mm;
+    width: 100%;
+}
+
+.cellWorkSheetRight {
+    text-align: right;
+}
+
+.cellWorkSheetDistItem {
+    padding: 0.3em;
+}
+
+.tablePrintableResults {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 75%;
+    break-inside: avoid;
+    page-break-inside: avoid;
+}
+
+.tablePrintableResults td {
+    border: solid 1px black;
+    padding: 0.3em;
+}
+
+/* th cells (added for table-header accessibility) must render identically to the td cells they
+   replaced in the header row - inherit lets a plain header row pick up body-default weight/align
+   while a .rowHeader row's own bold/white styling (below) still cascades through unaffected. */
+.tablePrintableResults th {
+    border: solid 1px black;
+    padding: 0.3em;
+    font-weight: inherit;
+    text-align: inherit;
+}
+
+.rowHeader {
+    background-color: #f9f6e6;
+    font-weight: bold;
+}
+
+.cellNoResultItems {
+    font-style: italic;
+}
+
+.PrintableResultsSpacer {
+    height: 0.5em;
+    break-after: avoid;
+    page-break-after: avoid;
+}
+
+@media print {
+    .noprint {
+        display: none;
+    }
+
+    /* The printed page is the worksheet only - matches legacy's master-chrome suppression. */
+    .govuk-skip-link,
+    .govuk-template__header,
+    .govuk-breadcrumbs,
+    .app-side-navigation,
+    .govuk-notification-banner,
+    .govuk-template__footer {
+        display: none;
+    }
+
+    /* The side navigation column collapses, so the worksheet can use the full page width. */
+    .govuk-grid-column-three-quarters {
+        width: 100%;
+    }
+}

@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <!-- CS1591 (missing XML comment) is informational only, matching PTL.Common's convention. -->
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Gives access to Tag Helpers / MVC ViewFeatures / Mvc.Rendering without pulling in the
+         Sdk.Web tooling, which is reserved for the deployable services (PTL.Api, PTL.InternalWeb,
+         PTL.ExternalWeb). Same pattern as PTL.Common. -->
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+</Project>

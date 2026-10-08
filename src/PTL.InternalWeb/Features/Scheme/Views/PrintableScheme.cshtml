@@ -1,0 +1,130 @@
+@model PTL.InternalWeb.Features.Scheme.PrintableSchemeWorksheet
+@{
+    ViewData["Title"] = Model.SchemeHeading;
+}
+
+@section Styles {
+    <link rel="stylesheet" href="~/css/printable-scheme.css" />
+}
+
+<div class="ptl-worksheet">
+        @* These tblWorkSheetNoBorder/tableWorkSheetLabId tables are pure layout (logo, lab-id box,
+           scheme heading) with no column headings to give - role="presentation" is the correct
+           WAI-ARIA technique for a layout table, rather than inventing headers that don't exist. *@
+        <table class="tblWorkSheetNoBorder" role="presentation">
+            <tr>
+                <td class="cellWorkSheetLogo">
+                    <img src="~/images/vetqasheader-greyscale.png" alt="" />
+                </td>
+                <td class="cellWorkSheetLabId">
+                    <table class="tableWorkSheetLabId" role="presentation">
+                        <tr><td>@Model.LabIdLabel</td></tr>
+                    </table>
+                </td>
+            </tr>
+            @* LblAhvlaAddress is intentionally blank in legacy - preserved as-is, not invented. *@
+            <tr><td colspan="2"></td></tr>
+        </table>
+        <hr />
+        <table class="tblWorkSheetNoBorder" role="presentation">
+            <tr>
+                @* LblDistribution and LblDate are intentionally blank in legacy - preserved as-is. *@
+                <td></td>
+                <td class="cellWorkSheetRight"></td>
+            </tr>
+            <tr>
+                <td colspan="2">@Model.SchemeHeading</td>
+            </tr>
+        </table>
+
+        @Html.Raw(Model.Instructions)
+
+        @if (Model.ShowDistributionItems)
+        {
+            <table class="tblWorkSheetNoBorder" role="presentation">
+                <tr>
+                    @if (Model.DateOfReceipt)
+                    {
+                        <td class="cellWorkSheetDistItem">Date Of Receipt: _____________</td>
+                    }
+                    @if (Model.ConditionOnReceipt)
+                    {
+                        <td class="cellWorkSheetDistItem">Condition on Receipt: _____________</td>
+                    }
+                    @if (Model.StorageConditions)
+                    {
+                        <td class="cellWorkSheetDistItem">Storage Conditions: _____________</td>
+                    }
+                </tr>
+            </table>
+        }
+
+        @foreach (var test in Model.Tests)
+        {
+            @foreach (var resultsTable in test.ResultsTables)
+            {
+                <div class="PrintableResultsSpacer"></div>
+                <table class="tablePrintableResults">
+                    <thead>
+                        @if (resultsTable.ShowTestName)
+                        {
+                            <tr class="rowHeader">
+                                <th scope="col" style="width:@(resultsTable.SampleColumnWidth)px">@resultsTable.TestTypeName</th>
+                                <th scope="col" colspan="@Math.Max(resultsTable.Columns.Count, 1)"></th>
+                            </tr>
+                        }
+                        <tr>
+                            <th scope="col" style="width:@(resultsTable.SampleColumnWidth)px">Sample No.</th>
+                            @if (resultsTable.Columns.Count == 0)
+                            {
+                                <th scope="col" class="cellNoResultItems">This test has no Result Items</th>
+                            }
+                            else
+                            {
+                                @foreach (var column in resultsTable.Columns)
+                                {
+                                    <th scope="col" style="width:@(column.Width)px">@column.Name</th>
+                                }
+                            }
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var sampleNumber in Model.SampleNumbers)
+                        {
+                            <tr class="rowSample">
+                                <td>@sampleNumber</td>
+                                @if (resultsTable.Columns.Count == 0)
+                                {
+                                    <td style="height:20px"></td>
+                                }
+                                else
+                                {
+                                    @foreach (var column in resultsTable.Columns)
+                                    {
+                                        <td style="height:20px"></td>
+                                    }
+                                }
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+
+            @if (test.MethodTable.MethodItemNames.Count > 0)
+            {
+                <div class="PrintableResultsSpacer"></div>
+                @* One column of method names with no header in the legacy design - role="presentation"
+                   keeps it out of the accessibility tree as a layout list rather than a data table. *@
+                <table class="tablePrintableResults" role="presentation">
+                    @foreach (var methodItemName in test.MethodTable.MethodItemNames)
+                    {
+                        <tr class="rowMethod"><td>@methodItemName</td></tr>
+                    }
+                </table>
+            }
+        }
+
+        <br />
+        <br />
+        <button type="button" class="govuk-button noprint" data-module="govuk-button" onclick="window.print(); return false;">Print</button>
+    </div>

@@ -1,3 +1,6 @@
+using PTL.Contracts.Lookup;
+using PTL.Core.Scheme;
+
 namespace PTL.Core.Lookup;
 
 public interface ILookupService
@@ -11,6 +14,15 @@ public interface ILookupService
     Task<IReadOnlyList<YearEntity>> GetAllYearsAsync(CancellationToken cancellationToken = default);
     Task<IReadOnlyList<YearEntity>> GetWeightedPricingYearsAsync(CancellationToken cancellationToken = default);
     Task<IReadOnlyList<GroupAddressEntity>> GetGroupAddressesAsync(CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<ScheduleEntity>> GetSchedulesAsync(CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<ScheduleCodeEntity>> GetScheduleCodesAsync(CancellationToken cancellationToken = default);
+
+    Task<SchemeMonthEditability> GetSchemeMonthEditabilityAsync(int yearId, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<DayEntity>> GetDaysAsync(CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<PTNumberEntity>> GetPTNumbersAsync(CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<SchemeUserEntity>> GetTestConsultantsAsync(CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<SchemeUserEntity>> GetAssessorsAsync(CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<SchemeItemTypeEntity>> GetSchemeItemTypesAsync(SchemeItemTypeKind kind, int yearId, CancellationToken cancellationToken = default);
 
     // Returns only the currency prices linked to the given scheme (spgaSchemeCurrency, filtered
     // in-memory - see docs/analysis/scheme-analysis.md, "Scheme Currency Read Operations").

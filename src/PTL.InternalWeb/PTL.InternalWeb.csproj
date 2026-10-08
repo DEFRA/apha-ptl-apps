@@ -14,6 +14,7 @@
     <ProjectReference Include="..\PTL.Auth.Entra\PTL.Auth.Entra.csproj" />
     <ProjectReference Include="..\PTL.Core\PTL.Core.csproj" />
     <ProjectReference Include="..\PTL.Common\PTL.Common.csproj" />
+    <ProjectReference Include="..\PTL.SharedUI\PTL.SharedUI.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -22,6 +23,7 @@
     <Content Include="..\Shared\Views\Shared\Error.cshtml" Link="Views\Shared\Error.cshtml" />
     <Content Include="..\Shared\Views\Shared\_Footer.cshtml" Link="Views\Shared\_Footer.cshtml" />
     <Content Include="..\Shared\Views\Shared\_Header.cshtml" Link="Views\Shared\_Header.cshtml" />
+    <Content Include="..\Shared\Views\Shared\_NotificationBanner.cshtml" Link="Views\Shared\_NotificationBanner.cshtml" />
     <Content Include="..\Shared\Views\Account\Login.cshtml" Link="Features\Account\Views\Login.cshtml" />
   </ItemGroup>
 

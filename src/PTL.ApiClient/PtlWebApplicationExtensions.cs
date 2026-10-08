@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Mvc.Razor;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -91,6 +92,20 @@ public static class PtlWebApplicationExtensions
 
     public static WebApplication UsePtlWebFrontEnd(this WebApplication app)
     {
+        // Must run before anything reads Request.Scheme/Host (including UseExceptionHandler and the
+        // OIDC handlers) - the ALB terminates TLS and talks plain HTTP to this ECS task, so without
+        // this, Request.Scheme is always "http" and the OIDC redirect_uri sent to Entra/CIDM is built
+        // wrong. KnownNetworks/KnownProxies are cleared because the ALB's ENI is never in the default
+        // loopback-only trusted list, and it's the only thing that can reach this task (private
+        // subnet, no public ingress), so trusting any upstream proxy here is safe.
+        var forwardedHeadersOptions = new ForwardedHeadersOptions
+        {
+            ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
+        };
+        forwardedHeadersOptions.KnownIPNetworks.Clear();
+        forwardedHeadersOptions.KnownProxies.Clear();
+        app.UseForwardedHeaders(forwardedHeadersOptions);
+
         // Configure the HTTP request pipeline.
         if (!app.Environment.IsDevelopment())
         {

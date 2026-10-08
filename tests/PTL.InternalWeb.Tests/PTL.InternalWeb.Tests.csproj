@@ -6,10 +6,10 @@
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
     <!-- PTL.InternalWeb owns the MVC controllers and ViewModels. Support libraries (PTL.ApiClient,
-         PTL.Common, PTL.Contracts, PTL.Core) are measured independently. AspNetCoreGeneratedDocument
+         PTL.Common, PTL.Contracts, PTL.Core, PTL.SharedUI) are measured independently. AspNetCoreGeneratedDocument
          is ASP.NET Core's compiled Razor views — implementation details, not user code. Exclude to
          focus on controllers/models which are testable business logic. -->
-    <Exclude>[PTL.ApiClient]*,[PTL.Common]*,[PTL.Contracts]*,[PTL.Core]*,[PTL.Auth.Entra]*,[PTL.InternalWeb]AspNetCoreGeneratedDocument*,[PTL.InternalWeb]System.Text.RegularExpressions.Generated.*</Exclude>
+    <Exclude>[PTL.ApiClient]*,[PTL.Common]*,[PTL.Contracts]*,[PTL.Core]*,[PTL.Auth.Entra]*,[PTL.SharedUI]*,[PTL.InternalWeb]AspNetCoreGeneratedDocument*,[PTL.InternalWeb]System.Text.RegularExpressions.Generated.*</Exclude>
   </PropertyGroup>
 
   <ItemGroup>

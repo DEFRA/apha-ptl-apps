@@ -23,4 +23,20 @@ public interface IViewerRepository
 
     Task<ViewerEntity> CreateAsync(ViewerEntity viewer, CancellationToken cancellationToken = default);
     Task<ViewerEntity?> UpdateAsync(ViewerEntity viewer, CancellationToken cancellationToken = default);
+
+    // spgaViewers result set 2 - the tlnkViewerScheme links for one scheme.
+    Task<IReadOnlyList<SchemeViewerEntity>> GetSchemeViewersAsync(Guid schemeId, CancellationToken cancellationToken = default);
+
+    Task AddSchemeViewerAsync(Guid viewerSchemeId, Guid viewerId, Guid schemeId, CancellationToken cancellationToken = default);
+
+    Task RemoveSchemeViewerAsync(Guid viewerSchemeId, CancellationToken cancellationToken = default);
+}
+
+// One tlnkViewerScheme row. Legacy generates fldViewerSchemeId client-side when a viewer is added
+// and never updates a link - it is inserted or deleted.
+public sealed class SchemeViewerEntity
+{
+    public Guid ViewerSchemeId { get; set; }
+    public Guid ViewerId { get; set; }
+    public Guid SchemeId { get; set; }
 }

@@ -18,6 +18,12 @@ internal sealed class FakeLookupRepository : ILookupRepository
     public IReadOnlyList<PostagePricingPlanEntity> PostagePricingPlans { get; set; } = [];
     public SystemSettingsEntity SystemSettings { get; set; } = new();
     public IReadOnlyList<GroupAddressEntity> GroupAddresses { get; set; } = [];
+    public IReadOnlyList<ScheduleEntity> Schedules { get; set; } = [];
+    public IReadOnlyList<ScheduleCodeEntity> ScheduleCodes { get; set; } = [];
+    public IReadOnlyList<DayEntity> Days { get; set; } = [];
+    public IReadOnlyList<PTNumberEntity> PTNumbers { get; set; } = [];
+    public IReadOnlyList<SchemeUserEntity> TestConsultants { get; set; } = [];
+    public IReadOnlyList<SchemeUserEntity> Assessors { get; set; } = [];
 
     public Task<IReadOnlyList<CountryEntity>> GetCountriesAsync(CancellationToken cancellationToken = default) =>
         Task.FromResult(Countries);
@@ -54,4 +60,32 @@ internal sealed class FakeLookupRepository : ILookupRepository
 
     public Task<IReadOnlyList<GroupAddressEntity>> GetGroupAddressesAsync(CancellationToken cancellationToken = default) =>
         Task.FromResult(GroupAddresses);
+
+    public Task<IReadOnlyList<ScheduleEntity>> GetSchedulesAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult(Schedules);
+
+    public Task<IReadOnlyList<ScheduleCodeEntity>> GetScheduleCodesAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult(ScheduleCodes);
+
+    public Task<IReadOnlyList<DayEntity>> GetDaysAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult(Days);
+
+    public IReadOnlyList<MonthlyDistributionEntity> MonthlyDistributions { get; set; } = [];
+
+    public Task<IReadOnlyList<MonthlyDistributionEntity>> GetMonthlyDistributionsAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult(MonthlyDistributions);
+
+    public Task<IReadOnlyList<PTNumberEntity>> GetPTNumbersAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult(PTNumbers);
+
+    public Task<IReadOnlyList<SchemeUserEntity>> GetTestConsultantsAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult(TestConsultants);
+
+    public Task<IReadOnlyList<SchemeUserEntity>> GetAssessorsAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult(Assessors);
+
+    public IReadOnlyList<SchemeItemTypeEntity> SchemeItemTypes { get; set; } = [];
+
+    public Task<IReadOnlyList<SchemeItemTypeEntity>> GetSchemeItemTypesAsync(PTL.Contracts.Lookup.SchemeItemTypeKind kind, int yearId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(SchemeItemTypes);
 }

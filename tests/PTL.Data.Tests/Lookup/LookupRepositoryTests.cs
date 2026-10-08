@@ -1,4 +1,5 @@
 using System.Data;
+using PTL.Contracts.Lookup;
 using PTL.Data.Infrastructure;
 using PTL.Data.Lookup;
 using PTL.Data.Tests.Fakes;
@@ -219,5 +220,166 @@ public class LookupRepositoryTests
         var result = await repository.GetSystemSettingsAsync();
 
         Assert.Equal("UT1/1", result.UTNumber);
+    }
+
+    [Fact]
+    public async Task GetSchedulesAsync_ReturnsMappedSchedules()
+    {
+        var (repository, connection) = CreateRepository();
+        var table = new DataTable();
+        table.Columns.Add("fldScheduleId", typeof(Guid));
+        table.Columns.Add("fldSchedule", typeof(string));
+        table.Rows.Add(Guid.NewGuid(), "Monthly");
+        connection.RespondToQuery("EXEC dbo.spgaSchedule", table);
+
+        var result = await repository.GetSchedulesAsync();
+
+        Assert.Single(result);
+        Assert.Equal("Monthly", result[0].Schedule);
+    }
+
+    [Fact]
+    public async Task GetScheduleCodesAsync_ReturnsMappedScheduleCodes()
+    {
+        var (repository, connection) = CreateRepository();
+        var table = new DataTable();
+        table.Columns.Add("fldScheduleCodeId", typeof(Guid));
+        table.Columns.Add("fldScheduleCode", typeof(string));
+        table.Rows.Add(Guid.NewGuid(), "M");
+        connection.RespondToQuery("EXEC dbo.spgaScheduleCode", table);
+
+        var result = await repository.GetScheduleCodesAsync();
+
+        Assert.Single(result);
+        Assert.Equal("M", result[0].ScheduleCode);
+    }
+
+    [Fact]
+    public async Task GetMonthlyDistributionsAsync_ReturnsMappedDistributions()
+    {
+        var (repository, connection) = CreateRepository();
+        var table = new DataTable();
+        table.Columns.Add("fldYearId", typeof(int));
+        table.Columns.Add("fldMonthId", typeof(int));
+        table.Rows.Add(2026, 4);
+        connection.RespondToQuery("EXEC dbo.spgaMonthlyDistributionInfo", table);
+
+        var result = await repository.GetMonthlyDistributionsAsync();
+
+        Assert.Single(result);
+        Assert.Equal(4, result[0].MonthId);
+    }
+
+    [Fact]
+    public async Task GetDaysAsync_ReturnsMappedDays()
+    {
+        var (repository, connection) = CreateRepository();
+        var table = new DataTable();
+        table.Columns.Add("fldDayId", typeof(Guid));
+        table.Columns.Add("fldDay", typeof(string));
+        table.Rows.Add(Guid.NewGuid(), "Monday");
+        connection.RespondToQuery("EXEC dbo.spgaDay", table);
+
+        var result = await repository.GetDaysAsync();
+
+        Assert.Single(result);
+        Assert.Equal("Monday", result[0].Day);
+    }
+
+    [Fact]
+    public async Task GetPTNumbersAsync_ReturnsMappedIdentifiers()
+    {
+        var (repository, connection) = CreateRepository();
+        var schemeId = Guid.NewGuid();
+        var table = new DataTable();
+        table.Columns.Add("fldSchemeId", typeof(Guid));
+        table.Columns.Add("fldIdentifier", typeof(string));
+        table.Rows.Add(schemeId, "PT1234");
+        connection.RespondToQuery("EXEC dbo.spgaPTNumbers", table);
+
+        var result = await repository.GetPTNumbersAsync();
+
+        Assert.Single(result);
+        Assert.Equal("PT1234", result[0].Identifier);
+    }
+
+    [Fact]
+    public async Task GetTestConsultantsAsync_MarksSecondResultSetAsExternal()
+    {
+        var (repository, connection) = CreateRepository();
+        var internalId = Guid.NewGuid();
+        var externalId = Guid.NewGuid();
+
+        var internalTable = new DataTable();
+        internalTable.Columns.Add("fldUserId", typeof(Guid));
+        internalTable.Columns.Add("fldFriendlyName", typeof(string));
+        internalTable.Columns.Add("fldIsInactive", typeof(bool));
+        internalTable.Rows.Add(internalId, "Internal Consultant", false);
+
+        var externalTable = new DataTable();
+        externalTable.Columns.Add("fldUserId", typeof(Guid));
+        externalTable.Columns.Add("fldFriendlyName", typeof(string));
+        externalTable.Columns.Add("fldIsInactive", typeof(bool));
+        externalTable.Rows.Add(externalId, "External Consultant", false);
+
+        var dataSet = new DataSet();
+        dataSet.Tables.Add(internalTable);
+        dataSet.Tables.Add(externalTable);
+        connection.RespondToQuery("EXEC dbo.spgaUserAllTestConsultant", dataSet);
+
+        var result = await repository.GetTestConsultantsAsync();
+
+        Assert.Equal(2, result.Count);
+        Assert.False(result.Single(c => c.UserId == internalId).IsExternal);
+        Assert.True(result.Single(c => c.UserId == externalId).IsExternal);
+    }
+
+    [Fact]
+    public async Task GetAssessorsAsync_ReturnsMappedAssessors()
+    {
+        var (repository, connection) = CreateRepository();
+        var userId = Guid.NewGuid();
+        var table = new DataTable();
+        table.Columns.Add("fldUserId", typeof(Guid));
+        table.Columns.Add("fldFriendlyName", typeof(string));
+        table.Columns.Add("fldIsInactive", typeof(bool));
+        table.Rows.Add(userId, "Assessor One", false);
+        connection.RespondToQuery("EXEC dbo.spgaUserAssessor", table);
+
+        var result = await repository.GetAssessorsAsync();
+
+        Assert.Single(result);
+        Assert.Equal("Assessor One", result[0].FriendlyName);
+    }
+
+    [Theory]
+    [InlineData(SchemeItemTypeKind.TestType, "spgTestTypeByYearId")]
+    [InlineData(SchemeItemTypeKind.TestResultItemType, "spgTestResultItemTypeByYearId")]
+    [InlineData(SchemeItemTypeKind.TestMethodItemType, "spgTestMethodItemTypeByYearId")]
+    [InlineData(SchemeItemTypeKind.CategoryItemType, "spgCategoryItemTypeByYearId")]
+    [InlineData(SchemeItemTypeKind.CriterionItemType, "spgCriterionItemTypeByYearId")]
+    public async Task GetSchemeItemTypesAsync_EachKind_CallsItsOwnProcedure(SchemeItemTypeKind kind, string procedure)
+    {
+        var (repository, connection) = CreateRepository();
+        var itemTypeId = Guid.NewGuid();
+        var table = new DataTable();
+        table.Columns.Add("fldTestTypeId", typeof(Guid));
+        table.Columns.Add("fldTestType", typeof(string));
+        table.Columns.Add("fldNoLongerInUse", typeof(bool));
+        table.Rows.Add(itemTypeId, "Antibody", false);
+        connection.RespondToQuery($"EXEC dbo.{procedure} @YearId", table);
+
+        var result = await repository.GetSchemeItemTypesAsync(kind, 2026);
+
+        Assert.Single(result);
+        Assert.Equal(itemTypeId, result[0].ItemTypeId);
+    }
+
+    [Fact]
+    public async Task GetSchemeItemTypesAsync_UnknownKind_ThrowsArgumentOutOfRangeException()
+    {
+        var (repository, _) = CreateRepository();
+
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => repository.GetSchemeItemTypesAsync((SchemeItemTypeKind)999, 2026));
     }
 }

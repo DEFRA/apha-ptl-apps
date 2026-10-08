@@ -52,11 +52,40 @@ public sealed class SchemeController(ISchemeService schemeService, ILogger<Schem
         return Ok(new SchemeSearchResponse(result.Items.Select(ToSummaryResponse).ToList(), result.TotalCount, page, pageSize));
     }
 
+    // GET /api/schemes/families[?page=&pageSize=&searchTerm=] - spgaSchemeInfo, every scheme family
+    // with no year filter, filtered only by the Scheme List screen's optional Scheme Name search box.
+    [HttpGet("schemes/families")]
+    public async Task<ActionResult<SchemeSearchResponse>> GetSchemeFamilies(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20,
+        [FromQuery] string? searchTerm = null,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await schemeService.GetSchemeFamiliesAsync(page, pageSize, searchTerm, cancellationToken);
+        return Ok(new SchemeSearchResponse(result.Items.Select(ToSummaryResponse).ToList(), result.TotalCount, page, pageSize));
+    }
+
     [HttpGet("schemes/families/{sharedId:guid}/history")]
     public async Task<ActionResult<IReadOnlyList<SchemeHistoryResponse>>> GetSchemeFamilyHistory(Guid sharedId, CancellationToken cancellationToken)
     {
         var history = await schemeService.GetSchemeFamilyHistoryAsync(sharedId, cancellationToken);
         return Ok(history.Select(ToHistoryResponse).ToList());
+    }
+
+    // GET /api/schemes/{schemeId}/renew - legacy Scheme.aspx?SchemeId=..&renewal=true: builds an
+    // unsaved draft for the following year, carried by the same SharedId. The draft is then saved
+    // through the normal POST /api/schemes - it isn't persisted here.
+    [HttpGet("schemes/{schemeId:guid}/renew")]
+    public async Task<ActionResult<SchemeResponse>> RenewScheme(Guid schemeId, CancellationToken cancellationToken)
+    {
+        var renewed = await schemeService.RenewSchemeAsync(schemeId, cancellationToken);
+        if (renewed is null)
+        {
+            LogSchemeNotFoundMessage(logger, schemeId, null);
+            return NotFound();
+        }
+
+        return Ok(ToResponse(renewed));
     }
 
     [HttpPost("schemes")]
@@ -102,6 +131,7 @@ public sealed class SchemeController(ISchemeService schemeService, ILogger<Schem
     private static Scheme ToEntity(Guid schemeId, SchemeRequest request) => new()
     {
         SchemeId = schemeId,
+        SharedId = request.SharedId ?? Guid.Empty,
         YearId = request.YearId,
         Identifier = request.Identifier,
         Name = request.Name,
@@ -155,7 +185,47 @@ public sealed class SchemeController(ISchemeService schemeService, ILogger<Schem
         Assessor2 = request.Assessor2,
         Assessor3 = request.Assessor3,
         Assessor4 = request.Assessor4,
-        StandardTabulationText = request.StandardTabulationText
+        StandardTabulationText = request.StandardTabulationText,
+        Prices = (request.Prices ?? [])
+            .Select(p => new SchemeCurrencyPrice
+            {
+                SchemeCurrencyId = p.SchemeCurrencyId,
+                CurrencyId = p.CurrencyId,
+                Price = p.Price,
+            })
+            .ToList(),
+        ViewerIds = (request.ViewerIds ?? []).ToList(),
+        Tests = (request.Tests ?? [])
+            .Select(t => new SchemeTest
+            {
+                TestId = t.TestId,
+                TestTypeId = t.TestTypeId,
+                ResultItems = t.ResultItems.Select(i => new SchemeTestResultItem { TestResultItemId = i.ItemId, TestResultItemTypeId = i.ItemTypeId }).ToList<SchemeTestResultItem>(),
+                MethodItems = t.MethodItems.Select(i => new SchemeTestMethodItem { TestMethodItemId = i.ItemId, TestMethodItemTypeId = i.ItemTypeId }).ToList<SchemeTestMethodItem>(),
+                Categories = t.Categories
+                    .Select(c => new SchemeCategoryItem
+                    {
+                        CategoryItemId = c.CategoryItemId,
+                        CategoryItemTypeId = c.CategoryItemTypeId,
+                        Criteria = c.Criteria.Select(cr => new SchemeCriterionItem { CriterionItemId = cr.ItemId, CriterionItemTypeId = cr.ItemTypeId }).ToList<SchemeCriterionItem>(),
+                    })
+                    .ToList<SchemeCategoryItem>(),
+            })
+            .ToList<SchemeTest>(),
+        Tabulations = (request.Tabulations ?? [])
+            .Select(t => new SchemeTabulation
+            {
+                TabulationId = t.TabulationId,
+                Name = t.Name,
+                IntendedResultsOnly = t.IntendedResultsOnly,
+                SingleParticipantTabulation = t.SingleParticipantTabulation,
+                ShowRatings = t.ShowRatings,
+                AvailableToParticipants = t.AvailableToParticipants,
+                AvailableToViewers = t.AvailableToViewers,
+                ResultItemIds = t.ResultItemIds.ToList(),
+                MethodItemIds = t.MethodItemIds.ToList(),
+            })
+            .ToList<SchemeTabulation>()
     };
 
     private static SchemeResponse ToResponse(Scheme scheme) => new(
@@ -217,7 +287,42 @@ public sealed class SchemeController(ISchemeService schemeService, ILogger<Schem
         scheme.Assessor4,
         scheme.StandardTabulationText,
         scheme.LastModified,
-        scheme.IsReadOnly);
+        scheme.IsReadOnly,
+        scheme.Prices
+            .Select(p => new SchemeCurrencyPriceResponse(p.SchemeCurrencyId, p.CurrencyId, p.Price, p.CurrencyName, p.CurrencySymbol))
+            .ToList(),
+        new SchemeMonthEditabilityResponse(
+            scheme.CanEditJan, scheme.CanEditFeb, scheme.CanEditMar, scheme.CanEditApr,
+            scheme.CanEditMay, scheme.CanEditJun, scheme.CanEditJul, scheme.CanEditAug,
+            scheme.CanEditSep, scheme.CanEditOct, scheme.CanEditNov, scheme.CanEditDec),
+        scheme.ViewerIds.ToList(),
+        scheme.Tests
+            .Select(t => new SchemeTestResponse(
+                t.TestId,
+                t.TestTypeId,
+                t.TestType,
+                t.Order,
+                [.. t.ResultItems.Select(i => new SchemeTestItemResponse(i.TestResultItemId, i.TestResultItemTypeId, i.TestResultItemType, i.Order, i.ExpectedLength))],
+                [.. t.MethodItems.Select(i => new SchemeTestItemResponse(i.TestMethodItemId, i.TestMethodItemTypeId, i.TestMethodItemType, i.Order, i.ExpectedLength))],
+                [.. t.Categories.Select(c => new SchemeCategoryItemResponse(
+                    c.CategoryItemId,
+                    c.CategoryItemTypeId,
+                    c.Name,
+                    c.Order,
+                    [.. c.Criteria.Select(cr => new SchemeTestItemResponse(cr.CriterionItemId, cr.CriterionItemTypeId, cr.Name, cr.Order))]))]))
+            .ToList(),
+        scheme.Tabulations
+            .Select(t => new SchemeTabulationResponse(
+                t.TabulationId,
+                t.Name,
+                t.IntendedResultsOnly,
+                t.SingleParticipantTabulation,
+                t.ShowRatings,
+                t.AvailableToParticipants,
+                t.AvailableToViewers,
+                [.. t.ResultItemIds],
+                [.. t.MethodItemIds]))
+            .ToList());
 
     private static SchemeSummaryResponse ToSummaryResponse(SchemeSummaryEntity scheme) => new(
         scheme.SharedId,
@@ -230,7 +335,9 @@ public sealed class SchemeController(ISchemeService schemeService, ILogger<Schem
         scheme.NextName,
         scheme.RecentSchemeId,
         scheme.RecentIdentifier,
-        scheme.RecentName);
+        scheme.RecentName,
+        scheme.Identifier,
+        scheme.Name);
 
     private static SchemeHistoryResponse ToHistoryResponse(SchemeHistoryEntity scheme) => new(
         scheme.SchemeId,

@@ -60,4 +60,18 @@ public sealed record SchemeRequest(
     Guid? Assessor2,
     Guid? Assessor3,
     Guid? Assessor4,
-    string? StandardTabulationText);
+    string? StandardTabulationText,
+    // Details tab currency pricing grid. Optional so existing callers remain source-compatible;
+    // an empty list leaves tlnkSchemeCurrency untouched.
+    IReadOnlyList<SchemeCurrencyPriceRequest>? Prices = null,
+    // Viewers tab. Null is treated as "no viewers", so every caller must send the full list.
+    IReadOnlyList<Guid>? ViewerIds = null,
+    // Tests tab. Null is treated as "no tests", so every caller must send the full tree.
+    IReadOnlyList<SchemeTestRequest>? Tests = null,
+    // Results Tabulations tab. Null is treated as "no tabulations".
+    IReadOnlyList<SchemeTabulationRequest>? Tabulations = null,
+    // Set only by a Renew draft's Create post, to keep the new scheme in its existing family
+    // instead of starting a new one. Null/omitted on every other Create request.
+    Guid? SharedId = null);
+
+public sealed record SchemeCurrencyPriceRequest(Guid SchemeCurrencyId, Guid CurrencyId, decimal Price);

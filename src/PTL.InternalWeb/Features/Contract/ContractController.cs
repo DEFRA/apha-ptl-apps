@@ -7,7 +7,7 @@ using PTL.Contracts.Contract;
 using PTL.Core.Contract.Document;
 using PTL.Core.Contract.Export.Templates;
 using PTL.InternalWeb.Navigation;
-using PTL.InternalWeb.Notifications;
+using PTL.SharedUI.Notifications;
 
 namespace PTL.InternalWeb.Features.Contract;
 
@@ -124,7 +124,7 @@ public class ContractController(IContractApiClient contractApiClient, ICustomerA
         ContractPeriodFilter period = ContractPeriodFilter.CurrentAndNext,
         string? searchTerm = null,
         int page = 1,
-        int pageSize = PTL.InternalWeb.Pagination.PaginationModel.DefaultPageSize,
+        int pageSize = PTL.SharedUI.Pagination.PaginationModel.DefaultPageSize,
         CancellationToken cancellationToken = default)
     {
         var result = await contractApiClient.GetContractsForCustomerAsync(customerId, new ContractSearchRequest(yearId, period, searchTerm, page, pageSize), cancellationToken);
