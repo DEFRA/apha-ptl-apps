@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Headers;
 using PTL.ApiClient;
 
 namespace PTL.ApiClient.Tests.Contract;
@@ -7,6 +8,9 @@ public class ExportTemplateApiClientTests
 {
     private static ExportTemplateApiClient CreateClient(HttpStatusCode statusCode, string? jsonContent) =>
         new(new HttpClient(new StubHttpMessageHandler(statusCode, jsonContent)) { BaseAddress = new Uri("http://localhost") });
+
+    private static ExportTemplateApiClient CreateClient(Func<HttpResponseMessage> responseFactory) =>
+        new(new HttpClient(new StubHttpMessageHandler(responseFactory)) { BaseAddress = new Uri("http://localhost") });
 
     [Fact]
     public async Task GetTemplatesAsync_ReturnsTheList()
@@ -55,8 +59,65 @@ public class ExportTemplateApiClientTests
     }
 
     [Fact]
+    public async Task UploadTemplateAsync_NullServiceResponse_ReturnsDefaultFailure()
+    {
+        var result = await CreateClient(HttpStatusCode.OK, "null")
+            .UploadTemplateAsync("Contracts", "Contract.docx", new MemoryStream([1, 2, 3]));
+
+        Assert.False(result.Success);
+        Assert.Equal("File could not be saved", result.ErrorMessage);
+    }
+
+    [Fact]
     public async Task DownloadTemplateAsync_Missing_ReturnsNull() =>
         Assert.Null(await CreateClient(HttpStatusCode.NotFound, null).DownloadTemplateAsync(Guid.NewGuid()));
+
+    [Fact]
+    public async Task DownloadTemplateAsync_WithFileNameStar_UsesFileNameStarAndContentType()
+    {
+        var client = CreateClient(() =>
+        {
+            var response = new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent([1, 2, 3]) };
+            response.Content.Headers.ContentDisposition = new ContentDispositionHeaderValue("attachment") { FileNameStar = "custom.docx" };
+            response.Content.Headers.ContentType = new MediaTypeHeaderValue("application/custom");
+            return response;
+        });
+
+        var result = await client.DownloadTemplateAsync(Guid.NewGuid());
+
+        Assert.NotNull(result);
+        Assert.Equal("custom.docx", result!.FileName);
+        Assert.Equal("application/custom", result.ContentType);
+        Assert.Equal(3, result.Content.Length);
+    }
+
+    [Fact]
+    public async Task DownloadTemplateAsync_WithFileNameOnly_UsesFileName()
+    {
+        var client = CreateClient(() =>
+        {
+            var response = new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent([1, 2]) };
+            response.Content.Headers.ContentDisposition = new ContentDispositionHeaderValue("attachment") { FileName = "plain.docx" };
+            return response;
+        });
+
+        var result = await client.DownloadTemplateAsync(Guid.NewGuid());
+
+        Assert.NotNull(result);
+        Assert.Equal("plain.docx", result!.FileName);
+        Assert.Equal("application/vnd.openxmlformats-officedocument.wordprocessingml.document", result.ContentType);
+    }
+
+    [Fact]
+    public async Task DownloadTemplateAsync_WithNoContentDisposition_UsesDefaultFileName()
+    {
+        var client = CreateClient(() => new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent([1]) });
+
+        var result = await client.DownloadTemplateAsync(Guid.NewGuid());
+
+        Assert.NotNull(result);
+        Assert.Equal("template.docx", result!.FileName);
+    }
 
     [Fact]
     public async Task SelectTemplateAsync_NoContent_ReturnsTrue() =>
@@ -125,4 +186,14 @@ public class BulkExportApiClientTests
     [Fact]
     public async Task GetRenewalsAsync_NullBody_ReturnsEmpty() =>
         Assert.Empty(await CreateClient("null").GetRenewalsAsync(nonUk: true));
+
+    [Fact]
+    public async Task GetRenewalsAsync_NonUkFalse_ReturnsDeserializedList()
+    {
+        const string json = """[{"contractId":"11111111-1111-1111-1111-111111111111","qalNumber":"QAL/00001","customerName":"Sample Labs","yearId":2026}]""";
+
+        var result = await CreateClient(json).GetRenewalsAsync(nonUk: false);
+
+        Assert.Single(result);
+    }
 }

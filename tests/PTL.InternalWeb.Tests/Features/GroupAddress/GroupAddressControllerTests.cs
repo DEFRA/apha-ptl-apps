@@ -60,6 +60,22 @@ public class GroupAddressControllerTests
     }
 
     [Fact]
+    public async Task Details_CountryNotInLookup_ReturnsViewWithEmptyCountryName()
+    {
+        var groupAddressId = Guid.NewGuid();
+        var groupAddress = SampleGroupAddress(groupAddressId);
+        var apiClient = new FakeGroupAddressApiClient { GroupAddress = groupAddress };
+        var lookupApiClient = new FakeLookupApiClient { Countries = [new CountryResponse(Guid.NewGuid(), "Some Other Country")] };
+        var controller = CreateController(apiClient, lookupApiClient);
+
+        var result = await controller.Details(groupAddressId, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<GroupAddressDetailsViewModel>(view.Model);
+        Assert.Equal(string.Empty, model.CountryName);
+    }
+
+    [Fact]
     public async Task Create_Get_ReturnsViewWithPopulatedCountryOptions()
     {
         var lookupApiClient = new FakeLookupApiClient { Countries = [new CountryResponse(Guid.NewGuid(), "United Kingdom")] };

@@ -84,6 +84,39 @@ public class SchemeControllerTests
     }
 
     [Fact]
+    public async Task Index_NoYearIdProvided_ResolvesToFirstCurrentYear()
+    {
+        var apiClient = new FakeSchemeApiClient
+        {
+            SearchResponse = new SchemeSearchResponse([], 0, 1, 20)
+        };
+        var lookupApiClient = new FakeLookupApiClient { Years = [new YearResponse(2027, "2026/27")] };
+        var controller = CreateController(apiClient, lookupApiClient);
+
+        var result = await controller.Index(null, null, 1, 20, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<PTL.InternalWeb.Features.Scheme.SchemeListViewModel>(view.Model);
+        Assert.Equal(2027, model.Search.YearId);
+    }
+
+    [Fact]
+    public async Task Index_NoYearIdAndNoCurrentYears_ResolvesToZero()
+    {
+        var apiClient = new FakeSchemeApiClient
+        {
+            SearchResponse = new SchemeSearchResponse([], 0, 1, 20)
+        };
+        var controller = CreateController(apiClient);
+
+        var result = await controller.Index(null, null, 1, 20, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<PTL.InternalWeb.Features.Scheme.SchemeListViewModel>(view.Model);
+        Assert.Equal(0, model.Search.YearId);
+    }
+
+    [Fact]
     public async Task Details_UnknownScheme_ReturnsNotFound()
     {
         var controller = CreateController(new FakeSchemeApiClient { SchemeResponse = null });

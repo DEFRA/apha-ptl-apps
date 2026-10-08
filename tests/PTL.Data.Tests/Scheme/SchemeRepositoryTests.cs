@@ -161,6 +161,17 @@ public class SchemeRepositoryTests
     }
 
     [Fact]
+    public async Task CreateAsync_InsertedButNotReReadable_Throws()
+    {
+        var (repository, connection) = CreateRepository();
+        connection.RespondToNonQuery(InsertSql, 1);
+        connection.RespondToQuery(GetByIdSql, new DataTable());
+        var scheme = new CoreScheme { SchemeId = Guid.NewGuid(), YearId = 2026, Name = "Test Scheme" };
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => repository.CreateAsync(scheme));
+    }
+
+    [Fact]
     public async Task UpdateAsync_ExistingScheme_UpdatesAndReReads()
     {
         var (repository, connection) = CreateRepository();

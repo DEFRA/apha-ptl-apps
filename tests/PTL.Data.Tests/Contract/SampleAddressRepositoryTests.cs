@@ -74,4 +74,40 @@ public class SampleAddressRepositoryTests
         Assert.Equal("Jan, Feb", scheme.MonthsActive);
         Assert.Empty(address.NonFeePayingSchemes);
     }
+
+    [Fact]
+    public async Task GetByContractIdAsync_NoMatchingSchemes_LeavesBothListsEmpty()
+    {
+        var connection = new PTL.Data.Tests.Fakes.FakeDbConnection();
+        var repository = new SampleAddressRepository(new FakeDbConnectionFactory(connection));
+        var contractId = Guid.NewGuid();
+        var participantId = Guid.NewGuid();
+        var dataSet = SampleAddressDataSet(contractId, participantId);
+        dataSet.Tables[1]!.Rows.Clear();
+        connection.RespondToQuery(GetSql, dataSet);
+
+        var result = await repository.GetByContractIdAsync(contractId);
+
+        var address = Assert.Single(result);
+        Assert.Empty(address.FeePayingSchemes);
+        Assert.Empty(address.NonFeePayingSchemes);
+    }
+
+    [Fact]
+    public async Task GetByContractIdAsync_NullMonthsActive_DefaultsToEmptyAfterTrim()
+    {
+        var connection = new PTL.Data.Tests.Fakes.FakeDbConnection();
+        var repository = new SampleAddressRepository(new FakeDbConnectionFactory(connection));
+        var contractId = Guid.NewGuid();
+        var participantId = Guid.NewGuid();
+        var dataSet = SampleAddressDataSet(contractId, participantId);
+        dataSet.Tables[1]!.Rows[0]["fldMonthsActive"] = DBNull.Value;
+        connection.RespondToQuery(GetSql, dataSet);
+
+        var result = await repository.GetByContractIdAsync(contractId);
+
+        var address = Assert.Single(result);
+        var scheme = Assert.Single(address.FeePayingSchemes);
+        Assert.Equal(string.Empty, scheme.MonthsActive);
+    }
 }

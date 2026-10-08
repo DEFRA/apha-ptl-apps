@@ -362,6 +362,35 @@ public class ContractControllerTests
     }
 
     [Fact]
+    public async Task Create_Post_Success_WithOptionalFieldsPopulated_RedirectsToDetails()
+    {
+        var contractId = Guid.NewGuid();
+        var apiClient = new FakeContractApiClient
+        {
+            SaveResult = new PTL.Contracts.Contract.ContractSaveResult(true, SampleContract(contractId, Guid.NewGuid()), new Dictionary<string, string[]>())
+        };
+        var controller = CreateController(apiClient);
+        var model = new PTL.InternalWeb.Features.Contract.ContractFormViewModel
+        {
+            YearId = 2027,
+            UTNumber = "UT12345",
+            FTNumber = "FT6789",
+            ContractSignatory = "Alice Example",
+            ActionsRequired = "None",
+            RenewalInformation = "Renews annually",
+            ReasonForClosure = "N/A",
+            Suffix = "B",
+            PurchaseOrderNumber = "PO-99"
+        };
+
+        var result = await controller.Create(Guid.NewGuid(), model, CancellationToken.None);
+
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal("Details", redirect.ActionName);
+        Assert.Equal(contractId, redirect.RouteValues!["id"]);
+    }
+
+    [Fact]
     public async Task Edit_Get_UnknownContract_ReturnsNotFound()
     {
         var controller = CreateController(new FakeContractApiClient { ContractResponse = null });
@@ -431,6 +460,39 @@ public class ContractControllerTests
         Assert.False(model.IsAllowed);
         Assert.Equal("There are no contracts for the current year.", model.BlockedReason);
         Assert.Empty(model.Items);
+    }
+
+    [Fact]
+    public async Task RenewContracts_Get_Allowed_WithCustomerAndNonRenewableItem_PopulatesCustomerFieldsAndExcludesIt()
+    {
+        var customerId = Guid.NewGuid();
+        var contractId = Guid.NewGuid();
+        var renewableSchemeId = Guid.NewGuid();
+        var nonRenewableSchemeId = Guid.NewGuid();
+        var contractRenewalApiClient = new FakeContractRenewalApiClient
+        {
+            ContractsResponse = new RenewableContractsResponse(true, null, ["Alice Example"],
+                [new RenewableContractDto(contractId, "A", "Alice Example", "Renewal info", string.Empty, true, 1)]),
+            ItemsResponse = new RenewableContractItemsResponse(
+            [
+                new RenewableContractItemDto(contractId, "A", renewableSchemeId, "LAB1", "Lab One", "S1", "Old Scheme", "S2", "New Scheme", true, "S1"),
+                new RenewableContractItemDto(contractId, "A", nonRenewableSchemeId, "LAB2", "Lab Two", "S3", "Old Scheme 2", "S4", "New Scheme 2", false, "S3")
+            ])
+        };
+        var controller = CreateController(
+            new FakeContractApiClient(),
+            new FakeCustomerApiClient { CustomerResponse = SampleCustomer(customerId) },
+            contractRenewalApiClient: contractRenewalApiClient);
+
+        var result = await controller.RenewContracts(customerId, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<PTL.InternalWeb.Features.Contract.RenewContractsViewModel>(view.Model);
+        Assert.Equal("Sample Laboratories Ltd", model.CustomerName);
+        Assert.Equal("Sample Organisation", model.CustomerOrganisation);
+        Assert.Equal("QAL/00001", model.QalNumber);
+        Assert.Contains(renewableSchemeId, model.SelectedParticipantSchemeIds);
+        Assert.DoesNotContain(nonRenewableSchemeId, model.SelectedParticipantSchemeIds);
     }
 
     [Fact]
@@ -606,6 +668,29 @@ public class ContractControllerTests
     }
 
     [Fact]
+    public async Task Export_JobSheetWithNonZeroTotalPrice_GeneratesDocument()
+    {
+        var contractId = Guid.NewGuid();
+        var customerId = Guid.NewGuid();
+        var apiClient = new FakeContractApiClient
+        {
+            ContractResponse = SampleContract(contractId, customerId),
+            ItemsResponse = new ContractItemsResponse(
+                contractId, "A", DateTime.UtcNow.Year, "QAL/00001", "£",
+                0m, 0m, 0, 0m, 0m, 0, 0m, 0m, 0, 0m, 0m, 0m, 0m, 50m, false, [])
+        };
+        var controller = CreateController(
+            apiClient,
+            new FakeCustomerApiClient { CustomerResponse = SampleCustomer(customerId) },
+            exportTemplateApiClient: SelectedTemplateFor(ExportDocumentTypes.JobSheets));
+        controller.TempData = CreateTempData();
+
+        var result = await controller.Export(contractId, "Job Sheet", CancellationToken.None);
+
+        Assert.IsType<FileContentResult>(result);
+    }
+
+    [Fact]
     public async Task Export_AddressConfirmationWithNoSampleAddresses_WarnsAndRedirectsToIndex()
     {
         var contractId = Guid.NewGuid();
@@ -639,6 +724,25 @@ public class ContractControllerTests
         var file = Assert.IsType<FileContentResult>(result);
         Assert.Equal(ExportTemplateService.DocxContentType, file.ContentType);
         Assert.Equal(selectedFileId, templateApiClient.LastDownloadedFileId);
+    }
+
+    [Fact]
+    public async Task Export_AddressConfirmationWithMultipleSampleAddresses_MergesThemIntoOneDocument()
+    {
+        var contractId = Guid.NewGuid();
+        var selectedFileId = Guid.NewGuid();
+        var templateApiClient = new FakeExportTemplateApiClient()
+            .WithSelectedTemplate(ExportDocumentTypes.AddressConfirmationLetters, selectedFileId, "AddressLetter.docx", MergeTemplateFactory.ContractTemplate());
+        var controller = CreateController(
+            new FakeContractApiClient { ContractResponse = SampleContract(contractId, Guid.NewGuid()) },
+            exportTemplateApiClient: templateApiClient,
+            contractExportApiClient: new FakeContractExportApiClient { SampleAddresses = [SampleAddress(contractId), SampleAddress(contractId)] });
+        controller.TempData = CreateTempData();
+
+        var result = await controller.Export(contractId, "Address Confirmation", CancellationToken.None);
+
+        var file = Assert.IsType<FileContentResult>(result);
+        Assert.Equal(ExportTemplateService.DocxContentType, file.ContentType);
     }
 
     [Fact]
@@ -694,6 +798,21 @@ public class ContractControllerTests
         Assert.Equal(contractId, model.ContractId);
         Assert.Equal(customerId, model.CustomerId);
         Assert.Single(model.YearOptions);
+    }
+
+    [Fact]
+    public async Task Edit_Get_ExistingContractWithFTNumber_SetsContractTypeToFT()
+    {
+        var contractId = Guid.NewGuid();
+        var customerId = Guid.NewGuid();
+        var contract = SampleContract(contractId, customerId) with { FTNumber = "FT6789" };
+        var controller = CreateController(new FakeContractApiClient { ContractResponse = contract });
+
+        var result = await controller.Edit(contractId, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<PTL.InternalWeb.Features.Contract.ContractFormViewModel>(view.Model);
+        Assert.Equal("FT", model.ContractType);
     }
 
     [Fact]

@@ -128,6 +128,25 @@ public class PendingOrderServiceTests
     }
 
     [Fact]
+    public async Task GetPendingOrdersAsync_ExcludesUnsubmittedAndDeletedOrders()
+    {
+        var harness = await CreateAsync();
+        var unsubmittedId = Guid.NewGuid();
+        var deletedId = Guid.NewGuid();
+        harness.PendingOrders.Seed(
+            new PendingOrderEntity { PendingContractId = unsubmittedId, YearId = CurrentYearId, IsSubmitted = false },
+            new PendingOrderSummaryEntity { PendingContractId = unsubmittedId, YearId = CurrentYearId, IsSubmitted = false });
+        harness.PendingOrders.Seed(
+            new PendingOrderEntity { PendingContractId = deletedId, YearId = CurrentYearId, IsSubmitted = true, IsDeleted = true },
+            new PendingOrderSummaryEntity { PendingContractId = deletedId, YearId = CurrentYearId, IsSubmitted = true, IsDeleted = true });
+
+        var (currentYear, _) = await harness.Service.GetPendingOrdersAsync();
+
+        Assert.Single(currentYear);
+        Assert.DoesNotContain(currentYear, o => o.PendingContractId == unsubmittedId || o.PendingContractId == deletedId);
+    }
+
+    [Fact]
     public async Task GetPendingOrderAsync_UnknownOrder_ReturnsNull()
     {
         var harness = await CreateAsync();

@@ -142,6 +142,36 @@ public class ContractServiceTests
     }
 
     [Fact]
+    public async Task SearchContractsAsync_SuffixNoMatch_ReturnsEmpty()
+    {
+        var repository = new FakeContractRepository();
+        var service = CreateService(repository);
+        var customerId = Guid.NewGuid();
+        var year = DateTime.UtcNow.Year + 1;
+        await service.CreateContractAsync(ValidContract(customerId, year));
+
+        var result = await service.SearchContractsAsync(customerId, null, ContractPeriodFilter.All, "no-such-suffix", 1, 20);
+
+        Assert.Empty(result.Items);
+    }
+
+    [Theory]
+    [InlineData(0, 20)]
+    [InlineData(-1, 400)]
+    public async Task SearchContractsAsync_InvalidPageOrPageSize_NormalisesToDefaults(int page, int pageSize)
+    {
+        var repository = new FakeContractRepository();
+        var service = CreateService(repository);
+        var customerId = Guid.NewGuid();
+        var year = DateTime.UtcNow.Year + 1;
+        await service.CreateContractAsync(ValidContract(customerId, year));
+
+        var result = await service.SearchContractsAsync(customerId, null, ContractPeriodFilter.All, null, page, pageSize);
+
+        Assert.Single(result.Items);
+    }
+
+    [Fact]
     public async Task CreateContractAsync_AlwaysForcesIsOnlineOrderFalse()
     {
         var service = CreateService(new FakeContractRepository());

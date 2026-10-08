@@ -58,4 +58,30 @@ public class WeightedPricingPlanApiClientTests
         Assert.False(result.Success);
         Assert.NotEmpty(result.Message);
     }
+
+    [Fact]
+    public async Task GetYearsAsync_NullResponse_ReturnsDefault()
+    {
+        var client = CreateClient(HttpStatusCode.OK, "null");
+
+        var result = await client.GetYearsAsync();
+
+        Assert.Empty(result.AvailableYears);
+        Assert.False(result.CanRenew);
+    }
+
+    [Fact]
+    public async Task GetPercentagesForYearAsync_NullResponse_ReturnsEmptyList() =>
+        Assert.Empty(await CreateClient(HttpStatusCode.OK, "null").GetPercentagesForYearAsync(2026));
+
+    [Fact]
+    public async Task RenewAsync_NullResponse_ReturnsDefaultFailureResult()
+    {
+        var client = CreateClient(HttpStatusCode.OK, "null");
+
+        var result = await client.RenewAsync();
+
+        Assert.False(result.Success);
+        Assert.NotEmpty(result.Message);
+    }
 }

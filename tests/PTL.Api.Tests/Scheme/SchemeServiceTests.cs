@@ -327,6 +327,63 @@ public class SchemeServiceTests
     }
 
     [Fact]
+    public async Task SearchSchemesAsync_NoSearchTerm_ReturnsAllSchemesForYear()
+    {
+        var repository = new FakeSchemeRepository();
+        var service = CreateService(repository);
+        var year = DateTime.UtcNow.Year + 1;
+        await service.CreateSchemeAsync(ValidScheme(year));
+        await service.CreateSchemeAsync(ValidScheme(year));
+
+        var result = await service.SearchSchemesAsync(year, null, 1, 20);
+
+        Assert.Equal(2, result.Items.Count);
+    }
+
+    [Fact]
+    public async Task SearchSchemesAsync_SearchTermMatchesName_ReturnsMatchingScheme()
+    {
+        var repository = new FakeSchemeRepository();
+        var service = CreateService(repository);
+        var year = DateTime.UtcNow.Year + 1;
+        var scheme = ValidScheme(year);
+        scheme.Name = "Salmonella Screening";
+        await service.CreateSchemeAsync(scheme);
+
+        var result = await service.SearchSchemesAsync(year, "salmonella", 1, 20);
+
+        Assert.Single(result.Items);
+    }
+
+    [Fact]
+    public async Task SearchSchemesAsync_SearchTermMatchesNeitherIdentifierNorName_ReturnsEmpty()
+    {
+        var repository = new FakeSchemeRepository();
+        var service = CreateService(repository);
+        var year = DateTime.UtcNow.Year + 1;
+        await service.CreateSchemeAsync(ValidScheme(year));
+
+        var result = await service.SearchSchemesAsync(year, "no-match-at-all", 1, 20);
+
+        Assert.Empty(result.Items);
+    }
+
+    [Theory]
+    [InlineData(0, 20)]
+    [InlineData(-1, 300)]
+    public async Task SearchSchemesAsync_InvalidPageOrPageSize_NormalisesToDefaults(int page, int pageSize)
+    {
+        var repository = new FakeSchemeRepository();
+        var service = CreateService(repository);
+        var year = DateTime.UtcNow.Year + 1;
+        await service.CreateSchemeAsync(ValidScheme(year));
+
+        var result = await service.SearchSchemesAsync(year, null, page, pageSize);
+
+        Assert.Single(result.Items);
+    }
+
+    [Fact]
     public async Task GetSchemeFamiliesAsync_FiltersByNameOnly_SimpleSubstringMatch()
     {
         var repository = new FakeSchemeRepository();

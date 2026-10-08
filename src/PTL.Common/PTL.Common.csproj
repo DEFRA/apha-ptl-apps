@@ -18,6 +18,9 @@
   <ItemGroup>
     <!-- Serilog.Context (LogContext) lives in the base package; no need for Serilog.AspNetCore here. -->
     <PackageReference Include="Serilog" Version="4.3.0" />
+    <!-- Needed for the shared OpenID Connect event helpers under Auth/ (TokenValidatedContext,
+         RemoteFailureContext) - used by both PTL.Auth.Cidm and PTL.Auth.Entra. -->
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" Version="10.0.12" />
   </ItemGroup>
 
 </Project>

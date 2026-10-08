@@ -44,6 +44,16 @@ public class CorrelationIdTests
     }
 
     [Fact]
+    public async Task DelegatingHandler_WithHttpContextButNoCorrelationIdItem_LeavesRequestUnchanged()
+    {
+        var httpContext = new DefaultHttpContext();
+
+        var captured = await SendThroughHandlerAsync(httpContext, request => request);
+
+        Assert.False(captured.Headers.Contains(CorrelationIdMiddlewareExtensions.HeaderName));
+    }
+
+    [Fact]
     public async Task UseCorrelationId_WithValidInboundHeader_PreservesIt()
     {
         var inbound = Guid.NewGuid().ToString();

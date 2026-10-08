@@ -1,0 +1,40 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <!-- Pure DI wiring, exercised end-to-end via PTL.InternalWeb.Tests' WebApplicationFactory-based
+         integration tests (which run the real Program.cs -> AddEntraAuthentication path) rather than
+         here - same rationale as excluding Program.cs itself elsewhere in the solution. Logging.g.cs
+         is the LoggerMessage source generator's combined output for the whole assembly - its
+         IsEnabled-gated internals are never hit when tests use NullLogger (by design, to keep test
+         output quiet), so it's compiler-generated plumbing rather than something a unit test should
+         be expected to cover. -->
+    <ExcludeByFile>**/EntraAuthenticationExtensions.cs,**/Logging.g.cs</ExcludeByFile>
+    <!-- PTL.Common (referenced for the shared Auth/ helpers) is measured independently by its own
+         PTL.Common.Tests project. -->
+    <Exclude>[PTL.Common]*</Exclude>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" Version="6.0.4" />
+    <PackageReference Include="coverlet.msbuild" Version="10.0.1">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\PTL.Auth.Entra\PTL.Auth.Entra.csproj" />
+  </ItemGroup>
+
+</Project>

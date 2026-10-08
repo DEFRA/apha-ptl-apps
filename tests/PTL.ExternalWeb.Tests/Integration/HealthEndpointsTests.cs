@@ -1,16 +1,16 @@
 using System.Net;
 using System.Net.Http.Json;
-using Microsoft.AspNetCore.Mvc.Testing;
 using PTL.ApiClient;
 using PTL.Common.Health;
+using PTL.ExternalWeb.Tests.TestSupport;
 
 namespace PTL.ExternalWeb.Tests.Integration;
 
-public class HealthEndpointsTests : IClassFixture<WebApplicationFactory<Program>>
+public class HealthEndpointsTests : IClassFixture<PtlExternalWebTestFactory>
 {
-    private readonly WebApplicationFactory<Program> _factory;
+    private readonly PtlExternalWebTestFactory _factory;
 
-    public HealthEndpointsTests(WebApplicationFactory<Program> factory)
+    public HealthEndpointsTests(PtlExternalWebTestFactory factory)
     {
         _factory = factory;
     }

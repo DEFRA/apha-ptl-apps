@@ -112,6 +112,32 @@ public class CustomerRepositoryTests
         Assert.Equal("Alice Example", result[0].ContactName);
         Assert.Equal("ACC-12345", result[0].AccountNumber);
         Assert.Equal("United Kingdom", result[0].Country);
+        var command = Assert.Single(connection.ExecutedCommands, c => c.CommandText == GetSummariesSql);
+        Assert.Equal(true, command.ParameterValue("@IsActive"));
+    }
+
+    [Fact]
+    public async Task GetSummariesAsync_Inactive_PassesFalseIsActive()
+    {
+        var (repository, connection) = CreateRepository();
+        connection.RespondToQuery(GetSummariesSql, SummaryTable(Guid.NewGuid(), isActive: false));
+
+        await repository.GetSummariesAsync(CustomerStatusFilter.Inactive);
+
+        var command = Assert.Single(connection.ExecutedCommands, c => c.CommandText == GetSummariesSql);
+        Assert.Equal(false, command.ParameterValue("@IsActive"));
+    }
+
+    [Fact]
+    public async Task GetSummariesAsync_All_PassesNullIsActive()
+    {
+        var (repository, connection) = CreateRepository();
+        connection.RespondToQuery(GetSummariesSql, SummaryTable(Guid.NewGuid()));
+
+        await repository.GetSummariesAsync(CustomerStatusFilter.All);
+
+        var command = Assert.Single(connection.ExecutedCommands, c => c.CommandText == GetSummariesSql);
+        Assert.Equal(DBNull.Value, command.ParameterValue("@IsActive"));
     }
 
     [Fact]
@@ -128,6 +154,17 @@ public class CustomerRepositoryTests
         Assert.Equal(customerId, result.CustomerId);
         var insertCommand = Assert.Single(connection.ExecutedCommands, c => c.CommandText == InsertSql);
         Assert.Equal(customerId, insertCommand.ParameterValue("@CustomerId"));
+    }
+
+    [Fact]
+    public async Task CreateAsync_InsertedButNotReReadable_Throws()
+    {
+        var (repository, connection) = CreateRepository();
+        connection.RespondToNonQuery(InsertSql, 1);
+        connection.RespondToQuery(GetByIdSql, new DataTable());
+        var customer = new CoreCustomer { CustomerId = Guid.NewGuid(), Name = "Test Customer", IsActive = true };
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => repository.CreateAsync(customer));
     }
 
     [Fact]
