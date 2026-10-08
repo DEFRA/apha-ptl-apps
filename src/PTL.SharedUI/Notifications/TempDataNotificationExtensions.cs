@@ -1,7 +1,7 @@
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc.ViewFeatures;
 
-namespace PTL.InternalWeb.Notifications;
+namespace PTL.SharedUI.Notifications;
 
 public static class TempDataNotificationExtensions
 {

@@ -14,6 +14,7 @@ COPY ["src/PTL.Auth.Entra/PTL.Auth.Entra.csproj", "src/PTL.Auth.Entra/"]
 COPY ["src/PTL.Core/PTL.Core.csproj", "src/PTL.Core/"]
 COPY ["src/PTL.Contracts/PTL.Contracts.csproj", "src/PTL.Contracts/"]
 COPY ["src/PTL.Common/PTL.Common.csproj", "src/PTL.Common/"]
+COPY ["src/PTL.SharedUI/PTL.SharedUI.csproj", "src/PTL.SharedUI/"]
 
 RUN --mount=type=cache,target=/root/.nuget/packages \
     dotnet restore "src/PTL.InternalWeb/PTL.InternalWeb.csproj"

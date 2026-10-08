@@ -2,7 +2,7 @@ using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.AspNetCore.Mvc.ViewFeatures;
 using Microsoft.AspNetCore.Razor.TagHelpers;
 
-namespace PTL.InternalWeb.TagHelpers;
+namespace PTL.SharedUI.TagHelpers;
 
 /// <summary>
 /// Renders a GOV.UK form group whose control is a TinyMCE rich text editor, for any model property

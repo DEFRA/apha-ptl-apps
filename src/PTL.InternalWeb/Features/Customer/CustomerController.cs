@@ -4,7 +4,7 @@ using Microsoft.Extensions.Logging;
 using PTL.ApiClient;
 using PTL.Contracts.Customer;
 using PTL.Core.Labels;
-using PTL.InternalWeb.Notifications;
+using PTL.SharedUI.Notifications;
 
 namespace PTL.InternalWeb.Features.Customer;
 
@@ -55,7 +55,7 @@ public class CustomerController(ICustomerApiClient customerApiClient, ILookupApi
         string? searchTerm,
         CustomerStatusFilter status = CustomerStatusFilter.Active,
         int page = 1,
-        int pageSize = PTL.InternalWeb.Pagination.PaginationModel.DefaultPageSize,
+        int pageSize = PTL.SharedUI.Pagination.PaginationModel.DefaultPageSize,
         CancellationToken cancellationToken = default)
     {
         var result = await customerApiClient.SearchCustomersAsync(new CustomerSearchRequest(searchTerm, status, page, pageSize), cancellationToken);

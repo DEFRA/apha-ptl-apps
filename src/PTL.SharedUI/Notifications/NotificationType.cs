@@ -1,4 +1,4 @@
-namespace PTL.InternalWeb.Notifications;
+namespace PTL.SharedUI.Notifications;
 
 public enum NotificationType
 {

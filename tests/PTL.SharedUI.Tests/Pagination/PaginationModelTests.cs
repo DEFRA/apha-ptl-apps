@@ -1,9 +1,11 @@
-using PTL.InternalWeb.Pagination;
+using PTL.SharedUI.Pagination;
 
-namespace PTL.InternalWeb.Tests.Pagination;
+namespace PTL.SharedUI.Tests.Pagination;
 
 public class PaginationModelTests
 {
+    private static readonly int[] ExpectedAvailablePageSizes = [10, 20, 25, 50, 100];
+
     [Fact]
     public void TotalPages_PageSizeZeroOrLess_ReturnsOne()
     {
@@ -58,5 +60,18 @@ public class PaginationModelTests
         var model = new PaginationModel { CurrentPage = 1, PageSize = 25, TotalRecords = 100 };
 
         Assert.True(model.HasNextPage);
+    }
+
+    [Fact]
+    public void Defaults_MatchDocumentedValues()
+    {
+        var model = new PaginationModel();
+
+        Assert.Equal(1, model.CurrentPage);
+        Assert.Equal(PaginationModel.DefaultPageSize, model.PageSize);
+        Assert.Equal("Index", model.Action);
+        Assert.Empty(model.RouteValues);
+        Assert.Equal(25, PaginationModel.DefaultPageSize);
+        Assert.Equal(ExpectedAvailablePageSizes, PaginationModel.AvailablePageSizes);
     }
 }

@@ -5,7 +5,7 @@ using PTL.ApiClient;
 using PTL.Contracts.Participant;
 using PTL.Contracts.Scheme;
 using PTL.InternalWeb.Navigation;
-using PTL.InternalWeb.Notifications;
+using PTL.SharedUI.Notifications;
 
 namespace PTL.InternalWeb.Features.ParticipantScheme;
 
@@ -264,7 +264,7 @@ public class ParticipantSchemeController(
             return;
         }
 
-        var request = new SchemeSearchRequest(model.YearId.GetValueOrDefault(), model.SchemeSearchTerm, model.SchemeOptionsPage.GetValueOrDefault(1), PTL.InternalWeb.Pagination.PaginationModel.DefaultPageSize);
+        var request = new SchemeSearchRequest(model.YearId.GetValueOrDefault(), model.SchemeSearchTerm, model.SchemeOptionsPage.GetValueOrDefault(1), PTL.SharedUI.Pagination.PaginationModel.DefaultPageSize);
         var result = await schemeApiClient.GetSchemesForYearAsync(request, cancellationToken);
         model.SchemeOptions = result.Items;
         model.SchemeOptionsTotalCount = result.TotalCount;

@@ -2,7 +2,7 @@ using System.Net;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.AspNetCore.Razor.TagHelpers;
 
-namespace PTL.InternalWeb.TagHelpers;
+namespace PTL.SharedUI.TagHelpers;
 
 /// <summary>
 /// Renders the GOV.UK Design System error summary (title + linked list) from a precomputed list
