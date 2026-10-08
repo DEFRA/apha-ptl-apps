@@ -2,10 +2,10 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.AspNetCore.Mvc.Routing;
 using Microsoft.AspNetCore.Razor.TagHelpers;
-using PTL.InternalWeb.Pagination;
-using PTL.InternalWeb.TagHelpers;
+using PTL.SharedUI.Pagination;
+using PTL.SharedUI.TagHelpers;
 
-namespace PTL.InternalWeb.Tests.TagHelpers;
+namespace PTL.SharedUI.Tests.TagHelpers;
 
 public class GovUkPaginationTagHelperTests
 {

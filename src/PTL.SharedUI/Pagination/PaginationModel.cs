@@ -1,4 +1,4 @@
-namespace PTL.InternalWeb.Pagination;
+namespace PTL.SharedUI.Pagination;
 
 /// <summary>
 /// Shared paging state for every list page (Customer/Participant/Contract/Scheme/future) - built by

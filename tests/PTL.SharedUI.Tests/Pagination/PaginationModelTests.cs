@@ -1,6 +1,6 @@
-using PTL.InternalWeb.Pagination;
+using PTL.SharedUI.Pagination;
 
-namespace PTL.InternalWeb.Tests.Pagination;
+namespace PTL.SharedUI.Tests.Pagination;
 
 public class PaginationModelTests
 {

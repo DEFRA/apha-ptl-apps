@@ -6,7 +6,7 @@ using PTL.ApiClient;
 using PTL.Contracts.Lookup;
 using PTL.Contracts.Scheme;
 using PTL.Core.Scheme;
-using PTL.InternalWeb.Notifications;
+using PTL.SharedUI.Notifications;
 using CoreScheme = PTL.Core.Scheme.Scheme;
 using SchemeStartDate = PTL.Core.Scheme.SchemeStartDate;
 
@@ -66,7 +66,7 @@ public class SchemeController(ISchemeApiClient schemeApiClient, ILookupApiClient
 
     // Legacy SchemeList.aspx has no year filter - the Scheme Name search box is the only filter,
     // searching across every scheme family regardless of year.
-    public async Task<IActionResult> Index(string? searchTerm = null, int page = 1, int pageSize = PTL.InternalWeb.Pagination.PaginationModel.DefaultPageSize, CancellationToken cancellationToken = default)
+    public async Task<IActionResult> Index(string? searchTerm = null, int page = 1, int pageSize = PTL.SharedUI.Pagination.PaginationModel.DefaultPageSize, CancellationToken cancellationToken = default)
     {
         var result = await schemeApiClient.GetSchemeFamiliesAsync(page, pageSize, searchTerm, cancellationToken);
         LogDisplayedSchemeListMessage(logger, 0, searchTerm, result.Page, result.TotalCount, null);
@@ -77,7 +77,7 @@ public class SchemeController(ISchemeApiClient schemeApiClient, ILookupApiClient
     // Legacy SchemeListForPrinting.aspx: the same spgaSchemeInfo family list as the main Scheme
     // List, but with no Search box, no Year filter, and no History column - just Identifier, Name,
     // and a View link per year that opens that scheme's printable worksheet.
-    public async Task<IActionResult> PrintableSchemes(int page = 1, int pageSize = PTL.InternalWeb.Pagination.PaginationModel.DefaultPageSize, CancellationToken cancellationToken = default)
+    public async Task<IActionResult> PrintableSchemes(int page = 1, int pageSize = PTL.SharedUI.Pagination.PaginationModel.DefaultPageSize, CancellationToken cancellationToken = default)
     {
         var result = await schemeApiClient.GetSchemeFamiliesAsync(page, pageSize, searchTerm: null, cancellationToken);
         LogDisplayedSchemeListMessage(logger, 0, null, result.Page, result.TotalCount, null);

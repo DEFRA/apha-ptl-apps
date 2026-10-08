@@ -1,6 +1,6 @@
 @model PTL.InternalWeb.Features.Customer.CustomerListViewModel
 @using PTL.Contracts.Customer
-@using PTL.InternalWeb.Pagination
+@using PTL.SharedUI.Pagination
 @{
     ViewData["Title"] = "Customers";
     var activeSelected = Model.SelectedStatus == CustomerStatusFilter.Active ? "selected" : null;

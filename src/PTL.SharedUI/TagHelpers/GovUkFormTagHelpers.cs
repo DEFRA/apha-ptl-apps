@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.AspNetCore.Mvc.ViewFeatures;
 using Microsoft.AspNetCore.Razor.TagHelpers;
 
-namespace PTL.InternalWeb.TagHelpers;
+namespace PTL.SharedUI.TagHelpers;
 
 /// <summary>
 /// Renders a complete GOV.UK Design System text-input form group (label, optional hint, error

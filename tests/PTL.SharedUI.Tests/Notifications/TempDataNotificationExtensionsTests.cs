@@ -1,9 +1,9 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.ViewFeatures;
-using PTL.InternalWeb.Notifications;
-using PTL.InternalWeb.Tests.TestSupport;
+using PTL.SharedUI.Notifications;
+using PTL.SharedUI.Tests.TestSupport;
 
-namespace PTL.InternalWeb.Tests.Notifications;
+namespace PTL.SharedUI.Tests.Notifications;
 
 public class TempDataNotificationExtensionsTests
 {
@@ -15,11 +15,11 @@ public class TempDataNotificationExtensionsTests
     {
         var tempData = CreateTempData();
 
-        tempData.SetNotification(PTL.InternalWeb.Notifications.NotificationType.Success, "Saved successfully.");
+        tempData.SetNotification(NotificationType.Success, "Saved successfully.");
         var notification = tempData.GetNotification();
 
         Assert.NotNull(notification);
-        Assert.Equal(PTL.InternalWeb.Notifications.NotificationType.Success, notification!.Type);
+        Assert.Equal(NotificationType.Success, notification!.Type);
         Assert.Equal("Saved successfully.", notification.Message);
     }
 
@@ -28,7 +28,7 @@ public class TempDataNotificationExtensionsTests
     {
         var tempData = CreateTempData();
 
-        Assert.Throws<ArgumentException>(() => tempData.SetNotification(PTL.InternalWeb.Notifications.NotificationType.Error, string.Empty));
+        Assert.Throws<ArgumentException>(() => tempData.SetNotification(NotificationType.Error, string.Empty));
     }
 
     [Fact]
@@ -43,7 +43,7 @@ public class TempDataNotificationExtensionsTests
     public void GetNotification_RemovesValueAfterReading()
     {
         var tempData = CreateTempData();
-        tempData.SetNotification(PTL.InternalWeb.Notifications.NotificationType.Error, "Something failed.");
+        tempData.SetNotification(NotificationType.Error, "Something failed.");
 
         tempData.GetNotification();
         var second = tempData.GetNotification();
@@ -56,7 +56,7 @@ public class TempDataNotificationExtensionsTests
     {
         ITempDataDictionary? tempData = null;
 
-        var exception = Record.Exception(() => tempData!.SetNotification(PTL.InternalWeb.Notifications.NotificationType.Success, "message"));
+        var exception = Record.Exception(() => tempData!.SetNotification(NotificationType.Success, "message"));
 
         Assert.Null(exception);
     }

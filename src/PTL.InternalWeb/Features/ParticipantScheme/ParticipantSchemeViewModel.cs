@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Mvc.Rendering;
 using PTL.Contracts.Scheme;
-using PTL.InternalWeb.Pagination;
+using PTL.SharedUI.Pagination;
 
 namespace PTL.InternalWeb.Features.ParticipantScheme;
 
