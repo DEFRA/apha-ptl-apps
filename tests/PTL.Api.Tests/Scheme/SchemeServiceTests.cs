@@ -272,6 +272,19 @@ public class SchemeServiceTests
     }
 
     [Fact]
+    public async Task UpdateSchemeAsync_RepositoryUpdateReturnsNull_ReturnsNull()
+    {
+        var repository = new FakeSchemeRepository();
+        var service = CreateService(repository);
+        var created = await service.CreateSchemeAsync(ValidScheme());
+        repository.ForceUpdateReturnsNull = true;
+
+        var result = await service.UpdateSchemeAsync(created.SchemeId, ValidScheme(created.YearId));
+
+        Assert.Null(result);
+    }
+
+    [Fact]
     public async Task UpdateSchemeAsync_PreservesSharedIdAndRequiresAssessment()
     {
         var repository = new FakeSchemeRepository();
@@ -401,6 +414,20 @@ public class SchemeServiceTests
         Assert.Equal("Salmonella Scheme", result.Items[0].Name);
     }
 
+    [Theory]
+    [InlineData(0, 20)]
+    [InlineData(-1, 300)]
+    public async Task GetSchemeFamiliesAsync_InvalidPageOrPageSize_NormalisesToDefaults(int page, int pageSize)
+    {
+        var repository = new FakeSchemeRepository();
+        var service = CreateService(repository);
+        await service.CreateSchemeAsync(ValidScheme());
+
+        var result = await service.GetSchemeFamiliesAsync(page, pageSize, null);
+
+        Assert.Single(result.Items);
+    }
+
     [Fact]
     public async Task GetSchemeFamilyHistoryAsync_ReturnsSchemesForSharedId()
     {
@@ -422,6 +449,25 @@ public class SchemeServiceTests
         var renewed = await service.RenewSchemeAsync(Guid.NewGuid());
 
         Assert.Null(renewed);
+    }
+
+    [Fact]
+    public async Task RenewSchemeAsync_WhenRequiresAssessment_LeavesTestConsultantTabulationIdUnmapped()
+    {
+        var repository = new FakeSchemeRepository();
+        var service = CreateService(repository);
+        var original = ValidScheme();
+        original.RequiresAssessment = true;
+        original.TestConsultant1 = null;
+        original.Assessor1 = Guid.NewGuid();
+        original.Assessor2 = Guid.NewGuid();
+        var created = await service.CreateSchemeAsync(original);
+
+        var renewed = await service.RenewSchemeAsync(created.SchemeId);
+
+        // An assessment scheme never uses the Test Consultants tab, so legacy leaves this id as-is
+        // rather than remapping it onto the newly-generated tabulation ids.
+        Assert.Equal(TestConsultantTabulationId, renewed!.TestConsultantTabulationId);
     }
 
     [Fact]
@@ -470,6 +516,24 @@ public class SchemeServiceTests
     }
 
     [Fact]
+    public async Task RenewSchemeAsync_OldPostagePlanNoLongerExistsForItsOwnYear_ResolvesToNullWithoutThrowing()
+    {
+        var oldPostageId = Guid.NewGuid();
+        var year = DateTime.UtcNow.Year + 1;
+        // No PostagePricingPlans configured at all, so the old year's lookup finds nothing for
+        // oldPostageId - oldPlanName is null before even considering the next year's plans.
+        var repository = new FakeSchemeRepository();
+        var service = CreateService(repository, new FakeLookupRepository());
+        var original = ValidScheme(year);
+        original.Postage = oldPostageId;
+        var created = await service.CreateSchemeAsync(original);
+
+        var renewed = await service.RenewSchemeAsync(created.SchemeId);
+
+        Assert.Null(renewed!.Postage);
+    }
+
+    [Fact]
     public async Task RenewSchemeAsync_NoMatchingNamedPostagePlanNextYear_ResolvesToNullWithoutThrowing()
     {
         var oldPostageId = Guid.NewGuid();
@@ -495,6 +559,7 @@ public class SchemeServiceTests
         var repository = new FakeSchemeRepository();
         var service = CreateService(repository);
         var resultItemId = Guid.NewGuid();
+        var methodItemId = Guid.NewGuid();
         var original = ValidScheme();
         original.Tests =
         [
@@ -503,14 +568,15 @@ public class SchemeServiceTests
                 TestId = Guid.NewGuid(),
                 TestTypeId = Guid.NewGuid(),
                 TestType = "Serology",
-                ResultItems = [new SchemeTestResultItem { TestResultItemId = resultItemId, TestResultItemTypeId = Guid.NewGuid(), TestResultItemType = "Positive" }]
+                ResultItems = [new SchemeTestResultItem { TestResultItemId = resultItemId, TestResultItemTypeId = Guid.NewGuid(), TestResultItemType = "Positive" }],
+                MethodItems = [new SchemeTestMethodItem { TestMethodItemId = methodItemId, TestMethodItemTypeId = Guid.NewGuid(), TestMethodItemType = "ELISA" }],
             }
         ];
         var publishedTabulationId = original.Tabulations.Single(t => t.Name == "Published").TabulationId;
         original.Tabulations =
         [
             .. original.Tabulations.Where(t => t.TabulationId != publishedTabulationId),
-            new SchemeTabulation { TabulationId = publishedTabulationId, Name = "Published", ResultItemIds = [resultItemId] }
+            new SchemeTabulation { TabulationId = publishedTabulationId, Name = "Published", ResultItemIds = [resultItemId], MethodItemIds = [methodItemId] }
         ];
         var created = await service.CreateSchemeAsync(original);
 
@@ -519,14 +585,60 @@ public class SchemeServiceTests
         var renewedTest = Assert.Single(renewed!.Tests);
         var renewedResultItem = Assert.Single(renewedTest.ResultItems);
         Assert.NotEqual(resultItemId, renewedResultItem.TestResultItemId);
+        var renewedMethodItem = Assert.Single(renewedTest.MethodItems);
+        Assert.NotEqual(methodItemId, renewedMethodItem.TestMethodItemId);
 
         var renewedTabulation = Assert.Single(renewed.Tabulations, t => t.Name == "Published");
         Assert.NotEqual(publishedTabulationId, renewedTabulation.TabulationId);
         Assert.Equal(renewedResultItem.TestResultItemId, Assert.Single(renewedTabulation.ResultItemIds));
+        Assert.Equal(renewedMethodItem.TestMethodItemId, Assert.Single(renewedTabulation.MethodItemIds));
 
         // The Test Consultant tabulation selection follows the same remap.
         var renewedConsultantTabulation = Assert.Single(renewed.Tabulations, t => t.Name == "Test Consultant");
         Assert.Equal(renewedConsultantTabulation.TabulationId, renewed.TestConsultantTabulationId);
+    }
+
+    [Fact]
+    public async Task RenewSchemeAsync_AssessmentScheme_CopiesCategoriesAndCriteriaWithFreshIds()
+    {
+        var repository = new FakeSchemeRepository();
+        var service = CreateService(repository);
+        var criterionId = Guid.NewGuid();
+        var original = ValidScheme();
+        // Categories/Criteria are only persisted for assessment schemes (ApplyDerivedFieldsAsync
+        // clears them otherwise), so RequiresAssessment must be true to exercise that mapping.
+        original.RequiresAssessment = true;
+        original.Assessor1 = Guid.NewGuid();
+        original.Assessor2 = Guid.NewGuid();
+        original.Tests =
+        [
+            new SchemeTest
+            {
+                TestId = Guid.NewGuid(),
+                TestTypeId = Guid.NewGuid(),
+                TestType = "Serology",
+                Categories =
+                [
+                    new SchemeCategoryItem
+                    {
+                        CategoryItemId = Guid.NewGuid(),
+                        CategoryItemTypeId = Guid.NewGuid(),
+                        Name = "Accuracy",
+                        Criteria = [new SchemeCriterionItem { CriterionItemId = criterionId, CriterionItemTypeId = Guid.NewGuid(), Name = "Within range" }]
+                    }
+                ],
+            }
+        ];
+        var created = await service.CreateSchemeAsync(original);
+
+        var renewed = await service.RenewSchemeAsync(created.SchemeId);
+
+        var renewedTest = Assert.Single(renewed!.Tests);
+        var renewedCategory = Assert.Single(renewedTest.Categories);
+        Assert.Equal("Accuracy", renewedCategory.Name);
+        var renewedCriterion = Assert.Single(renewedCategory.Criteria);
+        Assert.NotEqual(criterionId, renewedCriterion.CriterionItemId);
+        Assert.Equal("Within range", renewedCriterion.Name);
     }
 
     [Fact]

@@ -513,6 +513,150 @@ public class SchemeControllerTests
     }
 
     [Fact]
+    public async Task Create_Get_NoYearsAvailable_LeavesYearIdAndYearLabelEmpty()
+    {
+        // Default FakeLookupApiClient: Years=[], AllYears=[], SystemSettings CurrentYearId/NextYearId=0.
+        var controller = CreateController(new FakeSchemeApiClient());
+
+        var result = await controller.Create(cancellationToken: CancellationToken.None);
+
+        var model = Assert.IsType<PTL.InternalWeb.Features.Scheme.SchemeFormViewModel>(Assert.IsType<ViewResult>(result).Model);
+        Assert.Null(model.YearId);
+        Assert.Equal(string.Empty, model.YearLabel);
+    }
+
+    [Fact]
+    public async Task CreateForCurrentYear_Get_NoYearsAvailable_LeavesYearIdEmpty()
+    {
+        var controller = CreateController(new FakeSchemeApiClient());
+
+        var result = await controller.CreateForCurrentYear(CancellationToken.None);
+
+        var model = Assert.IsType<PTL.InternalWeb.Features.Scheme.SchemeFormViewModel>(Assert.IsType<ViewResult>(result).Model);
+        Assert.Null(model.YearId);
+    }
+
+    [Fact]
+    public async Task Edit_Get_ExistingScheme_WithFullNestedCollectionsAndCanEditFlags_MapsEveryBranch()
+    {
+        var schemeId = Guid.NewGuid();
+        var testId = Guid.NewGuid();
+        var resultItemId = Guid.NewGuid();
+        var methodItemId = Guid.NewGuid();
+        var categoryId = Guid.NewGuid();
+        var criterionId = Guid.NewGuid();
+        var participantsOnlyTabulationId = Guid.NewGuid();
+        var viewersOnlyTabulationId = Guid.NewGuid();
+        var currencyId = Guid.NewGuid();
+        var viewerId = Guid.NewGuid();
+        var scheme = SampleScheme(schemeId, Guid.NewGuid()) with
+        {
+            ViewerIds = [viewerId],
+            Prices = [new SchemeCurrencyPriceResponse(Guid.NewGuid(), currencyId, 12.5m, "British Pound", "£")],
+            CanEdit = new SchemeMonthEditabilityResponse(
+                Jan: false, Feb: true, Mar: true, Apr: true, May: true, Jun: true,
+                Jul: true, Aug: true, Sep: true, Oct: true, Nov: true, Dec: true),
+            Tests =
+            [
+                new SchemeTestResponse(
+                    testId, Guid.NewGuid(), "Serology", 1,
+                    ResultItems: [new SchemeTestItemResponse(resultItemId, Guid.NewGuid(), "Titre", 1)],
+                    MethodItems: [new SchemeTestItemResponse(methodItemId, Guid.NewGuid(), "ELISA", 1)],
+                    Categories:
+                    [
+                        new SchemeCategoryItemResponse(categoryId, Guid.NewGuid(), "Accuracy", 1,
+                            Criteria: [new SchemeTestItemResponse(criterionId, Guid.NewGuid(), "Within range", 1)])
+                    ])
+            ],
+            Tabulations =
+            [
+                new SchemeTabulationResponse(participantsOnlyTabulationId, "Participants Only", false, false, false, true, false, [resultItemId], [methodItemId]),
+                new SchemeTabulationResponse(viewersOnlyTabulationId, "Viewers Only", false, false, false, false, true, [], [])
+            ]
+        };
+        var controller = CreateController(
+            new FakeSchemeApiClient { SchemeResponse = scheme },
+            new FakeLookupApiClient { Currencies = [new CurrencyResponse(currencyId, "British Pound", "£", "£ - British Pound")] });
+
+        var result = await controller.Edit(schemeId, CancellationToken.None);
+
+        var model = Assert.IsType<PTL.InternalWeb.Features.Scheme.SchemeFormViewModel>(Assert.IsType<ViewResult>(result).Model);
+        Assert.False(model.CanEditJan);
+        Assert.True(model.CanEditFeb);
+
+        var test = Assert.Single(model.Tests);
+        Assert.Equal("ELISA", Assert.Single(test.MethodItems).Name);
+
+        Assert.Equal(2, model.Tabulations.Count);
+        var participantsOnly = model.Tabulations.Single(t => t.TabulationId == participantsOnlyTabulationId);
+        Assert.Equal(PTL.InternalWeb.Features.Scheme.SchemeTabulationAvailability.ParticipantsOnly, participantsOnly.Availability);
+        var viewersOnly = model.Tabulations.Single(t => t.TabulationId == viewersOnlyTabulationId);
+        Assert.Equal(PTL.InternalWeb.Features.Scheme.SchemeTabulationAvailability.ViewersAndTestConsultantsOnly, viewersOnly.Availability);
+    }
+
+    [Fact]
+    public async Task Create_Post_Success_WithFullTestsAndTabulationsTree_MapsRequestPayloadCorrectly()
+    {
+        var schemeId = Guid.NewGuid();
+        var apiClient = new FakeSchemeApiClient
+        {
+            SaveResult = new SchemeSaveResult(true, SampleScheme(schemeId, Guid.NewGuid()), new Dictionary<string, string[]>())
+        };
+        var controller = CreateController(apiClient);
+        var testId = Guid.NewGuid();
+        var resultItemId = Guid.NewGuid();
+        var methodItemId = Guid.NewGuid();
+        var categoryId = Guid.NewGuid();
+        var criterionId = Guid.NewGuid();
+        var model = new PTL.InternalWeb.Features.Scheme.SchemeFormViewModel { YearId = 2027, Identifier = "PT1234", Name = "Test Scheme" };
+        model.Tests.Add(new PTL.InternalWeb.Features.Scheme.SchemeTestViewModel
+        {
+            TestId = testId,
+            TestTypeId = Guid.NewGuid(),
+            ResultItems = [new PTL.InternalWeb.Features.Scheme.SchemeTestItemViewModel { ItemId = resultItemId, ItemTypeId = Guid.NewGuid() }],
+            MethodItems = [new PTL.InternalWeb.Features.Scheme.SchemeTestItemViewModel { ItemId = methodItemId, ItemTypeId = Guid.NewGuid() }],
+            Categories =
+            [
+                new PTL.InternalWeb.Features.Scheme.SchemeCategoryItemViewModel
+                {
+                    CategoryItemId = categoryId,
+                    CategoryItemTypeId = Guid.NewGuid(),
+                    Criteria = [new PTL.InternalWeb.Features.Scheme.SchemeTestItemViewModel { ItemId = criterionId, ItemTypeId = Guid.NewGuid() }],
+                }
+            ],
+        });
+        model.Tabulations.Add(new PTL.InternalWeb.Features.Scheme.SchemeTabulationViewModel
+        {
+            Name = "Participants Only",
+            Availability = PTL.InternalWeb.Features.Scheme.SchemeTabulationAvailability.ParticipantsOnly,
+        });
+        model.Tabulations.Add(new PTL.InternalWeb.Features.Scheme.SchemeTabulationViewModel
+        {
+            Name = "Viewers Only",
+            Availability = PTL.InternalWeb.Features.Scheme.SchemeTabulationAvailability.ViewersAndTestConsultantsOnly,
+        });
+
+        var result = await controller.Create(model, cancellationToken: CancellationToken.None);
+
+        Assert.IsType<RedirectToActionResult>(result);
+        Assert.NotNull(apiClient.LastCreateRequest);
+        var request = apiClient.LastCreateRequest!;
+        var test = Assert.Single(request.Tests!);
+        Assert.Equal(resultItemId, Assert.Single(test.ResultItems).ItemId);
+        Assert.Equal(methodItemId, Assert.Single(test.MethodItems).ItemId);
+        var category = Assert.Single(test.Categories);
+        Assert.Equal(criterionId, Assert.Single(category.Criteria).ItemId);
+
+        Assert.Equal(2, request.Tabulations!.Count);
+        var participantsOnly = request.Tabulations.Single(t => t.Name == "Participants Only");
+        Assert.True(participantsOnly.AvailableToParticipants);
+        Assert.False(participantsOnly.AvailableToViewers);
+        var viewersOnly = request.Tabulations.Single(t => t.Name == "Viewers Only");
+        Assert.False(viewersOnly.AvailableToParticipants);
+        Assert.True(viewersOnly.AvailableToViewers);
+    }
+
+    [Fact]
     public async Task Edit_Get_PostedPriceMergesOntoItsCurrencyRow()
     {
         var schemeId = Guid.NewGuid();

@@ -8,6 +8,10 @@ internal sealed class FakeSchemeRepository : ISchemeRepository
 {
     private readonly Dictionary<Guid, PTL.Core.Scheme.Scheme> _schemes = [];
 
+    // Simulates a concurrent delete between UpdateSchemeAsync's existence check and its actual
+    // update call - SchemeService must treat a null UpdateAsync result as "not found", not throw.
+    public bool ForceUpdateReturnsNull { get; set; }
+
     public Task<PTL.Core.Scheme.Scheme?> GetByIdAsync(Guid schemeId, CancellationToken cancellationToken = default) =>
         Task.FromResult(_schemes.TryGetValue(schemeId, out var scheme) ? Clone(scheme) : null);
 
@@ -97,7 +101,7 @@ internal sealed class FakeSchemeRepository : ISchemeRepository
 
     public Task<PTL.Core.Scheme.Scheme?> UpdateAsync(PTL.Core.Scheme.Scheme scheme, CancellationToken cancellationToken = default)
     {
-        if (!_schemes.TryGetValue(scheme.SchemeId, out var existing))
+        if (ForceUpdateReturnsNull || !_schemes.TryGetValue(scheme.SchemeId, out var existing))
         {
             return Task.FromResult<PTL.Core.Scheme.Scheme?>(null);
         }

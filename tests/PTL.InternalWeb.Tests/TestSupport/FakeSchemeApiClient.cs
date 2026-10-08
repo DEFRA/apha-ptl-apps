@@ -13,6 +13,8 @@ internal sealed class FakeSchemeApiClient : ISchemeApiClient
     public IReadOnlyList<SchemeHistoryResponse> HistoryResponse { get; set; } = [];
     public SchemeSaveResult SaveResult { get; set; } = new(true, null, new Dictionary<string, string[]>());
     public SchemeResponse? RenewResponse { get; set; }
+    public SchemeRequest? LastCreateRequest { get; private set; }
+    public SchemeRequest? LastUpdateRequest { get; private set; }
 
     public Task<SchemeResponse?> GetSchemeAsync(Guid schemeId, CancellationToken cancellationToken = default) =>
         Task.FromResult(SchemeResponse);
@@ -29,9 +31,15 @@ internal sealed class FakeSchemeApiClient : ISchemeApiClient
     public Task<SchemeResponse?> RenewSchemeAsync(Guid schemeId, CancellationToken cancellationToken = default) =>
         Task.FromResult(RenewResponse);
 
-    public Task<SchemeSaveResult> CreateSchemeAsync(SchemeRequest request, CancellationToken cancellationToken = default) =>
-        Task.FromResult(SaveResult);
+    public Task<SchemeSaveResult> CreateSchemeAsync(SchemeRequest request, CancellationToken cancellationToken = default)
+    {
+        LastCreateRequest = request;
+        return Task.FromResult(SaveResult);
+    }
 
-    public Task<SchemeSaveResult> UpdateSchemeAsync(Guid schemeId, SchemeRequest request, CancellationToken cancellationToken = default) =>
-        Task.FromResult(SaveResult);
+    public Task<SchemeSaveResult> UpdateSchemeAsync(Guid schemeId, SchemeRequest request, CancellationToken cancellationToken = default)
+    {
+        LastUpdateRequest = request;
+        return Task.FromResult(SaveResult);
+    }
 }
