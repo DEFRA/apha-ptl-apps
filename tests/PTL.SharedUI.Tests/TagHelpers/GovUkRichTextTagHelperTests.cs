@@ -69,4 +69,18 @@ public class GovUkRichTextTagHelperTests
         Assert.Contains("<p>Already saved</p>", html, StringComparison.Ordinal);
         Assert.DoesNotContain("ptl-rich-text", html, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void Process_ViewModeWithNullValue_RendersEmptyContentWithoutThrowing()
+    {
+        var model = new TestModel { Instructions = null };
+        var (viewContext, expression, generator) = TagHelperRenderContext.Create(model, nameof(TestModel.Instructions));
+        var helper = new GovUkRichTextTagHelper(generator) { For = expression, Label = "Instructions", ViewMode = true, ViewContext = viewContext };
+        var (context, output) = CreateTagHelperContext("govuk-rich-text");
+
+        helper.Process(context, output);
+
+        var html = output.Content.GetContent();
+        Assert.Contains("""<div class="govuk-body"></div>""", html, StringComparison.Ordinal);
+    }
 }

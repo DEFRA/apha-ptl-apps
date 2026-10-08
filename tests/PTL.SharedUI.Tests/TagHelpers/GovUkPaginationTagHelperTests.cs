@@ -140,3 +140,84 @@ public class GovUkPaginationTagHelperTests
         Assert.Single([.. System.Text.RegularExpressions.Regex.Matches(html, "govuk-pagination__item--ellipses")]);
     }
 }
+
+public class GovUkPageSizeSelectorTagHelperTests
+{
+    // Minimal stub so the tag helper can build the form's action without a full MVC routing context.
+    private sealed class StubUrlHelper : IUrlHelper
+    {
+        public ActionContext ActionContext { get; } = new();
+
+        public string? Action(UrlActionContext actionContext) => "/Index";
+
+        public string? Content(string? contentPath) => contentPath;
+
+        public bool IsLocalUrl(string? url) => true;
+
+        public string? Link(string? routeName, object? values) => null;
+
+        public string? RouteUrl(UrlRouteContext routeContext) => null;
+    }
+
+    private sealed class StubUrlHelperFactory : IUrlHelperFactory
+    {
+        public IUrlHelper GetUrlHelper(ActionContext context) => new StubUrlHelper();
+    }
+
+    private static (TagHelperContext Context, TagHelperOutput Output) CreateTagHelperContext() =>
+        (new TagHelperContext([], new Dictionary<object, object>(), Guid.NewGuid().ToString()),
+         new TagHelperOutput("govuk-page-size-selector", [], (_, _) => Task.FromResult<TagHelperContent>(new DefaultTagHelperContent())));
+
+    private static (TagHelperOutput Output, string Html) Render(PaginationModel model)
+    {
+        var helper = new GovUkPageSizeSelectorTagHelper(new StubUrlHelperFactory())
+        {
+            Model = model,
+            ViewContext = new ViewContext()
+        };
+        var (context, output) = CreateTagHelperContext();
+
+        helper.Process(context, output);
+
+        return (output, output.Content.GetContent());
+    }
+
+    [Fact]
+    public void Process_RendersFormWithHiddenPageAndEveryAvailableSize()
+    {
+        var model = new PaginationModel { PageSize = 25, RouteValues = new Dictionary<string, object?> { ["searchTerm"] = "foo" } };
+
+        var (output, html) = Render(model);
+
+        Assert.Equal("form", output.TagName);
+        Assert.Equal("get", output.Attributes["method"].Value);
+        Assert.Equal("/Index", output.Attributes["action"].Value);
+        Assert.Contains("""<input type="hidden" name="page" value="1" />""", html, StringComparison.Ordinal);
+        Assert.Contains("""<input type="hidden" name="searchTerm" value="foo" />""", html, StringComparison.Ordinal);
+        Assert.Contains("""<option value="25" selected>25</option>""", html, StringComparison.Ordinal);
+        Assert.Contains("""<option value="10">10</option>""", html, StringComparison.Ordinal);
+        Assert.Contains("""<noscript><button class="govuk-button govuk-button--secondary govuk-!-margin-left-2" type="submit">Apply</button></noscript>""", html, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Process_CurrentPageSize_IsMarkedSelected()
+    {
+        var model = new PaginationModel { PageSize = 50 };
+
+        var (_, html) = Render(model);
+
+        Assert.Contains("""<option value="50" selected>""", html, StringComparison.Ordinal);
+        Assert.Contains("""<option value="10">""", html, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Process_NullRouteValue_RendersEmptyHiddenInputValue()
+    {
+        var model = new PaginationModel { RouteValues = new Dictionary<string, object?> { ["yearId"] = null } };
+
+        var (_, html) = Render(model);
+
+        Assert.Contains("""<input type="hidden" name="yearId" value="" />""", html, StringComparison.Ordinal);
+    }
+}
+
