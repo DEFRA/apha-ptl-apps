@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using PTL.Core.Configuration;
 using PTL.Core.Notifications;
 
 namespace PTL.Core.Invoice;
@@ -12,6 +13,7 @@ public sealed class InvoiceService(
     INotifyClient notifyClient,
     IOptions<InvoiceStorageOptions> storageOptions,
     IOptions<InvoiceNotificationOptions> notificationOptions,
+    IOptions<InternalOptions> internalOptions,
     ILogger<InvoiceService> logger) : IInvoiceService
 {
     private static readonly Action<ILogger, int, string, Exception?> LogGeneratedMessage =
@@ -136,8 +138,8 @@ public sealed class InvoiceService(
     private async Task NotifyRecipientsAsync(string stage, Guid generationId, string storageKey, DateTime generatedAt, CancellationToken cancellationToken)
     {
         var options = notificationOptions.Value;
-        LogDiagnosticMessage(logger, $"Stage={stage} TemplateId={options.TemplateId} RecipientCount={options.Recipients.Count}", null);
-        if (string.IsNullOrWhiteSpace(options.TemplateId) || options.Recipients.Count == 0)
+        LogDiagnosticMessage(logger, $"Stage={stage} TemplateId={InvoiceNotificationOptions.TemplateId} RecipientCount={options.Recipients.Count}", null);
+        if (options.Recipients.Count == 0)
         {
             return;
         }
@@ -149,7 +151,7 @@ public sealed class InvoiceService(
         var personalisation = new Dictionary<string, string>
         {
             ["generationDateTime"] = generatedAt.ToString("yyyy/MM/dd HH:mm:ss", CultureInfo.InvariantCulture),
-            ["downloadUrl"] = BuildDownloadUrl(options.DownloadBaseUrl, generationId)
+            ["downloadUrl"] = BuildDownloadUrl(internalOptions.Value.AppUrl, generationId)
         };
 
         foreach (var recipient in options.Recipients)
@@ -158,9 +160,9 @@ public sealed class InvoiceService(
             {
                 LogNotifySendingMessage(
                     logger,
-                    $"recipient={recipient} templateId={options.TemplateId} generationId={generationId} personalisation=[{string.Join(", ", personalisation.Select(p => $"{p.Key}={p.Value}"))}]",
+                    $"recipient={recipient} templateId={InvoiceNotificationOptions.TemplateId} generationId={generationId} personalisation=[{string.Join(", ", personalisation.Select(p => $"{p.Key}={p.Value}"))}]",
                     null);
-                await notifyClient.SendEmailAsync(options.TemplateId, recipient, personalisation, reference: storageKey, cancellationToken);
+                await notifyClient.SendEmailAsync(InvoiceNotificationOptions.TemplateId, recipient, personalisation, reference: storageKey, cancellationToken);
                 // The Notify client surfaces only whether the send threw, so "response" is logged
                 // as Accepted/Failed rather than an HTTP status.
                 LogDiagnosticMessage(logger, $"Stage={stage} NotifyResponse=Accepted Recipient={recipient}", null);
@@ -175,8 +177,8 @@ public sealed class InvoiceService(
         }
     }
 
-    private static string BuildDownloadUrl(string downloadBaseUrl, Guid generationId) =>
-        $"{downloadBaseUrl.TrimEnd('/')}/Invoice/Download/{generationId}";
+    private static string BuildDownloadUrl(string appUrl, Guid generationId) =>
+        $"{appUrl.TrimEnd('/')}/Invoice/Download/{generationId}";
 
     private string BuildGenerationPrefix(Guid generationId)
     {

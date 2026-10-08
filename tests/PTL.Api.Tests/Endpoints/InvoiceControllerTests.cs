@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Options;
 using PTL.Api.Controllers;
 using PTL.Api.Tests.Invoice;
+using PTL.Core.Configuration;
 using PTL.Core.Invoice;
 using PTL.Core.Lookup;
 
@@ -18,7 +19,8 @@ public class InvoiceControllerTests
             new FakeInvoiceStorageService(),
             new FakeNotifyClient(),
             Options.Create(new InvoiceStorageOptions()),
-            Options.Create(new InvoiceNotificationOptions { TemplateId = "template-1", Recipients = recipients ?? ["ops@example.com"] }),
+            Options.Create(new InvoiceNotificationOptions { Recipients = recipients ?? ["ops@example.com"] }),
+            Options.Create(new InternalOptions()),
             Microsoft.Extensions.Logging.Abstractions.NullLogger<InvoiceService>.Instance);
 
         return new InvoiceController(service, lookupService ?? new FakeLookupServiceForInvoice(), Options.Create(new InvoiceNotificationOptions { Recipients = recipients ?? ["ops@example.com"] }));
@@ -142,7 +144,8 @@ public class InvoiceControllerTests
             storage,
             new FakeNotifyClient(),
             Options.Create(new InvoiceStorageOptions()),
-            Options.Create(new InvoiceNotificationOptions { TemplateId = "template-1", Recipients = ["ops@example.com"] }),
+            Options.Create(new InvoiceNotificationOptions { Recipients = ["ops@example.com"] }),
+            Options.Create(new InternalOptions()),
             Microsoft.Extensions.Logging.Abstractions.NullLogger<InvoiceService>.Instance);
         var generationId = Guid.NewGuid();
         await storage.SaveAsync($"invoices/{generationId}/PT_Invoices_2026-01-01.csv", [1, 2, 3], "text/csv");
