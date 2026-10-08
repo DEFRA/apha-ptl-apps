@@ -6,8 +6,8 @@ using Microsoft.Extensions.Logging.Abstractions;
 using PTL.Contracts.Contract;
 using PTL.Core.Contract.Document;
 using PTL.Core.Contract.Export.Templates;
-using PTL.SharedUI.Notifications;
 using PTL.InternalWeb.Tests.TestSupport;
+using PTL.SharedUI.Notifications;
 
 namespace PTL.InternalWeb.Tests.Features.Contract;
 

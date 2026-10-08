@@ -3,8 +3,8 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ViewFeatures;
 using Microsoft.Extensions.Logging.Abstractions;
 using PTL.Contracts.Participant;
-using PTL.SharedUI.Notifications;
 using PTL.InternalWeb.Tests.TestSupport;
+using PTL.SharedUI.Notifications;
 
 namespace PTL.InternalWeb.Tests.Features.Participant;
 
