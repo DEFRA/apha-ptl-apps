@@ -276,7 +276,7 @@ public sealed class SchemeRepository(IDbConnectionFactory connectionFactory) : I
 
         foreach (var link in existingLinks.Where(l => !requested.Contains(l.ItemId)))
         {
-            await connection.ExecuteAsync(deleteSql, new { LinkId = link.LinkId });
+            await connection.ExecuteAsync(deleteSql, new { link.LinkId });
         }
 
         var alreadyLinked = existingLinks.Select(l => l.ItemId).ToHashSet();

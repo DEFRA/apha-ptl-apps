@@ -8,13 +8,13 @@ using PTL.Core.Notifications;
 using PTL.Core.Participant;
 using PTL.Core.Scheme;
 using PTL.Core.Viewer;
-using CoreScheme = PTL.Core.Scheme.Scheme;
 using PTL.Data.Infrastructure;
 using PTL.Data.Notifications;
 using PTL.Data.Participant;
 using PTL.Data.Storage;
 using PTL.Data.Tests.Fakes;
 using PTL.Data.Viewer;
+using CoreScheme = PTL.Core.Scheme.Scheme;
 
 namespace PTL.Data.Tests;
 

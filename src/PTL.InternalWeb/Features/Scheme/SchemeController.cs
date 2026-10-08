@@ -164,10 +164,6 @@ public class SchemeController(ISchemeApiClient schemeApiClient, ILookupApiClient
     public Task<IActionResult> Create(CancellationToken cancellationToken) =>
         CreateForYearAsync(currentYear: false, cancellationToken);
 
-    [HttpGet]
-    public Task<IActionResult> CreateForCurrentYear(CancellationToken cancellationToken) =>
-        CreateForYearAsync(currentYear: true, cancellationToken);
-
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Create(SchemeFormViewModel model, string? testCommand = null, Guid? selectedItemTypeId = null, CancellationToken cancellationToken = default)
@@ -206,6 +202,10 @@ public class SchemeController(ISchemeApiClient schemeApiClient, ILookupApiClient
         TempData.SetNotification(NotificationType.Success, "Scheme created successfully.");
         return RedirectToAction(nameof(Details), new { id = result.Scheme.SchemeId });
     }
+
+    [HttpGet]
+    public Task<IActionResult> CreateForCurrentYear(CancellationToken cancellationToken) =>
+        CreateForYearAsync(currentYear: true, cancellationToken);
 
     private async Task<IActionResult> CreateForYearAsync(bool currentYear, CancellationToken cancellationToken)
     {
