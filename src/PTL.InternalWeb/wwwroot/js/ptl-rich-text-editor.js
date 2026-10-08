@@ -54,8 +54,6 @@
                 });
 
                 // The error summary links to the field id, so focus has to reach the editor.
-                // container.dataset assignment (not optional chaining) is required here since the
-                // guard protects an assignment target, and `container?.dataset.x = y` is invalid JS.
                 editor.on('init', function () {
                     var container = editor.getContainer();
                     if (container) {
@@ -68,7 +66,7 @@
 
     editors.forEach(function (textarea) {
         var panel = textarea.closest('.govuk-tabs__panel');
-        if (!panel || !panel.classList.contains('govuk-tabs__panel--hidden')) {
+        if (!panel?.classList.contains('govuk-tabs__panel--hidden')) {
             initEditor(textarea);
             return;
         }
