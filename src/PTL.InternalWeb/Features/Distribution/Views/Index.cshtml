@@ -62,7 +62,7 @@
                             <div class="ptl-progress-bar__fill" style="width: @(month.SchedulingCompletePercentage)%"></div>
                         </div>
                         <span class="govuk-body-s ptl-progress-bar__label">@month.SchedulingCompletePercentage%</span><br />
-                        <a class="govuk-link" asp-action="ViewStage" asp-route-stage="Scheduling">View<span class="govuk-visually-hidden"> Scheduling for @month.MonthDescription</span></a>
+                        <a class="govuk-link" asp-action="Schedule" asp-route-year="@month.YearId" asp-route-monthId="@month.MonthId">View<span class="govuk-visually-hidden"> Scheduling for @month.MonthDescription</span></a>
                     </td>
                     <td class="govuk-table__cell">
                         <div class="ptl-progress-bar" role="progressbar" aria-label="Preparation" aria-valuenow="@month.PreparationCompletePercentage" aria-valuemin="0" aria-valuemax="100" aria-valuetext="@(month.PreparationCompletePercentage)% complete">

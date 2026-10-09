@@ -55,4 +55,31 @@ public class DistributionApiClientTests
 
         Assert.Empty(result);
     }
+
+    [Fact]
+    public async Task GetScheduleAsync_ReturnsDeserializedResponse()
+    {
+        const string json = """
+            {"monthlyDistributionId":"11111111-1111-1111-1111-111111111111","yearId":2026,"monthId":4,"schemes":[]}
+            """;
+        var client = CreateClient(HttpStatusCode.OK, json);
+
+        var result = await client.GetScheduleAsync(2026, 4);
+
+        Assert.NotNull(result);
+        Assert.Equal(2026, result!.YearId);
+        Assert.Empty(result.Schemes);
+    }
+
+    [Fact]
+    public async Task SaveScheduleAsync_ReturnsDeserializedResult()
+    {
+        const string json = """{"success":true,"fieldErrorsBySchemeId":{}}""";
+        var client = CreateClient(HttpStatusCode.OK, json);
+
+        var result = await client.SaveScheduleAsync(2026, 4, []);
+
+        Assert.NotNull(result);
+        Assert.True(result!.Success);
+    }
 }

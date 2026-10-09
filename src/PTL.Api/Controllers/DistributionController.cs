@@ -30,6 +30,57 @@ public sealed class DistributionController(IDistributionService distributionServ
         return Ok(years.Select(y => new DistributionYearOptionResponse(y.YearId, y.Label)).ToList());
     }
 
+    // GET /api/distributions/months/{yearId}/{monthId}/schedule - the Monthly Distributions
+    // (Scheduling) screen, legacy MonthlyDistribution.FetchMonthlyDistribution(yearId, monthId).
+    [HttpGet("months/{yearId:int}/{monthId:int}/schedule")]
+    public async Task<ActionResult<MonthlyDistributionResponse>> GetSchedule(int yearId, int monthId, CancellationToken cancellationToken)
+    {
+        var result = await distributionService.GetMonthlyDistributionSchedulesAsync(yearId, monthId, cancellationToken);
+        if (result is null)
+        {
+            return Ok(new MonthlyDistributionResponse(null, yearId, monthId, []));
+        }
+
+        var schemes = result.Value.Schemes.Select(ToResponse).ToList();
+        return Ok(new MonthlyDistributionResponse(result.Value.MonthlyDistributionId, yearId, monthId, schemes));
+    }
+
+    // PUT /api/distributions/months/{yearId}/{monthId}/schedule - legacy MonthlyDistribution.
+    // Save() (ButtonSave_Click/ButtonApply_Click), which persists every row in one logical unit.
+    [HttpPut("months/{yearId:int}/{monthId:int}/schedule")]
+    public async Task<ActionResult<MonthlyDistributionScheduleSaveResult>> SaveSchedule(
+        int yearId, int monthId, [FromBody] IReadOnlyList<MonthlyDistributionScheduleRowRequest> rows, CancellationToken cancellationToken)
+    {
+        var updates = rows.Select(r => new MonthlyDistributionScheduleRowUpdate(
+            r.MonthlyDistributionSchemeId, r.DistributionDate, r.OverseasPostingDate, r.DeadlineDate, r.ResultsIssueTargetDate, r.IsCancelled)).ToList();
+
+        var outcome = await distributionService.SaveMonthlyDistributionScheduleAsync(yearId, monthId, updates, cancellationToken);
+
+        var fieldErrors = outcome.FieldErrorsBySchemeId.ToDictionary(
+            kvp => kvp.Key,
+            kvp => kvp.Value.Select(e => e.Message).ToArray());
+
+        return Ok(new MonthlyDistributionScheduleSaveResult(outcome.Success, fieldErrors));
+    }
+
+    private static MonthlyDistributionSchemeResponse ToResponse(MonthlyDistributionSchemeEntity scheme) =>
+        new(
+            scheme.MonthlyDistributionSchemeId,
+            scheme.SchemeId,
+            scheme.SchemeIdentifier,
+            scheme.SchemeName,
+            scheme.DistributionReferenceFull,
+            scheme.DistributionDate,
+            scheme.OverseasPostingDate,
+            scheme.DeadlineDate,
+            scheme.ResultsIssueTargetDate,
+            scheme.ParticipantCount,
+            scheme.TotalSetsOfSamplesRequired,
+            scheme.HasSampleNumbersDefined,
+            scheme.HasIntendedResults,
+            scheme.IsCancelled,
+            scheme.IsAsAvailable);
+
     private static DistributionDashboardMonthResponse ToResponse(DistributionDashboardMonth month) =>
         new(
             month.YearId,

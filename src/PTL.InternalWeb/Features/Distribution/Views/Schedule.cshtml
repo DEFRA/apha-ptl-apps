@@ -1,0 +1,121 @@
+@model PTL.InternalWeb.Features.Distribution.MonthlyDistributionScheduleViewModel
+@{
+    ViewData["Title"] = $"Monthly Distributions - {Model.MonthYearLabel}";
+
+    // Hand-rolled to match the GOV.UK Design System error summary exactly - see
+    // PTL.InternalWeb/Features/Customer/Views/_CustomerForm.cshtml for the reference pattern this follows.
+    var errors = ViewData.ModelState
+        .Where(entry => entry.Value?.Errors.Count > 0)
+        .SelectMany(entry => entry.Value!.Errors.Select(error => (Field: entry.Key, Message: error.ErrorMessage)))
+        .ToList();
+}
+
+<a class="govuk-back-link" asp-action="Index" asp-route-year="@Model.YearId">Back</a>
+
+<h1 class="govuk-heading-l">Monthly Distributions - @Model.MonthYearLabel</h1>
+
+<p class="govuk-body">This page shows all of the Schemes that have a Distribution for the selected month.</p>
+
+<govuk-error-summary errors="@errors" />
+
+<form method="post" asp-action="Schedule" asp-route-year="@Model.YearId" asp-route-monthId="@Model.MonthId">
+    @Html.AntiForgeryToken()
+    <input type="hidden" asp-for="YearId" />
+    <input type="hidden" asp-for="MonthId" />
+
+    @if (Model.Schemes.Count == 0)
+    {
+        <p class="govuk-body">There are no schemes set to be distributed this month.</p>
+    }
+    else
+    {
+        for (var i = 0; i < Model.Schemes.Count; i++)
+        {
+            var scheme = Model.Schemes[i];
+            <input type="hidden" asp-for="Schemes[i].MonthlyDistributionSchemeId" />
+            <input type="hidden" asp-for="Schemes[i].SchemeIdentifier" />
+            <input type="hidden" asp-for="Schemes[i].SchemeName" />
+            <input type="hidden" asp-for="Schemes[i].DistributionReferenceFull" />
+            <input type="hidden" asp-for="Schemes[i].IsCancelled" />
+            <input type="hidden" asp-for="Schemes[i].IsAsAvailable" />
+            <input type="hidden" asp-for="Schemes[i].ParticipantCount" />
+            <input type="hidden" asp-for="Schemes[i].TotalSetsOfSamplesRequired" />
+            <input type="hidden" asp-for="Schemes[i].HasSampleNumbersDefined" />
+            <input type="hidden" asp-for="Schemes[i].HasIntendedResults" />
+
+            <div class="govuk-!-margin-bottom-6 govuk-!-padding-bottom-4" style="border-bottom: 1px solid #b1b4b6;">
+                <h2 class="govuk-heading-m govuk-!-margin-bottom-2">
+                    @scheme.SchemeHeading
+                    <span class="govuk-body-s govuk-!-font-weight-regular">@scheme.DistributionReferenceFull</span>
+                </h2>
+
+                <h3 class="govuk-heading-s govuk-!-margin-bottom-2">Dates</h3>
+                <div class="govuk-grid-row">
+                    <div class="govuk-grid-column-one-quarter">
+                        <govuk-input asp-for="Schemes[i].DistributionDate" label="Distribution" type="date" input-class="govuk-input govuk-input--width-10" />
+                    </div>
+                    <div class="govuk-grid-column-one-quarter">
+                        <govuk-input asp-for="Schemes[i].OverseasPostingDate" label="O/seas Posting" type="date" input-class="govuk-input govuk-input--width-10" />
+                    </div>
+                    <div class="govuk-grid-column-one-quarter">
+                        <govuk-input asp-for="Schemes[i].DeadlineDate" label="Deadline" type="date" input-class="govuk-input govuk-input--width-10" />
+                    </div>
+                    <div class="govuk-grid-column-one-quarter">
+                        <govuk-input asp-for="Schemes[i].ResultsIssueTargetDate" label="Results" type="date" input-class="govuk-input govuk-input--width-10" />
+                    </div>
+                </div>
+
+                <h3 class="govuk-heading-s govuk-!-margin-bottom-2">Participants</h3>
+                <p class="govuk-body">
+                    <a class="govuk-link" asp-action="ViewStage" asp-route-stage="Participants">View Participants<span class="govuk-visually-hidden"> for @scheme.SchemeHeading</span></a>
+                    &mdash; @scheme.ParticipantCountLabel
+                    <br />
+                    Total number of sets of samples: @scheme.TotalSetsOfSamplesRequired
+                </p>
+
+                <h3 class="govuk-heading-s govuk-!-margin-bottom-2">Actions</h3>
+                <ul class="govuk-list">
+                    <li>
+                        @if (scheme.SampleNumbersLinkEnabled)
+                        {
+                            <a class="govuk-link" asp-action="ViewStage" asp-route-stage="Sample Numbers" title="@PTL.InternalWeb.Features.Distribution.MonthlyDistributionScheduleRowViewModel.SampleNumbersTooltip">@scheme.SampleNumbersLinkText<span class="govuk-visually-hidden"> for @scheme.SchemeHeading</span></a>
+                        }
+                        else
+                        {
+                            <span class="govuk-hint govuk-!-margin-bottom-0">@scheme.SampleNumbersLinkText<span class="govuk-visually-hidden"> for @scheme.SchemeHeading</span></span>
+                            <p class="govuk-hint govuk-body-s govuk-!-margin-bottom-0">@scheme.SampleNumbersDisabledTooltip</p>
+                        }
+                    </li>
+                    <li>
+                        @if (scheme.IntendedResultsLinkEnabled)
+                        {
+                            <a class="govuk-link" asp-action="ViewStage" asp-route-stage="Intended Results" title="@scheme.IntendedResultsTooltip">View Intended Results<span class="govuk-visually-hidden"> for @scheme.SchemeHeading</span></a>
+                        }
+                        else
+                        {
+                            <span class="govuk-hint govuk-!-margin-bottom-0">View Intended Results<span class="govuk-visually-hidden"> for @scheme.SchemeHeading</span></span>
+                            <p class="govuk-hint govuk-body-s govuk-!-margin-bottom-0">@scheme.IntendedResultsTooltip</p>
+                        }
+                    </li>
+                    @if (scheme.ShowCancelCommenceLink)
+                    {
+                        <li>
+                            <button type="submit" class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0"
+                                    formaction="@Url.Action("ToggleCancelled", new { year = Model.YearId, monthId = Model.MonthId, schemeId = scheme.MonthlyDistributionSchemeId })"
+                                    formnovalidate
+                                    data-module="govuk-button"
+                                    onclick="return confirm('@scheme.CancelCommenceConfirmText');">
+                                @scheme.CancelCommenceLinkText<span class="govuk-visually-hidden"> for @scheme.SchemeHeading</span>
+                            </button>
+                        </li>
+                    }
+                </ul>
+            </div>
+        }
+    }
+
+    <div class="govuk-button-group">
+        <button type="submit" name="command" value="save" class="govuk-button" data-module="govuk-button">Save</button>
+        <a class="govuk-button govuk-button--secondary" data-module="govuk-button" asp-action="Index" asp-route-year="@Model.YearId">Cancel</a>
+    </div>
+</form>

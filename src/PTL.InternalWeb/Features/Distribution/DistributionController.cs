@@ -5,15 +5,17 @@ using PTL.Contracts.Distribution;
 
 namespace PTL.InternalWeb.Features.Distribution;
 
-// Distribution Dashboard (legacy Distributions/MenuDistributions.aspx) - see
+// Distribution Dashboard and Monthly Distributions (Scheduling) - legacy
+// Distributions/MenuDistributions.aspx and Scheduling/monthlys.aspx - see
 // docs/analysis/distribution-analysis.md and docs/migration/distribution-migration.md.
 //
-// SCOPE: only the dashboard itself (year selection, month rows, progress indicators, the
-// "Initialise this Month" action's visibility/confirmation, and navigation) is implemented. The
-// five "View" links (Scheduling/Preparation/Packaging/Results/Tabulations) and the Initialise
-// action itself are placeholders - see ViewStage/InitialiseMonth below - because those workflows
-// (and the exact legacy persisted-save chain behind "Initialise this Month") are out of scope for
-// this story and are flagged [NEEDS INVESTIGATION] in docs/migration/distribution-migration.md.
+// SCOPE: the Dashboard (year selection, month rows, progress indicators, "Initialise this Month"
+// visibility/confirmation) and the Monthly Distributions scheduling screen (dates, Cancel/
+// Commence, Save/Apply/Cancel) are implemented. The Preparation/Packaging/Results/Tabulations
+// "View" links, the Sample Numbers/Intended Results/Participants links reached FROM Scheduling,
+// and "Initialise this Month" itself all remain placeholders (ViewStage/InitialiseMonth below) -
+// those workflows (and the exact legacy persisted-save chain behind Initialise) are out of scope
+// and flagged [NEEDS INVESTIGATION] in docs/migration/distribution-migration.md.
 public sealed class DistributionController(IDistributionApiClient distributionApiClient) : Controller
 {
     private static readonly string[] MonthOrder = ["Scheduling", "Preparation", "Packaging", "Results", "Tabulations"];
@@ -41,8 +43,9 @@ public sealed class DistributionController(IDistributionApiClient distributionAp
         return View(model);
     }
 
-    // Placeholder for every "View" link (Scheduling/Preparation/Packaging/Results/Tabulations) -
-    // these workflows are not yet migrated; see class remarks.
+    // Placeholder for every "View" link not yet migrated (Preparation/Packaging/Results/
+    // Tabulations, plus the Sample Numbers/Intended Results/Participants links on the Scheduling
+    // screen below, which all open workflows out of scope for this story) - see class remarks.
     [HttpGet]
     public IActionResult ViewStage(string stage)
     {
@@ -61,6 +64,125 @@ public sealed class DistributionController(IDistributionApiClient distributionAp
     {
         return View("FeatureNotAvailable", "Initialise This Month");
     }
+
+    // Monthly Distributions (Scheduling) - legacy Scheduling/monthlys.aspx. Reached from the
+    // Dashboard's "Scheduling: View" link once a month is initialised.
+    [HttpGet]
+    public async Task<IActionResult> Schedule(int year, int monthId, CancellationToken cancellationToken)
+    {
+        var schedule = await distributionApiClient.GetScheduleAsync(year, monthId, cancellationToken);
+        if (schedule is null || schedule.MonthlyDistributionId is null)
+        {
+            return NotFound();
+        }
+
+        return View(ToScheduleViewModel(year, monthId, schedule));
+    }
+
+    // Save = persist then leave (legacy ButtonSave_Click -> Save() -> LeavePage()).
+    // Apply = persist then stay, re-reading fresh data from the database (legacy
+    // ButtonApply_Click -> Save() -> LoadMonth(True)).
+    // Cancel = discard then leave, no save at all (legacy ButtonCancel_Click -> LeavePage()).
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Schedule(int year, int monthId, MonthlyDistributionScheduleViewModel model, string command, CancellationToken cancellationToken)
+    {
+        if (string.Equals(command, "cancel", StringComparison.OrdinalIgnoreCase))
+        {
+            return RedirectToAction(nameof(Index));
+        }
+
+        if (!ModelState.IsValid)
+        {
+            model.YearId = year;
+            model.MonthId = monthId;
+            return View(model);
+        }
+
+        var rows = model.Schemes.Select(ToRowRequest).ToList();
+        var result = await distributionApiClient.SaveScheduleAsync(year, monthId, rows, cancellationToken);
+
+        if (result is null || !result.Success)
+        {
+            foreach (var (schemeId, messages) in result?.FieldErrorsBySchemeId ?? new Dictionary<Guid, string[]>())
+            {
+                var index = model.Schemes.FindIndex(s => s.MonthlyDistributionSchemeId == schemeId);
+                if (index < 0)
+                {
+                    continue;
+                }
+
+                foreach (var message in messages)
+                {
+                    ModelState.AddModelError($"{nameof(model.Schemes)}[{index}]", message);
+                }
+            }
+
+            model.YearId = year;
+            model.MonthId = monthId;
+            return View(model);
+        }
+
+        if (string.Equals(command, "apply", StringComparison.OrdinalIgnoreCase))
+        {
+            return RedirectToAction(nameof(Schedule), new { year, monthId });
+        }
+
+        return RedirectToAction(nameof(Index));
+    }
+
+    // Preserves the legacy Cancel/Commence toggle exactly: dlMonth_RowCommand only flips the
+    // in-memory IsCancelled flag and redisplays the page from ViewState - it does NOT save to the
+    // database and does NOT discard any other unsaved date edits already typed into the form. The
+    // posted model already carries every other row's current (possibly unsaved) values, so
+    // re-rendering it after flipping just the one row reproduces that behaviour without any
+    // server-side state beyond this one request.
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public IActionResult ToggleCancelled(int year, int monthId, Guid schemeId, MonthlyDistributionScheduleViewModel model)
+    {
+        ModelState.Clear();
+        var row = model.Schemes.FirstOrDefault(s => s.MonthlyDistributionSchemeId == schemeId);
+        if (row is not null)
+        {
+            row.IsCancelled = !row.IsCancelled;
+        }
+
+        model.YearId = year;
+        model.MonthId = monthId;
+        return View(nameof(Schedule), model);
+    }
+
+    private static MonthlyDistributionScheduleRowRequest ToRowRequest(MonthlyDistributionScheduleRowViewModel row) =>
+        new(row.MonthlyDistributionSchemeId, row.DistributionDate!.Value, row.OverseasPostingDate!.Value, row.DeadlineDate!.Value, row.ResultsIssueTargetDate!.Value, row.IsCancelled);
+
+    private static MonthlyDistributionScheduleViewModel ToScheduleViewModel(int year, int monthId, MonthlyDistributionResponse schedule) =>
+        new()
+        {
+            YearId = year,
+            MonthId = monthId,
+            MonthYearLabel = new DateTime(year, monthId, 1).ToString("MMM yyyy", System.Globalization.CultureInfo.InvariantCulture),
+            Schemes = [.. schedule.Schemes.Select(ToRowViewModel)],
+        };
+
+    private static MonthlyDistributionScheduleRowViewModel ToRowViewModel(MonthlyDistributionSchemeResponse scheme) =>
+        new()
+        {
+            MonthlyDistributionSchemeId = scheme.MonthlyDistributionSchemeId,
+            SchemeIdentifier = scheme.SchemeIdentifier,
+            SchemeName = scheme.SchemeName,
+            DistributionReferenceFull = scheme.DistributionReferenceFull,
+            DistributionDate = scheme.DistributionDate,
+            OverseasPostingDate = scheme.OverseasPostingDate,
+            DeadlineDate = scheme.DeadlineDate,
+            ResultsIssueTargetDate = scheme.ResultsIssueTargetDate,
+            IsCancelled = scheme.IsCancelled,
+            IsAsAvailable = scheme.IsAsAvailable,
+            ParticipantCount = scheme.ParticipantCount,
+            TotalSetsOfSamplesRequired = scheme.TotalSetsOfSamplesRequired,
+            HasSampleNumbersDefined = scheme.HasSampleNumbersDefined,
+            HasIntendedResults = scheme.HasIntendedResults,
+        };
 
     private static DistributionDashboardMonthRowViewModel ToRow(DistributionDashboardMonthResponse month) =>
         new(

@@ -67,4 +67,167 @@ public class DistributionControllerTests
         Assert.Equal("FeatureNotAvailable", view.ViewName);
         Assert.Equal("Initialise This Month", view.Model);
     }
+
+    [Fact]
+    public async Task Schedule_Get_MonthNotInitialised_ReturnsNotFound()
+    {
+        var apiClient = new FakeDistributionApiClient { Schedule = new MonthlyDistributionResponse(null, 2026, 4, []) };
+        var controller = new DistributionController(apiClient);
+
+        var result = await controller.Schedule(2026, 4, CancellationToken.None);
+
+        Assert.IsType<NotFoundResult>(result);
+    }
+
+    [Fact]
+    public async Task Schedule_Get_MonthInitialised_ReturnsViewModelWithSchemes()
+    {
+        var schemeId = Guid.NewGuid();
+        var apiClient = new FakeDistributionApiClient
+        {
+            Schedule = new MonthlyDistributionResponse(Guid.NewGuid(), 2026, 4,
+            [
+                new MonthlyDistributionSchemeResponse(schemeId, Guid.NewGuid(), "S001", "Test Scheme", "D26-01A",
+                    new DateTime(2026, 4, 1), new DateTime(2026, 4, 1), new DateTime(2026, 4, 5), new DateTime(2026, 4, 10),
+                    3, 5, true, false, false, false),
+            ]),
+        };
+        var controller = new DistributionController(apiClient);
+
+        var result = await controller.Schedule(2026, 4, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<MonthlyDistributionScheduleViewModel>(view.Model);
+        Assert.Equal("Apr 2026", model.MonthYearLabel);
+        var row = Assert.Single(model.Schemes);
+        Assert.Equal(schemeId, row.MonthlyDistributionSchemeId);
+        Assert.Equal("D26-01A", row.DistributionReferenceFull);
+    }
+
+    [Fact]
+    public async Task Schedule_Post_CancelCommand_RedirectsWithoutSaving()
+    {
+        var apiClient = new FakeDistributionApiClient();
+        var controller = new DistributionController(apiClient);
+        var model = new MonthlyDistributionScheduleViewModel { YearId = 2026, MonthId = 4 };
+
+        var result = await controller.Schedule(2026, 4, model, "cancel", CancellationToken.None);
+
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal(nameof(DistributionController.Index), redirect.ActionName);
+        Assert.Empty(apiClient.SavedRows);
+    }
+
+    [Fact]
+    public async Task Schedule_Post_InvalidModelState_RedisplaysViewWithoutSaving()
+    {
+        var apiClient = new FakeDistributionApiClient();
+        var controller = new DistributionController(apiClient);
+        controller.ModelState.AddModelError("Schemes[0].DistributionDate", "Distribution Date required.");
+        var model = new MonthlyDistributionScheduleViewModel { YearId = 2026, MonthId = 4 };
+
+        var result = await controller.Schedule(2026, 4, model, "save", CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        Assert.Same(model, view.Model);
+        Assert.Empty(apiClient.SavedRows);
+    }
+
+    [Fact]
+    public async Task Schedule_Post_SaveCommand_ValidModel_PersistsAndRedirectsToIndex()
+    {
+        var schemeId = Guid.NewGuid();
+        var apiClient = new FakeDistributionApiClient { SaveResult = new MonthlyDistributionScheduleSaveResult(true, new Dictionary<Guid, string[]>()) };
+        var controller = new DistributionController(apiClient);
+        var model = new MonthlyDistributionScheduleViewModel
+        {
+            YearId = 2026,
+            MonthId = 4,
+            Schemes =
+            [
+                new MonthlyDistributionScheduleRowViewModel
+                {
+                    MonthlyDistributionSchemeId = schemeId,
+                    DistributionDate = new DateTime(2026, 4, 1),
+                    OverseasPostingDate = new DateTime(2026, 4, 1),
+                    DeadlineDate = new DateTime(2026, 4, 5),
+                    ResultsIssueTargetDate = new DateTime(2026, 4, 10),
+                },
+            ],
+        };
+
+        var result = await controller.Schedule(2026, 4, model, "save", CancellationToken.None);
+
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal(nameof(DistributionController.Index), redirect.ActionName);
+        Assert.Single(apiClient.SavedRows);
+    }
+
+    [Fact]
+    public async Task Schedule_Post_ApplyCommand_ValidModel_RedirectsBackToSchedule()
+    {
+        var apiClient = new FakeDistributionApiClient { SaveResult = new MonthlyDistributionScheduleSaveResult(true, new Dictionary<Guid, string[]>()) };
+        var controller = new DistributionController(apiClient);
+        var model = new MonthlyDistributionScheduleViewModel { YearId = 2026, MonthId = 4, Schemes = [] };
+
+        var result = await controller.Schedule(2026, 4, model, "apply", CancellationToken.None);
+
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal(nameof(DistributionController.Schedule), redirect.ActionName);
+    }
+
+    [Fact]
+    public async Task Schedule_Post_SaveFails_RedisplaysViewWithFieldErrors()
+    {
+        var schemeId = Guid.NewGuid();
+        var apiClient = new FakeDistributionApiClient
+        {
+            SaveResult = new MonthlyDistributionScheduleSaveResult(false, new Dictionary<Guid, string[]> { [schemeId] = ["Deadline Date needs to be after the UK Posting date."] }),
+        };
+        var controller = new DistributionController(apiClient);
+        var model = new MonthlyDistributionScheduleViewModel
+        {
+            YearId = 2026,
+            MonthId = 4,
+            Schemes =
+            [
+                new MonthlyDistributionScheduleRowViewModel
+                {
+                    MonthlyDistributionSchemeId = schemeId,
+                    DistributionDate = new DateTime(2026, 4, 1),
+                    OverseasPostingDate = new DateTime(2026, 4, 1),
+                    DeadlineDate = new DateTime(2026, 3, 30),
+                    ResultsIssueTargetDate = new DateTime(2026, 4, 10),
+                },
+            ],
+        };
+
+        var result = await controller.Schedule(2026, 4, model, "save", CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        Assert.Same(model, view.Model);
+        Assert.False(controller.ModelState.IsValid);
+    }
+
+    [Fact]
+    public void ToggleCancelled_FlipsMatchingRowAndRedisplaysWithoutSaving()
+    {
+        var schemeId = Guid.NewGuid();
+        var apiClient = new FakeDistributionApiClient();
+        var controller = new DistributionController(apiClient);
+        var model = new MonthlyDistributionScheduleViewModel
+        {
+            YearId = 2026,
+            MonthId = 4,
+            Schemes = [new MonthlyDistributionScheduleRowViewModel { MonthlyDistributionSchemeId = schemeId, IsCancelled = false }],
+        };
+
+        var result = controller.ToggleCancelled(2026, 4, schemeId, model);
+
+        var view = Assert.IsType<ViewResult>(result);
+        Assert.Equal("Schedule", view.ViewName);
+        var updatedModel = Assert.IsType<MonthlyDistributionScheduleViewModel>(view.Model);
+        Assert.True(updatedModel.Schemes.Single().IsCancelled);
+        Assert.Empty(apiClient.SavedRows);
+    }
 }

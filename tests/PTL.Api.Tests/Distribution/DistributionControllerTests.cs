@@ -63,4 +63,65 @@ public class DistributionControllerTests
         var years = Assert.IsType<IReadOnlyList<DistributionYearOptionResponse>>(ok.Value, exactMatch: false);
         Assert.Contains(years, y => y.YearId == 2026 && y.Label == "2026/27");
     }
+
+    [Fact]
+    public async Task GetSchedule_MonthNotInitialised_ReturnsEmptyResponseWithNullId()
+    {
+        var repository = new FakeDistributionRepository();
+        var controller = CreateController(repository);
+
+        var result = await controller.GetSchedule(2026, 4, CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var response = Assert.IsType<MonthlyDistributionResponse>(ok.Value);
+        Assert.Null(response.MonthlyDistributionId);
+        Assert.Empty(response.Schemes);
+    }
+
+    [Fact]
+    public async Task GetSchedule_MonthInitialised_ReturnsMappedSchemes()
+    {
+        var monthlyDistributionId = Guid.NewGuid();
+        var schemeId = Guid.NewGuid();
+        var repository = new FakeDistributionRepository();
+        repository.Schedules[(2026, 4)] = (monthlyDistributionId, [new MonthlyDistributionSchemeEntity
+        {
+            MonthlyDistributionSchemeId = schemeId,
+            SchemeIdentifier = "S001",
+            SchemeName = "Test Scheme",
+            DistributionReference = "D26-01",
+            DistributionReferenceSuffix = "A",
+            ScheduleCode = "BA",
+        }]);
+        var controller = CreateController(repository);
+
+        var result = await controller.GetSchedule(2026, 4, CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var response = Assert.IsType<MonthlyDistributionResponse>(ok.Value);
+        Assert.Equal(monthlyDistributionId, response.MonthlyDistributionId);
+        var scheme = Assert.Single(response.Schemes);
+        Assert.Equal("D26-01A/BA", scheme.DistributionReferenceFull);
+    }
+
+    [Fact]
+    public async Task SaveSchedule_InvalidRow_ReturnsUnsuccessfulWithFieldErrors()
+    {
+        var schemeId = Guid.NewGuid();
+        var repository = new FakeDistributionRepository();
+        repository.Schedules[(2026, 4)] = (Guid.NewGuid(), [new MonthlyDistributionSchemeEntity { MonthlyDistributionSchemeId = schemeId }]);
+        var controller = CreateController(repository);
+
+        var rows = new List<MonthlyDistributionScheduleRowRequest>
+        {
+            new(schemeId, new DateTime(2026, 4, 1), new DateTime(2026, 4, 1), new DateTime(2026, 3, 30), new DateTime(2026, 4, 10), false),
+        };
+
+        var result = await controller.SaveSchedule(2026, 4, rows, CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var response = Assert.IsType<MonthlyDistributionScheduleSaveResult>(ok.Value);
+        Assert.False(response.Success);
+        Assert.True(response.FieldErrorsBySchemeId.ContainsKey(schemeId));
+    }
 }

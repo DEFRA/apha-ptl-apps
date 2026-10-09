@@ -19,4 +19,16 @@ public sealed class DistributionApiClient(HttpClient httpClient) : IDistribution
             "/api/distributions/years", cancellationToken);
         return years ?? [];
     }
+
+    public async Task<MonthlyDistributionResponse?> GetScheduleAsync(int yearId, int monthId, CancellationToken cancellationToken = default) =>
+        await httpClient.GetFromJsonAsync<MonthlyDistributionResponse>(
+            $"/api/distributions/months/{yearId}/{monthId}/schedule", cancellationToken);
+
+    public async Task<MonthlyDistributionScheduleSaveResult?> SaveScheduleAsync(
+        int yearId, int monthId, IReadOnlyList<MonthlyDistributionScheduleRowRequest> rows, CancellationToken cancellationToken = default)
+    {
+        var response = await httpClient.PutAsJsonAsync($"/api/distributions/months/{yearId}/{monthId}/schedule", rows, cancellationToken);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<MonthlyDistributionScheduleSaveResult>(cancellationToken);
+    }
 }

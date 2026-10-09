@@ -258,11 +258,13 @@ public static class SideNavigationProvider
             Children =
             [
                 // Legacy sitemap siblings of MenuDistributions.aspx - not implemented yet (only
-                // the dashboard itself is in scope for this story), shown disabled so the overall
-                // menu shape matches legacy until each is migrated.
+                // the dashboard and Monthly Distributions scheduling screen are in scope for this
+                // story), shown disabled so the overall menu shape matches legacy until each is
+                // migrated.
                 Disabled("Participant Address Labels"),
                 Disabled("Group Address Labels"),
-                Disabled("Search")
+                Disabled("Search"),
+                new SideNavigationItem { Text = "Monthly Distributions", ControllerName = DistributionControllerName, ActionName = "Schedule", IsHidden = true }
             ]
         },
         Disabled("Test Consultant"),

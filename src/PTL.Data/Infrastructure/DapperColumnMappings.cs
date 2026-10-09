@@ -676,6 +676,42 @@ public static class DapperColumnMappings
             ["fldMonthId"] = nameof(DistributionMonthYearEntity.MonthId),
         });
 
+        Map<PTL.Data.Distribution.MonthlyDistributionHeaderEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldMonthlyDistributionId"] = nameof(PTL.Data.Distribution.MonthlyDistributionHeaderEntity.MonthlyDistributionId),
+            [ColYearId] = nameof(PTL.Data.Distribution.MonthlyDistributionHeaderEntity.YearId),
+            ["fldMonthId"] = nameof(PTL.Data.Distribution.MonthlyDistributionHeaderEntity.MonthId),
+        });
+
+        Map<MonthlyDistributionSchemeEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldMonthlyDistributionSchemeId"] = nameof(MonthlyDistributionSchemeEntity.MonthlyDistributionSchemeId),
+            ["fldMonthlyDistributionId"] = nameof(MonthlyDistributionSchemeEntity.MonthlyDistributionId),
+            [ColSchemeId] = nameof(MonthlyDistributionSchemeEntity.SchemeId),
+            ["SchemeIdentifier"] = nameof(MonthlyDistributionSchemeEntity.SchemeIdentifier),
+            ["SchemeName"] = nameof(MonthlyDistributionSchemeEntity.SchemeName),
+            ["fldDistributionReference"] = nameof(MonthlyDistributionSchemeEntity.DistributionReference),
+            ["fldDistributionReferenceSuffix"] = nameof(MonthlyDistributionSchemeEntity.DistributionReferenceSuffix),
+            ["fldScheduleCode"] = nameof(MonthlyDistributionSchemeEntity.ScheduleCode),
+            ["fldDistributionDate"] = nameof(MonthlyDistributionSchemeEntity.DistributionDate),
+            ["fldOverseasPostingDate"] = nameof(MonthlyDistributionSchemeEntity.OverseasPostingDate),
+            ["fldDeadlineDate"] = nameof(MonthlyDistributionSchemeEntity.DeadlineDate),
+            ["fldResultsIssueTargetDate"] = nameof(MonthlyDistributionSchemeEntity.ResultsIssueTargetDate),
+            ["fldComments"] = nameof(MonthlyDistributionSchemeEntity.Comments),
+            ["fldHasIntendedResults"] = nameof(MonthlyDistributionSchemeEntity.HasIntendedResults),
+            ["fldHasSampleNumbersDefined"] = nameof(MonthlyDistributionSchemeEntity.HasSampleNumbersDefined),
+            ["fldIsCancelled"] = nameof(MonthlyDistributionSchemeEntity.IsCancelled),
+            ["fldIsAsAvailable"] = nameof(MonthlyDistributionSchemeEntity.IsAsAvailable),
+            ["fldStoreRatings"] = nameof(MonthlyDistributionSchemeEntity.StoreRatings),
+            ["fldSchemeVersionDate"] = nameof(MonthlyDistributionSchemeEntity.SchemeVersionDate),
+        });
+
+        Map<MonthlyDistributionParticipantAggregateEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldDistributionSchemeId"] = nameof(MonthlyDistributionParticipantAggregateEntity.DistributionSchemeId),
+            ["fldNumberOfSetsRequired"] = nameof(MonthlyDistributionParticipantAggregateEntity.NumberOfSetsRequired),
+        });
+
         Map<DayEntity>(new(StringComparer.OrdinalIgnoreCase)
         {
             ["fldDayId"] = nameof(DayEntity.DayId),
