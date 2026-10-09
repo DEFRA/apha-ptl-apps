@@ -78,6 +78,8 @@ public static class DapperColumnMappings
     private const string ColAccountNumber = "fldAccountNumber";
     private const string ColVatNumber = "fldVatNumber";
     private const string ColInvoiceOrganisation = "fldInvoiceOrganisation";
+    private const string ColUserId = "fldUserId";
+    private const string ColIsInactive = "fldIsInactive";
     private const string ColInvoiceAddress1 = "fldInvoiceAddress1";
     private const string ColInvoiceAddress2 = "fldInvoiceAddress2";
     private const string ColInvoiceAddress3 = "fldInvoiceAddress3";
@@ -259,7 +261,7 @@ public static class DapperColumnMappings
             [ColEmail] = nameof(PTL.Core.TestConsultant.TestConsultant.Email),
             ["fldSsoId"] = nameof(PTL.Core.TestConsultant.TestConsultant.SsoId),
             ["fldSsoIdExt"] = nameof(PTL.Core.TestConsultant.TestConsultant.SsoIdExt),
-            ["fldIsInactive"] = nameof(PTL.Core.TestConsultant.TestConsultant.IsInactive),
+            [ColIsInactive] = nameof(PTL.Core.TestConsultant.TestConsultant.IsInactive),
             [ColInactiveDate] = nameof(PTL.Core.TestConsultant.TestConsultant.InactiveDate),
         });
 
@@ -689,9 +691,9 @@ public static class DapperColumnMappings
 
         Map<SchemeUserEntity>(new(StringComparer.OrdinalIgnoreCase)
         {
-            ["fldUserId"] = nameof(SchemeUserEntity.UserId),
+            [ColUserId] = nameof(SchemeUserEntity.UserId),
             ["fldFriendlyName"] = nameof(SchemeUserEntity.FriendlyName),
-            ["fldIsInactive"] = nameof(SchemeUserEntity.IsInactive),
+            [ColIsInactive] = nameof(SchemeUserEntity.IsInactive),
         });
 
         Map<SchemeViewerEntity>(new(StringComparer.OrdinalIgnoreCase)
@@ -826,14 +828,14 @@ public static class DapperColumnMappings
 
         Map<CoreUser>(new(StringComparer.OrdinalIgnoreCase)
         {
-            ["fldUserId"] = nameof(CoreUser.UserId),
+            [ColUserId] = nameof(CoreUser.UserId),
             ["fldUsername"] = nameof(CoreUser.Username),
             ["fldFriendlyName"] = nameof(CoreUser.FriendlyName),
             ["fldFirstName"] = nameof(CoreUser.FirstName),
             ["fldLastName"] = nameof(CoreUser.LastName),
             [ColEmail] = nameof(CoreUser.Email),
             ["fldDepartment"] = nameof(CoreUser.Department),
-            ["fldIsInactive"] = nameof(CoreUser.IsInactive),
+            [ColIsInactive] = nameof(CoreUser.IsInactive),
             ["fldInactiveDate"] = nameof(CoreUser.InactiveDate),
         });
 
@@ -846,7 +848,7 @@ public static class DapperColumnMappings
         Map<UserRoleAssignment>(new(StringComparer.OrdinalIgnoreCase)
         {
             ["fldUserRoleId"] = nameof(UserRoleAssignment.UserRoleId),
-            ["fldUserId"] = nameof(UserRoleAssignment.UserId),
+            [ColUserId] = nameof(UserRoleAssignment.UserId),
             ["fldRoleId"] = nameof(UserRoleAssignment.RoleId),
         });
 
@@ -1028,14 +1030,14 @@ public static class DapperColumnMappings
         // sppAuthenticate's first result set.
         Map<CoreInternalUser>(new(StringComparer.OrdinalIgnoreCase)
         {
-            ["fldUserId"] = nameof(CoreInternalUser.UserId),
+            [ColUserId] = nameof(CoreInternalUser.UserId),
             ["fldUsername"] = nameof(CoreInternalUser.Username),
             ["fldFriendlyName"] = nameof(CoreInternalUser.FriendlyName),
             ["fldFirstName"] = nameof(CoreInternalUser.FirstName),
             ["fldLastName"] = nameof(CoreInternalUser.LastName),
             [ColEmail] = nameof(CoreInternalUser.Email),
             ["fldDepartment"] = nameof(CoreInternalUser.Department),
-            ["fldIsInactive"] = nameof(CoreInternalUser.IsInactive),
+            [ColIsInactive] = nameof(CoreInternalUser.IsInactive),
             [ColInactiveDate] = nameof(CoreInternalUser.InactiveDate),
             ["fldSsoIdInt"] = nameof(CoreInternalUser.SsoIdInt),
         });
