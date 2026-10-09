@@ -13,6 +13,7 @@ COPY ["src/PTL.ApiClient/PTL.ApiClient.csproj", "src/PTL.ApiClient/"]
 COPY ["src/PTL.Auth.Cidm/PTL.Auth.Cidm.csproj", "src/PTL.Auth.Cidm/"]
 COPY ["src/PTL.Contracts/PTL.Contracts.csproj", "src/PTL.Contracts/"]
 COPY ["src/PTL.Common/PTL.Common.csproj", "src/PTL.Common/"]
+COPY ["src/PTL.SharedUI/PTL.SharedUI.csproj", "src/PTL.SharedUI/"]
 
 RUN --mount=type=cache,target=/root/.nuget/packages \
     dotnet restore "src/PTL.ExternalWeb/PTL.ExternalWeb.csproj"

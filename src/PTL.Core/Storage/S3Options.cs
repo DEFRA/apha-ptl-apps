@@ -2,19 +2,22 @@ namespace PTL.Core.Storage;
 
 /// <summary>
 /// Single shared S3 configuration model for every S3-backed feature (export templates, invoice
-/// archives) - one bucket/region, one prefix per feature. Do not add a second, independent
-/// bucket/region setting for a new feature; add a new nested prefix section here instead.
+/// archives) - one bucket, one prefix per feature. Do not add a second, independent bucket setting
+/// for a new feature; add a new nested prefix section here instead.
 /// </summary>
 public sealed class S3Options
 {
     public const string SectionName = "S3";
 
-    /// <summary>"S3" or "InMemory". InMemory lets a feature run before a bucket is provisioned.</summary>
-    public string Provider { get; set; } = "S3";
+    /// <summary>
+    /// AWS region never varies by deployed environment, so it is not configuration - every real
+    /// environment's bucket lives in this region. A local developer who needs a different region
+    /// for a personal test bucket can still override it via the AWS SDK's own default credential/
+    /// region chain (e.g. the AWS_REGION environment variable or a local profile).
+    /// </summary>
+    public const string DefaultRegion = "eu-west-2";
 
-    public string Region { get; set; } = string.Empty;
-
-    public string BucketName { get; set; } = string.Empty;
+    public string Bucket { get; set; } = string.Empty;
 
     public S3TemplatesOptions Templates { get; set; } = new();
 

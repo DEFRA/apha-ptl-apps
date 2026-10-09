@@ -54,3 +54,7 @@ docs/
 # OS files
 .DS_Store
 Thumbs.db
+
+# Custom agent
+.github/agents/
+.github/skills/

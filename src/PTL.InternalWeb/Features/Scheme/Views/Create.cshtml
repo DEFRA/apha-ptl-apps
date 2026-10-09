@@ -3,17 +3,19 @@
     ViewData["Title"] = "Create scheme";
 }
 
-<h1 class="govuk-heading-l">Create scheme</h1>
+<h1 class="govuk-heading-l">Create Scheme</h1>
 
 <form method="post" asp-action="Create" novalidate>
     @await Html.PartialAsync("_SchemeForm", Model)
 
     <div class="govuk-button-group">
-        <button class="govuk-button" data-module="govuk-button" type="submit">Create scheme</button>
+        <button class="govuk-button" data-module="govuk-button" type="submit">Save</button>
         <a class="govuk-button govuk-button--secondary" data-module="govuk-button" asp-controller="Scheme" asp-action="Index">Cancel</a>
     </div>
 </form>
 
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
+    <script src="~/lib/tinymce/tinymce.min.js" asp-append-version="true"></script>
+    <script src="~/js/ptl-rich-text-editor.js" asp-append-version="true"></script>
 }

@@ -119,7 +119,7 @@ public partial class SystemAdministrationRouteSmokeTests : IClassFixture<WebAppl
         var body = await response.Content.ReadAsStringAsync();
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.Contains("<title>System Administration - GOV.UK</title>", body, StringComparison.Ordinal);
+        Assert.Contains("<title>System Administration - Proficiency Testing - Internal</title>", body, StringComparison.Ordinal);
     }
 
     [Fact]

@@ -22,6 +22,20 @@ public class SchemeRepositoryTests
     private const string UpdateSql =
         "EXEC dbo.spuScheme @SchemeId, @SharedId, @YearId, @Identifier, @Name, @ScheduleId, @ScheduleCodeId, @StartDate, @DistributionMonthJan, @DistributionMonthFeb, @DistributionMonthMar, @DistributionMonthApr, @DistributionMonthMay, @DistributionMonthJun, @DistributionMonthJul, @DistributionMonthAug, @DistributionMonthSep, @DistributionMonthOct, @DistributionMonthNov, @DistributionMonthDec, @DistributionAsAvailable, @WeekNumber, @DayOfWeekId, @Deadline, @Pilot, @Accredited, @ComerciallyAvailable, @LimitedSampleAvailability, @NoVLALabs, @CombinedPackaging, @SampleOrigin, @Subcontractor, @NumberOfSamples, @SamplePackingInstructions, @TestConsultant1, @TestConsultant2, @TestConsultant3, @CommentsRequired, @DateOfReceipt, @StorageConditions, @ConditionOnReceipt, @Instructions, @TestConsultantTabulationId, @UseExternalReference, @LastModified, @StoreRatings, @Assessor1, @Assessor2, @Assessor3, @Assessor4, @RequiresAssessment, @StandardTabulationText, @Postage, @CustomsDocumentDescription, @CustomsDocumentVolume, @DataConsentDeclarationActive, @DataConsentDeclarationText";
 
+    private const string InsertPriceSql =
+        "EXEC dbo.spiSchemeCurrency @SchemeCurrencyId = @SchemeCurrencyId, @SchemeId = @SchemeId, @CurrencyId = @CurrencyId, @Price = @Price";
+    private const string UpdatePriceSql =
+        "EXEC dbo.spuSchemeCurrency @SchemeCurrencyId = @SchemeCurrencyId, @SchemeId = @SchemeId, @CurrencyId = @CurrencyId, @Price = @Price";
+
+    private const string InsertTestSql =
+        "EXEC dbo.spiTest @TestId = @TestId, @TestTypeId = @TestTypeId, @SchemeId = @SchemeId, @Order = @Order";
+    private const string InsertResultItemSql =
+        "EXEC dbo.spiTestResultItem @TestResultItemId = @TestResultItemId, @TestResultItemTypeId = @TestResultItemTypeId, @TestId = @TestId, @Order = @Order";
+    private const string InsertTabulationSql =
+        "EXEC dbo.spiTabulation @TabulationId = @TabulationId, @SchemeId = @SchemeId, @Name = @Name, @IntendedResultsOnly = @IntendedResultsOnly, @SingleParticipantTabulation = @SingleParticipantTabulation, @ShowRatings = @ShowRatings, @AvailableToParticipants = @AvailableToParticipants, @AvailableToViewers = @AvailableToViewers";
+    private const string InsertTabulationResultItemSql =
+        "EXEC dbo.spiTabulationTestResultItem @TabulationTestResultItemId = @LinkId, @TabulationId = @TabulationId, @TestResultItemId = @ItemId";
+
     private static DataTable SchemeTable(Guid schemeId, int yearId = 2026)
     {
         var table = new DataTable();
@@ -58,11 +72,139 @@ public class SchemeRepositoryTests
     public async Task GetByIdAsync_NotFound_ReturnsNull()
     {
         var (repository, connection) = CreateRepository();
-        connection.RespondToQuery(GetByIdSql, new DataTable());
+
+        // A real spgSchemeBySchemeId call still returns the full column set when no scheme
+        // matches, so the empty case is modelled as a shaped table with no rows.
+        var empty = SchemeTable(Guid.Empty);
+        empty.Rows.Clear();
+        connection.RespondToQuery(GetByIdSql, empty);
 
         var result = await repository.GetByIdAsync(Guid.NewGuid());
 
         Assert.Null(result);
+    }
+
+    [Fact]
+    public async Task GetByIdAsync_WithTestsAndTabulations_AssemblesTheFullTreeInOrder()
+    {
+        var (repository, connection) = CreateRepository();
+        var schemeId = Guid.NewGuid();
+        var testId = Guid.NewGuid();
+        var categoryId = Guid.NewGuid();
+        var resultItemId = Guid.NewGuid();
+        var methodItemId = Guid.NewGuid();
+        var criterionId = Guid.NewGuid();
+        var tabulationId = Guid.NewGuid();
+
+        var priceTable = new DataTable();
+        priceTable.Columns.Add("fldSchemeCurrencyId", typeof(Guid));
+        priceTable.Columns.Add("fldCurrencyId", typeof(Guid));
+        priceTable.Columns.Add("fldPrice", typeof(decimal));
+        priceTable.Columns.Add("fldCurrencyName", typeof(string));
+        priceTable.Columns.Add("fldCurrencySymbol", typeof(string));
+        priceTable.Rows.Add(Guid.NewGuid(), Guid.NewGuid(), 12.5m, "British Pound", "£");
+
+        // Two tests out of order (fldOrder 2 then 1) so ReadTestsAsync's final OrderBy is genuinely exercised.
+        var testTable = new DataTable();
+        testTable.Columns.Add("fldTestId", typeof(Guid));
+        testTable.Columns.Add("fldTestTypeId", typeof(Guid));
+        testTable.Columns.Add("fldTestType", typeof(string));
+        testTable.Columns.Add("fldSchemeId", typeof(Guid));
+        testTable.Columns.Add("fldOrder", typeof(int));
+        var secondTestId = Guid.NewGuid();
+        testTable.Rows.Add(secondTestId, Guid.NewGuid(), "Bacteriology", schemeId, 2);
+        testTable.Rows.Add(testId, Guid.NewGuid(), "Serology", schemeId, 1);
+
+        var methodItemTable = new DataTable();
+        methodItemTable.Columns.Add("fldTestMethodItemId", typeof(Guid));
+        methodItemTable.Columns.Add("fldTestMethodItemTypeId", typeof(Guid));
+        methodItemTable.Columns.Add("fldTestMethodItemType", typeof(string));
+        methodItemTable.Columns.Add("fldTestId", typeof(Guid));
+        methodItemTable.Columns.Add("fldOrder", typeof(int));
+        methodItemTable.Columns.Add("fldExpectedLength", typeof(int));
+        methodItemTable.Rows.Add(methodItemId, Guid.NewGuid(), "ELISA", testId, 1, 0);
+
+        var resultItemTable = new DataTable();
+        resultItemTable.Columns.Add("fldTestResultItemId", typeof(Guid));
+        resultItemTable.Columns.Add("fldTestResultItemTypeId", typeof(Guid));
+        resultItemTable.Columns.Add("fldTestResultItemType", typeof(string));
+        resultItemTable.Columns.Add("fldTestId", typeof(Guid));
+        resultItemTable.Columns.Add("fldOrder", typeof(int));
+        resultItemTable.Columns.Add("fldExpectedLength", typeof(int));
+        resultItemTable.Rows.Add(resultItemId, Guid.NewGuid(), "Titre", testId, 1, 3);
+
+        var categoryTable = new DataTable();
+        categoryTable.Columns.Add("fldCategoryItemId", typeof(Guid));
+        categoryTable.Columns.Add("fldCategoryItemTypeId", typeof(Guid));
+        categoryTable.Columns.Add("fldName", typeof(string));
+        categoryTable.Columns.Add("fldTestId", typeof(Guid));
+        categoryTable.Columns.Add("fldOrder", typeof(int));
+        categoryTable.Rows.Add(categoryId, Guid.NewGuid(), "Accuracy", testId, 1);
+
+        var criterionTable = new DataTable();
+        criterionTable.Columns.Add("fldCriterionItemId", typeof(Guid));
+        criterionTable.Columns.Add("fldCriterionItemTypeId", typeof(Guid));
+        criterionTable.Columns.Add("fldName", typeof(string));
+        criterionTable.Columns.Add("fldCategoryItemId", typeof(Guid));
+        criterionTable.Columns.Add("fldOrder", typeof(int));
+        criterionTable.Rows.Add(criterionId, Guid.NewGuid(), "Within range", categoryId, 1);
+
+        var tabulationTable = new DataTable();
+        tabulationTable.Columns.Add("fldTabulationId", typeof(Guid));
+        tabulationTable.Columns.Add("fldSchemeId", typeof(Guid));
+        tabulationTable.Columns.Add("fldName", typeof(string));
+        tabulationTable.Columns.Add("fldIntendedResultsOnly", typeof(bool));
+        tabulationTable.Columns.Add("fldSingleParticipantTabulation", typeof(bool));
+        tabulationTable.Columns.Add("fldShowRatings", typeof(bool));
+        tabulationTable.Columns.Add("fldAvailableToParticipants", typeof(bool));
+        tabulationTable.Columns.Add("fldAvailableToViewers", typeof(bool));
+        tabulationTable.Rows.Add(tabulationId, schemeId, "Published", false, false, false, true, true);
+
+        var tabulationMethodLinkTable = new DataTable();
+        tabulationMethodLinkTable.Columns.Add("fldTabulationTestMethodItemId", typeof(Guid));
+        tabulationMethodLinkTable.Columns.Add("fldTabulationId", typeof(Guid));
+        tabulationMethodLinkTable.Columns.Add("fldTestMethodItemId", typeof(Guid));
+        tabulationMethodLinkTable.Rows.Add(Guid.NewGuid(), tabulationId, methodItemId);
+
+        var tabulationResultLinkTable = new DataTable();
+        tabulationResultLinkTable.Columns.Add("fldTabulationTestResultItemId", typeof(Guid));
+        tabulationResultLinkTable.Columns.Add("fldTabulationId", typeof(Guid));
+        tabulationResultLinkTable.Columns.Add("fldTestResultItemId", typeof(Guid));
+        tabulationResultLinkTable.Rows.Add(Guid.NewGuid(), tabulationId, resultItemId);
+
+        var dataSet = new DataSet();
+        dataSet.Tables.Add(SchemeTable(schemeId));
+        dataSet.Tables.Add(priceTable);
+        dataSet.Tables.Add(testTable);
+        dataSet.Tables.Add(methodItemTable);
+        dataSet.Tables.Add(resultItemTable);
+        dataSet.Tables.Add(categoryTable);
+        dataSet.Tables.Add(criterionTable);
+        dataSet.Tables.Add(tabulationTable);
+        dataSet.Tables.Add(tabulationMethodLinkTable);
+        dataSet.Tables.Add(tabulationResultLinkTable);
+        connection.RespondToQuery(GetByIdSql, dataSet);
+
+        var result = await repository.GetByIdAsync(schemeId);
+
+        Assert.NotNull(result);
+        Assert.Equal(12.5m, Assert.Single(result!.Prices).Price);
+
+        Assert.Equal(2, result.Tests.Count);
+        Assert.Equal("Serology", result.Tests[0].TestType);
+        Assert.Equal("Bacteriology", result.Tests[1].TestType);
+
+        var serology = result.Tests[0];
+        Assert.Equal("Titre", Assert.Single(serology.ResultItems).TestResultItemType);
+        Assert.Equal("ELISA", Assert.Single(serology.MethodItems).TestMethodItemType);
+        var category = Assert.Single(serology.Categories);
+        Assert.Equal("Accuracy", category.Name);
+        Assert.Equal("Within range", Assert.Single(category.Criteria).Name);
+
+        var tabulation = Assert.Single(result.Tabulations);
+        Assert.Equal("Published", tabulation.Name);
+        Assert.Equal(resultItemId, Assert.Single(tabulation.ResultItemIds));
+        Assert.Equal(methodItemId, Assert.Single(tabulation.MethodItemIds));
     }
 
     [Fact]
@@ -177,5 +319,394 @@ public class SchemeRepositoryTests
         var result = await repository.UpdateAsync(scheme);
 
         Assert.Null(result);
+    }
+
+    [Fact]
+    public async Task GetByIdAsync_ReadsTheCurrencyPricingResultSet()
+    {
+        var (repository, connection) = CreateRepository();
+        var schemeId = Guid.NewGuid();
+        var currencyId = Guid.NewGuid();
+
+        var prices = new DataTable();
+        prices.Columns.Add("fldSchemeCurrencyId", typeof(Guid));
+        prices.Columns.Add("fldCurrencyId", typeof(Guid));
+        prices.Columns.Add("fldPrice", typeof(decimal));
+        prices.Columns.Add("fldCurrencyName", typeof(string));
+        prices.Columns.Add("fldCurrencySymbol", typeof(string));
+        prices.Rows.Add(Guid.NewGuid(), currencyId, 123.45m, "British Pound", "£");
+
+        var dataSet = new DataSet();
+        dataSet.Tables.Add(SchemeTable(schemeId));
+        dataSet.Tables.Add(prices);
+        connection.RespondToQuery(GetByIdSql, dataSet);
+
+        var result = await repository.GetByIdAsync(schemeId);
+
+        var price = Assert.Single(result!.Prices);
+        Assert.Equal(currencyId, price.CurrencyId);
+        Assert.Equal(123.45m, price.Price);
+        Assert.Equal("£", price.CurrencySymbol);
+    }
+
+    [Fact]
+    public async Task CreateAsync_NewPriceRow_IsInsertedWithEveryArgumentBoundByName()
+    {
+        var (repository, connection) = CreateRepository();
+        var schemeId = Guid.NewGuid();
+        var currencyId = Guid.NewGuid();
+        connection.RespondToNonQuery(InsertSql, 1);
+        connection.RespondToNonQuery(InsertPriceSql, 1);
+        connection.RespondToQuery(GetByIdSql, SchemeTable(schemeId));
+
+        var scheme = new CoreScheme
+        {
+            SchemeId = schemeId,
+            YearId = 2026,
+            Name = "Test Scheme",
+            Prices = [new SchemeCurrencyPrice { CurrencyId = currencyId, Price = 99.99m }]
+        };
+
+        await repository.CreateAsync(scheme);
+
+        var command = Assert.Single(connection.ExecutedCommands, c => c.CommandText == InsertPriceSql);
+        Assert.Equal(schemeId, command.ParameterValue("@SchemeId"));
+        Assert.Equal(currencyId, command.ParameterValue("@CurrencyId"));
+        Assert.Equal(99.99m, command.ParameterValue("@Price"));
+        Assert.NotEqual(Guid.Empty, scheme.Prices[0].SchemeCurrencyId);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_ExistingPriceRow_IsUpdatedRatherThanInserted()
+    {
+        var (repository, connection) = CreateRepository();
+        var schemeId = Guid.NewGuid();
+        var schemeCurrencyId = Guid.NewGuid();
+        connection.RespondToNonQuery(UpdateSql, 1);
+        connection.RespondToNonQuery(UpdatePriceSql, 1);
+        connection.RespondToQuery(GetByIdSql, SchemeTable(schemeId));
+
+        var scheme = new CoreScheme
+        {
+            SchemeId = schemeId,
+            YearId = 2026,
+            Name = "Test Scheme",
+            Prices = [new SchemeCurrencyPrice { SchemeCurrencyId = schemeCurrencyId, CurrencyId = Guid.NewGuid(), Price = 5m }]
+        };
+
+        await repository.UpdateAsync(scheme);
+
+        var command = Assert.Single(connection.ExecutedCommands, c => c.CommandText == UpdatePriceSql);
+        Assert.Equal(schemeCurrencyId, command.ParameterValue("@SchemeCurrencyId"));
+        Assert.DoesNotContain(connection.ExecutedCommands, c => c.CommandText == InsertPriceSql);
+    }
+
+    [Fact]
+    public async Task GetByIdAsync_BuildsTheTestTreeFromTheChildResultSets()
+    {
+        var (repository, connection) = CreateRepository();
+        var schemeId = Guid.NewGuid();
+        var testId = Guid.NewGuid();
+        var categoryItemId = Guid.NewGuid();
+
+        var dataSet = new DataSet();
+        dataSet.Tables.Add(SchemeTable(schemeId));
+        dataSet.Tables.Add(EmptyPriceTable());
+        dataSet.Tables.Add(TestTable(testId, schemeId));
+        dataSet.Tables.Add(ItemTable("fldTestMethodItemId", "fldTestMethodItemTypeId", "fldTestMethodItemType", testId, "ELISA"));
+        dataSet.Tables.Add(ItemTable("fldTestResultItemId", "fldTestResultItemTypeId", "fldTestResultItemType", testId, "Titre"));
+        dataSet.Tables.Add(CategoryTable(categoryItemId, testId));
+        dataSet.Tables.Add(CriterionTable(categoryItemId));
+        connection.RespondToQuery(GetByIdSql, dataSet);
+
+        var result = await repository.GetByIdAsync(schemeId);
+
+        var test = Assert.Single(result!.Tests);
+        Assert.Equal("Serology", test.TestType);
+        Assert.Equal("Titre", Assert.Single(test.ResultItems).TestResultItemType);
+        Assert.Equal("ELISA", Assert.Single(test.MethodItems).TestMethodItemType);
+        var category = Assert.Single(test.Categories);
+        Assert.Equal("Accuracy", category.Name);
+        Assert.Equal("Within range", Assert.Single(category.Criteria).Name);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_StagedTestTree_IsInsertedAndRenumbered()
+    {
+        var (repository, connection) = CreateRepository();
+        var schemeId = Guid.NewGuid();
+        connection.RespondToNonQuery(UpdateSql, 1);
+        connection.RespondToNonQuery(InsertTestSql, 1);
+        connection.RespondToNonQuery(InsertResultItemSql, 1);
+        connection.RespondToQuery(GetByIdSql, SchemeTable(schemeId));
+
+        var scheme = new CoreScheme
+        {
+            SchemeId = schemeId,
+            YearId = 2026,
+            Name = "Test Scheme",
+            Tests =
+            [
+                new SchemeTest
+                {
+                    TestTypeId = Guid.NewGuid(),
+                    ResultItems = [new SchemeTestResultItem { TestResultItemTypeId = Guid.NewGuid() }],
+                }
+            ],
+        };
+
+        await repository.UpdateAsync(scheme);
+
+        var insertedTest = Assert.Single(connection.ExecutedCommands, c => c.CommandText == InsertTestSql);
+        Assert.Equal(1, insertedTest.ParameterValue("@Order"));
+        Assert.NotEqual(Guid.Empty, scheme.Tests[0].TestId);
+
+        var insertedItem = Assert.Single(connection.ExecutedCommands, c => c.CommandText == InsertResultItemSql);
+        Assert.Equal(scheme.Tests[0].TestId, insertedItem.ParameterValue("@TestId"));
+        Assert.Equal(1, insertedItem.ParameterValue("@Order"));
+    }
+
+    [Fact]
+    public async Task UpdateAsync_TestRemovedFromTheTree_IsDeleted()
+    {
+        var (repository, connection) = CreateRepository();
+        var schemeId = Guid.NewGuid();
+        var removedTestId = Guid.NewGuid();
+        connection.RespondToNonQuery(UpdateSql, 1);
+        connection.RespondToNonQuery("EXEC dbo.spdCriterionItem @CriterionItemId", 1);
+        connection.RespondToNonQuery("EXEC dbo.spdCategoryItem @CategoryItemId", 1);
+        connection.RespondToNonQuery("EXEC dbo.spdTestResultItem @TestResultItemId", 1);
+        connection.RespondToNonQuery("EXEC dbo.spdTestMethodItem @TestMethodItemId", 1);
+        connection.RespondToNonQuery("EXEC dbo.spdTest @TestId", 1);
+
+        var dataSet = new DataSet();
+        dataSet.Tables.Add(SchemeTable(schemeId));
+        dataSet.Tables.Add(EmptyPriceTable());
+        dataSet.Tables.Add(TestTable(removedTestId, schemeId));
+        dataSet.Tables.Add(ItemTable("fldTestMethodItemId", "fldTestMethodItemTypeId", "fldTestMethodItemType", removedTestId, "ELISA"));
+        dataSet.Tables.Add(ItemTable("fldTestResultItemId", "fldTestResultItemTypeId", "fldTestResultItemType", removedTestId, "Titre"));
+        dataSet.Tables.Add(CategoryTable(Guid.NewGuid(), removedTestId));
+        dataSet.Tables.Add(CriterionTable(Guid.NewGuid()));
+        connection.RespondToQuery(GetByIdSql, dataSet);
+
+        var scheme = new CoreScheme { SchemeId = schemeId, YearId = 2026, Name = "Test Scheme", Tests = [] };
+
+        await repository.UpdateAsync(scheme);
+
+        var deleted = Assert.Single(connection.ExecutedCommands, c => c.CommandText == "EXEC dbo.spdTest @TestId");
+        Assert.Equal(removedTestId, deleted.ParameterValue("@TestId"));
+        Assert.Contains(connection.ExecutedCommands, c => c.CommandText == "EXEC dbo.spdTestResultItem @TestResultItemId");
+        Assert.Contains(connection.ExecutedCommands, c => c.CommandText == "EXEC dbo.spdTestMethodItem @TestMethodItemId");
+    }
+
+    [Fact]
+    public async Task UpdateAsync_NewTabulation_IsInsertedWithItsItemLinks()
+    {
+        var (repository, connection) = CreateRepository();
+        var schemeId = Guid.NewGuid();
+        var tabulationId = Guid.NewGuid();
+        var resultItemId = Guid.NewGuid();
+        connection.RespondToNonQuery(UpdateSql, 1);
+        connection.RespondToNonQuery(InsertTabulationSql, 1);
+        connection.RespondToNonQuery(InsertTabulationResultItemSql, 1);
+        connection.RespondToQuery(GetByIdSql, SchemeTable(schemeId));
+
+        var scheme = new CoreScheme
+        {
+            SchemeId = schemeId,
+            YearId = 2026,
+            Name = "Test Scheme",
+            Tabulations =
+            [
+                new SchemeTabulation
+                {
+                    TabulationId = tabulationId,
+                    Name = "Published",
+                    AvailableToParticipants = true,
+                    ResultItemIds = [resultItemId],
+                }
+            ],
+        };
+
+        await repository.UpdateAsync(scheme);
+
+        var inserted = Assert.Single(connection.ExecutedCommands, c => c.CommandText == InsertTabulationSql);
+        Assert.Equal(tabulationId, inserted.ParameterValue("@TabulationId"));
+        Assert.Equal(schemeId, inserted.ParameterValue("@SchemeId"));
+        Assert.Equal(true, inserted.ParameterValue("@AvailableToParticipants"));
+
+        var link = Assert.Single(connection.ExecutedCommands, c => c.CommandText == InsertTabulationResultItemSql);
+        Assert.Equal(resultItemId, link.ParameterValue("@ItemId"));
+        Assert.Equal(tabulationId, link.ParameterValue("@TabulationId"));
+    }
+
+    [Fact]
+    public async Task UpdateAsync_TabulationRemovedFromTheTab_IsDeleted()
+    {
+        var (repository, connection) = CreateRepository();
+        var schemeId = Guid.NewGuid();
+        var removedTabulationId = Guid.NewGuid();
+        connection.RespondToNonQuery(UpdateSql, 1);
+        connection.RespondToNonQuery("EXEC dbo.spdTabulation @TabulationId", 1);
+
+        var dataSet = new DataSet();
+        dataSet.Tables.Add(SchemeTable(schemeId));
+        dataSet.Tables.Add(EmptyPriceTable());
+        dataSet.Tables.Add(EmptyTestTable());
+        dataSet.Tables.Add(EmptyItemTable("fldTestMethodItemId", "fldTestMethodItemTypeId", "fldTestMethodItemType"));
+        dataSet.Tables.Add(EmptyItemTable("fldTestResultItemId", "fldTestResultItemTypeId", "fldTestResultItemType"));
+        dataSet.Tables.Add(EmptyCategoryTable());
+        dataSet.Tables.Add(EmptyCriterionTable());
+        dataSet.Tables.Add(TabulationTable(removedTabulationId, schemeId));
+        dataSet.Tables.Add(EmptyTabulationLinkTable("fldTabulationTestMethodItemId", "fldTestMethodItemId"));
+        dataSet.Tables.Add(EmptyTabulationLinkTable("fldTabulationTestResultItemId", "fldTestResultItemId"));
+        connection.RespondToQuery(GetByIdSql, dataSet);
+
+        var scheme = new CoreScheme { SchemeId = schemeId, YearId = 2026, Name = "Test Scheme", Tabulations = [] };
+
+        await repository.UpdateAsync(scheme);
+
+        var deleted = Assert.Single(connection.ExecutedCommands, c => c.CommandText == "EXEC dbo.spdTabulation @TabulationId");
+        Assert.Equal(removedTabulationId, deleted.ParameterValue("@TabulationId"));
+    }
+
+    [Fact]
+    public async Task GetByIdAsync_BuildsTabulationsWithTheirItemLinks()
+    {
+        var (repository, connection) = CreateRepository();
+        var schemeId = Guid.NewGuid();
+        var tabulationId = Guid.NewGuid();
+        var resultItemId = Guid.NewGuid();
+
+        var resultLinks = EmptyTabulationLinkTable("fldTabulationTestResultItemId", "fldTestResultItemId");
+        resultLinks.Rows.Add(Guid.NewGuid(), tabulationId, resultItemId);
+
+        var dataSet = new DataSet();
+        dataSet.Tables.Add(SchemeTable(schemeId));
+        dataSet.Tables.Add(EmptyPriceTable());
+        dataSet.Tables.Add(EmptyTestTable());
+        dataSet.Tables.Add(EmptyItemTable("fldTestMethodItemId", "fldTestMethodItemTypeId", "fldTestMethodItemType"));
+        dataSet.Tables.Add(EmptyItemTable("fldTestResultItemId", "fldTestResultItemTypeId", "fldTestResultItemType"));
+        dataSet.Tables.Add(EmptyCategoryTable());
+        dataSet.Tables.Add(EmptyCriterionTable());
+        dataSet.Tables.Add(TabulationTable(tabulationId, schemeId));
+        dataSet.Tables.Add(EmptyTabulationLinkTable("fldTabulationTestMethodItemId", "fldTestMethodItemId"));
+        dataSet.Tables.Add(resultLinks);
+        connection.RespondToQuery(GetByIdSql, dataSet);
+
+        var result = await repository.GetByIdAsync(schemeId);
+
+        var tabulation = Assert.Single(result!.Tabulations);
+        Assert.Equal("Published", tabulation.Name);
+        Assert.Equal(resultItemId, Assert.Single(tabulation.ResultItemIds));
+        Assert.Empty(tabulation.MethodItemIds);
+    }
+
+    private static DataTable EmptyTestTable() => TestTable(Guid.Empty, Guid.Empty, includeRow: false);
+
+    private static DataTable EmptyItemTable(string idColumn, string typeIdColumn, string nameColumn)
+    {
+        var table = ItemTable(idColumn, typeIdColumn, nameColumn, Guid.Empty, string.Empty);
+        table.Rows.Clear();
+        return table;
+    }
+
+    private static DataTable EmptyCategoryTable()
+    {
+        var table = CategoryTable(Guid.Empty, Guid.Empty);
+        table.Rows.Clear();
+        return table;
+    }
+
+    private static DataTable EmptyCriterionTable()
+    {
+        var table = CriterionTable(Guid.Empty);
+        table.Rows.Clear();
+        return table;
+    }
+
+    private static DataTable TabulationTable(Guid tabulationId, Guid schemeId)
+    {
+        var table = new DataTable();
+        table.Columns.Add("fldTabulationId", typeof(Guid));
+        table.Columns.Add("fldSchemeId", typeof(Guid));
+        table.Columns.Add("fldName", typeof(string));
+        table.Columns.Add("fldIntendedResultsOnly", typeof(bool));
+        table.Columns.Add("fldSingleParticipantTabulation", typeof(bool));
+        table.Columns.Add("fldShowRatings", typeof(bool));
+        table.Columns.Add("fldAvailableToParticipants", typeof(bool));
+        table.Columns.Add("fldAvailableToViewers", typeof(bool));
+        table.Rows.Add(tabulationId, schemeId, "Published", false, false, false, true, true);
+        return table;
+    }
+
+    private static DataTable EmptyTabulationLinkTable(string linkIdColumn, string itemIdColumn)
+    {
+        var table = new DataTable();
+        table.Columns.Add(linkIdColumn, typeof(Guid));
+        table.Columns.Add("fldTabulationId", typeof(Guid));
+        table.Columns.Add(itemIdColumn, typeof(Guid));
+        return table;
+    }
+
+    private static DataTable EmptyPriceTable()
+    {
+        var table = new DataTable();
+        table.Columns.Add("fldSchemeCurrencyId", typeof(Guid));
+        table.Columns.Add("fldCurrencyId", typeof(Guid));
+        table.Columns.Add("fldPrice", typeof(decimal));
+        return table;
+    }
+
+    private static DataTable TestTable(Guid testId, Guid schemeId, bool includeRow = true)
+    {
+        var table = new DataTable();
+        table.Columns.Add("fldTestId", typeof(Guid));
+        table.Columns.Add("fldTestTypeId", typeof(Guid));
+        table.Columns.Add("fldTestType", typeof(string));
+        table.Columns.Add("fldSchemeId", typeof(Guid));
+        table.Columns.Add("fldOrder", typeof(int));
+        if (includeRow)
+        {
+            table.Rows.Add(testId, Guid.NewGuid(), "Serology", schemeId, 1);
+        }
+
+        return table;
+    }
+
+    private static DataTable ItemTable(string idColumn, string typeIdColumn, string nameColumn, Guid testId, string name)
+    {
+        var table = new DataTable();
+        table.Columns.Add(idColumn, typeof(Guid));
+        table.Columns.Add(typeIdColumn, typeof(Guid));
+        table.Columns.Add(nameColumn, typeof(string));
+        table.Columns.Add("fldTestId", typeof(Guid));
+        table.Columns.Add("fldOrder", typeof(int));
+        table.Rows.Add(Guid.NewGuid(), Guid.NewGuid(), name, testId, 1);
+        return table;
+    }
+
+    private static DataTable CategoryTable(Guid categoryItemId, Guid testId)
+    {
+        var table = new DataTable();
+        table.Columns.Add("fldCategoryItemId", typeof(Guid));
+        table.Columns.Add("fldCategoryItemTypeId", typeof(Guid));
+        table.Columns.Add("fldName", typeof(string));
+        table.Columns.Add("fldTestId", typeof(Guid));
+        table.Columns.Add("fldOrder", typeof(int));
+        table.Rows.Add(categoryItemId, Guid.NewGuid(), "Accuracy", testId, 1);
+        return table;
+    }
+
+    private static DataTable CriterionTable(Guid categoryItemId)
+    {
+        var table = new DataTable();
+        table.Columns.Add("fldCriterionItemId", typeof(Guid));
+        table.Columns.Add("fldCriterionItemTypeId", typeof(Guid));
+        table.Columns.Add("fldName", typeof(string));
+        table.Columns.Add("fldCategoryItemId", typeof(Guid));
+        table.Columns.Add("fldOrder", typeof(int));
+        table.Rows.Add(Guid.NewGuid(), Guid.NewGuid(), "Within range", categoryItemId, 1);
+        return table;
     }
 }

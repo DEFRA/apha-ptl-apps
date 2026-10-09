@@ -1,4 +1,6 @@
+using PTL.Contracts.Lookup;
 using PTL.Core.Lookup;
+using PTL.Core.Scheme;
 
 namespace PTL.Api.Tests.PostagePricingPlan;
 
@@ -20,4 +22,12 @@ internal sealed class FakeLookupServiceForPostagePricingPlan : ILookupService
     public Task<SystemSettingsEntity> GetSystemSettingsAsync(CancellationToken cancellationToken = default) => Task.FromResult(new SystemSettingsEntity());
     public Task<IReadOnlyList<YearEntity>> GetWeightedPricingYearsAsync(CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<YearEntity>>([]);
     public Task<IReadOnlyList<GroupAddressEntity>> GetGroupAddressesAsync(CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<GroupAddressEntity>>([]);
+    public Task<IReadOnlyList<ScheduleEntity>> GetSchedulesAsync(CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<ScheduleEntity>>([]);
+    public Task<IReadOnlyList<ScheduleCodeEntity>> GetScheduleCodesAsync(CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<ScheduleCodeEntity>>([]);
+    public Task<SchemeMonthEditability> GetSchemeMonthEditabilityAsync(int yearId, CancellationToken cancellationToken = default) => Task.FromResult(SchemeMonthEditability.AllEditable);
+    public Task<IReadOnlyList<DayEntity>> GetDaysAsync(CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<DayEntity>>([]);
+    public Task<IReadOnlyList<PTNumberEntity>> GetPTNumbersAsync(CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<PTNumberEntity>>([]);
+    public Task<IReadOnlyList<SchemeUserEntity>> GetTestConsultantsAsync(CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<SchemeUserEntity>>([]);
+    public Task<IReadOnlyList<SchemeUserEntity>> GetAssessorsAsync(CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<SchemeUserEntity>>([]);
+    public Task<IReadOnlyList<SchemeItemTypeEntity>> GetSchemeItemTypesAsync(SchemeItemTypeKind kind, int yearId, CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<SchemeItemTypeEntity>>([]);
 }

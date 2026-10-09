@@ -1,4 +1,4 @@
-@model IReadOnlyList<PTL.Contracts.Scheme.SchemeHistoryResponse>
+@model IReadOnlyList<PTL.InternalWeb.Features.Scheme.SchemeHistoryRowViewModel>
 @{
     ViewData["Title"] = "Scheme family history";
 }
@@ -24,7 +24,7 @@ else
             @foreach (var scheme in Model)
             {
                 <tr class="govuk-table__row">
-                    <td class="govuk-table__cell">@scheme.YearId</td>
+                    <td class="govuk-table__cell">@scheme.YearLabel</td>
                     <td class="govuk-table__cell">@scheme.Identifier</td>
                     <td class="govuk-table__cell">@scheme.Name</td>
                     <td class="govuk-table__cell">

@@ -1,0 +1,25 @@
+@model PTL.InternalWeb.Features.Scheme.SchemeFormViewModel
+@using Microsoft.AspNetCore.Mvc.Rendering
+@{
+    string OptionText(IEnumerable<SelectListItem> options, Guid? value) =>
+        value is null ? string.Empty : options.FirstOrDefault(o => o.Value == value.Value.ToString())?.Text ?? string.Empty;
+}
+
+@if (Model.IsViewMode)
+{
+    <dl class="govuk-summary-list">
+        <govuk-summary-row label="Primary Test Consultant">@OptionText(Model.PrimaryTestConsultantOptions, Model.TestConsultant1)</govuk-summary-row>
+        <govuk-summary-row label="Deputy Test Consultant">@OptionText(Model.TestConsultantOptions, Model.TestConsultant2)</govuk-summary-row>
+        <govuk-summary-row label="Secondary Test Consultant">@OptionText(Model.TestConsultantOptions, Model.TestConsultant3)</govuk-summary-row>
+    </dl>
+}
+else
+{
+    <govuk-select asp-for="TestConsultant1" label="Primary Test Consultant" asp-items="Model.PrimaryTestConsultantOptions" />
+
+    <govuk-select asp-for="TestConsultant2" label="Deputy Test Consultant" asp-items="Model.TestConsultantOptions" />
+
+    <govuk-select asp-for="TestConsultant3" label="Secondary Test Consultant" asp-items="Model.TestConsultantOptions" />
+}
+
+<input type="hidden" asp-for="TestConsultantTabulationId" />

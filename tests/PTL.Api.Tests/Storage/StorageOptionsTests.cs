@@ -6,16 +6,15 @@ namespace PTL.Api.Tests.Storage;
 public class StorageOptionsTests
 {
     [Fact]
-    public void S3Options_DefaultsToS3ProviderWithPerFeaturePrefixes()
+    public void S3Options_DefaultsToEmptyBucketWithPerFeaturePrefixes()
     {
         var options = new S3Options();
 
-        Assert.Equal("S3", options.Provider);
-        Assert.Equal(string.Empty, options.Region);
-        Assert.Equal(string.Empty, options.BucketName);
+        Assert.Equal(string.Empty, options.Bucket);
         Assert.Equal("templates", options.Templates.Prefix);
         Assert.Equal("invoices", options.Invoices.Prefix);
         Assert.Equal("S3", S3Options.SectionName);
+        Assert.Equal("eu-west-2", S3Options.DefaultRegion);
     }
 
     // Legacy ExportBase rejected anything over 4MB.
@@ -30,16 +29,12 @@ public class StorageOptionsTests
     {
         var options = new S3Options
         {
-            Provider = "InMemory",
-            Region = "eu-west-2",
-            BucketName = "bucket",
+            Bucket = "bucket",
             Templates = new S3TemplatesOptions { Prefix = "t", MaxUploadBytes = 10 },
             Invoices = new S3InvoicesOptions { Prefix = "i" }
         };
 
-        Assert.Equal("InMemory", options.Provider);
-        Assert.Equal("eu-west-2", options.Region);
-        Assert.Equal("bucket", options.BucketName);
+        Assert.Equal("bucket", options.Bucket);
         Assert.Equal("t", options.Templates.Prefix);
         Assert.Equal(10, options.Templates.MaxUploadBytes);
         Assert.Equal("i", options.Invoices.Prefix);

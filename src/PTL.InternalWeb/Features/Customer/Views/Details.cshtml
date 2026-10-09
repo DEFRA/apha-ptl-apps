@@ -18,7 +18,7 @@
     <govuk-summary-row label="QAL Number">@customer.QalNumber</govuk-summary-row>
     <govuk-summary-row label="Name">@customer.Name</govuk-summary-row>
     <govuk-summary-row label="Initial start date">@customer.InitialStartDate.ToString("d MMMM yyyy")</govuk-summary-row>
-    <govuk-summary-row label="Payment (non-UK)">@(customer.PaymentNonUK ? "Yes" : "No")</govuk-summary-row>
+    <govuk-summary-row label="Payment Non-UK">@(customer.PaymentNonUK ? "Yes" : "No")</govuk-summary-row>
     <govuk-summary-row label="Customer Type">@Model.CustomerTypeName</govuk-summary-row>
     <govuk-summary-row label="VAT Number">@customer.VatNumber</govuk-summary-row>
     <govuk-summary-row label="Account Number">@customer.AccountNumber</govuk-summary-row>

@@ -8,8 +8,33 @@ internal sealed class FakeSchemeRepository : ISchemeRepository
 {
     private readonly Dictionary<Guid, PTL.Core.Scheme.Scheme> _schemes = [];
 
+    // Simulates a concurrent delete between UpdateSchemeAsync's existence check and its actual
+    // update call - SchemeService must treat a null UpdateAsync result as "not found", not throw.
+    public bool ForceUpdateReturnsNull { get; set; }
+
     public Task<PTL.Core.Scheme.Scheme?> GetByIdAsync(Guid schemeId, CancellationToken cancellationToken = default) =>
         Task.FromResult(_schemes.TryGetValue(schemeId, out var scheme) ? Clone(scheme) : null);
+
+    public Task<IReadOnlyList<SchemeSummaryEntity>> GetAllSummariesAsync(CancellationToken cancellationToken = default)
+    {
+        IReadOnlyList<SchemeSummaryEntity> summaries = _schemes.Values
+            .GroupBy(s => s.SharedId)
+            .Select(family =>
+            {
+                var mostRecent = family.OrderByDescending(s => s.YearId).First();
+                return new SchemeSummaryEntity
+                {
+                    SharedId = family.Key,
+                    YearId = mostRecent.YearId,
+                    RecentSchemeId = mostRecent.SchemeId,
+                    RecentIdentifier = mostRecent.Identifier,
+                    RecentName = mostRecent.Name
+                };
+            })
+            .ToList();
+
+        return Task.FromResult(summaries);
+    }
 
     public Task<IReadOnlyList<SchemeSummaryEntity>> GetSummariesByYearAsync(int yearId, CancellationToken cancellationToken = default)
     {
@@ -76,7 +101,7 @@ internal sealed class FakeSchemeRepository : ISchemeRepository
 
     public Task<PTL.Core.Scheme.Scheme?> UpdateAsync(PTL.Core.Scheme.Scheme scheme, CancellationToken cancellationToken = default)
     {
-        if (!_schemes.TryGetValue(scheme.SchemeId, out var existing))
+        if (ForceUpdateReturnsNull || !_schemes.TryGetValue(scheme.SchemeId, out var existing))
         {
             return Task.FromResult<PTL.Core.Scheme.Scheme?>(null);
         }
@@ -159,6 +184,10 @@ internal sealed class FakeSchemeRepository : ISchemeRepository
         Assessor4 = source.Assessor4,
         StandardTabulationText = source.StandardTabulationText,
         LastModified = source.LastModified,
-        IsReadOnly = source.IsReadOnly
+        IsReadOnly = source.IsReadOnly,
+        Prices = [.. source.Prices],
+        ViewerIds = [.. source.ViewerIds],
+        Tests = [.. source.Tests],
+        Tabulations = [.. source.Tabulations]
     };
 }

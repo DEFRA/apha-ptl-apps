@@ -9,7 +9,9 @@ public interface ISchemeApiClient
 {
     Task<SchemeResponse?> GetSchemeAsync(Guid schemeId, CancellationToken cancellationToken = default);
     Task<SchemeSearchResponse> GetSchemesForYearAsync(SchemeSearchRequest request, CancellationToken cancellationToken = default);
+    Task<SchemeSearchResponse> GetSchemeFamiliesAsync(int page, int pageSize, string? searchTerm = null, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<SchemeHistoryResponse>> GetSchemeHistoryAsync(Guid sharedId, CancellationToken cancellationToken = default);
+    Task<SchemeResponse?> RenewSchemeAsync(Guid schemeId, CancellationToken cancellationToken = default);
     Task<SchemeSaveResult> CreateSchemeAsync(SchemeRequest request, CancellationToken cancellationToken = default);
     Task<SchemeSaveResult> UpdateSchemeAsync(Guid schemeId, SchemeRequest request, CancellationToken cancellationToken = default);
 }
@@ -37,10 +39,29 @@ public sealed class SchemeApiClient(HttpClient httpClient) : ISchemeApiClient
         return result ?? new SchemeSearchResponse([], 0, request.Page, request.PageSize);
     }
 
+    public async Task<SchemeSearchResponse> GetSchemeFamiliesAsync(int page, int pageSize, string? searchTerm = null, CancellationToken cancellationToken = default)
+    {
+        var query = $"page={page}&pageSize={pageSize}&searchTerm={Uri.EscapeDataString(searchTerm ?? string.Empty)}";
+        var result = await httpClient.GetFromJsonAsync<SchemeSearchResponse>($"/api/schemes/families?{query}", cancellationToken);
+        return result ?? new SchemeSearchResponse([], 0, page, pageSize);
+    }
+
     public async Task<IReadOnlyList<SchemeHistoryResponse>> GetSchemeHistoryAsync(Guid sharedId, CancellationToken cancellationToken = default)
     {
         var result = await httpClient.GetFromJsonAsync<List<SchemeHistoryResponse>>($"/api/schemes/families/{sharedId}/history", cancellationToken);
         return result ?? [];
+    }
+
+    public async Task<SchemeResponse?> RenewSchemeAsync(Guid schemeId, CancellationToken cancellationToken = default)
+    {
+        var response = await httpClient.GetAsync($"/api/schemes/{schemeId}/renew", cancellationToken);
+        if (response.StatusCode == HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<SchemeResponse>(cancellationToken);
     }
 
     public async Task<SchemeSaveResult> CreateSchemeAsync(SchemeRequest request, CancellationToken cancellationToken = default)

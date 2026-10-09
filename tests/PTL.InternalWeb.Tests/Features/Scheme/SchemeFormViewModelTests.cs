@@ -70,4 +70,80 @@ public class SchemeFormViewModelTests
 
         Assert.DoesNotContain(errors, e => e.MemberNames.Contains(nameof(model.DataConsentDeclarationText)));
     }
+
+    [Fact]
+    public void Validate_InstructionsRendersAsEmpty_ReturnsInstructionsError()
+    {
+        // An empty paragraph passes [Required] (the markup itself is non-empty) but legacy
+        // measured the visible text, so this must still be rejected.
+        var model = new PTL.InternalWeb.Features.Scheme.SchemeFormViewModel
+        {
+            DistributionMonthApr = true,
+            Instructions = "<p></p>"
+        };
+
+        var errors = Validate(model);
+
+        Assert.Contains(errors, e => e.MemberNames.Contains(nameof(model.Instructions)));
+    }
+
+    [Fact]
+    public void Validate_InstructionsHasVisibleText_NoInstructionsError()
+    {
+        var model = new PTL.InternalWeb.Features.Scheme.SchemeFormViewModel
+        {
+            DistributionMonthApr = true,
+            Instructions = "<p>Follow the packing instructions.</p>"
+        };
+
+        var errors = Validate(model);
+
+        Assert.DoesNotContain(errors, e => e.MemberNames.Contains(nameof(model.Instructions)));
+    }
+
+    [Fact]
+    public void Validate_FewerThanTwoTabulationsOnNonAssessmentScheme_ForwardsTheTabulationsError()
+    {
+        // SchemeValidator's "Tabulations" error is a forwarded domain field, so it must surface on
+        // the view model even though no single input on the form owns it.
+        var model = new PTL.InternalWeb.Features.Scheme.SchemeFormViewModel
+        {
+            DistributionMonthApr = true,
+            RequiresAssessment = false,
+        };
+
+        var errors = Validate(model);
+
+        Assert.Contains(errors, e => e.MemberNames.Contains("Tabulations"));
+    }
+
+    [Fact]
+    public void Validate_SampleOriginMissing_DoesNotSurfaceAsAFormViewModelError()
+    {
+        // SampleOrigin already has its own [Required] attribute on the view model, so
+        // SchemeValidator's identical domain-level error is not a forwarded field and must be
+        // filtered out here rather than duplicated.
+        var model = new PTL.InternalWeb.Features.Scheme.SchemeFormViewModel
+        {
+            DistributionMonthApr = true,
+            SampleOrigin = null,
+        };
+
+        var errors = Validate(model);
+
+        Assert.DoesNotContain(errors, e => e.MemberNames.Contains(nameof(model.SampleOrigin)));
+    }
+
+    [Fact]
+    public void CheckboxId_ReplacesIndexerAndPropertyPunctuationWithUnderscores()
+    {
+        var itemId = Guid.NewGuid();
+        var checkbox = new PTL.InternalWeb.Features.Scheme.SchemeTabulationItemCheckboxViewModel(
+            FieldName: "Tabulations[0].ResultItemIds",
+            ItemId: itemId,
+            Selected: true,
+            Label: "Titre in Published");
+
+        Assert.Equal($"Tabulations_0__ResultItemIds{itemId:N}", checkbox.CheckboxId);
+    }
 }

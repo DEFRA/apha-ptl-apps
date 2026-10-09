@@ -18,7 +18,7 @@ internal sealed class FakeLookupApiClient : ILookupApiClient
     public IReadOnlyList<YearResponse> WeightedPricingYears { get; set; } = [];
     public IReadOnlyList<SchemeCurrencyResponse> SchemeCurrencies { get; set; } = [];
     public IReadOnlyList<PostagePricingPlanResponse> PostagePricingPlans { get; set; } = [];
-    public SystemSettingsResponse SystemSettings { get; set; } = new(string.Empty);
+    public SystemSettingsResponse SystemSettings { get; set; } = new(string.Empty, new DateTime(2025, 4, 1));
     public IReadOnlyList<GroupAddressResponse> GroupAddresses { get; set; } = [];
 
     public Task<IReadOnlyList<CountryResponse>> GetCountriesAsync(CancellationToken cancellationToken = default) =>
@@ -56,4 +56,40 @@ internal sealed class FakeLookupApiClient : ILookupApiClient
 
     public Task<IReadOnlyList<GroupAddressResponse>> GetGroupAddressesAsync(CancellationToken cancellationToken = default) =>
         Task.FromResult(GroupAddresses);
+
+    public IReadOnlyList<ScheduleResponse> Schedules { get; set; } = [];
+    public IReadOnlyList<ScheduleCodeResponse> ScheduleCodes { get; set; } = [];
+    public IReadOnlyList<DayResponse> Days { get; set; } = [];
+    public PTL.Contracts.Scheme.SchemeMonthEditabilityResponse SchemeMonthEditability { get; set; } =
+        new(true, true, true, true, true, true, true, true, true, true, true, true);
+
+    public Task<PTL.Contracts.Scheme.SchemeMonthEditabilityResponse> GetSchemeMonthEditabilityAsync(int yearId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(SchemeMonthEditability);
+
+    public Task<IReadOnlyList<ScheduleResponse>> GetSchedulesAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult(Schedules);
+
+    public Task<IReadOnlyList<ScheduleCodeResponse>> GetScheduleCodesAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult(ScheduleCodes);
+
+    public Task<IReadOnlyList<DayResponse>> GetDaysAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult(Days);
+
+    public IReadOnlyList<SchemeUserResponse> TestConsultants { get; set; } = [];
+    public IReadOnlyList<SchemeUserResponse> Assessors { get; set; } = [];
+    public IReadOnlyList<PTL.Contracts.Participant.ViewerResponse> Viewers { get; set; } = [];
+
+    public Task<IReadOnlyList<SchemeUserResponse>> GetTestConsultantsAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult(TestConsultants);
+
+    public Task<IReadOnlyList<SchemeUserResponse>> GetAssessorsAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult(Assessors);
+
+    public Task<IReadOnlyList<PTL.Contracts.Participant.ViewerResponse>> GetViewersAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult(Viewers);
+
+    public IReadOnlyList<SchemeItemTypeResponse> SchemeItemTypes { get; set; } = [];
+
+    public Task<IReadOnlyList<SchemeItemTypeResponse>> GetSchemeItemTypesAsync(SchemeItemTypeKind kind, int yearId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(SchemeItemTypes);
 }

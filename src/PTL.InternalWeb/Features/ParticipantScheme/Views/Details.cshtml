@@ -3,15 +3,19 @@
     ViewData["Title"] = Model.IsReadOnly ? "Contract Item (Removed)" : "Contract Item Details";
 }
 
-
-<h1 class="govuk-heading-l">@ViewData["Title"]</h1>
+<div class="govuk-grid-row">
+    <div class="govuk-grid-column-two-thirds">
+        <h1 class="govuk-heading-l">@ViewData["Title"]</h1>
+    </div>
+    <div class="govuk-grid-column-one-third govuk-!-text-align-right">
+        @if (!Model.IsReadOnly)
+        {
+            <a class="govuk-button" data-module="govuk-button" asp-action="Edit" asp-route-id="@Model.Fields.ParticipantSchemeId">Edit Contract Item</a>
+        }
+    </div>
+</div>
 
 <p class="govuk-body"><strong>Participant:</strong> @Model.Fields.ParticipantDisplayName</p>
 <p class="govuk-body"><strong>Scheme:</strong> @Model.Fields.SchemeDisplayName</p>
 
 <partial name="_ParticipantSchemeFields" model="Model.Fields" />
-
-@if (!Model.IsReadOnly)
-{
-    <a class="govuk-button" data-module="govuk-button" asp-action="Edit" asp-route-id="@Model.Fields.ParticipantSchemeId">Edit</a>
-}

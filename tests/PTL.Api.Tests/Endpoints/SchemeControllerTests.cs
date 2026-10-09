@@ -11,9 +11,10 @@ namespace PTL.Api.Tests.Endpoints;
 
 public class SchemeControllerTests
 {
+    private static readonly Guid TestConsultantTabulationId = Guid.NewGuid();
     private static SchemeController CreateController(FakeSchemeRepository repository)
     {
-        var controller = new SchemeController(new SchemeService(repository, NullLogger<SchemeService>.Instance), NullLogger<SchemeController>.Instance);
+        var controller = new SchemeController(new SchemeService(repository, new PTL.Api.Tests.Lookup.FakeLookupRepository(), new PTL.Api.Tests.Participant.FakeViewerRepository(), NullLogger<SchemeService>.Instance), NullLogger<SchemeController>.Instance);
 
         // ValidationProblem() resolves ProblemDetailsFactory from HttpContext.RequestServices,
         // which a bare controller instance does not have without this wiring.
@@ -70,17 +71,24 @@ public class SchemeControllerTests
         DateOfReceipt: false,
         StorageConditions: false,
         ConditionOnReceipt: false,
-        TestConsultant1: null,
+        TestConsultant1: Guid.NewGuid(),
         TestConsultant2: null,
         TestConsultant3: null,
-        TestConsultantTabulationId: null,
+        TestConsultantTabulationId: TestConsultantTabulationId,
         UseExternalReference: false,
         StoreRatings: false,
         Assessor1: null,
         Assessor2: null,
         Assessor3: null,
         Assessor4: null,
-        StandardTabulationText: null);
+        StandardTabulationText: null,
+        // A non-assessment scheme needs one tabulation for the Test Consultant and one that can
+        // be published.
+        Tabulations:
+        [
+            new SchemeTabulationRequest(TestConsultantTabulationId, "Test Consultant", false, false, false, true, true, [], []),
+            new SchemeTabulationRequest(Guid.NewGuid(), "Published", false, false, false, true, true, [], [])
+        ]);
 
     private static SchemeRequest ToUpdateRequest(SchemeRequest request) => request;
 
@@ -119,6 +127,66 @@ public class SchemeControllerTests
     }
 
     [Fact]
+    public async Task CreateScheme_WithTestsAndCategories_RoundTripsTheWholeTree()
+    {
+        var controller = CreateController(new FakeSchemeRepository());
+        var testId = Guid.NewGuid();
+        var resultItem = new SchemeTestItemRequest(Guid.NewGuid(), Guid.NewGuid());
+        var methodItem = new SchemeTestItemRequest(Guid.NewGuid(), Guid.NewGuid());
+        var criterion = new SchemeTestItemRequest(Guid.NewGuid(), Guid.NewGuid());
+        var category = new SchemeCategoryItemRequest(Guid.NewGuid(), Guid.NewGuid(), [criterion]);
+        var request = ValidCreateRequest() with
+        {
+            RequiresAssessment = true,
+            Assessor1 = Guid.NewGuid(),
+            Assessor2 = Guid.NewGuid(),
+            Tests = [new SchemeTestRequest(testId, Guid.NewGuid(), [resultItem], [methodItem], [category])]
+        };
+
+        var created = await controller.CreateScheme(request, CancellationToken.None);
+
+        var schemeId = ((SchemeResponse)((CreatedAtActionResult)created.Result!).Value!).SchemeId;
+        var result = await controller.GetScheme(schemeId, CancellationToken.None);
+        var response = Assert.IsType<SchemeResponse>(Assert.IsType<OkObjectResult>(result.Result).Value);
+
+        var test = Assert.Single(response.Tests!);
+        Assert.Equal(testId, test.TestId);
+        Assert.Equal(resultItem.ItemId, Assert.Single(test.ResultItems).ItemId);
+        Assert.Equal(methodItem.ItemId, Assert.Single(test.MethodItems).ItemId);
+        var returnedCategory = Assert.Single(test.Categories);
+        Assert.Equal(category.CategoryItemId, returnedCategory.CategoryItemId);
+        Assert.Equal(criterion.ItemId, Assert.Single(returnedCategory.Criteria).ItemId);
+    }
+
+    [Fact]
+    public async Task RenewScheme_UnknownScheme_ReturnsNotFound()
+    {
+        var controller = CreateController(new FakeSchemeRepository());
+
+        var result = await controller.RenewScheme(Guid.NewGuid(), CancellationToken.None);
+
+        Assert.IsType<NotFoundResult>(result.Result);
+    }
+
+    [Fact]
+    public async Task RenewScheme_ExistingScheme_ReturnsOkWithDraftForNextYear()
+    {
+        var controller = CreateController(new FakeSchemeRepository());
+        var request = ValidCreateRequest();
+        var created = await controller.CreateScheme(request, CancellationToken.None);
+        var original = (SchemeResponse)((CreatedAtActionResult)created.Result!).Value!;
+
+        var result = await controller.RenewScheme(original.SchemeId, CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var renewed = Assert.IsType<SchemeResponse>(ok.Value);
+        Assert.Equal(Guid.Empty, renewed.SchemeId);
+        Assert.Equal(original.SharedId, renewed.SharedId);
+        Assert.Equal(original.YearId + 1, renewed.YearId);
+        Assert.Equal(original.Identifier, renewed.Identifier);
+    }
+
+    [Fact]
     public async Task GetScheme_ExistingScheme_ReturnsOk()
     {
         var controller = CreateController(new FakeSchemeRepository());
@@ -150,7 +218,9 @@ public class SchemeControllerTests
         Assert.Equal(request.Name, response.Name);
         Assert.Equal(request.ScheduleId, response.ScheduleId);
         Assert.Equal(request.ScheduleCodeId, response.ScheduleCodeId);
-        Assert.Equal(request.StartDate, response.StartDate);
+        // StartDate is derived from the distribution months (legacy RecalucalateStartDate), not
+        // the posted value - the fixture distributes in April, so the scheme starts 1 April.
+        Assert.Equal(new DateTime(request.YearId, 4, 1), response.StartDate);
         Assert.Equal(request.DistributionMonthApr, response.DistributionMonthApr);
         Assert.Equal(request.DistributionMonthMay, response.DistributionMonthMay);
         Assert.Equal(request.DistributionMonthJun, response.DistributionMonthJun);

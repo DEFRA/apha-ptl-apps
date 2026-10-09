@@ -8,7 +8,7 @@ namespace PTL.Api.Tests.Endpoints;
 public class LookupControllerTests
 {
     private static LookupController CreateController(FakeLookupRepository repository) =>
-        new(new LookupService(repository));
+        new(new LookupService(repository), new PTL.Api.Tests.Participant.FakeViewerRepository());
 
     [Fact]
     public async Task GetCountries_ReturnsMappedResponses()
@@ -39,6 +39,53 @@ public class LookupControllerTests
         var currencies = Assert.IsType<IReadOnlyList<PTL.Contracts.Lookup.CurrencyResponse>>(ok.Value, exactMatch: false);
         Assert.Single(currencies);
         Assert.Equal("£ - British Pound", currencies[0].LongName);
+    }
+
+    [Fact]
+    public async Task GetTestConsultants_ExcludesInactiveAndFlagsExternalConsultants()
+    {
+        var internalId = Guid.NewGuid();
+        var externalId = Guid.NewGuid();
+        var repository = new FakeLookupRepository
+        {
+            TestConsultants =
+            [
+                new SchemeUserEntity { UserId = internalId, FriendlyName = "Internal TC", IsExternal = false },
+                new SchemeUserEntity { UserId = externalId, FriendlyName = "External TC", IsExternal = true },
+                new SchemeUserEntity { UserId = Guid.NewGuid(), FriendlyName = "Retired TC", IsInactive = true }
+            ]
+        };
+        var controller = CreateController(repository);
+
+        var result = await controller.GetTestConsultants(CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var consultants = Assert.IsType<IReadOnlyList<PTL.Contracts.Lookup.SchemeUserResponse>>(ok.Value, exactMatch: false);
+        Assert.Equal(2, consultants.Count);
+        Assert.False(consultants.Single(c => c.UserId == internalId).IsExternal);
+        Assert.True(consultants.Single(c => c.UserId == externalId).IsExternal);
+    }
+
+    [Fact]
+    public async Task GetAssessors_ExcludesInactiveAssessors()
+    {
+        var assessorId = Guid.NewGuid();
+        var repository = new FakeLookupRepository
+        {
+            Assessors =
+            [
+                new SchemeUserEntity { UserId = assessorId, FriendlyName = "Active Assessor" },
+                new SchemeUserEntity { UserId = Guid.NewGuid(), FriendlyName = "Retired Assessor", IsInactive = true }
+            ]
+        };
+        var controller = CreateController(repository);
+
+        var result = await controller.GetAssessors(CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var assessors = Assert.IsType<IReadOnlyList<PTL.Contracts.Lookup.SchemeUserResponse>>(ok.Value, exactMatch: false);
+        var assessor = Assert.Single(assessors);
+        Assert.Equal(assessorId, assessor.UserId);
     }
 
     [Fact]
@@ -197,5 +244,98 @@ public class LookupControllerTests
         var ok = Assert.IsType<OkObjectResult>(result.Result);
         var settings = Assert.IsType<PTL.Contracts.Lookup.SystemSettingsResponse>(ok.Value);
         Assert.Equal("UT3/306", settings.UTNumber);
+    }
+
+    [Fact]
+    public async Task GetViewers_ReturnsMappedResponses()
+    {
+        var viewerRepository = new PTL.Api.Tests.Participant.FakeViewerRepository();
+        viewerRepository.Viewers.Add(new PTL.Core.Viewer.ViewerEntity { ViewerId = Guid.NewGuid(), Name = "A Viewer", Email = "viewer@example.com" });
+        var controller = new LookupController(new LookupService(new FakeLookupRepository()), viewerRepository);
+
+        var result = await controller.GetViewers(CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var viewers = Assert.IsType<IReadOnlyList<PTL.Contracts.Participant.ViewerResponse>>(ok.Value, exactMatch: false);
+        Assert.Single(viewers);
+        Assert.Equal("A Viewer", viewers[0].Name);
+    }
+
+    [Fact]
+    public async Task GetSchedules_ReturnsMappedResponses()
+    {
+        var scheduleId = Guid.NewGuid();
+        var repository = new FakeLookupRepository { Schedules = [new ScheduleEntity { ScheduleId = scheduleId, Schedule = "Monthly" }] };
+        var controller = CreateController(repository);
+
+        var result = await controller.GetSchedules(CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var schedules = Assert.IsType<IReadOnlyList<PTL.Contracts.Lookup.ScheduleResponse>>(ok.Value, exactMatch: false);
+        Assert.Single(schedules);
+        Assert.Equal(scheduleId, schedules[0].ScheduleId);
+    }
+
+    [Fact]
+    public async Task GetScheduleCodes_ReturnsMappedResponses()
+    {
+        var scheduleCodeId = Guid.NewGuid();
+        var repository = new FakeLookupRepository { ScheduleCodes = [new ScheduleCodeEntity { ScheduleCodeId = scheduleCodeId, ScheduleCode = "M" }] };
+        var controller = CreateController(repository);
+
+        var result = await controller.GetScheduleCodes(CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var scheduleCodes = Assert.IsType<IReadOnlyList<PTL.Contracts.Lookup.ScheduleCodeResponse>>(ok.Value, exactMatch: false);
+        Assert.Single(scheduleCodes);
+        Assert.Equal(scheduleCodeId, scheduleCodes[0].ScheduleCodeId);
+    }
+
+    [Fact]
+    public async Task GetDays_ReturnsMappedResponses()
+    {
+        var dayId = Guid.NewGuid();
+        var repository = new FakeLookupRepository { Days = [new DayEntity { DayId = dayId, Day = "Monday" }] };
+        var controller = CreateController(repository);
+
+        var result = await controller.GetDays(CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var days = Assert.IsType<IReadOnlyList<PTL.Contracts.Lookup.DayResponse>>(ok.Value, exactMatch: false);
+        Assert.Single(days);
+        Assert.Equal(dayId, days[0].DayId);
+    }
+
+    [Fact]
+    public async Task GetSchemeMonthEditability_ReturnsEditabilityForTheGivenYear()
+    {
+        var repository = new FakeLookupRepository
+        {
+            SystemSettings = new PTL.Core.Lookup.SystemSettingsEntity { ContractStartDate = new DateTime(2026, 4, 1) },
+            MonthlyDistributions = [new MonthlyDistributionEntity { YearId = 2026, MonthId = 6 }],
+        };
+        var controller = CreateController(repository);
+
+        var result = await controller.GetSchemeMonthEditability(2026, CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var editability = Assert.IsType<PTL.Contracts.Scheme.SchemeMonthEditabilityResponse>(ok.Value);
+        Assert.False(editability.Jun);
+        Assert.True(editability.May);
+    }
+
+    [Fact]
+    public async Task GetSchemeItemTypes_ReturnsMappedResponses()
+    {
+        var itemTypeId = Guid.NewGuid();
+        var repository = new FakeLookupRepository { SchemeItemTypes = [new SchemeItemTypeEntity { ItemTypeId = itemTypeId, Name = "Antibody", NoLongerInUse = false }] };
+        var controller = CreateController(repository);
+
+        var result = await controller.GetSchemeItemTypes(PTL.Contracts.Lookup.SchemeItemTypeKind.TestType, 2026, CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var itemTypes = Assert.IsType<IReadOnlyList<PTL.Contracts.Lookup.SchemeItemTypeResponse>>(ok.Value, exactMatch: false);
+        Assert.Single(itemTypes);
+        Assert.Equal(itemTypeId, itemTypes[0].ItemTypeId);
     }
 }

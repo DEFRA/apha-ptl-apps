@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Hosting;
 using PTL.ApiClient;
-using PTL.InternalWeb.Notifications;
+using PTL.SharedUI.Notifications;
 
 namespace PTL.InternalWeb.Features.Invoice;
 

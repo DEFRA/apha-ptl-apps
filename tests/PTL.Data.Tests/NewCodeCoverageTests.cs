@@ -6,6 +6,7 @@ using PTL.Contracts.Participant;
 using PTL.Core.Invoice;
 using PTL.Core.Notifications;
 using PTL.Core.Participant;
+using PTL.Core.Scheme;
 using PTL.Core.Viewer;
 using PTL.Data.Infrastructure;
 using PTL.Data.Notifications;
@@ -13,6 +14,7 @@ using PTL.Data.Participant;
 using PTL.Data.Storage;
 using PTL.Data.Tests.Fakes;
 using PTL.Data.Viewer;
+using CoreScheme = PTL.Core.Scheme.Scheme;
 
 namespace PTL.Data.Tests;
 
@@ -272,6 +274,60 @@ public class NewCodeCoverageTests
         Assert.True(response.IsActive);
         Assert.Equal(available, response.AvailableViewers);
         Assert.Equal(assigned, response.AssignedViewers);
+    }
+
+    [Fact]
+    public void SchemeIdentifier_Normalise_UsesLegacyRulesForWhitespaceAndNumericValues()
+    {
+        Assert.Equal(string.Empty, SchemeIdentifier.Normalise(null));
+        Assert.Equal(string.Empty, SchemeIdentifier.Normalise("   "));
+        Assert.Equal("PT0001", SchemeIdentifier.Normalise("0001"));
+        Assert.Equal("PT2025", SchemeIdentifier.Normalise(" 2025 "));
+        Assert.Equal("ABC123", SchemeIdentifier.Normalise("abc123"));
+        Assert.Equal("PTL-001", SchemeIdentifier.Normalise("ptl-001"));
+    }
+
+    [Fact]
+    public void SchemeStartDate_Calculate_UsesDistributionAndFallbackRules()
+    {
+        var contractStart = new DateTime(2026, 7, 1, 0, 0, 0, DateTimeKind.Unspecified);
+
+        var availableScheme = new CoreScheme
+        {
+            YearId = 2027,
+            DistributionAsAvailable = true
+        };
+
+        Assert.Equal(new DateTime(2027, 7, 1, 0, 0, 0, DateTimeKind.Unspecified),
+            SchemeStartDate.Calculate(availableScheme, contractStart));
+
+        var monthDrivenScheme = new CoreScheme
+        {
+            YearId = 2026,
+            DistributionMonthApr = true,
+            DistributionMonthMay = true,
+            DistributionMonthSep = true,
+            DistributionMonthOct = true
+        };
+
+        var janContractStart = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Unspecified);
+        Assert.Equal(new DateTime(2026, 4, 1, 0, 0, 0, DateTimeKind.Unspecified),
+            SchemeStartDate.Calculate(monthDrivenScheme, janContractStart));
+
+        var nextYearFallbackScheme = new CoreScheme
+        {
+            YearId = 2026,
+            DistributionMonthJan = true,
+            DistributionMonthFeb = true
+        };
+
+        var lateContractStart = new DateTime(2026, 12, 1, 0, 0, 0, DateTimeKind.Unspecified);
+        Assert.Equal(new DateTime(2027, 1, 1, 0, 0, 0, DateTimeKind.Unspecified),
+            SchemeStartDate.Calculate(nextYearFallbackScheme, lateContractStart));
+
+        var noDistributionScheme = new CoreScheme { YearId = 2026 };
+        Assert.Equal(new DateTime(2026, 7, 1, 0, 0, 0, DateTimeKind.Unspecified),
+            SchemeStartDate.Calculate(noDistributionScheme, contractStart));
     }
 
     private sealed class CapturingHandler : HttpMessageHandler

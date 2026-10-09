@@ -132,15 +132,15 @@ builder.Services.AddScoped<IPendingOrderRepository, PendingOrderRepository>();
 builder.Services.AddScoped<IPendingOrderService, PendingOrderService>();
 
 // Single shared S3 configuration root for every S3-backed feature (export templates, invoice
-// archives) - one bucket/region, one prefix per feature (docs/migration/invoice-migration.md).
+// archives) - one bucket, one prefix per feature (docs/migration/invoice-migration.md). Provider
+// and region never vary by environment, so they are not bound from configuration at all - see
+// PTL.Core.Storage.S3Options.DefaultRegion and the AddSingleton<IAmazonS3> registration below.
 builder.Services.Configure<PTL.Core.Storage.S3Options>(builder.Configuration.GetSection(PTL.Core.Storage.S3Options.SectionName));
 
 builder.Services.AddOptions<TemplateStorageOptions>()
     .Configure<IOptions<PTL.Core.Storage.S3Options>>((options, s3) =>
     {
-        options.Provider = s3.Value.Provider;
-        options.BucketName = s3.Value.BucketName;
-        options.Region = s3.Value.Region;
+        options.BucketName = s3.Value.Bucket;
         options.Prefix = s3.Value.Templates.Prefix;
         options.MaxUploadBytes = s3.Value.Templates.MaxUploadBytes;
     });
@@ -152,12 +152,11 @@ builder.Services.AddScoped<IBulkExportService, BulkExportService>();
 // Use the AWS SDK default credential chain rather than hardcoded keys or appsettings credentials.
 // Local development resolves the authenticated IAM Identity Center profile; deployed environments
 // resolve the task/instance role automatically from the runtime environment.
-builder.Services.AddSingleton<Amazon.S3.IAmazonS3>(_ =>
-{
-    var region = builder.Configuration[$"{PTL.Core.Storage.S3Options.SectionName}:Region"];
-    return AwsS3ClientFactory.Create(region);
-});
+builder.Services.AddSingleton<Amazon.S3.IAmazonS3>(_ => AwsS3ClientFactory.Create(PTL.Core.Storage.S3Options.DefaultRegion));
 
+// "InMemory" is a local-developer-only convenience (set via an untracked appsettings.Development.
+// json) for running the feature before a bucket is provisioned - never present in any deployed
+// environment's configuration, so it is deliberately not a bound S3Options property.
 if (string.Equals(builder.Configuration[$"{PTL.Core.Storage.S3Options.SectionName}:Provider"], "InMemory", StringComparison.OrdinalIgnoreCase))
 {
     builder.Services.AddSingleton<ITemplateStorageService, InMemoryTemplateStorageService>();
@@ -202,9 +201,7 @@ builder.Services.AddScoped<IInvoiceService, InvoiceService>();
 builder.Services.AddOptions<InvoiceStorageOptions>()
     .Configure<IOptions<PTL.Core.Storage.S3Options>>((options, s3) =>
     {
-        options.Provider = s3.Value.Provider;
-        options.BucketName = s3.Value.BucketName;
-        options.Region = s3.Value.Region;
+        options.BucketName = s3.Value.Bucket;
         options.Prefix = s3.Value.Invoices.Prefix;
     });
 if (string.Equals(builder.Configuration[$"{PTL.Core.Storage.S3Options.SectionName}:Provider"], "InMemory", StringComparison.OrdinalIgnoreCase))
@@ -220,6 +217,7 @@ else
 // INotifyClient only, never SMTP/EmailHelper (docs/migration/email-notification-migration.md).
 builder.Services.Configure<NotifyOptions>(builder.Configuration.GetSection(NotifyOptions.SectionName));
 builder.Services.Configure<InvoiceNotificationOptions>(builder.Configuration.GetSection(InvoiceNotificationOptions.SectionName));
+builder.Services.Configure<PTL.Core.Configuration.InternalOptions>(builder.Configuration.GetSection(PTL.Core.Configuration.InternalOptions.SectionName));
 builder.Services.AddHttpClient<INotifyClient, NotifyClient>((services, client) =>
 {
     // BaseUrl is always sourced from appsettings.json/environment (Notification:BaseUrl) - no

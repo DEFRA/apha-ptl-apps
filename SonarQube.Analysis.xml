@@ -26,7 +26,7 @@
        percentage calculation, not issue analysis - coverage for test files themselves is not
        meaningful anyway since they're excluded from the "Test" source set's coverage goal by
        convention, not by this property. -->
-  <Property Name="sonar.coverage.exclusions">**/Program.cs,**/Properties/AssemblyInfo.cs,**/CidmAuthenticationExtensions.cs</Property>
+  <Property Name="sonar.coverage.exclusions">**/Program.cs,**/Properties/AssemblyInfo.cs,**/CidmAuthenticationExtensions.cs,**/wwwroot/js/**</Property>
 
   <!-- Report locations produced by `dotnet test` in the CI pipeline -->
   <Property Name="sonar.cs.vstest.reportsPaths">**/*.trx</Property>

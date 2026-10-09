@@ -228,16 +228,30 @@ public static class SideNavigationProvider
                     ActionName = IndexAction,
                     Children =
                     [
-                        new SideNavigationItem { Text = "Create Scheme", ControllerName = SchemeControllerName, ActionName = CreateAction },
+                        // Legacy's two separate entry points: Web.sitemap's "Create Scheme for Next
+                        // Year" and the "Create Scheme for Current Year" item SchemeList.aspx adds.
+                                                new SideNavigationItem { Text = "Create Scheme for Current Year", ControllerName = SchemeControllerName, ActionName = "CreateForCurrentYear" },
+                        new SideNavigationItem { Text = "Create Scheme for Next Year", ControllerName = SchemeControllerName, ActionName = CreateAction },
+                        new SideNavigationItem { Text = "Printable Schemes", ControllerName = SchemeControllerName, ActionName = "PrintableSchemes" },
+
 
                         // Hidden: not menu entries, but present so Details/Edit pages resolve a full
                         // breadcrumb trail instead of a plain controller/action crumb.
                         new SideNavigationItem { Text = "Scheme Details", ControllerName = SchemeControllerName, ActionName = DetailsAction, IsHidden = true },
                         new SideNavigationItem { Text = "Edit Scheme", ControllerName = SchemeControllerName, ActionName = EditAction, IsHidden = true },
 
+                        // Hidden: Renew reuses the Create view/action but needs its own breadcrumb
+                        // leaf - Home > Manage Schemes > Scheme > Scheme - Renew - rather than
+                        // falling back to a plain controller/action crumb.
+                        new SideNavigationItem { Text = "Scheme - Renew", ControllerName = SchemeControllerName, ActionName = "Renew", IsHidden = true },
+
                         // Hidden: only reached from a specific scheme's Details page ("View family
                         // history" link), not listed as a Scheme List child - same hidden pattern.
-                        new SideNavigationItem { Text = "Scheme History", ControllerName = SchemeControllerName, ActionName = "History", IsHidden = true }
+                        new SideNavigationItem { Text = "Scheme History", ControllerName = SchemeControllerName, ActionName = "History", IsHidden = true },
+
+                        // Hidden: legacy "Printable Scheme" (singular) is a hidden sitemap node too,
+                        // reached only via the Printable Schemes list's View links.
+                        new SideNavigationItem { Text = "Printable Scheme", ControllerName = SchemeControllerName, ActionName = "PrintableScheme", IsHidden = true }
                     ]
                 },
                 Disabled("Search"),
