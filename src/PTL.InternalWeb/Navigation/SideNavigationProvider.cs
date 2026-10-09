@@ -27,6 +27,7 @@ public static class SideNavigationProvider
     private const string GroupAddressControllerName = "GroupAddress";
     private const string ParticipantSchemeControllerName = "ParticipantScheme";
     private const string SystemAdministrationControllerName = "SystemAdministration";
+    private const string DistributionControllerName = "Distribution";
 
     // Placeholder for a menu entry whose page hasn't been migrated yet - see class remarks.
     private static SideNavigationItem Disabled(string text) => new() { Text = text, IsEnabled = false };
@@ -249,7 +250,21 @@ public static class SideNavigationProvider
                 Disabled("Criterion Items")
             ]
         },
-        Disabled("Distributions"),
+        new SideNavigationItem
+        {
+            Text = "Distributions",
+            ControllerName = DistributionControllerName,
+            ActionName = IndexAction,
+            Children =
+            [
+                // Legacy sitemap siblings of MenuDistributions.aspx - not implemented yet (only
+                // the dashboard itself is in scope for this story), shown disabled so the overall
+                // menu shape matches legacy until each is migrated.
+                Disabled("Participant Address Labels"),
+                Disabled("Group Address Labels"),
+                Disabled("Search")
+            ]
+        },
         Disabled("Test Consultant"),
         Disabled("Assessor"),
         Disabled("Results Sign-Off")

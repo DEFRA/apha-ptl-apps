@@ -143,6 +143,13 @@ public static class ApiClientServiceCollectionExtensions
         })
             .AddStandardResilienceHandler();
 
+        services.AddHttpClient<PTL.ApiClient.Distribution.IDistributionApiClient, PTL.ApiClient.Distribution.DistributionApiClient>(client =>
+        {
+            client.BaseAddress = new Uri(apiBaseUrl);
+        })
+            .AddHttpMessageHandler<CorrelationIdDelegatingHandler>()
+            .AddStandardResilienceHandler();
+
         services.AddHealthChecks()
             .AddCheck<ApiConnectivityHealthCheck>("api-connectivity");
 

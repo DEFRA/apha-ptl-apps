@@ -10,6 +10,7 @@ using PTL.Core.Contract.Renew;
 using PTL.Core.Contract.Renewal;
 using PTL.Core.Contract.SampleAddress;
 using PTL.Core.Customer;
+using PTL.Core.Distribution;
 using PTL.Core.GroupAddress;
 using PTL.Core.InternalUser;
 using PTL.Core.Invoice;
@@ -652,6 +653,27 @@ public static class DapperColumnMappings
         {
             [ColYearId] = nameof(MonthlyDistributionEntity.YearId),
             ["fldMonthId"] = nameof(MonthlyDistributionEntity.MonthId),
+        });
+
+        Map<DistributionMonthSummaryEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldMonthlyDistributionId"] = nameof(DistributionMonthSummaryEntity.MonthlyDistributionId),
+            [ColYearId] = nameof(DistributionMonthSummaryEntity.YearId),
+            ["fldMonthId"] = nameof(DistributionMonthSummaryEntity.MonthId),
+            ["fldNumberOfSchemes"] = nameof(DistributionMonthSummaryEntity.NumberOfSchemes),
+            ["fldNumberOfSampleNumbersDefined"] = nameof(DistributionMonthSummaryEntity.NumberOfSampleNumbersDefined),
+            ["fldNumberOfPrepComplete"] = nameof(DistributionMonthSummaryEntity.NumberOfPrepComplete),
+            ["fldNumberOfParticipants"] = nameof(DistributionMonthSummaryEntity.NumberOfParticipants),
+            ["fldNumberOfPackagingComplete"] = nameof(DistributionMonthSummaryEntity.NumberOfPackagingComplete),
+            ["fldNumberOfResultsEntered"] = nameof(DistributionMonthSummaryEntity.NumberOfResultsEntered),
+            ["fldNumberOfTabulations"] = nameof(DistributionMonthSummaryEntity.NumberOfTabulations),
+            ["fldNumberOfCompleteTabulations"] = nameof(DistributionMonthSummaryEntity.NumberOfCompleteTabulations),
+        });
+
+        Map<DistributionMonthYearEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            [ColYearId] = nameof(DistributionMonthYearEntity.YearId),
+            ["fldMonthId"] = nameof(DistributionMonthYearEntity.MonthId),
         });
 
         Map<DayEntity>(new(StringComparer.OrdinalIgnoreCase)

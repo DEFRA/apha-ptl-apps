@@ -280,3 +280,29 @@ span.app-side-navigation__link--disabled {
   justify-content: center;
   min-height: var(--ptl-viewer-list-height);
 }
+
+/* Distribution Dashboard per-stage completion indicator - replaces legacy's ProgressBar image
+   control (progressBar.gif etc.) with an accessible div-based bar (role="progressbar" + the
+   percentage shown as real text, not only colour). */
+.ptl-progress-bar {
+  width: 100px;
+  height: 10px;
+  background-color: #f3f2f1;
+  border: 1px solid #b1b4b6;
+}
+
+.ptl-progress-bar__fill {
+  height: 100%;
+  background-color: #1d70b8;
+}
+
+.ptl-progress-bar__label {
+  display: inline-block;
+  margin-top: 2px;
+}
+
+.ptl-distribution-initialise-cell {
+  text-align: center;
+  vertical-align: middle;
+}
+
