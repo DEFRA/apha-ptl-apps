@@ -49,27 +49,16 @@ body {
   align-items: center;
 }
 
-.app-service-bar {
-  background: #ffffff;
-  border-bottom: 1px solid #b1b4b6;
-}
-
-.app-service-bar__container {
-  min-height: 70px;
-  display: flex;
-  align-items: center;
-}
-
-.app-service-bar__container a[aria-label="Home"] img {
-  height: 40px;
+.govuk-service-navigation__service-name img {
+  height: 80px;
   width: auto;
 }
 
-.app-account-panel {
+/* Not a built-in govuk-frontend default, but a common, GDS-compliant customisation used by
+   GOV.UK services to right-align account/utility links - visual order only, DOM order (so
+   reading/tab order) is unchanged. */
+.govuk-service-navigation__wrapper {
   margin-left: auto;
-  display: flex;
-  align-items: center;
-  gap: 1rem;
 }
 
 /* Inactive contracts render struck-through, matching legacy ContractList.aspx.vb

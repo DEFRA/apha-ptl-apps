@@ -1,4 +1,4 @@
-@model (string Text, string Href)
+@model (string Text, string? Description, string Href)
 @* Structure follows the DfE Frontend Card component (github.com/DFE-Digital/dfe-frontend,
    packages/components/card/template.njk) - no official govuk-frontend card component exists.
    The heading uses the stretched-link pattern (app-card-link--header) so the whole tile is
@@ -8,5 +8,9 @@
         <h3 class="govuk-heading-m">
             <a class="govuk-link govuk-link--no-visited-state app-card-link--header" href="@Model.Href">@Model.Text</a>
         </h3>
+        @if (!string.IsNullOrWhiteSpace(Model.Description))
+        {
+            <p class="govuk-body-s">@Model.Description</p>
+        }
     </div>
 </div>

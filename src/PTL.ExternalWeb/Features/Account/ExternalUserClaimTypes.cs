@@ -17,4 +17,8 @@ public static class ExternalUserClaimTypes
     /// <summary>The resolved Participant's lab code (legacy NavigationBar.ascx "Lab Number"), only
     /// present when the Participant role resolved.</summary>
     public const string LabCode = "labCode";
+
+    /// <summary>Present (value "true") only when the resolved Participant's Customer has
+    /// CanOrderOnline set - gates the Orders section (NavigationProvider).</summary>
+    public const string CanOrderOnline = "canOrderOnline";
 }

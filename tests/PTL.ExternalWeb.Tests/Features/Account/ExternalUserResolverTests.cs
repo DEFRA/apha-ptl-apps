@@ -87,6 +87,38 @@ public class ExternalUserResolverTests
     }
 
     [Fact]
+    public async Task ResolveAsync_CanOrderOnlineTrue_AddsCanOrderOnlineClaim()
+    {
+        var principal = CreatePrincipal(
+            new Claim(CidmClaimTypes.ContactId, Guid.NewGuid().ToString()),
+            new Claim(ClaimTypes.Role, "Participant"));
+        var apiClient = new FakeExternalUserApiClient(
+            new ResolveExternalUserResponse("Jane Doe", ["Participant"], Guid.NewGuid(), "LAB001", null, null, CanOrderOnline: true));
+        var resolver = new ExternalUserResolver(apiClient, Logger);
+
+        var result = await resolver.ResolveAsync(principal, CancellationToken.None);
+
+        Assert.True(result.IsAllowed);
+        Assert.Equal("true", result.Claims![ExternalUserClaimTypes.CanOrderOnline]);
+    }
+
+    [Fact]
+    public async Task ResolveAsync_CanOrderOnlineFalse_DoesNotAddCanOrderOnlineClaim()
+    {
+        var principal = CreatePrincipal(
+            new Claim(CidmClaimTypes.ContactId, Guid.NewGuid().ToString()),
+            new Claim(ClaimTypes.Role, "Participant"));
+        var apiClient = new FakeExternalUserApiClient(
+            new ResolveExternalUserResponse("Jane Doe", ["Participant"], Guid.NewGuid(), "LAB001", null, null, CanOrderOnline: false));
+        var resolver = new ExternalUserResolver(apiClient, Logger);
+
+        var result = await resolver.ResolveAsync(principal, CancellationToken.None);
+
+        Assert.True(result.IsAllowed);
+        Assert.False(result.Claims!.ContainsKey(ExternalUserClaimTypes.CanOrderOnline));
+    }
+
+    [Fact]
     public async Task ResolveAsync_DisplayName_PrefersFirstNameLastNameClaims()
     {
         var principal = CreatePrincipal(

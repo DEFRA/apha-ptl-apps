@@ -70,7 +70,7 @@ public partial class AccountRouteSmokeTests : IClassFixture<PtlInternalWebTestFa
         // absent, which _Header.cshtml already handles on its own (it's conditional on
         // User.Identity.IsAuthenticated, which is false here since no session exists yet).
         Assert.Contains("govuk-phase-banner", body);
-        Assert.Contains("app-service-bar", body);
+        Assert.Contains("govuk-service-navigation", body);
         Assert.DoesNotContain("Sign out", body);
         Assert.DoesNotContain("Signed in as", body);
     }

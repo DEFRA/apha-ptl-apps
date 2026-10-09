@@ -4,8 +4,17 @@
 @{
     ViewData["Title"] = "Home";
     var roles = User.GetResolvedExternalRoles();
+    var canOrderOnline = User.CanOrderOnline();
+    bool IsVisible(NavigationItem item) =>
+        (item.RequiredRole is null || roles.Contains(item.RequiredRole, StringComparer.OrdinalIgnoreCase))
+        && (!item.RequireCanOrderOnline || canOrderOnline);
+
+    // See _SideNavigation.cshtml for why groups and children are each filtered independently
+    // (Results has no group-level role - only its children do).
     var visibleSections = NavigationProvider.Build()
-        .Where(group => group.RequiredRole is null || roles.Contains(group.RequiredRole, StringComparer.OrdinalIgnoreCase))
+        .Where(IsVisible)
+        .Select(group => new { group.Text, Children = group.Children.Where(IsVisible).ToList() })
+        .Where(group => group.Children.Count > 0)
         .ToList();
 }
 
@@ -52,7 +61,7 @@
         @foreach (var item in group.Children)
         {
             var href = Url.Action(item.ActionName, item.ControllerName, new { title = item.Text });
-            @await Html.PartialAsync("_QuickLinkCard", (item.Text, href ?? "#"))
+            @await Html.PartialAsync("_QuickLinkCard", (item.Text, item.Description, href ?? "#"))
         }
     </div>
 }

@@ -18,13 +18,11 @@
         .app-signout-form { display: inline; margin: 0; }
         .app-signout-button { background: none; border: 0; padding: 0; font: inherit; cursor: pointer; }
         .govuk-header__container { min-height: 56px; display: flex; align-items: center; }
-        .app-service-bar { background: #ffffff; border-bottom: 1px solid #b1b4b6; }
-        .app-service-bar__container { min-height: 70px; display: flex; align-items: center; }
-        .app-account-panel { margin-left: auto; display: flex; align-items: center; gap: 1rem; }
-        .app-account-strip { background: #f3f2f1; border-bottom: 1px solid #b1b4b6; }
-        .app-account-strip__container { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem; min-height: 40px; padding-top: 5px; padding-bottom: 5px; }
-        .app-account-strip__item { margin: 0; }
-        .app-account-strip__item--grow { flex-grow: 1; }
+        .govuk-service-navigation__service-name img { height: 80px; width: auto; }
+        /* Not a built-in govuk-frontend default, but a common, GDS-compliant customisation used by
+           GOV.UK services to right-align account/utility links - visual order only, DOM order
+           (so reading/tab order) is unchanged. */
+        .govuk-service-navigation__wrapper { margin-left: auto; }
         .app-side-navigation__title { font-weight: 700; margin-top: 1rem; }
         .app-side-navigation__list { margin-bottom: 1.5rem; }
         .app-side-navigation__link--disabled { color: #505a5f; }
@@ -63,11 +61,7 @@
             || string.Equals(currentAction, "SignedOut", StringComparison.OrdinalIgnoreCase));
 }
 
-@await Html.PartialAsync("_Header", ("Proficiency Testing - External", "height:40px; width:auto;"))
-@if (!isAccountFlowPage)
-{
-    @await Html.PartialAsync("_AccountStrip")
-}
+@await Html.PartialAsync("_Header", ("Proficiency Testing - External", "height:80px; width:auto;"))
 <div class="govuk-width-container app-width-container">
     <main role="main" class="pb-3" id="main-content">
         @if (!isAccountFlowPage)

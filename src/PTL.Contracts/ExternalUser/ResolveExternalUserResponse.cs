@@ -7,4 +7,5 @@ public sealed record ResolveExternalUserResponse(
     Guid? ParticipantId,
     string? LabCode,
     Guid? ViewerId,
-    Guid? TestConsultantId);
+    Guid? TestConsultantId,
+    bool CanOrderOnline = false);

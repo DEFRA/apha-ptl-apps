@@ -31,6 +31,7 @@ public sealed class ExternalUserController(IExternalUserService externalUserServ
             result.ParticipantId,
             result.LabCode,
             result.ViewerId,
-            result.TestConsultantId));
+            result.TestConsultantId,
+            result.CanOrderOnline));
     }
 }

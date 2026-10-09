@@ -61,6 +61,11 @@ public sealed class ExternalUserResolver(IExternalUserApiClient externalUserApiC
             claims[ExternalUserClaimTypes.LabCode] = response.LabCode;
         }
 
+        if (response.CanOrderOnline)
+        {
+            claims[ExternalUserClaimTypes.CanOrderOnline] = "true";
+        }
+
         return CidmExternalUserResolution.Allow(claims);
     }
 

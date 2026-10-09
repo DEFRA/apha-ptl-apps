@@ -7,22 +7,47 @@
             </div>
         </div>
     </div>
-    <section aria-label="Service information" class="app-service-bar">
-        <div class="govuk-width-container app-service-bar__container">
-            <div>
-                <a asp-controller="Home" asp-action="Index" aria-label="Home">
+    <section aria-label="Service information" class="govuk-service-navigation" data-module="govuk-service-navigation">
+        <div class="govuk-width-container govuk-service-navigation__container">
+            <span class="govuk-service-navigation__service-name">
+                @* govuk-link-image gives an image-only link a clean focus outline instead of the
+                   text link's solid yellow background, which only showed through the logo's
+                   transparent gaps. *@
+                <a asp-controller="Home" asp-action="Index" class="govuk-service-navigation__link govuk-link-image" aria-label="Home">
                     <img src="~/assets/images/AphaLogo.png" alt="APHA" style="@Model.LogoStyle" />
                 </a>
-            </div>
+            </span>
             @if (User.Identity is not null && User.Identity.IsAuthenticated)
             {
-                <div class="app-account-panel">
-                    <span class="govuk-body govuk-!-margin-bottom-0">Signed in as: <strong>@User.Identity.Name</strong></span>
-                    <form asp-controller="Account" asp-action="Logout" method="post" class="app-signout-form">
-                        @Html.AntiForgeryToken()
-                        <button type="submit" class="app-signout-button govuk-link govuk-!-margin-bottom-0">Sign out</button>
-                    </form>
-                </div>
+                @* Raw claim names, not the typed ExternalUserClaimTypes/InternalUserClaimTypes
+                   constants - this partial is shared between both apps, neither of which
+                   references the other's project. displayName/fullName are each app's resolved
+                   friendly name; Identity.Name is a last-resort fallback (CIDM's id_token has no
+                   "name" claim without the "profile" scope, so it's usually empty for external
+                   users). *@
+                var labCode = User.FindFirst("labCode")?.Value;
+                var friendlyName = User.FindFirst("displayName")?.Value
+                    ?? User.FindFirst("fullName")?.Value
+                    ?? User.Identity.Name;
+                <nav aria-label="Account navigation" class="govuk-service-navigation__wrapper">
+                    <ul class="govuk-service-navigation__list">
+                        @if (!string.IsNullOrWhiteSpace(labCode))
+                        {
+                            <li class="govuk-service-navigation__item">
+                                Lab Number: <strong>@labCode</strong>
+                            </li>
+                        }
+                        <li class="govuk-service-navigation__item">
+                            Signed in as <strong>@friendlyName</strong>
+                        </li>
+                        <li class="govuk-service-navigation__item">
+                            <form asp-controller="Account" asp-action="Logout" method="post" class="app-signout-form">
+                                @Html.AntiForgeryToken()
+                                <button type="submit" class="app-signout-button govuk-service-navigation__link">Sign out</button>
+                            </form>
+                        </li>
+                    </ul>
+                </nav>
             }
         </div>
     </section>
@@ -32,6 +57,7 @@
                 Alpha
             </strong>
             <span class="govuk-phase-banner__text">
+                @* TODO: point feedback at a real destination (mailto/survey) before go-live *@
                 This is a new service – your <a class="govuk-link" href="#">feedback</a> will help us to improve it.
             </span>
         </p>

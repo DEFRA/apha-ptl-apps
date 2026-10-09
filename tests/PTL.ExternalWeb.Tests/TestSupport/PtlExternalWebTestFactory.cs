@@ -104,6 +104,12 @@ public sealed class PtlExternalWebTestFactory : WebApplicationFactory<Program>
                         claims.Add(new Claim(ExternalUserClaimTypes.LabCode, labCode));
                     }
 
+                    var canOrderOnline = context.Request.Query["canOrderOnline"].FirstOrDefault();
+                    if (string.Equals(canOrderOnline, "true", StringComparison.OrdinalIgnoreCase))
+                    {
+                        claims.Add(new Claim(ExternalUserClaimTypes.CanOrderOnline, "true"));
+                    }
+
                     var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
                     var properties = new AuthenticationProperties();
                     properties.StoreTokens([new AuthenticationToken { Name = "id_token", Value = TestIdToken }]);

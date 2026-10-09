@@ -2,8 +2,19 @@
 @using PTL.ExternalWeb.Navigation
 @{
     var roles = User.GetResolvedExternalRoles();
+    var canOrderOnline = User.CanOrderOnline();
+    bool IsVisible(NavigationItem item) =>
+        (item.RequiredRole is null || roles.Contains(item.RequiredRole, StringComparer.OrdinalIgnoreCase))
+        && (!item.RequireCanOrderOnline || canOrderOnline);
+
+    // A group's own RequiredRole/RequireCanOrderOnline (if set) gates the whole group; children
+    // with their own RequiredRole (e.g. Results' Viewer/Test Consultant-only items) are then
+    // filtered individually, so a group with no RequiredRole of its own is only shown once at
+    // least one child passes its own check.
     var visibleGroups = NavigationProvider.Build()
-        .Where(item => item.RequiredRole is null || roles.Contains(item.RequiredRole, StringComparer.OrdinalIgnoreCase))
+        .Where(IsVisible)
+        .Select(group => new { group.Text, Children = group.Children.Where(IsVisible).ToList() })
+        .Where(group => group.Children.Count > 0)
         .ToList();
 }
 
@@ -34,4 +45,14 @@
     {
         <p class="govuk-body">No menu items are available for your account yet.</p>
     }
+    @* Always shown, regardless of role, matching legacy NavigationBar.ascx's persistent User Manual link. *@
+    <div class="govuk-body app-side-navigation__title">Help</div>
+    <ul class="govuk-list app-side-navigation__list">
+        <li class="app-side-navigation__item">
+            <a class="govuk-link app-side-navigation__link" href="/documents/User Manual.pdf" target="_blank" rel="noopener noreferrer">
+                User Manual
+                <span class="govuk-visually-hidden"> (opens in new tab, PDF)</span>
+            </a>
+        </li>
+    </ul>
 </nav>

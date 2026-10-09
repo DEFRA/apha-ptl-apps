@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using PTL.Api.Controllers;
+using PTL.Api.Tests.Customer;
 using PTL.Api.Tests.Participant;
 using PTL.Contracts.ExternalUser;
 using PTL.Core.ExternalUser;
@@ -13,11 +14,13 @@ public class ExternalUserControllerTests
     private static ExternalUserController CreateController(
         FakeParticipantRepository? participantRepository = null,
         FakeViewerRepository? viewerRepository = null,
-        FakeTestConsultantRepository? testConsultantRepository = null) =>
+        FakeTestConsultantRepository? testConsultantRepository = null,
+        FakeCustomerRepository? customerRepository = null) =>
         new(new ExternalUserService(
             participantRepository ?? new FakeParticipantRepository(),
             viewerRepository ?? new FakeViewerRepository(),
-            testConsultantRepository ?? new FakeTestConsultantRepository()));
+            testConsultantRepository ?? new FakeTestConsultantRepository(),
+            customerRepository ?? new FakeCustomerRepository()));
 
     [Fact]
     public async Task ResolveExternalUser_NoMatchingRoles_ReturnsOkWithEmptyRoles()
@@ -68,5 +71,25 @@ public class ExternalUserControllerTests
         var body = Assert.IsType<ResolveExternalUserResponse>(okResult.Value);
         Assert.Equal(["Participant"], body.Roles);
         Assert.Equal(participant.ParticipantId, body.ParticipantId);
+    }
+
+    [Fact]
+    public async Task ResolveExternalUser_ParticipantCustomerCanOrderOnline_ReturnsOkWithCanOrderOnlineTrue()
+    {
+        var ssoIdExt = Guid.NewGuid();
+        var customerId = Guid.NewGuid();
+        var participantRepository = new FakeParticipantRepository();
+        await participantRepository.CreateAsync(new CoreParticipant { SsoIdExt = ssoIdExt, CustomerId = customerId, LabCode = "LAB001" });
+        var customerRepository = new FakeCustomerRepository();
+        await customerRepository.CreateAsync(new PTL.Core.Customer.Customer { CustomerId = customerId, CanOrderOnline = true });
+        var controller = CreateController(participantRepository: participantRepository, customerRepository: customerRepository);
+
+        var response = await controller.ResolveExternalUser(
+            new ResolveExternalUserRequest(ssoIdExt, "participant@example.com", "Jane Doe", ["Participant"]),
+            CancellationToken.None);
+
+        var okResult = Assert.IsType<OkObjectResult>(response.Result);
+        var body = Assert.IsType<ResolveExternalUserResponse>(okResult.Value);
+        Assert.True(body.CanOrderOnline);
     }
 }

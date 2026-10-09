@@ -16,4 +16,9 @@ public static class ClaimsPrincipalExtensions
 
     public static bool HasResolvedExternalRole(this ClaimsPrincipal principal, string roleName) =>
         principal.GetResolvedExternalRoles().Contains(roleName, StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Whether the resolved Participant's Customer is eligible for online ordering (see
+    /// ExternalUserClaimTypes.CanOrderOnline) - gates the Orders section.</summary>
+    public static bool CanOrderOnline(this ClaimsPrincipal principal) =>
+        principal.HasClaim(claim => claim.Type == ExternalUserClaimTypes.CanOrderOnline);
 }

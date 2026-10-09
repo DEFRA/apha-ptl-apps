@@ -1,3 +1,4 @@
+using PTL.Api.Tests.Customer;
 using PTL.Api.Tests.Participant;
 using PTL.Core.ExternalUser;
 using PTL.Core.Viewer;
@@ -11,11 +12,13 @@ public class ExternalUserServiceTests
     private static ExternalUserService CreateService(
         FakeParticipantRepository? participantRepository = null,
         FakeViewerRepository? viewerRepository = null,
-        FakeTestConsultantRepository? testConsultantRepository = null) =>
+        FakeTestConsultantRepository? testConsultantRepository = null,
+        FakeCustomerRepository? customerRepository = null) =>
         new(
             participantRepository ?? new FakeParticipantRepository(),
             viewerRepository ?? new FakeViewerRepository(),
-            testConsultantRepository ?? new FakeTestConsultantRepository());
+            testConsultantRepository ?? new FakeTestConsultantRepository(),
+            customerRepository ?? new FakeCustomerRepository());
 
     [Fact]
     public async Task ResolveAsync_NoRecognisedRoles_ReturnsEmptyResult()
@@ -47,6 +50,41 @@ public class ExternalUserServiceTests
         Assert.Equal(["Participant"], result.Roles);
         Assert.Equal(participant.ParticipantId, result.ParticipantId);
         Assert.Equal("LAB001", result.LabCode);
+        Assert.False(result.CanOrderOnline);
+    }
+
+    [Fact]
+    public async Task ResolveAsync_ParticipantRole_CustomerCanOrderOnline_ReturnsCanOrderOnlineTrue()
+    {
+        var ssoIdExt = Guid.NewGuid();
+        var customerId = Guid.NewGuid();
+        var participant = new CoreParticipant { ParticipantId = Guid.NewGuid(), SsoIdExt = ssoIdExt, CustomerId = customerId, LabCode = "LAB001" };
+        var participantRepository = new FakeParticipantRepository();
+        await participantRepository.CreateAsync(participant);
+        var customerRepository = new FakeCustomerRepository();
+        await customerRepository.CreateAsync(new PTL.Core.Customer.Customer { CustomerId = customerId, CanOrderOnline = true });
+        var service = CreateService(participantRepository: participantRepository, customerRepository: customerRepository);
+
+        var result = await service.ResolveAsync(ssoIdExt, "participant@example.com", "Jane Doe", ["Participant"]);
+
+        Assert.True(result.CanOrderOnline);
+    }
+
+    [Fact]
+    public async Task ResolveAsync_ParticipantRole_CustomerCannotOrderOnline_ReturnsCanOrderOnlineFalse()
+    {
+        var ssoIdExt = Guid.NewGuid();
+        var customerId = Guid.NewGuid();
+        var participant = new CoreParticipant { ParticipantId = Guid.NewGuid(), SsoIdExt = ssoIdExt, CustomerId = customerId, LabCode = "LAB001" };
+        var participantRepository = new FakeParticipantRepository();
+        await participantRepository.CreateAsync(participant);
+        var customerRepository = new FakeCustomerRepository();
+        await customerRepository.CreateAsync(new PTL.Core.Customer.Customer { CustomerId = customerId, CanOrderOnline = false });
+        var service = CreateService(participantRepository: participantRepository, customerRepository: customerRepository);
+
+        var result = await service.ResolveAsync(ssoIdExt, "participant@example.com", "Jane Doe", ["Participant"]);
+
+        Assert.False(result.CanOrderOnline);
     }
 
     [Fact]
