@@ -29,6 +29,7 @@ public sealed class ExternalUserController(IExternalUserService externalUserServ
             result.DisplayName,
             result.Roles,
             result.ParticipantId,
+            result.LabCode,
             result.ViewerId,
             result.TestConsultantId));
     }

@@ -27,6 +27,7 @@ public class ExternalUserServiceTests
         Assert.Empty(result.Roles);
         Assert.False(result.IsResolved);
         Assert.Null(result.ParticipantId);
+        Assert.Null(result.LabCode);
         Assert.Null(result.ViewerId);
         Assert.Null(result.TestConsultantId);
         Assert.Equal("Jane Doe", result.DisplayName);
@@ -45,6 +46,7 @@ public class ExternalUserServiceTests
 
         Assert.Equal(["Participant"], result.Roles);
         Assert.Equal(participant.ParticipantId, result.ParticipantId);
+        Assert.Equal("LAB001", result.LabCode);
     }
 
     [Fact]

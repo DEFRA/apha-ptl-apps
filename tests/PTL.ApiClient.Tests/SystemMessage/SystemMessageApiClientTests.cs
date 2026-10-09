@@ -30,6 +30,27 @@ public class SystemMessageApiClientTests
     }
 
     [Fact]
+    public async Task GetMessageAsync_ReturnsDeserializedResponse()
+    {
+        const string json = """{"message":"<p>Welcome</p>"}""";
+        var client = CreateClient(HttpStatusCode.OK, json);
+
+        var result = await client.GetMessageAsync();
+
+        Assert.Equal("<p>Welcome</p>", result.Message);
+    }
+
+    [Fact]
+    public async Task GetMessageAsync_NullResponse_ReturnsFallbackWithNullMessage()
+    {
+        var client = CreateClient(HttpStatusCode.OK, "null");
+
+        var result = await client.GetMessageAsync();
+
+        Assert.Null(result.Message);
+    }
+
+    [Fact]
     public async Task GetImportantMessageAsync_ErrorStatusCode_Throws()
     {
         var client = CreateClient(HttpStatusCode.InternalServerError, null);

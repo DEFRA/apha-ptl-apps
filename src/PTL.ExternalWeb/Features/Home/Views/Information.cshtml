@@ -1,0 +1,15 @@
+@model PTL.ExternalWeb.Features.Home.InformationViewModel
+@{
+    ViewData["Title"] = "Information";
+}
+
+<h1 class="govuk-heading-xl">Information</h1>
+
+@if (!string.IsNullOrWhiteSpace(Model.MessageHtml))
+{
+    @* Html.Raw preserves admin-authored formatting - safe here for the same reason as Index's
+       Important Message banner: written internally via EditMessageOnWebsite.aspx, never user input. *@
+    <div class="govuk-body">
+        @Html.Raw(Model.MessageHtml)
+    </div>
+}

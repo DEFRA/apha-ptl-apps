@@ -25,4 +25,26 @@ public class SystemMessageServiceTests
 
         Assert.Null(result);
     }
+
+    [Fact]
+    public async Task GetMessageAsync_MessagePublished_ReturnsRepositoryResult()
+    {
+        var repository = new FakeSystemMessageRepository { Message = "<p>Welcome</p>" };
+        var service = new SystemMessageService(repository);
+
+        var result = await service.GetMessageAsync();
+
+        Assert.Equal("<p>Welcome</p>", result);
+    }
+
+    [Fact]
+    public async Task GetMessageAsync_NoMessagePublished_ReturnsNull()
+    {
+        var repository = new FakeSystemMessageRepository();
+        var service = new SystemMessageService(repository);
+
+        var result = await service.GetMessageAsync();
+
+        Assert.Null(result);
+    }
 }

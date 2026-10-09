@@ -12,24 +12,31 @@
 @* Index requires authentication (the app's default authorization policy), so Model is always
    populated here - no anonymous fallback branch needed. Navigation is the side nav
    (_SideNavigation.cshtml, driven by the same NavigationProvider); each section's sub-items are
-   also shown here as quick-link cards for fast access from Home - none of the linked screens
-   exist yet, so every card is flagged "Cannot start yet" until its own migration slice lands. *@
+   also shown here as quick-link cards for fast access from Home. No screen behind any of these
+   links has its own migration slice yet, so every one navigates to the shared ComingSoon page
+   instead of being a dead/disabled link, matching legacy's always-clickable navigation. *@
 
-@if (!string.IsNullOrWhiteSpace(Model.ImportantMessageHtml))
-{
-    @* govuk-notification-banner is the GDS equivalent of legacy Home.aspx's ImportantMessage
-       banner. Html.Raw preserves the admin-authored formatting (AC: "formatting is preserved") -
-       safe here because this content is never user-supplied: it's written by internal staff via
-       ProficiencyTestingWeb/Admin/EditMessageOnWebsite.aspx, which already sanitises it on save. *@
-    <div class="govuk-notification-banner" role="region" aria-labelledby="important-message-title" data-module="govuk-notification-banner">
-        <div class="govuk-notification-banner__header">
-            <h2 class="govuk-notification-banner__title" id="important-message-title">Important</h2>
-        </div>
-        <div class="govuk-notification-banner__content">
-            @Html.Raw(Model.ImportantMessageHtml)
-        </div>
+@* govuk-notification-banner is the GDS equivalent of legacy Home.aspx's "Important" callout -
+   the static text/link below is always shown (legacy pt-alert); the admin-authored
+   ImportantMessage (tblExtWebsiteMessage) is nested inside it, same as legacy, only when
+   published. Html.Raw preserves its formatting (AC: "formatting is preserved") - safe here
+   because this content is never user-supplied: it's written by internal staff via
+   ProficiencyTestingWeb/Admin/EditMessageOnWebsite.aspx, which already sanitises it on save. *@
+<div class="govuk-notification-banner" role="region" aria-labelledby="important-message-title" data-module="govuk-notification-banner">
+    <div class="govuk-notification-banner__header">
+        <h2 class="govuk-notification-banner__title" id="important-message-title">Important</h2>
     </div>
-}
+    <div class="govuk-notification-banner__content">
+        <p class="govuk-body">
+            Please read our information regarding online orders, import permits and invoices before placing an order.
+            <a class="govuk-link" asp-controller="Home" asp-action="Information">View Information</a>.
+        </p>
+        @if (!string.IsNullOrWhiteSpace(Model.ImportantMessageHtml))
+        {
+            <div>@Html.Raw(Model.ImportantMessageHtml)</div>
+        }
+    </div>
+</div>
 
 <h1 class="govuk-heading-xl">Welcome, @Model.DisplayName</h1>
 
@@ -44,7 +51,8 @@
     <div class="app-card-group">
         @foreach (var item in group.Children)
         {
-            @await Html.PartialAsync("_QuickLinkCard", item.Text)
+            var href = Url.Action(item.ActionName, item.ControllerName, new { title = item.Text });
+            @await Html.PartialAsync("_QuickLinkCard", (item.Text, href ?? "#"))
         }
     </div>
 }

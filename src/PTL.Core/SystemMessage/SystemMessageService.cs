@@ -4,4 +4,7 @@ public sealed class SystemMessageService(ISystemMessageRepository systemMessageR
 {
     public Task<string?> GetImportantMessageAsync(CancellationToken cancellationToken = default) =>
         systemMessageRepository.GetImportantMessageAsync(cancellationToken);
+
+    public Task<string?> GetMessageAsync(CancellationToken cancellationToken = default) =>
+        systemMessageRepository.GetMessageAsync(cancellationToken);
 }

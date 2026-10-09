@@ -45,6 +45,34 @@ public class SystemMessageRepositoryTests
     }
 
     [Fact]
+    public async Task GetMessageAsync_MessagePublished_ReturnsMessage()
+    {
+        var (repository, connection) = CreateRepository();
+        var table = new DataTable();
+        table.Columns.Add("fldMessageId", typeof(int));
+        table.Columns.Add("fldMessage", typeof(string));
+        table.Columns.Add("fldImportantMessage", typeof(string));
+        table.Columns.Add("fldSupportEmailAddress", typeof(string));
+        table.Rows.Add(0, "<p>Welcome message</p>", "<p>Planned maintenance</p>", "support@example.com");
+        connection.RespondToQuery("EXEC dbo.spgMainPageMessageBySsoId @SsoId", table);
+
+        var result = await repository.GetMessageAsync();
+
+        Assert.Equal("<p>Welcome message</p>", result);
+    }
+
+    [Fact]
+    public async Task GetMessageAsync_NoRowReturned_ReturnsNull()
+    {
+        var (repository, connection) = CreateRepository();
+        connection.RespondToQuery("EXEC dbo.spgMainPageMessageBySsoId @SsoId", new DataTable());
+
+        var result = await repository.GetMessageAsync();
+
+        Assert.Null(result);
+    }
+
+    [Fact]
     public async Task GetImportantMessageAsync_MessageClearedToNull_ReturnsNull()
     {
         var (repository, connection) = CreateRepository();

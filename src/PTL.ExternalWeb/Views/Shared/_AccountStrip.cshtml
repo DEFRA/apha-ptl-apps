@@ -1,0 +1,27 @@
+@using PTL.ExternalWeb.Features.Account
+@{
+    var labCode = User.FindFirst(ExternalUserClaimTypes.LabCode)?.Value;
+    var displayName = User.FindFirst(ExternalUserClaimTypes.DisplayName)?.Value ?? User.Identity?.Name;
+}
+
+@* Legacy NavigationBar.ascx's top strip (APHA Science Services / Lab Number or Logged in as /
+   User Manual) - sits above the role-gated menu, external-only, so it isn't in the shared
+   _Header.cshtml used by both front-ends. *@
+<div class="app-account-strip">
+    <div class="govuk-width-container app-account-strip__container">
+        @* Legacy's "APHA Science Services" link (/VLAServices/MainMenu.aspx) points at a
+           separate, non-migrated legacy portal - not linked until that target is confirmed. *@
+        <span class="govuk-body-s app-account-strip__item">APHA Science Services</span>
+        <span class="govuk-body-s app-account-strip__item app-account-strip__item--grow">
+            @if (!string.IsNullOrWhiteSpace(labCode))
+            {
+                <strong>Lab Number:</strong> @labCode
+            }
+            else if (!string.IsNullOrWhiteSpace(displayName))
+            {
+                <strong>Logged in as:</strong> @displayName
+            }
+        </span>
+        <a class="govuk-link govuk-link--no-visited-state govuk-body-s app-account-strip__item" href="/documents/User Manual.pdf" target="_blank" rel="noopener noreferrer">User Manual</a>
+    </div>
+</div>

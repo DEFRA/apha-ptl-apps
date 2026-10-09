@@ -50,11 +50,18 @@ public sealed class ExternalUserResolver(IExternalUserApiClient externalUserApiC
             return CidmExternalUserResolution.Deny("/Account/NotPermitted");
         }
 
-        return CidmExternalUserResolution.Allow(new Dictionary<string, string>
+        var claims = new Dictionary<string, string>
         {
             [ExternalUserClaimTypes.DisplayName] = response.DisplayName,
             [ExternalUserClaimTypes.ResolvedRoles] = string.Join(',', response.Roles)
-        });
+        };
+
+        if (!string.IsNullOrWhiteSpace(response.LabCode))
+        {
+            claims[ExternalUserClaimTypes.LabCode] = response.LabCode;
+        }
+
+        return CidmExternalUserResolution.Allow(claims);
     }
 
     // CIDM's display-name claim set isn't fully confirmed for PT-LIMS's registration, so this

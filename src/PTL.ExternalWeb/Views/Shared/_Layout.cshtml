@@ -21,6 +21,10 @@
         .app-service-bar { background: #ffffff; border-bottom: 1px solid #b1b4b6; }
         .app-service-bar__container { min-height: 70px; display: flex; align-items: center; }
         .app-account-panel { margin-left: auto; display: flex; align-items: center; gap: 1rem; }
+        .app-account-strip { background: #f3f2f1; border-bottom: 1px solid #b1b4b6; }
+        .app-account-strip__container { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem; min-height: 40px; padding-top: 5px; padding-bottom: 5px; }
+        .app-account-strip__item { margin: 0; }
+        .app-account-strip__item--grow { flex-grow: 1; }
         .app-side-navigation__title { font-weight: 700; margin-top: 1rem; }
         .app-side-navigation__list { margin-bottom: 1.5rem; }
         .app-side-navigation__link--disabled { color: #505a5f; }
@@ -60,6 +64,10 @@
 }
 
 @await Html.PartialAsync("_Header", ("Proficiency Testing - External", "height:40px; width:auto;"))
+@if (!isAccountFlowPage)
+{
+    @await Html.PartialAsync("_AccountStrip")
+}
 <div class="govuk-width-container app-width-container">
     <main role="main" class="pb-3" id="main-content">
         @if (!isAccountFlowPage)

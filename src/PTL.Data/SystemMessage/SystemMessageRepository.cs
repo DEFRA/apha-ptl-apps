@@ -31,4 +31,21 @@ public sealed class SystemMessageRepository(IDbConnectionFactory connectionFacto
         IDictionary<string, object> columns = row;
         return columns["fldImportantMessage"] as string;
     }
+
+    public async Task<string?> GetMessageAsync(CancellationToken cancellationToken = default)
+    {
+        using var connection = connectionFactory.CreateConnection();
+
+        var row = await connection.QuerySingleOrDefaultAsync(
+            "EXEC dbo.spgMainPageMessageBySsoId @SsoId",
+            new { SsoId = Guid.NewGuid() });
+
+        if (row is null)
+        {
+            return null;
+        }
+
+        IDictionary<string, object> columns = row;
+        return columns["fldMessage"] as string;
+    }
 }

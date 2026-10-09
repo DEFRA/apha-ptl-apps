@@ -17,4 +17,11 @@ public sealed class SystemMessageController(ISystemMessageService systemMessageS
         var message = await systemMessageService.GetImportantMessageAsync(cancellationToken);
         return Ok(new GetImportantMessageResponse(message));
     }
+
+    [HttpGet("general")]
+    public async Task<ActionResult<GetMessageResponse>> GetMessage(CancellationToken cancellationToken)
+    {
+        var message = await systemMessageService.GetMessageAsync(cancellationToken);
+        return Ok(new GetMessageResponse(message));
+    }
 }

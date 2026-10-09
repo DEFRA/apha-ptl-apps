@@ -23,4 +23,12 @@ public class HomeController(IApiClient apiClient, ISystemMessageApiClient system
     // [AllowAnonymous] pages (ApiStatus, Error), since it must be reachable before sign-in.
     [AllowAnonymous]
     public IActionResult Privacy() => View();
+
+    // Legacy ViewInformation.aspx, linked from Index's static "Important" banner - shows
+    // tblExtWebsiteMessage.fldMessage, requires sign-in (same as legacy).
+    public async Task<IActionResult> Information()
+    {
+        var message = await systemMessageApiClient.GetMessageAsync(HttpContext.RequestAborted);
+        return View(new InformationViewModel(message.Message));
+    }
 }

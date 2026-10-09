@@ -9,6 +9,7 @@ public sealed record ExternalUserResolutionResult(
     string DisplayName,
     IReadOnlyList<string> Roles,
     Guid? ParticipantId,
+    string? LabCode,
     Guid? ViewerId,
     Guid? TestConsultantId)
 {

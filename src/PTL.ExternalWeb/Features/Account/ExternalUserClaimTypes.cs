@@ -13,4 +13,8 @@ public static class ExternalUserClaimTypes
     /// <c>CidmExternalUserResolution.Allow</c> only supports one value per claim type.
     /// </summary>
     public const string ResolvedRoles = "resolvedRoles";
+
+    /// <summary>The resolved Participant's lab code (legacy NavigationBar.ascx "Lab Number"), only
+    /// present when the Participant role resolved.</summary>
+    public const string LabCode = "labCode";
 }

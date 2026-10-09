@@ -13,4 +13,13 @@ public sealed class SystemMessageApiClient(HttpClient httpClient) : ISystemMessa
         var result = await response.Content.ReadFromJsonAsync<GetImportantMessageResponse>(cancellationToken);
         return result ?? new GetImportantMessageResponse(null);
     }
+
+    public async Task<GetMessageResponse> GetMessageAsync(CancellationToken cancellationToken = default)
+    {
+        var response = await httpClient.GetAsync("/api/system-messages/general", cancellationToken);
+        response.EnsureSuccessStatusCode();
+
+        var result = await response.Content.ReadFromJsonAsync<GetMessageResponse>(cancellationToken);
+        return result ?? new GetMessageResponse(null);
+    }
 }

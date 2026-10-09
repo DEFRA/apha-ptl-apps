@@ -23,7 +23,7 @@
                         }
                         else
                         {
-                            <a class="govuk-link app-side-navigation__link" asp-controller="@item.ControllerName" asp-action="@item.ActionName">@item.Text</a>
+                            <a class="govuk-link app-side-navigation__link" asp-controller="@item.ControllerName" asp-action="@item.ActionName" asp-route-title="@item.Text">@item.Text</a>
                         }
                     </li>
                 }

@@ -124,6 +124,36 @@ public class HomeControllerTests
     }
 
     [Fact]
+    public async Task Information_MessagePublished_PassesHtmlToViewModel()
+    {
+        var controller = new HomeController(new FakeApiClient(), new FakeSystemMessageApiClient(message: "<p>Welcome</p>"))
+        {
+            ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() }
+        };
+
+        var result = await controller.Information();
+
+        var viewResult = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<InformationViewModel>(viewResult.Model);
+        Assert.Equal("<p>Welcome</p>", model.MessageHtml);
+    }
+
+    [Fact]
+    public async Task Information_NoMessagePublished_ViewModelHasNullMessage()
+    {
+        var controller = new HomeController(new FakeApiClient(), new FakeSystemMessageApiClient())
+        {
+            ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() }
+        };
+
+        var result = await controller.Information();
+
+        var viewResult = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<InformationViewModel>(viewResult.Model);
+        Assert.Null(model.MessageHtml);
+    }
+
+    [Fact]
     public async Task ApiStatus_ReturnsJsonFromApiClient()
     {
         var expected = new ApiHealthResponse("Healthy", 42, DateTime.UtcNow);

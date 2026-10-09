@@ -98,6 +98,12 @@ public sealed class PtlExternalWebTestFactory : WebApplicationFactory<Program>
                         claims.Add(new Claim(ExternalUserClaimTypes.ResolvedRoles, roles));
                     }
 
+                    var labCode = context.Request.Query["labCode"].FirstOrDefault();
+                    if (!string.IsNullOrEmpty(labCode))
+                    {
+                        claims.Add(new Claim(ExternalUserClaimTypes.LabCode, labCode));
+                    }
+
                     var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
                     var properties = new AuthenticationProperties();
                     properties.StoreTokens([new AuthenticationToken { Name = "id_token", Value = TestIdToken }]);
