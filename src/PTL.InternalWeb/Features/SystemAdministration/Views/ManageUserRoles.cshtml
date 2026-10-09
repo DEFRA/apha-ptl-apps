@@ -1,0 +1,77 @@
+@model PTL.InternalWeb.Features.SystemAdministration.ManageUserRolesViewModel
+@{
+    ViewData["Title"] = "Manage User Roles";
+}
+
+<h1 class="govuk-heading-l">Manage User Roles</h1>
+
+@if (Model.Message is not null)
+{
+    var bannerType = Model.MessageIsError ? "" : "govuk-notification-banner--success";
+    <div class="govuk-notification-banner @bannerType" role="@(Model.MessageIsError ? "alert" : "region")" aria-labelledby="govuk-notification-banner-title" data-module="govuk-notification-banner">
+        <div class="govuk-notification-banner__header">
+            <h2 class="govuk-notification-banner__title" id="govuk-notification-banner-title">@(Model.MessageIsError ? "Important" : "Success")</h2>
+        </div>
+        <div class="govuk-notification-banner__content">
+            <p class="govuk-notification-banner__heading">@Model.Message</p>
+        </div>
+    </div>
+}
+
+<form method="post" asp-action="ManageUserRoles">
+    <table class="govuk-table">
+        <thead class="govuk-table__head">
+            <tr class="govuk-table__row">
+                <th scope="col" class="govuk-table__header">User</th>
+                @foreach (var role in Model.Roles)
+                {
+                    <th scope="col" class="govuk-table__header">@role.Name</th>
+                }
+            </tr>
+        </thead>
+        <tbody class="govuk-table__body">
+            @if (Model.Rows.Count == 0)
+            {
+                <tr class="govuk-table__row">
+                    <td class="govuk-table__cell" colspan="@(Model.Roles.Count + 1)">There are no users to display.</td>
+                </tr>
+            }
+            @for (var i = 0; i < Model.Rows.Count; i++)
+            {
+                var row = Model.Rows[i];
+                <tr class="govuk-table__row">
+                    <td class="govuk-table__cell">
+                        @row.FriendlyName
+                        <input type="hidden" name="Rows[@i].UserId" value="@row.UserId" />
+                        <input type="hidden" name="Rows[@i].Username" value="@row.Username" />
+                        <input type="hidden" name="Rows[@i].FriendlyName" value="@row.FriendlyName" />
+                    </td>
+                    @foreach (var role in Model.Roles)
+                    {
+                        var isChecked = row.SelectedRoleIds.Contains(role.RoleId);
+                        <td class="govuk-table__cell">
+                            <div class="govuk-checkboxes govuk-checkboxes--small govuk-!-margin-bottom-0" data-module="govuk-checkboxes">
+                                <div class="govuk-checkboxes__item">
+                                    <input class="govuk-checkboxes__input" type="checkbox"
+                                           id="Rows_@(i)__@(role.RoleId)" name="Rows[@i].SelectedRoleIds" value="@role.RoleId"
+                                           checked="@(isChecked ? "checked" : null)" />
+                                    <!-- The visible checkbox box is a pseudo-element on the LABEL itself (govuk-checkboxes__label:before) -
+                                         govuk-visually-hidden must go on a nested span around the text only, never on the label, or the
+                                         box disappears along with the text. -->
+                                    <label class="govuk-label govuk-checkboxes__label" for="Rows_@(i)__@(role.RoleId)">
+                                        <span class="govuk-visually-hidden">@role.Name for @row.FriendlyName</span>
+                                    </label>
+                                </div>
+                            </div>
+                        </td>
+                    }
+                </tr>
+            }
+        </tbody>
+    </table>
+
+    <div class="govuk-button-group">
+        <button class="govuk-button" data-module="govuk-button" type="submit">Save</button>
+        <a class="govuk-button govuk-button--secondary" data-module="govuk-button" asp-action="ManageUserRoles">Cancel</a>
+    </div>
+</form>

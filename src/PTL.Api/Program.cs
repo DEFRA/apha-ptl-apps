@@ -14,7 +14,9 @@ using PTL.Core.Contract.PendingOrder;
 using PTL.Core.Contract.Renew;
 using PTL.Core.Contract.Renewal;
 using PTL.Core.Contract.SampleAddress;
+using PTL.Core.Country;
 using PTL.Core.Customer;
+using PTL.Core.ExternalSiteMessage;
 using PTL.Core.ExternalUser;
 using PTL.Core.GroupAddress;
 using PTL.Core.InternalUser;
@@ -22,8 +24,10 @@ using PTL.Core.Invoice;
 using PTL.Core.Lookup;
 using PTL.Core.Notifications;
 using PTL.Core.Participant;
+using PTL.Core.PostagePricingPlan;
 using PTL.Core.Scheme;
 using PTL.Core.TestConsultant;
+using PTL.Core.User;
 using PTL.Core.Viewer;
 using PTL.Core.WeightedPricingPlan;
 using PTL.Data.AdministrationCharge;
@@ -34,7 +38,9 @@ using PTL.Data.Contract.PendingOrder;
 using PTL.Data.Contract.Renew;
 using PTL.Data.Contract.Renewal;
 using PTL.Data.Contract.SampleAddress;
+using PTL.Data.Country;
 using PTL.Data.Customer;
+using PTL.Data.ExternalSiteMessage;
 using PTL.Data.GroupAddress;
 using PTL.Data.Infrastructure;
 using PTL.Data.InternalUser;
@@ -42,9 +48,11 @@ using PTL.Data.Invoice;
 using PTL.Data.Lookup;
 using PTL.Data.Notifications;
 using PTL.Data.Participant;
+using PTL.Data.PostagePricingPlan;
 using PTL.Data.Scheme;
 using PTL.Data.Storage;
 using PTL.Data.TestConsultant;
+using PTL.Data.User;
 using PTL.Data.Viewer;
 using PTL.Data.WeightedPricingPlan;
 using Serilog;
@@ -93,12 +101,15 @@ builder.Services.AddScoped<IParticipantRepository, ParticipantRepository>();
 builder.Services.AddScoped<IPendingParticipantUpdateRepository, PendingParticipantUpdateRepository>();
 builder.Services.AddScoped<IParticipantViewerRepository, ParticipantViewerRepository>();
 builder.Services.AddScoped<IViewerRepository, ViewerRepository>();
+builder.Services.AddScoped<IViewerService, ViewerService>();
 builder.Services.AddScoped<IParticipantService, ParticipantService>();
 builder.Services.AddScoped<IParticipantSchemeRepository, ParticipantSchemeRepository>();
 builder.Services.AddScoped<IParticipantSchemeService, ParticipantSchemeService>();
 
 builder.Services.AddScoped<ITestConsultantRepository, TestConsultantRepository>();
 builder.Services.AddScoped<IExternalUserService, ExternalUserService>();
+builder.Services.AddScoped<IExternalLoginService, StubExternalLoginService>();
+builder.Services.AddScoped<ITestConsultantService, TestConsultantService>();
 
 builder.Services.AddScoped<IInternalUserRepository, InternalUserRepository>();
 builder.Services.AddScoped<IInternalUserService, InternalUserService>();
@@ -166,6 +177,23 @@ builder.Services.AddScoped<IAdministrationChargeService, AdministrationChargeSer
 
 builder.Services.AddScoped<IWeightedPricingPlanRepository, WeightedPricingPlanRepository>();
 builder.Services.AddScoped<IWeightedPricingPlanService, WeightedPricingPlanService>();
+
+builder.Services.AddScoped<IPostagePricingPlanRepository, PostagePricingPlanRepository>();
+builder.Services.AddScoped<IPostagePricingPlanService, PostagePricingPlanService>();
+
+builder.Services.AddScoped<ICountryRepository, CountryRepository>();
+builder.Services.AddScoped<ICountryService, CountryService>();
+
+builder.Services.AddScoped<IExternalSiteMessageRepository, ExternalSiteMessageRepository>();
+builder.Services.AddScoped<IExternalSiteMessageService, ExternalSiteMessageService>();
+
+builder.Services.AddScoped<IUserRepository, UserRepository>();
+builder.Services.AddScoped<IStaffDirectoryService, StubStaffDirectoryService>();
+builder.Services.AddScoped<IUserService, UserService>();
+
+builder.Services.AddScoped<IRoleRepository, RoleRepository>();
+builder.Services.AddScoped<IUserRoleRepository, UserRoleRepository>();
+builder.Services.AddScoped<IUserRoleService, UserRoleService>();
 
 builder.Services.AddScoped<IInvoiceRepository, InvoiceRepository>();
 builder.Services.AddScoped<IInvoiceService, InvoiceService>();

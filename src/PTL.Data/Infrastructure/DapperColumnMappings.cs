@@ -9,21 +9,27 @@ using PTL.Core.Contract.PendingOrder;
 using PTL.Core.Contract.Renew;
 using PTL.Core.Contract.Renewal;
 using PTL.Core.Contract.SampleAddress;
+using PTL.Core.Country;
 using PTL.Core.Customer;
+using PTL.Core.ExternalSiteMessage;
 using PTL.Core.GroupAddress;
 using PTL.Core.InternalUser;
 using PTL.Core.Invoice;
 using PTL.Core.Lookup;
 using PTL.Core.Participant;
 using PTL.Core.Scheme;
+using PTL.Core.User;
 using PTL.Core.Viewer;
 using PTL.Core.WeightedPricingPlan;
 using CoreContract = PTL.Core.Contract.Contract;
+using CoreCountry = PTL.Core.Country.Country;
 using CoreCustomer = PTL.Core.Customer.Customer;
+using CoreExternalSiteMessage = PTL.Core.ExternalSiteMessage.ExternalSiteMessage;
 using CoreGroupAddress = PTL.Core.GroupAddress.GroupAddress;
 using CoreInternalUser = PTL.Core.InternalUser.InternalUser;
 using CoreParticipant = PTL.Core.Participant.Participant;
 using CoreScheme = PTL.Core.Scheme.Scheme;
+using CoreUser = PTL.Core.User.User;
 
 namespace PTL.Data.Infrastructure;
 
@@ -54,6 +60,7 @@ public static class DapperColumnMappings
     private const string ColParticipantId = "fldParticipantId";
     private const string ColLabCode = "fldLabCode";
     private const string ColIdentifier = "fldIdentifier";
+    private const string ColViewerId = "fldViewerId";
     private const string ColContractId = "fldContractId";
     private const string ColCurrencyId = "fldCurrencyId";
     private const string ColQalNumber = "fldQalNumber";
@@ -71,6 +78,8 @@ public static class DapperColumnMappings
     private const string ColAccountNumber = "fldAccountNumber";
     private const string ColVatNumber = "fldVatNumber";
     private const string ColInvoiceOrganisation = "fldInvoiceOrganisation";
+    private const string ColUserId = "fldUserId";
+    private const string ColIsInactive = "fldIsInactive";
     private const string ColInvoiceAddress1 = "fldInvoiceAddress1";
     private const string ColInvoiceAddress2 = "fldInvoiceAddress2";
     private const string ColInvoiceAddress3 = "fldInvoiceAddress3";
@@ -223,11 +232,25 @@ public static class DapperColumnMappings
 
         Map<ViewerEntity>(new(StringComparer.OrdinalIgnoreCase)
         {
-            ["fldViewerId"] = nameof(ViewerEntity.ViewerId),
+            [ColViewerId] = nameof(ViewerEntity.ViewerId),
             [ColName] = nameof(ViewerEntity.Name),
             [ColEmail] = nameof(ViewerEntity.Email),
             ["fldSsoId"] = nameof(ViewerEntity.SsoId),
             ["fldSsoIdExt"] = nameof(ViewerEntity.SsoIdExt),
+        });
+
+        Map<ViewerSchemeEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            [ColViewerId] = nameof(ViewerSchemeEntity.ViewerId),
+            [ColIdentifier] = nameof(ViewerSchemeEntity.Identifier),
+            [ColName] = nameof(ViewerSchemeEntity.Name),
+        });
+
+        Map<ViewerParticipantLinkEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            [ColViewerId] = nameof(ViewerParticipantLinkEntity.ViewerId),
+            [ColLabCode] = nameof(ViewerParticipantLinkEntity.LabCode),
+            [ColLabName] = nameof(ViewerParticipantLinkEntity.LabName),
         });
 
         Map<PTL.Core.TestConsultant.TestConsultant>(new(StringComparer.OrdinalIgnoreCase)
@@ -238,14 +261,14 @@ public static class DapperColumnMappings
             [ColEmail] = nameof(PTL.Core.TestConsultant.TestConsultant.Email),
             ["fldSsoId"] = nameof(PTL.Core.TestConsultant.TestConsultant.SsoId),
             ["fldSsoIdExt"] = nameof(PTL.Core.TestConsultant.TestConsultant.SsoIdExt),
-            ["fldIsInactive"] = nameof(PTL.Core.TestConsultant.TestConsultant.IsInactive),
+            [ColIsInactive] = nameof(PTL.Core.TestConsultant.TestConsultant.IsInactive),
             [ColInactiveDate] = nameof(PTL.Core.TestConsultant.TestConsultant.InactiveDate),
         });
 
         Map<ParticipantViewerEntity>(new(StringComparer.OrdinalIgnoreCase)
         {
             ["fldViewerParticipantId"] = nameof(ParticipantViewerEntity.ViewerParticipantId),
-            ["fldViewerId"] = nameof(ParticipantViewerEntity.ViewerId),
+            [ColViewerId] = nameof(ParticipantViewerEntity.ViewerId),
             [ColParticipantId] = nameof(ParticipantViewerEntity.ParticipantId),
             [ColName] = nameof(ParticipantViewerEntity.Name),
         });
@@ -668,9 +691,9 @@ public static class DapperColumnMappings
 
         Map<SchemeUserEntity>(new(StringComparer.OrdinalIgnoreCase)
         {
-            ["fldUserId"] = nameof(SchemeUserEntity.UserId),
+            [ColUserId] = nameof(SchemeUserEntity.UserId),
             ["fldFriendlyName"] = nameof(SchemeUserEntity.FriendlyName),
-            ["fldIsInactive"] = nameof(SchemeUserEntity.IsInactive),
+            [ColIsInactive] = nameof(SchemeUserEntity.IsInactive),
         });
 
         Map<SchemeViewerEntity>(new(StringComparer.OrdinalIgnoreCase)
@@ -779,6 +802,54 @@ public static class DapperColumnMappings
             [ColCountryId] = nameof(CountryEntity.CountryId),
             [ColCountry] = nameof(CountryEntity.Country),
             ["fldCountryType"] = nameof(CountryEntity.CountryType),
+        });
+
+        Map<CoreCountry>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            [ColCountryId] = nameof(CoreCountry.CountryId),
+            [ColCountry] = nameof(CoreCountry.CountryName),
+            ["fldCountryTypeId"] = nameof(CoreCountry.CountryTypeId),
+            ["fldCountryType"] = nameof(CoreCountry.CountryType),
+            ["fldAllocationCount"] = nameof(CoreCountry.AllocationCount),
+        });
+
+        Map<CountryTypeEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldCountryTypeId"] = nameof(CountryTypeEntity.CountryTypeId),
+            ["fldCountryType"] = nameof(CountryTypeEntity.CountryType),
+        });
+
+        Map<CoreExternalSiteMessage>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldMessage"] = nameof(CoreExternalSiteMessage.Message),
+            ["fldImportantMessage"] = nameof(CoreExternalSiteMessage.ImportantMessage),
+            ["fldSupportEmailAddress"] = nameof(CoreExternalSiteMessage.SupportEmailAddress),
+        });
+
+        Map<CoreUser>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            [ColUserId] = nameof(CoreUser.UserId),
+            ["fldUsername"] = nameof(CoreUser.Username),
+            ["fldFriendlyName"] = nameof(CoreUser.FriendlyName),
+            ["fldFirstName"] = nameof(CoreUser.FirstName),
+            ["fldLastName"] = nameof(CoreUser.LastName),
+            [ColEmail] = nameof(CoreUser.Email),
+            ["fldDepartment"] = nameof(CoreUser.Department),
+            [ColIsInactive] = nameof(CoreUser.IsInactive),
+            ["fldInactiveDate"] = nameof(CoreUser.InactiveDate),
+        });
+
+        Map<Role>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldRoleId"] = nameof(Role.RoleId),
+            ["fldRole"] = nameof(Role.Name),
+        });
+
+        Map<UserRoleAssignment>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldUserRoleId"] = nameof(UserRoleAssignment.UserRoleId),
+            [ColUserId] = nameof(UserRoleAssignment.UserId),
+            ["fldRoleId"] = nameof(UserRoleAssignment.RoleId),
         });
 
         Map<CurrencyEntity>(new(StringComparer.OrdinalIgnoreCase)
@@ -959,14 +1030,14 @@ public static class DapperColumnMappings
         // sppAuthenticate's first result set.
         Map<CoreInternalUser>(new(StringComparer.OrdinalIgnoreCase)
         {
-            ["fldUserId"] = nameof(CoreInternalUser.UserId),
+            [ColUserId] = nameof(CoreInternalUser.UserId),
             ["fldUsername"] = nameof(CoreInternalUser.Username),
             ["fldFriendlyName"] = nameof(CoreInternalUser.FriendlyName),
             ["fldFirstName"] = nameof(CoreInternalUser.FirstName),
             ["fldLastName"] = nameof(CoreInternalUser.LastName),
             [ColEmail] = nameof(CoreInternalUser.Email),
             ["fldDepartment"] = nameof(CoreInternalUser.Department),
-            ["fldIsInactive"] = nameof(CoreInternalUser.IsInactive),
+            [ColIsInactive] = nameof(CoreInternalUser.IsInactive),
             [ColInactiveDate] = nameof(CoreInternalUser.InactiveDate),
             ["fldSsoIdInt"] = nameof(CoreInternalUser.SsoIdInt),
         });

@@ -137,7 +137,49 @@ public static class ApiClientServiceCollectionExtensions
         })
             .AddStandardResilienceHandler();
 
+        services.AddHttpClient<IPostagePricingPlanApiClient, PostagePricingPlanApiClient>(client =>
+        {
+            client.BaseAddress = new Uri(apiBaseUrl);
+        })
+            .AddStandardResilienceHandler();
+
+        services.AddHttpClient<ICountryApiClient, CountryApiClient>(client =>
+        {
+            client.BaseAddress = new Uri(apiBaseUrl);
+        })
+            .AddStandardResilienceHandler();
+
+        services.AddHttpClient<IExternalSiteMessageApiClient, ExternalSiteMessageApiClient>(client =>
+        {
+            client.BaseAddress = new Uri(apiBaseUrl);
+        })
+            .AddStandardResilienceHandler();
+
+        services.AddHttpClient<IUserApiClient, UserApiClient>(client =>
+        {
+            client.BaseAddress = new Uri(apiBaseUrl);
+        })
+            .AddStandardResilienceHandler();
+
+        services.AddHttpClient<IRoleApiClient, RoleApiClient>(client =>
+        {
+            client.BaseAddress = new Uri(apiBaseUrl);
+        })
+            .AddStandardResilienceHandler();
+
         services.AddHttpClient<IInvoiceApiClient, InvoiceApiClient>(client =>
+        {
+            client.BaseAddress = new Uri(apiBaseUrl);
+        })
+            .AddStandardResilienceHandler();
+
+        services.AddHttpClient<IExternalTestConsultantApiClient, ExternalTestConsultantApiClient>(client =>
+        {
+            client.BaseAddress = new Uri(apiBaseUrl);
+        })
+            .AddStandardResilienceHandler();
+
+        services.AddHttpClient<IViewerApiClient, ViewerApiClient>(client =>
         {
             client.BaseAddress = new Uri(apiBaseUrl);
         })

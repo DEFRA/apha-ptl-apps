@@ -14,7 +14,8 @@ namespace PTL.InternalWeb.Features.Account;
 /// requirement for PT-LIMS.
 /// </summary>
 /// <param name="internalUserApiClient">Calls PTL.Api's internal-user resolve endpoint.</param>
-public sealed class InternalUserResolver(IInternalUserApiClient internalUserApiClient) : IEntraInternalUserResolver
+/// <param name="configuration">Used only to read the local-testing bypass flag below.</param>
+public sealed class InternalUserResolver(IInternalUserApiClient internalUserApiClient, IConfiguration configuration) : IEntraInternalUserResolver
 {
     /// <inheritdoc />
     public async Task<EntraInternalUserResolution> ResolveAsync(ClaimsPrincipal principal, CancellationToken cancellationToken)
@@ -59,6 +60,25 @@ public sealed class InternalUserResolver(IInternalUserApiClient internalUserApiC
 
         if (!response.IsPermitted)
         {
+            // LOCAL-TESTING BYPASS - grants a synthetic Admin identity instead of denying sign-in,
+            // so System Administration pages are reachable without a seeded tblUsers row. This is
+            // an auth bypass: it lets ANY signed-in Entra user into PT-LIMS as Admin, with no
+            // database record at all. Safe to leave in source control only because it is OFF by
+            // default - it activates solely via the "Entra:BypassUserResolutionForLocalTesting"
+            // flag, which must be set in a developer's own user-secrets/environment and must never
+            // be added to appsettings.json or any other committed config. Do not enable this flag
+            // outside a local dev machine.
+            if (configuration.GetValue<bool>("Entra:BypassUserResolutionForLocalTesting"))
+            {
+                return EntraInternalUserResolution.Allow(new Dictionary<string, string>
+                {
+                    [InternalUserClaimTypes.InternalUserId] = Guid.Empty.ToString(),
+                    [InternalUserClaimTypes.FullName] = "Local Test User (bypass)",
+                    [InternalUserClaimTypes.Department] = "N/A",
+                    [InternalUserClaimTypes.ResolvedRoles] = "Admin"
+                });
+            }
+
             return EntraInternalUserResolution.Deny("/Account/NotPermitted");
         }
 

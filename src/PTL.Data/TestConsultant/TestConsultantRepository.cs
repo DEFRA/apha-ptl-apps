@@ -24,6 +24,13 @@ public sealed class TestConsultantRepository(IDbConnectionFactory connectionFact
             new { Email = email });
     }
 
+    public async Task<IReadOnlyList<Core.TestConsultant.TestConsultant>> GetAllAsync(CancellationToken cancellationToken = default)
+    {
+        using var connection = connectionFactory.CreateConnection();
+
+        return (await connection.QueryAsync<Core.TestConsultant.TestConsultant>("EXEC dbo.spgaExtTestConsultants")).ToList();
+    }
+
     public async Task<Core.TestConsultant.TestConsultant> CreateAsync(Core.TestConsultant.TestConsultant testConsultant, CancellationToken cancellationToken = default)
     {
         using var connection = connectionFactory.CreateConnection();
