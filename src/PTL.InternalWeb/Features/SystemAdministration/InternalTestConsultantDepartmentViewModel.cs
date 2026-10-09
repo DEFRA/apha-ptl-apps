@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace PTL.InternalWeb.Features.SystemAdministration;
 
 public sealed class InternalTestConsultantDepartmentViewModel
@@ -33,11 +35,13 @@ public sealed class InternalTestConsultantRowViewModel
 // through the row's existing status untouched.
 public sealed class InternalTestConsultantEditViewModel
 {
-    public Guid UserId { get; set; }
+    [Required]
+    public Guid? UserId { get; set; }
 
     public string Department { get; set; } = string.Empty;
 
-    public bool IsInactive { get; set; }
+    [Required]
+    public bool? IsInactive { get; set; }
 
     public DateTime? InactiveDate { get; set; }
 }

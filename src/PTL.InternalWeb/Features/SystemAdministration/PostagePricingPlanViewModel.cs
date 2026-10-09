@@ -50,11 +50,13 @@ public sealed class PostagePricingPlanRowViewModel
 // GridViewPostagePricingPlan_Updating, which only ever updates the one row with EditIndex set.
 public sealed class PostagePricingPlanEditViewModel
 {
-    public Guid PostageId { get; set; }
+    [Required]
+    public Guid? PostageId { get; set; }
 
     // Page-navigation state only (which year to redisplay/redirect to) - never sent to the price
     // update API, which always sources the row's real year server-side.
-    public int YearId { get; set; }
+    [Required]
+    public int? YearId { get; set; }
 
     [Range(0, double.MaxValue, ErrorMessage = "A UK Price is required and must not be negative")]
     public decimal UKPrice { get; set; }

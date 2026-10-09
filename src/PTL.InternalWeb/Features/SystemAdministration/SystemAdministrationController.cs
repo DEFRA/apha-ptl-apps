@@ -164,15 +164,15 @@ public class SystemAdministrationController : Controller
         if (ModelState.IsValid)
         {
             var result = await postagePricingPlanApiClient.SetPriceAsync(
-                new UpdatePostagePricingPlanPriceRequest(model.PostageId, model.UKPrice, model.EUPrice, model.NonEUPrice),
+                new UpdatePostagePricingPlanPriceRequest(model.PostageId!.Value, model.UKPrice, model.EUPrice, model.NonEUPrice),
                 cancellationToken);
 
             if (result.Success)
             {
-                return RedirectToAction(nameof(PostagePricingPlan), new { yearId = model.YearId });
+                return RedirectToAction(nameof(PostagePricingPlan), new { yearId = model.YearId!.Value });
             }
 
-            LogSetPostagePriceFailedMessage(logger, model.PostageId, null);
+            LogSetPostagePriceFailedMessage(logger, model.PostageId.Value, null);
             foreach (var (field, messages) in result.FieldErrors)
             {
                 foreach (var errorMessage in messages)
@@ -244,7 +244,7 @@ public class SystemAdministrationController : Controller
     {
         if (ModelState.IsValid)
         {
-            var result = await countryApiClient.UpdateCountryAsync(model.CountryId, new CountrySaveRequest(model.Country, model.CountryTypeId!.Value), cancellationToken);
+            var result = await countryApiClient.UpdateCountryAsync(model.CountryId!.Value, new CountrySaveRequest(model.Country, model.CountryTypeId!.Value), cancellationToken);
             if (result.Success)
             {
                 return RedirectToAction(nameof(CountryManagement));
@@ -505,9 +505,14 @@ public class SystemAdministrationController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> InternalTestConsultantDepartmentSave([Bind(Prefix = "Edit")] InternalTestConsultantEditViewModel model, CancellationToken cancellationToken)
     {
+        if (!ModelState.IsValid)
+        {
+            return View(nameof(InternalTestConsultantDepartment), await BuildInternalTestConsultantDepartmentViewModelAsync(model.UserId, message: null, messageIsError: false, model, cancellationToken));
+        }
+
         await userApiClient.UpdateTestConsultantAsync(
-            model.UserId,
-            new UpdateTestConsultantRequest(model.Department, model.IsInactive, model.InactiveDate),
+            model.UserId!.Value,
+            new UpdateTestConsultantRequest(model.Department, model.IsInactive!.Value, model.InactiveDate),
             cancellationToken);
 
         return RedirectToAction(nameof(InternalTestConsultantDepartment));
@@ -601,7 +606,7 @@ public class SystemAdministrationController : Controller
     {
         if (ModelState.IsValid)
         {
-            var result = await externalTestConsultantApiClient.UpdateAsync(model.ExternalTestConsultantId, new ExternalTestConsultantSaveRequest(model.Name, model.Department, model.Email), cancellationToken);
+            var result = await externalTestConsultantApiClient.UpdateAsync(model.ExternalTestConsultantId!.Value, new ExternalTestConsultantSaveRequest(model.Name, model.Department, model.Email), cancellationToken);
             if (result.Success)
             {
                 return RedirectToAction(nameof(ExternalTestConsultantManagement));
@@ -712,7 +717,7 @@ public class SystemAdministrationController : Controller
     {
         if (ModelState.IsValid)
         {
-            var result = await viewerApiClient.UpdateAsync(model.ViewerId, new ViewerSaveRequest(model.Name, model.Email), cancellationToken);
+            var result = await viewerApiClient.UpdateAsync(model.ViewerId!.Value, new ViewerSaveRequest(model.Name, model.Email), cancellationToken);
             if (result.Success)
             {
                 return RedirectToAction(nameof(ViewerManagement));

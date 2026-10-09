@@ -55,7 +55,8 @@ public sealed class CountryManagementAddViewModel
 // legacy's two WebForms ValidationGroups ("Edit" vs "New").
 public sealed class CountryManagementEditViewModel
 {
-    public Guid CountryId { get; set; }
+    [Required]
+    public Guid? CountryId { get; set; }
 
     [Required(ErrorMessage = "Enter a country name")]
     [StringLength(50, ErrorMessage = "Country name must be 50 characters or fewer")]

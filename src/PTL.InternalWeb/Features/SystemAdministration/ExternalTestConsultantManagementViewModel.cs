@@ -56,7 +56,8 @@ public sealed class ExternalTestConsultantAddViewModel
 // CountryManagementEditViewModel.
 public sealed class ExternalTestConsultantEditViewModel
 {
-    public Guid ExternalTestConsultantId { get; set; }
+    [Required]
+    public Guid? ExternalTestConsultantId { get; set; }
 
     [Required(ErrorMessage = "Enter a name")]
     public string Name { get; set; } = string.Empty;

@@ -1,3 +1,5 @@
+using Microsoft.AspNetCore.Mvc.ModelBinding;
+
 namespace PTL.InternalWeb.Features.SystemAdministration;
 
 public sealed class ManageUserRolesViewModel
@@ -8,6 +10,9 @@ public sealed class ManageUserRolesViewModel
 
     public string? Message { get; set; }
 
+    // Server-computed display state, never posted by the view (the whole-grid-save form only
+    // posts Rows[].UserId/SelectedRoleIds) - excluded from binding.
+    [BindNever]
     public bool MessageIsError { get; set; }
 }
 

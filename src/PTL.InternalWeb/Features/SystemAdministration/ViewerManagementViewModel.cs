@@ -53,7 +53,8 @@ public sealed class ViewerAddViewModel
 // separate "Add a viewer" form rendered on the same page, matching CountryManagementEditViewModel.
 public sealed class ViewerEditViewModel
 {
-    public Guid ViewerId { get; set; }
+    [Required]
+    public Guid? ViewerId { get; set; }
 
     [Required(ErrorMessage = "Enter a name")]
     public string Name { get; set; } = string.Empty;
