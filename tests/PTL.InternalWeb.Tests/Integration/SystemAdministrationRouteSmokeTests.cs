@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text.RegularExpressions;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -13,7 +14,9 @@ using CountryTypeResponse = PTL.Contracts.Country.CountryTypeResponse;
 using CountryDeleteResponse = PTL.Contracts.Country.CountryDeleteResponse;
 using ExternalSiteMessageResponse = PTL.Contracts.ExternalSiteMessage.ExternalSiteMessageResponse;
 using ExternalSiteMessageSaveResult = PTL.Contracts.ExternalSiteMessage.ExternalSiteMessageSaveResult;
+using PTL.Contracts.TestConsultant;
 using PTL.Contracts.User;
+using PTL.Contracts.Viewer;
 
 namespace PTL.InternalWeb.Tests.Integration;
 
@@ -25,10 +28,12 @@ public partial class SystemAdministrationRouteSmokeTests : IClassFixture<WebAppl
     [GeneratedRegex("__RequestVerificationToken[^>]*value=\"([^\"]+)\"", RegexOptions.None)]
     private static partial Regex AntiforgeryTokenPattern();
 
+    private readonly WebApplicationFactory<Program> _rawFactory;
     private readonly WebApplicationFactory<Program> _factory;
 
     public SystemAdministrationRouteSmokeTests(WebApplicationFactory<Program> factory)
     {
+        _rawFactory = factory;
         _factory = factory.WithWebHostBuilder(builder =>
             builder.ConfigureServices(services =>
             {
@@ -48,7 +53,37 @@ public partial class SystemAdministrationRouteSmokeTests : IClassFixture<WebAppl
                 services.AddSingleton<IRoleApiClient>(new FakeRoleApiClient());
                 services.RemoveAll<ILookupApiClient>();
                 services.AddSingleton<ILookupApiClient>(new FakeLookupApiClient());
+                services.RemoveAll<IExternalTestConsultantApiClient>();
+                services.AddSingleton<IExternalTestConsultantApiClient>(new FakeExternalTestConsultantApiClient());
+                services.RemoveAll<IViewerApiClient>();
+                services.AddSingleton<IViewerApiClient>(new FakeViewerApiClient());
+
+                // Stands in for a real Entra ID sign-in (see TestAuthHandler remarks) so every
+                // existing smoke test below - which assumes full access, matching this feature
+                // set's confirmed RBAC decision - keeps working without a live Entra tenant.
+                services.AddAuthentication(TestAuthHandler.SchemeName)
+                    .AddScheme<TestAuthHandlerOptions, TestAuthHandler>(TestAuthHandler.SchemeName, _ => { });
+                services.PostConfigure<AuthenticationOptions>(options =>
+                {
+                    options.DefaultAuthenticateScheme = TestAuthHandler.SchemeName;
+                    options.DefaultChallengeScheme = TestAuthHandler.SchemeName;
+                    options.DefaultScheme = TestAuthHandler.SchemeName;
+                });
             }));
+    }
+
+    [Fact]
+    public async Task SystemAdministration_WithoutSignIn_RedirectsAwayFromThePage()
+    {
+        // Uses _rawFactory (no TestAuthHandler override) so the real Entra cookie/OIDC pipeline
+        // governs - with no cookie present, the request is anonymous and SystemAdministrationPolicy
+        // must reject it before the action body (and therefore any API call) ever runs.
+        var factory = _rawFactory.WithWebHostBuilder(builder => { });
+        var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+
+        var response = await client.GetAsync("/SystemAdministration/SystemAdministration");
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
     }
 
     [Fact]
@@ -540,6 +575,10 @@ public partial class SystemAdministrationRouteSmokeTests : IClassFixture<WebAppl
         Assert.Contains("Jane Smith", body, StringComparison.Ordinal);
         Assert.Contains("type=\"checkbox\"", body, StringComparison.Ordinal);
         Assert.Contains("checked=\"checked\"", body, StringComparison.Ordinal);
+        // Regression guard: the visible checkbox box is a pseudo-element on
+        // govuk-checkboxes__label itself - govuk-visually-hidden must never be applied directly
+        // to that label (it would hide the box along with the text), only to a nested span.
+        Assert.DoesNotContain("govuk-checkboxes__label govuk-visually-hidden", body, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -574,6 +613,150 @@ public partial class SystemAdministrationRouteSmokeTests : IClassFixture<WebAppl
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Contains("You cannot remove your own Admin access.", body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task RemoveUser_ReturnsSuccess()
+    {
+        var client = _factory.CreateClient();
+
+        var response = await client.GetAsync("/SystemAdministration/RemoveUser");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task RemoveUser_Post_Valid_RendersSuccessBanner()
+    {
+        var userId = Guid.NewGuid();
+        var factory = _factory.WithWebHostBuilder(builder =>
+            builder.ConfigureServices(services =>
+            {
+                services.RemoveAll<IUserApiClient>();
+                services.AddSingleton<IUserApiClient>(new FakeUserApiClient());
+            }));
+        var client = factory.CreateClient();
+        var (token, cookie) = await GetAntiforgeryAsync(client, "/SystemAdministration/RemoveUser");
+
+        var request = new HttpRequestMessage(HttpMethod.Post, "/SystemAdministration/RemoveUser")
+        {
+            Content = new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["__RequestVerificationToken"] = token,
+                ["SelectedUserId"] = userId.ToString()
+            })
+        };
+        request.Headers.Add("Cookie", cookie);
+
+        var response = await client.SendAsync(request);
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("User Removed Successfully", body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task InternalTestConsultantDepartment_ReturnsSuccess()
+    {
+        var client = _factory.CreateClient();
+
+        var response = await client.GetAsync("/SystemAdministration/InternalTestConsultantDepartment");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task InternalTestConsultantDepartment_WithData_RendersDepartmentAndStatus()
+    {
+        var userId = Guid.NewGuid();
+        var factory = _factory.WithWebHostBuilder(builder =>
+            builder.ConfigureServices(services =>
+            {
+                services.RemoveAll<IUserApiClient>();
+                services.AddSingleton<IUserApiClient>(new FakeUserApiClient
+                {
+                    TestConsultants = [new UserResponse(userId, "m100001", "Jane Smith", "Jane", "Smith", "jane@apha.gov.uk", "Science", true, new DateTime(2026, 10, 8, 0, 0, 0, DateTimeKind.Utc))]
+                });
+            }));
+        var client = factory.CreateClient();
+
+        var response = await client.GetAsync("/SystemAdministration/InternalTestConsultantDepartment");
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("Jane Smith", body, StringComparison.Ordinal);
+        Assert.Contains("Science", body, StringComparison.Ordinal);
+        Assert.Contains("Inactive", body, StringComparison.Ordinal);
+        Assert.Contains("Activate", body, StringComparison.Ordinal);
+        Assert.Contains("You are setting this test consultant to be active. Are you sure?", body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ExternalTestConsultantManagement_ReturnsSuccess()
+    {
+        var client = _factory.CreateClient();
+
+        var response = await client.GetAsync("/SystemAdministration/ExternalTestConsultantManagement");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task ExternalTestConsultantManagement_WithData_RendersAllSevenColumns()
+    {
+        var consultantId = Guid.NewGuid();
+        var factory = _factory.WithWebHostBuilder(builder =>
+            builder.ConfigureServices(services =>
+            {
+                services.RemoveAll<IExternalTestConsultantApiClient>();
+                services.AddSingleton<IExternalTestConsultantApiClient>(new FakeExternalTestConsultantApiClient
+                {
+                    TestConsultants = [new ExternalTestConsultantResponse(consultantId, "Jane Smith", "Science", "jane@example.com", false, null, false)]
+                });
+            }));
+        var client = factory.CreateClient();
+
+        var response = await client.GetAsync("/SystemAdministration/ExternalTestConsultantManagement");
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("Jane Smith", body, StringComparison.Ordinal);
+        Assert.Contains("jane@example.com", body, StringComparison.Ordinal);
+        Assert.Contains("Active", body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ViewerManagement_ReturnsSuccess()
+    {
+        var client = _factory.CreateClient();
+
+        var response = await client.GetAsync("/SystemAdministration/ViewerManagement");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task ViewerManagement_WithData_RendersAllFourColumns()
+    {
+        var viewerId = Guid.NewGuid();
+        var factory = _factory.WithWebHostBuilder(builder =>
+            builder.ConfigureServices(services =>
+            {
+                services.RemoveAll<IViewerApiClient>();
+                services.AddSingleton<IViewerApiClient>(new FakeViewerApiClient
+                {
+                    Viewers = [new ViewerResponse(viewerId, "Jane Smith", "jane@example.com", false, [], [])]
+                });
+            }));
+        var client = factory.CreateClient();
+
+        var response = await client.GetAsync("/SystemAdministration/ViewerManagement");
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("Jane Smith", body, StringComparison.Ordinal);
+        Assert.Contains("jane@example.com", body, StringComparison.Ordinal);
+        Assert.Contains("Remove", body, StringComparison.Ordinal);
     }
 
     private static async Task<(string Token, string Cookie)> GetAntiforgeryAsync(HttpClient client, string url)

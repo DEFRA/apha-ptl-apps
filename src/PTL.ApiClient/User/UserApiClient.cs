@@ -12,6 +12,9 @@ public interface IUserApiClient
     Task<CreateUserSaveResult> CreateUserAsync(CreateUserRequest request, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<UserRoleRowResponse>> GetUserRoleGridAsync(CancellationToken cancellationToken = default);
     Task<SetUserRolesResponse> SetUserRolesAsync(Guid userId, SetUserRolesRequest request, CancellationToken cancellationToken = default);
+    Task<UserRemoveResponse> RemoveUserAsync(Guid userId, Guid? actingUserId, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<UserResponse>> GetTestConsultantsAsync(CancellationToken cancellationToken = default);
+    Task UpdateTestConsultantAsync(Guid userId, UpdateTestConsultantRequest request, CancellationToken cancellationToken = default);
 }
 
 public sealed class UserApiClient(HttpClient httpClient) : IUserApiClient
@@ -58,5 +61,26 @@ public sealed class UserApiClient(HttpClient httpClient) : IUserApiClient
         response.EnsureSuccessStatusCode();
         var result = await response.Content.ReadFromJsonAsync<SetUserRolesResponse>(cancellationToken);
         return result ?? new SetUserRolesResponse(false, "The role change could not be saved.");
+    }
+
+    public async Task<UserRemoveResponse> RemoveUserAsync(Guid userId, Guid? actingUserId, CancellationToken cancellationToken = default)
+    {
+        var url = actingUserId is Guid id ? $"/api/users/{userId}?actingUserId={id}" : $"/api/users/{userId}";
+        var response = await httpClient.DeleteAsync(url, cancellationToken);
+        response.EnsureSuccessStatusCode();
+        var result = await response.Content.ReadFromJsonAsync<UserRemoveResponse>(cancellationToken);
+        return result ?? new UserRemoveResponse(false, "The user could not be removed.");
+    }
+
+    public async Task<IReadOnlyList<UserResponse>> GetTestConsultantsAsync(CancellationToken cancellationToken = default)
+    {
+        var items = await httpClient.GetFromJsonAsync<IReadOnlyList<UserResponse>>("/api/users/test-consultants", cancellationToken);
+        return items ?? [];
+    }
+
+    public async Task UpdateTestConsultantAsync(Guid userId, UpdateTestConsultantRequest request, CancellationToken cancellationToken = default)
+    {
+        var response = await httpClient.PutAsJsonAsync($"/api/users/{userId}/test-consultant", request, cancellationToken);
+        response.EnsureSuccessStatusCode();
     }
 }

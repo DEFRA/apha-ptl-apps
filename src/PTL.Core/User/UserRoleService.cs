@@ -1,10 +1,16 @@
 namespace PTL.Core.User;
 
+// The current user is resolved by PTL.InternalWeb (from the signed-in Entra claims) and passed in
+// explicitly as actingUserId on every call that needs it, rather than resolved here via an
+// injected "current user" service - see ICurrentUserProvider's removal: PTL.Api has no identity
+// context of its own (no authentication is validated at this layer yet), so an ambient
+// "who is calling" service here would either stay permanently stubbed or have to trust a
+// self-reported value anyway. Threading it explicitly from the one layer that actually knows it
+// keeps that trust boundary visible at every call site instead of hiding it behind a DI service.
 public sealed class UserRoleService(
     IUserRepository userRepository,
     IRoleRepository roleRepository,
-    IUserRoleRepository userRoleRepository,
-    ICurrentUserProvider currentUserProvider) : IUserRoleService
+    IUserRoleRepository userRoleRepository) : IUserRoleService
 {
     private const string AdminRoleName = "Admin";
 
@@ -25,7 +31,7 @@ public sealed class UserRoleService(
         return rows;
     }
 
-    public async Task<SetUserRolesResult> SetUserRolesAsync(Guid userId, IReadOnlyList<Guid> roleIds, CancellationToken cancellationToken = default)
+    public async Task<SetUserRolesResult> SetUserRolesAsync(Guid userId, IReadOnlyList<Guid> roleIds, Guid? actingUserId, CancellationToken cancellationToken = default)
     {
         var existing = await userRoleRepository.GetForUserAsync(userId, cancellationToken);
         var existingRoleIds = existing.Select(a => a.RoleId).ToHashSet();
@@ -38,13 +44,9 @@ public sealed class UserRoleService(
         var roles = await roleRepository.GetAllAsync(cancellationToken);
         var adminRoleId = roles.FirstOrDefault(r => string.Equals(r.Name, AdminRoleName, StringComparison.OrdinalIgnoreCase))?.RoleId;
 
-        if (adminRoleId is Guid adminId && existingRoleIds.Contains(adminId) && !desiredRoleIds.Contains(adminId))
+        if (adminRoleId is Guid adminId && existingRoleIds.Contains(adminId) && !desiredRoleIds.Contains(adminId) && actingUserId == userId)
         {
-            var currentUserId = await currentUserProvider.GetCurrentUserIdAsync(cancellationToken);
-            if (currentUserId == userId)
-            {
-                return new SetUserRolesResult(false, "You cannot remove your own Admin access.");
-            }
+            return new SetUserRolesResult(false, "You cannot remove your own Admin access.");
         }
 
         foreach (var roleId in desiredRoleIds.Except(existingRoleIds).ToList())
@@ -61,5 +63,22 @@ public sealed class UserRoleService(
         }
 
         return new SetUserRolesResult(true, null);
+    }
+
+    public async Task<UserRemoveResult> RemoveUserAsync(Guid userId, Guid? actingUserId, CancellationToken cancellationToken = default)
+    {
+        if (actingUserId == userId)
+        {
+            return new UserRemoveResult(false, "You cannot remove your own account.");
+        }
+
+        var existing = await userRoleRepository.GetForUserAsync(userId, cancellationToken);
+        foreach (var assignment in existing.ToList())
+        {
+            await userRoleRepository.RemoveAsync(assignment.UserRoleId, cancellationToken);
+        }
+
+        await userRepository.DeleteAsync(userId, cancellationToken);
+        return new UserRemoveResult(true, null);
     }
 }

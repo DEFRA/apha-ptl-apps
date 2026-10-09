@@ -14,6 +14,26 @@ public sealed class ViewerRepository(IDbConnectionFactory connectionFactory) : I
         return (await connection.QueryAsync<ViewerEntity>("EXEC dbo.spgaViewers")).ToList();
     }
 
+    // Reads all 3 spgaViewers result sets and attaches each viewer's assigned schemes/
+    // participants - used only by the admin grid's remove-confirmation listing.
+    public async Task<IReadOnlyList<ViewerEntity>> GetAllWithAssignmentsAsync(CancellationToken cancellationToken = default)
+    {
+        using var connection = connectionFactory.CreateConnection();
+        using var multi = await connection.QueryMultipleAsync("EXEC dbo.spgaViewers");
+
+        var viewers = (await multi.ReadAsync<ViewerEntity>()).ToList();
+        var schemesByViewer = (await multi.ReadAsync<ViewerSchemeEntity>()).ToLookup(s => s.ViewerId);
+        var participantsByViewer = (await multi.ReadAsync<ViewerParticipantLinkEntity>()).ToLookup(p => p.ViewerId);
+
+        foreach (var viewer in viewers)
+        {
+            viewer.Schemes = schemesByViewer[viewer.ViewerId].ToList();
+            viewer.Participants = participantsByViewer[viewer.ViewerId].ToList();
+        }
+
+        return viewers;
+    }
+
     public async Task<ViewerEntity?> GetBySsoIdExtAsync(Guid ssoIdExt, CancellationToken cancellationToken = default)
     {
         using var connection = connectionFactory.CreateConnection();
@@ -52,5 +72,16 @@ public sealed class ViewerRepository(IDbConnectionFactory connectionFactory) : I
             new { viewer.ViewerId, viewer.Name, viewer.Email, viewer.SsoId, viewer.SsoIdExt });
 
         return rowsAffected == 0 ? null : viewer;
+    }
+
+    public async Task<bool> DeleteAsync(Guid viewerId, CancellationToken cancellationToken = default)
+    {
+        using var connection = connectionFactory.CreateConnection();
+
+        var rowsAffected = await connection.ExecuteAsync(
+            "EXEC dbo.spdViewer @ViewerId",
+            new { ViewerId = viewerId });
+
+        return rowsAffected > 0;
     }
 }

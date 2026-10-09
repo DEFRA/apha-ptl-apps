@@ -61,7 +61,7 @@ public class ViewerRepositoryTests
         var result = await repository.GetBySsoIdExtAsync(ssoIdExt);
 
         Assert.NotNull(result);
-        Assert.Equal(ssoIdExt, result!.SsoIdExt);
+        Assert.Equal(ssoIdExt, result.SsoIdExt);
     }
 
     [Fact]
@@ -86,7 +86,7 @@ public class ViewerRepositoryTests
         var result = await repository.GetByEmailAsync(email);
 
         Assert.NotNull(result);
-        Assert.Equal(email, result!.Email);
+        Assert.Equal(email, result.Email);
     }
 
     [Fact]
@@ -137,5 +137,69 @@ public class ViewerRepositoryTests
         var result = await repository.UpdateAsync(viewer);
 
         Assert.Null(result);
+    }
+
+    [Fact]
+    public async Task GetAllWithAssignmentsAsync_AttachesSchemesAndParticipantsToMatchingViewer()
+    {
+        var (repository, connection) = CreateRepository();
+        var viewerId = Guid.NewGuid();
+        var otherViewerId = Guid.NewGuid();
+
+        var viewerTable = ViewerTable(viewerId, name: "Jane Smith");
+        var schemeTable = new DataTable();
+        schemeTable.Columns.Add("fldViewerId", typeof(Guid));
+        schemeTable.Columns.Add("fldIdentifier", typeof(string));
+        schemeTable.Columns.Add("fldName", typeof(string));
+        schemeTable.Rows.Add(viewerId, "SFW1234", "Heavy Metals");
+        schemeTable.Rows.Add(otherViewerId, "SFW9999", "Unrelated Scheme");
+
+        var participantTable = new DataTable();
+        participantTable.Columns.Add("fldViewerId", typeof(Guid));
+        participantTable.Columns.Add("fldLabCode", typeof(string));
+        participantTable.Columns.Add("fldLabName", typeof(string));
+        participantTable.Rows.Add(viewerId, "LAB001", "Example Lab");
+
+        var dataSet = new DataSet();
+        dataSet.Tables.Add(viewerTable);
+        dataSet.Tables.Add(schemeTable);
+        dataSet.Tables.Add(participantTable);
+        connection.RespondToQuery(GetAllSql, dataSet);
+
+        var result = await repository.GetAllWithAssignmentsAsync();
+
+        var viewer = Assert.Single(result);
+        Assert.Equal("Jane Smith", viewer.Name);
+        var scheme = Assert.Single(viewer.Schemes);
+        Assert.Equal("SFW1234", scheme.Identifier);
+        Assert.Equal("Heavy Metals", scheme.Name);
+        var participant = Assert.Single(viewer.Participants);
+        Assert.Equal("LAB001", participant.LabCode);
+        Assert.Equal("Example Lab", participant.LabName);
+    }
+
+    [Fact]
+    public async Task DeleteAsync_ExistingViewer_ReturnsTrue()
+    {
+        var (repository, connection) = CreateRepository();
+        var viewerId = Guid.NewGuid();
+        connection.RespondToNonQuery("EXEC dbo.spdViewer @ViewerId", 1);
+
+        var result = await repository.DeleteAsync(viewerId);
+
+        Assert.True(result);
+        var deleteCommand = Assert.Single(connection.ExecutedCommands, c => c.CommandText == "EXEC dbo.spdViewer @ViewerId");
+        Assert.Equal(viewerId, deleteCommand.ParameterValue("@ViewerId"));
+    }
+
+    [Fact]
+    public async Task DeleteAsync_UnknownViewer_ReturnsFalse()
+    {
+        var (repository, connection) = CreateRepository();
+        connection.RespondToNonQuery("EXEC dbo.spdViewer @ViewerId", 0);
+
+        var result = await repository.DeleteAsync(Guid.NewGuid());
+
+        Assert.False(result);
     }
 }

@@ -87,4 +87,35 @@ public class UserServiceTests
         Assert.Contains(ex.Errors, e => e.Message == UserValidator.DuplicateMessage);
         Assert.Empty(repository.Created);
     }
+
+    [Fact]
+    public async Task GetTestConsultantsAsync_ReturnsRepositoryResults()
+    {
+        var repository = new FakeUserRepository
+        {
+            TestConsultants = [new PTL.Core.User.User { Username = "m100001", FriendlyName = "Jane Smith", Department = "Science" }]
+        };
+        var service = CreateService(repository);
+
+        var result = await service.GetTestConsultantsAsync();
+
+        Assert.Equal("Science", Assert.Single(result).Department);
+    }
+
+    [Fact]
+    public async Task UpdateTestConsultantAsync_PassesValuesStraightThroughToRepository()
+    {
+        var userId = Guid.NewGuid();
+        var repository = new FakeUserRepository();
+        var service = CreateService(repository);
+        var inactiveDate = new DateTime(2026, 10, 8, 0, 0, 0, DateTimeKind.Utc);
+
+        await service.UpdateTestConsultantAsync(userId, "Science", true, inactiveDate);
+
+        var update = Assert.Single(repository.DepartmentUpdates);
+        Assert.Equal(userId, update.UserId);
+        Assert.Equal("Science", update.Department);
+        Assert.True(update.IsInactive);
+        Assert.Equal(inactiveDate, update.InactiveDate);
+    }
 }

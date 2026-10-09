@@ -87,4 +87,60 @@ public class UserApiClientTests
         Assert.False(result.Success);
         Assert.Equal("You cannot remove your own Admin access.", result.Message);
     }
+
+    [Fact]
+    public async Task RemoveUserAsync_Success_ReturnsSuccess()
+    {
+        const string json = """{"success":true,"message":null}""";
+        var client = CreateClient(HttpStatusCode.OK, json);
+
+        var result = await client.RemoveUserAsync(Guid.NewGuid(), actingUserId: null);
+
+        Assert.True(result.Success);
+    }
+
+    [Fact]
+    public async Task RemoveUserAsync_Blocked_ReturnsFailureMessage()
+    {
+        const string json = """{"success":false,"message":"You cannot remove your own account."}""";
+        var client = CreateClient(HttpStatusCode.OK, json);
+
+        var result = await client.RemoveUserAsync(Guid.NewGuid(), actingUserId: null);
+
+        Assert.False(result.Success);
+        Assert.Equal("You cannot remove your own account.", result.Message);
+    }
+
+    [Fact]
+    public async Task GetTestConsultantsAsync_Success_ReturnsDeserializedUsers()
+    {
+        const string json = """[{"userId":"11111111-1111-1111-1111-111111111111","username":"m100001","friendlyName":"Jane Smith","firstName":"Jane","lastName":"Smith","email":"jane@apha.gov.uk","department":"Science","isInactive":true,"inactiveDate":"2026-10-08T00:00:00"}]""";
+        var client = CreateClient(HttpStatusCode.OK, json);
+
+        var result = await client.GetTestConsultantsAsync();
+
+        var user = Assert.Single(result);
+        Assert.Equal("Science", user.Department);
+        Assert.True(user.IsInactive);
+    }
+
+    [Fact]
+    public async Task GetTestConsultantsAsync_NullResponse_ReturnsEmpty()
+    {
+        var client = CreateClient(HttpStatusCode.OK, "null");
+
+        var result = await client.GetTestConsultantsAsync();
+
+        Assert.Empty(result);
+    }
+
+    [Fact]
+    public async Task UpdateTestConsultantAsync_SendsRequest()
+    {
+        var client = CreateClient(HttpStatusCode.OK, null);
+
+        var exception = await Record.ExceptionAsync(() => client.UpdateTestConsultantAsync(Guid.NewGuid(), new UpdateTestConsultantRequest("Science", true, new DateTime(2026, 10, 8, 0, 0, 0, DateTimeKind.Utc))));
+
+        Assert.Null(exception);
+    }
 }

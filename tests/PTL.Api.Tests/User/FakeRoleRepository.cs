@@ -38,10 +38,3 @@ internal sealed class FakeUserRoleRepository : IUserRoleRepository
         return Task.CompletedTask;
     }
 }
-
-internal sealed class FakeCurrentUserProvider : ICurrentUserProvider
-{
-    public Guid? CurrentUserId { get; set; }
-
-    public Task<Guid?> GetCurrentUserIdAsync(CancellationToken cancellationToken = default) => Task.FromResult(CurrentUserId);
-}

@@ -39,4 +39,27 @@ internal sealed class FakeUserApiClient : IUserApiClient
         SetRolesCalls.Add((userId, request));
         return Task.FromResult(SetRolesResult);
     }
+
+    public UserRemoveResponse RemoveResult { get; set; } = new(true, null);
+    public List<Guid> RemoveCalls { get; } = [];
+    public Guid? LastRemoveActingUserId { get; private set; }
+
+    public Task<UserRemoveResponse> RemoveUserAsync(Guid userId, Guid? actingUserId, CancellationToken cancellationToken = default)
+    {
+        RemoveCalls.Add(userId);
+        LastRemoveActingUserId = actingUserId;
+        return Task.FromResult(RemoveResult);
+    }
+
+    public IReadOnlyList<UserResponse> TestConsultants { get; set; } = [];
+    public List<(Guid UserId, UpdateTestConsultantRequest Request)> UpdateTestConsultantCalls { get; } = [];
+
+    public Task<IReadOnlyList<UserResponse>> GetTestConsultantsAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult(TestConsultants);
+
+    public Task UpdateTestConsultantAsync(Guid userId, UpdateTestConsultantRequest request, CancellationToken cancellationToken = default)
+    {
+        UpdateTestConsultantCalls.Add((userId, request));
+        return Task.CompletedTask;
+    }
 }

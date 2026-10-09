@@ -60,6 +60,7 @@ public static class DapperColumnMappings
     private const string ColParticipantId = "fldParticipantId";
     private const string ColLabCode = "fldLabCode";
     private const string ColIdentifier = "fldIdentifier";
+    private const string ColViewerId = "fldViewerId";
     private const string ColContractId = "fldContractId";
     private const string ColCurrencyId = "fldCurrencyId";
     private const string ColQalNumber = "fldQalNumber";
@@ -227,11 +228,25 @@ public static class DapperColumnMappings
 
         Map<ViewerEntity>(new(StringComparer.OrdinalIgnoreCase)
         {
-            ["fldViewerId"] = nameof(ViewerEntity.ViewerId),
+            [ColViewerId] = nameof(ViewerEntity.ViewerId),
             [ColName] = nameof(ViewerEntity.Name),
             [ColEmail] = nameof(ViewerEntity.Email),
             ["fldSsoId"] = nameof(ViewerEntity.SsoId),
             ["fldSsoIdExt"] = nameof(ViewerEntity.SsoIdExt),
+        });
+
+        Map<ViewerSchemeEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            [ColViewerId] = nameof(ViewerSchemeEntity.ViewerId),
+            [ColIdentifier] = nameof(ViewerSchemeEntity.Identifier),
+            [ColName] = nameof(ViewerSchemeEntity.Name),
+        });
+
+        Map<ViewerParticipantLinkEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            [ColViewerId] = nameof(ViewerParticipantLinkEntity.ViewerId),
+            [ColLabCode] = nameof(ViewerParticipantLinkEntity.LabCode),
+            [ColLabName] = nameof(ViewerParticipantLinkEntity.LabName),
         });
 
         Map<PTL.Core.TestConsultant.TestConsultant>(new(StringComparer.OrdinalIgnoreCase)
@@ -249,7 +264,7 @@ public static class DapperColumnMappings
         Map<ParticipantViewerEntity>(new(StringComparer.OrdinalIgnoreCase)
         {
             ["fldViewerParticipantId"] = nameof(ParticipantViewerEntity.ViewerParticipantId),
-            ["fldViewerId"] = nameof(ParticipantViewerEntity.ViewerId),
+            [ColViewerId] = nameof(ParticipantViewerEntity.ViewerId),
             [ColParticipantId] = nameof(ParticipantViewerEntity.ParticipantId),
             [ColName] = nameof(ParticipantViewerEntity.Name),
         });

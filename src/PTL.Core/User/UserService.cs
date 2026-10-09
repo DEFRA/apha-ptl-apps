@@ -46,4 +46,10 @@ public sealed class UserService(IUserRepository userRepository, IStaffDirectoryS
         await userRepository.CreateAsync(newUser, cancellationToken);
         return newUser;
     }
+
+    public Task<IReadOnlyList<User>> GetTestConsultantsAsync(CancellationToken cancellationToken = default) =>
+        userRepository.GetTestConsultantsAsync(cancellationToken);
+
+    public Task UpdateTestConsultantAsync(Guid userId, string department, bool isInactive, DateTime? inactiveDate, CancellationToken cancellationToken = default) =>
+        userRepository.UpdateDepartmentAsync(userId, department, isInactive, inactiveDate, cancellationToken);
 }

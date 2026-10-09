@@ -11,4 +11,11 @@ public interface IUserService
 
     // Throws UserValidationException when business rules are violated (no email, duplicate account).
     Task<User> CreateUserAsync(string username, string email, string friendlyName, string firstName, string lastName, string department, CancellationToken cancellationToken = default);
+
+    // The Internal Test Consultant Department Management grid (spgaUserTestConsultant).
+    Task<IReadOnlyList<User>> GetTestConsultantsAsync(CancellationToken cancellationToken = default);
+
+    // Updates Department/IsInactive/InactiveDate together (spuUserDept) - the caller (InternalWeb)
+    // decides the InactiveDate value, since that's purely a UI round-trip concern, not a domain rule.
+    Task UpdateTestConsultantAsync(Guid userId, string department, bool isInactive, DateTime? inactiveDate, CancellationToken cancellationToken = default);
 }

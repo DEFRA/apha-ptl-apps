@@ -55,8 +55,11 @@
                                     <input class="govuk-checkboxes__input" type="checkbox"
                                            id="Rows_@(i)__@(role.RoleId)" name="Rows[@i].SelectedRoleIds" value="@role.RoleId"
                                            checked="@(isChecked ? "checked" : null)" />
-                                    <label class="govuk-label govuk-checkboxes__label govuk-visually-hidden" for="Rows_@(i)__@(role.RoleId)">
-                                        @role.Name for @row.FriendlyName
+                                    <!-- The visible checkbox box is a pseudo-element on the LABEL itself (govuk-checkboxes__label:before) -
+                                         govuk-visually-hidden must go on a nested span around the text only, never on the label, or the
+                                         box disappears along with the text. -->
+                                    <label class="govuk-label govuk-checkboxes__label" for="Rows_@(i)__@(role.RoleId)">
+                                        <span class="govuk-visually-hidden">@role.Name for @row.FriendlyName</span>
                                     </label>
                                 </div>
                             </div>

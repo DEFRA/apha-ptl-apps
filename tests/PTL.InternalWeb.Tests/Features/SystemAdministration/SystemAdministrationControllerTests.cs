@@ -1,9 +1,12 @@
+using System.Security.Claims;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging.Abstractions;
 using PTL.Contracts.AdministrationCharge;
 using PTL.Contracts.Lookup;
 using PTL.Contracts.PostagePricingPlan;
 using PTL.Contracts.WeightedPricingPlan;
+using PTL.InternalWeb.Features.Account;
 using PTL.InternalWeb.Features.SystemAdministration;
 using PTL.InternalWeb.Tests.TestSupport;
 using CountryResponse = PTL.Contracts.Country.CountryResponse;
@@ -12,7 +15,9 @@ using CountrySaveResult = PTL.Contracts.Country.CountrySaveResult;
 using CountryDeleteResponse = PTL.Contracts.Country.CountryDeleteResponse;
 using ExternalSiteMessageResponse = PTL.Contracts.ExternalSiteMessage.ExternalSiteMessageResponse;
 using ExternalSiteMessageSaveResult = PTL.Contracts.ExternalSiteMessage.ExternalSiteMessageSaveResult;
+using PTL.Contracts.TestConsultant;
 using PTL.Contracts.User;
+using PTL.Contracts.Viewer;
 
 namespace PTL.InternalWeb.Tests.Features.SystemAdministration;
 
@@ -26,16 +31,23 @@ public class SystemAdministrationControllerTests
         FakeExternalSiteMessageApiClient? externalSiteMessageApiClient = null,
         FakeUserApiClient? userApiClient = null,
         FakeRoleApiClient? roleApiClient = null,
-        FakeLookupApiClient? lookupApiClient = null) =>
+        FakeLookupApiClient? lookupApiClient = null,
+        FakeExternalTestConsultantApiClient? externalTestConsultantApiClient = null,
+        FakeViewerApiClient? viewerApiClient = null) =>
         new(
-            administrationChargeApiClient ?? new FakeAdministrationChargeApiClient(),
-            weightedPricingPlanApiClient ?? new FakeWeightedPricingPlanApiClient(),
-            postagePricingPlanApiClient ?? new FakePostagePricingPlanApiClient(),
-            countryApiClient ?? new FakeCountryApiClient(),
-            externalSiteMessageApiClient ?? new FakeExternalSiteMessageApiClient(),
-            userApiClient ?? new FakeUserApiClient(),
-            roleApiClient ?? new FakeRoleApiClient(),
-            lookupApiClient ?? new FakeLookupApiClient(),
+            new SystemAdministrationApiClients
+            {
+                AdministrationCharge = administrationChargeApiClient ?? new FakeAdministrationChargeApiClient(),
+                WeightedPricingPlan = weightedPricingPlanApiClient ?? new FakeWeightedPricingPlanApiClient(),
+                PostagePricingPlan = postagePricingPlanApiClient ?? new FakePostagePricingPlanApiClient(),
+                Country = countryApiClient ?? new FakeCountryApiClient(),
+                ExternalSiteMessage = externalSiteMessageApiClient ?? new FakeExternalSiteMessageApiClient(),
+                User = userApiClient ?? new FakeUserApiClient(),
+                Role = roleApiClient ?? new FakeRoleApiClient(),
+                Lookup = lookupApiClient ?? new FakeLookupApiClient(),
+                ExternalTestConsultant = externalTestConsultantApiClient ?? new FakeExternalTestConsultantApiClient(),
+                Viewer = viewerApiClient ?? new FakeViewerApiClient()
+            },
             NullLogger<SystemAdministrationController>.Instance);
 
     [Fact]
@@ -832,6 +844,32 @@ public class SystemAdministrationControllerTests
     }
 
     [Fact]
+    public async Task ManageUserRoles_Post_PassesSignedInUserIdFromClaims()
+    {
+        var userId = Guid.NewGuid();
+        var signedInUserId = Guid.NewGuid();
+        var userApiClient = new FakeUserApiClient();
+        var controller = CreateController(userApiClient: userApiClient);
+        controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext
+            {
+                User = new ClaimsPrincipal(new ClaimsIdentity(
+                    [new Claim(InternalUserClaimTypes.InternalUserId, signedInUserId.ToString())], "Test"))
+            }
+        };
+        var model = new ManageUserRolesViewModel
+        {
+            Rows = [new UserRoleRowViewModel { UserId = userId, FriendlyName = "Jane Smith", SelectedRoleIds = [] }]
+        };
+
+        await controller.ManageUserRoles(model, CancellationToken.None);
+
+        var call = Assert.Single(userApiClient.SetRolesCalls);
+        Assert.Equal(signedInUserId, call.Request.ActingUserId);
+    }
+
+    [Fact]
     public async Task ManageUserRoles_Post_BlockedBySelfAdminRule_ShowsErrorMessage()
     {
         var userId = Guid.NewGuid();
@@ -851,6 +889,437 @@ public class SystemAdministrationControllerTests
         var resultModel = Assert.IsType<ManageUserRolesViewModel>(view.Model);
         Assert.True(resultModel.MessageIsError);
         Assert.Contains("You cannot remove your own Admin access.", resultModel.Message);
+    }
+
+    [Fact]
+    public async Task RemoveUser_Get_BuildsUserOptionsWithPlaceholderFirst()
+    {
+        var userId = Guid.NewGuid();
+        var userApiClient = new FakeUserApiClient { Users = [new UserResponse(userId, "m100001", "Jane Smith", "Jane", "Smith", "jane@apha.gov.uk", "Science")] };
+        var controller = CreateController(userApiClient: userApiClient);
+
+        var result = await controller.RemoveUser(CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<RemoveUserViewModel>(view.Model);
+        Assert.Equal(2, model.UserOptions.Count);
+        Assert.Equal(string.Empty, model.UserOptions[0].Value);
+        Assert.Equal(userId.ToString(), model.UserOptions[1].Value);
+    }
+
+    [Fact]
+    public async Task RemoveUser_Post_NoSelection_ShowsErrorMessage()
+    {
+        var userApiClient = new FakeUserApiClient();
+        var controller = CreateController(userApiClient: userApiClient);
+        var model = new RemoveUserViewModel { SelectedUserId = null };
+
+        var result = await controller.RemoveUser(model, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var resultModel = Assert.IsType<RemoveUserViewModel>(view.Model);
+        Assert.True(resultModel.MessageIsError);
+        Assert.Equal("Select a user to remove.", resultModel.Message);
+        Assert.Empty(userApiClient.RemoveCalls);
+    }
+
+    [Fact]
+    public async Task RemoveUser_Post_Valid_ShowsSuccess()
+    {
+        var userId = Guid.NewGuid();
+        var userApiClient = new FakeUserApiClient();
+        var controller = CreateController(userApiClient: userApiClient);
+        var model = new RemoveUserViewModel { SelectedUserId = userId };
+
+        var result = await controller.RemoveUser(model, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var resultModel = Assert.IsType<RemoveUserViewModel>(view.Model);
+        Assert.True(resultModel.IsRemoved);
+        Assert.Equal("User Removed Successfully", resultModel.Message);
+        Assert.Contains(userId, userApiClient.RemoveCalls);
+    }
+
+    [Fact]
+    public async Task RemoveUser_Post_BlockedBySelfRemovalRule_ShowsErrorMessage()
+    {
+        var userId = Guid.NewGuid();
+        var userApiClient = new FakeUserApiClient { RemoveResult = new UserRemoveResponse(false, "You cannot remove your own account.") };
+        var controller = CreateController(userApiClient: userApiClient);
+        var model = new RemoveUserViewModel { SelectedUserId = userId };
+
+        var result = await controller.RemoveUser(model, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var resultModel = Assert.IsType<RemoveUserViewModel>(view.Model);
+        Assert.True(resultModel.MessageIsError);
+        Assert.Equal("You cannot remove your own account.", resultModel.Message);
+    }
+
+    [Fact]
+    public async Task RemoveUser_Post_PassesSignedInUserIdFromClaims()
+    {
+        var userId = Guid.NewGuid();
+        var signedInUserId = Guid.NewGuid();
+        var userApiClient = new FakeUserApiClient();
+        var controller = CreateController(userApiClient: userApiClient);
+        controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext
+            {
+                User = new ClaimsPrincipal(new ClaimsIdentity(
+                    [new Claim(InternalUserClaimTypes.InternalUserId, signedInUserId.ToString())], "Test"))
+            }
+        };
+        var model = new RemoveUserViewModel { SelectedUserId = userId };
+
+        await controller.RemoveUser(model, CancellationToken.None);
+
+        Assert.Equal(signedInUserId, userApiClient.LastRemoveActingUserId);
+    }
+
+    [Fact]
+    public async Task RemoveUser_Post_NoSignedInClaim_PassesNullActingUserId()
+    {
+        var userId = Guid.NewGuid();
+        var userApiClient = new FakeUserApiClient();
+        var controller = CreateController(userApiClient: userApiClient);
+        var model = new RemoveUserViewModel { SelectedUserId = userId };
+
+        await controller.RemoveUser(model, CancellationToken.None);
+
+        Assert.Null(userApiClient.LastRemoveActingUserId);
+    }
+
+    [Fact]
+    public async Task InternalTestConsultantDepartment_Get_BuildsRows()
+    {
+        var userId = Guid.NewGuid();
+        var userApiClient = new FakeUserApiClient
+        {
+            TestConsultants = [new UserResponse(userId, "m100001", "Jane Smith", "Jane", "Smith", "jane@apha.gov.uk", "Science", false, null)]
+        };
+        var controller = CreateController(userApiClient: userApiClient);
+
+        var result = await controller.InternalTestConsultantDepartment(editId: null, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<InternalTestConsultantDepartmentViewModel>(view.Model);
+        var row = Assert.Single(model.Rows);
+        Assert.Equal("Science", row.Department);
+        Assert.False(row.IsInactive);
+        Assert.False(row.IsEditing);
+    }
+
+    [Fact]
+    public async Task InternalTestConsultantDepartment_Get_WithEditId_MarksMatchingRowEditing()
+    {
+        var userId = Guid.NewGuid();
+        var userApiClient = new FakeUserApiClient
+        {
+            TestConsultants = [new UserResponse(userId, "m100001", "Jane Smith", "Jane", "Smith", "jane@apha.gov.uk", "Science", false, null)]
+        };
+        var controller = CreateController(userApiClient: userApiClient);
+
+        var result = await controller.InternalTestConsultantDepartment(userId, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<InternalTestConsultantDepartmentViewModel>(view.Model);
+        Assert.True(Assert.Single(model.Rows).IsEditing);
+    }
+
+    [Fact]
+    public async Task InternalTestConsultantDepartmentSave_PersistsDepartmentAndRoundTripsStatus()
+    {
+        var userId = Guid.NewGuid();
+        var userApiClient = new FakeUserApiClient();
+        var controller = CreateController(userApiClient: userApiClient);
+        var inactiveDate = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        var model = new InternalTestConsultantEditViewModel { UserId = userId, Department = "Virology", IsInactive = true, InactiveDate = inactiveDate };
+
+        var result = await controller.InternalTestConsultantDepartmentSave(model, CancellationToken.None);
+
+        Assert.IsType<RedirectToActionResult>(result);
+        var call = Assert.Single(userApiClient.UpdateTestConsultantCalls);
+        Assert.Equal(userId, call.UserId);
+        Assert.Equal("Virology", call.Request.Department);
+        Assert.True(call.Request.IsInactive);
+        Assert.Equal(inactiveDate, call.Request.InactiveDate);
+    }
+
+    [Fact]
+    public async Task InternalTestConsultantDepartmentToggleStatus_FromActive_SetsInactiveAndStampsDate()
+    {
+        var userId = Guid.NewGuid();
+        var userApiClient = new FakeUserApiClient();
+        var controller = CreateController(userApiClient: userApiClient);
+
+        var result = await controller.InternalTestConsultantDepartmentToggleStatus(userId, "Science", isInactive: false, CancellationToken.None);
+
+        Assert.IsType<RedirectToActionResult>(result);
+        var call = Assert.Single(userApiClient.UpdateTestConsultantCalls);
+        Assert.Equal("Science", call.Request.Department);
+        Assert.True(call.Request.IsInactive);
+        Assert.NotNull(call.Request.InactiveDate);
+    }
+
+    [Fact]
+    public async Task InternalTestConsultantDepartmentToggleStatus_FromInactive_SetsActiveAndClearsDate()
+    {
+        var userId = Guid.NewGuid();
+        var userApiClient = new FakeUserApiClient();
+        var controller = CreateController(userApiClient: userApiClient);
+
+        var result = await controller.InternalTestConsultantDepartmentToggleStatus(userId, "Science", isInactive: true, CancellationToken.None);
+
+        Assert.IsType<RedirectToActionResult>(result);
+        var call = Assert.Single(userApiClient.UpdateTestConsultantCalls);
+        Assert.False(call.Request.IsInactive);
+        Assert.Null(call.Request.InactiveDate);
+    }
+
+    [Fact]
+    public async Task ExternalTestConsultantManagement_Get_BuildsRows()
+    {
+        var consultantId = Guid.NewGuid();
+        var apiClient = new FakeExternalTestConsultantApiClient
+        {
+            TestConsultants = [new ExternalTestConsultantResponse(consultantId, "Jane Smith", "Science", "jane@example.com", false, null, true)]
+        };
+        var controller = CreateController(externalTestConsultantApiClient: apiClient);
+
+        var result = await controller.ExternalTestConsultantManagement(editId: null, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<ExternalTestConsultantManagementViewModel>(view.Model);
+        var row = Assert.Single(model.Rows);
+        Assert.Equal("Jane Smith", row.Name);
+        Assert.True(row.HasLogin);
+        Assert.False(row.IsEditing);
+    }
+
+    [Fact]
+    public async Task ExternalTestConsultantManagementAdd_Valid_RedirectsToList()
+    {
+        var apiClient = new FakeExternalTestConsultantApiClient();
+        var controller = CreateController(externalTestConsultantApiClient: apiClient);
+        var model = new ExternalTestConsultantAddViewModel { Name = "Jane Smith", Department = "Science", Email = "jane@example.com" };
+
+        var result = await controller.ExternalTestConsultantManagementAdd(model, CancellationToken.None);
+
+        Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal("Jane Smith", apiClient.LastCreateRequest?.Name);
+    }
+
+    [Fact]
+    public async Task ExternalTestConsultantManagementAdd_ApiRejectsMissingEmail_RedisplaysWithError()
+    {
+        var apiClient = new FakeExternalTestConsultantApiClient
+        {
+            SaveResult = new ExternalTestConsultantSaveResult(false, null, new Dictionary<string, string[]> { ["Email"] = ["Enter an email address"] })
+        };
+        var controller = CreateController(externalTestConsultantApiClient: apiClient);
+        var model = new ExternalTestConsultantAddViewModel { Name = "Jane Smith", Department = "Science", Email = "jane@example.com" };
+
+        var result = await controller.ExternalTestConsultantManagementAdd(model, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        Assert.False(controller.ModelState.IsValid);
+        Assert.IsType<ExternalTestConsultantManagementViewModel>(view.Model);
+    }
+
+    [Fact]
+    public async Task ExternalTestConsultantManagementSave_Valid_RedirectsToList()
+    {
+        var consultantId = Guid.NewGuid();
+        var apiClient = new FakeExternalTestConsultantApiClient();
+        var controller = CreateController(externalTestConsultantApiClient: apiClient);
+        var model = new ExternalTestConsultantEditViewModel { ExternalTestConsultantId = consultantId, Name = "Jane Smith", Department = "Science", Email = "jane@example.com" };
+
+        var result = await controller.ExternalTestConsultantManagementSave(model, CancellationToken.None);
+
+        Assert.IsType<RedirectToActionResult>(result);
+        var call = Assert.Single(apiClient.UpdateCalls);
+        Assert.Equal(consultantId, call.ExternalTestConsultantId);
+    }
+
+    [Fact]
+    public async Task ExternalTestConsultantManagementToggleStatus_FromActive_TogglesToInactive()
+    {
+        var consultantId = Guid.NewGuid();
+        var apiClient = new FakeExternalTestConsultantApiClient();
+        var controller = CreateController(externalTestConsultantApiClient: apiClient);
+
+        var result = await controller.ExternalTestConsultantManagementToggleStatus(consultantId, isInactive: false, CancellationToken.None);
+
+        Assert.IsType<RedirectToActionResult>(result);
+        var call = Assert.Single(apiClient.SetStatusCalls);
+        Assert.Equal(consultantId, call.ExternalTestConsultantId);
+        Assert.True(call.IsInactive);
+    }
+
+    [Fact]
+    public async Task ExternalTestConsultantManagementGenerateLogin_Success_ShowsSuccessMessage()
+    {
+        var consultantId = Guid.NewGuid();
+        var apiClient = new FakeExternalTestConsultantApiClient { GenerateLoginResult = new GenerateLoginResponse(true, null) };
+        var controller = CreateController(externalTestConsultantApiClient: apiClient);
+
+        var result = await controller.ExternalTestConsultantManagementGenerateLogin(consultantId, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<ExternalTestConsultantManagementViewModel>(view.Model);
+        Assert.False(model.MessageIsError);
+        Assert.Contains(consultantId, apiClient.GenerateLoginCalls);
+    }
+
+    [Fact]
+    public async Task ExternalTestConsultantManagementGenerateLogin_Failure_ShowsErrorMessage()
+    {
+        var consultantId = Guid.NewGuid();
+        var apiClient = new FakeExternalTestConsultantApiClient { GenerateLoginResult = new GenerateLoginResponse(false, "The login could not be generated.") };
+        var controller = CreateController(externalTestConsultantApiClient: apiClient);
+
+        var result = await controller.ExternalTestConsultantManagementGenerateLogin(consultantId, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<ExternalTestConsultantManagementViewModel>(view.Model);
+        Assert.True(model.MessageIsError);
+        Assert.Equal("The login could not be generated.", model.Message);
+    }
+
+    [Fact]
+    public async Task ViewerManagement_Get_BuildsRows()
+    {
+        var viewerId = Guid.NewGuid();
+        var apiClient = new FakeViewerApiClient
+        {
+            Viewers = [new ViewerResponse(viewerId, "Jane Smith", "jane@example.com", true, [], [])]
+        };
+        var controller = CreateController(viewerApiClient: apiClient);
+
+        var result = await controller.ViewerManagement(editId: null, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<ViewerManagementViewModel>(view.Model);
+        var row = Assert.Single(model.Rows);
+        Assert.Equal("Jane Smith", row.Name);
+        Assert.True(row.HasLogin);
+        Assert.False(row.IsEditing);
+    }
+
+    [Fact]
+    public async Task ViewerManagement_Get_WithAssignments_BuildsEnrichedRemoveConfirmMessage()
+    {
+        var viewerId = Guid.NewGuid();
+        var apiClient = new FakeViewerApiClient
+        {
+            Viewers =
+            [
+                new ViewerResponse(viewerId, "Jane Smith", "jane@example.com", false,
+                    [new ViewerSchemeResponse("SFW1234", "Heavy Metals")],
+                    [new ViewerParticipantResponse("LAB001", "Example Lab")])
+            ]
+        };
+        var controller = CreateController(viewerApiClient: apiClient);
+
+        var result = await controller.ViewerManagement(editId: null, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<ViewerManagementViewModel>(view.Model);
+        var row = Assert.Single(model.Rows);
+        Assert.Contains("SFW1234: Heavy Metals", row.RemoveConfirmMessage);
+        Assert.Contains("LAB001: Example Lab", row.RemoveConfirmMessage);
+    }
+
+    [Fact]
+    public async Task ViewerManagementAdd_Valid_RedirectsToList()
+    {
+        var apiClient = new FakeViewerApiClient();
+        var controller = CreateController(viewerApiClient: apiClient);
+        var model = new ViewerAddViewModel { Name = "Jane Smith", Email = "jane@example.com" };
+
+        var result = await controller.ViewerManagementAdd(model, CancellationToken.None);
+
+        Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal("Jane Smith", apiClient.LastCreateRequest?.Name);
+    }
+
+    [Fact]
+    public async Task ViewerManagementAdd_ApiRejectsMissingEmail_RedisplaysWithError()
+    {
+        var apiClient = new FakeViewerApiClient
+        {
+            SaveResult = new ViewerSaveResult(false, null, new Dictionary<string, string[]> { ["Email"] = ["Enter an email address"] })
+        };
+        var controller = CreateController(viewerApiClient: apiClient);
+        var model = new ViewerAddViewModel { Name = "Jane Smith", Email = "jane@example.com" };
+
+        var result = await controller.ViewerManagementAdd(model, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        Assert.False(controller.ModelState.IsValid);
+        Assert.IsType<ViewerManagementViewModel>(view.Model);
+    }
+
+    [Fact]
+    public async Task ViewerManagementSave_Valid_RedirectsToList()
+    {
+        var viewerId = Guid.NewGuid();
+        var apiClient = new FakeViewerApiClient();
+        var controller = CreateController(viewerApiClient: apiClient);
+        var model = new ViewerEditViewModel { ViewerId = viewerId, Name = "Jane Smith", Email = "jane@example.com" };
+
+        var result = await controller.ViewerManagementSave(model, CancellationToken.None);
+
+        Assert.IsType<RedirectToActionResult>(result);
+        var call = Assert.Single(apiClient.UpdateCalls);
+        Assert.Equal(viewerId, call.ViewerId);
+    }
+
+    [Fact]
+    public async Task ViewerManagementRemove_Success_ShowsSuccessMessage()
+    {
+        var viewerId = Guid.NewGuid();
+        var apiClient = new FakeViewerApiClient { DeleteResult = new ViewerDeleteResponse(true, null) };
+        var controller = CreateController(viewerApiClient: apiClient);
+
+        var result = await controller.ViewerManagementRemove(viewerId, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<ViewerManagementViewModel>(view.Model);
+        Assert.False(model.MessageIsError);
+        Assert.Contains(viewerId, apiClient.DeleteCalls);
+    }
+
+    [Fact]
+    public async Task ViewerManagementGenerateLogin_Success_ShowsSuccessMessage()
+    {
+        var viewerId = Guid.NewGuid();
+        var apiClient = new FakeViewerApiClient { GenerateLoginResult = new GenerateLoginResponse(true, null) };
+        var controller = CreateController(viewerApiClient: apiClient);
+
+        var result = await controller.ViewerManagementGenerateLogin(viewerId, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<ViewerManagementViewModel>(view.Model);
+        Assert.False(model.MessageIsError);
+        Assert.Contains(viewerId, apiClient.GenerateLoginCalls);
+    }
+
+    [Fact]
+    public async Task ViewerManagementGenerateLogin_Failure_ShowsErrorMessage()
+    {
+        var viewerId = Guid.NewGuid();
+        var apiClient = new FakeViewerApiClient { GenerateLoginResult = new GenerateLoginResponse(false, "The login could not be generated.") };
+        var controller = CreateController(viewerApiClient: apiClient);
+
+        var result = await controller.ViewerManagementGenerateLogin(viewerId, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<ViewerManagementViewModel>(view.Model);
+        Assert.True(model.MessageIsError);
+        Assert.Equal("The login could not be generated.", model.Message);
     }
 }
 

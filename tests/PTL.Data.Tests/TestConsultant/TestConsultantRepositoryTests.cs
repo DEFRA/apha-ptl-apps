@@ -49,7 +49,7 @@ public class TestConsultantRepositoryTests
         var result = await repository.GetBySsoIdExtAsync(ssoIdExt);
 
         Assert.NotNull(result);
-        Assert.Equal(ssoIdExt, result!.SsoIdExt);
+        Assert.Equal(ssoIdExt, result.SsoIdExt);
     }
 
     [Fact]
@@ -74,7 +74,7 @@ public class TestConsultantRepositoryTests
         var result = await repository.GetByEmailAsync(email);
 
         Assert.NotNull(result);
-        Assert.Equal(email, result!.Email);
+        Assert.Equal(email, result.Email);
     }
 
     [Fact]
@@ -125,5 +125,19 @@ public class TestConsultantRepositoryTests
         var result = await repository.UpdateAsync(testConsultant);
 
         Assert.Null(result);
+    }
+
+    [Fact]
+    public async Task GetAllAsync_ReturnsMappedTestConsultants()
+    {
+        var (repository, connection) = CreateRepository();
+        var id = Guid.NewGuid();
+        connection.RespondToQuery("EXEC dbo.spgaExtTestConsultants", TestConsultantTable(id, name: "Jane Smith", email: "jane@example.com"));
+
+        var result = await repository.GetAllAsync();
+
+        var consultant = Assert.Single(result);
+        Assert.Equal("Jane Smith", consultant.Name);
+        Assert.Equal("jane@example.com", consultant.Email);
     }
 }

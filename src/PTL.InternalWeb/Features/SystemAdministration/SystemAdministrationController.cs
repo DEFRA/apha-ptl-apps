@@ -1,4 +1,5 @@
 using System.Globalization;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using PTL.ApiClient;
@@ -7,23 +8,48 @@ using PTL.Contracts.Country;
 using PTL.Contracts.ExternalSiteMessage;
 using PTL.Contracts.Lookup;
 using PTL.Contracts.PostagePricingPlan;
+using PTL.Contracts.TestConsultant;
 using PTL.Contracts.User;
+using PTL.Contracts.Viewer;
+using PTL.InternalWeb.Features.Account;
 
 namespace PTL.InternalWeb.Features.SystemAdministration;
 
-// Authentication/authorization are out of scope for this phase - assume the current user is
-// already authenticated with full access, same as every other InternalWeb controller.
-public class SystemAdministrationController(
-    IAdministrationChargeApiClient administrationChargeApiClient,
-    IWeightedPricingPlanApiClient weightedPricingPlanApiClient,
-    IPostagePricingPlanApiClient postagePricingPlanApiClient,
-    ICountryApiClient countryApiClient,
-    IExternalSiteMessageApiClient externalSiteMessageApiClient,
-    IUserApiClient userApiClient,
-    IRoleApiClient roleApiClient,
-    ILookupApiClient lookupApiClient,
-    ILogger<SystemAdministrationController> logger) : Controller
+// Gated behind the "Admin" role (resolved from our own database, not an Entra ID group - see
+// SystemAdministrationPolicy remarks). PTL.Api itself remains unauthenticated for this phase
+// (tracked separately) - this is the one enforcement point today.
+[Authorize(Policy = SystemAdministrationPolicy.Name)]
+public class SystemAdministrationController : Controller
 {
+    private readonly IAdministrationChargeApiClient administrationChargeApiClient;
+    private readonly IWeightedPricingPlanApiClient weightedPricingPlanApiClient;
+    private readonly IPostagePricingPlanApiClient postagePricingPlanApiClient;
+    private readonly ICountryApiClient countryApiClient;
+    private readonly IExternalSiteMessageApiClient externalSiteMessageApiClient;
+    private readonly IUserApiClient userApiClient;
+    private readonly IRoleApiClient roleApiClient;
+    private readonly ILookupApiClient lookupApiClient;
+    private readonly IExternalTestConsultantApiClient externalTestConsultantApiClient;
+    private readonly IViewerApiClient viewerApiClient;
+    private readonly ILogger<SystemAdministrationController> logger;
+
+    // Takes the bundled SystemAdministrationApiClients rather than 8 separate parameters, to stay
+    // under the analyzer's constructor-parameter-count threshold - see that type's remarks.
+    public SystemAdministrationController(SystemAdministrationApiClients apiClients, ILogger<SystemAdministrationController> logger)
+    {
+        administrationChargeApiClient = apiClients.AdministrationCharge;
+        weightedPricingPlanApiClient = apiClients.WeightedPricingPlan;
+        postagePricingPlanApiClient = apiClients.PostagePricingPlan;
+        countryApiClient = apiClients.Country;
+        externalSiteMessageApiClient = apiClients.ExternalSiteMessage;
+        userApiClient = apiClients.User;
+        roleApiClient = apiClients.Role;
+        lookupApiClient = apiClients.Lookup;
+        externalTestConsultantApiClient = apiClients.ExternalTestConsultant;
+        viewerApiClient = apiClients.Viewer;
+        this.logger = logger;
+    }
+
     private static readonly Action<ILogger, Guid, Guid, Exception?> LogSetPriceFailedMessage =
         LoggerMessage.Define<Guid, Guid>(
             LogLevel.Warning,
@@ -385,11 +411,12 @@ public class SystemAdministrationController(
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> ManageUserRoles(ManageUserRolesViewModel model, CancellationToken cancellationToken)
     {
+        var actingUserId = GetCurrentUserId();
         var blockedMessages = new List<string>();
 
         foreach (var row in model.Rows)
         {
-            var result = await userApiClient.SetUserRolesAsync(row.UserId, new SetUserRolesRequest(row.SelectedRoleIds), cancellationToken);
+            var result = await userApiClient.SetUserRolesAsync(row.UserId, new SetUserRolesRequest(row.SelectedRoleIds, actingUserId), cancellationToken);
             if (!result.Success && result.Message is not null)
             {
                 blockedMessages.Add($"{row.FriendlyName}: {result.Message}");
@@ -422,6 +449,379 @@ public class SystemAdministrationController(
             MessageIsError = messageIsError
         };
     }
+
+    public async Task<IActionResult> RemoveUser(CancellationToken cancellationToken) =>
+        View(await BuildRemoveUserViewModelAsync(message: null, messageIsError: false, cancellationToken));
+
+    // Matches legacy Button_DeleteUser_Click - revokes every role then removes the user record.
+    // Blocked (Success = false) if the selection is the current user, same reasoning as the
+    // self-Admin-removal guard in ManageUserRoles.
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> RemoveUser(RemoveUserViewModel model, CancellationToken cancellationToken)
+    {
+        if (model.SelectedUserId is not Guid userId)
+        {
+            return View(await BuildRemoveUserViewModelAsync("Select a user to remove.", messageIsError: true, cancellationToken));
+        }
+
+        var result = await userApiClient.RemoveUserAsync(userId, GetCurrentUserId(), cancellationToken);
+        if (result.Success)
+        {
+            return View(new RemoveUserViewModel { IsRemoved = true, Message = "User Removed Successfully" });
+        }
+
+        return View(await BuildRemoveUserViewModelAsync(result.Message, messageIsError: true, cancellationToken));
+    }
+
+    // Reads the InternalUserId claim InternalUserResolver added at sign-in - null if absent
+    // (e.g. no HttpContext in a unit test), which the API layer treats as "unknown caller".
+    private Guid? GetCurrentUserId() =>
+        Guid.TryParse(HttpContext?.User?.FindFirst(InternalUserClaimTypes.InternalUserId)?.Value, out var id) ? id : null;
+
+    private async Task<RemoveUserViewModel> BuildRemoveUserViewModelAsync(string? message, bool messageIsError, CancellationToken cancellationToken)
+    {
+        var users = await userApiClient.GetUsersAsync(cancellationToken);
+        var options = new List<SelectListItem> { new("Select an existing user...", string.Empty) };
+        options.AddRange(users
+            .OrderBy(u => u.FriendlyName, StringComparer.OrdinalIgnoreCase)
+            .Select(u => new SelectListItem($"{u.Username}: {u.FriendlyName}", u.UserId.ToString())));
+
+        return new RemoveUserViewModel
+        {
+            UserOptions = options,
+            Message = message,
+            MessageIsError = messageIsError
+        };
+    }
+
+    public async Task<IActionResult> InternalTestConsultantDepartment(Guid? editId, CancellationToken cancellationToken) =>
+        View(await BuildInternalTestConsultantDepartmentViewModelAsync(editId, message: null, messageIsError: false, editValues: null, cancellationToken));
+
+    // Only the row matching model.UserId is ever in edit mode when this posts - matches
+    // CountryManagementSave. IsInactive/InactiveDate are round-tripped unchanged (see
+    // InternalTestConsultantEditViewModel remarks) since spuUserDept updates all three together.
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> InternalTestConsultantDepartmentSave([Bind(Prefix = "Edit")] InternalTestConsultantEditViewModel model, CancellationToken cancellationToken)
+    {
+        await userApiClient.UpdateTestConsultantAsync(
+            model.UserId,
+            new UpdateTestConsultantRequest(model.Department, model.IsInactive, model.InactiveDate),
+            cancellationToken);
+
+        return RedirectToAction(nameof(InternalTestConsultantDepartment));
+    }
+
+    // Toggles the current Status (Active/Inactive). Department is round-tripped unchanged for the
+    // same reason as the Save action above. Deactivating stamps InactiveDate with now; activating
+    // clears it - matches the story's "Inactive Date is populated" acceptance criterion. The
+    // activation confirmation ("Are you sure?") is a client-side confirm() on the view's button,
+    // matching the story's wording exactly - no separate server-side confirmation step exists.
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> InternalTestConsultantDepartmentToggleStatus(Guid userId, string department, bool isInactive, CancellationToken cancellationToken)
+    {
+        var newIsInactive = !isInactive;
+        var inactiveDate = newIsInactive ? DateTime.UtcNow : (DateTime?)null;
+
+        await userApiClient.UpdateTestConsultantAsync(
+            userId,
+            new UpdateTestConsultantRequest(department, newIsInactive, inactiveDate),
+            cancellationToken);
+
+        return RedirectToAction(nameof(InternalTestConsultantDepartment));
+    }
+
+    private async Task<InternalTestConsultantDepartmentViewModel> BuildInternalTestConsultantDepartmentViewModelAsync(
+        Guid? editId,
+        string? message,
+        bool messageIsError,
+        InternalTestConsultantEditViewModel? editValues,
+        CancellationToken cancellationToken)
+    {
+        var consultants = await userApiClient.GetTestConsultantsAsync(cancellationToken);
+
+        var rows = consultants
+            .OrderBy(c => c.FriendlyName, StringComparer.OrdinalIgnoreCase)
+            .Select(c => new InternalTestConsultantRowViewModel
+            {
+                UserId = c.UserId,
+                Username = c.Username,
+                FriendlyName = c.FriendlyName,
+                Department = editId == c.UserId && editValues is not null ? editValues.Department : c.Department,
+                IsInactive = c.IsInactive,
+                InactiveDate = c.InactiveDate,
+                IsEditing = editId == c.UserId
+            })
+            .ToList();
+
+        return new InternalTestConsultantDepartmentViewModel
+        {
+            Rows = rows,
+            Message = message,
+            MessageIsError = messageIsError
+        };
+    }
+
+    public async Task<IActionResult> ExternalTestConsultantManagement(Guid? editId, CancellationToken cancellationToken) =>
+        View(await BuildExternalTestConsultantManagementViewModelAsync(editId, message: null, messageIsError: false, addValues: null, editValues: null, cancellationToken));
+
+    // Matches legacy ButtonAdd_Click - Name and Email are required (Department is optional), per
+    // the story's Business Rule.
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ExternalTestConsultantManagementAdd([Bind(Prefix = "Add")] ExternalTestConsultantAddViewModel model, CancellationToken cancellationToken)
+    {
+        if (ModelState.IsValid)
+        {
+            var result = await externalTestConsultantApiClient.CreateAsync(new ExternalTestConsultantSaveRequest(model.Name, model.Department, model.Email), cancellationToken);
+            if (result.Success)
+            {
+                return RedirectToAction(nameof(ExternalTestConsultantManagement));
+            }
+
+            foreach (var (field, messages) in result.FieldErrors)
+            {
+                foreach (var errorMessage in messages)
+                {
+                    ModelState.AddModelError($"Add.{field}", errorMessage);
+                }
+            }
+        }
+
+        return View(nameof(ExternalTestConsultantManagement), await BuildExternalTestConsultantManagementViewModelAsync(editId: null, message: null, messageIsError: false, model, editValues: null, cancellationToken));
+    }
+
+    // Only the row matching model.ExternalTestConsultantId is ever in edit mode when this posts -
+    // matches CountryManagementSave/legacy GridViewTC_Updating.
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ExternalTestConsultantManagementSave([Bind(Prefix = "Edit")] ExternalTestConsultantEditViewModel model, CancellationToken cancellationToken)
+    {
+        if (ModelState.IsValid)
+        {
+            var result = await externalTestConsultantApiClient.UpdateAsync(model.ExternalTestConsultantId, new ExternalTestConsultantSaveRequest(model.Name, model.Department, model.Email), cancellationToken);
+            if (result.Success)
+            {
+                return RedirectToAction(nameof(ExternalTestConsultantManagement));
+            }
+
+            foreach (var (field, messages) in result.FieldErrors)
+            {
+                foreach (var errorMessage in messages)
+                {
+                    ModelState.AddModelError($"Edit.{field}", errorMessage);
+                }
+            }
+        }
+
+        return View(nameof(ExternalTestConsultantManagement), await BuildExternalTestConsultantManagementViewModelAsync(model.ExternalTestConsultantId, message: null, messageIsError: false, addValues: null, model, cancellationToken));
+    }
+
+    // Toggles Active/Inactive - the API stamps/clears InactiveDate accordingly, matching the
+    // story's "Inactive Date is populated" acceptance criterion.
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ExternalTestConsultantManagementToggleStatus(Guid externalTestConsultantId, bool isInactive, CancellationToken cancellationToken)
+    {
+        await externalTestConsultantApiClient.SetStatusAsync(externalTestConsultantId, !isInactive, cancellationToken);
+        return RedirectToAction(nameof(ExternalTestConsultantManagement));
+    }
+
+    // [NEEDS INVESTIGATION] Generate Login is a stub - see IExternalLoginService remarks. The
+    // confirmation ("Generating a login... Are you sure you wish to proceed?") is a client-side
+    // confirm() on the view's link, matching the story's wording exactly - Cancel simply never
+    // submits the form, so no server-side action runs.
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ExternalTestConsultantManagementGenerateLogin(Guid externalTestConsultantId, CancellationToken cancellationToken)
+    {
+        var result = await externalTestConsultantApiClient.GenerateLoginAsync(externalTestConsultantId, cancellationToken);
+        return View(nameof(ExternalTestConsultantManagement), await BuildExternalTestConsultantManagementViewModelAsync(
+            editId: null, result.Message ?? (result.Success ? "Login generated successfully." : null), messageIsError: !result.Success, addValues: null, editValues: null, cancellationToken));
+    }
+
+    private async Task<ExternalTestConsultantManagementViewModel> BuildExternalTestConsultantManagementViewModelAsync(
+        Guid? editId,
+        string? message,
+        bool messageIsError,
+        ExternalTestConsultantAddViewModel? addValues,
+        ExternalTestConsultantEditViewModel? editValues,
+        CancellationToken cancellationToken)
+    {
+        var consultants = await externalTestConsultantApiClient.GetAllAsync(cancellationToken);
+
+        var rows = consultants
+            .OrderBy(c => c.Name, StringComparer.OrdinalIgnoreCase)
+            .Select(c => new ExternalTestConsultantRowViewModel
+            {
+                ExternalTestConsultantId = c.ExternalTestConsultantId,
+                Name = editId == c.ExternalTestConsultantId && editValues is not null ? editValues.Name : c.Name,
+                Department = editId == c.ExternalTestConsultantId && editValues is not null ? editValues.Department : c.Department,
+                Email = editId == c.ExternalTestConsultantId && editValues is not null ? editValues.Email : c.Email,
+                IsInactive = c.IsInactive,
+                InactiveDate = c.InactiveDate,
+                HasLogin = c.HasLogin,
+                IsEditing = editId == c.ExternalTestConsultantId
+            })
+            .ToList();
+
+        return new ExternalTestConsultantManagementViewModel
+        {
+            Rows = rows,
+            Add = addValues ?? new ExternalTestConsultantAddViewModel(),
+            Message = message,
+            MessageIsError = messageIsError
+        };
+    }
+
+    public async Task<IActionResult> ViewerManagement(Guid? editId, CancellationToken cancellationToken) =>
+        View(await BuildViewerManagementViewModelAsync(editId, message: null, messageIsError: false, addValues: null, editValues: null, cancellationToken));
+
+    // Matches legacy ButtonAdd_Click - Name and Email are both required per the story's Business Rule.
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ViewerManagementAdd([Bind(Prefix = "Add")] ViewerAddViewModel model, CancellationToken cancellationToken)
+    {
+        if (ModelState.IsValid)
+        {
+            var result = await viewerApiClient.CreateAsync(new ViewerSaveRequest(model.Name, model.Email), cancellationToken);
+            if (result.Success)
+            {
+                return RedirectToAction(nameof(ViewerManagement));
+            }
+
+            foreach (var (field, messages) in result.FieldErrors)
+            {
+                foreach (var errorMessage in messages)
+                {
+                    ModelState.AddModelError($"Add.{field}", errorMessage);
+                }
+            }
+        }
+
+        return View(nameof(ViewerManagement), await BuildViewerManagementViewModelAsync(editId: null, message: null, messageIsError: false, model, editValues: null, cancellationToken));
+    }
+
+    // Only the row matching model.ViewerId is ever in edit mode when this posts - matches
+    // CountryManagementSave/legacy GridViewViewer_Updating.
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ViewerManagementSave([Bind(Prefix = "Edit")] ViewerEditViewModel model, CancellationToken cancellationToken)
+    {
+        if (ModelState.IsValid)
+        {
+            var result = await viewerApiClient.UpdateAsync(model.ViewerId, new ViewerSaveRequest(model.Name, model.Email), cancellationToken);
+            if (result.Success)
+            {
+                return RedirectToAction(nameof(ViewerManagement));
+            }
+
+            foreach (var (field, messages) in result.FieldErrors)
+            {
+                foreach (var errorMessage in messages)
+                {
+                    ModelState.AddModelError($"Edit.{field}", errorMessage);
+                }
+            }
+        }
+
+        return View(nameof(ViewerManagement), await BuildViewerManagementViewModelAsync(model.ViewerId, message: null, messageIsError: false, addValues: null, model, cancellationToken));
+    }
+
+    // Removal is never blocked server-side (spdViewer is unconditional, matching legacy) - the
+    // confirmation listing assigned schemes/participants is purely a client-side courtesy
+    // (ViewerRowViewModel.RemoveConfirmMessage), matching legacy ManageViewers.aspx.
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ViewerManagementRemove(Guid viewerId, CancellationToken cancellationToken)
+    {
+        var result = await viewerApiClient.DeleteAsync(viewerId, cancellationToken);
+        return View(nameof(ViewerManagement), await BuildViewerManagementViewModelAsync(
+            editId: null, result.Success ? "Viewer removed successfully." : result.Message, messageIsError: !result.Success, addValues: null, editValues: null, cancellationToken));
+    }
+
+    // [NEEDS INVESTIGATION] Generate Login is a stub - see IExternalLoginService remarks. The
+    // confirmation ("Generating a login... Are you sure you wish to proceed?") is a client-side
+    // confirm() on the view's link, matching the story's wording exactly - Cancel simply never
+    // submits the form, so no server-side action runs.
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ViewerManagementGenerateLogin(Guid viewerId, CancellationToken cancellationToken)
+    {
+        var result = await viewerApiClient.GenerateLoginAsync(viewerId, cancellationToken);
+        return View(nameof(ViewerManagement), await BuildViewerManagementViewModelAsync(
+            editId: null, result.Message ?? (result.Success ? "Login generated successfully." : null), messageIsError: !result.Success, addValues: null, editValues: null, cancellationToken));
+    }
+
+    private async Task<ViewerManagementViewModel> BuildViewerManagementViewModelAsync(
+        Guid? editId,
+        string? message,
+        bool messageIsError,
+        ViewerAddViewModel? addValues,
+        ViewerEditViewModel? editValues,
+        CancellationToken cancellationToken)
+    {
+        var viewers = await viewerApiClient.GetAllAsync(cancellationToken);
+
+        var rows = viewers
+            .OrderBy(v => v.Name, StringComparer.OrdinalIgnoreCase)
+            .Select(v => new ViewerRowViewModel
+            {
+                ViewerId = v.ViewerId,
+                Name = editId == v.ViewerId && editValues is not null ? editValues.Name : v.Name,
+                Email = editId == v.ViewerId && editValues is not null ? editValues.Email : v.Email,
+                HasLogin = v.HasLogin,
+                IsEditing = editId == v.ViewerId,
+                RemoveConfirmMessage = BuildRemoveConfirmMessage(v.Schemes, v.Participants)
+            })
+            .ToList();
+
+        return new ViewerManagementViewModel
+        {
+            Rows = rows,
+            Add = addValues ?? new ViewerAddViewModel(),
+            Message = message,
+            MessageIsError = messageIsError
+        };
+    }
+
+    // Matches legacy GridViewTC_RowDataBound's warning text (Schemes then Participants, each as
+    // "Identifier/LabCode: Name/LabName"), always ending with a plain "are you sure" question so
+    // every viewer gets a confirmation - unlike legacy, which showed no confirmation at all when
+    // nothing was assigned; this codebase's other Remove actions (e.g. Remove User) always
+    // confirm, so this keeps that consistent even for a viewer with no assignments.
+    private static string BuildRemoveConfirmMessage(IReadOnlyList<ViewerSchemeResponse> schemes, IReadOnlyList<ViewerParticipantResponse> participants)
+    {
+        var lines = new List<string>();
+
+        if (schemes.Count > 0)
+        {
+            lines.Add("This viewer is assigned to the following schemes:");
+            lines.AddRange(schemes.Select(s => $"{s.Identifier}: {s.Name}"));
+            lines.Add(string.Empty);
+        }
+
+        if (participants.Count > 0)
+        {
+            lines.Add("This viewer is assigned to the following participants:");
+            lines.AddRange(participants.Select(p => $"{p.LabCode}: {p.LabName}"));
+            lines.Add(string.Empty);
+        }
+
+        lines.Add("Are you sure you want to remove this viewer?");
+
+        // JS-escape each line's raw content (not HTML-escape) before joining with the literal
+        // "\n" line-break sequence, since this is embedded inside a single-quoted JS string
+        // literal in an onclick attribute - HTML-encoding alone would not stop an apostrophe in a
+        // scheme/participant name from terminating the string early, and escaping after joining
+        // would double-escape the "\n" separators themselves.
+        return string.Join("\\n", lines.Select(EscapeForJavaScriptString));
+    }
+
+    private static string EscapeForJavaScriptString(string value) =>
+        value.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("'", "\\'", StringComparison.Ordinal);
 
     private async Task<AdministrationChargeListViewModel> BuildAdministrationChargeViewModelAsync(CancellationToken cancellationToken)
     {

@@ -66,4 +66,53 @@ public class UserRepositoryTests
 
         Assert.Contains(connection.ExecutedCommands, c => c.CommandText == insertSql);
     }
+
+    [Fact]
+    public async Task DeleteAsync_ExecutesSpdUser()
+    {
+        var (repository, connection) = CreateRepository();
+        const string deleteSql = "EXEC dbo.spdUser @UserId";
+        connection.RespondToNonQuery(deleteSql, 1);
+        var userId = Guid.NewGuid();
+
+        await repository.DeleteAsync(userId);
+
+        Assert.Contains(connection.ExecutedCommands, c => c.CommandText == deleteSql);
+    }
+
+    [Fact]
+    public async Task GetTestConsultantsAsync_ReturnsMappedUsers()
+    {
+        var (repository, connection) = CreateRepository();
+        var userId = Guid.NewGuid();
+        var table = new DataTable();
+        table.Columns.Add("fldUserId", typeof(Guid));
+        table.Columns.Add("fldUsername", typeof(string));
+        table.Columns.Add("fldFriendlyName", typeof(string));
+        table.Columns.Add("fldFirstName", typeof(string));
+        table.Columns.Add("fldLastName", typeof(string));
+        table.Columns.Add("fldEmail", typeof(string));
+        table.Columns.Add("fldDepartment", typeof(string));
+        table.Columns.Add("fldIsInactive", typeof(bool));
+        table.Columns.Add("fldInactiveDate", typeof(DateTime));
+        table.Rows.Add(userId, "m100001", "Jane Smith", "Jane", "Smith", "jane@apha.gov.uk", "Science", false, DBNull.Value);
+        connection.RespondToQuery("EXEC dbo.spgaUserTestConsultant", table);
+
+        var result = await repository.GetTestConsultantsAsync();
+
+        Assert.Equal("Jane Smith", Assert.Single(result).FriendlyName);
+    }
+
+    [Fact]
+    public async Task UpdateDepartmentAsync_ExecutesSpuUserDept()
+    {
+        var (repository, connection) = CreateRepository();
+        const string updateSql = "EXEC dbo.spuUserDept @UserId, @Department, @IsInactive, @InactiveDate";
+        connection.RespondToNonQuery(updateSql, 1);
+        var userId = Guid.NewGuid();
+
+        await repository.UpdateDepartmentAsync(userId, "Science", true, new DateTime(2026, 10, 8, 0, 0, 0, DateTimeKind.Utc));
+
+        Assert.Contains(connection.ExecutedCommands, c => c.CommandText == updateSql);
+    }
 }

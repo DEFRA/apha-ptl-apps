@@ -15,9 +15,18 @@ internal sealed class FakeUserRoleService : IUserRoleService
     public Task<IReadOnlyList<UserRoleRow>> GetUserRoleGridAsync(CancellationToken cancellationToken = default) =>
         Task.FromResult(Grid);
 
-    public Task<SetUserRolesResult> SetUserRolesAsync(Guid userId, IReadOnlyList<Guid> roleIds, CancellationToken cancellationToken = default)
+    public Task<SetUserRolesResult> SetUserRolesAsync(Guid userId, IReadOnlyList<Guid> roleIds, Guid? actingUserId, CancellationToken cancellationToken = default)
     {
         SetCalls.Add((userId, roleIds));
         return Task.FromResult(SetResult);
+    }
+
+    public UserRemoveResult RemoveResult { get; set; } = new(true, null);
+    public List<Guid> RemoveCalls { get; } = [];
+
+    public Task<UserRemoveResult> RemoveUserAsync(Guid userId, Guid? actingUserId, CancellationToken cancellationToken = default)
+    {
+        RemoveCalls.Add(userId);
+        return Task.FromResult(RemoveResult);
     }
 }

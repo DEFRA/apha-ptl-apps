@@ -101,12 +101,15 @@ builder.Services.AddScoped<IParticipantRepository, ParticipantRepository>();
 builder.Services.AddScoped<IPendingParticipantUpdateRepository, PendingParticipantUpdateRepository>();
 builder.Services.AddScoped<IParticipantViewerRepository, ParticipantViewerRepository>();
 builder.Services.AddScoped<IViewerRepository, ViewerRepository>();
+builder.Services.AddScoped<IViewerService, ViewerService>();
 builder.Services.AddScoped<IParticipantService, ParticipantService>();
 builder.Services.AddScoped<IParticipantSchemeRepository, ParticipantSchemeRepository>();
 builder.Services.AddScoped<IParticipantSchemeService, ParticipantSchemeService>();
 
 builder.Services.AddScoped<ITestConsultantRepository, TestConsultantRepository>();
 builder.Services.AddScoped<IExternalUserService, ExternalUserService>();
+builder.Services.AddScoped<IExternalLoginService, StubExternalLoginService>();
+builder.Services.AddScoped<ITestConsultantService, TestConsultantService>();
 
 builder.Services.AddScoped<IInternalUserRepository, InternalUserRepository>();
 builder.Services.AddScoped<IInternalUserService, InternalUserService>();
@@ -191,7 +194,6 @@ builder.Services.AddScoped<IUserService, UserService>();
 
 builder.Services.AddScoped<IRoleRepository, RoleRepository>();
 builder.Services.AddScoped<IUserRoleRepository, UserRoleRepository>();
-builder.Services.AddScoped<ICurrentUserProvider, StubCurrentUserProvider>();
 builder.Services.AddScoped<IUserRoleService, UserRoleService>();
 
 builder.Services.AddScoped<IInvoiceRepository, InvoiceRepository>();

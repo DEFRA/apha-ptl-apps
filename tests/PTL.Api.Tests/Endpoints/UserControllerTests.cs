@@ -149,4 +149,68 @@ public class UserControllerTests
         Assert.True(response.Success);
         Assert.Single(userRoleService.SetCalls);
     }
+
+    [Fact]
+    public async Task RemoveUser_Blocked_ReturnsOkWithFailureMessage()
+    {
+        var userId = Guid.NewGuid();
+        var userRoleService = new FakeUserRoleService { RemoveResult = new PTL.Core.User.UserRemoveResult(false, "You cannot remove your own account.") };
+        var controller = CreateController(new FakeUserRepository(), userRoleService: userRoleService);
+
+        var result = await controller.RemoveUser(userId, actingUserId: null, CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var response = Assert.IsType<UserRemoveResponse>(ok.Value);
+        Assert.False(response.Success);
+        Assert.Equal("You cannot remove your own account.", response.Message);
+    }
+
+    [Fact]
+    public async Task RemoveUser_Valid_ReturnsOkWithSuccess()
+    {
+        var userId = Guid.NewGuid();
+        var userRoleService = new FakeUserRoleService();
+        var controller = CreateController(new FakeUserRepository(), userRoleService: userRoleService);
+
+        var result = await controller.RemoveUser(userId, actingUserId: null, CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var response = Assert.IsType<UserRemoveResponse>(ok.Value);
+        Assert.True(response.Success);
+        Assert.Single(userRoleService.RemoveCalls);
+    }
+
+    [Fact]
+    public async Task GetTestConsultants_ReturnsMappedUsers()
+    {
+        var repository = new FakeUserRepository
+        {
+            TestConsultants = [new PTL.Core.User.User { Username = "m100001", FriendlyName = "Jane Smith", Department = "Science", IsInactive = true, InactiveDate = new DateTime(2026, 10, 8, 0, 0, 0, DateTimeKind.Utc) }]
+        };
+        var controller = CreateController(repository);
+
+        var result = await controller.GetTestConsultants(CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var users = Assert.IsAssignableFrom<IReadOnlyList<UserResponse>>(ok.Value);
+        var user = Assert.Single(users);
+        Assert.Equal("Science", user.Department);
+        Assert.True(user.IsInactive);
+    }
+
+    [Fact]
+    public async Task UpdateTestConsultant_PersistsRequestValues()
+    {
+        var userId = Guid.NewGuid();
+        var repository = new FakeUserRepository();
+        var controller = CreateController(repository);
+
+        var result = await controller.UpdateTestConsultant(userId, new UpdateTestConsultantRequest("Science", true, new DateTime(2026, 10, 8, 0, 0, 0, DateTimeKind.Utc)), CancellationToken.None);
+
+        Assert.IsType<OkResult>(result);
+        var update = Assert.Single(repository.DepartmentUpdates);
+        Assert.Equal(userId, update.UserId);
+        Assert.Equal("Science", update.Department);
+        Assert.True(update.IsInactive);
+    }
 }

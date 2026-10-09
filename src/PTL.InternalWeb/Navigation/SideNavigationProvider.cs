@@ -43,14 +43,27 @@ public static class SideNavigationProvider
             [
                 new SideNavigationItem { Text = "Create User", ControllerName = SystemAdministrationControllerName, ActionName = "CreateUser" },
                 new SideNavigationItem { Text = "Assign Roles to User", ControllerName = SystemAdministrationControllerName, ActionName = "ManageUserRoles" },
-                Disabled("Remove User"),
-                Disabled("Internal Test Consultant Department Management"),
-                Disabled("External Test Consultant Management"),
-                Disabled("Viewer Management"),
+                new SideNavigationItem { Text = "Remove User", ControllerName = SystemAdministrationControllerName, ActionName = "RemoveUser" },
+                new SideNavigationItem { Text = "Internal Test Consultant Department Management", ControllerName = SystemAdministrationControllerName, ActionName = "InternalTestConsultantDepartment" },
+                new SideNavigationItem { Text = "External Test Consultant Management", ControllerName = SystemAdministrationControllerName, ActionName = "ExternalTestConsultantManagement" },
+                new SideNavigationItem { Text = "Viewer Management", ControllerName = SystemAdministrationControllerName, ActionName = "ViewerManagement" },
                 new SideNavigationItem { Text = "Country Management", ControllerName = SystemAdministrationControllerName, ActionName = "CountryManagement" },
                 new SideNavigationItem { Text = "External Site Management", ControllerName = SystemAdministrationControllerName, ActionName = "ExternalSiteManagement" },
                 new SideNavigationItem { Text = "Administration Charges Management", ControllerName = SystemAdministrationControllerName, ActionName = "AdministrationCharge" },
-                new SideNavigationItem { Text = "Weighted Charging Plan", ControllerName = SystemAdministrationControllerName, ActionName = "WeightedPricingPlan" },
+                new SideNavigationItem
+                {
+                    Text = "Weighted Charging Plan",
+                    ControllerName = SystemAdministrationControllerName,
+                    ActionName = "WeightedPricingPlan",
+                    Children =
+                    [
+                        // "Renew" doesn't follow the "{ParentActionName}{Suffix}" convention the
+                        // prefix fallback in FindNode/FindPath relies on (unlike e.g.
+                        // "PostagePricingPlanRenew"), so it needs its own explicit entry - same
+                        // pattern as "Renew Contracts" under the hidden "Contracts" node below.
+                        new SideNavigationItem { Text = "Renew Weighted Pricing Plan", ControllerName = SystemAdministrationControllerName, ActionName = "Renew", IsHidden = true }
+                    ]
+                },
                 new SideNavigationItem { Text = "Postage Pricing Plan", ControllerName = SystemAdministrationControllerName, ActionName = "PostagePricingPlan" }
             ]
         },
@@ -244,7 +257,18 @@ public static class SideNavigationProvider
     // Depth-first search for the node matching the current controller/action, regardless of
     // depth or IsHidden - this is what makes Participants/Contracts reachable even though they're
     // excluded from their parent's rendered child list.
-    public static SideNavigationItem? FindNode(IReadOnlyList<SideNavigationItem> items, string controllerName, string actionName)
+    //
+    // Falls back to a prefix match (same controller, longest registered ActionName that the
+    // current action name starts with) when no exact match exists - needed because many POST
+    // sub-actions (e.g. ViewerManagementController's "ViewerManagementRemove", "CreateUserSearch")
+    // return View(viewName, ...) directly rather than redirecting, so RouteData's action name
+    // stays the sub-action's own name, never the logical page's registered ActionName. Without
+    // this, the sidebar/breadcrumb would have no current node to show (see
+    // _SideNavigation.cshtml's "currentNode is null" branch).
+    public static SideNavigationItem? FindNode(IReadOnlyList<SideNavigationItem> items, string controllerName, string actionName) =>
+        FindNodeExact(items, controllerName, actionName) ?? FindNodeByActionPrefix(items, controllerName, actionName);
+
+    private static SideNavigationItem? FindNodeExact(IReadOnlyList<SideNavigationItem> items, string controllerName, string actionName)
     {
         foreach (var item in items)
         {
@@ -254,7 +278,7 @@ public static class SideNavigationProvider
                 return item;
             }
 
-            var found = FindNode(item.Children, controllerName, actionName);
+            var found = FindNodeExact(item.Children, controllerName, actionName);
             if (found is not null)
             {
                 return found;
@@ -264,9 +288,48 @@ public static class SideNavigationProvider
         return null;
     }
 
+    private static SideNavigationItem? FindNodeByActionPrefix(IReadOnlyList<SideNavigationItem> items, string controllerName, string actionName)
+    {
+        SideNavigationItem? best = null;
+
+        void Walk(IReadOnlyList<SideNavigationItem> nodes)
+        {
+            foreach (var item in nodes)
+            {
+                if (string.Equals(item.ControllerName, controllerName, StringComparison.OrdinalIgnoreCase)
+                    && item.ActionName is not null
+                    && actionName.StartsWith(item.ActionName, StringComparison.OrdinalIgnoreCase)
+                    && (best is null || item.ActionName.Length > best.ActionName!.Length))
+                {
+                    best = item;
+                }
+
+                Walk(item.Children);
+            }
+        }
+
+        Walk(items);
+        return best;
+    }
+
     // The full ancestor chain from the root down to (and including) the matching node - used to
     // render the breadcrumb trail as the exact reverse of the drill-down navigation journey.
+    // Same exact-then-prefix-fallback strategy as FindNode - once the prefix fallback resolves
+    // the logical node, re-runs the exact path-finder against ITS OWN (controller, action) pair
+    // rather than duplicating the path-tracking walk.
     public static IReadOnlyList<SideNavigationItem>? FindPath(IReadOnlyList<SideNavigationItem> items, string controllerName, string actionName)
+    {
+        var exactPath = FindPathExact(items, controllerName, actionName);
+        if (exactPath is not null)
+        {
+            return exactPath;
+        }
+
+        var fallbackNode = FindNodeByActionPrefix(items, controllerName, actionName);
+        return fallbackNode is null ? null : FindPathExact(items, fallbackNode.ControllerName!, fallbackNode.ActionName!);
+    }
+
+    private static IReadOnlyList<SideNavigationItem>? FindPathExact(IReadOnlyList<SideNavigationItem> items, string controllerName, string actionName)
     {
         foreach (var item in items)
         {
@@ -276,7 +339,7 @@ public static class SideNavigationProvider
                 return [item];
             }
 
-            var childPath = FindPath(item.Children, controllerName, actionName);
+            var childPath = FindPathExact(item.Children, controllerName, actionName);
             if (childPath is not null)
             {
                 return [item, .. childPath];

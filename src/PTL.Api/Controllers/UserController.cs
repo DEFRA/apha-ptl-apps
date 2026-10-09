@@ -68,11 +68,36 @@ public sealed class UserController(IUserService userService, IUserRoleService us
     [HttpPut("{userId:guid}/roles")]
     public async Task<ActionResult<SetUserRolesResponse>> SetUserRoles(Guid userId, [FromBody] SetUserRolesRequest request, CancellationToken cancellationToken)
     {
-        var result = await userRoleService.SetUserRolesAsync(userId, request.RoleIds, cancellationToken);
+        var result = await userRoleService.SetUserRolesAsync(userId, request.RoleIds, request.ActingUserId, cancellationToken);
         return Ok(new SetUserRolesResponse(result.Success, result.Message));
     }
 
+    // Returns 200 OK with Success=false (not 400) when removal is blocked by a business rule
+    // (e.g. removing your own account) - matches CountryController.DeleteCountry. actingUserId is
+    // the signed-in admin performing the removal (resolved by PTL.InternalWeb from Entra claims).
+    [HttpDelete("{userId:guid}")]
+    public async Task<ActionResult<UserRemoveResponse>> RemoveUser(Guid userId, [FromQuery] Guid? actingUserId, CancellationToken cancellationToken)
+    {
+        var result = await userRoleService.RemoveUserAsync(userId, actingUserId, cancellationToken);
+        return Ok(new UserRemoveResponse(result.Success, result.Message));
+    }
+
+    // GET /api/users/test-consultants - the Internal Test Consultant Department Management grid.
+    [HttpGet("test-consultants")]
+    public async Task<ActionResult<IReadOnlyList<UserResponse>>> GetTestConsultants(CancellationToken cancellationToken)
+    {
+        var users = await userService.GetTestConsultantsAsync(cancellationToken);
+        return Ok(users.Select(ToResponse).ToList());
+    }
+
+    [HttpPut("{userId:guid}/test-consultant")]
+    public async Task<IActionResult> UpdateTestConsultant(Guid userId, [FromBody] UpdateTestConsultantRequest request, CancellationToken cancellationToken)
+    {
+        await userService.UpdateTestConsultantAsync(userId, request.Department, request.IsInactive, request.InactiveDate, cancellationToken);
+        return Ok();
+    }
+
     private static UserResponse ToResponse(PTL.Core.User.User user) =>
-        new(user.UserId, user.Username, user.FriendlyName, user.FirstName, user.LastName, user.Email, user.Department);
+        new(user.UserId, user.Username, user.FriendlyName, user.FirstName, user.LastName, user.Email, user.Department, user.IsInactive, user.InactiveDate);
 }
 
