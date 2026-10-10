@@ -85,7 +85,7 @@ public sealed class DistributionController(IDistributionService distributionServ
         new(
             month.YearId,
             month.MonthId,
-            new DateTime(2000, month.MonthId, 1).ToString("MMM", System.Globalization.CultureInfo.InvariantCulture),
+            new DateTime(2000, month.MonthId, 1, 0, 0, 0, DateTimeKind.Utc).ToString("MMM", System.Globalization.CultureInfo.InvariantCulture),
             month.MonthlyDistributionId,
             month.IsInitialisable,
             month.SchedulingCompletePercentage,

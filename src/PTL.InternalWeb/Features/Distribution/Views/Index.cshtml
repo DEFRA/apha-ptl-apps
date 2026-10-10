@@ -58,37 +58,27 @@
                 else
                 {
                     <td class="govuk-table__cell">
-                        <div class="ptl-progress-bar" role="progressbar" aria-label="Scheduling" aria-valuenow="@month.SchedulingCompletePercentage" aria-valuemin="0" aria-valuemax="100" aria-valuetext="@(month.SchedulingCompletePercentage)% complete">
-                            <div class="ptl-progress-bar__fill" style="width: @(month.SchedulingCompletePercentage)%"></div>
-                        </div>
+                        <progress class="ptl-progress-bar" max="100" value="@month.SchedulingCompletePercentage" aria-label="Scheduling for @month.MonthDescription">@month.SchedulingCompletePercentage% complete</progress>
                         <span class="govuk-body-s ptl-progress-bar__label">@month.SchedulingCompletePercentage%</span><br />
                         <a class="govuk-link" asp-action="Schedule" asp-route-year="@month.YearId" asp-route-monthId="@month.MonthId">View<span class="govuk-visually-hidden"> Scheduling for @month.MonthDescription</span></a>
                     </td>
                     <td class="govuk-table__cell">
-                        <div class="ptl-progress-bar" role="progressbar" aria-label="Preparation" aria-valuenow="@month.PreparationCompletePercentage" aria-valuemin="0" aria-valuemax="100" aria-valuetext="@(month.PreparationCompletePercentage)% complete">
-                            <div class="ptl-progress-bar__fill" style="width: @(month.PreparationCompletePercentage)%"></div>
-                        </div>
+                        <progress class="ptl-progress-bar" max="100" value="@month.PreparationCompletePercentage" aria-label="Preparation for @month.MonthDescription">@month.PreparationCompletePercentage% complete</progress>
                         <span class="govuk-body-s ptl-progress-bar__label">@month.PreparationCompletePercentage%</span><br />
                         <a class="govuk-link" asp-action="ViewStage" asp-route-stage="Preparation">View<span class="govuk-visually-hidden"> Preparation for @month.MonthDescription</span></a>
                     </td>
                     <td class="govuk-table__cell">
-                        <div class="ptl-progress-bar" role="progressbar" aria-label="Packaging" aria-valuenow="@month.PackagingCompletePercentage" aria-valuemin="0" aria-valuemax="100" aria-valuetext="@(month.PackagingCompletePercentage)% complete">
-                            <div class="ptl-progress-bar__fill" style="width: @(month.PackagingCompletePercentage)%"></div>
-                        </div>
+                        <progress class="ptl-progress-bar" max="100" value="@month.PackagingCompletePercentage" aria-label="Packaging for @month.MonthDescription">@month.PackagingCompletePercentage% complete</progress>
                         <span class="govuk-body-s ptl-progress-bar__label">@month.PackagingCompletePercentage%</span><br />
                         <a class="govuk-link" asp-action="ViewStage" asp-route-stage="Packaging">View<span class="govuk-visually-hidden"> Packaging for @month.MonthDescription</span></a>
                     </td>
                     <td class="govuk-table__cell">
-                        <div class="ptl-progress-bar" role="progressbar" aria-label="Results" aria-valuenow="@month.ResultsCompletePercentage" aria-valuemin="0" aria-valuemax="100" aria-valuetext="@(month.ResultsCompletePercentage)% complete">
-                            <div class="ptl-progress-bar__fill" style="width: @(month.ResultsCompletePercentage)%"></div>
-                        </div>
+                        <progress class="ptl-progress-bar" max="100" value="@month.ResultsCompletePercentage" aria-label="Results for @month.MonthDescription">@month.ResultsCompletePercentage% complete</progress>
                         <span class="govuk-body-s ptl-progress-bar__label">@month.ResultsCompletePercentage%</span><br />
                         <a class="govuk-link" asp-action="ViewStage" asp-route-stage="Results">View<span class="govuk-visually-hidden"> Results for @month.MonthDescription</span></a>
                     </td>
                     <td class="govuk-table__cell">
-                        <div class="ptl-progress-bar" role="progressbar" aria-label="Tabulations" aria-valuenow="@month.TabulationsCompletePercentage" aria-valuemin="0" aria-valuemax="100" aria-valuetext="@(month.TabulationsCompletePercentage)% complete">
-                            <div class="ptl-progress-bar__fill" style="width: @(month.TabulationsCompletePercentage)%"></div>
-                        </div>
+                        <progress class="ptl-progress-bar" max="100" value="@month.TabulationsCompletePercentage" aria-label="Tabulations for @month.MonthDescription">@month.TabulationsCompletePercentage% complete</progress>
                         <span class="govuk-body-s ptl-progress-bar__label">@month.TabulationsCompletePercentage%</span><br />
                         <a class="govuk-link" asp-action="ViewStage" asp-route-stage="Tabulations">View<span class="govuk-visually-hidden"> Tabulations for @month.MonthDescription</span></a>
                     </td>

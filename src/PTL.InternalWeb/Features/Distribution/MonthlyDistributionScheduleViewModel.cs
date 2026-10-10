@@ -8,7 +8,12 @@ namespace PTL.InternalWeb.Features.Distribution;
 // per-row "click Edit first" step), submitted together via the page-level Save/Apply buttons.
 public sealed class MonthlyDistributionScheduleRowViewModel
 {
+    // S6964 (value-type controller-action input) suppressed for this block: these are hidden inputs
+    // and HTML checkboxes round-tripped verbatim so the Cancel/Commence toggle can redisplay the
+    // form without losing unsaved edits - making them nullable would break that round-trip.
+#pragma warning disable S6964
     public Guid MonthlyDistributionSchemeId { get; set; }
+#pragma warning restore S6964
 
     public string SchemeIdentifier { get; set; } = string.Empty;
 
@@ -36,6 +41,7 @@ public sealed class MonthlyDistributionScheduleRowViewModel
     [DataType(DataType.Date)]
     public DateTime? ResultsIssueTargetDate { get; set; }
 
+#pragma warning disable S6964
     public bool IsCancelled { get; set; }
 
     public bool IsAsAvailable { get; set; }
@@ -47,12 +53,22 @@ public sealed class MonthlyDistributionScheduleRowViewModel
     public bool HasSampleNumbersDefined { get; set; }
 
     public bool HasIntendedResults { get; set; }
+#pragma warning restore S6964
 
     // "[Cancelled] "/"[Not Commenced] " heading prefix - legacy dlMonth_RowDataBound.
-    public string SchemeHeading =>
-        IsCancelled
-            ? (IsAsAvailable ? $"[Not Commenced] {SchemeIdentifier}: {SchemeName}" : $"[Cancelled] {SchemeIdentifier}: {SchemeName}")
-            : $"{SchemeIdentifier}: {SchemeName}";
+    public string SchemeHeading
+    {
+        get
+        {
+            if (!IsCancelled)
+            {
+                return $"{SchemeIdentifier}: {SchemeName}";
+            }
+
+            var prefix = IsAsAvailable ? "[Not Commenced]" : "[Cancelled]";
+            return $"{prefix} {SchemeIdentifier}: {SchemeName}";
+        }
+    }
 
     // A cancelled, non-"as available" scheme has no Commence option at all (legacy hides the link
     // entirely - HyperLink_Cancel.Visible = False).
@@ -86,9 +102,13 @@ public sealed class MonthlyDistributionScheduleRowViewModel
 
 public sealed class MonthlyDistributionScheduleViewModel : IValidatableObject
 {
+    // S6964 suppressed: both are hidden inputs, and the controller overwrites them from the route
+    // values on every path before they are read.
+#pragma warning disable S6964
     public int YearId { get; set; }
 
     public int MonthId { get; set; }
+#pragma warning restore S6964
 
     // "MMM yyyy" - legacy lblMonthYear.
     public string MonthYearLabel { get; set; } = string.Empty;

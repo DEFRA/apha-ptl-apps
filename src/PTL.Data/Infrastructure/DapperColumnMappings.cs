@@ -43,6 +43,7 @@ public static class DapperColumnMappings
     private const string ColName = "fldName";
     private const string ColIsActive = "fldIsActive";
     private const string ColYearId = "fldYearId";
+    private const string ColMonthId = "fldMonthId";
     private const string ColAddress1 = "fldAddress1";
     private const string ColAddress2 = "fldAddress2";
     private const string ColAddress3 = "fldAddress3";
@@ -652,14 +653,14 @@ public static class DapperColumnMappings
         Map<MonthlyDistributionEntity>(new(StringComparer.OrdinalIgnoreCase)
         {
             [ColYearId] = nameof(MonthlyDistributionEntity.YearId),
-            ["fldMonthId"] = nameof(MonthlyDistributionEntity.MonthId),
+            [ColMonthId] = nameof(MonthlyDistributionEntity.MonthId),
         });
 
         Map<DistributionMonthSummaryEntity>(new(StringComparer.OrdinalIgnoreCase)
         {
             ["fldMonthlyDistributionId"] = nameof(DistributionMonthSummaryEntity.MonthlyDistributionId),
             [ColYearId] = nameof(DistributionMonthSummaryEntity.YearId),
-            ["fldMonthId"] = nameof(DistributionMonthSummaryEntity.MonthId),
+            [ColMonthId] = nameof(DistributionMonthSummaryEntity.MonthId),
             ["fldNumberOfSchemes"] = nameof(DistributionMonthSummaryEntity.NumberOfSchemes),
             ["fldNumberOfSampleNumbersDefined"] = nameof(DistributionMonthSummaryEntity.NumberOfSampleNumbersDefined),
             ["fldNumberOfPrepComplete"] = nameof(DistributionMonthSummaryEntity.NumberOfPrepComplete),
@@ -673,14 +674,14 @@ public static class DapperColumnMappings
         Map<DistributionMonthYearEntity>(new(StringComparer.OrdinalIgnoreCase)
         {
             [ColYearId] = nameof(DistributionMonthYearEntity.YearId),
-            ["fldMonthId"] = nameof(DistributionMonthYearEntity.MonthId),
+            [ColMonthId] = nameof(DistributionMonthYearEntity.MonthId),
         });
 
         Map<PTL.Data.Distribution.MonthlyDistributionHeaderEntity>(new(StringComparer.OrdinalIgnoreCase)
         {
             ["fldMonthlyDistributionId"] = nameof(PTL.Data.Distribution.MonthlyDistributionHeaderEntity.MonthlyDistributionId),
             [ColYearId] = nameof(PTL.Data.Distribution.MonthlyDistributionHeaderEntity.YearId),
-            ["fldMonthId"] = nameof(PTL.Data.Distribution.MonthlyDistributionHeaderEntity.MonthId),
+            [ColMonthId] = nameof(PTL.Data.Distribution.MonthlyDistributionHeaderEntity.MonthId),
         });
 
         Map<MonthlyDistributionSchemeEntity>(new(StringComparer.OrdinalIgnoreCase)

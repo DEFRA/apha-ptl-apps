@@ -282,17 +282,27 @@ span.app-side-navigation__link--disabled {
 }
 
 /* Distribution Dashboard per-stage completion indicator - replaces legacy's ProgressBar image
-   control (progressBar.gif etc.) with an accessible div-based bar (role="progressbar" + the
-   percentage shown as real text, not only colour). */
+   control (progressBar.gif etc.) with a native <progress> element (percentage also shown as real
+   text, not only colour). The vendor pseudo-elements are the only way to recolour it per browser. */
 .ptl-progress-bar {
+  display: block;
   width: 100px;
   height: 10px;
+  appearance: none;
   background-color: #f3f2f1;
   border: 1px solid #b1b4b6;
+  color: #1d70b8;
 }
 
-.ptl-progress-bar__fill {
-  height: 100%;
+.ptl-progress-bar::-webkit-progress-bar {
+  background-color: #f3f2f1;
+}
+
+.ptl-progress-bar::-webkit-progress-value {
+  background-color: #1d70b8;
+}
+
+.ptl-progress-bar::-moz-progress-bar {
   background-color: #1d70b8;
 }
 

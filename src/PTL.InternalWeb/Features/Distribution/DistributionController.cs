@@ -137,9 +137,13 @@ public sealed class DistributionController(IDistributionApiClient distributionAp
     // posted model already carries every other row's current (possibly unsaved) values, so
     // re-rendering it after flipping just the one row reproduces that behaviour without any
     // server-side state beyond this one request.
+    // S6967 (ModelState.IsValid not checked) suppressed deliberately: legacy dlMonth_RowCommand
+    // runs with CausesValidation=False, so a half-filled form can still be toggled and redisplayed.
     [HttpPost]
     [ValidateAntiForgeryToken]
+#pragma warning disable S6967
     public IActionResult ToggleCancelled(int year, int monthId, Guid schemeId, MonthlyDistributionScheduleViewModel model)
+#pragma warning restore S6967
     {
         ModelState.Clear();
         var row = model.Schemes.FirstOrDefault(s => s.MonthlyDistributionSchemeId == schemeId);
@@ -161,7 +165,7 @@ public sealed class DistributionController(IDistributionApiClient distributionAp
         {
             YearId = year,
             MonthId = monthId,
-            MonthYearLabel = new DateTime(year, monthId, 1).ToString("MMM yyyy", System.Globalization.CultureInfo.InvariantCulture),
+            MonthYearLabel = new DateTime(year, monthId, 1, 0, 0, 0, DateTimeKind.Utc).ToString("MMM yyyy", System.Globalization.CultureInfo.InvariantCulture),
             Schemes = [.. schedule.Schemes.Select(ToRowViewModel)],
         };
 
