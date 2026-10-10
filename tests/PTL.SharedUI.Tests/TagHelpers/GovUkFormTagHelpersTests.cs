@@ -15,6 +15,8 @@ public class GovUkFormTagHelpersTests
         public string? CountryId { get; set; }
 
         public string? Comments { get; set; }
+
+        public DateTime? StartDate { get; set; }
     }
 
     private static (TagHelperContext Context, TagHelperOutput Output) CreateTagHelperContext(string tagName) =>
@@ -70,6 +72,35 @@ public class GovUkFormTagHelpersTests
         var html = output.Content.GetContent();
         Assert.Contains("disabled=\"disabled\"", html, StringComparison.Ordinal);
         Assert.Contains("type=\"date\"", html, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Input_DateTypeWithDateTimeValue_RendersIsoValueTheDatePickerAccepts()
+    {
+        var model = new TestModel { StartDate = new DateTime(2026, 4, 1, 0, 0, 0, DateTimeKind.Utc) };
+        var (viewContext, expression, generator) = TagHelperRenderContext.Create(model, nameof(TestModel.StartDate));
+        var helper = new GovUkInputTagHelper(generator) { For = expression, Label = "Start date", Type = "date", ViewContext = viewContext };
+        var (context, output) = CreateTagHelperContext("govuk-input");
+
+        helper.Process(context, output);
+
+        var html = output.Content.GetContent();
+        Assert.Contains("value=\"2026-04-01\"", html, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Input_DateTypeWithNoValue_RendersEmptyValue()
+    {
+        var model = new TestModel();
+        var (viewContext, expression, generator) = TagHelperRenderContext.Create(model, nameof(TestModel.StartDate));
+        var helper = new GovUkInputTagHelper(generator) { For = expression, Label = "Start date", Type = "date", ViewContext = viewContext };
+        var (context, output) = CreateTagHelperContext("govuk-input");
+
+        helper.Process(context, output);
+
+        var html = output.Content.GetContent();
+        Assert.Contains("type=\"date\"", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("value=\"2026", html, StringComparison.Ordinal);
     }
 
     [Fact]

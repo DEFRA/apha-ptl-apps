@@ -15,6 +15,7 @@ using PTL.Core.Contract.Renew;
 using PTL.Core.Contract.Renewal;
 using PTL.Core.Contract.SampleAddress;
 using PTL.Core.Customer;
+using PTL.Core.Distribution;
 using PTL.Core.ExternalUser;
 using PTL.Core.GroupAddress;
 using PTL.Core.InternalUser;
@@ -35,6 +36,7 @@ using PTL.Data.Contract.Renew;
 using PTL.Data.Contract.Renewal;
 using PTL.Data.Contract.SampleAddress;
 using PTL.Data.Customer;
+using PTL.Data.Distribution;
 using PTL.Data.GroupAddress;
 using PTL.Data.Infrastructure;
 using PTL.Data.InternalUser;
@@ -160,6 +162,9 @@ builder.Services.AddScoped<ISchemeService, SchemeService>();
 
 builder.Services.AddScoped<ILookupRepository, LookupRepository>();
 builder.Services.AddScoped<ILookupService, LookupService>();
+
+builder.Services.AddScoped<IDistributionRepository, DistributionRepository>();
+builder.Services.AddScoped<IDistributionService, DistributionService>();
 
 builder.Services.AddScoped<IAdministrationChargeRepository, AdministrationChargeRepository>();
 builder.Services.AddScoped<IAdministrationChargeService, AdministrationChargeService>();
