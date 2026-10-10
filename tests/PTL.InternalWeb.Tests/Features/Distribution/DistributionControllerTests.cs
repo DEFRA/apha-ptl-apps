@@ -230,4 +230,62 @@ public class DistributionControllerTests
         Assert.True(updatedModel.Schemes.Single().IsCancelled);
         Assert.Empty(apiClient.SavedRows);
     }
+
+    [Fact]
+    public async Task Schedule_Get_ApiReturnsNull_ReturnsNotFound()
+    {
+        var controller = new DistributionController(new FakeDistributionApiClient());
+
+        var result = await controller.Schedule(2026, 4, CancellationToken.None);
+
+        Assert.IsType<NotFoundResult>(result);
+    }
+
+    [Fact]
+    public async Task Schedule_Post_SaveReturnsNull_RedisplaysViewWithoutAddingFieldErrors()
+    {
+        var apiClient = new FakeDistributionApiClient { SaveResult = null };
+        var controller = new DistributionController(apiClient);
+        var model = new MonthlyDistributionScheduleViewModel { YearId = 2026, MonthId = 4, Schemes = [] };
+
+        var result = await controller.Schedule(2026, 4, model, "save", CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        Assert.Same(model, view.Model);
+        Assert.Equal(2026, model.YearId);
+        Assert.Equal(4, model.MonthId);
+    }
+
+    [Fact]
+    public async Task Schedule_Post_FieldErrorForUnknownScheme_IsIgnored()
+    {
+        var apiClient = new FakeDistributionApiClient
+        {
+            SaveResult = new MonthlyDistributionScheduleSaveResult(false, new Dictionary<Guid, string[]> { [Guid.NewGuid()] = ["Deadline Date needs to be after the UK Posting date."] }),
+        };
+        var controller = new DistributionController(apiClient);
+        var model = new MonthlyDistributionScheduleViewModel { YearId = 2026, MonthId = 4, Schemes = [] };
+
+        var result = await controller.Schedule(2026, 4, model, "save", CancellationToken.None);
+
+        Assert.IsType<ViewResult>(result);
+        Assert.True(controller.ModelState.IsValid);
+    }
+
+    [Fact]
+    public void ToggleCancelled_UnknownScheme_LeavesEveryRowUnchanged()
+    {
+        var schemeId = Guid.NewGuid();
+        var controller = new DistributionController(new FakeDistributionApiClient());
+        var model = new MonthlyDistributionScheduleViewModel
+        {
+            Schemes = [new MonthlyDistributionScheduleRowViewModel { MonthlyDistributionSchemeId = schemeId, IsCancelled = false }],
+        };
+
+        var result = controller.ToggleCancelled(2026, 4, Guid.NewGuid(), model);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var updatedModel = Assert.IsType<MonthlyDistributionScheduleViewModel>(view.Model);
+        Assert.False(updatedModel.Schemes.Single().IsCancelled);
+    }
 }

@@ -148,6 +148,17 @@ public class DistributionRepositoryTests
     }
 
     [Fact]
+    public async Task UpdateMonthlyDistributionSchemesAsync_NoSchemes_DoesNotOpenATransaction()
+    {
+        var (repository, connection) = CreateRepository();
+
+        await repository.UpdateMonthlyDistributionSchemesAsync([]);
+
+        Assert.Empty(connection.ExecutedCommands);
+        Assert.Null(connection.LastTransaction);
+    }
+
+    [Fact]
     public async Task UpdateMonthlyDistributionSchemesAsync_ExecutesOneCommandPerSchemeAndCommits()
     {
         var (repository, connection) = CreateRepository();

@@ -83,6 +83,26 @@ public class DistributionServiceTests
     }
 
     [Fact]
+    public async Task SaveMonthlyDistributionScheduleAsync_RowForUnknownScheme_IsSkipped()
+    {
+        var knownSchemeId = Guid.NewGuid();
+        var repository = new FakeDistributionRepository();
+        repository.Schedules[(2026, 4)] = (Guid.NewGuid(), [new MonthlyDistributionSchemeEntity { MonthlyDistributionSchemeId = knownSchemeId }]);
+        var service = new DistributionService(repository);
+
+        var rows = new List<MonthlyDistributionScheduleRowUpdate>
+        {
+            new(knownSchemeId, new DateTime(2026, 4, 1), new DateTime(2026, 4, 1), new DateTime(2026, 4, 5), new DateTime(2026, 4, 10), false),
+            new(Guid.NewGuid(), new DateTime(2026, 4, 1), new DateTime(2026, 4, 1), new DateTime(2026, 4, 5), new DateTime(2026, 4, 10), false),
+        };
+
+        var outcome = await service.SaveMonthlyDistributionScheduleAsync(2026, 4, rows);
+
+        Assert.True(outcome.Success);
+        Assert.Equal(knownSchemeId, Assert.Single(repository.UpdatedSchemes).MonthlyDistributionSchemeId);
+    }
+
+    [Fact]
     public async Task SaveMonthlyDistributionScheduleAsync_MonthNotInitialised_ReturnsUnsuccessful()
     {
         var repository = new FakeDistributionRepository();
