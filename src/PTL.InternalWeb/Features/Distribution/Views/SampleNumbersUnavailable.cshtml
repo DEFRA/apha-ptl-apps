@@ -18,5 +18,7 @@
 <p class="govuk-body">This Distribution cannot be opened until the Scheme is corrected. Once the problems listed above have been resolved on the Scheme, return to this Distribution to define its Sample Numbers.</p>
 
 <div class="govuk-button-group">
-    <a class="govuk-button govuk-button--secondary" data-module="govuk-button" role="button" draggable="false" asp-action="Schedule" asp-route-year="@Model.YearId" asp-route-monthId="@Model.MonthId">Return to Monthly Distributions</a>
+    @* Navigation, not an action, so this stays a plain link - role="button" on an <a> forces
+       keyboard handlers that a real link does not need. *@
+    <a class="govuk-link" asp-action="Schedule" asp-route-year="@Model.YearId" asp-route-monthId="@Model.MonthId">Return to Monthly Distributions</a>
 </div>

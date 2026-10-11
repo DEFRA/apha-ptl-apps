@@ -86,14 +86,15 @@ public partial class SampleNumbersRenderTests : IClassFixture<WebApplicationFact
         }
     }
 
-    // Legacy's only header row per table is the section label; an empty bordered band above each
-    // list is a regression, so the item tables must have no <thead> at all.
+    // Legacy's header row per table IS the section label (rowPrepSheetHeader), so the label must
+    // sit in a real <th> - that is both legacy-faithful and what the accessibility rules require.
+    // What must never come back is an EMPTY header band, i.e. a <th> holding only hidden text.
     [Theory]
     [InlineData(1)]
     [InlineData(2)]
     [InlineData(3)]
     [InlineData(8)]
-    public async Task ItemTables_HaveNoEmptyHeaderBand(int testCount)
+    public async Task ItemTables_LabelTheirHeaderRowWithTheSectionName(int testCount)
     {
         var html = await GetSampleNumbersHtmlAsync(testCount, requiresAssessment: true);
 
@@ -101,12 +102,16 @@ public partial class SampleNumbersRenderTests : IClassFixture<WebApplicationFact
         Assert.DoesNotContain("<span class=\"govuk-visually-hidden\">Method Item</span>", html, StringComparison.Ordinal);
         Assert.DoesNotContain("<span class=\"govuk-visually-hidden\">Category/Criterion Item</span>", html, StringComparison.Ordinal);
 
-        // Each table is still named by its caption, and keeps legacy's 15px (spacing scale 3) gap.
-        foreach (var caption in new[] { "Samples:", "Test Items:", "Method Items:", "Category/Criterion Items: " })
+        foreach (var section in new[] { "Test Items:", "Method Items:", "Category/Criterion Items: " })
         {
-            Assert.Contains($"govuk-table__caption--s\">{caption}<", html, StringComparison.Ordinal);
+            Assert.Equal(testCount, Regex.Count(html, $"<th scope=\"col\" class=\"govuk-table__header\">{Regex.Escape(section)}</th>"));
+            Assert.DoesNotContain($"govuk-table__caption--s\">{section}<", html, StringComparison.Ordinal);
         }
 
+        // The Samples: table is a real data table and keeps its caption plus its own column headers.
+        Assert.Contains("govuk-table__caption--s\">Samples:<", html, StringComparison.Ordinal);
+
+        // Legacy's 15px (spacing scale 3) gap between the stacked tables is unchanged.
         Assert.Equal(testCount * 4, Regex.Count(html, "class=\"govuk-table govuk-!-margin-bottom-3\""));
     }
 
@@ -263,6 +268,9 @@ public partial class SampleNumbersRenderTests : IClassFixture<WebApplicationFact
         Assert.DoesNotContain("govuk-tabs", html, StringComparison.Ordinal);
 
         Assert.Contains("<a class=\"govuk-back-link\" href=\"/Distribution/Schedule?year=2026&amp;monthId=4\">Back</a>", html, StringComparison.Ordinal);
-        Assert.Matches("<a class=\"govuk-button govuk-button--secondary\"[^>]*href=\"/Distribution/Schedule\\?year=2026&amp;monthId=4\"", html);
+
+        // Navigation, so a plain link rather than an anchor wearing role="button".
+        Assert.Contains("<a class=\"govuk-link\" href=\"/Distribution/Schedule?year=2026&amp;monthId=4\">Return to Monthly Distributions</a>", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("role=\"button\"", html, StringComparison.Ordinal);
     }
 }

@@ -193,12 +193,15 @@
                                         @if (j >= 0)
                                         {
                                             var allocationId = Html.IdFor(m => m.Samples[i].Allocations[j].IsApplicable);
+                                            var allocationLabel = $"Sample Allocation for sample {sample.SampleNumber}";
                                             <div class="govuk-checkboxes govuk-checkboxes--small" data-module="govuk-checkboxes">
                                                 <div class="govuk-checkboxes__item">
-                                                    @* Legacy disables every tick box once an assessment scheme is with the assessor. *@
-                                                    <input class="govuk-checkboxes__input" type="checkbox" asp-for="Samples[i].Allocations[j].IsApplicable" disabled="@(!Model.AllocationEditable)" />
+                                                    @* Legacy disables every tick box once an assessment scheme is with the assessor.
+                                                       aria-label as well as the <label>: the label's for= is a Razor expression, so
+                                                       static analysis cannot see the association. *@
+                                                    <input class="govuk-checkboxes__input" type="checkbox" asp-for="Samples[i].Allocations[j].IsApplicable" aria-label="@allocationLabel" disabled="@(!Model.AllocationEditable)" />
                                                     <label class="govuk-label govuk-checkboxes__label" for="@allocationId">
-                                                        <span class="govuk-visually-hidden">Sample Allocation for sample @sample.SampleNumber</span>
+                                                        <span class="govuk-visually-hidden">@allocationLabel</span>
                                                     </label>
                                                 </div>
                                             </div>
@@ -209,10 +212,15 @@
                         </tbody>
                     </table>
 
-                    @* No <thead>: legacy's only header row is the section label, which the caption
-                       supplies. An empty header row would draw a visible blank band above the list. *@
+                    @* Legacy PopulateTabContainer gives each of these tables a header row whose
+                       single cell carries the section label (rowPrepSheetHeader), so the label
+                       belongs in a <th>, not a <caption>. *@
                     <table class="govuk-table govuk-!-margin-bottom-3">
-                        <caption class="govuk-table__caption govuk-table__caption--s">Test Items:</caption>
+                        <thead class="govuk-table__head">
+                            <tr class="govuk-table__row">
+                                <th scope="col" class="govuk-table__header">Test Items:</th>
+                            </tr>
+                        </thead>
                         <tbody class="govuk-table__body">
                             @if (test.TestResultItemNames.Count == 0)
                             {
@@ -231,7 +239,11 @@
                     </table>
 
                     <table class="govuk-table govuk-!-margin-bottom-3">
-                        <caption class="govuk-table__caption govuk-table__caption--s">Method Items:</caption>
+                        <thead class="govuk-table__head">
+                            <tr class="govuk-table__row">
+                                <th scope="col" class="govuk-table__header">Method Items:</th>
+                            </tr>
+                        </thead>
                         <tbody class="govuk-table__body">
                             @if (test.TestMethodItemNames.Count == 0)
                             {
@@ -252,7 +264,11 @@
                     @if (Model.RequiresAssessment)
                     {
                         <table class="govuk-table govuk-!-margin-bottom-3">
-                            <caption class="govuk-table__caption govuk-table__caption--s">Category/Criterion Items: </caption>
+                            <thead class="govuk-table__head">
+                                <tr class="govuk-table__row">
+                                    <th scope="col" class="govuk-table__header">Category/Criterion Items: </th>
+                                </tr>
+                            </thead>
                             <tbody class="govuk-table__body">
                                 @if (test.CategoryItemNames.Count == 0)
                                 {

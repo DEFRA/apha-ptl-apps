@@ -83,6 +83,8 @@ public static class DapperColumnMappings
     private const string ColVatRating = "fldVatRating";
     private const string ColInactiveDate = "fldInactiveDate";
     private const string ColTestId = "fldTestId";
+    private const string ColComments = "fldComments";
+    private const string ColCategoryItemId = "fldCategoryItemId";
 
     public static void Register()
     {
@@ -111,7 +113,7 @@ public static class DapperColumnMappings
             [ColFax] = nameof(CoreCustomer.Fax),
             [ColEmail] = nameof(CoreCustomer.Email),
             [ColCurrencyId] = nameof(CoreCustomer.CurrencyId),
-            ["fldComments"] = nameof(CoreCustomer.Comments),
+            [ColComments] = nameof(CoreCustomer.Comments),
             ["fldInitialStartDate"] = nameof(CoreCustomer.InitialStartDate),
             ["fldPostageArrangements"] = nameof(CoreCustomer.PostageArrangements),
             ["fldPaymentNonUK"] = nameof(CoreCustomer.PaymentNonUK),
@@ -206,7 +208,7 @@ public static class DapperColumnMappings
             [ColFax] = nameof(CoreParticipant.Fax),
             [ColEmail] = nameof(CoreParticipant.Email),
             ["fldEmail2"] = nameof(CoreParticipant.Email2),
-            ["fldComments"] = nameof(CoreParticipant.Comments),
+            [ColComments] = nameof(CoreParticipant.Comments),
             [ColIsActive] = nameof(CoreParticipant.IsActive),
             [ColInactiveDate] = nameof(CoreParticipant.InactiveDate),
             ["fldInactiveError"] = nameof(CoreParticipant.InactiveError),
@@ -700,7 +702,7 @@ public static class DapperColumnMappings
             ["fldOverseasPostingDate"] = nameof(MonthlyDistributionSchemeEntity.OverseasPostingDate),
             ["fldDeadlineDate"] = nameof(MonthlyDistributionSchemeEntity.DeadlineDate),
             ["fldResultsIssueTargetDate"] = nameof(MonthlyDistributionSchemeEntity.ResultsIssueTargetDate),
-            ["fldComments"] = nameof(MonthlyDistributionSchemeEntity.Comments),
+            [ColComments] = nameof(MonthlyDistributionSchemeEntity.Comments),
             ["fldHasIntendedResults"] = nameof(MonthlyDistributionSchemeEntity.HasIntendedResults),
             ["fldHasSampleNumbersDefined"] = nameof(MonthlyDistributionSchemeEntity.HasSampleNumbersDefined),
             ["fldIsCancelled"] = nameof(MonthlyDistributionSchemeEntity.IsCancelled),
@@ -718,7 +720,7 @@ public static class DapperColumnMappings
         Map<IntendedResultsHeaderEntity>(new(StringComparer.OrdinalIgnoreCase)
         {
             ["fldMonthlyDistributionSchemeId"] = nameof(IntendedResultsHeaderEntity.MonthlyDistributionSchemeId),
-            ["fldComments"] = nameof(IntendedResultsHeaderEntity.Comments),
+            [ColComments] = nameof(IntendedResultsHeaderEntity.Comments),
             ["fldHasIntendedResults"] = nameof(IntendedResultsHeaderEntity.HasIntendedResults),
             ["fldHasSampleNumbersDefined"] = nameof(IntendedResultsHeaderEntity.HasSampleNumbersDefined),
             ["fldTestConsultantTabulationId"] = nameof(IntendedResultsHeaderEntity.TestConsultantTabulationId),
@@ -772,7 +774,7 @@ public static class DapperColumnMappings
 
         Map<DistributionCategoryItemEntity>(new(StringComparer.OrdinalIgnoreCase)
         {
-            ["fldCategoryItemId"] = nameof(DistributionCategoryItemEntity.CategoryItemId),
+            [ColCategoryItemId] = nameof(DistributionCategoryItemEntity.CategoryItemId),
             [ColTestId] = nameof(DistributionCategoryItemEntity.TestId),
             [ColName] = nameof(DistributionCategoryItemEntity.Name),
             [ColOrder] = nameof(DistributionCategoryItemEntity.Order),
@@ -781,7 +783,7 @@ public static class DapperColumnMappings
         Map<DistributionCriterionItemEntity>(new(StringComparer.OrdinalIgnoreCase)
         {
             ["fldCriterionItemId"] = nameof(DistributionCriterionItemEntity.CriterionItemId),
-            ["fldCategoryItemId"] = nameof(DistributionCriterionItemEntity.CategoryItemId),
+            [ColCategoryItemId] = nameof(DistributionCriterionItemEntity.CategoryItemId),
             [ColTestId] = nameof(DistributionCriterionItemEntity.TestId),
             [ColName] = nameof(DistributionCriterionItemEntity.Name),
             [ColOrder] = nameof(DistributionCriterionItemEntity.Order),
@@ -844,7 +846,7 @@ public static class DapperColumnMappings
 
         Map<SchemeCategoryItem>(new(StringComparer.OrdinalIgnoreCase)
         {
-            ["fldCategoryItemId"] = nameof(SchemeCategoryItem.CategoryItemId),
+            [ColCategoryItemId] = nameof(SchemeCategoryItem.CategoryItemId),
             ["fldCategoryItemTypeId"] = nameof(SchemeCategoryItem.CategoryItemTypeId),
             [ColName] = nameof(SchemeCategoryItem.Name),
             [ColTestId] = nameof(SchemeCategoryItem.TestId),
@@ -856,7 +858,7 @@ public static class DapperColumnMappings
             ["fldCriterionItemId"] = nameof(SchemeCriterionItem.CriterionItemId),
             ["fldCriterionItemTypeId"] = nameof(SchemeCriterionItem.CriterionItemTypeId),
             [ColName] = nameof(SchemeCriterionItem.Name),
-            ["fldCategoryItemId"] = nameof(SchemeCriterionItem.CategoryItemId),
+            [ColCategoryItemId] = nameof(SchemeCriterionItem.CategoryItemId),
             [ColOrder] = nameof(SchemeCriterionItem.Order),
         });
 

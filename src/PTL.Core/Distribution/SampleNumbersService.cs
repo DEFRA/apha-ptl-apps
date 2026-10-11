@@ -167,8 +167,7 @@ public sealed class SampleNumbersService(
                 continue;
             }
 
-            List<DistributionSampleTestEntity> changedAllocations =
-                allocationsLocked ? [] : CollectChangedAllocations(posted, existingSampleTests);
+            var changedAllocations = allocationsLocked ? [] : CollectChangedAllocations(posted, existingSampleTests);
 
             var tabulationDescriptionChanged = !Matches(sample.TabulationDescription, posted.TabulationDescription);
             var sampleChanged = tabulationDescriptionChanged
