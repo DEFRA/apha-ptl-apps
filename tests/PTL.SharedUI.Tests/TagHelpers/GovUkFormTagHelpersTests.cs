@@ -170,4 +170,62 @@ public class GovUkFormTagHelpersTests
         Assert.Contains("govuk-label govuk-label--s", html, StringComparison.Ordinal);
         Assert.Contains("Enter comments", html, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void Input_WithMaxLength_RendersMaxLengthAttribute()
+    {
+        var model = new TestModel();
+        var (viewContext, expression, generator) = TagHelperRenderContext.Create(model, nameof(TestModel.Name));
+        var helper = new GovUkInputTagHelper(generator) { For = expression, Label = "Name", MaxLength = 50, ViewContext = viewContext };
+        var (context, output) = CreateTagHelperContext("govuk-input");
+
+        helper.Process(context, output);
+
+        Assert.Contains("maxlength=\"50\"", output.Content.GetContent(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Input_WithoutMaxLength_OmitsMaxLengthAttribute()
+    {
+        var model = new TestModel();
+        var (viewContext, expression, generator) = TagHelperRenderContext.Create(model, nameof(TestModel.Name));
+        var helper = new GovUkInputTagHelper(generator) { For = expression, Label = "Name", ViewContext = viewContext };
+        var (context, output) = CreateTagHelperContext("govuk-input");
+
+        helper.Process(context, output);
+
+        Assert.DoesNotContain("maxlength", output.Content.GetContent(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Input_WithVisuallyHiddenLabelClass_RendersThatLabelClass()
+    {
+        var model = new TestModel();
+        var (viewContext, expression, generator) = TagHelperRenderContext.Create(model, nameof(TestModel.Name));
+        var helper = new GovUkInputTagHelper(generator)
+        {
+            For = expression,
+            Label = "Sample No.",
+            LabelCssClass = "govuk-label govuk-visually-hidden",
+            ViewContext = viewContext,
+        };
+        var (context, output) = CreateTagHelperContext("govuk-input");
+
+        helper.Process(context, output);
+
+        Assert.Contains("govuk-label govuk-visually-hidden", output.Content.GetContent(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Textarea_WithMaxLength_RendersMaxLengthAttribute()
+    {
+        var model = new TestModel();
+        var (viewContext, expression, generator) = TagHelperRenderContext.Create(model, nameof(TestModel.Comments));
+        var helper = new GovUkTextareaTagHelper(generator) { For = expression, Label = "Comments", MaxLength = 8000, ViewContext = viewContext };
+        var (context, output) = CreateTagHelperContext("govuk-textarea");
+
+        helper.Process(context, output);
+
+        Assert.Contains("maxlength=\"8000\"", output.Content.GetContent(), StringComparison.Ordinal);
+    }
 }

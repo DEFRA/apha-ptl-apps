@@ -689,6 +689,8 @@ public static class DapperColumnMappings
             ["fldMonthlyDistributionSchemeId"] = nameof(MonthlyDistributionSchemeEntity.MonthlyDistributionSchemeId),
             ["fldMonthlyDistributionId"] = nameof(MonthlyDistributionSchemeEntity.MonthlyDistributionId),
             [ColSchemeId] = nameof(MonthlyDistributionSchemeEntity.SchemeId),
+            [ColYearId] = nameof(MonthlyDistributionSchemeEntity.YearId),
+            [ColMonthId] = nameof(MonthlyDistributionSchemeEntity.MonthId),
             ["SchemeIdentifier"] = nameof(MonthlyDistributionSchemeEntity.SchemeIdentifier),
             ["SchemeName"] = nameof(MonthlyDistributionSchemeEntity.SchemeName),
             ["fldDistributionReference"] = nameof(MonthlyDistributionSchemeEntity.DistributionReference),
@@ -711,6 +713,78 @@ public static class DapperColumnMappings
         {
             ["fldDistributionSchemeId"] = nameof(MonthlyDistributionParticipantAggregateEntity.DistributionSchemeId),
             ["fldNumberOfSetsRequired"] = nameof(MonthlyDistributionParticipantAggregateEntity.NumberOfSetsRequired),
+        });
+
+        Map<IntendedResultsHeaderEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldMonthlyDistributionSchemeId"] = nameof(IntendedResultsHeaderEntity.MonthlyDistributionSchemeId),
+            ["fldComments"] = nameof(IntendedResultsHeaderEntity.Comments),
+            ["fldHasIntendedResults"] = nameof(IntendedResultsHeaderEntity.HasIntendedResults),
+            ["fldHasSampleNumbersDefined"] = nameof(IntendedResultsHeaderEntity.HasSampleNumbersDefined),
+            ["fldTestConsultantTabulationId"] = nameof(IntendedResultsHeaderEntity.TestConsultantTabulationId),
+            ["fldStoreRatings"] = nameof(IntendedResultsHeaderEntity.StoreRatings),
+            ["fldRequiresAssessment"] = nameof(IntendedResultsHeaderEntity.RequiresAssessment),
+            ["fldIsReadyForAssessor"] = nameof(IntendedResultsHeaderEntity.IsReadyForAssessor),
+        });
+
+        Map<DistributionSampleEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldSampleId"] = nameof(DistributionSampleEntity.SampleId),
+            ["fldDistributionSchemeId"] = nameof(DistributionSampleEntity.DistributionSchemeId),
+            ["fldSampleNumber"] = nameof(DistributionSampleEntity.SampleNumber),
+            ["fldInternalDescription"] = nameof(DistributionSampleEntity.InternalDescription),
+            ["fldExternalDescription"] = nameof(DistributionSampleEntity.ExternalDescription),
+            ["fldTabulationDescription"] = nameof(DistributionSampleEntity.TabulationDescription),
+            ["fldTestConsultantsDescription"] = nameof(DistributionSampleEntity.TestConsultantsDescription),
+        });
+
+        Map<DistributionSampleTestEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldSampleTestId"] = nameof(DistributionSampleTestEntity.SampleTestId),
+            ["fldSampleId"] = nameof(DistributionSampleTestEntity.SampleId),
+            [ColTestId] = nameof(DistributionSampleTestEntity.TestId),
+            ["fldIsApplicable"] = nameof(DistributionSampleTestEntity.IsApplicable),
+        });
+
+        Map<DistributionTestEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            [ColTestId] = nameof(DistributionTestEntity.TestId),
+            ["fldTestTypeId"] = nameof(DistributionTestEntity.TestTypeId),
+            ["TestName"] = nameof(DistributionTestEntity.TestName),
+            [ColOrder] = nameof(DistributionTestEntity.Order),
+        });
+
+        Map<DistributionTestMethodItemEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldTestMethodItemId"] = nameof(DistributionTestMethodItemEntity.TestMethodItemId),
+            [ColTestId] = nameof(DistributionTestMethodItemEntity.TestId),
+            ["TestMethodItemTypeName"] = nameof(DistributionTestMethodItemEntity.Name),
+            [ColOrder] = nameof(DistributionTestMethodItemEntity.Order),
+        });
+
+        Map<DistributionTestResultItemEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldTestResultItemId"] = nameof(DistributionTestResultItemEntity.TestResultItemId),
+            [ColTestId] = nameof(DistributionTestResultItemEntity.TestId),
+            ["TestResultItemTypeName"] = nameof(DistributionTestResultItemEntity.Name),
+            [ColOrder] = nameof(DistributionTestResultItemEntity.Order),
+        });
+
+        Map<DistributionCategoryItemEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldCategoryItemId"] = nameof(DistributionCategoryItemEntity.CategoryItemId),
+            [ColTestId] = nameof(DistributionCategoryItemEntity.TestId),
+            [ColName] = nameof(DistributionCategoryItemEntity.Name),
+            [ColOrder] = nameof(DistributionCategoryItemEntity.Order),
+        });
+
+        Map<DistributionCriterionItemEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldCriterionItemId"] = nameof(DistributionCriterionItemEntity.CriterionItemId),
+            ["fldCategoryItemId"] = nameof(DistributionCriterionItemEntity.CategoryItemId),
+            [ColTestId] = nameof(DistributionCriterionItemEntity.TestId),
+            [ColName] = nameof(DistributionCriterionItemEntity.Name),
+            [ColOrder] = nameof(DistributionCriterionItemEntity.Order),
         });
 
         Map<DayEntity>(new(StringComparer.OrdinalIgnoreCase)

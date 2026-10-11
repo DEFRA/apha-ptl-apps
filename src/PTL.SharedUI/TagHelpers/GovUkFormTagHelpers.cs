@@ -29,6 +29,14 @@ public class GovUkInputTagHelper(IHtmlGenerator generator) : TagHelper
     [HtmlAttributeName("input-class")]
     public string InputCssClass { get; set; } = "govuk-input";
 
+    /// <summary>Set to "govuk-label govuk-visually-hidden" where the visible label is a table column header.</summary>
+    [HtmlAttributeName("label-class")]
+    public string LabelCssClass { get; set; } = "govuk-label";
+
+    /// <summary>Rendered &lt;input&gt; maxlength; 0 (the default) omits the attribute.</summary>
+    [HtmlAttributeName("maxlength")]
+    public int MaxLength { get; set; }
+
     public bool Disabled { get; set; }
 
     /// <summary>Overrides the rendered &lt;input&gt;'s type attribute (e.g. "date"); defaults to "text".</summary>
@@ -42,7 +50,7 @@ public class GovUkInputTagHelper(IHtmlGenerator generator) : TagHelper
     {
         var field = For.Name;
         var hasError = ViewContext.ViewData.ModelState.TryGetValue(field, out var entry) && entry.Errors.Count > 0;
-        var describedBy = GovUkFormGroupMarkup.Render(output, ViewContext, field, Label, Hint, entry);
+        var describedBy = GovUkFormGroupMarkup.Render(output, ViewContext, field, Label, Hint, entry, LabelCssClass);
 
         var htmlAttributes = new Dictionary<string, object>
         {
@@ -51,6 +59,10 @@ public class GovUkInputTagHelper(IHtmlGenerator generator) : TagHelper
         if (describedBy is not null)
         {
             htmlAttributes["aria-describedby"] = describedBy;
+        }
+        if (MaxLength > 0)
+        {
+            htmlAttributes["maxlength"] = MaxLength;
         }
         if (Disabled)
         {
@@ -141,6 +153,10 @@ public class GovUkTextareaTagHelper(IHtmlGenerator generator) : TagHelper
     [HtmlAttributeName("label-class")]
     public string LabelCssClass { get; set; } = "govuk-label";
 
+    /// <summary>Rendered &lt;textarea&gt; maxlength; 0 (the default) omits the attribute.</summary>
+    [HtmlAttributeName("maxlength")]
+    public int MaxLength { get; set; }
+
     [ViewContext]
     [HtmlAttributeNotBound]
     public ViewContext ViewContext { get; set; } = default!;
@@ -158,6 +174,10 @@ public class GovUkTextareaTagHelper(IHtmlGenerator generator) : TagHelper
         if (describedBy is not null)
         {
             htmlAttributes["aria-describedby"] = describedBy;
+        }
+        if (MaxLength > 0)
+        {
+            htmlAttributes["maxlength"] = MaxLength;
         }
 
         var textarea = generator.GenerateTextArea(ViewContext, For.ModelExplorer, field, rows: Rows, columns: 0, htmlAttributes);

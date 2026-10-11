@@ -180,11 +180,13 @@ body {
   }
 }
 
-/* The Scheme form keeps legacy Scheme.aspx's seven tabs, which do not fit on one row. The GOV.UK
-   tabs component floats its items and draws a single border under the <ul>, so once the list wraps
-   the first row loses its underline and the selected tab's "joins to the panel" notch lands in the
-   middle of the list. Lay the rows out with flex and give every item its own bottom border. */
-.govuk-frontend-supported #scheme-tabs .govuk-tabs__list {
+/* The Scheme form keeps legacy Scheme.aspx's seven tabs, and Sample Numbers renders one tab per
+   test with no upper bound, so neither list fits on one row. The GOV.UK tabs component floats its
+   items and draws a single border under the <ul>, so once the list wraps the first row loses its
+   underline and the selected tab's "joins to the panel" notch lands in the middle of the list.
+   Lay the rows out with flex and give every item its own bottom border. */
+.govuk-frontend-supported #scheme-tabs .govuk-tabs__list,
+.govuk-frontend-supported #sample-numbers-tabs .govuk-tabs__list {
   display: flex;
   flex-wrap: wrap;
   align-items: flex-end;
@@ -192,11 +194,13 @@ body {
   border-bottom: 0;
 }
 
-.govuk-frontend-supported #scheme-tabs .govuk-tabs__list::after {
+.govuk-frontend-supported #scheme-tabs .govuk-tabs__list::after,
+.govuk-frontend-supported #sample-numbers-tabs .govuk-tabs__list::after {
   content: none;
 }
 
-.govuk-frontend-supported #scheme-tabs .govuk-tabs__list-item {
+.govuk-frontend-supported #scheme-tabs .govuk-tabs__list-item,
+.govuk-frontend-supported #sample-numbers-tabs .govuk-tabs__list-item {
   float: none;
   margin-top: 0;
   margin-bottom: 0;
@@ -205,11 +209,18 @@ body {
   border-bottom-color: var(--govuk-border-colour, #cecece);
 }
 
-.govuk-frontend-supported #scheme-tabs .govuk-tabs__list-item--selected {
+.govuk-frontend-supported #scheme-tabs .govuk-tabs__list-item--selected,
+.govuk-frontend-supported #sample-numbers-tabs .govuk-tabs__list-item--selected {
   padding: 10px 20px;
   border-color: var(--govuk-border-colour, #cecece);
   border-bottom-color: var(--govuk-body-background-colour, #fff);
   background-color: var(--govuk-body-background-colour, #fff);
+}
+
+/* Legacy stacks the Samples / Test Items / Method Items tables with a 15px spacer between them.
+   The caption is the section label (legacy's rowPrepSheetHeader), so it sits tight to its table. */
+#sample-numbers-tabs .govuk-table__caption {
+  margin-bottom: 5px;
 }
 
 

@@ -1,0 +1,22 @@
+@model PTL.InternalWeb.Features.Distribution.SampleNumbersUnavailableViewModel
+@{
+    // GOV.UK error-page convention: the title is prefixed so screen reader users hear the failure
+    // first. The layout only adds that prefix for ModelState errors, which this page does not use.
+    ViewData["Title"] = "Error: Sample Numbers";
+
+    // These are whole-page business messages with no field to focus, so the field key is left empty
+    // and the shared summary renders each one as a plain list item rather than a link.
+    var errors = Model.Errors.Select(message => (Field: string.Empty, Message: message)).ToList();
+}
+
+<a class="govuk-back-link" asp-action="Schedule" asp-route-year="@Model.YearId" asp-route-monthId="@Model.MonthId">Back</a>
+
+<h1 class="govuk-heading-l">Sample Numbers</h1>
+
+<govuk-error-summary errors="@errors" />
+
+<p class="govuk-body">This Distribution cannot be opened until the Scheme is corrected. Once the problems listed above have been resolved on the Scheme, return to this Distribution to define its Sample Numbers.</p>
+
+<div class="govuk-button-group">
+    <a class="govuk-button govuk-button--secondary" data-module="govuk-button" role="button" draggable="false" asp-action="Schedule" asp-route-year="@Model.YearId" asp-route-monthId="@Model.MonthId">Return to Monthly Distributions</a>
+</div>

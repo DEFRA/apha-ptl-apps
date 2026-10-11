@@ -1,0 +1,285 @@
+@model PTL.InternalWeb.Features.Distribution.SampleNumbersViewModel
+@{
+    // Legacy diverts to a separate Audit.aspx page; here it is a second step of the same view.
+    ViewData["Title"] = Model.RequiresAuditReason
+        ? $"Reason for these changes - {Model.DistributionHeading}"
+        : $"Sample Numbers - {Model.DistributionHeading}";
+
+    // Hand-rolled to match the GOV.UK Design System error summary exactly - same pattern as
+    // Features/Distribution/Views/Schedule.cshtml.
+    var errors = ViewData.ModelState
+        .Where(entry => entry.Value?.Errors.Count > 0)
+        .SelectMany(entry => entry.Value!.Errors.Select(error => (Field: entry.Key, Message: error.ErrorMessage)))
+        .ToList();
+}
+
+@if (Model.RequiresAuditReason)
+{
+    <a class="govuk-back-link" asp-action="SampleNumbers" asp-route-year="@Model.YearId" asp-route-monthId="@Model.MonthId" asp-route-schemeId="@Model.MonthlyDistributionSchemeId">Back</a>
+
+    <h1 class="govuk-heading-l">@Model.DistributionHeading</h1>
+
+    <govuk-error-summary errors="@errors" />
+
+    <p class="govuk-body">Changes have been made to the following object:</p>
+
+    <h2 class="govuk-heading-m">@Model.AuditObjectName</h2>
+
+    <hr class="govuk-section-break govuk-section-break--visible govuk-section-break--m">
+
+    <form method="post" asp-action="SampleNumbers" asp-route-year="@Model.YearId" asp-route-monthId="@Model.MonthId" asp-route-schemeId="@Model.MonthlyDistributionSchemeId">
+        @Html.AntiForgeryToken()
+        @* Legacy holds the pending edits in Session while Audit.aspx runs. There is no server-side
+           session here, so every editable field has to ride along hidden or the user's edit is
+           silently dropped when the audited save finally runs. *@
+        <input type="hidden" asp-for="MonthlyDistributionSchemeId" />
+        <input type="hidden" asp-for="YearId" />
+        <input type="hidden" asp-for="MonthId" />
+        <input type="hidden" asp-for="Comments" />
+        <input type="hidden" asp-for="RequiresAuditReason" />
+        <input type="hidden" asp-for="AuditObjectName" />
+        <input type="hidden" asp-for="PendingCommand" />
+        @for (var i = 0; i < Model.Samples.Count; i++)
+        {
+            <input type="hidden" asp-for="Samples[i].SampleId" />
+            <input type="hidden" asp-for="Samples[i].SampleNumber" />
+            <input type="hidden" asp-for="Samples[i].InternalDescription" />
+            <input type="hidden" asp-for="Samples[i].TabulationDescription" />
+            <input type="hidden" asp-for="Samples[i].ExternalDescription" />
+            <input type="hidden" asp-for="Samples[i].TestConsultantsDescription" />
+            @for (var a = 0; a < Model.Samples[i].Allocations.Count; a++)
+            {
+                <input type="hidden" asp-for="Samples[i].Allocations[a].SampleTestId" />
+                <input type="hidden" asp-for="Samples[i].Allocations[a].TestId" />
+                <input type="hidden" asp-for="Samples[i].Allocations[a].IsApplicable" />
+            }
+        }
+
+        <govuk-textarea asp-for="AuditWhy" label="Before these modifications can be saved, you must enter your reasons for making these changes below: " rows="5" maxlength="2000" />
+
+        <hr class="govuk-section-break govuk-section-break--visible govuk-section-break--m">
+
+        <div class="govuk-button-group">
+            <button type="submit" name="command" value="@Model.PendingCommand" class="govuk-button" data-module="govuk-button">Save</button>
+            <button type="submit" name="command" value="cancelAudit" class="govuk-button govuk-button--secondary" data-module="govuk-button" formnovalidate>Cancel</button>
+        </div>
+    </form>
+
+    return;
+}
+
+<a class="govuk-back-link" asp-action="Schedule" asp-route-year="@Model.YearId" asp-route-monthId="@Model.MonthId">Back</a>
+
+<h1 class="govuk-heading-l">@Model.DistributionHeading</h1>
+
+<hr class="govuk-section-break govuk-section-break--visible govuk-section-break--m">
+
+<p class="govuk-body">The table below lists the Sample Number and the Descriptions for each Sample on this Distribution.</p>
+
+<govuk-error-summary errors="@errors" />
+
+<form method="post" asp-action="SampleNumbers" asp-route-year="@Model.YearId" asp-route-monthId="@Model.MonthId" asp-route-schemeId="@Model.MonthlyDistributionSchemeId">
+    @Html.AntiForgeryToken()
+    <input type="hidden" asp-for="MonthlyDistributionSchemeId" />
+    <input type="hidden" asp-for="YearId" />
+    <input type="hidden" asp-for="MonthId" />
+
+    <table class="govuk-table">
+        <caption class="govuk-table__caption govuk-visually-hidden">Sample Number and Descriptions for each Sample on this Distribution</caption>
+        <thead class="govuk-table__head">
+            <tr class="govuk-table__row">
+                <th scope="col" class="govuk-table__header">Sample No.</th>
+                <th scope="col" class="govuk-table__header" colspan="2">Descriptions</th>
+            </tr>
+        </thead>
+        <tbody class="govuk-table__body">
+            @for (var i = 0; i < Model.Samples.Count; i++)
+            {
+                var sample = Model.Samples[i];
+                // Legacy starts every sample collapsed; open the row when it is hiding a field the
+                // error summary links to, otherwise the link would move focus to hidden content.
+                var expanded = ViewData.ModelState[$"Samples[{i}].ExternalDescription"]?.Errors.Count > 0
+                    || ViewData.ModelState[$"Samples[{i}].TestConsultantsDescription"]?.Errors.Count > 0;
+
+                <tr class="govuk-table__row">
+                    <td class="govuk-table__cell">
+                        <input type="hidden" asp-for="Samples[i].SampleId" />
+                        @for (var a = 0; a < sample.Allocations.Count; a++)
+                        {
+                            <input type="hidden" asp-for="Samples[i].Allocations[a].SampleTestId" />
+                            <input type="hidden" asp-for="Samples[i].Allocations[a].TestId" />
+                        }
+                        <govuk-input asp-for="Samples[i].SampleNumber" label="Sample No." label-class="govuk-label govuk-visually-hidden" maxlength="50" input-class="govuk-input govuk-input--width-10" />
+                    </td>
+                    <td class="govuk-table__cell">
+                        <govuk-input asp-for="Samples[i].InternalDescription" label="Internal Description: " maxlength="100" input-class="govuk-input govuk-input--width-20" />
+                    </td>
+                    <td class="govuk-table__cell">
+                        <govuk-input asp-for="Samples[i].TabulationDescription" label="Tabulation Description: " maxlength="500" input-class="govuk-input govuk-input--width-20" />
+                    </td>
+                </tr>
+                <tr class="govuk-table__row">
+                    <td class="govuk-table__cell" colspan="3">
+                        <details class="govuk-details" open="@expanded">
+                            <summary class="govuk-details__summary">
+                                <span class="govuk-details__summary-text">
+                                    Test Instruction and Description for TC<span class="govuk-visually-hidden"> for sample @(i + 1)</span>
+                                </span>
+                            </summary>
+                            <div class="govuk-details__text">
+                                <govuk-textarea asp-for="Samples[i].ExternalDescription" label="Test Instruction: " rows="5" maxlength="500" />
+                                <govuk-textarea asp-for="Samples[i].TestConsultantsDescription" label="Description for TC: " rows="5" maxlength="500" />
+                            </div>
+                        </details>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+
+    <p class="govuk-body">Number of each Sample required: @Model.NumberOfSetsRequired</p>
+
+    <hr class="govuk-section-break govuk-section-break--visible govuk-section-break--m">
+
+    <p class="govuk-body">The following box is for any comments that should appear on Results Tabulations relating to the Samples used.</p>
+
+    <govuk-textarea asp-for="Comments" label="Comments" rows="5" maxlength="8000" />
+
+    <hr class="govuk-section-break govuk-section-break--visible govuk-section-break--m">
+
+    <p class="govuk-body">The Sample Allocation, Method Items and Result Items for each Test are shown below.</p>
+
+    @if (Model.Tests.Count == 0)
+    {
+        <p class="govuk-body">There are no Tests</p>
+    }
+    else
+    {
+        @* Legacy renders one AjaxControlToolkit TabPanel per test with no cap on the count, so the
+           tab list has to wrap - see #sample-numbers-tabs in site.css, shared with the Scheme tabs. *@
+        <div class="govuk-tabs" data-module="govuk-tabs" id="sample-numbers-tabs">
+            <h2 class="govuk-tabs__title">Contents</h2>
+            <ul class="govuk-tabs__list">
+                @for (var t = 0; t < Model.Tests.Count; t++)
+                {
+                    <li class="govuk-tabs__list-item @(t == 0 ? "govuk-tabs__list-item--selected" : null)">
+                        <a class="govuk-tabs__tab" href="#test-@Model.Tests[t].TestId">@Model.Tests[t].TestName</a>
+                    </li>
+                }
+            </ul>
+
+            @for (var t = 0; t < Model.Tests.Count; t++)
+            {
+                var test = Model.Tests[t];
+                <div class="govuk-tabs__panel @(t == 0 ? null : "govuk-tabs__panel--hidden")" id="test-@test.TestId">
+                    @* Legacy separates the stacked tables with a 15px spacer only, so each one
+                       overrides govuk-table's larger default bottom margin to scale point 3 (15px). *@
+                    <table class="govuk-table govuk-!-margin-bottom-3">
+                        <caption class="govuk-table__caption govuk-table__caption--s">Samples:</caption>
+                        <thead class="govuk-table__head">
+                            <tr class="govuk-table__row">
+                                <th scope="col" class="govuk-table__header">Sample No.</th>
+                                <th scope="col" class="govuk-table__header">Sample Allocation</th>
+                            </tr>
+                        </thead>
+                        <tbody class="govuk-table__body">
+                            @for (var i = 0; i < Model.Samples.Count; i++)
+                            {
+                                var sample = Model.Samples[i];
+                                var j = Model.AllocationIndexFor(i, test.TestId);
+                                <tr class="govuk-table__row">
+                                    <th scope="row" class="govuk-table__header">@sample.SampleNumber</th>
+                                    <td class="govuk-table__cell">
+                                        @if (j >= 0)
+                                        {
+                                            var allocationId = Html.IdFor(m => m.Samples[i].Allocations[j].IsApplicable);
+                                            <div class="govuk-checkboxes govuk-checkboxes--small" data-module="govuk-checkboxes">
+                                                <div class="govuk-checkboxes__item">
+                                                    @* Legacy disables every tick box once an assessment scheme is with the assessor. *@
+                                                    <input class="govuk-checkboxes__input" type="checkbox" asp-for="Samples[i].Allocations[j].IsApplicable" disabled="@(!Model.AllocationEditable)" />
+                                                    <label class="govuk-label govuk-checkboxes__label" for="@allocationId">
+                                                        <span class="govuk-visually-hidden">Sample Allocation for sample @sample.SampleNumber</span>
+                                                    </label>
+                                                </div>
+                                            </div>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+
+                    @* No <thead>: legacy's only header row is the section label, which the caption
+                       supplies. An empty header row would draw a visible blank band above the list. *@
+                    <table class="govuk-table govuk-!-margin-bottom-3">
+                        <caption class="govuk-table__caption govuk-table__caption--s">Test Items:</caption>
+                        <tbody class="govuk-table__body">
+                            @if (test.TestResultItemNames.Count == 0)
+                            {
+                                <tr class="govuk-table__row"><td class="govuk-table__cell">There are no test result items</td></tr>
+                            }
+                            else
+                            {
+                                foreach (var itemName in test.TestResultItemNames)
+                                {
+                                    <tr class="govuk-table__row">
+                                        <td class="govuk-table__cell">@itemName</td>
+                                    </tr>
+                                }
+                            }
+                        </tbody>
+                    </table>
+
+                    <table class="govuk-table govuk-!-margin-bottom-3">
+                        <caption class="govuk-table__caption govuk-table__caption--s">Method Items:</caption>
+                        <tbody class="govuk-table__body">
+                            @if (test.TestMethodItemNames.Count == 0)
+                            {
+                                <tr class="govuk-table__row"><td class="govuk-table__cell">There are no Method Items</td></tr>
+                            }
+                            else
+                            {
+                                foreach (var itemName in test.TestMethodItemNames)
+                                {
+                                    <tr class="govuk-table__row">
+                                        <td class="govuk-table__cell">@itemName</td>
+                                    </tr>
+                                }
+                            }
+                        </tbody>
+                    </table>
+
+                    @if (Model.RequiresAssessment)
+                    {
+                        <table class="govuk-table govuk-!-margin-bottom-3">
+                            <caption class="govuk-table__caption govuk-table__caption--s">Category/Criterion Items: </caption>
+                            <tbody class="govuk-table__body">
+                                @if (test.CategoryItemNames.Count == 0)
+                                {
+                                    <tr class="govuk-table__row"><td class="govuk-table__cell">There are no Category Items</td></tr>
+                                }
+                                else
+                                {
+                                    foreach (var itemName in test.CategoryItemNames)
+                                    {
+                                        <tr class="govuk-table__row">
+                                            <td class="govuk-table__cell">@itemName</td>
+                                        </tr>
+                                    }
+                                }
+                            </tbody>
+                        </table>
+                    }
+                </div>
+            }
+        </div>
+    }
+
+    <hr class="govuk-section-break govuk-section-break--visible govuk-section-break--m">
+
+    <div class="govuk-button-group">
+        <button type="submit" name="command" value="save" class="govuk-button" data-module="govuk-button">Save</button>
+        <button type="submit" name="command" value="saveAndGoToIntendedResults" class="govuk-button govuk-button--secondary" data-module="govuk-button">Save and go to Intended Results</button>
+        <button type="submit" name="command" value="cancel" class="govuk-button govuk-button--secondary" data-module="govuk-button" formnovalidate>Cancel</button>
+    </div>
+</form>

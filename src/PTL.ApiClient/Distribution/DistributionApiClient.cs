@@ -31,4 +31,38 @@ public sealed class DistributionApiClient(HttpClient httpClient) : IDistribution
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadFromJsonAsync<MonthlyDistributionScheduleSaveResult>(cancellationToken);
     }
+
+    public async Task<SampleNumbersPageResult> GetSampleNumbersAsync(Guid monthlyDistributionSchemeId, CancellationToken cancellationToken = default)
+    {
+        var response = await httpClient.GetAsync(
+            new Uri($"/api/distributions/schemes/{monthlyDistributionSchemeId}/sample-numbers", UriKind.Relative), cancellationToken);
+
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            return new SampleNumbersPageResult(null, []);
+        }
+
+        // The structure could not be built from the Scheme - surface the business message rather
+        // than failing with an opaque error.
+        if (response.StatusCode == System.Net.HttpStatusCode.BadRequest)
+        {
+            var problem = await response.Content.ReadFromJsonAsync<Microsoft.AspNetCore.Mvc.ValidationProblemDetails>(cancellationToken);
+            var errors = problem?.Errors is { Count: > 0 }
+                ? problem.Errors.SelectMany(e => e.Value).ToList()
+                : ["Sample Numbers could not be opened for this distribution."];
+            return new SampleNumbersPageResult(null, errors);
+        }
+
+        response.EnsureSuccessStatusCode();
+        return new SampleNumbersPageResult(await response.Content.ReadFromJsonAsync<SampleNumbersResponse>(cancellationToken), []);
+    }
+
+    public async Task<SampleNumbersSaveResult?> SaveSampleNumbersAsync(
+        Guid monthlyDistributionSchemeId, SampleNumbersSaveRequest request, CancellationToken cancellationToken = default)
+    {
+        var response = await httpClient.PutAsJsonAsync(
+            $"/api/distributions/schemes/{monthlyDistributionSchemeId}/sample-numbers", request, cancellationToken);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<SampleNumbersSaveResult>(cancellationToken);
+    }
 }
