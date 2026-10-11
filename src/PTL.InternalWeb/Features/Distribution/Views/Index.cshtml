@@ -1,0 +1,89 @@
+@model PTL.InternalWeb.Features.Distribution.DistributionDashboardViewModel
+@{
+    ViewData["Title"] = "Distributions";
+}
+
+<h1 class="govuk-heading-l">Distributions</h1>
+
+<form method="get" asp-action="Index" class="govuk-!-margin-bottom-6">
+    <div class="govuk-form-group">
+        <label class="govuk-label" for="year">Year</label>
+        <select class="govuk-select" id="year" name="year" onchange="this.form.submit()">
+            @foreach (var option in Model.YearOptions)
+            {
+                <option value="@option.Value" selected="@(option.Selected ? "selected" : null)">@option.Text</option>
+            }
+        </select>
+        <noscript><button type="submit" class="govuk-button govuk-button--secondary govuk-!-margin-left-2">View</button></noscript>
+    </div>
+</form>
+
+<table class="govuk-table">
+    <thead class="govuk-table__head">
+        <tr class="govuk-table__row">
+            <th scope="col" class="govuk-table__header">Month</th>
+            <th scope="col" class="govuk-table__header">Scheduling</th>
+            <th scope="col" class="govuk-table__header">Preparation</th>
+            <th scope="col" class="govuk-table__header">Packaging</th>
+            <th scope="col" class="govuk-table__header">Results</th>
+            <th scope="col" class="govuk-table__header">Tabulations</th>
+        </tr>
+    </thead>
+    <tbody class="govuk-table__body">
+        @foreach (var month in Model.Months)
+        {
+            <tr class="govuk-table__row">
+                <th scope="row" class="govuk-table__header">@month.MonthDescription</th>
+                @if (!month.IsInitialised)
+                {
+                    <td class="govuk-table__cell ptl-distribution-initialise-cell" colspan="5">
+                        @if (month.IsInitialisable)
+                        {
+                            <form method="post" asp-action="InitialiseMonth">
+                                <input type="hidden" name="year" value="@month.YearId" />
+                                <input type="hidden" name="monthId" value="@month.MonthId" />
+                                <button type="submit" class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0"
+                                        data-module="govuk-button"
+                                        onclick="return confirm('Are you sure you wish to initialise this month? If you do, you will no longer be able to add schemes to this month (participants can still be added up to a day before the posting date).');">
+                                    Initialise this Month
+                                </button>
+                            </form>
+                        }
+                        else
+                        {
+                            <span class="govuk-hint govuk-!-margin-bottom-0">&ndash;</span>
+                        }
+                    </td>
+                }
+                else
+                {
+                    <td class="govuk-table__cell">
+                        <progress class="ptl-progress-bar" max="100" value="@month.SchedulingCompletePercentage" aria-label="Scheduling for @month.MonthDescription">@month.SchedulingCompletePercentage% complete</progress>
+                        <span class="govuk-body-s ptl-progress-bar__label">@month.SchedulingCompletePercentage%</span><br />
+                        <a class="govuk-link" asp-action="Schedule" asp-route-year="@month.YearId" asp-route-monthId="@month.MonthId">View<span class="govuk-visually-hidden"> Scheduling for @month.MonthDescription</span></a>
+                    </td>
+                    <td class="govuk-table__cell">
+                        <progress class="ptl-progress-bar" max="100" value="@month.PreparationCompletePercentage" aria-label="Preparation for @month.MonthDescription">@month.PreparationCompletePercentage% complete</progress>
+                        <span class="govuk-body-s ptl-progress-bar__label">@month.PreparationCompletePercentage%</span><br />
+                        <a class="govuk-link" asp-action="ViewStage" asp-route-stage="Preparation">View<span class="govuk-visually-hidden"> Preparation for @month.MonthDescription</span></a>
+                    </td>
+                    <td class="govuk-table__cell">
+                        <progress class="ptl-progress-bar" max="100" value="@month.PackagingCompletePercentage" aria-label="Packaging for @month.MonthDescription">@month.PackagingCompletePercentage% complete</progress>
+                        <span class="govuk-body-s ptl-progress-bar__label">@month.PackagingCompletePercentage%</span><br />
+                        <a class="govuk-link" asp-action="ViewStage" asp-route-stage="Packaging">View<span class="govuk-visually-hidden"> Packaging for @month.MonthDescription</span></a>
+                    </td>
+                    <td class="govuk-table__cell">
+                        <progress class="ptl-progress-bar" max="100" value="@month.ResultsCompletePercentage" aria-label="Results for @month.MonthDescription">@month.ResultsCompletePercentage% complete</progress>
+                        <span class="govuk-body-s ptl-progress-bar__label">@month.ResultsCompletePercentage%</span><br />
+                        <a class="govuk-link" asp-action="ViewStage" asp-route-stage="Results">View<span class="govuk-visually-hidden"> Results for @month.MonthDescription</span></a>
+                    </td>
+                    <td class="govuk-table__cell">
+                        <progress class="ptl-progress-bar" max="100" value="@month.TabulationsCompletePercentage" aria-label="Tabulations for @month.MonthDescription">@month.TabulationsCompletePercentage% complete</progress>
+                        <span class="govuk-body-s ptl-progress-bar__label">@month.TabulationsCompletePercentage%</span><br />
+                        <a class="govuk-link" asp-action="ViewStage" asp-route-stage="Tabulations">View<span class="govuk-visually-hidden"> Tabulations for @month.MonthDescription</span></a>
+                    </td>
+                }
+            </tr>
+        }
+    </tbody>
+</table>
