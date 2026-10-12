@@ -2,6 +2,7 @@ using System.Data;
 using Dapper;
 using PTL.Core.Contract;
 using PTL.Core.Customer;
+using PTL.Core.Distribution;
 using PTL.Core.Lookup;
 using PTL.Core.Participant;
 using PTL.Core.Scheme;
@@ -274,6 +275,220 @@ public class DapperColumnMappingsTests
 
         Assert.Equal(countryId, country.CountryId);
         Assert.Equal("United Kingdom", country.Country);
+    }
+
+    // The next eight tests use the exact result-set column lists from spgIntendedResults.sql and
+    // spgMonthlyDistributionScheme.sql, including the columns those procedures return that the
+    // Sample Numbers screen has no property for - they must be skipped, not throw.
+    [Fact]
+    public void Register_MapsIntendedResultsHeader_ColumnsToProperties()
+    {
+        var schemeId = Guid.NewGuid();
+        var tabulationId = Guid.NewGuid();
+        var table = new DataTable();
+        table.Columns.Add("fldMonthlyDistributionSchemeId", typeof(Guid));
+        table.Columns.Add("fldComments", typeof(string));
+        table.Columns.Add("fldHasIntendedResults", typeof(bool));
+        table.Columns.Add("fldHasSampleNumbersDefined", typeof(bool));
+        table.Columns.Add("fldTestConsultantTabulationId", typeof(Guid));
+        table.Columns.Add("fldStoreRatings", typeof(bool));
+        table.Columns.Add("fldSchemeVersionDate", typeof(DateTime));
+        table.Columns.Add("fldDateOfReceipt", typeof(DateTime));
+        table.Columns.Add("fldStorageConditions", typeof(string));
+        table.Columns.Add("fldConditionOnReceipt", typeof(string));
+        table.Columns.Add("fldInstructions", typeof(string));
+        table.Columns.Add("fldRequiresAssessment", typeof(bool));
+        table.Columns.Add("fldIsReadyForAssessor", typeof(DateTime));
+        table.Rows.Add(
+            schemeId, "Some comments", true, true, tabulationId, true,
+            new DateTime(2026, 1, 1), DBNull.Value, "Chilled", "Good", "Instructions",
+            true, new DateTime(2026, 4, 1));
+
+        var header = Parse<IntendedResultsHeaderEntity>(table).Single();
+
+        Assert.Equal(schemeId, header.MonthlyDistributionSchemeId);
+        Assert.Equal("Some comments", header.Comments);
+        Assert.True(header.HasIntendedResults);
+        Assert.True(header.HasSampleNumbersDefined);
+        Assert.Equal(tabulationId, header.TestConsultantTabulationId);
+        Assert.True(header.StoreRatings);
+        Assert.True(header.RequiresAssessment);
+        Assert.Equal(new DateTime(2026, 4, 1), header.IsReadyForAssessor);
+    }
+
+    [Fact]
+    public void Register_MapsIntendedResultsHeader_NullIsReadyForAssessor()
+    {
+        var table = new DataTable();
+        table.Columns.Add("fldMonthlyDistributionSchemeId", typeof(Guid));
+        table.Columns.Add("fldIsReadyForAssessor", typeof(DateTime));
+        table.Rows.Add(Guid.NewGuid(), DBNull.Value);
+
+        Assert.Null(Parse<IntendedResultsHeaderEntity>(table).Single().IsReadyForAssessor);
+    }
+
+    [Fact]
+    public void Register_MapsDistributionSample_ColumnsToProperties()
+    {
+        var sampleId = Guid.NewGuid();
+        var schemeId = Guid.NewGuid();
+        var table = new DataTable();
+        table.Columns.Add("fldDistributionSchemeId", typeof(Guid));
+        table.Columns.Add("fldSampleId", typeof(Guid));
+        table.Columns.Add("fldSampleNumber", typeof(string));
+        table.Columns.Add("fldInternalDescription", typeof(string));
+        table.Columns.Add("fldExternalDescription", typeof(string));
+        table.Columns.Add("fldTabulationDescription", typeof(string));
+        table.Columns.Add("fldTestConsultantsDescription", typeof(string));
+        table.Rows.Add(schemeId, sampleId, "S1", "Internal", "External", "Tabulation", "TC");
+
+        var sample = Parse<DistributionSampleEntity>(table).Single();
+
+        Assert.Equal(sampleId, sample.SampleId);
+        Assert.Equal(schemeId, sample.DistributionSchemeId);
+        Assert.Equal("S1", sample.SampleNumber);
+        Assert.Equal("Internal", sample.InternalDescription);
+        Assert.Equal("External", sample.ExternalDescription);
+        Assert.Equal("Tabulation", sample.TabulationDescription);
+        Assert.Equal("TC", sample.TestConsultantsDescription);
+    }
+
+    [Fact]
+    public void Register_MapsDistributionSampleTest_ColumnsToProperties()
+    {
+        var sampleTestId = Guid.NewGuid();
+        var sampleId = Guid.NewGuid();
+        var testId = Guid.NewGuid();
+        var table = new DataTable();
+        table.Columns.Add("fldDistributionSchemeId", typeof(Guid));
+        table.Columns.Add("fldSampleId", typeof(Guid));
+        table.Columns.Add("fldSampleTestId", typeof(Guid));
+        table.Columns.Add("fldTestId", typeof(Guid));
+        table.Columns.Add("fldIsApplicable", typeof(bool));
+        table.Rows.Add(Guid.NewGuid(), sampleId, sampleTestId, testId, true);
+
+        var sampleTest = Parse<DistributionSampleTestEntity>(table).Single();
+
+        Assert.Equal(sampleTestId, sampleTest.SampleTestId);
+        Assert.Equal(sampleId, sampleTest.SampleId);
+        Assert.Equal(testId, sampleTest.TestId);
+        Assert.True(sampleTest.IsApplicable);
+    }
+
+    [Fact]
+    public void Register_MapsDistributionTest_ColumnsToProperties()
+    {
+        var testId = Guid.NewGuid();
+        var testTypeId = Guid.NewGuid();
+        var table = new DataTable();
+        table.Columns.Add("fldDistributionSchemeId", typeof(Guid));
+        table.Columns.Add("fldTestId", typeof(Guid));
+        table.Columns.Add("fldTestTypeId", typeof(Guid));
+        table.Columns.Add("TestName", typeof(string));
+        table.Columns.Add("fldOrder", typeof(int));
+        table.Rows.Add(Guid.NewGuid(), testId, testTypeId, "Somatic cell count", 2);
+
+        var test = Parse<DistributionTestEntity>(table).Single();
+
+        Assert.Equal(testId, test.TestId);
+        Assert.Equal(testTypeId, test.TestTypeId);
+        Assert.Equal("Somatic cell count", test.TestName);
+        Assert.Equal(2, test.Order);
+    }
+
+    [Fact]
+    public void Register_MapsDistributionTestMethodItem_ColumnsToProperties()
+    {
+        var methodItemId = Guid.NewGuid();
+        var testId = Guid.NewGuid();
+        var table = new DataTable();
+        table.Columns.Add("fldTestMethodItemId", typeof(Guid));
+        table.Columns.Add("fldTestId", typeof(Guid));
+        table.Columns.Add("fldTestMethodItemTypeId", typeof(Guid));
+        table.Columns.Add("fldIntendedResult", typeof(string));
+        table.Columns.Add("TestMethodItemTypeName", typeof(string));
+        table.Columns.Add("FormatString", typeof(string));
+        table.Columns.Add("ReturnValueType", typeof(string));
+        table.Columns.Add("fldOrder", typeof(int));
+        table.Columns.Add("fldIsApplicable", typeof(bool));
+        table.Rows.Add(methodItemId, testId, Guid.NewGuid(), "3.2", "Method A", "{0:N2}", "Numeric", 1, true);
+
+        var methodItem = Parse<DistributionTestMethodItemEntity>(table).Single();
+
+        Assert.Equal(methodItemId, methodItem.TestMethodItemId);
+        Assert.Equal(testId, methodItem.TestId);
+        Assert.Equal("Method A", methodItem.Name);
+        Assert.Equal(1, methodItem.Order);
+    }
+
+    [Fact]
+    public void Register_MapsDistributionTestResultItem_ColumnsToProperties()
+    {
+        var resultItemId = Guid.NewGuid();
+        var testId = Guid.NewGuid();
+        var table = new DataTable();
+        table.Columns.Add("fldTestResultItemId", typeof(Guid));
+        table.Columns.Add("fldTestId", typeof(Guid));
+        table.Columns.Add("fldTestResultItemTypeId", typeof(Guid));
+        table.Columns.Add("TestResultItemTypeName", typeof(string));
+        table.Columns.Add("FormatString", typeof(string));
+        table.Columns.Add("ExpectedLength", typeof(int));
+        table.Columns.Add("ReturnValueType", typeof(string));
+        table.Columns.Add("fldOrder", typeof(int));
+        table.Columns.Add("fldIsRange", typeof(bool));
+        table.Rows.Add(resultItemId, testId, Guid.NewGuid(), "Result A", "{0:N2}", 6, "Numeric", 3, false);
+
+        var resultItem = Parse<DistributionTestResultItemEntity>(table).Single();
+
+        Assert.Equal(resultItemId, resultItem.TestResultItemId);
+        Assert.Equal(testId, resultItem.TestId);
+        Assert.Equal("Result A", resultItem.Name);
+        Assert.Equal(3, resultItem.Order);
+    }
+
+    [Fact]
+    public void Register_MapsDistributionCategoryItem_ColumnsToProperties()
+    {
+        var categoryItemId = Guid.NewGuid();
+        var testId = Guid.NewGuid();
+        var table = new DataTable();
+        table.Columns.Add("fldCategoryItemId", typeof(Guid));
+        table.Columns.Add("fldTestId", typeof(Guid));
+        table.Columns.Add("fldCategoryItemTypeId", typeof(Guid));
+        table.Columns.Add("fldOrder", typeof(int));
+        table.Columns.Add("fldName", typeof(string));
+        table.Rows.Add(categoryItemId, testId, Guid.NewGuid(), 4, "Appearance");
+
+        var categoryItem = Parse<DistributionCategoryItemEntity>(table).Single();
+
+        Assert.Equal(categoryItemId, categoryItem.CategoryItemId);
+        Assert.Equal(testId, categoryItem.TestId);
+        Assert.Equal(4, categoryItem.Order);
+        Assert.Equal("Appearance", categoryItem.Name);
+    }
+
+    [Fact]
+    public void Register_MapsDistributionCriterionItem_ColumnsToProperties()
+    {
+        var criterionItemId = Guid.NewGuid();
+        var categoryItemId = Guid.NewGuid();
+        var testId = Guid.NewGuid();
+        var table = new DataTable();
+        table.Columns.Add("fldCriterionItemId", typeof(Guid));
+        table.Columns.Add("fldCategoryItemId", typeof(Guid));
+        table.Columns.Add("fldCriterionItemTypeId", typeof(Guid));
+        table.Columns.Add("fldOrder", typeof(int));
+        table.Columns.Add("fldTestId", typeof(Guid));
+        table.Columns.Add("fldName", typeof(string));
+        table.Rows.Add(criterionItemId, categoryItemId, Guid.NewGuid(), 5, testId, "Colour");
+
+        var criterionItem = Parse<DistributionCriterionItemEntity>(table).Single();
+
+        Assert.Equal(criterionItemId, criterionItem.CriterionItemId);
+        Assert.Equal(categoryItemId, criterionItem.CategoryItemId);
+        Assert.Equal(testId, criterionItem.TestId);
+        Assert.Equal(5, criterionItem.Order);
+        Assert.Equal("Colour", criterionItem.Name);
     }
 
     private static List<T> Parse<T>(DataTable table)

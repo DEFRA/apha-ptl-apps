@@ -35,4 +35,48 @@ internal sealed class FakeDistributionRepository : IDistributionRepository
         UpdatedSchemes.AddRange(schemes);
         return Task.CompletedTask;
     }
+
+    public Dictionary<Guid, MonthlyDistributionSchemeEntity> SchemesById { get; } = [];
+
+    public Dictionary<Guid, IntendedResultsData> IntendedResults { get; } = [];
+
+    public List<SampleNumbersWrite> SavedSampleNumbers { get; } = [];
+
+    public Task<MonthlyDistributionSchemeEntity?> GetMonthlyDistributionSchemeAsync(
+        Guid monthlyDistributionSchemeId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(SchemesById.GetValueOrDefault(monthlyDistributionSchemeId));
+
+    public Task<IntendedResultsData?> GetIntendedResultsAsync(
+        Guid monthlyDistributionSchemeId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(IntendedResults.GetValueOrDefault(monthlyDistributionSchemeId));
+
+    public Task UpdateSampleNumbersAsync(SampleNumbersWrite write, CancellationToken cancellationToken = default)
+    {
+        SavedSampleNumbers.Add(write);
+        return Task.CompletedTask;
+    }
+
+    public List<(Guid SchemeId, Guid ScheduleId, DateTime SampleNumberDate, DistributionStructure Structure)> CreatedStructures { get; } = [];
+
+    // Set to false to simulate losing the concurrent-create race.
+    public bool CreateStructureSucceeds { get; set; } = true;
+
+    // Optional: the IntendedResultsData GetIntendedResultsAsync should return after a create.
+    public IntendedResultsData? IntendedResultsAfterCreate { get; set; }
+
+    public Task<bool> CreateDistributionStructureAsync(
+        Guid monthlyDistributionSchemeId,
+        Guid scheduleId,
+        DateTime sampleNumberDate,
+        DistributionStructure structure,
+        CancellationToken cancellationToken = default)
+    {
+        CreatedStructures.Add((monthlyDistributionSchemeId, scheduleId, sampleNumberDate, structure));
+        if (IntendedResultsAfterCreate is not null)
+        {
+            IntendedResults[monthlyDistributionSchemeId] = IntendedResultsAfterCreate;
+        }
+
+        return Task.FromResult(CreateStructureSucceeds);
+    }
 }

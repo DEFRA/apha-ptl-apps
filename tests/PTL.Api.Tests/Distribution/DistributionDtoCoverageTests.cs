@@ -213,4 +213,293 @@ public class DistributionDtoCoverageTests
         Assert.Equal(monthlyDistributionSchemeId, participant.DistributionSchemeId);
         Assert.Equal(3, participant.NumberOfSetsRequired);
     }
+
+    [Fact]
+    public void SampleNumbersResponses_ExposeEveryProperty()
+    {
+        var schemeId = Guid.NewGuid();
+        var sampleId = Guid.NewGuid();
+        var sampleTestId = Guid.NewGuid();
+        var testId = Guid.NewGuid();
+
+        var allocation = new SampleAllocationResponse(sampleTestId, testId, true);
+        var sample = new SampleNumberRowResponse(sampleId, "S1", "Internal", "External", "Tabulation", "TC", [allocation]);
+        var test = new SampleNumbersTestResponse(testId, "Somatic cell count", ["Result A"], ["Method A"], ["Appearance (Colour)"]);
+        var response = new SampleNumbersResponse(schemeId, "17152A/BA", "PT0060", "Mastitis bovine", 9, "Comments", true, true, [sample], [test]);
+
+        Assert.Equal(schemeId, response.MonthlyDistributionSchemeId);
+        Assert.Equal("17152A/BA", response.DistributionReferenceFull);
+        Assert.Equal("PT0060", response.SchemeIdentifier);
+        Assert.Equal("Mastitis bovine", response.SchemeName);
+        Assert.Equal(9, response.NumberOfSetsRequired);
+        Assert.Equal("Comments", response.Comments);
+        Assert.True(response.RequiresAssessment);
+        Assert.True(response.IsReadyForAssessment);
+        Assert.Same(sample, Assert.Single(response.Samples));
+        Assert.Same(test, Assert.Single(response.Tests));
+
+        Assert.Equal(sampleId, sample.SampleId);
+        Assert.Equal("S1", sample.SampleNumber);
+        Assert.Equal("Internal", sample.InternalDescription);
+        Assert.Equal("External", sample.ExternalDescription);
+        Assert.Equal("Tabulation", sample.TabulationDescription);
+        Assert.Equal("TC", sample.TestConsultantsDescription);
+        Assert.Same(allocation, Assert.Single(sample.Allocations));
+
+        Assert.Equal(sampleTestId, allocation.SampleTestId);
+        Assert.Equal(testId, allocation.TestId);
+        Assert.True(allocation.IsApplicable);
+
+        Assert.Equal(testId, test.TestId);
+        Assert.Equal("Somatic cell count", test.TestName);
+        Assert.Equal(["Result A"], test.TestResultItemNames);
+        Assert.Equal(["Method A"], test.TestMethodItemNames);
+        Assert.Equal(["Appearance (Colour)"], test.CategoryItemNames);
+    }
+
+    [Fact]
+    public void SampleNumbersSaveContracts_ExposeEveryProperty()
+    {
+        var sampleId = Guid.NewGuid();
+        var sampleTestId = Guid.NewGuid();
+
+        var allocation = new SampleAllocationRequest(sampleTestId, true);
+        var row = new SampleNumberRowRequest(sampleId, "S1", "Internal", "External", "Tabulation", "TC", [allocation]);
+        var request = new SampleNumbersSaveRequest("Comments", [row], "Because");
+
+        Assert.Equal("Comments", request.Comments);
+        Assert.Same(row, Assert.Single(request.Samples));
+        Assert.Equal("Because", request.AuditWhy);
+        Assert.Null(new SampleNumbersSaveRequest("Comments", [row]).AuditWhy);
+        Assert.Equal(sampleId, row.SampleId);
+        Assert.Equal("S1", row.SampleNumber);
+        Assert.Equal("Internal", row.InternalDescription);
+        Assert.Equal("External", row.ExternalDescription);
+        Assert.Equal("Tabulation", row.TabulationDescription);
+        Assert.Equal("TC", row.TestConsultantsDescription);
+        Assert.Equal(sampleTestId, allocation.SampleTestId);
+        Assert.True(allocation.IsApplicable);
+
+        var fieldError = new SampleNumbersFieldError("SampleNumber", "Sample Number Required");
+        var result = new SampleNumbersSaveResult(false, ["Comments must not exceed 8000 characters"], new Dictionary<Guid, SampleNumbersFieldError[]> { [sampleId] = [fieldError] });
+
+        Assert.False(result.Success);
+        Assert.Equal("Comments must not exceed 8000 characters", Assert.Single(result.PageErrors));
+        Assert.Same(fieldError, Assert.Single(result.FieldErrorsBySampleId[sampleId]));
+        Assert.Equal("SampleNumber", fieldError.Field);
+        Assert.Equal("Sample Number Required", fieldError.Message);
+        Assert.False(result.AuditReasonRequired);
+        Assert.Null(result.AuditObjectName);
+
+        var auditResult = new SampleNumbersSaveResult(
+            false, [], new Dictionary<Guid, SampleNumbersFieldError[]>(), AuditReasonRequired: true, AuditObjectName: "Intended Results Set");
+        Assert.True(auditResult.AuditReasonRequired);
+        Assert.Equal("Intended Results Set", auditResult.AuditObjectName);
+    }
+
+    [Fact]
+    public void SampleNumbersPageModels_ExposeEveryProperty()
+    {
+        var schemeId = Guid.NewGuid();
+        var sampleId = Guid.NewGuid();
+        var sampleTestId = Guid.NewGuid();
+        var testId = Guid.NewGuid();
+
+        var allocation = new SampleAllocation(sampleTestId, testId, true);
+        var sample = new SampleNumberRow(sampleId, "S1", "Internal", "External", "Tabulation", "TC", [allocation]);
+        var test = new SampleNumbersTest(testId, "Somatic cell count", ["Result A"], ["Method A"], ["Appearance ()"]);
+        var page = new SampleNumbersPage(schemeId, "17152A/BA", "PT0060", "Mastitis bovine", 9, "Comments", true, false, [sample], [test]);
+
+        Assert.Equal(schemeId, page.MonthlyDistributionSchemeId);
+        Assert.Equal("17152A/BA", page.DistributionReferenceFull);
+        Assert.Equal("PT0060", page.SchemeIdentifier);
+        Assert.Equal("Mastitis bovine", page.SchemeName);
+        Assert.Equal(9, page.NumberOfSetsRequired);
+        Assert.Equal("Comments", page.Comments);
+        Assert.True(page.RequiresAssessment);
+        Assert.False(page.IsReadyForAssessment);
+        Assert.Same(sample, Assert.Single(page.Samples));
+        Assert.Same(test, Assert.Single(page.Tests));
+
+        Assert.Equal(sampleId, sample.SampleId);
+        Assert.Equal("S1", sample.SampleNumber);
+        Assert.Equal("Internal", sample.InternalDescription);
+        Assert.Equal("External", sample.ExternalDescription);
+        Assert.Equal("Tabulation", sample.TabulationDescription);
+        Assert.Equal("TC", sample.TestConsultantsDescription);
+        Assert.Same(allocation, Assert.Single(sample.Allocations));
+        Assert.Equal(sampleTestId, allocation.SampleTestId);
+        Assert.Equal(testId, allocation.TestId);
+        Assert.True(allocation.IsApplicable);
+
+        Assert.Equal(testId, test.TestId);
+        Assert.Equal("Somatic cell count", test.TestName);
+        Assert.Equal(["Result A"], test.TestResultItemNames);
+        Assert.Equal(["Method A"], test.TestMethodItemNames);
+        Assert.Equal(["Appearance ()"], test.CategoryItemNames);
+
+        var update = new SampleNumbersUpdate("Comments", [new SampleNumberRowUpdate(sampleId, "S1", "Internal", "External", "Tabulation", "TC", [new SampleAllocationUpdate(sampleTestId, false)])]);
+        Assert.Equal("Comments", update.Comments);
+        Assert.Equal(string.Empty, update.AuditWho);
+        Assert.Equal(string.Empty, update.AuditWhy);
+        var audited = update with { AuditWho = "tester", AuditWhy = "Because" };
+        Assert.Equal("tester", audited.AuditWho);
+        Assert.Equal("Because", audited.AuditWhy);
+        var rowUpdate = Assert.Single(update.Samples);
+        Assert.Equal(sampleId, rowUpdate.SampleId);
+        Assert.Equal("S1", rowUpdate.SampleNumber);
+        Assert.Equal("Internal", rowUpdate.InternalDescription);
+        Assert.Equal("External", rowUpdate.ExternalDescription);
+        Assert.Equal("Tabulation", rowUpdate.TabulationDescription);
+        Assert.Equal("TC", rowUpdate.TestConsultantsDescription);
+        var allocationUpdate = Assert.Single(rowUpdate.Allocations);
+        Assert.Equal(sampleTestId, allocationUpdate.SampleTestId);
+        Assert.False(allocationUpdate.IsApplicable);
+
+        var error = new SampleNumbersError("Comments", "Too long");
+        var outcome = new SampleNumbersSaveOutcome(false, [error], new Dictionary<Guid, IReadOnlyList<SampleNumbersError>> { [sampleId] = [error] });
+        Assert.False(outcome.Success);
+        Assert.Same(error, Assert.Single(outcome.PageErrors));
+        Assert.Same(error, Assert.Single(outcome.FieldErrorsBySampleId[sampleId]));
+        Assert.Equal("Comments", error.Field);
+        Assert.Equal("Too long", error.Message);
+
+        var succeeded = SampleNumbersSaveOutcome.Succeeded();
+        Assert.True(succeeded.Success);
+        Assert.Empty(succeeded.PageErrors);
+        Assert.Empty(succeeded.FieldErrorsBySampleId);
+        Assert.False(succeeded.AuditReasonRequired);
+        Assert.Null(succeeded.AuditObjectName);
+
+        var failed = SampleNumbersSaveOutcome.Failed([error], new Dictionary<Guid, IReadOnlyList<SampleNumbersError>> { [sampleId] = [error] });
+        Assert.False(failed.Success);
+        Assert.Same(error, Assert.Single(failed.PageErrors));
+        Assert.False(failed.AuditReasonRequired);
+
+        var needsReason = SampleNumbersSaveOutcome.NeedsAuditReason("Intended Results Set");
+        Assert.False(needsReason.Success);
+        Assert.True(needsReason.AuditReasonRequired);
+        Assert.Equal("Intended Results Set", needsReason.AuditObjectName);
+        Assert.Empty(needsReason.PageErrors);
+        Assert.Empty(needsReason.FieldErrorsBySampleId);
+
+        var header = new IntendedResultsHeaderEntity { MonthlyDistributionSchemeId = schemeId };
+        var write = new SampleNumbersWrite(
+            header,
+            [new DistributionSampleEntity { SampleId = sampleId }],
+            [new DistributionSampleTestEntity { SampleTestId = sampleTestId }],
+            [sampleId],
+            "tester",
+            "Because",
+            SetupSampleReceipt: true);
+        Assert.Same(header, write.Header);
+        Assert.Equal(sampleId, Assert.Single(write.Samples).SampleId);
+        Assert.Equal(sampleTestId, Assert.Single(write.SampleTests).SampleTestId);
+        Assert.Equal(sampleId, Assert.Single(write.AuditedSampleIds));
+        Assert.Equal("tester", write.AuditWho);
+        Assert.Equal("Because", write.AuditWhy);
+        Assert.True(write.SetupSampleReceipt);
+    }
+
+    [Fact]
+    public void IntendedResultsEntities_ExposeEveryProperty()
+    {
+        var schemeId = Guid.NewGuid();
+        var sampleId = Guid.NewGuid();
+        var sampleTestId = Guid.NewGuid();
+        var testId = Guid.NewGuid();
+        var testTypeId = Guid.NewGuid();
+        var tabulationId = Guid.NewGuid();
+        var categoryItemId = Guid.NewGuid();
+
+        var header = new IntendedResultsHeaderEntity
+        {
+            MonthlyDistributionSchemeId = schemeId,
+            Comments = "Comments",
+            HasIntendedResults = true,
+            HasSampleNumbersDefined = true,
+            TestConsultantTabulationId = tabulationId,
+            StoreRatings = true,
+            RequiresAssessment = true,
+            IsReadyForAssessor = new DateTime(2026, 4, 1, 0, 0, 0, DateTimeKind.Utc),
+        };
+
+        Assert.Equal(schemeId, header.MonthlyDistributionSchemeId);
+        Assert.Equal("Comments", header.Comments);
+        Assert.True(header.HasIntendedResults);
+        Assert.True(header.HasSampleNumbersDefined);
+        Assert.Equal(tabulationId, header.TestConsultantTabulationId);
+        Assert.True(header.StoreRatings);
+        Assert.True(header.RequiresAssessment);
+        Assert.Equal(new DateTime(2026, 4, 1, 0, 0, 0, DateTimeKind.Utc), header.IsReadyForAssessor);
+
+        var sample = new DistributionSampleEntity
+        {
+            SampleId = sampleId,
+            DistributionSchemeId = schemeId,
+            SampleNumber = "S1",
+            InternalDescription = "Internal",
+            ExternalDescription = "External",
+            TabulationDescription = "Tabulation",
+            TestConsultantsDescription = "TC",
+        };
+
+        Assert.Equal(sampleId, sample.SampleId);
+        Assert.Equal(schemeId, sample.DistributionSchemeId);
+        Assert.Equal("S1", sample.SampleNumber);
+        Assert.Equal("Internal", sample.InternalDescription);
+        Assert.Equal("External", sample.ExternalDescription);
+        Assert.Equal("Tabulation", sample.TabulationDescription);
+        Assert.Equal("TC", sample.TestConsultantsDescription);
+
+        var sampleTest = new DistributionSampleTestEntity { SampleTestId = sampleTestId, SampleId = sampleId, TestId = testId, IsApplicable = true };
+        Assert.Equal(sampleTestId, sampleTest.SampleTestId);
+        Assert.Equal(sampleId, sampleTest.SampleId);
+        Assert.Equal(testId, sampleTest.TestId);
+        Assert.True(sampleTest.IsApplicable);
+
+        var test = new DistributionTestEntity { TestId = testId, TestTypeId = testTypeId, TestName = "Somatic cell count", Order = 1 };
+        Assert.Equal(testId, test.TestId);
+        Assert.Equal(testTypeId, test.TestTypeId);
+        Assert.Equal("Somatic cell count", test.TestName);
+        Assert.Equal(1, test.Order);
+
+        var methodItemId = Guid.NewGuid();
+        var methodItem = new DistributionTestMethodItemEntity { TestMethodItemId = methodItemId, TestId = testId, Name = "Method A", Order = 2 };
+        Assert.Equal(methodItemId, methodItem.TestMethodItemId);
+        Assert.Equal(testId, methodItem.TestId);
+        Assert.Equal("Method A", methodItem.Name);
+        Assert.Equal(2, methodItem.Order);
+
+        var resultItemId = Guid.NewGuid();
+        var resultItem = new DistributionTestResultItemEntity { TestResultItemId = resultItemId, TestId = testId, Name = "Result A", Order = 3 };
+        Assert.Equal(resultItemId, resultItem.TestResultItemId);
+        Assert.Equal(testId, resultItem.TestId);
+        Assert.Equal("Result A", resultItem.Name);
+        Assert.Equal(3, resultItem.Order);
+
+        var categoryItem = new DistributionCategoryItemEntity { CategoryItemId = categoryItemId, TestId = testId, Name = "Appearance", Order = 4 };
+        Assert.Equal(categoryItemId, categoryItem.CategoryItemId);
+        Assert.Equal(testId, categoryItem.TestId);
+        Assert.Equal("Appearance", categoryItem.Name);
+        Assert.Equal(4, categoryItem.Order);
+
+        var criterionItemId = Guid.NewGuid();
+        var criterionItem = new DistributionCriterionItemEntity { CriterionItemId = criterionItemId, CategoryItemId = categoryItemId, TestId = testId, Name = "Colour", Order = 5 };
+        Assert.Equal(criterionItemId, criterionItem.CriterionItemId);
+        Assert.Equal(categoryItemId, criterionItem.CategoryItemId);
+        Assert.Equal(testId, criterionItem.TestId);
+        Assert.Equal("Colour", criterionItem.Name);
+        Assert.Equal(5, criterionItem.Order);
+
+        var data = new IntendedResultsData(header, [sample], [sampleTest], [test], [methodItem], [resultItem], [categoryItem], [criterionItem]);
+        Assert.Same(header, data.Header);
+        Assert.Same(sample, Assert.Single(data.Samples));
+        Assert.Same(sampleTest, Assert.Single(data.SampleTests));
+        Assert.Same(test, Assert.Single(data.Tests));
+        Assert.Same(methodItem, Assert.Single(data.TestMethodItems));
+        Assert.Same(resultItem, Assert.Single(data.TestResultItems));
+        Assert.Same(categoryItem, Assert.Single(data.CategoryItems));
+        Assert.Same(criterionItem, Assert.Single(data.CriterionItems));
+    }
 }
