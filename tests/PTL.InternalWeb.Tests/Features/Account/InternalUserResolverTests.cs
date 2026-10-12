@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging.Abstractions;
 using PTL.Auth.Entra.Claims;
 using PTL.Contracts.InternalUser;
 using PTL.InternalWeb.Features.Account;
@@ -23,7 +24,7 @@ public class InternalUserResolverTests
     [Fact]
     public async Task ResolveAsync_NullPrincipal_Throws()
     {
-        var resolver = new InternalUserResolver(new FakeInternalUserApiClient(new ResolveInternalUserResponse(false, null, "", "", [])), CreateConfiguration());
+        var resolver = new InternalUserResolver(new FakeInternalUserApiClient(new ResolveInternalUserResponse(false, null, "", "", [])), CreateConfiguration(), NullLogger<InternalUserResolver>.Instance);
 
         await Assert.ThrowsAsync<ArgumentNullException>(() => resolver.ResolveAsync(null!, CancellationToken.None));
     }
@@ -32,7 +33,7 @@ public class InternalUserResolverTests
     public async Task ResolveAsync_MissingObjectIdClaim_DeniesWithNotPermittedRedirect()
     {
         var principal = CreatePrincipal(new Claim(EntraClaimTypes.OnPremisesSamAccountName, "auser"));
-        var resolver = new InternalUserResolver(new FakeInternalUserApiClient(new ResolveInternalUserResponse(false, null, "", "", [])), CreateConfiguration());
+        var resolver = new InternalUserResolver(new FakeInternalUserApiClient(new ResolveInternalUserResponse(false, null, "", "", [])), CreateConfiguration(), NullLogger<InternalUserResolver>.Instance);
 
         var result = await resolver.ResolveAsync(principal, CancellationToken.None);
 
@@ -44,7 +45,7 @@ public class InternalUserResolverTests
     public async Task ResolveAsync_MissingSamAccountNameAndDomain_DeniesWithNotPermittedRedirect()
     {
         var principal = CreatePrincipal(new Claim(EntraClaimTypes.ObjectId, Guid.NewGuid().ToString()));
-        var resolver = new InternalUserResolver(new FakeInternalUserApiClient(new ResolveInternalUserResponse(false, null, "", "", [])), CreateConfiguration());
+        var resolver = new InternalUserResolver(new FakeInternalUserApiClient(new ResolveInternalUserResponse(false, null, "", "", [])), CreateConfiguration(), NullLogger<InternalUserResolver>.Instance);
 
         var result = await resolver.ResolveAsync(principal, CancellationToken.None);
 
@@ -60,7 +61,7 @@ public class InternalUserResolverTests
             new Claim(EntraClaimTypes.OnPremisesSamAccountName, "auser"),
             new Claim(EntraClaimTypes.OnPremisesDomainName, "DEFRA"));
         var apiClient = new FakeInternalUserApiClient(new ResolveInternalUserResponse(false, null, "", "", []));
-        var resolver = new InternalUserResolver(apiClient, CreateConfiguration());
+        var resolver = new InternalUserResolver(apiClient, CreateConfiguration(), NullLogger<InternalUserResolver>.Instance);
 
         var result = await resolver.ResolveAsync(principal, CancellationToken.None);
 
@@ -76,7 +77,7 @@ public class InternalUserResolverTests
             new Claim(EntraClaimTypes.OnPremisesSamAccountName, "auser"),
             new Claim(EntraClaimTypes.OnPremisesDomainName, "DEFRA"));
         var apiClient = new FakeInternalUserApiClient(new ResolveInternalUserResponse(false, null, "", "", []));
-        var resolver = new InternalUserResolver(apiClient, CreateConfiguration(bypassEnabled: true));
+        var resolver = new InternalUserResolver(apiClient, CreateConfiguration(bypassEnabled: true), NullLogger<InternalUserResolver>.Instance);
 
         var result = await resolver.ResolveAsync(principal, CancellationToken.None);
 
@@ -93,7 +94,7 @@ public class InternalUserResolverTests
             new Claim(EntraClaimTypes.OnPremisesSamAccountName, "auser"),
             new Claim(EntraClaimTypes.OnPremisesDomainName, "DEFRA.local"));
         var apiClient = new FakeInternalUserApiClient(new ResolveInternalUserResponse(true, Guid.NewGuid(), "Alice User", "QAU", ["Admin", "Distributions"]));
-        var resolver = new InternalUserResolver(apiClient, CreateConfiguration());
+        var resolver = new InternalUserResolver(apiClient, CreateConfiguration(), NullLogger<InternalUserResolver>.Instance);
 
         var result = await resolver.ResolveAsync(principal, CancellationToken.None);
 
@@ -115,12 +116,29 @@ public class InternalUserResolverTests
             new Claim(EntraClaimTypes.OnPremisesSamAccountName, "auser"),
             new Claim(EntraClaimTypes.OnPremisesDomainName, "DEFRA"));
         var apiClient = new FakeInternalUserApiClient(new ResolveInternalUserResponse(true, Guid.NewGuid(), "Alice User", "QAU", ["Admin"]));
-        var resolver = new InternalUserResolver(apiClient, CreateConfiguration());
+        var resolver = new InternalUserResolver(apiClient, CreateConfiguration(), NullLogger<InternalUserResolver>.Instance);
 
         var result = await resolver.ResolveAsync(principal, CancellationToken.None);
 
         Assert.True(result.IsAllowed);
         Assert.Equal(objectId, apiClient.ReceivedRequest!.SsoIdInt);
     }
+
+    [Fact]
+    public async Task ResolveAsync_ApiCallThrowsHttpRequestException_DeniesWithErrorRedirect()
+    {
+        var principal = CreatePrincipal(
+            new Claim(EntraClaimTypes.ObjectId, Guid.NewGuid().ToString()),
+            new Claim(EntraClaimTypes.OnPremisesSamAccountName, "auser"),
+            new Claim(EntraClaimTypes.OnPremisesDomainName, "DEFRA"));
+        var apiClient = new FakeInternalUserApiClient(new ResolveInternalUserResponse(false, null, "", "", []), new HttpRequestException("Connection refused"));
+        var resolver = new InternalUserResolver(apiClient, CreateConfiguration(), NullLogger<InternalUserResolver>.Instance);
+
+        var result = await resolver.ResolveAsync(principal, CancellationToken.None);
+
+        Assert.False(result.IsAllowed);
+        Assert.Equal("/Home/Error", result.DenialRedirectPath);
+    }
 }
+
 

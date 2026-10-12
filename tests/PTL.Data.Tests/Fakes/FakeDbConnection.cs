@@ -13,6 +13,7 @@ internal sealed class FakeDbConnection : DbConnection
 {
     private readonly Dictionary<string, Func<FakeDbCommand, DbDataReader>> _readerFactories = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, Func<FakeDbCommand, int>> _nonQueryResults = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, Func<FakeDbCommand, object?>> _scalarResults = new(StringComparer.OrdinalIgnoreCase);
     private ConnectionState _state = ConnectionState.Closed;
 
     public List<FakeDbCommand> ExecutedCommands { get; } = [];
@@ -44,6 +45,16 @@ internal sealed class FakeDbConnection : DbConnection
     public void RespondToNonQuery(string commandText, int rowsAffected) =>
         _nonQueryResults[commandText] = _ => rowsAffected;
 
+    // Configures the single value an ExecuteScalarAsync call against this exact command text
+    // should return. Several values hand back one per call, in order, so a procedure that
+    // allocates a new number on every execution (spgNextSampleNumber) can be simulated; the last
+    // value is repeated if the repository calls it more times than configured.
+    public void RespondToScalar(string commandText, params object?[] values)
+    {
+        var callCount = 0;
+        _scalarResults[commandText] = _ => values[Math.Min(callCount++, values.Length - 1)];
+    }
+
     internal DbDataReader ResolveReader(FakeDbCommand command) =>
         _readerFactories.TryGetValue(command.CommandText, out var factory)
             ? factory(command)
@@ -53,6 +64,11 @@ internal sealed class FakeDbConnection : DbConnection
         _nonQueryResults.TryGetValue(command.CommandText, out var factory)
             ? factory(command)
             : throw new InvalidOperationException($"No non-query result configured for command text: '{command.CommandText}'.");
+
+    internal object? ResolveScalarResult(FakeDbCommand command) =>
+        _scalarResults.TryGetValue(command.CommandText, out var factory)
+            ? factory(command)
+            : throw new InvalidOperationException($"No scalar result configured for command text: '{command.CommandText}'.");
 
     public override void Open() => _state = ConnectionState.Open;
 
@@ -69,7 +85,7 @@ internal sealed class FakeDbConnection : DbConnection
 
     protected override DbTransaction BeginDbTransaction(IsolationLevel isolationLevel)
     {
-        LastTransaction = new FakeDbTransaction(this);
+        LastTransaction = new FakeDbTransaction(this, isolationLevel);
         return LastTransaction;
     }
 

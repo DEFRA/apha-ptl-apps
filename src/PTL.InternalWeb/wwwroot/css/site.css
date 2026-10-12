@@ -180,11 +180,13 @@ body {
   }
 }
 
-/* The Scheme form keeps legacy Scheme.aspx's seven tabs, which do not fit on one row. The GOV.UK
-   tabs component floats its items and draws a single border under the <ul>, so once the list wraps
-   the first row loses its underline and the selected tab's "joins to the panel" notch lands in the
-   middle of the list. Lay the rows out with flex and give every item its own bottom border. */
-.govuk-frontend-supported #scheme-tabs .govuk-tabs__list {
+/* The Scheme form keeps legacy Scheme.aspx's seven tabs, and Sample Numbers renders one tab per
+   test with no upper bound, so neither list fits on one row. The GOV.UK tabs component floats its
+   items and draws a single border under the <ul>, so once the list wraps the first row loses its
+   underline and the selected tab's "joins to the panel" notch lands in the middle of the list.
+   Lay the rows out with flex and give every item its own bottom border. */
+.govuk-frontend-supported #scheme-tabs .govuk-tabs__list,
+.govuk-frontend-supported #sample-numbers-tabs .govuk-tabs__list {
   display: flex;
   flex-wrap: wrap;
   align-items: flex-end;
@@ -192,11 +194,13 @@ body {
   border-bottom: 0;
 }
 
-.govuk-frontend-supported #scheme-tabs .govuk-tabs__list::after {
+.govuk-frontend-supported #scheme-tabs .govuk-tabs__list::after,
+.govuk-frontend-supported #sample-numbers-tabs .govuk-tabs__list::after {
   content: none;
 }
 
-.govuk-frontend-supported #scheme-tabs .govuk-tabs__list-item {
+.govuk-frontend-supported #scheme-tabs .govuk-tabs__list-item,
+.govuk-frontend-supported #sample-numbers-tabs .govuk-tabs__list-item {
   float: none;
   margin-top: 0;
   margin-bottom: 0;
@@ -205,11 +209,18 @@ body {
   border-bottom-color: var(--govuk-border-colour, #cecece);
 }
 
-.govuk-frontend-supported #scheme-tabs .govuk-tabs__list-item--selected {
+.govuk-frontend-supported #scheme-tabs .govuk-tabs__list-item--selected,
+.govuk-frontend-supported #sample-numbers-tabs .govuk-tabs__list-item--selected {
   padding: 10px 20px;
   border-color: var(--govuk-border-colour, #cecece);
   border-bottom-color: var(--govuk-body-background-colour, #fff);
   background-color: var(--govuk-body-background-colour, #fff);
+}
+
+/* Legacy stacks the Samples / Test Items / Method Items tables with a 15px spacer between them.
+   The caption is the section label (legacy's rowPrepSheetHeader), so it sits tight to its table. */
+#sample-numbers-tabs .govuk-table__caption {
+  margin-bottom: 5px;
 }
 
 
@@ -280,3 +291,39 @@ span.app-side-navigation__link--disabled {
   justify-content: center;
   min-height: var(--ptl-viewer-list-height);
 }
+
+/* Distribution Dashboard per-stage completion indicator - replaces legacy's ProgressBar image
+   control (progressBar.gif etc.) with a native <progress> element (percentage also shown as real
+   text, not only colour). The vendor pseudo-elements are the only way to recolour it per browser. */
+.ptl-progress-bar {
+  display: block;
+  width: 100px;
+  height: 10px;
+  appearance: none;
+  background-color: #f3f2f1;
+  border: 1px solid #b1b4b6;
+  color: #1d70b8;
+}
+
+.ptl-progress-bar::-webkit-progress-bar {
+  background-color: #f3f2f1;
+}
+
+.ptl-progress-bar::-webkit-progress-value {
+  background-color: #1d70b8;
+}
+
+.ptl-progress-bar::-moz-progress-bar {
+  background-color: #1d70b8;
+}
+
+.ptl-progress-bar__label {
+  display: inline-block;
+  margin-top: 2px;
+}
+
+.ptl-distribution-initialise-cell {
+  text-align: center;
+  vertical-align: middle;
+}
+

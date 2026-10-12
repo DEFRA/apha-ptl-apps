@@ -10,8 +10,13 @@ internal sealed class StubHttpMessageHandler(HttpStatusCode statusCode, string? 
     public StubHttpMessageHandler(Func<HttpResponseMessage> responseFactory) : this(HttpStatusCode.OK, null) =>
         _responseFactory = responseFactory;
 
+    // Set by tests that need to assert the URI/method/body the client actually sent.
+    public Action<HttpRequestMessage>? OnRequest { get; set; }
+
     protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
+        OnRequest?.Invoke(request);
+
         if (_responseFactory is not null)
         {
             return Task.FromResult(_responseFactory());

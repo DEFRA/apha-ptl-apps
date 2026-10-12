@@ -11,6 +11,7 @@ using PTL.Core.Contract.Renewal;
 using PTL.Core.Contract.SampleAddress;
 using PTL.Core.Country;
 using PTL.Core.Customer;
+using PTL.Core.Distribution;
 using PTL.Core.ExternalSiteMessage;
 using PTL.Core.GroupAddress;
 using PTL.Core.InternalUser;
@@ -48,6 +49,7 @@ public static class DapperColumnMappings
     private const string ColName = "fldName";
     private const string ColIsActive = "fldIsActive";
     private const string ColYearId = "fldYearId";
+    private const string ColMonthId = "fldMonthId";
     private const string ColAddress1 = "fldAddress1";
     private const string ColAddress2 = "fldAddress2";
     private const string ColAddress3 = "fldAddress3";
@@ -90,6 +92,8 @@ public static class DapperColumnMappings
     private const string ColVatRating = "fldVatRating";
     private const string ColInactiveDate = "fldInactiveDate";
     private const string ColTestId = "fldTestId";
+    private const string ColComments = "fldComments";
+    private const string ColCategoryItemId = "fldCategoryItemId";
 
     public static void Register()
     {
@@ -118,7 +122,7 @@ public static class DapperColumnMappings
             [ColFax] = nameof(CoreCustomer.Fax),
             [ColEmail] = nameof(CoreCustomer.Email),
             [ColCurrencyId] = nameof(CoreCustomer.CurrencyId),
-            ["fldComments"] = nameof(CoreCustomer.Comments),
+            [ColComments] = nameof(CoreCustomer.Comments),
             ["fldInitialStartDate"] = nameof(CoreCustomer.InitialStartDate),
             ["fldPostageArrangements"] = nameof(CoreCustomer.PostageArrangements),
             ["fldPaymentNonUK"] = nameof(CoreCustomer.PaymentNonUK),
@@ -213,7 +217,7 @@ public static class DapperColumnMappings
             [ColFax] = nameof(CoreParticipant.Fax),
             [ColEmail] = nameof(CoreParticipant.Email),
             ["fldEmail2"] = nameof(CoreParticipant.Email2),
-            ["fldComments"] = nameof(CoreParticipant.Comments),
+            [ColComments] = nameof(CoreParticipant.Comments),
             [ColIsActive] = nameof(CoreParticipant.IsActive),
             [ColInactiveDate] = nameof(CoreParticipant.InactiveDate),
             ["fldInactiveError"] = nameof(CoreParticipant.InactiveError),
@@ -674,7 +678,138 @@ public static class DapperColumnMappings
         Map<MonthlyDistributionEntity>(new(StringComparer.OrdinalIgnoreCase)
         {
             [ColYearId] = nameof(MonthlyDistributionEntity.YearId),
-            ["fldMonthId"] = nameof(MonthlyDistributionEntity.MonthId),
+            [ColMonthId] = nameof(MonthlyDistributionEntity.MonthId),
+        });
+
+        Map<DistributionMonthSummaryEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldMonthlyDistributionId"] = nameof(DistributionMonthSummaryEntity.MonthlyDistributionId),
+            [ColYearId] = nameof(DistributionMonthSummaryEntity.YearId),
+            [ColMonthId] = nameof(DistributionMonthSummaryEntity.MonthId),
+            ["fldNumberOfSchemes"] = nameof(DistributionMonthSummaryEntity.NumberOfSchemes),
+            ["fldNumberOfSampleNumbersDefined"] = nameof(DistributionMonthSummaryEntity.NumberOfSampleNumbersDefined),
+            ["fldNumberOfPrepComplete"] = nameof(DistributionMonthSummaryEntity.NumberOfPrepComplete),
+            ["fldNumberOfParticipants"] = nameof(DistributionMonthSummaryEntity.NumberOfParticipants),
+            ["fldNumberOfPackagingComplete"] = nameof(DistributionMonthSummaryEntity.NumberOfPackagingComplete),
+            ["fldNumberOfResultsEntered"] = nameof(DistributionMonthSummaryEntity.NumberOfResultsEntered),
+            ["fldNumberOfTabulations"] = nameof(DistributionMonthSummaryEntity.NumberOfTabulations),
+            ["fldNumberOfCompleteTabulations"] = nameof(DistributionMonthSummaryEntity.NumberOfCompleteTabulations),
+        });
+
+        Map<DistributionMonthYearEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            [ColYearId] = nameof(DistributionMonthYearEntity.YearId),
+            [ColMonthId] = nameof(DistributionMonthYearEntity.MonthId),
+        });
+
+        Map<PTL.Data.Distribution.MonthlyDistributionHeaderEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldMonthlyDistributionId"] = nameof(PTL.Data.Distribution.MonthlyDistributionHeaderEntity.MonthlyDistributionId),
+            [ColYearId] = nameof(PTL.Data.Distribution.MonthlyDistributionHeaderEntity.YearId),
+            [ColMonthId] = nameof(PTL.Data.Distribution.MonthlyDistributionHeaderEntity.MonthId),
+        });
+
+        Map<MonthlyDistributionSchemeEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldMonthlyDistributionSchemeId"] = nameof(MonthlyDistributionSchemeEntity.MonthlyDistributionSchemeId),
+            ["fldMonthlyDistributionId"] = nameof(MonthlyDistributionSchemeEntity.MonthlyDistributionId),
+            [ColSchemeId] = nameof(MonthlyDistributionSchemeEntity.SchemeId),
+            [ColYearId] = nameof(MonthlyDistributionSchemeEntity.YearId),
+            [ColMonthId] = nameof(MonthlyDistributionSchemeEntity.MonthId),
+            ["SchemeIdentifier"] = nameof(MonthlyDistributionSchemeEntity.SchemeIdentifier),
+            ["SchemeName"] = nameof(MonthlyDistributionSchemeEntity.SchemeName),
+            ["fldDistributionReference"] = nameof(MonthlyDistributionSchemeEntity.DistributionReference),
+            ["fldDistributionReferenceSuffix"] = nameof(MonthlyDistributionSchemeEntity.DistributionReferenceSuffix),
+            ["fldScheduleCode"] = nameof(MonthlyDistributionSchemeEntity.ScheduleCode),
+            ["fldDistributionDate"] = nameof(MonthlyDistributionSchemeEntity.DistributionDate),
+            ["fldOverseasPostingDate"] = nameof(MonthlyDistributionSchemeEntity.OverseasPostingDate),
+            ["fldDeadlineDate"] = nameof(MonthlyDistributionSchemeEntity.DeadlineDate),
+            ["fldResultsIssueTargetDate"] = nameof(MonthlyDistributionSchemeEntity.ResultsIssueTargetDate),
+            [ColComments] = nameof(MonthlyDistributionSchemeEntity.Comments),
+            ["fldHasIntendedResults"] = nameof(MonthlyDistributionSchemeEntity.HasIntendedResults),
+            ["fldHasSampleNumbersDefined"] = nameof(MonthlyDistributionSchemeEntity.HasSampleNumbersDefined),
+            ["fldIsCancelled"] = nameof(MonthlyDistributionSchemeEntity.IsCancelled),
+            ["fldIsAsAvailable"] = nameof(MonthlyDistributionSchemeEntity.IsAsAvailable),
+            ["fldStoreRatings"] = nameof(MonthlyDistributionSchemeEntity.StoreRatings),
+            ["fldSchemeVersionDate"] = nameof(MonthlyDistributionSchemeEntity.SchemeVersionDate),
+        });
+
+        Map<MonthlyDistributionParticipantAggregateEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldDistributionSchemeId"] = nameof(MonthlyDistributionParticipantAggregateEntity.DistributionSchemeId),
+            ["fldNumberOfSetsRequired"] = nameof(MonthlyDistributionParticipantAggregateEntity.NumberOfSetsRequired),
+        });
+
+        Map<IntendedResultsHeaderEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldMonthlyDistributionSchemeId"] = nameof(IntendedResultsHeaderEntity.MonthlyDistributionSchemeId),
+            [ColComments] = nameof(IntendedResultsHeaderEntity.Comments),
+            ["fldHasIntendedResults"] = nameof(IntendedResultsHeaderEntity.HasIntendedResults),
+            ["fldHasSampleNumbersDefined"] = nameof(IntendedResultsHeaderEntity.HasSampleNumbersDefined),
+            ["fldTestConsultantTabulationId"] = nameof(IntendedResultsHeaderEntity.TestConsultantTabulationId),
+            ["fldStoreRatings"] = nameof(IntendedResultsHeaderEntity.StoreRatings),
+            ["fldRequiresAssessment"] = nameof(IntendedResultsHeaderEntity.RequiresAssessment),
+            ["fldIsReadyForAssessor"] = nameof(IntendedResultsHeaderEntity.IsReadyForAssessor),
+        });
+
+        Map<DistributionSampleEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldSampleId"] = nameof(DistributionSampleEntity.SampleId),
+            ["fldDistributionSchemeId"] = nameof(DistributionSampleEntity.DistributionSchemeId),
+            ["fldSampleNumber"] = nameof(DistributionSampleEntity.SampleNumber),
+            ["fldInternalDescription"] = nameof(DistributionSampleEntity.InternalDescription),
+            ["fldExternalDescription"] = nameof(DistributionSampleEntity.ExternalDescription),
+            ["fldTabulationDescription"] = nameof(DistributionSampleEntity.TabulationDescription),
+            ["fldTestConsultantsDescription"] = nameof(DistributionSampleEntity.TestConsultantsDescription),
+        });
+
+        Map<DistributionSampleTestEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldSampleTestId"] = nameof(DistributionSampleTestEntity.SampleTestId),
+            ["fldSampleId"] = nameof(DistributionSampleTestEntity.SampleId),
+            [ColTestId] = nameof(DistributionSampleTestEntity.TestId),
+            ["fldIsApplicable"] = nameof(DistributionSampleTestEntity.IsApplicable),
+        });
+
+        Map<DistributionTestEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            [ColTestId] = nameof(DistributionTestEntity.TestId),
+            ["fldTestTypeId"] = nameof(DistributionTestEntity.TestTypeId),
+            ["TestName"] = nameof(DistributionTestEntity.TestName),
+            [ColOrder] = nameof(DistributionTestEntity.Order),
+        });
+
+        Map<DistributionTestMethodItemEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldTestMethodItemId"] = nameof(DistributionTestMethodItemEntity.TestMethodItemId),
+            [ColTestId] = nameof(DistributionTestMethodItemEntity.TestId),
+            ["TestMethodItemTypeName"] = nameof(DistributionTestMethodItemEntity.Name),
+            [ColOrder] = nameof(DistributionTestMethodItemEntity.Order),
+        });
+
+        Map<DistributionTestResultItemEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldTestResultItemId"] = nameof(DistributionTestResultItemEntity.TestResultItemId),
+            [ColTestId] = nameof(DistributionTestResultItemEntity.TestId),
+            ["TestResultItemTypeName"] = nameof(DistributionTestResultItemEntity.Name),
+            [ColOrder] = nameof(DistributionTestResultItemEntity.Order),
+        });
+
+        Map<DistributionCategoryItemEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            [ColCategoryItemId] = nameof(DistributionCategoryItemEntity.CategoryItemId),
+            [ColTestId] = nameof(DistributionCategoryItemEntity.TestId),
+            [ColName] = nameof(DistributionCategoryItemEntity.Name),
+            [ColOrder] = nameof(DistributionCategoryItemEntity.Order),
+        });
+
+        Map<DistributionCriterionItemEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldCriterionItemId"] = nameof(DistributionCriterionItemEntity.CriterionItemId),
+            [ColCategoryItemId] = nameof(DistributionCriterionItemEntity.CategoryItemId),
+            [ColTestId] = nameof(DistributionCriterionItemEntity.TestId),
+            [ColName] = nameof(DistributionCriterionItemEntity.Name),
+            [ColOrder] = nameof(DistributionCriterionItemEntity.Order),
         });
 
         Map<DayEntity>(new(StringComparer.OrdinalIgnoreCase)
@@ -734,7 +869,7 @@ public static class DapperColumnMappings
 
         Map<SchemeCategoryItem>(new(StringComparer.OrdinalIgnoreCase)
         {
-            ["fldCategoryItemId"] = nameof(SchemeCategoryItem.CategoryItemId),
+            [ColCategoryItemId] = nameof(SchemeCategoryItem.CategoryItemId),
             ["fldCategoryItemTypeId"] = nameof(SchemeCategoryItem.CategoryItemTypeId),
             [ColName] = nameof(SchemeCategoryItem.Name),
             [ColTestId] = nameof(SchemeCategoryItem.TestId),
@@ -746,7 +881,7 @@ public static class DapperColumnMappings
             ["fldCriterionItemId"] = nameof(SchemeCriterionItem.CriterionItemId),
             ["fldCriterionItemTypeId"] = nameof(SchemeCriterionItem.CriterionItemTypeId),
             [ColName] = nameof(SchemeCriterionItem.Name),
-            ["fldCategoryItemId"] = nameof(SchemeCriterionItem.CategoryItemId),
+            [ColCategoryItemId] = nameof(SchemeCriterionItem.CategoryItemId),
             [ColOrder] = nameof(SchemeCriterionItem.Order),
         });
 
