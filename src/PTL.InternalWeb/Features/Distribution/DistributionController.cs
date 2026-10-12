@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using PTL.ApiClient.Distribution;
 using PTL.Contracts.Distribution;
+using PTL.SharedUI.Notifications;
 
 namespace PTL.InternalWeb.Features.Distribution;
 
@@ -105,6 +106,11 @@ public sealed class DistributionController(IDistributionApiClient distributionAp
 
         if (result is null || !result.Success)
         {
+            if (result is null)
+            {
+                TempData.SetNotification(NotificationType.Error, "Monthly Distributions could not be saved. Please try again later.");
+            }
+
             foreach (var (schemeId, messages) in result?.FieldErrorsBySchemeId ?? new Dictionary<Guid, string[]>())
             {
                 var index = model.Schemes.FindIndex(s => s.MonthlyDistributionSchemeId == schemeId);
@@ -123,6 +129,8 @@ public sealed class DistributionController(IDistributionApiClient distributionAp
             model.MonthId = monthId;
             return View(model);
         }
+
+        TempData.SetNotification(NotificationType.Success, "Monthly Distributions updated successfully.");
 
         if (string.Equals(command, "apply", StringComparison.OrdinalIgnoreCase))
         {
@@ -244,6 +252,11 @@ public sealed class DistributionController(IDistributionApiClient distributionAp
 
         if (result is null || !result.Success)
         {
+            if (result is null)
+            {
+                TempData.SetNotification(NotificationType.Error, "Sample Numbers could not be saved. Please try again later.");
+            }
+
             foreach (var message in result?.PageErrors ?? [])
             {
                 ModelState.AddModelError(nameof(model.Comments), message);
@@ -265,6 +278,8 @@ public sealed class DistributionController(IDistributionApiClient distributionAp
 
             return View(await RehydrateSampleNumbersAsync(year, monthId, schemeId, model, cancellationToken));
         }
+
+        TempData.SetNotification(NotificationType.Success, "Sample Numbers updated successfully.");
 
         return RedirectToDestination(command, year, monthId);
     }

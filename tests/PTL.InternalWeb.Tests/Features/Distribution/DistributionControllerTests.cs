@@ -1,12 +1,21 @@
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ViewFeatures;
+using PTL.ApiClient.Distribution;
 using PTL.Contracts.Distribution;
 using PTL.InternalWeb.Features.Distribution;
 using PTL.InternalWeb.Tests.TestSupport;
+using PTL.SharedUI.Notifications;
 
 namespace PTL.InternalWeb.Tests.Features.Distribution;
 
 public class DistributionControllerTests
 {
+    private static DistributionController CreateController(IDistributionApiClient apiClient) =>
+        new(apiClient)
+        {
+            TempData = new TempDataDictionary(new DefaultHttpContext(), new FakeTempDataProvider())
+        };
     [Fact]
     public async Task Index_NoYearSpecified_UsesCurrentFinancialYearDefault()
     {
@@ -15,7 +24,7 @@ public class DistributionControllerTests
             Years = [new DistributionYearOptionResponse(2026, "2026/27")],
             Months = [new DistributionDashboardMonthResponse(2026, 4, "Apr", null, true, 0, 0, 0, 0, 0)],
         };
-        var controller = new DistributionController(apiClient);
+        var controller = CreateController(apiClient);
 
         var result = await controller.Index(year: null, CancellationToken.None);
 
@@ -34,7 +43,7 @@ public class DistributionControllerTests
             Years = [new DistributionYearOptionResponse(2026, "2026/27")],
             Months = [new DistributionDashboardMonthResponse(2026, 4, "Apr", Guid.NewGuid(), false, 33.33m, 0, 0, 0, 0)],
         };
-        var controller = new DistributionController(apiClient);
+        var controller = CreateController(apiClient);
 
         var result = await controller.Index(2026, CancellationToken.None);
 
@@ -47,7 +56,7 @@ public class DistributionControllerTests
     [Fact]
     public void ViewStage_ReturnsFeatureNotAvailableWithStageName()
     {
-        var controller = new DistributionController(new FakeDistributionApiClient());
+        var controller = CreateController(new FakeDistributionApiClient());
 
         var result = controller.ViewStage("Scheduling");
 
@@ -59,7 +68,7 @@ public class DistributionControllerTests
     [Fact]
     public void InitialiseMonth_ReturnsFeatureNotAvailable()
     {
-        var controller = new DistributionController(new FakeDistributionApiClient());
+        var controller = CreateController(new FakeDistributionApiClient());
 
         var result = controller.InitialiseMonth(2026, 4);
 
@@ -72,7 +81,7 @@ public class DistributionControllerTests
     public async Task Schedule_Get_MonthNotInitialised_ReturnsNotFound()
     {
         var apiClient = new FakeDistributionApiClient { Schedule = new MonthlyDistributionResponse(null, 2026, 4, []) };
-        var controller = new DistributionController(apiClient);
+        var controller = CreateController(apiClient);
 
         var result = await controller.Schedule(2026, 4, CancellationToken.None);
 
@@ -92,7 +101,7 @@ public class DistributionControllerTests
                     3, 5, true, false, false, false),
             ]),
         };
-        var controller = new DistributionController(apiClient);
+        var controller = CreateController(apiClient);
 
         var result = await controller.Schedule(2026, 4, CancellationToken.None);
 
@@ -108,7 +117,7 @@ public class DistributionControllerTests
     public async Task Schedule_Post_CancelCommand_RedirectsWithoutSaving()
     {
         var apiClient = new FakeDistributionApiClient();
-        var controller = new DistributionController(apiClient);
+        var controller = CreateController(apiClient);
         var model = new MonthlyDistributionScheduleViewModel { YearId = 2026, MonthId = 4 };
 
         var result = await controller.Schedule(2026, 4, model, "cancel", CancellationToken.None);
@@ -116,13 +125,48 @@ public class DistributionControllerTests
         var redirect = Assert.IsType<RedirectToActionResult>(result);
         Assert.Equal(nameof(DistributionController.Index), redirect.ActionName);
         Assert.Empty(apiClient.SavedRows);
+        Assert.Null(controller.TempData.GetNotification());
+    }
+
+    // Matches the save notification every other migrated save screen raises.
+    [Theory]
+    [InlineData("save")]
+    [InlineData("apply")]
+    public async Task Schedule_Post_SaveSucceeds_ShowsSuccessNotification(string command)
+    {
+        var apiClient = new FakeDistributionApiClient
+        {
+            SaveResult = new MonthlyDistributionScheduleSaveResult(true, new Dictionary<Guid, string[]>()),
+        };
+        var controller = CreateController(apiClient);
+        var model = new MonthlyDistributionScheduleViewModel { YearId = 2026, MonthId = 4 };
+
+        await controller.Schedule(2026, 4, model, command, CancellationToken.None);
+
+        var notification = controller.TempData.GetNotification();
+        Assert.Equal(NotificationType.Success, notification!.Type);
+        Assert.Equal("Monthly Distributions updated successfully.", notification.Message);
+    }
+
+    [Fact]
+    public async Task Schedule_Post_ApiUnavailable_ShowsErrorNotification()
+    {
+        var controller = CreateController(new FakeDistributionApiClient { SaveResult = null });
+        var model = new MonthlyDistributionScheduleViewModel { YearId = 2026, MonthId = 4 };
+
+        var result = await controller.Schedule(2026, 4, model, "save", CancellationToken.None);
+
+        Assert.IsType<ViewResult>(result);
+        var notification = controller.TempData.GetNotification();
+        Assert.Equal(NotificationType.Error, notification!.Type);
+        Assert.Equal("Monthly Distributions could not be saved. Please try again later.", notification.Message);
     }
 
     [Fact]
     public async Task Schedule_Post_InvalidModelState_RedisplaysViewWithoutSaving()
     {
         var apiClient = new FakeDistributionApiClient();
-        var controller = new DistributionController(apiClient);
+        var controller = CreateController(apiClient);
         controller.ModelState.AddModelError("Schemes[0].DistributionDate", "Distribution Date required.");
         var model = new MonthlyDistributionScheduleViewModel { YearId = 2026, MonthId = 4 };
 
@@ -138,7 +182,7 @@ public class DistributionControllerTests
     {
         var schemeId = Guid.NewGuid();
         var apiClient = new FakeDistributionApiClient { SaveResult = new MonthlyDistributionScheduleSaveResult(true, new Dictionary<Guid, string[]>()) };
-        var controller = new DistributionController(apiClient);
+        var controller = CreateController(apiClient);
         var model = new MonthlyDistributionScheduleViewModel
         {
             YearId = 2026,
@@ -167,7 +211,7 @@ public class DistributionControllerTests
     public async Task Schedule_Post_ApplyCommand_ValidModel_RedirectsBackToSchedule()
     {
         var apiClient = new FakeDistributionApiClient { SaveResult = new MonthlyDistributionScheduleSaveResult(true, new Dictionary<Guid, string[]>()) };
-        var controller = new DistributionController(apiClient);
+        var controller = CreateController(apiClient);
         var model = new MonthlyDistributionScheduleViewModel { YearId = 2026, MonthId = 4, Schemes = [] };
 
         var result = await controller.Schedule(2026, 4, model, "apply", CancellationToken.None);
@@ -184,7 +228,7 @@ public class DistributionControllerTests
         {
             SaveResult = new MonthlyDistributionScheduleSaveResult(false, new Dictionary<Guid, string[]> { [schemeId] = ["Deadline Date needs to be after the UK Posting date."] }),
         };
-        var controller = new DistributionController(apiClient);
+        var controller = CreateController(apiClient);
         var model = new MonthlyDistributionScheduleViewModel
         {
             YearId = 2026,
@@ -214,7 +258,7 @@ public class DistributionControllerTests
     {
         var schemeId = Guid.NewGuid();
         var apiClient = new FakeDistributionApiClient();
-        var controller = new DistributionController(apiClient);
+        var controller = CreateController(apiClient);
         var model = new MonthlyDistributionScheduleViewModel
         {
             YearId = 2026,
@@ -234,7 +278,7 @@ public class DistributionControllerTests
     [Fact]
     public async Task Schedule_Get_ApiReturnsNull_ReturnsNotFound()
     {
-        var controller = new DistributionController(new FakeDistributionApiClient());
+        var controller = CreateController(new FakeDistributionApiClient());
 
         var result = await controller.Schedule(2026, 4, CancellationToken.None);
 
@@ -245,7 +289,7 @@ public class DistributionControllerTests
     public async Task Schedule_Post_SaveReturnsNull_RedisplaysViewWithoutAddingFieldErrors()
     {
         var apiClient = new FakeDistributionApiClient { SaveResult = null };
-        var controller = new DistributionController(apiClient);
+        var controller = CreateController(apiClient);
         var model = new MonthlyDistributionScheduleViewModel { YearId = 2026, MonthId = 4, Schemes = [] };
 
         var result = await controller.Schedule(2026, 4, model, "save", CancellationToken.None);
@@ -263,7 +307,7 @@ public class DistributionControllerTests
         {
             SaveResult = new MonthlyDistributionScheduleSaveResult(false, new Dictionary<Guid, string[]> { [Guid.NewGuid()] = ["Deadline Date needs to be after the UK Posting date."] }),
         };
-        var controller = new DistributionController(apiClient);
+        var controller = CreateController(apiClient);
         var model = new MonthlyDistributionScheduleViewModel { YearId = 2026, MonthId = 4, Schemes = [] };
 
         var result = await controller.Schedule(2026, 4, model, "save", CancellationToken.None);
@@ -276,7 +320,7 @@ public class DistributionControllerTests
     public void ToggleCancelled_UnknownScheme_LeavesEveryRowUnchanged()
     {
         var schemeId = Guid.NewGuid();
-        var controller = new DistributionController(new FakeDistributionApiClient());
+        var controller = CreateController(new FakeDistributionApiClient());
         var model = new MonthlyDistributionScheduleViewModel
         {
             Schemes = [new MonthlyDistributionScheduleRowViewModel { MonthlyDistributionSchemeId = schemeId, IsCancelled = false }],

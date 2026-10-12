@@ -1,7 +1,11 @@
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ViewFeatures;
+using PTL.ApiClient.Distribution;
 using PTL.Contracts.Distribution;
 using PTL.InternalWeb.Features.Distribution;
 using PTL.InternalWeb.Tests.TestSupport;
+using PTL.SharedUI.Notifications;
 
 namespace PTL.InternalWeb.Tests.Features.Distribution;
 
@@ -10,6 +14,11 @@ namespace PTL.InternalWeb.Tests.Features.Distribution;
 // for legacy's Session-held IntendedResultsSet on a failed post.
 public class SampleNumbersControllerTests
 {
+    private static DistributionController CreateController(IDistributionApiClient apiClient) =>
+        new(apiClient)
+        {
+            TempData = new TempDataDictionary(new DefaultHttpContext(), new FakeTempDataProvider())
+        };
     private static readonly Guid SchemeId = Guid.Parse("11111111-1111-1111-1111-111111111111");
     private static readonly Guid SampleId = Guid.Parse("22222222-2222-2222-2222-222222222222");
     private static readonly Guid SampleTestId = Guid.Parse("33333333-3333-3333-3333-333333333333");
@@ -52,7 +61,7 @@ public class SampleNumbersControllerTests
     [Fact]
     public async Task SampleNumbers_Get_UnknownScheme_ReturnsNotFound()
     {
-        var controller = new DistributionController(new FakeDistributionApiClient());
+        var controller = CreateController(new FakeDistributionApiClient());
 
         var result = await controller.SampleNumbers(2026, 4, SchemeId, CancellationToken.None);
 
@@ -68,7 +77,7 @@ public class SampleNumbersControllerTests
         {
             SampleNumbersErrors = ["Scheme PT0060 has no Test Consultant Tabulation.", "Correct the Scheme first."],
         };
-        var controller = new DistributionController(apiClient);
+        var controller = CreateController(apiClient);
 
         var result = await controller.SampleNumbers(2026, 4, SchemeId, CancellationToken.None);
 
@@ -89,7 +98,7 @@ public class SampleNumbersControllerTests
             SampleNumbers = Response(),
             SampleNumbersErrors = ["Correct the Scheme first."],
         };
-        var controller = new DistributionController(apiClient);
+        var controller = CreateController(apiClient);
 
         var result = await controller.SampleNumbers(2026, 4, SchemeId, CancellationToken.None);
 
@@ -100,7 +109,7 @@ public class SampleNumbersControllerTests
     public async Task SampleNumbers_Get_MapsResponseOntoViewModel()
     {
         var apiClient = new FakeDistributionApiClient { SampleNumbers = Response() };
-        var controller = new DistributionController(apiClient);
+        var controller = CreateController(apiClient);
 
         var result = await controller.SampleNumbers(2026, 4, SchemeId, CancellationToken.None);
 
@@ -138,7 +147,7 @@ public class SampleNumbersControllerTests
     public async Task SampleNumbers_Get_ReleasedAssessmentScheme_LocksAllocations()
     {
         var apiClient = new FakeDistributionApiClient { SampleNumbers = Response(requiresAssessment: true, isReadyForAssessment: true) };
-        var controller = new DistributionController(apiClient);
+        var controller = CreateController(apiClient);
 
         var result = await controller.SampleNumbers(2026, 4, SchemeId, CancellationToken.None);
 
@@ -150,7 +159,7 @@ public class SampleNumbersControllerTests
     public async Task SampleNumbers_Post_CancelCommand_RedirectsToScheduleWithoutSaving()
     {
         var apiClient = new FakeDistributionApiClient();
-        var controller = new DistributionController(apiClient);
+        var controller = CreateController(apiClient);
 
         var result = await controller.SampleNumbers(2026, 4, SchemeId, PostedModel(), "cancel", CancellationToken.None);
 
@@ -169,7 +178,7 @@ public class SampleNumbersControllerTests
             SampleNumbers = Response(),
             SampleNumbersSaveResult = new SampleNumbersSaveResult(true, [], new Dictionary<Guid, SampleNumbersFieldError[]>()),
         };
-        var controller = new DistributionController(apiClient);
+        var controller = CreateController(apiClient);
 
         var result = await controller.SampleNumbers(2026, 4, SchemeId, PostedModel(), "save", CancellationToken.None);
 
@@ -187,6 +196,76 @@ public class SampleNumbersControllerTests
         Assert.Equal(SampleTestId, Assert.Single(sample.Allocations).SampleTestId);
     }
 
+    // The save notification follows the convention used by every other migrated save screen.
+    [Theory]
+    [InlineData("save")]
+    [InlineData("saveAndGoToIntendedResults")]
+    public async Task SampleNumbers_Post_SaveSucceeds_ShowsSuccessNotification(string command)
+    {
+        var apiClient = new FakeDistributionApiClient
+        {
+            SampleNumbers = Response(),
+            SampleNumbersSaveResult = new SampleNumbersSaveResult(true, [], new Dictionary<Guid, SampleNumbersFieldError[]>()),
+        };
+        var controller = CreateController(apiClient);
+
+        await controller.SampleNumbers(2026, 4, SchemeId, PostedModel(), command, CancellationToken.None);
+
+        var notification = controller.TempData.GetNotification();
+        Assert.Equal(NotificationType.Success, notification!.Type);
+        Assert.Equal("Sample Numbers updated successfully.", notification.Message);
+    }
+
+    [Theory]
+    [InlineData("cancel")]
+    [InlineData("cancelAudit")]
+    public async Task SampleNumbers_Post_Cancelled_ShowsNoNotification(string command)
+    {
+        var apiClient = new FakeDistributionApiClient { SampleNumbers = Response() };
+        var controller = CreateController(apiClient);
+
+        await controller.SampleNumbers(2026, 4, SchemeId, PostedModel(), command, CancellationToken.None);
+
+        Assert.Null(controller.TempData.GetNotification());
+    }
+
+    // A validation failure is reported in the error summary, so a banner would be noise - but an
+    // unreachable API produces no field errors at all and must still tell the user something.
+    [Fact]
+    public async Task SampleNumbers_Post_ApiUnavailable_ShowsErrorNotification()
+    {
+        var apiClient = new FakeDistributionApiClient { SampleNumbers = Response(), SampleNumbersSaveResult = null };
+        var controller = CreateController(apiClient);
+
+        var result = await controller.SampleNumbers(2026, 4, SchemeId, PostedModel(), "save", CancellationToken.None);
+
+        Assert.IsType<ViewResult>(result);
+        var notification = controller.TempData.GetNotification();
+        Assert.Equal(NotificationType.Error, notification!.Type);
+        Assert.Equal("Sample Numbers could not be saved. Please try again later.", notification.Message);
+    }
+
+    [Fact]
+    public async Task SampleNumbers_Post_FieldErrors_ShowsNoNotificationBecauseTheSummaryCarriesThem()
+    {
+        var apiClient = new FakeDistributionApiClient
+        {
+            SampleNumbers = Response(),
+            SampleNumbersSaveResult = new SampleNumbersSaveResult(
+                false,
+                [],
+                new Dictionary<Guid, SampleNumbersFieldError[]>
+                {
+                    [SampleId] = [new SampleNumbersFieldError("SampleNumber", "Enter the Sample Number")],
+                }),
+        };
+        var controller = CreateController(apiClient);
+
+        await controller.SampleNumbers(2026, 4, SchemeId, PostedModel(), "save", CancellationToken.None);
+
+        Assert.Null(controller.TempData.GetNotification());
+    }
+
     [Fact]
     public async Task SampleNumbers_Post_SaveAndGoToIntendedResults_RedirectsToIntendedResultsStage()
     {
@@ -195,7 +274,7 @@ public class SampleNumbersControllerTests
             SampleNumbers = Response(),
             SampleNumbersSaveResult = new SampleNumbersSaveResult(true, [], new Dictionary<Guid, SampleNumbersFieldError[]>()),
         };
-        var controller = new DistributionController(apiClient);
+        var controller = CreateController(apiClient);
 
         var result = await controller.SampleNumbers(2026, 4, SchemeId, PostedModel(), "saveAndGoToIntendedResults", CancellationToken.None);
 
@@ -209,7 +288,7 @@ public class SampleNumbersControllerTests
     public async Task SampleNumbers_Post_InvalidModelState_RehydratesDisplayDataAndKeepsTypedValues()
     {
         var apiClient = new FakeDistributionApiClient { SampleNumbers = Response() };
-        var controller = new DistributionController(apiClient);
+        var controller = CreateController(apiClient);
         controller.ModelState.AddModelError("Samples[0].SampleNumber", "Sample Number Required");
 
         var result = await controller.SampleNumbers(2026, 4, SchemeId, PostedModel(), "save", CancellationToken.None);
@@ -238,7 +317,7 @@ public class SampleNumbersControllerTests
     public async Task SampleNumbers_Post_InvalidModelState_SchemeNoLongerReadable_RedisplaysPostedModel()
     {
         var apiClient = new FakeDistributionApiClient();
-        var controller = new DistributionController(apiClient);
+        var controller = CreateController(apiClient);
         controller.ModelState.AddModelError("Samples[0].SampleNumber", "Sample Number Required");
         var posted = PostedModel();
 
@@ -255,7 +334,7 @@ public class SampleNumbersControllerTests
     public async Task SampleNumbers_Post_ReleasedAssessmentScheme_DoesNotOverlayPostedAllocations()
     {
         var apiClient = new FakeDistributionApiClient { SampleNumbers = Response(requiresAssessment: true, isReadyForAssessment: true) };
-        var controller = new DistributionController(apiClient);
+        var controller = CreateController(apiClient);
         controller.ModelState.AddModelError("Comments", "Comments must not exceed 8000 characters");
 
         var result = await controller.SampleNumbers(2026, 4, SchemeId, PostedModel(allocationIsApplicable: false), "save", CancellationToken.None);
@@ -279,7 +358,7 @@ public class SampleNumbersControllerTests
                     [SampleId] = [new SampleNumbersFieldError("SampleNumber", "Sample Number Required")],
                 }),
         };
-        var controller = new DistributionController(apiClient);
+        var controller = CreateController(apiClient);
 
         var result = await controller.SampleNumbers(2026, 4, SchemeId, PostedModel(), "save", CancellationToken.None);
 
@@ -302,7 +381,7 @@ public class SampleNumbersControllerTests
                     [Guid.NewGuid()] = [new SampleNumbersFieldError("SampleNumber", "Sample Number Required")],
                 }),
         };
-        var controller = new DistributionController(apiClient);
+        var controller = CreateController(apiClient);
 
         var result = await controller.SampleNumbers(2026, 4, SchemeId, PostedModel(), "save", CancellationToken.None);
 
@@ -314,7 +393,7 @@ public class SampleNumbersControllerTests
     public async Task SampleNumbers_Post_NullResult_IsHandledAndRedisplays()
     {
         var apiClient = new FakeDistributionApiClient { SampleNumbers = Response(), SampleNumbersSaveResult = null };
-        var controller = new DistributionController(apiClient);
+        var controller = CreateController(apiClient);
 
         var result = await controller.SampleNumbers(2026, 4, SchemeId, PostedModel(), "save", CancellationToken.None);
 
@@ -327,7 +406,7 @@ public class SampleNumbersControllerTests
     public async Task SampleNumbers_Post_RehydrationIgnoresSamplesNotPostedBack()
     {
         var apiClient = new FakeDistributionApiClient { SampleNumbers = Response() };
-        var controller = new DistributionController(apiClient);
+        var controller = CreateController(apiClient);
         controller.ModelState.AddModelError("Comments", "Comments must not exceed 8000 characters");
         var posted = new SampleNumbersViewModel { Comments = "User comments", Samples = [] };
 
@@ -345,7 +424,7 @@ public class SampleNumbersControllerTests
     public async Task SampleNumbers_Post_AuditReasonRequired_RendersTheAuditStepInsteadOfRedirecting()
     {
         var apiClient = new FakeDistributionApiClient { SampleNumbers = Response(), SampleNumbersSaveResult = AuditRequired() };
-        var controller = new DistributionController(apiClient);
+        var controller = CreateController(apiClient);
 
         var result = await controller.SampleNumbers(2026, 4, SchemeId, PostedModel(), "save", CancellationToken.None);
 
@@ -361,7 +440,7 @@ public class SampleNumbersControllerTests
     public async Task SampleNumbers_Post_AuditReasonRequired_RemembersTheOriginalDestination()
     {
         var apiClient = new FakeDistributionApiClient { SampleNumbers = Response(), SampleNumbersSaveResult = AuditRequired() };
-        var controller = new DistributionController(apiClient);
+        var controller = CreateController(apiClient);
 
         var result = await controller.SampleNumbers(2026, 4, SchemeId, PostedModel(), "saveAndGoToIntendedResults", CancellationToken.None);
 
@@ -377,7 +456,7 @@ public class SampleNumbersControllerTests
             SampleNumbers = Response(),
             SampleNumbersSaveResult = new SampleNumbersSaveResult(true, [], new Dictionary<Guid, SampleNumbersFieldError[]>()),
         };
-        var controller = new DistributionController(apiClient);
+        var controller = CreateController(apiClient);
         var posted = PostedModel();
         posted.RequiresAuditReason = true;
         posted.AuditWhy = "Corrected a typo";
@@ -394,7 +473,7 @@ public class SampleNumbersControllerTests
     public async Task SampleNumbers_Post_InvalidAuditResubmit_KeepsRenderingTheAuditStep()
     {
         var apiClient = new FakeDistributionApiClient { SampleNumbers = Response() };
-        var controller = new DistributionController(apiClient);
+        var controller = CreateController(apiClient);
         controller.ModelState.AddModelError("AuditWhy", "The reason for these changes must be specified");
         var posted = PostedModel();
         posted.RequiresAuditReason = true;
@@ -417,7 +496,7 @@ public class SampleNumbersControllerTests
     public async Task SampleNumbers_Post_CancelAudit_ReturnsToScheduleWithoutSaving()
     {
         var apiClient = new FakeDistributionApiClient { SampleNumbers = Response() };
-        var controller = new DistributionController(apiClient);
+        var controller = CreateController(apiClient);
         var posted = PostedModel();
         posted.RequiresAuditReason = true;
         posted.PendingCommand = "save";
@@ -435,7 +514,7 @@ public class SampleNumbersControllerTests
     public async Task SampleNumbers_Post_CancelAudit_FromTheIntendedResultsButton_ReturnsToIntendedResults()
     {
         var apiClient = new FakeDistributionApiClient { SampleNumbers = Response() };
-        var controller = new DistributionController(apiClient);
+        var controller = CreateController(apiClient);
         var posted = PostedModel();
         posted.RequiresAuditReason = true;
         posted.PendingCommand = "saveAndGoToIntendedResults";
@@ -453,7 +532,7 @@ public class SampleNumbersControllerTests
     public async Task SampleNumbers_Post_CancelAudit_WithNoPendingCommand_ReturnsToSchedule()
     {
         var apiClient = new FakeDistributionApiClient();
-        var controller = new DistributionController(apiClient);
+        var controller = CreateController(apiClient);
 
         var result = await controller.SampleNumbers(2026, 4, SchemeId, PostedModel(), "cancelAudit", CancellationToken.None);
 
@@ -468,7 +547,7 @@ public class SampleNumbersControllerTests
     public async Task SampleNumbers_Post_AuditReasonRequired_SchemeNoLongerReadable_StillRendersTheAuditStep()
     {
         var apiClient = new FakeDistributionApiClient { SampleNumbers = null, SampleNumbersSaveResult = AuditRequired() };
-        var controller = new DistributionController(apiClient);
+        var controller = CreateController(apiClient);
 
         var result = await controller.SampleNumbers(2026, 4, SchemeId, PostedModel(), "save", CancellationToken.None);
 
