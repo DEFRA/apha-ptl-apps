@@ -49,16 +49,27 @@ body {
   align-items: center;
 }
 
-.govuk-service-navigation__service-name img {
-  height: 80px;
+.app-service-bar {
+  background: #ffffff;
+  border-bottom: 1px solid #b1b4b6;
+}
+
+.app-service-bar__container {
+  min-height: 70px;
+  display: flex;
+  align-items: center;
+}
+
+.app-service-bar__container a[aria-label="Home"] img {
+  height: 40px;
   width: auto;
 }
 
-/* Not a built-in govuk-frontend default, but a common, GDS-compliant customisation used by
-   GOV.UK services to right-align account/utility links - visual order only, DOM order (so
-   reading/tab order) is unchanged. */
-.govuk-service-navigation__wrapper {
+.app-account-panel {
   margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
 }
 
 /* Inactive contracts render struck-through, matching legacy ContractList.aspx.vb
@@ -169,11 +180,13 @@ body {
   }
 }
 
-/* The Scheme form keeps legacy Scheme.aspx's seven tabs, which do not fit on one row. The GOV.UK
-   tabs component floats its items and draws a single border under the <ul>, so once the list wraps
-   the first row loses its underline and the selected tab's "joins to the panel" notch lands in the
-   middle of the list. Lay the rows out with flex and give every item its own bottom border. */
-.govuk-frontend-supported #scheme-tabs .govuk-tabs__list {
+/* The Scheme form keeps legacy Scheme.aspx's seven tabs, and Sample Numbers renders one tab per
+   test with no upper bound, so neither list fits on one row. The GOV.UK tabs component floats its
+   items and draws a single border under the <ul>, so once the list wraps the first row loses its
+   underline and the selected tab's "joins to the panel" notch lands in the middle of the list.
+   Lay the rows out with flex and give every item its own bottom border. */
+.govuk-frontend-supported #scheme-tabs .govuk-tabs__list,
+.govuk-frontend-supported #sample-numbers-tabs .govuk-tabs__list {
   display: flex;
   flex-wrap: wrap;
   align-items: flex-end;
@@ -181,11 +194,13 @@ body {
   border-bottom: 0;
 }
 
-.govuk-frontend-supported #scheme-tabs .govuk-tabs__list::after {
+.govuk-frontend-supported #scheme-tabs .govuk-tabs__list::after,
+.govuk-frontend-supported #sample-numbers-tabs .govuk-tabs__list::after {
   content: none;
 }
 
-.govuk-frontend-supported #scheme-tabs .govuk-tabs__list-item {
+.govuk-frontend-supported #scheme-tabs .govuk-tabs__list-item,
+.govuk-frontend-supported #sample-numbers-tabs .govuk-tabs__list-item {
   float: none;
   margin-top: 0;
   margin-bottom: 0;
@@ -194,11 +209,18 @@ body {
   border-bottom-color: var(--govuk-border-colour, #cecece);
 }
 
-.govuk-frontend-supported #scheme-tabs .govuk-tabs__list-item--selected {
+.govuk-frontend-supported #scheme-tabs .govuk-tabs__list-item--selected,
+.govuk-frontend-supported #sample-numbers-tabs .govuk-tabs__list-item--selected {
   padding: 10px 20px;
   border-color: var(--govuk-border-colour, #cecece);
   border-bottom-color: var(--govuk-body-background-colour, #fff);
   background-color: var(--govuk-body-background-colour, #fff);
+}
+
+/* Legacy stacks the Samples / Test Items / Method Items tables with a 15px spacer between them.
+   The caption is the section label (legacy's rowPrepSheetHeader), so it sits tight to its table. */
+#sample-numbers-tabs .govuk-table__caption {
+  margin-bottom: 5px;
 }
 
 
@@ -304,4 +326,3 @@ span.app-side-navigation__link--disabled {
   text-align: center;
   vertical-align: middle;
 }
-

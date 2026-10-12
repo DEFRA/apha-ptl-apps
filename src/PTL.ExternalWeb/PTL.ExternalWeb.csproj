@@ -17,12 +17,10 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- Views shared byte-for-byte with the other PTL web front-end(s) - single physical file under
-         src/Shared, linked in here (and in the sibling app) instead of duplicated per app. -->
+    <!-- Error.cshtml and Login.cshtml are still shared byte-for-byte with PTL.InternalWeb (single
+         physical file under src/Shared, linked in here and in the sibling app). _Header/_Footer/
+         _NotificationBanner now have their own ExternalWeb-only copies in Views/Shared/ instead. -->
     <Content Include="..\Shared\Views\Shared\Error.cshtml" Link="Views\Shared\Error.cshtml" />
-    <Content Include="..\Shared\Views\Shared\_Footer.cshtml" Link="Views\Shared\_Footer.cshtml" />
-    <Content Include="..\Shared\Views\Shared\_Header.cshtml" Link="Views\Shared\_Header.cshtml" />
-    <Content Include="..\Shared\Views\Shared\_NotificationBanner.cshtml" Link="Views\Shared\_NotificationBanner.cshtml" />
     <Content Include="..\Shared\Views\Account\Login.cshtml" Link="Features\Account\Views\Login.cshtml" />
   </ItemGroup>
 

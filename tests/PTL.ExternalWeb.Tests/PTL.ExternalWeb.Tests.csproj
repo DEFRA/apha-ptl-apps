@@ -14,8 +14,11 @@
          instead) - it's exercised by PTL.InternalWeb.Tests, which still uses it for real. Combined
          with Program.cs's own exclusion (inherited from tests/Directory.Build.props) using a comma,
          not a semicolon - Coverlet's glob-list parser silently stops excluding anything once more than
-         one semicolon-separated pattern is present. -->
-    <ExcludeByFile>**/Program.cs,**/Shared/Views/Account/Login.cshtml</ExcludeByFile>
+         one semicolon-separated pattern is present. Logging.g.cs ([LoggerMessage]'s source-generated
+         IsEnabled(level) fast-path, always false for the NullLogger these tests use) is excluded the
+         same way - a plain value here fully replaces (not appends to) Directory.Build.props's own
+         ExcludeByFile, so each pattern needs repeating per project rather than relying on $(...). -->
+    <ExcludeByFile>**/Program.cs,**/Shared/Views/Account/Login.cshtml,**/Logging.g.cs</ExcludeByFile>
   </PropertyGroup>
 
   <ItemGroup>

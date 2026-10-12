@@ -1,0 +1,63 @@
+@using PTL.ExternalWeb.Features.Account
+@model (string ServiceName, string? LogoStyle)
+<header class="govuk-template__header">
+    <div class="govuk-header">
+        <div class="govuk-header__container govuk-width-container">
+            <div class="govuk-header__content">
+                @* govuk-header__content/__link/__service-name have no rules in govuk-frontend
+                   6.5.0 (stale pre-v5 class names) - govuk-header__product-name is the only real
+                   class this bundle ships for prominent header text (font-size: 1.9375rem). *@
+                <span class="govuk-header__product-name">@Model.ServiceName</span>
+            </div>
+        </div>
+    </div>
+    <section aria-label="Service information" class="govuk-service-navigation" data-module="govuk-service-navigation">
+        <div class="govuk-width-container govuk-service-navigation__container">
+            <span class="govuk-service-navigation__service-name">
+                @* govuk-link-image gives an image-only link a clean focus outline instead of the
+                   text link's solid yellow background, which only showed through the logo's
+                   transparent gaps. *@
+                <a asp-controller="Home" asp-action="Index" class="govuk-service-navigation__link govuk-link-image" aria-label="Home">
+                    <img src="~/assets/images/AphaLogo.png" alt="APHA" style="@Model.LogoStyle" />
+                </a>
+            </span>
+            @if (User.Identity is not null && User.Identity.IsAuthenticated)
+            {
+                // Identity.Name is a last-resort fallback - CIDM's id_token has no "name" claim
+                // without the "profile" scope, so it's usually empty for external users.
+                var labCode = User.FindFirst(ExternalUserClaimTypes.LabCode)?.Value;
+                var friendlyName = User.FindFirst(ExternalUserClaimTypes.DisplayName)?.Value ?? User.Identity.Name;
+                <nav aria-label="Account navigation" class="govuk-service-navigation__wrapper">
+                    <ul class="govuk-service-navigation__list">
+                        @if (!string.IsNullOrWhiteSpace(labCode))
+                        {
+                            <li class="govuk-service-navigation__item">
+                                Lab Number: <strong>@labCode</strong>
+                            </li>
+                        }
+                        <li class="govuk-service-navigation__item">
+                            Signed in as <strong>@friendlyName</strong>
+                        </li>
+                        <li class="govuk-service-navigation__item">
+                            <form asp-controller="Account" asp-action="Logout" method="post" class="app-signout-form">
+                                @Html.AntiForgeryToken()
+                                <button type="submit" class="app-signout-button govuk-service-navigation__link">Sign out</button>
+                            </form>
+                        </li>
+                    </ul>
+                </nav>
+            }
+        </div>
+    </section>
+    <div class="govuk-phase-banner govuk-width-container">
+        <p class="govuk-phase-banner__content">
+            <strong class="govuk-tag govuk-phase-banner__content__tag">
+                Alpha
+            </strong>
+            <span class="govuk-phase-banner__text">
+                @* TODO: point feedback at a real destination (mailto/survey) before go-live *@
+                This is a new service – your <a class="govuk-link" href="#">feedback</a> will help us to improve it.
+            </span>
+        </p>
+    </div>
+</header>

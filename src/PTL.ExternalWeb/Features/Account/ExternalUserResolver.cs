@@ -27,7 +27,7 @@ public sealed partial class ExternalUserResolver(IExternalUserApiClient external
         // organisation/relationship they're currently acting under.
         if (!Guid.TryParse(principal.FindFirst(CidmClaimTypes.ContactId)?.Value, out var ssoIdExt))
         {
-            logger.LogWarning("CIDM resolve denied: no parseable {Claim} claim present", CidmClaimTypes.ContactId);
+            LogMissingContactIdClaim(CidmClaimTypes.ContactId);
             return CidmExternalUserResolution.Deny("/Account/NotPermitted");
         }
 
@@ -100,4 +100,7 @@ public sealed partial class ExternalUserResolver(IExternalUserApiClient external
 
     [LoggerMessage(Level = LogLevel.Error, Message = "Failed to resolve external user (SsoIdExt={SsoIdExt}) against PTL.Api")]
     private partial void LogExternalUserResolutionFailed(Guid ssoIdExt, Exception exception);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "CIDM resolve denied: no parseable {Claim} claim present")]
+    private partial void LogMissingContactIdClaim(string claim);
 }
