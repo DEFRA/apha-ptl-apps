@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using Microsoft.Extensions.Logging;
 using PTL.ApiClient;
 using PTL.Auth.Entra.Claims;
 using PTL.Auth.Entra.Events;
@@ -14,7 +15,8 @@ namespace PTL.InternalWeb.Features.Account;
 /// requirement for PT-LIMS.
 /// </summary>
 /// <param name="internalUserApiClient">Calls PTL.Api's internal-user resolve endpoint.</param>
-public sealed class InternalUserResolver(IInternalUserApiClient internalUserApiClient) : IEntraInternalUserResolver
+/// <param name="logger">Logs resolution failures so a sign-in landing on /Home/Error is diagnosable.</param>
+public sealed partial class InternalUserResolver(IInternalUserApiClient internalUserApiClient, ILogger<InternalUserResolver> logger) : IEntraInternalUserResolver
 {
     /// <inheritdoc />
     public async Task<EntraInternalUserResolution> ResolveAsync(ClaimsPrincipal principal, CancellationToken cancellationToken)
@@ -53,9 +55,22 @@ public sealed class InternalUserResolver(IInternalUserApiClient internalUserApiC
             return EntraInternalUserResolution.Deny("/Account/NotPermitted");
         }
 
-        var response = await internalUserApiClient.ResolveAsync(
-            new ResolveInternalUserRequest(entraSsoId, username),
-            cancellationToken);
+        ResolveInternalUserResponse response;
+        try
+        {
+            response = await internalUserApiClient.ResolveAsync(
+                new ResolveInternalUserRequest(entraSsoId, username),
+                cancellationToken);
+        }
+        catch (Exception exception) when (exception is HttpRequestException or TaskCanceledException or NotSupportedException)
+        {
+            // HttpRequestException: network/DNS failure, connection refused, or EnsureSuccessStatusCode
+            // threw for a non-success response. TaskCanceledException: request timeout. NotSupportedException:
+            // response wasn't valid JSON for the expected DTO. Without this, a PTL.Api connectivity
+            // problem during sign-in produces zero diagnostic trace - it just lands on /Home/Error.
+            LogInternalUserResolutionFailed(entraSsoId, exception);
+            return EntraInternalUserResolution.Deny("/Home/Error");
+        }
 
         if (!response.IsPermitted)
         {
@@ -70,4 +85,7 @@ public sealed class InternalUserResolver(IInternalUserApiClient internalUserApiC
             [InternalUserClaimTypes.ResolvedRoles] = string.Join(',', response.Roles)
         });
     }
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Failed to resolve internal user (SsoIdInt={SsoIdInt}) against PTL.Api")]
+    private partial void LogInternalUserResolutionFailed(Guid ssoIdInt, Exception exception);
 }
