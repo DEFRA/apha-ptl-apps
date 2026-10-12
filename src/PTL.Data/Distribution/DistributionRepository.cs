@@ -552,6 +552,92 @@ public sealed class DistributionRepository(IDbConnectionFactory connectionFactor
 
         transaction.Commit();
     }
+
+    public async Task<DistributionParticipantsData?> GetDistributionParticipantsAsync(
+        Guid monthlyDistributionSchemeId, CancellationToken cancellationToken = default)
+    {
+        using var connection = connectionFactory.CreateConnection();
+        using var results = await connection.QueryMultipleAsync(
+            "EXEC dbo.spgMonthlyDistributionScheme @MonthlyDistributionSchemeId = @MonthlyDistributionSchemeId",
+            new { MonthlyDistributionSchemeId = monthlyDistributionSchemeId });
+
+        var scheme = await results.ReadFirstOrDefaultAsync<MonthlyDistributionSchemeEntity>();
+        if (scheme is null)
+        {
+            return null;
+        }
+
+        var participants = (await results.ReadAsync<DistributionParticipantEntity>()).ToList();
+        var additionalParticipants = (await results.ReadAsync<AdditionalParticipantEntity>()).ToList();
+
+        scheme.ParticipantCount = participants.Count;
+        scheme.TotalSetsOfSamplesRequired = participants.Sum(p => p.NumberOfSetsRequired);
+
+        return new DistributionParticipantsData(scheme, participants, additionalParticipants);
+    }
+
+    public async Task UpdateParticipantDeadlineAsync(DistributionParticipantEntity participant, CancellationToken cancellationToken = default)
+    {
+        using var connection = connectionFactory.CreateConnection();
+        await connection.ExecuteAsync(
+            """
+            EXEC dbo.spuDistributionParticipant
+                @DistributionParticipantId = @DistributionParticipantId,
+                @ParticipantId = @ParticipantId,
+                @MonthlyDistributionSchemeId = @MonthlyDistributionSchemeId,
+                @DeadlineDate = @DeadlineDate,
+                @DeadlineChangeReason = @DeadlineChangeReason,
+                @AdditionalParticipant = @AdditionalParticipant
+            """,
+            participant);
+    }
+
+    public async Task RepeatDistributionAsync(
+        MonthlyDistributionSchemeEntity newScheme, IReadOnlyList<DistributionParticipantEntity> newParticipants, CancellationToken cancellationToken = default)
+    {
+        using var connection = connectionFactory.CreateConnection();
+        connection.Open();
+        using var transaction = connection.BeginTransaction();
+
+        await connection.ExecuteAsync(
+            """
+            EXEC dbo.spiMonthlyDistributionScheme
+                @MonthlyDistributionSchemeId = @MonthlyDistributionSchemeId,
+                @MonthlyDistributionId = @MonthlyDistributionId,
+                @SchemeId = @SchemeId,
+                @MonthlyDistributionReference = @DistributionReference,
+                @MonthlyDistributionReferenceSuffix = @DistributionReferenceSuffix,
+                @MonthlyDistributionDate = @DistributionDate,
+                @DeadlineDate = @DeadlineDate,
+                @OverseasPostingDate = @OverseasPostingDate,
+                @ResultsIssueTargetDate = @ResultsIssueTargetDate,
+                @Comments = @Comments,
+                @HasIntendedResults = @HasIntendedResults,
+                @HasSampleNumbersDefined = @HasSampleNumbersDefined,
+                @IsCancelled = @IsCancelled,
+                @StoreRatings = @StoreRatings,
+                @SchemeVersionDate = @SchemeVersionDate
+            """,
+            newScheme,
+            transaction);
+
+        const string insertParticipantSql = """
+            EXEC dbo.spiDistributionParticipant
+                @DistributionParticipantId = @DistributionParticipantId,
+                @ParticipantId = @ParticipantId,
+                @MonthlyDistributionSchemeId = @MonthlyDistributionSchemeId,
+                @DeadlineDate = @DeadlineDate,
+                @DeadlineChangeReason = @DeadlineChangeReason,
+                @AdditionalParticipant = @AdditionalParticipant
+            """;
+
+        foreach (var participant in newParticipants)
+        {
+            await connection.ExecuteAsync(insertParticipantSql, participant, transaction);
+        }
+
+        transaction.Commit();
+    }
 }
 
 // spgMonthlyDistribution result set 1 - only present when the month has been initialised.

@@ -14,6 +14,7 @@ public sealed class DistributionController(
     IDistributionService distributionService,
     ISampleNumbersService sampleNumbersService,
     IIntendedResultsService intendedResultsService,
+    IDistributionParticipantsService distributionParticipantsService,
     ILogger<DistributionController> logger) : ControllerBase
 {
     private static readonly Action<ILogger, Guid, Exception?> LogStructureCreationFailedMessage =
@@ -177,6 +178,51 @@ public sealed class DistributionController(
             outcome.AuditReasonRequired,
             outcome.AuditObjectName));
     }
+
+    // GET /api/distributions/schemes/{monthlyDistributionSchemeId}/participants - legacy
+    // DistributionParticipantList.aspx's LoadMonthlyDistributionScheme.
+    [HttpGet("schemes/{monthlyDistributionSchemeId:guid}/participants")]
+    public async Task<ActionResult<DistributionParticipantsResponse>> GetParticipants(Guid monthlyDistributionSchemeId, CancellationToken cancellationToken)
+    {
+        var data = await distributionParticipantsService.GetParticipantsAsync(monthlyDistributionSchemeId, cancellationToken);
+        return data is null ? NotFound() : Ok(ToResponse(data));
+    }
+
+    // PUT /api/distributions/schemes/{monthlyDistributionSchemeId}/participants/{distributionParticipantId}/deadline -
+    // legacy DistributionParticipant.SetNewDeadlineDate + MonthlyDistributionScheme.Save().
+    [HttpPut("schemes/{monthlyDistributionSchemeId:guid}/participants/{distributionParticipantId:guid}/deadline")]
+    public async Task<ActionResult<ChangeDeadlineResult>> ChangeDeadline(
+        Guid monthlyDistributionSchemeId, Guid distributionParticipantId, [FromBody] ChangeDeadlineRequest request, CancellationToken cancellationToken)
+    {
+        var outcome = await distributionParticipantsService.ChangeDeadlineAsync(
+            monthlyDistributionSchemeId, distributionParticipantId, request.NewDeadlineDate, request.Reason, cancellationToken);
+
+        return Ok(new ChangeDeadlineResult(outcome.Success, outcome.NewDeadlineDateError, outcome.ReasonError));
+    }
+
+    // POST /api/distributions/schemes/{monthlyDistributionSchemeId}/repeat - legacy
+    // MonthlyDistribution.RepeatDistribution + Save().
+    [HttpPost("schemes/{monthlyDistributionSchemeId:guid}/repeat")]
+    public async Task<ActionResult<RepeatDistributionResult>> RepeatDistribution(
+        Guid monthlyDistributionSchemeId, [FromBody] RepeatDistributionRequest request, CancellationToken cancellationToken)
+    {
+        var selections = request.Selections.Select(s => new ParticipantSelection(s.Id, s.IsAdditional)).ToList();
+        var outcome = await distributionParticipantsService.RepeatDistributionAsync(monthlyDistributionSchemeId, selections, cancellationToken);
+        return Ok(new RepeatDistributionResult(outcome.Success, outcome.Error));
+    }
+
+    private static DistributionParticipantsResponse ToResponse(DistributionParticipantsData data) =>
+        new(
+            data.Scheme.MonthlyDistributionSchemeId,
+            data.Scheme.YearId,
+            data.Scheme.MonthId,
+            data.Scheme.SchemeIdentifier,
+            data.Scheme.SchemeName,
+            data.Scheme.DistributionReferenceFull,
+            !string.IsNullOrEmpty(data.Scheme.DistributionReferenceSuffix),
+            [.. data.Participants.Select(p => new DistributionParticipantResponse(
+                p.DistributionParticipantId, p.FullName, p.EffectiveDeadlineDate, p.DeadlineChangeReason, p.AdditionalParticipant))],
+            [.. data.AdditionalParticipants.Select(p => new DistributionAdditionalParticipantResponse(p.ParticipantSchemeId, p.FullName))]);
 
     private static IntendedResultsResponse ToResponse(IntendedResultsPage page) =>
         new(

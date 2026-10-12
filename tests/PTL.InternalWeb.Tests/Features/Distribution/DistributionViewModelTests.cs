@@ -184,4 +184,73 @@ public class DistributionViewModelTests
         Assert.Equal(5, month.ResultsCompletePercentage);
         Assert.Equal(1, month.TabulationsCompletePercentage);
     }
+
+    [Fact]
+    public void ParticipantsViewModel_SchemeHeading_CombinesIdentifierAndName()
+    {
+        var model = new DistributionParticipantsViewModel { SchemeIdentifier = "PT0060", SchemeName = "Mastitis bovine" };
+
+        Assert.Equal("PT0060: Mastitis bovine", model.SchemeHeading);
+    }
+
+    [Fact]
+    public void ParticipantsViewModel_DistributionListTitle_OriginalDistribution_WhenNotARepeat()
+    {
+        var model = new DistributionParticipantsViewModel { IsRepeatDistribution = false };
+
+        Assert.Equal("Original Distribution", model.DistributionListTitle);
+    }
+
+    [Fact]
+    public void ParticipantsViewModel_DistributionListTitle_RepeatDistribution_WhenARepeat()
+    {
+        var model = new DistributionParticipantsViewModel { IsRepeatDistribution = true };
+
+        Assert.Equal("Repeat Distribution", model.DistributionListTitle);
+    }
+
+    // Legacy hides btnRepeatDistribution entirely once already a repeat, or when there is nothing to repeat.
+    [Fact]
+    public void ParticipantsViewModel_ShowRepeatDistributionButton_AlreadyARepeat_IsHiddenEvenWithParticipants()
+    {
+        var model = new DistributionParticipantsViewModel
+        {
+            IsRepeatDistribution = true,
+            Participants = [new DistributionParticipantRowViewModel()],
+        };
+
+        Assert.False(model.ShowRepeatDistributionButton);
+    }
+
+    [Fact]
+    public void ParticipantsViewModel_ShowRepeatDistributionButton_NotARepeatWithNoParticipantsOrAdditional_IsHidden()
+    {
+        var model = new DistributionParticipantsViewModel { IsRepeatDistribution = false };
+
+        Assert.False(model.ShowRepeatDistributionButton);
+    }
+
+    [Fact]
+    public void ParticipantsViewModel_ShowRepeatDistributionButton_NotARepeatWithParticipants_IsShown()
+    {
+        var model = new DistributionParticipantsViewModel
+        {
+            IsRepeatDistribution = false,
+            Participants = [new DistributionParticipantRowViewModel()],
+        };
+
+        Assert.True(model.ShowRepeatDistributionButton);
+    }
+
+    [Fact]
+    public void ParticipantsViewModel_ShowRepeatDistributionButton_NotARepeatWithOnlyAdditionalParticipants_IsShown()
+    {
+        var model = new DistributionParticipantsViewModel
+        {
+            IsRepeatDistribution = false,
+            AdditionalParticipants = [new DistributionAdditionalParticipantRowViewModel()],
+        };
+
+        Assert.True(model.ShowRepeatDistributionButton);
+    }
 }

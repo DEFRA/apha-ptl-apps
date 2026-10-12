@@ -67,7 +67,7 @@
 
                 <h3 class="govuk-heading-s govuk-!-margin-bottom-2">Participants</h3>
                 <p class="govuk-body">
-                    <a class="govuk-link" asp-action="ViewStage" asp-route-stage="Participants">View Participants<span class="govuk-visually-hidden"> for @scheme.SchemeHeading</span></a>
+                    <a class="govuk-link" asp-action="Participants" asp-route-year="@Model.YearId" asp-route-monthId="@Model.MonthId" asp-route-schemeId="@scheme.MonthlyDistributionSchemeId">View Participants<span class="govuk-visually-hidden"> for @scheme.SchemeHeading</span></a>
                     &mdash; @scheme.ParticipantCountLabel
                     <br />
                     Total number of sets of samples: @scheme.TotalSetsOfSamplesRequired

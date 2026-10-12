@@ -274,7 +274,8 @@ public static class SideNavigationProvider
                     [
                         // Hidden: reached only from a specific Schedule's links, not listed here.
                         new SideNavigationItem { Text = "Sample Numbers", ControllerName = DistributionControllerName, ActionName = "SampleNumbers", IsHidden = true },
-                        new SideNavigationItem { Text = "Intended Results", ControllerName = DistributionControllerName, ActionName = "IntendedResults", IsHidden = true }
+                        new SideNavigationItem { Text = "Intended Results", ControllerName = DistributionControllerName, ActionName = "IntendedResults", IsHidden = true },
+                        new SideNavigationItem { Text = "Participants", ControllerName = DistributionControllerName, ActionName = "Participants", IsHidden = true }
                     ]
                 }
             ]

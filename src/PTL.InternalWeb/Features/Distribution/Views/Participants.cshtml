@@ -1,0 +1,231 @@
+@model PTL.InternalWeb.Features.Distribution.DistributionParticipantsViewModel
+@{
+    // Legacy never calls Master.SetPageTitle on DistributionParticipantList.aspx, so the master
+    // page's H1 banner falls back to the Web.sitemap node's plain title - same pattern as
+    // IntendedResults.cshtml/SampleNumbers.cshtml.
+    ViewData["Title"] = $"Distribution Participants - {Model.SchemeHeading}";
+
+    var errors = ViewData.ModelState
+        .Where(entry => entry.Value?.Errors.Count > 0)
+        .SelectMany(entry => entry.Value!.Errors.Select(error => (Field: entry.Key, Message: error.ErrorMessage)))
+        .ToList();
+
+    // The whole form posts every row's New Date/Reason inputs regardless of which row's panel is
+    // visually open (the `hidden` attribute does not exclude a field from submission), so every
+    // row gets a ModelState entry on any redisplay - ContainsKey alone would wrongly expand every
+    // row. Only a row with an actual validation ERROR should expand.
+    bool RowHasError(int index) =>
+        (ViewData.ModelState.TryGetValue($"{nameof(Model.Participants)}[{index}].{nameof(PTL.InternalWeb.Features.Distribution.DistributionParticipantRowViewModel.NewDeadlineDate)}", out var dateState) && dateState.Errors.Count > 0) ||
+        (ViewData.ModelState.TryGetValue($"{nameof(Model.Participants)}[{index}].{nameof(PTL.InternalWeb.Features.Distribution.DistributionParticipantRowViewModel.NewDeadlineReason)}", out var reasonState) && reasonState.Errors.Count > 0);
+}
+
+<a class="govuk-back-link" asp-action="Schedule" asp-route-year="@Model.YearId" asp-route-monthId="@Model.MonthId">Back</a>
+
+<h1 class="govuk-heading-l">Distribution Participants</h1>
+
+<p class="govuk-body">
+    @(new DateTime(2000, Model.MonthId, 1).ToString("MMM", System.Globalization.CultureInfo.InvariantCulture)) @Model.YearId
+</p>
+
+<h2 class="govuk-heading-m">@Model.SchemeHeading</h2>
+<p class="govuk-body">@Model.DistributionReferenceFull</p>
+
+<govuk-error-summary errors="@errors" />
+
+<form method="post" asp-action="RepeatDistribution" asp-route-year="@Model.YearId" asp-route-monthId="@Model.MonthId" asp-route-schemeId="@Model.MonthlyDistributionSchemeId">
+    @Html.AntiForgeryToken()
+    <input type="hidden" asp-for="MonthlyDistributionSchemeId" />
+    <input type="hidden" asp-for="YearId" />
+    <input type="hidden" asp-for="MonthId" />
+    <input type="hidden" asp-for="IsRepeatDistribution" />
+
+    <h3 class="govuk-heading-m">@Model.DistributionListTitle</h3>
+
+    @if (Model.Participants.Count == 0)
+    {
+        <p class="govuk-body">There are no participants defined on this scheme.</p>
+    }
+    else
+    {
+    <table class="govuk-table">
+        <caption class="govuk-table__caption govuk-visually-hidden">Participants on this distribution</caption>
+        <thead class="govuk-table__head">
+            <tr class="govuk-table__row">
+                <th scope="col" class="govuk-table__header" style="vertical-align: middle;">
+                    <div class="govuk-checkboxes govuk-checkboxes--small govuk-!-margin-top-0">
+                        <div class="govuk-checkboxes__item">
+                            <input class="govuk-checkboxes__input distribution-select-all" type="checkbox" id="selectAllParticipants" data-select-group="participants" aria-label="Select all participants" />
+                            <label class="govuk-label govuk-checkboxes__label" for="selectAllParticipants"><span class="govuk-visually-hidden">Select all</span></label>
+                        </div>
+                    </div>
+                </th>
+                <th scope="col" class="govuk-table__header" style="vertical-align: middle;">Lab</th>
+                <th scope="col" class="govuk-table__header" style="vertical-align: middle;">Deadline Date</th>
+            </tr>
+        </thead>
+        <tbody class="govuk-table__body">
+                @for (var i = 0; i < Model.Participants.Count; i++)
+                {
+                    var row = Model.Participants[i];
+                    var expanded = RowHasError(i);
+                    var ariaExpanded = expanded ? "true" : "false";
+                    <tr class="govuk-table__row">
+                        <td class="govuk-table__cell" style="vertical-align: middle;">
+                            <input type="hidden" asp-for="Participants[i].DistributionParticipantId" />
+                            <input type="hidden" asp-for="Participants[i].AdditionalParticipant" />
+                            <input type="hidden" asp-for="Participants[i].DeadlineDate" />
+                            <input type="hidden" asp-for="Participants[i].DeadlineChangeReason" />
+                            <div class="govuk-checkboxes govuk-checkboxes--small govuk-!-margin-top-0">
+                                <div class="govuk-checkboxes__item">
+                                    <input class="govuk-checkboxes__input distribution-select-item" type="checkbox" data-select-group="participants"
+                                           id="@Html.IdFor(m => m.Participants[i].Selected)" name="@Html.NameFor(m => m.Participants[i].Selected)" value="true"
+                                           @(row.Selected ? "checked" : "") />
+                                    <label class="govuk-label govuk-checkboxes__label" for="@Html.IdFor(m => m.Participants[i].Selected)">
+                                        <span class="govuk-visually-hidden">Select @row.FullName</span>
+                                    </label>
+                                </div>
+                            </div>
+                        </td>
+                        <th class="govuk-table__header" scope="row" style="vertical-align: middle;">@row.FullName</th>
+                        <td class="govuk-table__cell" style="vertical-align: middle;">
+                            <div class="distribution-deadline-readonly" style="display: flex; align-items: center; gap: 10px;" @(expanded ? "hidden" : "")>
+                                @if (!string.IsNullOrEmpty(row.DeadlineChangeReason))
+                                {
+                                    <span title="@($"Change reason: {row.DeadlineChangeReason}")">
+                                        <strong>@row.DeadlineDate.ToString("dd/MM/yyyy")</strong>
+                                        <span class="govuk-visually-hidden"> (Change reason: @row.DeadlineChangeReason)</span>
+                                    </span>
+                                }
+                                else
+                                {
+                                    <span>@row.DeadlineDate.ToString("dd/MM/yyyy")</span>
+                                }
+                                <button type="button" class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0 distribution-change-deadline-toggle" data-reveal="deadline-@i" aria-expanded="@ariaExpanded" aria-controls="deadline-@i">
+                                    Change Deadline Date<span class="govuk-visually-hidden"> for @row.FullName</span>
+                                </button>
+                            </div>
+                            <div class="distribution-deadline-edit" id="deadline-@i" @(expanded ? "" : "hidden")>
+                                <govuk-input asp-for="Participants[i].NewDeadlineDate" label="New Date" label-class="govuk-label govuk-visually-hidden" type="date" input-class="govuk-input govuk-input--width-10" />
+                                <govuk-input asp-for="Participants[i].NewDeadlineReason" label="Reason" label-class="govuk-label govuk-visually-hidden" input-class="govuk-input" />
+                                <div class="govuk-button-group govuk-!-margin-top-2">
+                                    <button type="submit" class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0"
+                                            formaction="@Url.Action("ChangeDeadline", new { year = Model.YearId, monthId = Model.MonthId, schemeId = Model.MonthlyDistributionSchemeId, participantId = row.DistributionParticipantId })">
+                                        Save
+                                    </button>
+                                    <button type="button" class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0 distribution-change-deadline-cancel" data-reveal="deadline-@i">Cancel</button>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                }
+        </tbody>
+    </table>
+    }
+
+    <h3 class="govuk-heading-m">Add Additional Participants</h3>
+    @if (Model.AdditionalParticipants.Count == 0)
+    {
+        <p class="govuk-body">There are no additional participants available for this scheme.</p>
+    }
+    else
+    {
+    <table class="govuk-table">
+        <caption class="govuk-table__caption govuk-visually-hidden">Participants available to be added to this distribution</caption>
+        <thead class="govuk-table__head">
+            <tr class="govuk-table__row">
+                <th scope="col" class="govuk-table__header" style="vertical-align: middle;">
+                    <div class="govuk-checkboxes govuk-checkboxes--small govuk-!-margin-top-0">
+                        <div class="govuk-checkboxes__item">
+                            <input class="govuk-checkboxes__input distribution-select-all" type="checkbox" id="selectAllAdditionalParticipants" data-select-group="additional-participants" aria-label="Select all additional participants" />
+                            <label class="govuk-label govuk-checkboxes__label" for="selectAllAdditionalParticipants"><span class="govuk-visually-hidden">Select all</span></label>
+                        </div>
+                    </div>
+                </th>
+                <th scope="col" class="govuk-table__header" style="vertical-align: middle;">Lab</th>
+            </tr>
+        </thead>
+        <tbody class="govuk-table__body">
+                @for (var i = 0; i < Model.AdditionalParticipants.Count; i++)
+                {
+                    var row = Model.AdditionalParticipants[i];
+                    <tr class="govuk-table__row">
+                        <td class="govuk-table__cell" style="vertical-align: middle;">
+                            <input type="hidden" asp-for="AdditionalParticipants[i].ParticipantSchemeId" />
+                            <div class="govuk-checkboxes govuk-checkboxes--small govuk-!-margin-top-0">
+                                <div class="govuk-checkboxes__item">
+                                    <input class="govuk-checkboxes__input distribution-select-item" type="checkbox" data-select-group="additional-participants"
+                                           id="@Html.IdFor(m => m.AdditionalParticipants[i].Selected)" name="@Html.NameFor(m => m.AdditionalParticipants[i].Selected)" value="true"
+                                           @(row.Selected ? "checked" : "") />
+                                    <label class="govuk-label govuk-checkboxes__label" for="@Html.IdFor(m => m.AdditionalParticipants[i].Selected)">
+                                        <span class="govuk-visually-hidden">Select @row.FullName</span>
+                                    </label>
+                                </div>
+                            </div>
+                        </td>
+                        <th class="govuk-table__header" scope="row" style="vertical-align: middle;">@row.FullName</th>
+                    </tr>
+                }
+        </tbody>
+    </table>
+    }
+
+    <hr class="govuk-section-break govuk-section-break--visible govuk-section-break--m">
+
+    @if (Model.ShowRepeatDistributionButton)
+    {
+        <p class="govuk-error-message" id="repeatDistributionSelectionError" role="alert" hidden>
+            <span class="govuk-visually-hidden">Error:</span> Select at least one participant to be included in the repeat of this distribution.
+        </p>
+    }
+    <div class="govuk-button-group">
+        @if (Model.ShowRepeatDistributionButton)
+        {
+            <button type="submit" class="govuk-button" data-module="govuk-button" id="repeatDistributionButton">Repeat this Distribution</button>
+        }
+        <a class="govuk-button govuk-button--secondary" data-module="govuk-button" asp-action="Schedule" asp-route-year="@Model.YearId" asp-route-monthId="@Model.MonthId">Back</a>
+    </div>
+</form>
+
+@* Legacy selectChecks/checkSelected/checkifchecked (client-side only - no postback). *@
+<script>
+    document.querySelectorAll('.distribution-select-all').forEach(function (toggle) {
+        toggle.addEventListener('change', function () {
+            document.querySelectorAll('.distribution-select-item[data-select-group="' + toggle.dataset.selectGroup + '"]')
+                .forEach(function (item) { item.checked = toggle.checked; });
+        });
+    });
+
+    document.querySelectorAll('.distribution-change-deadline-toggle, .distribution-change-deadline-cancel').forEach(function (button) {
+        button.addEventListener('click', function () {
+            var row = button.closest('td');
+            var editPanel = document.getElementById(button.dataset.reveal);
+            var readOnlyPanel = row.querySelector('.distribution-deadline-readonly');
+            var toggleButton = readOnlyPanel.querySelector('.distribution-change-deadline-toggle');
+
+            // Moving focus here matters: the clicked button lives inside the panel that is
+            // about to be hidden, and hiding a focused element silently drops focus to <body>.
+            readOnlyPanel.hidden = !readOnlyPanel.hidden;
+            editPanel.hidden = !editPanel.hidden;
+            toggleButton.setAttribute('aria-expanded', String(!editPanel.hidden));
+
+            if (editPanel.hidden) {
+                toggleButton.focus();
+            } else {
+                var firstField = editPanel.querySelector('input, select, textarea');
+                (firstField || toggleButton).focus();
+            }
+        });
+    });
+
+    var repeatButton = document.getElementById('repeatDistributionButton');
+    var repeatSelectionError = document.getElementById('repeatDistributionSelectionError');
+    if (repeatButton && repeatSelectionError) {
+        repeatButton.addEventListener('click', function (e) {
+            var anySelected = document.querySelectorAll('.distribution-select-item:checked').length > 0;
+            repeatSelectionError.hidden = anySelected;
+            if (!anySelected) {
+                e.preventDefault();
+            }
+        });
+    }
+</script>

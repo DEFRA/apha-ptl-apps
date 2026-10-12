@@ -88,4 +88,36 @@ public sealed class DistributionApiClient(HttpClient httpClient) : IDistribution
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadFromJsonAsync<IntendedResultsSaveResult>(cancellationToken);
     }
+
+    public async Task<DistributionParticipantsResponse?> GetParticipantsAsync(Guid monthlyDistributionSchemeId, CancellationToken cancellationToken = default)
+    {
+        var response = await httpClient.GetAsync(
+            new Uri($"/api/distributions/schemes/{monthlyDistributionSchemeId}/participants", UriKind.Relative), cancellationToken);
+
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<DistributionParticipantsResponse>(cancellationToken);
+    }
+
+    public async Task<ChangeDeadlineResult?> ChangeDeadlineAsync(
+        Guid monthlyDistributionSchemeId, Guid distributionParticipantId, ChangeDeadlineRequest request, CancellationToken cancellationToken = default)
+    {
+        var response = await httpClient.PutAsJsonAsync(
+            $"/api/distributions/schemes/{monthlyDistributionSchemeId}/participants/{distributionParticipantId}/deadline", request, cancellationToken);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<ChangeDeadlineResult>(cancellationToken);
+    }
+
+    public async Task<RepeatDistributionResult?> RepeatDistributionAsync(
+        Guid monthlyDistributionSchemeId, RepeatDistributionRequest request, CancellationToken cancellationToken = default)
+    {
+        var response = await httpClient.PostAsJsonAsync(
+            $"/api/distributions/schemes/{monthlyDistributionSchemeId}/repeat", request, cancellationToken);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<RepeatDistributionResult>(cancellationToken);
+    }
 }

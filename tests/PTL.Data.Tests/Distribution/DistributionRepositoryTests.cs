@@ -907,4 +907,219 @@ public class DistributionRepositoryTests
         Assert.Equal(auditedId, audit.ParameterValue("SampleResultItemId"));
         Assert.Equal(3, connection.ExecutedCommands.Count(c => c.CommandText == UpdateSampleResultItemSql));
     }
+
+    // spgMonthlyDistributionScheme's 3 result sets for the Distribution Participants screen: the
+    // scheme header (set 1, shared with GetMonthlyDistributionSchemeAsync), the full participant
+    // detail rows (set 2) and the eligible-but-not-enrolled additional participants (set 3).
+    private static DataTable DistributionParticipantTable()
+    {
+        var table = new DataTable();
+        table.Columns.Add("fldDistributionParticipantId", typeof(Guid));
+        table.Columns.Add("fldParticipantId", typeof(Guid));
+        table.Columns.Add("fldLabCode", typeof(string));
+        table.Columns.Add("fldLabName", typeof(string));
+        table.Columns.Add("fldDistributionSchemeId", typeof(Guid));
+        table.Columns.Add("fldMDSDeadlineDate", typeof(DateTime));
+        table.Columns.Add("fldDeadlineDate", typeof(DateTime));
+        table.Columns.Add("fldDeadlineChangeReason", typeof(string));
+        table.Columns.Add("fldContractId", typeof(Guid));
+        table.Columns.Add("fldParticipantSchemeId", typeof(Guid));
+        table.Columns.Add("fldAdditionalParticipant", typeof(bool));
+        table.Columns.Add("fldNumberOfSetsRequired", typeof(int));
+        return table;
+    }
+
+    private static DataTable AdditionalParticipantTable()
+    {
+        var table = new DataTable();
+        table.Columns.Add("fldParticipantId", typeof(Guid));
+        table.Columns.Add("fldLabCode", typeof(string));
+        table.Columns.Add("fldLabName", typeof(string));
+        table.Columns.Add("fldParticipantSchemeId", typeof(Guid));
+        table.Columns.Add("fldContractId", typeof(Guid));
+        table.Columns.Add("fldNumberOfSetsRequired", typeof(int));
+        return table;
+    }
+
+    [Fact]
+    public async Task GetDistributionParticipantsAsync_UnknownScheme_ReturnsNull()
+    {
+        var (repository, connection) = CreateRepository();
+        var dataSet = new DataSet();
+        dataSet.Tables.Add(SchemeTable());
+        dataSet.Tables.Add(DistributionParticipantTable());
+        dataSet.Tables.Add(AdditionalParticipantTable());
+        connection.RespondToQuery(GetSchemeSql, dataSet);
+
+        Assert.Null(await repository.GetDistributionParticipantsAsync(Guid.NewGuid()));
+    }
+
+    [Fact]
+    public async Task GetDistributionParticipantsAsync_ReturnsSchemeParticipantsAndAdditionalParticipants()
+    {
+        var (repository, connection) = CreateRepository();
+        var schemeId = Guid.NewGuid();
+        var participantOneId = Guid.NewGuid();
+        var participantTwoId = Guid.NewGuid();
+
+        var schemes = SchemeTable();
+        schemes.Rows.Add(
+            schemeId, Guid.NewGuid(), Guid.NewGuid(), "PT0060", "Mastitis bovine", "17152", "A", "BA",
+            new DateTime(2026, 4, 1), new DateTime(2026, 4, 1), new DateTime(2026, 4, 5), new DateTime(2026, 4, 10),
+            "Some comments", false, false, false, false, false, new DateTime(2026, 1, 1));
+
+        var participants = DistributionParticipantTable();
+        // Participant One has never had its deadline individually changed - fldDeadlineDate is
+        // NULL in the DB, so the effective deadline must fall back to the scheme's own deadline.
+        participants.Rows.Add(
+            participantOneId, Guid.NewGuid(), "L001", "Lab One", schemeId, new DateTime(2026, 4, 5), DBNull.Value, "",
+            Guid.NewGuid(), Guid.NewGuid(), false, 2);
+        participants.Rows.Add(
+            participantTwoId, Guid.NewGuid(), "L002", "Lab Two", schemeId, new DateTime(2026, 4, 5), new DateTime(2026, 4, 12), "A reason",
+            Guid.NewGuid(), Guid.NewGuid(), true, 3);
+
+        var additionalParticipantId = Guid.NewGuid();
+        var additionalParticipantSchemeId = Guid.NewGuid();
+        var additionalParticipants = AdditionalParticipantTable();
+        additionalParticipants.Rows.Add(additionalParticipantId, "L003", "Lab Three", additionalParticipantSchemeId, Guid.NewGuid(), 4);
+
+        var dataSet = new DataSet();
+        dataSet.Tables.Add(schemes);
+        dataSet.Tables.Add(participants);
+        dataSet.Tables.Add(additionalParticipants);
+        connection.RespondToQuery(GetSchemeSql, dataSet);
+
+        var result = await repository.GetDistributionParticipantsAsync(schemeId);
+
+        Assert.NotNull(result);
+        Assert.Equal(schemeId, result!.Scheme.MonthlyDistributionSchemeId);
+        Assert.Equal("17152A/BA", result.Scheme.DistributionReferenceFull);
+        Assert.Equal(2, result.Scheme.ParticipantCount);
+        Assert.Equal(5, result.Scheme.TotalSetsOfSamplesRequired);
+
+        Assert.Equal(2, result.Participants.Count);
+        var participantOne = result.Participants.Single(p => p.DistributionParticipantId == participantOneId);
+        Assert.Equal("L001: Lab One", participantOne.FullName);
+        Assert.False(participantOne.AdditionalParticipant);
+        Assert.Null(participantOne.DeadlineDate);
+        Assert.Equal(new DateTime(2026, 4, 5), participantOne.EffectiveDeadlineDate);
+        var participantTwo = result.Participants.Single(p => p.DistributionParticipantId == participantTwoId);
+        Assert.Equal("A reason", participantTwo.DeadlineChangeReason);
+        Assert.True(participantTwo.AdditionalParticipant);
+        Assert.Equal(new DateTime(2026, 4, 12), participantTwo.EffectiveDeadlineDate);
+
+        var additional = Assert.Single(result.AdditionalParticipants);
+        Assert.Equal(additionalParticipantId, additional.ParticipantId);
+        Assert.Equal("L003: Lab Three", additional.FullName);
+        Assert.Equal(additionalParticipantSchemeId, additional.ParticipantSchemeId);
+        Assert.Equal(4, additional.NumberOfSetsRequired);
+    }
+
+    private const string UpdateParticipantDeadlineSql = """
+        EXEC dbo.spuDistributionParticipant
+            @DistributionParticipantId = @DistributionParticipantId,
+            @ParticipantId = @ParticipantId,
+            @MonthlyDistributionSchemeId = @MonthlyDistributionSchemeId,
+            @DeadlineDate = @DeadlineDate,
+            @DeadlineChangeReason = @DeadlineChangeReason,
+            @AdditionalParticipant = @AdditionalParticipant
+        """;
+
+    [Fact]
+    public async Task UpdateParticipantDeadlineAsync_ExecutesSpuDistributionParticipantWithTheNewValues()
+    {
+        var (repository, connection) = CreateRepository();
+        connection.RespondToNonQuery(UpdateParticipantDeadlineSql, 1);
+
+        var participant = new PTL.Core.Distribution.DistributionParticipantEntity
+        {
+            DistributionParticipantId = Guid.NewGuid(),
+            ParticipantId = Guid.NewGuid(),
+            MonthlyDistributionSchemeId = Guid.NewGuid(),
+            DeadlineDate = new DateTime(2026, 5, 15),
+            DeadlineChangeReason = "Supplier delay",
+            AdditionalParticipant = true,
+        };
+
+        await repository.UpdateParticipantDeadlineAsync(participant);
+
+        var command = Assert.Single(connection.ExecutedCommands, c => c.CommandText == UpdateParticipantDeadlineSql);
+        Assert.Equal(participant.DistributionParticipantId, command.ParameterValue("DistributionParticipantId"));
+        Assert.Equal(new DateTime(2026, 5, 15), command.ParameterValue("DeadlineDate"));
+        Assert.Equal("Supplier delay", command.ParameterValue("DeadlineChangeReason"));
+        Assert.Equal(true, command.ParameterValue("AdditionalParticipant"));
+    }
+
+    private const string InsertSchemeSql = """
+        EXEC dbo.spiMonthlyDistributionScheme
+            @MonthlyDistributionSchemeId = @MonthlyDistributionSchemeId,
+            @MonthlyDistributionId = @MonthlyDistributionId,
+            @SchemeId = @SchemeId,
+            @MonthlyDistributionReference = @DistributionReference,
+            @MonthlyDistributionReferenceSuffix = @DistributionReferenceSuffix,
+            @MonthlyDistributionDate = @DistributionDate,
+            @DeadlineDate = @DeadlineDate,
+            @OverseasPostingDate = @OverseasPostingDate,
+            @ResultsIssueTargetDate = @ResultsIssueTargetDate,
+            @Comments = @Comments,
+            @HasIntendedResults = @HasIntendedResults,
+            @HasSampleNumbersDefined = @HasSampleNumbersDefined,
+            @IsCancelled = @IsCancelled,
+            @StoreRatings = @StoreRatings,
+            @SchemeVersionDate = @SchemeVersionDate
+        """;
+
+    private const string InsertParticipantSql = """
+        EXEC dbo.spiDistributionParticipant
+            @DistributionParticipantId = @DistributionParticipantId,
+            @ParticipantId = @ParticipantId,
+            @MonthlyDistributionSchemeId = @MonthlyDistributionSchemeId,
+            @DeadlineDate = @DeadlineDate,
+            @DeadlineChangeReason = @DeadlineChangeReason,
+            @AdditionalParticipant = @AdditionalParticipant
+        """;
+
+    [Fact]
+    public async Task RepeatDistributionAsync_NoParticipants_InsertsOnlyTheSchemeAndCommits()
+    {
+        var (repository, connection) = CreateRepository();
+        connection.RespondToNonQuery(InsertSchemeSql, 1);
+
+        var newScheme = new PTL.Core.Distribution.MonthlyDistributionSchemeEntity { MonthlyDistributionSchemeId = Guid.NewGuid() };
+
+        await repository.RepeatDistributionAsync(newScheme, []);
+
+        Assert.Single(connection.ExecutedCommands, c => c.CommandText == InsertSchemeSql);
+        Assert.DoesNotContain(connection.ExecutedCommands, c => c.CommandText == InsertParticipantSql);
+        Assert.True(connection.LastTransaction!.Committed);
+    }
+
+    [Fact]
+    public async Task RepeatDistributionAsync_InsertsTheSchemeThenEachParticipantAndCommits()
+    {
+        var (repository, connection) = CreateRepository();
+        connection.RespondToNonQuery(InsertSchemeSql, 1);
+        connection.RespondToNonQuery(InsertParticipantSql, 1);
+
+        var newSchemeId = Guid.NewGuid();
+        var newScheme = new PTL.Core.Distribution.MonthlyDistributionSchemeEntity
+        {
+            MonthlyDistributionSchemeId = newSchemeId,
+            DistributionReference = "17152",
+            DistributionReferenceSuffix = "a",
+        };
+        var newParticipants = new List<PTL.Core.Distribution.DistributionParticipantEntity>
+        {
+            new() { DistributionParticipantId = Guid.NewGuid(), MonthlyDistributionSchemeId = newSchemeId },
+            new() { DistributionParticipantId = Guid.NewGuid(), MonthlyDistributionSchemeId = newSchemeId },
+        };
+
+        await repository.RepeatDistributionAsync(newScheme, newParticipants);
+
+        var schemeCommand = Assert.Single(connection.ExecutedCommands, c => c.CommandText == InsertSchemeSql);
+        Assert.Equal(newSchemeId, schemeCommand.ParameterValue("MonthlyDistributionSchemeId"));
+        Assert.Equal("a", schemeCommand.ParameterValue("DistributionReferenceSuffix"));
+        Assert.Equal(2, connection.ExecutedCommands.Count(c => c.CommandText == InsertParticipantSql));
+        Assert.True(connection.LastTransaction!.Committed);
+    }
 }

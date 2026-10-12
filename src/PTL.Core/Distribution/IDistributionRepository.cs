@@ -56,4 +56,23 @@ public interface IDistributionRepository
     // spiAuditSampleResultItem each run immediately BEFORE their row's own spu* call, because the
     // audit procedure records the row's CURRENT (pre-update) value.
     Task UpdateIntendedResultsAsync(IntendedResultsWrite write, CancellationToken cancellationToken = default);
+
+    // spgMonthlyDistributionScheme - all 3 result sets (scheme header, Participants,
+    // AdditionalParticipants), legacy DistributionParticipantList.aspx's LoadMonthlyDistributionScheme.
+    // Returns null when the id does not resolve (including outside the seven-year retention window).
+    Task<DistributionParticipantsData?> GetDistributionParticipantsAsync(
+        Guid monthlyDistributionSchemeId, CancellationToken cancellationToken = default);
+
+    // spuDistributionParticipant - legacy DistributionParticipant.SetNewDeadlineDate followed by
+    // MonthlyDistributionScheme.Save() (CSLA only sends an UPDATE for the one dirty child).
+    Task UpdateParticipantDeadlineAsync(DistributionParticipantEntity participant, CancellationToken cancellationToken = default);
+
+    // spiMonthlyDistributionScheme + spiDistributionParticipant x N in a single transaction -
+    // legacy MonthlyDistribution.RepeatDistribution followed by MonthlyDistribution.Save(). The
+    // suffix/new participant rows are computed by the caller (IDistributionParticipantsService)
+    // from a fresh GetMonthlyDistributionSchedulesAsync read - no new stored procedure is used.
+    Task RepeatDistributionAsync(
+        MonthlyDistributionSchemeEntity newScheme,
+        IReadOnlyList<DistributionParticipantEntity> newParticipants,
+        CancellationToken cancellationToken = default);
 }

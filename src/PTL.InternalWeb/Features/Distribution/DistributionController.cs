@@ -12,12 +12,12 @@ namespace PTL.InternalWeb.Features.Distribution;
 //
 // SCOPE: the Dashboard (year selection, month rows, progress indicators, "Initialise this Month"
 // visibility/confirmation), the Monthly Distributions scheduling screen (dates, Cancel/
-// Commence, Save/Apply/Cancel), the Sample Numbers screen and the Intended Results screen are
-// implemented. The Preparation/Packaging/Results/Tabulations "View" links and the Participants
-// link reached FROM Scheduling, plus "Initialise this Month" itself, all remain placeholders
-// (ViewStage/InitialiseMonth below) - those workflows (and the exact legacy persisted-save chain
-// behind Initialise) are out of scope and flagged [NEEDS INVESTIGATION] in
-// docs/migration/distribution-migration.md.
+// Commence, Save/Apply/Cancel), the Sample Numbers screen, the Intended Results screen, and the
+// Distribution Participants screen (view, Change Deadline Date, Repeat Distribution) are
+// implemented. The Preparation/Packaging/Results/Tabulations "View" links, plus "Initialise this
+// Month" itself, all remain placeholders (ViewStage/InitialiseMonth below) - those workflows (and
+// the exact legacy persisted-save chain behind Initialise) are out of scope and flagged [NEEDS
+// INVESTIGATION] in docs/migration/distribution-migration.md.
 public sealed class DistributionController(IDistributionApiClient distributionApiClient) : Controller
 {
     private static readonly string[] MonthOrder = ["Scheduling", "Preparation", "Packaging", "Results", "Tabulations"];
@@ -637,8 +637,113 @@ public sealed class DistributionController(IDistributionApiClient distributionAp
             })],
         };
 
+    // Distribution Participants - legacy Scheduling/DistributionParticipantList.aspx. Reached from
+    // the Scheduling screen's "View Participants" link.
+    [HttpGet]
+    public async Task<IActionResult> Participants(int year, int monthId, Guid schemeId, CancellationToken cancellationToken)
+    {
+        var data = await distributionApiClient.GetParticipantsAsync(schemeId, cancellationToken);
+        return data is null ? NotFound() : View(ToParticipantsViewModel(year, monthId, data));
+    }
+
+    // Change Deadline Date - legacy gridParticipants_RowCommand (lnkSaveNewDeadline). Each row has
+    // its own ValidationGroup in legacy, so only the row being saved is validated/applied here;
+    // every other row's posted values are ignored and redisplay uses fresh server data.
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ChangeDeadline(
+        int year, int monthId, Guid schemeId, Guid participantId, DistributionParticipantsViewModel model, CancellationToken cancellationToken)
+    {
+        var row = model.Participants.FirstOrDefault(p => p.DistributionParticipantId == participantId);
+        var result = await distributionApiClient.ChangeDeadlineAsync(
+            schemeId, participantId, new ChangeDeadlineRequest(row?.NewDeadlineDate, row?.NewDeadlineReason), cancellationToken);
+
+        if (result is null || !result.Success)
+        {
+            if (result is null)
+            {
+                TempData.SetNotification(NotificationType.Error, "The deadline date could not be saved. Please try again later.");
+            }
+            else
+            {
+                var rowIndex = model.Participants.FindIndex(p => p.DistributionParticipantId == participantId);
+                if (result.NewDeadlineDateError is not null)
+                {
+                    ModelState.AddModelError($"{nameof(model.Participants)}[{rowIndex}].{nameof(DistributionParticipantRowViewModel.NewDeadlineDate)}", result.NewDeadlineDateError);
+                }
+
+                if (result.ReasonError is not null)
+                {
+                    ModelState.AddModelError($"{nameof(model.Participants)}[{rowIndex}].{nameof(DistributionParticipantRowViewModel.NewDeadlineReason)}", result.ReasonError);
+                }
+            }
+
+            return View(nameof(Participants), await RehydrateParticipantsAsync(year, monthId, schemeId, model, cancellationToken));
+        }
+
+        TempData.SetNotification(NotificationType.Success, "Deadline Date updated successfully.");
+        return RedirectToAction(nameof(Participants), new { year, monthId, schemeId });
+    }
+
+    // Repeat this Distribution - legacy btnRepeatDistribution_Click. "Please tick at least one
+    // participant..." mirrors legacy's client-side checkifchecked() guard, re-enforced server-side.
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> RepeatDistribution(int year, int monthId, Guid schemeId, DistributionParticipantsViewModel model, CancellationToken cancellationToken)
+    {
+        var selections = model.Participants.Where(p => p.Selected).Select(p => new ParticipantSelectionRequest(p.DistributionParticipantId, false))
+            .Concat(model.AdditionalParticipants.Where(p => p.Selected).Select(p => new ParticipantSelectionRequest(p.ParticipantSchemeId, true)))
+            .ToList();
+
+        var result = await distributionApiClient.RepeatDistributionAsync(schemeId, new RepeatDistributionRequest(selections), cancellationToken);
+
+        if (result is null || !result.Success)
+        {
+            TempData.SetNotification(
+                NotificationType.Error,
+                result?.Error ?? "The distribution could not be repeated. Please try again later.");
+            return View(nameof(Participants), await RehydrateParticipantsAsync(year, monthId, schemeId, model, cancellationToken));
+        }
+
+        TempData.SetNotification(NotificationType.Success, "Distribution repeated successfully.");
+        return RedirectToAction(nameof(Schedule), new { year, monthId });
+    }
+
+    private async Task<DistributionParticipantsViewModel> RehydrateParticipantsAsync(
+        int year, int monthId, Guid schemeId, DistributionParticipantsViewModel posted, CancellationToken cancellationToken)
+    {
+        var data = await distributionApiClient.GetParticipantsAsync(schemeId, cancellationToken);
+        return data is null ? posted : ToParticipantsViewModel(year, monthId, data);
+    }
+
+    private static DistributionParticipantsViewModel ToParticipantsViewModel(int year, int monthId, DistributionParticipantsResponse data) =>
+        new()
+        {
+            MonthlyDistributionSchemeId = data.MonthlyDistributionSchemeId,
+            YearId = year,
+            MonthId = monthId,
+            SchemeIdentifier = data.SchemeIdentifier,
+            SchemeName = data.SchemeName,
+            DistributionReferenceFull = data.DistributionReferenceFull,
+            IsRepeatDistribution = data.IsRepeatDistribution,
+            Participants = [.. data.Participants.Select(p => new DistributionParticipantRowViewModel
+            {
+                DistributionParticipantId = p.DistributionParticipantId,
+                FullName = p.FullName,
+                DeadlineDate = p.DeadlineDate,
+                DeadlineChangeReason = p.DeadlineChangeReason,
+                AdditionalParticipant = p.AdditionalParticipant,
+            })],
+            AdditionalParticipants = [.. data.AdditionalParticipants.Select(p => new DistributionAdditionalParticipantRowViewModel
+            {
+                ParticipantSchemeId = p.ParticipantSchemeId,
+                FullName = p.FullName,
+            })],
+        };
+
     private static MonthlyDistributionScheduleRowRequest ToRowRequest(MonthlyDistributionScheduleRowViewModel row) =>
         new(row.MonthlyDistributionSchemeId, row.DistributionDate!.Value, row.OverseasPostingDate!.Value, row.DeadlineDate!.Value, row.ResultsIssueTargetDate!.Value, row.IsCancelled);
+
 
     private static MonthlyDistributionScheduleViewModel ToScheduleViewModel(int year, int monthId, MonthlyDistributionResponse schedule) =>
         new()

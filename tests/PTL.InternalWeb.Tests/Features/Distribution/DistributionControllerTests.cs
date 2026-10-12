@@ -332,4 +332,240 @@ public class DistributionControllerTests
         var updatedModel = Assert.IsType<MonthlyDistributionScheduleViewModel>(view.Model);
         Assert.False(updatedModel.Schemes.Single().IsCancelled);
     }
+
+    private static readonly Guid ParticipantsSchemeId = Guid.Parse("11111111-1111-1111-1111-111111111111");
+    private static readonly Guid DistributionParticipantId = Guid.Parse("22222222-2222-2222-2222-222222222222");
+    private static readonly Guid AdditionalParticipantSchemeId = Guid.Parse("33333333-3333-3333-3333-333333333333");
+
+    private static DistributionParticipantsResponse ParticipantsResponse(bool isRepeatDistribution = false) =>
+        new(
+            ParticipantsSchemeId,
+            2026,
+            4,
+            "PT0060",
+            "Mastitis bovine",
+            "17152A/BA",
+            isRepeatDistribution,
+            [new DistributionParticipantResponse(DistributionParticipantId, "L001: Lab One", new DateTime(2026, 4, 5), string.Empty, false)],
+            [new DistributionAdditionalParticipantResponse(AdditionalParticipantSchemeId, "L002: Lab Two")]);
+
+    [Fact]
+    public async Task Participants_Get_UnknownScheme_ReturnsNotFound()
+    {
+        var controller = CreateController(new FakeDistributionApiClient());
+
+        var result = await controller.Participants(2026, 4, ParticipantsSchemeId, CancellationToken.None);
+
+        Assert.IsType<NotFoundResult>(result);
+    }
+
+    [Fact]
+    public async Task Participants_Get_MapsResponseOntoViewModel()
+    {
+        var apiClient = new FakeDistributionApiClient { Participants = ParticipantsResponse(isRepeatDistribution: true) };
+        var controller = CreateController(apiClient);
+
+        var result = await controller.Participants(2026, 4, ParticipantsSchemeId, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<DistributionParticipantsViewModel>(view.Model);
+        Assert.Equal(ParticipantsSchemeId, model.MonthlyDistributionSchemeId);
+        Assert.Equal(2026, model.YearId);
+        Assert.Equal(4, model.MonthId);
+        Assert.Equal("PT0060: Mastitis bovine", model.SchemeHeading);
+        Assert.True(model.IsRepeatDistribution);
+        Assert.Equal("Repeat Distribution", model.DistributionListTitle);
+        var participant = Assert.Single(model.Participants);
+        Assert.Equal(DistributionParticipantId, participant.DistributionParticipantId);
+        Assert.Equal("L001: Lab One", participant.FullName);
+        Assert.Equal("L002: Lab Two", Assert.Single(model.AdditionalParticipants).FullName);
+    }
+
+    private static DistributionParticipantsViewModel PostedParticipantsModel(DateTime? newDate = null, string? newReason = null) => new()
+    {
+        MonthlyDistributionSchemeId = ParticipantsSchemeId,
+        YearId = 2026,
+        MonthId = 4,
+        Participants =
+        [
+            new DistributionParticipantRowViewModel
+            {
+                DistributionParticipantId = DistributionParticipantId,
+                FullName = "L001: Lab One",
+                DeadlineDate = new DateTime(2026, 4, 5),
+                NewDeadlineDate = newDate,
+                NewDeadlineReason = newReason,
+            },
+        ],
+    };
+
+    [Fact]
+    public async Task ChangeDeadline_Post_Success_ShowsSuccessNotificationAndRedirectsToParticipants()
+    {
+        var apiClient = new FakeDistributionApiClient { ChangeDeadlineResult = new ChangeDeadlineResult(true, null, null) };
+        var controller = CreateController(apiClient);
+        var model = PostedParticipantsModel(new DateTime(2026, 5, 1), "A reason");
+
+        var result = await controller.ChangeDeadline(2026, 4, ParticipantsSchemeId, DistributionParticipantId, model, CancellationToken.None);
+
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal(nameof(DistributionController.Participants), redirect.ActionName);
+        var notification = controller.TempData.GetNotification();
+        Assert.Equal(NotificationType.Success, notification!.Type);
+        Assert.Equal("Deadline Date updated successfully.", notification.Message);
+        var saved = Assert.Single(apiClient.SavedDeadlines);
+        Assert.Equal(DistributionParticipantId, saved.DistributionParticipantId);
+        Assert.Equal(new DateTime(2026, 5, 1), saved.Request.NewDeadlineDate);
+        Assert.Equal("A reason", saved.Request.Reason);
+    }
+
+    [Fact]
+    public async Task ChangeDeadline_Post_ValidationFailure_AddsFieldErrorsAndRehydrates()
+    {
+        var apiClient = new FakeDistributionApiClient
+        {
+            ChangeDeadlineResult = new ChangeDeadlineResult(false, "Deadline Date required.", "A reason for changing the deadline date is required."),
+            Participants = ParticipantsResponse(),
+        };
+        var controller = CreateController(apiClient);
+        var model = PostedParticipantsModel(null, null);
+
+        var result = await controller.ChangeDeadline(2026, 4, ParticipantsSchemeId, DistributionParticipantId, model, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        Assert.Equal(nameof(DistributionController.Participants), view.ViewName);
+        Assert.False(controller.ModelState.IsValid);
+        Assert.True(controller.ModelState.ContainsKey($"{nameof(model.Participants)}[0].{nameof(DistributionParticipantRowViewModel.NewDeadlineDate)}"));
+        Assert.True(controller.ModelState.ContainsKey($"{nameof(model.Participants)}[0].{nameof(DistributionParticipantRowViewModel.NewDeadlineReason)}"));
+        Assert.Null(controller.TempData.GetNotification());
+    }
+
+    // Repository could not find the participant - distinct from a validation failure, so no field
+    // errors are added, only the page is redisplayed with fresh data.
+    [Fact]
+    public async Task ChangeDeadline_Post_ParticipantNotFound_RedisplaysWithoutFieldErrorsOrNotification()
+    {
+        var apiClient = new FakeDistributionApiClient
+        {
+            ChangeDeadlineResult = new ChangeDeadlineResult(false, null, null),
+            Participants = ParticipantsResponse(),
+        };
+        var controller = CreateController(apiClient);
+        var model = PostedParticipantsModel(new DateTime(2026, 5, 1), "A reason");
+
+        var result = await controller.ChangeDeadline(2026, 4, ParticipantsSchemeId, DistributionParticipantId, model, CancellationToken.None);
+
+        Assert.IsType<ViewResult>(result);
+        Assert.True(controller.ModelState.IsValid);
+        Assert.Null(controller.TempData.GetNotification());
+    }
+
+    [Fact]
+    public async Task ChangeDeadline_Post_ApiUnavailable_ShowsErrorNotificationAndRehydrates()
+    {
+        var apiClient = new FakeDistributionApiClient { ChangeDeadlineResult = null, Participants = ParticipantsResponse() };
+        var controller = CreateController(apiClient);
+        var model = PostedParticipantsModel(new DateTime(2026, 5, 1), "A reason");
+
+        var result = await controller.ChangeDeadline(2026, 4, ParticipantsSchemeId, DistributionParticipantId, model, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        Assert.IsType<DistributionParticipantsViewModel>(view.Model);
+        var notification = controller.TempData.GetNotification();
+        Assert.Equal(NotificationType.Error, notification!.Type);
+        Assert.Equal("The deadline date could not be saved. Please try again later.", notification.Message);
+    }
+
+    private static DistributionParticipantsViewModel PostedRepeatModel(bool selectParticipant = true, bool selectAdditional = false) => new()
+    {
+        MonthlyDistributionSchemeId = ParticipantsSchemeId,
+        YearId = 2026,
+        MonthId = 4,
+        Participants = [new DistributionParticipantRowViewModel { DistributionParticipantId = DistributionParticipantId, Selected = selectParticipant }],
+        AdditionalParticipants = [new DistributionAdditionalParticipantRowViewModel { ParticipantSchemeId = AdditionalParticipantSchemeId, Selected = selectAdditional }],
+    };
+
+    [Fact]
+    public async Task RepeatDistribution_Post_Success_ShowsSuccessNotificationAndRedirectsToSchedule()
+    {
+        var apiClient = new FakeDistributionApiClient { RepeatDistributionResult = new RepeatDistributionResult(true, null) };
+        var controller = CreateController(apiClient);
+        var model = PostedRepeatModel();
+
+        var result = await controller.RepeatDistribution(2026, 4, ParticipantsSchemeId, model, CancellationToken.None);
+
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal(nameof(DistributionController.Schedule), redirect.ActionName);
+        Assert.Equal(2026, redirect.RouteValues!["year"]);
+        Assert.Equal(4, redirect.RouteValues["monthId"]);
+        var notification = controller.TempData.GetNotification();
+        Assert.Equal(NotificationType.Success, notification!.Type);
+        Assert.Equal("Distribution repeated successfully.", notification.Message);
+        var saved = Assert.Single(apiClient.SavedRepeatRequests);
+        Assert.Contains(saved.Selections, s => s.Id == DistributionParticipantId && !s.IsAdditional);
+    }
+
+    [Fact]
+    public async Task RepeatDistribution_Post_MixesOriginalAndAdditionalSelections()
+    {
+        var apiClient = new FakeDistributionApiClient { RepeatDistributionResult = new RepeatDistributionResult(true, null) };
+        var controller = CreateController(apiClient);
+        var model = PostedRepeatModel(selectParticipant: true, selectAdditional: true);
+
+        await controller.RepeatDistribution(2026, 4, ParticipantsSchemeId, model, CancellationToken.None);
+
+        var saved = Assert.Single(apiClient.SavedRepeatRequests);
+        Assert.Equal(2, saved.Selections.Count);
+        Assert.Contains(saved.Selections, s => s.Id == AdditionalParticipantSchemeId && s.IsAdditional);
+    }
+
+    // Legacy client-side checkifchecked() guard, re-enforced server-side.
+    [Fact]
+    public async Task RepeatDistribution_Post_EmptySelection_ShowsApiErrorMessageAndRedisplays()
+    {
+        var apiClient = new FakeDistributionApiClient
+        {
+            RepeatDistributionResult = new RepeatDistributionResult(false, "Please tick at least one participant to be included in the repeat of this distribution."),
+            Participants = ParticipantsResponse(),
+        };
+        var controller = CreateController(apiClient);
+        var model = PostedRepeatModel(selectParticipant: false, selectAdditional: false);
+
+        var result = await controller.RepeatDistribution(2026, 4, ParticipantsSchemeId, model, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        Assert.Equal(nameof(DistributionController.Participants), view.ViewName);
+        var notification = controller.TempData.GetNotification();
+        Assert.Equal(NotificationType.Error, notification!.Type);
+        Assert.Equal("Please tick at least one participant to be included in the repeat of this distribution.", notification.Message);
+    }
+
+    [Fact]
+    public async Task RepeatDistribution_Post_ApiUnavailable_ShowsDefaultErrorNotification()
+    {
+        var apiClient = new FakeDistributionApiClient { RepeatDistributionResult = null, Participants = ParticipantsResponse() };
+        var controller = CreateController(apiClient);
+        var model = PostedRepeatModel();
+
+        var result = await controller.RepeatDistribution(2026, 4, ParticipantsSchemeId, model, CancellationToken.None);
+
+        Assert.IsType<ViewResult>(result);
+        var notification = controller.TempData.GetNotification();
+        Assert.Equal(NotificationType.Error, notification!.Type);
+        Assert.Equal("The distribution could not be repeated. Please try again later.", notification.Message);
+    }
+
+    // Rehydration itself cannot reach the API - the originally posted model is redisplayed as-is.
+    [Fact]
+    public async Task RepeatDistribution_Post_RehydrationApiReturnsNull_KeepsPostedModel()
+    {
+        var apiClient = new FakeDistributionApiClient { RepeatDistributionResult = null, Participants = null };
+        var controller = CreateController(apiClient);
+        var model = PostedRepeatModel();
+
+        var result = await controller.RepeatDistribution(2026, 4, ParticipantsSchemeId, model, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        Assert.Same(model, view.Model);
+    }
 }

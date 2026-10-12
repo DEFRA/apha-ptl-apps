@@ -15,6 +15,7 @@ public class DistributionControllerTests
             new DistributionService(repository),
             new SampleNumbersService(repository, schemeService ?? new FakeSchemeService()),
             new IntendedResultsService(repository),
+            new DistributionParticipantsService(repository),
             Microsoft.Extensions.Logging.Abstractions.NullLogger<DistributionController>.Instance);
 
     // ValidationProblem() resolves ProblemDetailsFactory from HttpContext.RequestServices,
@@ -615,5 +616,123 @@ public class DistributionControllerTests
         var response = Assert.IsType<IntendedResultsSaveResult>(ok.Value);
         Assert.False(response.Success);
         Assert.Empty(response.FieldErrorsByItemId);
+    }
+
+    private static readonly Guid ParticipantsSchemeId = Guid.Parse("bbbbbbbb-1111-1111-1111-111111111111");
+    private static readonly Guid DistributionParticipantId = Guid.Parse("bbbbbbbb-2222-2222-2222-222222222222");
+
+    private static FakeDistributionRepository ParticipantsRepository()
+    {
+        var repository = new FakeDistributionRepository();
+        repository.ParticipantsByScheme[ParticipantsSchemeId] = new DistributionParticipantsData(
+            new MonthlyDistributionSchemeEntity
+            {
+                MonthlyDistributionSchemeId = ParticipantsSchemeId,
+                YearId = 2026,
+                MonthId = 4,
+                SchemeIdentifier = "PT0060",
+                SchemeName = "Mastitis bovine",
+                DistributionReference = "17152",
+                DistributionReferenceSuffix = "A",
+                ScheduleCode = "BA",
+                DeadlineDate = new DateTime(2026, 4, 5),
+            },
+            [new DistributionParticipantEntity
+            {
+                DistributionParticipantId = DistributionParticipantId,
+                ParticipantId = Guid.NewGuid(),
+                LabCode = "L001",
+                LabName = "Lab One",
+                MonthlyDistributionSchemeId = ParticipantsSchemeId,
+                DeadlineDate = new DateTime(2026, 4, 5),
+            }],
+            []);
+        return repository;
+    }
+
+    [Fact]
+    public async Task GetParticipants_UnknownScheme_ReturnsNotFound()
+    {
+        var controller = CreateController(new FakeDistributionRepository());
+
+        var result = await controller.GetParticipants(ParticipantsSchemeId, CancellationToken.None);
+
+        Assert.IsType<NotFoundResult>(result.Result);
+    }
+
+    [Fact]
+    public async Task GetParticipants_KnownScheme_ReturnsMappedResponse()
+    {
+        var controller = CreateController(ParticipantsRepository());
+
+        var result = await controller.GetParticipants(ParticipantsSchemeId, CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var response = Assert.IsType<DistributionParticipantsResponse>(ok.Value);
+        Assert.Equal(ParticipantsSchemeId, response.MonthlyDistributionSchemeId);
+        Assert.Equal("17152A/BA", response.DistributionReferenceFull);
+        Assert.True(response.IsRepeatDistribution);
+        var participant = Assert.Single(response.Participants);
+        Assert.Equal(DistributionParticipantId, participant.DistributionParticipantId);
+        Assert.Equal("L001: Lab One", participant.FullName);
+    }
+
+    [Fact]
+    public async Task ChangeDeadline_Valid_ReturnsSuccessfulResultAndWritesTheChange()
+    {
+        var repository = ParticipantsRepository();
+        var controller = CreateController(repository);
+
+        var result = await controller.ChangeDeadline(
+            ParticipantsSchemeId, DistributionParticipantId, new ChangeDeadlineRequest(new DateTime(2026, 5, 1), "A reason"), CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var response = Assert.IsType<ChangeDeadlineResult>(ok.Value);
+        Assert.True(response.Success);
+        Assert.Single(repository.UpdatedParticipantDeadlines);
+    }
+
+    [Fact]
+    public async Task ChangeDeadline_Invalid_EchoesBackTheValidationErrors()
+    {
+        var controller = CreateController(ParticipantsRepository());
+
+        var result = await controller.ChangeDeadline(
+            ParticipantsSchemeId, DistributionParticipantId, new ChangeDeadlineRequest(null, null), CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var response = Assert.IsType<ChangeDeadlineResult>(ok.Value);
+        Assert.False(response.Success);
+        Assert.Equal("Deadline Date required.", response.NewDeadlineDateError);
+        Assert.Equal("A reason for changing the deadline date is required.", response.ReasonError);
+    }
+
+    [Fact]
+    public async Task RepeatDistribution_Valid_ReturnsSuccessfulResultAndWritesANewScheme()
+    {
+        var repository = ParticipantsRepository();
+        var controller = CreateController(repository);
+
+        var request = new RepeatDistributionRequest([new ParticipantSelectionRequest(DistributionParticipantId, false)]);
+        var result = await controller.RepeatDistribution(ParticipantsSchemeId, request, CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var response = Assert.IsType<RepeatDistributionResult>(ok.Value);
+        Assert.True(response.Success);
+        Assert.Single(repository.RepeatedDistributions);
+    }
+
+    [Fact]
+    public async Task RepeatDistribution_NoSelections_ReturnsLegacyValidationMessage()
+    {
+        var controller = CreateController(ParticipantsRepository());
+
+        var request = new RepeatDistributionRequest([]);
+        var result = await controller.RepeatDistribution(ParticipantsSchemeId, request, CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var response = Assert.IsType<RepeatDistributionResult>(ok.Value);
+        Assert.False(response.Success);
+        Assert.Equal("Please tick at least one participant to be included in the repeat of this distribution.", response.Error);
     }
 }
