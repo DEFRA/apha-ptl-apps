@@ -3,7 +3,10 @@
     <div class="govuk-header">
         <div class="govuk-header__container govuk-width-container">
             <div class="govuk-header__content">
-                <span class="govuk-header__link govuk-header__service-name">@Model.ServiceName</span>
+                @* govuk-header__content/__link/__service-name have no rules in govuk-frontend
+                   6.5.0 (stale pre-v5 class names) - govuk-header__product-name is the only real
+                   class this bundle ships for prominent header text (font-size: 1.9375rem). *@
+                <span class="govuk-header__product-name">@Model.ServiceName</span>
             </div>
         </div>
     </div>
