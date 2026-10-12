@@ -83,6 +83,9 @@ public static class DapperColumnMappings
     private const string ColVatRating = "fldVatRating";
     private const string ColInactiveDate = "fldInactiveDate";
     private const string ColTestId = "fldTestId";
+    private const string ColFormatString = "FormatString";
+    private const string ColReturnValueType = "ReturnValueType";
+    private const string ColIntendedResult = "fldIntendedResult";
     private const string ColComments = "fldComments";
     private const string ColCategoryItemId = "fldCategoryItemId";
 
@@ -760,16 +763,35 @@ public static class DapperColumnMappings
         {
             ["fldTestMethodItemId"] = nameof(DistributionTestMethodItemEntity.TestMethodItemId),
             [ColTestId] = nameof(DistributionTestMethodItemEntity.TestId),
+            ["fldTestMethodItemTypeId"] = nameof(DistributionTestMethodItemEntity.TestMethodItemTypeId),
             ["TestMethodItemTypeName"] = nameof(DistributionTestMethodItemEntity.Name),
             [ColOrder] = nameof(DistributionTestMethodItemEntity.Order),
+            ["fldIsApplicable"] = nameof(DistributionTestMethodItemEntity.IsApplicable),
+            [ColFormatString] = nameof(DistributionTestMethodItemEntity.FormatString),
+            [ColReturnValueType] = nameof(DistributionTestMethodItemEntity.ReturnValueType),
+            [ColIntendedResult] = nameof(DistributionTestMethodItemEntity.IntendedResult),
         });
 
         Map<DistributionTestResultItemEntity>(new(StringComparer.OrdinalIgnoreCase)
         {
             ["fldTestResultItemId"] = nameof(DistributionTestResultItemEntity.TestResultItemId),
             [ColTestId] = nameof(DistributionTestResultItemEntity.TestId),
+            ["fldTestResultItemTypeId"] = nameof(DistributionTestResultItemEntity.TestResultItemTypeId),
             ["TestResultItemTypeName"] = nameof(DistributionTestResultItemEntity.Name),
             [ColOrder] = nameof(DistributionTestResultItemEntity.Order),
+            [ColFormatString] = nameof(DistributionTestResultItemEntity.FormatString),
+            [ColReturnValueType] = nameof(DistributionTestResultItemEntity.ReturnValueType),
+            ["fldIsRange"] = nameof(DistributionTestResultItemEntity.IsRange),
+        });
+
+        Map<DistributionSampleResultItemEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldSampleResultItemId"] = nameof(DistributionSampleResultItemEntity.SampleResultItemId),
+            ["fldSampleId"] = nameof(DistributionSampleResultItemEntity.SampleId),
+            ["fldSampleTestId"] = nameof(DistributionSampleResultItemEntity.SampleTestId),
+            ["fldTestResultItemId"] = nameof(DistributionSampleResultItemEntity.TestResultItemId),
+            [ColIntendedResult] = nameof(DistributionSampleResultItemEntity.IntendedResult),
+            ["fldIntendedResult2"] = nameof(DistributionSampleResultItemEntity.IntendedResult2),
         });
 
         Map<DistributionCategoryItemEntity>(new(StringComparer.OrdinalIgnoreCase)

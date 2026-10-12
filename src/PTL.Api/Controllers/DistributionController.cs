@@ -13,6 +13,7 @@ namespace PTL.Api.Controllers;
 public sealed class DistributionController(
     IDistributionService distributionService,
     ISampleNumbersService sampleNumbersService,
+    IIntendedResultsService intendedResultsService,
     ILogger<DistributionController> logger) : ControllerBase
 {
     private static readonly Action<ILogger, Guid, Exception?> LogStructureCreationFailedMessage =
@@ -129,6 +130,72 @@ public sealed class DistributionController(
             outcome.AuditReasonRequired,
             outcome.AuditObjectName));
     }
+
+    // GET /api/distributions/schemes/{monthlyDistributionSchemeId}/intended-results - legacy
+    // IntendedResultsSet.FetchIntendedResults, gated on HasSampleNumbersDefined - legacy's silent
+    // LeavePage() when sample numbers are not yet defined, so a 404 here carries no error message.
+    [HttpGet("schemes/{monthlyDistributionSchemeId:guid}/intended-results")]
+    public async Task<ActionResult<IntendedResultsResponse>> GetIntendedResults(Guid monthlyDistributionSchemeId, CancellationToken cancellationToken)
+    {
+        var page = await intendedResultsService.GetIntendedResultsAsync(monthlyDistributionSchemeId, cancellationToken);
+        return page is null ? NotFound() : Ok(ToResponse(page));
+    }
+
+    // PUT /api/distributions/schemes/{monthlyDistributionSchemeId}/intended-results - legacy
+    // IntendedResults.aspx ButtonSave_Click -> IntendedResultsSet.Save().
+    [HttpPut("schemes/{monthlyDistributionSchemeId:guid}/intended-results")]
+    public async Task<ActionResult<IntendedResultsSaveResult>> SaveIntendedResults(
+        Guid monthlyDistributionSchemeId, [FromBody] IntendedResultsSaveRequest request, CancellationToken cancellationToken)
+    {
+        if (!ModelState.IsValid)
+        {
+            return ValidationProblem(ModelState);
+        }
+
+        var update = new IntendedResultsUpdate(
+            [.. request.Tests.Select(t => new IntendedResultsTestUpdate(
+                t.TestId,
+                [.. t.ResultItems.Select(r => new IntendedResultsResultItemUpdate(r.TestResultItemId, r.IsRange))],
+                [.. t.MethodItems.Select(m => new IntendedResultsMethodItemUpdate(m.TestMethodItemId, m.IntendedResult))],
+                [.. t.Samples.Select(s => new IntendedResultsSampleRowUpdate(
+                    s.SampleId,
+                    s.IsApplicable,
+                    [.. s.Values.Select(v => new IntendedResultsSampleResultValueUpdate(v.SampleResultItemId, v.IntendedResult, v.IntendedResult2))]))]))],
+            request.RequiresAuditReason,
+            User?.Identity?.Name ?? "Guest",
+            request.AuditWhy ?? string.Empty);
+
+        var outcome = await intendedResultsService.SaveIntendedResultsAsync(monthlyDistributionSchemeId, update, cancellationToken);
+
+        var intendedResultsFieldErrors = outcome.FieldErrorsByItemId.ToDictionary(
+            kvp => kvp.Key,
+            kvp => kvp.Value.Select(e => new IntendedResultsFieldError(e.Field, e.Message)).ToArray());
+
+        return Ok(new IntendedResultsSaveResult(
+            outcome.Success,
+            intendedResultsFieldErrors,
+            outcome.AuditReasonRequired,
+            outcome.AuditObjectName));
+    }
+
+    private static IntendedResultsResponse ToResponse(IntendedResultsPage page) =>
+        new(
+            page.MonthlyDistributionSchemeId,
+            page.DistributionReferenceFull,
+            page.SchemeIdentifier,
+            page.SchemeName,
+            page.RequiresAuditReason,
+            [.. page.Tests.Select(t => new IntendedResultsTestResponse(
+                t.TestId,
+                t.TestName,
+                [.. t.ResultItems.Select(r => new IntendedResultsResultItemResponse(r.TestResultItemId, r.Name, r.FormatString, r.ReturnValueType, r.IsRange))],
+                [.. t.MethodItems.Select(m => new IntendedResultsMethodItemResponse(m.TestMethodItemId, m.Name, m.FormatString, m.ReturnValueType, m.IntendedResult))],
+                [.. t.Samples.Select(s => new IntendedResultsSampleRowResponse(
+                    s.SampleId,
+                    s.SampleNumber,
+                    s.InternalDescription,
+                    s.IsApplicable,
+                    [.. s.Values.Select(v => new IntendedResultsSampleResultValueResponse(v.SampleResultItemId, v.TestResultItemId, v.IntendedResult, v.IntendedResult2))]))]))]);
 
     private static SampleNumbersResponse ToResponse(SampleNumbersPage page) =>
         new(

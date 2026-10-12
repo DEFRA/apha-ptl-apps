@@ -125,14 +125,14 @@ public sealed class DistributionRepository(IDbConnectionFactory connectionFactor
 
         var samples = (await results.ReadAsync<DistributionSampleEntity>()).ToList();
         var sampleTests = (await results.ReadAsync<DistributionSampleTestEntity>()).ToList();
-        _ = await results.ReadAsync<dynamic>(); // Sample Result Items - Intended Results screen only.
+        var sampleResultItems = (await results.ReadAsync<DistributionSampleResultItemEntity>()).ToList();
         var tests = (await results.ReadAsync<DistributionTestEntity>()).ToList();
         var methodItems = (await results.ReadAsync<DistributionTestMethodItemEntity>()).ToList();
         var resultItems = (await results.ReadAsync<DistributionTestResultItemEntity>()).ToList();
         var categoryItems = (await results.ReadAsync<DistributionCategoryItemEntity>()).ToList();
         var criterionItems = (await results.ReadAsync<DistributionCriterionItemEntity>()).ToList();
 
-        return new IntendedResultsData(header, samples, sampleTests, tests, methodItems, resultItems, categoryItems, criterionItems);
+        return new IntendedResultsData(header, samples, sampleTests, tests, methodItems, resultItems, categoryItems, criterionItems, sampleResultItems);
     }
 
     public async Task UpdateSampleNumbersAsync(SampleNumbersWrite write, CancellationToken cancellationToken = default)
@@ -436,6 +436,121 @@ public sealed class DistributionRepository(IDbConnectionFactory connectionFactor
                 }
             }
         }
+    }
+
+    public async Task UpdateIntendedResultsAsync(IntendedResultsWrite write, CancellationToken cancellationToken = default)
+    {
+        using var connection = connectionFactory.CreateConnection();
+        connection.Open();
+        using var transaction = connection.BeginTransaction();
+
+        await connection.ExecuteAsync(
+            """
+            EXEC dbo.spuIntendedResults
+                @MonthlyDistributionSchemeId = @MonthlyDistributionSchemeId,
+                @Comments = @Comments,
+                @HasIntendedResults = @HasIntendedResults,
+                @HasSampleNumbersDefined = @HasSampleNumbersDefined,
+                @TestConsultantTabulationId = @TestConsultantTabulationId
+            """,
+            write.Header,
+            transaction);
+
+        var auditedTestMethodItemIds = write.AuditedTestMethodItemIds.ToHashSet();
+        const string auditTestMethodItemSql = """
+            EXEC dbo.spiAuditDistributionTestMethodItem
+                @DistributionTestMethodItemId = @TestMethodItemId,
+                @AuditWho = @AuditWho,
+                @AuditWhy = @AuditWhy,
+                @IntendedResult = @IntendedResult,
+                @IntendedResultUpdate = 1
+            """;
+
+        const string updateTestMethodItemSql = """
+            EXEC dbo.spuDistributionTestMethodItem
+                @DistributionTestMethodItemId = @TestMethodItemId,
+                @TestId = @TestId,
+                @TestMethodItemTypeId = @TestMethodItemTypeId,
+                @IntendedResult = @IntendedResult,
+                @IsApplicable = @IsApplicable,
+                @Order = @Order
+            """;
+
+        foreach (var methodItem in write.TestMethodItems)
+        {
+            // Must precede spuDistributionTestMethodItem: the audit procedure records the row's
+            // CURRENT (pre-update) IntendedResult value.
+            if (auditedTestMethodItemIds.Contains(methodItem.TestMethodItemId))
+            {
+                await connection.ExecuteAsync(
+                    auditTestMethodItemSql,
+                    new { methodItem.TestMethodItemId, write.AuditWho, write.AuditWhy, methodItem.IntendedResult },
+                    transaction);
+            }
+
+            await connection.ExecuteAsync(updateTestMethodItemSql, methodItem, transaction);
+        }
+
+        const string updateTestResultItemSql = """
+            EXEC dbo.spuDistributionTestResultItem
+                @DistributionTestResultItemId = @TestResultItemId,
+                @TestId = @TestId,
+                @TestResultItemTypeId = @TestResultItemTypeId,
+                @Order = @Order,
+                @IsRange = @IsRange
+            """;
+
+        foreach (var resultItem in write.TestResultItems)
+        {
+            await connection.ExecuteAsync(updateTestResultItemSql, resultItem, transaction);
+        }
+
+        var auditedSampleResultItems = write.AuditedSampleResultItems.ToDictionary(a => a.SampleResultItemId);
+        const string auditSampleResultItemSql = """
+            EXEC dbo.spiAuditSampleResultItem
+                @SampleResultItemId = @SampleResultItemId,
+                @AuditWho = @AuditWho,
+                @AuditWhy = @AuditWhy,
+                @IntendedResult = @IntendedResult,
+                @IntendedResultUpdate = @IntendedResultUpdate,
+                @IntendedResult2 = @IntendedResult2,
+                @IntendedResult2Update = @IntendedResult2Update
+            """;
+
+        const string updateSampleResultItemSql = """
+            EXEC dbo.spuSampleResultItem
+                @SampleResultItemId = @SampleResultItemId,
+                @SampleTestId = @SampleTestId,
+                @TestResultItemId = @TestResultItemId,
+                @IntendedResult = @IntendedResult,
+                @IntendedResult2 = @IntendedResult2
+            """;
+
+        foreach (var sampleResultItem in write.SampleResultItems)
+        {
+            // Must precede spuSampleResultItem: the audit procedure records the row's CURRENT
+            // (pre-update) values.
+            if (auditedSampleResultItems.TryGetValue(sampleResultItem.SampleResultItemId, out var audited))
+            {
+                await connection.ExecuteAsync(
+                    auditSampleResultItemSql,
+                    new
+                    {
+                        sampleResultItem.SampleResultItemId,
+                        write.AuditWho,
+                        write.AuditWhy,
+                        sampleResultItem.IntendedResult,
+                        IntendedResultUpdate = audited.IntendedResultChanged,
+                        sampleResultItem.IntendedResult2,
+                        IntendedResult2Update = audited.IntendedResult2Changed,
+                    },
+                    transaction);
+            }
+
+            await connection.ExecuteAsync(updateSampleResultItemSql, sampleResultItem, transaction);
+        }
+
+        transaction.Commit();
     }
 }
 

@@ -194,4 +194,72 @@ public class DistributionApiClientTests
         Assert.Equal("Comments must not exceed 8000 characters", Assert.Single(result.PageErrors));
         Assert.Equal("Sample Number Required", Assert.Single(result.FieldErrorsBySampleId[Guid.Parse("22222222-2222-2222-2222-222222222222")]).Message);
     }
+
+    [Fact]
+    public async Task GetIntendedResultsAsync_NotFound_ReturnsNull()
+    {
+        var client = CreateClient(HttpStatusCode.NotFound, null);
+
+        var result = await client.GetIntendedResultsAsync(Guid.NewGuid());
+
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public async Task GetIntendedResultsAsync_ServerError_Throws()
+    {
+        var client = CreateClient(HttpStatusCode.InternalServerError, null);
+
+        await Assert.ThrowsAsync<HttpRequestException>(() => client.GetIntendedResultsAsync(Guid.NewGuid()));
+    }
+
+    [Fact]
+    public async Task GetIntendedResultsAsync_ReturnsDeserializedResponse()
+    {
+        const string json = """
+            {"monthlyDistributionSchemeId":"11111111-1111-1111-1111-111111111111","distributionReferenceFull":"17152A/BA","schemeIdentifier":"PT0060","schemeName":"Mastitis bovine","requiresAuditReason":true,"tests":[{"testId":"44444444-4444-4444-4444-444444444444","testName":"Somatic cell count","resultItems":[{"testResultItemId":"55555555-5555-5555-5555-555555555555","name":"Result A","formatString":"^[0-9]+$","returnValueType":"Numeric","isRange":false}],"methodItems":[{"testMethodItemId":"66666666-6666-6666-6666-666666666666","name":"Method A","formatString":"^[0-9]+$","returnValueType":"Numeric","intendedResult":"42"}],"samples":[{"sampleId":"22222222-2222-2222-2222-222222222222","sampleNumber":"S1","internalDescription":"Internal 1","isApplicable":true,"values":[{"sampleResultItemId":"77777777-7777-7777-7777-777777777777","testResultItemId":"55555555-5555-5555-5555-555555555555","intendedResult":"12","intendedResult2":""}]}]}]}
+            """;
+        var client = CreateClient(HttpStatusCode.OK, json);
+
+        var result = await client.GetIntendedResultsAsync(Guid.Parse("11111111-1111-1111-1111-111111111111"));
+
+        Assert.NotNull(result);
+        Assert.Equal("17152A/BA", result!.DistributionReferenceFull);
+        Assert.True(result.RequiresAuditReason);
+        var test = Assert.Single(result.Tests);
+        Assert.Equal("Somatic cell count", test.TestName);
+        Assert.Equal("42", Assert.Single(test.MethodItems).IntendedResult);
+        var sample = Assert.Single(test.Samples);
+        Assert.True(sample.IsApplicable);
+        Assert.Equal("12", Assert.Single(sample.Values).IntendedResult);
+    }
+
+    [Fact]
+    public async Task SaveIntendedResultsAsync_PutsToIntendedResultsEndpointAndReturnsDeserializedResult()
+    {
+        var schemeId = Guid.Parse("11111111-1111-1111-1111-111111111111");
+        const string json = """{"success":false,"fieldErrorsByItemId":{"66666666-6666-6666-6666-666666666666":[{"field":"IntendedResult","message":"Input must be of format: Numeric"}]},"auditReasonRequired":false}""";
+        HttpRequestMessage? captured = null;
+        var handler = new StubHttpMessageHandler(HttpStatusCode.OK, json) { OnRequest = request => captured = request };
+        var client = new DistributionApiClient(new HttpClient(handler) { BaseAddress = new Uri("http://localhost") });
+
+        var result = await client.SaveIntendedResultsAsync(schemeId, new Contracts.Distribution.IntendedResultsSaveRequest([], false));
+
+        Assert.NotNull(captured);
+        Assert.Equal(HttpMethod.Put, captured!.Method);
+        Assert.Equal($"/api/distributions/schemes/{schemeId}/intended-results", captured.RequestUri!.AbsolutePath);
+        Assert.NotNull(result);
+        Assert.False(result!.Success);
+        var fieldError = Assert.Single(result.FieldErrorsByItemId[Guid.Parse("66666666-6666-6666-6666-666666666666")]);
+        Assert.Equal("Input must be of format: Numeric", fieldError.Message);
+    }
+
+    [Fact]
+    public async Task SaveIntendedResultsAsync_ServerError_Throws()
+    {
+        var client = CreateClient(HttpStatusCode.InternalServerError, null);
+
+        await Assert.ThrowsAsync<HttpRequestException>(
+            () => client.SaveIntendedResultsAsync(Guid.NewGuid(), new Contracts.Distribution.IntendedResultsSaveRequest([], false)));
+    }
 }

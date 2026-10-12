@@ -264,7 +264,19 @@ public static class SideNavigationProvider
                 Disabled("Participant Address Labels"),
                 Disabled("Group Address Labels"),
                 Disabled("Search"),
-                new SideNavigationItem { Text = "Monthly Distributions", ControllerName = DistributionControllerName, ActionName = "Schedule", IsHidden = true }
+                new SideNavigationItem
+                {
+                    Text = "Monthly Distributions",
+                    ControllerName = DistributionControllerName,
+                    ActionName = "Schedule",
+                    IsHidden = true,
+                    Children =
+                    [
+                        // Hidden: reached only from a specific Schedule's links, not listed here.
+                        new SideNavigationItem { Text = "Sample Numbers", ControllerName = DistributionControllerName, ActionName = "SampleNumbers", IsHidden = true },
+                        new SideNavigationItem { Text = "Intended Results", ControllerName = DistributionControllerName, ActionName = "IntendedResults", IsHidden = true }
+                    ]
+                }
             ]
         },
         Disabled("Test Consultant"),

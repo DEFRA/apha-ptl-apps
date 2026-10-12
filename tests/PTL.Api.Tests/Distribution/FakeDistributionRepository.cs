@@ -79,4 +79,12 @@ internal sealed class FakeDistributionRepository : IDistributionRepository
 
         return Task.FromResult(CreateStructureSucceeds);
     }
+
+    public List<IntendedResultsWrite> SavedIntendedResults { get; } = [];
+
+    public Task UpdateIntendedResultsAsync(IntendedResultsWrite write, CancellationToken cancellationToken = default)
+    {
+        SavedIntendedResults.Add(write);
+        return Task.CompletedTask;
+    }
 }

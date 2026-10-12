@@ -14,6 +14,7 @@ public class DistributionControllerTests
         new(
             new DistributionService(repository),
             new SampleNumbersService(repository, schemeService ?? new FakeSchemeService()),
+            new IntendedResultsService(repository),
             Microsoft.Extensions.Logging.Abstractions.NullLogger<DistributionController>.Instance);
 
     // ValidationProblem() resolves ProblemDetailsFactory from HttpContext.RequestServices,
@@ -402,5 +403,217 @@ public class DistributionControllerTests
         Assert.Equal(SampleNumbersSampleId, fieldErrors.Key);
         Assert.Contains(fieldErrors.Value, e => e.Field == "SampleNumber" && e.Message == "Enter the Sample Number");
         Assert.Empty(repository.SavedSampleNumbers);
+    }
+
+    private static readonly Guid IntendedResultsSchemeId = Guid.Parse("ffffffff-ffff-ffff-ffff-ffffffffffff");
+    private static readonly Guid IntendedResultsSampleId = Guid.Parse("11111111-2222-2222-2222-222222222222");
+    private static readonly Guid IntendedResultsTestId = Guid.Parse("33333333-4444-4444-4444-444444444444");
+    private static readonly Guid IntendedResultsSampleTestId = Guid.Parse("55555555-6666-6666-6666-666666666666");
+    private static readonly Guid IntendedResultsMethodItemId = Guid.Parse("77777777-8888-8888-8888-888888888888");
+    private static readonly Guid IntendedResultsResultItemId = Guid.Parse("99999999-0000-0000-0000-000000000000");
+    private static readonly Guid IntendedResultsSampleResultItemId = Guid.Parse("aaaaaaaa-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
+
+    private static FakeDistributionRepository IntendedResultsRepository()
+    {
+        var repository = new FakeDistributionRepository();
+        repository.SchemesById[IntendedResultsSchemeId] = new MonthlyDistributionSchemeEntity
+        {
+            MonthlyDistributionSchemeId = IntendedResultsSchemeId,
+            SchemeIdentifier = "PT0060",
+            SchemeName = "Mastitis bovine",
+            DistributionReference = "17152",
+            DistributionReferenceSuffix = "A",
+            ScheduleCode = "BA",
+            HasSampleNumbersDefined = true,
+        };
+        repository.IntendedResults[IntendedResultsSchemeId] = new IntendedResultsData(
+            new IntendedResultsHeaderEntity { MonthlyDistributionSchemeId = IntendedResultsSchemeId },
+            [new DistributionSampleEntity { SampleId = IntendedResultsSampleId, DistributionSchemeId = IntendedResultsSchemeId, SampleNumber = "S1", InternalDescription = "Internal 1" }],
+            [new DistributionSampleTestEntity { SampleTestId = IntendedResultsSampleTestId, SampleId = IntendedResultsSampleId, TestId = IntendedResultsTestId, IsApplicable = true }],
+            [new DistributionTestEntity { TestId = IntendedResultsTestId, TestName = "Somatic cell count", Order = 1 }],
+            [new DistributionTestMethodItemEntity { TestMethodItemId = IntendedResultsMethodItemId, TestId = IntendedResultsTestId, Name = "Method A", Order = 1, FormatString = "^[0-9]+$", ReturnValueType = "Numeric" }],
+            [new DistributionTestResultItemEntity { TestResultItemId = IntendedResultsResultItemId, TestId = IntendedResultsTestId, Name = "Result A", Order = 1, FormatString = "^[0-9]+$", ReturnValueType = "Numeric" }],
+            [],
+            [],
+            [new DistributionSampleResultItemEntity { SampleResultItemId = IntendedResultsSampleResultItemId, SampleId = IntendedResultsSampleId, SampleTestId = IntendedResultsSampleTestId, TestResultItemId = IntendedResultsResultItemId }]);
+        return repository;
+    }
+
+    [Fact]
+    public async Task GetIntendedResults_UnknownScheme_ReturnsNotFound()
+    {
+        var controller = CreateController(new FakeDistributionRepository());
+
+        var result = await controller.GetIntendedResults(IntendedResultsSchemeId, CancellationToken.None);
+
+        Assert.IsType<NotFoundResult>(result.Result);
+    }
+
+    // Legacy Page_Load: "Samples numbers must be defined before setting the Intended Results".
+    [Fact]
+    public async Task GetIntendedResults_SampleNumbersNotYetDefined_ReturnsNotFound()
+    {
+        var repository = IntendedResultsRepository();
+        repository.SchemesById[IntendedResultsSchemeId].HasSampleNumbersDefined = false;
+        var controller = CreateController(repository);
+
+        var result = await controller.GetIntendedResults(IntendedResultsSchemeId, CancellationToken.None);
+
+        Assert.IsType<NotFoundResult>(result.Result);
+    }
+
+    [Fact]
+    public async Task GetIntendedResults_KnownScheme_ReturnsMappedResponse()
+    {
+        var controller = CreateController(IntendedResultsRepository());
+
+        var result = await controller.GetIntendedResults(IntendedResultsSchemeId, CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var response = Assert.IsType<IntendedResultsResponse>(ok.Value);
+        Assert.Equal(IntendedResultsSchemeId, response.MonthlyDistributionSchemeId);
+        Assert.Equal("17152A/BA", response.DistributionReferenceFull);
+        Assert.Equal("PT0060", response.SchemeIdentifier);
+        Assert.False(response.RequiresAuditReason);
+
+        var test = Assert.Single(response.Tests);
+        Assert.Equal("Somatic cell count", test.TestName);
+        var resultItem = Assert.Single(test.ResultItems);
+        Assert.Equal(IntendedResultsResultItemId, resultItem.TestResultItemId);
+        var methodItem = Assert.Single(test.MethodItems);
+        Assert.Equal(IntendedResultsMethodItemId, methodItem.TestMethodItemId);
+        var sample = Assert.Single(test.Samples);
+        Assert.Equal(IntendedResultsSampleId, sample.SampleId);
+        Assert.True(sample.IsApplicable);
+        var value = Assert.Single(sample.Values);
+        Assert.Equal(IntendedResultsSampleResultItemId, value.SampleResultItemId);
+    }
+
+    [Fact]
+    public async Task SaveIntendedResults_InvalidModelState_ReturnsValidationProblem()
+    {
+        var controller = CreateControllerWithProblemDetails(IntendedResultsRepository());
+        controller.ModelState.AddModelError("Tests", "The Tests field is required.");
+
+        var request = new IntendedResultsSaveRequest([], false);
+        var result = await controller.SaveIntendedResults(IntendedResultsSchemeId, request, CancellationToken.None);
+
+        var objectResult = Assert.IsType<ObjectResult>(result.Result, exactMatch: false);
+        Assert.IsType<ValidationProblemDetails>(objectResult.Value);
+    }
+
+    [Fact]
+    public async Task SaveIntendedResults_Valid_ReturnsSuccessfulResultAndWritesTheChange()
+    {
+        var repository = IntendedResultsRepository();
+        var controller = CreateController(repository);
+
+        var request = new IntendedResultsSaveRequest(
+        [
+            new IntendedResultsTestRequest(
+                IntendedResultsTestId,
+                [],
+                [new IntendedResultsMethodItemRequest(IntendedResultsMethodItemId, "42")],
+                [new IntendedResultsSampleRowRequest(IntendedResultsSampleId, true, [])]),
+        ], false);
+
+        var result = await controller.SaveIntendedResults(IntendedResultsSchemeId, request, CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var response = Assert.IsType<IntendedResultsSaveResult>(ok.Value);
+        Assert.True(response.Success);
+        Assert.Empty(response.FieldErrorsByItemId);
+        Assert.False(response.AuditReasonRequired);
+        var saved = Assert.Single(repository.SavedIntendedResults);
+        Assert.Equal("42", Assert.Single(saved.TestMethodItems).IntendedResult);
+    }
+
+    [Fact]
+    public async Task SaveIntendedResults_InvalidValue_ReturnsFieldErrorsAndWritesNothing()
+    {
+        var repository = IntendedResultsRepository();
+        var controller = CreateController(repository);
+
+        var request = new IntendedResultsSaveRequest(
+        [
+            new IntendedResultsTestRequest(
+                IntendedResultsTestId,
+                [],
+                [new IntendedResultsMethodItemRequest(IntendedResultsMethodItemId, "not-numeric")],
+                [new IntendedResultsSampleRowRequest(IntendedResultsSampleId, true, [])]),
+        ], false);
+
+        var result = await controller.SaveIntendedResults(IntendedResultsSchemeId, request, CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var response = Assert.IsType<IntendedResultsSaveResult>(ok.Value);
+        Assert.False(response.Success);
+        var fieldErrors = Assert.Single(response.FieldErrorsByItemId);
+        Assert.Equal(IntendedResultsMethodItemId, fieldErrors.Key);
+        Assert.Contains(fieldErrors.Value, e => e.Field == "IntendedResult");
+        Assert.Empty(repository.SavedIntendedResults);
+    }
+
+    // AuditWho is never accepted from the body - it is taken from the authenticated identity.
+    [Fact]
+    public async Task SaveIntendedResults_AuditWho_ComesFromTheAuthenticatedIdentity()
+    {
+        var repository = IntendedResultsRepository();
+        var controller = CreateController(repository);
+        controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext
+            {
+                User = new ClaimsPrincipal(new ClaimsIdentity([new Claim(ClaimTypes.Name, "APHA\\jbloggs")], "TestAuth")),
+            }
+        };
+
+        var request = new IntendedResultsSaveRequest(
+        [
+            new IntendedResultsTestRequest(
+                IntendedResultsTestId,
+                [],
+                [new IntendedResultsMethodItemRequest(IntendedResultsMethodItemId, "42")],
+                [new IntendedResultsSampleRowRequest(IntendedResultsSampleId, true, [])]),
+        ], false);
+
+        await controller.SaveIntendedResults(IntendedResultsSchemeId, request, CancellationToken.None);
+
+        Assert.Equal("APHA\\jbloggs", Assert.Single(repository.SavedIntendedResults).AuditWho);
+    }
+
+    [Fact]
+    public async Task SaveIntendedResults_UnauthenticatedCaller_RecordsGuestAsAuditWho()
+    {
+        var repository = IntendedResultsRepository();
+        var controller = CreateController(repository);
+        controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
+
+        var request = new IntendedResultsSaveRequest(
+        [
+            new IntendedResultsTestRequest(
+                IntendedResultsTestId,
+                [],
+                [new IntendedResultsMethodItemRequest(IntendedResultsMethodItemId, "42")],
+                [new IntendedResultsSampleRowRequest(IntendedResultsSampleId, true, [])]),
+        ], false);
+
+        await controller.SaveIntendedResults(IntendedResultsSchemeId, request, CancellationToken.None);
+
+        Assert.Equal("Guest", Assert.Single(repository.SavedIntendedResults).AuditWho);
+    }
+
+    [Fact]
+    public async Task SaveIntendedResults_DistributionCannotBeReRead_ReturnsUnsuccessfulWithNoFieldErrors()
+    {
+        var controller = CreateController(new FakeDistributionRepository());
+
+        var request = new IntendedResultsSaveRequest([], false);
+        var result = await controller.SaveIntendedResults(IntendedResultsSchemeId, request, CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var response = Assert.IsType<IntendedResultsSaveResult>(ok.Value);
+        Assert.False(response.Success);
+        Assert.Empty(response.FieldErrorsByItemId);
     }
 }

@@ -49,4 +49,11 @@ public interface IDistributionRepository
         DateTime sampleNumberDate,
         DistributionStructure distributionStructure,
         CancellationToken cancellationToken = default);
+
+    // spuIntendedResults + spuDistributionTestMethodItem x N + spuDistributionTestResultItem x N +
+    // spuSampleResultItem x N in a single transaction, mirroring IntendedResultsSet.
+    // DataPortal_Update (mTests.Update then mSamples.Update). spiAuditDistributionTestMethodItem /
+    // spiAuditSampleResultItem each run immediately BEFORE their row's own spu* call, because the
+    // audit procedure records the row's CURRENT (pre-update) value.
+    Task UpdateIntendedResultsAsync(IntendedResultsWrite write, CancellationToken cancellationToken = default);
 }
