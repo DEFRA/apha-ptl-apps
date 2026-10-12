@@ -12,4 +12,9 @@ public interface IDistributionApiClient
 
     Task<MonthlyDistributionScheduleSaveResult?> SaveScheduleAsync(
         int yearId, int monthId, IReadOnlyList<MonthlyDistributionScheduleRowRequest> rows, CancellationToken cancellationToken = default);
+
+    Task<SampleNumbersPageResult> GetSampleNumbersAsync(Guid monthlyDistributionSchemeId, CancellationToken cancellationToken = default);
+
+    Task<SampleNumbersSaveResult?> SaveSampleNumbersAsync(
+        Guid monthlyDistributionSchemeId, SampleNumbersSaveRequest request, CancellationToken cancellationToken = default);
 }

@@ -10,6 +10,11 @@ public class MonthlyDistributionSchemeEntity
     public Guid MonthlyDistributionSchemeId { get; set; }
     public Guid MonthlyDistributionId { get; set; }
     public Guid SchemeId { get; set; }
+
+    // Only returned by spgMonthlyDistributionScheme - the Sample Numbers create path formats the
+    // generated sample numbers from the distribution month, not from the distribution date.
+    public int YearId { get; set; }
+    public int MonthId { get; set; }
     public string SchemeIdentifier { get; set; } = string.Empty;
     public string SchemeName { get; set; } = string.Empty;
     public string DistributionReference { get; set; } = string.Empty;

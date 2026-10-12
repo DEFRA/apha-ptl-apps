@@ -26,4 +26,19 @@ internal sealed class FakeDistributionApiClient : IDistributionApiClient
         SavedRows.AddRange(rows);
         return Task.FromResult(SaveResult);
     }
+
+    public SampleNumbersResponse? SampleNumbers { get; set; }
+    public IReadOnlyList<string> SampleNumbersErrors { get; set; } = [];
+    public SampleNumbersSaveResult? SampleNumbersSaveResult { get; set; }
+    public List<SampleNumbersSaveRequest> SavedSampleNumbers { get; } = [];
+
+    public Task<SampleNumbersPageResult> GetSampleNumbersAsync(Guid monthlyDistributionSchemeId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(new SampleNumbersPageResult(SampleNumbers, SampleNumbersErrors));
+
+    public Task<SampleNumbersSaveResult?> SaveSampleNumbersAsync(
+        Guid monthlyDistributionSchemeId, SampleNumbersSaveRequest request, CancellationToken cancellationToken = default)
+    {
+        SavedSampleNumbers.Add(request);
+        return Task.FromResult(SampleNumbersSaveResult);
+    }
 }

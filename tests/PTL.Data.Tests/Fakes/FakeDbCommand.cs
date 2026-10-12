@@ -34,7 +34,11 @@ internal sealed class FakeDbCommand(FakeDbConnection connection) : DbCommand
         return connection.ResolveNonQueryResult(this);
     }
 
-    public override object? ExecuteScalar() => throw new NotSupportedException("Not used by any repository under test.");
+    public override object? ExecuteScalar()
+    {
+        connection.ExecutedCommands.Add(this);
+        return connection.ResolveScalarResult(this);
+    }
 
     public override void Prepare()
     {
@@ -52,4 +56,6 @@ internal sealed class FakeDbCommand(FakeDbConnection connection) : DbCommand
         Task.FromResult(ExecuteDbDataReader(behavior));
 
     public override Task<int> ExecuteNonQueryAsync(CancellationToken cancellationToken) => Task.FromResult(ExecuteNonQuery());
+
+    public override Task<object?> ExecuteScalarAsync(CancellationToken cancellationToken) => Task.FromResult(ExecuteScalar());
 }
