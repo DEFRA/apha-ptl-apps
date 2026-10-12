@@ -16,12 +16,10 @@
     <ProjectReference Include="..\PTL.SharedUI\PTL.SharedUI.csproj" />
   </ItemGroup>
 
-  <ItemGroup>
-    <!-- Error.cshtml and Login.cshtml are still shared byte-for-byte with PTL.InternalWeb (single
-         physical file under src/Shared, linked in here and in the sibling app). _Header/_Footer/
-         _NotificationBanner now have their own ExternalWeb-only copies in Views/Shared/ instead. -->
-    <Content Include="..\Shared\Views\Shared\Error.cshtml" Link="Views\Shared\Error.cshtml" />
-    <Content Include="..\Shared\Views\Account\Login.cshtml" Link="Features\Account\Views\Login.cshtml" />
-  </ItemGroup>
+  <!-- Login.cshtml's shared stub (PTL.ApiClient/PtlAccountControllerBase) is never rendered here -
+       Login(GET) always challenges CIDM directly, Login(POST) is disabled - so it has no dependency
+       on this app at all; no local copy needed. Error.cshtml, _Header.cshtml, _Footer.cshtml and
+       _NotificationBanner.cshtml all have their own local copies in Views/Shared/ instead of
+       linking to src/Shared. -->
 
 </Project>
