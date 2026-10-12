@@ -61,7 +61,14 @@ public class GovUkInputTagHelper(IHtmlGenerator generator) : TagHelper
             htmlAttributes["type"] = Type;
         }
 
-        var input = generator.GenerateTextBox(ViewContext, For.ModelExplorer, field, For.Model, format: null, htmlAttributes);
+        // A native <input type="date"> only accepts/displays a value in "yyyy-MM-dd" - GenerateTextBox's
+        // default (format: null) formats DateTime with the current culture (e.g. "01/04/2026 00:00:00"),
+        // which the date picker silently rejects, leaving the field blank.
+        var format = string.Equals(Type, "date", StringComparison.OrdinalIgnoreCase) && For.Model is DateTime
+            ? "{0:yyyy-MM-dd}"
+            : null;
+
+        var input = generator.GenerateTextBox(ViewContext, For.ModelExplorer, field, For.Model, format, htmlAttributes);
         output.Content.AppendHtml(input);
     }
 }

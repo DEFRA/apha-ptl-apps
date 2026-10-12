@@ -15,8 +15,8 @@ namespace PTL.ExternalWeb.Features.Account;
 /// PTL.Api again to know who the user is.
 /// </summary>
 /// <param name="externalUserApiClient">Calls PTL.Api's external-user resolve endpoint.</param>
-/// <param name="logger">Logs why a sign-in was denied, for support/diagnostics.</param>
-public sealed class ExternalUserResolver(IExternalUserApiClient externalUserApiClient, ILogger<ExternalUserResolver> logger) : ICidmExternalUserResolver
+/// <param name="logger">Logs resolution failures so a sign-in landing on /Home/Error is diagnosable.</param>
+public sealed partial class ExternalUserResolver(IExternalUserApiClient externalUserApiClient, ILogger<ExternalUserResolver> logger) : ICidmExternalUserResolver
 {
     /// <inheritdoc />
     public async Task<CidmExternalUserResolution> ResolveAsync(ClaimsPrincipal principal, CancellationToken cancellationToken)
@@ -39,9 +39,22 @@ public sealed class ExternalUserResolver(IExternalUserApiClient externalUserApiC
         // resolver - a user can hold more than one simultaneously.
         var cidmRoles = principal.FindAll(ClaimTypes.Role).Select(claim => claim.Value).Distinct().ToList();
 
-        var response = await externalUserApiClient.ResolveAsync(
-            new ResolveExternalUserRequest(ssoIdExt, email, displayName, cidmRoles),
-            cancellationToken);
+        ResolveExternalUserResponse response;
+        try
+        {
+            response = await externalUserApiClient.ResolveAsync(
+                new ResolveExternalUserRequest(ssoIdExt, email, displayName, cidmRoles),
+                cancellationToken);
+        }
+        catch (Exception exception) when (exception is HttpRequestException or TaskCanceledException or NotSupportedException)
+        {
+            // HttpRequestException: network/DNS failure, connection refused, or EnsureSuccessStatusCode
+            // threw for a non-success response. TaskCanceledException: request timeout. NotSupportedException:
+            // response wasn't valid JSON for the expected DTO. Without this, a PTL.Api connectivity
+            // problem during sign-in produces zero diagnostic trace - it just lands on /Home/Error.
+            LogExternalUserResolutionFailed(ssoIdExt, exception);
+            return CidmExternalUserResolution.Deny("/Home/Error");
+        }
 
         // No CIDM role resolved to an existing record - nothing in PTL this person is permitted to
         // use, so deny entirely rather than signing them into an app with no accessible data.
@@ -84,4 +97,7 @@ public sealed class ExternalUserResolver(IExternalUserApiClient externalUserApiC
 
         return principal.FindFirst("name")?.Value ?? principal.FindFirst(ClaimTypes.Name)?.Value ?? string.Empty;
     }
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Failed to resolve external user (SsoIdExt={SsoIdExt}) against PTL.Api")]
+    private partial void LogExternalUserResolutionFailed(Guid ssoIdExt, Exception exception);
 }
