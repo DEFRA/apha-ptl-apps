@@ -1,13 +1,16 @@
+using PTL.Core.Customer;
 using PTL.Core.Participant;
 using PTL.Core.TestConsultant;
 using PTL.Core.Viewer;
+using CoreParticipant = PTL.Core.Participant.Participant;
 
 namespace PTL.Core.ExternalUser;
 
 public sealed class ExternalUserService(
     IParticipantRepository participantRepository,
     IViewerRepository viewerRepository,
-    ITestConsultantRepository testConsultantRepository) : IExternalUserService
+    ITestConsultantRepository testConsultantRepository,
+    ICustomerRepository customerRepository) : IExternalUserService
 {
     private const string ParticipantRoleName = "Participant";
     private const string ViewerRoleName = "Viewer";
@@ -22,15 +25,22 @@ public sealed class ExternalUserService(
     {
         var resolvedRoles = new List<string>();
         Guid? participantId = null;
+        string? labCode = null;
         Guid? viewerId = null;
         Guid? testConsultantId = null;
+        var canOrderOnline = false;
 
         if (HasRole(cidmRoles, ParticipantRoleName))
         {
-            participantId = await ResolveParticipantAsync(ssoIdExt, email, cancellationToken);
-            if (participantId is not null)
+            var participant = await ResolveParticipantAsync(ssoIdExt, email, cancellationToken);
+            if (participant is not null)
             {
+                participantId = participant.ParticipantId;
+                labCode = participant.LabCode;
                 resolvedRoles.Add(ParticipantRoleName);
+
+                var customer = await customerRepository.GetByIdAsync(participant.CustomerId, cancellationToken);
+                canOrderOnline = customer?.CanOrderOnline ?? false;
             }
         }
 
@@ -52,18 +62,18 @@ public sealed class ExternalUserService(
             }
         }
 
-        return new ExternalUserResolutionResult(displayName, resolvedRoles, participantId, viewerId, testConsultantId);
+        return new ExternalUserResolutionResult(displayName, resolvedRoles, participantId, labCode, viewerId, testConsultantId, canOrderOnline);
     }
 
     private static bool HasRole(IReadOnlyList<string> cidmRoles, string roleName) =>
         cidmRoles.Contains(roleName, StringComparer.OrdinalIgnoreCase);
 
-    private async Task<Guid?> ResolveParticipantAsync(Guid ssoIdExt, string email, CancellationToken cancellationToken)
+    private async Task<CoreParticipant?> ResolveParticipantAsync(Guid ssoIdExt, string email, CancellationToken cancellationToken)
     {
         var participant = await participantRepository.GetBySsoIdExtAsync(ssoIdExt, cancellationToken);
         if (participant is not null)
         {
-            return participant.ParticipantId;
+            return participant;
         }
 
         participant = await participantRepository.GetByEmailAsync(email, cancellationToken);
@@ -74,7 +84,7 @@ public sealed class ExternalUserService(
 
         participant.SsoIdExt = ssoIdExt;
         await participantRepository.UpdateAsync(participant, cancellationToken);
-        return participant.ParticipantId;
+        return participant;
     }
 
     private async Task<Guid?> ResolveViewerAsync(Guid ssoIdExt, string email, CancellationToken cancellationToken)

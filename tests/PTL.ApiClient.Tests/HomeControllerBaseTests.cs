@@ -7,11 +7,11 @@ namespace PTL.ApiClient.Tests;
 public class HomeControllerBaseTests
 {
     [Fact]
-    public void Index_ReturnsView()
+    public async Task Index_ReturnsView()
     {
         var controller = new TestHomeController(new FakeApiClient());
 
-        var result = controller.Index();
+        var result = await controller.Index();
 
         Assert.IsType<ViewResult>(result);
     }

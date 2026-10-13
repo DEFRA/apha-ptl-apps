@@ -27,6 +27,7 @@ public sealed partial class ExternalUserResolver(IExternalUserApiClient external
         // organisation/relationship they're currently acting under.
         if (!Guid.TryParse(principal.FindFirst(CidmClaimTypes.ContactId)?.Value, out var ssoIdExt))
         {
+            LogMissingContactIdClaim(CidmClaimTypes.ContactId);
             return CidmExternalUserResolution.Deny("/Account/NotPermitted");
         }
 
@@ -62,11 +63,23 @@ public sealed partial class ExternalUserResolver(IExternalUserApiClient external
             return CidmExternalUserResolution.Deny("/Account/NotPermitted");
         }
 
-        return CidmExternalUserResolution.Allow(new Dictionary<string, string>
+        var claims = new Dictionary<string, string>
         {
             [ExternalUserClaimTypes.DisplayName] = response.DisplayName,
             [ExternalUserClaimTypes.ResolvedRoles] = string.Join(',', response.Roles)
-        });
+        };
+
+        if (!string.IsNullOrWhiteSpace(response.LabCode))
+        {
+            claims[ExternalUserClaimTypes.LabCode] = response.LabCode;
+        }
+
+        if (response.CanOrderOnline)
+        {
+            claims[ExternalUserClaimTypes.CanOrderOnline] = "true";
+        }
+
+        return CidmExternalUserResolution.Allow(claims);
     }
 
     // CIDM's display-name claim set isn't fully confirmed for PT-LIMS's registration, so this
@@ -87,4 +100,7 @@ public sealed partial class ExternalUserResolver(IExternalUserApiClient external
 
     [LoggerMessage(Level = LogLevel.Error, Message = "Failed to resolve external user (SsoIdExt={SsoIdExt}) against PTL.Api")]
     private partial void LogExternalUserResolutionFailed(Guid ssoIdExt, Exception exception);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "CIDM resolve denied: no parseable {Claim} claim present")]
+    private partial void LogMissingContactIdClaim(string claim);
 }

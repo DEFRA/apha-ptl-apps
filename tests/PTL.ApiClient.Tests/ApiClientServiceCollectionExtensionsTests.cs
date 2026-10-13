@@ -44,6 +44,7 @@ public class ApiClientServiceCollectionExtensionsTests
         Assert.IsType<PTL.ApiClient.Distribution.DistributionApiClient>(provider.GetRequiredService<PTL.ApiClient.Distribution.IDistributionApiClient>());
         Assert.IsType<ExternalUserApiClient>(provider.GetRequiredService<IExternalUserApiClient>());
         Assert.IsType<InternalUserApiClient>(provider.GetRequiredService<IInternalUserApiClient>());
+        Assert.IsType<SystemMessageApiClient>(provider.GetRequiredService<ISystemMessageApiClient>());
     }
 
     [Theory]
