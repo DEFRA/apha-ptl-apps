@@ -1,6 +1,7 @@
 using System.Reflection;
 using Dapper;
 using PTL.Core.AdministrationCharge;
+using PTL.Core.CategoryItemType;
 using PTL.Core.Contract;
 using PTL.Core.Contract.Export.Bulk;
 using PTL.Core.Contract.Export.Templates;
@@ -22,6 +23,7 @@ using PTL.Core.Scheme;
 using PTL.Core.User;
 using PTL.Core.Viewer;
 using PTL.Core.WeightedPricingPlan;
+using CoreCategoryItemType = PTL.Core.CategoryItemType.CategoryItemType;
 using CoreContract = PTL.Core.Contract.Contract;
 using CoreCountry = PTL.Core.Country.Country;
 using CoreCustomer = PTL.Core.Customer.Customer;
@@ -351,6 +353,18 @@ public static class DapperColumnMappings
             ["CurrentYearId"] = nameof(SystemSettingsEntity.CurrentYearId),
             ["NextYearId"] = nameof(SystemSettingsEntity.NextYearId),
             ["fldContractStartDate"] = nameof(SystemSettingsEntity.ContractStartDate),
+            ["FinalYearId"] = nameof(SystemSettingsEntity.FinalYearId),
+        });
+
+        Map<CoreCategoryItemType>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldCategoryItemTypeId"] = nameof(CoreCategoryItemType.CategoryItemTypeId),
+            [ColName] = nameof(CoreCategoryItemType.Name),
+            ["fldStartYearId"] = nameof(CoreCategoryItemType.StartYearId),
+            ["fldEndYearId"] = nameof(CoreCategoryItemType.EndYearId),
+            ["fldNoLongerInUse"] = nameof(CoreCategoryItemType.NoLongerInUse),
+            ["ForeignInstances"] = nameof(CoreCategoryItemType.ForeignInstances),
+            ["ForeignInstancesString"] = nameof(CoreCategoryItemType.ForeignInstancesString),
         });
 
         // spgContractMerge result set 1 (legacy ContractMergeInfo).
