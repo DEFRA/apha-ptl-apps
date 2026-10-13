@@ -88,6 +88,21 @@ public class UserServiceTests
         Assert.Empty(repository.Created);
     }
 
+    // System Administration business rule: if the audit trail write fails, the account creation
+    // itself is rolled back too - no unaudited change is ever persisted.
+    [Fact]
+    public async Task CreateUserAsync_AuditWriteFails_RollsBackAndDoesNotPersistTheAccount()
+    {
+        var repository = new FakeUserRepository { ThrowOnAudit = true };
+        var service = CreateService(repository);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => service.CreateUserAsync("m100001", "jane@apha.gov.uk", "Jane Smith", "Jane", "Smith", "Science"));
+
+        Assert.Empty(repository.Created);
+        Assert.Empty(repository.Users);
+    }
+
     [Fact]
     public async Task GetTestConsultantsAsync_ReturnsRepositoryResults()
     {

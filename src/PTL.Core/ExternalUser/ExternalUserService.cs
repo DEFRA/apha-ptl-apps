@@ -101,11 +101,13 @@ public sealed class ExternalUserService(
         var testConsultant = await testConsultantRepository.GetBySsoIdExtAsync(ssoIdExt, cancellationToken);
         if (testConsultant is not null)
         {
-            return testConsultant.ExternalTestConsultantId;
+            // Inactive External Test Consultants must not access Test Consultant functionality,
+            // even if they were previously linked (SsoIdExt already set from an earlier sign-in).
+            return testConsultant.IsInactive ? null : testConsultant.ExternalTestConsultantId;
         }
 
         testConsultant = await testConsultantRepository.GetByEmailAsync(email, cancellationToken);
-        if (testConsultant is null)
+        if (testConsultant is null || testConsultant.IsInactive)
         {
             return null;
         }

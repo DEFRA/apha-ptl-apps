@@ -1,3 +1,5 @@
+using PTL.Core.Audit;
+
 namespace PTL.Core.User;
 
 // The current user is resolved by PTL.InternalWeb (from the signed-in Entra claims) and passed in
@@ -13,6 +15,7 @@ public sealed class UserRoleService(
     IUserRoleRepository userRoleRepository) : IUserRoleService
 {
     private const string AdminRoleName = "Admin";
+    private const string UserEntityType = "User";
 
     public Task<IReadOnlyList<Role>> GetRolesAsync(CancellationToken cancellationToken = default) =>
         roleRepository.GetAllAsync(cancellationToken);
@@ -33,6 +36,15 @@ public sealed class UserRoleService(
 
     public async Task<SetUserRolesResult> SetUserRolesAsync(Guid userId, IReadOnlyList<Guid> roleIds, Guid? actingUserId, CancellationToken cancellationToken = default)
     {
+        // A directory user with no PT-LIMS account (no tblUsers row) must never get a role
+        // assignment - blocks until Create User has run for them first.
+        var users = await userRepository.GetAllAsync(cancellationToken);
+        var user = users.FirstOrDefault(u => u.UserId == userId);
+        if (user is null)
+        {
+            return new SetUserRolesResult(false, "This user does not have a PT-LIMS account yet. Create the account before assigning roles.");
+        }
+
         var existing = await userRoleRepository.GetForUserAsync(userId, cancellationToken);
         var existingRoleIds = existing.Select(a => a.RoleId).ToHashSet();
         var desiredRoleIds = roleIds.ToHashSet();
@@ -49,18 +61,24 @@ public sealed class UserRoleService(
             return new SetUserRolesResult(false, "You cannot remove your own Admin access.");
         }
 
-        foreach (var roleId in desiredRoleIds.Except(existingRoleIds).ToList())
+        var roleIdsToAdd = desiredRoleIds.Except(existingRoleIds).ToList();
+        var userRoleIdsToRemove = existing.Where(a => !desiredRoleIds.Contains(a.RoleId)).Select(a => a.UserRoleId).ToList();
+
+        if (roleIdsToAdd.Count == 0 && userRoleIdsToRemove.Count == 0)
         {
-            await userRoleRepository.AddAsync(Guid.NewGuid(), userId, roleId, cancellationToken);
+            return new SetUserRolesResult(true, null);
         }
 
-        // Materialized to a list first - awaiting RemoveAsync per iteration while enumerating
-        // directly off `existing` risks an "enumeration operation may not execute" failure if a
-        // repository implementation's existing collection is mutated by the remove itself.
-        foreach (var assignment in existing.Where(a => !desiredRoleIds.Contains(a.RoleId)).ToList())
-        {
-            await userRoleRepository.RemoveAsync(assignment.UserRoleId, cancellationToken);
-        }
+        var roleNamesById = roles.ToDictionary(r => r.RoleId, r => r.Name);
+        var addedNames = roleIdsToAdd.Select(id => roleNamesById.GetValueOrDefault(id, id.ToString()));
+        var removedNames = existing.Where(a => userRoleIdsToRemove.Contains(a.UserRoleId)).Select(a => roleNamesById.GetValueOrDefault(a.RoleId, a.RoleId.ToString()));
+        var details = $"Added: [{string.Join(", ", addedNames)}]; Removed: [{string.Join(", ", removedNames)}]";
+
+        var auditEntry = new AuditEntry(actingUserId, "SetUserRoles", UserEntityType, userId.ToString(), details);
+
+        // Audited in one DB transaction - if the audit write fails, every add/remove in this
+        // batch rolls back too, so no unaudited role change is ever persisted.
+        await userRoleRepository.ApplyRoleChangesWithAuditAsync(userId, roleIdsToAdd, userRoleIdsToRemove, auditEntry, cancellationToken);
 
         return new SetUserRolesResult(true, null);
     }

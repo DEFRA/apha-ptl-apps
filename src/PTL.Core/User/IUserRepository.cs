@@ -1,3 +1,5 @@
+using PTL.Core.Audit;
+
 namespace PTL.Core.User;
 
 public interface IUserRepository
@@ -7,6 +9,10 @@ public interface IUserRepository
 
     // spiUser
     Task CreateAsync(User user, CancellationToken cancellationToken = default);
+
+    // spiUser + spiSystemAdministrationAudit, in one transaction - if the audit write fails, the
+    // user row is never persisted either (see ApplyRoleChangesWithAuditAsync remarks).
+    Task CreateWithAuditAsync(User user, AuditEntry auditEntry, CancellationToken cancellationToken = default);
 
     // spdUser
     Task DeleteAsync(Guid userId, CancellationToken cancellationToken = default);

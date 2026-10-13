@@ -364,7 +364,7 @@ public class SystemAdministrationController : Controller
         {
             var candidate = UnpackCandidate(model.SelectedCandidate);
             var result = await userApiClient.CreateUserAsync(
-                new CreateUserRequest(candidate.Username, candidate.Email, candidate.FriendlyName, candidate.FirstName, candidate.LastName, model.Department),
+                new CreateUserRequest(candidate.Username, candidate.Email, candidate.FriendlyName, candidate.FirstName, candidate.LastName, model.Department, GetCurrentUserId()),
                 cancellationToken);
 
             if (result.Success)

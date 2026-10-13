@@ -1,4 +1,5 @@
 using System.Data;
+using PTL.Core.Audit;
 using PTL.Data.Infrastructure;
 using PTL.Data.Tests.Fakes;
 using PTL.Data.User;
@@ -78,6 +79,49 @@ public class UserRepositoryTests
         await repository.DeleteAsync(userId);
 
         Assert.Contains(connection.ExecutedCommands, c => c.CommandText == deleteSql);
+    }
+
+    private const string InsertUserSql = "EXEC dbo.spiUser @UserId, @Username, @FriendlyName, @FirstName, @LastName, @Email, @Department, @IsInactive, @InactiveDate";
+    private const string AuditSql = "EXEC dbo.spiSystemAdministrationAudit @AuditId, @ActingUserId, @Action, @EntityType, @EntityId, @Details";
+
+    [Fact]
+    public async Task CreateWithAuditAsync_CommitsTheInsertAndAuditInOneTransaction()
+    {
+        var (repository, connection) = CreateRepository();
+        var userId = Guid.NewGuid();
+        connection.RespondToNonQuery(InsertUserSql, 1);
+        connection.RespondToNonQuery(AuditSql, 1);
+        var auditEntry = new AuditEntry(null, "CreateUser", "User", userId.ToString(), "Username: m100001");
+
+        await repository.CreateWithAuditAsync(
+            new PTL.Core.User.User { UserId = userId, Username = "m100001", FriendlyName = "Jane Smith", FirstName = "Jane", LastName = "Smith", Email = "jane@apha.gov.uk", Department = "Science" },
+            auditEntry);
+
+        Assert.NotNull(connection.LastTransaction);
+        Assert.True(connection.LastTransaction!.Committed);
+        Assert.Contains(connection.ExecutedCommands, c => c.CommandText == InsertUserSql);
+        var auditCommand = Assert.Single(connection.ExecutedCommands, c => c.CommandText == AuditSql);
+        Assert.Equal("CreateUser", auditCommand.ParameterValue("@Action"));
+    }
+
+    // System Administration business rule: if the audit trail write fails, the account creation
+    // is rolled back - no unaudited change is ever persisted.
+    [Fact]
+    public async Task CreateWithAuditAsync_AuditWriteFails_RollsBackTheTransaction()
+    {
+        var (repository, connection) = CreateRepository();
+        var userId = Guid.NewGuid();
+        connection.RespondToNonQuery(InsertUserSql, 1);
+        // AuditSql deliberately has no configured response - simulates the audit write failing.
+        var auditEntry = new AuditEntry(null, "CreateUser", "User", userId.ToString(), "Username: m100001");
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => repository.CreateWithAuditAsync(
+            new PTL.Core.User.User { UserId = userId, Username = "m100001", FriendlyName = "Jane Smith", FirstName = "Jane", LastName = "Smith", Email = "jane@apha.gov.uk", Department = "Science" },
+            auditEntry));
+
+        Assert.NotNull(connection.LastTransaction);
+        Assert.True(connection.LastTransaction!.RolledBack);
+        Assert.False(connection.LastTransaction!.Committed);
     }
 
     [Fact]

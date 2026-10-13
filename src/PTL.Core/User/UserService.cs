@@ -1,7 +1,11 @@
+using PTL.Core.Audit;
+
 namespace PTL.Core.User;
 
 public sealed class UserService(IUserRepository userRepository, IStaffDirectoryService staffDirectoryService) : IUserService
 {
+    private const string UserEntityType = "User";
+
     public Task<IReadOnlyList<User>> GetAllAsync(CancellationToken cancellationToken = default) =>
         userRepository.GetAllAsync(cancellationToken);
 
@@ -15,7 +19,7 @@ public sealed class UserService(IUserRepository userRepository, IStaffDirectoryS
         return candidates.Where(c => !existingUsernames.Contains(c.Username)).ToList();
     }
 
-    public async Task<User> CreateUserAsync(string username, string email, string friendlyName, string firstName, string lastName, string department, CancellationToken cancellationToken = default)
+    public async Task<User> CreateUserAsync(string username, string email, string friendlyName, string firstName, string lastName, string department, Guid? actingUserId = null, CancellationToken cancellationToken = default)
     {
         var deptValue = department.Trim();
         var validation = UserValidator.Validate(email, deptValue);
@@ -43,7 +47,10 @@ public sealed class UserService(IUserRepository userRepository, IStaffDirectoryS
             InactiveDate = null
         };
 
-        await userRepository.CreateAsync(newUser, cancellationToken);
+        // Audited in the SAME transaction as the insert - if the audit write fails, the account
+        // itself is never persisted either (see IUserRepository.CreateWithAuditAsync remarks).
+        var auditEntry = new AuditEntry(actingUserId, "CreateUser", UserEntityType, newUser.UserId.ToString(), $"Username: {username}");
+        await userRepository.CreateWithAuditAsync(newUser, auditEntry, cancellationToken);
         return newUser;
     }
 

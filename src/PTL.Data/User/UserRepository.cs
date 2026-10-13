@@ -1,5 +1,7 @@
 using Dapper;
+using PTL.Core.Audit;
 using PTL.Core.User;
+using PTL.Data.Audit;
 using PTL.Data.Infrastructure;
 using CoreUser = PTL.Core.User.User;
 
@@ -35,6 +37,30 @@ public sealed class UserRepository(IDbConnectionFactory connectionFactory) : IUs
         await connection.ExecuteAsync(
             "EXEC dbo.spiUser @UserId, @Username, @FriendlyName, @FirstName, @LastName, @Email, @Department, @IsInactive, @InactiveDate",
             new { user.UserId, user.Username, user.FriendlyName, user.FirstName, user.LastName, user.Email, user.Department, user.IsInactive, user.InactiveDate });
+    }
+
+    public async Task CreateWithAuditAsync(CoreUser user, AuditEntry auditEntry, CancellationToken cancellationToken = default)
+    {
+        using var connection = connectionFactory.CreateConnection();
+        connection.Open();
+        using var transaction = connection.BeginTransaction();
+
+        try
+        {
+            await connection.ExecuteAsync(
+                "EXEC dbo.spiUser @UserId, @Username, @FriendlyName, @FirstName, @LastName, @Email, @Department, @IsInactive, @InactiveDate",
+                new { user.UserId, user.Username, user.FriendlyName, user.FirstName, user.LastName, user.Email, user.Department, user.IsInactive, user.InactiveDate },
+                transaction);
+
+            await AuditTrailWriter.WriteAsync(connection, transaction, auditEntry, cancellationToken);
+
+            transaction.Commit();
+        }
+        catch
+        {
+            transaction.Rollback();
+            throw;
+        }
     }
 
     public async Task DeleteAsync(Guid userId, CancellationToken cancellationToken = default)

@@ -1,3 +1,4 @@
+using PTL.Core.Audit;
 using PTL.Core.User;
 
 namespace PTL.Api.Tests.User;
@@ -15,6 +16,24 @@ internal sealed class FakeUserRepository : IUserRepository
     {
         Created.Add(user);
         Users.Add(user);
+        return Task.CompletedTask;
+    }
+
+    // When true, simulates the audit write failing - mimics the real transaction's rollback by
+    // throwing BEFORE the user row is added, so a test can assert nothing was persisted.
+    public bool ThrowOnAudit { get; set; }
+    public AuditEntry? LastAuditEntry { get; private set; }
+
+    public Task CreateWithAuditAsync(PTL.Core.User.User user, AuditEntry auditEntry, CancellationToken cancellationToken = default)
+    {
+        if (ThrowOnAudit)
+        {
+            throw new InvalidOperationException("Simulated audit trail write failure.");
+        }
+
+        Created.Add(user);
+        Users.Add(user);
+        LastAuditEntry = auditEntry;
         return Task.CompletedTask;
     }
 

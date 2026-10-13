@@ -10,7 +10,7 @@ public interface IUserService
     Task<IReadOnlyList<StaffDirectoryUser>> SearchStaffDirectoryAsync(string searchTerm, CancellationToken cancellationToken = default);
 
     // Throws UserValidationException when business rules are violated (no email, duplicate account).
-    Task<User> CreateUserAsync(string username, string email, string friendlyName, string firstName, string lastName, string department, CancellationToken cancellationToken = default);
+    Task<User> CreateUserAsync(string username, string email, string friendlyName, string firstName, string lastName, string department, Guid? actingUserId = null, CancellationToken cancellationToken = default);
 
     // The Internal Test Consultant Department Management grid (spgaUserTestConsultant).
     Task<IReadOnlyList<User>> GetTestConsultantsAsync(CancellationToken cancellationToken = default);
