@@ -1,0 +1,102 @@
+@model PTL.InternalWeb.Features.SystemAdministration.InternalTestConsultantDepartmentViewModel
+@{
+    ViewData["Title"] = "Internal Test Consultant Department Management";
+
+    var editingRow = Model.Rows.FirstOrDefault(r => r.IsEditing);
+}
+
+<h1 class="govuk-heading-l">Internal Test Consultant Department Management</h1>
+
+@if (Model.Message is not null)
+{
+    var bannerType = Model.MessageIsError ? "" : "govuk-notification-banner--success";
+    <div class="govuk-notification-banner @bannerType" role="@(Model.MessageIsError ? "alert" : "region")" aria-labelledby="govuk-notification-banner-title" data-module="govuk-notification-banner">
+        <div class="govuk-notification-banner__header">
+            <h2 class="govuk-notification-banner__title" id="govuk-notification-banner-title">@(Model.MessageIsError ? "Important" : "Success")</h2>
+        </div>
+        <div class="govuk-notification-banner__content">
+            <p class="govuk-notification-banner__heading">@Model.Message</p>
+        </div>
+    </div>
+}
+
+<table class="govuk-table">
+    <thead class="govuk-table__head">
+        <tr class="govuk-table__row">
+            <th scope="col" class="govuk-table__header">Username</th>
+            <th scope="col" class="govuk-table__header">Name</th>
+            <th scope="col" class="govuk-table__header">Department</th>
+            <th scope="col" class="govuk-table__header">Action</th>
+            <th scope="col" class="govuk-table__header">Status</th>
+            <th scope="col" class="govuk-table__header">Inactive Date</th>
+        </tr>
+    </thead>
+    <tbody class="govuk-table__body">
+        @if (Model.Rows.Count == 0)
+        {
+            <tr class="govuk-table__row">
+                <td class="govuk-table__cell" colspan="6">There are no Internal Test Consultants to display.</td>
+            </tr>
+        }
+        @foreach (var row in Model.Rows)
+        {
+            <tr class="govuk-table__row">
+                <td class="govuk-table__cell">@row.Username</td>
+                <td class="govuk-table__cell">@row.FriendlyName</td>
+                @if (row.IsEditing)
+                {
+                    <td class="govuk-table__cell">
+                        <div class="govuk-form-group govuk-!-margin-bottom-0">
+                            <label class="govuk-visually-hidden" for="Edit.Department">Department for @row.FriendlyName</label>
+                            <input id="Edit.Department" form="tcEditForm" name="Edit.Department" value="@row.Department" maxlength="50" class="govuk-input" />
+                        </div>
+                    </td>
+                    <td class="govuk-table__cell">
+                        <button form="tcEditForm" class="govuk-button govuk-!-margin-bottom-0" data-module="govuk-button" type="submit">Save</button>
+                        <a class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0" data-module="govuk-button" asp-action="InternalTestConsultantDepartment">Cancel</a>
+                    </td>
+                }
+                else
+                {
+                    <td class="govuk-table__cell">@row.Department</td>
+                    <td class="govuk-table__cell">
+                        <a class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0" data-module="govuk-button" asp-action="InternalTestConsultantDepartment" asp-route-editId="@row.UserId">Edit</a>
+                        <form method="post" asp-action="InternalTestConsultantDepartmentToggleStatus" class="govuk-!-display-inline">
+                            <input type="hidden" name="userId" value="@row.UserId" />
+                            <input type="hidden" name="department" value="@row.Department" />
+                            <input type="hidden" name="isInactive" value="@row.IsInactive" />
+                            @if (row.IsInactive)
+                            {
+                                <button class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0" data-module="govuk-button" type="submit"
+                                        onclick="return confirm('You are setting this test consultant to be active. Are you sure?');">
+                                    Activate
+                                </button>
+                            }
+                            else
+                            {
+                                <button class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0" data-module="govuk-button" type="submit">
+                                    Deactivate
+                                </button>
+                            }
+                        </form>
+                    </td>
+                }
+                <td class="govuk-table__cell">@(row.IsInactive ? "Inactive" : "Active")</td>
+                <td class="govuk-table__cell">@(row.InactiveDate is { } inactiveDate ? inactiveDate.ToString("d MMM yyyy") : "")</td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+@if (editingRow is not null)
+{
+    @* Inputs/button for the editing row live in table cells above and bind here via the "form"
+       attribute, since a <form> can't be split across multiple <td> elements - matches
+       CountryManagement.cshtml. IsInactive/InactiveDate are round-tripped unchanged (see
+       InternalTestConsultantEditViewModel remarks). *@
+    <form id="tcEditForm" method="post" asp-action="InternalTestConsultantDepartmentSave" novalidate>
+        <input type="hidden" name="Edit.UserId" value="@editingRow.UserId" />
+        <input type="hidden" name="Edit.IsInactive" value="@editingRow.IsInactive" />
+        <input type="hidden" name="Edit.InactiveDate" value="@editingRow.InactiveDate" />
+    </form>
+}

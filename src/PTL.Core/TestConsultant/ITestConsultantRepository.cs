@@ -8,6 +8,9 @@ public interface ITestConsultantRepository
     /// <summary>Reads the test consultant row matching an email address via <c>spgTestConsultantByEmail</c>, used only as a CIDM fallback.</summary>
     Task<TestConsultant?> GetByEmailAsync(string email, CancellationToken cancellationToken = default);
 
+    /// <summary>The External Test Consultant Management grid (spgaExtTestConsultants).</summary>
+    Task<IReadOnlyList<TestConsultant>> GetAllAsync(CancellationToken cancellationToken = default);
+
     Task<TestConsultant> CreateAsync(TestConsultant testConsultant, CancellationToken cancellationToken = default);
     Task<TestConsultant?> UpdateAsync(TestConsultant testConsultant, CancellationToken cancellationToken = default);
 }

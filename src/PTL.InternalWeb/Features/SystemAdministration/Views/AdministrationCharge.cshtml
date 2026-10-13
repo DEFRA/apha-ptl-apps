@@ -2,15 +2,26 @@
 @{
     ViewData["Title"] = "Administration Charges";
 
-    var errors = ViewData.ModelState
-        .Where(entry => entry.Value?.Errors.Count > 0)
-        .SelectMany(entry => entry.Value!.Errors.Select(error => (Field: entry.Key, Message: error.ErrorMessage)))
-        .ToList();
-
     string? FirstError(int i, int j) =>
         ViewData.ModelState.TryGetValue($"Charges[{i}].Prices[{j}].Price", out var entry) && entry.Errors.Count > 0
             ? entry.Errors[0].ErrorMessage
             : null;
+
+    // The error-summary link's href must match a real element id - the raw ModelState key
+    // ("Charges[0].Prices[0].Price") doesn't match asp-for's sanitised id, so each field here is
+    // keyed by the same "charge-{i}-price-{j}" id assigned to its price input below.
+    var errors = new List<(string Field, string Message)>();
+    for (var i = 0; i < Model.Charges.Count; i++)
+    {
+        for (var j = 0; j < Model.Charges[i].Prices.Count; j++)
+        {
+            var fieldError = FirstError(i, j);
+            if (fieldError is not null)
+            {
+                errors.Add(($"charge-{i}-price-{j}", fieldError));
+            }
+        }
+    }
 }
 
 <h1 class="govuk-heading-l">Administration Charges</h1>
@@ -46,18 +57,20 @@ else
                         </td>
                         @for (var j = 0; j < charge.Prices.Count; j++)
                         {
+                            var price = charge.Prices[j];
+                            var fieldId = $"charge-{i}-price-{j}";
                             var error = FirstError(i, j);
                             <td class="govuk-table__cell">
                                 <div class="govuk-form-group @(error is null ? "" : "govuk-form-group--error")">
+                                    <label class="govuk-visually-hidden" for="@fieldId">@charge.Name price in @price.CurrencyLabel</label>
                                     @if (error is not null)
                                     {
                                         <p class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @error</p>
                                     }
                                     <input type="hidden" asp-for="Charges[i].Prices[j].CurrencyId" />
                                     <input type="hidden" asp-for="Charges[i].Prices[j].CurrencyLabel" />
-                                    <input asp-for="Charges[i].Prices[j].Price"
-                                           class="govuk-input govuk-input--width-5 @(error is null ? "" : "govuk-input--error")"
-                                           aria-label="@($"{charge.Name} price in {charge.Prices[j].CurrencyLabel}")" />
+                                    <input id="@fieldId" name="Charges[@i].Prices[@j].Price" value="@price.Price"
+                                           class="govuk-input govuk-input--width-5 @(error is null ? "" : "govuk-input--error")" />
                                 </div>
                             </td>
                         }

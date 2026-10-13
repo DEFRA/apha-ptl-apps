@@ -87,4 +87,50 @@ public class SideNavigationProviderTests
 
         Assert.NotNull(path);
     }
+
+    [Theory]
+    [InlineData("CreateUserSearch", "Create User")]
+    [InlineData("CreateUserConfirm", "Create User")]
+    [InlineData("ViewerManagementAdd", "Viewer Management")]
+    [InlineData("ViewerManagementSave", "Viewer Management")]
+    [InlineData("ViewerManagementRemove", "Viewer Management")]
+    [InlineData("ViewerManagementGenerateLogin", "Viewer Management")]
+    [InlineData("ExternalTestConsultantManagementAdd", "External Test Consultant Management")]
+    [InlineData("ExternalTestConsultantManagementToggleStatus", "External Test Consultant Management")]
+    [InlineData("CountryManagementRemove", "Country Management")]
+    [InlineData("InternalTestConsultantDepartmentToggleStatus", "Internal Test Consultant Department Management")]
+    [InlineData("PostagePricingPlanRenew", "Postage Pricing Plan")]
+    public void FindNode_SubActionWithoutExactMatch_FallsBackToLongestRegisteredPrefix(string actionName, string expectedText)
+    {
+        var tree = SideNavigationProvider.Build();
+
+        var node = SideNavigationProvider.FindNode(tree, "SystemAdministration", actionName);
+
+        Assert.NotNull(node);
+        Assert.Equal(expectedText, node!.Text);
+    }
+
+    [Fact]
+    public void FindNode_WeightedPricingPlanRenew_MatchesExplicitHiddenNode()
+    {
+        var tree = SideNavigationProvider.Build();
+
+        // "Renew" has no shared prefix with "WeightedPricingPlan", so it must be an explicit
+        // (hidden) node rather than relying on the prefix fallback.
+        var node = SideNavigationProvider.FindNode(tree, "SystemAdministration", "Renew");
+
+        Assert.NotNull(node);
+        Assert.Equal("Renew Weighted Pricing Plan", node!.Text);
+    }
+
+    [Fact]
+    public void FindPath_SubActionWithoutExactMatch_ResolvesToLogicalPageAncestorChain()
+    {
+        var tree = SideNavigationProvider.Build();
+
+        var path = SideNavigationProvider.FindPath(tree, "SystemAdministration", "ViewerManagementRemove");
+
+        Assert.NotNull(path);
+        Assert.Equal("Viewer Management", path![^1].Text);
+    }
 }

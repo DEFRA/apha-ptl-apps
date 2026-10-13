@@ -1,8 +1,8 @@
 namespace PTL.Core.TestConsultant;
 
-// tblExternalTestConsultant - external subject-matter-expert/assessor role. Minimal slice: just
-// enough to support CIDM external-user resolution, not the full admin/management surface
-// Participant has.
+// tblExternalTestConsultant - external subject-matter-expert/assessor role. Originally just
+// enough to support CIDM external-user resolution; now also backs the External Test Consultant
+// Management admin screen (add/edit/status + the stubbed Generate Login action).
 public sealed class TestConsultant
 {
     public Guid ExternalTestConsultantId { get; set; }

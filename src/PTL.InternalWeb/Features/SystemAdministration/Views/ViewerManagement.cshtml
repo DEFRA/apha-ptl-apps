@@ -1,0 +1,113 @@
+@model PTL.InternalWeb.Features.SystemAdministration.ViewerManagementViewModel
+@{
+    ViewData["Title"] = "Viewer Management";
+
+    var errors = ViewData.ModelState
+        .Where(entry => entry.Value?.Errors.Count > 0)
+        .SelectMany(entry => entry.Value!.Errors.Select(error => (Field: entry.Key, Message: error.ErrorMessage)))
+        .ToList();
+
+    var editingRow = Model.Rows.FirstOrDefault(r => r.IsEditing);
+}
+
+<h1 class="govuk-heading-l">Viewer Management</h1>
+
+@if (Model.Message is not null)
+{
+    var bannerType = Model.MessageIsError ? "" : "govuk-notification-banner--success";
+    <div class="govuk-notification-banner @bannerType" role="@(Model.MessageIsError ? "alert" : "region")" aria-labelledby="govuk-notification-banner-title" data-module="govuk-notification-banner">
+        <div class="govuk-notification-banner__header">
+            <h2 class="govuk-notification-banner__title" id="govuk-notification-banner-title">@(Model.MessageIsError ? "Important" : "Success")</h2>
+        </div>
+        <div class="govuk-notification-banner__content">
+            <p class="govuk-notification-banner__heading">@Model.Message</p>
+        </div>
+    </div>
+}
+
+<govuk-error-summary errors="@errors" />
+
+<table class="govuk-table">
+    <thead class="govuk-table__head">
+        <tr class="govuk-table__row">
+            <th scope="col" class="govuk-table__header">Name</th>
+            <th scope="col" class="govuk-table__header">Email</th>
+            <th scope="col" class="govuk-table__header">External Website Login</th>
+            <th scope="col" class="govuk-table__header">Actions</th>
+        </tr>
+    </thead>
+    <tbody class="govuk-table__body">
+        @if (Model.Rows.Count == 0)
+        {
+            <tr class="govuk-table__row">
+                <td class="govuk-table__cell" colspan="4">There are no Viewers to display.</td>
+            </tr>
+        }
+        @foreach (var row in Model.Rows)
+        {
+            <tr class="govuk-table__row">
+                @if (row.IsEditing)
+                {
+                    <td class="govuk-table__cell">
+                        <div class="govuk-form-group govuk-!-margin-bottom-0">
+                            <label class="govuk-visually-hidden" for="Edit.Name">Name</label>
+                            <input id="Edit.Name" form="viewerEditForm" name="Edit.Name" value="@row.Name" maxlength="50" class="govuk-input" />
+                        </div>
+                    </td>
+                    <td class="govuk-table__cell">
+                        <div class="govuk-form-group govuk-!-margin-bottom-0">
+                            <label class="govuk-visually-hidden" for="Edit.Email">Email</label>
+                            <input id="Edit.Email" form="viewerEditForm" name="Edit.Email" value="@row.Email" maxlength="50" class="govuk-input" />
+                        </div>
+                    </td>
+                    <td class="govuk-table__cell">@(row.HasLogin ? "Login generated" : "")</td>
+                    <td class="govuk-table__cell">
+                        <button form="viewerEditForm" class="govuk-button govuk-!-margin-bottom-0" data-module="govuk-button" type="submit">Save</button>
+                        <a class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0" data-module="govuk-button" asp-action="ViewerManagement">Cancel</a>
+                    </td>
+                }
+                else
+                {
+                    <td class="govuk-table__cell">@row.Name</td>
+                    <td class="govuk-table__cell">@row.Email</td>
+                    <td class="govuk-table__cell">
+                        @if (row.HasLogin)
+                        {
+                            @:Login generated
+                        }
+                    </td>
+                    <td class="govuk-table__cell">
+                        <a class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0" data-module="govuk-button" asp-action="ViewerManagement" asp-route-editId="@row.ViewerId">Edit</a>
+                        <form method="post" asp-action="ViewerManagementRemove" class="govuk-!-display-inline">
+                            <input type="hidden" name="viewerId" value="@row.ViewerId" />
+                            <button class="govuk-button govuk-button--warning govuk-!-margin-bottom-0" data-module="govuk-button" type="submit"
+                                    onclick="return confirm('@row.RemoveConfirmMessage');">
+                                Remove
+                            </button>
+                        </form>
+                    </td>
+                }
+            </tr>
+        }
+    </tbody>
+</table>
+
+@if (editingRow is not null)
+{
+    @* Inputs/button for the editing row live in table cells above and bind here via the "form"
+       attribute, since a <form> can't be split across multiple <td> elements - matches
+       CountryManagement.cshtml. *@
+    <form id="viewerEditForm" method="post" asp-action="ViewerManagementSave" novalidate>
+        <input type="hidden" name="Edit.ViewerId" value="@editingRow.ViewerId" />
+    </form>
+}
+
+<hr />
+
+<h2 class="govuk-heading-m">Add a Viewer</h2>
+
+<form method="post" asp-action="ViewerManagementAdd">
+    <govuk-input asp-for="Add.Name" label="Name" input-class="govuk-input govuk-input--width-20" />
+    <govuk-input asp-for="Add.Email" label="Email" input-class="govuk-input govuk-input--width-20" />
+    <button class="govuk-button" data-module="govuk-button" type="submit">Add</button>
+</form>
