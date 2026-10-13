@@ -17,4 +17,17 @@ public interface IDistributionApiClient
 
     Task<SampleNumbersSaveResult?> SaveSampleNumbersAsync(
         Guid monthlyDistributionSchemeId, SampleNumbersSaveRequest request, CancellationToken cancellationToken = default);
+
+    Task<IntendedResultsResponse?> GetIntendedResultsAsync(Guid monthlyDistributionSchemeId, CancellationToken cancellationToken = default);
+
+    Task<IntendedResultsSaveResult?> SaveIntendedResultsAsync(
+        Guid monthlyDistributionSchemeId, IntendedResultsSaveRequest request, CancellationToken cancellationToken = default);
+
+    Task<DistributionParticipantsResponse?> GetParticipantsAsync(Guid monthlyDistributionSchemeId, CancellationToken cancellationToken = default);
+
+    Task<ChangeDeadlineResult?> ChangeDeadlineAsync(
+        Guid monthlyDistributionSchemeId, Guid distributionParticipantId, ChangeDeadlineRequest request, CancellationToken cancellationToken = default);
+
+    Task<RepeatDistributionResult?> RepeatDistributionAsync(
+        Guid monthlyDistributionSchemeId, RepeatDistributionRequest request, CancellationToken cancellationToken = default);
 }

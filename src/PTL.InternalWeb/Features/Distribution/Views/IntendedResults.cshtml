@@ -1,0 +1,256 @@
+@model PTL.InternalWeb.Features.Distribution.IntendedResultsViewModel
+@{
+    // Legacy diverts to a separate Audit.aspx page; here it is a second step of the same view -
+    // same pattern as Features/Distribution/Views/SampleNumbers.cshtml.
+    ViewData["Title"] = Model.IsAuditStep
+        ? $"Audit Trail - {Model.DistributionHeading}"
+        : $"Intended Results - {Model.DistributionHeading}";
+
+    var errors = ViewData.ModelState
+        .Where(entry => entry.Value?.Errors.Count > 0)
+        .SelectMany(entry => entry.Value!.Errors.Select(error => (Field: entry.Key, Message: error.ErrorMessage)))
+        .ToList();
+}
+
+@if (Model.IsAuditStep)
+{
+    <a class="govuk-back-link" asp-action="IntendedResults" asp-route-year="@Model.YearId" asp-route-monthId="@Model.MonthId" asp-route-schemeId="@Model.MonthlyDistributionSchemeId">Back</a>
+
+    <h1 class="govuk-heading-l">Audit Trail</h1>
+
+    <govuk-error-summary errors="@errors" />
+
+    <p class="govuk-body">Changes have been made to the following object:</p>
+
+    <h2 class="govuk-heading-m">@Model.AuditObjectName</h2>
+
+    <hr class="govuk-section-break govuk-section-break--visible govuk-section-break--m">
+
+    <form method="post" asp-action="IntendedResults" asp-route-year="@Model.YearId" asp-route-monthId="@Model.MonthId" asp-route-schemeId="@Model.MonthlyDistributionSchemeId">
+        @Html.AntiForgeryToken()
+        @* Legacy holds the pending edits in Session while Audit.aspx runs. There is no
+           server-side session here, so every editable field has to ride along hidden or the
+           user's edit is silently dropped when the audited save finally runs. *@
+        <input type="hidden" asp-for="MonthlyDistributionSchemeId" />
+        <input type="hidden" asp-for="YearId" />
+        <input type="hidden" asp-for="MonthId" />
+        <input type="hidden" asp-for="RequiresAuditReason" />
+        <input type="hidden" asp-for="IsAuditStep" />
+        <input type="hidden" asp-for="AuditObjectName" />
+        <input type="hidden" asp-for="PendingCommand" />
+        @for (var t = 0; t < Model.Tests.Count; t++)
+        {
+            <input type="hidden" asp-for="Tests[t].TestId" />
+            for (var r = 0; r < Model.Tests[t].ResultItems.Count; r++)
+            {
+                <input type="hidden" asp-for="Tests[t].ResultItems[r].TestResultItemId" />
+                <input type="hidden" asp-for="Tests[t].ResultItems[r].IsRange" />
+            }
+            for (var m = 0; m < Model.Tests[t].MethodItems.Count; m++)
+            {
+                <input type="hidden" asp-for="Tests[t].MethodItems[m].TestMethodItemId" />
+                <input type="hidden" asp-for="Tests[t].MethodItems[m].IntendedResult" />
+            }
+            for (var s = 0; s < Model.Tests[t].Samples.Count; s++)
+            {
+                <input type="hidden" asp-for="Tests[t].Samples[s].SampleId" />
+                <input type="hidden" asp-for="Tests[t].Samples[s].IsApplicable" />
+                for (var v = 0; v < Model.Tests[t].Samples[s].Values.Count; v++)
+                {
+                    <input type="hidden" asp-for="Tests[t].Samples[s].Values[v].SampleResultItemId" />
+                    <input type="hidden" asp-for="Tests[t].Samples[s].Values[v].TestResultItemId" />
+                    <input type="hidden" asp-for="Tests[t].Samples[s].Values[v].IntendedResult" />
+                    <input type="hidden" asp-for="Tests[t].Samples[s].Values[v].IntendedResult2" />
+                }
+            }
+        }
+
+        <govuk-textarea asp-for="AuditWhy" label="Before these modifications can be saved, you must enter your reasons for making these changes below: " rows="5" maxlength="2000" />
+
+        <hr class="govuk-section-break govuk-section-break--visible govuk-section-break--m">
+
+        <div class="govuk-button-group">
+            <button type="submit" name="command" value="@Model.PendingCommand" class="govuk-button" data-module="govuk-button">Save</button>
+            <button type="submit" name="command" value="cancelAudit" class="govuk-button govuk-button--secondary" data-module="govuk-button" formnovalidate>Cancel</button>
+        </div>
+    </form>
+
+    return;
+}
+
+<a class="govuk-back-link" asp-action="Schedule" asp-route-year="@Model.YearId" asp-route-monthId="@Model.MonthId">Back</a>
+
+<h1 class="govuk-heading-l">Intended Results</h1>
+
+<h2 class="govuk-heading-m">@Model.DistributionHeading</h2>
+
+<hr class="govuk-section-break govuk-section-break--visible govuk-section-break--m">
+
+<p class="govuk-body">Please enter any Intended Results for the Result Items and the Method Items.</p>
+
+<hr class="govuk-section-break govuk-section-break--visible govuk-section-break--m">
+
+<govuk-error-summary errors="@errors" />
+
+<form method="post" asp-action="IntendedResults" asp-route-year="@Model.YearId" asp-route-monthId="@Model.MonthId" asp-route-schemeId="@Model.MonthlyDistributionSchemeId">
+    @Html.AntiForgeryToken()
+    <input type="hidden" asp-for="MonthlyDistributionSchemeId" />
+    <input type="hidden" asp-for="YearId" />
+    <input type="hidden" asp-for="MonthId" />
+    <input type="hidden" asp-for="RequiresAuditReason" />
+    <input type="hidden" asp-for="IsAuditStep" />
+
+    @if (Model.Tests.Count == 0)
+    {
+        <p class="govuk-body">This Distribution has no Tests</p>
+    }
+    else
+    {
+        for (var t = 0; t < Model.Tests.Count; t++)
+        {
+            var test = Model.Tests[t];
+
+            <h2 class="govuk-heading-m">@test.TestName</h2>
+
+            <div class="govuk-!-margin-bottom-6" style="overflow-x: auto;">
+                <table class="govuk-table">
+                    <caption class="govuk-table__caption govuk-visually-hidden">Intended Results for @test.TestName</caption>
+                    <thead class="govuk-table__head">
+                        <tr class="govuk-table__row">
+                            <th scope="col" class="govuk-table__header">Sample</th>
+                            @for (var r = 0; r < test.ResultItems.Count; r++)
+                            {
+                                var resultItem = test.ResultItems[r];
+                                var rangeId = Html.IdFor(m => m.Tests[t].ResultItems[r].IsRange);
+                                var rangeGroup = $"{test.TestId}_{resultItem.TestResultItemId}";
+                                <th scope="col" class="govuk-table__header">
+                                    @resultItem.Name
+                                    <input type="hidden" asp-for="Tests[t].ResultItems[r].TestResultItemId" />
+                                    <div class="govuk-checkboxes govuk-checkboxes--small govuk-!-margin-top-1" data-module="govuk-checkboxes">
+                                        <div class="govuk-checkboxes__item">
+                                            @* aria-label disambiguates the accessible name - every column renders a checkbox labelled
+                                               "Range", so a screen reader user tabbing between them needs the Result Item name too. *@
+                                            <input class="govuk-checkboxes__input intended-results-range-toggle" type="checkbox" asp-for="Tests[t].ResultItems[r].IsRange"
+                                                   data-range-group="@rangeGroup"
+                                                   aria-label="@($"{resultItem.Name} is a range of values")"
+                                                   title="Click here to set whether the Intended Result for this Result Item is a Range of values" />
+                                            <label class="govuk-label govuk-checkboxes__label" for="@rangeId">Range</label>
+                                        </div>
+                                    </div>
+                                </th>
+                            }
+                        </tr>
+                    </thead>
+                    <tbody class="govuk-table__body">
+                        @if (test.ResultItems.Count == 0)
+                        {
+                            <tr class="govuk-table__row">
+                                <td class="govuk-table__cell" colspan="@(test.ResultItems.Count + 1)">This Test has no Result Items</td>
+                            </tr>
+                        }
+                        else
+                        {
+                            for (var s = 0; s < test.Samples.Count; s++)
+                            {
+                                var sample = test.Samples[s];
+                                <tr class="govuk-table__row">
+                                    <th scope="row" class="govuk-table__header">
+                                        <strong>@sample.SampleNumber:</strong><br />@sample.InternalDescription
+                                    </th>
+                                    @for (var r = 0; r < test.ResultItems.Count; r++)
+                                    {
+                                        var resultItem = test.ResultItems[r];
+                                        var v = test.ValueIndexFor(s, resultItem.TestResultItemId);
+                                        <td class="govuk-table__cell">
+                                            @if (v >= 0)
+                                            {
+                                                <input type="hidden" asp-for="Tests[t].Samples[s].Values[v].SampleResultItemId" />
+                                                <input type="hidden" asp-for="Tests[t].Samples[s].Values[v].TestResultItemId" />
+                                                var valueLabel = $"{resultItem.Name} for sample {sample.SampleNumber}";
+                                                var disabled = !sample.IsApplicable;
+                                                var valueRangeGroup = $"{test.TestId}_{resultItem.TestResultItemId}";
+                                                if (resultItem.IsDropdown)
+                                                {
+                                                    <govuk-select asp-for="Tests[t].Samples[s].Values[v].IntendedResult" label="@valueLabel" label-class="govuk-label govuk-visually-hidden"
+                                                                  asp-items="@(resultItem.DropdownOptions.Select(o => new Microsoft.AspNetCore.Mvc.Rendering.SelectListItem(o, o)))"
+                                                                  option-label="- Select -" disabled="@disabled" />
+                                                }
+                                                else
+                                                {
+                                                    <govuk-input asp-for="Tests[t].Samples[s].Values[v].IntendedResult" label="@valueLabel" label-class="govuk-label govuk-visually-hidden"
+                                                                 input-class="govuk-input govuk-input--width-10" disabled="@disabled" />
+                                                }
+                                                <span class="intended-results-range-value" data-range-group="@valueRangeGroup" hidden="@(!resultItem.IsRange)">
+                                                    &nbsp;to&nbsp;
+                                                    @if (resultItem.IsDropdown)
+                                                    {
+                                                        <govuk-select asp-for="Tests[t].Samples[s].Values[v].IntendedResult2" label="@($"{valueLabel} (upper value)")" label-class="govuk-label govuk-visually-hidden"
+                                                                      asp-items="@(resultItem.DropdownOptions.Select(o => new Microsoft.AspNetCore.Mvc.Rendering.SelectListItem(o, o)))"
+                                                                      option-label="- Select -" disabled="@disabled" />
+                                                    }
+                                                    else
+                                                    {
+                                                        <govuk-input asp-for="Tests[t].Samples[s].Values[v].IntendedResult2" label="@($"{valueLabel} (upper value)")" label-class="govuk-label govuk-visually-hidden"
+                                                                     input-class="govuk-input govuk-input--width-10" disabled="@disabled" />
+                                                    }
+                                                </span>
+                                            }
+                                        </td>
+                                    }
+                                </tr>
+                            }
+                        }
+
+                        @if (test.MethodItems.Count == 0)
+                        {
+                            <tr class="govuk-table__row">
+                                <td class="govuk-table__cell" colspan="@(test.ResultItems.Count + 1)">This Test has no Method Items</td>
+                            </tr>
+                        }
+                        else
+                        {
+                            for (var m = 0; m < test.MethodItems.Count; m++)
+                            {
+                                var methodItem = test.MethodItems[m];
+                                <tr class="govuk-table__row">
+                                    <th scope="row" class="govuk-table__header">@methodItem.Name:</th>
+                                    <td class="govuk-table__cell" colspan="@(Math.Max(test.ResultItems.Count, 1))">
+                                        <input type="hidden" asp-for="Tests[t].MethodItems[m].TestMethodItemId" />
+                                        @if (methodItem.IsDropdown)
+                                        {
+                                            <govuk-select asp-for="Tests[t].MethodItems[m].IntendedResult" label="@methodItem.Name" label-class="govuk-label govuk-visually-hidden"
+                                                          asp-items="@(methodItem.DropdownOptions.Select(o => new Microsoft.AspNetCore.Mvc.Rendering.SelectListItem(o, o)))"
+                                                          option-label="- Select -" />
+                                        }
+                                        else
+                                        {
+                                            <govuk-input asp-for="Tests[t].MethodItems[m].IntendedResult" label="@methodItem.Name" label-class="govuk-label govuk-visually-hidden"
+                                                         input-class="govuk-input govuk-input--width-20" />
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    }
+
+    <div class="govuk-button-group">
+        <button type="submit" name="command" value="save" class="govuk-button" data-module="govuk-button">Save</button>
+        <button type="submit" name="command" value="cancel" class="govuk-button govuk-button--secondary" data-module="govuk-button" formnovalidate>Cancel</button>
+    </div>
+</form>
+
+@* Legacy's ToggleCheckbox: ticking a Result Item's Range box reveals a second ("to") value for
+   every sample under that column. No AJAX/postback is needed here - both values always post, and
+   the server only honours the second one when IsRange is actually true for that submission. *@
+<script>
+    document.querySelectorAll('.intended-results-range-toggle').forEach(function (toggle) {
+        toggle.addEventListener('change', function () {
+            document.querySelectorAll('[data-range-group="' + toggle.dataset.rangeGroup + '"].intended-results-range-value')
+                .forEach(function (cell) { cell.hidden = !toggle.checked; });
+        });
+    });
+</script>

@@ -182,6 +182,8 @@ builder.Services.AddScoped<ILookupService, LookupService>();
 builder.Services.AddScoped<IDistributionRepository, DistributionRepository>();
 builder.Services.AddScoped<IDistributionService, DistributionService>();
 builder.Services.AddScoped<ISampleNumbersService, SampleNumbersService>();
+builder.Services.AddScoped<IIntendedResultsService, IntendedResultsService>();
+builder.Services.AddScoped<IDistributionParticipantsService, DistributionParticipantsService>();
 
 builder.Services.AddScoped<IAdministrationChargeRepository, AdministrationChargeRepository>();
 builder.Services.AddScoped<IAdministrationChargeService, AdministrationChargeService>();

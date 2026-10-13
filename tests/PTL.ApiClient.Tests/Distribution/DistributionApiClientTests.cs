@@ -194,4 +194,166 @@ public class DistributionApiClientTests
         Assert.Equal("Comments must not exceed 8000 characters", Assert.Single(result.PageErrors));
         Assert.Equal("Sample Number Required", Assert.Single(result.FieldErrorsBySampleId[Guid.Parse("22222222-2222-2222-2222-222222222222")]).Message);
     }
+
+    [Fact]
+    public async Task GetIntendedResultsAsync_NotFound_ReturnsNull()
+    {
+        var client = CreateClient(HttpStatusCode.NotFound, null);
+
+        var result = await client.GetIntendedResultsAsync(Guid.NewGuid());
+
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public async Task GetIntendedResultsAsync_ServerError_Throws()
+    {
+        var client = CreateClient(HttpStatusCode.InternalServerError, null);
+
+        await Assert.ThrowsAsync<HttpRequestException>(() => client.GetIntendedResultsAsync(Guid.NewGuid()));
+    }
+
+    [Fact]
+    public async Task GetIntendedResultsAsync_ReturnsDeserializedResponse()
+    {
+        const string json = """
+            {"monthlyDistributionSchemeId":"11111111-1111-1111-1111-111111111111","distributionReferenceFull":"17152A/BA","schemeIdentifier":"PT0060","schemeName":"Mastitis bovine","requiresAuditReason":true,"tests":[{"testId":"44444444-4444-4444-4444-444444444444","testName":"Somatic cell count","resultItems":[{"testResultItemId":"55555555-5555-5555-5555-555555555555","name":"Result A","formatString":"^[0-9]+$","returnValueType":"Numeric","isRange":false}],"methodItems":[{"testMethodItemId":"66666666-6666-6666-6666-666666666666","name":"Method A","formatString":"^[0-9]+$","returnValueType":"Numeric","intendedResult":"42"}],"samples":[{"sampleId":"22222222-2222-2222-2222-222222222222","sampleNumber":"S1","internalDescription":"Internal 1","isApplicable":true,"values":[{"sampleResultItemId":"77777777-7777-7777-7777-777777777777","testResultItemId":"55555555-5555-5555-5555-555555555555","intendedResult":"12","intendedResult2":""}]}]}]}
+            """;
+        var client = CreateClient(HttpStatusCode.OK, json);
+
+        var result = await client.GetIntendedResultsAsync(Guid.Parse("11111111-1111-1111-1111-111111111111"));
+
+        Assert.NotNull(result);
+        Assert.Equal("17152A/BA", result!.DistributionReferenceFull);
+        Assert.True(result.RequiresAuditReason);
+        var test = Assert.Single(result.Tests);
+        Assert.Equal("Somatic cell count", test.TestName);
+        Assert.Equal("42", Assert.Single(test.MethodItems).IntendedResult);
+        var sample = Assert.Single(test.Samples);
+        Assert.True(sample.IsApplicable);
+        Assert.Equal("12", Assert.Single(sample.Values).IntendedResult);
+    }
+
+    [Fact]
+    public async Task SaveIntendedResultsAsync_PutsToIntendedResultsEndpointAndReturnsDeserializedResult()
+    {
+        var schemeId = Guid.Parse("11111111-1111-1111-1111-111111111111");
+        const string json = """{"success":false,"fieldErrorsByItemId":{"66666666-6666-6666-6666-666666666666":[{"field":"IntendedResult","message":"Input must be of format: Numeric"}]},"auditReasonRequired":false}""";
+        HttpRequestMessage? captured = null;
+        var handler = new StubHttpMessageHandler(HttpStatusCode.OK, json) { OnRequest = request => captured = request };
+        var client = new DistributionApiClient(new HttpClient(handler) { BaseAddress = new Uri("http://localhost") });
+
+        var result = await client.SaveIntendedResultsAsync(schemeId, new Contracts.Distribution.IntendedResultsSaveRequest([], false));
+
+        Assert.NotNull(captured);
+        Assert.Equal(HttpMethod.Put, captured!.Method);
+        Assert.Equal($"/api/distributions/schemes/{schemeId}/intended-results", captured.RequestUri!.AbsolutePath);
+        Assert.NotNull(result);
+        Assert.False(result!.Success);
+        var fieldError = Assert.Single(result.FieldErrorsByItemId[Guid.Parse("66666666-6666-6666-6666-666666666666")]);
+        Assert.Equal("Input must be of format: Numeric", fieldError.Message);
+    }
+
+    [Fact]
+    public async Task SaveIntendedResultsAsync_ServerError_Throws()
+    {
+        var client = CreateClient(HttpStatusCode.InternalServerError, null);
+
+        await Assert.ThrowsAsync<HttpRequestException>(
+            () => client.SaveIntendedResultsAsync(Guid.NewGuid(), new Contracts.Distribution.IntendedResultsSaveRequest([], false)));
+    }
+
+    [Fact]
+    public async Task GetParticipantsAsync_NotFound_ReturnsNull()
+    {
+        var client = CreateClient(HttpStatusCode.NotFound, null);
+
+        var result = await client.GetParticipantsAsync(Guid.NewGuid());
+
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public async Task GetParticipantsAsync_ServerError_Throws()
+    {
+        var client = CreateClient(HttpStatusCode.InternalServerError, null);
+
+        await Assert.ThrowsAsync<HttpRequestException>(() => client.GetParticipantsAsync(Guid.NewGuid()));
+    }
+
+    [Fact]
+    public async Task GetParticipantsAsync_ReturnsDeserializedResponse()
+    {
+        const string json = """
+            {"monthlyDistributionSchemeId":"11111111-1111-1111-1111-111111111111","yearId":2026,"monthId":4,"schemeIdentifier":"PT0060","schemeName":"Mastitis bovine","distributionReferenceFull":"17152A/BA","isRepeatDistribution":true,"participants":[{"distributionParticipantId":"22222222-2222-2222-2222-222222222222","fullName":"L001: Lab One","deadlineDate":"2026-04-05T00:00:00","deadlineChangeReason":"","additionalParticipant":false}],"additionalParticipants":[{"participantSchemeId":"33333333-3333-3333-3333-333333333333","fullName":"L002: Lab Two"}]}
+            """;
+        var client = CreateClient(HttpStatusCode.OK, json);
+
+        var result = await client.GetParticipantsAsync(Guid.Parse("11111111-1111-1111-1111-111111111111"));
+
+        Assert.NotNull(result);
+        Assert.Equal("17152A/BA", result!.DistributionReferenceFull);
+        Assert.True(result.IsRepeatDistribution);
+        var participant = Assert.Single(result.Participants);
+        Assert.Equal("L001: Lab One", participant.FullName);
+        Assert.Equal("L002: Lab Two", Assert.Single(result.AdditionalParticipants).FullName);
+    }
+
+    [Fact]
+    public async Task ChangeDeadlineAsync_PutsToDeadlineEndpointAndReturnsDeserializedResult()
+    {
+        var schemeId = Guid.Parse("11111111-1111-1111-1111-111111111111");
+        var participantId = Guid.Parse("22222222-2222-2222-2222-222222222222");
+        const string json = """{"success":false,"newDeadlineDateError":"Deadline Date required.","reasonError":null}""";
+        HttpRequestMessage? captured = null;
+        var handler = new StubHttpMessageHandler(HttpStatusCode.OK, json) { OnRequest = request => captured = request };
+        var client = new DistributionApiClient(new HttpClient(handler) { BaseAddress = new Uri("http://localhost") });
+
+        var result = await client.ChangeDeadlineAsync(schemeId, participantId, new Contracts.Distribution.ChangeDeadlineRequest(null, "A reason"));
+
+        Assert.NotNull(captured);
+        Assert.Equal(HttpMethod.Put, captured!.Method);
+        Assert.Equal($"/api/distributions/schemes/{schemeId}/participants/{participantId}/deadline", captured.RequestUri!.AbsolutePath);
+        Assert.NotNull(result);
+        Assert.False(result!.Success);
+        Assert.Equal("Deadline Date required.", result.NewDeadlineDateError);
+    }
+
+    [Fact]
+    public async Task ChangeDeadlineAsync_ServerError_Throws()
+    {
+        var client = CreateClient(HttpStatusCode.InternalServerError, null);
+
+        await Assert.ThrowsAsync<HttpRequestException>(
+            () => client.ChangeDeadlineAsync(Guid.NewGuid(), Guid.NewGuid(), new Contracts.Distribution.ChangeDeadlineRequest(DateTime.UtcNow, "reason")));
+    }
+
+    [Fact]
+    public async Task RepeatDistributionAsync_PostsToRepeatEndpointAndReturnsDeserializedResult()
+    {
+        var schemeId = Guid.Parse("11111111-1111-1111-1111-111111111111");
+        const string json = """{"success":true,"error":null}""";
+        HttpRequestMessage? captured = null;
+        var handler = new StubHttpMessageHandler(HttpStatusCode.OK, json) { OnRequest = request => captured = request };
+        var client = new DistributionApiClient(new HttpClient(handler) { BaseAddress = new Uri("http://localhost") });
+
+        var request = new Contracts.Distribution.RepeatDistributionRequest(
+            [new Contracts.Distribution.ParticipantSelectionRequest(Guid.NewGuid(), false)]);
+        var result = await client.RepeatDistributionAsync(schemeId, request);
+
+        Assert.NotNull(captured);
+        Assert.Equal(HttpMethod.Post, captured!.Method);
+        Assert.Equal($"/api/distributions/schemes/{schemeId}/repeat", captured.RequestUri!.AbsolutePath);
+        Assert.NotNull(result);
+        Assert.True(result!.Success);
+    }
+
+    [Fact]
+    public async Task RepeatDistributionAsync_ServerError_Throws()
+    {
+        var client = CreateClient(HttpStatusCode.InternalServerError, null);
+
+        await Assert.ThrowsAsync<HttpRequestException>(
+            () => client.RepeatDistributionAsync(Guid.NewGuid(), new Contracts.Distribution.RepeatDistributionRequest([])));
+    }
 }
