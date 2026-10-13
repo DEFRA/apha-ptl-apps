@@ -9,11 +9,11 @@ namespace PTL.InternalWeb.Tests.Features.Home;
 public class HomeControllerTests
 {
     [Fact]
-    public void Index_ReturnsView()
+    public async Task Index_ReturnsView()
     {
         var controller = new HomeController(new FakeApiClient());
 
-        var result = controller.Index();
+        var result = await controller.Index();
 
         Assert.IsType<ViewResult>(result);
     }

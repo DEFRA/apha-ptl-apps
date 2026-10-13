@@ -81,15 +81,15 @@ public partial class AccountRouteSmokeTests : IClassFixture<PtlExternalWebTestFa
         var cookies = new Dictionary<string, string>();
 
         var signInResponse = await client.GetAsync(PtlExternalWebTestFactory.TestSignInPath);
-        CaptureCookies(signInResponse, cookies);
+        CookieForwardingHttpClient.CaptureCookies(signInResponse, cookies);
 
-        var homeResponse = await SendWithCookiesAsync(client, HttpMethod.Get, "/Home/Index", cookies);
-        CaptureCookies(homeResponse, cookies);
+        var homeResponse = await CookieForwardingHttpClient.SendWithCookiesAsync(client, HttpMethod.Get, "/Home/Index", cookies);
+        CookieForwardingHttpClient.CaptureCookies(homeResponse, cookies);
         var homeBody = await homeResponse.Content.ReadAsStringAsync();
         Assert.Contains("Signed in as", homeBody);
         var token = AntiforgeryTokenRegex().Match(homeBody).Groups[1].Value;
 
-        var logoutResponse = await SendWithCookiesAsync(client, HttpMethod.Post, "/Account/Logout", cookies,
+        var logoutResponse = await CookieForwardingHttpClient.SendWithCookiesAsync(client, HttpMethod.Post, "/Account/Logout", cookies,
             new FormUrlEncodedContent(new Dictionary<string, string> { ["__RequestVerificationToken"] = token }));
         var logoutBody = await logoutResponse.Content.ReadAsStringAsync();
 
@@ -98,32 +98,6 @@ public partial class AccountRouteSmokeTests : IClassFixture<PtlExternalWebTestFa
         Assert.Contains("id_token_hint", logoutBody);
         Assert.Contains($"name=\"id_token_hint\" value=\"{PtlExternalWebTestFactory.TestIdToken}\"", logoutBody);
         Assert.Contains("name=\"post_logout_redirect_uri\" value=\"http://localhost/signout-oidc\"", logoutBody);
-    }
-
-    private static void CaptureCookies(HttpResponseMessage response, Dictionary<string, string> cookies)
-    {
-        if (!response.Headers.TryGetValues("Set-Cookie", out var values))
-        {
-            return;
-        }
-
-        foreach (var value in values)
-        {
-            var nameValue = value.Split(';')[0];
-            var separatorIndex = nameValue.IndexOf('=');
-            if (separatorIndex > 0)
-            {
-                cookies[nameValue[..separatorIndex]] = nameValue;
-            }
-        }
-    }
-
-    private static Task<HttpResponseMessage> SendWithCookiesAsync(
-        HttpClient client, HttpMethod method, string url, Dictionary<string, string> cookies, HttpContent? content = null)
-    {
-        var request = new HttpRequestMessage(method, url) { Content = content };
-        request.Headers.Add("Cookie", string.Join("; ", cookies.Values));
-        return client.SendAsync(request);
     }
 
     [GeneratedRegex("__RequestVerificationToken[^>]*value=\"([^\"]+)\"")]

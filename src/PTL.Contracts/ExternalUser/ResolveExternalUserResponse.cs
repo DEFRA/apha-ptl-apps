@@ -5,5 +5,7 @@ public sealed record ResolveExternalUserResponse(
     string DisplayName,
     IReadOnlyList<string> Roles,
     Guid? ParticipantId,
+    string? LabCode,
     Guid? ViewerId,
-    Guid? TestConsultantId);
+    Guid? TestConsultantId,
+    bool CanOrderOnline = false);
