@@ -477,19 +477,19 @@ public sealed class DistributionController(IDistributionApiClient distributionAp
         {
             var test = model.Tests[testIndex];
 
-            if (TryApplyMethodItemErrors(model, test, testIndex, itemId, errors))
+            if (TryApplyMethodItemErrors(test, testIndex, itemId, errors))
             {
                 return;
             }
 
-            if (TryApplySampleValueErrors(model, test, testIndex, itemId, errors))
+            if (TryApplySampleValueErrors(test, testIndex, itemId, errors))
             {
                 return;
             }
         }
     }
 
-    private bool TryApplyMethodItemErrors(IntendedResultsViewModel model, IntendedResultsTestViewModel test, int testIndex, Guid itemId, IntendedResultsFieldError[] errors)
+    private bool TryApplyMethodItemErrors(IntendedResultsTestViewModel test, int testIndex, Guid itemId, IntendedResultsFieldError[] errors)
     {
         var methodItemIndex = test.MethodItems.FindIndex(m => m.TestMethodItemId == itemId);
         if (methodItemIndex < 0)
@@ -500,14 +500,14 @@ public sealed class DistributionController(IDistributionApiClient distributionAp
         foreach (var error in errors)
         {
             ModelState.AddModelError(
-                $"{nameof(model.Tests)}[{testIndex}].{nameof(test.MethodItems)}[{methodItemIndex}].{nameof(IntendedResultsMethodItemViewModel.IntendedResult)}",
+                $"{nameof(IntendedResultsViewModel.Tests)}[{testIndex}].{nameof(test.MethodItems)}[{methodItemIndex}].{nameof(IntendedResultsMethodItemViewModel.IntendedResult)}",
                 error.Message);
         }
 
         return true;
     }
 
-    private bool TryApplySampleValueErrors(IntendedResultsViewModel model, IntendedResultsTestViewModel test, int testIndex, Guid itemId, IntendedResultsFieldError[] errors)
+    private bool TryApplySampleValueErrors(IntendedResultsTestViewModel test, int testIndex, Guid itemId, IntendedResultsFieldError[] errors)
     {
         for (var sampleIndex = 0; sampleIndex < test.Samples.Count; sampleIndex++)
         {
@@ -524,7 +524,7 @@ public sealed class DistributionController(IDistributionApiClient distributionAp
                     : nameof(IntendedResultsSampleValueViewModel.IntendedResult);
 
                 ModelState.AddModelError(
-                    $"{nameof(model.Tests)}[{testIndex}].{nameof(test.Samples)}[{sampleIndex}].{nameof(IntendedResultsSampleRowViewModel.Values)}[{valueIndex}].{propertyName}",
+                    $"{nameof(IntendedResultsViewModel.Tests)}[{testIndex}].{nameof(test.Samples)}[{sampleIndex}].{nameof(IntendedResultsSampleRowViewModel.Values)}[{valueIndex}].{propertyName}",
                     error.Message);
             }
 
