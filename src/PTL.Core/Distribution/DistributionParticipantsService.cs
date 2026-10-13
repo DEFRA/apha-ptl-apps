@@ -33,7 +33,6 @@ public sealed class DistributionParticipantsService(IDistributionRepository dist
     // Legacy ValidatorDistributionDateRequired/RequiredFieldValidator2 - both the new date and the
     // reason are mandatory on this screen (verbatim legacy ToolTip text).
     private const string NewDeadlineDateRequiredMessage = "Deadline Date required.";
-    private const string NewDeadlineDateInvalidMessage = "Invalid entry for Deadline Date.";
     private const string ReasonRequiredMessage = "A reason for changing the deadline date is required.";
 
     // CSLA StringMaxLength("DeadlineChangeReason", 255) on DistributionParticipant.vb.

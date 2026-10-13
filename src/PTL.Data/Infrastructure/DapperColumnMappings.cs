@@ -99,6 +99,7 @@ public static class DapperColumnMappings
     private const string ColCategoryItemId = "fldCategoryItemId";
     private const string ColDistributionSchemeId = "fldDistributionSchemeId";
     private const string ColNumberOfSetsRequired = "fldNumberOfSetsRequired";
+    private const string ColTestResultItemId = "fldTestResultItemId";
 
     public static void Register()
     {
@@ -825,7 +826,7 @@ public static class DapperColumnMappings
 
         Map<DistributionTestResultItemEntity>(new(StringComparer.OrdinalIgnoreCase)
         {
-            ["fldTestResultItemId"] = nameof(DistributionTestResultItemEntity.TestResultItemId),
+            [ColTestResultItemId] = nameof(DistributionTestResultItemEntity.TestResultItemId),
             [ColTestId] = nameof(DistributionTestResultItemEntity.TestId),
             ["fldTestResultItemTypeId"] = nameof(DistributionTestResultItemEntity.TestResultItemTypeId),
             ["TestResultItemTypeName"] = nameof(DistributionTestResultItemEntity.Name),
@@ -840,7 +841,7 @@ public static class DapperColumnMappings
             ["fldSampleResultItemId"] = nameof(DistributionSampleResultItemEntity.SampleResultItemId),
             ["fldSampleId"] = nameof(DistributionSampleResultItemEntity.SampleId),
             ["fldSampleTestId"] = nameof(DistributionSampleResultItemEntity.SampleTestId),
-            ["fldTestResultItemId"] = nameof(DistributionSampleResultItemEntity.TestResultItemId),
+            [ColTestResultItemId] = nameof(DistributionSampleResultItemEntity.TestResultItemId),
             [ColIntendedResult] = nameof(DistributionSampleResultItemEntity.IntendedResult),
             ["fldIntendedResult2"] = nameof(DistributionSampleResultItemEntity.IntendedResult2),
         });
@@ -899,7 +900,7 @@ public static class DapperColumnMappings
 
         Map<SchemeTestResultItem>(new(StringComparer.OrdinalIgnoreCase)
         {
-            ["fldTestResultItemId"] = nameof(SchemeTestResultItem.TestResultItemId),
+            [ColTestResultItemId] = nameof(SchemeTestResultItem.TestResultItemId),
             ["fldTestResultItemTypeId"] = nameof(SchemeTestResultItem.TestResultItemTypeId),
             ["fldTestResultItemType"] = nameof(SchemeTestResultItem.TestResultItemType),
             [ColTestId] = nameof(SchemeTestResultItem.TestId),
@@ -954,7 +955,7 @@ public static class DapperColumnMappings
             ["fldTabulationTestResultItemId"] = nameof(SchemeTabulationItemLink.LinkId),
             ["fldTabulationTestMethodItemId"] = nameof(SchemeTabulationItemLink.LinkId),
             ["fldTabulationId"] = nameof(SchemeTabulationItemLink.TabulationId),
-            ["fldTestResultItemId"] = nameof(SchemeTabulationItemLink.ItemId),
+            [ColTestResultItemId] = nameof(SchemeTabulationItemLink.ItemId),
             ["fldTestMethodItemId"] = nameof(SchemeTabulationItemLink.ItemId),
         });
 

@@ -188,37 +188,53 @@ public sealed class IntendedResultsService(IDistributionRepository distributionR
 
         foreach (var test in update.Tests)
         {
-            foreach (var methodItem in test.MethodItems)
-            {
-                if (!methodItemsById.TryGetValue(methodItem.TestMethodItemId, out var stored))
-                {
-                    continue;
-                }
-
-                var message = IntendedResultsValidator.ValidateValue(stored.FormatString, stored.ReturnValueType, methodItem.IntendedResult);
-                if (message is not null)
-                {
-                    errors[methodItem.TestMethodItemId] = [new SampleNumbersError("IntendedResult", message)];
-                }
-            }
-
-            foreach (var sample in test.Samples)
-            {
-                // Legacy disables the Result Item controls entirely for a non-applicable
-                // sample/test pair, and a disabled RegularExpressionValidator never fires.
-                if (!sample.IsApplicable)
-                {
-                    continue;
-                }
-
-                foreach (var value in sample.Values)
-                {
-                    CollectValueErrors(value, sampleResultItemsById, resultItemsById, errors);
-                }
-            }
+            CollectMethodItemErrors(test, methodItemsById, errors);
+            CollectSampleErrors(test, sampleResultItemsById, resultItemsById, errors);
         }
 
         return errors;
+    }
+
+    private static void CollectMethodItemErrors(
+        IntendedResultsTestUpdate test,
+        Dictionary<Guid, DistributionTestMethodItemEntity> methodItemsById,
+        Dictionary<Guid, IReadOnlyList<SampleNumbersError>> errors)
+    {
+        foreach (var methodItem in test.MethodItems)
+        {
+            if (!methodItemsById.TryGetValue(methodItem.TestMethodItemId, out var stored))
+            {
+                continue;
+            }
+
+            var message = IntendedResultsValidator.ValidateValue(stored.FormatString, stored.ReturnValueType, methodItem.IntendedResult);
+            if (message is not null)
+            {
+                errors[methodItem.TestMethodItemId] = [new SampleNumbersError("IntendedResult", message)];
+            }
+        }
+    }
+
+    private static void CollectSampleErrors(
+        IntendedResultsTestUpdate test,
+        Dictionary<Guid, DistributionSampleResultItemEntity> sampleResultItemsById,
+        Dictionary<Guid, DistributionTestResultItemEntity> resultItemsById,
+        Dictionary<Guid, IReadOnlyList<SampleNumbersError>> errors)
+    {
+        foreach (var sample in test.Samples)
+        {
+            // Legacy disables the Result Item controls entirely for a non-applicable
+            // sample/test pair, and a disabled RegularExpressionValidator never fires.
+            if (!sample.IsApplicable)
+            {
+                continue;
+            }
+
+            foreach (var value in sample.Values)
+            {
+                CollectValueErrors(value, sampleResultItemsById, resultItemsById, errors);
+            }
+        }
     }
 
     private static void CollectValueErrors(

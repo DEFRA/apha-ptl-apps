@@ -477,41 +477,61 @@ public sealed class DistributionController(IDistributionApiClient distributionAp
         {
             var test = model.Tests[testIndex];
 
-            var methodItemIndex = test.MethodItems.FindIndex(m => m.TestMethodItemId == itemId);
-            if (methodItemIndex >= 0)
+            if (TryApplyMethodItemErrors(model, test, testIndex, itemId, errors))
             {
-                foreach (var error in errors)
-                {
-                    ModelState.AddModelError(
-                        $"{nameof(model.Tests)}[{testIndex}].{nameof(test.MethodItems)}[{methodItemIndex}].{nameof(IntendedResultsMethodItemViewModel.IntendedResult)}",
-                        error.Message);
-                }
-
                 return;
             }
 
-            for (var sampleIndex = 0; sampleIndex < test.Samples.Count; sampleIndex++)
+            if (TryApplySampleValueErrors(model, test, testIndex, itemId, errors))
             {
-                var valueIndex = test.Samples[sampleIndex].Values.FindIndex(v => v.SampleResultItemId == itemId);
-                if (valueIndex < 0)
-                {
-                    continue;
-                }
-
-                foreach (var error in errors)
-                {
-                    var propertyName = string.Equals(error.Field, "IntendedResult2", StringComparison.Ordinal)
-                        ? nameof(IntendedResultsSampleValueViewModel.IntendedResult2)
-                        : nameof(IntendedResultsSampleValueViewModel.IntendedResult);
-
-                    ModelState.AddModelError(
-                        $"{nameof(model.Tests)}[{testIndex}].{nameof(test.Samples)}[{sampleIndex}].{nameof(IntendedResultsSampleRowViewModel.Values)}[{valueIndex}].{propertyName}",
-                        error.Message);
-                }
-
                 return;
             }
         }
+    }
+
+    private bool TryApplyMethodItemErrors(IntendedResultsViewModel model, IntendedResultsTestViewModel test, int testIndex, Guid itemId, IntendedResultsFieldError[] errors)
+    {
+        var methodItemIndex = test.MethodItems.FindIndex(m => m.TestMethodItemId == itemId);
+        if (methodItemIndex < 0)
+        {
+            return false;
+        }
+
+        foreach (var error in errors)
+        {
+            ModelState.AddModelError(
+                $"{nameof(model.Tests)}[{testIndex}].{nameof(test.MethodItems)}[{methodItemIndex}].{nameof(IntendedResultsMethodItemViewModel.IntendedResult)}",
+                error.Message);
+        }
+
+        return true;
+    }
+
+    private bool TryApplySampleValueErrors(IntendedResultsViewModel model, IntendedResultsTestViewModel test, int testIndex, Guid itemId, IntendedResultsFieldError[] errors)
+    {
+        for (var sampleIndex = 0; sampleIndex < test.Samples.Count; sampleIndex++)
+        {
+            var valueIndex = test.Samples[sampleIndex].Values.FindIndex(v => v.SampleResultItemId == itemId);
+            if (valueIndex < 0)
+            {
+                continue;
+            }
+
+            foreach (var error in errors)
+            {
+                var propertyName = string.Equals(error.Field, "IntendedResult2", StringComparison.Ordinal)
+                    ? nameof(IntendedResultsSampleValueViewModel.IntendedResult2)
+                    : nameof(IntendedResultsSampleValueViewModel.IntendedResult);
+
+                ModelState.AddModelError(
+                    $"{nameof(model.Tests)}[{testIndex}].{nameof(test.Samples)}[{sampleIndex}].{nameof(IntendedResultsSampleRowViewModel.Values)}[{valueIndex}].{propertyName}",
+                    error.Message);
+            }
+
+            return true;
+        }
+
+        return false;
     }
 
     // Legacy keeps the whole IntendedResultsSet in Session, so a failed Save redisplays the page
@@ -654,6 +674,11 @@ public sealed class DistributionController(IDistributionApiClient distributionAp
     public async Task<IActionResult> ChangeDeadline(
         int year, int monthId, Guid schemeId, Guid participantId, DistributionParticipantsViewModel model, CancellationToken cancellationToken)
     {
+        if (!ModelState.IsValid)
+        {
+            return View(nameof(Participants), await RehydrateParticipantsAsync(year, monthId, schemeId, model, cancellationToken));
+        }
+
         var row = model.Participants.FirstOrDefault(p => p.DistributionParticipantId == participantId);
         var result = await distributionApiClient.ChangeDeadlineAsync(
             schemeId, participantId, new ChangeDeadlineRequest(row?.NewDeadlineDate, row?.NewDeadlineReason), cancellationToken);
@@ -691,6 +716,11 @@ public sealed class DistributionController(IDistributionApiClient distributionAp
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> RepeatDistribution(int year, int monthId, Guid schemeId, DistributionParticipantsViewModel model, CancellationToken cancellationToken)
     {
+        if (!ModelState.IsValid)
+        {
+            return View(nameof(Participants), await RehydrateParticipantsAsync(year, monthId, schemeId, model, cancellationToken));
+        }
+
         var selections = model.Participants.Where(p => p.Selected).Select(p => new ParticipantSelectionRequest(p.DistributionParticipantId, false))
             .Concat(model.AdditionalParticipants.Where(p => p.Selected).Select(p => new ParticipantSelectionRequest(p.ParticipantSchemeId, true)))
             .ToList();

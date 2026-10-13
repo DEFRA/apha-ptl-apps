@@ -23,6 +23,6 @@ public static class IntendedResultsValidator
             return null;
         }
 
-        return Regex.IsMatch(value, formatString!) ? null : $"Input must be of format: {returnValueType}";
+        return Regex.IsMatch(value, formatString!, RegexOptions.None, TimeSpan.FromMilliseconds(100)) ? null : $"Input must be of format: {returnValueType}";
     }
 }
