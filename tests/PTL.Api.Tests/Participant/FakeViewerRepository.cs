@@ -11,6 +11,9 @@ internal sealed class FakeViewerRepository : IViewerRepository
     public Task<IReadOnlyList<ViewerEntity>> GetAllAsync(CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<ViewerEntity>>(Viewers);
 
+    public Task<IReadOnlyList<ViewerEntity>> GetAllWithAssignmentsAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<ViewerEntity>>(Viewers);
+
     public Task<ViewerEntity?> GetBySsoIdExtAsync(Guid ssoIdExt, CancellationToken cancellationToken = default) =>
         Task.FromResult(Viewers.FirstOrDefault(v => v.SsoIdExt == ssoIdExt));
 
@@ -34,6 +37,18 @@ internal sealed class FakeViewerRepository : IViewerRepository
 
         Viewers[index] = viewer;
         return Task.FromResult<ViewerEntity?>(viewer);
+    }
+
+    public Task<bool> DeleteAsync(Guid viewerId, CancellationToken cancellationToken = default)
+    {
+        var index = Viewers.FindIndex(v => v.ViewerId == viewerId);
+        if (index < 0)
+        {
+            return Task.FromResult(false);
+        }
+
+        Viewers.RemoveAt(index);
+        return Task.FromResult(true);
     }
 
     public Task<IReadOnlyList<SchemeViewerEntity>> GetSchemeViewersAsync(Guid schemeId, CancellationToken cancellationToken = default) =>

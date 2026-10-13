@@ -1,23 +1,68 @@
 ﻿@model PTL.ExternalWeb.Features.Home.HomeIndexViewModel
+@using PTL.ExternalWeb.Features.Account
+@using PTL.ExternalWeb.Navigation
 @{
-    ViewData["Title"] = "Home Page";
+    ViewData["Title"] = "Home";
+    var roles = User.GetResolvedExternalRoles();
+    var canOrderOnline = User.CanOrderOnline();
+    bool IsVisible(NavigationItem item) =>
+        (item.RequiredRole is null || roles.Contains(item.RequiredRole, StringComparer.OrdinalIgnoreCase))
+        && (!item.RequireCanOrderOnline || canOrderOnline);
+
+    // See _SideNavigation.cshtml for why groups and children are each filtered independently
+    // (Results has no group-level role - only its children do).
+    var visibleSections = NavigationProvider.Build()
+        .Where(IsVisible)
+        .Select(group => new { group.Text, Children = group.Children.Where(IsVisible).ToList() })
+        .Where(group => group.Children.Count > 0)
+        .ToList();
 }
 
-<div class="text-center">
-    @* Index requires authentication (the app's default authorization policy), so Model is always
-       populated here - no anonymous fallback branch needed. *@
-    <h1 class="display-4">Welcome, @Model.DisplayName</h1>
+@* Index requires authentication (the app's default authorization policy), so Model is always
+   populated here - no anonymous fallback branch needed. Navigation is the side nav
+   (_SideNavigation.cshtml, driven by the same NavigationProvider); each section's sub-items are
+   also shown here as quick-link cards for fast access from Home. No screen behind any of these
+   links has its own migration slice yet, so every one navigates to the shared ComingSoon page
+   instead of being a dead/disabled link, matching legacy's always-clickable navigation. *@
 
-    @if (Model.Roles.Count > 0)
-    {
-        <p>Your roles:</p>
-        <ul class="list-unstyled">
-            @foreach (var role in Model.Roles)
-            {
-                <li>@role</li>
-            }
-        </ul>
-    }
+@* govuk-notification-banner is the GDS equivalent of legacy Home.aspx's "Important" callout -
+   the static text/link below is always shown (legacy pt-alert); the admin-authored
+   ImportantMessage (tblExtWebsiteMessage) is nested inside it, same as legacy, only when
+   published. Html.Raw preserves its formatting (AC: "formatting is preserved") - safe here
+   because this content is never user-supplied: it's written by internal staff via
+   ProficiencyTestingWeb/Admin/EditMessageOnWebsite.aspx, which already sanitises it on save. *@
+<section class="govuk-notification-banner" aria-labelledby="important-message-title" data-module="govuk-notification-banner">
+    <div class="govuk-notification-banner__header">
+        <h2 class="govuk-notification-banner__title" id="important-message-title">Important</h2>
+    </div>
+    <div class="govuk-notification-banner__content">
+        <p class="govuk-body">
+            Please read our information regarding online orders, import permits and invoices before placing an order.
+            <a class="govuk-link" asp-controller="Home" asp-action="Information">View Information</a>.
+        </p>
+        @if (!string.IsNullOrWhiteSpace(Model.ImportantMessageHtml))
+        {
+            <div>@Html.Raw(Model.ImportantMessageHtml)</div>
+        }
+    </div>
+</section>
 
-    <p>Learn about <a href="https://learn.microsoft.com/aspnet/core">building Web apps with ASP.NET Core</a>.</p>
-</div>
+<h1 class="govuk-heading-xl">Welcome, @Model.DisplayName</h1>
+
+@if (visibleSections.Count == 0)
+{
+    <p class="govuk-body">No roles are available for your account yet. Contact APHA if you believe this is incorrect.</p>
+}
+
+@foreach (var group in visibleSections)
+{
+    <h2 class="govuk-heading-l">@group.Text</h2>
+    <div class="app-card-group">
+        @foreach (var item in group.Children)
+        {
+            var href = Url.Action(item.ActionName, item.ControllerName, new { title = item.Text });
+            @await Html.PartialAsync("_QuickLinkCard", (item.Text, item.Description, href ?? "#"))
+        }
+    </div>
+}
+

@@ -1,0 +1,57 @@
+@model PTL.InternalWeb.Features.SystemAdministration.ExternalSiteManagementViewModel
+@{
+    ViewData["Title"] = "External Site Management";
+
+    string[] fieldOrder = ["Message", "ImportantMessage", "SupportEmailAddress"];
+
+    var errors = ViewData.ModelState
+        .Where(entry => entry.Value?.Errors.Count > 0)
+        .SelectMany(entry => entry.Value!.Errors.Select(error => (Field: entry.Key, Message: error.ErrorMessage)))
+        .OrderBy(error => Array.IndexOf(fieldOrder, error.Field) is var idx && idx == -1 ? -1 : idx)
+        .ToList();
+}
+
+<h1 class="govuk-heading-l">External Site Management</h1>
+
+<govuk-error-summary errors="@errors" />
+
+<form method="post" asp-action="ExternalSiteManagement" novalidate>
+    <govuk-textarea asp-for="Message" label="Further Information message" hint="Update content of Further Information screen on External site." rows="10" />
+
+    <govuk-textarea asp-for="ImportantMessage" label="Important Message"
+                     hint="A section to provide an urgent message on the external site homepage. Clearing this field and saving removes the message from the external site (max 500 characters)."
+                     rows="10" />
+
+    <govuk-input asp-for="SupportEmailAddress" label="Edit error screen email address" />
+
+    <div class="govuk-button-group">
+        <button class="govuk-button" data-module="govuk-button" type="submit">Save</button>
+        <a class="govuk-button govuk-button--secondary" data-module="govuk-button" asp-action="ExternalSiteManagement">Cancel</a>
+    </div>
+</form>
+
+@section Scripts {
+    <script src="~/lib/tinymce/tinymce.min.js"></script>
+    <script>
+        // Toolbar/plugins match the legacy EditMessageOnWebsite.aspx configuration
+        // (undo redo | bold italic underline | superscript subscript charmap) plus a link
+        // button/plugin, which legacy never had despite supporting hyperlinks in stored content.
+        tinymce.init({
+            selector: '#Message, #ImportantMessage',
+            plugins: 'lists save charmap link',
+            toolbar: 'undo redo | bold italic underline | link | superscript subscript charmap',
+            menubar: false,
+            branding: false,
+            license_key: 'gpl',
+            height: 300
+        });
+
+        // Mirrors legacy's SaveAllTinyMCEContent/tinyMCE.triggerSave() - copies each editor's
+        // current content back into its underlying <textarea> before the form posts.
+        document.querySelector('form').addEventListener('submit', function () {
+            if (typeof tinymce !== 'undefined') {
+                tinymce.triggerSave();
+            }
+        });
+    </script>
+}

@@ -42,4 +42,7 @@ internal sealed class FakeTestConsultantRepository : ITestConsultantRepository
         _testConsultants[testConsultant.ExternalTestConsultantId] = testConsultant;
         return Task.FromResult<CoreTestConsultant?>(testConsultant);
     }
+
+    public Task<IReadOnlyList<CoreTestConsultant>> GetAllAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<CoreTestConsultant>>(_testConsultants.Values.ToList());
 }

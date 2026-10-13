@@ -62,8 +62,19 @@ public sealed partial class CidmOpenIdConnectEvents : OpenIdConnectEvents
             identity.AddClaim(new Claim(CidmClaimTypes.Relationship, JsonSerializer.Serialize(relationship)));
         }
 
-        var rawRoles = context.Principal.FindAll(CidmClaimTypes.RawRoles).Select(c => c.Value);
-        foreach (var role in CidmClaimsMapper.ParseRoles(rawRoles))
+        // "role" is a well-known short JWT claim name, so ASP.NET Core's default inbound claim-type
+        // mapping has already renamed it to ClaimTypes.Role (keeping its raw, unparsed
+        // "relationshipId:roleName:status" value) by the time this handler runs - CidmClaimTypes.RawRoles
+        // only ever matches in tests that build the principal directly, never against a real CIDM token.
+        var rawRoleClaims = context.Principal.FindAll(CidmClaimTypes.RawRoles)
+            .Concat(context.Principal.FindAll(ClaimTypes.Role))
+            .ToList();
+        foreach (var rawRoleClaim in rawRoleClaims)
+        {
+            identity.RemoveClaim(rawRoleClaim);
+        }
+
+        foreach (var role in CidmClaimsMapper.ParseRoles(rawRoleClaims.Select(c => c.Value)))
         {
             // Standard role claim so [Authorize(Roles = "...")] works against the role name directly,
             // plus the full parsed detail (including which relationship/organisation it applies to).
