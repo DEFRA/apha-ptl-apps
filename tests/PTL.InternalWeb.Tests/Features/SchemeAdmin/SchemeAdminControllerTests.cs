@@ -225,7 +225,7 @@ public class SchemeAdminControllerTests
         var page2Model = Assert.IsType<CategoryItemTypeViewModel>(Assert.IsType<ViewResult>(page2Result).Model);
 
         Assert.Equal(15, page1Model.Rows.Count);
-        Assert.Equal(1, page2Model.Rows.Count);
+        Assert.Single(page2Model.Rows);
         Assert.Equal(16, page1Model.TotalRecords);
         Assert.Equal(16, page2Model.TotalRecords);
     }
@@ -383,7 +383,7 @@ public class SchemeAdminControllerTests
         var page2Model = Assert.IsType<TestTypeViewModel>(Assert.IsType<ViewResult>(page2Result).Model);
 
         Assert.Equal(15, page1Model.Rows.Count);
-        Assert.Equal(1, page2Model.Rows.Count);
+        Assert.Single(page2Model.Rows);
         Assert.Equal(16, page1Model.TotalRecords);
         Assert.Equal(16, page2Model.TotalRecords);
     }
@@ -541,7 +541,7 @@ public class SchemeAdminControllerTests
         var page2Model = Assert.IsType<CriterionItemTypeViewModel>(Assert.IsType<ViewResult>(page2Result).Model);
 
         Assert.Equal(15, page1Model.Rows.Count);
-        Assert.Equal(1, page2Model.Rows.Count);
+        Assert.Single(page2Model.Rows);
         Assert.Equal(16, page1Model.TotalRecords);
         Assert.Equal(16, page2Model.TotalRecords);
     }
