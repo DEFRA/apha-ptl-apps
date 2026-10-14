@@ -5,9 +5,9 @@ using PTL.Core.Distribution;
 namespace PTL.Api.Controllers;
 
 // Distribution Dashboard (legacy Distributions/MenuDistributions.aspx) - see
-// docs/analysis/distribution-analysis.md and docs/migration/distribution-migration.md. This is
-// the ONLY Distribution feature implemented so far; every other distribution workflow
-// (Scheduling, Preparation, Packaging, Results, Tabulations) is out of scope.
+// docs/analysis/distribution-analysis.md and docs/migration/distribution-migration.md. Scheduling,
+// Sample Numbers, Intended Results, Participants and Sample Preparation are also implemented here -
+// Packaging, Results (dashboard) and Tabulations remain out of scope.
 [ApiController]
 [Route("api/distributions")]
 public sealed class DistributionController(
@@ -15,6 +15,7 @@ public sealed class DistributionController(
     ISampleNumbersService sampleNumbersService,
     IIntendedResultsService intendedResultsService,
     IDistributionParticipantsService distributionParticipantsService,
+    IPreparationService preparationService,
     ILogger<DistributionController> logger) : ControllerBase
 {
     private static readonly Action<ILogger, Guid, Exception?> LogStructureCreationFailedMessage =
@@ -72,6 +73,29 @@ public sealed class DistributionController(
             kvp => kvp.Value.Select(e => e.Message).ToArray());
 
         return Ok(new MonthlyDistributionScheduleSaveResult(outcome.Success, fieldErrors));
+    }
+
+    // GET /api/distributions/months/{yearId}/{monthId}/preparation - the Sample Preparation
+    // screen, legacy PreparationSheet.FetchPreparationSheet.
+    [HttpGet("months/{yearId:int}/{monthId:int}/preparation")]
+    public async Task<ActionResult<PreparationSheetResponse>> GetPreparation(int yearId, int monthId, CancellationToken cancellationToken)
+    {
+        var sheet = await preparationService.GetPreparationAsync(yearId, monthId, cancellationToken);
+        return sheet is null ? NotFound() : Ok(ToResponse(sheet));
+    }
+
+    // PUT /api/distributions/months/{yearId}/{monthId}/preparation - legacy
+    // PreparationSheet.Save() (ButtonSave_Click/ButtonApply_Click both call this; the
+    // save-vs-stay distinction is owned entirely by InternalWeb).
+    [HttpPut("months/{yearId:int}/{monthId:int}/preparation")]
+    public async Task<ActionResult<PreparationSaveResult>> SavePreparation(
+        int yearId, int monthId, [FromBody] PreparationSaveRequest request, CancellationToken cancellationToken)
+    {
+        var updates = request.Updates.Select(u => new PreparationStageUpdate(
+            u.MonthlyDistributionSchemeId, u.DiaryEntryChecked, u.PrepStartChecked, u.PrepCompleteChecked)).ToList();
+
+        var outcome = await preparationService.SavePreparationAsync(yearId, monthId, updates, cancellationToken);
+        return outcome.Success ? Ok(new PreparationSaveResult(true)) : NotFound();
     }
 
     // GET /api/distributions/schemes/{monthlyDistributionSchemeId}/sample-numbers - the Sample
@@ -234,14 +258,21 @@ public sealed class DistributionController(
             [.. page.Tests.Select(t => new IntendedResultsTestResponse(
                 t.TestId,
                 t.TestName,
-                [.. t.ResultItems.Select(r => new IntendedResultsResultItemResponse(r.TestResultItemId, r.Name, r.FormatString, r.ReturnValueType, r.IsRange))],
+                [.. t.ResultItems.Select(r => new IntendedResultsResultItemResponse(r.TestResultItemId, r.Name, r.FormatString, r.ReturnValueType, r.IsRange, r.ExpectedLength))],
                 [.. t.MethodItems.Select(m => new IntendedResultsMethodItemResponse(m.TestMethodItemId, m.Name, m.FormatString, m.ReturnValueType, m.IntendedResult))],
                 [.. t.Samples.Select(s => new IntendedResultsSampleRowResponse(
                     s.SampleId,
                     s.SampleNumber,
                     s.InternalDescription,
                     s.IsApplicable,
-                    [.. s.Values.Select(v => new IntendedResultsSampleResultValueResponse(v.SampleResultItemId, v.TestResultItemId, v.IntendedResult, v.IntendedResult2))]))]))]);
+                    [.. s.Values.Select(v => new IntendedResultsSampleResultValueResponse(v.SampleResultItemId, v.TestResultItemId, v.IntendedResult, v.IntendedResult2))],
+                    s.ExternalDescription))]))],
+            page.SchemeVersionDate,
+            page.HasIntendedResults,
+            page.DateOfReceipt,
+            page.StorageConditions,
+            page.ConditionOnReceipt,
+            page.Instructions);
 
     private static SampleNumbersResponse ToResponse(SampleNumbersPage page) =>
         new(
@@ -284,7 +315,28 @@ public sealed class DistributionController(
             scheme.HasSampleNumbersDefined,
             scheme.HasIntendedResults,
             scheme.IsCancelled,
-            scheme.IsAsAvailable);
+            scheme.IsAsAvailable,
+            scheme.IsAccredited);
+
+    private static PreparationSheetResponse ToResponse(PreparationSheetData sheet) =>
+        new(
+            sheet.MonthlyDistributionId,
+            sheet.YearId,
+            sheet.MonthId,
+            [.. sheet.Schemes.Select(ToResponse)]);
+
+    private static PreparationSchemeResponse ToResponse(PreparationSchemeEntity scheme) =>
+        new(
+            scheme.MonthlyDistributionSchemeId,
+            scheme.SchemeIdentifier,
+            scheme.SchemeName,
+            scheme.DistributionReferenceFull,
+            scheme.NumberOfSetsRequired,
+            scheme.SamplePackingInstructions,
+            scheme.DiaryEntry,
+            scheme.PrepStartDate,
+            scheme.PrepCompleteDate,
+            [.. scheme.Samples.Select(s => new PreparationSampleResponse(s.SampleId, s.SampleNumber, s.InternalDescription))]);
 
     private static DistributionDashboardMonthResponse ToResponse(DistributionDashboardMonth month) =>
         new(

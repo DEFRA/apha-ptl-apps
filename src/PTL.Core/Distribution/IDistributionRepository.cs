@@ -75,4 +75,13 @@ public interface IDistributionRepository
         MonthlyDistributionSchemeEntity newScheme,
         IReadOnlyList<DistributionParticipantEntity> newParticipants,
         CancellationToken cancellationToken = default);
+
+    // spgPreparationSheet - the Sample Preparation screen's scheme+sample listing for a
+    // distribution month, legacy PreparationSheet.FetchPreparationSheet. Returns null when the
+    // header row itself is not found.
+    Task<PreparationSheetData?> GetPreparationSheetAsync(Guid monthlyDistributionId, CancellationToken cancellationToken = default);
+
+    // spuMonthlyDistributionSchemePrep x N - legacy MonthlyDistributionSchemeCollection.Update,
+    // called once per dirty scheme (only schemes with at least one newly-set stage are passed in).
+    Task UpdatePreparationAsync(IReadOnlyList<PreparationSchemeEntity> schemes, CancellationToken cancellationToken = default);
 }

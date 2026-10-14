@@ -12,12 +12,14 @@ namespace PTL.InternalWeb.Features.Distribution;
 //
 // SCOPE: the Dashboard (year selection, month rows, progress indicators, "Initialise this Month"
 // visibility/confirmation), the Monthly Distributions scheduling screen (dates, Cancel/
-// Commence, Save/Apply/Cancel), the Sample Numbers screen, the Intended Results screen, and the
-// Distribution Participants screen (view, Change Deadline Date, Repeat Distribution) are
-// implemented. The Preparation/Packaging/Results/Tabulations "View" links, plus "Initialise this
-// Month" itself, all remain placeholders (ViewStage/InitialiseMonth below) - those workflows (and
-// the exact legacy persisted-save chain behind Initialise) are out of scope and flagged [NEEDS
-// INVESTIGATION] in docs/migration/distribution-migration.md.
+// Commence, Save/Apply/Cancel), the Sample Numbers screen, the Intended Results screen, the
+// Distribution Participants screen (view, Change Deadline Date, Repeat Distribution), the Sample
+// Preparation screen (Diary Entry/Prep Started/Prep Completed, Save/Apply/Cancel, Print) and its
+// per-scheme Printable Results view are implemented. The Packaging/Results(dashboard)/Tabulations
+// "View" links, plus "Initialise this Month" itself, all remain placeholders (ViewStage/
+// InitialiseMonth below) - those workflows (and the exact legacy persisted-save chain behind
+// Initialise) are out of scope and flagged [NEEDS INVESTIGATION] in
+// docs/migration/distribution-migration.md.
 public sealed class DistributionController(IDistributionApiClient distributionApiClient) : Controller
 {
     private static readonly string[] MonthOrder = ["Scheduling", "Preparation", "Packaging", "Results", "Tabulations"];
@@ -164,6 +166,50 @@ public sealed class DistributionController(IDistributionApiClient distributionAp
         model.YearId = year;
         model.MonthId = monthId;
         return View(nameof(Schedule), model);
+    }
+
+    // Sample Preparation - legacy Internal User/PreparationSheet.aspx. Reached from the
+    // Dashboard's "Preparation: View" link.
+    [HttpGet]
+    public async Task<IActionResult> Preparation(int year, int monthId, CancellationToken cancellationToken)
+    {
+        var sheet = await distributionApiClient.GetPreparationAsync(year, monthId, cancellationToken);
+        return sheet is null ? NotFound() : View(ToPreparationViewModel(year, monthId, sheet));
+    }
+
+    // Save = persist then leave (legacy ButtonSave_Click -> Save() -> LeavePage() ->
+    // MenuDistributions.aspx, i.e. the Dashboard). Apply = persist then stay, re-reading fresh
+    // data (legacy ButtonApply_Click -> Save() only, redrawing from the already-updated object).
+    // Cancel = discard then leave, no save at all (legacy ButtonCancel_Click -> LeavePage()).
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Preparation(int year, int monthId, PreparationViewModel model, string command, CancellationToken cancellationToken)
+    {
+        if (string.Equals(command, "cancel", StringComparison.OrdinalIgnoreCase))
+        {
+            return RedirectToAction(nameof(Index));
+        }
+
+        var updates = model.Schemes
+            .Select(s => new PreparationStageUpdateRequest(s.MonthlyDistributionSchemeId, s.DiaryEntryChecked, s.PrepStartChecked, s.PrepCompleteChecked))
+            .ToList();
+
+        var result = await distributionApiClient.SavePreparationAsync(year, monthId, new PreparationSaveRequest(updates), cancellationToken);
+
+        if (result is null || !result.Success)
+        {
+            TempData.SetNotification(NotificationType.Error, "Sample Preparation could not be saved. Please try again later.");
+            return RedirectToAction(nameof(Preparation), new { year, monthId });
+        }
+
+        TempData.SetNotification(NotificationType.Success, "Sample Preparation updated successfully.");
+
+        if (string.Equals(command, "apply", StringComparison.OrdinalIgnoreCase))
+        {
+            return RedirectToAction(nameof(Preparation), new { year, monthId });
+        }
+
+        return RedirectToAction(nameof(Index));
     }
 
     // Sample Numbers - legacy Scheduling/SampleNumbers.aspx. Opened from the Scheduling screen's
@@ -468,6 +514,45 @@ public sealed class DistributionController(IDistributionApiClient distributionAp
         return RedirectToAction(nameof(Schedule), new { year, monthId });
     }
 
+    // Printable Results - legacy Internal User/PrintableResults.aspx, reached from the Sample
+    // Preparation screen's per-scheme Results "View" link. Reuses the same Intended Results data
+    // (legacy IntendedResultsSet.FetchIntendedResults) already fetched for the Intended Results
+    // screen above, but shaped by PrintableResultsWorksheetBuilder into legacy's dynamic,
+    // ExpectedLength-packed multi-table-per-test worksheet rather than the interactive edit
+    // screen's own view model.
+    // showValues mirrors legacy's "Select Version to Print" dropdown, whose default selected item
+    // is always "Blank" (DropDownParticipant.SelectedIndex = 0) regardless of whether intended
+    // results exist - only an explicit ?showValues=true request shows them, and only when
+    // HasIntendedResults is true (legacy never even offers the "Show Intended Results" option
+    // otherwise).
+    [HttpGet]
+    public async Task<IActionResult> PrintableResults(int year, int monthId, Guid schemeId, bool showValues, CancellationToken cancellationToken)
+    {
+        var page = await distributionApiClient.GetIntendedResultsAsync(schemeId, cancellationToken);
+        if (page is null)
+        {
+            return NotFound();
+        }
+
+        // DATE OF DISTRIBUTION/the deadline message/the UKAS accreditation mark only exist on the
+        // Scheduling-level scheme row (legacy's separate MonthlyDistributionScheme.
+        // FetchMonthlyDistributionSchemeChild call) - already-available via the same schedule
+        // lookup the Scheduling screen itself uses.
+        var schedule = await distributionApiClient.GetScheduleAsync(year, monthId, cancellationToken);
+        var scheduleScheme = schedule?.Schemes.FirstOrDefault(s => s.MonthlyDistributionSchemeId == schemeId);
+
+        var worksheet = PrintableResultsWorksheetBuilder.Build(
+            year,
+            monthId,
+            page,
+            page.HasIntendedResults && showValues,
+            scheduleScheme?.DistributionDate ?? default,
+            scheduleScheme?.DeadlineDate ?? default,
+            scheduleScheme?.IsAccredited ?? false);
+
+        return View(worksheet);
+    }
+
     // Field errors are keyed by TestResultItemId/TestMethodItemId/SampleResultItemId (globally
     // unique, so no collision risk across the three id spaces) rather than by a flat row index,
     // since this screen has no single list to index into.
@@ -653,6 +738,31 @@ public sealed class DistributionController(IDistributionApiClient distributionAp
                         IntendedResult = v.IntendedResult,
                         IntendedResult2 = v.IntendedResult2,
                     })],
+                })],
+            })],
+        };
+
+    private static PreparationViewModel ToPreparationViewModel(int year, int monthId, PreparationSheetResponse sheet) =>
+        new()
+        {
+            YearId = year,
+            MonthId = monthId,
+            MonthDescription = new DateTime(2000, monthId, 1, 0, 0, 0, DateTimeKind.Utc).ToString("MMM", System.Globalization.CultureInfo.InvariantCulture) + " " + year,
+            Schemes = [.. sheet.Schemes.Select(s => new PreparationSchemeRowViewModel
+            {
+                MonthlyDistributionSchemeId = s.MonthlyDistributionSchemeId,
+                SchemeIdentifier = s.SchemeIdentifier,
+                SchemeName = s.SchemeName,
+                DistributionReferenceFull = s.DistributionReferenceFull,
+                NumberOfSetsRequired = s.NumberOfSetsRequired,
+                SamplePackingInstructions = s.SamplePackingInstructions,
+                DiaryEntry = s.DiaryEntry,
+                PrepStartDate = s.PrepStartDate,
+                PrepCompleteDate = s.PrepCompleteDate,
+                Samples = [.. s.Samples.Select(sa => new PreparationSampleRowViewModel
+                {
+                    SampleNumber = sa.SampleNumber,
+                    InternalDescription = sa.InternalDescription,
                 })],
             })],
         };

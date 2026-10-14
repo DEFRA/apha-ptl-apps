@@ -118,7 +118,13 @@ public sealed class IntendedResultsService(IDistributionRepository distributionR
             scheme.SchemeIdentifier,
             scheme.SchemeName,
             ComputeRequiresAuditReason(data),
-            tests);
+            tests,
+            data.Header.SchemeVersionDate,
+            data.Header.HasIntendedResults,
+            data.Header.DateOfReceipt,
+            data.Header.StorageConditions,
+            data.Header.ConditionOnReceipt,
+            data.Header.Instructions ?? string.Empty);
     }
 
     private static IntendedResultsTest BuildTest(
@@ -130,7 +136,7 @@ public sealed class IntendedResultsService(IDistributionRepository distributionR
         var resultItems = data.TestResultItems
             .Where(r => r.TestId == test.TestId)
             .OrderBy(r => r.Order)
-            .Select(r => new IntendedResultsResultItem(r.TestResultItemId, r.Name ?? string.Empty, r.FormatString ?? string.Empty, r.ReturnValueType ?? string.Empty, r.IsRange))
+            .Select(r => new IntendedResultsResultItem(r.TestResultItemId, r.Name ?? string.Empty, r.FormatString ?? string.Empty, r.ReturnValueType ?? string.Empty, r.IsRange, r.ExpectedLength))
             .ToList();
 
         var methodItems = data.TestMethodItems
@@ -175,7 +181,8 @@ public sealed class IntendedResultsService(IDistributionRepository distributionR
             sample.SampleNumber ?? string.Empty,
             sample.InternalDescription ?? string.Empty,
             hasSampleTest && sampleTest!.IsApplicable,
-            values);
+            values,
+            sample.ExternalDescription ?? string.Empty);
     }
 
     private static Dictionary<Guid, IReadOnlyList<SampleNumbersError>> CollectFieldErrors(IntendedResultsUpdate update, IntendedResultsData data)

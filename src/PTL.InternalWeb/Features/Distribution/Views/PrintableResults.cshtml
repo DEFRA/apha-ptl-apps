@@ -1,0 +1,207 @@
+@model PTL.InternalWeb.Features.Distribution.PrintableResultsWorksheet
+@{
+    ViewData["Title"] = Model.SchemeHeading;
+}
+
+@section Styles {
+    <link rel="stylesheet" href="~/css/printable-scheme.css" />
+}
+
+<a class="govuk-back-link noprint" asp-action="Preparation" asp-route-year="@Model.YearId" asp-route-monthId="@Model.MonthId">Back</a>
+
+<form method="get" asp-action="PrintableResults" class="noprint govuk-!-margin-bottom-6">
+    <input type="hidden" name="year" value="@Model.YearId" />
+    <input type="hidden" name="monthId" value="@Model.MonthId" />
+    <input type="hidden" name="schemeId" value="@Model.MonthlyDistributionSchemeId" />
+    <div class="govuk-form-group">
+        <label class="govuk-label" for="showValues">
+            @(Model.HasIntendedResults ? "Select Version to Print: " : "Select Version to Print (Intended Results not yet defined): ")
+        </label>
+        <select class="govuk-select" id="showValues" name="showValues" onchange="this.form.submit()">
+            <option value="false" selected="@(!Model.ShowValues ? "selected" : null)">Blank</option>
+            @if (Model.HasIntendedResults)
+            {
+                <option value="true" selected="@(Model.ShowValues ? "selected" : null)">Show Intended Results</option>
+            }
+        </select>
+        <noscript><button type="submit" class="govuk-button govuk-button--secondary govuk-!-margin-left-2">View</button></noscript>
+    </div>
+</form>
+
+<div class="ptl-worksheet">
+    @* These tblWorkSheetNoBorder/tableWorkSheetLabId tables are pure layout (logo, lab-id box,
+       scheme heading) with no column headings to give - role="presentation" is the correct
+       WAI-ARIA technique for a layout table, rather than inventing headers that don't exist. *@
+    <table class="tblWorkSheetNoBorder" role="presentation">
+        <tr>
+            <td class="cellWorkSheetLogo">
+                <img src="~/images/vetqasheader-greyscale.png" alt="" />
+            </td>
+            <td class="cellWorkSheetLabId">
+                <table class="tableWorkSheetLabId" role="presentation">
+                    <tr><td>@Model.LabIdLabel</td></tr>
+                </table>
+            </td>
+        </tr>
+        <tr><td colspan="2"></td></tr>
+    </table>
+    <hr />
+    <table class="tblWorkSheetNoBorder" role="presentation">
+        <tr>
+            <td>@Model.DistributionHeading</td>
+            <td class="cellWorkSheetRight">@Model.DateOfDistributionLabel</td>
+        </tr>
+        <tr>
+            <td colspan="2">@Model.SchemeHeading</td>
+        </tr>
+    </table>
+
+    @Html.Raw(Model.Instructions)
+
+    <table class="tblSampleInstruction">
+        <caption class="govuk-visually-hidden">Sample Instructions</caption>
+        <thead>
+            <tr>
+                <th scope="col" class="cellSampleInstruction">Sample No.</th>
+                <th scope="col" class="cellSampleInstruction">Sample Instruction</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var sampleInstruction in Model.SampleInstructions)
+            {
+                <tr>
+                    <th scope="row" class="cellSampleInstruction">@sampleInstruction.SampleNumber</th>
+                    <td class="cellSampleInstruction">@sampleInstruction.ExternalDescription</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+
+    @if (Model.ShowDistributionItems)
+    {
+        <table class="tblWorkSheetNoBorder" role="presentation">
+            <tr>
+                @if (Model.DateOfReceipt)
+                {
+                    <td class="cellWorkSheetDistItem">Date Of Receipt: _____________</td>
+                }
+                @if (Model.ConditionOnReceipt)
+                {
+                    <td class="cellWorkSheetDistItem">Condition on Receipt: _____________</td>
+                }
+                @if (Model.StorageConditions)
+                {
+                    <td class="cellWorkSheetDistItem">Storage Conditions: _____________</td>
+                }
+            </tr>
+        </table>
+    }
+
+    @foreach (var test in Model.Tests)
+    {
+        @foreach (var resultsTable in test.ResultsTables)
+        {
+            <div class="PrintableResultsSpacer"></div>
+            <table class="tablePrintableResults">
+                <thead>
+                    @if (resultsTable.ShowTestName)
+                    {
+                        <tr class="rowHeader">
+                            <th scope="col" style="width:@(resultsTable.SampleColumnWidth)px">@resultsTable.TestName</th>
+                            <th scope="col" colspan="@Math.Max(resultsTable.Columns.Count, 1)"></th>
+                        </tr>
+                    }
+                    <tr>
+                        <th scope="col" style="width:@(resultsTable.SampleColumnWidth)px">Sample No.</th>
+                        @if (resultsTable.Columns.Count == 0)
+                        {
+                            <th scope="col" class="cellNoResultItems">This test has no Result Items</th>
+                        }
+                        else
+                        {
+                            @foreach (var column in resultsTable.Columns)
+                            {
+                                <th scope="col" style="width:@(column.Width)px">@column.Name</th>
+                            }
+                        }
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var row in resultsTable.Rows)
+                    {
+                        <tr class="rowSample">
+                            <th scope="row">@row.SampleNumber</th>
+                            @foreach (var value in row.Values)
+                            {
+                                <td>@value</td>
+                            }
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+
+        @if (test.MethodRows.Count > 0)
+        {
+            <div class="PrintableResultsSpacer"></div>
+            @* One column of method name/value pairs with no header in the legacy design -
+               role="presentation" keeps it out of the accessibility tree as a layout list
+               rather than a data table. *@
+            <table class="tablePrintableResults" role="presentation">
+                @foreach (var methodRow in test.MethodRows)
+                {
+                    <tr class="rowMethod"><td>@methodRow.Name: @methodRow.Value</td></tr>
+                }
+            </table>
+        }
+    }
+
+    <table class="tblWorkSheetNoBorder" role="presentation">
+        <tr><td>Date of Receipt:</td></tr>
+        <tr><td>Date of Testing:</td></tr>
+    </table>
+
+    <table class="tblWorkSheetNoBorder" id="tblFooter" role="presentation">
+        <tr>
+            <td class="cellWorkSheetAddress">
+                Enter results online at:<br />
+                <strong>https://new.uat-science.apha.gov.uk/ProficiencyTesting</strong><br /><br />
+                Animal and Plant Health Agency<br />
+                Quality Assurance Unit<br />
+                The Elms, College Road<br />
+                Sutton Bonington<br />
+                Loughborough<br />
+                Leicestershire<br />
+                LE12 5RB<br />
+                UK
+            </td>
+            <td class="cellWorkSheetUkaslogo">
+                @if (Model.IsAccredited)
+                {
+                    <img src="~/images/ukas.png" alt="" class="ukaslogo" width="60" />
+                    <br />
+                    <text>0004</text>
+                }
+            </td>
+            <td class="cellWorkSheetDeadline">
+                <table class="tableWorkSheetLabId" role="presentation">
+                    <tr><td>@Model.DeadlineMessage</td></tr>
+                </table>
+            </td>
+        </tr>
+        <tr><td>&nbsp;</td></tr>
+        <tr>
+            <td colspan="2" class="cellWorkSheetFooter">
+                TEL: 03000 600003<br />
+                EMAIL: Vetqas@@apha.gov.uk
+            </td>
+            <td class="cellWorkSheetFooter" style="text-align:right;">
+                @Model.VersionLabel
+            </td>
+        </tr>
+    </table>
+
+    <br />
+    <br />
+    <button type="button" class="govuk-button noprint" data-module="govuk-button" onclick="window.print(); return false;">Print</button>
+</div>

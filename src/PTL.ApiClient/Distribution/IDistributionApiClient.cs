@@ -30,4 +30,9 @@ public interface IDistributionApiClient
 
     Task<RepeatDistributionResult?> RepeatDistributionAsync(
         Guid monthlyDistributionSchemeId, RepeatDistributionRequest request, CancellationToken cancellationToken = default);
+
+    Task<PreparationSheetResponse?> GetPreparationAsync(int yearId, int monthId, CancellationToken cancellationToken = default);
+
+    Task<PreparationSaveResult?> SavePreparationAsync(
+        int yearId, int monthId, PreparationSaveRequest request, CancellationToken cancellationToken = default);
 }

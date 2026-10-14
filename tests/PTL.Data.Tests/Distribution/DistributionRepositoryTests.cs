@@ -120,10 +120,11 @@ public class DistributionRepositoryTests
         schemes.Columns.Add("fldIsAsAvailable", typeof(bool));
         schemes.Columns.Add("fldStoreRatings", typeof(bool));
         schemes.Columns.Add("fldSchemeVersionDate", typeof(DateTime));
+        schemes.Columns.Add("fldIsAccredited", typeof(bool));
         schemes.Rows.Add(
             schemeId, monthlyDistributionId, Guid.NewGuid(), "S001", "Test Scheme", "D26-01", "A", "BA",
             new DateTime(2026, 4, 1), new DateTime(2026, 4, 1), new DateTime(2026, 4, 5), new DateTime(2026, 4, 10),
-            "Some comments", false, false, false, false, false, new DateTime(2026, 1, 1));
+            "Some comments", false, false, false, false, false, new DateTime(2026, 1, 1), true);
 
         var participants = new DataTable();
         participants.Columns.Add("fldDistributionSchemeId", typeof(Guid));
@@ -145,6 +146,7 @@ public class DistributionRepositoryTests
         Assert.Equal(2, scheme.ParticipantCount);
         Assert.Equal(5, scheme.TotalSetsOfSamplesRequired);
         Assert.Equal("D26-01A/BA", scheme.DistributionReferenceFull);
+        Assert.True(scheme.IsAccredited);
     }
 
     [Fact]
@@ -1122,4 +1124,146 @@ public class DistributionRepositoryTests
         Assert.Equal(2, connection.ExecutedCommands.Count(c => c.CommandText == InsertParticipantSql));
         Assert.True(connection.LastTransaction!.Committed);
     }
+
+    private const string GetPreparationSheetSql = "EXEC dbo.spgPreparationSheet @MonthlyDistributionId = @MonthlyDistributionId";
+
+    private static DataTable PreparationHeaderTable()
+    {
+        var table = new DataTable();
+        table.Columns.Add("fldYearId", typeof(int));
+        table.Columns.Add("fldMonthId", typeof(int));
+        return table;
+    }
+
+    private static DataTable PreparationSchemeTable()
+    {
+        var table = new DataTable();
+        table.Columns.Add("fldMonthlyDistributionSchemeId", typeof(Guid));
+        table.Columns.Add("fldIdentifier", typeof(string));
+        table.Columns.Add("fldName", typeof(string));
+        table.Columns.Add("fldDistributionReference", typeof(string));
+        table.Columns.Add("fldDistributionReferenceSuffix", typeof(string));
+        table.Columns.Add("fldScheduleCode", typeof(string));
+        table.Columns.Add("fldNumberOfSetsRequired", typeof(int));
+        table.Columns.Add("fldSamplePackingInstructions", typeof(string));
+        table.Columns.Add("fldDiaryEntry", typeof(DateTime));
+        table.Columns.Add("fldPrepStartDate", typeof(DateTime));
+        table.Columns.Add("fldPrepCompleteDate", typeof(DateTime));
+        return table;
+    }
+
+    private static DataTable PreparationSampleTable()
+    {
+        var table = new DataTable();
+        table.Columns.Add("fldMonthlyDistributionSchemeId", typeof(Guid));
+        table.Columns.Add("fldSampleId", typeof(Guid));
+        table.Columns.Add("fldSampleNumber", typeof(string));
+        table.Columns.Add("fldInternalDescription", typeof(string));
+        return table;
+    }
+
+    [Fact]
+    public async Task GetPreparationSheetAsync_HeaderNotFound_ReturnsNull()
+    {
+        var (repository, connection) = CreateRepository();
+        var dataSet = new DataSet();
+        dataSet.Tables.Add(PreparationHeaderTable());
+        dataSet.Tables.Add(PreparationSchemeTable());
+        dataSet.Tables.Add(PreparationSampleTable());
+        connection.RespondToQuery(GetPreparationSheetSql, dataSet);
+
+        Assert.Null(await repository.GetPreparationSheetAsync(Guid.NewGuid()));
+    }
+
+    [Fact]
+    public async Task GetPreparationSheetAsync_ReturnsSchemesWithSamplesCorrelatedByScheme()
+    {
+        var (repository, connection) = CreateRepository();
+        var monthlyDistributionId = Guid.NewGuid();
+        var schemeId = Guid.NewGuid();
+        var otherSchemeId = Guid.NewGuid();
+
+        var header = PreparationHeaderTable();
+        header.Rows.Add(2026, 4);
+
+        var schemes = PreparationSchemeTable();
+        schemes.Rows.Add(
+            schemeId, "PT0060", "Mastitis bovine", "17152", "A", "BA", 3, "Pack in foil",
+            DBNull.Value, DBNull.Value, DBNull.Value);
+        schemes.Rows.Add(
+            otherSchemeId, "PT0070", "Salmonella", "17153", "", "BB", 2, "Keep refrigerated",
+            new DateTime(2026, 4, 1), DBNull.Value, DBNull.Value);
+
+        var samples = PreparationSampleTable();
+        samples.Rows.Add(schemeId, Guid.NewGuid(), "S001", "Sample one");
+        samples.Rows.Add(schemeId, Guid.NewGuid(), "S002", "Sample two");
+
+        var dataSet = new DataSet();
+        dataSet.Tables.Add(header);
+        dataSet.Tables.Add(schemes);
+        dataSet.Tables.Add(samples);
+        connection.RespondToQuery(GetPreparationSheetSql, dataSet);
+
+        var result = await repository.GetPreparationSheetAsync(monthlyDistributionId);
+
+        Assert.NotNull(result);
+        Assert.Equal(monthlyDistributionId, result!.MonthlyDistributionId);
+        Assert.Equal(2026, result.YearId);
+        Assert.Equal(4, result.MonthId);
+        Assert.Equal(2, result.Schemes.Count);
+
+        var scheme = result.Schemes.Single(s => s.MonthlyDistributionSchemeId == schemeId);
+        Assert.Equal("17152A/BA", scheme.DistributionReferenceFull);
+        Assert.Equal(2, scheme.Samples.Count);
+        Assert.Null(scheme.DiaryEntry);
+
+        var otherScheme = result.Schemes.Single(s => s.MonthlyDistributionSchemeId == otherSchemeId);
+        Assert.Empty(otherScheme.Samples);
+        Assert.Equal(new DateTime(2026, 4, 1), otherScheme.DiaryEntry);
+    }
+
+    private const string UpdatePreparationSql = """
+        EXEC dbo.spuMonthlyDistributionSchemePrep
+            @MonthlyDistributionSchemeId = @MonthlyDistributionSchemeId,
+            @DiaryEntry = @DiaryEntry,
+            @PrepStartDate = @PrepStartDate,
+            @PrepCompleteDate = @PrepCompleteDate
+        """;
+
+    [Fact]
+    public async Task UpdatePreparationAsync_NoSchemes_DoesNotOpenATransaction()
+    {
+        var (repository, connection) = CreateRepository();
+
+        await repository.UpdatePreparationAsync([]);
+
+        Assert.Empty(connection.ExecutedCommands);
+        Assert.Null(connection.LastTransaction);
+    }
+
+    [Fact]
+    public async Task UpdatePreparationAsync_ExecutesEachSchemeInOneTransactionAndCommits()
+    {
+        var (repository, connection) = CreateRepository();
+        connection.RespondToNonQuery(UpdatePreparationSql, 1);
+
+        var schemeOne = new PTL.Core.Distribution.PreparationSchemeEntity
+        {
+            MonthlyDistributionSchemeId = Guid.NewGuid(),
+            DiaryEntry = new DateTime(2026, 4, 1),
+        };
+        var schemeTwo = new PTL.Core.Distribution.PreparationSchemeEntity
+        {
+            MonthlyDistributionSchemeId = Guid.NewGuid(),
+            PrepCompleteDate = new DateTime(2026, 4, 2),
+        };
+
+        await repository.UpdatePreparationAsync([schemeOne, schemeTwo]);
+
+        Assert.Equal(2, connection.ExecutedCommands.Count(c => c.CommandText == UpdatePreparationSql));
+        var firstCommand = connection.ExecutedCommands.First(c => c.CommandText == UpdatePreparationSql);
+        Assert.Equal(schemeOne.MonthlyDistributionSchemeId, firstCommand.ParameterValue("MonthlyDistributionSchemeId"));
+        Assert.True(connection.LastTransaction!.Committed);
+    }
+
 }

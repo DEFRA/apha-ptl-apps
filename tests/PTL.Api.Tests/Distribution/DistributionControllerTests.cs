@@ -16,6 +16,7 @@ public class DistributionControllerTests
             new SampleNumbersService(repository, schemeService ?? new FakeSchemeService()),
             new IntendedResultsService(repository),
             new DistributionParticipantsService(repository),
+            new PreparationService(repository),
             Microsoft.Extensions.Logging.Abstractions.NullLogger<DistributionController>.Instance);
 
     // ValidationProblem() resolves ProblemDetailsFactory from HttpContext.RequestServices,
@@ -734,5 +735,91 @@ public class DistributionControllerTests
         var response = Assert.IsType<RepeatDistributionResult>(ok.Value);
         Assert.False(response.Success);
         Assert.Equal("Please tick at least one participant to be included in the repeat of this distribution.", response.Error);
+    }
+
+    private static readonly Guid PreparationMonthlyDistributionId = Guid.Parse("cccccccc-1111-1111-1111-111111111111");
+    private static readonly Guid PreparationSchemeId = Guid.Parse("cccccccc-2222-2222-2222-222222222222");
+    private static readonly Guid PreparationSampleId = Guid.Parse("cccccccc-3333-3333-3333-333333333333");
+
+    private static FakeDistributionRepository PreparationRepository()
+    {
+        var repository = new FakeDistributionRepository();
+        repository.Schedules[(2026, 4)] = (PreparationMonthlyDistributionId, [new MonthlyDistributionSchemeEntity { MonthlyDistributionSchemeId = PreparationSchemeId }]);
+        repository.PreparationSheets[PreparationMonthlyDistributionId] = new PreparationSheetData(
+            PreparationMonthlyDistributionId,
+            2026,
+            4,
+            [
+                new PreparationSchemeEntity
+                {
+                    MonthlyDistributionSchemeId = PreparationSchemeId,
+                    SchemeIdentifier = "PT0060",
+                    SchemeName = "Mastitis bovine",
+                    DistributionReference = "17152",
+                    DistributionReferenceSuffix = "A",
+                    ScheduleCode = "BA",
+                    NumberOfSetsRequired = 9,
+                    SamplePackingInstructions = "Keep chilled",
+                    Samples = [new PreparationSampleEntity { MonthlyDistributionSchemeId = PreparationSchemeId, SampleId = PreparationSampleId, SampleNumber = "S1", InternalDescription = "Internal 1" }],
+                },
+            ]);
+        return repository;
+    }
+
+    [Fact]
+    public async Task GetPreparation_MonthNotInitialised_ReturnsNotFound()
+    {
+        var controller = CreateController(new FakeDistributionRepository());
+
+        var result = await controller.GetPreparation(2026, 4, CancellationToken.None);
+
+        Assert.IsType<NotFoundResult>(result.Result);
+    }
+
+    [Fact]
+    public async Task GetPreparation_MonthInitialised_ReturnsMappedResponse()
+    {
+        var controller = CreateController(PreparationRepository());
+
+        var result = await controller.GetPreparation(2026, 4, CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var response = Assert.IsType<PreparationSheetResponse>(ok.Value);
+        Assert.Equal(PreparationMonthlyDistributionId, response.MonthlyDistributionId);
+        Assert.Equal(2026, response.YearId);
+        Assert.Equal(4, response.MonthId);
+        var scheme = Assert.Single(response.Schemes);
+        Assert.Equal(PreparationSchemeId, scheme.MonthlyDistributionSchemeId);
+        Assert.Equal("17152A/BA", scheme.DistributionReferenceFull);
+        Assert.Equal(9, scheme.NumberOfSetsRequired);
+        var sample = Assert.Single(scheme.Samples);
+        Assert.Equal(PreparationSampleId, sample.SampleId);
+        Assert.Equal("S1", sample.SampleNumber);
+    }
+
+    [Fact]
+    public async Task SavePreparation_MonthInitialised_PersistsAndReturnsSuccess()
+    {
+        var repository = PreparationRepository();
+        var controller = CreateController(repository);
+
+        var request = new PreparationSaveRequest([new PreparationStageUpdateRequest(PreparationSchemeId, true, false, false)]);
+        var result = await controller.SavePreparation(2026, 4, request, CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var response = Assert.IsType<PreparationSaveResult>(ok.Value);
+        Assert.True(response.Success);
+        Assert.Single(repository.UpdatedPreparationSchemes);
+    }
+
+    [Fact]
+    public async Task SavePreparation_MonthNotInitialised_ReturnsNotFound()
+    {
+        var controller = CreateController(new FakeDistributionRepository());
+
+        var request = new PreparationSaveRequest([new PreparationStageUpdateRequest(PreparationSchemeId, true, false, false)]);
+        var result = await controller.SavePreparation(2026, 4, request, CancellationToken.None);
+
+        Assert.IsType<NotFoundResult>(result.Result);
     }
 }

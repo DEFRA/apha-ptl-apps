@@ -738,6 +738,7 @@ public static class DapperColumnMappings
             ["fldIsAsAvailable"] = nameof(MonthlyDistributionSchemeEntity.IsAsAvailable),
             ["fldStoreRatings"] = nameof(MonthlyDistributionSchemeEntity.StoreRatings),
             ["fldSchemeVersionDate"] = nameof(MonthlyDistributionSchemeEntity.SchemeVersionDate),
+            ["fldIsAccredited"] = nameof(MonthlyDistributionSchemeEntity.IsAccredited),
         });
 
         Map<MonthlyDistributionParticipantAggregateEntity>(new(StringComparer.OrdinalIgnoreCase)
@@ -782,6 +783,11 @@ public static class DapperColumnMappings
             ["fldStoreRatings"] = nameof(IntendedResultsHeaderEntity.StoreRatings),
             ["fldRequiresAssessment"] = nameof(IntendedResultsHeaderEntity.RequiresAssessment),
             ["fldIsReadyForAssessor"] = nameof(IntendedResultsHeaderEntity.IsReadyForAssessor),
+            ["fldSchemeVersionDate"] = nameof(IntendedResultsHeaderEntity.SchemeVersionDate),
+            ["fldDateOfReceipt"] = nameof(IntendedResultsHeaderEntity.DateOfReceipt),
+            ["fldStorageConditions"] = nameof(IntendedResultsHeaderEntity.StorageConditions),
+            ["fldConditionOnReceipt"] = nameof(IntendedResultsHeaderEntity.ConditionOnReceipt),
+            ["fldInstructions"] = nameof(IntendedResultsHeaderEntity.Instructions),
         });
 
         Map<DistributionSampleEntity>(new(StringComparer.OrdinalIgnoreCase)
@@ -834,6 +840,7 @@ public static class DapperColumnMappings
             [ColFormatString] = nameof(DistributionTestResultItemEntity.FormatString),
             [ColReturnValueType] = nameof(DistributionTestResultItemEntity.ReturnValueType),
             ["fldIsRange"] = nameof(DistributionTestResultItemEntity.IsRange),
+            ["ExpectedLength"] = nameof(DistributionTestResultItemEntity.ExpectedLength),
         });
 
         Map<DistributionSampleResultItemEntity>(new(StringComparer.OrdinalIgnoreCase)
@@ -844,6 +851,35 @@ public static class DapperColumnMappings
             [ColTestResultItemId] = nameof(DistributionSampleResultItemEntity.TestResultItemId),
             [ColIntendedResult] = nameof(DistributionSampleResultItemEntity.IntendedResult),
             ["fldIntendedResult2"] = nameof(DistributionSampleResultItemEntity.IntendedResult2),
+        });
+
+        Map<PreparationHeaderEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            [ColYearId] = nameof(PreparationHeaderEntity.YearId),
+            [ColMonthId] = nameof(PreparationHeaderEntity.MonthId),
+        });
+
+        Map<PreparationSchemeEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldMonthlyDistributionSchemeId"] = nameof(PreparationSchemeEntity.MonthlyDistributionSchemeId),
+            [ColIdentifier] = nameof(PreparationSchemeEntity.SchemeIdentifier),
+            [ColName] = nameof(PreparationSchemeEntity.SchemeName),
+            ["fldDistributionReference"] = nameof(PreparationSchemeEntity.DistributionReference),
+            ["fldDistributionReferenceSuffix"] = nameof(PreparationSchemeEntity.DistributionReferenceSuffix),
+            ["fldScheduleCode"] = nameof(PreparationSchemeEntity.ScheduleCode),
+            [ColNumberOfSetsRequired] = nameof(PreparationSchemeEntity.NumberOfSetsRequired),
+            ["fldSamplePackingInstructions"] = nameof(PreparationSchemeEntity.SamplePackingInstructions),
+            ["fldDiaryEntry"] = nameof(PreparationSchemeEntity.DiaryEntry),
+            ["fldPrepStartDate"] = nameof(PreparationSchemeEntity.PrepStartDate),
+            ["fldPrepCompleteDate"] = nameof(PreparationSchemeEntity.PrepCompleteDate),
+        });
+
+        Map<PreparationSampleEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldMonthlyDistributionSchemeId"] = nameof(PreparationSampleEntity.MonthlyDistributionSchemeId),
+            ["fldSampleId"] = nameof(PreparationSampleEntity.SampleId),
+            ["fldSampleNumber"] = nameof(PreparationSampleEntity.SampleNumber),
+            ["fldInternalDescription"] = nameof(PreparationSampleEntity.InternalDescription),
         });
 
         Map<DistributionCategoryItemEntity>(new(StringComparer.OrdinalIgnoreCase)

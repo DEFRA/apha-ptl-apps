@@ -638,6 +638,61 @@ public sealed class DistributionRepository(IDbConnectionFactory connectionFactor
 
         transaction.Commit();
     }
+
+    public async Task<PreparationSheetData?> GetPreparationSheetAsync(Guid monthlyDistributionId, CancellationToken cancellationToken = default)
+    {
+        using var connection = connectionFactory.CreateConnection();
+        using var results = await connection.QueryMultipleAsync(
+            "EXEC dbo.spgPreparationSheet @MonthlyDistributionId = @MonthlyDistributionId",
+            new { MonthlyDistributionId = monthlyDistributionId });
+
+        var header = await results.ReadFirstOrDefaultAsync<PreparationHeaderEntity>();
+        if (header is null)
+        {
+            return null;
+        }
+
+        var schemes = (await results.ReadAsync<PreparationSchemeEntity>()).ToList();
+        var samples = (await results.ReadAsync<PreparationSampleEntity>()).ToList();
+
+        var schemesById = schemes.ToDictionary(s => s.MonthlyDistributionSchemeId);
+        foreach (var sample in samples)
+        {
+            if (schemesById.TryGetValue(sample.MonthlyDistributionSchemeId, out var scheme))
+            {
+                scheme.Samples.Add(sample);
+            }
+        }
+
+        return new PreparationSheetData(monthlyDistributionId, header.YearId, header.MonthId, schemes);
+    }
+
+    public async Task UpdatePreparationAsync(IReadOnlyList<PreparationSchemeEntity> schemes, CancellationToken cancellationToken = default)
+    {
+        if (schemes.Count == 0)
+        {
+            return;
+        }
+
+        using var connection = connectionFactory.CreateConnection();
+        connection.Open();
+        using var transaction = connection.BeginTransaction();
+
+        const string updateSql = """
+            EXEC dbo.spuMonthlyDistributionSchemePrep
+                @MonthlyDistributionSchemeId = @MonthlyDistributionSchemeId,
+                @DiaryEntry = @DiaryEntry,
+                @PrepStartDate = @PrepStartDate,
+                @PrepCompleteDate = @PrepCompleteDate
+            """;
+
+        foreach (var scheme in schemes)
+        {
+            await connection.ExecuteAsync(updateSql, scheme, transaction);
+        }
+
+        transaction.Commit();
+    }
 }
 
 // spgMonthlyDistribution result set 1 - only present when the month has been initialised.

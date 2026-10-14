@@ -78,4 +78,18 @@ internal sealed class FakeDistributionApiClient : IDistributionApiClient
         SavedRepeatRequests.Add(request);
         return Task.FromResult(RepeatDistributionResult);
     }
+
+    public PreparationSheetResponse? Preparation { get; set; }
+    public PreparationSaveResult? PreparationSaveResult { get; set; }
+    public List<PreparationSaveRequest> SavedPreparationRequests { get; } = [];
+
+    public Task<PreparationSheetResponse?> GetPreparationAsync(int yearId, int monthId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Preparation);
+
+    public Task<PreparationSaveResult?> SavePreparationAsync(
+        int yearId, int monthId, PreparationSaveRequest request, CancellationToken cancellationToken = default)
+    {
+        SavedPreparationRequests.Add(request);
+        return Task.FromResult(PreparationSaveResult);
+    }
 }

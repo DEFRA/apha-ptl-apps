@@ -14,6 +14,17 @@ public class IntendedResultsHeaderEntity
     public bool StoreRatings { get; set; }
     public bool RequiresAssessment { get; set; }
     public DateTime? IsReadyForAssessor { get; set; }
+
+    // The remaining 5 columns are snapshotted from the Scheme onto this row the first time
+    // Intended Results is created (legacy IntendedResultsSet.DataPortal_Create), then read back
+    // from this same row thereafter - they are NOT re-read from the Scheme on every fetch, so a
+    // later Scheme edit does not retroactively change an already-created distribution's worksheet.
+    // Used only by the Printable Results screen, not the interactive Intended Results screen.
+    public DateTime SchemeVersionDate { get; set; }
+    public bool DateOfReceipt { get; set; }
+    public bool StorageConditions { get; set; }
+    public bool ConditionOnReceipt { get; set; }
+    public string? Instructions { get; set; }
 }
 
 // spgIntendedResults result set 2 (tblSample), ordered by fldSampleNumber.
@@ -77,6 +88,10 @@ public class DistributionTestResultItemEntity
     public string? FormatString { get; set; }
     public string? ReturnValueType { get; set; }
     public bool IsRange { get; set; }
+
+    // Only read by Printable Results - legacy ResultsTable.GetColumnWidth's column-packing budget
+    // (ExpectedLength * 20 pixels per column).
+    public int ExpectedLength { get; set; }
 }
 
 // spgIntendedResults result set 8 (tblDistributionCategoryItem) - only rendered when the scheme

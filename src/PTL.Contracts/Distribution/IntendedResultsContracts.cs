@@ -8,7 +8,15 @@ public sealed record IntendedResultsResponse(
     string SchemeIdentifier,
     string SchemeName,
     bool RequiresAuditReason,
-    IReadOnlyList<IntendedResultsTestResponse> Tests);
+    IReadOnlyList<IntendedResultsTestResponse> Tests,
+    // The remaining 5 are only used by Printable Results - snapshotted onto the distribution from
+    // the Scheme once, at creation time (see IntendedResultsHeaderEntity).
+    DateTime SchemeVersionDate = default,
+    bool HasIntendedResults = false,
+    bool DateOfReceipt = false,
+    bool StorageConditions = false,
+    bool ConditionOnReceipt = false,
+    string Instructions = "");
 
 public sealed record IntendedResultsTestResponse(
     Guid TestId,
@@ -18,8 +26,10 @@ public sealed record IntendedResultsTestResponse(
     IReadOnlyList<IntendedResultsSampleRowResponse> Samples);
 
 // IsRange is a TEST-LEVEL toggle shared by every sample under this Test, not per-sample.
+// ExpectedLength is only used by Printable Results - legacy ResultsTable.GetColumnWidth's
+// column-packing budget (ExpectedLength * 20 pixels per column).
 public sealed record IntendedResultsResultItemResponse(
-    Guid TestResultItemId, string Name, string FormatString, string ReturnValueType, bool IsRange);
+    Guid TestResultItemId, string Name, string FormatString, string ReturnValueType, bool IsRange, int ExpectedLength = 0);
 
 // Method Items have exactly one value for the whole distribution, not per sample.
 public sealed record IntendedResultsMethodItemResponse(
@@ -30,7 +40,9 @@ public sealed record IntendedResultsSampleRowResponse(
     string SampleNumber,
     string InternalDescription,
     bool IsApplicable,
-    IReadOnlyList<IntendedResultsSampleResultValueResponse> Values);
+    IReadOnlyList<IntendedResultsSampleResultValueResponse> Values,
+    // Only used by Printable Results' sample-instruction grid.
+    string ExternalDescription = "");
 
 public sealed record IntendedResultsSampleResultValueResponse(
     Guid SampleResultItemId, Guid TestResultItemId, string IntendedResult, string IntendedResult2);

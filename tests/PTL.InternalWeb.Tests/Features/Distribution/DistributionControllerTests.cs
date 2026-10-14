@@ -568,4 +568,187 @@ public class DistributionControllerTests
         var view = Assert.IsType<ViewResult>(result);
         Assert.Same(model, view.Model);
     }
+
+    private static readonly Guid PreparationSchemeId = Guid.Parse("44444444-4444-4444-4444-444444444444");
+    private static readonly Guid PreparationSampleId = Guid.Parse("55555555-5555-5555-5555-555555555555");
+
+    private static PreparationSheetResponse PreparationResponse() =>
+        new(
+            Guid.NewGuid(),
+            2026,
+            4,
+            [
+                new PreparationSchemeResponse(
+                    PreparationSchemeId,
+                    "PT0060",
+                    "Mastitis bovine",
+                    "17152A/BA",
+                    9,
+                    "Keep chilled",
+                    DiaryEntry: null,
+                    PrepStartDate: null,
+                    PrepCompleteDate: null,
+                    Samples: [new PreparationSampleResponse(PreparationSampleId, "S1", "Internal 1")]),
+            ]);
+
+    [Fact]
+    public async Task Preparation_Get_MonthNotInitialised_ReturnsNotFound()
+    {
+        var controller = CreateController(new FakeDistributionApiClient());
+
+        var result = await controller.Preparation(2026, 4, CancellationToken.None);
+
+        Assert.IsType<NotFoundResult>(result);
+    }
+
+    [Fact]
+    public async Task Preparation_Get_MonthInitialised_ReturnsViewModelWithSchemesAndSamples()
+    {
+        var apiClient = new FakeDistributionApiClient { Preparation = PreparationResponse() };
+        var controller = CreateController(apiClient);
+
+        var result = await controller.Preparation(2026, 4, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<PreparationViewModel>(view.Model);
+        Assert.Equal(2026, model.YearId);
+        Assert.Equal(4, model.MonthId);
+        Assert.Equal("Apr 2026", model.MonthDescription);
+        var row = Assert.Single(model.Schemes);
+        Assert.Equal(PreparationSchemeId, row.MonthlyDistributionSchemeId);
+        Assert.Equal("17152A/BA PT0060: Mastitis bovine", row.SchemeHeading);
+        Assert.True(row.HasSamples);
+        Assert.Equal("S1", Assert.Single(row.Samples).SampleNumber);
+    }
+
+    [Fact]
+    public async Task Preparation_Post_CancelCommand_RedirectsToIndexWithoutSaving()
+    {
+        var apiClient = new FakeDistributionApiClient();
+        var controller = CreateController(apiClient);
+        var model = new PreparationViewModel { YearId = 2026, MonthId = 4 };
+
+        var result = await controller.Preparation(2026, 4, model, "cancel", CancellationToken.None);
+
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal(nameof(DistributionController.Index), redirect.ActionName);
+        Assert.Empty(apiClient.SavedPreparationRequests);
+    }
+
+    [Fact]
+    public async Task Preparation_Post_SaveCommand_PersistsAndRedirectsToIndex()
+    {
+        var apiClient = new FakeDistributionApiClient { PreparationSaveResult = new PreparationSaveResult(true) };
+        var controller = CreateController(apiClient);
+        var model = new PreparationViewModel
+        {
+            YearId = 2026,
+            MonthId = 4,
+            Schemes = [new PreparationSchemeRowViewModel { MonthlyDistributionSchemeId = PreparationSchemeId, DiaryEntryChecked = true }],
+        };
+
+        var result = await controller.Preparation(2026, 4, model, "save", CancellationToken.None);
+
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal(nameof(DistributionController.Index), redirect.ActionName);
+        var saved = Assert.Single(apiClient.SavedPreparationRequests);
+        Assert.True(Assert.Single(saved.Updates).DiaryEntryChecked);
+        var notification = controller.TempData.GetNotification();
+        Assert.Equal(NotificationType.Success, notification!.Type);
+        Assert.Equal("Sample Preparation updated successfully.", notification.Message);
+    }
+
+    [Fact]
+    public async Task Preparation_Post_ApplyCommand_PersistsAndRedirectsBackToPreparation()
+    {
+        var apiClient = new FakeDistributionApiClient { PreparationSaveResult = new PreparationSaveResult(true) };
+        var controller = CreateController(apiClient);
+        var model = new PreparationViewModel { YearId = 2026, MonthId = 4, Schemes = [] };
+
+        var result = await controller.Preparation(2026, 4, model, "apply", CancellationToken.None);
+
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal(nameof(DistributionController.Preparation), redirect.ActionName);
+        Assert.Equal(2026, redirect.RouteValues!["year"]);
+        Assert.Equal(4, redirect.RouteValues["monthId"]);
+    }
+
+    [Fact]
+    public async Task Preparation_Post_SaveFails_ShowsErrorNotificationAndRedirectsBackToPreparation()
+    {
+        var apiClient = new FakeDistributionApiClient { PreparationSaveResult = new PreparationSaveResult(false) };
+        var controller = CreateController(apiClient);
+        var model = new PreparationViewModel { YearId = 2026, MonthId = 4, Schemes = [] };
+
+        var result = await controller.Preparation(2026, 4, model, "save", CancellationToken.None);
+
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal(nameof(DistributionController.Preparation), redirect.ActionName);
+        var notification = controller.TempData.GetNotification();
+        Assert.Equal(NotificationType.Error, notification!.Type);
+        Assert.Equal("Sample Preparation could not be saved. Please try again later.", notification.Message);
+    }
+
+    [Fact]
+    public async Task Preparation_Post_ApiUnavailable_ShowsErrorNotificationAndRedirectsBackToPreparation()
+    {
+        var apiClient = new FakeDistributionApiClient { PreparationSaveResult = null };
+        var controller = CreateController(apiClient);
+        var model = new PreparationViewModel { YearId = 2026, MonthId = 4, Schemes = [] };
+
+        var result = await controller.Preparation(2026, 4, model, "save", CancellationToken.None);
+
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal(nameof(DistributionController.Preparation), redirect.ActionName);
+        var notification = controller.TempData.GetNotification();
+        Assert.Equal(NotificationType.Error, notification!.Type);
+        Assert.Equal("Sample Preparation could not be saved. Please try again later.", notification.Message);
+    }
+
+    [Fact]
+    public async Task PrintableResults_Get_UnknownScheme_ReturnsNotFound()
+    {
+        var controller = CreateController(new FakeDistributionApiClient());
+
+        var result = await controller.PrintableResults(2026, 4, ParticipantsSchemeId, showValues: false, CancellationToken.None);
+
+        Assert.IsType<NotFoundResult>(result);
+    }
+
+    [Fact]
+    public async Task PrintableResults_Get_KnownScheme_ReturnsMappedWorksheet()
+    {
+        var apiClient = new FakeDistributionApiClient
+        {
+            IntendedResults = new IntendedResultsResponse(
+                ParticipantsSchemeId, "17152A/BA", "PT0060", "Mastitis bovine", false, []),
+        };
+        var controller = CreateController(apiClient);
+
+        var result = await controller.PrintableResults(2026, 4, ParticipantsSchemeId, showValues: false, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<PrintableResultsWorksheet>(view.Model);
+        Assert.Equal(ParticipantsSchemeId, model.MonthlyDistributionSchemeId);
+        Assert.Equal(2026, model.YearId);
+        Assert.Equal(4, model.MonthId);
+        Assert.Equal("PT0060: Mastitis bovine", model.SchemeHeading);
+    }
+
+    [Fact]
+    public async Task PrintableResults_Get_HasIntendedResultsFalse_ClampsShowValuesToFalse()
+    {
+        var apiClient = new FakeDistributionApiClient
+        {
+            IntendedResults = new IntendedResultsResponse(
+                ParticipantsSchemeId, "17152A/BA", "PT0060", "Mastitis bovine", false, [], HasIntendedResults: false),
+        };
+        var controller = CreateController(apiClient);
+
+        var result = await controller.PrintableResults(2026, 4, ParticipantsSchemeId, showValues: true, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<PrintableResultsWorksheet>(view.Model);
+        Assert.False(model.ShowValues);
+    }
 }

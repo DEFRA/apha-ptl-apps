@@ -120,4 +120,30 @@ public sealed class DistributionApiClient(HttpClient httpClient) : IDistribution
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadFromJsonAsync<RepeatDistributionResult>(cancellationToken);
     }
+
+    public async Task<PreparationSheetResponse?> GetPreparationAsync(int yearId, int monthId, CancellationToken cancellationToken = default)
+    {
+        var response = await httpClient.GetAsync(
+            new Uri($"/api/distributions/months/{yearId}/{monthId}/preparation", UriKind.Relative), cancellationToken);
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<PreparationSheetResponse>(cancellationToken);
+    }
+
+    public async Task<PreparationSaveResult?> SavePreparationAsync(
+        int yearId, int monthId, PreparationSaveRequest request, CancellationToken cancellationToken = default)
+    {
+        var response = await httpClient.PutAsJsonAsync($"/api/distributions/months/{yearId}/{monthId}/preparation", request, cancellationToken);
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<PreparationSaveResult>(cancellationToken);
+    }
 }
