@@ -16,6 +16,12 @@ public interface IResultsReceiptService
 
     Task<ResultsReceiptSaveOutcome> SaveResultsReceiptAsync(
         int yearId, int monthId, IReadOnlyList<ResultsReceiptParticipantUpdate> updates, CancellationToken cancellationToken = default);
+
+    Task<SampleReceiptPage?> GetSampleReceiptAsync(
+        Guid distributionParticipantId, Guid monthlyDistributionSchemeId, CancellationToken cancellationToken = default);
+
+    Task<SampleReceiptSaveOutcome> SaveSampleReceiptAsync(
+        Guid distributionParticipantId, Guid monthlyDistributionSchemeId, IReadOnlyList<SampleReceiptUpdate> updates, CancellationToken cancellationToken = default);
 }
 
 public sealed class ResultsReceiptService(IDistributionRepository distributionRepository, TimeProvider timeProvider) : IResultsReceiptService
@@ -103,5 +109,122 @@ public sealed class ResultsReceiptService(IDistributionRepository distributionRe
         }
 
         return new ResultsReceiptSaveOutcome(true);
+    }
+
+    public async Task<SampleReceiptPage?> GetSampleReceiptAsync(
+        Guid distributionParticipantId, Guid monthlyDistributionSchemeId, CancellationToken cancellationToken = default)
+    {
+        var data = await distributionRepository.GetSampleReceiptAsync(distributionParticipantId, monthlyDistributionSchemeId, cancellationToken);
+        return data is null ? null : ToPage(data);
+    }
+
+    // Legacy ButtonSave_Click / ButtonApply_Click -> TestCollection.Save(); the controls are disabled
+    // (so nothing can be posted) when the page is read-only, which is re-enforced here.
+    public async Task<SampleReceiptSaveOutcome> SaveSampleReceiptAsync(
+        Guid distributionParticipantId, Guid monthlyDistributionSchemeId, IReadOnlyList<SampleReceiptUpdate> updates, CancellationToken cancellationToken = default)
+    {
+        var data = await distributionRepository.GetSampleReceiptAsync(distributionParticipantId, monthlyDistributionSchemeId, cancellationToken);
+        if (data is null)
+        {
+            return new SampleReceiptSaveOutcome(SampleReceiptSaveStatus.NotFound);
+        }
+
+        if (IsReadOnly(data))
+        {
+            return new SampleReceiptSaveOutcome(SampleReceiptSaveStatus.ReadOnly);
+        }
+
+        var updatesById = new Dictionary<Guid, SampleReceiptUpdate>();
+        foreach (var u in updates)
+        {
+            updatesById[u.SampleReceiptId] = u;
+        }
+
+        var today = timeProvider.GetLocalNow().Date;
+        var changed = new List<SampleReceiptSampleEntity>();
+        foreach (var sample in data.Samples)
+        {
+            if (updatesById.TryGetValue(sample.SampleReceiptId, out var update) && ApplyTicks(sample, update, today))
+            {
+                changed.Add(sample);
+            }
+        }
+
+        if (changed.Count > 0)
+        {
+            await distributionRepository.UpdateSampleReceiptAsync(changed, cancellationToken);
+        }
+
+        return new SampleReceiptSaveOutcome(SampleReceiptSaveStatus.Saved);
+    }
+
+    // Legacy: controls are disabled when there are no Tests or the scheme is ready for the assessor.
+    private static bool IsReadOnly(SampleReceiptData data) =>
+        data.Tests.Count == 0 || data.Scheme.IsReadyForAssessor is not null;
+
+    private static SampleReceiptPage ToPage(SampleReceiptData data)
+    {
+        var samplesByTest = data.Samples.ToLookup(s => s.TestId);
+
+        // Legacy only renders a Test that has at least one Sample.
+        var tests = data.Tests
+            .Select(t => new SampleReceiptTest(
+                t.TestId,
+                t.TestType,
+                [.. samplesByTest[t.TestId].Select(s => new SampleReceiptSample(
+                    s.SampleReceiptId, s.SampleNumber, s.SubmissionDate is not null, s.NonSubmissionDate is not null, s.NonCapableDate is not null))]))
+            .Where(t => t.Samples.Count > 0)
+            .ToList();
+
+        return new SampleReceiptPage(
+            $"{data.Scheme.DistributionReferenceFull} : {data.Scheme.SchemeIdentifier} {data.Scheme.SchemeName}",
+            $"Labcode {data.Lab.LabCode}: {data.Lab.LabName}",
+            IsReadOnly(data),
+            tests);
+    }
+
+    private enum SampleReceiptKind
+    {
+        None,
+        Submitted,
+        NotSubmitted,
+        NotInRepertoire,
+    }
+
+    // Legacy Checkbox_CheckChanged: the three ticks are mutually exclusive - ticking one stamps today's
+    // date and clears the other two; unticking it clears its date. A form posts every tick at once, so
+    // the tick that differs from what is stored is the one the user just made.
+    private static bool ApplyTicks(SampleReceiptSampleEntity sample, SampleReceiptUpdate update, DateTime today)
+    {
+        var storedSubmitted = sample.SubmissionDate is not null;
+        var storedNotSubmitted = sample.NonSubmissionDate is not null;
+        var storedNotInRepertoire = sample.NonCapableDate is not null;
+
+        if (update.Submitted == storedSubmitted && update.NotSubmitted == storedNotSubmitted && update.NotInRepertoire == storedNotInRepertoire)
+        {
+            return false;
+        }
+
+        var chosen =
+            update.Submitted && !storedSubmitted ? SampleReceiptKind.Submitted
+            : update.NotSubmitted && !storedNotSubmitted ? SampleReceiptKind.NotSubmitted
+            : update.NotInRepertoire && !storedNotInRepertoire ? SampleReceiptKind.NotInRepertoire
+            : update.Submitted ? SampleReceiptKind.Submitted
+            : update.NotSubmitted ? SampleReceiptKind.NotSubmitted
+            : update.NotInRepertoire ? SampleReceiptKind.NotInRepertoire
+            : SampleReceiptKind.None;
+
+        var submissionDate = chosen == SampleReceiptKind.Submitted ? sample.SubmissionDate ?? today : (DateTime?)null;
+        var nonSubmissionDate = chosen == SampleReceiptKind.NotSubmitted ? sample.NonSubmissionDate ?? today : (DateTime?)null;
+        var nonCapableDate = chosen == SampleReceiptKind.NotInRepertoire ? sample.NonCapableDate ?? today : (DateTime?)null;
+
+        var changed = submissionDate != sample.SubmissionDate
+            || nonSubmissionDate != sample.NonSubmissionDate
+            || nonCapableDate != sample.NonCapableDate;
+
+        sample.SubmissionDate = submissionDate;
+        sample.NonSubmissionDate = nonSubmissionDate;
+        sample.NonCapableDate = nonCapableDate;
+        return changed;
     }
 }

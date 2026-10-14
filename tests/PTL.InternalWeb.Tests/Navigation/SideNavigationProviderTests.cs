@@ -68,6 +68,7 @@ public class SideNavigationProviderTests
     [InlineData("Packaging", "Sample Packaging")]
     [InlineData("ResultsReceipt", "Results Receipt")]
     [InlineData("ActualResults", "Results")]
+    [InlineData("SampleReceipt", "Submission Status")]
     public void FindPath_DistributionScreens_ReturnsFullAncestorChain(string actionName, string expectedText)
     {
         var tree = SideNavigationProvider.Build();

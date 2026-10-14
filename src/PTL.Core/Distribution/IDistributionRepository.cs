@@ -94,6 +94,15 @@ public interface IDistributionRepository
     // called once per changed participant.
     Task UpdateResultsReceiptAsync(IReadOnlyList<ResultsReceiptParticipantEntity> participants, CancellationToken cancellationToken = default);
 
+    // spgSampleReceipt - all 4 result sets (Tests, Sample Receipts, Lab, scheme), legacy
+    // ResultsReceipt.TestCollection.DataPortal_Fetch. Null when the lab or scheme row is not found.
+    Task<SampleReceiptData?> GetSampleReceiptAsync(
+        Guid distributionParticipantId, Guid monthlyDistributionSchemeId, CancellationToken cancellationToken = default);
+
+    // spuSampleReceipt x N in one transaction - legacy ParticipantSampleReceiptCollection.Update,
+    // called once per changed Sample.
+    Task UpdateSampleReceiptAsync(IReadOnlyList<SampleReceiptSampleEntity> samples, CancellationToken cancellationToken = default);
+
     // spgGroupedPackagingSheet / spgPartGroupedPackagingSheet / spgWeeklyPackagingSheet - the
     // Sample Packaging screen's data for one option (and week, for the two Combined options),
     // legacy GroupedPackagingSheet / PartGroupedPackagingSheet / WeeklyPackagingSheet.Fetch*.

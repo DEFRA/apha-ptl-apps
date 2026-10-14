@@ -482,6 +482,70 @@ public class DistributionApiClientTests
         await Assert.ThrowsAsync<HttpRequestException>(() => CreateClient(HttpStatusCode.InternalServerError, null)
             .SaveResultsReceiptAsync(2026, 5, new Contracts.Distribution.ResultsReceiptSaveRequest([])));
 
+    private static readonly Guid SampleReceiptSchemeId = Guid.Parse("22222222-2222-2222-2222-222222222222");
+    private static readonly Guid SampleReceiptParticipantId = Guid.Parse("33333333-3333-3333-3333-333333333333");
+
+    [Fact]
+    public async Task GetSampleReceiptAsync_GetsSampleReceiptEndpointAndReturnsDeserializedResponse()
+    {
+        const string json = """
+            {"schemeHeading":"D1/S1 : BT Brucella","labHeading":"Labcode L001: Lab One","isReadOnly":true,"tests":[{"testId":"44444444-4444-4444-4444-444444444444","testType":"Culture","samples":[{"sampleReceiptId":"55555555-5555-5555-5555-555555555555","sampleNumber":"S001","submitted":true,"notSubmitted":false,"notInRepertoire":false}]}]}
+            """;
+        HttpRequestMessage? captured = null;
+        var client = CreateCapturingClient(HttpStatusCode.OK, json, request => captured = request);
+
+        var result = await client.GetSampleReceiptAsync(SampleReceiptSchemeId, SampleReceiptParticipantId);
+
+        Assert.Equal(HttpMethod.Get, captured!.Method);
+        Assert.Equal($"/api/distributions/schemes/{SampleReceiptSchemeId}/participants/{SampleReceiptParticipantId}/sample-receipt", captured.RequestUri!.AbsolutePath);
+        Assert.Equal("Labcode L001: Lab One", result!.LabHeading);
+        Assert.True(result.IsReadOnly);
+        var sample = Assert.Single(Assert.Single(result.Tests).Samples);
+        Assert.Equal(("S001", true), (sample.SampleNumber, sample.Submitted));
+    }
+
+    [Fact]
+    public async Task GetSampleReceiptAsync_NotFound_ReturnsNull() =>
+        Assert.Null(await CreateClient(HttpStatusCode.NotFound, null).GetSampleReceiptAsync(SampleReceiptSchemeId, SampleReceiptParticipantId));
+
+    [Fact]
+    public async Task GetSampleReceiptAsync_ServerError_Throws() =>
+        await Assert.ThrowsAsync<HttpRequestException>(
+            () => CreateClient(HttpStatusCode.InternalServerError, null).GetSampleReceiptAsync(SampleReceiptSchemeId, SampleReceiptParticipantId));
+
+    [Fact]
+    public async Task SaveSampleReceiptAsync_PutsToSampleReceiptEndpointAndReturnsDeserializedResult()
+    {
+        HttpRequestMessage? captured = null;
+        string? body = null;
+        var client = CreateCapturingClient(HttpStatusCode.OK, """{"success":false,"readOnly":true}""", request =>
+        {
+            captured = request;
+            body = request.Content!.ReadAsStringAsync().GetAwaiter().GetResult();
+        });
+        var sampleId = Guid.NewGuid();
+
+        var result = await client.SaveSampleReceiptAsync(SampleReceiptSchemeId, SampleReceiptParticipantId,
+            new Contracts.Distribution.SampleReceiptSaveRequest([new Contracts.Distribution.SampleReceiptSampleUpdateRequest(sampleId, false, true, false)]));
+
+        Assert.Equal(HttpMethod.Put, captured!.Method);
+        Assert.Equal($"/api/distributions/schemes/{SampleReceiptSchemeId}/participants/{SampleReceiptParticipantId}/sample-receipt", captured.RequestUri!.AbsolutePath);
+        Assert.Contains(sampleId.ToString(), body);
+        Assert.Contains("\"notSubmitted\":true", body);
+        Assert.False(result!.Success);
+        Assert.True(result.ReadOnly);
+    }
+
+    [Fact]
+    public async Task SaveSampleReceiptAsync_NotFound_ReturnsNull() =>
+        Assert.Null(await CreateClient(HttpStatusCode.NotFound, null)
+            .SaveSampleReceiptAsync(SampleReceiptSchemeId, SampleReceiptParticipantId, new Contracts.Distribution.SampleReceiptSaveRequest([])));
+
+    [Fact]
+    public async Task SaveSampleReceiptAsync_ServerError_Throws() =>
+        await Assert.ThrowsAsync<HttpRequestException>(() => CreateClient(HttpStatusCode.InternalServerError, null)
+            .SaveSampleReceiptAsync(SampleReceiptSchemeId, SampleReceiptParticipantId, new Contracts.Distribution.SampleReceiptSaveRequest([])));
+
     private static readonly Guid ActualResultsSchemeId = Guid.Parse("22222222-2222-2222-2222-222222222222");
     private static readonly Guid ActualResultsParticipantId = Guid.Parse("33333333-3333-3333-3333-333333333333");
     private const string ActualResultsPath =

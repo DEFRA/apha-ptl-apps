@@ -755,6 +755,49 @@ public sealed class DistributionRepository(IDbConnectionFactory connectionFactor
         transaction.Commit();
     }
 
+    public async Task<SampleReceiptData?> GetSampleReceiptAsync(
+        Guid distributionParticipantId, Guid monthlyDistributionSchemeId, CancellationToken cancellationToken = default)
+    {
+        using var connection = connectionFactory.CreateConnection();
+        using var results = await connection.QueryMultipleAsync(
+            "EXEC dbo.spgSampleReceipt @DistributionParticipantId = @DistributionParticipantId, @MonthlyDistributionSchemeId = @MonthlyDistributionSchemeId",
+            new { DistributionParticipantId = distributionParticipantId, MonthlyDistributionSchemeId = monthlyDistributionSchemeId });
+
+        var tests = (await results.ReadAsync<SampleReceiptTestEntity>()).ToList();
+        var samples = (await results.ReadAsync<SampleReceiptSampleEntity>()).ToList();
+        var lab = await results.ReadFirstOrDefaultAsync<SampleReceiptLabEntity>();
+        var scheme = await results.ReadFirstOrDefaultAsync<SampleReceiptSchemeEntity>();
+
+        return lab is null || scheme is null ? null : new SampleReceiptData(scheme, lab, tests, samples);
+    }
+
+    public async Task UpdateSampleReceiptAsync(IReadOnlyList<SampleReceiptSampleEntity> samples, CancellationToken cancellationToken = default)
+    {
+        if (samples.Count == 0)
+        {
+            return;
+        }
+
+        using var connection = connectionFactory.CreateConnection();
+        connection.Open();
+        using var transaction = connection.BeginTransaction();
+
+        const string updateSql = """
+            EXEC dbo.spuSampleReceipt
+                @SampleReceiptId = @SampleReceiptId,
+                @SubmissionDate = @SubmissionDate,
+                @NonSubmissionDate = @NonSubmissionDate,
+                @NonCapableDate = @NonCapableDate
+            """;
+
+        foreach (var sample in samples)
+        {
+            await connection.ExecuteAsync(updateSql, sample, transaction);
+        }
+
+        transaction.Commit();
+    }
+
     public async Task<PackagingRawData?> GetPackagingSheetAsync(
         Guid monthlyDistributionId, PackagingMode mode, int week, CancellationToken cancellationToken = default)
     {

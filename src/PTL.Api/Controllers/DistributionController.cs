@@ -126,6 +126,32 @@ public sealed class DistributionController(
         return outcome.Success ? Ok(new ResultsReceiptSaveResult(true)) : NotFound();
     }
 
+    // GET /api/distributions/schemes/{monthlyDistributionSchemeId}/participants/{distributionParticipantId}/sample-receipt -
+    // the Sample Receipt screen, legacy ResultsReceipt.TestCollection.FetchTestCollection(participantId, mdsId).
+    [HttpGet("schemes/{monthlyDistributionSchemeId:guid}/participants/{distributionParticipantId:guid}/sample-receipt")]
+    public async Task<ActionResult<SampleReceiptResponse>> GetSampleReceipt(
+        Guid monthlyDistributionSchemeId, Guid distributionParticipantId, CancellationToken cancellationToken)
+    {
+        var page = await resultsReceiptService.GetSampleReceiptAsync(distributionParticipantId, monthlyDistributionSchemeId, cancellationToken);
+        return page is null ? NotFound() : Ok(ToResponse(page));
+    }
+
+    // PUT /api/distributions/schemes/{monthlyDistributionSchemeId}/participants/{distributionParticipantId}/sample-receipt -
+    // legacy SampleReceipt.aspx ButtonSave_Click / ButtonApply_Click -> TestCollection.Save() (the
+    // save-vs-stay distinction is owned by InternalWeb).
+    [HttpPut("schemes/{monthlyDistributionSchemeId:guid}/participants/{distributionParticipantId:guid}/sample-receipt")]
+    public async Task<ActionResult<SampleReceiptSaveResult>> SaveSampleReceipt(
+        Guid monthlyDistributionSchemeId, Guid distributionParticipantId, [FromBody] SampleReceiptSaveRequest request, CancellationToken cancellationToken)
+    {
+        var updates = request.Samples.Select(s => new SampleReceiptUpdate(s.SampleReceiptId, s.Submitted, s.NotSubmitted, s.NotInRepertoire)).ToList();
+
+        var outcome = await resultsReceiptService.SaveSampleReceiptAsync(distributionParticipantId, monthlyDistributionSchemeId, updates, cancellationToken);
+
+        return outcome.Status == SampleReceiptSaveStatus.NotFound
+            ? NotFound()
+            : Ok(new SampleReceiptSaveResult(outcome.Success, outcome.Status == SampleReceiptSaveStatus.ReadOnly));
+    }
+
     // GET /api/distributions/schemes/{monthlyDistributionSchemeId}/participants/{distributionParticipantId}/actual-results -
     // the Actual Results screen, legacy ActualResultsSet.FetchActualResults(participantId, mdsId).
     [HttpGet("schemes/{monthlyDistributionSchemeId:guid}/participants/{distributionParticipantId:guid}/actual-results")]
@@ -160,6 +186,16 @@ public sealed class DistributionController(
                 outcome.Status == ActualResultsSaveStatus.AuditReasonRequired,
                 outcome.AuditObjectName));
     }
+
+    private static SampleReceiptResponse ToResponse(SampleReceiptPage page) =>
+        new(
+            page.SchemeHeading,
+            page.LabHeading,
+            page.IsReadOnly,
+            [.. page.Tests.Select(t => new SampleReceiptTestResponse(
+                t.TestId,
+                t.TestType,
+                [.. t.Samples.Select(s => new SampleReceiptSampleResponse(s.SampleReceiptId, s.SampleNumber, s.Submitted, s.NotSubmitted, s.NotInRepertoire))]))]);
 
     private static ActualResultsResponse ToResponse(ActualResultsPage page) =>
         new(

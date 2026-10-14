@@ -106,6 +106,8 @@ public partial class ActualResultsRenderTests : IClassFixture<WebApplicationFact
 
     private static string H1(string html) => Text(Regex.Match(html, "<h1[^>]*>(.*?)</h1>", RegexOptions.Singleline).Groups[1].Value);
 
+    private static string H2(string html) => Text(Regex.Match(html, "<h2[^>]*>(.*?)</h2>", RegexOptions.Singleline).Groups[1].Value);
+
     // The whole first-step form, as the browser would post it.
     private static (string Name, string Value)[] FormFields(string sample1Count = "12") =>
     [
@@ -148,8 +150,9 @@ public partial class ActualResultsRenderTests : IClassFixture<WebApplicationFact
 
         var html = await GetHtmlAsync();
 
-        Assert.Contains($"Actual Results - {Heading}", Title(html), StringComparison.Ordinal);
-        Assert.Equal(Heading, H1(html));
+        Assert.Contains($"Results - {Heading}", Title(html), StringComparison.Ordinal);
+        Assert.Equal("Results", H1(html));
+        Assert.Equal(Heading, H2(html));
         var decoded = WebUtility.HtmlDecode(html);
         var first = decoded.IndexOf(">Enter the Test Results below.<", StringComparison.Ordinal);
         var second = decoded.IndexOf(">Tests are divided into Result Items which are tested for each Sample, and Method Items which apply to the Test itself.<", StringComparison.Ordinal);
@@ -171,7 +174,8 @@ public partial class ActualResultsRenderTests : IClassFixture<WebApplicationFact
 
         var html = await GetHtmlAsync();
 
-        Assert.Equal(Heading, H1(html));
+        Assert.Equal("Results", H1(html));
+        Assert.Equal(Heading, H2(html));
         Assert.Contains("The deadline date for these results has passed.", html, StringComparison.Ordinal);
         Assert.DoesNotContain("<form", html, StringComparison.Ordinal);
         Assert.DoesNotContain("<input", html, StringComparison.Ordinal);
@@ -399,7 +403,7 @@ public partial class ActualResultsRenderTests : IClassFixture<WebApplicationFact
         var summary = Regex.Match(html, "<div class=\"govuk-error-summary\".*?</ul>", RegexOptions.Singleline).Value;
         Assert.Contains("Save Failed: No results can be saved after the deadline date.", summary, StringComparison.Ordinal);
         Assert.StartsWith("Error: ", Title(html), StringComparison.Ordinal);
-        Assert.Equal(Heading, H1(html));
+        Assert.Equal("Results", H1(html));
     }
 
     [Fact]

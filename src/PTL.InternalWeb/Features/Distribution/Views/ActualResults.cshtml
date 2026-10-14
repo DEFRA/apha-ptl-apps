@@ -4,7 +4,7 @@
     // same pattern as Features/Distribution/Views/IntendedResults.cshtml.
     ViewData["Title"] = Model.IsAuditStep
         ? $"Audit Trail - {Model.Heading}"
-        : $"Actual Results - {Model.Heading}";
+        : $"Results - {Model.Heading}";
 
     const string saveFailedMessage = "Save Failed: No results can be saved after the deadline date.";
 
@@ -91,7 +91,11 @@
 
 <govuk-error-summary errors="@errors" />
 
-<h1 class="govuk-heading-l">@Model.Heading</h1>
+<h1 class="govuk-heading-l">Results</h1>
+
+<h2 class="govuk-heading-m">@Model.Heading</h2>
+
+<hr class="govuk-section-break govuk-section-break--visible govuk-section-break--m">
 
 @if (Model.IsReadOnly)
 {
@@ -302,7 +306,6 @@
 
     <div class="govuk-button-group">
         <button type="submit" name="command" value="save" class="govuk-button" data-module="govuk-button">Save</button>
-        <button type="submit" name="command" value="apply" class="govuk-button govuk-button--secondary" data-module="govuk-button">Apply</button>
         <button type="submit" name="command" value="cancel" class="govuk-button govuk-button--secondary" data-module="govuk-button" formnovalidate>Cancel</button>
     </div>
 </form>

@@ -73,6 +73,20 @@ public class DistributionBreadcrumbTests : IClassFixture<WebApplicationFactory<P
     }
 
     [Fact]
+    public async Task SampleReceipt_LinksBackToTheResultsReceiptForTheSameMonth()
+    {
+        _apiClient.SampleReceipt = new SampleReceiptResponse("D1 : BT Brucella", "Labcode L001: Lab One", true, []);
+
+        var crumbs = await CrumbsAsync($"/Distribution/SampleReceipt?year=2026&monthId=5&schemeId={Scheme}&participantId={Participant}");
+
+        Assert.Equal(["Home", "Distributions", "Results Receipt", "Submission Status"], crumbs.Select(c => c.Text));
+        Assert.Contains("/Distribution/ResultsReceipt", crumbs[2].Href, StringComparison.Ordinal);
+        Assert.Contains("year=2026", crumbs[2].Href, StringComparison.Ordinal);
+        Assert.Contains("monthId=5", crumbs[2].Href, StringComparison.Ordinal);
+        Assert.Null(crumbs[3].Href);
+    }
+
+    [Fact]
     public async Task Packaging_ShowsSamplePackagingInsteadOfAPlainControllerAndActionCrumb()
     {
         var crumbs = await CrumbsAsync("/Distribution/Packaging?year=2026&monthId=5");

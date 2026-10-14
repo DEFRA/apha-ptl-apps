@@ -319,8 +319,9 @@ public static class SideNavigationProvider
                     LinkQueryKeys = YearMonthKeys,
                     Children =
                     [
-                        // Legacy sitemap title for ActualResults.aspx.
-                        new SideNavigationItem { Text = "Results", ControllerName = DistributionControllerName, ActionName = "ActualResults", IsHidden = true }
+                        // Legacy sitemap titles for ActualResults.aspx and SampleReceipt.aspx.
+                        new SideNavigationItem { Text = "Results", ControllerName = DistributionControllerName, ActionName = "ActualResults", IsHidden = true },
+                        new SideNavigationItem { Text = "Submission Status", ControllerName = DistributionControllerName, ActionName = "SampleReceipt", IsHidden = true }
                     ]
                 }
             ]

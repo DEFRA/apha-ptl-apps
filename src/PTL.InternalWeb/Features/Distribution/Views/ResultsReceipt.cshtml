@@ -109,7 +109,7 @@
                                 var samplesSuffix = participant.HasUnaccountedSamples ? " (Y)" : " (N)";
                                 if (participant.CanViewResults)
                                 {
-                                    <a class="govuk-link" asp-action="ViewStage" asp-route-stage="Sample Receipt">View/Edit<span class="govuk-visually-hidden"> Submission Status for @participant.FullName</span></a>@samplesSuffix
+                                    <a class="govuk-link" asp-action="SampleReceipt" asp-route-year="@Model.YearId" asp-route-monthId="@Model.MonthId" asp-route-schemeId="@scheme.MonthlyDistributionSchemeId" asp-route-participantId="@participant.DistributionParticipantId">View/Edit<span class="govuk-visually-hidden"> Submission Status for @participant.FullName</span></a>@samplesSuffix
                                 }
                                 else
                                 {
@@ -150,7 +150,6 @@
 
     <div class="govuk-button-group noprint">
         <button type="submit" name="command" value="save" class="govuk-button" data-module="govuk-button">Save</button>
-        <button type="submit" name="command" value="apply" class="govuk-button govuk-button--secondary" data-module="govuk-button">Apply</button>
         <button type="submit" name="command" value="cancel" class="govuk-button govuk-button--secondary" data-module="govuk-button" formnovalidate>Cancel</button>
     </div>
 </form>

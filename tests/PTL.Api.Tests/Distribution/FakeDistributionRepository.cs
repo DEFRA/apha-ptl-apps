@@ -138,6 +138,21 @@ internal sealed class FakeDistributionRepository : IDistributionRepository
         return Task.CompletedTask;
     }
 
+    // Keyed by (distributionParticipantId, monthlyDistributionSchemeId); a missing key means "not found" (null).
+    public Dictionary<(Guid ParticipantId, Guid SchemeId), SampleReceiptData> SampleReceipts { get; } = [];
+
+    public List<SampleReceiptSampleEntity> UpdatedSampleReceipts { get; } = [];
+
+    public Task<SampleReceiptData?> GetSampleReceiptAsync(
+        Guid distributionParticipantId, Guid monthlyDistributionSchemeId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(SampleReceipts.GetValueOrDefault((distributionParticipantId, monthlyDistributionSchemeId)));
+
+    public Task UpdateSampleReceiptAsync(IReadOnlyList<SampleReceiptSampleEntity> samples, CancellationToken cancellationToken = default)
+    {
+        UpdatedSampleReceipts.AddRange(samples);
+        return Task.CompletedTask;
+    }
+
     // Keyed by distributionParticipantId; a missing key means "participant not returned" (null).
     public Dictionary<Guid, ActualResultsData> ActualResults { get; } = [];
 

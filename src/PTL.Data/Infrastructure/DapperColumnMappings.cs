@@ -920,6 +920,38 @@ public static class DapperColumnMappings
             ["fldHasUnaccountedSamples"] = nameof(ResultsReceiptSampleStatusEntity.HasUnaccountedSamples),
         });
 
+        Map<SampleReceiptTestEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldTestId"] = nameof(SampleReceiptTestEntity.TestId),
+            ["fldTestType"] = nameof(SampleReceiptTestEntity.TestType),
+        });
+
+        Map<SampleReceiptSampleEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldSampleReceiptId"] = nameof(SampleReceiptSampleEntity.SampleReceiptId),
+            ["fldTestId"] = nameof(SampleReceiptSampleEntity.TestId),
+            ["fldSampleNumber"] = nameof(SampleReceiptSampleEntity.SampleNumber),
+            ["fldSubmissionDate"] = nameof(SampleReceiptSampleEntity.SubmissionDate),
+            ["fldNonSubmissionDate"] = nameof(SampleReceiptSampleEntity.NonSubmissionDate),
+            ["fldNonCapableDate"] = nameof(SampleReceiptSampleEntity.NonCapableDate),
+        });
+
+        Map<SampleReceiptLabEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            [ColLabCode] = nameof(SampleReceiptLabEntity.LabCode),
+            [ColLabName] = nameof(SampleReceiptLabEntity.LabName),
+        });
+
+        Map<SampleReceiptSchemeEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldDistributionReference"] = nameof(SampleReceiptSchemeEntity.DistributionReference),
+            ["fldDistributionReferenceSuffix"] = nameof(SampleReceiptSchemeEntity.DistributionReferenceSuffix),
+            ["fldScheduleCode"] = nameof(SampleReceiptSchemeEntity.ScheduleCode),
+            ["fldIsReadyForAssessor"] = nameof(SampleReceiptSchemeEntity.IsReadyForAssessor),
+            [ColName] = nameof(SampleReceiptSchemeEntity.SchemeName),
+            [ColIdentifier] = nameof(SampleReceiptSchemeEntity.SchemeIdentifier),
+        });
+
         Map<ActualResultsHeaderEntity>(new(StringComparer.OrdinalIgnoreCase)
         {
             ["fldFirstEditDate"] = nameof(ActualResultsHeaderEntity.FirstEditDate),

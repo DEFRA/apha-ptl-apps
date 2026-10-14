@@ -42,6 +42,13 @@ public interface IDistributionApiClient
     Task<ResultsReceiptSaveResult?> SaveResultsReceiptAsync(
         int yearId, int monthId, ResultsReceiptSaveRequest request, CancellationToken cancellationToken = default);
 
+    // Null when the participant or scheme is not found.
+    Task<SampleReceiptResponse?> GetSampleReceiptAsync(
+        Guid monthlyDistributionSchemeId, Guid distributionParticipantId, CancellationToken cancellationToken = default);
+
+    Task<SampleReceiptSaveResult?> SaveSampleReceiptAsync(
+        Guid monthlyDistributionSchemeId, Guid distributionParticipantId, SampleReceiptSaveRequest request, CancellationToken cancellationToken = default);
+
     // Null when the participant is not found.
     Task<ActualResultsResponse?> GetActualResultsAsync(
         Guid monthlyDistributionSchemeId, Guid distributionParticipantId, CancellationToken cancellationToken = default);

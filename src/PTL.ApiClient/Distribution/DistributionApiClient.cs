@@ -173,6 +173,35 @@ public sealed class DistributionApiClient(HttpClient httpClient) : IDistribution
         return await response.Content.ReadFromJsonAsync<ResultsReceiptSaveResult>(cancellationToken);
     }
 
+    public async Task<SampleReceiptResponse?> GetSampleReceiptAsync(
+        Guid monthlyDistributionSchemeId, Guid distributionParticipantId, CancellationToken cancellationToken = default)
+    {
+        var response = await httpClient.GetAsync(
+            new Uri($"/api/distributions/schemes/{monthlyDistributionSchemeId}/participants/{distributionParticipantId}/sample-receipt", UriKind.Relative),
+            cancellationToken);
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<SampleReceiptResponse>(cancellationToken);
+    }
+
+    public async Task<SampleReceiptSaveResult?> SaveSampleReceiptAsync(
+        Guid monthlyDistributionSchemeId, Guid distributionParticipantId, SampleReceiptSaveRequest request, CancellationToken cancellationToken = default)
+    {
+        var response = await httpClient.PutAsJsonAsync(
+            $"/api/distributions/schemes/{monthlyDistributionSchemeId}/participants/{distributionParticipantId}/sample-receipt", request, cancellationToken);
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<SampleReceiptSaveResult>(cancellationToken);
+    }
+
     public async Task<ActualResultsResponse?> GetActualResultsAsync(
         Guid monthlyDistributionSchemeId, Guid distributionParticipantId, CancellationToken cancellationToken = default)
     {

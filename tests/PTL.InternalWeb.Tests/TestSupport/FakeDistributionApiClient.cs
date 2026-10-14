@@ -107,6 +107,21 @@ internal sealed class FakeDistributionApiClient : IDistributionApiClient
         return Task.FromResult(ResultsReceiptSaveResult);
     }
 
+    public SampleReceiptResponse? SampleReceipt { get; set; }
+    public SampleReceiptSaveResult? SampleReceiptSaveResult { get; set; }
+    public List<SampleReceiptSaveRequest> SavedSampleReceiptRequests { get; } = [];
+
+    public Task<SampleReceiptResponse?> GetSampleReceiptAsync(
+        Guid monthlyDistributionSchemeId, Guid distributionParticipantId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(SampleReceipt);
+
+    public Task<SampleReceiptSaveResult?> SaveSampleReceiptAsync(
+        Guid monthlyDistributionSchemeId, Guid distributionParticipantId, SampleReceiptSaveRequest request, CancellationToken cancellationToken = default)
+    {
+        SavedSampleReceiptRequests.Add(request);
+        return Task.FromResult(SampleReceiptSaveResult);
+    }
+
     public ActualResultsResponse? ActualResults { get; set; }
     public ActualResultsSaveResult? ActualResultsSaveResult { get; set; }
     public List<ActualResultsSaveRequest> SavedActualResultsRequests { get; } = [];

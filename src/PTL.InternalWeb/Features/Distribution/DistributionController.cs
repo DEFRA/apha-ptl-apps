@@ -259,6 +259,78 @@ public sealed class DistributionController(IDistributionApiClient distributionAp
             : RedirectToAction(nameof(Index));
     }
 
+    // Sample Receipt - legacy Internal User/SampleReceipt.aspx (sitemap "Submission Status"). Reached
+    // from the Results Receipt screen's per-participant Submission Status "View/Edit" link; year/monthId
+    // are carried through purely so Save, Cancel and Back return to the Results Receipt screen.
+    [HttpGet]
+    public async Task<IActionResult> SampleReceipt(int year, int monthId, Guid schemeId, Guid participantId, CancellationToken cancellationToken)
+    {
+        var page = await distributionApiClient.GetSampleReceiptAsync(schemeId, participantId, cancellationToken);
+        return page is null ? NotFound() : View(ToSampleReceiptViewModel(year, monthId, schemeId, participantId, page));
+    }
+
+    // Save = persist then return to Results Receipt (legacy ButtonSave_Click -> LeavePage()).
+    // Apply = persist then stay (legacy ButtonApply_Click). Cancel = discard, no save.
+    // Every sample posts several fields, so a large page exceeds the 1,024-value default.
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    [RequestFormLimits(ValueCountLimit = 20000)]
+    public async Task<IActionResult> SampleReceipt(
+        int year, int monthId, Guid schemeId, Guid participantId, SampleReceiptViewModel model, string command, CancellationToken cancellationToken)
+    {
+        if (string.Equals(command, CancelCommand, StringComparison.OrdinalIgnoreCase))
+        {
+            return RedirectToAction(nameof(ResultsReceipt), new { year, monthId });
+        }
+
+        var request = new SampleReceiptSaveRequest(
+            [.. model.Tests.SelectMany(t => t.Samples)
+                .Select(s => new SampleReceiptSampleUpdateRequest(s.SampleReceiptId, s.Submitted, s.NotSubmitted, s.NotInRepertoire))]);
+
+        var result = await distributionApiClient.SaveSampleReceiptAsync(schemeId, participantId, request, cancellationToken);
+
+        if (result is null || !result.Success)
+        {
+            TempData.SetNotification(
+                NotificationType.Error,
+                result is { ReadOnly: true }
+                    ? "Submission Status can no longer be changed."
+                    : "Submission Status could not be saved. Please try again later.");
+            return RedirectToAction(nameof(SampleReceipt), new { year, monthId, schemeId, participantId });
+        }
+
+        TempData.SetNotification(NotificationType.Success, "Submission Status updated successfully.");
+
+        return string.Equals(command, ApplyCommand, StringComparison.OrdinalIgnoreCase)
+            ? RedirectToAction(nameof(SampleReceipt), new { year, monthId, schemeId, participantId })
+            : RedirectToAction(nameof(ResultsReceipt), new { year, monthId });
+    }
+
+    private static SampleReceiptViewModel ToSampleReceiptViewModel(int year, int monthId, Guid schemeId, Guid participantId, SampleReceiptResponse page) =>
+        new()
+        {
+            YearId = year,
+            MonthId = monthId,
+            MonthlyDistributionSchemeId = schemeId,
+            DistributionParticipantId = participantId,
+            SchemeHeading = page.SchemeHeading,
+            LabHeading = page.LabHeading,
+            IsReadOnly = page.IsReadOnly,
+            Tests = [.. page.Tests.Select(t => new SampleReceiptTestViewModel
+            {
+                TestId = t.TestId,
+                TestType = t.TestType,
+                Samples = [.. t.Samples.Select(s => new SampleReceiptSampleViewModel
+                {
+                    SampleReceiptId = s.SampleReceiptId,
+                    SampleNumber = s.SampleNumber,
+                    Submitted = s.Submitted,
+                    NotSubmitted = s.NotSubmitted,
+                    NotInRepertoire = s.NotInRepertoire,
+                })],
+            })],
+        };
+
     // Actual Results - legacy Internal User/ActualResults.aspx. Reached from the Results Receipt
     // screen's per-participant Results "View/Edit" link; year/monthId are carried through purely so
     // Save and Cancel can return to the Results Receipt screen the user came from.

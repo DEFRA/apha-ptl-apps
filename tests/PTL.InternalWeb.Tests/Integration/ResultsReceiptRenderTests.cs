@@ -136,7 +136,9 @@ public partial class ResultsReceiptRenderTests : IClassFixture<WebApplicationFac
         Assert.Contains($"schemeId={SchemeA}", cells[5], StringComparison.Ordinal);
         Assert.DoesNotContain("ptl-link-disabled", cells[5], StringComparison.Ordinal);
         Assert.Contains("href=", cells[6], StringComparison.Ordinal);
-        Assert.Contains("Sample%20Receipt", cells[6], StringComparison.Ordinal);
+        Assert.Contains("/Distribution/SampleReceipt", cells[6], StringComparison.Ordinal);
+        Assert.Contains($"participantId={Posted}", cells[6], StringComparison.Ordinal);
+        Assert.Contains($"schemeId={SchemeA}", cells[6], StringComparison.Ordinal);
         Assert.EndsWith("(Y)", Text(cells[6]), StringComparison.Ordinal);
         Assert.Equal("05/05/2026", Text(cells[7]));
         Assert.DoesNotContain("type=\"checkbox\"", cells[7], StringComparison.Ordinal);

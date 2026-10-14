@@ -1,0 +1,170 @@
+@using PTL.InternalWeb.Features.Distribution
+@model PTL.InternalWeb.Features.Distribution.SampleReceiptViewModel
+@{
+    ViewData["Title"] = $"Submission Status - {Model.SchemeHeading}";
+
+    // Legacy label text, including its "reportoire" spelling.
+    const string submittedLabel = "Submitted";
+    const string notSubmittedLabel = "Not submitted";
+    const string notInRepertoireLabel = "Not in reportoire";
+
+    string StatusOf(SampleReceiptSampleViewModel sample) =>
+        sample.Submitted ? submittedLabel
+        : sample.NotSubmitted ? notSubmittedLabel
+        : sample.NotInRepertoire ? notInRepertoireLabel
+        : string.Empty;
+}
+
+<a class="govuk-back-link" asp-action="ResultsReceipt" asp-route-year="@Model.YearId" asp-route-monthId="@Model.MonthId">Back</a>
+
+<h1 class="govuk-heading-l">Submission Status</h1>
+
+<h2 class="govuk-heading-m">@Model.SchemeHeading</h2>
+
+<h2 class="govuk-heading-m">@Model.LabHeading</h2>
+
+<hr class="govuk-section-break govuk-section-break--visible govuk-section-break--m">
+
+@if (Model.Tests.Count == 0)
+{
+    <p class="govuk-body">There are no samples allocated to tests for this distribution.</p>
+
+    <a class="govuk-button govuk-button--secondary" role="button" draggable="false" data-module="govuk-button" asp-action="ResultsReceipt" asp-route-year="@Model.YearId" asp-route-monthId="@Model.MonthId">Back</a>
+
+    return;
+}
+
+@if (Model.IsReadOnly)
+{
+    <div class="govuk-inset-text">The samples can no longer be changed because the results are ready for the assessor.</div>
+
+    @foreach (var test in Model.Tests)
+    {
+        <h2 class="govuk-heading-m">@test.TestType</h2>
+
+        <table class="govuk-table">
+            <caption class="govuk-table__caption govuk-visually-hidden">Submission Status for @test.TestType</caption>
+            <thead class="govuk-table__head">
+                <tr class="govuk-table__row">
+                    <th scope="col" class="govuk-table__header">Sample</th>
+                    <th scope="col" class="govuk-table__header">Status</th>
+                </tr>
+            </thead>
+            <tbody class="govuk-table__body">
+                @foreach (var sample in test.Samples)
+                {
+                    var status = StatusOf(sample);
+                    <tr class="govuk-table__row">
+                        <th scope="row" class="govuk-table__header">Sample: @sample.SampleNumber</th>
+                        <td class="govuk-table__cell">
+                            @if (string.IsNullOrEmpty(status))
+                            {
+                                <span class="govuk-visually-hidden">No status recorded</span>
+                            }
+                            else
+                            {
+                                @status
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+
+    <a class="govuk-button govuk-button--secondary" role="button" draggable="false" data-module="govuk-button" asp-action="ResultsReceipt" asp-route-year="@Model.YearId" asp-route-monthId="@Model.MonthId">Back</a>
+
+    return;
+}
+
+<form method="post" asp-action="SampleReceipt" asp-route-year="@Model.YearId" asp-route-monthId="@Model.MonthId" asp-route-schemeId="@Model.MonthlyDistributionSchemeId" asp-route-participantId="@Model.DistributionParticipantId" id="sample-receipt-form">
+    @Html.AntiForgeryToken()
+
+    @for (var t = 0; t < Model.Tests.Count; t++)
+    {
+        var test = Model.Tests[t];
+
+        <h2 class="govuk-heading-m">@test.TestType</h2>
+
+        <table class="govuk-table">
+            <caption class="govuk-table__caption govuk-visually-hidden">Submission Status for @test.TestType</caption>
+            <thead class="govuk-table__head">
+                <tr class="govuk-table__row">
+                    <th scope="col" class="govuk-table__header">Sample</th>
+                    <th scope="col" class="govuk-table__header">@submittedLabel</th>
+                    <th scope="col" class="govuk-table__header">@notSubmittedLabel</th>
+                    <th scope="col" class="govuk-table__header">@notInRepertoireLabel</th>
+                </tr>
+            </thead>
+            <tbody class="govuk-table__body">
+                @for (var s = 0; s < test.Samples.Count; s++)
+                {
+                    var sample = test.Samples[s];
+                    var submittedId = Html.IdFor(m => m.Tests[t].Samples[s].Submitted);
+                    var notSubmittedId = Html.IdFor(m => m.Tests[t].Samples[s].NotSubmitted);
+                    var notInRepertoireId = Html.IdFor(m => m.Tests[t].Samples[s].NotInRepertoire);
+
+                    <tr class="govuk-table__row">
+                        <th scope="row" class="govuk-table__header govuk-!-font-weight-regular">
+                            <input type="hidden" asp-for="Tests[t].Samples[s].SampleReceiptId" />
+                            Sample: @sample.SampleNumber
+                        </th>
+                        <td class="govuk-table__cell">
+                            <div class="govuk-checkboxes govuk-checkboxes--small" data-module="govuk-checkboxes">
+                                <div class="govuk-checkboxes__item">
+                                    <input class="govuk-checkboxes__input ptl-sample-receipt-tick" type="checkbox" id="@submittedId" asp-for="Tests[t].Samples[s].Submitted" />
+                                    <label class="govuk-label govuk-checkboxes__label" for="@submittedId">
+                                        <span class="govuk-visually-hidden">@submittedLabel for sample @sample.SampleNumber</span>
+                                    </label>
+                                </div>
+                            </div>
+                        </td>
+                        <td class="govuk-table__cell">
+                            <div class="govuk-checkboxes govuk-checkboxes--small" data-module="govuk-checkboxes">
+                                <div class="govuk-checkboxes__item">
+                                    <input class="govuk-checkboxes__input ptl-sample-receipt-tick" type="checkbox" id="@notSubmittedId" asp-for="Tests[t].Samples[s].NotSubmitted" />
+                                    <label class="govuk-label govuk-checkboxes__label" for="@notSubmittedId">
+                                        <span class="govuk-visually-hidden">@notSubmittedLabel for sample @sample.SampleNumber</span>
+                                    </label>
+                                </div>
+                            </div>
+                        </td>
+                        <td class="govuk-table__cell">
+                            <div class="govuk-checkboxes govuk-checkboxes--small" data-module="govuk-checkboxes">
+                                <div class="govuk-checkboxes__item">
+                                    <input class="govuk-checkboxes__input ptl-sample-receipt-tick" type="checkbox" id="@notInRepertoireId" asp-for="Tests[t].Samples[s].NotInRepertoire" />
+                                    <label class="govuk-label govuk-checkboxes__label" for="@notInRepertoireId">
+                                        <span class="govuk-visually-hidden">@notInRepertoireLabel for sample @sample.SampleNumber</span>
+                                    </label>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+
+    <div class="govuk-button-group">
+        <button type="submit" name="command" value="save" class="govuk-button" data-module="govuk-button">Save</button>
+        <button type="submit" name="command" value="cancel" class="govuk-button govuk-button--secondary" data-module="govuk-button" formnovalidate>Cancel</button>
+    </div>
+</form>
+
+@* Legacy ticks are mutually exclusive: ticking one clears the other two in the row. The server applies
+   the same rule on save, so the page still works without JavaScript. *@
+<script>
+    document.querySelectorAll('.ptl-sample-receipt-tick').forEach(function (tick) {
+        tick.addEventListener('change', function () {
+            if (!tick.checked) {
+                return;
+            }
+
+            tick.closest('tr').querySelectorAll('.ptl-sample-receipt-tick').forEach(function (other) {
+                if (other !== tick) {
+                    other.checked = false;
+                }
+            });
+        });
+    });
+</script>
