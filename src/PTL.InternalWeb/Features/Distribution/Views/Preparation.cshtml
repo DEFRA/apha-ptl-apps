@@ -59,7 +59,7 @@
                             }
                             <div class="govuk-checkboxes govuk-checkboxes--small" data-module="govuk-checkboxes">
                                 <div class="govuk-checkboxes__item">
-                                    <input class="govuk-checkboxes__input ptl-preparation-print-checkbox" type="checkbox" asp-for="Schemes[i].Selected" />
+                                    <input class="govuk-checkboxes__input ptl-preparation-print-checkbox" type="checkbox" id="@printId" asp-for="Schemes[i].Selected" />
                                     <label class="govuk-label govuk-checkboxes__label" for="@printId">
                                         <span class="govuk-visually-hidden">Select @scheme.SchemeHeading for printing</span>
                                     </label>
@@ -105,7 +105,7 @@
                                     var diaryEntryId = Html.IdFor(m => m.Schemes[i].DiaryEntryChecked);
                                     <div class="govuk-checkboxes govuk-checkboxes--small noprint" data-module="govuk-checkboxes">
                                         <div class="govuk-checkboxes__item">
-                                            <input class="govuk-checkboxes__input" type="checkbox" asp-for="Schemes[i].DiaryEntryChecked" />
+                                            <input class="govuk-checkboxes__input" type="checkbox" id="@diaryEntryId" asp-for="Schemes[i].DiaryEntryChecked" />
                                             <label class="govuk-label govuk-checkboxes__label" for="@diaryEntryId">
                                                 <span class="govuk-visually-hidden">Mark Diary Entry Started for @scheme.SchemeHeading</span>
                                             </label>
@@ -123,7 +123,7 @@
                                     var prepStartId = Html.IdFor(m => m.Schemes[i].PrepStartChecked);
                                     <div class="govuk-checkboxes govuk-checkboxes--small noprint" data-module="govuk-checkboxes">
                                         <div class="govuk-checkboxes__item">
-                                            <input class="govuk-checkboxes__input" type="checkbox" asp-for="Schemes[i].PrepStartChecked" />
+                                            <input class="govuk-checkboxes__input" type="checkbox" id="@prepStartId" asp-for="Schemes[i].PrepStartChecked" />
                                             <label class="govuk-label govuk-checkboxes__label" for="@prepStartId">
                                                 <span class="govuk-visually-hidden">Mark Prep Started for @scheme.SchemeHeading</span>
                                             </label>
@@ -141,7 +141,7 @@
                                     var prepCompleteId = Html.IdFor(m => m.Schemes[i].PrepCompleteChecked);
                                     <div class="govuk-checkboxes govuk-checkboxes--small noprint" data-module="govuk-checkboxes">
                                         <div class="govuk-checkboxes__item">
-                                            <input class="govuk-checkboxes__input" type="checkbox" asp-for="Schemes[i].PrepCompleteChecked" />
+                                            <input class="govuk-checkboxes__input" type="checkbox" id="@prepCompleteId" asp-for="Schemes[i].PrepCompleteChecked" />
                                             <label class="govuk-label govuk-checkboxes__label" for="@prepCompleteId">
                                                 <span class="govuk-visually-hidden">Mark Prep Completed for @scheme.SchemeHeading</span>
                                             </label>

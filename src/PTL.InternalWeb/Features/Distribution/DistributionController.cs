@@ -23,6 +23,7 @@ namespace PTL.InternalWeb.Features.Distribution;
 public sealed class DistributionController(IDistributionApiClient distributionApiClient) : Controller
 {
     private static readonly string[] MonthOrder = ["Scheduling", "Preparation", "Packaging", "Results", "Tabulations"];
+    private const string CancelCommand = "cancel";
 
     [HttpGet]
     public async Task<IActionResult> Index(int? year, CancellationToken cancellationToken)
@@ -91,7 +92,7 @@ public sealed class DistributionController(IDistributionApiClient distributionAp
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Schedule(int year, int monthId, MonthlyDistributionScheduleViewModel model, string command, CancellationToken cancellationToken)
     {
-        if (string.Equals(command, "cancel", StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(command, CancelCommand, StringComparison.OrdinalIgnoreCase))
         {
             return RedirectToAction(nameof(Index));
         }
@@ -185,7 +186,7 @@ public sealed class DistributionController(IDistributionApiClient distributionAp
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Preparation(int year, int monthId, PreparationViewModel model, string command, CancellationToken cancellationToken)
     {
-        if (string.Equals(command, "cancel", StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(command, CancelCommand, StringComparison.OrdinalIgnoreCase))
         {
             return RedirectToAction(nameof(Index));
         }
@@ -251,7 +252,7 @@ public sealed class DistributionController(IDistributionApiClient distributionAp
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> SampleNumbers(int year, int monthId, Guid schemeId, SampleNumbersViewModel model, string command, CancellationToken cancellationToken)
     {
-        if (string.Equals(command, "cancel", StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(command, CancelCommand, StringComparison.OrdinalIgnoreCase))
         {
             return RedirectToAction(nameof(Schedule), new { year, monthId });
         }
@@ -452,7 +453,7 @@ public sealed class DistributionController(IDistributionApiClient distributionAp
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> IntendedResults(int year, int monthId, Guid schemeId, IntendedResultsViewModel model, string command, CancellationToken cancellationToken)
     {
-        if (string.Equals(command, "cancel", StringComparison.OrdinalIgnoreCase) ||
+        if (string.Equals(command, CancelCommand, StringComparison.OrdinalIgnoreCase) ||
             string.Equals(command, "cancelAudit", StringComparison.OrdinalIgnoreCase))
         {
             return RedirectToAction(nameof(Schedule), new { year, monthId });
