@@ -118,6 +118,13 @@
     text-align: left;
 }
 
+/* Chromium double-renders the collapsed border where thead meets tbody, making that line look
+   thicker than the rest of the grid - dropping the header cells' own bottom border leaves the
+   body row's top border as the single 1px line, matching the rest of the table. */
+.ptl-worksheet .tblSampleInstruction thead .cellSampleInstruction {
+    border-bottom: none;
+}
+
 .cellWorkSheetAddress {
     width: 50%;
     vertical-align: top;
