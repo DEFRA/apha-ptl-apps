@@ -6,6 +6,7 @@ using PTL.Api.Infrastructure;
 using PTL.Common.Correlation;
 using PTL.Common.Health;
 using PTL.Core.AdministrationCharge;
+using PTL.Core.CategoryItemType;
 using PTL.Core.Contract;
 using PTL.Core.Contract.Export.Bulk;
 using PTL.Core.Contract.Export.Templates;
@@ -15,6 +16,7 @@ using PTL.Core.Contract.Renew;
 using PTL.Core.Contract.Renewal;
 using PTL.Core.Contract.SampleAddress;
 using PTL.Core.Country;
+using PTL.Core.CriterionItemType;
 using PTL.Core.Customer;
 using PTL.Core.Distribution;
 using PTL.Core.ExternalSiteMessage;
@@ -29,10 +31,12 @@ using PTL.Core.PostagePricingPlan;
 using PTL.Core.Scheme;
 using PTL.Core.SystemMessage;
 using PTL.Core.TestConsultant;
+using PTL.Core.TestType;
 using PTL.Core.User;
 using PTL.Core.Viewer;
 using PTL.Core.WeightedPricingPlan;
 using PTL.Data.AdministrationCharge;
+using PTL.Data.CategoryItemType;
 using PTL.Data.Contract;
 using PTL.Data.Contract.Export;
 using PTL.Data.Contract.ImportPermit;
@@ -41,6 +45,7 @@ using PTL.Data.Contract.Renew;
 using PTL.Data.Contract.Renewal;
 using PTL.Data.Contract.SampleAddress;
 using PTL.Data.Country;
+using PTL.Data.CriterionItemType;
 using PTL.Data.Customer;
 using PTL.Data.Distribution;
 using PTL.Data.ExternalSiteMessage;
@@ -56,6 +61,7 @@ using PTL.Data.Scheme;
 using PTL.Data.Storage;
 using PTL.Data.SystemMessage;
 using PTL.Data.TestConsultant;
+using PTL.Data.TestType;
 using PTL.Data.User;
 using PTL.Data.Viewer;
 using PTL.Data.WeightedPricingPlan;
@@ -197,6 +203,15 @@ builder.Services.AddScoped<IPostagePricingPlanService, PostagePricingPlanService
 
 builder.Services.AddScoped<ICountryRepository, CountryRepository>();
 builder.Services.AddScoped<ICountryService, CountryService>();
+
+builder.Services.AddScoped<ICategoryItemTypeRepository, CategoryItemTypeRepository>();
+builder.Services.AddScoped<ICategoryItemTypeService, CategoryItemTypeService>();
+
+builder.Services.AddScoped<ITestTypeRepository, TestTypeRepository>();
+builder.Services.AddScoped<ITestTypeService, TestTypeService>();
+
+builder.Services.AddScoped<ICriterionItemTypeRepository, CriterionItemTypeRepository>();
+builder.Services.AddScoped<ICriterionItemTypeService, CriterionItemTypeService>();
 
 builder.Services.AddScoped<IExternalSiteMessageRepository, ExternalSiteMessageRepository>();
 builder.Services.AddScoped<IExternalSiteMessageService, ExternalSiteMessageService>();

@@ -256,11 +256,11 @@ public static class SideNavigationProvider
                     ]
                 },
                 Disabled("Search"),
-                Disabled("Test Types"),
+                new SideNavigationItem { Text = "Test Types", ControllerName = "SchemeAdmin", ActionName = "TestType" },
                 Disabled("Test Result Items"),
                 Disabled("Test Method Items"),
-                Disabled("Category Items"),
-                Disabled("Criterion Items")
+                new SideNavigationItem { Text = "Category Items", ControllerName = "SchemeAdmin", ActionName = "CategoryItemType" },
+                new SideNavigationItem { Text = "Criterion Items", ControllerName = "SchemeAdmin", ActionName = "CriterionItemType" }
             ]
         },
         new SideNavigationItem
