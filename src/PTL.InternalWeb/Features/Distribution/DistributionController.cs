@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using PTL.ApiClient.Distribution;
 using PTL.Contracts.Distribution;
+using PTL.InternalWeb.Navigation;
 using PTL.SharedUI.Notifications;
 
 namespace PTL.InternalWeb.Features.Distribution;
@@ -160,6 +161,7 @@ public sealed class DistributionController(IDistributionApiClient distributionAp
 #pragma warning restore S6967
     {
         ModelState.Clear();
+        ViewData[BreadcrumbRouteValues.Action] = nameof(Schedule);
         var row = model.Schemes.FirstOrDefault(s => s.MonthlyDistributionSchemeId == schemeId);
         if (row is not null)
         {
@@ -1252,6 +1254,7 @@ public sealed class DistributionController(IDistributionApiClient distributionAp
     public async Task<IActionResult> ChangeDeadline(
         int year, int monthId, Guid schemeId, Guid participantId, DistributionParticipantsViewModel model, CancellationToken cancellationToken)
     {
+        ViewData[BreadcrumbRouteValues.Action] = nameof(Participants);
         if (!ModelState.IsValid)
         {
             return View(nameof(Participants), await RehydrateParticipantsAsync(year, monthId, schemeId, model, cancellationToken));
@@ -1294,6 +1297,7 @@ public sealed class DistributionController(IDistributionApiClient distributionAp
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> RepeatDistribution(int year, int monthId, Guid schemeId, DistributionParticipantsViewModel model, CancellationToken cancellationToken)
     {
+        ViewData[BreadcrumbRouteValues.Action] = nameof(Participants);
         if (!ModelState.IsValid)
         {
             return View(nameof(Participants), await RehydrateParticipantsAsync(year, monthId, schemeId, model, cancellationToken));

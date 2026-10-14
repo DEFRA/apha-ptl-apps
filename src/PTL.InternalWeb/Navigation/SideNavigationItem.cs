@@ -22,4 +22,8 @@ public sealed class SideNavigationItem
     // LinkRouteValueKey names the ambient value that supplies it (see BreadcrumbRouteValues).
     public string? LinkRouteParameter { get; init; }
     public string? LinkRouteValueKey { get; init; }
+
+    // Request values (query string or route) copied onto this node's breadcrumb link - e.g. a
+    // Distribution month page needs year and monthId. If any is absent the crumb renders as plain text.
+    public IReadOnlyList<string> LinkQueryKeys { get; init; } = [];
 }
