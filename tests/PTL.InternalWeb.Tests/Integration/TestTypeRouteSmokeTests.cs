@@ -53,8 +53,8 @@ public partial class TestTypeRouteSmokeTests : IClassFixture<WebApplicationFacto
         var body = await response.Content.ReadAsStringAsync();
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.Contains("Test Type Name", body, StringComparison.Ordinal);
-        Assert.Contains("No Longer in Use", body, StringComparison.Ordinal);
+        Assert.Contains("Test type name", body, StringComparison.Ordinal);
+        Assert.Contains("No longer in use", body, StringComparison.Ordinal);
         Assert.Contains("Actions", body, StringComparison.Ordinal);
         Assert.Contains("Chemical", body, StringComparison.Ordinal);
     }
@@ -202,6 +202,37 @@ public partial class TestTypeRouteSmokeTests : IClassFixture<WebApplicationFacto
         Assert.Equal(2, _fakeApiClient.AllNoLongerInUseRequests.Count);
         Assert.True(_fakeApiClient.AllNoLongerInUseRequests.Single(r => r.TestTypeId == tickedId).Request.NoLongerInUse);
         Assert.False(_fakeApiClient.AllNoLongerInUseRequests.Single(r => r.TestTypeId == untickedId).Request.NoLongerInUse);
+    }
+
+    // Locks in the error-summary anchor fix - see CategoryItemTypeSave_MissingName_... remarks.
+    [Fact]
+    public async Task TestTypeSave_MissingName_RendersErrorSummaryWithMatchingAnchor()
+    {
+        var itemId = Guid.NewGuid();
+        _fakeApiClient.Items = [new TestTypeResponse(itemId, Guid.NewGuid(), "Chemical", CurrentYearId, 9999, false, 0, string.Empty)];
+        var client = _factory.CreateClient();
+        var (token, cookie) = await GetAntiforgeryAsync(client, "/SchemeAdmin/TestType?yearId=" + CurrentYearId);
+
+        var request = new HttpRequestMessage(HttpMethod.Post, "/SchemeAdmin/TestTypeSave")
+        {
+            Content = new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["__RequestVerificationToken"] = token,
+                ["yearId"] = CurrentYearId.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                ["page"] = "1",
+                ["Edit.TestTypeId"] = itemId.ToString(),
+                ["Edit.Name"] = string.Empty
+            })
+        };
+        request.Headers.Add("Cookie", cookie);
+
+        var response = await client.SendAsync(request);
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("govuk-error-summary", body, StringComparison.Ordinal);
+        Assert.Contains("href=\"#Edit_Name\"", body, StringComparison.Ordinal);
+        Assert.Contains("id=\"Edit_Name\"", body, StringComparison.Ordinal);
     }
 
     private static async Task<(string Token, string Cookie)> GetAntiforgeryAsync(HttpClient client, string url)

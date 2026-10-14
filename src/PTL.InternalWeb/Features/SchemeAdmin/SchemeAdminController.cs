@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using PTL.ApiClient;
 using PTL.Contracts.CategoryItemType;
+using PTL.Contracts.CriterionItemType;
 using PTL.Contracts.Lookup;
 using PTL.Contracts.TestType;
 
@@ -9,7 +10,7 @@ namespace PTL.InternalWeb.Features.SchemeAdmin;
 
 // Authentication/authorization are out of scope for this phase - same convention as
 // Features/Scheme/SchemeController.cs, which this "Manage Schemes" sub-area sits alongside.
-public class SchemeAdminController(ICategoryItemTypeApiClient categoryItemTypeApiClient, ITestTypeApiClient testTypeApiClient, ILookupApiClient lookupApiClient, ILogger<SchemeAdminController> logger) : Controller
+public class SchemeAdminController(ICategoryItemTypeApiClient categoryItemTypeApiClient, ITestTypeApiClient testTypeApiClient, ICriterionItemTypeApiClient criterionItemTypeApiClient, ILookupApiClient lookupApiClient, ILogger<SchemeAdminController> logger) : Controller
 {
     private static readonly Action<ILogger, Guid, Exception?> LogCategoryItemTypeRemoveBlockedMessage =
         LoggerMessage.Define<Guid>(
@@ -22,6 +23,21 @@ public class SchemeAdminController(ICategoryItemTypeApiClient categoryItemTypeAp
             LogLevel.Information,
             new EventId(2, nameof(LogTestTypeRemoveBlockedMessage)),
             "Test type {TestTypeId} removal was blocked: still in use");
+
+    private static readonly Action<ILogger, Guid, Exception?> LogCriterionItemTypeRemoveBlockedMessage =
+        LoggerMessage.Define<Guid>(
+            LogLevel.Information,
+            new EventId(3, nameof(LogCriterionItemTypeRemoveBlockedMessage)),
+            "Criterion item type {CriterionItemTypeId} removal was blocked: still in use");
+
+    private const string NoLongerInUseSaveFailedMessage = "Could not save all 'No Longer in Use' changes because the service did not respond. Please try again.";
+
+    // Distinguishes a genuine downstream API failure (e.g. the API process stopped mid-request,
+    // surfacing as HttpRequestException/TaskCanceledException/IOException) from the caller's own
+    // request being aborted (requestAborted already cancelled), which should propagate normally
+    // rather than trying to render a now-pointless response.
+    private static bool IsTransientApiFailure(Exception ex, CancellationToken requestAborted) =>
+        !requestAborted.IsCancellationRequested && ex is HttpRequestException or TaskCanceledException or IOException;
 
     public async Task<IActionResult> CategoryItemType(int? yearId, Guid? editId, Guid? removeConfirmId, int page = 1, CancellationToken cancellationToken = default) =>
         View(await BuildCategoryItemTypeViewModelAsync(yearId, editId, page, message: null, messageIsError: false, addValues: null, editValues: null, cancellationToken, removeConfirmId));
@@ -97,9 +113,16 @@ public class SchemeAdminController(ICategoryItemTypeApiClient categoryItemTypeAp
     public async Task<IActionResult> CategoryItemTypeSaveAllNoLongerInUse(List<Guid>? pageCategoryItemTypeIds, List<Guid>? checkedCategoryItemTypeIds, int yearId, int page, CancellationToken cancellationToken)
     {
         var checkedIds = checkedCategoryItemTypeIds ?? [];
-        foreach (var id in pageCategoryItemTypeIds ?? [])
+        try
         {
-            await categoryItemTypeApiClient.SetNoLongerInUseAsync(id, new CategoryItemTypeNoLongerInUseRequest(checkedIds.Contains(id), yearId), cancellationToken);
+            foreach (var id in pageCategoryItemTypeIds ?? [])
+            {
+                await categoryItemTypeApiClient.SetNoLongerInUseAsync(id, new CategoryItemTypeNoLongerInUseRequest(checkedIds.Contains(id), yearId), cancellationToken);
+            }
+        }
+        catch (Exception ex) when (IsTransientApiFailure(ex, cancellationToken))
+        {
+            return View(nameof(CategoryItemType), await BuildCategoryItemTypeViewModelAsync(yearId, editId: null, page, NoLongerInUseSaveFailedMessage, messageIsError: true, addValues: null, editValues: null, cancellationToken));
         }
 
         return RedirectToAction(nameof(CategoryItemType), new { yearId, page });
@@ -174,7 +197,10 @@ public class SchemeAdminController(ICategoryItemTypeApiClient categoryItemTypeAp
         return new CategoryItemTypeViewModel
         {
             SelectedYearId = selectedYearId,
-            YearOptions = years.Select(y => new SelectListItem(y.Year, y.YearId.ToString())),
+            // Legacy's DropDownListYear.Items.Add(CurrentYearId) shows the plain year ("2026"),
+            // not the shared Year lookup's financial-year label ("2026/27") used elsewhere (e.g.
+            // Contract/PostagePricingPlan) - this dropdown only ever needs the YearId anyway.
+            YearOptions = years.Select(y => new SelectListItem(y.YearId.ToString(System.Globalization.CultureInfo.InvariantCulture), y.YearId.ToString(System.Globalization.CultureInfo.InvariantCulture))),
             Rows = rows,
             Page = currentPage,
             TotalRecords = sortedItems.Count,
@@ -276,9 +302,16 @@ public class SchemeAdminController(ICategoryItemTypeApiClient categoryItemTypeAp
     public async Task<IActionResult> TestTypeSaveAllNoLongerInUse(List<Guid>? pageTestTypeIds, List<Guid>? checkedTestTypeIds, int yearId, int page, CancellationToken cancellationToken)
     {
         var checkedIds = checkedTestTypeIds ?? [];
-        foreach (var id in pageTestTypeIds ?? [])
+        try
         {
-            await testTypeApiClient.SetNoLongerInUseAsync(id, new TestTypeNoLongerInUseRequest(checkedIds.Contains(id), yearId), cancellationToken);
+            foreach (var id in pageTestTypeIds ?? [])
+            {
+                await testTypeApiClient.SetNoLongerInUseAsync(id, new TestTypeNoLongerInUseRequest(checkedIds.Contains(id), yearId), cancellationToken);
+            }
+        }
+        catch (Exception ex) when (IsTransientApiFailure(ex, cancellationToken))
+        {
+            return View(nameof(TestType), await BuildTestTypeViewModelAsync(yearId, editId: null, page, NoLongerInUseSaveFailedMessage, messageIsError: true, addValues: null, editValues: null, cancellationToken));
         }
 
         return RedirectToAction(nameof(TestType), new { yearId, page });
@@ -350,7 +383,9 @@ public class SchemeAdminController(ICategoryItemTypeApiClient categoryItemTypeAp
         return new TestTypeViewModel
         {
             SelectedYearId = selectedYearId,
-            YearOptions = years.Select(y => new SelectListItem(y.Year, y.YearId.ToString())),
+            // See CategoryItemTypeViewModel's YearOptions remarks: plain year, not the shared
+            // financial-year label.
+            YearOptions = years.Select(y => new SelectListItem(y.YearId.ToString(System.Globalization.CultureInfo.InvariantCulture), y.YearId.ToString(System.Globalization.CultureInfo.InvariantCulture))),
             Rows = rows,
             Page = currentPage,
             TotalRecords = sortedItems.Count,
@@ -366,4 +401,174 @@ public class SchemeAdminController(ICategoryItemTypeApiClient categoryItemTypeAp
         item.ForeignInstances == -1
             ? $"This Test is being used on a distribution and cannot be {action}. It is also being used on the following Scheme(s): {item.ForeignInstancesString}"
             : $"This Test is being used on {item.ForeignInstances} Scheme(s): {item.ForeignInstancesString} and cannot be {action}.";
+
+    public async Task<IActionResult> CriterionItemType(int? yearId, Guid? editId, Guid? removeConfirmId, int page = 1, CancellationToken cancellationToken = default) =>
+        View(await BuildCriterionItemTypeViewModelAsync(yearId, editId, page, message: null, messageIsError: false, addValues: null, editValues: null, cancellationToken, removeConfirmId));
+
+    // Matches legacy ButtonAdd_Click - Name is required; the new item always starts in whichever
+    // year is currently selected in the dropdown.
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> CriterionItemTypeAdd([Bind(Prefix = "Add")] CriterionItemTypeAddViewModel model, int yearId, int page, CancellationToken cancellationToken)
+    {
+        if (ModelState.IsValid)
+        {
+            var result = await criterionItemTypeApiClient.CreateAsync(new CriterionItemTypeSaveRequest(model.Name, model.NoLongerInUse, yearId), cancellationToken);
+            if (result.Success)
+            {
+                return RedirectToAction(nameof(CriterionItemType), new { yearId, page });
+            }
+
+            foreach (var (field, messages) in result.FieldErrors)
+            {
+                foreach (var errorMessage in messages)
+                {
+                    ModelState.AddModelError($"Add.{field}", errorMessage);
+                }
+            }
+        }
+
+        return View(nameof(CriterionItemType), await BuildCriterionItemTypeViewModelAsync(yearId, editId: null, page, message: null, messageIsError: false, model, editValues: null, cancellationToken));
+    }
+
+    // Only the row matching model.CriterionItemTypeId is ever in edit mode when this posts -
+    // matches legacy GridViewCriterionItemType_RowUpdating, which only acts on the row with
+    // EditIndex set. Blocked (in-use) edits surface the legacy warning message as a notification
+    // banner rather than a JS alert.
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> CriterionItemTypeSave([Bind(Prefix = "Edit")] CriterionItemTypeEditViewModel model, int yearId, int page, CancellationToken cancellationToken)
+    {
+        if (ModelState.IsValid)
+        {
+            var result = await criterionItemTypeApiClient.UpdateAsync(model.CriterionItemTypeId!.Value, new CriterionItemTypeSaveRequest(model.Name, model.NoLongerInUse, yearId), cancellationToken);
+            if (result.Success)
+            {
+                return RedirectToAction(nameof(CriterionItemType), new { yearId, page });
+            }
+
+            if (result.FieldErrors.TryGetValue(string.Empty, out var conflictMessages))
+            {
+                return View(nameof(CriterionItemType), await BuildCriterionItemTypeViewModelAsync(yearId, model.CriterionItemTypeId, page, conflictMessages[0], messageIsError: true, addValues: null, editValues: null, cancellationToken));
+            }
+
+            foreach (var (field, messages) in result.FieldErrors)
+            {
+                foreach (var errorMessage in messages)
+                {
+                    ModelState.AddModelError($"Edit.{field}", errorMessage);
+                }
+            }
+        }
+
+        return View(nameof(CriterionItemType), await BuildCriterionItemTypeViewModelAsync(yearId, model.CriterionItemTypeId, page, message: null, messageIsError: false, addValues: null, model, cancellationToken));
+    }
+
+    // "No Longer in Use" is saved for every row on the current page in one combined submit - see
+    // CategoryItemTypeSaveAllNoLongerInUse remarks for the full rationale.
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> CriterionItemTypeSaveAllNoLongerInUse(List<Guid>? pageCriterionItemTypeIds, List<Guid>? checkedCriterionItemTypeIds, int yearId, int page, CancellationToken cancellationToken)
+    {
+        var checkedIds = checkedCriterionItemTypeIds ?? [];
+        try
+        {
+            foreach (var id in pageCriterionItemTypeIds ?? [])
+            {
+                await criterionItemTypeApiClient.SetNoLongerInUseAsync(id, new CriterionItemTypeNoLongerInUseRequest(checkedIds.Contains(id), yearId), cancellationToken);
+            }
+        }
+        catch (Exception ex) when (IsTransientApiFailure(ex, cancellationToken))
+        {
+            return View(nameof(CriterionItemType), await BuildCriterionItemTypeViewModelAsync(yearId, editId: null, page, NoLongerInUseSaveFailedMessage, messageIsError: true, addValues: null, editValues: null, cancellationToken));
+        }
+
+        return RedirectToAction(nameof(CriterionItemType), new { yearId, page });
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> CriterionItemTypeRemove(Guid criterionItemTypeId, int yearId, int page, CancellationToken cancellationToken)
+    {
+        var result = await criterionItemTypeApiClient.DeleteAsync(criterionItemTypeId, yearId, cancellationToken);
+        if (!result.Success)
+        {
+            LogCriterionItemTypeRemoveBlockedMessage(logger, criterionItemTypeId, null);
+        }
+
+        return View(nameof(CriterionItemType), await BuildCriterionItemTypeViewModelAsync(yearId, editId: null, page, result.Message, messageIsError: !result.Success, addValues: null, editValues: null, cancellationToken));
+    }
+
+    private async Task<CriterionItemTypeViewModel> BuildCriterionItemTypeViewModelAsync(
+        int? yearId,
+        Guid? editId,
+        int page,
+        string? message,
+        bool messageIsError,
+        CriterionItemTypeAddViewModel? addValues,
+        CriterionItemTypeEditViewModel? editValues,
+        CancellationToken cancellationToken,
+        Guid? removeConfirmId = null)
+    {
+        var years = await lookupApiClient.GetCurrentYearsAsync(cancellationToken);
+        var currentYearId = years.Count > 0 ? years[0].YearId : (int?)null;
+        var selectedYearId = ResolveSelectedYearId(yearId, years, currentYearId);
+
+        var items = await criterionItemTypeApiClient.GetByYearAsync(selectedYearId, cancellationToken);
+
+        // Defence in depth against a forced ?editId= for an in-use item (the Edit link itself is
+        // never rendered for such a row) - refuses to open edit mode and surfaces the same
+        // dependency message Save/Remove would, rather than silently rendering an editable row.
+        var editTarget = editId is null ? null : items.FirstOrDefault(i => i.CriterionItemTypeId == editId);
+        if (editTarget is not null && editTarget.ForeignInstances != 0 && message is null)
+        {
+            message = BuildCriterionItemTypeInUseMessage(editTarget, "edited");
+            messageIsError = true;
+            editId = null;
+        }
+
+        // Matches legacy CriterionItemTypeCollection.GetSortedFilteredList's ApplySort("Name",
+        // Ascending).
+        var sortedItems = items.OrderBy(i => i.Name, StringComparer.OrdinalIgnoreCase).ToList();
+
+        // Matches legacy GridViewCriterionItemType.AllowPaging/PageSize = 15.
+        var currentPage = page < 1 ? 1 : page;
+        var pagedItems = sortedItems
+            .Skip((currentPage - 1) * CriterionItemTypeViewModel.PageSize)
+            .Take(CriterionItemTypeViewModel.PageSize);
+
+        var rows = pagedItems
+            .Select(i => new CriterionItemTypeRowViewModel
+            {
+                CriterionItemTypeId = i.CriterionItemTypeId,
+                Name = editId == i.CriterionItemTypeId && editValues is not null ? editValues.Name : i.Name,
+                NoLongerInUse = editId == i.CriterionItemTypeId && editValues is not null ? editValues.NoLongerInUse : i.NoLongerInUse,
+                ForeignInstances = i.ForeignInstances,
+                ForeignInstancesString = i.ForeignInstancesString,
+                IsEditing = editId == i.CriterionItemTypeId,
+                IsConfirmingRemove = removeConfirmId == i.CriterionItemTypeId
+            })
+            .ToList();
+
+        return new CriterionItemTypeViewModel
+        {
+            SelectedYearId = selectedYearId,
+            // See CategoryItemTypeViewModel's YearOptions remarks: plain year, not the shared
+            // financial-year label.
+            YearOptions = years.Select(y => new SelectListItem(y.YearId.ToString(System.Globalization.CultureInfo.InvariantCulture), y.YearId.ToString(System.Globalization.CultureInfo.InvariantCulture))),
+            Rows = rows,
+            Page = currentPage,
+            TotalRecords = sortedItems.Count,
+            Add = addValues ?? new CriterionItemTypeAddViewModel(),
+            Message = message,
+            MessageIsError = messageIsError
+        };
+    }
+
+    // Matches the exact wording CriterionItemTypeService uses server-side, so a blocked Edit
+    // attempt (forced ?editId=) reads identically to a blocked Save/Remove.
+    private static string BuildCriterionItemTypeInUseMessage(CriterionItemTypeResponse item, string action) =>
+        item.ForeignInstances == -1
+            ? $"This Criterion Item is being used on a distribution and cannot be {action}. It is also being used on the following Scheme(s): {item.ForeignInstancesString}"
+            : $"This Criterion Item is being used on {item.ForeignInstances} Scheme(s): {item.ForeignInstancesString} and cannot be {action}.";
 }

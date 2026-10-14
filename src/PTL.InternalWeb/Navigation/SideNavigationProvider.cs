@@ -260,7 +260,7 @@ public static class SideNavigationProvider
                 Disabled("Test Result Items"),
                 Disabled("Test Method Items"),
                 new SideNavigationItem { Text = "Category Items", ControllerName = "SchemeAdmin", ActionName = "CategoryItemType" },
-                Disabled("Criterion Items")
+                new SideNavigationItem { Text = "Criterion Items", ControllerName = "SchemeAdmin", ActionName = "CriterionItemType" }
             ]
         },
         new SideNavigationItem

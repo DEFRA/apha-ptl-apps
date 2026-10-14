@@ -10,6 +10,7 @@ using PTL.Core.Contract.PendingOrder;
 using PTL.Core.Contract.Renew;
 using PTL.Core.Contract.Renewal;
 using PTL.Core.Contract.SampleAddress;
+using PTL.Core.CriterionItemType;
 using PTL.Core.Country;
 using PTL.Core.Customer;
 using PTL.Core.Distribution;
@@ -27,6 +28,7 @@ using PTL.Core.WeightedPricingPlan;
 using CoreCategoryItemType = PTL.Core.CategoryItemType.CategoryItemType;
 using CoreContract = PTL.Core.Contract.Contract;
 using CoreCountry = PTL.Core.Country.Country;
+using CoreCriterionItemType = PTL.Core.CriterionItemType.CriterionItemType;
 using CoreCustomer = PTL.Core.Customer.Customer;
 using CoreExternalSiteMessage = PTL.Core.ExternalSiteMessage.ExternalSiteMessage;
 using CoreGroupAddress = PTL.Core.GroupAddress.GroupAddress;
@@ -367,6 +369,17 @@ public static class DapperColumnMappings
             ["fldNoLongerInUse"] = nameof(CoreCategoryItemType.NoLongerInUse),
             ["ForeignInstances"] = nameof(CoreCategoryItemType.ForeignInstances),
             ["ForeignInstancesString"] = nameof(CoreCategoryItemType.ForeignInstancesString),
+        });
+
+        Map<CoreCriterionItemType>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldCriterionItemTypeId"] = nameof(CoreCriterionItemType.CriterionItemTypeId),
+            [ColName] = nameof(CoreCriterionItemType.Name),
+            ["fldStartYearId"] = nameof(CoreCriterionItemType.StartYearId),
+            ["fldEndYearId"] = nameof(CoreCriterionItemType.EndYearId),
+            ["fldNoLongerInUse"] = nameof(CoreCriterionItemType.NoLongerInUse),
+            ["ForeignInstances"] = nameof(CoreCriterionItemType.ForeignInstances),
+            ["ForeignInstancesString"] = nameof(CoreCriterionItemType.ForeignInstancesString),
         });
 
         Map<CoreTestType>(new(StringComparer.OrdinalIgnoreCase)

@@ -63,8 +63,8 @@
     </colgroup>
     <thead class="govuk-table__head">
         <tr class="govuk-table__row">
-            <th scope="col" class="govuk-table__header">Test Type Name</th>
-            <th scope="col" class="govuk-table__header">No Longer in Use</th>
+            <th scope="col" class="govuk-table__header">Test type name</th>
+            <th scope="col" class="govuk-table__header">No longer in use</th>
             <th scope="col" class="govuk-table__header">Actions</th>
         </tr>
     </thead>
@@ -82,12 +82,12 @@
                 {
                     <td class="govuk-table__cell">
                         <div class="govuk-form-group govuk-!-margin-bottom-0 @(FirstError("Edit.Name") is null ? "" : "govuk-form-group--error")">
-                            <label class="govuk-visually-hidden" for="Edit.Name">Test Type Name</label>
+                            <label class="govuk-visually-hidden" for="Edit_Name">Test type name</label>
                             @if (FirstError("Edit.Name") is string nameError)
                             {
                                 <p class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @nameError</p>
                             }
-                            <input id="Edit.Name" form="testTypeEditForm" name="Edit.Name" value="@row.Name" maxlength="30" autofocus
+                            <input id="Edit_Name" form="testTypeEditForm" name="Edit.Name" value="@row.Name" maxlength="30" autofocus
                                    class="govuk-input @(FirstError("Edit.Name") is null ? "" : "govuk-input--error")" />
                         </div>
                     </td>
@@ -95,7 +95,7 @@
                         <div class="govuk-checkboxes govuk-checkboxes--small" data-module="govuk-checkboxes">
                             <div class="govuk-checkboxes__item">
                                 <input class="govuk-checkboxes__input" type="checkbox" id="Edit.NoLongerInUse" form="testTypeEditForm" name="Edit.NoLongerInUse" value="true" checked="@row.NoLongerInUse" />
-                                <label class="govuk-label govuk-checkboxes__label" for="Edit.NoLongerInUse">No Longer in Use</label>
+                                <label class="govuk-label govuk-checkboxes__label" for="Edit.NoLongerInUse">No longer in use</label>
                             </div>
                         </div>
                     </td>
@@ -119,7 +119,7 @@
                                 @* govuk-visually-hidden must go on a nested span, not the label itself - the visible
                                    checkbox box is a pseudo-element on the label, so hiding the label hides the box too. *@
                                 <label class="govuk-label govuk-checkboxes__label" for="NoLongerInUse_@row.TestTypeId">
-                                    <span class="govuk-visually-hidden">No Longer in Use - @row.Name</span>
+                                    <span class="govuk-visually-hidden">No longer in use - @row.Name</span>
                                 </label>
                             </div>
                         </div>
@@ -210,7 +210,7 @@
     <div class="govuk-checkboxes govuk-checkboxes--small govuk-!-margin-bottom-4" data-module="govuk-checkboxes">
         <div class="govuk-checkboxes__item">
             <input class="govuk-checkboxes__input" asp-for="Add.NoLongerInUse" />
-            <label class="govuk-label govuk-checkboxes__label" asp-for="Add.NoLongerInUse">No Longer in Use</label>
+            <label class="govuk-label govuk-checkboxes__label" asp-for="Add.NoLongerInUse">No longer in use</label>
         </div>
     </div>
     @if (editingRow is not null)

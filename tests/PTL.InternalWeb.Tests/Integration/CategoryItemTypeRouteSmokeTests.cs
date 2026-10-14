@@ -53,8 +53,8 @@ public partial class CategoryItemTypeRouteSmokeTests : IClassFixture<WebApplicat
         var body = await response.Content.ReadAsStringAsync();
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.Contains("Category Item Type Name", body, StringComparison.Ordinal);
-        Assert.Contains("No Longer in Use", body, StringComparison.Ordinal);
+        Assert.Contains("Category item type name", body, StringComparison.Ordinal);
+        Assert.Contains("No longer in use", body, StringComparison.Ordinal);
         Assert.Contains("Actions", body, StringComparison.Ordinal);
         Assert.Contains("Colour", body, StringComparison.Ordinal);
     }
@@ -201,6 +201,40 @@ public partial class CategoryItemTypeRouteSmokeTests : IClassFixture<WebApplicat
         Assert.Equal(2, _fakeApiClient.AllNoLongerInUseRequests.Count);
         Assert.True(_fakeApiClient.AllNoLongerInUseRequests.Single(r => r.CategoryItemTypeId == tickedId).Request.NoLongerInUse);
         Assert.False(_fakeApiClient.AllNoLongerInUseRequests.Single(r => r.CategoryItemTypeId == untickedId).Request.NoLongerInUse);
+    }
+
+    // Locks in the error-summary anchor fix: the hand-rolled edit-row Name input/label previously
+    // used the literal "Edit.Name" id, but govuk-error-summary sanitises dots to underscores
+    // ("Edit_Name"), so the link silently went nowhere - same class of bug already fixed once for
+    // AdministrationCharge.cshtml.
+    [Fact]
+    public async Task CategoryItemTypeSave_MissingName_RendersErrorSummaryWithMatchingAnchor()
+    {
+        var itemId = Guid.NewGuid();
+        _fakeApiClient.Items = [new CategoryItemTypeResponse(itemId, "Colour", CurrentYearId, 9999, false, 0, string.Empty)];
+        var client = _factory.CreateClient();
+        var (token, cookie) = await GetAntiforgeryAsync(client, "/SchemeAdmin/CategoryItemType?yearId=" + CurrentYearId);
+
+        var request = new HttpRequestMessage(HttpMethod.Post, "/SchemeAdmin/CategoryItemTypeSave")
+        {
+            Content = new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["__RequestVerificationToken"] = token,
+                ["yearId"] = CurrentYearId.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                ["page"] = "1",
+                ["Edit.CategoryItemTypeId"] = itemId.ToString(),
+                ["Edit.Name"] = string.Empty
+            })
+        };
+        request.Headers.Add("Cookie", cookie);
+
+        var response = await client.SendAsync(request);
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("govuk-error-summary", body, StringComparison.Ordinal);
+        Assert.Contains("href=\"#Edit_Name\"", body, StringComparison.Ordinal);
+        Assert.Contains("id=\"Edit_Name\"", body, StringComparison.Ordinal);
     }
 
     private static async Task<(string Token, string Cookie)> GetAntiforgeryAsync(HttpClient client, string url)

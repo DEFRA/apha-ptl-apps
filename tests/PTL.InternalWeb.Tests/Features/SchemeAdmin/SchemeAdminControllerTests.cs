@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging.Abstractions;
 using PTL.Contracts.CategoryItemType;
+using PTL.Contracts.CriterionItemType;
 using PTL.Contracts.Lookup;
 using PTL.Contracts.TestType;
 using PTL.InternalWeb.Features.SchemeAdmin;
@@ -12,10 +13,11 @@ public class SchemeAdminControllerTests
 {
     private const int CurrentYearId = 2026;
 
-    private static SchemeAdminController CreateController(FakeCategoryItemTypeApiClient? categoryItemTypeApiClient = null, FakeLookupApiClient? lookupApiClient = null, FakeTestTypeApiClient? testTypeApiClient = null) =>
+    private static SchemeAdminController CreateController(FakeCategoryItemTypeApiClient? categoryItemTypeApiClient = null, FakeLookupApiClient? lookupApiClient = null, FakeTestTypeApiClient? testTypeApiClient = null, FakeCriterionItemTypeApiClient? criterionItemTypeApiClient = null) =>
         new(
             categoryItemTypeApiClient ?? new FakeCategoryItemTypeApiClient(),
             testTypeApiClient ?? new FakeTestTypeApiClient(),
+            criterionItemTypeApiClient ?? new FakeCriterionItemTypeApiClient(),
             lookupApiClient ?? new FakeLookupApiClient { Years = [new YearResponse(CurrentYearId, "2026"), new YearResponse(CurrentYearId + 1, "2027")] },
             NullLogger<SchemeAdminController>.Instance);
 
@@ -379,6 +381,164 @@ public class SchemeAdminControllerTests
 
         var page2Result = await controller.TestType(CurrentYearId, null, null, page: 2, cancellationToken: CancellationToken.None);
         var page2Model = Assert.IsType<TestTypeViewModel>(Assert.IsType<ViewResult>(page2Result).Model);
+
+        Assert.Equal(15, page1Model.Rows.Count);
+        Assert.Equal(1, page2Model.Rows.Count);
+        Assert.Equal(16, page1Model.TotalRecords);
+        Assert.Equal(16, page2Model.TotalRecords);
+    }
+
+    [Fact]
+    public async Task CriterionItemType_Get_BuildsRowsAndYearOptions()
+    {
+        var apiClient = new FakeCriterionItemTypeApiClient
+        {
+            Items = [new CriterionItemTypeResponse(Guid.NewGuid(), "Appearance", CurrentYearId, 9999, false, 0, string.Empty)]
+        };
+        var controller = CreateController(criterionItemTypeApiClient: apiClient);
+
+        var result = await controller.CriterionItemType(null, null, null, cancellationToken: CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<CriterionItemTypeViewModel>(view.Model);
+        Assert.Equal(CurrentYearId, model.SelectedYearId);
+        Assert.Equal("Appearance", Assert.Single(model.Rows).Name);
+    }
+
+    [Fact]
+    public async Task CriterionItemType_Get_WithEditIdOnInUseItem_RefusesEditModeAndShowsDependencyMessage()
+    {
+        var itemId = Guid.NewGuid();
+        var apiClient = new FakeCriterionItemTypeApiClient
+        {
+            Items = [new CriterionItemTypeResponse(itemId, "Appearance", CurrentYearId, 9999, false, 2, "Scheme A, Scheme B")]
+        };
+        var controller = CreateController(criterionItemTypeApiClient: apiClient);
+
+        var result = await controller.CriterionItemType(CurrentYearId, itemId, null, cancellationToken: CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<CriterionItemTypeViewModel>(view.Model);
+        Assert.False(Assert.Single(model.Rows).IsEditing);
+        Assert.True(model.MessageIsError);
+        Assert.Contains("Scheme A, Scheme B", model.Message);
+    }
+
+    [Fact]
+    public async Task CriterionItemTypeAdd_ValidModel_CreatesAndRedirects()
+    {
+        var apiClient = new FakeCriterionItemTypeApiClient();
+        var controller = CreateController(criterionItemTypeApiClient: apiClient);
+        var model = new CriterionItemTypeAddViewModel { Name = "Appearance", NoLongerInUse = false };
+
+        var result = await controller.CriterionItemTypeAdd(model, CurrentYearId, 1, CancellationToken.None);
+
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal(nameof(SchemeAdminController.CriterionItemType), redirect.ActionName);
+        Assert.Equal("Appearance", apiClient.LastCreateRequest?.Name);
+    }
+
+    [Fact]
+    public async Task CriterionItemTypeSave_ValidModel_UpdatesAndRedirects()
+    {
+        var itemId = Guid.NewGuid();
+        var apiClient = new FakeCriterionItemTypeApiClient();
+        var controller = CreateController(criterionItemTypeApiClient: apiClient);
+        var model = new CriterionItemTypeEditViewModel { CriterionItemTypeId = itemId, Name = "Appearance (renamed)", NoLongerInUse = true };
+
+        var result = await controller.CriterionItemTypeSave(model, CurrentYearId, 1, CancellationToken.None);
+
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal(nameof(SchemeAdminController.CriterionItemType), redirect.ActionName);
+        Assert.Equal(itemId, apiClient.LastUpdateRequest?.CriterionItemTypeId);
+    }
+
+    [Fact]
+    public async Task CriterionItemTypeSave_ApiReportsInUseConflict_RedisplaysWithBannerMessage()
+    {
+        var itemId = Guid.NewGuid();
+        var apiClient = new FakeCriterionItemTypeApiClient
+        {
+            SaveResult = new CriterionItemTypeSaveResult(false, null, new Dictionary<string, string[]> { [string.Empty] = ["This Criterion Item is being used on 1 Scheme(s): Scheme A and cannot be edited."] })
+        };
+        var controller = CreateController(criterionItemTypeApiClient: apiClient);
+        var model = new CriterionItemTypeEditViewModel { CriterionItemTypeId = itemId, Name = "Appearance" };
+
+        var result = await controller.CriterionItemTypeSave(model, CurrentYearId, 1, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var resultModel = Assert.IsType<CriterionItemTypeViewModel>(view.Model);
+        Assert.True(resultModel.MessageIsError);
+        Assert.Contains("Scheme A", resultModel.Message);
+    }
+
+    [Fact]
+    public async Task CriterionItemTypeSaveAllNoLongerInUse_TickedAndUntickedRows_SavesBothCorrectly()
+    {
+        var tickedId = Guid.NewGuid();
+        var untickedId = Guid.NewGuid();
+        var apiClient = new FakeCriterionItemTypeApiClient();
+        var controller = CreateController(criterionItemTypeApiClient: apiClient);
+
+        var result = await controller.CriterionItemTypeSaveAllNoLongerInUse(
+            pageCriterionItemTypeIds: [tickedId, untickedId],
+            checkedCriterionItemTypeIds: [tickedId],
+            CurrentYearId, 1, CancellationToken.None);
+
+        Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal(2, apiClient.AllNoLongerInUseRequests.Count);
+        Assert.True(apiClient.AllNoLongerInUseRequests.Single(r => r.CriterionItemTypeId == tickedId).Request.NoLongerInUse);
+        Assert.False(apiClient.AllNoLongerInUseRequests.Single(r => r.CriterionItemTypeId == untickedId).Request.NoLongerInUse);
+    }
+
+    [Fact]
+    public async Task CriterionItemTypeRemove_Blocked_RedisplaysWithMessage()
+    {
+        var itemId = Guid.NewGuid();
+        var apiClient = new FakeCriterionItemTypeApiClient
+        {
+            DeleteResponse = new CriterionItemTypeDeleteResponse(false, "This Criterion Item is being used on 1 Scheme(s): Scheme A and cannot be removed.")
+        };
+        var controller = CreateController(criterionItemTypeApiClient: apiClient);
+
+        var result = await controller.CriterionItemTypeRemove(itemId, CurrentYearId, 1, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<CriterionItemTypeViewModel>(view.Model);
+        Assert.True(model.MessageIsError);
+    }
+
+    [Fact]
+    public async Task CriterionItemTypeRemove_Success_RedisplaysWithSuccessMessageAndPassesYearIdToDelete()
+    {
+        var itemId = Guid.NewGuid();
+        var apiClient = new FakeCriterionItemTypeApiClient { DeleteResponse = new CriterionItemTypeDeleteResponse(true, null) };
+        var controller = CreateController(criterionItemTypeApiClient: apiClient);
+
+        var result = await controller.CriterionItemTypeRemove(itemId, CurrentYearId, 1, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<CriterionItemTypeViewModel>(view.Model);
+        Assert.False(model.MessageIsError);
+        Assert.Equal(itemId, apiClient.LastDeletedCriterionItemTypeId);
+        Assert.Equal(CurrentYearId, apiClient.LastDeletedYearId);
+    }
+
+    // Matches legacy GridViewCriterionItemType.AllowPaging/PageSize = 15.
+    [Fact]
+    public async Task CriterionItemType_Get_WithMoreThan15Items_PaginatesAtLegacyPageSizeOf15()
+    {
+        var items = Enumerable.Range(1, 16)
+            .Select(i => new CriterionItemTypeResponse(Guid.NewGuid(), $"Item {i:D2}", CurrentYearId, 9999, false, 0, string.Empty))
+            .ToList();
+        var apiClient = new FakeCriterionItemTypeApiClient { Items = items };
+        var controller = CreateController(criterionItemTypeApiClient: apiClient);
+
+        var page1Result = await controller.CriterionItemType(CurrentYearId, null, null, page: 1, cancellationToken: CancellationToken.None);
+        var page1Model = Assert.IsType<CriterionItemTypeViewModel>(Assert.IsType<ViewResult>(page1Result).Model);
+
+        var page2Result = await controller.CriterionItemType(CurrentYearId, null, null, page: 2, cancellationToken: CancellationToken.None);
+        var page2Model = Assert.IsType<CriterionItemTypeViewModel>(Assert.IsType<ViewResult>(page2Result).Model);
 
         Assert.Equal(15, page1Model.Rows.Count);
         Assert.Equal(1, page2Model.Rows.Count);
