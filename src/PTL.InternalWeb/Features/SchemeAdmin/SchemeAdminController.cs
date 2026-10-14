@@ -3,18 +3,25 @@ using Microsoft.AspNetCore.Mvc.Rendering;
 using PTL.ApiClient;
 using PTL.Contracts.CategoryItemType;
 using PTL.Contracts.Lookup;
+using PTL.Contracts.TestType;
 
 namespace PTL.InternalWeb.Features.SchemeAdmin;
 
 // Authentication/authorization are out of scope for this phase - same convention as
 // Features/Scheme/SchemeController.cs, which this "Manage Schemes" sub-area sits alongside.
-public class SchemeAdminController(ICategoryItemTypeApiClient categoryItemTypeApiClient, ILookupApiClient lookupApiClient, ILogger<SchemeAdminController> logger) : Controller
+public class SchemeAdminController(ICategoryItemTypeApiClient categoryItemTypeApiClient, ITestTypeApiClient testTypeApiClient, ILookupApiClient lookupApiClient, ILogger<SchemeAdminController> logger) : Controller
 {
     private static readonly Action<ILogger, Guid, Exception?> LogCategoryItemTypeRemoveBlockedMessage =
         LoggerMessage.Define<Guid>(
             LogLevel.Information,
             new EventId(1, nameof(LogCategoryItemTypeRemoveBlockedMessage)),
             "Category item type {CategoryItemTypeId} removal was blocked: still in use");
+
+    private static readonly Action<ILogger, Guid, Exception?> LogTestTypeRemoveBlockedMessage =
+        LoggerMessage.Define<Guid>(
+            LogLevel.Information,
+            new EventId(2, nameof(LogTestTypeRemoveBlockedMessage)),
+            "Test type {TestTypeId} removal was blocked: still in use");
 
     public async Task<IActionResult> CategoryItemType(int? yearId, Guid? editId, Guid? removeConfirmId, int page = 1, CancellationToken cancellationToken = default) =>
         View(await BuildCategoryItemTypeViewModelAsync(yearId, editId, page, message: null, messageIsError: false, addValues: null, editValues: null, cancellationToken, removeConfirmId));
@@ -198,4 +205,165 @@ public class SchemeAdminController(ICategoryItemTypeApiClient categoryItemTypeAp
 
         return availableYears.Count > 0 ? availableYears[0].YearId : 0;
     }
+
+    public async Task<IActionResult> TestType(int? yearId, Guid? editId, Guid? removeConfirmId, int page = 1, CancellationToken cancellationToken = default) =>
+        View(await BuildTestTypeViewModelAsync(yearId, editId, page, message: null, messageIsError: false, addValues: null, editValues: null, cancellationToken, removeConfirmId));
+
+    // Matches legacy ButtonAdd_Click - Name is required; the new item always starts in whichever
+    // year is currently selected in the dropdown.
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> TestTypeAdd([Bind(Prefix = "Add")] TestTypeAddViewModel model, int yearId, int page, CancellationToken cancellationToken)
+    {
+        if (ModelState.IsValid)
+        {
+            var result = await testTypeApiClient.CreateAsync(new TestTypeSaveRequest(model.Name, model.NoLongerInUse, yearId), cancellationToken);
+            if (result.Success)
+            {
+                return RedirectToAction(nameof(TestType), new { yearId, page });
+            }
+
+            foreach (var (field, messages) in result.FieldErrors)
+            {
+                foreach (var errorMessage in messages)
+                {
+                    ModelState.AddModelError($"Add.{field}", errorMessage);
+                }
+            }
+        }
+
+        return View(nameof(TestType), await BuildTestTypeViewModelAsync(yearId, editId: null, page, message: null, messageIsError: false, model, editValues: null, cancellationToken));
+    }
+
+    // Only the row matching model.TestTypeId is ever in edit mode when this posts - matches
+    // legacy GridViewTestType_RowUpdating, which only acts on the row with EditIndex set. Blocked
+    // (in-use) edits surface the legacy warning message as a notification banner rather than a JS
+    // alert.
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> TestTypeSave([Bind(Prefix = "Edit")] TestTypeEditViewModel model, int yearId, int page, CancellationToken cancellationToken)
+    {
+        if (ModelState.IsValid)
+        {
+            var result = await testTypeApiClient.UpdateAsync(model.TestTypeId!.Value, new TestTypeSaveRequest(model.Name, model.NoLongerInUse, yearId), cancellationToken);
+            if (result.Success)
+            {
+                return RedirectToAction(nameof(TestType), new { yearId, page });
+            }
+
+            if (result.FieldErrors.TryGetValue(string.Empty, out var conflictMessages))
+            {
+                return View(nameof(TestType), await BuildTestTypeViewModelAsync(yearId, model.TestTypeId, page, conflictMessages[0], messageIsError: true, addValues: null, editValues: null, cancellationToken));
+            }
+
+            foreach (var (field, messages) in result.FieldErrors)
+            {
+                foreach (var errorMessage in messages)
+                {
+                    ModelState.AddModelError($"Edit.{field}", errorMessage);
+                }
+            }
+        }
+
+        return View(nameof(TestType), await BuildTestTypeViewModelAsync(yearId, model.TestTypeId, page, message: null, messageIsError: false, addValues: null, model, cancellationToken));
+    }
+
+    // "No Longer in Use" is saved for every row on the current page in one combined submit - see
+    // CategoryItemTypeSaveAllNoLongerInUse remarks for the full rationale (bulk GOV.UK checkboxes
+    // pattern, flat dual-list binding to avoid the edit-mode index-gap bug).
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> TestTypeSaveAllNoLongerInUse(List<Guid>? pageTestTypeIds, List<Guid>? checkedTestTypeIds, int yearId, int page, CancellationToken cancellationToken)
+    {
+        var checkedIds = checkedTestTypeIds ?? [];
+        foreach (var id in pageTestTypeIds ?? [])
+        {
+            await testTypeApiClient.SetNoLongerInUseAsync(id, new TestTypeNoLongerInUseRequest(checkedIds.Contains(id), yearId), cancellationToken);
+        }
+
+        return RedirectToAction(nameof(TestType), new { yearId, page });
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> TestTypeRemove(Guid testTypeId, int yearId, int page, CancellationToken cancellationToken)
+    {
+        var result = await testTypeApiClient.DeleteAsync(testTypeId, yearId, cancellationToken);
+        if (!result.Success)
+        {
+            LogTestTypeRemoveBlockedMessage(logger, testTypeId, null);
+        }
+
+        return View(nameof(TestType), await BuildTestTypeViewModelAsync(yearId, editId: null, page, result.Message, messageIsError: !result.Success, addValues: null, editValues: null, cancellationToken));
+    }
+
+    private async Task<TestTypeViewModel> BuildTestTypeViewModelAsync(
+        int? yearId,
+        Guid? editId,
+        int page,
+        string? message,
+        bool messageIsError,
+        TestTypeAddViewModel? addValues,
+        TestTypeEditViewModel? editValues,
+        CancellationToken cancellationToken,
+        Guid? removeConfirmId = null)
+    {
+        var years = await lookupApiClient.GetCurrentYearsAsync(cancellationToken);
+        var currentYearId = years.Count > 0 ? years[0].YearId : (int?)null;
+        var selectedYearId = ResolveSelectedYearId(yearId, years, currentYearId);
+
+        var items = await testTypeApiClient.GetByYearAsync(selectedYearId, cancellationToken);
+
+        // Defence in depth against a forced ?editId= for an in-use item (the Edit link itself is
+        // never rendered for such a row) - refuses to open edit mode and surfaces the same
+        // dependency message Save/Remove would, rather than silently rendering an editable row.
+        var editTarget = editId is null ? null : items.FirstOrDefault(i => i.TestTypeId == editId);
+        if (editTarget is not null && editTarget.ForeignInstances != 0 && message is null)
+        {
+            message = BuildTestTypeInUseMessage(editTarget, "edited");
+            messageIsError = true;
+            editId = null;
+        }
+
+        // Matches legacy TestTypeCollection.GetSortedFilteredList's ApplySort("Name", Ascending).
+        var sortedItems = items.OrderBy(i => i.Name, StringComparer.OrdinalIgnoreCase).ToList();
+
+        // Matches legacy GridViewTestType.AllowPaging/PageSize = 15.
+        var currentPage = page < 1 ? 1 : page;
+        var pagedItems = sortedItems
+            .Skip((currentPage - 1) * TestTypeViewModel.PageSize)
+            .Take(TestTypeViewModel.PageSize);
+
+        var rows = pagedItems
+            .Select(i => new TestTypeRowViewModel
+            {
+                TestTypeId = i.TestTypeId,
+                Name = editId == i.TestTypeId && editValues is not null ? editValues.Name : i.Name,
+                NoLongerInUse = editId == i.TestTypeId && editValues is not null ? editValues.NoLongerInUse : i.NoLongerInUse,
+                ForeignInstances = i.ForeignInstances,
+                ForeignInstancesString = i.ForeignInstancesString,
+                IsEditing = editId == i.TestTypeId,
+                IsConfirmingRemove = removeConfirmId == i.TestTypeId
+            })
+            .ToList();
+
+        return new TestTypeViewModel
+        {
+            SelectedYearId = selectedYearId,
+            YearOptions = years.Select(y => new SelectListItem(y.Year, y.YearId.ToString())),
+            Rows = rows,
+            Page = currentPage,
+            TotalRecords = sortedItems.Count,
+            Add = addValues ?? new TestTypeAddViewModel(),
+            Message = message,
+            MessageIsError = messageIsError
+        };
+    }
+
+    // Matches the exact wording TestTypeService uses server-side, so a blocked Edit attempt
+    // (forced ?editId=) reads identically to a blocked Save/Remove.
+    private static string BuildTestTypeInUseMessage(TestTypeResponse item, string action) =>
+        item.ForeignInstances == -1
+            ? $"This Test is being used on a distribution and cannot be {action}. It is also being used on the following Scheme(s): {item.ForeignInstancesString}"
+            : $"This Test is being used on {item.ForeignInstances} Scheme(s): {item.ForeignInstancesString} and cannot be {action}.";
 }

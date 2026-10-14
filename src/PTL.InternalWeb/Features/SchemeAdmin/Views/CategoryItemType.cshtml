@@ -207,8 +207,8 @@
 <form method="post" asp-action="CategoryItemTypeAdd">
     <input type="hidden" name="yearId" value="@Model.SelectedYearId" />
     <input type="hidden" name="page" value="@Model.Page" />
-    <govuk-input asp-for="Add.Name" label="New Category Name" input-class="govuk-input govuk-input--width-20" />
-    <div class="govuk-checkboxes govuk-checkboxes--small" data-module="govuk-checkboxes">
+    <govuk-input asp-for="Add.Name" label="New category name" input-class="govuk-input govuk-input--width-20" />
+    <div class="govuk-checkboxes govuk-checkboxes--small govuk-!-margin-bottom-4" data-module="govuk-checkboxes">
         <div class="govuk-checkboxes__item">
             <input class="govuk-checkboxes__input" asp-for="Add.NoLongerInUse" />
             <label class="govuk-label govuk-checkboxes__label" asp-for="Add.NoLongerInUse">No Longer in Use</label>

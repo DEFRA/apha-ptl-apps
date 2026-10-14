@@ -20,6 +20,7 @@ using PTL.Core.Invoice;
 using PTL.Core.Lookup;
 using PTL.Core.Participant;
 using PTL.Core.Scheme;
+using PTL.Core.TestType;
 using PTL.Core.User;
 using PTL.Core.Viewer;
 using PTL.Core.WeightedPricingPlan;
@@ -32,6 +33,7 @@ using CoreGroupAddress = PTL.Core.GroupAddress.GroupAddress;
 using CoreInternalUser = PTL.Core.InternalUser.InternalUser;
 using CoreParticipant = PTL.Core.Participant.Participant;
 using CoreScheme = PTL.Core.Scheme.Scheme;
+using CoreTestType = PTL.Core.TestType.TestType;
 using CoreUser = PTL.Core.User.User;
 
 namespace PTL.Data.Infrastructure;
@@ -365,6 +367,18 @@ public static class DapperColumnMappings
             ["fldNoLongerInUse"] = nameof(CoreCategoryItemType.NoLongerInUse),
             ["ForeignInstances"] = nameof(CoreCategoryItemType.ForeignInstances),
             ["ForeignInstancesString"] = nameof(CoreCategoryItemType.ForeignInstancesString),
+        });
+
+        Map<CoreTestType>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldTestTypeId"] = nameof(CoreTestType.TestTypeId),
+            ["fldSharedId"] = nameof(CoreTestType.SharedId),
+            ["fldTestType"] = nameof(CoreTestType.Name),
+            ["fldStartYearId"] = nameof(CoreTestType.StartYearId),
+            ["fldEndYearId"] = nameof(CoreTestType.EndYearId),
+            ["fldNoLongerInUse"] = nameof(CoreTestType.NoLongerInUse),
+            ["ForeignInstances"] = nameof(CoreTestType.ForeignInstances),
+            ["ForeignInstancesString"] = nameof(CoreTestType.ForeignInstancesString),
         });
 
         // spgContractMerge result set 1 (legacy ContractMergeInfo).

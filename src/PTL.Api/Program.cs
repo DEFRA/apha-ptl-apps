@@ -7,6 +7,7 @@ using PTL.Common.Correlation;
 using PTL.Common.Health;
 using PTL.Core.AdministrationCharge;
 using PTL.Core.CategoryItemType;
+using PTL.Core.TestType;
 using PTL.Core.Contract;
 using PTL.Core.Contract.Export.Bulk;
 using PTL.Core.Contract.Export.Templates;
@@ -35,6 +36,7 @@ using PTL.Core.Viewer;
 using PTL.Core.WeightedPricingPlan;
 using PTL.Data.AdministrationCharge;
 using PTL.Data.CategoryItemType;
+using PTL.Data.TestType;
 using PTL.Data.Contract;
 using PTL.Data.Contract.Export;
 using PTL.Data.Contract.ImportPermit;
@@ -199,6 +201,9 @@ builder.Services.AddScoped<ICountryService, CountryService>();
 
 builder.Services.AddScoped<ICategoryItemTypeRepository, CategoryItemTypeRepository>();
 builder.Services.AddScoped<ICategoryItemTypeService, CategoryItemTypeService>();
+
+builder.Services.AddScoped<ITestTypeRepository, TestTypeRepository>();
+builder.Services.AddScoped<ITestTypeService, TestTypeService>();
 
 builder.Services.AddScoped<IExternalSiteMessageRepository, ExternalSiteMessageRepository>();
 builder.Services.AddScoped<IExternalSiteMessageService, ExternalSiteMessageService>();

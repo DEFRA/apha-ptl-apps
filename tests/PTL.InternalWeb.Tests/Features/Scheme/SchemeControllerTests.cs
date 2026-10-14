@@ -235,6 +235,38 @@ public class SchemeControllerTests
         Assert.True(model.CanEditApr);
     }
 
+    // AC (story 744589): "Given a test type is marked No Longer in Use, When a new scheme is
+    // configured, Then the retired type is not offered for selection but remains visible on
+    // existing schemes." FakeLookupApiClient.GetSchemeItemTypesAsync returns the same list for
+    // every SchemeItemTypeKind, so this also confirms the filter is scoped to TestType only - a
+    // retired item of a different kind (here simulated via the same fake list) is not expected to
+    // be dropped from a kind the filter doesn't apply to yet.
+    [Fact]
+    public async Task Create_Get_ExcludesNoLongerInUseTestTypesFromAddDropdownButKeepsOtherKindsUnfiltered()
+    {
+        var activeId = Guid.NewGuid();
+        var retiredId = Guid.NewGuid();
+        var lookup = new FakeLookupApiClient
+        {
+            SchemeItemTypes =
+            [
+                new PTL.Contracts.Lookup.SchemeItemTypeResponse(activeId, "Chemical", false),
+                new PTL.Contracts.Lookup.SchemeItemTypeResponse(retiredId, "Retired Test", true)
+            ]
+        };
+        var controller = CreateController(new FakeSchemeApiClient(), lookup);
+
+        var result = await controller.Create(cancellationToken: CancellationToken.None);
+
+        var model = Assert.IsType<PTL.InternalWeb.Features.Scheme.SchemeFormViewModel>(Assert.IsType<ViewResult>(result).Model);
+        Assert.Contains(model.TestTypeOptions, o => o.Value == activeId.ToString());
+        Assert.DoesNotContain(model.TestTypeOptions, o => o.Value == retiredId.ToString());
+
+        // Category Item Type dropdown is unaffected by the TestType-only fix - see
+        // SchemeController.PopulateTestItemTypeOptionsAsync remarks.
+        Assert.Contains(model.CategoryItemTypeOptions, o => o.Value == retiredId.ToString());
+    }
+
     [Fact]
     public async Task CreateForCurrentYear_Get_DefaultsToCurrentYearAndRendersTheCreateView()
     {

@@ -56,8 +56,8 @@ public sealed class CategoryItemTypeRowViewModel
 // ButtonAddCategory_Click.
 public sealed class CategoryItemTypeAddViewModel
 {
-    [Required(ErrorMessage = "Name required")]
-    [StringLength(50, ErrorMessage = "Name must be 50 characters or fewer")]
+    [Required(ErrorMessage = "Enter a new category name")]
+    [StringLength(50, ErrorMessage = "New category name must be 50 characters or fewer")]
     public string Name { get; set; } = string.Empty;
 
     public bool NoLongerInUse { get; set; }
@@ -72,8 +72,8 @@ public sealed class CategoryItemTypeEditViewModel
     [Required]
     public Guid? CategoryItemTypeId { get; set; }
 
-    [Required(ErrorMessage = "Name required")]
-    [StringLength(50, ErrorMessage = "Name must be 50 characters or fewer")]
+    [Required(ErrorMessage = "Enter a new category name")]
+    [StringLength(50, ErrorMessage = "New category name must be 50 characters or fewer")]
     public string Name { get; set; } = string.Empty;
 
     public bool NoLongerInUse { get; set; }
