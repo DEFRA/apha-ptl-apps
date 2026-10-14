@@ -21,15 +21,12 @@ public class PackagingServiceRegistrationTests(WebApplicationFactory<Program> fa
     }
 
     [Fact]
-    public void PackagingOptions_AreBoundFromAppSettings()
+    public void ExternalOptions_AreBoundFromAppSettings()
     {
         using var scope = factory.Services.CreateScope();
 
-        var customs = scope.ServiceProvider.GetRequiredService<IOptions<PackagingCustomsOptions>>().Value;
         var external = scope.ServiceProvider.GetRequiredService<IOptions<PTL.Core.Configuration.ExternalOptions>>().Value;
 
-        Assert.Equal("customs", customs.Folder);
-        Assert.Equal("Customs Pro-Forma Template v20.10.2020.docx", customs.TemplateFileName);
         Assert.Equal("http://localhost:5215", external.AppUrl);
     }
 }

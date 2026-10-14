@@ -343,6 +343,23 @@ public class DistributionControllerPackagingTests
         Assert.Equal("Sample Packaging updated successfully.", notification.Message);
     }
 
+    [Fact]
+    public async Task Packaging_Post_Save_EmailFailureShowsAWarningNamingTheRecipientsButStillLeaves()
+    {
+        var apiClient = new FakeDistributionApiClient
+        {
+            PackagingSaveResult = new PackagingSaveResult(true, ["lab@example.test (17152A/BA)", "other@example.test (17152A/BA)"]),
+        };
+        var controller = CreateController(apiClient);
+
+        var result = await controller.Packaging(Year, Month, ModelOf(posted: [Tick(0, 1, Dp1)]), "save", CancellationToken.None);
+
+        Assert.Equal(nameof(DistributionController.Index), Assert.IsType<RedirectToActionResult>(result).ActionName);
+        var notification = controller.TempData.GetNotification();
+        Assert.Equal(NotificationType.Warning, notification!.Type);
+        Assert.Contains("could not be sent to: lab@example.test (17152A/BA), other@example.test (17152A/BA)", notification.Message);
+    }
+
     [Theory]
     [InlineData("apply")]
     [InlineData("APPLY")]

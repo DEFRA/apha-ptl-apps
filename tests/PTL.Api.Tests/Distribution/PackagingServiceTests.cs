@@ -171,6 +171,34 @@ public class PackagingServiceTests
     }
 
     [Fact]
+    public async Task SavePackagingAsync_PostedTick_ReportsEmailsThatCouldNotBeSentWithoutFailingTheSave()
+    {
+        var h = new Harness();
+        h.Sheet(PackagingMode.GroupAddress, 1, GroupRaw(Dp1));
+        var queued = new DistributionPostedEmailEntity { DistributionPostedEmailId = Guid.NewGuid(), Email = "a@example.test", Distribution = "17152A/BA" };
+        h.Notifier.EmailsToReturn.Add(queued);
+        h.Notifier.FailedEmails.Add(queued);
+
+        var outcome = await h.Service.SavePackagingAsync(2026, 5, [Tick(Dp1, packed: false, posted: true)]);
+
+        Assert.True(outcome.Success);
+        Assert.Equal("a@example.test (17152A/BA)", Assert.Single(outcome.EmailFailures!));
+        Assert.Single(h.Repository.PackagingUpdates);
+    }
+
+    [Fact]
+    public async Task SavePackagingAsync_PostedTick_ReportsNoFailuresWhenEveryEmailIsSent()
+    {
+        var h = new Harness();
+        h.Sheet(PackagingMode.GroupAddress, 1, GroupRaw(Dp1));
+        h.Notifier.EmailsToReturn.Add(new DistributionPostedEmailEntity { DistributionPostedEmailId = Guid.NewGuid(), Email = "a@example.test" });
+
+        var outcome = await h.Service.SavePackagingAsync(2026, 5, [Tick(Dp1, packed: false, posted: true)]);
+
+        Assert.Empty(outcome.EmailFailures!);
+    }
+
+    [Fact]
     public async Task SavePackagingAsync_PostedTickKeepsAnExistingPackedDate()
     {
         var h = new Harness();

@@ -21,8 +21,7 @@ public sealed class PackagingOutputService(
     IDistributionRepository distributionRepository,
     ITemplateStorageService templateStorage,
     ITemplateMergeService templateMergeService,
-    IOptions<TemplateStorageOptions> templateStorageOptions,
-    IOptions<PackagingCustomsOptions> customsOptions) : IPackagingOutputService
+    IOptions<TemplateStorageOptions> templateStorageOptions) : IPackagingOutputService
 {
     private const string DocxExtension = ".docx";
 
@@ -160,7 +159,7 @@ public sealed class PackagingOutputService(
     private string TemplateKey()
     {
         var prefix = (templateStorageOptions.Value.Prefix ?? string.Empty).Trim('/');
-        var path = $"{customsOptions.Value.Folder.Trim('/')}/{customsOptions.Value.TemplateFileName}";
+        var path = $"{PackagingCustomsTemplate.Folder}/{PackagingCustomsTemplate.FileName}";
         return prefix.Length == 0 ? path : $"{prefix}/{path}";
     }
 

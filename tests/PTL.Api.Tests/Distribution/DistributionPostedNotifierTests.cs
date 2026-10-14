@@ -7,8 +7,8 @@ using static PTL.Api.Tests.Distribution.PackagingTestData;
 
 namespace PTL.Api.Tests.Distribution;
 
-// Pins legacy DistributionPostedEmailCollection.AddNewDistributionPostedEmail (queue, never
-// duplicating an unsent email) and the send step that GOV.UK Notify replaces.
+// Pins legacy DistributionPostedEmailCollection.AddNewDistributionPostedEmail (one email per
+// participant address) and the immediate GOV.UK Notify send that replaces the polled SMTP service.
 public class DistributionPostedNotifierTests
 {
     private static readonly DateTimeOffset Now = new(2026, 5, 13, 10, 30, 0, TimeSpan.Zero);
@@ -47,7 +47,6 @@ public class DistributionPostedNotifierTests
         var emails = await h.Notifier.BuildEmailsAsync([]);
 
         Assert.Empty(emails);
-        Assert.Equal(0, h.Repository.UnsentPostedEmailRequests);
         Assert.Empty(h.Participants.Requested);
     }
 
@@ -106,7 +105,7 @@ public class DistributionPostedNotifierTests
     }
 
     [Fact]
-    public async Task BuildEmailsAsync_AddressAlreadyWaitingInTheQueueIsNotQueuedAgainIgnoringCase()
+    public async Task BuildEmailsAsync_UnsentRowsFromEarlierFailuresDoNotBlockANewEmail()
     {
         var h = new Harness();
         h.AddParticipant(Part1, "Lab@Example.test", "other@example.test");
@@ -114,20 +113,7 @@ public class DistributionPostedNotifierTests
 
         var emails = await h.Notifier.BuildEmailsAsync([Posted(Part1)]);
 
-        Assert.Equal("other@example.test", Assert.Single(emails).Email);
-    }
-
-    [Fact]
-    public async Task BuildEmailsAsync_SameAddressForADifferentSchemeIsStillQueued()
-    {
-        var h = new Harness();
-        h.AddParticipant(Part1, "lab@example.test");
-        h.Repository.UnsentPostedEmails.Add(Email(Guid.NewGuid()));
-
-        var emails = await h.Notifier.BuildEmailsAsync([Posted(Part1, Scheme2)]);
-
-        var email = Assert.Single(emails);
-        Assert.Equal(Scheme2, email.MonthlyDistributionSchemeId);
+        Assert.Equal(["Lab@Example.test", "other@example.test"], emails.Select(e => e.Email));
     }
 
     [Fact]
@@ -148,8 +134,9 @@ public class DistributionPostedNotifierTests
     {
         var h = new Harness();
 
-        await h.Notifier.DispatchAsync([]);
+        var failed = await h.Notifier.DispatchAsync([]);
 
+        Assert.Empty(failed);
         Assert.Empty(h.Notify.Sent);
         Assert.Empty(h.Logger.Entries);
     }
@@ -160,8 +147,9 @@ public class DistributionPostedNotifierTests
         var h = new Harness();
         var id = Guid.NewGuid();
 
-        await h.Notifier.DispatchAsync([Email(id)]);
+        var failed = await h.Notifier.DispatchAsync([Email(id)]);
 
+        Assert.Empty(failed);
         var sent = Assert.Single(h.Notify.Sent);
         Assert.Equal("2bb0e2d0-fa23-472e-947c-4524d14ad288", sent.TemplateId);
         Assert.Equal("lab@example.test", sent.Email);
@@ -175,7 +163,7 @@ public class DistributionPostedNotifierTests
     }
 
     [Fact]
-    public async Task DispatchAsync_FailedSendIsLoggedLeftQueuedAndTheNextEmailStillGoes()
+    public async Task DispatchAsync_FailedSendIsLoggedReturnedAndTheNextEmailStillGoes()
     {
         var h = new Harness();
         var failing = Email(Guid.NewGuid());
@@ -183,12 +171,13 @@ public class DistributionPostedNotifierTests
         var working = Email(Guid.NewGuid());
         h.Notify.FailFor = address => address == "broken@example.test" ? new InvalidOperationException("Notify down") : null;
 
-        await h.Notifier.DispatchAsync([failing, working]);
+        var failed = await h.Notifier.DispatchAsync([failing, working]);
 
+        Assert.Same(failing, Assert.Single(failed));
         Assert.Equal("lab@example.test", Assert.Single(h.Notify.Sent).Email);
         Assert.Equal(working.DistributionPostedEmailId, Assert.Single(h.Repository.MarkedSentEmails).Id);
         var entry = Assert.Single(h.Logger.Entries);
-        Assert.Equal(LogLevel.Warning, entry.Level);
+        Assert.Equal(LogLevel.Error, entry.Level);
         Assert.IsType<InvalidOperationException>(entry.Exception);
     }
 

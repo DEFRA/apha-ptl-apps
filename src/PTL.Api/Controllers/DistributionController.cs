@@ -136,7 +136,7 @@ public sealed class DistributionController(
         }
 
         var outcome = await packagingService.SavePackagingAsync(yearId, monthId, updates, cancellationToken);
-        return outcome.Success ? Ok(new PackagingSaveResult(true)) : NotFound();
+        return outcome.Success ? Ok(new PackagingSaveResult(true, outcome.EmailFailures ?? [])) : NotFound();
     }
 
     // POST /api/distributions/months/{yearId}/{monthId}/packaging/labels - legacy Print Labels,

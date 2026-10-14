@@ -65,13 +65,14 @@ public sealed class PackagingService(
         }
 
         var emails = await postedNotifier.BuildEmailsAsync(newlyPosted, cancellationToken);
+        IReadOnlyList<DistributionPostedEmailEntity> failedEmails = [];
         if (progress.Count > 0 || emails.Count > 0)
         {
             await distributionRepository.UpdatePackagingAsync(progress, emails, cancellationToken);
-            await postedNotifier.DispatchAsync(emails, cancellationToken);
+            failedEmails = await postedNotifier.DispatchAsync(emails, cancellationToken);
         }
 
-        return new PackagingSaveOutcome(true);
+        return new PackagingSaveOutcome(true, [.. failedEmails.Select(e => $"{e.Email} ({e.Distribution})")]);
     }
 
     private static void CollectProgress(

@@ -18,7 +18,6 @@ public class PackagingOutputServiceTests
         public FakeTemplateStorageService Storage { get; } = new();
         public FakeTemplateMergeService Merge { get; } = new();
         public TemplateStorageOptions StorageOptions { get; } = new() { Prefix = "templates" };
-        public PackagingCustomsOptions CustomsOptions { get; } = new();
         public PackagingOutputService Service { get; }
 
         public Harness(bool initialised = true)
@@ -28,7 +27,7 @@ public class PackagingOutputServiceTests
                 Repository.Schedules[(2026, 5)] = (MonthlyDistributionId, []);
             }
 
-            Service = new PackagingOutputService(Repository, Storage, Merge, Options.Create(StorageOptions), Options.Create(CustomsOptions));
+            Service = new PackagingOutputService(Repository, Storage, Merge, Options.Create(StorageOptions));
         }
 
         public void Sheet(PackagingMode mode, int week, PackagingRawData raw) =>
@@ -365,7 +364,7 @@ public class PackagingOutputServiceTests
     [InlineData("/templates/", "templates/customs/Customs Pro-Forma Template v20.10.2020.docx")]
     [InlineData("", "customs/Customs Pro-Forma Template v20.10.2020.docx")]
     [InlineData("/", "customs/Customs Pro-Forma Template v20.10.2020.docx")]
-    public async Task GetCustomsDocumentAsync_ReadsTheTemplateFromTheConfiguredKey(string prefix, string expectedKey)
+    public async Task GetCustomsDocumentAsync_ReadsTheFixedTemplateUnderTheStoragePrefix(string prefix, string expectedKey)
     {
         var h = new Harness();
         h.StorageOptions.Prefix = prefix;
@@ -376,20 +375,6 @@ public class PackagingOutputServiceTests
 
         Assert.True(outcome.Success);
         Assert.Equal([1], h.Merge.MergedTemplate);
-    }
-
-    [Fact]
-    public async Task GetCustomsDocumentAsync_HonoursConfiguredFolderAndFileName()
-    {
-        var h = new Harness();
-        h.CustomsOptions.Folder = "/forms/";
-        h.CustomsOptions.TemplateFileName = "Customs.docx";
-        h.Storage.Files["templates/forms/Customs.docx"] = [2];
-        h.Sheet(PackagingMode.ParticipantCombined, 1, Raw(groups: [Group(participantId: Part1)]));
-
-        var outcome = await h.Service.GetCustomsDocumentAsync(2026, 5, PackagingMode.ParticipantCombined, 1, []);
-
-        Assert.True(outcome.Success);
     }
 
     [Fact]

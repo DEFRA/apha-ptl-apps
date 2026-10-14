@@ -66,6 +66,9 @@ internal sealed class FakePostedNotifier : IDistributionPostedNotifier
     // Emails BuildEmailsAsync hands back for whatever was posted.
     public List<DistributionPostedEmailEntity> EmailsToReturn { get; } = [];
 
+    // Emails DispatchAsync reports as not sent.
+    public List<DistributionPostedEmailEntity> FailedEmails { get; } = [];
+
     // Mirrors the real notifier's contract (nothing posted -> nothing to send) unless told otherwise.
     public bool ReturnEmailsEvenWhenNothingPosted { get; set; }
 
@@ -77,10 +80,11 @@ internal sealed class FakePostedNotifier : IDistributionPostedNotifier
             posted.Count == 0 && !ReturnEmailsEvenWhenNothingPosted ? [] : [.. EmailsToReturn]);
     }
 
-    public Task DispatchAsync(IReadOnlyList<DistributionPostedEmailEntity> emails, CancellationToken cancellationToken = default)
+    public Task<IReadOnlyList<DistributionPostedEmailEntity>> DispatchAsync(
+        IReadOnlyList<DistributionPostedEmailEntity> emails, CancellationToken cancellationToken = default)
     {
         Dispatched.Add(emails);
-        return Task.CompletedTask;
+        return Task.FromResult<IReadOnlyList<DistributionPostedEmailEntity>>([.. FailedEmails]);
     }
 }
 

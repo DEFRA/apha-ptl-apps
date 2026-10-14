@@ -192,7 +192,6 @@ builder.Services.AddScoped<IPackagingService, PackagingService>();
 builder.Services.AddScoped<IPackagingOutputService, PackagingOutputService>();
 builder.Services.AddScoped<ITemplateMergeService, TemplateMergeService>();
 builder.Services.Configure<PTL.Core.Configuration.ExternalOptions>(builder.Configuration.GetSection(PTL.Core.Configuration.ExternalOptions.SectionName));
-builder.Services.Configure<PackagingCustomsOptions>(builder.Configuration.GetSection(PackagingCustomsOptions.SectionName));
 
 builder.Services.AddScoped<IAdministrationChargeRepository, AdministrationChargeRepository>();
 builder.Services.AddScoped<IAdministrationChargeService, AdministrationChargeService>();

@@ -295,7 +295,16 @@ public sealed class DistributionController(IDistributionApiClient distributionAp
             return RedirectToAction(nameof(Packaging), new { year, monthId, mode = model.Mode, week = model.Week });
         }
 
-        TempData.SetNotification(NotificationType.Success, "Sample Packaging updated successfully.");
+        if (result.EmailFailures is { Count: > 0 } emailFailures)
+        {
+            TempData.SetNotification(
+                NotificationType.Warning,
+                $"Sample Packaging updated, but the Distribution Posted email could not be sent to: {string.Join(", ", emailFailures)}. Please notify the participant another way.");
+        }
+        else
+        {
+            TempData.SetNotification(NotificationType.Success, "Sample Packaging updated successfully.");
+        }
 
         return string.Equals(command, ApplyCommand, StringComparison.OrdinalIgnoreCase)
             ? RedirectToAction(nameof(Packaging), new { year, monthId, mode = model.Mode, week = model.Week })

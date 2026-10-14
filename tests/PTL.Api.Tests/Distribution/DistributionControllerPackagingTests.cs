@@ -194,6 +194,19 @@ public class DistributionControllerPackagingTests
     }
 
     [Fact]
+    public async Task SavePackaging_EmailFailures_AreReturnedToTheCaller()
+    {
+        var h = new Harness();
+        h.Packaging.SaveOutcome = new PackagingSaveOutcome(true, ["lab@example.test (17152A/BA)"]);
+
+        var result = await h.Controller.SavePackaging(2026, 5, new PackagingSaveRequest([]), CancellationToken.None);
+
+        var saved = Assert.IsType<PackagingSaveResult>(Assert.IsType<OkObjectResult>(result.Result).Value);
+        Assert.True(saved.Success);
+        Assert.Equal("lab@example.test (17152A/BA)", Assert.Single(saved.EmailFailures!));
+    }
+
+    [Fact]
     public async Task SavePackaging_Valid_PassesMappedUpdatesAndReturnsSuccess()
     {
         var h = new Harness();

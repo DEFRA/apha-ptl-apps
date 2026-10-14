@@ -11,14 +11,15 @@ public sealed record PostedParticipant(Guid ParticipantId, Guid MonthlyDistribut
 
 public interface IDistributionPostedNotifier
 {
-    // Legacy DistributionPostedEmailCollection.AddNewDistributionPostedEmail: one queued email per
-    // participant email address (primary, plus the secondary if there is one), never duplicating
-    // an email still waiting to be sent.
+    // Legacy DistributionPostedEmailCollection.AddNewDistributionPostedEmail: one email per
+    // participant email address (primary, plus the secondary if there is one).
     Task<IReadOnlyList<DistributionPostedEmailEntity>> BuildEmailsAsync(
         IReadOnlyList<PostedParticipant> posted, CancellationToken cancellationToken = default);
 
-    // Replaces legacy's ProficiencyTestingService SMTP send with GOV.UK Notify.
-    Task DispatchAsync(IReadOnlyList<DistributionPostedEmailEntity> emails, CancellationToken cancellationToken = default);
+    // Sends straight through GOV.UK Notify (replaces legacy's polled SMTP service) and returns the
+    // emails that could not be sent. There is no retry.
+    Task<IReadOnlyList<DistributionPostedEmailEntity>> DispatchAsync(
+        IReadOnlyList<DistributionPostedEmailEntity> emails, CancellationToken cancellationToken = default);
 }
 
 public sealed class DistributionPostedNotifier(
@@ -31,9 +32,9 @@ public sealed class DistributionPostedNotifier(
 {
     private static readonly Action<ILogger, Guid, Exception?> LogSendFailedMessage =
         LoggerMessage.Define<Guid>(
-            LogLevel.Warning,
+            LogLevel.Error,
             new EventId(1, nameof(LogSendFailedMessage)),
-            "Distribution Posted notification {DistributionPostedEmailId} could not be sent and stays queued");
+            "Distribution Posted notification {DistributionPostedEmailId} could not be sent");
 
     public async Task<IReadOnlyList<DistributionPostedEmailEntity>> BuildEmailsAsync(
         IReadOnlyList<PostedParticipant> posted, CancellationToken cancellationToken = default)
@@ -43,10 +44,7 @@ public sealed class DistributionPostedNotifier(
             return [];
         }
 
-        var unsent = await repository.GetUnsentDistributionPostedEmailsAsync(cancellationToken);
-        var queued = unsent
-            .Select(e => (e.ParticipantId, e.MonthlyDistributionSchemeId, Email: e.Email.ToUpperInvariant()))
-            .ToHashSet();
+        var queued = new HashSet<(Guid ParticipantId, Guid MonthlyDistributionSchemeId, string Email)>();
 
         var emails = new List<DistributionPostedEmailEntity>();
         foreach (var item in posted)
@@ -80,12 +78,10 @@ public sealed class DistributionPostedNotifier(
         return emails;
     }
 
-    public async Task DispatchAsync(IReadOnlyList<DistributionPostedEmailEntity> emails, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<DistributionPostedEmailEntity>> DispatchAsync(
+        IReadOnlyList<DistributionPostedEmailEntity> emails, CancellationToken cancellationToken = default)
     {
-        if (emails.Count == 0)
-        {
-            return;
-        }
+        var failed = new List<DistributionPostedEmailEntity>();
 
         foreach (var email in emails)
         {
@@ -98,16 +94,24 @@ public sealed class DistributionPostedNotifier(
                 ["date"] = now.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture),
             };
 
+            var sent = false;
             try
             {
                 await notifyClient.SendEmailAsync(DistributionPostedNotificationOptions.TemplateId, email.Email, personalisation, email.DistributionPostedEmailId.ToString(), cancellationToken);
+                sent = true;
                 await repository.MarkDistributionPostedEmailSentAsync(email.DistributionPostedEmailId, now, cancellationToken);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                // The Save has already committed; a failed send must not undo it - the row stays queued.
+                // The Save has already committed, so a failed send is reported rather than rolled back.
                 LogSendFailedMessage(logger, email.DistributionPostedEmailId, ex);
+                if (!sent)
+                {
+                    failed.Add(email);
+                }
             }
         }
+
+        return failed;
     }
 }

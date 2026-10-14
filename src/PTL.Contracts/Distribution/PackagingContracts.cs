@@ -47,7 +47,7 @@ public sealed record PackagingStageUpdateRequest(int Mode, int Week, Guid Distri
 
 public sealed record PackagingSaveRequest(IReadOnlyList<PackagingStageUpdateRequest> Updates);
 
-public sealed record PackagingSaveResult(bool Success);
+public sealed record PackagingSaveResult(bool Success, IReadOnlyList<string>? EmailFailures = null);
 
 // The rows ticked in the Print column (PackagingBlockResponse.PrintKey).
 public sealed record PackagingSelectionRequest(int Mode, int Week, IReadOnlyList<string> SelectedKeys);
