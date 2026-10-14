@@ -19,7 +19,7 @@ public partial class PackagingRenderTests : IClassFixture<WebApplicationFactory<
     private static partial Regex AntiforgeryTokenPattern();
 
     private const string PreparationIncomplete = "The preparation for this Scheme is not complete";
-    private const string BlurbText = "After selecting an option from the Drop Down list, the table below will show all the Sets of Samples that are to be packaged. Any special Packing Instructions will also be displayed.";
+    private const string BlurbText = "Select a packaging option and, if needed, a week. Then choose View to show the sample packaging list and any special packing instructions.";
     private const string BaseQuery = "year=2026&monthId=4";
 
     private static readonly DateTime Apr10 = new(2026, 4, 10);
@@ -156,7 +156,7 @@ public partial class PackagingRenderTests : IClassFixture<WebApplicationFactory<
 
     private static void AssertButtons(string html, bool customs)
     {
-        foreach (var (command, text) in new[] { ("save", "Save"), ("apply", "Apply"), ("cancel", "Cancel"), ("labels", "Print Labels") })
+        foreach (var (command, text) in new[] { ("select", "View"), ("save", "Save"), ("apply", "Apply"), ("cancel", "Cancel"), ("labels", "Print Labels") })
         {
             Assert.Matches($"<button[^>]*name=\"command\" value=\"{command}\"[^>]*>{text}</button>", html);
         }
@@ -577,11 +577,13 @@ public partial class PackagingRenderTests : IClassFixture<WebApplicationFactory<
     }
 
     [Fact]
-    public async Task Labels_WithNoOptionChosen_ShowsNoLabelsToPrintWithoutATable()
+    public async Task Labels_WithNoOptionChosen_ShowsValidationErrorWithoutATable()
     {
         var html = await PostHtmlAsync(("command", "labels"));
 
-        Assert.Contains("<h2 class=\"govuk-error-summary__title\">No Labels to Print</h2>", html, StringComparison.Ordinal);
+        Assert.Contains("<title>Error: Sample Packaging", html, StringComparison.Ordinal);
+        Assert.Contains("<a href=\"#packaging-mode\">Select a packaging option</a>", html, StringComparison.Ordinal);
+        Assert.Contains("id=\"packaging-mode-error\"", html, StringComparison.Ordinal);
         Assert.DoesNotContain("<table", html, StringComparison.Ordinal);
         Assert.Empty(_apiClient.PackagingLabelRequests);
     }

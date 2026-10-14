@@ -382,16 +382,32 @@ public class DistributionControllerPackagingTests
     }
 
     [Fact]
-    public async Task Packaging_Post_Apply_WithNoModeChosenRedirectsWithANullMode()
+    public async Task Packaging_Post_Apply_WithNoModeChosen_ShowsModeErrorWithoutSaving()
     {
         var apiClient = new FakeDistributionApiClient { PackagingSaveResult = new PackagingSaveResult(true) };
         var controller = CreateController(apiClient);
 
         var result = await controller.Packaging(Year, Month, ModelOf(mode: null, week: 0), "apply", CancellationToken.None);
 
-        var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal(nameof(DistributionController.Packaging), redirect.ActionName);
-        Assert.Null(redirect.RouteValues!["mode"]);
+        var model = ViewModelOf(result);
+        Assert.Equal("Select a packaging option", model.ModeError);
+        Assert.Null(model.WeekError);
+        Assert.Empty(apiClient.SavedPackagingRequests);
+    }
+
+    [Theory]
+    [InlineData("select")]
+    [InlineData("save")]
+    [InlineData("apply")]
+    public async Task Packaging_Post_GroupAddressWithNoWeek_ShowsWeekError(string command)
+    {
+        var controller = CreateController(new FakeDistributionApiClient());
+
+        var result = await controller.Packaging(Year, Month, ModelOf(0, 0), command, CancellationToken.None);
+
+        var model = ViewModelOf(result);
+        Assert.Equal("Select a week", model.WeekError);
+        Assert.Null(model.ModeError);
     }
 
     [Theory]
@@ -482,7 +498,7 @@ public class DistributionControllerPackagingTests
     }
 
     [Fact]
-    public async Task Packaging_Post_Labels_NoModeChosen_ShowsTheNoLabelsMessageWithoutCallingTheLabelsApi()
+    public async Task Packaging_Post_Labels_NoModeChosen_ShowsModeErrorWithoutCallingTheLabelsApi()
     {
         var apiClient = new FakeDistributionApiClient { PackagingLabels = new PackagingLabelsResponse([new PackagingLabelResponse(["x"])]) };
         var controller = CreateController(apiClient);
@@ -490,7 +506,7 @@ public class DistributionControllerPackagingTests
         var result = await controller.Packaging(Year, Month, ModelOf(mode: null, week: 0), "labels", CancellationToken.None);
 
         var model = ViewModelOf(result);
-        Assert.Equal("No Labels to Print", model.Message);
+        Assert.Equal("Select a packaging option", model.ModeError);
         Assert.Null(model.Sheet);
         Assert.Empty(apiClient.PackagingLabelRequests);
     }

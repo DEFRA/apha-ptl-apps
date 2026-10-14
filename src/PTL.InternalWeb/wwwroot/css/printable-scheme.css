@@ -195,6 +195,12 @@
     flex-wrap: wrap;
     align-items: flex-end;
     gap: 0 20px;
+    margin-bottom: 30px;
+}
+
+.ptl-packaging-selects > .govuk-form-group,
+.ptl-packaging-selects > .govuk-button {
+    margin-bottom: 0;
 }
 
 .ptl-packaging-actions {

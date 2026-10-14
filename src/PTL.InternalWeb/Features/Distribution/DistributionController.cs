@@ -225,7 +225,7 @@ public sealed class DistributionController(IDistributionApiClient distributionAp
         return model is null ? NotFound() : View(model);
     }
 
-    // select = the Packaging/Week dropdown changed (legacy AutoPostBack): redisplay, keeping unsaved ticks.
+    // select = explicit View button after choosing the Packaging/Week values: redisplay, keeping unsaved ticks.
     // Save = persist then leave (legacy ButtonSave_Click -> LeavePage() -> MenuDistributions.aspx).
     // Apply = persist then stay (legacy ButtonApply_Click redraws from the saved data).
     // Cancel = discard then leave. labels/customs = Print Labels / Print Customs.
@@ -236,6 +236,12 @@ public sealed class DistributionController(IDistributionApiClient distributionAp
         if (string.Equals(command, CancelCommand, StringComparison.OrdinalIgnoreCase))
         {
             return RedirectToAction(nameof(Index));
+        }
+
+        if (!ValidatePackagingSelection(model))
+        {
+            var invalid = await BuildPackagingViewModelAsync(year, monthId, model, cancellationToken);
+            return invalid is null ? NotFound() : View(invalid);
         }
 
         if (string.Equals(command, "save", StringComparison.OrdinalIgnoreCase) || string.Equals(command, ApplyCommand, StringComparison.OrdinalIgnoreCase))
@@ -283,6 +289,21 @@ public sealed class DistributionController(IDistributionApiClient distributionAp
 
         var rebuilt = await BuildPackagingViewModelAsync(year, monthId, model, cancellationToken);
         return rebuilt is null ? NotFound() : View(rebuilt);
+    }
+
+    private static bool ValidatePackagingSelection(PackagingViewModel model)
+    {
+        if (model.Mode is not (0 or 1 or 2))
+        {
+            model.Mode = null;
+            model.ModeError = "Select a packaging option";
+        }
+        else if (model.Mode is 0 or 1 && model.Week is < 1 or > 4)
+        {
+            model.WeekError = "Select a week";
+        }
+
+        return !model.HasSelectionError;
     }
 
     private async Task<IActionResult> SavePackagingAsync(int year, int monthId, PackagingViewModel model, string command, CancellationToken cancellationToken)

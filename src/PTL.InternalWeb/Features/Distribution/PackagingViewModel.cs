@@ -42,6 +42,12 @@ public sealed class PackagingViewModel
 
     public string PrintTitle { get; set; } = string.Empty;
 
+    public string? ModeError { get; set; }
+
+    public string? WeekError { get; set; }
+
+    public bool HasSelectionError => ModeError is not null || WeekError is not null;
+
     public bool ShowWeek => Mode is 0 or 1;
 
     public bool ShowCustoms => (Mode == 1 && Week > 0) || Mode == 2;

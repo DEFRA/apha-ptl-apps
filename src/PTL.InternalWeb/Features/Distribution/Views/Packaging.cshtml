@@ -3,7 +3,7 @@
 @model PTL.InternalWeb.Features.Distribution.PackagingViewModel
 @{
     var hasMessage = !string.IsNullOrEmpty(Model.Message);
-    ViewData["Title"] = $"{(hasMessage ? "Error: " : string.Empty)}Sample Packaging - {Model.MonthDescription}";
+    ViewData["Title"] = $"{(hasMessage || Model.HasSelectionError ? "Error: " : string.Empty)}Sample Packaging - {Model.MonthDescription}";
 
     var sheet = Model.Sheet;
     var isDaily = sheet?.Mode == 2;
@@ -167,12 +167,31 @@
     {
         <input type="hidden" name="PostedTicks" value="@tick" />
     }
-    <input type="hidden" name="command" value="select" id="packaging-select-command" disabled />
-
     <p class="ptl-print-title">Sample Packaging - @Model.PrintTitle</p>
 
     <div class="noprint">
-        <p class="govuk-body">After selecting an option from the Drop Down list, the table below will show all the Sets of Samples that are to be packaged. Any special Packing Instructions will also be displayed.</p>
+        <p class="govuk-body">Select a packaging option and, if needed, a week. Then choose View to show the sample packaging list and any special packing instructions.</p>
+
+        @if (Model.HasSelectionError)
+        {
+            <div class="govuk-error-summary" data-module="govuk-error-summary">
+                <div role="alert">
+                    <h2 class="govuk-error-summary__title">There is a problem</h2>
+                    <div class="govuk-error-summary__body">
+                        <ul class="govuk-list govuk-error-summary__list">
+                            @if (Model.ModeError is not null)
+                            {
+                                <li><a href="#packaging-mode">@Model.ModeError</a></li>
+                            }
+                            @if (Model.WeekError is not null)
+                            {
+                                <li><a href="#packaging-week">@Model.WeekError</a></li>
+                            }
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        }
 
         @if (hasMessage)
         {
@@ -190,9 +209,13 @@
         }
 
         <div class="ptl-packaging-selects">
-            <div class="govuk-form-group">
-                <label class="govuk-label govuk-visually-hidden" for="packaging-mode">Packaging option</label>
-                <select class="govuk-select" id="packaging-mode" name="Mode">
+            <div class="govuk-form-group @(Model.ModeError is null ? "" : "govuk-form-group--error")">
+                <label class="govuk-label" for="packaging-mode">Packaging option</label>
+                @if (Model.ModeError is not null)
+                {
+                    <p id="packaging-mode-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @Model.ModeError</p>
+                }
+                <select class="govuk-select @(Model.ModeError is null ? "" : "govuk-select--error")" id="packaging-mode" name="Mode" aria-describedby="@(Model.ModeError is null ? null : "packaging-mode-error")">
                     @if (Model.Mode is null)
                     {
                         <option value="" selected="selected">- Please Select -</option>
@@ -204,9 +227,13 @@
             </div>
             @if (Model.ShowWeek)
             {
-                <div class="govuk-form-group">
-                    <label class="govuk-label govuk-visually-hidden" for="packaging-week">Week</label>
-                    <select class="govuk-select" id="packaging-week" name="Week">
+                <div class="govuk-form-group @(Model.WeekError is null ? "" : "govuk-form-group--error")">
+                    <label class="govuk-label" for="packaging-week">Week</label>
+                    @if (Model.WeekError is not null)
+                    {
+                        <p id="packaging-week-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @Model.WeekError</p>
+                    }
+                    <select class="govuk-select @(Model.WeekError is null ? "" : "govuk-select--error")" id="packaging-week" name="Week" aria-describedby="@(Model.WeekError is null ? null : "packaging-week-error")">
                         @if (Model.Week == 0)
                         {
                             <option value="0" selected="selected">- Please Select -</option>
@@ -218,9 +245,7 @@
                     </select>
                 </div>
             }
-            <noscript>
-                <button type="submit" name="command" value="select" class="govuk-button govuk-button--secondary govuk-!-margin-bottom-6" data-module="govuk-button" formnovalidate>View</button>
-            </noscript>
+            <button type="submit" name="command" value="select" class="govuk-button govuk-button--secondary" data-module="govuk-button">View</button>
         </div>
     </div>
 
@@ -374,27 +399,8 @@
     </div>
 </form>
 
-@* Legacy AutoPostBack: either dropdown submits the form as command=select. Changing the Packaging
-   option resets the Week dropdown to "- Please Select -" (legacy re-inserts it), so Week is left
-   out of that submit. *@
 <script>
     (function () {
-        var form = document.getElementById('packaging-form');
-        var selectCommand = document.getElementById('packaging-select-command');
-
-        function submitSelect(resetWeek) {
-            var week = document.getElementById('packaging-week');
-            if (resetWeek && week) {
-                week.disabled = true;
-            }
-
-            selectCommand.disabled = false;
-            form.submit();
-        }
-
-        document.getElementById('packaging-mode').addEventListener('change', function () { submitSelect(true); });
-        document.getElementById('packaging-week')?.addEventListener('change', function () { submitSelect(false); });
-
         document.getElementById('packaging-print-button').addEventListener('click', function () { window.print(); });
     })();
 </script>
