@@ -29,6 +29,8 @@ public class DistributionControllerPackagingTests
                 new IntendedResultsService(repository),
                 new DistributionParticipantsService(repository),
                 new PreparationService(repository),
+                new ResultsReceiptService(repository, TimeProvider.System),
+                new ActualResultsService(repository, TimeProvider.System),
                 Packaging,
                 Output,
                 Microsoft.Extensions.Logging.Abstractions.NullLogger<DistributionController>.Instance)

@@ -994,6 +994,75 @@ public class DapperColumnMappingsTests
         Assert.Equal(string.Empty, label.Address2);
     }
 
+    // The three result sets of spgActualResults (header, tlnkActualResultItemResult, tlnkActualMethodItemResult).
+    [Fact]
+    public void Register_MapsActualResultsHeader_ColumnsToProperties()
+    {
+        var table = new DataTable();
+        table.Columns.Add("fldFirstEditDate", typeof(DateTime));
+        table.Columns.Add("fldLastEditDate", typeof(DateTime));
+        table.Columns.Add("fldDistribution", typeof(string));
+        table.Columns.Add("fldSchemeIdentifier", typeof(string));
+        table.Columns.Add("fldSchemeName", typeof(string));
+        table.Columns.Add("fldDeadlineDate", typeof(DateTime));
+        table.Rows.Add(new DateTime(2026, 6, 1), new DateTime(2026, 6, 2), "D1/S1", "BT", "Brucella", new DateTime(2026, 6, 30));
+
+        var header = Parse<ActualResultsHeaderEntity>(table).Single();
+
+        Assert.Equal(new DateTime(2026, 6, 1), header.FirstEditDate);
+        Assert.Equal(new DateTime(2026, 6, 2), header.LastEditDate);
+        Assert.Equal("D1/S1", header.Distribution);
+        Assert.Equal("BT", header.SchemeIdentifier);
+        Assert.Equal("Brucella", header.SchemeName);
+        Assert.Equal(new DateTime(2026, 6, 30), header.DeadlineDate);
+    }
+
+    [Fact]
+    public void Register_MapsActualResultsHeader_NullFirstEditDateMeansNothingSavedYet()
+    {
+        var table = new DataTable();
+        table.Columns.Add("fldFirstEditDate", typeof(DateTime));
+        table.Columns.Add("fldLastEditDate", typeof(DateTime));
+        table.Rows.Add(DBNull.Value, DBNull.Value);
+
+        var header = Parse<ActualResultsHeaderEntity>(table).Single();
+
+        Assert.Null(header.FirstEditDate);
+        Assert.Null(header.LastEditDate);
+    }
+
+    [Fact]
+    public void Register_MapsActualSampleResult_ColumnsToProperties()
+    {
+        var id = Guid.NewGuid();
+        var table = new DataTable();
+        table.Columns.Add("fldSampleResultItemId", typeof(Guid));
+        table.Columns.Add("fldResult", typeof(string));
+        table.Rows.Add(id, "12");
+        table.Rows.Add(Guid.NewGuid(), DBNull.Value);
+
+        var results = Parse<ActualSampleResultEntity>(table);
+
+        Assert.Equal((id, "12"), (results[0].SampleResultItemId, results[0].Result));
+        Assert.Null(results[1].Result);
+    }
+
+    [Fact]
+    public void Register_MapsActualMethodItemResult_ColumnsToProperties()
+    {
+        var id = Guid.NewGuid();
+        var table = new DataTable();
+        table.Columns.Add("fldTestMethodItemId", typeof(Guid));
+        table.Columns.Add("fldResult", typeof(string));
+        table.Rows.Add(id, "37C");
+        table.Rows.Add(Guid.NewGuid(), DBNull.Value);
+
+        var results = Parse<ActualMethodItemResultEntity>(table);
+
+        Assert.Equal((id, "37C"), (results[0].TestMethodItemId, results[0].Result));
+        Assert.Null(results[1].Result);
+    }
+
     private static List<T> Parse<T>(DataTable table)
     {
         using var reader = table.CreateDataReader();

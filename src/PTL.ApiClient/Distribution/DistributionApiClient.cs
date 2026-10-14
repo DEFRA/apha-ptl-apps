@@ -147,6 +147,61 @@ public sealed class DistributionApiClient(HttpClient httpClient) : IDistribution
         return await response.Content.ReadFromJsonAsync<PreparationSaveResult>(cancellationToken);
     }
 
+    public async Task<ResultsReceiptResponse?> GetResultsReceiptAsync(int yearId, int monthId, CancellationToken cancellationToken = default)
+    {
+        var response = await httpClient.GetAsync(
+            new Uri($"/api/distributions/months/{yearId}/{monthId}/results-receipt", UriKind.Relative), cancellationToken);
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<ResultsReceiptResponse>(cancellationToken);
+    }
+
+    public async Task<ResultsReceiptSaveResult?> SaveResultsReceiptAsync(
+        int yearId, int monthId, ResultsReceiptSaveRequest request, CancellationToken cancellationToken = default)
+    {
+        var response = await httpClient.PutAsJsonAsync($"/api/distributions/months/{yearId}/{monthId}/results-receipt", request, cancellationToken);
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<ResultsReceiptSaveResult>(cancellationToken);
+    }
+
+    public async Task<ActualResultsResponse?> GetActualResultsAsync(
+        Guid monthlyDistributionSchemeId, Guid distributionParticipantId, CancellationToken cancellationToken = default)
+    {
+        var response = await httpClient.GetAsync(
+            new Uri($"/api/distributions/schemes/{monthlyDistributionSchemeId}/participants/{distributionParticipantId}/actual-results", UriKind.Relative),
+            cancellationToken);
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<ActualResultsResponse>(cancellationToken);
+    }
+
+    public async Task<ActualResultsSaveResult?> SaveActualResultsAsync(
+        Guid monthlyDistributionSchemeId, Guid distributionParticipantId, ActualResultsSaveRequest request, CancellationToken cancellationToken = default)
+    {
+        var response = await httpClient.PutAsJsonAsync(
+            $"/api/distributions/schemes/{monthlyDistributionSchemeId}/participants/{distributionParticipantId}/actual-results", request, cancellationToken);
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<ActualResultsSaveResult>(cancellationToken);
+    }
+
     public async Task<PackagingSheetResponse?> GetPackagingAsync(int yearId, int monthId, int mode, int week, CancellationToken cancellationToken = default)
     {
         var response = await httpClient.GetAsync(

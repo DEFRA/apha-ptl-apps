@@ -124,6 +124,39 @@ internal sealed class FakeDistributionRepository : IDistributionRepository
         return Task.CompletedTask;
     }
 
+    // Keyed by (yearId, monthId); a missing key means "no distribution for the month" (null).
+    public Dictionary<(int YearId, int MonthId), ResultsReceiptData> ResultsReceipts { get; } = [];
+
+    public List<ResultsReceiptParticipantEntity> UpdatedResultsReceiptParticipants { get; } = [];
+
+    public Task<ResultsReceiptData?> GetResultsReceiptAsync(int yearId, int monthId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(ResultsReceipts.GetValueOrDefault((yearId, monthId)));
+
+    public Task UpdateResultsReceiptAsync(IReadOnlyList<ResultsReceiptParticipantEntity> participants, CancellationToken cancellationToken = default)
+    {
+        UpdatedResultsReceiptParticipants.AddRange(participants);
+        return Task.CompletedTask;
+    }
+
+    // Keyed by distributionParticipantId; a missing key means "participant not returned" (null).
+    public Dictionary<Guid, ActualResultsData> ActualResults { get; } = [];
+
+    public List<Guid> RatingIds { get; } = [];
+
+    public List<ActualResultsWrite> SavedActualResults { get; } = [];
+
+    public Task<ActualResultsData?> GetActualResultsAsync(Guid distributionParticipantId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(ActualResults.GetValueOrDefault(distributionParticipantId));
+
+    public Task<IReadOnlyList<Guid>> GetRatingIdsAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<Guid>>(RatingIds);
+
+    public Task SaveActualResultsAsync(ActualResultsWrite write, CancellationToken cancellationToken = default)
+    {
+        SavedActualResults.Add(write);
+        return Task.CompletedTask;
+    }
+
     // Keyed by (monthlyDistributionId, mode, week); a missing key means "no packaging header" (null).
     public Dictionary<(Guid MonthlyDistributionId, PackagingMode Mode, int Week), PackagingRawData> PackagingSheets { get; } = [];
 

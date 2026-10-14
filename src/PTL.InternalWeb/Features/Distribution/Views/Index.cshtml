@@ -75,7 +75,7 @@
                     <td class="govuk-table__cell">
                         <progress class="ptl-progress-bar" max="100" value="@month.ResultsCompletePercentage" aria-label="Results for @month.MonthDescription">@month.ResultsCompletePercentage% complete</progress>
                         <span class="govuk-body-s ptl-progress-bar__label">@month.ResultsCompletePercentage%</span><br />
-                        <a class="govuk-link" asp-action="ViewStage" asp-route-stage="Results">View<span class="govuk-visually-hidden"> Results for @month.MonthDescription</span></a>
+                        <a class="govuk-link" asp-action="ResultsReceipt" asp-route-year="@month.YearId" asp-route-monthId="@month.MonthId">View<span class="govuk-visually-hidden"> Results for @month.MonthDescription</span></a>
                     </td>
                     <td class="govuk-table__cell">
                         <progress class="ptl-progress-bar" max="100" value="@month.TabulationsCompletePercentage" aria-label="Tabulations for @month.MonthDescription">@month.TabulationsCompletePercentage% complete</progress>

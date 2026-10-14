@@ -93,6 +93,35 @@ internal sealed class FakeDistributionApiClient : IDistributionApiClient
         return Task.FromResult(PreparationSaveResult);
     }
 
+    public ResultsReceiptResponse? ResultsReceipt { get; set; }
+    public ResultsReceiptSaveResult? ResultsReceiptSaveResult { get; set; }
+    public List<ResultsReceiptSaveRequest> SavedResultsReceiptRequests { get; } = [];
+
+    public Task<ResultsReceiptResponse?> GetResultsReceiptAsync(int yearId, int monthId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(ResultsReceipt);
+
+    public Task<ResultsReceiptSaveResult?> SaveResultsReceiptAsync(
+        int yearId, int monthId, ResultsReceiptSaveRequest request, CancellationToken cancellationToken = default)
+    {
+        SavedResultsReceiptRequests.Add(request);
+        return Task.FromResult(ResultsReceiptSaveResult);
+    }
+
+    public ActualResultsResponse? ActualResults { get; set; }
+    public ActualResultsSaveResult? ActualResultsSaveResult { get; set; }
+    public List<ActualResultsSaveRequest> SavedActualResultsRequests { get; } = [];
+
+    public Task<ActualResultsResponse?> GetActualResultsAsync(
+        Guid monthlyDistributionSchemeId, Guid distributionParticipantId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(ActualResults);
+
+    public Task<ActualResultsSaveResult?> SaveActualResultsAsync(
+        Guid monthlyDistributionSchemeId, Guid distributionParticipantId, ActualResultsSaveRequest request, CancellationToken cancellationToken = default)
+    {
+        SavedActualResultsRequests.Add(request);
+        return Task.FromResult(ActualResultsSaveResult);
+    }
+
     public PackagingSheetResponse? Packaging { get; set; }
     public PackagingSaveResult? PackagingSaveResult { get; set; }
     public PackagingLabelsResponse? PackagingLabels { get; set; }

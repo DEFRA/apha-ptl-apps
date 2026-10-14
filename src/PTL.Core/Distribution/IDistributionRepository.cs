@@ -85,6 +85,15 @@ public interface IDistributionRepository
     // called once per dirty scheme (only schemes with at least one newly-set stage are passed in).
     Task UpdatePreparationAsync(IReadOnlyList<PreparationSchemeEntity> schemes, CancellationToken cancellationToken = default);
 
+    // spgMonthlyDistributionForResultsReceipt - all 4 result sets (header, schemes, participants,
+    // unaccounted-sample status), legacy ResultsReceipt.MonthlyDistribution.FetchMonthlyDistribution.
+    // Returns null when the month has no distribution.
+    Task<ResultsReceiptData?> GetResultsReceiptAsync(int yearId, int monthId, CancellationToken cancellationToken = default);
+
+    // spuDistributionParticipantForResultsReceipt x N - legacy DistributionParticipantCollection.Update,
+    // called once per changed participant.
+    Task UpdateResultsReceiptAsync(IReadOnlyList<ResultsReceiptParticipantEntity> participants, CancellationToken cancellationToken = default);
+
     // spgGroupedPackagingSheet / spgPartGroupedPackagingSheet / spgWeeklyPackagingSheet - the
     // Sample Packaging screen's data for one option (and week, for the two Combined options),
     // legacy GroupedPackagingSheet / PartGroupedPackagingSheet / WeeklyPackagingSheet.Fetch*.
@@ -99,6 +108,20 @@ public interface IDistributionRepository
         IReadOnlyList<PackagingProgressUpdate> updates,
         IReadOnlyList<DistributionPostedEmailEntity> emails,
         CancellationToken cancellationToken = default);
+
+    // spgActualResults - legacy ActualResultsSet.DataPortal_Fetch's 3 result sets (header, sample
+    // results, method item results) for one participant. Returns null when the participant is not
+    // returned (including outside the seven-year retention window).
+    Task<ActualResultsData?> GetActualResultsAsync(Guid distributionParticipantId, CancellationToken cancellationToken = default);
+
+    // spgaRating - every Rating, ordered by fldOrder; legacy uses the first as the default.
+    Task<IReadOnlyList<Guid>> GetRatingIdsAsync(CancellationToken cancellationToken = default);
+
+    // spiActualResults/spuActualResults + spi/spuActualMethodItemResult + spi/spuActualResultItemResult
+    // (+ spiAuditActual* before each audited update, + spiSampleRating on first save for
+    // StoreRatings schemes) in a single transaction, mirroring ActualResultsSet.DataPortal_Insert/
+    // DataPortal_Update's TransactionScope (method items first, then sample result items).
+    Task SaveActualResultsAsync(ActualResultsWrite write, CancellationToken cancellationToken = default);
 
     // spgaDistributionPostedEmail - emails queued but not yet sent.
     Task<IReadOnlyList<DistributionPostedEmailEntity>> GetUnsentDistributionPostedEmailsAsync(CancellationToken cancellationToken = default);

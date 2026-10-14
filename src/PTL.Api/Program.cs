@@ -186,6 +186,8 @@ builder.Services.AddScoped<ISampleNumbersService, SampleNumbersService>();
 builder.Services.AddScoped<IIntendedResultsService, IntendedResultsService>();
 builder.Services.AddScoped<IDistributionParticipantsService, DistributionParticipantsService>();
 builder.Services.AddScoped<IPreparationService, PreparationService>();
+builder.Services.AddScoped<IResultsReceiptService, ResultsReceiptService>();
+builder.Services.AddScoped<IActualResultsService, ActualResultsService>();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddScoped<IDistributionPostedNotifier, DistributionPostedNotifier>();
 builder.Services.AddScoped<IPackagingService, PackagingService>();

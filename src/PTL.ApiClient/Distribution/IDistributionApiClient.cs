@@ -37,6 +37,19 @@ public interface IDistributionApiClient
         int yearId, int monthId, PreparationSaveRequest request, CancellationToken cancellationToken = default);
 
     // Null when the month has not been initialised.
+    Task<ResultsReceiptResponse?> GetResultsReceiptAsync(int yearId, int monthId, CancellationToken cancellationToken = default);
+
+    Task<ResultsReceiptSaveResult?> SaveResultsReceiptAsync(
+        int yearId, int monthId, ResultsReceiptSaveRequest request, CancellationToken cancellationToken = default);
+
+    // Null when the participant is not found.
+    Task<ActualResultsResponse?> GetActualResultsAsync(
+        Guid monthlyDistributionSchemeId, Guid distributionParticipantId, CancellationToken cancellationToken = default);
+
+    Task<ActualResultsSaveResult?> SaveActualResultsAsync(
+        Guid monthlyDistributionSchemeId, Guid distributionParticipantId, ActualResultsSaveRequest request, CancellationToken cancellationToken = default);
+
+    // Null when the month has not been initialised.
     Task<PackagingSheetResponse?> GetPackagingAsync(int yearId, int monthId, int mode, int week, CancellationToken cancellationToken = default);
 
     Task<PackagingSaveResult?> SavePackagingAsync(

@@ -419,6 +419,164 @@ public class DistributionApiClientTests
         Assert.Null(result);
     }
 
+    [Fact]
+    public async Task GetResultsReceiptAsync_GetsResultsReceiptEndpointAndReturnsDeserializedResponse()
+    {
+        const string json = """
+            {"monthlyDistributionId":"11111111-1111-1111-1111-111111111111","yearId":2026,"monthId":5,"schemes":[{"monthlyDistributionSchemeId":"22222222-2222-2222-2222-222222222222","description":"D1/S1: BT Brucella","requiresAssessment":true,"progressPercentage":50,"participants":[{"distributionParticipantId":"33333333-3333-3333-3333-333333333333","fullName":"L001: Lab One","deadlineDate":"2026-06-30T00:00:00","firstEditDate":null,"lastEditDate":null,"extraDocumentsReturned":true,"canViewResults":false,"hasUnaccountedSamples":true,"returnedDate":"2026-05-05T00:00:00"}]}]}
+            """;
+        HttpRequestMessage? captured = null;
+        var client = CreateCapturingClient(HttpStatusCode.OK, json, request => captured = request);
+
+        var result = await client.GetResultsReceiptAsync(2026, 5);
+
+        Assert.Equal(HttpMethod.Get, captured!.Method);
+        Assert.Equal("/api/distributions/months/2026/5/results-receipt", captured.RequestUri!.AbsolutePath);
+        var scheme = Assert.Single(result!.Schemes);
+        Assert.Equal(50, scheme.ProgressPercentage);
+        var participant = Assert.Single(scheme.Participants);
+        Assert.Equal("L001: Lab One", participant.FullName);
+        Assert.Null(participant.FirstEditDate);
+        Assert.True(participant.ExtraDocumentsReturned);
+        Assert.Equal(new DateTime(2026, 5, 5), participant.ReturnedDate);
+    }
+
+    [Fact]
+    public async Task GetResultsReceiptAsync_NotFound_ReturnsNull() =>
+        Assert.Null(await CreateClient(HttpStatusCode.NotFound, null).GetResultsReceiptAsync(2026, 5));
+
+    [Fact]
+    public async Task GetResultsReceiptAsync_ServerError_Throws() =>
+        await Assert.ThrowsAsync<HttpRequestException>(
+            () => CreateClient(HttpStatusCode.InternalServerError, null).GetResultsReceiptAsync(2026, 5));
+
+    [Fact]
+    public async Task SaveResultsReceiptAsync_PutsToResultsReceiptEndpointAndReturnsDeserializedResult()
+    {
+        HttpRequestMessage? captured = null;
+        string? body = null;
+        var client = CreateCapturingClient(HttpStatusCode.OK, """{"success":true}""", request =>
+        {
+            captured = request;
+            body = request.Content!.ReadAsStringAsync().GetAwaiter().GetResult();
+        });
+        var participantId = Guid.NewGuid();
+
+        var result = await client.SaveResultsReceiptAsync(2026, 5, new Contracts.Distribution.ResultsReceiptSaveRequest(
+            [new Contracts.Distribution.ResultsReceiptParticipantUpdateRequest(participantId, true, true)]));
+
+        Assert.Equal(HttpMethod.Put, captured!.Method);
+        Assert.Equal("/api/distributions/months/2026/5/results-receipt", captured.RequestUri!.AbsolutePath);
+        Assert.Contains(participantId.ToString(), body);
+        Assert.Contains("\"returnedChecked\":true", body);
+        Assert.True(result!.Success);
+    }
+
+    [Fact]
+    public async Task SaveResultsReceiptAsync_NotFound_ReturnsNull() =>
+        Assert.Null(await CreateClient(HttpStatusCode.NotFound, null)
+            .SaveResultsReceiptAsync(2026, 5, new Contracts.Distribution.ResultsReceiptSaveRequest([])));
+
+    [Fact]
+    public async Task SaveResultsReceiptAsync_ServerError_Throws() =>
+        await Assert.ThrowsAsync<HttpRequestException>(() => CreateClient(HttpStatusCode.InternalServerError, null)
+            .SaveResultsReceiptAsync(2026, 5, new Contracts.Distribution.ResultsReceiptSaveRequest([])));
+
+    private static readonly Guid ActualResultsSchemeId = Guid.Parse("22222222-2222-2222-2222-222222222222");
+    private static readonly Guid ActualResultsParticipantId = Guid.Parse("33333333-3333-3333-3333-333333333333");
+    private const string ActualResultsPath =
+        "/api/distributions/schemes/22222222-2222-2222-2222-222222222222/participants/33333333-3333-3333-3333-333333333333/actual-results";
+
+    [Fact]
+    public async Task GetActualResultsAsync_GetsTheActualResultsEndpointAndReturnsDeserializedResponse()
+    {
+        const string json = """
+            {"distributionParticipantId":"33333333-3333-3333-3333-333333333333","monthlyDistributionSchemeId":"22222222-2222-2222-2222-222222222222","heading":"D1 BT: Brucella","auditObjectName":"Results Received for D1 BT: Brucella","deadlineDate":"2026-06-30T00:00:00","isNew":true,"tests":[{"testId":"44444444-4444-4444-4444-444444444444","testName":"Culture","resultItems":[{"testResultItemId":"55555555-5555-5555-5555-555555555555","name":"Count","formatString":"^\\d+$","returnValueType":"Whole number"}],"methodItems":[{"testMethodItemId":"66666666-6666-6666-6666-666666666666","name":"Incubation","formatString":"^.+$","returnValueType":"Text","result":"37C"}],"samples":[{"sampleId":"77777777-7777-7777-7777-777777777777","sampleNumber":"S001","values":[{"sampleResultItemId":"88888888-8888-8888-8888-888888888888","testResultItemId":"55555555-5555-5555-5555-555555555555","result":"12"}]}]}]}
+            """;
+        HttpRequestMessage? captured = null;
+        var client = CreateCapturingClient(HttpStatusCode.OK, json, request => captured = request);
+
+        var result = await client.GetActualResultsAsync(ActualResultsSchemeId, ActualResultsParticipantId);
+
+        Assert.Equal(HttpMethod.Get, captured!.Method);
+        Assert.Equal(ActualResultsPath, captured.RequestUri!.AbsolutePath);
+        Assert.Equal("D1 BT: Brucella", result!.Heading);
+        Assert.True(result.IsNew);
+        Assert.Equal(new DateTime(2026, 6, 30), result.DeadlineDate);
+        var test = Assert.Single(result.Tests);
+        Assert.Equal("Whole number", Assert.Single(test.ResultItems).ReturnValueType);
+        Assert.Equal("37C", Assert.Single(test.MethodItems).Result);
+        var sample = Assert.Single(test.Samples);
+        Assert.Equal("S001", sample.SampleNumber);
+        Assert.Equal("12", Assert.Single(sample.Values).Result);
+    }
+
+    [Fact]
+    public async Task GetActualResultsAsync_NotFound_ReturnsNull() =>
+        Assert.Null(await CreateClient(HttpStatusCode.NotFound, null).GetActualResultsAsync(ActualResultsSchemeId, ActualResultsParticipantId));
+
+    [Fact]
+    public async Task GetActualResultsAsync_ServerError_Throws() =>
+        await Assert.ThrowsAsync<HttpRequestException>(
+            () => CreateClient(HttpStatusCode.InternalServerError, null).GetActualResultsAsync(ActualResultsSchemeId, ActualResultsParticipantId));
+
+    [Fact]
+    public async Task SaveActualResultsAsync_PutsTheValuesAndReasonAndDeserializesFieldErrors()
+    {
+        HttpRequestMessage? captured = null;
+        string? body = null;
+        var itemId = Guid.Parse("88888888-8888-8888-8888-888888888888");
+        var client = CreateCapturingClient(
+            HttpStatusCode.OK,
+            $$"""{"success":false,"fieldErrorsByItemId":{"{{itemId}}":"Input must be of format: Whole number"},"deadlinePassed":false,"auditReasonRequired":true,"auditObjectName":"Results Received for D1 BT: Brucella"}""",
+            request =>
+            {
+                captured = request;
+                body = request.Content!.ReadAsStringAsync().GetAwaiter().GetResult();
+            });
+
+        var result = await client.SaveActualResultsAsync(
+            ActualResultsSchemeId,
+            ActualResultsParticipantId,
+            new Contracts.Distribution.ActualResultsSaveRequest(
+                [new Contracts.Distribution.ActualResultsSampleValueRequest(itemId, "twelve")],
+                [new Contracts.Distribution.ActualResultsMethodItemRequest(Guid.Parse("66666666-6666-6666-6666-666666666666"), "37C")],
+                "Lab corrected"));
+
+        Assert.Equal(HttpMethod.Put, captured!.Method);
+        Assert.Equal(ActualResultsPath, captured.RequestUri!.AbsolutePath);
+        Assert.Contains("\"result\":\"twelve\"", body);
+        Assert.Contains("\"auditWhy\":\"Lab corrected\"", body);
+        Assert.False(result!.Success);
+        Assert.True(result.AuditReasonRequired);
+        Assert.False(result.DeadlinePassed);
+        Assert.Equal("Results Received for D1 BT: Brucella", result.AuditObjectName);
+        Assert.Equal("Input must be of format: Whole number", result.FieldErrorsByItemId[itemId]);
+    }
+
+    [Fact]
+    public async Task SaveActualResultsAsync_Success_ReturnsSuccessResult()
+    {
+        var client = CreateClient(HttpStatusCode.OK, """{"success":true,"fieldErrorsByItemId":{}}""");
+
+        var result = await client.SaveActualResultsAsync(
+            ActualResultsSchemeId, ActualResultsParticipantId, new Contracts.Distribution.ActualResultsSaveRequest([], []));
+
+        Assert.True(result!.Success);
+        Assert.Empty(result.FieldErrorsByItemId);
+        Assert.Null(result.AuditObjectName);
+    }
+
+    [Fact]
+    public async Task SaveActualResultsAsync_NotFound_ReturnsNull() =>
+        Assert.Null(await CreateClient(HttpStatusCode.NotFound, null).SaveActualResultsAsync(
+            ActualResultsSchemeId, ActualResultsParticipantId, new Contracts.Distribution.ActualResultsSaveRequest([], [])));
+
+    [Fact]
+    public async Task SaveActualResultsAsync_ServerError_Throws() =>
+        await Assert.ThrowsAsync<HttpRequestException>(() => CreateClient(HttpStatusCode.InternalServerError, null).SaveActualResultsAsync(
+            ActualResultsSchemeId, ActualResultsParticipantId, new Contracts.Distribution.ActualResultsSaveRequest([], [])));
+
     private static DistributionApiClient CreateCapturingClient(
         HttpStatusCode statusCode, string? json, Action<HttpRequestMessage> capture) =>
         new(new HttpClient(new StubHttpMessageHandler(statusCode, json) { OnRequest = capture }) { BaseAddress = new Uri("http://localhost") });

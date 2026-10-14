@@ -879,6 +879,69 @@ public static class DapperColumnMappings
             ["fldPrepCompleteDate"] = nameof(PreparationSchemeEntity.PrepCompleteDate),
         });
 
+        Map<ResultsReceiptHeaderEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldMonthlyDistributionId"] = nameof(ResultsReceiptHeaderEntity.MonthlyDistributionId),
+            [ColYearId] = nameof(ResultsReceiptHeaderEntity.YearId),
+            [ColMonthId] = nameof(ResultsReceiptHeaderEntity.MonthId),
+        });
+
+        Map<ResultsReceiptSchemeEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            [ColMonthlyDistributionSchemeId] = nameof(ResultsReceiptSchemeEntity.MonthlyDistributionSchemeId),
+            [ColIdentifier] = nameof(ResultsReceiptSchemeEntity.SchemeIdentifier),
+            [ColName] = nameof(ResultsReceiptSchemeEntity.SchemeName),
+            ["fldDistributionReference"] = nameof(ResultsReceiptSchemeEntity.DistributionReference),
+            ["fldDistributionReferenceSuffix"] = nameof(ResultsReceiptSchemeEntity.DistributionReferenceSuffix),
+            ["fldScheduleCode"] = nameof(ResultsReceiptSchemeEntity.ScheduleCode),
+            ["fldHasSampleNumbersDefined"] = nameof(ResultsReceiptSchemeEntity.HasSampleNumbersDefined),
+            ["fldDeadlineDate"] = nameof(ResultsReceiptSchemeEntity.DeadlineDate),
+            ["fldRequiresAssessment"] = nameof(ResultsReceiptSchemeEntity.RequiresAssessment),
+        });
+
+        Map<ResultsReceiptParticipantEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldDistributionParticipantId"] = nameof(ResultsReceiptParticipantEntity.DistributionParticipantId),
+            [ColMonthlyDistributionSchemeId] = nameof(ResultsReceiptParticipantEntity.MonthlyDistributionSchemeId),
+            [ColLabCode] = nameof(ResultsReceiptParticipantEntity.LabCode),
+            [ColLabName] = nameof(ResultsReceiptParticipantEntity.LabName),
+            ["fldExtraDocumentsReturned"] = nameof(ResultsReceiptParticipantEntity.ExtraDocumentsReturned),
+            ["fldFirstEditDate"] = nameof(ResultsReceiptParticipantEntity.FirstEditDate),
+            ["fldLastEditDate"] = nameof(ResultsReceiptParticipantEntity.LastEditDate),
+            ["fldDeadlineDate"] = nameof(ResultsReceiptParticipantEntity.DeadlineDate),
+            ["fldDeadlineChangeReason"] = nameof(ResultsReceiptParticipantEntity.DeadlineChangeReason),
+            ["fldPostedDate"] = nameof(ResultsReceiptParticipantEntity.PostedDate),
+            ["fldReturnedDate"] = nameof(ResultsReceiptParticipantEntity.ReturnedDate),
+        });
+
+        Map<ResultsReceiptSampleStatusEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldDistributionParticipantId"] = nameof(ResultsReceiptSampleStatusEntity.DistributionParticipantId),
+            ["fldHasUnaccountedSamples"] = nameof(ResultsReceiptSampleStatusEntity.HasUnaccountedSamples),
+        });
+
+        Map<ActualResultsHeaderEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldFirstEditDate"] = nameof(ActualResultsHeaderEntity.FirstEditDate),
+            ["fldLastEditDate"] = nameof(ActualResultsHeaderEntity.LastEditDate),
+            ["fldDistribution"] = nameof(ActualResultsHeaderEntity.Distribution),
+            ["fldSchemeIdentifier"] = nameof(ActualResultsHeaderEntity.SchemeIdentifier),
+            ["fldSchemeName"] = nameof(ActualResultsHeaderEntity.SchemeName),
+            ["fldDeadlineDate"] = nameof(ActualResultsHeaderEntity.DeadlineDate),
+        });
+
+        Map<ActualSampleResultEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldSampleResultItemId"] = nameof(ActualSampleResultEntity.SampleResultItemId),
+            ["fldResult"] = nameof(ActualSampleResultEntity.Result),
+        });
+
+        Map<ActualMethodItemResultEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldTestMethodItemId"] = nameof(ActualMethodItemResultEntity.TestMethodItemId),
+            ["fldResult"] = nameof(ActualMethodItemResultEntity.Result),
+        });
+
         Map<PreparationSampleEntity>(new(StringComparer.OrdinalIgnoreCase)
         {
             [ColMonthlyDistributionSchemeId] = nameof(PreparationSampleEntity.MonthlyDistributionSchemeId),

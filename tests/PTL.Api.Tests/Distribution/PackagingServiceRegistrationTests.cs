@@ -21,6 +21,22 @@ public class PackagingServiceRegistrationTests(WebApplicationFactory<Program> fa
     }
 
     [Fact]
+    public void ResultsReceiptService_ResolvesFromTheRealContainer()
+    {
+        using var scope = factory.Services.CreateScope();
+
+        Assert.IsType<ResultsReceiptService>(scope.ServiceProvider.GetRequiredService<IResultsReceiptService>());
+    }
+
+    [Fact]
+    public void ActualResultsService_ResolvesFromTheRealContainer()
+    {
+        using var scope = factory.Services.CreateScope();
+
+        Assert.IsType<ActualResultsService>(scope.ServiceProvider.GetRequiredService<IActualResultsService>());
+    }
+
+    [Fact]
     public void ExternalOptions_AreBoundFromAppSettings()
     {
         using var scope = factory.Services.CreateScope();

@@ -694,6 +694,67 @@ public sealed class DistributionRepository(IDbConnectionFactory connectionFactor
         transaction.Commit();
     }
 
+    public async Task<ResultsReceiptData?> GetResultsReceiptAsync(int yearId, int monthId, CancellationToken cancellationToken = default)
+    {
+        // @ReferenceDate is left to its NULL default - the stored procedure then uses today's date.
+        using var connection = connectionFactory.CreateConnection();
+        using var results = await connection.QueryMultipleAsync(
+            "EXEC dbo.spgMonthlyDistributionForResultsReceipt @YearId = @YearId, @MonthId = @MonthId",
+            new { YearId = yearId, MonthId = monthId });
+
+        var header = await results.ReadFirstOrDefaultAsync<ResultsReceiptHeaderEntity>();
+        if (header is null)
+        {
+            return null;
+        }
+
+        var schemes = (await results.ReadAsync<ResultsReceiptSchemeEntity>()).ToList();
+        var participants = (await results.ReadAsync<ResultsReceiptParticipantEntity>()).ToList();
+        var statuses = (await results.ReadAsync<ResultsReceiptSampleStatusEntity>()).ToDictionary(s => s.DistributionParticipantId, s => s.HasUnaccountedSamples);
+
+        var schemesById = schemes.ToDictionary(s => s.MonthlyDistributionSchemeId);
+        foreach (var participant in participants)
+        {
+            if (statuses.TryGetValue(participant.DistributionParticipantId, out var hasUnaccounted))
+            {
+                participant.HasUnaccountedSamples = hasUnaccounted;
+            }
+
+            if (schemesById.TryGetValue(participant.MonthlyDistributionSchemeId, out var scheme))
+            {
+                scheme.Participants.Add(participant);
+            }
+        }
+
+        return new ResultsReceiptData(header.MonthlyDistributionId, header.YearId, header.MonthId, schemes);
+    }
+
+    public async Task UpdateResultsReceiptAsync(IReadOnlyList<ResultsReceiptParticipantEntity> participants, CancellationToken cancellationToken = default)
+    {
+        if (participants.Count == 0)
+        {
+            return;
+        }
+
+        using var connection = connectionFactory.CreateConnection();
+        connection.Open();
+        using var transaction = connection.BeginTransaction();
+
+        const string updateSql = """
+            EXEC dbo.spuDistributionParticipantForResultsReceipt
+                @DistributionParticipantId = @DistributionParticipantId,
+                @ExtraDocumentsReturned = @ExtraDocumentsReturned,
+                @ReturnedDate = @ReturnedDate
+            """;
+
+        foreach (var participant in participants)
+        {
+            await connection.ExecuteAsync(updateSql, participant, transaction);
+        }
+
+        transaction.Commit();
+    }
+
     public async Task<PackagingRawData?> GetPackagingSheetAsync(
         Guid monthlyDistributionId, PackagingMode mode, int week, CancellationToken cancellationToken = default)
     {
@@ -768,6 +829,132 @@ public sealed class DistributionRepository(IDbConnectionFactory connectionFactor
         foreach (var email in emails)
         {
             await connection.ExecuteAsync(insertEmailSql, email, transaction);
+        }
+
+        transaction.Commit();
+    }
+
+    public async Task<ActualResultsData?> GetActualResultsAsync(Guid distributionParticipantId, CancellationToken cancellationToken = default)
+    {
+        // @ReferenceDate is left to its NULL default - the procedure then uses today's date
+        // (legacy only overrides it from the ResultsTestDate test-harness appSetting).
+        using var connection = connectionFactory.CreateConnection();
+        using var results = await connection.QueryMultipleAsync(
+            "EXEC dbo.spgActualResults @ActualResultsId = @ActualResultsId",
+            new { ActualResultsId = distributionParticipantId });
+
+        var header = await results.ReadFirstOrDefaultAsync<ActualResultsHeaderEntity>();
+        if (header is null)
+        {
+            return null;
+        }
+
+        var sampleResults = (await results.ReadAsync<ActualSampleResultEntity>()).ToList();
+        var methodItemResults = (await results.ReadAsync<ActualMethodItemResultEntity>()).ToList();
+        return new ActualResultsData(header, sampleResults, methodItemResults);
+    }
+
+    public async Task<IReadOnlyList<Guid>> GetRatingIdsAsync(CancellationToken cancellationToken = default)
+    {
+        using var connection = connectionFactory.CreateConnection();
+        return (await connection.QueryAsync<Guid>("EXEC dbo.spgaRating")).ToList();
+    }
+
+    public async Task SaveActualResultsAsync(ActualResultsWrite write, CancellationToken cancellationToken = default)
+    {
+        using var connection = connectionFactory.CreateConnection();
+        connection.Open();
+        using var transaction = connection.BeginTransaction();
+
+        var actualResultsParameters = new
+        {
+            ActualResultsId = write.DistributionParticipantId,
+            write.FirstEditDate,
+            write.LastEditDate,
+        };
+
+        await connection.ExecuteAsync(
+            write.IsNew
+                ? "EXEC dbo.spiActualResults @ActualResultsId = @ActualResultsId, @FirstEditDate = @FirstEditDate, @LastEditDate = @LastEditDate"
+                : "EXEC dbo.spuActualResults @ActualResultsId = @ActualResultsId, @FirstEditDate = @FirstEditDate, @LastEditDate = @LastEditDate",
+            actualResultsParameters,
+            transaction);
+
+        // The audit procedures record the row's CURRENT (pre-update) value, so they must run
+        // immediately BEFORE the matching spu* call.
+        foreach (var item in write.MethodItems)
+        {
+            var parameters = new { ActualResultsId = write.DistributionParticipantId, TestMethodItemId = item.ItemId, item.Result, write.AuditWho, write.AuditWhy };
+
+            if (item.IsInsert)
+            {
+                await connection.ExecuteAsync(
+                    "EXEC dbo.spiActualMethodItemResult @ActualResultsId = @ActualResultsId, @TestMethodItemId = @TestMethodItemId, @Result = @Result",
+                    parameters,
+                    transaction);
+                continue;
+            }
+
+            await connection.ExecuteAsync(
+                """
+                EXEC dbo.spiAuditActualTestMethodItem
+                    @ActualResultsId = @ActualResultsId,
+                    @TestMethodItemId = @TestMethodItemId,
+                    @AuditWho = @AuditWho,
+                    @AuditWhy = @AuditWhy,
+                    @Result = @Result,
+                    @ResultUpdate = 1
+                """,
+                parameters,
+                transaction);
+
+            await connection.ExecuteAsync(
+                "EXEC dbo.spuActualMethodItemResult @ActualResultsId = @ActualResultsId, @TestMethodItemId = @TestMethodItemId, @Result = @Result",
+                parameters,
+                transaction);
+        }
+
+        foreach (var item in write.SampleItems)
+        {
+            var parameters = new { ActualResultsId = write.DistributionParticipantId, SampleResultItemId = item.ItemId, item.Result, write.AuditWho, write.AuditWhy };
+
+            if (item.IsInsert)
+            {
+                await connection.ExecuteAsync(
+                    "EXEC dbo.spiActualResultItemResult @ActualResultsId = @ActualResultsId, @SampleResultItemId = @SampleResultItemId, @Result = @Result",
+                    parameters,
+                    transaction);
+                continue;
+            }
+
+            await connection.ExecuteAsync(
+                """
+                EXEC dbo.spiAuditActualSampleResultItem
+                    @ActualResultsId = @ActualResultsId,
+                    @SampleResultItemId = @SampleResultItemId,
+                    @AuditWho = @AuditWho,
+                    @AuditWhy = @AuditWhy,
+                    @Result = @Result,
+                    @ResultUpdate = 1
+                """,
+                parameters,
+                transaction);
+
+            await connection.ExecuteAsync(
+                "EXEC dbo.spuActualResultItemResult @ActualResultsId = @ActualResultsId, @SampleResultItemId = @SampleResultItemId, @Result = @Result",
+                parameters,
+                transaction);
+        }
+
+        if (write.DefaultRatingId is { } ratingId)
+        {
+            foreach (var sampleId in write.RatingSampleIds)
+            {
+                await connection.ExecuteAsync(
+                    "EXEC dbo.spiSampleRating @SampleId = @SampleId, @ParticipantId = @ParticipantId, @RatingId = @RatingId",
+                    new { SampleId = sampleId, ParticipantId = write.DistributionParticipantId, RatingId = ratingId },
+                    transaction);
+            }
         }
 
         transaction.Commit();
