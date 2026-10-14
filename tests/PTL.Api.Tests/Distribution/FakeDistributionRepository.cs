@@ -110,4 +110,17 @@ internal sealed class FakeDistributionRepository : IDistributionRepository
         RepeatedDistributions.Add((newScheme, newParticipants));
         return Task.CompletedTask;
     }
+
+    public Dictionary<Guid, PreparationSheetData> PreparationSheets { get; } = [];
+
+    public List<PreparationSchemeEntity> UpdatedPreparationSchemes { get; } = [];
+
+    public Task<PreparationSheetData?> GetPreparationSheetAsync(Guid monthlyDistributionId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(PreparationSheets.GetValueOrDefault(monthlyDistributionId));
+
+    public Task UpdatePreparationAsync(IReadOnlyList<PreparationSchemeEntity> schemes, CancellationToken cancellationToken = default)
+    {
+        UpdatedPreparationSchemes.AddRange(schemes);
+        return Task.CompletedTask;
+    }
 }

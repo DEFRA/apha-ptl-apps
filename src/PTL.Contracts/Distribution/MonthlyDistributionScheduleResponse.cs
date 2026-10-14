@@ -24,7 +24,9 @@ public sealed record MonthlyDistributionSchemeResponse(
     bool HasSampleNumbersDefined,
     bool HasIntendedResults,
     bool IsCancelled,
-    bool IsAsAvailable);
+    bool IsAsAvailable,
+    // Only used by Printable Results - legacy PnlUkasLogo.Visible.
+    bool IsAccredited = false);
 
 // One scheme row's posted dates/cancellation state (legacy: Save/Apply posts every row at once;
 // the server round-trips every other field - Comments/HasIntendedResults/etc. - unchanged).

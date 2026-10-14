@@ -356,4 +356,66 @@ public class DistributionApiClientTests
         await Assert.ThrowsAsync<HttpRequestException>(
             () => client.RepeatDistributionAsync(Guid.NewGuid(), new Contracts.Distribution.RepeatDistributionRequest([])));
     }
+
+    [Fact]
+    public async Task GetPreparationAsync_ReturnsDeserializedResponse()
+    {
+        const string json = """
+            {"monthlyDistributionId":"11111111-1111-1111-1111-111111111111","yearId":2026,"monthId":4,"schemes":[]}
+            """;
+        var client = CreateClient(HttpStatusCode.OK, json);
+
+        var result = await client.GetPreparationAsync(2026, 4);
+
+        Assert.NotNull(result);
+        Assert.Equal(2026, result!.YearId);
+        Assert.Empty(result.Schemes);
+    }
+
+    [Fact]
+    public async Task GetPreparationAsync_NotFound_ReturnsNull()
+    {
+        var client = CreateClient(HttpStatusCode.NotFound, null);
+
+        var result = await client.GetPreparationAsync(2026, 4);
+
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public async Task GetPreparationAsync_ServerError_Throws()
+    {
+        var client = CreateClient(HttpStatusCode.InternalServerError, null);
+
+        await Assert.ThrowsAsync<HttpRequestException>(() => client.GetPreparationAsync(2026, 4));
+    }
+
+    [Fact]
+    public async Task SavePreparationAsync_PutsToPreparationEndpointAndReturnsDeserializedResult()
+    {
+        const string json = """{"success":true}""";
+        HttpRequestMessage? captured = null;
+        var handler = new StubHttpMessageHandler(HttpStatusCode.OK, json) { OnRequest = request => captured = request };
+        var client = new DistributionApiClient(new HttpClient(handler) { BaseAddress = new Uri("http://localhost") });
+
+        var request = new Contracts.Distribution.PreparationSaveRequest(
+            [new Contracts.Distribution.PreparationStageUpdateRequest(Guid.NewGuid(), true, false, false)]);
+        var result = await client.SavePreparationAsync(2026, 4, request);
+
+        Assert.NotNull(captured);
+        Assert.Equal(HttpMethod.Put, captured!.Method);
+        Assert.Equal("/api/distributions/months/2026/4/preparation", captured.RequestUri!.AbsolutePath);
+        Assert.NotNull(result);
+        Assert.True(result!.Success);
+    }
+
+    [Fact]
+    public async Task SavePreparationAsync_NotFound_ReturnsNull()
+    {
+        var client = CreateClient(HttpStatusCode.NotFound, null);
+
+        var result = await client.SavePreparationAsync(2026, 4, new Contracts.Distribution.PreparationSaveRequest([]));
+
+        Assert.Null(result);
+    }
 }

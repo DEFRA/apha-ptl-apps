@@ -12,7 +12,14 @@ public sealed record IntendedResultsPage(
     string SchemeIdentifier,
     string SchemeName,
     bool RequiresAuditReason,
-    IReadOnlyList<IntendedResultsTest> Tests);
+    IReadOnlyList<IntendedResultsTest> Tests,
+    // The remaining 5 are only used by Printable Results - see IntendedResultsHeaderEntity remarks.
+    DateTime SchemeVersionDate = default,
+    bool HasIntendedResults = false,
+    bool DateOfReceipt = false,
+    bool StorageConditions = false,
+    bool ConditionOnReceipt = false,
+    string Instructions = "");
 
 public sealed record IntendedResultsTest(
     Guid TestId,
@@ -23,12 +30,15 @@ public sealed record IntendedResultsTest(
 
 // IsRange is a TEST-LEVEL toggle shared by every sample under this Test, not a per-sample
 // setting - legacy's CheckboxResult_CheckChanged sets Test.TestResultItems[x].IsRange directly.
+// ExpectedLength is only used by Printable Results - legacy ResultsTable.GetColumnWidth's
+// column-packing budget (ExpectedLength * 20 pixels per column).
 public sealed record IntendedResultsResultItem(
     Guid TestResultItemId,
     string Name,
     string FormatString,
     string ReturnValueType,
-    bool IsRange);
+    bool IsRange,
+    int ExpectedLength = 0);
 
 // Method Items have exactly one value for the whole distribution (not per sample) - legacy stores
 // IntendedResult directly on the Test's TestMethodItem, never on a per-Sample child object.
@@ -47,7 +57,9 @@ public sealed record IntendedResultsSampleRow(
     // disables every Result Item input for this sample/test pair when false and blanks the display.
     bool IsApplicable,
     // One entry per IntendedResultsTest.ResultItems, same order, matched by TestResultItemId.
-    IReadOnlyList<IntendedResultsSampleResultValue> Values);
+    IReadOnlyList<IntendedResultsSampleResultValue> Values,
+    // Only used by Printable Results' sample-instruction grid.
+    string ExternalDescription = "");
 
 public sealed record IntendedResultsSampleResultValue(
     Guid SampleResultItemId,
