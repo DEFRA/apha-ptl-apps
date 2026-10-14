@@ -1,6 +1,8 @@
 using Dapper;
+using PTL.Core.Audit;
 using PTL.Core.Lookup;
 using PTL.Core.PostagePricingPlan;
+using PTL.Data.Audit;
 using PTL.Data.Infrastructure;
 
 namespace PTL.Data.PostagePricingPlan;
@@ -25,19 +27,20 @@ public sealed class PostagePricingPlanRepository(IDbConnectionFactory connection
             new { PostageId = postageId });
     }
 
-    public async Task SetPriceAsync(Guid postageId, int yearId, decimal ukPrice, decimal euPrice, decimal nonEuPrice, CancellationToken cancellationToken = default)
-    {
-        using var connection = connectionFactory.CreateConnection();
+    public Task SetPriceAsync(Guid postageId, int yearId, decimal ukPrice, decimal euPrice, decimal nonEuPrice, AuditEntry? auditEntry = null, CancellationToken cancellationToken = default) =>
+        AuditTrailWriter.ExecuteAsync(
+            connectionFactory,
+            auditEntry,
+            (connection, transaction) => connection.ExecuteAsync(
+                "EXEC dbo.spuPostage @fldPostageId, @fldUkPrice, @fldEuPrice, @fldNonEuPrice, @fldYearId",
+                new { fldPostageId = postageId, fldUkPrice = ukPrice, fldEuPrice = euPrice, fldNonEuPrice = nonEuPrice, fldYearId = yearId },
+                transaction),
+            cancellationToken);
 
-        await connection.ExecuteAsync(
-            "EXEC dbo.spuPostage @fldPostageId, @fldUkPrice, @fldEuPrice, @fldNonEuPrice, @fldYearId",
-            new { fldPostageId = postageId, fldUkPrice = ukPrice, fldEuPrice = euPrice, fldNonEuPrice = nonEuPrice, fldYearId = yearId });
-    }
-
-    public async Task RenewAsync(int newYearId, CancellationToken cancellationToken = default)
-    {
-        using var connection = connectionFactory.CreateConnection();
-
-        await connection.ExecuteAsync("EXEC dbo.sppRenewPostagePricingPlan @YearId", new { YearId = newYearId });
-    }
+    public Task RenewAsync(int newYearId, AuditEntry? auditEntry = null, CancellationToken cancellationToken = default) =>
+        AuditTrailWriter.ExecuteAsync(
+            connectionFactory,
+            auditEntry,
+            (connection, transaction) => connection.ExecuteAsync("EXEC dbo.sppRenewPostagePricingPlan @YearId", new { YearId = newYearId }, transaction),
+            cancellationToken);
 }

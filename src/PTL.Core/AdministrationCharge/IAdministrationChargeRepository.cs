@@ -1,3 +1,5 @@
+using PTL.Core.Audit;
+
 namespace PTL.Core.AdministrationCharge;
 
 public interface IAdministrationChargeRepository
@@ -13,8 +15,8 @@ public interface IAdministrationChargeRepository
     Task<AdministrationChargeCurrencyEntity?> GetPriceAsync(Guid administrationChargeId, Guid currencyId, CancellationToken cancellationToken = default);
 
     // spiAdministrationChargeCurrency
-    Task InsertPriceAsync(AdministrationChargeCurrencyEntity price, CancellationToken cancellationToken = default);
+    Task InsertPriceAsync(AdministrationChargeCurrencyEntity price, AuditEntry? auditEntry = null, CancellationToken cancellationToken = default);
 
     // spuAdministrationChargeCurrency
-    Task UpdatePriceAsync(AdministrationChargeCurrencyEntity price, CancellationToken cancellationToken = default);
+    Task UpdatePriceAsync(AdministrationChargeCurrencyEntity price, AuditEntry? auditEntry = null, CancellationToken cancellationToken = default);
 }

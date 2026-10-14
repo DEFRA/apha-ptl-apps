@@ -1,3 +1,5 @@
+using PTL.Api.Tests.Audit;
+using PTL.Core.Audit;
 using PTL.Core.Lookup;
 using PTL.Core.WeightedPricingPlan;
 
@@ -5,8 +7,10 @@ namespace PTL.Api.Tests.WeightedPricingPlan;
 
 public class WeightedPricingPlanServiceTests
 {
+    private static readonly FakeActingUserAccessor ActingUser = new() { ActingUserId = Guid.NewGuid() };
+
     private static WeightedPricingPlanService CreateService(FakeWeightedPricingPlanRepository repository, FakeLookupServiceForWeightedPricingPlan? lookupService = null) =>
-        new(repository, lookupService ?? new FakeLookupServiceForWeightedPricingPlan());
+        new(repository, lookupService ?? new FakeLookupServiceForWeightedPricingPlan(), ActingUser);
 
     [Fact]
     public async Task GetYearsAsync_CurrentYearHasPlanAndNextDoesNot_CanRenewIsTrue()
@@ -112,6 +116,11 @@ public class WeightedPricingPlanServiceTests
         Assert.True(result.Success);
         Assert.Contains("2027/28", result.Message);
         Assert.Equal(2027, Assert.Single(repository.RenewedYearIds));
+        var audit = Assert.IsType<AuditEntry>(repository.LastAuditEntry);
+        Assert.Equal("RenewWeightedPricingPlan", audit.Action);
+        Assert.Equal("WeightedPricingPlan", audit.EntityType);
+        Assert.Equal("2027", audit.EntityId);
+        Assert.Equal(ActingUser.ActingUserId, audit.ActingUserId);
     }
 
     [Fact]
@@ -129,5 +138,6 @@ public class WeightedPricingPlanServiceTests
         Assert.False(result.Success);
         Assert.NotEmpty(result.Message);
         Assert.Empty(repository.RenewedYearIds);
+        Assert.Null(repository.LastAuditEntry);
     }
 }

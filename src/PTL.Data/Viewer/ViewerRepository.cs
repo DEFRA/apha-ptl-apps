@@ -1,5 +1,7 @@
 using Dapper;
+using PTL.Core.Audit;
 using PTL.Core.Viewer;
+using PTL.Data.Audit;
 using PTL.Data.Infrastructure;
 
 namespace PTL.Data.Viewer;
@@ -52,38 +54,38 @@ public sealed class ViewerRepository(IDbConnectionFactory connectionFactory) : I
             new { Email = email });
     }
 
-    public async Task<ViewerEntity> CreateAsync(ViewerEntity viewer, CancellationToken cancellationToken = default)
-    {
-        using var connection = connectionFactory.CreateConnection();
+    public Task<ViewerEntity> CreateAsync(ViewerEntity viewer, AuditEntry? auditEntry = null, CancellationToken cancellationToken = default) =>
+        AuditTrailWriter.ExecuteAsync(connectionFactory, auditEntry, async (connection, transaction) =>
+        {
+            await connection.ExecuteAsync(
+                "EXEC dbo.spiViewer @ViewerId, @Name, @Email, @SsoId, @SsoIdExt",
+                new { viewer.ViewerId, viewer.Name, viewer.Email, viewer.SsoId, viewer.SsoIdExt },
+                transaction);
 
-        await connection.ExecuteAsync(
-            "EXEC dbo.spiViewer @ViewerId, @Name, @Email, @SsoId, @SsoIdExt",
-            new { viewer.ViewerId, viewer.Name, viewer.Email, viewer.SsoId, viewer.SsoIdExt });
+            return viewer;
+        }, cancellationToken);
 
-        return viewer;
-    }
+    public Task<ViewerEntity?> UpdateAsync(ViewerEntity viewer, AuditEntry? auditEntry = null, CancellationToken cancellationToken = default) =>
+        AuditTrailWriter.ExecuteAsync<ViewerEntity?>(connectionFactory, auditEntry, async (connection, transaction) =>
+        {
+            var rowsAffected = await connection.ExecuteAsync(
+                "EXEC dbo.spuViewer @ViewerId, @Name, @Email, @SsoId, @SsoIdExt",
+                new { viewer.ViewerId, viewer.Name, viewer.Email, viewer.SsoId, viewer.SsoIdExt },
+                transaction);
 
-    public async Task<ViewerEntity?> UpdateAsync(ViewerEntity viewer, CancellationToken cancellationToken = default)
-    {
-        using var connection = connectionFactory.CreateConnection();
+            return rowsAffected == 0 ? null : viewer;
+        }, cancellationToken);
 
-        var rowsAffected = await connection.ExecuteAsync(
-            "EXEC dbo.spuViewer @ViewerId, @Name, @Email, @SsoId, @SsoIdExt",
-            new { viewer.ViewerId, viewer.Name, viewer.Email, viewer.SsoId, viewer.SsoIdExt });
+    public Task<bool> DeleteAsync(Guid viewerId, AuditEntry? auditEntry = null, CancellationToken cancellationToken = default) =>
+        AuditTrailWriter.ExecuteAsync(connectionFactory, auditEntry, async (connection, transaction) =>
+        {
+            var rowsAffected = await connection.ExecuteAsync(
+                "EXEC dbo.spdViewer @ViewerId",
+                new { ViewerId = viewerId },
+                transaction);
 
-        return rowsAffected == 0 ? null : viewer;
-    }
-
-    public async Task<bool> DeleteAsync(Guid viewerId, CancellationToken cancellationToken = default)
-    {
-        using var connection = connectionFactory.CreateConnection();
-
-        var rowsAffected = await connection.ExecuteAsync(
-            "EXEC dbo.spdViewer @ViewerId",
-            new { ViewerId = viewerId });
-
-        return rowsAffected > 0;
-    }
+            return rowsAffected > 0;
+        }, cancellationToken);
 
     public async Task<IReadOnlyList<SchemeViewerEntity>> GetSchemeViewersAsync(Guid schemeId, CancellationToken cancellationToken = default)
     {

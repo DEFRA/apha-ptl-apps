@@ -90,13 +90,14 @@ public sealed class UserRoleService(
             return new UserRemoveResult(false, "You cannot remove your own account.");
         }
 
+        var users = await userRepository.GetAllAsync(cancellationToken);
+        var user = users.FirstOrDefault(u => u.UserId == userId);
         var existing = await userRoleRepository.GetForUserAsync(userId, cancellationToken);
-        foreach (var assignment in existing.ToList())
-        {
-            await userRoleRepository.RemoveAsync(assignment.UserRoleId, cancellationToken);
-        }
 
-        await userRepository.DeleteAsync(userId, cancellationToken);
+        // Role assignments, the user row and the audit entry go in one transaction - if the audit
+        // write fails nothing is removed, so no unaudited removal is ever persisted.
+        var auditEntry = new AuditEntry(actingUserId, "RemoveUser", UserEntityType, userId.ToString(), $"Username: {user?.Username}");
+        await userRepository.DeleteWithAuditAsync(userId, existing.Select(a => a.UserRoleId).ToList(), auditEntry, cancellationToken);
         return new UserRemoveResult(true, null);
     }
 }

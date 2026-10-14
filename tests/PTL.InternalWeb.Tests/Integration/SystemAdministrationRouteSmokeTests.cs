@@ -87,6 +87,18 @@ public partial class SystemAdministrationRouteSmokeTests : IClassFixture<WebAppl
     }
 
     [Fact]
+    public void RefusedRequests_AreHandledByTheLoggingAuthorizationHandler()
+    {
+        // Without this registration ASP.NET Core falls back to its default handler and a
+        // non-Admin refusal is never logged.
+        using var scope = _rawFactory.Services.CreateScope();
+
+        var handler = scope.ServiceProvider.GetRequiredService<Microsoft.AspNetCore.Authorization.IAuthorizationMiddlewareResultHandler>();
+
+        Assert.IsType<PTL.InternalWeb.Authorization.LoggingAuthorizationMiddlewareResultHandler>(handler);
+    }
+
+    [Fact]
     public async Task SystemAdministration_ReturnsSuccess()
     {
         var client = _factory.CreateClient();

@@ -1,3 +1,4 @@
+using PTL.Core.Audit;
 using PTL.Core.Lookup;
 
 namespace PTL.Core.PostagePricingPlan;
@@ -13,9 +14,9 @@ public interface IPostagePricingPlanRepository
     Task<PostagePricingPlanEntity?> GetByIdAsync(Guid postageId, CancellationToken cancellationToken = default);
 
     // spuPostage
-    Task SetPriceAsync(Guid postageId, int yearId, decimal ukPrice, decimal euPrice, decimal nonEuPrice, CancellationToken cancellationToken = default);
+    Task SetPriceAsync(Guid postageId, int yearId, decimal ukPrice, decimal euPrice, decimal nonEuPrice, AuditEntry? auditEntry = null, CancellationToken cancellationToken = default);
 
     // sppRenewPostagePricingPlan - idempotent copy-forward from (newYearId - 1) into newYearId; a
     // no-op if newYearId already has rows or if there's nothing to copy from.
-    Task RenewAsync(int newYearId, CancellationToken cancellationToken = default);
+    Task RenewAsync(int newYearId, AuditEntry? auditEntry = null, CancellationToken cancellationToken = default);
 }

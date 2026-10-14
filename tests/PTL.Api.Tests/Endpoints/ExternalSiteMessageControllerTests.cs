@@ -12,7 +12,7 @@ public class ExternalSiteMessageControllerTests
 {
     private static ExternalSiteMessageController CreateController(FakeExternalSiteMessageRepository repository)
     {
-        var controller = new ExternalSiteMessageController(new ExternalSiteMessageService(repository));
+        var controller = new ExternalSiteMessageController(new ExternalSiteMessageService(repository, new PTL.Api.Tests.Audit.FakeActingUserAccessor()));
 
         var services = new ServiceCollection().AddMvc().Services.BuildServiceProvider();
         controller.ControllerContext = new ControllerContext

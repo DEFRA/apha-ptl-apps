@@ -92,6 +92,9 @@ builder.Services.AddHealthChecks()
 
 builder.Services.AddControllers();
 
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<PTL.Core.Audit.IActingUserAccessor, HttpActingUserAccessor>();
+
 builder.Services.AddScoped<ICustomerRepository, CustomerRepository>();
 builder.Services.AddScoped<IPendingCustomerUpdateRepository, PendingCustomerUpdateRepository>();
 builder.Services.AddScoped<ICustomerService, CustomerService>();

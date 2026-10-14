@@ -1,8 +1,9 @@
+using PTL.Core.Audit;
 using PTL.Core.Lookup;
 
 namespace PTL.Core.WeightedPricingPlan;
 
-public sealed class WeightedPricingPlanService(IWeightedPricingPlanRepository repository, ILookupService lookupService) : IWeightedPricingPlanService
+public sealed class WeightedPricingPlanService(IWeightedPricingPlanRepository repository, ILookupService lookupService, IActingUserAccessor actingUser) : IWeightedPricingPlanService
 {
     public async Task<WeightedPricingPlanYearsResult> GetYearsAsync(CancellationToken cancellationToken = default)
     {
@@ -37,7 +38,14 @@ public sealed class WeightedPricingPlanService(IWeightedPricingPlanRepository re
             return new WeightedPricingPlanRenewResult(false, "No weighted pricing percentages have been entered for the current financial year, so the plan cannot be renewed.");
         }
 
-        await repository.RenewAsync(years.NextYearId.Value, cancellationToken);
+        var audit = new AuditEntry(
+            actingUser.ActingUserId,
+            "RenewWeightedPricingPlan",
+            "WeightedPricingPlan",
+            years.NextYearId.Value.ToString(),
+            $"Renewed for financial year {years.NextYearLabel}");
+
+        await repository.RenewAsync(years.NextYearId.Value, audit, cancellationToken);
         return new WeightedPricingPlanRenewResult(true, $"The weighted pricing plan has successfully been renewed for the financial year {years.NextYearLabel}.");
     }
 }

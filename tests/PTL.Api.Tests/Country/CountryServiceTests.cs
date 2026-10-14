@@ -1,10 +1,14 @@
+using PTL.Api.Tests.Audit;
+using PTL.Core.Audit;
 using PTL.Core.Country;
 
 namespace PTL.Api.Tests.Country;
 
 public class CountryServiceTests
 {
-    private static CountryService CreateService(FakeCountryRepository repository) => new(repository);
+    private static readonly FakeActingUserAccessor ActingUser = new() { ActingUserId = Guid.NewGuid() };
+
+    private static CountryService CreateService(FakeCountryRepository repository) => new(repository, ActingUser);
 
     [Fact]
     public async Task CreateAsync_ValidRequest_PersistsAndReturnsCountry()
@@ -17,6 +21,11 @@ public class CountryServiceTests
 
         Assert.Equal("France", created.CountryName);
         Assert.Single(repository.Created);
+        var audit = Assert.IsType<AuditEntry>(repository.LastAuditEntry);
+        Assert.Equal("CreateCountry", audit.Action);
+        Assert.Equal("Country", audit.EntityType);
+        Assert.Equal(created.CountryId.ToString(), audit.EntityId);
+        Assert.Equal(ActingUser.ActingUserId, audit.ActingUserId);
     }
 
     [Fact]
@@ -42,6 +51,7 @@ public class CountryServiceTests
 
         Assert.Contains(ex.Errors, e => e.Message == CountryValidator.DuplicateNameMessage);
         Assert.Empty(repository.Created);
+        Assert.Null(repository.LastAuditEntry);
     }
 
     [Fact]
@@ -68,6 +78,11 @@ public class CountryServiceTests
 
         Assert.NotNull(result);
         Assert.Single(repository.Updated);
+        var audit = Assert.IsType<AuditEntry>(repository.LastAuditEntry);
+        Assert.Equal("UpdateCountry", audit.Action);
+        Assert.Equal("Country", audit.EntityType);
+        Assert.Equal(countryId.ToString(), audit.EntityId);
+        Assert.Equal(ActingUser.ActingUserId, audit.ActingUserId);
     }
 
     [Fact]
@@ -114,6 +129,7 @@ public class CountryServiceTests
         Assert.False(result.Success);
         Assert.Equal("This country is being used by 8 customer(s)/participant(s)/Group Addresses.", result.Message);
         Assert.Empty(repository.Deleted);
+        Assert.Null(repository.LastAuditEntry);
     }
 
     [Fact]
@@ -130,5 +146,10 @@ public class CountryServiceTests
 
         Assert.True(result.Success);
         Assert.Contains(countryId, repository.Deleted);
+        var audit = Assert.IsType<AuditEntry>(repository.LastAuditEntry);
+        Assert.Equal("DeleteCountry", audit.Action);
+        Assert.Equal("Country", audit.EntityType);
+        Assert.Equal(countryId.ToString(), audit.EntityId);
+        Assert.Equal(ActingUser.ActingUserId, audit.ActingUserId);
     }
 }

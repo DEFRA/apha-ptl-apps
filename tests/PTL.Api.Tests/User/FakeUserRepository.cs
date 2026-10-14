@@ -44,15 +44,37 @@ internal sealed class FakeUserRepository : IUserRepository
         return Task.CompletedTask;
     }
 
+    public List<Guid> RemovedUserRoleIds { get; } = [];
+
+    public Task DeleteWithAuditAsync(Guid userId, IReadOnlyList<Guid> userRoleIds, AuditEntry auditEntry, CancellationToken cancellationToken = default)
+    {
+        if (ThrowOnAudit)
+        {
+            throw new InvalidOperationException("Simulated audit trail write failure.");
+        }
+
+        RemovedUserRoleIds.AddRange(userRoleIds);
+        Deleted.Add(userId);
+        Users.RemoveAll(u => u.UserId == userId);
+        LastAuditEntry = auditEntry;
+        return Task.CompletedTask;
+    }
+
     public List<PTL.Core.User.User> TestConsultants { get; set; } = [];
     public List<(Guid UserId, string Department, bool IsInactive, DateTime? InactiveDate)> DepartmentUpdates { get; } = [];
 
     public Task<IReadOnlyList<PTL.Core.User.User>> GetTestConsultantsAsync(CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<PTL.Core.User.User>>(TestConsultants);
 
-    public Task UpdateDepartmentAsync(Guid userId, string department, bool isInactive, DateTime? inactiveDate, CancellationToken cancellationToken = default)
+    public Task UpdateDepartmentAsync(Guid userId, string department, bool isInactive, DateTime? inactiveDate, AuditEntry? auditEntry = null, CancellationToken cancellationToken = default)
     {
+        if (ThrowOnAudit)
+        {
+            throw new InvalidOperationException("Simulated audit trail write failure.");
+        }
+
         DepartmentUpdates.Add((userId, department, isInactive, inactiveDate));
+        LastAuditEntry = auditEntry;
         return Task.CompletedTask;
     }
 }

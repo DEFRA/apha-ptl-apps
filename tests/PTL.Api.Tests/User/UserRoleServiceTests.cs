@@ -152,9 +152,10 @@ public class UserRoleServiceTests
     }
 
     [Fact]
-    public async Task RemoveUserAsync_RevokesAllRolesAndDeletesTheUser()
+    public async Task RemoveUserAsync_RevokesAllRolesAndDeletesTheUser_AuditedInOneCall()
     {
         var userId = Guid.NewGuid();
+        var actingUserId = Guid.NewGuid();
         var assignmentId = Guid.NewGuid();
         var users = new FakeUserRepository { Users = [new PTL.Core.User.User { UserId = userId, Username = "m100001", FriendlyName = "Jane Smith" }] };
         var userRoles = new FakeUserRoleRepository
@@ -163,11 +164,31 @@ public class UserRoleServiceTests
         };
         var service = CreateService(users: users, userRoles: userRoles);
 
-        var result = await service.RemoveUserAsync(userId, actingUserId: null);
+        var result = await service.RemoveUserAsync(userId, actingUserId);
 
         Assert.True(result.Success);
-        Assert.Contains(assignmentId, userRoles.Removed);
+        Assert.Contains(assignmentId, users.RemovedUserRoleIds);
         Assert.Contains(userId, users.Deleted);
+        Assert.Equal("RemoveUser", users.LastAuditEntry?.Action);
+        Assert.Equal(actingUserId, users.LastAuditEntry?.ActingUserId);
+        Assert.Equal(userId.ToString(), users.LastAuditEntry?.EntityId);
+    }
+
+    [Fact]
+    public async Task RemoveUserAsync_AuditWriteFails_UserIsNotRemoved()
+    {
+        var userId = Guid.NewGuid();
+        var users = new FakeUserRepository
+        {
+            Users = [new PTL.Core.User.User { UserId = userId, Username = "m100001", FriendlyName = "Jane Smith" }],
+            ThrowOnAudit = true
+        };
+        var service = CreateService(users: users);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => service.RemoveUserAsync(userId, actingUserId: Guid.NewGuid()));
+
+        Assert.Empty(users.Deleted);
+        Assert.Single(users.Users);
     }
 
     [Fact]

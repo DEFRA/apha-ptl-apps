@@ -1,7 +1,9 @@
+using Microsoft.AspNetCore.Authorization;
 using PTL.ApiClient;
 using PTL.Auth.Entra;
 using PTL.Auth.Entra.Events;
 using PTL.Core.Contract.Document;
+using PTL.InternalWeb.Authorization;
 using PTL.InternalWeb.Features.Account;
 using PTL.InternalWeb.Features.SystemAdministration;
 
@@ -18,6 +20,10 @@ builder.Services.AddAuthorizationBuilder()
         context.User.FindFirst(InternalUserClaimTypes.ResolvedRoles)?.Value
             .Split(',', StringSplitOptions.RemoveEmptyEntries)
             .Contains(SystemAdministrationPolicy.AdminRoleName, StringComparer.OrdinalIgnoreCase) ?? false));
+
+// Logs every refused request ("non-Admin request is refused AND LOGGED") - without this
+// registration ASP.NET Core silently uses its default handler and refusals go unlogged.
+builder.Services.AddSingleton<IAuthorizationMiddlewareResultHandler, LoggingAuthorizationMiddlewareResultHandler>();
 
 // Mail merge runs in-process in this app; the template bytes come from S3 via PTL.Api's
 // export-template endpoints, so nothing here touches the file system.

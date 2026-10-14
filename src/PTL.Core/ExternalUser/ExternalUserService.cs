@@ -92,7 +92,7 @@ public sealed class ExternalUserService(
         }
 
         viewer.SsoIdExt = ssoIdExt;
-        await viewerRepository.UpdateAsync(viewer, cancellationToken);
+        await viewerRepository.UpdateAsync(viewer, cancellationToken: cancellationToken);
         return viewer.ViewerId;
     }
 
@@ -113,7 +113,7 @@ public sealed class ExternalUserService(
         }
 
         testConsultant.SsoIdExt = ssoIdExt;
-        await testConsultantRepository.UpdateAsync(testConsultant, cancellationToken);
+        await testConsultantRepository.UpdateAsync(testConsultant, cancellationToken: cancellationToken);
         return testConsultant.ExternalTestConsultantId;
     }
 }

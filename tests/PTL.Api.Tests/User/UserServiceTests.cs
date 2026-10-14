@@ -4,8 +4,8 @@ namespace PTL.Api.Tests.User;
 
 public class UserServiceTests
 {
-    private static UserService CreateService(FakeUserRepository repository, FakeStaffDirectoryService? directory = null) =>
-        new(repository, directory ?? new FakeStaffDirectoryService());
+    private static UserService CreateService(FakeUserRepository repository, FakeStaffDirectoryService? directory = null, PTL.Api.Tests.Audit.FakeActingUserAccessor? actingUser = null) =>
+        new(repository, directory ?? new FakeStaffDirectoryService(), actingUser ?? new PTL.Api.Tests.Audit.FakeActingUserAccessor());
 
     [Fact]
     public async Task SearchStaffDirectoryAsync_FiltersOutCandidatesWithExistingAccounts()
@@ -132,5 +132,31 @@ public class UserServiceTests
         Assert.Equal("Science", update.Department);
         Assert.True(update.IsInactive);
         Assert.Equal(inactiveDate, update.InactiveDate);
+    }
+
+    [Fact]
+    public async Task UpdateTestConsultantAsync_AuditsTheChangeAgainstTheActingUser()
+    {
+        var userId = Guid.NewGuid();
+        var actingUserId = Guid.NewGuid();
+        var repository = new FakeUserRepository();
+        var service = CreateService(repository, actingUser: new PTL.Api.Tests.Audit.FakeActingUserAccessor { ActingUserId = actingUserId });
+
+        await service.UpdateTestConsultantAsync(userId, "Science", true, null);
+
+        Assert.Equal("UpdateInternalTestConsultant", repository.LastAuditEntry?.Action);
+        Assert.Equal(actingUserId, repository.LastAuditEntry?.ActingUserId);
+        Assert.Equal(userId.ToString(), repository.LastAuditEntry?.EntityId);
+    }
+
+    [Fact]
+    public async Task UpdateTestConsultantAsync_AuditWriteFails_NothingIsPersisted()
+    {
+        var repository = new FakeUserRepository { ThrowOnAudit = true };
+        var service = CreateService(repository);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => service.UpdateTestConsultantAsync(Guid.NewGuid(), "Science", true, null));
+
+        Assert.Empty(repository.DepartmentUpdates);
     }
 }

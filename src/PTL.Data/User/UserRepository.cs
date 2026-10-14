@@ -23,13 +23,15 @@ public sealed class UserRepository(IDbConnectionFactory connectionFactory) : IUs
         return (await connection.QueryAsync<CoreUser>("EXEC dbo.spgaUserTestConsultant")).ToList();
     }
 
-    public async Task UpdateDepartmentAsync(Guid userId, string department, bool isInactive, DateTime? inactiveDate, CancellationToken cancellationToken = default)
-    {
-        using var connection = connectionFactory.CreateConnection();
-        await connection.ExecuteAsync(
-            "EXEC dbo.spuUserDept @UserId, @Department, @IsInactive, @InactiveDate",
-            new { UserId = userId, Department = department, IsInactive = isInactive, InactiveDate = inactiveDate });
-    }
+    public Task UpdateDepartmentAsync(Guid userId, string department, bool isInactive, DateTime? inactiveDate, AuditEntry? auditEntry = null, CancellationToken cancellationToken = default) =>
+        AuditTrailWriter.ExecuteAsync(
+            connectionFactory,
+            auditEntry,
+            (connection, transaction) => connection.ExecuteAsync(
+                "EXEC dbo.spuUserDept @UserId, @Department, @IsInactive, @InactiveDate",
+                new { UserId = userId, Department = department, IsInactive = isInactive, InactiveDate = inactiveDate },
+                transaction),
+            cancellationToken);
 
     public async Task CreateAsync(CoreUser user, CancellationToken cancellationToken = default)
     {
@@ -68,4 +70,19 @@ public sealed class UserRepository(IDbConnectionFactory connectionFactory) : IUs
         using var connection = connectionFactory.CreateConnection();
         await connection.ExecuteAsync("EXEC dbo.spdUser @UserId", new { UserId = userId });
     }
+
+    public Task DeleteWithAuditAsync(Guid userId, IReadOnlyList<Guid> userRoleIds, AuditEntry auditEntry, CancellationToken cancellationToken = default) =>
+        AuditTrailWriter.ExecuteAsync(
+            connectionFactory,
+            auditEntry,
+            async (connection, transaction) =>
+            {
+                foreach (var userRoleId in userRoleIds)
+                {
+                    await connection.ExecuteAsync("EXEC dbo.spdUserRole @UserRoleId", new { UserRoleId = userRoleId }, transaction);
+                }
+
+                return await connection.ExecuteAsync("EXEC dbo.spdUser @UserId", new { UserId = userId }, transaction);
+            },
+            cancellationToken);
 }

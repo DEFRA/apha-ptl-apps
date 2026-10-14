@@ -1,4 +1,5 @@
 using System.Data;
+using PTL.Core.Audit;
 using PTL.Data.Infrastructure;
 using PTL.Data.PostagePricingPlan;
 using PTL.Data.Tests.Fakes;
@@ -98,5 +99,39 @@ public class PostagePricingPlanRepositoryTests
 
         var command = Assert.Single(connection.ExecutedCommands, c => c.CommandText == RenewSql);
         Assert.Equal(2027, command.ParameterValue("@YearId"));
+    }
+
+    private const string AuditSql = "EXEC dbo.spiSystemAdministrationAudit @AuditId, @ActingUserId, @Action, @EntityType, @EntityId, @Details";
+
+    [Fact]
+    public async Task SetPriceAsync_WithAudit_CommitsChangeAndAuditInOneTransaction()
+    {
+        var (repository, connection) = CreateRepository();
+        connection.RespondToNonQuery(SetPriceSql, 1);
+        connection.RespondToNonQuery(AuditSql, 1);
+        var postageId = Guid.NewGuid();
+        var audit = new AuditEntry(Guid.NewGuid(), "SetPostagePrice", "PostagePricingPlan", postageId.ToString(), "Prices set");
+
+        await repository.SetPriceAsync(postageId, 2026, 5.00m, 10.00m, 15.00m, audit);
+
+        Assert.NotNull(connection.LastTransaction);
+        Assert.True(connection.LastTransaction!.Committed);
+        Assert.Contains(connection.ExecutedCommands, c => c.CommandText == SetPriceSql);
+        var auditCommand = Assert.Single(connection.ExecutedCommands, c => c.CommandText == AuditSql);
+        Assert.Equal("SetPostagePrice", auditCommand.ParameterValue("@Action"));
+    }
+
+    [Fact]
+    public async Task RenewAsync_AuditWriteFails_RollsBackTheTransaction()
+    {
+        var (repository, connection) = CreateRepository();
+        connection.RespondToNonQuery(RenewSql, 1);
+        var audit = new AuditEntry(Guid.NewGuid(), "RenewPostagePricingPlan", "PostagePricingPlan", "2027", "Renewed");
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => repository.RenewAsync(2027, audit));
+
+        Assert.NotNull(connection.LastTransaction);
+        Assert.True(connection.LastTransaction!.RolledBack);
+        Assert.False(connection.LastTransaction!.Committed);
     }
 }

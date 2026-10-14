@@ -13,7 +13,7 @@ public class PostagePricingPlanControllerTests
 {
     private static PostagePricingPlanController CreateController(FakePostagePricingPlanRepository repository, FakeLookupServiceForPostagePricingPlan? lookupService = null)
     {
-        var controller = new PostagePricingPlanController(new PostagePricingPlanService(repository, lookupService ?? new FakeLookupServiceForPostagePricingPlan()));
+        var controller = new PostagePricingPlanController(new PostagePricingPlanService(repository, lookupService ?? new FakeLookupServiceForPostagePricingPlan(), new PTL.Api.Tests.Audit.FakeActingUserAccessor()));
 
         // ValidationProblem() resolves ProblemDetailsFactory from HttpContext.RequestServices,
         // which a bare controller instance does not have without this wiring.

@@ -1,3 +1,5 @@
+using PTL.Api.Tests.Audit;
+using PTL.Core.Audit;
 using PTL.Core.Lookup;
 using PTL.Core.PostagePricingPlan;
 
@@ -5,8 +7,10 @@ namespace PTL.Api.Tests.PostagePricingPlan;
 
 public class PostagePricingPlanServiceTests
 {
+    private static readonly FakeActingUserAccessor ActingUser = new() { ActingUserId = Guid.NewGuid() };
+
     private static PostagePricingPlanService CreateService(FakePostagePricingPlanRepository repository, FakeLookupServiceForPostagePricingPlan? lookupService = null) =>
-        new(repository, lookupService ?? new FakeLookupServiceForPostagePricingPlan());
+        new(repository, lookupService ?? new FakeLookupServiceForPostagePricingPlan(), ActingUser);
 
     [Fact]
     public async Task GetYearsAsync_CurrentYearHasPlanAndNextDoesNot_CanRenewIsTrue()
@@ -98,6 +102,11 @@ public class PostagePricingPlanServiceTests
         Assert.Equal(5.00m, saved.UKPrice);
         Assert.Equal(10.00m, saved.EUPrice);
         Assert.Equal(15.00m, saved.NonEUPrice);
+        var audit = Assert.IsType<AuditEntry>(repository.LastAuditEntry);
+        Assert.Equal("SetPostagePrice", audit.Action);
+        Assert.Equal("PostagePricingPlan", audit.EntityType);
+        Assert.Equal(postageId.ToString(), audit.EntityId);
+        Assert.Equal(ActingUser.ActingUserId, audit.ActingUserId);
     }
 
     [Fact]
@@ -115,6 +124,7 @@ public class PostagePricingPlanServiceTests
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, e => e.Field == "UKPrice");
         Assert.Empty(repository.SavedPrices);
+        Assert.Null(repository.LastAuditEntry);
     }
 
     // The two sibling features (AdministrationCharge/WeightedPricingPlan) never let a client choose
@@ -131,6 +141,7 @@ public class PostagePricingPlanServiceTests
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, e => e.Field == "PostageId");
         Assert.Empty(repository.SavedPrices);
+        Assert.Null(repository.LastAuditEntry);
     }
 
     [Fact]
@@ -148,6 +159,11 @@ public class PostagePricingPlanServiceTests
         Assert.True(result.Success);
         Assert.Contains("2027/28", result.Message);
         Assert.Equal(2027, Assert.Single(repository.RenewedYearIds));
+        var audit = Assert.IsType<AuditEntry>(repository.LastAuditEntry);
+        Assert.Equal("RenewPostagePricingPlan", audit.Action);
+        Assert.Equal("PostagePricingPlan", audit.EntityType);
+        Assert.Equal("2027", audit.EntityId);
+        Assert.Equal(ActingUser.ActingUserId, audit.ActingUserId);
     }
 
     [Fact]
@@ -165,5 +181,6 @@ public class PostagePricingPlanServiceTests
         Assert.False(result.Success);
         Assert.NotEmpty(result.Message);
         Assert.Empty(repository.RenewedYearIds);
+        Assert.Null(repository.LastAuditEntry);
     }
 }

@@ -17,10 +17,15 @@ public interface IUserRepository
     // spdUser
     Task DeleteAsync(Guid userId, CancellationToken cancellationToken = default);
 
+    // spdUserRole for each of the user's role assignments, then spdUser, then
+    // spiSystemAdministrationAudit, in one transaction - if the audit write fails, the user and
+    // their role assignments all remain (see ApplyRoleChangesWithAuditAsync remarks).
+    Task DeleteWithAuditAsync(Guid userId, IReadOnlyList<Guid> userRoleIds, AuditEntry auditEntry, CancellationToken cancellationToken = default);
+
     // spgaUserTestConsultant - the Internal Test Consultant Department Management grid.
     Task<IReadOnlyList<User>> GetTestConsultantsAsync(CancellationToken cancellationToken = default);
 
     // spuUserDept - updates Department/IsInactive/InactiveDate together, matching the stored
-    // procedure's own parameters exactly.
-    Task UpdateDepartmentAsync(Guid userId, string department, bool isInactive, DateTime? inactiveDate, CancellationToken cancellationToken = default);
+    // procedure's own parameters exactly. Audited in the same transaction when auditEntry is given.
+    Task UpdateDepartmentAsync(Guid userId, string department, bool isInactive, DateTime? inactiveDate, AuditEntry? auditEntry = null, CancellationToken cancellationToken = default);
 }

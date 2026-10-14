@@ -2,7 +2,7 @@ using PTL.Core.Audit;
 
 namespace PTL.Core.User;
 
-public sealed class UserService(IUserRepository userRepository, IStaffDirectoryService staffDirectoryService) : IUserService
+public sealed class UserService(IUserRepository userRepository, IStaffDirectoryService staffDirectoryService, IActingUserAccessor actingUser) : IUserService
 {
     private const string UserEntityType = "User";
 
@@ -57,6 +57,9 @@ public sealed class UserService(IUserRepository userRepository, IStaffDirectoryS
     public Task<IReadOnlyList<User>> GetTestConsultantsAsync(CancellationToken cancellationToken = default) =>
         userRepository.GetTestConsultantsAsync(cancellationToken);
 
-    public Task UpdateTestConsultantAsync(Guid userId, string department, bool isInactive, DateTime? inactiveDate, CancellationToken cancellationToken = default) =>
-        userRepository.UpdateDepartmentAsync(userId, department, isInactive, inactiveDate, cancellationToken);
+    public async Task UpdateTestConsultantAsync(Guid userId, string department, bool isInactive, DateTime? inactiveDate, CancellationToken cancellationToken = default)
+    {
+        var auditEntry = new AuditEntry(actingUser.ActingUserId, "UpdateInternalTestConsultant", UserEntityType, userId.ToString(), $"Department: {department}; Inactive: {isInactive}");
+        await userRepository.UpdateDepartmentAsync(userId, department, isInactive, inactiveDate, auditEntry, cancellationToken);
+    }
 }

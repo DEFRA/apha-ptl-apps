@@ -1,8 +1,9 @@
+using PTL.Core.Audit;
 using PTL.Core.Lookup;
 
 namespace PTL.Core.PostagePricingPlan;
 
-public sealed class PostagePricingPlanService(IPostagePricingPlanRepository repository, ILookupService lookupService) : IPostagePricingPlanService
+public sealed class PostagePricingPlanService(IPostagePricingPlanRepository repository, ILookupService lookupService, IActingUserAccessor actingUser) : IPostagePricingPlanService
 {
     public async Task<PostagePricingPlanYearsResult> GetYearsAsync(CancellationToken cancellationToken = default)
     {
@@ -42,7 +43,14 @@ public sealed class PostagePricingPlanService(IPostagePricingPlanRepository repo
             return validation;
         }
 
-        await repository.SetPriceAsync(postageId, existing.YearId, ukPrice, euPrice, nonEuPrice, cancellationToken);
+        var audit = new AuditEntry(
+            actingUser.ActingUserId,
+            "SetPostagePrice",
+            "PostagePricingPlan",
+            postageId.ToString(),
+            $"YearId={existing.YearId}; UkPrice={ukPrice}; EuPrice={euPrice}; NonEuPrice={nonEuPrice}");
+
+        await repository.SetPriceAsync(postageId, existing.YearId, ukPrice, euPrice, nonEuPrice, audit, cancellationToken);
         return validation;
     }
 
@@ -54,7 +62,14 @@ public sealed class PostagePricingPlanService(IPostagePricingPlanRepository repo
             return new PostagePricingPlanRenewResult(false, "No postage pricing plan has been entered for the current financial year, so the plan cannot be renewed.");
         }
 
-        await repository.RenewAsync(years.NextYearId.Value, cancellationToken);
+        var audit = new AuditEntry(
+            actingUser.ActingUserId,
+            "RenewPostagePricingPlan",
+            "PostagePricingPlan",
+            years.NextYearId.Value.ToString(),
+            $"Renewed for financial year {years.NextYearLabel}");
+
+        await repository.RenewAsync(years.NextYearId.Value, audit, cancellationToken);
         return new PostagePricingPlanRenewResult(true, $"The postage pricing plan has successfully been renewed for the financial year {years.NextYearLabel}.");
     }
 }
