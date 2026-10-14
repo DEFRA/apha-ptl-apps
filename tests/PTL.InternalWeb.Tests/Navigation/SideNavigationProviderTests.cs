@@ -58,6 +58,22 @@ public class SideNavigationProviderTests
         Assert.Equal("Renew Contracts", path[^1].Text);
     }
 
+    // Sample Numbers/Intended Results are hidden children of "Monthly Distributions" so they get
+    // a proper breadcrumb trail instead of falling back to a plain "Distribution - X" crumb.
+    [Theory]
+    [InlineData("SampleNumbers", "Sample Numbers")]
+    [InlineData("IntendedResults", "Intended Results")]
+    public void FindPath_DistributionScreens_ReturnsFullAncestorChain(string actionName, string expectedText)
+    {
+        var tree = SideNavigationProvider.Build();
+
+        var path = SideNavigationProvider.FindPath(tree, "Distribution", actionName);
+
+        Assert.NotNull(path);
+        Assert.True(path!.Count > 1);
+        Assert.Equal(expectedText, path[^1].Text);
+    }
+
     [Fact]
     public void FindPath_UnknownNode_ReturnsNull()
     {

@@ -502,4 +502,125 @@ public class DistributionDtoCoverageTests
         Assert.Same(categoryItem, Assert.Single(data.CategoryItems));
         Assert.Same(criterionItem, Assert.Single(data.CriterionItems));
     }
+
+    [Fact]
+    public void PreparationContracts_ExposeEveryProperty()
+    {
+        var monthlyDistributionId = Guid.NewGuid();
+        var schemeId = Guid.NewGuid();
+        var sampleId = Guid.NewGuid();
+        var diaryEntry = new DateTime(2026, 1, 1, 9, 0, 0, DateTimeKind.Utc);
+        var prepStart = new DateTime(2026, 1, 2, 9, 0, 0, DateTimeKind.Utc);
+        var prepComplete = new DateTime(2026, 1, 3, 9, 0, 0, DateTimeKind.Utc);
+
+        var sampleResponse = new PreparationSampleResponse(sampleId, "S1", "Internal 1");
+        Assert.Equal(sampleId, sampleResponse.SampleId);
+        Assert.Equal("S1", sampleResponse.SampleNumber);
+        Assert.Equal("Internal 1", sampleResponse.InternalDescription);
+
+        var schemeResponse = new PreparationSchemeResponse(
+            schemeId, "PT0060", "Mastitis bovine", "17152A/BA", 9, "Keep chilled",
+            diaryEntry, prepStart, prepComplete, [sampleResponse]);
+
+        Assert.Equal(schemeId, schemeResponse.MonthlyDistributionSchemeId);
+        Assert.Equal("PT0060", schemeResponse.SchemeIdentifier);
+        Assert.Equal("Mastitis bovine", schemeResponse.SchemeName);
+        Assert.Equal("17152A/BA", schemeResponse.DistributionReferenceFull);
+        Assert.Equal(9, schemeResponse.NumberOfSetsRequired);
+        Assert.Equal("Keep chilled", schemeResponse.SamplePackingInstructions);
+        Assert.Equal(diaryEntry, schemeResponse.DiaryEntry);
+        Assert.Equal(prepStart, schemeResponse.PrepStartDate);
+        Assert.Equal(prepComplete, schemeResponse.PrepCompleteDate);
+        Assert.Same(sampleResponse, Assert.Single(schemeResponse.Samples));
+
+        var sheetResponse = new PreparationSheetResponse(monthlyDistributionId, 2026, 4, [schemeResponse]);
+        Assert.Equal(monthlyDistributionId, sheetResponse.MonthlyDistributionId);
+        Assert.Equal(2026, sheetResponse.YearId);
+        Assert.Equal(4, sheetResponse.MonthId);
+        Assert.Same(schemeResponse, Assert.Single(sheetResponse.Schemes));
+
+        var stageUpdateRequest = new PreparationStageUpdateRequest(schemeId, true, false, true);
+        Assert.Equal(schemeId, stageUpdateRequest.MonthlyDistributionSchemeId);
+        Assert.True(stageUpdateRequest.DiaryEntryChecked);
+        Assert.False(stageUpdateRequest.PrepStartChecked);
+        Assert.True(stageUpdateRequest.PrepCompleteChecked);
+
+        var saveRequest = new PreparationSaveRequest([stageUpdateRequest]);
+        Assert.Same(stageUpdateRequest, Assert.Single(saveRequest.Updates));
+
+        var saveResult = new PreparationSaveResult(true);
+        Assert.True(saveResult.Success);
+    }
+
+    [Fact]
+    public void PreparationEntities_ExposeEveryProperty()
+    {
+        var monthlyDistributionId = Guid.NewGuid();
+        var schemeId = Guid.NewGuid();
+        var sampleId = Guid.NewGuid();
+        var diaryEntry = new DateTime(2026, 1, 1, 9, 0, 0, DateTimeKind.Utc);
+        var prepStart = new DateTime(2026, 1, 2, 9, 0, 0, DateTimeKind.Utc);
+        var prepComplete = new DateTime(2026, 1, 3, 9, 0, 0, DateTimeKind.Utc);
+
+        var sample = new PreparationSampleEntity
+        {
+            MonthlyDistributionSchemeId = schemeId,
+            SampleId = sampleId,
+            SampleNumber = "S1",
+            InternalDescription = "Internal 1",
+        };
+        Assert.Equal(schemeId, sample.MonthlyDistributionSchemeId);
+        Assert.Equal(sampleId, sample.SampleId);
+        Assert.Equal("S1", sample.SampleNumber);
+        Assert.Equal("Internal 1", sample.InternalDescription);
+
+        var scheme = new PreparationSchemeEntity
+        {
+            MonthlyDistributionSchemeId = schemeId,
+            SchemeIdentifier = "PT0060",
+            SchemeName = "Mastitis bovine",
+            DistributionReference = "17152",
+            DistributionReferenceSuffix = "A",
+            ScheduleCode = "BA",
+            NumberOfSetsRequired = 9,
+            SamplePackingInstructions = "Keep chilled",
+            DiaryEntry = diaryEntry,
+            PrepStartDate = prepStart,
+            PrepCompleteDate = prepComplete,
+            Samples = [sample],
+        };
+
+        Assert.Equal(schemeId, scheme.MonthlyDistributionSchemeId);
+        Assert.Equal("PT0060", scheme.SchemeIdentifier);
+        Assert.Equal("Mastitis bovine", scheme.SchemeName);
+        Assert.Equal("17152", scheme.DistributionReference);
+        Assert.Equal("A", scheme.DistributionReferenceSuffix);
+        Assert.Equal("BA", scheme.ScheduleCode);
+        Assert.Equal(9, scheme.NumberOfSetsRequired);
+        Assert.Equal("Keep chilled", scheme.SamplePackingInstructions);
+        Assert.Equal(diaryEntry, scheme.DiaryEntry);
+        Assert.Equal(prepStart, scheme.PrepStartDate);
+        Assert.Equal(prepComplete, scheme.PrepCompleteDate);
+        Assert.Same(sample, Assert.Single(scheme.Samples));
+        Assert.Equal("17152A/BA", scheme.DistributionReferenceFull);
+
+        var header = new PreparationHeaderEntity { YearId = 2026, MonthId = 4 };
+        Assert.Equal(2026, header.YearId);
+        Assert.Equal(4, header.MonthId);
+
+        var sheet = new PreparationSheetData(monthlyDistributionId, 2026, 4, [scheme]);
+        Assert.Equal(monthlyDistributionId, sheet.MonthlyDistributionId);
+        Assert.Equal(2026, sheet.YearId);
+        Assert.Equal(4, sheet.MonthId);
+        Assert.Same(scheme, Assert.Single(sheet.Schemes));
+
+        var stageUpdate = new PreparationStageUpdate(schemeId, true, false, true);
+        Assert.Equal(schemeId, stageUpdate.MonthlyDistributionSchemeId);
+        Assert.True(stageUpdate.DiaryEntryChecked);
+        Assert.False(stageUpdate.PrepStartChecked);
+        Assert.True(stageUpdate.PrepCompleteChecked);
+
+        var outcome = new PreparationSaveOutcome(true);
+        Assert.True(outcome.Success);
+    }
 }

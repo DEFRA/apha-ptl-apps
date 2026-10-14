@@ -100,12 +100,18 @@ public class GovUkSelectTagHelper(IHtmlGenerator generator) : TagHelper
 
     public string? Hint { get; set; }
 
+    /// <summary>Set to "govuk-label govuk-visually-hidden" where the visible label is a table column header.</summary>
+    [HtmlAttributeName("label-class")]
+    public string LabelCssClass { get; set; } = "govuk-label";
+
     [HtmlAttributeName("asp-items")]
     public IEnumerable<SelectListItem> Items { get; set; } = [];
 
     /// <summary>Renders a leading empty-valued option (legacy's "- Please Select -" entry) when set.</summary>
     [HtmlAttributeName("option-label")]
     public string? OptionLabel { get; set; }
+
+    public bool Disabled { get; set; }
 
     [ViewContext]
     [HtmlAttributeNotBound]
@@ -115,13 +121,17 @@ public class GovUkSelectTagHelper(IHtmlGenerator generator) : TagHelper
     {
         var field = For.Name;
         var hasError = ViewContext.ViewData.ModelState.TryGetValue(field, out var entry) && entry.Errors.Count > 0;
-        var describedBy = GovUkFormGroupMarkup.Render(output, ViewContext, field, Label, Hint, entry);
+        var describedBy = GovUkFormGroupMarkup.Render(output, ViewContext, field, Label, Hint, entry, LabelCssClass);
 
         var cssClass = hasError ? "govuk-select govuk-select--error" : "govuk-select";
         var htmlAttributes = new Dictionary<string, object> { ["class"] = cssClass };
         if (describedBy is not null)
         {
             htmlAttributes["aria-describedby"] = describedBy;
+        }
+        if (Disabled)
+        {
+            htmlAttributes["disabled"] = "disabled";
         }
 
         var select = generator.GenerateSelect(ViewContext, For.ModelExplorer, OptionLabel, field, Items, allowMultiple: false, htmlAttributes);

@@ -12,15 +12,18 @@ namespace PTL.InternalWeb.Features.Distribution;
 //
 // SCOPE: the Dashboard (year selection, month rows, progress indicators, "Initialise this Month"
 // visibility/confirmation), the Monthly Distributions scheduling screen (dates, Cancel/
-// Commence, Save/Apply/Cancel) and the Sample Numbers screen are implemented. The Preparation/
-// Packaging/Results/Tabulations "View" links, the Intended Results/Participants links reached FROM
-// Scheduling, and "Initialise this Month" itself all remain placeholders (ViewStage/
+// Commence, Save/Apply/Cancel), the Sample Numbers screen, the Intended Results screen, the
+// Distribution Participants screen (view, Change Deadline Date, Repeat Distribution), the Sample
+// Preparation screen (Diary Entry/Prep Started/Prep Completed, Save/Apply/Cancel, Print) and its
+// per-scheme Printable Results view are implemented. The Packaging/Results(dashboard)/Tabulations
+// "View" links, plus "Initialise this Month" itself, all remain placeholders (ViewStage/
 // InitialiseMonth below) - those workflows (and the exact legacy persisted-save chain behind
 // Initialise) are out of scope and flagged [NEEDS INVESTIGATION] in
 // docs/migration/distribution-migration.md.
 public sealed class DistributionController(IDistributionApiClient distributionApiClient) : Controller
 {
     private static readonly string[] MonthOrder = ["Scheduling", "Preparation", "Packaging", "Results", "Tabulations"];
+    private const string CancelCommand = "cancel";
 
     [HttpGet]
     public async Task<IActionResult> Index(int? year, CancellationToken cancellationToken)
@@ -46,8 +49,8 @@ public sealed class DistributionController(IDistributionApiClient distributionAp
     }
 
     // Placeholder for every "View" link not yet migrated (Preparation/Packaging/Results/
-    // Tabulations, plus the Intended Results/Participants links on the Scheduling screen below,
-    // which all open workflows out of scope for this story) - see class remarks.
+    // Tabulations, plus the Participants link on the Scheduling screen below, which all open
+    // workflows out of scope for this story) - see class remarks.
     [HttpGet]
     public IActionResult ViewStage(string stage)
     {
@@ -89,7 +92,7 @@ public sealed class DistributionController(IDistributionApiClient distributionAp
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Schedule(int year, int monthId, MonthlyDistributionScheduleViewModel model, string command, CancellationToken cancellationToken)
     {
-        if (string.Equals(command, "cancel", StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(command, CancelCommand, StringComparison.OrdinalIgnoreCase))
         {
             return RedirectToAction(nameof(Index));
         }
@@ -166,6 +169,50 @@ public sealed class DistributionController(IDistributionApiClient distributionAp
         return View(nameof(Schedule), model);
     }
 
+    // Sample Preparation - legacy Internal User/PreparationSheet.aspx. Reached from the
+    // Dashboard's "Preparation: View" link.
+    [HttpGet]
+    public async Task<IActionResult> Preparation(int year, int monthId, CancellationToken cancellationToken)
+    {
+        var sheet = await distributionApiClient.GetPreparationAsync(year, monthId, cancellationToken);
+        return sheet is null ? NotFound() : View(ToPreparationViewModel(year, monthId, sheet));
+    }
+
+    // Save = persist then leave (legacy ButtonSave_Click -> Save() -> LeavePage() ->
+    // MenuDistributions.aspx, i.e. the Dashboard). Apply = persist then stay, re-reading fresh
+    // data (legacy ButtonApply_Click -> Save() only, redrawing from the already-updated object).
+    // Cancel = discard then leave, no save at all (legacy ButtonCancel_Click -> LeavePage()).
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Preparation(int year, int monthId, PreparationViewModel model, string command, CancellationToken cancellationToken)
+    {
+        if (string.Equals(command, CancelCommand, StringComparison.OrdinalIgnoreCase))
+        {
+            return RedirectToAction(nameof(Index));
+        }
+
+        var updates = model.Schemes
+            .Select(s => new PreparationStageUpdateRequest(s.MonthlyDistributionSchemeId, s.DiaryEntryChecked, s.PrepStartChecked, s.PrepCompleteChecked))
+            .ToList();
+
+        var result = await distributionApiClient.SavePreparationAsync(year, monthId, new PreparationSaveRequest(updates), cancellationToken);
+
+        if (result is null || !result.Success)
+        {
+            TempData.SetNotification(NotificationType.Error, "Sample Preparation could not be saved. Please try again later.");
+            return RedirectToAction(nameof(Preparation), new { year, monthId });
+        }
+
+        TempData.SetNotification(NotificationType.Success, "Sample Preparation updated successfully.");
+
+        if (string.Equals(command, "apply", StringComparison.OrdinalIgnoreCase))
+        {
+            return RedirectToAction(nameof(Preparation), new { year, monthId });
+        }
+
+        return RedirectToAction(nameof(Index));
+    }
+
     // Sample Numbers - legacy Scheduling/SampleNumbers.aspx. Opened from the Scheduling screen's
     // "Define Sample Numbers"/"View Sample Numbers" link; year/monthId are carried through purely
     // so Save and Cancel can return to the Scheduling screen the user came from (legacy redirects
@@ -205,14 +252,14 @@ public sealed class DistributionController(IDistributionApiClient distributionAp
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> SampleNumbers(int year, int monthId, Guid schemeId, SampleNumbersViewModel model, string command, CancellationToken cancellationToken)
     {
-        if (string.Equals(command, "cancel", StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(command, CancelCommand, StringComparison.OrdinalIgnoreCase))
         {
             return RedirectToAction(nameof(Schedule), new { year, monthId });
         }
 
         if (string.Equals(command, "cancelAudit", StringComparison.OrdinalIgnoreCase))
         {
-            return RedirectToDestination(model.PendingCommand, year, monthId);
+            return RedirectToDestination(model.PendingCommand, year, monthId, schemeId);
         }
 
         model.YearId = year;
@@ -281,12 +328,12 @@ public sealed class DistributionController(IDistributionApiClient distributionAp
 
         TempData.SetNotification(NotificationType.Success, "Sample Numbers updated successfully.");
 
-        return RedirectToDestination(command, year, monthId);
+        return RedirectToDestination(command, year, monthId, schemeId);
     }
 
-    private RedirectToActionResult RedirectToDestination(string? command, int year, int monthId) =>
+    private RedirectToActionResult RedirectToDestination(string? command, int year, int monthId, Guid schemeId) =>
         string.Equals(command, "saveAndGoToIntendedResults", StringComparison.OrdinalIgnoreCase)
-            ? RedirectToAction(nameof(ViewStage), new { stage = "Intended Results" })
+            ? RedirectToAction(nameof(IntendedResults), new { year, monthId, schemeId })
             : RedirectToAction(nameof(Schedule), new { year, monthId });
 
     // Legacy keeps the whole IntendedResultsSet in Session, so a failed Save redisplays the page
@@ -379,8 +426,465 @@ public sealed class DistributionController(IDistributionApiClient distributionAp
             })],
         };
 
+    // Intended Results - legacy Scheduling/IntendedResults.aspx. Opened from the Scheduling
+    // screen's "View Intended Results" link; year/monthId are carried through purely so Save and
+    // Cancel can return to the Scheduling screen the user came from.
+    [HttpGet]
+    public async Task<IActionResult> IntendedResults(int year, int monthId, Guid schemeId, CancellationToken cancellationToken)
+    {
+        var page = await distributionApiClient.GetIntendedResultsAsync(schemeId, cancellationToken);
+
+        // Legacy Page_Load: "Samples numbers must be defined before setting the Intended
+        // Results" - If Not mds.HasSampleNumbersDefined Then LeavePage(). No error shown, just a
+        // silent return to Scheduling.
+        if (page is null)
+        {
+            return RedirectToAction(nameof(Schedule), new { year, monthId });
+        }
+
+        return View(ToIntendedResultsViewModel(year, monthId, page));
+    }
+
+    // Save = persist then return to Monthly Distributions (legacy ButtonSave_Click -> LeavePage()).
+    // Cancel = discard, no save at all (legacy ButtonCancel_Click, CausesValidation=False).
+    // cancelAudit = Cancel on the audit-reason step - legacy Audit.aspx always returns to
+    // ~/Scheduling/monthlys.aspx for this screen, so there is only one destination.
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> IntendedResults(int year, int monthId, Guid schemeId, IntendedResultsViewModel model, string command, CancellationToken cancellationToken)
+    {
+        if (string.Equals(command, CancelCommand, StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(command, "cancelAudit", StringComparison.OrdinalIgnoreCase))
+        {
+            return RedirectToAction(nameof(Schedule), new { year, monthId });
+        }
+
+        model.YearId = year;
+        model.MonthId = monthId;
+        model.MonthlyDistributionSchemeId = schemeId;
+
+        if (!ModelState.IsValid)
+        {
+            return View(await RehydrateIntendedResultsAsync(year, monthId, schemeId, model, cancellationToken));
+        }
+
+        var request = new IntendedResultsSaveRequest(
+            [.. model.Tests.Select(t => new IntendedResultsTestRequest(
+                t.TestId,
+                [.. t.ResultItems.Select(r => new IntendedResultsResultItemRequest(r.TestResultItemId, r.IsRange))],
+                [.. t.MethodItems.Select(m => new IntendedResultsMethodItemRequest(m.TestMethodItemId, m.IntendedResult ?? string.Empty))],
+                [.. t.Samples.Select(s => new IntendedResultsSampleRowRequest(
+                    s.SampleId,
+                    s.IsApplicable,
+                    [.. s.Values.Select(v => new IntendedResultsSampleResultValueRequest(v.SampleResultItemId, v.IntendedResult ?? string.Empty, v.IntendedResult2 ?? string.Empty))]))]))],
+            model.RequiresAuditReason,
+            model.AuditWhy);
+
+        var result = await distributionApiClient.SaveIntendedResultsAsync(schemeId, request, cancellationToken);
+
+        // Legacy RequireAudit -> Audit.aspx: diverted BEFORE anything is written, even when
+        // nothing in this particular save is dirty.
+        if (result is not null && result.AuditReasonRequired)
+        {
+            var auditModel = await RehydrateIntendedResultsAsync(year, monthId, schemeId, model, cancellationToken);
+            auditModel.RequiresAuditReason = true;
+            auditModel.IsAuditStep = true;
+            auditModel.AuditObjectName = result.AuditObjectName;
+            auditModel.PendingCommand = command;
+            auditModel.AuditWhy = model.AuditWhy;
+            return View(auditModel);
+        }
+
+        if (result is null || !result.Success)
+        {
+            if (result is null)
+            {
+                TempData.SetNotification(NotificationType.Error, "Intended Results could not be saved. Please try again later.");
+            }
+
+            foreach (var (itemId, errors) in result?.FieldErrorsByItemId ?? new Dictionary<Guid, IntendedResultsFieldError[]>())
+            {
+                ApplyIntendedResultsFieldErrors(model, itemId, errors);
+            }
+
+            return View(await RehydrateIntendedResultsAsync(year, monthId, schemeId, model, cancellationToken));
+        }
+
+        TempData.SetNotification(NotificationType.Success, "Intended Results updated successfully.");
+
+        return RedirectToAction(nameof(Schedule), new { year, monthId });
+    }
+
+    // Printable Results - legacy Internal User/PrintableResults.aspx, reached from the Sample
+    // Preparation screen's per-scheme Results "View" link. Reuses the same Intended Results data
+    // (legacy IntendedResultsSet.FetchIntendedResults) already fetched for the Intended Results
+    // screen above, but shaped by PrintableResultsWorksheetBuilder into legacy's dynamic,
+    // ExpectedLength-packed multi-table-per-test worksheet rather than the interactive edit
+    // screen's own view model.
+    // showValues mirrors legacy's "Select Version to Print" dropdown, whose default selected item
+    // is always "Blank" (DropDownParticipant.SelectedIndex = 0) regardless of whether intended
+    // results exist - only an explicit ?showValues=true request shows them, and only when
+    // HasIntendedResults is true (legacy never even offers the "Show Intended Results" option
+    // otherwise).
+    [HttpGet]
+    public async Task<IActionResult> PrintableResults(int year, int monthId, Guid schemeId, bool showValues, CancellationToken cancellationToken)
+    {
+        var page = await distributionApiClient.GetIntendedResultsAsync(schemeId, cancellationToken);
+        if (page is null)
+        {
+            return NotFound();
+        }
+
+        // DATE OF DISTRIBUTION/the deadline message/the UKAS accreditation mark only exist on the
+        // Scheduling-level scheme row (legacy's separate MonthlyDistributionScheme.
+        // FetchMonthlyDistributionSchemeChild call) - already-available via the same schedule
+        // lookup the Scheduling screen itself uses.
+        var schedule = await distributionApiClient.GetScheduleAsync(year, monthId, cancellationToken);
+        var scheduleScheme = schedule?.Schemes.FirstOrDefault(s => s.MonthlyDistributionSchemeId == schemeId);
+
+        var worksheet = PrintableResultsWorksheetBuilder.Build(
+            year,
+            monthId,
+            page,
+            page.HasIntendedResults && showValues,
+            scheduleScheme?.DistributionDate ?? default,
+            scheduleScheme?.DeadlineDate ?? default,
+            scheduleScheme?.IsAccredited ?? false);
+
+        return View(worksheet);
+    }
+
+    // Field errors are keyed by TestResultItemId/TestMethodItemId/SampleResultItemId (globally
+    // unique, so no collision risk across the three id spaces) rather than by a flat row index,
+    // since this screen has no single list to index into.
+    private void ApplyIntendedResultsFieldErrors(IntendedResultsViewModel model, Guid itemId, IntendedResultsFieldError[] errors)
+    {
+        for (var testIndex = 0; testIndex < model.Tests.Count; testIndex++)
+        {
+            var test = model.Tests[testIndex];
+
+            if (TryApplyMethodItemErrors(test, testIndex, itemId, errors))
+            {
+                return;
+            }
+
+            if (TryApplySampleValueErrors(test, testIndex, itemId, errors))
+            {
+                return;
+            }
+        }
+    }
+
+    private bool TryApplyMethodItemErrors(IntendedResultsTestViewModel test, int testIndex, Guid itemId, IntendedResultsFieldError[] errors)
+    {
+        var methodItemIndex = test.MethodItems.FindIndex(m => m.TestMethodItemId == itemId);
+        if (methodItemIndex < 0)
+        {
+            return false;
+        }
+
+        foreach (var error in errors)
+        {
+            ModelState.AddModelError(
+                $"{nameof(IntendedResultsViewModel.Tests)}[{testIndex}].{nameof(test.MethodItems)}[{methodItemIndex}].{nameof(IntendedResultsMethodItemViewModel.IntendedResult)}",
+                error.Message);
+        }
+
+        return true;
+    }
+
+    private bool TryApplySampleValueErrors(IntendedResultsTestViewModel test, int testIndex, Guid itemId, IntendedResultsFieldError[] errors)
+    {
+        for (var sampleIndex = 0; sampleIndex < test.Samples.Count; sampleIndex++)
+        {
+            var valueIndex = test.Samples[sampleIndex].Values.FindIndex(v => v.SampleResultItemId == itemId);
+            if (valueIndex < 0)
+            {
+                continue;
+            }
+
+            foreach (var error in errors)
+            {
+                var propertyName = string.Equals(error.Field, "IntendedResult2", StringComparison.Ordinal)
+                    ? nameof(IntendedResultsSampleValueViewModel.IntendedResult2)
+                    : nameof(IntendedResultsSampleValueViewModel.IntendedResult);
+
+                ModelState.AddModelError(
+                    $"{nameof(IntendedResultsViewModel.Tests)}[{testIndex}].{nameof(test.Samples)}[{sampleIndex}].{nameof(IntendedResultsSampleRowViewModel.Values)}[{valueIndex}].{propertyName}",
+                    error.Message);
+            }
+
+            return true;
+        }
+
+        return false;
+    }
+
+    // Legacy keeps the whole IntendedResultsSet in Session, so a failed Save redisplays the page
+    // with the server's heading/structure intact and only the user's typed edits overlaid. There
+    // is no server-side session here, so re-read the distribution and overlay the posted editable
+    // fields onto it - the display-only data is never trusted from the form.
+    private async Task<IntendedResultsViewModel> RehydrateIntendedResultsAsync(
+        int year, int monthId, Guid schemeId, IntendedResultsViewModel posted, CancellationToken cancellationToken)
+    {
+        var page = await distributionApiClient.GetIntendedResultsAsync(schemeId, cancellationToken);
+        if (page is null)
+        {
+            return posted;
+        }
+
+        var model = ToIntendedResultsViewModel(year, monthId, page);
+        model.RequiresAuditReason = posted.RequiresAuditReason;
+        model.IsAuditStep = posted.IsAuditStep;
+        model.AuditObjectName = posted.AuditObjectName;
+        model.PendingCommand = posted.PendingCommand;
+        model.AuditWhy = posted.AuditWhy;
+
+        var postedTestsById = posted.Tests.ToDictionary(t => t.TestId);
+        foreach (var test in model.Tests)
+        {
+            if (!postedTestsById.TryGetValue(test.TestId, out var postedTest))
+            {
+                continue;
+            }
+
+            OverlayPostedTest(test, postedTest);
+        }
+
+        return model;
+    }
+
+    private static void OverlayPostedTest(IntendedResultsTestViewModel test, IntendedResultsTestViewModel postedTest)
+    {
+        var postedResultItemsById = postedTest.ResultItems.ToDictionary(r => r.TestResultItemId);
+        foreach (var resultItem in test.ResultItems)
+        {
+            if (postedResultItemsById.TryGetValue(resultItem.TestResultItemId, out var postedResultItem))
+            {
+                resultItem.IsRange = postedResultItem.IsRange;
+            }
+        }
+
+        var postedMethodItemsById = postedTest.MethodItems.ToDictionary(m => m.TestMethodItemId);
+        foreach (var methodItem in test.MethodItems)
+        {
+            if (postedMethodItemsById.TryGetValue(methodItem.TestMethodItemId, out var postedMethodItem))
+            {
+                methodItem.IntendedResult = postedMethodItem.IntendedResult;
+            }
+        }
+
+        var postedSamplesById = postedTest.Samples.ToDictionary(s => s.SampleId);
+        foreach (var sample in test.Samples)
+        {
+            // Mirrors legacy's disabled controls: a non-applicable sample/test pair is never
+            // posted back by a real browser, so its server-fetched (stored) values stand as-is.
+            if (!sample.IsApplicable || !postedSamplesById.TryGetValue(sample.SampleId, out var postedSample))
+            {
+                continue;
+            }
+
+            var postedValuesById = postedSample.Values.ToDictionary(v => v.SampleResultItemId);
+            foreach (var value in sample.Values)
+            {
+                if (postedValuesById.TryGetValue(value.SampleResultItemId, out var postedValue))
+                {
+                    value.IntendedResult = postedValue.IntendedResult;
+                    value.IntendedResult2 = postedValue.IntendedResult2;
+                }
+            }
+        }
+    }
+
+    private static IntendedResultsViewModel ToIntendedResultsViewModel(int year, int monthId, IntendedResultsResponse page) =>
+        new()
+        {
+            MonthlyDistributionSchemeId = page.MonthlyDistributionSchemeId,
+            YearId = year,
+            MonthId = monthId,
+            DistributionReferenceFull = page.DistributionReferenceFull,
+            SchemeIdentifier = page.SchemeIdentifier,
+            SchemeName = page.SchemeName,
+            RequiresAuditReason = page.RequiresAuditReason,
+            Tests = [.. page.Tests.Select(t => new IntendedResultsTestViewModel
+            {
+                TestId = t.TestId,
+                TestName = t.TestName,
+                ResultItems = [.. t.ResultItems.Select(r => new IntendedResultsResultItemViewModel
+                {
+                    TestResultItemId = r.TestResultItemId,
+                    Name = r.Name,
+                    FormatString = r.FormatString,
+                    ReturnValueType = r.ReturnValueType,
+                    IsRange = r.IsRange,
+                })],
+                MethodItems = [.. t.MethodItems.Select(m => new IntendedResultsMethodItemViewModel
+                {
+                    TestMethodItemId = m.TestMethodItemId,
+                    Name = m.Name,
+                    FormatString = m.FormatString,
+                    ReturnValueType = m.ReturnValueType,
+                    IntendedResult = m.IntendedResult,
+                })],
+                Samples = [.. t.Samples.Select(s => new IntendedResultsSampleRowViewModel
+                {
+                    SampleId = s.SampleId,
+                    SampleNumber = s.SampleNumber,
+                    InternalDescription = s.InternalDescription,
+                    IsApplicable = s.IsApplicable,
+                    Values = [.. s.Values.Select(v => new IntendedResultsSampleValueViewModel
+                    {
+                        SampleResultItemId = v.SampleResultItemId,
+                        TestResultItemId = v.TestResultItemId,
+                        IntendedResult = v.IntendedResult,
+                        IntendedResult2 = v.IntendedResult2,
+                    })],
+                })],
+            })],
+        };
+
+    private static PreparationViewModel ToPreparationViewModel(int year, int monthId, PreparationSheetResponse sheet) =>
+        new()
+        {
+            YearId = year,
+            MonthId = monthId,
+            MonthDescription = new DateTime(2000, monthId, 1, 0, 0, 0, DateTimeKind.Utc).ToString("MMM", System.Globalization.CultureInfo.InvariantCulture) + " " + year,
+            Schemes = [.. sheet.Schemes.Select(s => new PreparationSchemeRowViewModel
+            {
+                MonthlyDistributionSchemeId = s.MonthlyDistributionSchemeId,
+                SchemeIdentifier = s.SchemeIdentifier,
+                SchemeName = s.SchemeName,
+                DistributionReferenceFull = s.DistributionReferenceFull,
+                NumberOfSetsRequired = s.NumberOfSetsRequired,
+                SamplePackingInstructions = s.SamplePackingInstructions,
+                DiaryEntry = s.DiaryEntry,
+                PrepStartDate = s.PrepStartDate,
+                PrepCompleteDate = s.PrepCompleteDate,
+                Samples = [.. s.Samples.Select(sa => new PreparationSampleRowViewModel
+                {
+                    SampleNumber = sa.SampleNumber,
+                    InternalDescription = sa.InternalDescription,
+                })],
+            })],
+        };
+
+    // Distribution Participants - legacy Scheduling/DistributionParticipantList.aspx. Reached from
+    // the Scheduling screen's "View Participants" link.
+    [HttpGet]
+    public async Task<IActionResult> Participants(int year, int monthId, Guid schemeId, CancellationToken cancellationToken)
+    {
+        var data = await distributionApiClient.GetParticipantsAsync(schemeId, cancellationToken);
+        return data is null ? NotFound() : View(ToParticipantsViewModel(year, monthId, data));
+    }
+
+    // Change Deadline Date - legacy gridParticipants_RowCommand (lnkSaveNewDeadline). Each row has
+    // its own ValidationGroup in legacy, so only the row being saved is validated/applied here;
+    // every other row's posted values are ignored and redisplay uses fresh server data.
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ChangeDeadline(
+        int year, int monthId, Guid schemeId, Guid participantId, DistributionParticipantsViewModel model, CancellationToken cancellationToken)
+    {
+        if (!ModelState.IsValid)
+        {
+            return View(nameof(Participants), await RehydrateParticipantsAsync(year, monthId, schemeId, model, cancellationToken));
+        }
+
+        var row = model.Participants.FirstOrDefault(p => p.DistributionParticipantId == participantId);
+        var result = await distributionApiClient.ChangeDeadlineAsync(
+            schemeId, participantId, new ChangeDeadlineRequest(row?.NewDeadlineDate, row?.NewDeadlineReason), cancellationToken);
+
+        if (result is null || !result.Success)
+        {
+            if (result is null)
+            {
+                TempData.SetNotification(NotificationType.Error, "The deadline date could not be saved. Please try again later.");
+            }
+            else
+            {
+                var rowIndex = model.Participants.FindIndex(p => p.DistributionParticipantId == participantId);
+                if (result.NewDeadlineDateError is not null)
+                {
+                    ModelState.AddModelError($"{nameof(model.Participants)}[{rowIndex}].{nameof(DistributionParticipantRowViewModel.NewDeadlineDate)}", result.NewDeadlineDateError);
+                }
+
+                if (result.ReasonError is not null)
+                {
+                    ModelState.AddModelError($"{nameof(model.Participants)}[{rowIndex}].{nameof(DistributionParticipantRowViewModel.NewDeadlineReason)}", result.ReasonError);
+                }
+            }
+
+            return View(nameof(Participants), await RehydrateParticipantsAsync(year, monthId, schemeId, model, cancellationToken));
+        }
+
+        TempData.SetNotification(NotificationType.Success, "Deadline Date updated successfully.");
+        return RedirectToAction(nameof(Participants), new { year, monthId, schemeId });
+    }
+
+    // Repeat this Distribution - legacy btnRepeatDistribution_Click. "Please tick at least one
+    // participant..." mirrors legacy's client-side checkifchecked() guard, re-enforced server-side.
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> RepeatDistribution(int year, int monthId, Guid schemeId, DistributionParticipantsViewModel model, CancellationToken cancellationToken)
+    {
+        if (!ModelState.IsValid)
+        {
+            return View(nameof(Participants), await RehydrateParticipantsAsync(year, monthId, schemeId, model, cancellationToken));
+        }
+
+        var selections = model.Participants.Where(p => p.Selected).Select(p => new ParticipantSelectionRequest(p.DistributionParticipantId, false))
+            .Concat(model.AdditionalParticipants.Where(p => p.Selected).Select(p => new ParticipantSelectionRequest(p.ParticipantSchemeId, true)))
+            .ToList();
+
+        var result = await distributionApiClient.RepeatDistributionAsync(schemeId, new RepeatDistributionRequest(selections), cancellationToken);
+
+        if (result is null || !result.Success)
+        {
+            TempData.SetNotification(
+                NotificationType.Error,
+                result?.Error ?? "The distribution could not be repeated. Please try again later.");
+            return View(nameof(Participants), await RehydrateParticipantsAsync(year, monthId, schemeId, model, cancellationToken));
+        }
+
+        TempData.SetNotification(NotificationType.Success, "Distribution repeated successfully.");
+        return RedirectToAction(nameof(Schedule), new { year, monthId });
+    }
+
+    private async Task<DistributionParticipantsViewModel> RehydrateParticipantsAsync(
+        int year, int monthId, Guid schemeId, DistributionParticipantsViewModel posted, CancellationToken cancellationToken)
+    {
+        var data = await distributionApiClient.GetParticipantsAsync(schemeId, cancellationToken);
+        return data is null ? posted : ToParticipantsViewModel(year, monthId, data);
+    }
+
+    private static DistributionParticipantsViewModel ToParticipantsViewModel(int year, int monthId, DistributionParticipantsResponse data) =>
+        new()
+        {
+            MonthlyDistributionSchemeId = data.MonthlyDistributionSchemeId,
+            YearId = year,
+            MonthId = monthId,
+            SchemeIdentifier = data.SchemeIdentifier,
+            SchemeName = data.SchemeName,
+            DistributionReferenceFull = data.DistributionReferenceFull,
+            IsRepeatDistribution = data.IsRepeatDistribution,
+            Participants = [.. data.Participants.Select(p => new DistributionParticipantRowViewModel
+            {
+                DistributionParticipantId = p.DistributionParticipantId,
+                FullName = p.FullName,
+                DeadlineDate = p.DeadlineDate,
+                DeadlineChangeReason = p.DeadlineChangeReason,
+                AdditionalParticipant = p.AdditionalParticipant,
+            })],
+            AdditionalParticipants = [.. data.AdditionalParticipants.Select(p => new DistributionAdditionalParticipantRowViewModel
+            {
+                ParticipantSchemeId = p.ParticipantSchemeId,
+                FullName = p.FullName,
+            })],
+        };
+
     private static MonthlyDistributionScheduleRowRequest ToRowRequest(MonthlyDistributionScheduleRowViewModel row) =>
         new(row.MonthlyDistributionSchemeId, row.DistributionDate!.Value, row.OverseasPostingDate!.Value, row.DeadlineDate!.Value, row.ResultsIssueTargetDate!.Value, row.IsCancelled);
+
 
     private static MonthlyDistributionScheduleViewModel ToScheduleViewModel(int year, int monthId, MonthlyDistributionResponse schedule) =>
         new()

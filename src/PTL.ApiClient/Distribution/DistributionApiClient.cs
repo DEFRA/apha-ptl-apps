@@ -65,4 +65,85 @@ public sealed class DistributionApiClient(HttpClient httpClient) : IDistribution
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadFromJsonAsync<SampleNumbersSaveResult>(cancellationToken);
     }
+
+    public async Task<IntendedResultsResponse?> GetIntendedResultsAsync(Guid monthlyDistributionSchemeId, CancellationToken cancellationToken = default)
+    {
+        var response = await httpClient.GetAsync(
+            new Uri($"/api/distributions/schemes/{monthlyDistributionSchemeId}/intended-results", UriKind.Relative), cancellationToken);
+
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<IntendedResultsResponse>(cancellationToken);
+    }
+
+    public async Task<IntendedResultsSaveResult?> SaveIntendedResultsAsync(
+        Guid monthlyDistributionSchemeId, IntendedResultsSaveRequest request, CancellationToken cancellationToken = default)
+    {
+        var response = await httpClient.PutAsJsonAsync(
+            $"/api/distributions/schemes/{monthlyDistributionSchemeId}/intended-results", request, cancellationToken);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<IntendedResultsSaveResult>(cancellationToken);
+    }
+
+    public async Task<DistributionParticipantsResponse?> GetParticipantsAsync(Guid monthlyDistributionSchemeId, CancellationToken cancellationToken = default)
+    {
+        var response = await httpClient.GetAsync(
+            new Uri($"/api/distributions/schemes/{monthlyDistributionSchemeId}/participants", UriKind.Relative), cancellationToken);
+
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<DistributionParticipantsResponse>(cancellationToken);
+    }
+
+    public async Task<ChangeDeadlineResult?> ChangeDeadlineAsync(
+        Guid monthlyDistributionSchemeId, Guid distributionParticipantId, ChangeDeadlineRequest request, CancellationToken cancellationToken = default)
+    {
+        var response = await httpClient.PutAsJsonAsync(
+            $"/api/distributions/schemes/{monthlyDistributionSchemeId}/participants/{distributionParticipantId}/deadline", request, cancellationToken);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<ChangeDeadlineResult>(cancellationToken);
+    }
+
+    public async Task<RepeatDistributionResult?> RepeatDistributionAsync(
+        Guid monthlyDistributionSchemeId, RepeatDistributionRequest request, CancellationToken cancellationToken = default)
+    {
+        var response = await httpClient.PostAsJsonAsync(
+            $"/api/distributions/schemes/{monthlyDistributionSchemeId}/repeat", request, cancellationToken);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<RepeatDistributionResult>(cancellationToken);
+    }
+
+    public async Task<PreparationSheetResponse?> GetPreparationAsync(int yearId, int monthId, CancellationToken cancellationToken = default)
+    {
+        var response = await httpClient.GetAsync(
+            new Uri($"/api/distributions/months/{yearId}/{monthId}/preparation", UriKind.Relative), cancellationToken);
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<PreparationSheetResponse>(cancellationToken);
+    }
+
+    public async Task<PreparationSaveResult?> SavePreparationAsync(
+        int yearId, int monthId, PreparationSaveRequest request, CancellationToken cancellationToken = default)
+    {
+        var response = await httpClient.PutAsJsonAsync($"/api/distributions/months/{yearId}/{monthId}/preparation", request, cancellationToken);
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<PreparationSaveResult>(cancellationToken);
+    }
 }

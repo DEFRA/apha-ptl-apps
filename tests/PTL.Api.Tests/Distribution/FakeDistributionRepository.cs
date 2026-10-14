@@ -79,4 +79,48 @@ internal sealed class FakeDistributionRepository : IDistributionRepository
 
         return Task.FromResult(CreateStructureSucceeds);
     }
+
+    public List<IntendedResultsWrite> SavedIntendedResults { get; } = [];
+
+    public Task UpdateIntendedResultsAsync(IntendedResultsWrite write, CancellationToken cancellationToken = default)
+    {
+        SavedIntendedResults.Add(write);
+        return Task.CompletedTask;
+    }
+
+    public Dictionary<Guid, DistributionParticipantsData> ParticipantsByScheme { get; } = [];
+
+    public List<DistributionParticipantEntity> UpdatedParticipantDeadlines { get; } = [];
+
+    public List<(MonthlyDistributionSchemeEntity NewScheme, IReadOnlyList<DistributionParticipantEntity> NewParticipants)> RepeatedDistributions { get; } = [];
+
+    public Task<DistributionParticipantsData?> GetDistributionParticipantsAsync(
+        Guid monthlyDistributionSchemeId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(ParticipantsByScheme.GetValueOrDefault(monthlyDistributionSchemeId));
+
+    public Task UpdateParticipantDeadlineAsync(DistributionParticipantEntity participant, CancellationToken cancellationToken = default)
+    {
+        UpdatedParticipantDeadlines.Add(participant);
+        return Task.CompletedTask;
+    }
+
+    public Task RepeatDistributionAsync(
+        MonthlyDistributionSchemeEntity newScheme, IReadOnlyList<DistributionParticipantEntity> newParticipants, CancellationToken cancellationToken = default)
+    {
+        RepeatedDistributions.Add((newScheme, newParticipants));
+        return Task.CompletedTask;
+    }
+
+    public Dictionary<Guid, PreparationSheetData> PreparationSheets { get; } = [];
+
+    public List<PreparationSchemeEntity> UpdatedPreparationSchemes { get; } = [];
+
+    public Task<PreparationSheetData?> GetPreparationSheetAsync(Guid monthlyDistributionId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(PreparationSheets.GetValueOrDefault(monthlyDistributionId));
+
+    public Task UpdatePreparationAsync(IReadOnlyList<PreparationSchemeEntity> schemes, CancellationToken cancellationToken = default)
+    {
+        UpdatedPreparationSchemes.AddRange(schemes);
+        return Task.CompletedTask;
+    }
 }

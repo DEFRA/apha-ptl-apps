@@ -279,8 +279,8 @@ public class SampleNumbersControllerTests
         var result = await controller.SampleNumbers(2026, 4, SchemeId, PostedModel(), "saveAndGoToIntendedResults", CancellationToken.None);
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal(nameof(DistributionController.ViewStage), redirect.ActionName);
-        Assert.Equal("Intended Results", redirect.RouteValues!["stage"]);
+        Assert.Equal(nameof(DistributionController.IntendedResults), redirect.ActionName);
+        Assert.Equal(SchemeId, redirect.RouteValues!["schemeId"]);
         Assert.Single(apiClient.SavedSampleNumbers);
     }
 
@@ -522,8 +522,8 @@ public class SampleNumbersControllerTests
         var result = await controller.SampleNumbers(2026, 4, SchemeId, posted, "cancelAudit", CancellationToken.None);
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal(nameof(DistributionController.ViewStage), redirect.ActionName);
-        Assert.Equal("Intended Results", redirect.RouteValues!["stage"]);
+        Assert.Equal(nameof(DistributionController.IntendedResults), redirect.ActionName);
+        Assert.Equal(SchemeId, redirect.RouteValues!["schemeId"]);
         Assert.Empty(apiClient.SavedSampleNumbers);
     }
 

@@ -5,14 +5,17 @@ using PTL.Core.Distribution;
 namespace PTL.Api.Controllers;
 
 // Distribution Dashboard (legacy Distributions/MenuDistributions.aspx) - see
-// docs/analysis/distribution-analysis.md and docs/migration/distribution-migration.md. This is
-// the ONLY Distribution feature implemented so far; every other distribution workflow
-// (Scheduling, Preparation, Packaging, Results, Tabulations) is out of scope.
+// docs/analysis/distribution-analysis.md and docs/migration/distribution-migration.md. Scheduling,
+// Sample Numbers, Intended Results, Participants and Sample Preparation are also implemented here -
+// Packaging, Results (dashboard) and Tabulations remain out of scope.
 [ApiController]
 [Route("api/distributions")]
 public sealed class DistributionController(
     IDistributionService distributionService,
     ISampleNumbersService sampleNumbersService,
+    IIntendedResultsService intendedResultsService,
+    IDistributionParticipantsService distributionParticipantsService,
+    IPreparationService preparationService,
     ILogger<DistributionController> logger) : ControllerBase
 {
     private static readonly Action<ILogger, Guid, Exception?> LogStructureCreationFailedMessage =
@@ -70,6 +73,29 @@ public sealed class DistributionController(
             kvp => kvp.Value.Select(e => e.Message).ToArray());
 
         return Ok(new MonthlyDistributionScheduleSaveResult(outcome.Success, fieldErrors));
+    }
+
+    // GET /api/distributions/months/{yearId}/{monthId}/preparation - the Sample Preparation
+    // screen, legacy PreparationSheet.FetchPreparationSheet.
+    [HttpGet("months/{yearId:int}/{monthId:int}/preparation")]
+    public async Task<ActionResult<PreparationSheetResponse>> GetPreparation(int yearId, int monthId, CancellationToken cancellationToken)
+    {
+        var sheet = await preparationService.GetPreparationAsync(yearId, monthId, cancellationToken);
+        return sheet is null ? NotFound() : Ok(ToResponse(sheet));
+    }
+
+    // PUT /api/distributions/months/{yearId}/{monthId}/preparation - legacy
+    // PreparationSheet.Save() (ButtonSave_Click/ButtonApply_Click both call this; the
+    // save-vs-stay distinction is owned entirely by InternalWeb).
+    [HttpPut("months/{yearId:int}/{monthId:int}/preparation")]
+    public async Task<ActionResult<PreparationSaveResult>> SavePreparation(
+        int yearId, int monthId, [FromBody] PreparationSaveRequest request, CancellationToken cancellationToken)
+    {
+        var updates = request.Updates.Select(u => new PreparationStageUpdate(
+            u.MonthlyDistributionSchemeId, u.DiaryEntryChecked, u.PrepStartChecked, u.PrepCompleteChecked)).ToList();
+
+        var outcome = await preparationService.SavePreparationAsync(yearId, monthId, updates, cancellationToken);
+        return outcome.Success ? Ok(new PreparationSaveResult(true)) : NotFound();
     }
 
     // GET /api/distributions/schemes/{monthlyDistributionSchemeId}/sample-numbers - the Sample
@@ -130,6 +156,124 @@ public sealed class DistributionController(
             outcome.AuditObjectName));
     }
 
+    // GET /api/distributions/schemes/{monthlyDistributionSchemeId}/intended-results - legacy
+    // IntendedResultsSet.FetchIntendedResults, gated on HasSampleNumbersDefined - legacy's silent
+    // LeavePage() when sample numbers are not yet defined, so a 404 here carries no error message.
+    [HttpGet("schemes/{monthlyDistributionSchemeId:guid}/intended-results")]
+    public async Task<ActionResult<IntendedResultsResponse>> GetIntendedResults(Guid monthlyDistributionSchemeId, CancellationToken cancellationToken)
+    {
+        var page = await intendedResultsService.GetIntendedResultsAsync(monthlyDistributionSchemeId, cancellationToken);
+        return page is null ? NotFound() : Ok(ToResponse(page));
+    }
+
+    // PUT /api/distributions/schemes/{monthlyDistributionSchemeId}/intended-results - legacy
+    // IntendedResults.aspx ButtonSave_Click -> IntendedResultsSet.Save().
+    [HttpPut("schemes/{monthlyDistributionSchemeId:guid}/intended-results")]
+    public async Task<ActionResult<IntendedResultsSaveResult>> SaveIntendedResults(
+        Guid monthlyDistributionSchemeId, [FromBody] IntendedResultsSaveRequest request, CancellationToken cancellationToken)
+    {
+        if (!ModelState.IsValid)
+        {
+            return ValidationProblem(ModelState);
+        }
+
+        var update = new IntendedResultsUpdate(
+            [.. request.Tests.Select(t => new IntendedResultsTestUpdate(
+                t.TestId,
+                [.. t.ResultItems.Select(r => new IntendedResultsResultItemUpdate(r.TestResultItemId, r.IsRange))],
+                [.. t.MethodItems.Select(m => new IntendedResultsMethodItemUpdate(m.TestMethodItemId, m.IntendedResult))],
+                [.. t.Samples.Select(s => new IntendedResultsSampleRowUpdate(
+                    s.SampleId,
+                    s.IsApplicable,
+                    [.. s.Values.Select(v => new IntendedResultsSampleResultValueUpdate(v.SampleResultItemId, v.IntendedResult, v.IntendedResult2))]))]))],
+            request.RequiresAuditReason,
+            User?.Identity?.Name ?? "Guest",
+            request.AuditWhy ?? string.Empty);
+
+        var outcome = await intendedResultsService.SaveIntendedResultsAsync(monthlyDistributionSchemeId, update, cancellationToken);
+
+        var intendedResultsFieldErrors = outcome.FieldErrorsByItemId.ToDictionary(
+            kvp => kvp.Key,
+            kvp => kvp.Value.Select(e => new IntendedResultsFieldError(e.Field, e.Message)).ToArray());
+
+        return Ok(new IntendedResultsSaveResult(
+            outcome.Success,
+            intendedResultsFieldErrors,
+            outcome.AuditReasonRequired,
+            outcome.AuditObjectName));
+    }
+
+    // GET /api/distributions/schemes/{monthlyDistributionSchemeId}/participants - legacy
+    // DistributionParticipantList.aspx's LoadMonthlyDistributionScheme.
+    [HttpGet("schemes/{monthlyDistributionSchemeId:guid}/participants")]
+    public async Task<ActionResult<DistributionParticipantsResponse>> GetParticipants(Guid monthlyDistributionSchemeId, CancellationToken cancellationToken)
+    {
+        var data = await distributionParticipantsService.GetParticipantsAsync(monthlyDistributionSchemeId, cancellationToken);
+        return data is null ? NotFound() : Ok(ToResponse(data));
+    }
+
+    // PUT /api/distributions/schemes/{monthlyDistributionSchemeId}/participants/{distributionParticipantId}/deadline -
+    // legacy DistributionParticipant.SetNewDeadlineDate + MonthlyDistributionScheme.Save().
+    [HttpPut("schemes/{monthlyDistributionSchemeId:guid}/participants/{distributionParticipantId:guid}/deadline")]
+    public async Task<ActionResult<ChangeDeadlineResult>> ChangeDeadline(
+        Guid monthlyDistributionSchemeId, Guid distributionParticipantId, [FromBody] ChangeDeadlineRequest request, CancellationToken cancellationToken)
+    {
+        var outcome = await distributionParticipantsService.ChangeDeadlineAsync(
+            monthlyDistributionSchemeId, distributionParticipantId, request.NewDeadlineDate, request.Reason, cancellationToken);
+
+        return Ok(new ChangeDeadlineResult(outcome.Success, outcome.NewDeadlineDateError, outcome.ReasonError));
+    }
+
+    // POST /api/distributions/schemes/{monthlyDistributionSchemeId}/repeat - legacy
+    // MonthlyDistribution.RepeatDistribution + Save().
+    [HttpPost("schemes/{monthlyDistributionSchemeId:guid}/repeat")]
+    public async Task<ActionResult<RepeatDistributionResult>> RepeatDistribution(
+        Guid monthlyDistributionSchemeId, [FromBody] RepeatDistributionRequest request, CancellationToken cancellationToken)
+    {
+        var selections = request.Selections.Select(s => new ParticipantSelection(s.Id, s.IsAdditional)).ToList();
+        var outcome = await distributionParticipantsService.RepeatDistributionAsync(monthlyDistributionSchemeId, selections, cancellationToken);
+        return Ok(new RepeatDistributionResult(outcome.Success, outcome.Error));
+    }
+
+    private static DistributionParticipantsResponse ToResponse(DistributionParticipantsData data) =>
+        new(
+            data.Scheme.MonthlyDistributionSchemeId,
+            data.Scheme.YearId,
+            data.Scheme.MonthId,
+            data.Scheme.SchemeIdentifier,
+            data.Scheme.SchemeName,
+            data.Scheme.DistributionReferenceFull,
+            !string.IsNullOrEmpty(data.Scheme.DistributionReferenceSuffix),
+            [.. data.Participants.Select(p => new DistributionParticipantResponse(
+                p.DistributionParticipantId, p.FullName, p.EffectiveDeadlineDate, p.DeadlineChangeReason, p.AdditionalParticipant))],
+            [.. data.AdditionalParticipants.Select(p => new DistributionAdditionalParticipantResponse(p.ParticipantSchemeId, p.FullName))]);
+
+    private static IntendedResultsResponse ToResponse(IntendedResultsPage page) =>
+        new(
+            page.MonthlyDistributionSchemeId,
+            page.DistributionReferenceFull,
+            page.SchemeIdentifier,
+            page.SchemeName,
+            page.RequiresAuditReason,
+            [.. page.Tests.Select(t => new IntendedResultsTestResponse(
+                t.TestId,
+                t.TestName,
+                [.. t.ResultItems.Select(r => new IntendedResultsResultItemResponse(r.TestResultItemId, r.Name, r.FormatString, r.ReturnValueType, r.IsRange, r.ExpectedLength))],
+                [.. t.MethodItems.Select(m => new IntendedResultsMethodItemResponse(m.TestMethodItemId, m.Name, m.FormatString, m.ReturnValueType, m.IntendedResult))],
+                [.. t.Samples.Select(s => new IntendedResultsSampleRowResponse(
+                    s.SampleId,
+                    s.SampleNumber,
+                    s.InternalDescription,
+                    s.IsApplicable,
+                    [.. s.Values.Select(v => new IntendedResultsSampleResultValueResponse(v.SampleResultItemId, v.TestResultItemId, v.IntendedResult, v.IntendedResult2))],
+                    s.ExternalDescription))]))],
+            page.SchemeVersionDate,
+            page.HasIntendedResults,
+            page.DateOfReceipt,
+            page.StorageConditions,
+            page.ConditionOnReceipt,
+            page.Instructions);
+
     private static SampleNumbersResponse ToResponse(SampleNumbersPage page) =>
         new(
             page.MonthlyDistributionSchemeId,
@@ -171,7 +315,28 @@ public sealed class DistributionController(
             scheme.HasSampleNumbersDefined,
             scheme.HasIntendedResults,
             scheme.IsCancelled,
-            scheme.IsAsAvailable);
+            scheme.IsAsAvailable,
+            scheme.IsAccredited);
+
+    private static PreparationSheetResponse ToResponse(PreparationSheetData sheet) =>
+        new(
+            sheet.MonthlyDistributionId,
+            sheet.YearId,
+            sheet.MonthId,
+            [.. sheet.Schemes.Select(ToResponse)]);
+
+    private static PreparationSchemeResponse ToResponse(PreparationSchemeEntity scheme) =>
+        new(
+            scheme.MonthlyDistributionSchemeId,
+            scheme.SchemeIdentifier,
+            scheme.SchemeName,
+            scheme.DistributionReferenceFull,
+            scheme.NumberOfSetsRequired,
+            scheme.SamplePackingInstructions,
+            scheme.DiaryEntry,
+            scheme.PrepStartDate,
+            scheme.PrepCompleteDate,
+            [.. scheme.Samples.Select(s => new PreparationSampleResponse(s.SampleId, s.SampleNumber, s.InternalDescription))]);
 
     private static DistributionDashboardMonthResponse ToResponse(DistributionDashboardMonth month) =>
         new(

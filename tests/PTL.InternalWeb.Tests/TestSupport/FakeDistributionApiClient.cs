@@ -41,4 +41,55 @@ internal sealed class FakeDistributionApiClient : IDistributionApiClient
         SavedSampleNumbers.Add(request);
         return Task.FromResult(SampleNumbersSaveResult);
     }
+
+    public IntendedResultsResponse? IntendedResults { get; set; }
+    public IntendedResultsSaveResult? IntendedResultsSaveResult { get; set; }
+    public List<IntendedResultsSaveRequest> SavedIntendedResults { get; } = [];
+
+    public Task<IntendedResultsResponse?> GetIntendedResultsAsync(Guid monthlyDistributionSchemeId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(IntendedResults);
+
+    public Task<IntendedResultsSaveResult?> SaveIntendedResultsAsync(
+        Guid monthlyDistributionSchemeId, IntendedResultsSaveRequest request, CancellationToken cancellationToken = default)
+    {
+        SavedIntendedResults.Add(request);
+        return Task.FromResult(IntendedResultsSaveResult);
+    }
+
+    public DistributionParticipantsResponse? Participants { get; set; }
+    public ChangeDeadlineResult? ChangeDeadlineResult { get; set; }
+    public RepeatDistributionResult? RepeatDistributionResult { get; set; }
+    public List<(Guid DistributionParticipantId, ChangeDeadlineRequest Request)> SavedDeadlines { get; } = [];
+    public List<RepeatDistributionRequest> SavedRepeatRequests { get; } = [];
+
+    public Task<DistributionParticipantsResponse?> GetParticipantsAsync(Guid monthlyDistributionSchemeId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Participants);
+
+    public Task<ChangeDeadlineResult?> ChangeDeadlineAsync(
+        Guid monthlyDistributionSchemeId, Guid distributionParticipantId, ChangeDeadlineRequest request, CancellationToken cancellationToken = default)
+    {
+        SavedDeadlines.Add((distributionParticipantId, request));
+        return Task.FromResult(ChangeDeadlineResult);
+    }
+
+    public Task<RepeatDistributionResult?> RepeatDistributionAsync(
+        Guid monthlyDistributionSchemeId, RepeatDistributionRequest request, CancellationToken cancellationToken = default)
+    {
+        SavedRepeatRequests.Add(request);
+        return Task.FromResult(RepeatDistributionResult);
+    }
+
+    public PreparationSheetResponse? Preparation { get; set; }
+    public PreparationSaveResult? PreparationSaveResult { get; set; }
+    public List<PreparationSaveRequest> SavedPreparationRequests { get; } = [];
+
+    public Task<PreparationSheetResponse?> GetPreparationAsync(int yearId, int monthId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Preparation);
+
+    public Task<PreparationSaveResult?> SavePreparationAsync(
+        int yearId, int monthId, PreparationSaveRequest request, CancellationToken cancellationToken = default)
+    {
+        SavedPreparationRequests.Add(request);
+        return Task.FromResult(PreparationSaveResult);
+    }
 }

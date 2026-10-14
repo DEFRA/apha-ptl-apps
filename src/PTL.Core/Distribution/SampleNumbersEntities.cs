@@ -14,6 +14,17 @@ public class IntendedResultsHeaderEntity
     public bool StoreRatings { get; set; }
     public bool RequiresAssessment { get; set; }
     public DateTime? IsReadyForAssessor { get; set; }
+
+    // The remaining 5 columns are snapshotted from the Scheme onto this row the first time
+    // Intended Results is created (legacy IntendedResultsSet.DataPortal_Create), then read back
+    // from this same row thereafter - they are NOT re-read from the Scheme on every fetch, so a
+    // later Scheme edit does not retroactively change an already-created distribution's worksheet.
+    // Used only by the Printable Results screen, not the interactive Intended Results screen.
+    public DateTime SchemeVersionDate { get; set; }
+    public bool DateOfReceipt { get; set; }
+    public bool StorageConditions { get; set; }
+    public bool ConditionOnReceipt { get; set; }
+    public string? Instructions { get; set; }
 }
 
 // spgIntendedResults result set 2 (tblSample), ordered by fldSampleNumber.
@@ -48,21 +59,39 @@ public class DistributionTestEntity
 }
 
 // spgIntendedResults result set 6 (tblDistributionTestMethodItem), ordered by fldOrder.
+// TestMethodItemTypeId/IsApplicable round-trip unchanged through spuDistributionTestMethodItem;
+// FormatString/ReturnValueType/IntendedResult are only read by the Intended Results screen -
+// Sample Numbers only needs Name/Order for its Method Items list.
 public class DistributionTestMethodItemEntity
 {
     public Guid TestMethodItemId { get; set; }
     public Guid TestId { get; set; }
+    public Guid TestMethodItemTypeId { get; set; }
     public string? Name { get; set; }
     public int Order { get; set; }
+    public bool IsApplicable { get; set; }
+    public string? FormatString { get; set; }
+    public string? ReturnValueType { get; set; }
+    public string? IntendedResult { get; set; }
 }
 
 // spgIntendedResults result set 7 (tblDistributionTestResultItem), ordered by fldOrder.
+// TestResultItemTypeId round-trips unchanged through spuDistributionTestResultItem;
+// FormatString/ReturnValueType/IsRange are only read by the Intended Results screen.
 public class DistributionTestResultItemEntity
 {
     public Guid TestResultItemId { get; set; }
     public Guid TestId { get; set; }
+    public Guid TestResultItemTypeId { get; set; }
     public string? Name { get; set; }
     public int Order { get; set; }
+    public string? FormatString { get; set; }
+    public string? ReturnValueType { get; set; }
+    public bool IsRange { get; set; }
+
+    // Only read by Printable Results - legacy ResultsTable.GetColumnWidth's column-packing budget
+    // (ExpectedLength * 20 pixels per column).
+    public int ExpectedLength { get; set; }
 }
 
 // spgIntendedResults result set 8 (tblDistributionCategoryItem) - only rendered when the scheme
@@ -86,7 +115,21 @@ public class DistributionCriterionItemEntity
     public int Order { get; set; }
 }
 
-// Everything spgIntendedResults returns, before it is shaped into the Sample Numbers screen model.
+// spgIntendedResults result set 4 (tblSampleResultItem joined to tblSampleTest) - the per-sample,
+// per-TestResultItem intended value(s). Read only by the Intended Results screen; Sample Numbers
+// discards this result set entirely.
+public class DistributionSampleResultItemEntity
+{
+    public Guid SampleResultItemId { get; set; }
+    public Guid SampleId { get; set; }
+    public Guid SampleTestId { get; set; }
+    public Guid TestResultItemId { get; set; }
+    public string? IntendedResult { get; set; }
+    public string? IntendedResult2 { get; set; }
+}
+
+// Everything spgIntendedResults returns, before it is shaped into a screen-specific model.
+// SampleResultItems defaults to empty for existing Sample Numbers call sites that never read it.
 public sealed record IntendedResultsData(
     IntendedResultsHeaderEntity Header,
     IReadOnlyList<DistributionSampleEntity> Samples,
@@ -95,4 +138,8 @@ public sealed record IntendedResultsData(
     IReadOnlyList<DistributionTestMethodItemEntity> TestMethodItems,
     IReadOnlyList<DistributionTestResultItemEntity> TestResultItems,
     IReadOnlyList<DistributionCategoryItemEntity> CategoryItems,
-    IReadOnlyList<DistributionCriterionItemEntity> CriterionItems);
+    IReadOnlyList<DistributionCriterionItemEntity> CriterionItems,
+    IReadOnlyList<DistributionSampleResultItemEntity> SampleResultItems = null!)
+{
+    public IReadOnlyList<DistributionSampleResultItemEntity> SampleResultItems { get; init; } = SampleResultItems ?? [];
+}

@@ -49,4 +49,39 @@ public interface IDistributionRepository
         DateTime sampleNumberDate,
         DistributionStructure distributionStructure,
         CancellationToken cancellationToken = default);
+
+    // spuIntendedResults + spuDistributionTestMethodItem x N + spuDistributionTestResultItem x N +
+    // spuSampleResultItem x N in a single transaction, mirroring IntendedResultsSet.
+    // DataPortal_Update (mTests.Update then mSamples.Update). spiAuditDistributionTestMethodItem /
+    // spiAuditSampleResultItem each run immediately BEFORE their row's own spu* call, because the
+    // audit procedure records the row's CURRENT (pre-update) value.
+    Task UpdateIntendedResultsAsync(IntendedResultsWrite write, CancellationToken cancellationToken = default);
+
+    // spgMonthlyDistributionScheme - all 3 result sets (scheme header, Participants,
+    // AdditionalParticipants), legacy DistributionParticipantList.aspx's LoadMonthlyDistributionScheme.
+    // Returns null when the id does not resolve (including outside the seven-year retention window).
+    Task<DistributionParticipantsData?> GetDistributionParticipantsAsync(
+        Guid monthlyDistributionSchemeId, CancellationToken cancellationToken = default);
+
+    // spuDistributionParticipant - legacy DistributionParticipant.SetNewDeadlineDate followed by
+    // MonthlyDistributionScheme.Save() (CSLA only sends an UPDATE for the one dirty child).
+    Task UpdateParticipantDeadlineAsync(DistributionParticipantEntity participant, CancellationToken cancellationToken = default);
+
+    // spiMonthlyDistributionScheme + spiDistributionParticipant x N in a single transaction -
+    // legacy MonthlyDistribution.RepeatDistribution followed by MonthlyDistribution.Save(). The
+    // suffix/new participant rows are computed by the caller (IDistributionParticipantsService)
+    // from a fresh GetMonthlyDistributionSchedulesAsync read - no new stored procedure is used.
+    Task RepeatDistributionAsync(
+        MonthlyDistributionSchemeEntity newScheme,
+        IReadOnlyList<DistributionParticipantEntity> newParticipants,
+        CancellationToken cancellationToken = default);
+
+    // spgPreparationSheet - the Sample Preparation screen's scheme+sample listing for a
+    // distribution month, legacy PreparationSheet.FetchPreparationSheet. Returns null when the
+    // header row itself is not found.
+    Task<PreparationSheetData?> GetPreparationSheetAsync(Guid monthlyDistributionId, CancellationToken cancellationToken = default);
+
+    // spuMonthlyDistributionSchemePrep x N - legacy MonthlyDistributionSchemeCollection.Update,
+    // called once per dirty scheme (only schemes with at least one newly-set stage are passed in).
+    Task UpdatePreparationAsync(IReadOnlyList<PreparationSchemeEntity> schemes, CancellationToken cancellationToken = default);
 }
