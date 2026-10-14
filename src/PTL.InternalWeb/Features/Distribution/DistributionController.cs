@@ -15,15 +15,17 @@ namespace PTL.InternalWeb.Features.Distribution;
 // Commence, Save/Apply/Cancel), the Sample Numbers screen, the Intended Results screen, the
 // Distribution Participants screen (view, Change Deadline Date, Repeat Distribution), the Sample
 // Preparation screen (Diary Entry/Prep Started/Prep Completed, Save/Apply/Cancel, Print) and its
-// per-scheme Printable Results view are implemented. The Packaging/Results(dashboard)/Tabulations
-// "View" links, plus "Initialise this Month" itself, all remain placeholders (ViewStage/
-// InitialiseMonth below) - those workflows (and the exact legacy persisted-save chain behind
-// Initialise) are out of scope and flagged [NEEDS INVESTIGATION] in
+// per-scheme Printable Results view, and the Sample Packaging screen (Group Address / Participant
+// Combined / Daily, Save/Apply/Cancel, Print, Print Labels, Print Customs) are implemented. The
+// Results(dashboard)/Tabulations "View" links, plus "Initialise this Month" itself, all remain
+// placeholders (ViewStage/InitialiseMonth below) - those workflows (and the exact legacy
+// persisted-save chain behind Initialise) are out of scope and flagged [NEEDS INVESTIGATION] in
 // docs/migration/distribution-migration.md.
 public sealed class DistributionController(IDistributionApiClient distributionApiClient) : Controller
 {
     private static readonly string[] MonthOrder = ["Scheduling", "Preparation", "Packaging", "Results", "Tabulations"];
     private const string CancelCommand = "cancel";
+    private const string ApplyCommand = "apply";
 
     [HttpGet]
     public async Task<IActionResult> Index(int? year, CancellationToken cancellationToken)
@@ -135,7 +137,7 @@ public sealed class DistributionController(IDistributionApiClient distributionAp
 
         TempData.SetNotification(NotificationType.Success, "Monthly Distributions updated successfully.");
 
-        if (string.Equals(command, "apply", StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(command, ApplyCommand, StringComparison.OrdinalIgnoreCase))
         {
             return RedirectToAction(nameof(Schedule), new { year, monthId });
         }
@@ -205,12 +207,171 @@ public sealed class DistributionController(IDistributionApiClient distributionAp
 
         TempData.SetNotification(NotificationType.Success, "Sample Preparation updated successfully.");
 
-        if (string.Equals(command, "apply", StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(command, ApplyCommand, StringComparison.OrdinalIgnoreCase))
         {
             return RedirectToAction(nameof(Preparation), new { year, monthId });
         }
 
         return RedirectToAction(nameof(Index));
+    }
+
+    // Sample Packaging - legacy Internal User/PackagingSheet.aspx. Reached from the Dashboard's
+    // "Packaging: View" link. Print is the browser's own print of this page (legacy window.print()
+    // with the Print column choosing which rows appear), so it has no server action.
+    [HttpGet]
+    public async Task<IActionResult> Packaging(int year, int monthId, int? mode, int week, CancellationToken cancellationToken)
+    {
+        var model = await BuildPackagingViewModelAsync(year, monthId, new PackagingViewModel { Mode = mode, Week = week }, cancellationToken);
+        return model is null ? NotFound() : View(model);
+    }
+
+    // select = the Packaging/Week dropdown changed (legacy AutoPostBack): redisplay, keeping unsaved ticks.
+    // Save = persist then leave (legacy ButtonSave_Click -> LeavePage() -> MenuDistributions.aspx).
+    // Apply = persist then stay (legacy ButtonApply_Click redraws from the saved data).
+    // Cancel = discard then leave. labels/customs = Print Labels / Print Customs.
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Packaging(int year, int monthId, PackagingViewModel model, string command, CancellationToken cancellationToken)
+    {
+        if (string.Equals(command, CancelCommand, StringComparison.OrdinalIgnoreCase))
+        {
+            return RedirectToAction(nameof(Index));
+        }
+
+        if (string.Equals(command, "save", StringComparison.OrdinalIgnoreCase) || string.Equals(command, ApplyCommand, StringComparison.OrdinalIgnoreCase))
+        {
+            return await SavePackagingAsync(year, monthId, model, command, cancellationToken);
+        }
+
+        if (string.Equals(command, "labels", StringComparison.OrdinalIgnoreCase) && model.Mode is { } labelMode)
+        {
+            var labels = await distributionApiClient.GetPackagingLabelsAsync(
+                year, monthId, new PackagingSelectionRequest(labelMode, model.Week, model.PrintKeys), cancellationToken);
+
+            if (labels is { Labels.Count: > 0 })
+            {
+                return View("PackagingLabels", new PackagingLabelsViewModel
+                {
+                    YearId = year,
+                    MonthId = monthId,
+                    Mode = labelMode,
+                    Week = model.Week,
+                    MonthDescription = PackagingMonthDescription(year, monthId),
+                    Labels = labels.Labels,
+                });
+            }
+
+            model.Message = "No Labels to Print";
+        }
+        else if (string.Equals(command, "customs", StringComparison.OrdinalIgnoreCase) && model.Mode is { } customsMode)
+        {
+            var customs = await distributionApiClient.GetPackagingCustomsAsync(
+                year, monthId, new PackagingSelectionRequest(customsMode, model.Week, model.PrintKeys), cancellationToken);
+
+            if (customs.Content is not null)
+            {
+                return File(customs.Content, "application/vnd.openxmlformats-officedocument.wordprocessingml.document", customs.FileName);
+            }
+
+            model.Message = "There was a problem with the Mail Merge";
+            model.MessageDetail = customs.Error;
+        }
+        else if (string.Equals(command, "labels", StringComparison.OrdinalIgnoreCase))
+        {
+            model.Message = "No Labels to Print";
+        }
+
+        var rebuilt = await BuildPackagingViewModelAsync(year, monthId, model, cancellationToken);
+        return rebuilt is null ? NotFound() : View(rebuilt);
+    }
+
+    private async Task<IActionResult> SavePackagingAsync(int year, int monthId, PackagingViewModel model, string command, CancellationToken cancellationToken)
+    {
+        var result = await distributionApiClient.SavePackagingAsync(year, monthId, new PackagingSaveRequest(ToPackagingUpdates(model)), cancellationToken);
+
+        if (result is null || !result.Success)
+        {
+            TempData.SetNotification(NotificationType.Error, "Sample Packaging could not be saved. Please try again later.");
+            return RedirectToAction(nameof(Packaging), new { year, monthId, mode = model.Mode, week = model.Week });
+        }
+
+        TempData.SetNotification(NotificationType.Success, "Sample Packaging updated successfully.");
+
+        return string.Equals(command, ApplyCommand, StringComparison.OrdinalIgnoreCase)
+            ? RedirectToAction(nameof(Packaging), new { year, monthId, mode = model.Mode, week = model.Week })
+            : RedirectToAction(nameof(Index));
+    }
+
+    private async Task<PackagingViewModel?> BuildPackagingViewModelAsync(int year, int monthId, PackagingViewModel model, CancellationToken cancellationToken)
+    {
+        model.YearId = year;
+        model.MonthId = monthId;
+        model.MonthDescription = PackagingMonthDescription(year, monthId);
+        model.PrintTitle = PackagingPrintTitle(model.Mode, model.Week, model.MonthDescription);
+        model.Sheet = null;
+
+        var weekNeeded = model.Mode is 0 or 1;
+        if (model.Mode is not (0 or 1 or 2) || (weekNeeded && model.Week is < 1 or > 4))
+        {
+            return model;
+        }
+
+        model.Sheet = await distributionApiClient.GetPackagingAsync(year, monthId, model.Mode.Value, weekNeeded ? model.Week : 0, cancellationToken);
+        return model.Sheet is null ? null : model;
+    }
+
+    private static string PackagingMonthDescription(int year, int monthId) =>
+        $"{System.Globalization.CultureInfo.GetCultureInfo("en-GB").DateTimeFormat.GetMonthName(monthId)} {year}";
+
+    // Legacy LblPrintTitle2 - printed beneath "Sample Packaging - ".
+    private static string PackagingPrintTitle(int? mode, int week, string monthDescription) =>
+        mode switch
+        {
+            0 when week > 0 => $"Week {week} - {monthDescription} - Group Packaging",
+            1 when week > 0 => $"Week {week} - {monthDescription} - Participant Combined Packaging",
+            2 => $"{monthDescription} - Weekly",
+            _ => string.Empty,
+        };
+
+    // Ticks are "{mode}:{week}:{distributionParticipantId}"; ticking Posted alone is enough, the API
+    // stamps Packed as well.
+    private static List<PackagingStageUpdateRequest> ToPackagingUpdates(PackagingViewModel model)
+    {
+        var updates = new Dictionary<(int Mode, int Week, Guid Id), (bool Packed, bool Posted)>();
+
+        foreach (var tick in model.PackedTicks)
+        {
+            if (TryParsePackagingTick(tick, out var key))
+            {
+                updates[key] = (true, updates.TryGetValue(key, out var current) && current.Posted);
+            }
+        }
+
+        foreach (var tick in model.PostedTicks)
+        {
+            if (TryParsePackagingTick(tick, out var key))
+            {
+                updates[key] = (updates.TryGetValue(key, out var current) && current.Packed, true);
+            }
+        }
+
+        return [.. updates.Select(u => new PackagingStageUpdateRequest(u.Key.Mode, u.Key.Week, u.Key.Id, u.Value.Packed, u.Value.Posted))];
+    }
+
+    private static bool TryParsePackagingTick(string tick, out (int Mode, int Week, Guid Id) key)
+    {
+        key = default;
+        var parts = tick.Split(':');
+        if (parts.Length != 3
+            || !int.TryParse(parts[0], System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var mode)
+            || !int.TryParse(parts[1], System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var week)
+            || !Guid.TryParse(parts[2], out var id))
+        {
+            return false;
+        }
+
+        key = (mode, week, id);
+        return true;
     }
 
     // Sample Numbers - legacy Scheduling/SampleNumbers.aspx. Opened from the Scheduling screen's

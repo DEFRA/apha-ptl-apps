@@ -100,6 +100,9 @@ public static class DapperColumnMappings
     private const string ColDistributionSchemeId = "fldDistributionSchemeId";
     private const string ColMonthlyDistributionSchemeId = "fldMonthlyDistributionSchemeId";
     private const string ColNumberOfSetsRequired = "fldNumberOfSetsRequired";
+    private const string ColGroupAddressId = "fldGroupAddressId";
+    private const string ColPackingInfo = "fldPackingInfo";
+    private const string ColDistributionDate = "fldDistributionDate";
     private const string ColSampleId = "fldSampleId";
     private const string ColTestResultItemId = "fldTestResultItemId";
 
@@ -884,6 +887,8 @@ public static class DapperColumnMappings
             ["fldInternalDescription"] = nameof(PreparationSampleEntity.InternalDescription),
         });
 
+        RegisterPackagingMappings();
+
         Map<DistributionCategoryItemEntity>(new(StringComparer.OrdinalIgnoreCase)
         {
             [ColCategoryItemId] = nameof(DistributionCategoryItemEntity.CategoryItemId),
@@ -1264,6 +1269,129 @@ public static class DapperColumnMappings
             [ColIsInactive] = nameof(CoreInternalUser.IsInactive),
             [ColInactiveDate] = nameof(CoreInternalUser.InactiveDate),
             ["fldSsoIdInt"] = nameof(CoreInternalUser.SsoIdInt),
+        });
+    }
+
+    // Sample Packaging: spgGroupedPackagingSheet / spgPartGroupedPackagingSheet / spgWeeklyPackagingSheet
+    // plus the Distribution Posted email queue and label address procedures. Several columns are
+    // shared by more than one result-set shape (e.g. fldPackingInfo), so each entity maps only the
+    // columns its own result set returns.
+    private static void RegisterPackagingMappings()
+    {
+        Map<PackagingGroupEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            [ColGroupAddressId] = nameof(PackagingGroupEntity.GroupAddressId),
+            [ColParticipantId] = nameof(PackagingGroupEntity.ParticipantId),
+            [ColIdentifier] = nameof(PackagingGroupEntity.Identifier),
+            [ColLabCode] = nameof(PackagingGroupEntity.LabCode),
+            [ColLabName] = nameof(PackagingGroupEntity.LabName),
+            [ColPackingInfo] = nameof(PackagingGroupEntity.PackingInfo),
+            [ColDistributionDate] = nameof(PackagingGroupEntity.DistributionDate),
+            [ColContactName] = nameof(PackagingGroupEntity.ContactName),
+            [ColOrganisation] = nameof(PackagingGroupEntity.Organisation),
+            [ColAddress1] = nameof(PackagingGroupEntity.Address1),
+            [ColAddress2] = nameof(PackagingGroupEntity.Address2),
+            [ColAddress3] = nameof(PackagingGroupEntity.Address3),
+            [ColAddress4] = nameof(PackagingGroupEntity.Address4),
+            [ColAddress5] = nameof(PackagingGroupEntity.Address5),
+            [ColTelephone] = nameof(PackagingGroupEntity.Telephone),
+            [ColCountry] = nameof(PackagingGroupEntity.Country),
+        });
+
+        Map<PackagingItemEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            [ColMonthlyDistributionSchemeId] = nameof(PackagingItemEntity.MonthlyDistributionSchemeId),
+            [ColGroupAddressId] = nameof(PackagingItemEntity.GroupAddressId),
+            ["fldPreparationComplete"] = nameof(PackagingItemEntity.PreparationComplete),
+            [ColName] = nameof(PackagingItemEntity.SchemeName),
+            [ColIdentifier] = nameof(PackagingItemEntity.SchemeIdentifier),
+            ["fldDistributionReference"] = nameof(PackagingItemEntity.DistributionReference),
+            ["fldDistributionReferenceSuffix"] = nameof(PackagingItemEntity.DistributionReferenceSuffix),
+            ["fldScheduleCode"] = nameof(PackagingItemEntity.ScheduleCode),
+            [ColPackingInfo] = nameof(PackagingItemEntity.PackingInfo),
+            [ColNumberOfSetsRequired] = nameof(PackagingItemEntity.NumberOfSetsRequired),
+            [ColDistributionDate] = nameof(PackagingItemEntity.DistributionDate),
+            ["fldCustomsDocumentDescription"] = nameof(PackagingItemEntity.CustomsDocumentDescription),
+            ["fldCustomsDocumentVolume"] = nameof(PackagingItemEntity.CustomsDocumentVolume),
+            ["fldNumberOfSamples"] = nameof(PackagingItemEntity.NumberOfSamples),
+        });
+
+        Map<PackagingParticipantEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            [ColGroupAddressId] = nameof(PackagingParticipantEntity.GroupAddressId),
+            [ColMonthlyDistributionSchemeId] = nameof(PackagingParticipantEntity.MonthlyDistributionSchemeId),
+            ["fldDistributionParticipantId"] = nameof(PackagingParticipantEntity.DistributionParticipantId),
+            [ColParticipantId] = nameof(PackagingParticipantEntity.ParticipantId),
+            ["fldPackagedDate"] = nameof(PackagingParticipantEntity.PackagedDate),
+            ["fldPostedDate"] = nameof(PackagingParticipantEntity.PostedDate),
+            [ColLabCode] = nameof(PackagingParticipantEntity.LabCode),
+            [ColLabName] = nameof(PackagingParticipantEntity.LabName),
+            [ColPackingInfo] = nameof(PackagingParticipantEntity.PackingInfo),
+            ["fldCustomerPackingInfo"] = nameof(PackagingParticipantEntity.CustomerPackingInfo),
+            ["fldPSLevelPackingInfo"] = nameof(PackagingParticipantEntity.PSLevelPackingInfo),
+            [ColNumberOfSetsRequired] = nameof(PackagingParticipantEntity.NumberOfSetsRequired),
+            ["fldImportExportLicenceRequired"] = nameof(PackagingParticipantEntity.ImportExportLicenceRequired),
+            ["fldImportPermitReceived"] = nameof(PackagingParticipantEntity.ImportPermitReceived),
+            ["fldCustomsCertificateRequired"] = nameof(PackagingParticipantEntity.CustomsCertificateRequired),
+            [ColContactName] = nameof(PackagingParticipantEntity.ContactName),
+            [ColOrganisation] = nameof(PackagingParticipantEntity.Organisation),
+            [ColAddress1] = nameof(PackagingParticipantEntity.Address1),
+            [ColAddress2] = nameof(PackagingParticipantEntity.Address2),
+            [ColAddress3] = nameof(PackagingParticipantEntity.Address3),
+            [ColAddress4] = nameof(PackagingParticipantEntity.Address4),
+            [ColAddress5] = nameof(PackagingParticipantEntity.Address5),
+            [ColTelephone] = nameof(PackagingParticipantEntity.Telephone),
+            [ColCountry] = nameof(PackagingParticipantEntity.Country),
+            [ColDistributionDate] = nameof(PackagingParticipantEntity.DistributionDate),
+        });
+
+        Map<PackagingSchemeItemEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            [ColParticipantId] = nameof(PackagingSchemeItemEntity.ParticipantId),
+            ["fldDistributionParticipantId"] = nameof(PackagingSchemeItemEntity.DistributionParticipantId),
+            [ColMonthlyDistributionSchemeId] = nameof(PackagingSchemeItemEntity.MonthlyDistributionSchemeId),
+            ["fldPreparationComplete"] = nameof(PackagingSchemeItemEntity.PreparationComplete),
+            ["fldDistributionReference"] = nameof(PackagingSchemeItemEntity.DistributionReference),
+            ["fldDistributionReferenceSuffix"] = nameof(PackagingSchemeItemEntity.DistributionReferenceSuffix),
+            ["fldScheduleCode"] = nameof(PackagingSchemeItemEntity.ScheduleCode),
+            ["fldPackagedDate"] = nameof(PackagingSchemeItemEntity.PackagedDate),
+            ["fldPostedDate"] = nameof(PackagingSchemeItemEntity.PostedDate),
+            [ColPackingInfo] = nameof(PackagingSchemeItemEntity.PackingInfo),
+            ["fldSchemeName"] = nameof(PackagingSchemeItemEntity.SchemeName),
+            ["fldSchemeIdentifier"] = nameof(PackagingSchemeItemEntity.SchemeIdentifier),
+            ["fldCustomsDocumentDescription"] = nameof(PackagingSchemeItemEntity.CustomsDocumentDescription),
+            ["fldCustomsDocumentVolume"] = nameof(PackagingSchemeItemEntity.CustomsDocumentVolume),
+            ["fldNumberOfSamples"] = nameof(PackagingSchemeItemEntity.NumberOfSamples),
+            [ColNumberOfSetsRequired] = nameof(PackagingSchemeItemEntity.NumberOfSetsRequired),
+            ["fldPSLevelPackingInfo"] = nameof(PackagingSchemeItemEntity.PSLevelPackingInfo),
+            ["fldImportExportLicenceRequired"] = nameof(PackagingSchemeItemEntity.ImportExportLicenceRequired),
+            ["fldImportPermitReceived"] = nameof(PackagingSchemeItemEntity.ImportPermitReceived),
+            ["fldCustomsCertificateRequired"] = nameof(PackagingSchemeItemEntity.CustomsCertificateRequired),
+            ["fldCustomerPackingInfo"] = nameof(PackagingSchemeItemEntity.CustomerPackingInfo),
+            [ColDistributionDate] = nameof(PackagingSchemeItemEntity.DistributionDate),
+        });
+
+        Map<DistributionPostedEmailEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldDistributionPostedEmailId"] = nameof(DistributionPostedEmailEntity.DistributionPostedEmailId),
+            [ColParticipantId] = nameof(DistributionPostedEmailEntity.ParticipantId),
+            [ColMonthlyDistributionSchemeId] = nameof(DistributionPostedEmailEntity.MonthlyDistributionSchemeId),
+            [ColEmail] = nameof(DistributionPostedEmailEntity.Email),
+            ["fldDistribution"] = nameof(DistributionPostedEmailEntity.Distribution),
+            ["fldSchemeName"] = nameof(DistributionPostedEmailEntity.SchemeName),
+        });
+
+        Map<PackagingLabelAddressEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            [ColContactName] = nameof(PackagingLabelAddressEntity.ContactName),
+            [ColOrganisation] = nameof(PackagingLabelAddressEntity.Organisation),
+            [ColAddress1] = nameof(PackagingLabelAddressEntity.Address1),
+            [ColAddress2] = nameof(PackagingLabelAddressEntity.Address2),
+            [ColAddress3] = nameof(PackagingLabelAddressEntity.Address3),
+            [ColAddress4] = nameof(PackagingLabelAddressEntity.Address4),
+            [ColAddress5] = nameof(PackagingLabelAddressEntity.Address5),
+            [ColCountry] = nameof(PackagingLabelAddressEntity.Country),
+            [ColTelephone] = nameof(PackagingLabelAddressEntity.Telephone),
         });
     }
 

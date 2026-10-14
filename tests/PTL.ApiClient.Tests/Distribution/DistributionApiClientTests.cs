@@ -418,4 +418,242 @@ public class DistributionApiClientTests
 
         Assert.Null(result);
     }
+
+    private static DistributionApiClient CreateCapturingClient(
+        HttpStatusCode statusCode, string? json, Action<HttpRequestMessage> capture) =>
+        new(new HttpClient(new StubHttpMessageHandler(statusCode, json) { OnRequest = capture }) { BaseAddress = new Uri("http://localhost") });
+
+    private static DistributionApiClient CreateClient(Func<HttpResponseMessage> responseFactory) =>
+        new(new HttpClient(new StubHttpMessageHandler(responseFactory)) { BaseAddress = new Uri("http://localhost") });
+
+    [Fact]
+    public async Task GetPackagingAsync_GetsThePackagingEndpointWithModeAndWeekAndReturnsTheSheet()
+    {
+        const string json = """
+            {"mode":1,"week":3,"yearId":2026,"monthId":5,"blocks":[{"printKey":"abc_20260513","date":"2026-05-13T00:00:00","heading":"L001: Lab One","packingInfo":"","dueToBePosted":false,"showAllPacked":true,"showAllPosted":false,"schemes":[]}]}
+            """;
+        HttpRequestMessage? captured = null;
+        var client = CreateCapturingClient(HttpStatusCode.OK, json, request => captured = request);
+
+        var result = await client.GetPackagingAsync(2026, 5, 1, 3);
+
+        Assert.NotNull(captured);
+        Assert.Equal(HttpMethod.Get, captured!.Method);
+        Assert.Equal("/api/distributions/months/2026/5/packaging", captured.RequestUri!.AbsolutePath);
+        Assert.Equal("?mode=1&week=3", captured.RequestUri.Query);
+        Assert.NotNull(result);
+        Assert.Equal(1, result!.Mode);
+        Assert.Equal(3, result.Week);
+        var block = Assert.Single(result.Blocks);
+        Assert.Equal("abc_20260513", block.PrintKey);
+        Assert.True(block.ShowAllPacked);
+    }
+
+    [Fact]
+    public async Task GetPackagingAsync_NotFound_ReturnsNull()
+    {
+        var client = CreateClient(HttpStatusCode.NotFound, null);
+
+        Assert.Null(await client.GetPackagingAsync(2026, 5, 0, 1));
+    }
+
+    [Fact]
+    public async Task GetPackagingAsync_ServerError_Throws()
+    {
+        var client = CreateClient(HttpStatusCode.InternalServerError, null);
+
+        await Assert.ThrowsAsync<HttpRequestException>(() => client.GetPackagingAsync(2026, 5, 0, 1));
+    }
+
+    [Fact]
+    public async Task SavePackagingAsync_PutsTheUpdatesAndReturnsTheResult()
+    {
+        HttpRequestMessage? captured = null;
+        string? body = null;
+        var client = CreateCapturingClient(HttpStatusCode.OK, """{"success":true}""", request =>
+        {
+            captured = request;
+            body = request.Content!.ReadAsStringAsync().GetAwaiter().GetResult();
+        });
+        var distributionParticipantId = Guid.NewGuid();
+
+        var result = await client.SavePackagingAsync(
+            2026, 5, new Contracts.Distribution.PackagingSaveRequest(
+                [new Contracts.Distribution.PackagingStageUpdateRequest(1, 2, distributionParticipantId, true, false)]));
+
+        Assert.NotNull(captured);
+        Assert.Equal(HttpMethod.Put, captured!.Method);
+        Assert.Equal("/api/distributions/months/2026/5/packaging", captured.RequestUri!.AbsolutePath);
+        Assert.Contains(distributionParticipantId.ToString(), body);
+        Assert.NotNull(result);
+        Assert.True(result!.Success);
+    }
+
+    [Fact]
+    public async Task SavePackagingAsync_NotFound_ReturnsNull()
+    {
+        var client = CreateClient(HttpStatusCode.NotFound, null);
+
+        Assert.Null(await client.SavePackagingAsync(2026, 5, new Contracts.Distribution.PackagingSaveRequest([])));
+    }
+
+    [Fact]
+    public async Task SavePackagingAsync_ServerError_Throws()
+    {
+        var client = CreateClient(HttpStatusCode.InternalServerError, null);
+
+        await Assert.ThrowsAsync<HttpRequestException>(
+            () => client.SavePackagingAsync(2026, 5, new Contracts.Distribution.PackagingSaveRequest([])));
+    }
+
+    [Fact]
+    public async Task GetPackagingLabelsAsync_PostsTheSelectionAndReturnsTheLabels()
+    {
+        const string json = """{"labels":[{"lines":["A Contact","An Org"]}]}""";
+        HttpRequestMessage? captured = null;
+        string? body = null;
+        var client = CreateCapturingClient(HttpStatusCode.OK, json, request =>
+        {
+            captured = request;
+            body = request.Content!.ReadAsStringAsync().GetAwaiter().GetResult();
+        });
+
+        var result = await client.GetPackagingLabelsAsync(
+            2026, 5, new Contracts.Distribution.PackagingSelectionRequest(0, 2, ["key1"]));
+
+        Assert.NotNull(captured);
+        Assert.Equal(HttpMethod.Post, captured!.Method);
+        Assert.Equal("/api/distributions/months/2026/5/packaging/labels", captured.RequestUri!.AbsolutePath);
+        Assert.Contains("key1", body);
+        Assert.NotNull(result);
+        Assert.Equal(["A Contact", "An Org"], Assert.Single(result!.Labels).Lines);
+    }
+
+    [Fact]
+    public async Task GetPackagingLabelsAsync_NotFound_ReturnsNull()
+    {
+        var client = CreateClient(HttpStatusCode.NotFound, null);
+
+        Assert.Null(await client.GetPackagingLabelsAsync(2026, 5, new Contracts.Distribution.PackagingSelectionRequest(0, 1, [])));
+    }
+
+    [Fact]
+    public async Task GetPackagingLabelsAsync_ServerError_Throws()
+    {
+        var client = CreateClient(HttpStatusCode.InternalServerError, null);
+
+        await Assert.ThrowsAsync<HttpRequestException>(
+            () => client.GetPackagingLabelsAsync(2026, 5, new Contracts.Distribution.PackagingSelectionRequest(0, 1, [])));
+    }
+
+    private static HttpResponseMessage DocxResponse(Action<System.Net.Http.Headers.HttpContentHeaders>? configureHeaders)
+    {
+        var content = new ByteArrayContent([1, 2, 3]);
+        configureHeaders?.Invoke(content.Headers);
+        return new HttpResponseMessage(HttpStatusCode.OK) { Content = content };
+    }
+
+    [Fact]
+    public async Task GetPackagingCustomsAsync_PostsTheSelectionAndReturnsTheDocumentWithItsEncodedFileName()
+    {
+        HttpRequestMessage? captured = null;
+        var handler = new StubHttpMessageHandler(() => DocxResponse(headers =>
+            headers.ContentDisposition = new System.Net.Http.Headers.ContentDispositionHeaderValue("attachment")
+            {
+                FileNameStar = "Daily packaging May 2026.docx",
+            }))
+        { OnRequest = request => captured = request };
+        var client = new DistributionApiClient(new HttpClient(handler) { BaseAddress = new Uri("http://localhost") });
+
+        var result = await client.GetPackagingCustomsAsync(
+            2026, 5, new Contracts.Distribution.PackagingSelectionRequest(2, 0, ["key1"]));
+
+        Assert.NotNull(captured);
+        Assert.Equal(HttpMethod.Post, captured!.Method);
+        Assert.Equal("/api/distributions/months/2026/5/packaging/customs", captured.RequestUri!.AbsolutePath);
+        Assert.Equal([1, 2, 3], result.Content);
+        Assert.Equal("Daily packaging May 2026.docx", result.FileName);
+        Assert.Null(result.Error);
+    }
+
+    [Theory]
+    [InlineData("\"Combined packaging May 2026 Week 1.docx\"")]
+    [InlineData("Combined packaging May 2026 Week 1.docx")]
+    public async Task GetPackagingCustomsAsync_PlainFileNameHasItsQuotesTrimmed(string headerFileName)
+    {
+        var client = CreateClient(() => DocxResponse(headers =>
+            headers.ContentDisposition = new System.Net.Http.Headers.ContentDispositionHeaderValue("attachment") { FileName = headerFileName }));
+
+        var result = await client.GetPackagingCustomsAsync(2026, 5, new Contracts.Distribution.PackagingSelectionRequest(1, 1, []));
+
+        Assert.Equal("Combined packaging May 2026 Week 1.docx", result.FileName);
+        Assert.Equal([1, 2, 3], result.Content);
+        Assert.Null(result.Error);
+    }
+
+    [Fact]
+    public async Task GetPackagingCustomsAsync_NoContentDisposition_FallsBackToCustomsDocx()
+    {
+        var client = CreateClient(() => DocxResponse(null));
+
+        var result = await client.GetPackagingCustomsAsync(2026, 5, new Contracts.Distribution.PackagingSelectionRequest(1, 1, []));
+
+        Assert.Equal("Customs.docx", result.FileName);
+        Assert.Equal([1, 2, 3], result.Content);
+        Assert.Null(result.Error);
+    }
+
+    [Fact]
+    public async Task GetPackagingCustomsAsync_ContentDispositionWithoutAFileName_FallsBackToCustomsDocx()
+    {
+        var client = CreateClient(() => DocxResponse(headers =>
+            headers.ContentDisposition = new System.Net.Http.Headers.ContentDispositionHeaderValue("attachment")));
+
+        var result = await client.GetPackagingCustomsAsync(2026, 5, new Contracts.Distribution.PackagingSelectionRequest(1, 1, []));
+
+        Assert.Equal("Customs.docx", result.FileName);
+    }
+
+    [Fact]
+    public async Task GetPackagingCustomsAsync_BadRequestWithDetail_ReturnsTheBusinessMessageAsTheError()
+    {
+        var client = CreateClient(HttpStatusCode.BadRequest, """{"title":"Customs","status":400,"detail":"Please select schemes to print"}""");
+
+        var result = await client.GetPackagingCustomsAsync(2026, 5, new Contracts.Distribution.PackagingSelectionRequest(2, 0, []));
+
+        Assert.Null(result.Content);
+        Assert.Equal(string.Empty, result.FileName);
+        Assert.Equal("Please select schemes to print", result.Error);
+    }
+
+    [Theory]
+    [InlineData("""{"status":400}""")]
+    [InlineData("null")]
+    public async Task GetPackagingCustomsAsync_BadRequestWithoutDetail_ReturnsTheDefaultMailMergeMessage(string json)
+    {
+        var client = CreateClient(HttpStatusCode.BadRequest, json);
+
+        var result = await client.GetPackagingCustomsAsync(2026, 5, new Contracts.Distribution.PackagingSelectionRequest(2, 0, []));
+
+        Assert.Null(result.Content);
+        Assert.Equal("There was a problem with the Mail Merge", result.Error);
+    }
+
+    [Fact]
+    public async Task GetPackagingCustomsAsync_OtherFailure_Throws()
+    {
+        var client = CreateClient(HttpStatusCode.InternalServerError, null);
+
+        await Assert.ThrowsAsync<HttpRequestException>(
+            () => client.GetPackagingCustomsAsync(2026, 5, new Contracts.Distribution.PackagingSelectionRequest(2, 0, [])));
+    }
+
+    [Fact]
+    public async Task GetPackagingCustomsAsync_NotFound_Throws()
+    {
+        var client = CreateClient(HttpStatusCode.NotFound, null);
+
+        await Assert.ThrowsAsync<HttpRequestException>(
+            () => client.GetPackagingCustomsAsync(2026, 5, new Contracts.Distribution.PackagingSelectionRequest(2, 0, [])));
+    }
 }

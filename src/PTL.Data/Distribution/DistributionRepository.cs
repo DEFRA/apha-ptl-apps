@@ -693,6 +693,116 @@ public sealed class DistributionRepository(IDbConnectionFactory connectionFactor
 
         transaction.Commit();
     }
+
+    public async Task<PackagingRawData?> GetPackagingSheetAsync(
+        Guid monthlyDistributionId, PackagingMode mode, int week, CancellationToken cancellationToken = default)
+    {
+        // @ReferenceDate is left to its NULL default - the stored procedures then use today's date
+        // (legacy only overrides it from the ResultsTestDate test-harness appSetting).
+        var (sql, parameters) = mode switch
+        {
+            PackagingMode.GroupAddress => (
+                "EXEC dbo.spgGroupedPackagingSheet @MonthlyDistributionId = @MonthlyDistributionId, @WeekNumber = @WeekNumber",
+                new { MonthlyDistributionId = monthlyDistributionId, WeekNumber = week }),
+            PackagingMode.ParticipantCombined => (
+                "EXEC dbo.spgPartGroupedPackagingSheet @MonthlyDistributionId = @MonthlyDistributionId, @WeekNumber = @WeekNumber",
+                new { MonthlyDistributionId = monthlyDistributionId, WeekNumber = week }),
+            _ => (
+                "EXEC dbo.spgWeeklyPackagingSheet @MonthlyDistributionId = @MonthlyDistributionId",
+                new { MonthlyDistributionId = monthlyDistributionId, WeekNumber = 0 }),
+        };
+
+        using var connection = connectionFactory.CreateConnection();
+        using var results = await connection.QueryMultipleAsync(sql, parameters);
+
+        var header = await results.ReadFirstOrDefaultAsync<PreparationHeaderEntity>();
+        if (header is null)
+        {
+            return null;
+        }
+
+        var groups = (await results.ReadAsync<PackagingGroupEntity>()).ToList();
+
+        if (mode == PackagingMode.ParticipantCombined)
+        {
+            var schemeItems = (await results.ReadAsync<PackagingSchemeItemEntity>()).ToList();
+            return new PackagingRawData(header.YearId, header.MonthId, groups, [], [], schemeItems);
+        }
+
+        var items = (await results.ReadAsync<PackagingItemEntity>()).ToList();
+        var participants = (await results.ReadAsync<PackagingParticipantEntity>()).ToList();
+        return new PackagingRawData(header.YearId, header.MonthId, groups, items, participants, []);
+    }
+
+    public async Task UpdatePackagingAsync(
+        IReadOnlyList<PackagingProgressUpdate> updates,
+        IReadOnlyList<DistributionPostedEmailEntity> emails,
+        CancellationToken cancellationToken = default)
+    {
+        using var connection = connectionFactory.CreateConnection();
+        connection.Open();
+        using var transaction = connection.BeginTransaction();
+
+        const string updateSql = """
+            EXEC dbo.spuDistributionParticipantPacking
+                @DistributionParticipantId = @DistributionParticipantId,
+                @PackagedDate = @PackagedDate,
+                @PostedDate = @PostedDate
+            """;
+
+        foreach (var update in updates)
+        {
+            await connection.ExecuteAsync(updateSql, update, transaction);
+        }
+
+        const string insertEmailSql = """
+            EXEC dbo.spiDistributionPostedEmail
+                @DistributionPostedEmailId = @DistributionPostedEmailId,
+                @ParticipantId = @ParticipantId,
+                @MonthlyDistributionSchemeId = @MonthlyDistributionSchemeId,
+                @Email = @Email,
+                @Distribution = @Distribution,
+                @SchemeName = @SchemeName
+            """;
+
+        foreach (var email in emails)
+        {
+            await connection.ExecuteAsync(insertEmailSql, email, transaction);
+        }
+
+        transaction.Commit();
+    }
+
+    public async Task<IReadOnlyList<DistributionPostedEmailEntity>> GetUnsentDistributionPostedEmailsAsync(CancellationToken cancellationToken = default)
+    {
+        using var connection = connectionFactory.CreateConnection();
+        return (await connection.QueryAsync<DistributionPostedEmailEntity>("EXEC dbo.spgaDistributionPostedEmail")).ToList();
+    }
+
+    public async Task MarkDistributionPostedEmailSentAsync(Guid distributionPostedEmailId, DateTime dateSent, CancellationToken cancellationToken = default)
+    {
+        using var connection = connectionFactory.CreateConnection();
+        await connection.ExecuteAsync(
+            "EXEC dbo.spuDistributionPostedEmail @DistributionPostedEmailId = @DistributionPostedEmailId, @DateSent = @DateSent",
+            new { DistributionPostedEmailId = distributionPostedEmailId, DateSent = dateSent });
+    }
+
+    public async Task<PackagingLabelAddressEntity?> GetLabelParticipantAddressAsync(
+        Guid participantId, Guid monthlyDistributionSchemeId, CancellationToken cancellationToken = default)
+    {
+        using var connection = connectionFactory.CreateConnection();
+        return await connection.QueryFirstOrDefaultAsync<PackagingLabelAddressEntity>(
+            "EXEC dbo.spgLabelParticipantAddress @ParticipantId = @ParticipantId, @MonthlyDistributionSchemeId = @MonthlyDistributionSchemeId",
+            new { ParticipantId = participantId, MonthlyDistributionSchemeId = monthlyDistributionSchemeId });
+    }
+
+    public async Task<PackagingLabelAddressEntity?> GetLabelGroupAddressAsync(Guid groupAddressId, CancellationToken cancellationToken = default)
+    {
+        using var connection = connectionFactory.CreateConnection();
+        return await connection.QueryFirstOrDefaultAsync<PackagingLabelAddressEntity>(
+            "EXEC dbo.spgLabelGroupAddress @GroupAddressId = @GroupAddressId",
+            new { GroupAddressId = groupAddressId });
+    }
 }
 
 // spgMonthlyDistribution result set 1 - only present when the month has been initialised.

@@ -146,4 +146,60 @@ public sealed class DistributionApiClient(HttpClient httpClient) : IDistribution
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadFromJsonAsync<PreparationSaveResult>(cancellationToken);
     }
+
+    public async Task<PackagingSheetResponse?> GetPackagingAsync(int yearId, int monthId, int mode, int week, CancellationToken cancellationToken = default)
+    {
+        var response = await httpClient.GetAsync(
+            new Uri($"/api/distributions/months/{yearId}/{monthId}/packaging?mode={mode}&week={week}", UriKind.Relative), cancellationToken);
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<PackagingSheetResponse>(cancellationToken);
+    }
+
+    public async Task<PackagingSaveResult?> SavePackagingAsync(
+        int yearId, int monthId, PackagingSaveRequest request, CancellationToken cancellationToken = default)
+    {
+        var response = await httpClient.PutAsJsonAsync($"/api/distributions/months/{yearId}/{monthId}/packaging", request, cancellationToken);
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<PackagingSaveResult>(cancellationToken);
+    }
+
+    public async Task<PackagingLabelsResponse?> GetPackagingLabelsAsync(
+        int yearId, int monthId, PackagingSelectionRequest request, CancellationToken cancellationToken = default)
+    {
+        var response = await httpClient.PostAsJsonAsync($"/api/distributions/months/{yearId}/{monthId}/packaging/labels", request, cancellationToken);
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<PackagingLabelsResponse>(cancellationToken);
+    }
+
+    public async Task<PackagingCustomsResult> GetPackagingCustomsAsync(
+        int yearId, int monthId, PackagingSelectionRequest request, CancellationToken cancellationToken = default)
+    {
+        var response = await httpClient.PostAsJsonAsync($"/api/distributions/months/{yearId}/{monthId}/packaging/customs", request, cancellationToken);
+
+        // Legacy surfaced the business message (e.g. "Please select schemes to print") on the page.
+        if (response.StatusCode == System.Net.HttpStatusCode.BadRequest)
+        {
+            var problem = await response.Content.ReadFromJsonAsync<Microsoft.AspNetCore.Mvc.ProblemDetails>(cancellationToken);
+            return new PackagingCustomsResult(null, string.Empty, problem?.Detail ?? "There was a problem with the Mail Merge");
+        }
+
+        response.EnsureSuccessStatusCode();
+        var fileName = response.Content.Headers.ContentDisposition?.FileNameStar ?? response.Content.Headers.ContentDisposition?.FileName?.Trim('"') ?? "Customs.docx";
+        return new PackagingCustomsResult(await response.Content.ReadAsByteArrayAsync(cancellationToken), fileName, null);
+    }
 }

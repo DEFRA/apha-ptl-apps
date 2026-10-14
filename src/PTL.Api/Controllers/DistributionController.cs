@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 using PTL.Contracts.Distribution;
 using PTL.Core.Distribution;
 
@@ -6,8 +7,8 @@ namespace PTL.Api.Controllers;
 
 // Distribution Dashboard (legacy Distributions/MenuDistributions.aspx) - see
 // docs/analysis/distribution-analysis.md and docs/migration/distribution-migration.md. Scheduling,
-// Sample Numbers, Intended Results, Participants and Sample Preparation are also implemented here -
-// Packaging, Results (dashboard) and Tabulations remain out of scope.
+// Sample Numbers, Intended Results, Participants, Sample Preparation and Sample Packaging are also
+// implemented here - Results (dashboard) and Tabulations remain out of scope.
 [ApiController]
 [Route("api/distributions")]
 public sealed class DistributionController(
@@ -16,6 +17,8 @@ public sealed class DistributionController(
     IIntendedResultsService intendedResultsService,
     IDistributionParticipantsService distributionParticipantsService,
     IPreparationService preparationService,
+    IPackagingService packagingService,
+    IPackagingOutputService packagingOutputService,
     ILogger<DistributionController> logger) : ControllerBase
 {
     private static readonly Action<ILogger, Guid, Exception?> LogStructureCreationFailedMessage =
@@ -96,6 +99,103 @@ public sealed class DistributionController(
 
         var outcome = await preparationService.SavePreparationAsync(yearId, monthId, updates, cancellationToken);
         return outcome.Success ? Ok(new PreparationSaveResult(true)) : NotFound();
+    }
+
+    // GET /api/distributions/months/{yearId}/{monthId}/packaging?mode={0|1|2}&week={1-4} - the
+    // Sample Packaging screen, legacy GroupedPackagingSheet / PartGroupedPackagingSheet /
+    // WeeklyPackagingSheet.Fetch*. Week is required for the two Combined options only.
+    [HttpGet("months/{yearId:int}/{monthId:int}/packaging")]
+    public async Task<ActionResult<PackagingSheetResponse>> GetPackaging(
+        int yearId, int monthId, [FromQuery] int mode, [FromQuery] int week, CancellationToken cancellationToken)
+    {
+        if (!TryParsePackagingSelection(mode, week, out var packagingMode, out var packagingWeek))
+        {
+            return ValidationProblem(PackagingSelectionErrors());
+        }
+
+        var sheet = await packagingService.GetPackagingAsync(yearId, monthId, packagingMode, packagingWeek, cancellationToken);
+        return sheet is null ? NotFound() : Ok(ToResponse(sheet));
+    }
+
+    // PUT /api/distributions/months/{yearId}/{monthId}/packaging - legacy ButtonSave_Click /
+    // ButtonApply_Click, which save every packaging sheet the user touched (the save-vs-stay
+    // distinction is owned by InternalWeb).
+    [HttpPut("months/{yearId:int}/{monthId:int}/packaging")]
+    public async Task<ActionResult<PackagingSaveResult>> SavePackaging(
+        int yearId, int monthId, [FromBody] PackagingSaveRequest request, CancellationToken cancellationToken)
+    {
+        var updates = new List<PackagingStageUpdate>();
+        foreach (var update in request.Updates)
+        {
+            if (!TryParsePackagingSelection(update.Mode, update.Week, out var packagingMode, out var packagingWeek))
+            {
+                return ValidationProblem(PackagingSelectionErrors());
+            }
+
+            updates.Add(new PackagingStageUpdate(packagingMode, packagingWeek, update.DistributionParticipantId, update.Packed, update.Posted));
+        }
+
+        var outcome = await packagingService.SavePackagingAsync(yearId, monthId, updates, cancellationToken);
+        return outcome.Success ? Ok(new PackagingSaveResult(true)) : NotFound();
+    }
+
+    // POST /api/distributions/months/{yearId}/{monthId}/packaging/labels - legacy Print Labels,
+    // returned as printable label text rather than sent to a server-side label printer.
+    [HttpPost("months/{yearId:int}/{monthId:int}/packaging/labels")]
+    public async Task<ActionResult<PackagingLabelsResponse>> GetPackagingLabels(
+        int yearId, int monthId, [FromBody] PackagingSelectionRequest request, CancellationToken cancellationToken)
+    {
+        if (!TryParsePackagingSelection(request.Mode, request.Week, out var packagingMode, out var packagingWeek))
+        {
+            return ValidationProblem(PackagingSelectionErrors());
+        }
+
+        var labels = await packagingOutputService.GetLabelsAsync(yearId, monthId, packagingMode, packagingWeek, request.SelectedKeys, cancellationToken);
+        return labels is null
+            ? NotFound()
+            : Ok(new PackagingLabelsResponse([.. labels.Select(l => new PackagingLabelResponse(l.Lines))]));
+    }
+
+    // POST /api/distributions/months/{yearId}/{monthId}/packaging/customs - legacy Print Customs
+    // (Participant Combined and Daily only): the Customs Pro-Forma Word document.
+    [HttpPost("months/{yearId:int}/{monthId:int}/packaging/customs")]
+    public async Task<IActionResult> GetPackagingCustoms(
+        int yearId, int monthId, [FromBody] PackagingSelectionRequest request, CancellationToken cancellationToken)
+    {
+        if (!TryParsePackagingSelection(request.Mode, request.Week, out var packagingMode, out var packagingWeek))
+        {
+            return ValidationProblem(PackagingSelectionErrors());
+        }
+
+        var outcome = await packagingOutputService.GetCustomsDocumentAsync(yearId, monthId, packagingMode, packagingWeek, request.SelectedKeys, cancellationToken);
+        return outcome.Success
+            ? File(outcome.Content, "application/vnd.openxmlformats-officedocument.wordprocessingml.document", outcome.FileName)
+            : Problem(detail: outcome.Error, statusCode: StatusCodes.Status400BadRequest);
+    }
+
+    private static bool TryParsePackagingSelection(int mode, int week, out PackagingMode packagingMode, out int packagingWeek)
+    {
+        packagingMode = (PackagingMode)mode;
+        packagingWeek = 0;
+
+        if (!Enum.IsDefined(packagingMode))
+        {
+            return false;
+        }
+
+        if (packagingMode == PackagingMode.Daily)
+        {
+            return true;
+        }
+
+        packagingWeek = week;
+        return week is >= 1 and <= 4;
+    }
+
+    private ModelStateDictionary PackagingSelectionErrors()
+    {
+        ModelState.AddModelError("mode", "Select a valid Packaging option and, for Combined Packaging, a Week from 1 to 4.");
+        return ModelState;
     }
 
     // GET /api/distributions/schemes/{monthlyDistributionSchemeId}/sample-numbers - the Sample
@@ -317,6 +417,39 @@ public sealed class DistributionController(
             scheme.IsCancelled,
             scheme.IsAsAvailable,
             scheme.IsAccredited);
+
+    private static PackagingSheetResponse ToResponse(PackagingSheet sheet) =>
+        new(
+            (int)sheet.Mode,
+            sheet.Week,
+            sheet.YearId,
+            sheet.MonthId,
+            [.. sheet.Blocks.Select(b => new PackagingBlockResponse(
+                b.PrintKey,
+                b.Date,
+                b.Heading,
+                b.PackingInfo,
+                b.DueToBePosted,
+                b.ShowAllPacked,
+                b.ShowAllPosted,
+                [.. b.Schemes.Select(ToResponse)]))]);
+
+    private static PackagingSchemeResponse ToResponse(PackagingSchemeRow scheme) =>
+        new(
+            scheme.MonthlyDistributionSchemeId,
+            scheme.Description,
+            scheme.PreparationComplete,
+            scheme.PackingInfo,
+            scheme.CustomerPackingInfo,
+            scheme.PSLevelPackingInfo,
+            scheme.ImportPermitStatus,
+            scheme.DistributionParticipantId,
+            scheme.PackagedDate,
+            scheme.PostedDate,
+            (int)scheme.PackedTotal,
+            (int)scheme.PostedTotal,
+            [.. scheme.Participants.Select(p => new PackagingParticipantResponse(
+                p.DistributionParticipantId, p.Description, p.PackagedDate, p.PostedDate, p.ImportPermitStatus))]);
 
     private static PreparationSheetResponse ToResponse(PreparationSheetData sheet) =>
         new(

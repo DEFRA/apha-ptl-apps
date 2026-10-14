@@ -92,4 +92,40 @@ internal sealed class FakeDistributionApiClient : IDistributionApiClient
         SavedPreparationRequests.Add(request);
         return Task.FromResult(PreparationSaveResult);
     }
+
+    public PackagingSheetResponse? Packaging { get; set; }
+    public PackagingSaveResult? PackagingSaveResult { get; set; }
+    public PackagingLabelsResponse? PackagingLabels { get; set; }
+    public PackagingCustomsResult PackagingCustoms { get; set; } = new(null, string.Empty, "Not configured");
+    public List<(int YearId, int MonthId, int Mode, int Week)> PackagingRequests { get; } = [];
+    public List<PackagingSaveRequest> SavedPackagingRequests { get; } = [];
+    public List<PackagingSelectionRequest> PackagingLabelRequests { get; } = [];
+    public List<PackagingSelectionRequest> PackagingCustomsRequests { get; } = [];
+
+    public Task<PackagingSheetResponse?> GetPackagingAsync(int yearId, int monthId, int mode, int week, CancellationToken cancellationToken = default)
+    {
+        PackagingRequests.Add((yearId, monthId, mode, week));
+        return Task.FromResult(Packaging);
+    }
+
+    public Task<PackagingSaveResult?> SavePackagingAsync(
+        int yearId, int monthId, PackagingSaveRequest request, CancellationToken cancellationToken = default)
+    {
+        SavedPackagingRequests.Add(request);
+        return Task.FromResult(PackagingSaveResult);
+    }
+
+    public Task<PackagingLabelsResponse?> GetPackagingLabelsAsync(
+        int yearId, int monthId, PackagingSelectionRequest request, CancellationToken cancellationToken = default)
+    {
+        PackagingLabelRequests.Add(request);
+        return Task.FromResult(PackagingLabels);
+    }
+
+    public Task<PackagingCustomsResult> GetPackagingCustomsAsync(
+        int yearId, int monthId, PackagingSelectionRequest request, CancellationToken cancellationToken = default)
+    {
+        PackagingCustomsRequests.Add(request);
+        return Task.FromResult(PackagingCustoms);
+    }
 }

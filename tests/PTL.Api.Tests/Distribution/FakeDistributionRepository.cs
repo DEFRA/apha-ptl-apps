@@ -123,4 +123,65 @@ internal sealed class FakeDistributionRepository : IDistributionRepository
         UpdatedPreparationSchemes.AddRange(schemes);
         return Task.CompletedTask;
     }
+
+    // Keyed by (monthlyDistributionId, mode, week); a missing key means "no packaging header" (null).
+    public Dictionary<(Guid MonthlyDistributionId, PackagingMode Mode, int Week), PackagingRawData> PackagingSheets { get; } = [];
+
+    public List<(Guid MonthlyDistributionId, PackagingMode Mode, int Week)> PackagingSheetRequests { get; } = [];
+
+    public List<(IReadOnlyList<PackagingProgressUpdate> Updates, IReadOnlyList<DistributionPostedEmailEntity> Emails)> PackagingUpdates { get; } = [];
+
+    public List<DistributionPostedEmailEntity> UnsentPostedEmails { get; } = [];
+
+    public int UnsentPostedEmailRequests { get; private set; }
+
+    public List<(Guid Id, DateTime DateSent)> MarkedSentEmails { get; } = [];
+
+    // Keyed by (participantId, schemeId) - an absent key returns null (no address row).
+    public Dictionary<(Guid ParticipantId, Guid SchemeId), PackagingLabelAddressEntity> ParticipantLabelAddresses { get; } = [];
+
+    public Dictionary<Guid, PackagingLabelAddressEntity> GroupLabelAddresses { get; } = [];
+
+    public List<(Guid ParticipantId, Guid SchemeId)> ParticipantLabelRequests { get; } = [];
+
+    public List<Guid> GroupLabelRequests { get; } = [];
+
+    public Task<PackagingRawData?> GetPackagingSheetAsync(
+        Guid monthlyDistributionId, PackagingMode mode, int week, CancellationToken cancellationToken = default)
+    {
+        PackagingSheetRequests.Add((monthlyDistributionId, mode, week));
+        return Task.FromResult(PackagingSheets.GetValueOrDefault((monthlyDistributionId, mode, week)));
+    }
+
+    public Task UpdatePackagingAsync(
+        IReadOnlyList<PackagingProgressUpdate> updates, IReadOnlyList<DistributionPostedEmailEntity> emails, CancellationToken cancellationToken = default)
+    {
+        PackagingUpdates.Add((updates, emails));
+        return Task.CompletedTask;
+    }
+
+    public Task<IReadOnlyList<DistributionPostedEmailEntity>> GetUnsentDistributionPostedEmailsAsync(CancellationToken cancellationToken = default)
+    {
+        UnsentPostedEmailRequests++;
+        return Task.FromResult<IReadOnlyList<DistributionPostedEmailEntity>>([.. UnsentPostedEmails]);
+    }
+
+    public Task MarkDistributionPostedEmailSentAsync(Guid distributionPostedEmailId, DateTime dateSent, CancellationToken cancellationToken = default)
+    {
+        MarkedSentEmails.Add((distributionPostedEmailId, dateSent));
+        return Task.CompletedTask;
+    }
+
+    public Task<PackagingLabelAddressEntity?> GetLabelParticipantAddressAsync(
+        Guid participantId, Guid monthlyDistributionSchemeId, CancellationToken cancellationToken = default)
+    {
+        ParticipantLabelRequests.Add((participantId, monthlyDistributionSchemeId));
+        return Task.FromResult(ParticipantLabelAddresses.GetValueOrDefault((participantId, monthlyDistributionSchemeId)));
+    }
+
+    public Task<PackagingLabelAddressEntity?> GetLabelGroupAddressAsync(Guid groupAddressId, CancellationToken cancellationToken = default)
+    {
+        GroupLabelRequests.Add(groupAddressId);
+        return Task.FromResult(GroupLabelAddresses.GetValueOrDefault(groupAddressId));
+    }
 }

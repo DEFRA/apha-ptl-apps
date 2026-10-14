@@ -84,4 +84,33 @@ public interface IDistributionRepository
     // spuMonthlyDistributionSchemePrep x N - legacy MonthlyDistributionSchemeCollection.Update,
     // called once per dirty scheme (only schemes with at least one newly-set stage are passed in).
     Task UpdatePreparationAsync(IReadOnlyList<PreparationSchemeEntity> schemes, CancellationToken cancellationToken = default);
+
+    // spgGroupedPackagingSheet / spgPartGroupedPackagingSheet / spgWeeklyPackagingSheet - the
+    // Sample Packaging screen's data for one option (and week, for the two Combined options),
+    // legacy GroupedPackagingSheet / PartGroupedPackagingSheet / WeeklyPackagingSheet.Fetch*.
+    // Returns null when the header row itself is not found.
+    Task<PackagingRawData?> GetPackagingSheetAsync(
+        Guid monthlyDistributionId, PackagingMode mode, int week, CancellationToken cancellationToken = default);
+
+    // spuDistributionParticipantPacking x N + spiDistributionPostedEmail x M in a single
+    // transaction - legacy ParticipantInfo/SchemeItem.Update, which saves the participant's dates
+    // and then its queued Distribution Posted emails together.
+    Task UpdatePackagingAsync(
+        IReadOnlyList<PackagingProgressUpdate> updates,
+        IReadOnlyList<DistributionPostedEmailEntity> emails,
+        CancellationToken cancellationToken = default);
+
+    // spgaDistributionPostedEmail - emails queued but not yet sent.
+    Task<IReadOnlyList<DistributionPostedEmailEntity>> GetUnsentDistributionPostedEmailsAsync(CancellationToken cancellationToken = default);
+
+    // spuDistributionPostedEmail - legacy DistributionPostedEmail.MarkSent.
+    Task MarkDistributionPostedEmailSentAsync(Guid distributionPostedEmailId, DateTime dateSent, CancellationToken cancellationToken = default);
+
+    // spgLabelParticipantAddress - an empty monthlyDistributionSchemeId returns the participant's
+    // own address, otherwise the scheme-level contact applies. Null when no row is returned.
+    Task<PackagingLabelAddressEntity?> GetLabelParticipantAddressAsync(
+        Guid participantId, Guid monthlyDistributionSchemeId, CancellationToken cancellationToken = default);
+
+    // spgLabelGroupAddress.
+    Task<PackagingLabelAddressEntity?> GetLabelGroupAddressAsync(Guid groupAddressId, CancellationToken cancellationToken = default);
 }

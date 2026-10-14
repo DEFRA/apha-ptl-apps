@@ -35,4 +35,16 @@ public interface IDistributionApiClient
 
     Task<PreparationSaveResult?> SavePreparationAsync(
         int yearId, int monthId, PreparationSaveRequest request, CancellationToken cancellationToken = default);
+
+    // Null when the month has not been initialised.
+    Task<PackagingSheetResponse?> GetPackagingAsync(int yearId, int monthId, int mode, int week, CancellationToken cancellationToken = default);
+
+    Task<PackagingSaveResult?> SavePackagingAsync(
+        int yearId, int monthId, PackagingSaveRequest request, CancellationToken cancellationToken = default);
+
+    Task<PackagingLabelsResponse?> GetPackagingLabelsAsync(
+        int yearId, int monthId, PackagingSelectionRequest request, CancellationToken cancellationToken = default);
+
+    Task<PackagingCustomsResult> GetPackagingCustomsAsync(
+        int yearId, int monthId, PackagingSelectionRequest request, CancellationToken cancellationToken = default);
 }

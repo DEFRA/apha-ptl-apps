@@ -1,0 +1,452 @@
+@using PTL.Contracts.Distribution
+@using PTL.Core.Distribution
+@model PTL.InternalWeb.Features.Distribution.PackagingViewModel
+@{
+    var hasMessage = !string.IsNullOrEmpty(Model.Message);
+    ViewData["Title"] = $"{(hasMessage ? "Error: " : string.Empty)}Sample Packaging - {Model.MonthDescription}";
+
+    var sheet = Model.Sheet;
+    var isDaily = sheet?.Mode == 2;
+    var isParticipantCombined = sheet?.Mode == 1;
+    var columnCount = isDaily ? 6 : 8;
+    var tickId = 0;
+    const string preparationIncompleteText = "The preparation for this Scheme is not complete";
+
+    // Extra full-width rows shown beneath a Scheme row (legacy cellWorkSheetSchemePacking).
+    List<string> PackingLines(PackagingSchemeResponse scheme)
+    {
+        var lines = new List<string>();
+        if (!string.IsNullOrEmpty(scheme.PackingInfo))
+        {
+            lines.Add(scheme.PackingInfo);
+        }
+
+        if (isParticipantCombined)
+        {
+            if (!string.IsNullOrEmpty(scheme.CustomerPackingInfo))
+            {
+                lines.Add(scheme.CustomerPackingInfo);
+            }
+
+            if (!string.IsNullOrEmpty(scheme.PSLevelPackingInfo))
+            {
+                lines.Add(scheme.PSLevelPackingInfo);
+            }
+        }
+
+        return lines;
+    }
+
+    void Tick(string cssClass, string? name, string? value, bool isChecked, string label, bool labelVisible, string? kind, string? scheme)
+    {
+        var id = $"packaging-tick-{++tickId}";
+        <div class="govuk-checkboxes govuk-checkboxes--small" data-module="govuk-checkboxes">
+            <div class="govuk-checkboxes__item">
+                <input class="govuk-checkboxes__input @cssClass" type="checkbox" id="@id" name="@name" value="@value" checked="@isChecked" data-kind="@kind" data-scheme="@scheme" />
+                <label class="govuk-label govuk-checkboxes__label" for="@id">
+                    @if (labelVisible)
+                    {
+                        @label
+                    }
+                    else
+                    {
+                        <span class="govuk-visually-hidden">@label</span>
+                    }
+                </label>
+            </div>
+        </div>
+    }
+
+    // Legacy BuildPackingCompleteCell/BuildPostingCompleteCell (and the Participant Combined scheme-row variants).
+    void RowStageCell(string kind, Guid? id, DateTime? date, bool preparationComplete, string label, string scheme)
+    {
+        if (!preparationComplete)
+        {
+            return;
+        }
+
+        if (date.HasValue)
+        {
+            @PackagingSheetBuilder.ShortDate(date.Value)
+        }
+        else if (id.HasValue)
+        {
+            var packed = kind == "packed";
+            Tick("ptl-tick", packed ? "PackedTicks" : "PostedTicks", Model.RowTickKey(id.Value),
+                packed ? Model.IsPacked(id.Value) : Model.IsPosted(id.Value), label, false, kind, scheme);
+        }
+    }
+
+    // Legacy BuildPackingCompleteTotalCell/BuildPostingCompleteTotalCell.
+    void TotalStageCell(string kind, int total, string label, string scheme)
+    {
+        if (total == 1)
+        {
+            <text>Complete</text>
+        }
+        else if (total == 2)
+        {
+            Tick("ptl-tick-scheme", null, null, false, label, false, kind, scheme);
+        }
+    }
+
+    // Legacy AddSelectAllCell: a one-way "select all" checkbox beside the column title.
+    void SelectAllHeader(string kind, string title, string label, bool noPrint)
+    {
+        <th scope="col" class="govuk-table__header@(noPrint ? " noprint" : null)">
+            @title
+            <div class="govuk-checkboxes govuk-checkboxes--small govuk-!-margin-top-1 noprint" data-module="govuk-checkboxes">
+                <div class="govuk-checkboxes__item">
+                    <input class="govuk-checkboxes__input" type="checkbox" id="packaging-select-all-@kind" data-select-all="@kind" />
+                    <label class="govuk-label govuk-checkboxes__label" for="packaging-select-all-@kind">
+                        <span class="govuk-visually-hidden">@label</span>
+                    </label>
+                </div>
+            </div>
+        </th>
+    }
+
+    void LeadingCells(PackagingBlockResponse block, int rowCount)
+    {
+        var printLabel = isDaily && block.Schemes.Count > 0 ? $"{block.Heading}: {block.Schemes[0].Description}" : block.Heading;
+
+        if (isDaily)
+        {
+            <td class="govuk-table__cell cellWorkSheetScheme" rowspan="@rowCount">
+                @if (block.DueToBePosted)
+                {
+                    <span class="govuk-visually-hidden">Due to be posted: </span>
+                }
+                @PackagingSheetBuilder.LongDate(block.Date)
+            </td>
+        }
+        else
+        {
+            <td class="govuk-table__cell cellWorkSheetGroup" rowspan="@rowCount">@PackagingSheetBuilder.LongDate(block.Date)</td>
+            <td class="govuk-table__cell cellWorkSheetGroup" rowspan="@rowCount">
+                @block.Heading
+                @if (isParticipantCombined && (block.ShowAllPacked || block.ShowAllPosted))
+                {
+                    <div class="noprint">
+                        <hr class="govuk-section-break govuk-section-break--visible govuk-!-margin-top-2 govuk-!-margin-bottom-2" />
+                        @if (block.ShowAllPacked)
+                        {
+                            Tick("ptl-tick-block", null, null, false, "All Packed:", true, "packed", null);
+                        }
+                        @if (block.ShowAllPosted)
+                        {
+                            Tick("ptl-tick-block", null, null, false, "All Posted:", true, "posted", null);
+                        }
+                    </div>
+                }
+            </td>
+        }
+
+        <td class="govuk-table__cell noprint" rowspan="@rowCount">
+            @{
+                Tick("ptl-print-checkbox", "PrintKeys", block.PrintKey, Model.PrintKeys.Contains(block.PrintKey), $"Print {printLabel}", false, null, null);
+            }
+        </td>
+    }
+}
+
+@section Styles {
+    <link rel="stylesheet" href="~/css/printable-scheme.css" />
+}
+
+<a class="govuk-back-link noprint" asp-action="Index" asp-route-year="@Model.YearId">Back</a>
+
+<h1 class="govuk-heading-l noprint">Sample Packaging - @Model.MonthDescription</h1>
+
+<form method="post" asp-action="Packaging" asp-route-year="@Model.YearId" asp-route-monthId="@Model.MonthId" id="packaging-form">
+    @foreach (var tick in Model.CarriedTicks(Model.PackedTicks))
+    {
+        <input type="hidden" name="PackedTicks" value="@tick" />
+    }
+    @foreach (var tick in Model.CarriedTicks(Model.PostedTicks))
+    {
+        <input type="hidden" name="PostedTicks" value="@tick" />
+    }
+    <input type="hidden" name="command" value="select" id="packaging-select-command" disabled />
+
+    <p class="ptl-print-title">Sample Packaging - @Model.PrintTitle</p>
+
+    <div class="noprint">
+        <p class="govuk-body">After selecting an option from the Drop Down list, the table below will show all the Sets of Samples that are to be packaged. Any special Packing Instructions will also be displayed.</p>
+
+        @if (hasMessage)
+        {
+            <div class="govuk-error-summary" data-module="govuk-error-summary">
+                <div role="alert">
+                    <h2 class="govuk-error-summary__title">@Model.Message</h2>
+                    @if (!string.IsNullOrEmpty(Model.MessageDetail))
+                    {
+                        <div class="govuk-error-summary__body">
+                            <p class="govuk-body">@Model.MessageDetail</p>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+
+        <div class="ptl-packaging-selects">
+            <div class="govuk-form-group">
+                <label class="govuk-label govuk-visually-hidden" for="packaging-mode">Packaging option</label>
+                <select class="govuk-select" id="packaging-mode" name="Mode">
+                    @if (Model.Mode is null)
+                    {
+                        <option value="" selected="selected">- Please Select -</option>
+                    }
+                    <option value="0" selected="@(Model.Mode == 0)">Group Address Packaging</option>
+                    <option value="1" selected="@(Model.Mode == 1)">Participant Combined Packaging</option>
+                    <option value="2" selected="@(Model.Mode == 2)">Daily Packaging</option>
+                </select>
+            </div>
+            @if (Model.ShowWeek)
+            {
+                <div class="govuk-form-group">
+                    <label class="govuk-label govuk-visually-hidden" for="packaging-week">Week</label>
+                    <select class="govuk-select" id="packaging-week" name="Week">
+                        @if (Model.Week == 0)
+                        {
+                            <option value="0" selected="selected">- Please Select -</option>
+                        }
+                        @for (var week = 1; week <= 4; week++)
+                        {
+                            <option value="@week" selected="@(Model.Week == week)">Week @week</option>
+                        }
+                    </select>
+                </div>
+            }
+            <noscript>
+                <button type="submit" name="command" value="select" class="govuk-button govuk-button--secondary govuk-!-margin-bottom-6" data-module="govuk-button" formnovalidate>View</button>
+            </noscript>
+        </div>
+    </div>
+
+    @if (sheet is not null)
+    {
+        <table class="govuk-table" id="packaging-table">
+            <caption class="govuk-table__caption govuk-visually-hidden">Sample Packaging</caption>
+            <thead class="govuk-table__head">
+                <tr class="govuk-table__row">
+                    @if (isDaily)
+                    {
+                        <th scope="col" class="govuk-table__header">Day</th>
+                    }
+                    else
+                    {
+                        <th scope="col" class="govuk-table__header">Date</th>
+                        <th scope="col" class="govuk-table__header">@(isParticipantCombined ? "Participant" : "Group Address")</th>
+                    }
+                    @{
+                        SelectAllHeader("print", "Print", "Select all rows to print", true);
+                    }
+                    <th scope="col" class="govuk-table__header">Scheme</th>
+                    @{
+                        SelectAllHeader("packed", "Packed", "Select all rows as packed", false);
+                        SelectAllHeader("posted", "Posted", "Select all rows as posted", false);
+                    }
+                    <th scope="col" class="govuk-table__header">Import Permit</th>
+                    @if (!isDaily)
+                    {
+                        <th scope="col" class="govuk-table__header">Packing Instructions</th>
+                    }
+                </tr>
+            </thead>
+            @if (sheet.Blocks.Count == 0)
+            {
+                <tbody class="govuk-table__body">
+                    <tr class="govuk-table__row">
+                        <td class="govuk-table__cell cellWorkSheetNoSchemes" colspan="@columnCount">There are no samples to be packed</td>
+                    </tr>
+                </tbody>
+            }
+
+            @for (var b = 0; b < sheet.Blocks.Count; b++)
+            {
+                var block = sheet.Blocks[b];
+                var blockRows = block.Schemes.Count == 0 ? 1 : block.Schemes.Sum(s => 1 + PackingLines(s).Count + s.Participants.Count);
+                var rowClass = block.DueToBePosted ? "govuk-table__row rowDueToBePosted" : "govuk-table__row";
+
+                <tbody class="govuk-table__body" data-block="@b">
+                    @if (block.Schemes.Count == 0)
+                    {
+                        <tr class="@rowClass">
+                            @{
+                                LeadingCells(block, 1);
+                            }
+                        </tr>
+                    }
+
+                    @for (var s = 0; s < block.Schemes.Count; s++)
+                    {
+                        var scheme = block.Schemes[s];
+                        var lines = PackingLines(scheme);
+                        var schemeId = scheme.MonthlyDistributionSchemeId.ToString();
+                        var schemeClass = scheme.PreparationComplete ? "cellWorkSheetScheme" : "cellWorkSheetScheme cellWorkSheetPreparationIncomplete";
+
+                        <tr class="@rowClass">
+                            @if (s == 0)
+                            {
+                                LeadingCells(block, blockRows);
+                            }
+                            <td class="govuk-table__cell @schemeClass" title="@(scheme.PreparationComplete ? null : preparationIncompleteText)">
+                                @scheme.Description
+                                @if (!scheme.PreparationComplete)
+                                {
+                                    <span class="govuk-visually-hidden"> (@preparationIncompleteText)</span>
+                                }
+                            </td>
+                            <td class="govuk-table__cell cellWorkSheetCompleteTotal" rowspan="@(1 + lines.Count)">
+                                @if (isParticipantCombined)
+                                {
+                                    RowStageCell("packed", scheme.DistributionParticipantId, scheme.PackagedDate, scheme.PreparationComplete, $"Packed: {block.Heading}, {scheme.Description}", schemeId);
+                                }
+                                else
+                                {
+                                    TotalStageCell("packed", scheme.PackedTotal, $"All Packed: {scheme.Description}", schemeId);
+                                }
+                            </td>
+                            <td class="govuk-table__cell cellWorkSheetCompleteTotal" rowspan="@(1 + lines.Count)">
+                                @if (isParticipantCombined)
+                                {
+                                    RowStageCell("posted", scheme.DistributionParticipantId, scheme.PostedDate, scheme.PreparationComplete, $"Posted: {block.Heading}, {scheme.Description}", schemeId);
+                                }
+                                else
+                                {
+                                    TotalStageCell("posted", scheme.PostedTotal, $"All Posted: {scheme.Description}", schemeId);
+                                }
+                            </td>
+                            <td class="govuk-table__cell cellWorkSheetImportPermit" rowspan="@(1 + lines.Count)">@(isParticipantCombined ? scheme.ImportPermitStatus : null)</td>
+                            @if (!isDaily && s == 0)
+                            {
+                                <td class="govuk-table__cell cellWorkSheetPacking" rowspan="@blockRows">@block.PackingInfo</td>
+                            }
+                        </tr>
+
+                        @foreach (var line in lines)
+                        {
+                            <tr class="govuk-table__row">
+                                <td class="govuk-table__cell cellWorkSheetSchemePacking">@line</td>
+                            </tr>
+                        }
+
+                        @foreach (var participant in scheme.Participants)
+                        {
+                            <tr class="@rowClass">
+                                <td class="govuk-table__cell cellWorkSheetParticipant">@participant.Description</td>
+                                <td class="govuk-table__cell cellWorkSheetComplete">
+                                    @{
+                                        RowStageCell("packed", participant.DistributionParticipantId, participant.PackagedDate, scheme.PreparationComplete, $"Packed: {participant.Description}, {scheme.Description}", schemeId);
+                                    }
+                                </td>
+                                <td class="govuk-table__cell cellWorkSheetComplete">
+                                    @{
+                                        RowStageCell("posted", participant.DistributionParticipantId, participant.PostedDate, scheme.PreparationComplete, $"Posted: {participant.Description}, {scheme.Description}", schemeId);
+                                    }
+                                </td>
+                                <td class="govuk-table__cell cellWorkSheetImportPermit">@participant.ImportPermitStatus</td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            }
+        </table>
+    }
+
+    <div class="noprint">
+        <div class="ptl-packaging-actions">
+            <div class="govuk-button-group">
+                <button type="submit" name="command" value="save" class="govuk-button" data-module="govuk-button">Save</button>
+                <button type="submit" name="command" value="apply" class="govuk-button govuk-button--secondary" data-module="govuk-button">Apply</button>
+                <button type="submit" name="command" value="cancel" class="govuk-button govuk-button--secondary" data-module="govuk-button" formnovalidate>Cancel</button>
+            </div>
+            <div class="govuk-button-group">
+                @if (Model.ShowCustoms)
+                {
+                    <button type="submit" name="command" value="customs" class="govuk-button govuk-button--secondary" data-module="govuk-button">Print Customs</button>
+                }
+                <button type="button" id="packaging-print-button" class="govuk-button govuk-button--secondary" data-module="govuk-button">Print</button>
+                <button type="submit" name="command" value="labels" class="govuk-button govuk-button--secondary" data-module="govuk-button">Print Labels</button>
+            </div>
+        </div>
+    </div>
+</form>
+
+@* Legacy AutoPostBack: either dropdown submits the form as command=select. Changing the Packaging
+   option resets the Week dropdown to "- Please Select -" (legacy re-inserts it), so Week is left
+   out of that submit. *@
+<script>
+    (function () {
+        var form = document.getElementById('packaging-form');
+        var selectCommand = document.getElementById('packaging-select-command');
+
+        function submitSelect(resetWeek) {
+            var week = document.getElementById('packaging-week');
+            if (resetWeek && week) {
+                week.disabled = true;
+            }
+
+            selectCommand.disabled = false;
+            form.submit();
+        }
+
+        document.getElementById('packaging-mode').addEventListener('change', function () { submitSelect(true); });
+        document.getElementById('packaging-week')?.addEventListener('change', function () { submitSelect(false); });
+
+        document.getElementById('packaging-print-button').addEventListener('click', function () { window.print(); });
+    })();
+</script>
+
+@* Legacy SelectAll()/CustomCheckBoxWithList/CustomCheckBoxWithSchemeList: header, scheme "All" and
+   participant "All Packed:/All Posted:" checkboxes are one-way toggles of the boxes they cover.
+   Legacy fnUpdatePrint(): with nothing ticked in the Print column every block is hidden from the
+   printout; otherwise only the ticked blocks print. Each block is its own <tbody>, so hiding a block
+   hides all of its rows (including the scheme packing and participant rows). *@
+<script>
+    (function () {
+        var table = document.getElementById('packaging-table');
+        if (!table) {
+            return;
+        }
+
+        function setChecked(boxes, checked) {
+            boxes.forEach(function (box) { box.checked = checked; });
+        }
+
+        function updatePrint() {
+            var printBoxes = table.querySelectorAll('.ptl-print-checkbox');
+            var anyChecked = Array.prototype.some.call(printBoxes, function (box) { return box.checked; });
+
+            table.querySelectorAll('tbody[data-block]').forEach(function (block) {
+                var box = block.querySelector('.ptl-print-checkbox');
+                block.classList.toggle('noprint', !(anyChecked && box && box.checked));
+            });
+        }
+
+        table.addEventListener('change', function (e) {
+            var box = e.target;
+            if (!(box instanceof HTMLInputElement) || box.type !== 'checkbox') {
+                return;
+            }
+
+            var kind = box.dataset.selectAll || box.dataset.kind;
+
+            if (box.classList.contains('ptl-print-checkbox')) {
+                updatePrint();
+            } else if (box.dataset.selectAll === 'print') {
+                setChecked(table.querySelectorAll('.ptl-print-checkbox'), box.checked);
+                updatePrint();
+            } else if (box.dataset.selectAll) {
+                setChecked(table.querySelectorAll('[data-kind="' + kind + '"].ptl-tick, [data-kind="' + kind + '"].ptl-tick-scheme'), box.checked);
+            } else if (box.classList.contains('ptl-tick-scheme')) {
+                setChecked(box.closest('tbody').querySelectorAll('.ptl-tick[data-kind="' + kind + '"][data-scheme="' + box.dataset.scheme + '"]'), box.checked);
+            } else if (box.classList.contains('ptl-tick-block')) {
+                setChecked(box.closest('tbody').querySelectorAll('.ptl-tick[data-kind="' + kind + '"]'), box.checked);
+            }
+        });
+
+        updatePrint();
+    })();
+</script>
