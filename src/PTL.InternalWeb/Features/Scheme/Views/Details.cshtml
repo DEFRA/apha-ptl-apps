@@ -23,6 +23,12 @@
         }
     </div>
 </div>
-
+@if (Model.IsReadOnly == true)
+{
+    <div class="govuk-inset-text">
+        This is a point-in-time record of the scheme configuration as it applied in @Model.YearLabel.
+        It is shown for reference and cannot be edited.
+    </div>
+}
 
 <partial name="_SchemeForm" model="Model" />

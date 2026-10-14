@@ -115,6 +115,54 @@ public class SchemeRouteSmokeEdgeCaseTests : IClassFixture<WebApplicationFactory
     }
 
     [Fact]
+    public async Task History_WithMultipleRecords_RendersIdentifierNameYearDetailsColumnsMostRecentYearFirst()
+    {
+        _fakeApiClient.HistoryResponse = new[]
+        {
+            new SchemeHistoryResponse(_schemeId, _sharedId, 2025, "PT1234", "Test Scheme"),
+            new SchemeHistoryResponse(_schemeId, _sharedId, 2027, "PT1234", "Test Scheme"),
+            new SchemeHistoryResponse(_schemeId, _sharedId, 2026, "PT1234", "Test Scheme")
+        };
+        var client = _factory.CreateClient();
+
+        var html = await client.GetStringAsync($"/Scheme/History?sharedId={_sharedId}");
+
+        var headers = new[] { ">Identifier<", ">Name<", ">Year<", ">Details<" };
+        var headerPositions = headers.Select(header => html.IndexOf(header, StringComparison.Ordinal)).ToList();
+        Assert.All(headerPositions, position => Assert.True(position >= 0));
+        Assert.Equal(headerPositions.Order(), headerPositions);
+
+        // The test lookup has no year names, so each row falls back to the raw YearId.
+        var yearPositions = new[] { ">2027<", ">2026<", ">2025<" }.Select(year => html.IndexOf(year, StringComparison.Ordinal)).ToList();
+        Assert.All(yearPositions, position => Assert.True(position >= 0));
+        Assert.Equal(yearPositions.Order(), yearPositions);
+        Assert.Equal(3, html.Split("href=\"/Scheme/Details/", StringSplitOptions.None).Length - 1);
+    }
+
+    [Fact]
+    public async Task Details_WithReadOnlyScheme_ShowsPointInTimeNoticeAndNoEditButton()
+    {
+        _fakeApiClient.SchemeResponse = SampleScheme(_schemeId, _sharedId, isReadOnly: true);
+        var client = _factory.CreateClient();
+
+        var html = await client.GetStringAsync($"/Scheme/Details/{_schemeId}");
+
+        Assert.Contains("point-in-time record of the scheme configuration", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("Edit scheme", html, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Details_WithCurrentOrFutureYearScheme_ShowsNoPointInTimeNoticeAndOffersEdit()
+    {
+        var client = _factory.CreateClient();
+
+        var html = await client.GetStringAsync($"/Scheme/Details/{_schemeId}");
+
+        Assert.DoesNotContain("point-in-time record", html, StringComparison.Ordinal);
+        Assert.Contains("Edit scheme", html, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Index_WithEmptyResults_RendersSuccessfully()
     {
         _fakeApiClient.SearchResponse = new SchemeSearchResponse([], 0, 1, 20);

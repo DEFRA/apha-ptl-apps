@@ -186,6 +186,32 @@ public class SchemeControllerTests
     }
 
     [Fact]
+    public async Task History_OrdersRecordsByYearDescendingMostRecentFirst()
+    {
+        var sharedId = Guid.NewGuid();
+        var apiClient = new FakeSchemeApiClient
+        {
+            HistoryResponse =
+            [
+                new SchemeHistoryResponse(Guid.NewGuid(), sharedId, 2025, "PT1234", "Test Scheme"),
+                new SchemeHistoryResponse(Guid.NewGuid(), sharedId, 2027, "PT1234", "Test Scheme"),
+                new SchemeHistoryResponse(Guid.NewGuid(), sharedId, 2026, "PT1234", "Test Scheme")
+            ]
+        };
+        var lookupApiClient = new FakeLookupApiClient
+        {
+            AllYears = [new YearResponse(2025, "2025/26"), new YearResponse(2026, "2026/27"), new YearResponse(2027, "2027/28")]
+        };
+        var controller = CreateController(apiClient, lookupApiClient);
+
+        var result = await controller.History(sharedId, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<IReadOnlyList<PTL.InternalWeb.Features.Scheme.SchemeHistoryRowViewModel>>(view.Model, exactMatch: false);
+        Assert.Equal(["2027/28", "2026/27", "2025/26"], model.Select(row => row.YearLabel));
+    }
+
+    [Fact]
     public async Task Create_Get_ReturnsFormViewModel()
     {
         var controller = CreateController(new FakeSchemeApiClient());

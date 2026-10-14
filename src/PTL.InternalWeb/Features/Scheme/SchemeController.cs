@@ -114,6 +114,8 @@ public class SchemeController(ISchemeApiClient schemeApiClient, ILookupApiClient
         return View(model);
     }
 
+    // Same order the legacy procedure returns (spgSchemeInfoBySharedId: YearId DESC) - enforced
+    // here too so "most recent first" never depends on the data layer's ordering.
     public async Task<IActionResult> History(Guid sharedId, CancellationToken cancellationToken)
     {
         var history = await schemeApiClient.GetSchemeHistoryAsync(sharedId, cancellationToken);
@@ -121,6 +123,7 @@ public class SchemeController(ISchemeApiClient schemeApiClient, ILookupApiClient
         var yearLabels = years.ToDictionary(y => y.YearId, y => y.Year);
 
         var rows = history
+            .OrderByDescending(scheme => scheme.YearId)
             .Select(scheme => new SchemeHistoryRowViewModel(
                 scheme.SchemeId,
                 yearLabels.GetValueOrDefault(scheme.YearId, scheme.YearId.ToString(CultureInfo.InvariantCulture)),
