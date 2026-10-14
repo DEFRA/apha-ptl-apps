@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Mvc.Rendering;
 
 namespace PTL.InternalWeb.Features.SchemeAdmin;
@@ -58,6 +59,9 @@ public sealed class TestTypeAddViewModel
     [StringLength(30, ErrorMessage = "New test type name must be 30 characters or fewer")]
     public string Name { get; set; } = string.Empty;
 
+    // Never JSON-bound here (classic MVC form post) - [JsonRequired] only satisfies the
+    // under-posting analyzer; an unticked checkbox omitting the field still binds to false.
+    [JsonRequired]
     public bool NoLongerInUse { get; set; }
 }
 
@@ -73,5 +77,6 @@ public sealed class TestTypeEditViewModel
     [StringLength(30, ErrorMessage = "New test type name must be 30 characters or fewer")]
     public string Name { get; set; } = string.Empty;
 
+    [JsonRequired]
     public bool NoLongerInUse { get; set; }
 }

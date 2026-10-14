@@ -87,7 +87,7 @@
                             {
                                 <p class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @nameError</p>
                             }
-                            <input id="Edit_Name" form="categoryItemTypeEditForm" name="Edit.Name" value="@row.Name" maxlength="50" autofocus
+                            <input id="Edit_Name" form="categoryItemTypeEditForm" name="Edit.Name" value="@row.Name" maxlength="50"
                                    class="govuk-input @(FirstError("Edit.Name") is null ? "" : "govuk-input--error")" />
                         </div>
                     </td>

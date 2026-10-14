@@ -108,6 +108,7 @@ public static class DapperColumnMappings
     private const string ColNumberOfSetsRequired = "fldNumberOfSetsRequired";
     private const string ColSampleId = "fldSampleId";
     private const string ColTestResultItemId = "fldTestResultItemId";
+    private const string ColTestTypeId = "fldTestTypeId";
 
     public static void Register()
     {
@@ -392,7 +393,7 @@ public static class DapperColumnMappings
 
         Map<CoreTestType>(new(StringComparer.OrdinalIgnoreCase)
         {
-            ["fldTestTypeId"] = nameof(CoreTestType.TestTypeId),
+            [ColTestTypeId] = nameof(CoreTestType.TestTypeId),
             ["fldSharedId"] = nameof(CoreTestType.SharedId),
             ["fldTestType"] = nameof(CoreTestType.Name),
             ["fldStartYearId"] = nameof(CoreTestType.StartYearId),
@@ -855,7 +856,7 @@ public static class DapperColumnMappings
         Map<DistributionTestEntity>(new(StringComparer.OrdinalIgnoreCase)
         {
             [ColTestId] = nameof(DistributionTestEntity.TestId),
-            ["fldTestTypeId"] = nameof(DistributionTestEntity.TestTypeId),
+            [ColTestTypeId] = nameof(DistributionTestEntity.TestTypeId),
             ["TestName"] = nameof(DistributionTestEntity.TestName),
             [ColOrder] = nameof(DistributionTestEntity.Order),
         });
@@ -971,7 +972,7 @@ public static class DapperColumnMappings
         Map<SchemeTest>(new(StringComparer.OrdinalIgnoreCase)
         {
             [ColTestId] = nameof(SchemeTest.TestId),
-            ["fldTestTypeId"] = nameof(SchemeTest.TestTypeId),
+            [ColTestTypeId] = nameof(SchemeTest.TestTypeId),
             ["fldTestType"] = nameof(SchemeTest.TestType),
             [ColSchemeId] = nameof(SchemeTest.SchemeId),
             [ColOrder] = nameof(SchemeTest.Order),
@@ -1040,7 +1041,7 @@ public static class DapperColumnMappings
 
         Map<SchemeItemTypeEntity>(new(StringComparer.OrdinalIgnoreCase)
         {
-            ["fldTestTypeId"] = nameof(SchemeItemTypeEntity.ItemTypeId),
+            [ColTestTypeId] = nameof(SchemeItemTypeEntity.ItemTypeId),
             ["fldTestType"] = nameof(SchemeItemTypeEntity.Name),
             ["fldTestResultItemTypeId"] = nameof(SchemeItemTypeEntity.ItemTypeId),
             ["fldTestResultItemType"] = nameof(SchemeItemTypeEntity.Name),

@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Mvc.Rendering;
 
 namespace PTL.InternalWeb.Features.SchemeAdmin;
@@ -60,6 +61,9 @@ public sealed class CategoryItemTypeAddViewModel
     [StringLength(50, ErrorMessage = "New category name must be 50 characters or fewer")]
     public string Name { get; set; } = string.Empty;
 
+    // Never JSON-bound here (classic MVC form post) - [JsonRequired] only satisfies the
+    // under-posting analyzer; an unticked checkbox omitting the field still binds to false.
+    [JsonRequired]
     public bool NoLongerInUse { get; set; }
 }
 
@@ -76,5 +80,6 @@ public sealed class CategoryItemTypeEditViewModel
     [StringLength(50, ErrorMessage = "New category name must be 50 characters or fewer")]
     public string Name { get; set; } = string.Empty;
 
+    [JsonRequired]
     public bool NoLongerInUse { get; set; }
 }

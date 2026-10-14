@@ -40,7 +40,9 @@ public class SchemeAdminController(ICategoryItemTypeApiClient categoryItemTypeAp
         !requestAborted.IsCancellationRequested && ex is HttpRequestException or TaskCanceledException or IOException;
 
     public async Task<IActionResult> CategoryItemType(int? yearId, Guid? editId, Guid? removeConfirmId, int page = 1, CancellationToken cancellationToken = default) =>
-        View(await BuildCategoryItemTypeViewModelAsync(yearId, editId, page, message: null, messageIsError: false, addValues: null, editValues: null, cancellationToken, removeConfirmId));
+        View(await BuildCategoryItemTypeViewModelAsync(
+            new CategoryItemTypeViewModelRequest(yearId, editId, page, Message: null, MessageIsError: false, AddValues: null, EditValues: null, removeConfirmId),
+            cancellationToken));
 
     // Matches legacy ButtonAddCategory_Click - Name is required; the new item always starts in
     // whichever year is currently selected in the dropdown.
@@ -65,7 +67,9 @@ public class SchemeAdminController(ICategoryItemTypeApiClient categoryItemTypeAp
             }
         }
 
-        return View(nameof(CategoryItemType), await BuildCategoryItemTypeViewModelAsync(yearId, editId: null, page, message: null, messageIsError: false, model, editValues: null, cancellationToken));
+        return View(nameof(CategoryItemType), await BuildCategoryItemTypeViewModelAsync(
+            new CategoryItemTypeViewModelRequest(yearId, EditId: null, page, Message: null, MessageIsError: false, model, EditValues: null),
+            cancellationToken));
     }
 
     // Only the row matching model.CategoryItemTypeId is ever in edit mode when this posts -
@@ -86,7 +90,9 @@ public class SchemeAdminController(ICategoryItemTypeApiClient categoryItemTypeAp
 
             if (result.FieldErrors.TryGetValue(string.Empty, out var conflictMessages))
             {
-                return View(nameof(CategoryItemType), await BuildCategoryItemTypeViewModelAsync(yearId, model.CategoryItemTypeId, page, conflictMessages[0], messageIsError: true, addValues: null, editValues: null, cancellationToken));
+                return View(nameof(CategoryItemType), await BuildCategoryItemTypeViewModelAsync(
+                    new CategoryItemTypeViewModelRequest(yearId, model.CategoryItemTypeId, page, conflictMessages[0], MessageIsError: true, AddValues: null, EditValues: null),
+                    cancellationToken));
             }
 
             foreach (var (field, messages) in result.FieldErrors)
@@ -98,7 +104,9 @@ public class SchemeAdminController(ICategoryItemTypeApiClient categoryItemTypeAp
             }
         }
 
-        return View(nameof(CategoryItemType), await BuildCategoryItemTypeViewModelAsync(yearId, model.CategoryItemTypeId, page, message: null, messageIsError: false, addValues: null, model, cancellationToken));
+        return View(nameof(CategoryItemType), await BuildCategoryItemTypeViewModelAsync(
+            new CategoryItemTypeViewModelRequest(yearId, model.CategoryItemTypeId, page, Message: null, MessageIsError: false, AddValues: null, model),
+            cancellationToken));
     }
 
     // "No Longer in Use" is saved for every row on the current page in one combined submit -
@@ -122,7 +130,9 @@ public class SchemeAdminController(ICategoryItemTypeApiClient categoryItemTypeAp
         }
         catch (Exception ex) when (IsTransientApiFailure(ex, cancellationToken))
         {
-            return View(nameof(CategoryItemType), await BuildCategoryItemTypeViewModelAsync(yearId, editId: null, page, NoLongerInUseSaveFailedMessage, messageIsError: true, addValues: null, editValues: null, cancellationToken));
+            return View(nameof(CategoryItemType), await BuildCategoryItemTypeViewModelAsync(
+                new CategoryItemTypeViewModelRequest(yearId, EditId: null, page, NoLongerInUseSaveFailedMessage, MessageIsError: true, AddValues: null, EditValues: null),
+                cancellationToken));
         }
 
         return RedirectToAction(nameof(CategoryItemType), new { yearId, page });
@@ -138,20 +148,36 @@ public class SchemeAdminController(ICategoryItemTypeApiClient categoryItemTypeAp
             LogCategoryItemTypeRemoveBlockedMessage(logger, categoryItemTypeId, null);
         }
 
-        return View(nameof(CategoryItemType), await BuildCategoryItemTypeViewModelAsync(yearId, editId: null, page, result.Message, messageIsError: !result.Success, addValues: null, editValues: null, cancellationToken));
+        return View(nameof(CategoryItemType), await BuildCategoryItemTypeViewModelAsync(
+            new CategoryItemTypeViewModelRequest(yearId, EditId: null, page, result.Message, !result.Success, AddValues: null, EditValues: null),
+            cancellationToken));
     }
 
+    // Bundles BuildCategoryItemTypeViewModelAsync's render-state inputs into one object - the
+    // method itself was flagged for exceeding Sonar's 7-parameter limit (S107).
+    private sealed record CategoryItemTypeViewModelRequest(
+        int? YearId,
+        Guid? EditId,
+        int Page,
+        string? Message,
+        bool MessageIsError,
+        CategoryItemTypeAddViewModel? AddValues,
+        CategoryItemTypeEditViewModel? EditValues,
+        Guid? RemoveConfirmId = null);
+
     private async Task<CategoryItemTypeViewModel> BuildCategoryItemTypeViewModelAsync(
-        int? yearId,
-        Guid? editId,
-        int page,
-        string? message,
-        bool messageIsError,
-        CategoryItemTypeAddViewModel? addValues,
-        CategoryItemTypeEditViewModel? editValues,
-        CancellationToken cancellationToken,
-        Guid? removeConfirmId = null)
+        CategoryItemTypeViewModelRequest request,
+        CancellationToken cancellationToken)
     {
+        var yearId = request.YearId;
+        var editId = request.EditId;
+        var page = request.Page;
+        var message = request.Message;
+        var messageIsError = request.MessageIsError;
+        var addValues = request.AddValues;
+        var editValues = request.EditValues;
+        var removeConfirmId = request.RemoveConfirmId;
+
         var years = await lookupApiClient.GetCurrentYearsAsync(cancellationToken);
         var currentYearId = years.Count > 0 ? years[0].YearId : (int?)null;
         var selectedYearId = ResolveSelectedYearId(yearId, years, currentYearId);
@@ -233,7 +259,9 @@ public class SchemeAdminController(ICategoryItemTypeApiClient categoryItemTypeAp
     }
 
     public async Task<IActionResult> TestType(int? yearId, Guid? editId, Guid? removeConfirmId, int page = 1, CancellationToken cancellationToken = default) =>
-        View(await BuildTestTypeViewModelAsync(yearId, editId, page, message: null, messageIsError: false, addValues: null, editValues: null, cancellationToken, removeConfirmId));
+        View(await BuildTestTypeViewModelAsync(
+            new TestTypeViewModelRequest(yearId, editId, page, Message: null, MessageIsError: false, AddValues: null, EditValues: null, removeConfirmId),
+            cancellationToken));
 
     // Matches legacy ButtonAdd_Click - Name is required; the new item always starts in whichever
     // year is currently selected in the dropdown.
@@ -258,7 +286,9 @@ public class SchemeAdminController(ICategoryItemTypeApiClient categoryItemTypeAp
             }
         }
 
-        return View(nameof(TestType), await BuildTestTypeViewModelAsync(yearId, editId: null, page, message: null, messageIsError: false, model, editValues: null, cancellationToken));
+        return View(nameof(TestType), await BuildTestTypeViewModelAsync(
+            new TestTypeViewModelRequest(yearId, EditId: null, page, Message: null, MessageIsError: false, model, EditValues: null),
+            cancellationToken));
     }
 
     // Only the row matching model.TestTypeId is ever in edit mode when this posts - matches
@@ -279,7 +309,9 @@ public class SchemeAdminController(ICategoryItemTypeApiClient categoryItemTypeAp
 
             if (result.FieldErrors.TryGetValue(string.Empty, out var conflictMessages))
             {
-                return View(nameof(TestType), await BuildTestTypeViewModelAsync(yearId, model.TestTypeId, page, conflictMessages[0], messageIsError: true, addValues: null, editValues: null, cancellationToken));
+                return View(nameof(TestType), await BuildTestTypeViewModelAsync(
+                    new TestTypeViewModelRequest(yearId, model.TestTypeId, page, conflictMessages[0], MessageIsError: true, AddValues: null, EditValues: null),
+                    cancellationToken));
             }
 
             foreach (var (field, messages) in result.FieldErrors)
@@ -291,7 +323,9 @@ public class SchemeAdminController(ICategoryItemTypeApiClient categoryItemTypeAp
             }
         }
 
-        return View(nameof(TestType), await BuildTestTypeViewModelAsync(yearId, model.TestTypeId, page, message: null, messageIsError: false, addValues: null, model, cancellationToken));
+        return View(nameof(TestType), await BuildTestTypeViewModelAsync(
+            new TestTypeViewModelRequest(yearId, model.TestTypeId, page, Message: null, MessageIsError: false, AddValues: null, model),
+            cancellationToken));
     }
 
     // "No Longer in Use" is saved for every row on the current page in one combined submit - see
@@ -311,7 +345,9 @@ public class SchemeAdminController(ICategoryItemTypeApiClient categoryItemTypeAp
         }
         catch (Exception ex) when (IsTransientApiFailure(ex, cancellationToken))
         {
-            return View(nameof(TestType), await BuildTestTypeViewModelAsync(yearId, editId: null, page, NoLongerInUseSaveFailedMessage, messageIsError: true, addValues: null, editValues: null, cancellationToken));
+            return View(nameof(TestType), await BuildTestTypeViewModelAsync(
+                new TestTypeViewModelRequest(yearId, EditId: null, page, NoLongerInUseSaveFailedMessage, MessageIsError: true, AddValues: null, EditValues: null),
+                cancellationToken));
         }
 
         return RedirectToAction(nameof(TestType), new { yearId, page });
@@ -327,20 +363,36 @@ public class SchemeAdminController(ICategoryItemTypeApiClient categoryItemTypeAp
             LogTestTypeRemoveBlockedMessage(logger, testTypeId, null);
         }
 
-        return View(nameof(TestType), await BuildTestTypeViewModelAsync(yearId, editId: null, page, result.Message, messageIsError: !result.Success, addValues: null, editValues: null, cancellationToken));
+        return View(nameof(TestType), await BuildTestTypeViewModelAsync(
+            new TestTypeViewModelRequest(yearId, EditId: null, page, result.Message, !result.Success, AddValues: null, EditValues: null),
+            cancellationToken));
     }
 
+    // Bundles BuildTestTypeViewModelAsync's render-state inputs into one object - see
+    // CategoryItemTypeViewModelRequest remarks (Sonar S107, 7-parameter limit).
+    private sealed record TestTypeViewModelRequest(
+        int? YearId,
+        Guid? EditId,
+        int Page,
+        string? Message,
+        bool MessageIsError,
+        TestTypeAddViewModel? AddValues,
+        TestTypeEditViewModel? EditValues,
+        Guid? RemoveConfirmId = null);
+
     private async Task<TestTypeViewModel> BuildTestTypeViewModelAsync(
-        int? yearId,
-        Guid? editId,
-        int page,
-        string? message,
-        bool messageIsError,
-        TestTypeAddViewModel? addValues,
-        TestTypeEditViewModel? editValues,
-        CancellationToken cancellationToken,
-        Guid? removeConfirmId = null)
+        TestTypeViewModelRequest request,
+        CancellationToken cancellationToken)
     {
+        var yearId = request.YearId;
+        var editId = request.EditId;
+        var page = request.Page;
+        var message = request.Message;
+        var messageIsError = request.MessageIsError;
+        var addValues = request.AddValues;
+        var editValues = request.EditValues;
+        var removeConfirmId = request.RemoveConfirmId;
+
         var years = await lookupApiClient.GetCurrentYearsAsync(cancellationToken);
         var currentYearId = years.Count > 0 ? years[0].YearId : (int?)null;
         var selectedYearId = ResolveSelectedYearId(yearId, years, currentYearId);
@@ -403,7 +455,9 @@ public class SchemeAdminController(ICategoryItemTypeApiClient categoryItemTypeAp
             : $"This Test is being used on {item.ForeignInstances} Scheme(s): {item.ForeignInstancesString} and cannot be {action}.";
 
     public async Task<IActionResult> CriterionItemType(int? yearId, Guid? editId, Guid? removeConfirmId, int page = 1, CancellationToken cancellationToken = default) =>
-        View(await BuildCriterionItemTypeViewModelAsync(yearId, editId, page, message: null, messageIsError: false, addValues: null, editValues: null, cancellationToken, removeConfirmId));
+        View(await BuildCriterionItemTypeViewModelAsync(
+            new CriterionItemTypeViewModelRequest(yearId, editId, page, Message: null, MessageIsError: false, AddValues: null, EditValues: null, removeConfirmId),
+            cancellationToken));
 
     // Matches legacy ButtonAdd_Click - Name is required; the new item always starts in whichever
     // year is currently selected in the dropdown.
@@ -428,7 +482,9 @@ public class SchemeAdminController(ICategoryItemTypeApiClient categoryItemTypeAp
             }
         }
 
-        return View(nameof(CriterionItemType), await BuildCriterionItemTypeViewModelAsync(yearId, editId: null, page, message: null, messageIsError: false, model, editValues: null, cancellationToken));
+        return View(nameof(CriterionItemType), await BuildCriterionItemTypeViewModelAsync(
+            new CriterionItemTypeViewModelRequest(yearId, EditId: null, page, Message: null, MessageIsError: false, model, EditValues: null),
+            cancellationToken));
     }
 
     // Only the row matching model.CriterionItemTypeId is ever in edit mode when this posts -
@@ -449,7 +505,9 @@ public class SchemeAdminController(ICategoryItemTypeApiClient categoryItemTypeAp
 
             if (result.FieldErrors.TryGetValue(string.Empty, out var conflictMessages))
             {
-                return View(nameof(CriterionItemType), await BuildCriterionItemTypeViewModelAsync(yearId, model.CriterionItemTypeId, page, conflictMessages[0], messageIsError: true, addValues: null, editValues: null, cancellationToken));
+                return View(nameof(CriterionItemType), await BuildCriterionItemTypeViewModelAsync(
+                    new CriterionItemTypeViewModelRequest(yearId, model.CriterionItemTypeId, page, conflictMessages[0], MessageIsError: true, AddValues: null, EditValues: null),
+                    cancellationToken));
             }
 
             foreach (var (field, messages) in result.FieldErrors)
@@ -461,7 +519,9 @@ public class SchemeAdminController(ICategoryItemTypeApiClient categoryItemTypeAp
             }
         }
 
-        return View(nameof(CriterionItemType), await BuildCriterionItemTypeViewModelAsync(yearId, model.CriterionItemTypeId, page, message: null, messageIsError: false, addValues: null, model, cancellationToken));
+        return View(nameof(CriterionItemType), await BuildCriterionItemTypeViewModelAsync(
+            new CriterionItemTypeViewModelRequest(yearId, model.CriterionItemTypeId, page, Message: null, MessageIsError: false, AddValues: null, model),
+            cancellationToken));
     }
 
     // "No Longer in Use" is saved for every row on the current page in one combined submit - see
@@ -480,7 +540,9 @@ public class SchemeAdminController(ICategoryItemTypeApiClient categoryItemTypeAp
         }
         catch (Exception ex) when (IsTransientApiFailure(ex, cancellationToken))
         {
-            return View(nameof(CriterionItemType), await BuildCriterionItemTypeViewModelAsync(yearId, editId: null, page, NoLongerInUseSaveFailedMessage, messageIsError: true, addValues: null, editValues: null, cancellationToken));
+            return View(nameof(CriterionItemType), await BuildCriterionItemTypeViewModelAsync(
+                new CriterionItemTypeViewModelRequest(yearId, EditId: null, page, NoLongerInUseSaveFailedMessage, MessageIsError: true, AddValues: null, EditValues: null),
+                cancellationToken));
         }
 
         return RedirectToAction(nameof(CriterionItemType), new { yearId, page });
@@ -496,20 +558,36 @@ public class SchemeAdminController(ICategoryItemTypeApiClient categoryItemTypeAp
             LogCriterionItemTypeRemoveBlockedMessage(logger, criterionItemTypeId, null);
         }
 
-        return View(nameof(CriterionItemType), await BuildCriterionItemTypeViewModelAsync(yearId, editId: null, page, result.Message, messageIsError: !result.Success, addValues: null, editValues: null, cancellationToken));
+        return View(nameof(CriterionItemType), await BuildCriterionItemTypeViewModelAsync(
+            new CriterionItemTypeViewModelRequest(yearId, EditId: null, page, result.Message, !result.Success, AddValues: null, EditValues: null),
+            cancellationToken));
     }
 
+    // Bundles BuildCriterionItemTypeViewModelAsync's render-state inputs into one object - see
+    // CategoryItemTypeViewModelRequest remarks (Sonar S107, 7-parameter limit).
+    private sealed record CriterionItemTypeViewModelRequest(
+        int? YearId,
+        Guid? EditId,
+        int Page,
+        string? Message,
+        bool MessageIsError,
+        CriterionItemTypeAddViewModel? AddValues,
+        CriterionItemTypeEditViewModel? EditValues,
+        Guid? RemoveConfirmId = null);
+
     private async Task<CriterionItemTypeViewModel> BuildCriterionItemTypeViewModelAsync(
-        int? yearId,
-        Guid? editId,
-        int page,
-        string? message,
-        bool messageIsError,
-        CriterionItemTypeAddViewModel? addValues,
-        CriterionItemTypeEditViewModel? editValues,
-        CancellationToken cancellationToken,
-        Guid? removeConfirmId = null)
+        CriterionItemTypeViewModelRequest request,
+        CancellationToken cancellationToken)
     {
+        var yearId = request.YearId;
+        var editId = request.EditId;
+        var page = request.Page;
+        var message = request.Message;
+        var messageIsError = request.MessageIsError;
+        var addValues = request.AddValues;
+        var editValues = request.EditValues;
+        var removeConfirmId = request.RemoveConfirmId;
+
         var years = await lookupApiClient.GetCurrentYearsAsync(cancellationToken);
         var currentYearId = years.Count > 0 ? years[0].YearId : (int?)null;
         var selectedYearId = ResolveSelectedYearId(yearId, years, currentYearId);
