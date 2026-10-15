@@ -11,13 +11,14 @@ namespace PTL.Api.Controllers;
 // implemented here - Results (dashboard) and Tabulations remain out of scope.
 [ApiController]
 [Route("api/distributions")]
-public sealed class DistributionController(
+public sealed partial class DistributionController(
     IDistributionService distributionService,
     ISampleNumbersService sampleNumbersService,
     IIntendedResultsService intendedResultsService,
     IDistributionParticipantsService distributionParticipantsService,
     IPreparationService preparationService,
     IResultsReceiptService resultsReceiptService,
+    ITabulationsService tabulationsService,
     IActualResultsService actualResultsService,
     IPackagingService packagingService,
     IPackagingOutputService packagingOutputService,
@@ -126,6 +127,16 @@ public sealed class DistributionController(
         return outcome.Success ? Ok(new ResultsReceiptSaveResult(true)) : NotFound();
     }
 
+    // GET /api/distributions/months/{yearId}/{monthId}/tabulations - Monthly Distributions -
+    // Tabulations, legacy ResultsTabulation.MonthlyDistribution.FetchMonthlyDistribution. Read only:
+    // the Send/Amend/Comments commands are shown in their legacy state but not executed.
+    [HttpGet("months/{yearId:int}/{monthId:int}/tabulations")]
+    public async Task<ActionResult<TabulationsResponse>> GetTabulations(int yearId, int monthId, CancellationToken cancellationToken)
+    {
+        var page = await tabulationsService.GetTabulationsAsync(yearId, monthId, cancellationToken);
+        return page is null ? NotFound() : Ok(ToResponse(page));
+    }
+
     // GET /api/distributions/schemes/{monthlyDistributionSchemeId}/participants/{distributionParticipantId}/sample-receipt -
     // the Sample Receipt screen, legacy ResultsReceipt.TestCollection.FetchTestCollection(participantId, mdsId).
     [HttpGet("schemes/{monthlyDistributionSchemeId:guid}/participants/{distributionParticipantId:guid}/sample-receipt")]
@@ -186,6 +197,28 @@ public sealed class DistributionController(
                 outcome.Status == ActualResultsSaveStatus.AuditReasonRequired,
                 outcome.AuditObjectName));
     }
+
+    private static TabulationsResponse ToResponse(TabulationsPage page) =>
+        new(
+            page.YearId,
+            page.MonthId,
+            [.. page.Schemes.Select(s => new TabulationsSchemeResponse(
+                s.MonthlyDistributionSchemeId,
+                s.SchemeNameFull,
+                s.DistributionReferenceFull,
+                s.DeadlineDate,
+                s.ResultsIssueTargetDate,
+                s.RequiresAssessment,
+                s.Consultants,
+                [.. s.Tabulations.Select(t => new TabulationRowResponse(t.TabulationId, t.Name, t.IsTestConsultant, t.PublishCount))],
+                new TabulationActionsResponse(
+                    ToResponse(s.Actions.AmendResults),
+                    ToResponse(s.Actions.SendToTestConsultant),
+                    ToResponse(s.Actions.SendForAssessment),
+                    ToResponse(s.Actions.SendToResultsSignOff))))]);
+
+    private static TabulationActionResponse ToResponse(TabulationAction action) =>
+        new(action.Text, action.IsEnabled, action.Hint, action.Command.ToString(), action.IsOverdue, action.IsLabel);
 
     private static SampleReceiptResponse ToResponse(SampleReceiptPage page) =>
         new(

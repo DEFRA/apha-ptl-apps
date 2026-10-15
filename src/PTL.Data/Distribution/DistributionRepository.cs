@@ -4,7 +4,7 @@ using PTL.Data.Infrastructure;
 
 namespace PTL.Data.Distribution;
 
-public sealed class DistributionRepository(IDbConnectionFactory connectionFactory) : IDistributionRepository
+public sealed partial class DistributionRepository(IDbConnectionFactory connectionFactory) : IDistributionRepository
 {
     public async Task<IReadOnlyList<DistributionMonthSummaryEntity>> GetMonthlyDistributionSummariesAsync(CancellationToken cancellationToken = default)
     {
@@ -727,6 +727,42 @@ public sealed class DistributionRepository(IDbConnectionFactory connectionFactor
         }
 
         return new ResultsReceiptData(header.MonthlyDistributionId, header.YearId, header.MonthId, schemes);
+    }
+
+    public async Task<IReadOnlyList<TabulationsSchemeEntity>> GetTabulationsAsync(Guid monthlyDistributionId, CancellationToken cancellationToken = default)
+    {
+        // @ReferenceDate is left to its NULL default - the stored procedure then uses today's date.
+        using var connection = connectionFactory.CreateConnection();
+        List<TabulationsSchemeEntity> schemes;
+
+        using (var results = await connection.QueryMultipleAsync(
+            "EXEC dbo.spgMonthlyDistributionInfoForTabulationsById @MonthlyDistributionId = @MonthlyDistributionId",
+            new { MonthlyDistributionId = monthlyDistributionId }))
+        {
+            // The first result set is the month header, which the caller already has.
+            _ = await results.ReadAsync();
+            schemes = (await results.ReadAsync<TabulationsSchemeEntity>()).ToList();
+            var tabulations = (await results.ReadAsync<TabulationEntity>()).ToList();
+
+            var schemesById = schemes.ToDictionary(s => s.MonthlyDistributionSchemeId);
+            foreach (var tabulation in tabulations)
+            {
+                if (schemesById.TryGetValue(tabulation.MonthlyDistributionSchemeId, out var scheme))
+                {
+                    scheme.Tabulations.Add(tabulation);
+                }
+            }
+        }
+
+        // Legacy reads this for every scheme but only consults it when the scheme requires assessment.
+        foreach (var scheme in schemes.Where(s => s.RequiresAssessment))
+        {
+            scheme.AssessmentStatuses = (await connection.QueryAsync<TabulationAssessmentStatusEntity>(
+                "EXEC dbo.spgAssessmentStatus @MonthlyDistributionSchemeId = @MonthlyDistributionSchemeId",
+                new { scheme.MonthlyDistributionSchemeId })).ToList();
+        }
+
+        return schemes;
     }
 
     public async Task UpdateResultsReceiptAsync(IReadOnlyList<ResultsReceiptParticipantEntity> participants, CancellationToken cancellationToken = default)

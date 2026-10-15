@@ -1,6 +1,6 @@
 namespace PTL.Core.Distribution;
 
-public interface IDistributionRepository
+public partial interface IDistributionRepository
 {
     Task<IReadOnlyList<DistributionMonthSummaryEntity>> GetMonthlyDistributionSummariesAsync(CancellationToken cancellationToken = default);
 
@@ -102,6 +102,11 @@ public interface IDistributionRepository
     // spuSampleReceipt x N in one transaction - legacy ParticipantSampleReceiptCollection.Update,
     // called once per changed Sample.
     Task UpdateSampleReceiptAsync(IReadOnlyList<SampleReceiptSampleEntity> samples, CancellationToken cancellationToken = default);
+
+    // spgMonthlyDistributionInfoForTabulationsById (schemes + tabulations) and, for each scheme that
+    // requires assessment, spgAssessmentStatus - legacy ResultsTabulation.MonthlyDistribution.
+    // FetchMonthlyDistribution. An empty list means the month has no schemes to tabulate.
+    Task<IReadOnlyList<TabulationsSchemeEntity>> GetTabulationsAsync(Guid monthlyDistributionId, CancellationToken cancellationToken = default);
 
     // spgGroupedPackagingSheet / spgPartGroupedPackagingSheet / spgWeeklyPackagingSheet - the
     // Sample Packaging screen's data for one option (and week, for the two Combined options),

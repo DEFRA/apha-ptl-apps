@@ -21,6 +21,7 @@ public class DistributionControllerActualResultsTests
             new DistributionParticipantsService(repository),
             new PreparationService(repository),
             new ResultsReceiptService(repository, TimeProvider.System),
+            new TabulationsService(repository, TimeProvider.System),
             new ActualResultsService(repository, new LocalClock(new DateTime(2026, 6, 15, 12, 0, 0))),
             new FakePackagingService(),
             new FakePackagingOutputService(),

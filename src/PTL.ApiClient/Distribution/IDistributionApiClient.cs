@@ -2,7 +2,7 @@ using PTL.Contracts.Distribution;
 
 namespace PTL.ApiClient.Distribution;
 
-public interface IDistributionApiClient
+public partial interface IDistributionApiClient
 {
     Task<IReadOnlyList<DistributionDashboardMonthResponse>> GetDashboardAsync(int yearId, CancellationToken cancellationToken = default);
 
@@ -41,6 +41,8 @@ public interface IDistributionApiClient
 
     Task<ResultsReceiptSaveResult?> SaveResultsReceiptAsync(
         int yearId, int monthId, ResultsReceiptSaveRequest request, CancellationToken cancellationToken = default);
+
+    Task<TabulationsResponse?> GetTabulationsAsync(int yearId, int monthId, CancellationToken cancellationToken = default);
 
     // Null when the participant or scheme is not found.
     Task<SampleReceiptResponse?> GetSampleReceiptAsync(

@@ -3,7 +3,7 @@ using PTL.Contracts.Distribution;
 
 namespace PTL.InternalWeb.Tests.TestSupport;
 
-internal sealed class FakeDistributionApiClient : IDistributionApiClient
+internal sealed partial class FakeDistributionApiClient : IDistributionApiClient
 {
     public IReadOnlyList<DistributionDashboardMonthResponse> Months { get; set; } = [];
     public IReadOnlyList<DistributionYearOptionResponse> Years { get; set; } = [];
@@ -99,6 +99,16 @@ internal sealed class FakeDistributionApiClient : IDistributionApiClient
 
     public Task<ResultsReceiptResponse?> GetResultsReceiptAsync(int yearId, int monthId, CancellationToken cancellationToken = default) =>
         Task.FromResult(ResultsReceipt);
+
+    public TabulationsResponse? Tabulations { get; set; }
+
+    public List<(int YearId, int MonthId)> TabulationRequests { get; } = [];
+
+    public Task<TabulationsResponse?> GetTabulationsAsync(int yearId, int monthId, CancellationToken cancellationToken = default)
+    {
+        TabulationRequests.Add((yearId, monthId));
+        return Task.FromResult(Tabulations);
+    }
 
     public Task<ResultsReceiptSaveResult?> SaveResultsReceiptAsync(
         int yearId, int monthId, ResultsReceiptSaveRequest request, CancellationToken cancellationToken = default)

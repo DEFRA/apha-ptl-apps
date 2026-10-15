@@ -451,6 +451,43 @@ public class DistributionApiClientTests
             () => CreateClient(HttpStatusCode.InternalServerError, null).GetResultsReceiptAsync(2026, 5));
 
     [Fact]
+    public async Task GetTabulationsAsync_GetsTabulationsEndpointAndReturnsDeserializedResponse()
+    {
+        const string json = """
+            {"yearId":2026,"monthId":5,"schemes":[{"monthlyDistributionSchemeId":"22222222-2222-2222-2222-222222222222","schemeNameFull":"BT: Brucella","distributionReferenceFull":"D1a/S1","deadlineDate":"2026-05-20T00:00:00","resultsIssueTargetDate":"2026-06-30T00:00:00","requiresAssessment":true,"consultants":["A1","","",""],"tabulations":[{"tabulationId":"33333333-3333-3333-3333-333333333333","name":"Summary","isTestConsultant":true,"publishCount":2}],"actions":{"amendResults":{"text":"Amend Results","isEnabled":true,"hint":"Click","command":"None","isOverdue":false,"isLabel":false},"sendToTestConsultant":{"text":"OVERDUE","isEnabled":true,"hint":"Late","command":"ViewComments","isOverdue":true,"isLabel":false},"sendForAssessment":{"text":"Awaiting Assessment","isEnabled":false,"hint":"","command":"SendForAssessment"},"sendToResultsSignOff":{"text":"OVERDUE","isEnabled":false,"hint":"","command":"SendToResultsSignOff","isOverdue":true,"isLabel":true}}}]}
+            """;
+        HttpRequestMessage? captured = null;
+        var client = CreateCapturingClient(HttpStatusCode.OK, json, request => captured = request);
+
+        var result = await client.GetTabulationsAsync(2026, 5);
+
+        Assert.Equal(HttpMethod.Get, captured!.Method);
+        Assert.Equal("/api/distributions/months/2026/5/tabulations", captured.RequestUri!.AbsolutePath);
+        Assert.Equal((2026, 5), (result!.YearId, result.MonthId));
+        var scheme = Assert.Single(result.Schemes);
+        Assert.Equal("BT: Brucella", scheme.SchemeNameFull);
+        Assert.Equal("D1a/S1", scheme.DistributionReferenceFull);
+        Assert.Equal(new DateTime(2026, 5, 20), scheme.DeadlineDate);
+        Assert.True(scheme.RequiresAssessment);
+        Assert.Equal(["A1", "", "", ""], scheme.Consultants);
+        var row = Assert.Single(scheme.Tabulations);
+        Assert.Equal(("Summary", true, 2), (row.Name, row.IsTestConsultant, row.PublishCount));
+        Assert.Equal("ViewComments", scheme.Actions.SendToTestConsultant.Command);
+        Assert.True(scheme.Actions.SendToTestConsultant.IsOverdue);
+        Assert.False(scheme.Actions.SendForAssessment.IsEnabled);
+        Assert.True(scheme.Actions.SendToResultsSignOff.IsLabel);
+    }
+
+    [Fact]
+    public async Task GetTabulationsAsync_NotFound_ReturnsNull() =>
+        Assert.Null(await CreateClient(HttpStatusCode.NotFound, null).GetTabulationsAsync(2026, 5));
+
+    [Fact]
+    public async Task GetTabulationsAsync_ServerError_Throws() =>
+        await Assert.ThrowsAsync<HttpRequestException>(
+            () => CreateClient(HttpStatusCode.InternalServerError, null).GetTabulationsAsync(2026, 5));
+
+    [Fact]
     public async Task SaveResultsReceiptAsync_PutsToResultsReceiptEndpointAndReturnsDeserializedResult()
     {
         HttpRequestMessage? captured = null;

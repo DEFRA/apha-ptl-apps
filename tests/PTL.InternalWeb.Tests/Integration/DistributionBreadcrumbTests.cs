@@ -59,6 +59,19 @@ public class DistributionBreadcrumbTests : IClassFixture<WebApplicationFactory<P
     }
 
     [Fact]
+    public async Task Tabulations_ShowsHomeDistributionsTabulations_WithTheYearKeptOnTheDistributionsLink()
+    {
+        _apiClient.Tabulations = new TabulationsResponse(2026, 5, []);
+
+        var crumbs = await CrumbsAsync("/Distribution/Tabulations?year=2026&monthId=5");
+
+        Assert.Equal(["Home", "Distributions", "Tabulations"], crumbs.Select(c => c.Text));
+        Assert.Contains("/Distribution", crumbs[1].Href, StringComparison.Ordinal);
+        Assert.Contains("year=2026", crumbs[1].Href, StringComparison.Ordinal);
+        Assert.Null(crumbs[2].Href);
+    }
+
+    [Fact]
     public async Task ActualResults_LinksBackToTheResultsReceiptForTheSameMonth()
     {
         _apiClient.ActualResults = new ActualResultsResponse(Participant, Scheme, "D1 S1: Brucella", "Audit", new DateTime(2030, 1, 1), false, []);
@@ -106,5 +119,118 @@ public class DistributionBreadcrumbTests : IClassFixture<WebApplicationFactory<P
         Assert.Contains("/Distribution/Schedule", crumbs[2].Href, StringComparison.Ordinal);
         Assert.Contains("year=2026", crumbs[2].Href, StringComparison.Ordinal);
         Assert.Contains("monthId=5", crumbs[2].Href, StringComparison.Ordinal);
+    }
+
+    private static readonly Guid Tabulation = Guid.Parse("aaaaaaaa-0000-0000-0000-0000000000b1");
+    private static readonly Guid PublishedTabulation = Guid.Parse("aaaaaaaa-0000-0000-0000-0000000000b2");
+    private static readonly Guid Test = Guid.Parse("aaaaaaaa-0000-0000-0000-0000000000b3");
+
+    private static TabulationReportResponse TabulationReport() =>
+        new(Tabulation, false, Tabulation, "FINAL REPORT", "Summary", "Date Of Distribution: 03/05/2026", "", "", "", "Comments :", false, null,
+            [], Guid.Empty, [], Guid.Empty, [], null, null, new TabulationPrintResponse([], [], []));
+
+    private static AssessmentResultsResponse AssessmentResults() => new(false, [], "Assessment Score", "Frequency", []);
+
+    private static void AssertMonthLink(string? href, string path)
+    {
+        Assert.StartsWith(path + "?", href, StringComparison.Ordinal);
+        Assert.Contains("year=2026", href, StringComparison.Ordinal);
+        Assert.Contains("monthId=5", href, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Tabulation_ShowsTabulationUnderTabulationsForTheSameMonth()
+    {
+        _apiClient.TabulationReport = TabulationReport();
+
+        var crumbs = await CrumbsAsync($"/Distribution/Tabulation?year=2026&monthId=5&tabulationId={Tabulation}");
+
+        Assert.Equal(["Home", "Distributions", "Tabulations", "Tabulation"], crumbs.Select(c => c.Text));
+        AssertMonthLink(crumbs[2].Href, "/Distribution/Tabulations");
+        Assert.Null(crumbs[3].Href);
+    }
+
+    [Fact]
+    public async Task AssessmentResults_LinksBackToTheTabulationItCameFrom()
+    {
+        _apiClient.AssessmentResults = AssessmentResults();
+
+        var crumbs = await CrumbsAsync($"/Distribution/TabulationAssessmentResults?year=2026&monthId=5&tabulationId={Tabulation}&testId={Test}");
+
+        Assert.Equal(["Home", "Distributions", "Tabulations", "Tabulation", "Assessment Results"], crumbs.Select(c => c.Text));
+        AssertMonthLink(crumbs[2].Href, "/Distribution/Tabulations");
+        AssertMonthLink(crumbs[3].Href, "/Distribution/Tabulation");
+        Assert.Contains($"tabulationId={Tabulation}", crumbs[3].Href, StringComparison.Ordinal);
+        Assert.DoesNotContain("testId", crumbs[3].Href, StringComparison.Ordinal);
+        Assert.Null(crumbs[4].Href);
+    }
+
+    [Fact]
+    public async Task ViewComments_ShowsViewCommentsUnderTabulationsForTheSameMonth()
+    {
+        _apiClient.TestConsultantComments = new TestConsultantCommentsResponse(
+            Scheme, "D1a/S1 BT: Brucella", "", "", true, [], [".pdf"], "PDF (.pdf)", "10MB");
+
+        var crumbs = await CrumbsAsync($"/Distribution/ViewComments?year=2026&monthId=5&schemeId={Scheme}");
+
+        Assert.Equal(["Home", "Distributions", "Tabulations", "View Comments"], crumbs.Select(c => c.Text));
+        AssertMonthLink(crumbs[2].Href, "/Distribution/Tabulations");
+        Assert.Null(crumbs[3].Href);
+    }
+
+    [Fact]
+    public async Task AmendResults_ShowsAmendResultsUnderTabulationsForTheSameMonth()
+    {
+        _apiClient.AmendResults = new AmendResultsResponse(Scheme, "D1a/S1 BT: Brucella", false, false, [], [], [], [], []);
+
+        var crumbs = await CrumbsAsync($"/Distribution/AmendResults?year=2026&monthId=5&schemeId={Scheme}");
+
+        Assert.Equal(["Home", "Distributions", "Tabulations", "Amend Results"], crumbs.Select(c => c.Text));
+        AssertMonthLink(crumbs[2].Href, "/Distribution/Tabulations");
+        Assert.Null(crumbs[3].Href);
+    }
+
+    [Fact]
+    public async Task PublishedTabulations_ShowsIssuedTabulationsUnderTabulations()
+    {
+        _apiClient.PublishedTabulations = new PublishedTabulationsResponse(Tabulation, "D1 BT: Brucella", "Summary", []);
+
+        var crumbs = await CrumbsAsync($"/Distribution/PublishedTabulations?year=2026&monthId=5&tabulationId={Tabulation}");
+
+        Assert.Equal(["Home", "Distributions", "Tabulations", "Issued Tabulations"], crumbs.Select(c => c.Text));
+        AssertMonthLink(crumbs[2].Href, "/Distribution/Tabulations");
+        Assert.Null(crumbs[3].Href);
+    }
+
+    [Fact]
+    public async Task PublishedTabulation_LinksBackToTheIssuedTabulationsOfTheSameTabulation()
+    {
+        _apiClient.PublishedTabulationReport = TabulationReport();
+
+        var crumbs = await CrumbsAsync($"/Distribution/PublishedTabulation?year=2026&monthId=5&tabulationId={Tabulation}&publishedTabulationId={PublishedTabulation}");
+
+        Assert.Equal(["Home", "Distributions", "Tabulations", "Issued Tabulations", "Issued Tabulation"], crumbs.Select(c => c.Text));
+        AssertMonthLink(crumbs[3].Href, "/Distribution/PublishedTabulations");
+        Assert.Contains($"tabulationId={Tabulation}", crumbs[3].Href, StringComparison.Ordinal);
+        Assert.DoesNotContain("publishedTabulationId", crumbs[3].Href, StringComparison.Ordinal);
+        Assert.Null(crumbs[4].Href);
+    }
+
+    [Fact]
+    public async Task PublishedAssessmentResults_LinksBackToTheIssuedTabulationItCameFrom()
+    {
+        _apiClient.AssessmentResults = AssessmentResults();
+
+        var crumbs = await CrumbsAsync(
+            $"/Distribution/PublishedAssessmentResults?year=2026&monthId=5&tabulationId={Tabulation}&publishedTabulationId={PublishedTabulation}&testId={Test}");
+
+        Assert.Equal(
+            ["Home", "Distributions", "Tabulations", "Issued Tabulations", "Issued Tabulation", "Issued Assessment Results"],
+            crumbs.Select(c => c.Text));
+        AssertMonthLink(crumbs[4].Href, "/Distribution/PublishedTabulation");
+        Assert.Contains($"tabulationId={Tabulation}", crumbs[4].Href, StringComparison.Ordinal);
+        Assert.Contains($"publishedTabulationId={PublishedTabulation}", crumbs[4].Href, StringComparison.Ordinal);
+        Assert.DoesNotContain("testId", crumbs[4].Href, StringComparison.Ordinal);
+        Assert.Null(crumbs[5].Href);
     }
 }

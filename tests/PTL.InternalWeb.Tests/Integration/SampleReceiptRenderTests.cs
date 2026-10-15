@@ -115,7 +115,7 @@ public partial class SampleReceiptRenderTests : IClassFixture<WebApplicationFact
     }
 
     [Fact]
-    public async Task Get_Editable_RendersSaveApplyCancelAndTheFormPostsToTheSameRoute()
+    public async Task Get_Editable_RendersSaveAndCancelAndTheFormPostsToTheSameRoute()
     {
         _apiClient.SampleReceipt = Page();
 
@@ -124,7 +124,7 @@ public partial class SampleReceiptRenderTests : IClassFixture<WebApplicationFact
         var buttons = Regex.Matches(html, "<button type=\"submit\" name=\"command\" value=\"(\\w+)\"[^>]*>(.*?)</button>", RegexOptions.Singleline)
             .Select(m => (Value: m.Groups[1].Value, Label: Text(m.Groups[2].Value)))
             .ToList();
-        Assert.Equal([("save", "Save"), ("apply", "Apply"), ("cancel", "Cancel")], buttons);
+        Assert.Equal([("save", "Save"), ("cancel", "Cancel")], buttons);
         Assert.Matches("<form[^>]*action=\"/Distribution/SampleReceipt\\?year=2026&amp;monthId=5&amp;schemeId=[^\"]+&amp;participantId=[^\"]+\"", html);
         Assert.Matches("<a class=\"govuk-back-link\" href=\"/Distribution/ResultsReceipt\\?year=2026&amp;monthId=5\">Back</a>", html);
     }

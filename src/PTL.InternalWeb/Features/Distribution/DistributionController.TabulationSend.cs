@@ -1,0 +1,85 @@
+using Microsoft.AspNetCore.Mvc;
+using PTL.Contracts.Distribution;
+using PTL.SharedUI.Notifications;
+
+namespace PTL.InternalWeb.Features.Distribution;
+
+// Tabulations "Send To Test Consultant" / "Send For Assessment" / "Send For Results Sign-Off" with
+// Save and Cancel. As in legacy, a send (after its confirm() question) only changes what the page
+// shows; Save writes every staged send, Cancel discards them. The staged sends travel in the form.
+public sealed partial class DistributionController
+{
+    private const string SaveCommand = "save";
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Tabulations(
+        int year, int monthId, string? command, string? stage, bool confirmed, string[]? staged, CancellationToken cancellationToken)
+    {
+        var stagedSends = ParseStaged(staged);
+
+        // Legacy ButtonSave/ButtonCancel both leave for the Distributions menu.
+        if (string.Equals(command, CancelCommand, StringComparison.OrdinalIgnoreCase))
+        {
+            return RedirectToAction(nameof(Index), new { year });
+        }
+
+        if (string.Equals(command, SaveCommand, StringComparison.OrdinalIgnoreCase))
+        {
+            if (await distributionApiClient.SaveTabulationsAsync(year, monthId, stagedSends, cancellationToken))
+            {
+                return RedirectToAction(nameof(Index), new { year });
+            }
+
+            TempData.SetNotification(NotificationType.Error, "The changes could not be saved because the Tabulations have been changed by someone else. Please try again.");
+            return RedirectToAction(nameof(Tabulations), new { year, monthId });
+        }
+
+        if (ParseStaged(stage is null ? [] : [stage]) is [var send])
+        {
+            var confirmation = await distributionApiClient.StageTabulationSendAsync(
+                year, monthId, new TabulationStageRequest(stagedSends, send.MonthlyDistributionSchemeId, send.Command), cancellationToken);
+
+            if (confirmation is not null)
+            {
+                if (confirmation.ConfirmationQuestion.Length > 0 && !confirmed)
+                {
+                    ViewData[Navigation.BreadcrumbRouteValues.Action] = nameof(Tabulations);
+                    return View("SendTabulation", new TabulationSendViewModel { YearId = year, MonthId = monthId, Send = confirmation, Staged = stagedSends });
+                }
+
+                stagedSends.Add(send);
+            }
+        }
+
+        var page = await distributionApiClient.PreviewTabulationsAsync(year, monthId, stagedSends, cancellationToken);
+        if (page is null)
+        {
+            return NotFound();
+        }
+
+        return View(nameof(Tabulations), new TabulationsViewModel
+        {
+            YearId = year,
+            MonthId = monthId,
+            MonthDescription = PackagingMonthDescription(year, monthId),
+            Schemes = page.Schemes,
+            Staged = stagedSends,
+        });
+    }
+
+    // "{schemeId}:{command}" values; anything malformed is ignored.
+    private static List<TabulationStagedSendRequest> ParseStaged(IEnumerable<string>? values) =>
+        [.. (values ?? [])
+            .Select(v => v.Split(':', 2))
+            .Where(p => p.Length == 2 && Guid.TryParse(p[0], out _) && p[1].Length > 0)
+            .Select(p => new TabulationStagedSendRequest(Guid.Parse(p[0]), p[1]))];
+}
+
+public sealed class TabulationSendViewModel
+{
+    public required int YearId { get; init; }
+    public required int MonthId { get; init; }
+    public required TabulationSendResponse Send { get; init; }
+    public IReadOnlyList<TabulationStagedSendRequest> Staged { get; init; } = [];
+}

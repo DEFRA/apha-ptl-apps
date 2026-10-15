@@ -43,7 +43,7 @@ namespace PTL.Data.Infrastructure;
 /// stored procedures' result columns exactly as that file was. Call <see cref="Register"/> once at
 /// startup, before any repository executes a query.
 /// </summary>
-public static class DapperColumnMappings
+public static partial class DapperColumnMappings
 {
     private const string ColCustomerId = "fldCustomerId";
     private const string ColName = "fldName";
@@ -982,6 +982,12 @@ public static class DapperColumnMappings
             ["fldInternalDescription"] = nameof(PreparationSampleEntity.InternalDescription),
         });
 
+        RegisterTabulationsMappings();
+
+        RegisterTabulationReportMappings();
+
+        RegisterTabulationEmailMappings();
+
         RegisterPackagingMappings();
 
         Map<DistributionCategoryItemEntity>(new(StringComparer.OrdinalIgnoreCase)
@@ -1371,6 +1377,53 @@ public static class DapperColumnMappings
     // plus the Distribution Posted email queue and label address procedures. Several columns are
     // shared by more than one result-set shape (e.g. fldPackingInfo), so each entity maps only the
     // columns its own result set returns.
+    private static void RegisterTabulationsMappings()
+    {
+        Map<TabulationsSchemeEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            [ColMonthlyDistributionSchemeId] = nameof(TabulationsSchemeEntity.MonthlyDistributionSchemeId),
+            ["fldSchemeName"] = nameof(TabulationsSchemeEntity.SchemeName),
+            ["fldSchemeIdentifier"] = nameof(TabulationsSchemeEntity.SchemeIdentifier),
+            ["fldDistributionReference"] = nameof(TabulationsSchemeEntity.DistributionReference),
+            ["fldDistributionReferenceSuffix"] = nameof(TabulationsSchemeEntity.DistributionReferenceSuffix),
+            ["fldScheduleCode"] = nameof(TabulationsSchemeEntity.ScheduleCode),
+            ["fldResultsIssueTargetDate"] = nameof(TabulationsSchemeEntity.ResultsIssueTargetDate),
+            ["fldDeadlineDate"] = nameof(TabulationsSchemeEntity.DeadlineDate),
+            ["fldTestConsultant1Name"] = nameof(TabulationsSchemeEntity.TestConsultant1Name),
+            ["fldTestConsultant2Name"] = nameof(TabulationsSchemeEntity.TestConsultant2Name),
+            ["fldTestConsultant3Name"] = nameof(TabulationsSchemeEntity.TestConsultant3Name),
+            ["fldIsCommentSubmitted"] = nameof(TabulationsSchemeEntity.IsCommentSubmitted),
+            ["fldTestConsultantTabulationId"] = nameof(TabulationsSchemeEntity.TestConsultantTabulationId),
+            ["fldEmailState"] = nameof(TabulationsSchemeEntity.EmailState),
+            ["fldIsReadyForTestConsultant"] = nameof(TabulationsSchemeEntity.IsReadyForTestConsultant),
+            ["fldIsReadyForResultsSignOff"] = nameof(TabulationsSchemeEntity.IsReadyForResultsSignOff),
+            ["fldIsReadyForAssessor"] = nameof(TabulationsSchemeEntity.IsReadyForAssessor),
+            ["fldAssessor1Name"] = nameof(TabulationsSchemeEntity.Assessor1Name),
+            ["fldAssessor2Name"] = nameof(TabulationsSchemeEntity.Assessor2Name),
+            ["fldAssessor3Name"] = nameof(TabulationsSchemeEntity.Assessor3Name),
+            ["fldAssessor4Name"] = nameof(TabulationsSchemeEntity.Assessor4Name),
+            ["fldHasIntendedResults"] = nameof(TabulationsSchemeEntity.HasIntendedResults),
+            ["fldRequiresAssessment"] = nameof(TabulationsSchemeEntity.RequiresAssessment),
+        });
+
+        Map<TabulationEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            [ColMonthlyDistributionSchemeId] = nameof(TabulationEntity.MonthlyDistributionSchemeId),
+            ["fldDistributionTabulationId"] = nameof(TabulationEntity.TabulationId),
+            [ColName] = nameof(TabulationEntity.Name),
+            ["fldPublishState"] = nameof(TabulationEntity.PublishState),
+            ["fldPublishCount"] = nameof(TabulationEntity.PublishCount),
+        });
+
+        Map<TabulationAssessmentStatusEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldAssessmentSubmitted"] = nameof(TabulationAssessmentStatusEntity.AssessmentSubmitted),
+            ["fldSubmissionDate"] = nameof(TabulationAssessmentStatusEntity.SubmissionDate),
+            ["fldNonSubmissionDate"] = nameof(TabulationAssessmentStatusEntity.NonSubmissionDate),
+            ["fldNonCapableDate"] = nameof(TabulationAssessmentStatusEntity.NonCapableDate),
+        });
+    }
+
     private static void RegisterPackagingMappings()
     {
         Map<PackagingGroupEntity>(new(StringComparer.OrdinalIgnoreCase)

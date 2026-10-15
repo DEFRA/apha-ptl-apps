@@ -1,0 +1,45 @@
+@using System.Globalization
+@model PTL.InternalWeb.Features.Distribution.PublishedTabulationsViewModel
+@{
+    ViewData["Title"] = "Issued Tabulations";
+}
+
+<a class="govuk-back-link" asp-action="Tabulations" asp-route-year="@Model.YearId" asp-route-monthId="@Model.MonthId">Back</a>
+
+<h1 class="govuk-heading-l">@Model.Page.Title</h1>
+<h2 class="govuk-heading-m">@Model.Page.TabulationName</h2>
+
+<p class="govuk-body">The table below lists all of the issued versions of this Tabulation.</p>
+
+@if (Model.Page.Tabulations.Count == 0)
+{
+    <p class="govuk-body">There are no issued versions of this Tabulation.</p>
+}
+else
+{
+    <table class="govuk-table">
+        <caption class="govuk-table__caption govuk-visually-hidden">Issued versions of @Model.Page.TabulationName</caption>
+        <thead class="govuk-table__head">
+            <tr class="govuk-table__row">
+                <th scope="col" class="govuk-table__header">Date Issued</th>
+                <th scope="col" class="govuk-table__header">Signatory</th>
+                <th scope="col" class="govuk-table__header">View</th>
+            </tr>
+        </thead>
+        <tbody class="govuk-table__body">
+            @foreach (var issued in Model.Page.Tabulations)
+            {
+                var date = issued.CreationDate.ToString("dd/MM/yyyy HH:mm:ss", CultureInfo.InvariantCulture);
+                <tr class="govuk-table__row">
+                    <td class="govuk-table__cell">@date</td>
+                    <td class="govuk-table__cell">@issued.Signatory</td>
+                    <td class="govuk-table__cell">
+                        <a class="govuk-link" asp-action="PublishedTabulation" asp-route-year="@Model.YearId" asp-route-monthId="@Model.MonthId" asp-route-tabulationId="@Model.TabulationId" asp-route-publishedTabulationId="@issued.PublishedTabulationId">View<span class="govuk-visually-hidden"> issued tabulation of @date</span></a>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+<a class="govuk-button govuk-button--secondary" role="button" draggable="false" data-module="govuk-button" asp-action="Tabulations" asp-route-year="@Model.YearId" asp-route-monthId="@Model.MonthId">Back</a>

@@ -162,7 +162,7 @@ public partial class ActualResultsRenderTests : IClassFixture<WebApplicationFact
         var buttons = Regex.Matches(html, "<button type=\"submit\" name=\"command\" value=\"(\\w+)\"[^>]*>(.*?)</button>", RegexOptions.Singleline)
             .Select(m => (Value: m.Groups[1].Value, Label: Text(m.Groups[2].Value)))
             .ToList();
-        Assert.Equal([("save", "Save"), ("apply", "Apply"), ("cancel", "Cancel")], buttons);
+        Assert.Equal([("save", "Save"), ("cancel", "Cancel")], buttons);
         Assert.Matches("<button[^>]*value=\"cancel\"[^>]*formnovalidate", html);
         Assert.Matches("<a class=\"govuk-back-link\" href=\"/Distribution/ResultsReceipt\\?year=2026&amp;monthId=5\">Back</a>", html);
     }

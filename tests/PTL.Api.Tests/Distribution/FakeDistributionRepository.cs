@@ -2,7 +2,7 @@ using PTL.Core.Distribution;
 
 namespace PTL.Api.Tests.Distribution;
 
-internal sealed class FakeDistributionRepository : IDistributionRepository
+internal sealed partial class FakeDistributionRepository : IDistributionRepository
 {
     public List<DistributionMonthSummaryEntity> Summaries { get; } = [];
 
@@ -131,6 +131,16 @@ internal sealed class FakeDistributionRepository : IDistributionRepository
 
     public Task<ResultsReceiptData?> GetResultsReceiptAsync(int yearId, int monthId, CancellationToken cancellationToken = default) =>
         Task.FromResult(ResultsReceipts.GetValueOrDefault((yearId, monthId)));
+
+    public Dictionary<Guid, IReadOnlyList<TabulationsSchemeEntity>> Tabulations { get; } = [];
+
+    public List<Guid> TabulationRequests { get; } = [];
+
+    public Task<IReadOnlyList<TabulationsSchemeEntity>> GetTabulationsAsync(Guid monthlyDistributionId, CancellationToken cancellationToken = default)
+    {
+        TabulationRequests.Add(monthlyDistributionId);
+        return Task.FromResult(Tabulations.GetValueOrDefault(monthlyDistributionId) ?? []);
+    }
 
     public Task UpdateResultsReceiptAsync(IReadOnlyList<ResultsReceiptParticipantEntity> participants, CancellationToken cancellationToken = default)
     {

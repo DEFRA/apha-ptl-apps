@@ -1,0 +1,531 @@
+@using System.Globalization
+@using PTL.Contracts.Distribution
+@using Keys = PTL.Contracts.Distribution.AmendResultsFieldKeys
+@model PTL.InternalWeb.Features.Distribution.AmendResultsViewModel
+@{
+    // Legacy Scheduling/AmendResults.aspx (grid from BuildTable). Legacy diverts to Audit.aspx for an
+    // audited change; here it is a second step of the same view (same pattern as ActualResults.cshtml).
+    var amend = Model.Page;
+    var audit = Model.IsAuditStep;
+    var invariant = CultureInfo.InvariantCulture;
+    string[] scores = ["1", "2", "3", "4", "5"];
+
+    ViewData["Title"] = audit ? "Audit Trail - Amend Results" : "Amend Results";
+
+    var errors = ViewData.ModelState
+        .Where(entry => entry.Value?.Errors.Count > 0)
+        .SelectMany(entry => entry.Value!.Errors.Select(error => (Field: entry.Key, Message: error.ErrorMessage)))
+        .ToList();
+
+    // Legacy only drew a table for a test that has samples.
+    var tests = amend.Tests.Where(t => t.Samples.Count > 0).ToList();
+
+    string? ErrorFor(string name) =>
+        ViewData.ModelState.TryGetValue(name, out var entry) && entry.Errors.Count > 0 ? entry.Errors[0].ErrorMessage : null;
+
+    bool IsFreeText(AmendItemResponse item) => item.FormatString.StartsWith('^');
+
+    // Legacy showed "Input must be of format: {Message}" as a tooltip; here it is a hint under the item's column header.
+    string? HintId(AmendItemResponse item) =>
+        IsFreeText(item) && !string.IsNullOrEmpty(item.Message) ? $"hint_{item.ItemId:N}" : null;
+
+    string? DescribedBy(params string?[] ids)
+    {
+        var joined = string.Join(' ', ids.Where(i => !string.IsNullOrEmpty(i)));
+        return joined.Length == 0 ? null : joined;
+    }
+
+    void Hidden(string name, string value)
+    {
+        <input type="hidden" name="@name" value="@value" />
+    }
+
+    void FieldError(string id, string? error)
+    {
+        if (error is not null)
+        {
+            <p id="@(id)-error" class="govuk-error-message govuk-!-margin-bottom-1"><span class="govuk-visually-hidden">Error:</span> @error</p>
+        }
+    }
+
+    // A select keeps a stored value that is not in its list, so saving never silently blanks it.
+    void Choice(string name, string id, string value, IReadOnlyList<string> options, bool emptyFirst, string label)
+    {
+        if (audit)
+        {
+            <span>@value</span>
+            Hidden(name, value);
+            return;
+        }
+
+        var error = ErrorFor(name);
+        <div class="govuk-form-group govuk-!-margin-bottom-0@(error is null ? null : " govuk-form-group--error")">
+            <label class="govuk-label govuk-visually-hidden" for="@id">@label</label>
+            @{ FieldError(id, error); }
+            <select class="govuk-select@(error is null ? null : " govuk-select--error")" id="@id" name="@name" aria-describedby="@DescribedBy(error is null ? null : id + "-error")">
+                @* "!" opts out of the option tag helper, which would force this local function to be async. *@
+                @if (emptyFirst)
+                {
+                    <!option value=""></!option>
+                }
+                @if (value.Length > 0 && !options.Contains(value, StringComparer.Ordinal))
+                {
+                    <!option value="@value" selected>@value</!option>
+                }
+                @foreach (var option in options)
+                {
+                    <!option value="@option" selected="@(string.Equals(option, value, StringComparison.Ordinal))">@option</!option>
+                }
+            </select>
+        </div>
+    }
+
+    void TextField(string name, string id, string value, string label, string? hintId, int maxLength = 0, string? extraAttribute = null)
+    {
+        if (audit)
+        {
+            <span>@value</span>
+            Hidden(name, value);
+            return;
+        }
+
+        var error = ErrorFor(name);
+        <div class="govuk-form-group govuk-!-margin-bottom-0@(error is null ? null : " govuk-form-group--error")">
+            <label class="govuk-label govuk-visually-hidden" for="@id">@label</label>
+            @{ FieldError(id, error); }
+            <input class="govuk-input@(error is null ? null : " govuk-input--error")" id="@id" name="@name" type="text" value="@value"
+                   maxlength="@(maxLength > 0 ? maxLength.ToString(invariant) : null)" spellcheck="false"
+                   aria-describedby="@DescribedBy(hintId, error is null ? null : id + "-error")"
+                   data-amend-nil-return="@(extraAttribute == "nil-return" ? "true" : null)" />
+        </div>
+    }
+
+    void ItemField(string name, string value, AmendItemResponse item, string label)
+    {
+        if (IsFreeText(item))
+        {
+            TextField(name, name, value, label, HintId(item));
+        }
+        else
+        {
+            Choice(name, name, value, item.FormatString.Split('|'), emptyFirst: true, label);
+        }
+    }
+
+    void NilCell(int colspan = 1)
+    {
+        <td class="TabulationCell NilReturn" colspan="@(colspan > 1 ? colspan.ToString(invariant) : null)"></td>
+    }
+}
+
+@section Styles {
+    <link rel="stylesheet" href="~/css/tabulation.css" asp-append-version="true" />
+}
+
+@section Scripts {
+    <script src="~/js/amend-results.js" asp-append-version="true"></script>
+}
+
+@if (audit)
+{
+    <a class="govuk-back-link" asp-action="AmendResults" asp-route-year="@Model.YearId" asp-route-monthId="@Model.MonthId" asp-route-schemeId="@Model.MonthlyDistributionSchemeId">Back</a>
+
+    <govuk-error-summary errors="@errors" />
+
+    <h1 class="govuk-heading-l">Audit Trail</h1>
+
+    <p class="govuk-body">Changes have been made to the following object:</p>
+
+    <h2 class="govuk-heading-m">@Model.AuditObjectName</h2>
+
+    <hr class="govuk-section-break govuk-section-break--visible govuk-section-break--m">
+}
+else
+{
+    <a class="govuk-back-link" asp-action="Tabulations" asp-route-year="@Model.YearId" asp-route-monthId="@Model.MonthId">Back</a>
+
+    <govuk-error-summary errors="@errors" />
+
+    <h1 class="govuk-heading-l">@amend.DistributionTitle</h1>
+
+    <p class="govuk-body">All of the Intended Results and the Results received from Participants are shown below for Amending.</p>
+}
+
+<form method="post" asp-action="AmendResults" asp-route-year="@Model.YearId" asp-route-monthId="@Model.MonthId" asp-route-schemeId="@Model.MonthlyDistributionSchemeId" data-amend-results>
+    @if (audit)
+    {
+        @* No server-side session holds the pending edits, so the whole grid rides along (read-only) and is re-posted. *@
+        <input type="hidden" name="isAuditStep" value="true" />
+        <input type="hidden" name="pendingCommand" value="@Model.PendingCommand" />
+        <input type="hidden" name="auditObjectName" value="@Model.AuditObjectName" />
+
+        <govuk-textarea asp-for="AuditWhy" label="Before these modifications can be saved, you must enter your reasons for making these changes below: " rows="5" maxlength="2000" />
+
+        <hr class="govuk-section-break govuk-section-break--visible govuk-section-break--m">
+
+        <div class="govuk-button-group">
+            <button type="submit" name="command" value="@Model.PendingCommand" class="govuk-button" data-module="govuk-button">Save</button>
+            <button type="submit" name="command" value="cancelAudit" class="govuk-button govuk-button--secondary" data-module="govuk-button" formnovalidate>Cancel</button>
+        </div>
+    }
+
+    @if (audit)
+    {
+        @:<details class="govuk-details">
+        @:<summary class="govuk-details__summary"><span class="govuk-details__summary-text">View the results being saved</span></summary>
+        @:<div class="govuk-details__text">
+    }
+
+    @for (var testIndex = 0; testIndex < tests.Count; testIndex++)
+    {
+        var test = tests[testIndex];
+        var samples = test.Samples;
+        var categoryCount = test.CategoryItems.Count;
+        var categorySpan = Math.Max(categoryCount, 1);
+        var assess = amend.RequiresAssessment;
+        var headerRows = assess && categoryCount > 0 ? 3 : (test.ResultItems.Count > 0 || assess ? 2 : 1);
+        var totalColumns = 1 + test.MethodItems.Count + test.ResultItems.Count * samples.Count
+            + (assess ? samples.Count * categorySpan + samples.Count * 2 : 0);
+        var nilSpan = Math.Clamp(test.MethodItems.Count + test.ResultItems.Count * samples.Count + categoryCount * samples.Count, 1, Math.Max(totalColumns - 1, 1));
+
+        <div class="ptl-table-scroll ptl-tabulation-scroll" tabindex="0" role="region" aria-label="@test.Name">
+            <table class="TabulationTable">
+                <caption class="govuk-visually-hidden">@test.Name</caption>
+                <thead>
+                    <tr>
+                        <th scope="col" class="TabulationHeader1" rowspan="@headerRows">@test.Name</th>
+                        @foreach (var methodItem in test.MethodItems)
+                        {
+                            <th scope="col" class="TabulationHeader1" rowspan="@headerRows">
+                                @methodItem.Name
+                                @if (HintId(methodItem) is { } hintId)
+                                {
+                                    <div id="@hintId" class="govuk-hint govuk-!-font-size-16 govuk-!-margin-bottom-0">Input must be of format: @methodItem.Message</div>
+                                }
+                            </th>
+                        }
+                        @foreach (var resultItem in test.ResultItems)
+                        {
+                            var rangeName = Keys.Range(resultItem.ItemId);
+                            var isRange = Model.IsRange(resultItem);
+                            <th scope="colgroup" class="TabulationHeader1" colspan="@samples.Count">
+                                @resultItem.Name
+                                @if (audit)
+                                {
+                                    <span>(Range: @(isRange ? "Yes" : "No"))</span>
+                                    if (isRange)
+                                    {
+                                        Hidden(rangeName, "true");
+                                    }
+                                }
+                                else
+                                {
+                                    <div class="govuk-checkboxes govuk-checkboxes--small" data-module="govuk-checkboxes">
+                                        <div class="govuk-checkboxes__item">
+                                            <input class="govuk-checkboxes__input" id="@rangeName" name="@rangeName" type="checkbox" value="true" checked="@isRange" data-amend-range />
+                                            <label class="govuk-label govuk-checkboxes__label" for="@rangeName">Range<span class="govuk-visually-hidden"> for @resultItem.Name</span></label>
+                                        </div>
+                                    </div>
+                                }
+                                @{ Hidden(rangeName + "_shown", "1"); }
+                                @if (HintId(resultItem) is { } hintId)
+                                {
+                                    <div id="@hintId" class="govuk-hint govuk-!-font-size-16 govuk-!-margin-bottom-0">Input must be of format: @resultItem.Message</div>
+                                }
+                            </th>
+                        }
+                        @if (assess)
+                        {
+                            <th scope="colgroup" class="TabulationHeader1" colspan="@(samples.Count * categorySpan)">Categories</th>
+                            <th scope="colgroup" class="TabulationHeader1" colspan="@(samples.Count * 2)">Assessment (Comments / Overall score)</th>
+                        }
+                    </tr>
+                    @if (headerRows >= 2)
+                    {
+                        <tr>
+                            @foreach (var resultItem in test.ResultItems)
+                            {
+                                foreach (var sample in samples)
+                                {
+                                    <th scope="col" class="TabulationHeader2" rowspan="@(headerRows - 1)">@sample.SampleNumber</th>
+                                }
+                            }
+                            @if (assess)
+                            {
+                                foreach (var sample in samples)
+                                {
+                                    <th scope="colgroup" class="TabulationHeader2" colspan="@categorySpan">@sample.SampleNumber</th>
+                                }
+                                foreach (var sample in samples)
+                                {
+                                    <th scope="colgroup" class="TabulationHeader2" colspan="2" rowspan="@(headerRows - 1)">@sample.SampleNumber</th>
+                                }
+                            }
+                        </tr>
+                    }
+                    @if (headerRows == 3)
+                    {
+                        <tr>
+                            @foreach (var sample in samples)
+                            {
+                                foreach (var categoryItem in test.CategoryItems)
+                                {
+                                    <th scope="col" class="TabulationHeader2">@categoryItem.Name</th>
+                                }
+                            }
+                        </tr>
+                    }
+                </thead>
+                <tbody>
+                    <tr>
+                        <th scope="row" class="TabulationCell">Intended</th>
+                        @foreach (var methodItem in test.MethodItems)
+                        {
+                            var name = Keys.IntendedMethod(methodItem.ItemId);
+                            var stored = test.IntendedMethodResults.FirstOrDefault(i => i.ItemId == methodItem.ItemId)?.Value ?? string.Empty;
+                            <td class="TabulationCell">
+                                @{ ItemField(name, Model.Value(name, stored), methodItem, $"Intended {methodItem.Name}"); }
+                            </td>
+                        }
+                        @foreach (var resultItem in test.ResultItems)
+                        {
+                            var isRange = Model.IsRange(resultItem);
+                            foreach (var sample in samples)
+                            {
+                                var intended = test.IntendedResultItemResults.FirstOrDefault(i => i.ItemId == resultItem.ItemId && i.SampleId == sample.SampleId);
+                                var name1 = Keys.IntendedResult(sample.SampleId, resultItem.ItemId, 1);
+                                var name2 = Keys.IntendedResult(sample.SampleId, resultItem.ItemId, 2);
+                                <td class="TabulationCell">
+                                    @{ ItemField(name1, Model.Value(name1, intended?.Value ?? string.Empty), resultItem, $"Intended {resultItem.Name} {sample.SampleNumber}"); }
+                                    <span data-amend-range-second="@Keys.Range(resultItem.ItemId)" hidden="@(isRange ? null : "hidden")">
+                                        to
+                                        @{ ItemField(name2, Model.Value(name2, intended?.Value2 ?? string.Empty), resultItem, $"Intended {resultItem.Name} {sample.SampleNumber} range end"); }
+                                    </span>
+                                </td>
+                            }
+                        }
+                        @if (assess)
+                        {
+                            foreach (var sample in samples)
+                            {
+                                <td class="TabulationCell" colspan="@(categorySpan > 1 ? categorySpan.ToString(invariant) : null)"></td>
+                            }
+                            foreach (var sample in samples)
+                            {
+                                <td class="TabulationCell" colspan="2"></td>
+                            }
+                        }
+                    </tr>
+                    @foreach (var participant in amend.Participants)
+                    {
+                        var participantId = participant.DistributionParticipantId;
+                        <tr>
+                            <th scope="row" class="TabulationCell">@participant.LabCode</th>
+                            @if (!participant.HasResults)
+                            {
+                                var name = Keys.NilReturn(participantId);
+                                // The box repeats on every test table; only the first copy carries the id the error summary links to.
+                                var id = testIndex == 0 ? name : $"{name}_{testIndex}";
+                                <td class="TabulationCell NilReturn" colspan="@nilSpan">
+                                    @{ TextField(name, id, Model.Value(name, participant.NilReturnReason), $"{participant.LabCode} nil return reason", null, 100, "nil-return"); }
+                                </td>
+                                if (totalColumns - 1 - nilSpan > 0)
+                                {
+                                    NilCell(totalColumns - 1 - nilSpan);
+                                }
+                            }
+                            else
+                            {
+                                foreach (var methodItem in test.MethodItems)
+                                {
+                                    var result = participant.MethodResults.FirstOrDefault(m => m.TestId == test.TestId && m.ItemId == methodItem.ItemId);
+                                    if (result is null)
+                                    {
+                                        NilCell();
+                                        continue;
+                                    }
+
+                                    var name = Keys.ParticipantMethod(participantId, methodItem.ItemId);
+                                    <td class="TabulationCell">
+                                        @{ ItemField(name, Model.Value(name, result.Value), methodItem, $"{participant.LabCode} {methodItem.Name}"); }
+                                    </td>
+                                }
+
+                                foreach (var resultItem in test.ResultItems)
+                                {
+                                    foreach (var sample in samples)
+                                    {
+                                        var result = participant.ResultItemResults.FirstOrDefault(r => r.TestId == test.TestId && r.ItemId == resultItem.ItemId && r.SampleId == sample.SampleId);
+                                        if (result is null)
+                                        {
+                                            NilCell();
+                                            continue;
+                                        }
+
+                                        var name = Keys.ParticipantResult(participantId, sample.SampleId, resultItem.ItemId);
+                                        <td class="TabulationCell">
+                                            @{ ItemField(name, Model.Value(name, result.Value), resultItem, $"{participant.LabCode} {sample.SampleNumber} {resultItem.Name}"); }
+                                        </td>
+                                    }
+                                }
+
+                                if (assess)
+                                {
+                                    foreach (var sample in samples)
+                                    {
+                                        if (categoryCount == 0)
+                                        {
+                                            NilCell();
+                                        }
+
+                                        foreach (var categoryItem in test.CategoryItems)
+                                        {
+                                            var score = participant.CategoryResults.FirstOrDefault(c => c.TestId == test.TestId && c.CategoryItemId == categoryItem.CategoryItemId && c.SampleId == sample.SampleId);
+                                            if (score is null)
+                                            {
+                                                NilCell();
+                                                continue;
+                                            }
+
+                                            var name = Keys.CategoryScore(participantId, sample.SampleId, categoryItem.CategoryItemId);
+                                            <td class="TabulationCell">
+                                                @{ Choice(name, name, Model.Value(name, score.Score.ToString(invariant)), scores, emptyFirst: false, $"{participant.LabCode} {sample.SampleNumber} {categoryItem.Name} score"); }
+                                            </td>
+                                        }
+                                    }
+
+                                    foreach (var sample in samples)
+                                    {
+                                        var assessment = test.IsAssessmentSubmitted
+                                            ? participant.Assessments.FirstOrDefault(a => a.TestId == test.TestId && a.SampleId == sample.SampleId)
+                                            : null;
+                                        if (assessment is null)
+                                        {
+                                            NilCell(2);
+                                            continue;
+                                        }
+
+                                        var commentName = Keys.AssessmentComment(participantId, test.TestId, sample.SampleId);
+                                        var scoreName = Keys.AssessmentScore(participantId, test.TestId, sample.SampleId);
+                                        <td class="TabulationCell">
+                                            @{ TextField(commentName, commentName, Model.Value(commentName, assessment.Comment), $"{participant.LabCode} {sample.SampleNumber} assessment comment", null, 2000); }
+                                        </td>
+                                        <td class="TabulationCell">
+                                            @{ Choice(scoreName, scoreName, Model.Value(scoreName, assessment.Score.ToString(invariant)), scores, emptyFirst: false, $"{participant.LabCode} {sample.SampleNumber} overall assessment score"); }
+                                        </td>
+                                    }
+                                }
+                            }
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+
+    @if (amend.StoreRatings)
+    {
+        <div class="ptl-table-scroll ptl-tabulation-scroll" tabindex="0" role="region" aria-label="QAU Ratings">
+            <table class="TabulationTable">
+                <caption class="govuk-visually-hidden">QAU Ratings</caption>
+                <thead>
+                    <tr>
+                        <th scope="col" class="TabulationHeader1">QAU Ratings</th>
+                        @foreach (var sample in amend.RatingSamples)
+                        {
+                            <th scope="col" class="TabulationHeader2">@sample.SampleNumber</th>
+                        }
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var participant in amend.Participants)
+                    {
+                        <tr>
+                            <th scope="row" class="TabulationCell">@participant.LabCode</th>
+                            @foreach (var sample in amend.RatingSamples)
+                            {
+                                var rating = participant.HasRatingResults
+                                    ? participant.Ratings.FirstOrDefault(r => r.SampleId == sample.SampleId)
+                                    : null;
+                                if (rating is null)
+                                {
+                                    NilCell();
+                                    continue;
+                                }
+
+                                var name = Keys.Rating(participant.DistributionParticipantId, sample.SampleId);
+                                var value = Model.Value(name, rating.RatingId.ToString());
+                                <td class="TabulationCell">
+                                    @if (audit)
+                                    {
+                                        <span>@(amend.RatingOptions.FirstOrDefault(o => string.Equals(o.RatingId.ToString(), value, StringComparison.OrdinalIgnoreCase))?.Rating)</span>
+                                        Hidden(name, value);
+                                    }
+                                    else
+                                    {
+                                        var error = ErrorFor(name);
+                                        <div class="govuk-form-group govuk-!-margin-bottom-0@(error is null ? null : " govuk-form-group--error")">
+                                            <label class="govuk-label govuk-visually-hidden" for="@name">@participant.LabCode @sample.SampleNumber rating</label>
+                                            @{ FieldError(name, error); }
+                                            <select class="govuk-select@(error is null ? null : " govuk-select--error")" id="@name" name="@name"
+                                                    aria-describedby="@DescribedBy(error is null ? null : name + "-error")"
+                                                    data-amend-rating data-sample-id="@sample.SampleId">
+                                                @foreach (var option in amend.RatingOptions)
+                                                {
+                                                    <option value="@option.RatingId" selected="@(string.Equals(option.RatingId.ToString(), value, StringComparison.OrdinalIgnoreCase))">@option.Rating</option>
+                                                }
+                                            </select>
+                                        </div>
+                                    }
+                                </td>
+                            }
+                        </tr>
+                    }
+                    @foreach (var (label, stat) in new[]
+                    {
+                        ("Mean score of all laboratories:", "mean"),
+                        ("No. of labs reporting intended result:", "labs"),
+                        ("No. of Participants:", "count"),
+                        ("Percent Correct:", "percent"),
+                    })
+                    {
+                        <tr>
+                            <th scope="row" class="TabulationCell">@label</th>
+                            @foreach (var sample in amend.RatingSamples)
+                            {
+                                var statistics = amend.Statistics.FirstOrDefault(s => s.SampleId == sample.SampleId);
+                                var text = stat switch
+                                {
+                                    "mean" => statistics?.MeanScore,
+                                    "labs" => statistics?.LabsReporting,
+                                    "count" => statistics?.ParticipantCount,
+                                    _ => statistics?.PercentageCorrect,
+                                };
+                                <td class="TabulationCell" data-stat="@stat" data-sample-id="@sample.SampleId">@text</td>
+                            }
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        @if (!audit)
+        {
+            <p class="govuk-visually-hidden" role="status" data-amend-stats-status></p>
+            <button type="button" class="govuk-button govuk-button--secondary" data-module="govuk-button" data-amend-recalculate>Recalculate</button>
+        }
+    }
+
+    @if (audit)
+    {
+        @:</div>
+        @:</details>
+    }
+    else
+    {
+        <div class="govuk-button-group">
+            <button type="submit" name="command" value="save" class="govuk-button" data-module="govuk-button">Save</button>
+            <button type="submit" name="command" value="cancel" class="govuk-button govuk-button--secondary" data-module="govuk-button" formnovalidate>Cancel</button>
+        </div>
+    }
+</form>

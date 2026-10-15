@@ -1,0 +1,174 @@
+@model PTL.InternalWeb.Features.Distribution.ViewCommentsViewModel
+@{
+    // Legacy diverts to a separate Audit.aspx page; here it is a second step of the same view -
+    // same pattern as Features/Distribution/Views/IntendedResults.cshtml.
+    ViewData["Title"] = Model.IsAuditStep
+        ? $"Audit Trail - {Model.DistributionTitle}"
+        : $"View Comments - {Model.DistributionTitle}";
+
+    const string fileField = "File";
+
+    var errors = ViewData.ModelState
+        .Where(entry => entry.Value?.Errors.Count > 0)
+        .SelectMany(entry => entry.Value!.Errors.Select(error => (Field: entry.Key, Message: error.ErrorMessage)))
+        .ToList();
+}
+
+@if (Model.IsAuditStep)
+{
+    <a class="govuk-back-link" asp-action="ViewComments" asp-route-year="@Model.YearId" asp-route-monthId="@Model.MonthId" asp-route-schemeId="@Model.MonthlyDistributionSchemeId">Back</a>
+
+    <h1 class="govuk-heading-l">Audit Trail</h1>
+
+    <govuk-error-summary errors="@errors" />
+
+    <p class="govuk-body">Changes have been made to the following object:</p>
+
+    <h2 class="govuk-heading-m">@Model.AuditObjectName</h2>
+
+    <hr class="govuk-section-break govuk-section-break--visible govuk-section-break--m">
+
+    @if (string.Equals(Model.PendingCommand, "submit", StringComparison.OrdinalIgnoreCase))
+    {
+        <div class="govuk-warning-text">
+            <span class="govuk-warning-text__icon" aria-hidden="true">!</span>
+            <strong class="govuk-warning-text__text">
+                <span class="govuk-visually-hidden">Warning</span>
+                Submitting the comments will prevent the Test Consultants from making any further modifications. Are you sure that you want to submit these comments?
+            </strong>
+        </div>
+    }
+
+    <form method="post" asp-action="ViewComments" asp-route-year="@Model.YearId" asp-route-monthId="@Model.MonthId" asp-route-schemeId="@Model.MonthlyDistributionSchemeId" novalidate>
+        @* No server-side session (legacy kept the comments in Session while Audit.aspx ran), so the
+           unsaved comments ride along hidden or they are lost when the audited save runs. *@
+        <input type="hidden" asp-for="IsAuditStep" />
+        <input type="hidden" asp-for="AuditObjectName" />
+        <input type="hidden" asp-for="PendingCommand" />
+        <input type="hidden" asp-for="Comments" />
+        @foreach (var staged in Model.StagedAttachments)
+        {
+            <input type="hidden" name="StagedAttachments" value="@staged" />
+        }
+        @foreach (var removedId in Model.RemovedAttachmentIds)
+        {
+            <input type="hidden" name="RemovedAttachmentIds" value="@removedId" />
+        }
+
+        <govuk-textarea asp-for="AuditWhy" label="Before these modifications can be saved, you must enter your reasons for making these changes below: " rows="5" maxlength="2000" />
+
+        <hr class="govuk-section-break govuk-section-break--visible govuk-section-break--m">
+
+        <div class="govuk-button-group">
+            <button type="submit" name="command" value="@Model.PendingCommand" class="govuk-button" data-module="govuk-button">Save</button>
+            <button type="submit" name="command" value="cancelAudit" class="govuk-button govuk-button--secondary" data-module="govuk-button" formnovalidate>Cancel</button>
+        </div>
+    </form>
+
+    return;
+}
+
+@{
+    var fileError = ViewData.ModelState.TryGetValue(fileField, out var fileEntry) && fileEntry.Errors.Count > 0
+        ? fileEntry.Errors[0].ErrorMessage
+        : null;
+    var fileDescribedBy = fileError is null ? "attachments-hint" : "attachments-hint File-error";
+}
+
+<a class="govuk-back-link" asp-action="Tabulations" asp-route-year="@Model.YearId" asp-route-monthId="@Model.MonthId">Back</a>
+
+<govuk-error-summary errors="@errors" />
+
+<h1 class="govuk-heading-l">@Model.DistributionTitle</h1>
+
+<p class="govuk-body">@Model.AuthorText</p>
+
+<form method="post" enctype="multipart/form-data" asp-action="ViewComments" asp-route-year="@Model.YearId" asp-route-monthId="@Model.MonthId" asp-route-schemeId="@Model.MonthlyDistributionSchemeId" novalidate>
+    <input type="hidden" asp-for="IsAuditStep" />
+    @* Unsaved attachment changes (legacy Session) until Save. *@
+    @foreach (var staged in Model.StagedAttachments)
+    {
+        <input type="hidden" name="StagedAttachments" value="@staged" />
+    }
+    @foreach (var removedId in Model.RemovedAttachmentIds)
+    {
+        <input type="hidden" name="RemovedAttachmentIds" value="@removedId" />
+    }
+
+    <govuk-rich-text asp-for="Comments" label="Comments" />
+
+    <h2 class="govuk-heading-m">Attachments</h2>
+
+    <div id="attachments-hint" class="govuk-hint">
+        Allowed file types: @Model.AllowedFileTypesText. Maximum file size: @Model.MaxFileSizeText. Note: Only one attachment is allowed.
+    </div>
+
+    @if (Model.Attachments.Count > 0)
+    {
+        if (fileError is not null)
+        {
+            @* Gives the error summary's "#File" link a target while the file input is hidden. *@
+            <p id="@fileField" class="govuk-error-message" tabindex="-1">
+                <span class="govuk-visually-hidden">Error:</span> @fileError
+            </p>
+        }
+
+        <dl class="govuk-summary-list">
+            @foreach (var attachment in Model.Attachments)
+            {
+                <div class="govuk-summary-list__row">
+                    <dt class="govuk-summary-list__key">Attachment</dt>
+                    <dd class="govuk-summary-list__value">
+                        @if (attachment.IsStaged)
+                        {
+                            <a class="govuk-link" asp-action="ViewCommentsStagedAttachment" asp-route-schemeId="@Model.MonthlyDistributionSchemeId" asp-route-token="@attachment.Id">@attachment.FileName</a>
+                            <strong class="govuk-tag govuk-tag--yellow govuk-!-margin-left-2">Not saved</strong>
+                        }
+                        else
+                        {
+                            <a class="govuk-link" asp-action="ViewCommentsAttachment" asp-route-schemeId="@Model.MonthlyDistributionSchemeId" asp-route-attachmentId="@attachment.Id">@attachment.FileName</a>
+                        }
+                    </dd>
+                    <dd class="govuk-summary-list__actions">
+                        <button type="submit" formaction="@Url.Action("ViewCommentsRemoveAttachment", new { year = Model.YearId, monthId = Model.MonthId, schemeId = Model.MonthlyDistributionSchemeId, attachmentId = attachment.Id })" formnovalidate class="govuk-button govuk-button--warning govuk-!-margin-bottom-0" data-module="govuk-button">Remove<span class="govuk-visually-hidden"> @attachment.FileName</span></button>
+                    </dd>
+                </div>
+            }
+        </dl>
+    }
+    else
+    {
+        <div class="govuk-form-group@(fileError is null ? string.Empty : " govuk-form-group--error")">
+            <label class="govuk-label" for="@fileField">Upload a file</label>
+            @if (fileError is not null)
+            {
+                <p id="File-error" class="govuk-error-message">
+                    <span class="govuk-visually-hidden">Error:</span> @fileError
+                </p>
+            }
+            <input class="govuk-file-upload@(fileError is null ? string.Empty : " govuk-file-upload--error")" id="@fileField" name="file" type="file"
+                   accept="@string.Join(",", Model.AllowedFileTypes)" aria-describedby="@fileDescribedBy" />
+        </div>
+
+        <button type="submit" formaction="@Url.Action("ViewCommentsUpload", new { year = Model.YearId, monthId = Model.MonthId, schemeId = Model.MonthlyDistributionSchemeId })" formnovalidate class="govuk-button govuk-button--secondary" data-module="govuk-button">Upload</button>
+    }
+
+    <hr class="govuk-section-break govuk-section-break--visible govuk-section-break--m">
+
+    <div class="govuk-button-group">
+        <button type="submit" name="command" value="save" class="govuk-button" data-module="govuk-button">Save</button>
+        <button type="submit" name="command" value="cancel" class="govuk-button govuk-button--secondary" data-module="govuk-button" formnovalidate>Cancel</button>
+    </div>
+
+    @if (Model.CanSubmit)
+    {
+        <div class="govuk-button-group">
+            <button type="submit" name="command" value="submit" class="govuk-button" data-module="govuk-button">Submit</button>
+        </div>
+    }
+</form>
+
+@section Scripts {
+    <script src="~/lib/tinymce/tinymce.min.js" asp-append-version="true"></script>
+    <script src="~/js/ptl-rich-text-editor.js" asp-append-version="true"></script>
+}

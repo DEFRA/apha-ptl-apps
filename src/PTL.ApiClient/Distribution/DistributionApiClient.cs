@@ -4,7 +4,7 @@ using PTL.Contracts.Distribution;
 namespace PTL.ApiClient.Distribution;
 
 // Thin typed HttpClient wrapper around PTL.Api's Distribution Dashboard endpoints.
-public sealed class DistributionApiClient(HttpClient httpClient) : IDistributionApiClient
+public sealed partial class DistributionApiClient(HttpClient httpClient) : IDistributionApiClient
 {
     public async Task<IReadOnlyList<DistributionDashboardMonthResponse>> GetDashboardAsync(int yearId, CancellationToken cancellationToken = default)
     {
@@ -171,6 +171,19 @@ public sealed class DistributionApiClient(HttpClient httpClient) : IDistribution
 
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadFromJsonAsync<ResultsReceiptSaveResult>(cancellationToken);
+    }
+
+    public async Task<TabulationsResponse?> GetTabulationsAsync(int yearId, int monthId, CancellationToken cancellationToken = default)
+    {
+        var response = await httpClient.GetAsync(
+            new Uri($"/api/distributions/months/{yearId}/{monthId}/tabulations", UriKind.Relative), cancellationToken);
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<TabulationsResponse>(cancellationToken);
     }
 
     public async Task<SampleReceiptResponse?> GetSampleReceiptAsync(

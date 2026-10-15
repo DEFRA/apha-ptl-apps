@@ -22,6 +22,7 @@ public class DistributionControllerTests
             new DistributionParticipantsService(repository),
             new PreparationService(repository),
             new ResultsReceiptService(repository, TimeProvider.System),
+            new TabulationsService(repository, TimeProvider.System),
             new ActualResultsService(repository, TimeProvider.System),
             packagingService ?? new FakePackagingService(),
             packagingOutputService ?? new FakePackagingOutputService(),

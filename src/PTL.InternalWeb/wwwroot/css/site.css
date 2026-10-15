@@ -135,7 +135,47 @@ body {
   padding: 0;
   margin: 0;
   font: inherit;
+  text-align: left;
   cursor: pointer;
+}
+
+/* A <button> never matches .govuk-link's :link/:visited colour rules, so give it the link colours. */
+.govuk-link.ptl-link-button:not(:focus) {
+  color: var(--govuk-link-colour, #1a65a6);
+}
+
+.govuk-link.ptl-link-button:hover:not(:focus) {
+  color: var(--govuk-link-hover-colour, #0f385c);
+}
+
+/* Legacy coloured overdue actions red; keep them underlined links (not tags) and let focus win. */
+.govuk-link.ptl-link--overdue:not(:focus),
+.govuk-link.ptl-link--overdue:hover:not(:focus) {
+  color: var(--govuk-error-colour, #ca3535);
+  font-weight: 700;
+}
+
+/* Monthly Distributions - Tabulations: the middle (tabulations table) column was squeezed to a third. */
+@media (min-width: 40.0625em) {
+  .ptl-tabulations-row {
+    display: flex;
+  }
+
+  .ptl-tabulations-row::after {
+    content: none;
+  }
+
+  .ptl-tabulations-row > [class*="govuk-grid-column-"] {
+    float: none;
+    flex: 1 1 0;
+    width: auto;
+    min-width: 0;
+  }
+
+  .ptl-tabulations-row > .ptl-tabulations-column {
+    flex-grow: 1.5;
+    min-width: 20em;
+  }
 }
 
 /* A table that gains a column per record (Results Tabulations) outgrows the page once there are a

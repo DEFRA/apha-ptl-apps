@@ -20,6 +20,7 @@ public class DistributionControllerSampleReceiptTests
             new DistributionParticipantsService(repository),
             new PreparationService(repository),
             new ResultsReceiptService(repository, TimeProvider.System),
+            new TabulationsService(repository, TimeProvider.System),
             new ActualResultsService(repository, TimeProvider.System),
             new FakePackagingService(),
             new FakePackagingOutputService(),

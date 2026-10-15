@@ -22,9 +22,12 @@ namespace PTL.InternalWeb.Features.Distribution;
 // placeholders (ViewStage/InitialiseMonth below) - those workflows (and the exact legacy
 // persisted-save chain behind Initialise) are out of scope and flagged [NEEDS INVESTIGATION] in
 // docs/migration/distribution-migration.md.
-public sealed class DistributionController(IDistributionApiClient distributionApiClient) : Controller
+public sealed partial class DistributionController(IDistributionApiClient distributionApiClient) : Controller
 {
-    private static readonly string[] MonthOrder = ["Scheduling", "Preparation", "Packaging", "Results", "Tabulations", "Actual Results", "Sample Receipt"];
+    private static readonly string[] MonthOrder =
+    [
+        "Scheduling", "Preparation", "Packaging", "Results", "Tabulations", "Actual Results", "Sample Receipt",
+    ];
     private const string CancelCommand = "cancel";
     private const string ApplyCommand = "apply";
 
@@ -257,6 +260,30 @@ public sealed class DistributionController(IDistributionApiClient distributionAp
         return string.Equals(command, ApplyCommand, StringComparison.OrdinalIgnoreCase)
             ? RedirectToAction(nameof(ResultsReceipt), new { year, monthId })
             : RedirectToAction(nameof(Index));
+    }
+
+    // Monthly Distributions - Tabulations - legacy Scheduling/Tabulations.aspx. Reached from the
+    // Dashboard's "Tabulations: View" link. Read only: every legacy action is shown in its legacy
+    // state, but the commands behind them (Send To Test Consultant/For Assessment/For Results
+    // Sign-Off) and the Tabulation, Issued, Amend Results and View Comments pages are not migrated
+    // yet (ViewStage placeholder). The legacy emails are sent by the Windows Email Service, which
+    // is out of scope - [EMAIL FUNCTIONALITY DEFERRED].
+    [HttpGet]
+    public async Task<IActionResult> Tabulations(int year, int monthId, CancellationToken cancellationToken)
+    {
+        var page = await distributionApiClient.GetTabulationsAsync(year, monthId, cancellationToken);
+        if (page is null)
+        {
+            return NotFound();
+        }
+
+        return View(new TabulationsViewModel
+        {
+            YearId = year,
+            MonthId = monthId,
+            MonthDescription = PackagingMonthDescription(year, monthId),
+            Schemes = page.Schemes,
+        });
     }
 
     // Sample Receipt - legacy Internal User/SampleReceipt.aspx (sitemap "Submission Status"). Reached
