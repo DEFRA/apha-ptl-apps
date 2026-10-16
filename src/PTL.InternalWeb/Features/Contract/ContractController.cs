@@ -495,59 +495,162 @@ public class ContractController(IContractApiClient contractApiClient, ICustomerA
     // button per row; clicking it switches that row into edit mode (Update/Cancel). Only the
     // "Import Permit Received"/"Import Permit Expiry" cells have an EditItemTemplate - "Import
     // Permit Required" has none, so it stays the same read-only, disabled checkbox in both view and
-    // edit mode (it is never itself editable - see ImportPermitViewModel.cs). editParticipantSchemeId
-    // carries which single row is in edit mode across the GET, replacing WebForms' GridView.EditIndex
-    // ViewState.
+    // edit mode (it is never itself editable - see ImportPermitViewModel.cs).
     [HttpGet]
-    public async Task<IActionResult> ImportPermits(Guid id, Guid? editParticipantSchemeId, CancellationToken cancellationToken)
+    public async Task<IActionResult> ImportPermits(Guid id, CancellationToken cancellationToken)
     {
         var permits = await importPermitApiClient.GetImportPermitsAsync(id, cancellationToken);
         LogDisplayedImportPermitsMessage(logger, id, permits.Count, null);
-        var model = ToImportPermitsViewModel(id, permits);
-        model.EditParticipantSchemeId = editParticipantSchemeId;
-        ViewData[BreadcrumbRouteValues.ContractId] = id;
-        return View(model);
+        return ImportPermitsView(ToImportPermitsViewModel(id, permits));
     }
 
-    // Matches legacy GridViewImportPermits_RowUpdating - commits the single edited row and returns
-    // to view mode (EditIndex = -1). Received/Expiry are posted as individual values (not the whole
-    // list) since only one row is ever editable at a time.
+    // Legacy ImportPermit.aspx workflow, driven by the page's submit buttons (command):
+    //   edit       - GridViewImportPermits_RowEditing: puts one row into edit mode.
+    //   update     - GridViewImportPermits_RowUpdating: applies the edited row to the pending (in-memory)
+    //                list only and leaves edit mode. Nothing is written to the database and no
+    //                notification is shown.
+    //   cancelEdit - RowCancelingEdit: discards the row's edit, keeping other rows' pending changes.
+    //   apply/save - btnApply/btnSave: write every row to the database; save then leaves the page.
+    //   cancel     - btnCancel: leaves the page, discarding all pending changes.
+    // Legacy held the pending list in ViewState; here it is round-tripped via the form (pending).
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> UpdateImportPermit(Guid id, Guid participantSchemeId, bool importPermitReceived, string? importPermitExpiry, CancellationToken cancellationToken)
+    public async Task<IActionResult> ImportPermits(Guid id, List<ImportPermitPendingRow>? pending, string? command, Guid? rowId, bool? editReceived, string? editExpiry, CancellationToken cancellationToken)
     {
-        var expiry = ParseExpiry(importPermitExpiry);
-        if (importPermitReceived && expiry is null)
+        if (string.Equals(command, ImportPermitCommands.Cancel, StringComparison.OrdinalIgnoreCase))
         {
-            ModelState.AddModelError(
-                nameof(importPermitExpiry),
-                string.IsNullOrWhiteSpace(importPermitExpiry) ? "Expiry date required" : "Invalid date. Please enter a valid date in dd/mm/yyyy format.");
-
-            var permits = await importPermitApiClient.GetImportPermitsAsync(id, cancellationToken);
-            var model = ToImportPermitsViewModel(id, permits);
-            model.EditParticipantSchemeId = participantSchemeId;
-
-            // Redisplay the row still in edit mode with what the user actually typed, not the
-            // last-saved value, matching legacy redisplaying the postback's own EditItemTemplate values.
-            var row = model.Permits.FirstOrDefault(p => p.ParticipantSchemeId == participantSchemeId);
-            if (row is not null)
-            {
-                row.ImportPermitReceived = importPermitReceived;
-                row.ImportPermitExpiry = importPermitExpiry;
-            }
-
-            return View(nameof(ImportPermits), model);
+            return await RedirectToContractListAsync(id, cancellationToken);
         }
 
-        await importPermitApiClient.UpdateImportPermitAsync(participantSchemeId, new UpdateImportPermitRequest(importPermitReceived, expiry), cancellationToken);
-        TempData.SetNotification(NotificationType.Success, "Import permit updated successfully.");
-        return RedirectToAction(nameof(ImportPermits), new { id });
+        var model = await BuildPendingImportPermitsModelAsync(id, pending ?? [], cancellationToken);
+
+        if (string.Equals(command, ImportPermitCommands.Edit, StringComparison.OrdinalIgnoreCase))
+        {
+            model.EditParticipantSchemeId = rowId;
+            return ImportPermitsView(model);
+        }
+
+        if (string.Equals(command, ImportPermitCommands.Update, StringComparison.OrdinalIgnoreCase))
+        {
+            return ApplyImportPermitRowEdit(model, rowId, editReceived, editExpiry);
+        }
+
+        if (string.Equals(command, ImportPermitCommands.Apply, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(command, ImportPermitCommands.Save, StringComparison.OrdinalIgnoreCase))
+        {
+            var saved = await SaveImportPermitsAsync(model, cancellationToken);
+            if (saved && string.Equals(command, ImportPermitCommands.Save, StringComparison.OrdinalIgnoreCase))
+            {
+                return await RedirectToContractListAsync(id, cancellationToken);
+            }
+
+            return ImportPermitsView(model);
+        }
+
+        // cancelEdit (or no command): redisplay the pending list with no row in edit mode.
+        return ImportPermitsView(model);
+    }
+
+    private ViewResult ImportPermitsView(ImportPermitsViewModel model)
+    {
+        ViewData[BreadcrumbRouteValues.ContractId] = model.ContractId;
+        return View(nameof(ImportPermits), model);
+    }
+
+    // Legacy returns to ContractList.aspx from Save and Cancel/Back.
+    private async Task<IActionResult> RedirectToContractListAsync(Guid contractId, CancellationToken cancellationToken)
+    {
+        var contract = await contractApiClient.GetContractAsync(contractId, cancellationToken);
+        return contract is null
+            ? RedirectToAction(nameof(ManageContracts))
+            : RedirectToAction(nameof(Index), new { customerId = contract.CustomerId });
+    }
+
+    // Reloads the read-only columns (and Required) from the database, then overlays each row's
+    // pending Received/Expiry posted by the form.
+    private async Task<ImportPermitsViewModel> BuildPendingImportPermitsModelAsync(Guid contractId, IReadOnlyList<ImportPermitPendingRow> pending, CancellationToken cancellationToken)
+    {
+        var permits = await importPermitApiClient.GetImportPermitsAsync(contractId, cancellationToken);
+        var model = ToImportPermitsViewModel(contractId, permits);
+        foreach (var row in model.Permits)
+        {
+            var pendingRow = pending.LastOrDefault(p => p.ParticipantSchemeId == row.ParticipantSchemeId);
+            if (pendingRow is null)
+            {
+                continue;
+            }
+
+            row.ImportPermitReceived = pendingRow.ImportPermitReceived ?? row.ImportPermitReceived;
+            row.ImportPermitExpiry = string.IsNullOrWhiteSpace(pendingRow.ImportPermitExpiry) ? null : pendingRow.ImportPermitExpiry.Trim();
+        }
+
+        return model;
+    }
+
+    // Matches legacy GridViewImportPermits_RowUpdating: the expiry is only kept while the permit is
+    // required AND received (otherwise it is cleared), and is required/validated only in that case.
+    // Only the in-memory model changes - no database write, no notification.
+    private ViewResult ApplyImportPermitRowEdit(ImportPermitsViewModel model, Guid? rowId, bool? editReceived, string? editExpiry)
+    {
+        var row = model.Permits.FirstOrDefault(p => p.ParticipantSchemeId == rowId);
+        if (row is null)
+        {
+            return ImportPermitsView(model);
+        }
+
+        // A disabled Received dropdown (permit not required) is not posted - keep the pending value.
+        var received = editReceived ?? row.ImportPermitReceived;
+        var expiryKept = row.ImportPermitRequired && received;
+        var expiry = expiryKept ? ParseExpiry(editExpiry) : null;
+
+        if (expiryKept && expiry is null)
+        {
+            ModelState.AddModelError(
+                ImportPermitExpiryField,
+                string.IsNullOrWhiteSpace(editExpiry) ? "Expiry date required" : "Invalid date. Please enter a valid date in dd/mm/yyyy format.");
+
+            // Redisplay the row still in edit mode with what the user actually typed.
+            model.EditParticipantSchemeId = row.ParticipantSchemeId;
+            model.EditReceived = received;
+            model.EditExpiry = editExpiry;
+            return ImportPermitsView(model);
+        }
+
+        row.ImportPermitReceived = received;
+        row.ImportPermitExpiry = expiry?.ToString(ExpiryFormat, CultureInfo.InvariantCulture);
+        return ImportPermitsView(model);
+    }
+
+    // Matches legacy btnApply/btnSave: writes every row (not just the changed ones) to the database.
+    // Returns false (with an error banner) if any write is rejected.
+    private async Task<bool> SaveImportPermitsAsync(ImportPermitsViewModel model, CancellationToken cancellationToken)
+    {
+        foreach (var row in model.Permits)
+        {
+            var updated = await importPermitApiClient.UpdateImportPermitAsync(
+                row.ParticipantSchemeId,
+                new UpdateImportPermitRequest(row.ImportPermitReceived, ParseExpiry(row.ImportPermitExpiry)),
+                cancellationToken);
+            if (!updated)
+            {
+                TempData.SetNotification(NotificationType.Error, "The import permits could not be saved.");
+                return false;
+            }
+        }
+
+        TempData.SetNotification(NotificationType.Success, "Saved successfully.");
+        return true;
     }
 
     // Matches legacy validatePermitExpiry()/cvPermitExpiry_ServerValidate's exact dd/MM/yyyy format.
+    private const string ExpiryFormat = "dd/MM/yyyy";
+
+    // ModelState key / input id of the edited row's expiry field.
+    private const string ImportPermitExpiryField = "importPermitExpiry";
+
     private static DateTime? ParseExpiry(string? text) =>
         !string.IsNullOrWhiteSpace(text) &&
-        DateTime.TryParseExact(text.Trim(), "dd/MM/yyyy", CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsed)
+        DateTime.TryParseExact(text.Trim(), ExpiryFormat, CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsed)
             ? parsed
             : null;
 
