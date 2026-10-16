@@ -626,6 +626,19 @@ public sealed partial class DistributionController(IDistributionApiClient distri
             return await SavePackagingAsync(year, monthId, model, command, cancellationToken);
         }
 
+        var printed = await TryPrintPackagingAsync(year, monthId, model, command, cancellationToken);
+        if (printed is not null)
+        {
+            return printed;
+        }
+
+        var rebuilt = await BuildPackagingViewModelAsync(year, monthId, model, cancellationToken);
+        return rebuilt is null ? NotFound() : View(rebuilt);
+    }
+
+    // The labels / customs print commands; null means redisplay the page (with model.Message set).
+    private async Task<IActionResult?> TryPrintPackagingAsync(int year, int monthId, PackagingViewModel model, string command, CancellationToken cancellationToken)
+    {
         if (string.Equals(command, "labels", StringComparison.OrdinalIgnoreCase) && model.Mode is { } labelMode)
         {
             var labels = await distributionApiClient.GetPackagingLabelsAsync(
@@ -664,8 +677,7 @@ public sealed partial class DistributionController(IDistributionApiClient distri
             model.Message = "No Labels to Print";
         }
 
-        var rebuilt = await BuildPackagingViewModelAsync(year, monthId, model, cancellationToken);
-        return rebuilt is null ? NotFound() : View(rebuilt);
+        return null;
     }
 
     private static bool ValidatePackagingSelection(PackagingViewModel model)

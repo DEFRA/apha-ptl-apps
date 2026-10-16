@@ -4,12 +4,12 @@
 (function () {
     "use strict";
 
-    var pageHeight = 720;
-    var pageWidth = 650;
-    var stretchWidth = 300;
+    const pageHeight = 720;
+    const pageWidth = 650;
+    const stretchWidth = 300;
 
     function cell(text, className) {
-        var td = document.createElement("td");
+        const td = document.createElement("td");
         td.textContent = text;
         td.className = className;
         return td;
@@ -21,7 +21,8 @@
 
     // Rows 0-3 are the test header, sample header, intended description and intended value rows;
     // participant rows follow.
-    const FIRST_PARTICIPANT_ROW = 4;
+    const INTENDED_VALUE_ROW = 3;
+    const FIRST_PARTICIPANT_ROW = INTENDED_VALUE_ROW + 1;
 
     class CustomTable {
         constructor(testName, participants) {
@@ -68,7 +69,7 @@
             header.rowSpan = 2;
             this.table.rows[0].appendChild(header);
             this.table.rows[2].appendChild(cell("\u00a0", "TabulationCell"));
-            this.table.rows[3].appendChild(cell(withSpace(column.intendedResult), "TabulationCell"));
+            this.table.rows[INTENDED_VALUE_ROW].appendChild(cell(withSpace(column.intendedResult), "TabulationCell"));
 
             const isFirstColumn = this.table.rows[0].cells.length === 2;
             for (let i = 0; i < column.results.length; i++) {
@@ -91,7 +92,7 @@
 
             for (const column of sample.resultColumns) {
                 this.table.rows[1].appendChild(cell(column.headerText, "TabulationHeader2"));
-                this.table.rows[3].appendChild(cell(withSpace(column.intendedResult), "TabulationCell"));
+                this.table.rows[INTENDED_VALUE_ROW].appendChild(cell(withSpace(column.intendedResult), "TabulationCell"));
                 this.addSampleResults(column.results);
             }
         }
@@ -105,6 +106,8 @@
                     const td = cell(results[j].result, "TabulationCell");
                     td.colSpan = results[j].span;
                     row.appendChild(td);
+                } else {
+                    // A zero span means an earlier cell already covers this column.
                 }
             }
         }
@@ -151,13 +154,13 @@
     // Adds columns one at a time; when a column pushes the table past the page width (and it is not
     // the table's first column) that column is removed and drawn again at the start of a new table.
     function addColumns(container, columns, createTable, addColumn) {
-        var table = createTable();
+        let table = createTable();
         container.appendChild(table.table);
         container.appendChild(document.createElement("br"));
 
-        for (var i = 0; i < columns.length; i++) {
-            var previous = table.table.cloneNode(true);
-            var isFirstColumn = table.table.rows[0].cells.length === 1;
+        for (let i = 0; i < columns.length; i++) {
+            const previous = table.table.cloneNode(true);
+            const isFirstColumn = table.table.rows[0].cells.length === 1;
             addColumn(table, columns[i]);
 
             if (table.table.offsetWidth > pageWidth && !isFirstColumn) {
@@ -172,10 +175,10 @@
 
     function build(container, data) {
         container.style.width = pageWidth + "px";
-        var participants = data.participants;
+        const participants = data.participants;
 
         data.tests.forEach(function (test) {
-            var columns = test.methodColumns.map(function (c) { return { kind: "method", value: c }; })
+            const columns = test.methodColumns.map(function (c) { return { kind: "method", value: c }; })
                 .concat(test.sampleColumns
                     .filter(function (s) { return s.resultColumns.length > 0; })
                     .map(function (s) { return { kind: "sample", value: s }; }));
@@ -197,15 +200,15 @@
                 function (table, column) { table.addRatingColumn(column); });
         }
 
-        var tables = container.getElementsByTagName("table");
+        const tables = container.getElementsByTagName("table");
         for (const printTable of tables) {
             if (printTable.offsetWidth >= stretchWidth) {
                 printTable.style.width = pageWidth + "px";
             }
         }
 
-        var totalHeight = 0;
-        for (var k = 1; k < tables.length; k++) {
+        let totalHeight = 0;
+        for (let k = 1; k < tables.length; k++) {
             if (-totalHeight + tables[k].offsetTop + tables[k].offsetHeight > pageHeight && !tables[k].classList.contains("nobreak")) {
                 totalHeight = tables[k].offsetTop;
                 tables[k - 1].style.pageBreakAfter = "always";
@@ -216,8 +219,8 @@
     }
 
     document.addEventListener("DOMContentLoaded", function () {
-        var dataElement = document.getElementById("tabulation-print-data");
-        var container = document.getElementById("tabulation-print-tables");
+        const dataElement = document.getElementById("tabulation-print-data");
+        const container = document.getElementById("tabulation-print-tables");
         if (!dataElement || !container) {
             return;
         }
