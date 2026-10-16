@@ -1,6 +1,6 @@
 namespace PTL.Core.Distribution;
 
-public interface IDistributionRepository
+public partial interface IDistributionRepository
 {
     Task<IReadOnlyList<DistributionMonthSummaryEntity>> GetMonthlyDistributionSummariesAsync(CancellationToken cancellationToken = default);
 
@@ -84,4 +84,70 @@ public interface IDistributionRepository
     // spuMonthlyDistributionSchemePrep x N - legacy MonthlyDistributionSchemeCollection.Update,
     // called once per dirty scheme (only schemes with at least one newly-set stage are passed in).
     Task UpdatePreparationAsync(IReadOnlyList<PreparationSchemeEntity> schemes, CancellationToken cancellationToken = default);
+
+    // spgMonthlyDistributionForResultsReceipt - all 4 result sets (header, schemes, participants,
+    // unaccounted-sample status), legacy ResultsReceipt.MonthlyDistribution.FetchMonthlyDistribution.
+    // Returns null when the month has no distribution.
+    Task<ResultsReceiptData?> GetResultsReceiptAsync(int yearId, int monthId, CancellationToken cancellationToken = default);
+
+    // spuDistributionParticipantForResultsReceipt x N - legacy DistributionParticipantCollection.Update,
+    // called once per changed participant.
+    Task UpdateResultsReceiptAsync(IReadOnlyList<ResultsReceiptParticipantEntity> participants, CancellationToken cancellationToken = default);
+
+    // spgSampleReceipt - all 4 result sets (Tests, Sample Receipts, Lab, scheme), legacy
+    // ResultsReceipt.TestCollection.DataPortal_Fetch. Null when the lab or scheme row is not found.
+    Task<SampleReceiptData?> GetSampleReceiptAsync(
+        Guid distributionParticipantId, Guid monthlyDistributionSchemeId, CancellationToken cancellationToken = default);
+
+    // spuSampleReceipt x N in one transaction - legacy ParticipantSampleReceiptCollection.Update,
+    // called once per changed Sample.
+    Task UpdateSampleReceiptAsync(IReadOnlyList<SampleReceiptSampleEntity> samples, CancellationToken cancellationToken = default);
+
+    // spgMonthlyDistributionInfoForTabulationsById (schemes + tabulations) and, for each scheme that
+    // requires assessment, spgAssessmentStatus - legacy ResultsTabulation.MonthlyDistribution.
+    // FetchMonthlyDistribution. An empty list means the month has no schemes to tabulate.
+    Task<IReadOnlyList<TabulationsSchemeEntity>> GetTabulationsAsync(Guid monthlyDistributionId, CancellationToken cancellationToken = default);
+
+    // spgGroupedPackagingSheet / spgPartGroupedPackagingSheet / spgWeeklyPackagingSheet - the
+    // Sample Packaging screen's data for one option (and week, for the two Combined options),
+    // legacy GroupedPackagingSheet / PartGroupedPackagingSheet / WeeklyPackagingSheet.Fetch*.
+    // Returns null when the header row itself is not found.
+    Task<PackagingRawData?> GetPackagingSheetAsync(
+        Guid monthlyDistributionId, PackagingMode mode, int week, CancellationToken cancellationToken = default);
+
+    // spuDistributionParticipantPacking x N + spiDistributionPostedEmail x M in a single
+    // transaction - legacy ParticipantInfo/SchemeItem.Update, which saves the participant's dates
+    // and then its queued Distribution Posted emails together.
+    Task UpdatePackagingAsync(
+        IReadOnlyList<PackagingProgressUpdate> updates,
+        IReadOnlyList<DistributionPostedEmailEntity> emails,
+        CancellationToken cancellationToken = default);
+
+    // spgActualResults - legacy ActualResultsSet.DataPortal_Fetch's 3 result sets (header, sample
+    // results, method item results) for one participant. Returns null when the participant is not
+    // returned (including outside the seven-year retention window).
+    Task<ActualResultsData?> GetActualResultsAsync(Guid distributionParticipantId, CancellationToken cancellationToken = default);
+
+    // spgaRating - every Rating, ordered by fldOrder; legacy uses the first as the default.
+    Task<IReadOnlyList<Guid>> GetRatingIdsAsync(CancellationToken cancellationToken = default);
+
+    // spiActualResults/spuActualResults + spi/spuActualMethodItemResult + spi/spuActualResultItemResult
+    // (+ spiAuditActual* before each audited update, + spiSampleRating on first save for
+    // StoreRatings schemes) in a single transaction, mirroring ActualResultsSet.DataPortal_Insert/
+    // DataPortal_Update's TransactionScope (method items first, then sample result items).
+    Task SaveActualResultsAsync(ActualResultsWrite write, CancellationToken cancellationToken = default);
+
+    // spgaDistributionPostedEmail - emails queued but not yet sent.
+    Task<IReadOnlyList<DistributionPostedEmailEntity>> GetUnsentDistributionPostedEmailsAsync(CancellationToken cancellationToken = default);
+
+    // spuDistributionPostedEmail - legacy DistributionPostedEmail.MarkSent.
+    Task MarkDistributionPostedEmailSentAsync(Guid distributionPostedEmailId, DateTime dateSent, CancellationToken cancellationToken = default);
+
+    // spgLabelParticipantAddress - an empty monthlyDistributionSchemeId returns the participant's
+    // own address, otherwise the scheme-level contact applies. Null when no row is returned.
+    Task<PackagingLabelAddressEntity?> GetLabelParticipantAddressAsync(
+        Guid participantId, Guid monthlyDistributionSchemeId, CancellationToken cancellationToken = default);
+
+    // spgLabelGroupAddress.
+    Task<PackagingLabelAddressEntity?> GetLabelGroupAddressAsync(Guid groupAddressId, CancellationToken cancellationToken = default);
 }

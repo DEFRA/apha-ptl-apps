@@ -3,7 +3,7 @@ using PTL.Contracts.Distribution;
 
 namespace PTL.InternalWeb.Tests.TestSupport;
 
-internal sealed class FakeDistributionApiClient : IDistributionApiClient
+internal sealed partial class FakeDistributionApiClient : IDistributionApiClient
 {
     public IReadOnlyList<DistributionDashboardMonthResponse> Months { get; set; } = [];
     public IReadOnlyList<DistributionYearOptionResponse> Years { get; set; } = [];
@@ -91,5 +91,95 @@ internal sealed class FakeDistributionApiClient : IDistributionApiClient
     {
         SavedPreparationRequests.Add(request);
         return Task.FromResult(PreparationSaveResult);
+    }
+
+    public ResultsReceiptResponse? ResultsReceipt { get; set; }
+    public ResultsReceiptSaveResult? ResultsReceiptSaveResult { get; set; }
+    public List<ResultsReceiptSaveRequest> SavedResultsReceiptRequests { get; } = [];
+
+    public Task<ResultsReceiptResponse?> GetResultsReceiptAsync(int yearId, int monthId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(ResultsReceipt);
+
+    public TabulationsResponse? Tabulations { get; set; }
+
+    public List<(int YearId, int MonthId)> TabulationRequests { get; } = [];
+
+    public Task<TabulationsResponse?> GetTabulationsAsync(int yearId, int monthId, CancellationToken cancellationToken = default)
+    {
+        TabulationRequests.Add((yearId, monthId));
+        return Task.FromResult(Tabulations);
+    }
+
+    public Task<ResultsReceiptSaveResult?> SaveResultsReceiptAsync(
+        int yearId, int monthId, ResultsReceiptSaveRequest request, CancellationToken cancellationToken = default)
+    {
+        SavedResultsReceiptRequests.Add(request);
+        return Task.FromResult(ResultsReceiptSaveResult);
+    }
+
+    public SampleReceiptResponse? SampleReceipt { get; set; }
+    public SampleReceiptSaveResult? SampleReceiptSaveResult { get; set; }
+    public List<SampleReceiptSaveRequest> SavedSampleReceiptRequests { get; } = [];
+
+    public Task<SampleReceiptResponse?> GetSampleReceiptAsync(
+        Guid monthlyDistributionSchemeId, Guid distributionParticipantId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(SampleReceipt);
+
+    public Task<SampleReceiptSaveResult?> SaveSampleReceiptAsync(
+        Guid monthlyDistributionSchemeId, Guid distributionParticipantId, SampleReceiptSaveRequest request, CancellationToken cancellationToken = default)
+    {
+        SavedSampleReceiptRequests.Add(request);
+        return Task.FromResult(SampleReceiptSaveResult);
+    }
+
+    public ActualResultsResponse? ActualResults { get; set; }
+    public ActualResultsSaveResult? ActualResultsSaveResult { get; set; }
+    public List<ActualResultsSaveRequest> SavedActualResultsRequests { get; } = [];
+
+    public Task<ActualResultsResponse?> GetActualResultsAsync(
+        Guid monthlyDistributionSchemeId, Guid distributionParticipantId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(ActualResults);
+
+    public Task<ActualResultsSaveResult?> SaveActualResultsAsync(
+        Guid monthlyDistributionSchemeId, Guid distributionParticipantId, ActualResultsSaveRequest request, CancellationToken cancellationToken = default)
+    {
+        SavedActualResultsRequests.Add(request);
+        return Task.FromResult(ActualResultsSaveResult);
+    }
+
+    public PackagingSheetResponse? Packaging { get; set; }
+    public PackagingSaveResult? PackagingSaveResult { get; set; }
+    public PackagingLabelsResponse? PackagingLabels { get; set; }
+    public PackagingCustomsResult PackagingCustoms { get; set; } = new(null, string.Empty, "Not configured");
+    public List<(int YearId, int MonthId, int Mode, int Week)> PackagingRequests { get; } = [];
+    public List<PackagingSaveRequest> SavedPackagingRequests { get; } = [];
+    public List<PackagingSelectionRequest> PackagingLabelRequests { get; } = [];
+    public List<PackagingSelectionRequest> PackagingCustomsRequests { get; } = [];
+
+    public Task<PackagingSheetResponse?> GetPackagingAsync(int yearId, int monthId, int mode, int week, CancellationToken cancellationToken = default)
+    {
+        PackagingRequests.Add((yearId, monthId, mode, week));
+        return Task.FromResult(Packaging);
+    }
+
+    public Task<PackagingSaveResult?> SavePackagingAsync(
+        int yearId, int monthId, PackagingSaveRequest request, CancellationToken cancellationToken = default)
+    {
+        SavedPackagingRequests.Add(request);
+        return Task.FromResult(PackagingSaveResult);
+    }
+
+    public Task<PackagingLabelsResponse?> GetPackagingLabelsAsync(
+        int yearId, int monthId, PackagingSelectionRequest request, CancellationToken cancellationToken = default)
+    {
+        PackagingLabelRequests.Add(request);
+        return Task.FromResult(PackagingLabels);
+    }
+
+    public Task<PackagingCustomsResult> GetPackagingCustomsAsync(
+        int yearId, int monthId, PackagingSelectionRequest request, CancellationToken cancellationToken = default)
+    {
+        PackagingCustomsRequests.Add(request);
+        return Task.FromResult(PackagingCustoms);
     }
 }

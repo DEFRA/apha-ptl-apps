@@ -40,6 +40,11 @@ internal sealed class FakeDbConnection : DbConnection
     public void RespondToQuery(string commandText, DataSet dataSet) =>
         _readerFactories[commandText] = _ => dataSet.CreateDataReader();
 
+    // Configures a single result set chosen per executed command, for a procedure the repository
+    // runs repeatedly with different parameters (e.g. once per scheme).
+    public void RespondToQuery(string commandText, Func<FakeDbCommand, DataTable> tableFactory) =>
+        _readerFactories[commandText] = command => tableFactory(command).CreateDataReader();
+
     // Configures the rows-affected count an ExecuteAsync (insert/update) call against this exact
     // command text should return.
     public void RespondToNonQuery(string commandText, int rowsAffected) =>

@@ -7,6 +7,7 @@ using PTL.Common.Correlation;
 using PTL.Common.Health;
 using PTL.Core.AdministrationCharge;
 using PTL.Core.Contract;
+using PTL.Core.Contract.Document;
 using PTL.Core.Contract.Export.Bulk;
 using PTL.Core.Contract.Export.Templates;
 using PTL.Core.Contract.ImportPermit;
@@ -188,6 +189,29 @@ builder.Services.AddScoped<ISampleNumbersService, SampleNumbersService>();
 builder.Services.AddScoped<IIntendedResultsService, IntendedResultsService>();
 builder.Services.AddScoped<IDistributionParticipantsService, DistributionParticipantsService>();
 builder.Services.AddScoped<IPreparationService, PreparationService>();
+builder.Services.AddScoped<IResultsReceiptService, ResultsReceiptService>();
+builder.Services.AddScoped<ITabulationsService, TabulationsService>();
+builder.Services.AddScoped<ITabulationReportService, TabulationReportService>();
+builder.Services.AddScoped<ITestConsultantCommentsService, TestConsultantCommentsService>();
+builder.Services.AddScoped<IAmendResultsService, AmendResultsService>();
+builder.Services.AddScoped<ITabulationSendService, TabulationSendService>();
+builder.Services.Configure<AttachmentOptions>(builder.Configuration.GetSection(AttachmentOptions.SectionName));
+builder.Services.AddScoped<IActualResultsService, ActualResultsService>();
+builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddScoped<IDistributionPostedNotifier, DistributionPostedNotifier>();
+
+// Test Consultant and publication emails: sent through GOV.UK Notify, with the scheduler hosted in this process.
+builder.Services.Configure<TabulationEmailOptions>(builder.Configuration.GetSection(TabulationEmailOptions.SectionName));
+builder.Services.Configure<PublicationNotificationOptions>(builder.Configuration.GetSection(PublicationNotificationOptions.SectionName));
+builder.Services.AddSingleton<TabulationEmailGuard>();
+builder.Services.AddSingleton<TabulationEmailContext>();
+builder.Services.AddScoped<ITabulationEmailService, TabulationEmailService>();
+builder.Services.AddScoped<ITabulationPublishedNotifier, TabulationPublishedNotifier>();
+builder.Services.AddHostedService<PTL.Api.BackgroundServices.TabulationEmailBackgroundService>();
+builder.Services.AddScoped<IPackagingService, PackagingService>();
+builder.Services.AddScoped<IPackagingOutputService, PackagingOutputService>();
+builder.Services.AddScoped<ITemplateMergeService, TemplateMergeService>();
+builder.Services.Configure<PTL.Core.Configuration.ExternalOptions>(builder.Configuration.GetSection(PTL.Core.Configuration.ExternalOptions.SectionName));
 
 builder.Services.AddScoped<IAdministrationChargeRepository, AdministrationChargeRepository>();
 builder.Services.AddScoped<IAdministrationChargeService, AdministrationChargeService>();
@@ -229,6 +253,9 @@ else
 {
     builder.Services.AddScoped<IInvoiceStorageService, S3InvoiceStorageService>();
 }
+
+// Distribution attachments are stored only in the database (fldFileData), as in legacy.
+builder.Services.AddSingleton<PTL.Core.Distribution.IAttachmentStagingStore, InMemoryAttachmentStagingStore>();
 
 // Shared GOV.UK Notify client - every feature needing outbound notifications depends on
 // INotifyClient only, never SMTP/EmailHelper (docs/migration/email-notification-migration.md).

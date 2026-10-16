@@ -586,6 +586,483 @@ public class DapperColumnMappingsTests
         Assert.Equal("Internal 1", sample.InternalDescription);
     }
 
+    [Fact]
+    public void Register_MapsPackagingGroup_ColumnsToProperties()
+    {
+        var groupAddressId = Guid.NewGuid();
+        var participantId = Guid.NewGuid();
+        var distributionDate = new DateTime(2026, 5, 13);
+        var table = new DataTable();
+        table.Columns.Add("fldGroupAddressId", typeof(Guid));
+        table.Columns.Add("fldParticipantId", typeof(Guid));
+        table.Columns.Add("fldIdentifier", typeof(string));
+        table.Columns.Add("fldLabCode", typeof(string));
+        table.Columns.Add("fldLabName", typeof(string));
+        table.Columns.Add("fldPackingInfo", typeof(string));
+        table.Columns.Add("fldDistributionDate", typeof(DateTime));
+        table.Columns.Add("fldContactName", typeof(string));
+        table.Columns.Add("fldOrganisation", typeof(string));
+        table.Columns.Add("fldAddress1", typeof(string));
+        table.Columns.Add("fldAddress2", typeof(string));
+        table.Columns.Add("fldAddress3", typeof(string));
+        table.Columns.Add("fldAddress4", typeof(string));
+        table.Columns.Add("fldAddress5", typeof(string));
+        table.Columns.Add("fldTelephone", typeof(string));
+        table.Columns.Add("fldCountry", typeof(string));
+        table.Rows.Add(
+            groupAddressId, participantId, "G1", "L001", "Lab One", "Keep cool", distributionDate,
+            "A Contact", "An Org", "1 High St", "Town", "County", "Four", "Five", "0123", "UK");
+
+        var group = Parse<PackagingGroupEntity>(table).Single();
+
+        Assert.Equal(groupAddressId, group.GroupAddressId);
+        Assert.Equal(participantId, group.ParticipantId);
+        Assert.Equal("G1", group.Identifier);
+        Assert.Equal("L001", group.LabCode);
+        Assert.Equal("Lab One", group.LabName);
+        Assert.Equal("Keep cool", group.PackingInfo);
+        Assert.Equal(distributionDate, group.DistributionDate);
+        Assert.Equal("A Contact", group.ContactName);
+        Assert.Equal("An Org", group.Organisation);
+        Assert.Equal("1 High St", group.Address1);
+        Assert.Equal("Town", group.Address2);
+        Assert.Equal("County", group.Address3);
+        Assert.Equal("Four", group.Address4);
+        Assert.Equal("Five", group.Address5);
+        Assert.Equal("0123", group.Telephone);
+        Assert.Equal("UK", group.Country);
+    }
+
+    // Result set 2 of spgWeeklyPackagingSheet returns only the date; everything else keeps its default.
+    [Fact]
+    public void Register_MapsPackagingGroup_DayRowWithOnlyADateKeepsDefaults()
+    {
+        var table = new DataTable();
+        table.Columns.Add("fldDistributionDate", typeof(DateTime));
+        table.Columns.Add("fldPackingInfo", typeof(string));
+        table.Columns.Add("fldLabName", typeof(string));
+        table.Rows.Add(new DateTime(2026, 5, 14), DBNull.Value, DBNull.Value);
+
+        var group = Parse<PackagingGroupEntity>(table).Single();
+
+        Assert.Equal(new DateTime(2026, 5, 14), group.DistributionDate);
+        Assert.Equal(string.Empty, group.PackingInfo);
+        Assert.Equal(string.Empty, group.LabName);
+        Assert.Equal(Guid.Empty, group.GroupAddressId);
+    }
+
+    [Fact]
+    public void Register_MapsPackagingItem_UsingFldNameAndFldIdentifierForTheScheme()
+    {
+        var schemeId = Guid.NewGuid();
+        var groupAddressId = Guid.NewGuid();
+        var table = new DataTable();
+        table.Columns.Add("fldMonthlyDistributionSchemeId", typeof(Guid));
+        table.Columns.Add("fldGroupAddressId", typeof(Guid));
+        table.Columns.Add("fldPreparationComplete", typeof(bool));
+        table.Columns.Add("fldName", typeof(string));
+        table.Columns.Add("fldIdentifier", typeof(string));
+        table.Columns.Add("fldDistributionReference", typeof(string));
+        table.Columns.Add("fldDistributionReferenceSuffix", typeof(string));
+        table.Columns.Add("fldScheduleCode", typeof(string));
+        table.Columns.Add("fldPackingInfo", typeof(string));
+        table.Columns.Add("fldNumberOfSetsRequired", typeof(int));
+        table.Columns.Add("fldDistributionDate", typeof(DateTime));
+        table.Columns.Add("fldCustomsDocumentDescription", typeof(string));
+        table.Columns.Add("fldCustomsDocumentVolume", typeof(string));
+        table.Columns.Add("fldNumberOfSamples", typeof(int));
+        table.Rows.Add(
+            schemeId, groupAddressId, true, "Mastitis bovine", "PT0060", "17152", "A", "BA", "Scheme pack", 3,
+            new DateTime(2026, 5, 13), "Blood samples", "5ml", 4);
+
+        var item = Parse<PackagingItemEntity>(table).Single();
+
+        Assert.Equal(schemeId, item.MonthlyDistributionSchemeId);
+        Assert.Equal(groupAddressId, item.GroupAddressId);
+        Assert.True(item.PreparationComplete);
+        Assert.Equal("Mastitis bovine", item.SchemeName);
+        Assert.Equal("PT0060", item.SchemeIdentifier);
+        Assert.Equal("17152", item.DistributionReference);
+        Assert.Equal("A", item.DistributionReferenceSuffix);
+        Assert.Equal("BA", item.ScheduleCode);
+        Assert.Equal("Scheme pack", item.PackingInfo);
+        Assert.Equal(3, item.NumberOfSetsRequired);
+        Assert.Equal(new DateTime(2026, 5, 13), item.DistributionDate);
+        Assert.Equal("Blood samples", item.CustomsDocumentDescription);
+        Assert.Equal("5ml", item.CustomsDocumentVolume);
+        Assert.Equal(4, item.NumberOfSamples);
+    }
+
+    // The Participant Combined result set names the scheme columns fldSchemeName/fldSchemeIdentifier;
+    // PackagingItemEntity deliberately does not read those aliases.
+    [Fact]
+    public void Register_MapsPackagingItem_IgnoresTheSchemePrefixedAliases()
+    {
+        var table = new DataTable();
+        table.Columns.Add("fldSchemeName", typeof(string));
+        table.Columns.Add("fldSchemeIdentifier", typeof(string));
+        table.Rows.Add("Ignored name", "Ignored id");
+
+        var item = Parse<PackagingItemEntity>(table).Single();
+
+        Assert.Equal(string.Empty, item.SchemeName);
+        Assert.Equal(string.Empty, item.SchemeIdentifier);
+    }
+
+    [Fact]
+    public void Register_MapsPackagingItem_NullColumnsKeepPropertyDefaults()
+    {
+        var table = new DataTable();
+        table.Columns.Add("fldPreparationComplete", typeof(bool));
+        table.Columns.Add("fldPackingInfo", typeof(string));
+        table.Columns.Add("fldNumberOfSetsRequired", typeof(int));
+        table.Columns.Add("fldNumberOfSamples", typeof(int));
+        table.Rows.Add(DBNull.Value, DBNull.Value, DBNull.Value, DBNull.Value);
+
+        var item = Parse<PackagingItemEntity>(table).Single();
+
+        Assert.False(item.PreparationComplete);
+        Assert.Equal(string.Empty, item.PackingInfo);
+        Assert.Equal(0, item.NumberOfSetsRequired);
+        Assert.Equal(0, item.NumberOfSamples);
+    }
+
+    [Fact]
+    public void Register_MapsPackagingParticipant_ColumnsToProperties()
+    {
+        var groupAddressId = Guid.NewGuid();
+        var schemeId = Guid.NewGuid();
+        var distributionParticipantId = Guid.NewGuid();
+        var participantId = Guid.NewGuid();
+        var packaged = new DateTime(2026, 5, 12, 9, 0, 0);
+        var posted = new DateTime(2026, 5, 13, 9, 0, 0);
+        var table = new DataTable();
+        table.Columns.Add("fldGroupAddressId", typeof(Guid));
+        table.Columns.Add("fldMonthlyDistributionSchemeId", typeof(Guid));
+        table.Columns.Add("fldDistributionParticipantId", typeof(Guid));
+        table.Columns.Add("fldParticipantId", typeof(Guid));
+        table.Columns.Add("fldPackagedDate", typeof(DateTime));
+        table.Columns.Add("fldPostedDate", typeof(DateTime));
+        table.Columns.Add("fldLabCode", typeof(string));
+        table.Columns.Add("fldLabName", typeof(string));
+        table.Columns.Add("fldPackingInfo", typeof(string));
+        table.Columns.Add("fldCustomerPackingInfo", typeof(string));
+        table.Columns.Add("fldPSLevelPackingInfo", typeof(string));
+        table.Columns.Add("fldNumberOfSetsRequired", typeof(int));
+        table.Columns.Add("fldImportExportLicenceRequired", typeof(bool));
+        table.Columns.Add("fldImportPermitReceived", typeof(bool));
+        table.Columns.Add("fldCustomsCertificateRequired", typeof(bool));
+        table.Columns.Add("fldContactName", typeof(string));
+        table.Columns.Add("fldOrganisation", typeof(string));
+        table.Columns.Add("fldAddress1", typeof(string));
+        table.Columns.Add("fldAddress2", typeof(string));
+        table.Columns.Add("fldAddress3", typeof(string));
+        table.Columns.Add("fldAddress4", typeof(string));
+        table.Columns.Add("fldAddress5", typeof(string));
+        table.Columns.Add("fldTelephone", typeof(string));
+        table.Columns.Add("fldCountry", typeof(string));
+        table.Columns.Add("fldDistributionDate", typeof(DateTime));
+        table.Rows.Add(
+            groupAddressId, schemeId, distributionParticipantId, participantId, packaged, posted, "L001", "Lab One",
+            "Participant pack", "Customer pack", "PS pack", 2, true, true, true, "A Contact", "An Org", "1 High St",
+            "Town", "County", "Four", "Five", "0123", "UK", new DateTime(2026, 5, 13));
+
+        var participant = Parse<PackagingParticipantEntity>(table).Single();
+
+        Assert.Equal(groupAddressId, participant.GroupAddressId);
+        Assert.Equal(schemeId, participant.MonthlyDistributionSchemeId);
+        Assert.Equal(distributionParticipantId, participant.DistributionParticipantId);
+        Assert.Equal(participantId, participant.ParticipantId);
+        Assert.Equal(packaged, participant.PackagedDate);
+        Assert.Equal(posted, participant.PostedDate);
+        Assert.Equal("L001", participant.LabCode);
+        Assert.Equal("Lab One", participant.LabName);
+        Assert.Equal("Participant pack", participant.PackingInfo);
+        Assert.Equal("Customer pack", participant.CustomerPackingInfo);
+        Assert.Equal("PS pack", participant.PSLevelPackingInfo);
+        Assert.Equal(2, participant.NumberOfSetsRequired);
+        Assert.True(participant.ImportExportLicenceRequired);
+        Assert.True(participant.ImportPermitReceived);
+        Assert.True(participant.CustomsCertificateRequired);
+        Assert.Equal("A Contact", participant.ContactName);
+        Assert.Equal("An Org", participant.Organisation);
+        Assert.Equal("1 High St", participant.Address1);
+        Assert.Equal("Town", participant.Address2);
+        Assert.Equal("County", participant.Address3);
+        Assert.Equal("Four", participant.Address4);
+        Assert.Equal("Five", participant.Address5);
+        Assert.Equal("0123", participant.Telephone);
+        Assert.Equal("UK", participant.Country);
+        Assert.Equal(new DateTime(2026, 5, 13), participant.DistributionDate);
+    }
+
+    [Fact]
+    public void Register_MapsPackagingParticipant_NullDatesAndTextKeepDefaults()
+    {
+        var table = new DataTable();
+        table.Columns.Add("fldPackagedDate", typeof(DateTime));
+        table.Columns.Add("fldPostedDate", typeof(DateTime));
+        table.Columns.Add("fldPackingInfo", typeof(string));
+        table.Columns.Add("fldCustomerPackingInfo", typeof(string));
+        table.Columns.Add("fldImportExportLicenceRequired", typeof(bool));
+        table.Rows.Add(DBNull.Value, DBNull.Value, DBNull.Value, DBNull.Value, DBNull.Value);
+
+        var participant = Parse<PackagingParticipantEntity>(table).Single();
+
+        Assert.Null(participant.PackagedDate);
+        Assert.Null(participant.PostedDate);
+        Assert.Equal(string.Empty, participant.PackingInfo);
+        Assert.Equal(string.Empty, participant.CustomerPackingInfo);
+        Assert.False(participant.ImportExportLicenceRequired);
+    }
+
+    [Fact]
+    public void Register_MapsPackagingSchemeItem_UsingTheSchemePrefixedColumns()
+    {
+        var participantId = Guid.NewGuid();
+        var distributionParticipantId = Guid.NewGuid();
+        var schemeId = Guid.NewGuid();
+        var packaged = new DateTime(2026, 5, 12, 9, 0, 0);
+        var posted = new DateTime(2026, 5, 13, 9, 0, 0);
+        var table = new DataTable();
+        table.Columns.Add("fldParticipantId", typeof(Guid));
+        table.Columns.Add("fldDistributionParticipantId", typeof(Guid));
+        table.Columns.Add("fldMonthlyDistributionSchemeId", typeof(Guid));
+        table.Columns.Add("fldPreparationComplete", typeof(bool));
+        table.Columns.Add("fldDistributionReference", typeof(string));
+        table.Columns.Add("fldDistributionReferenceSuffix", typeof(string));
+        table.Columns.Add("fldScheduleCode", typeof(string));
+        table.Columns.Add("fldPackagedDate", typeof(DateTime));
+        table.Columns.Add("fldPostedDate", typeof(DateTime));
+        table.Columns.Add("fldPackingInfo", typeof(string));
+        table.Columns.Add("fldSchemeName", typeof(string));
+        table.Columns.Add("fldSchemeIdentifier", typeof(string));
+        table.Columns.Add("fldCustomsDocumentDescription", typeof(string));
+        table.Columns.Add("fldCustomsDocumentVolume", typeof(string));
+        table.Columns.Add("fldNumberOfSamples", typeof(int));
+        table.Columns.Add("fldNumberOfSetsRequired", typeof(int));
+        table.Columns.Add("fldPSLevelPackingInfo", typeof(string));
+        table.Columns.Add("fldImportExportLicenceRequired", typeof(bool));
+        table.Columns.Add("fldImportPermitReceived", typeof(bool));
+        table.Columns.Add("fldCustomsCertificateRequired", typeof(bool));
+        table.Columns.Add("fldCustomerPackingInfo", typeof(string));
+        table.Columns.Add("fldDistributionDate", typeof(DateTime));
+        table.Rows.Add(
+            participantId, distributionParticipantId, schemeId, true, "17152", "A", "BA", packaged, posted,
+            "Scheme pack", "Mastitis bovine", "PT0060", "Blood samples", "5ml", 4, 2, "PS pack", true, false, true,
+            "Customer pack", new DateTime(2026, 5, 13));
+
+        var item = Parse<PackagingSchemeItemEntity>(table).Single();
+
+        Assert.Equal(participantId, item.ParticipantId);
+        Assert.Equal(distributionParticipantId, item.DistributionParticipantId);
+        Assert.Equal(schemeId, item.MonthlyDistributionSchemeId);
+        Assert.True(item.PreparationComplete);
+        Assert.Equal("17152", item.DistributionReference);
+        Assert.Equal("A", item.DistributionReferenceSuffix);
+        Assert.Equal("BA", item.ScheduleCode);
+        Assert.Equal(packaged, item.PackagedDate);
+        Assert.Equal(posted, item.PostedDate);
+        Assert.Equal("Scheme pack", item.PackingInfo);
+        Assert.Equal("Mastitis bovine", item.SchemeName);
+        Assert.Equal("PT0060", item.SchemeIdentifier);
+        Assert.Equal("Blood samples", item.CustomsDocumentDescription);
+        Assert.Equal("5ml", item.CustomsDocumentVolume);
+        Assert.Equal(4, item.NumberOfSamples);
+        Assert.Equal(2, item.NumberOfSetsRequired);
+        Assert.Equal("PS pack", item.PSLevelPackingInfo);
+        Assert.True(item.ImportExportLicenceRequired);
+        Assert.False(item.ImportPermitReceived);
+        Assert.True(item.CustomsCertificateRequired);
+        Assert.Equal("Customer pack", item.CustomerPackingInfo);
+        Assert.Equal(new DateTime(2026, 5, 13), item.DistributionDate);
+    }
+
+    // fldName/fldIdentifier belong to the Group Address/Daily item shape, not this one.
+    [Fact]
+    public void Register_MapsPackagingSchemeItem_IgnoresFldNameAndFldIdentifier()
+    {
+        var table = new DataTable();
+        table.Columns.Add("fldName", typeof(string));
+        table.Columns.Add("fldIdentifier", typeof(string));
+        table.Rows.Add("Ignored name", "Ignored id");
+
+        var item = Parse<PackagingSchemeItemEntity>(table).Single();
+
+        Assert.Equal(string.Empty, item.SchemeName);
+        Assert.Equal(string.Empty, item.SchemeIdentifier);
+    }
+
+    [Fact]
+    public void Register_MapsPackagingSchemeItem_NullDatesAndTextKeepDefaults()
+    {
+        var table = new DataTable();
+        table.Columns.Add("fldPackagedDate", typeof(DateTime));
+        table.Columns.Add("fldPostedDate", typeof(DateTime));
+        table.Columns.Add("fldPackingInfo", typeof(string));
+        table.Columns.Add("fldPSLevelPackingInfo", typeof(string));
+        table.Columns.Add("fldPreparationComplete", typeof(bool));
+        table.Rows.Add(DBNull.Value, DBNull.Value, DBNull.Value, DBNull.Value, DBNull.Value);
+
+        var item = Parse<PackagingSchemeItemEntity>(table).Single();
+
+        Assert.Null(item.PackagedDate);
+        Assert.Null(item.PostedDate);
+        Assert.Equal(string.Empty, item.PackingInfo);
+        Assert.Equal(string.Empty, item.PSLevelPackingInfo);
+        Assert.False(item.PreparationComplete);
+    }
+
+    [Fact]
+    public void Register_MapsDistributionPostedEmail_ColumnsToProperties()
+    {
+        var emailId = Guid.NewGuid();
+        var participantId = Guid.NewGuid();
+        var schemeId = Guid.NewGuid();
+        var table = new DataTable();
+        table.Columns.Add("fldDistributionPostedEmailId", typeof(Guid));
+        table.Columns.Add("fldParticipantId", typeof(Guid));
+        table.Columns.Add("fldMonthlyDistributionSchemeId", typeof(Guid));
+        table.Columns.Add("fldEmail", typeof(string));
+        table.Columns.Add("fldDistribution", typeof(string));
+        table.Columns.Add("fldSchemeName", typeof(string));
+        table.Rows.Add(emailId, participantId, schemeId, "lab@example.org", "17152A/BA", "PT0060: Mastitis bovine");
+
+        var email = Parse<DistributionPostedEmailEntity>(table).Single();
+
+        Assert.Equal(emailId, email.DistributionPostedEmailId);
+        Assert.Equal(participantId, email.ParticipantId);
+        Assert.Equal(schemeId, email.MonthlyDistributionSchemeId);
+        Assert.Equal("lab@example.org", email.Email);
+        Assert.Equal("17152A/BA", email.Distribution);
+        Assert.Equal("PT0060: Mastitis bovine", email.SchemeName);
+    }
+
+    [Fact]
+    public void Register_MapsDistributionPostedEmail_NullTextKeepsDefaults()
+    {
+        var table = new DataTable();
+        table.Columns.Add("fldEmail", typeof(string));
+        table.Columns.Add("fldDistribution", typeof(string));
+        table.Rows.Add(DBNull.Value, DBNull.Value);
+
+        var email = Parse<DistributionPostedEmailEntity>(table).Single();
+
+        Assert.Equal(string.Empty, email.Email);
+        Assert.Equal(string.Empty, email.Distribution);
+    }
+
+    [Fact]
+    public void Register_MapsPackagingLabelAddress_ColumnsToProperties()
+    {
+        var table = new DataTable();
+        table.Columns.Add("fldContactName", typeof(string));
+        table.Columns.Add("fldOrganisation", typeof(string));
+        table.Columns.Add("fldAddress1", typeof(string));
+        table.Columns.Add("fldAddress2", typeof(string));
+        table.Columns.Add("fldAddress3", typeof(string));
+        table.Columns.Add("fldAddress4", typeof(string));
+        table.Columns.Add("fldAddress5", typeof(string));
+        table.Columns.Add("fldCountry", typeof(string));
+        table.Columns.Add("fldTelephone", typeof(string));
+        table.Rows.Add("A Contact", "An Org", "1 High St", "Town", "County", "Four", "Five", "UK", "0123");
+
+        var label = Parse<PackagingLabelAddressEntity>(table).Single();
+
+        Assert.Equal("A Contact", label.ContactName);
+        Assert.Equal("An Org", label.Organisation);
+        Assert.Equal("1 High St", label.Address1);
+        Assert.Equal("Town", label.Address2);
+        Assert.Equal("County", label.Address3);
+        Assert.Equal("Four", label.Address4);
+        Assert.Equal("Five", label.Address5);
+        Assert.Equal("UK", label.Country);
+        Assert.Equal("0123", label.Telephone);
+    }
+
+    [Fact]
+    public void Register_MapsPackagingLabelAddress_NullColumnsKeepDefaults()
+    {
+        var table = new DataTable();
+        table.Columns.Add("fldContactName", typeof(string));
+        table.Columns.Add("fldAddress2", typeof(string));
+        table.Rows.Add(DBNull.Value, DBNull.Value);
+
+        var label = Parse<PackagingLabelAddressEntity>(table).Single();
+
+        Assert.Equal(string.Empty, label.ContactName);
+        Assert.Equal(string.Empty, label.Address2);
+    }
+
+    // The three result sets of spgActualResults (header, tlnkActualResultItemResult, tlnkActualMethodItemResult).
+    [Fact]
+    public void Register_MapsActualResultsHeader_ColumnsToProperties()
+    {
+        var table = new DataTable();
+        table.Columns.Add("fldFirstEditDate", typeof(DateTime));
+        table.Columns.Add("fldLastEditDate", typeof(DateTime));
+        table.Columns.Add("fldDistribution", typeof(string));
+        table.Columns.Add("fldSchemeIdentifier", typeof(string));
+        table.Columns.Add("fldSchemeName", typeof(string));
+        table.Columns.Add("fldDeadlineDate", typeof(DateTime));
+        table.Rows.Add(new DateTime(2026, 6, 1), new DateTime(2026, 6, 2), "D1/S1", "BT", "Brucella", new DateTime(2026, 6, 30));
+
+        var header = Parse<ActualResultsHeaderEntity>(table).Single();
+
+        Assert.Equal(new DateTime(2026, 6, 1), header.FirstEditDate);
+        Assert.Equal(new DateTime(2026, 6, 2), header.LastEditDate);
+        Assert.Equal("D1/S1", header.Distribution);
+        Assert.Equal("BT", header.SchemeIdentifier);
+        Assert.Equal("Brucella", header.SchemeName);
+        Assert.Equal(new DateTime(2026, 6, 30), header.DeadlineDate);
+    }
+
+    [Fact]
+    public void Register_MapsActualResultsHeader_NullFirstEditDateMeansNothingSavedYet()
+    {
+        var table = new DataTable();
+        table.Columns.Add("fldFirstEditDate", typeof(DateTime));
+        table.Columns.Add("fldLastEditDate", typeof(DateTime));
+        table.Rows.Add(DBNull.Value, DBNull.Value);
+
+        var header = Parse<ActualResultsHeaderEntity>(table).Single();
+
+        Assert.Null(header.FirstEditDate);
+        Assert.Null(header.LastEditDate);
+    }
+
+    [Fact]
+    public void Register_MapsActualSampleResult_ColumnsToProperties()
+    {
+        var id = Guid.NewGuid();
+        var table = new DataTable();
+        table.Columns.Add("fldSampleResultItemId", typeof(Guid));
+        table.Columns.Add("fldResult", typeof(string));
+        table.Rows.Add(id, "12");
+        table.Rows.Add(Guid.NewGuid(), DBNull.Value);
+
+        var results = Parse<ActualSampleResultEntity>(table);
+
+        Assert.Equal((id, "12"), (results[0].SampleResultItemId, results[0].Result));
+        Assert.Null(results[1].Result);
+    }
+
+    [Fact]
+    public void Register_MapsActualMethodItemResult_ColumnsToProperties()
+    {
+        var id = Guid.NewGuid();
+        var table = new DataTable();
+        table.Columns.Add("fldTestMethodItemId", typeof(Guid));
+        table.Columns.Add("fldResult", typeof(string));
+        table.Rows.Add(id, "37C");
+        table.Rows.Add(Guid.NewGuid(), DBNull.Value);
+
+        var results = Parse<ActualMethodItemResultEntity>(table);
+
+        Assert.Equal((id, "37C"), (results[0].TestMethodItemId, results[0].Result));
+        Assert.Null(results[1].Result);
+    }
+
     private static List<T> Parse<T>(DataTable table)
     {
         using var reader = table.CreateDataReader();

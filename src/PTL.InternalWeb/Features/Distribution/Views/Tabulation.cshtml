@@ -1,0 +1,15 @@
+@model PTL.InternalWeb.Features.Distribution.TabulationReportViewModel
+@{
+    ViewData["Title"] = "Tabulation";
+}
+
+@section Styles {
+    <link rel="stylesheet" href="~/css/tabulation.css" asp-append-version="true" />
+}
+
+<partial name="_TabulationReport" model="Model" />
+
+@section Scripts {
+    <script src="~/js/tabulation-print.js" asp-append-version="true"></script>
+    <script src="~/js/print-button.js" asp-append-version="true"></script>
+}

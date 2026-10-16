@@ -623,4 +623,18 @@ public class DistributionDtoCoverageTests
         var outcome = new PreparationSaveOutcome(true);
         Assert.True(outcome.Success);
     }
+
+    [Fact]
+    public void PackagingCustomsResult_ExposesEveryProperty()
+    {
+        var document = new PackagingCustomsResult([1, 2], "Customs.docx", null);
+        var failure = new PackagingCustomsResult(null, string.Empty, "Please select schemes to print");
+
+        Assert.Equal([1, 2], document.Content);
+        Assert.Equal("Customs.docx", document.FileName);
+        Assert.Null(document.Error);
+        Assert.Null(failure.Content);
+        Assert.Equal(string.Empty, failure.FileName);
+        Assert.Equal("Please select schemes to print", failure.Error);
+    }
 }

@@ -2,7 +2,7 @@
 @using PTL.InternalWeb.Navigation
 @{
     var controller = (ViewContext.RouteData.Values["controller"]?.ToString() ?? string.Empty).Trim();
-    var action = (ViewContext.RouteData.Values["action"]?.ToString() ?? string.Empty).Trim();
+    var action = (ViewData[BreadcrumbRouteValues.Action]?.ToString() ?? ViewContext.RouteData.Values["action"]?.ToString() ?? string.Empty).Trim();
 
     // Ancestor links such as Contracts and Contract Items are parameterised routes. Take the id
     // from the current request where present, otherwise from whatever the page published (see
@@ -64,6 +64,20 @@
                 // A node needing a route parameter we could not resolve would link to an empty or
                 // erroring page, so it renders as plain text instead.
                 var isUnresolvedLink = node.LinkRouteParameter is not null && routeData.Count == 0;
+
+                foreach (var key in node.LinkQueryKeys)
+                {
+                    var value = ViewContext.HttpContext.Request.Query[key].FirstOrDefault()
+                        ?? ViewContext.RouteData.Values[key]?.ToString();
+                    if (string.IsNullOrEmpty(value))
+                    {
+                        isUnresolvedLink = true;
+                    }
+                    else
+                    {
+                        routeData[key] = value;
+                    }
+                }
 
                 <li class="govuk-breadcrumbs__list-item">
                     @if (isLast || isUnresolvedLink)

@@ -418,4 +418,501 @@ public class DistributionApiClientTests
 
         Assert.Null(result);
     }
+
+    [Fact]
+    public async Task GetResultsReceiptAsync_GetsResultsReceiptEndpointAndReturnsDeserializedResponse()
+    {
+        const string json = """
+            {"monthlyDistributionId":"11111111-1111-1111-1111-111111111111","yearId":2026,"monthId":5,"schemes":[{"monthlyDistributionSchemeId":"22222222-2222-2222-2222-222222222222","description":"D1/S1: BT Brucella","requiresAssessment":true,"progressPercentage":50,"participants":[{"distributionParticipantId":"33333333-3333-3333-3333-333333333333","fullName":"L001: Lab One","deadlineDate":"2026-06-30T00:00:00","firstEditDate":null,"lastEditDate":null,"extraDocumentsReturned":true,"canViewResults":false,"hasUnaccountedSamples":true,"returnedDate":"2026-05-05T00:00:00"}]}]}
+            """;
+        HttpRequestMessage? captured = null;
+        var client = CreateCapturingClient(HttpStatusCode.OK, json, request => captured = request);
+
+        var result = await client.GetResultsReceiptAsync(2026, 5);
+
+        Assert.Equal(HttpMethod.Get, captured!.Method);
+        Assert.Equal("/api/distributions/months/2026/5/results-receipt", captured.RequestUri!.AbsolutePath);
+        var scheme = Assert.Single(result!.Schemes);
+        Assert.Equal(50, scheme.ProgressPercentage);
+        var participant = Assert.Single(scheme.Participants);
+        Assert.Equal("L001: Lab One", participant.FullName);
+        Assert.Null(participant.FirstEditDate);
+        Assert.True(participant.ExtraDocumentsReturned);
+        Assert.Equal(new DateTime(2026, 5, 5), participant.ReturnedDate);
+    }
+
+    [Fact]
+    public async Task GetResultsReceiptAsync_NotFound_ReturnsNull() =>
+        Assert.Null(await CreateClient(HttpStatusCode.NotFound, null).GetResultsReceiptAsync(2026, 5));
+
+    [Fact]
+    public async Task GetResultsReceiptAsync_ServerError_Throws() =>
+        await Assert.ThrowsAsync<HttpRequestException>(
+            () => CreateClient(HttpStatusCode.InternalServerError, null).GetResultsReceiptAsync(2026, 5));
+
+    [Fact]
+    public async Task GetTabulationsAsync_GetsTabulationsEndpointAndReturnsDeserializedResponse()
+    {
+        const string json = """
+            {"yearId":2026,"monthId":5,"schemes":[{"monthlyDistributionSchemeId":"22222222-2222-2222-2222-222222222222","schemeNameFull":"BT: Brucella","distributionReferenceFull":"D1a/S1","deadlineDate":"2026-05-20T00:00:00","resultsIssueTargetDate":"2026-06-30T00:00:00","requiresAssessment":true,"consultants":["A1","","",""],"tabulations":[{"tabulationId":"33333333-3333-3333-3333-333333333333","name":"Summary","isTestConsultant":true,"publishCount":2}],"actions":{"amendResults":{"text":"Amend Results","isEnabled":true,"hint":"Click","command":"None","isOverdue":false,"isLabel":false},"sendToTestConsultant":{"text":"OVERDUE","isEnabled":true,"hint":"Late","command":"ViewComments","isOverdue":true,"isLabel":false},"sendForAssessment":{"text":"Awaiting Assessment","isEnabled":false,"hint":"","command":"SendForAssessment"},"sendToResultsSignOff":{"text":"OVERDUE","isEnabled":false,"hint":"","command":"SendToResultsSignOff","isOverdue":true,"isLabel":true}}}]}
+            """;
+        HttpRequestMessage? captured = null;
+        var client = CreateCapturingClient(HttpStatusCode.OK, json, request => captured = request);
+
+        var result = await client.GetTabulationsAsync(2026, 5);
+
+        Assert.Equal(HttpMethod.Get, captured!.Method);
+        Assert.Equal("/api/distributions/months/2026/5/tabulations", captured.RequestUri!.AbsolutePath);
+        Assert.Equal((2026, 5), (result!.YearId, result.MonthId));
+        var scheme = Assert.Single(result.Schemes);
+        Assert.Equal("BT: Brucella", scheme.SchemeNameFull);
+        Assert.Equal("D1a/S1", scheme.DistributionReferenceFull);
+        Assert.Equal(new DateTime(2026, 5, 20), scheme.DeadlineDate);
+        Assert.True(scheme.RequiresAssessment);
+        Assert.Equal(["A1", "", "", ""], scheme.Consultants);
+        var row = Assert.Single(scheme.Tabulations);
+        Assert.Equal(("Summary", true, 2), (row.Name, row.IsTestConsultant, row.PublishCount));
+        Assert.Equal("ViewComments", scheme.Actions.SendToTestConsultant.Command);
+        Assert.True(scheme.Actions.SendToTestConsultant.IsOverdue);
+        Assert.False(scheme.Actions.SendForAssessment.IsEnabled);
+        Assert.True(scheme.Actions.SendToResultsSignOff.IsLabel);
+    }
+
+    [Fact]
+    public async Task GetTabulationsAsync_NotFound_ReturnsNull() =>
+        Assert.Null(await CreateClient(HttpStatusCode.NotFound, null).GetTabulationsAsync(2026, 5));
+
+    [Fact]
+    public async Task GetTabulationsAsync_ServerError_Throws() =>
+        await Assert.ThrowsAsync<HttpRequestException>(
+            () => CreateClient(HttpStatusCode.InternalServerError, null).GetTabulationsAsync(2026, 5));
+
+    [Fact]
+    public async Task SaveResultsReceiptAsync_PutsToResultsReceiptEndpointAndReturnsDeserializedResult()
+    {
+        HttpRequestMessage? captured = null;
+        string? body = null;
+        var client = CreateCapturingClient(HttpStatusCode.OK, """{"success":true}""", request =>
+        {
+            captured = request;
+            body = request.Content!.ReadAsStringAsync().GetAwaiter().GetResult();
+        });
+        var participantId = Guid.NewGuid();
+
+        var result = await client.SaveResultsReceiptAsync(2026, 5, new Contracts.Distribution.ResultsReceiptSaveRequest(
+            [new Contracts.Distribution.ResultsReceiptParticipantUpdateRequest(participantId, true, true)]));
+
+        Assert.Equal(HttpMethod.Put, captured!.Method);
+        Assert.Equal("/api/distributions/months/2026/5/results-receipt", captured.RequestUri!.AbsolutePath);
+        Assert.Contains(participantId.ToString(), body);
+        Assert.Contains("\"returnedChecked\":true", body);
+        Assert.True(result!.Success);
+    }
+
+    [Fact]
+    public async Task SaveResultsReceiptAsync_NotFound_ReturnsNull() =>
+        Assert.Null(await CreateClient(HttpStatusCode.NotFound, null)
+            .SaveResultsReceiptAsync(2026, 5, new Contracts.Distribution.ResultsReceiptSaveRequest([])));
+
+    [Fact]
+    public async Task SaveResultsReceiptAsync_ServerError_Throws() =>
+        await Assert.ThrowsAsync<HttpRequestException>(() => CreateClient(HttpStatusCode.InternalServerError, null)
+            .SaveResultsReceiptAsync(2026, 5, new Contracts.Distribution.ResultsReceiptSaveRequest([])));
+
+    private static readonly Guid SampleReceiptSchemeId = Guid.Parse("22222222-2222-2222-2222-222222222222");
+    private static readonly Guid SampleReceiptParticipantId = Guid.Parse("33333333-3333-3333-3333-333333333333");
+
+    [Fact]
+    public async Task GetSampleReceiptAsync_GetsSampleReceiptEndpointAndReturnsDeserializedResponse()
+    {
+        const string json = """
+            {"schemeHeading":"D1/S1 : BT Brucella","labHeading":"Labcode L001: Lab One","isReadOnly":true,"tests":[{"testId":"44444444-4444-4444-4444-444444444444","testType":"Culture","samples":[{"sampleReceiptId":"55555555-5555-5555-5555-555555555555","sampleNumber":"S001","submitted":true,"notSubmitted":false,"notInRepertoire":false}]}]}
+            """;
+        HttpRequestMessage? captured = null;
+        var client = CreateCapturingClient(HttpStatusCode.OK, json, request => captured = request);
+
+        var result = await client.GetSampleReceiptAsync(SampleReceiptSchemeId, SampleReceiptParticipantId);
+
+        Assert.Equal(HttpMethod.Get, captured!.Method);
+        Assert.Equal($"/api/distributions/schemes/{SampleReceiptSchemeId}/participants/{SampleReceiptParticipantId}/sample-receipt", captured.RequestUri!.AbsolutePath);
+        Assert.Equal("Labcode L001: Lab One", result!.LabHeading);
+        Assert.True(result.IsReadOnly);
+        var sample = Assert.Single(Assert.Single(result.Tests).Samples);
+        Assert.Equal(("S001", true), (sample.SampleNumber, sample.Submitted));
+    }
+
+    [Fact]
+    public async Task GetSampleReceiptAsync_NotFound_ReturnsNull() =>
+        Assert.Null(await CreateClient(HttpStatusCode.NotFound, null).GetSampleReceiptAsync(SampleReceiptSchemeId, SampleReceiptParticipantId));
+
+    [Fact]
+    public async Task GetSampleReceiptAsync_ServerError_Throws() =>
+        await Assert.ThrowsAsync<HttpRequestException>(
+            () => CreateClient(HttpStatusCode.InternalServerError, null).GetSampleReceiptAsync(SampleReceiptSchemeId, SampleReceiptParticipantId));
+
+    [Fact]
+    public async Task SaveSampleReceiptAsync_PutsToSampleReceiptEndpointAndReturnsDeserializedResult()
+    {
+        HttpRequestMessage? captured = null;
+        string? body = null;
+        var client = CreateCapturingClient(HttpStatusCode.OK, """{"success":false,"readOnly":true}""", request =>
+        {
+            captured = request;
+            body = request.Content!.ReadAsStringAsync().GetAwaiter().GetResult();
+        });
+        var sampleId = Guid.NewGuid();
+
+        var result = await client.SaveSampleReceiptAsync(SampleReceiptSchemeId, SampleReceiptParticipantId,
+            new Contracts.Distribution.SampleReceiptSaveRequest([new Contracts.Distribution.SampleReceiptSampleUpdateRequest(sampleId, false, true, false)]));
+
+        Assert.Equal(HttpMethod.Put, captured!.Method);
+        Assert.Equal($"/api/distributions/schemes/{SampleReceiptSchemeId}/participants/{SampleReceiptParticipantId}/sample-receipt", captured.RequestUri!.AbsolutePath);
+        Assert.Contains(sampleId.ToString(), body);
+        Assert.Contains("\"notSubmitted\":true", body);
+        Assert.False(result!.Success);
+        Assert.True(result.ReadOnly);
+    }
+
+    [Fact]
+    public async Task SaveSampleReceiptAsync_NotFound_ReturnsNull() =>
+        Assert.Null(await CreateClient(HttpStatusCode.NotFound, null)
+            .SaveSampleReceiptAsync(SampleReceiptSchemeId, SampleReceiptParticipantId, new Contracts.Distribution.SampleReceiptSaveRequest([])));
+
+    [Fact]
+    public async Task SaveSampleReceiptAsync_ServerError_Throws() =>
+        await Assert.ThrowsAsync<HttpRequestException>(() => CreateClient(HttpStatusCode.InternalServerError, null)
+            .SaveSampleReceiptAsync(SampleReceiptSchemeId, SampleReceiptParticipantId, new Contracts.Distribution.SampleReceiptSaveRequest([])));
+
+    private static readonly Guid ActualResultsSchemeId = Guid.Parse("22222222-2222-2222-2222-222222222222");
+    private static readonly Guid ActualResultsParticipantId = Guid.Parse("33333333-3333-3333-3333-333333333333");
+    private const string ActualResultsPath =
+        "/api/distributions/schemes/22222222-2222-2222-2222-222222222222/participants/33333333-3333-3333-3333-333333333333/actual-results";
+
+    [Fact]
+    public async Task GetActualResultsAsync_GetsTheActualResultsEndpointAndReturnsDeserializedResponse()
+    {
+        const string json = """
+            {"distributionParticipantId":"33333333-3333-3333-3333-333333333333","monthlyDistributionSchemeId":"22222222-2222-2222-2222-222222222222","heading":"D1 BT: Brucella","auditObjectName":"Results Received for D1 BT: Brucella","deadlineDate":"2026-06-30T00:00:00","isNew":true,"tests":[{"testId":"44444444-4444-4444-4444-444444444444","testName":"Culture","resultItems":[{"testResultItemId":"55555555-5555-5555-5555-555555555555","name":"Count","formatString":"^\\d+$","returnValueType":"Whole number"}],"methodItems":[{"testMethodItemId":"66666666-6666-6666-6666-666666666666","name":"Incubation","formatString":"^.+$","returnValueType":"Text","result":"37C"}],"samples":[{"sampleId":"77777777-7777-7777-7777-777777777777","sampleNumber":"S001","values":[{"sampleResultItemId":"88888888-8888-8888-8888-888888888888","testResultItemId":"55555555-5555-5555-5555-555555555555","result":"12"}]}]}]}
+            """;
+        HttpRequestMessage? captured = null;
+        var client = CreateCapturingClient(HttpStatusCode.OK, json, request => captured = request);
+
+        var result = await client.GetActualResultsAsync(ActualResultsSchemeId, ActualResultsParticipantId);
+
+        Assert.Equal(HttpMethod.Get, captured!.Method);
+        Assert.Equal(ActualResultsPath, captured.RequestUri!.AbsolutePath);
+        Assert.Equal("D1 BT: Brucella", result!.Heading);
+        Assert.True(result.IsNew);
+        Assert.Equal(new DateTime(2026, 6, 30), result.DeadlineDate);
+        var test = Assert.Single(result.Tests);
+        Assert.Equal("Whole number", Assert.Single(test.ResultItems).ReturnValueType);
+        Assert.Equal("37C", Assert.Single(test.MethodItems).Result);
+        var sample = Assert.Single(test.Samples);
+        Assert.Equal("S001", sample.SampleNumber);
+        Assert.Equal("12", Assert.Single(sample.Values).Result);
+    }
+
+    [Fact]
+    public async Task GetActualResultsAsync_NotFound_ReturnsNull() =>
+        Assert.Null(await CreateClient(HttpStatusCode.NotFound, null).GetActualResultsAsync(ActualResultsSchemeId, ActualResultsParticipantId));
+
+    [Fact]
+    public async Task GetActualResultsAsync_ServerError_Throws() =>
+        await Assert.ThrowsAsync<HttpRequestException>(
+            () => CreateClient(HttpStatusCode.InternalServerError, null).GetActualResultsAsync(ActualResultsSchemeId, ActualResultsParticipantId));
+
+    [Fact]
+    public async Task SaveActualResultsAsync_PutsTheValuesAndReasonAndDeserializesFieldErrors()
+    {
+        HttpRequestMessage? captured = null;
+        string? body = null;
+        var itemId = Guid.Parse("88888888-8888-8888-8888-888888888888");
+        var client = CreateCapturingClient(
+            HttpStatusCode.OK,
+            $$"""{"success":false,"fieldErrorsByItemId":{"{{itemId}}":"Input must be of format: Whole number"},"deadlinePassed":false,"auditReasonRequired":true,"auditObjectName":"Results Received for D1 BT: Brucella"}""",
+            request =>
+            {
+                captured = request;
+                body = request.Content!.ReadAsStringAsync().GetAwaiter().GetResult();
+            });
+
+        var result = await client.SaveActualResultsAsync(
+            ActualResultsSchemeId,
+            ActualResultsParticipantId,
+            new Contracts.Distribution.ActualResultsSaveRequest(
+                [new Contracts.Distribution.ActualResultsSampleValueRequest(itemId, "twelve")],
+                [new Contracts.Distribution.ActualResultsMethodItemRequest(Guid.Parse("66666666-6666-6666-6666-666666666666"), "37C")],
+                "Lab corrected"));
+
+        Assert.Equal(HttpMethod.Put, captured!.Method);
+        Assert.Equal(ActualResultsPath, captured.RequestUri!.AbsolutePath);
+        Assert.Contains("\"result\":\"twelve\"", body);
+        Assert.Contains("\"auditWhy\":\"Lab corrected\"", body);
+        Assert.False(result!.Success);
+        Assert.True(result.AuditReasonRequired);
+        Assert.False(result.DeadlinePassed);
+        Assert.Equal("Results Received for D1 BT: Brucella", result.AuditObjectName);
+        Assert.Equal("Input must be of format: Whole number", result.FieldErrorsByItemId[itemId]);
+    }
+
+    [Fact]
+    public async Task SaveActualResultsAsync_Success_ReturnsSuccessResult()
+    {
+        var client = CreateClient(HttpStatusCode.OK, """{"success":true,"fieldErrorsByItemId":{}}""");
+
+        var result = await client.SaveActualResultsAsync(
+            ActualResultsSchemeId, ActualResultsParticipantId, new Contracts.Distribution.ActualResultsSaveRequest([], []));
+
+        Assert.True(result!.Success);
+        Assert.Empty(result.FieldErrorsByItemId);
+        Assert.Null(result.AuditObjectName);
+    }
+
+    [Fact]
+    public async Task SaveActualResultsAsync_NotFound_ReturnsNull() =>
+        Assert.Null(await CreateClient(HttpStatusCode.NotFound, null).SaveActualResultsAsync(
+            ActualResultsSchemeId, ActualResultsParticipantId, new Contracts.Distribution.ActualResultsSaveRequest([], [])));
+
+    [Fact]
+    public async Task SaveActualResultsAsync_ServerError_Throws() =>
+        await Assert.ThrowsAsync<HttpRequestException>(() => CreateClient(HttpStatusCode.InternalServerError, null).SaveActualResultsAsync(
+            ActualResultsSchemeId, ActualResultsParticipantId, new Contracts.Distribution.ActualResultsSaveRequest([], [])));
+
+    private static DistributionApiClient CreateCapturingClient(
+        HttpStatusCode statusCode, string? json, Action<HttpRequestMessage> capture) =>
+        new(new HttpClient(new StubHttpMessageHandler(statusCode, json) { OnRequest = capture }) { BaseAddress = new Uri("http://localhost") });
+
+    private static DistributionApiClient CreateClient(Func<HttpResponseMessage> responseFactory) =>
+        new(new HttpClient(new StubHttpMessageHandler(responseFactory)) { BaseAddress = new Uri("http://localhost") });
+
+    [Fact]
+    public async Task GetPackagingAsync_GetsThePackagingEndpointWithModeAndWeekAndReturnsTheSheet()
+    {
+        const string json = """
+            {"mode":1,"week":3,"yearId":2026,"monthId":5,"blocks":[{"printKey":"abc_20260513","date":"2026-05-13T00:00:00","heading":"L001: Lab One","packingInfo":"","dueToBePosted":false,"showAllPacked":true,"showAllPosted":false,"schemes":[]}]}
+            """;
+        HttpRequestMessage? captured = null;
+        var client = CreateCapturingClient(HttpStatusCode.OK, json, request => captured = request);
+
+        var result = await client.GetPackagingAsync(2026, 5, 1, 3);
+
+        Assert.NotNull(captured);
+        Assert.Equal(HttpMethod.Get, captured!.Method);
+        Assert.Equal("/api/distributions/months/2026/5/packaging", captured.RequestUri!.AbsolutePath);
+        Assert.Equal("?mode=1&week=3", captured.RequestUri.Query);
+        Assert.NotNull(result);
+        Assert.Equal(1, result!.Mode);
+        Assert.Equal(3, result.Week);
+        var block = Assert.Single(result.Blocks);
+        Assert.Equal("abc_20260513", block.PrintKey);
+        Assert.True(block.ShowAllPacked);
+    }
+
+    [Fact]
+    public async Task GetPackagingAsync_NotFound_ReturnsNull()
+    {
+        var client = CreateClient(HttpStatusCode.NotFound, null);
+
+        Assert.Null(await client.GetPackagingAsync(2026, 5, 0, 1));
+    }
+
+    [Fact]
+    public async Task GetPackagingAsync_ServerError_Throws()
+    {
+        var client = CreateClient(HttpStatusCode.InternalServerError, null);
+
+        await Assert.ThrowsAsync<HttpRequestException>(() => client.GetPackagingAsync(2026, 5, 0, 1));
+    }
+
+    [Fact]
+    public async Task SavePackagingAsync_PutsTheUpdatesAndReturnsTheResult()
+    {
+        HttpRequestMessage? captured = null;
+        string? body = null;
+        var client = CreateCapturingClient(HttpStatusCode.OK, """{"success":true}""", request =>
+        {
+            captured = request;
+            body = request.Content!.ReadAsStringAsync().GetAwaiter().GetResult();
+        });
+        var distributionParticipantId = Guid.NewGuid();
+
+        var result = await client.SavePackagingAsync(
+            2026, 5, new Contracts.Distribution.PackagingSaveRequest(
+                [new Contracts.Distribution.PackagingStageUpdateRequest(1, 2, distributionParticipantId, true, false)]));
+
+        Assert.NotNull(captured);
+        Assert.Equal(HttpMethod.Put, captured!.Method);
+        Assert.Equal("/api/distributions/months/2026/5/packaging", captured.RequestUri!.AbsolutePath);
+        Assert.Contains(distributionParticipantId.ToString(), body);
+        Assert.NotNull(result);
+        Assert.True(result!.Success);
+    }
+
+    [Fact]
+    public async Task SavePackagingAsync_NotFound_ReturnsNull()
+    {
+        var client = CreateClient(HttpStatusCode.NotFound, null);
+
+        Assert.Null(await client.SavePackagingAsync(2026, 5, new Contracts.Distribution.PackagingSaveRequest([])));
+    }
+
+    [Fact]
+    public async Task SavePackagingAsync_ServerError_Throws()
+    {
+        var client = CreateClient(HttpStatusCode.InternalServerError, null);
+
+        await Assert.ThrowsAsync<HttpRequestException>(
+            () => client.SavePackagingAsync(2026, 5, new Contracts.Distribution.PackagingSaveRequest([])));
+    }
+
+    [Fact]
+    public async Task GetPackagingLabelsAsync_PostsTheSelectionAndReturnsTheLabels()
+    {
+        const string json = """{"labels":[{"lines":["A Contact","An Org"]}]}""";
+        HttpRequestMessage? captured = null;
+        string? body = null;
+        var client = CreateCapturingClient(HttpStatusCode.OK, json, request =>
+        {
+            captured = request;
+            body = request.Content!.ReadAsStringAsync().GetAwaiter().GetResult();
+        });
+
+        var result = await client.GetPackagingLabelsAsync(
+            2026, 5, new Contracts.Distribution.PackagingSelectionRequest(0, 2, ["key1"]));
+
+        Assert.NotNull(captured);
+        Assert.Equal(HttpMethod.Post, captured!.Method);
+        Assert.Equal("/api/distributions/months/2026/5/packaging/labels", captured.RequestUri!.AbsolutePath);
+        Assert.Contains("key1", body);
+        Assert.NotNull(result);
+        Assert.Equal(["A Contact", "An Org"], Assert.Single(result!.Labels).Lines);
+    }
+
+    [Fact]
+    public async Task GetPackagingLabelsAsync_NotFound_ReturnsNull()
+    {
+        var client = CreateClient(HttpStatusCode.NotFound, null);
+
+        Assert.Null(await client.GetPackagingLabelsAsync(2026, 5, new Contracts.Distribution.PackagingSelectionRequest(0, 1, [])));
+    }
+
+    [Fact]
+    public async Task GetPackagingLabelsAsync_ServerError_Throws()
+    {
+        var client = CreateClient(HttpStatusCode.InternalServerError, null);
+
+        await Assert.ThrowsAsync<HttpRequestException>(
+            () => client.GetPackagingLabelsAsync(2026, 5, new Contracts.Distribution.PackagingSelectionRequest(0, 1, [])));
+    }
+
+    private static HttpResponseMessage DocxResponse(Action<System.Net.Http.Headers.HttpContentHeaders>? configureHeaders)
+    {
+        var content = new ByteArrayContent([1, 2, 3]);
+        configureHeaders?.Invoke(content.Headers);
+        return new HttpResponseMessage(HttpStatusCode.OK) { Content = content };
+    }
+
+    [Fact]
+    public async Task GetPackagingCustomsAsync_PostsTheSelectionAndReturnsTheDocumentWithItsEncodedFileName()
+    {
+        HttpRequestMessage? captured = null;
+        var handler = new StubHttpMessageHandler(() => DocxResponse(headers =>
+            headers.ContentDisposition = new System.Net.Http.Headers.ContentDispositionHeaderValue("attachment")
+            {
+                FileNameStar = "Daily packaging May 2026.docx",
+            }))
+        { OnRequest = request => captured = request };
+        var client = new DistributionApiClient(new HttpClient(handler) { BaseAddress = new Uri("http://localhost") });
+
+        var result = await client.GetPackagingCustomsAsync(
+            2026, 5, new Contracts.Distribution.PackagingSelectionRequest(2, 0, ["key1"]));
+
+        Assert.NotNull(captured);
+        Assert.Equal(HttpMethod.Post, captured!.Method);
+        Assert.Equal("/api/distributions/months/2026/5/packaging/customs", captured.RequestUri!.AbsolutePath);
+        Assert.Equal([1, 2, 3], result.Content);
+        Assert.Equal("Daily packaging May 2026.docx", result.FileName);
+        Assert.Null(result.Error);
+    }
+
+    [Theory]
+    [InlineData("\"Combined packaging May 2026 Week 1.docx\"")]
+    [InlineData("Combined packaging May 2026 Week 1.docx")]
+    public async Task GetPackagingCustomsAsync_PlainFileNameHasItsQuotesTrimmed(string headerFileName)
+    {
+        var client = CreateClient(() => DocxResponse(headers =>
+            headers.ContentDisposition = new System.Net.Http.Headers.ContentDispositionHeaderValue("attachment") { FileName = headerFileName }));
+
+        var result = await client.GetPackagingCustomsAsync(2026, 5, new Contracts.Distribution.PackagingSelectionRequest(1, 1, []));
+
+        Assert.Equal("Combined packaging May 2026 Week 1.docx", result.FileName);
+        Assert.Equal([1, 2, 3], result.Content);
+        Assert.Null(result.Error);
+    }
+
+    [Fact]
+    public async Task GetPackagingCustomsAsync_NoContentDisposition_FallsBackToCustomsDocx()
+    {
+        var client = CreateClient(() => DocxResponse(null));
+
+        var result = await client.GetPackagingCustomsAsync(2026, 5, new Contracts.Distribution.PackagingSelectionRequest(1, 1, []));
+
+        Assert.Equal("Customs.docx", result.FileName);
+        Assert.Equal([1, 2, 3], result.Content);
+        Assert.Null(result.Error);
+    }
+
+    [Fact]
+    public async Task GetPackagingCustomsAsync_ContentDispositionWithoutAFileName_FallsBackToCustomsDocx()
+    {
+        var client = CreateClient(() => DocxResponse(headers =>
+            headers.ContentDisposition = new System.Net.Http.Headers.ContentDispositionHeaderValue("attachment")));
+
+        var result = await client.GetPackagingCustomsAsync(2026, 5, new Contracts.Distribution.PackagingSelectionRequest(1, 1, []));
+
+        Assert.Equal("Customs.docx", result.FileName);
+    }
+
+    [Fact]
+    public async Task GetPackagingCustomsAsync_BadRequestWithDetail_ReturnsTheBusinessMessageAsTheError()
+    {
+        var client = CreateClient(HttpStatusCode.BadRequest, """{"title":"Customs","status":400,"detail":"Please select schemes to print"}""");
+
+        var result = await client.GetPackagingCustomsAsync(2026, 5, new Contracts.Distribution.PackagingSelectionRequest(2, 0, []));
+
+        Assert.Null(result.Content);
+        Assert.Equal(string.Empty, result.FileName);
+        Assert.Equal("Please select schemes to print", result.Error);
+    }
+
+    [Theory]
+    [InlineData("""{"status":400}""")]
+    [InlineData("null")]
+    public async Task GetPackagingCustomsAsync_BadRequestWithoutDetail_ReturnsTheDefaultMailMergeMessage(string json)
+    {
+        var client = CreateClient(HttpStatusCode.BadRequest, json);
+
+        var result = await client.GetPackagingCustomsAsync(2026, 5, new Contracts.Distribution.PackagingSelectionRequest(2, 0, []));
+
+        Assert.Null(result.Content);
+        Assert.Equal("There was a problem with the Mail Merge", result.Error);
+    }
+
+    [Fact]
+    public async Task GetPackagingCustomsAsync_OtherFailure_Throws()
+    {
+        var client = CreateClient(HttpStatusCode.InternalServerError, null);
+
+        await Assert.ThrowsAsync<HttpRequestException>(
+            () => client.GetPackagingCustomsAsync(2026, 5, new Contracts.Distribution.PackagingSelectionRequest(2, 0, [])));
+    }
+
+    [Fact]
+    public async Task GetPackagingCustomsAsync_NotFound_Throws()
+    {
+        var client = CreateClient(HttpStatusCode.NotFound, null);
+
+        await Assert.ThrowsAsync<HttpRequestException>(
+            () => client.GetPackagingCustomsAsync(2026, 5, new Contracts.Distribution.PackagingSelectionRequest(2, 0, [])));
+    }
 }

@@ -29,6 +29,11 @@ public static class SideNavigationProvider
     private const string SystemAdministrationControllerName = "SystemAdministration";
     private const string DistributionControllerName = "Distribution";
 
+    private static readonly string[] YearKey = ["year"];
+    private static readonly string[] YearMonthKeys = ["year", "monthId"];
+    private static readonly string[] TabulationKeys = ["year", "monthId", "tabulationId"];
+    private static readonly string[] PublishedTabulationKeys = ["year", "monthId", "tabulationId", "publishedTabulationId"];
+
     // Placeholder for a menu entry whose page hasn't been migrated yet - see class remarks.
     private static SideNavigationItem Disabled(string text) => new() { Text = text, IsEnabled = false };
 
@@ -268,6 +273,7 @@ public static class SideNavigationProvider
             Text = "Distributions",
             ControllerName = DistributionControllerName,
             ActionName = IndexAction,
+            LinkQueryKeys = YearKey,
             Children =
             [
                 // Legacy sitemap siblings of MenuDistributions.aspx - not implemented yet (only
@@ -283,12 +289,92 @@ public static class SideNavigationProvider
                     ControllerName = DistributionControllerName,
                     ActionName = "Schedule",
                     IsHidden = true,
+                    LinkQueryKeys = YearMonthKeys,
                     Children =
                     [
                         // Hidden: reached only from a specific Schedule's links, not listed here.
                         new SideNavigationItem { Text = "Sample Numbers", ControllerName = DistributionControllerName, ActionName = "SampleNumbers", IsHidden = true },
                         new SideNavigationItem { Text = "Intended Results", ControllerName = DistributionControllerName, ActionName = "IntendedResults", IsHidden = true },
                         new SideNavigationItem { Text = "Participants", ControllerName = DistributionControllerName, ActionName = "Participants", IsHidden = true }
+                    ]
+                },
+                // Hidden, as in the legacy sitemap: reached from the Dashboard's stage links.
+                new SideNavigationItem
+                {
+                    Text = "Sample Preparation",
+                    ControllerName = DistributionControllerName,
+                    ActionName = "Preparation",
+                    IsHidden = true,
+                    LinkQueryKeys = YearMonthKeys,
+                    Children =
+                    [
+                        new SideNavigationItem { Text = "Printable Results", ControllerName = DistributionControllerName, ActionName = "PrintableResults", IsHidden = true }
+                    ]
+                },
+                new SideNavigationItem { Text = "Sample Packaging", ControllerName = DistributionControllerName, ActionName = "Packaging", IsHidden = true },
+                // Hidden, as in the legacy sitemap (Scheduling/Tabulations.aspx): reached from the Dashboard's Tabulations link.
+                new SideNavigationItem
+                {
+                    Text = "Tabulations",
+                    ControllerName = DistributionControllerName,
+                    ActionName = "Tabulations",
+                    IsHidden = true,
+                    LinkQueryKeys = YearMonthKeys,
+                    Children =
+                    [
+                        // Legacy sitemap titles for Scheduling/Tabulation.aspx, PublishedTabulations.aspx,
+                        // PublishedTabulation.aspx and the two assessment results pages.
+                        new SideNavigationItem
+                        {
+                            Text = "Tabulation",
+                            ControllerName = DistributionControllerName,
+                            ActionName = "Tabulation",
+                            IsHidden = true,
+                            LinkQueryKeys = TabulationKeys,
+                            Children =
+                            [
+                                new SideNavigationItem { Text = "Assessment Results", ControllerName = DistributionControllerName, ActionName = "TabulationAssessmentResults", IsHidden = true }
+                            ]
+                        },
+                        new SideNavigationItem { Text = "View Comments", ControllerName = DistributionControllerName, ActionName = "ViewComments", IsHidden = true },
+                        new SideNavigationItem { Text = "Amend Results", ControllerName = DistributionControllerName, ActionName = "AmendResults", IsHidden = true },
+                        new SideNavigationItem
+                        {
+                            Text = "Issued Tabulations",
+                            ControllerName = DistributionControllerName,
+                            ActionName = "PublishedTabulations",
+                            IsHidden = true,
+                            LinkQueryKeys = TabulationKeys,
+                            Children =
+                            [
+                                new SideNavigationItem
+                                {
+                                    Text = "Issued Tabulation",
+                                    ControllerName = DistributionControllerName,
+                                    ActionName = "PublishedTabulation",
+                                    IsHidden = true,
+                                    LinkQueryKeys = PublishedTabulationKeys,
+                                    Children =
+                                    [
+                                        new SideNavigationItem { Text = "Issued Assessment Results", ControllerName = DistributionControllerName, ActionName = "PublishedAssessmentResults", IsHidden = true }
+                                    ]
+                                }
+                            ]
+                        }
+                    ]
+                },
+                new SideNavigationItem
+                {
+                    Text = "Results Receipt",
+                    ControllerName = DistributionControllerName,
+                    ActionName = "ResultsReceipt",
+                    IsHidden = true,
+                    LinkQueryKeys = YearMonthKeys,
+                    Children =
+                    [
+                        // Legacy sitemap titles for ActualResults.aspx and SampleReceipt.aspx.
+                        new SideNavigationItem { Text = "Results", ControllerName = DistributionControllerName, ActionName = "ActualResults", IsHidden = true },
+                        new SideNavigationItem { Text = "Submission Status", ControllerName = DistributionControllerName, ActionName = "SampleReceipt", IsHidden = true }
                     ]
                 }
             ]

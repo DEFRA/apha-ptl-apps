@@ -1,0 +1,113 @@
+@using System.Globalization
+@model PTL.InternalWeb.Features.Distribution.AssessmentResultsViewModel
+@{
+    var isIssued = Model.PublishedTabulationId is not null;
+    ViewData["Title"] = isIssued ? "Issued Assessment Results" : "Assessment Results";
+    var results = Model.Results;
+    var inv = CultureInfo.InvariantCulture;
+
+    var backRoute = new Dictionary<string, string>
+    {
+        ["year"] = Model.YearId.ToString(inv),
+        ["monthId"] = Model.MonthId.ToString(inv),
+        ["tabulationId"] = Model.TabulationId.ToString(),
+    };
+    if (isIssued)
+    {
+        backRoute["publishedTabulationId"] = Model.PublishedTabulationId!.Value.ToString();
+    }
+    var backAction = isIssued ? "PublishedTabulation" : "Tabulation";
+
+    var chartTitle = results.Titles.Count > 0 ? results.Titles[0] : string.Empty;
+
+    // Legacy chart area was 500x500; the plot leaves room for the axis titles and the -60deg labels.
+    const double width = 500, height = 500, left = 70, right = 20, top = 20, bottom = 120;
+    var plotWidth = width - left - right;
+    var plotHeight = height - top - bottom;
+    var axisY = top + plotHeight;
+
+    var step = Math.Max(1, (int)Math.Ceiling(Model.MaxFrequency / 10.0));
+    var yMax = (int)Math.Ceiling(Model.MaxFrequency / (double)step) * step;
+    var band = plotWidth / Math.Max(1, results.Scores.Count);
+    var barWidth = band * 0.6;
+
+    string F(double value) => value.ToString("0.##", inv);
+    double Y(int value) => axisY - (plotHeight * value / yMax);
+}
+
+<a class="govuk-back-link noprint" asp-action="@backAction" asp-all-route-data="backRoute">Back</a>
+
+<h1 class="govuk-heading-l">@ViewData["Title"]</h1>
+
+@if (results.IsAssessmentSubmitted)
+{
+    <h2 class="govuk-heading-m">@chartTitle</h2>
+
+    @if (results.Titles.Skip(1).Any(t => !string.IsNullOrWhiteSpace(t)))
+    {
+        <ul class="govuk-list">
+            @foreach (var line in results.Titles.Skip(1).Where(t => !string.IsNullOrWhiteSpace(t)))
+            {
+                <li>@line</li>
+            }
+        </ul>
+    }
+
+    <svg class="ptl-assessment-chart" role="img" aria-labelledby="assessment-chart-title assessment-chart-desc" focusable="false"
+         xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 500" width="500" height="500">
+        <title id="assessment-chart-title">@chartTitle</title>
+        <desc id="assessment-chart-desc">@results.YAxisTitle by @results.XAxisTitle. The same data is shown in the table below the chart.</desc>
+
+        @for (var tick = 0; tick <= yMax; tick += step)
+        {
+            var y = F(Y(tick));
+            @* Wrapped in <g> so Razor emits <text> as SVG rather than its own text block. *@
+            <g>
+                <line x1="@F(left)" y1="@y" x2="@F(width - right)" y2="@y" stroke="#b1b4b6" stroke-width="1" />
+                <text x="@F(left - 8)" y="@y" text-anchor="end" dominant-baseline="middle" font-size="14" fill="#0b0c0c">@tick</text>
+            </g>
+        }
+
+        @for (var i = 0; i < results.Scores.Count; i++)
+        {
+            var score = results.Scores[i];
+            var centre = left + (band * i) + (band / 2);
+            var barTop = Y(score.Frequency);
+            <g>
+                <rect x="@F(centre - (barWidth / 2))" y="@F(barTop)" width="@F(barWidth)" height="@F(axisY - barTop)" fill="#1d70b8" />
+                <text transform="translate(@F(centre) @F(axisY + 10)) rotate(-60)" text-anchor="end" dominant-baseline="middle" font-size="14" fill="#0b0c0c">@score.Label</text>
+            </g>
+        }
+
+        <line x1="@F(left)" y1="@F(top)" x2="@F(left)" y2="@F(axisY)" stroke="#0b0c0c" stroke-width="1" />
+        <line x1="@F(left)" y1="@F(axisY)" x2="@F(width - right)" y2="@F(axisY)" stroke="#0b0c0c" stroke-width="1" />
+
+        <text x="@F(left + (plotWidth / 2))" y="@F(height - 8)" text-anchor="middle" font-size="16" font-weight="bold" fill="#0b0c0c">@results.XAxisTitle</text>
+        <text transform="translate(18 @F(top + (plotHeight / 2))) rotate(-90)" text-anchor="middle" font-size="16" font-weight="bold" fill="#0b0c0c">@results.YAxisTitle</text>
+    </svg>
+
+    <table class="govuk-table">
+        <caption class="govuk-table__caption govuk-table__caption--s">@chartTitle (data table)</caption>
+        <thead class="govuk-table__head">
+            <tr class="govuk-table__row">
+                <th scope="col" class="govuk-table__header">@results.XAxisTitle</th>
+                <th scope="col" class="govuk-table__header govuk-table__header--numeric">@results.YAxisTitle</th>
+            </tr>
+        </thead>
+        <tbody class="govuk-table__body">
+            @foreach (var score in results.Scores)
+            {
+                <tr class="govuk-table__row">
+                    <th scope="row" class="govuk-table__header">@score.Label</th>
+                    <td class="govuk-table__cell govuk-table__cell--numeric">@score.Frequency</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+<a class="govuk-button govuk-button--secondary noprint" asp-action="@backAction" asp-all-route-data="backRoute">Back</a>
+
+@section Styles {
+    <link rel="stylesheet" href="~/css/tabulation.css" asp-append-version="true" />
+}
