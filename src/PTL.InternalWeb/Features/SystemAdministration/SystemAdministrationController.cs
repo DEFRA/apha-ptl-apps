@@ -735,9 +735,10 @@ public class SystemAdministrationController : Controller
         return View(nameof(ViewerManagement), await BuildViewerManagementViewModelAsync(model.ViewerId, message: null, messageIsError: false, addValues: null, model, cancellationToken));
     }
 
-    // Removal is never blocked server-side (spdViewer is unconditional, matching legacy) - the
-    // confirmation listing assigned schemes/participants is purely a client-side courtesy
-    // (ViewerRowViewModel.RemoveConfirmMessage), matching legacy ManageViewers.aspx.
+    // Removal is blocked server-side by ViewerService.DeleteAsync while the viewer has scheme or
+    // participant assignments (legacy only hit the same rule as an FK error from spdViewer). The
+    // view warns up front via ViewerRowViewModel.IsRemoveBlocked; the service message is the
+    // authoritative fallback.
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> ViewerManagementRemove(Guid viewerId, CancellationToken cancellationToken)
@@ -779,6 +780,7 @@ public class SystemAdministrationController : Controller
                 Email = editId == v.ViewerId && editValues is not null ? editValues.Email : v.Email,
                 HasLogin = v.HasLogin,
                 IsEditing = editId == v.ViewerId,
+                IsRemoveBlocked = v.Schemes.Count > 0 || v.Participants.Count > 0,
                 RemoveConfirmMessage = BuildRemoveConfirmMessage(v.Schemes, v.Participants)
             })
             .ToList();
@@ -792,11 +794,11 @@ public class SystemAdministrationController : Controller
         };
     }
 
-    // Matches legacy GridViewTC_RowDataBound's warning text (Schemes then Participants, each as
-    // "Identifier/LabCode: Name/LabName"), always ending with a plain "are you sure" question so
-    // every viewer gets a confirmation - unlike legacy, which showed no confirmation at all when
-    // nothing was assigned; this codebase's other Remove actions (e.g. Remove User) always
-    // confirm, so this keeps that consistent even for a viewer with no assignments.
+    // Lists assignments in legacy GridViewTC_RowDataBound's format (Schemes then Participants,
+    // each as "Identifier/LabCode: Name/LabName"). With assignments the text ends by saying they
+    // must be removed first (shown as an alert, since the service refuses the removal); without
+    // any it is a plain "are you sure" confirm, consistent with this codebase's other Remove
+    // actions (e.g. Remove User).
     private static string BuildRemoveConfirmMessage(IReadOnlyList<ViewerSchemeResponse> schemes, IReadOnlyList<ViewerParticipantResponse> participants)
     {
         var lines = new List<string>();
@@ -815,7 +817,9 @@ public class SystemAdministrationController : Controller
             lines.Add(string.Empty);
         }
 
-        lines.Add("Are you sure you want to remove this viewer?");
+        lines.Add(schemes.Count > 0 || participants.Count > 0
+            ? "Remove these assignments before removing this viewer."
+            : "Are you sure you want to remove this viewer?");
 
         // JS-escape each line's raw content (not HTML-escape) before joining with the literal
         // "\n" line-break sequence, since this is embedded inside a single-quoted JS string
