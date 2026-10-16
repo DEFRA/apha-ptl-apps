@@ -103,7 +103,7 @@ public partial class AmendResultsRenderTests : IClassFixture<WebApplicationFacto
 
     private static string H1(string html) => Text(Regex.Match(html, "<h1[^>]*>(.*?)</h1>", RegexOptions.Singleline).Groups[1].Value);
 
-    private static string Main(string html) => Regex.Match(html, "<main.*?</main>", RegexOptions.Singleline).Value;
+    private static string MainContent(string html) => Regex.Match(html, "<main.*?</main>", RegexOptions.Singleline).Value;
 
     private static bool HasCommandButton(string html, string value, string label) =>
         Regex.IsMatch(html, $"<button[^>]*name=\"command\"[^>]*value=\"{value}\"[^>]*>{label}</button>");
@@ -132,7 +132,7 @@ public partial class AmendResultsRenderTests : IClassFixture<WebApplicationFacto
         Assert.Equal(Title, H1(html));
         Assert.Contains(
             "All of the Intended Results and the Results received from Participants are shown below for Amending.",
-            Text(Main(html)), StringComparison.Ordinal);
+            Text(MainContent(html)), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -194,7 +194,7 @@ public partial class AmendResultsRenderTests : IClassFixture<WebApplicationFacto
     {
         Seed();
 
-        var text = Text(Main(await GetHtmlAsync()));
+        var text = Text(MainContent(await GetHtmlAsync()));
 
         Assert.Contains("Categories", text, StringComparison.Ordinal);
         Assert.Contains("Assessment (Comments / Overall score)", text, StringComparison.Ordinal);
@@ -249,7 +249,7 @@ public partial class AmendResultsRenderTests : IClassFixture<WebApplicationFacto
 
         Assert.Contains("Audit Trail - Amend Results", WebUtility.HtmlDecode(PageTitle(html)), StringComparison.Ordinal);
         Assert.Equal("Audit Trail", H1(html));
-        Assert.Contains(AuditObject, Text(Main(html)), StringComparison.Ordinal);
+        Assert.Contains(AuditObject, Text(MainContent(html)), StringComparison.Ordinal);
         Assert.Matches("<textarea[^>]*name=\"AuditWhy\"", html);
         Assert.Matches($"<input type=\"hidden\" name=\"pendingCommand\" value=\"{command}\"", html);
         Assert.Matches("<input type=\"hidden\" name=\"isAuditStep\" value=\"true\"", html);
@@ -268,7 +268,7 @@ public partial class AmendResultsRenderTests : IClassFixture<WebApplicationFacto
         var html = await PostHtmlAsync("save", ("isAuditStep", "true"), ("pendingCommand", "save"), ("auditObjectName", AuditObject));
 
         Assert.Equal("Audit Trail", H1(html));
-        Assert.Contains("The reason for these changes must be specified", Text(Main(html)), StringComparison.Ordinal);
+        Assert.Contains("The reason for these changes must be specified", Text(MainContent(html)), StringComparison.Ordinal);
         Assert.Empty(_apiClient.SavedAmendResults);
     }
 

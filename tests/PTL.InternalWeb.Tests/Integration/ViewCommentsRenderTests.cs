@@ -62,7 +62,7 @@ public class ViewCommentsRenderTests : IClassFixture<WebApplicationFactory<Progr
         return await response.Content.ReadAsStringAsync();
     }
 
-    private static string Main(string html) => Regex.Match(html, "<main.*?</main>", RegexOptions.Singleline).Value;
+    private static string MainContent(string html) => Regex.Match(html, "<main.*?</main>", RegexOptions.Singleline).Value;
 
     private static bool HasCommandButton(string html, string value, string label) =>
         Regex.IsMatch(html, $"<button type=\"submit\" name=\"command\" value=\"{value}\"[^>]*>{label}</button>");
@@ -74,7 +74,7 @@ public class ViewCommentsRenderTests : IClassFixture<WebApplicationFactory<Progr
     {
         Seed();
 
-        var html = Main(await GetHtmlAsync());
+        var html = MainContent(await GetHtmlAsync());
 
         Assert.True(HasUploadInput(html));
         Assert.Contains(">Upload</button>", html, StringComparison.Ordinal);
@@ -92,7 +92,7 @@ public class ViewCommentsRenderTests : IClassFixture<WebApplicationFactory<Progr
     {
         Seed(canSubmit: false);
 
-        var html = Main(await GetHtmlAsync());
+        var html = MainContent(await GetHtmlAsync());
 
         Assert.False(HasCommandButton(html, "submit", "Submit"));
         Assert.True(HasCommandButton(html, "save", "Save"));
@@ -103,7 +103,7 @@ public class ViewCommentsRenderTests : IClassFixture<WebApplicationFactory<Progr
     {
         Seed(withSaved: true);
 
-        var html = Main(await GetHtmlAsync());
+        var html = MainContent(await GetHtmlAsync());
 
         Assert.Contains(
             $"href=\"/Distribution/ViewCommentsAttachment?schemeId={Scheme}&amp;attachmentId={SavedId}\">saved.pdf</a>",
@@ -118,7 +118,7 @@ public class ViewCommentsRenderTests : IClassFixture<WebApplicationFactory<Progr
     {
         Seed(withSaved: true);
 
-        var html = Main(await PostHtmlAsync(
+        var html = MainContent(await PostHtmlAsync(
             ("command", "cancelAudit"),
             ("StagedAttachments", $"{Token}|new.pdf"),
             ("RemovedAttachmentIds", SavedId.ToString())));
@@ -140,7 +140,7 @@ public class ViewCommentsRenderTests : IClassFixture<WebApplicationFactory<Progr
     {
         Seed(withSaved: true);
 
-        var html = Main(await PostHtmlAsync(("command", "cancelAudit"), ("RemovedAttachmentIds", SavedId.ToString())));
+        var html = MainContent(await PostHtmlAsync(("command", "cancelAudit"), ("RemovedAttachmentIds", SavedId.ToString())));
 
         Assert.DoesNotContain("saved.pdf", html, StringComparison.Ordinal);
         Assert.True(HasUploadInput(html));
@@ -154,7 +154,7 @@ public class ViewCommentsRenderTests : IClassFixture<WebApplicationFactory<Progr
         Seed();
         _apiClient.CommentsSaveResult = new TestConsultantCommentsSaveResult(false, true, "Comments for D1a/S1", new Dictionary<string, string>());
 
-        var html = Main(await PostHtmlAsync(("command", command), ("StagedAttachments", $"{Token}|new.pdf")));
+        var html = MainContent(await PostHtmlAsync(("command", command), ("StagedAttachments", $"{Token}|new.pdf")));
 
         Assert.Contains("<h1 class=\"govuk-heading-l\">Audit Trail</h1>", html, StringComparison.Ordinal);
         Assert.Equal(warning, html.Contains(SubmitWarning, StringComparison.Ordinal));

@@ -235,13 +235,13 @@ public class TabulationReportRenderTests : IClassFixture<WebApplicationFactory<P
         Assert.Contains("<section class=\"ptl-table-scroll ptl-tabulation-scroll\" aria-label=\"Clinical\"", html, StringComparison.Ordinal);
         var table = TableHtml(html, "Clinical");
         var head = Regex.Match(table, "<thead>(.*?)</thead>", RegexOptions.Singleline).Groups[1].Value;
-        Assert.Equal(2, Regex.Matches(head, "<tr>").Count);
+        Assert.Equal(2, Regex.Count(head, "<tr>"));
         var rows = TableRows(table);
         Assert.Equal(6, rows.Count);
         Assert.Equal(
             "<th scope=\"col\" class=\"TabulationHeader1\" rowspan=\"2\">Clinical</th><th scope=\"col\" class=\"TabulationHeader2\" rowspan=\"2\">Method</th><th scope=\"col\" class=\"TabulationHeader1\" colspan=\"5\">S1</th>",
             rows[0]);
-        Assert.Equal(5, Regex.Matches(rows[1], "<th scope=\"col\" class=\"TabulationHeader2\">").Count);
+        Assert.Equal(5, Regex.Count(rows[1], "<th scope=\"col\" class=\"TabulationHeader2\">"));
         Assert.Equal(
             "<th scope=\"row\" class=\"TabulationCell\" rowspan=\"2\">Intended</th><td>&nbsp;</td><td class=\"TabulationCell\" colspan=\"5\">Brucella abortus</td>",
             rows[2]);
@@ -331,7 +331,7 @@ public class TabulationReportRenderTests : IClassFixture<WebApplicationFactory<P
         var html = await GetHtmlAsync(TabulationUrl);
 
         var comments = Regex.Match(html, "<div id=\"commentsDiv\">(.*)<div class=\"govuk-button-group noprint\">", RegexOptions.Singleline).Groups[1].Value;
-        Assert.Equal(3, Regex.Matches(comments, "<div class=\"divTestConsultantComments\">").Count);
+        Assert.Equal(3, Regex.Count(comments, "<div class=\"divTestConsultantComments\">"));
         Assert.Contains("<p>Standard text</p>", comments, StringComparison.Ordinal);
         Assert.Contains("<p>Sample <b>comments</b></p>", comments, StringComparison.Ordinal);
         Assert.Contains("<p class=\"commentsTitle\">Comments provided by Dr A, QAU:</p>", comments, StringComparison.Ordinal);
@@ -546,7 +546,7 @@ public class TabulationReportRenderTests : IClassFixture<WebApplicationFactory<P
         var svg = Regex.Match(html, "<svg class=\"ptl-assessment-chart\".*?</svg>", RegexOptions.Singleline).Value;
         Assert.Contains("<title id=\"assessment-chart-title\">Bar chart shows the frequency of assessment scores</title>", svg, StringComparison.Ordinal);
         Assert.Contains("Frequency by Assessment Score.", svg, StringComparison.Ordinal);
-        Assert.Equal(3, Regex.Matches(svg, "<rect ").Count);
+        Assert.Equal(3, Regex.Count(svg, "<rect "));
         Assert.Contains(">5 Excellent</text>", svg, StringComparison.Ordinal);
         // 25 at most: ticks every 3 up to 27.
         Assert.Contains(">27</text>", svg, StringComparison.Ordinal);

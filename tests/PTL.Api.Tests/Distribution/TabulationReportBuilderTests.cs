@@ -21,6 +21,7 @@ public class TabulationReportBuilderTests
     private static readonly Guid P4 = Guid.Parse("60000000-0000-0000-0000-000000000004");
     private static readonly Guid Viewer1 = Guid.Parse("70000000-0000-0000-0000-000000000001");
     private static readonly DateTime Submitted = new(2026, 5, 10);
+    private static readonly string[] MixedRatings = ["2", "2", "-1", "abc"];
 
     private static TabulationSource Source(
         bool published = false,
@@ -720,7 +721,7 @@ public class TabulationReportBuilderTests
     {
         var source = Source(hasRatings: true);
         source.Tests.Add(PlainTest());
-        foreach (var (rating, index) in new[] { "2", "2", "-1", "abc" }.Select((r, i) => (r, i)))
+        foreach (var (rating, index) in MixedRatings.Select((r, i) => (r, i)))
         {
             var participant = WithResult(Participant(Guid.NewGuid(), $"L00{index}"), SampleA, "x");
             participant.SampleRatings[SampleA] = rating;
