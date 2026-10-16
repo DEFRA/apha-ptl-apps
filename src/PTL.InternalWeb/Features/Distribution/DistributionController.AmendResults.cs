@@ -1,6 +1,7 @@
 using System.Globalization;
 using Microsoft.AspNetCore.Mvc;
 using PTL.Contracts.Distribution;
+using PTL.SharedUI.Notifications;
 using Keys = PTL.Contracts.Distribution.AmendResultsFieldKeys;
 
 namespace PTL.InternalWeb.Features.Distribution;
@@ -111,6 +112,7 @@ public sealed partial class DistributionController
             return View(model);
         }
 
+        TempData.SetNotification(NotificationType.Success, "Amended Results updated successfully.");
         return RedirectToAction(nameof(Tabulations), new { year, monthId });
     }
 

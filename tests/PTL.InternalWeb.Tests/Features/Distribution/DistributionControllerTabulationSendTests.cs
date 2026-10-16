@@ -83,7 +83,9 @@ public class DistributionControllerTabulationSendTests
         Assert.Equal(
             [new TabulationStagedSendRequest(SchemeA, "SendToTestConsultant"), new TabulationStagedSendRequest(SchemeB, "SendToResultsSignOff")],
             Assert.Single(apiClient.SavedTabulations));
-        Assert.Null(controller.TempData.GetNotification());
+        var notification = controller.TempData.GetNotification();
+        Assert.Equal(NotificationType.Success, notification!.Type);
+        Assert.Equal("Tabulations updated successfully.", notification.Message);
     }
 
     [Fact]

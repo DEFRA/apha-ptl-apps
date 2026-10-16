@@ -35,7 +35,8 @@
         <input type="hidden" asp-for="YearId" />
         <input type="hidden" asp-for="MonthId" />
         <input type="hidden" asp-for="RequiresAuditReason" />
-        <input type="hidden" asp-for="IsAuditStep" />
+        @* Literal, not asp-for: the editing form posted IsAuditStep=False and the tag helper would echo that stale value back. *@
+        <input type="hidden" name="IsAuditStep" value="true" />
         <input type="hidden" asp-for="AuditObjectName" />
         <input type="hidden" asp-for="PendingCommand" />
         @for (var t = 0; t < Model.Tests.Count; t++)

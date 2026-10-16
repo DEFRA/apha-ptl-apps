@@ -28,6 +28,7 @@ public sealed partial class DistributionController
         {
             if (await distributionApiClient.SaveTabulationsAsync(year, monthId, stagedSends, cancellationToken))
             {
+                TempData.SetNotification(NotificationType.Success, "Tabulations updated successfully.");
                 return RedirectToAction(nameof(Index), new { year });
             }
 

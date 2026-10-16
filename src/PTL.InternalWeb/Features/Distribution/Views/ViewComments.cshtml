@@ -42,7 +42,8 @@
     <form method="post" asp-action="ViewComments" asp-route-year="@Model.YearId" asp-route-monthId="@Model.MonthId" asp-route-schemeId="@Model.MonthlyDistributionSchemeId" novalidate>
         @* No server-side session (legacy kept the comments in Session while Audit.aspx ran), so the
            unsaved comments ride along hidden or they are lost when the audited save runs. *@
-        <input type="hidden" asp-for="IsAuditStep" />
+        @* Literal, not asp-for: the editing form posted IsAuditStep=False and the tag helper would echo that stale value back. *@
+        <input type="hidden" name="IsAuditStep" value="true" />
         <input type="hidden" asp-for="AuditObjectName" />
         <input type="hidden" asp-for="PendingCommand" />
         <input type="hidden" asp-for="Comments" />

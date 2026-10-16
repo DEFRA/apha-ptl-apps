@@ -146,6 +146,20 @@ public class ViewCommentsRenderTests : IClassFixture<WebApplicationFactory<Progr
         Assert.True(HasUploadInput(html));
     }
 
+    [Fact]
+    public async Task Post_FirstSaveThatNeedsAnAudit_PostsIsAuditStepTrueFromTheAuditForm()
+    {
+        Seed();
+        _apiClient.CommentsSaveResult = new TestConsultantCommentsSaveResult(false, true, "Comments for D1a/S1", new Dictionary<string, string>());
+
+        // The browser posts the editing form's hidden IsAuditStep=False; the audit form must not echo that back.
+        var html = MainContent(await PostHtmlAsync(("command", "save"), ("IsAuditStep", "False")));
+
+        Assert.Contains("<h1 class=\"govuk-heading-l\">Audit Trail</h1>", html, StringComparison.Ordinal);
+        Assert.Matches("name=\"IsAuditStep\" value=\"true\"", html);
+        Assert.DoesNotMatch("name=\"IsAuditStep\" value=\"False\"", html);
+    }
+
     [Theory]
     [InlineData("submit", true)]
     [InlineData("save", false)]
