@@ -4,7 +4,7 @@ using PTL.Contracts.Distribution;
 namespace PTL.ApiClient.Distribution;
 
 // Thin typed HttpClient wrapper around PTL.Api's Distribution Dashboard endpoints.
-public sealed class DistributionApiClient(HttpClient httpClient) : IDistributionApiClient
+public sealed partial class DistributionApiClient(HttpClient httpClient) : IDistributionApiClient
 {
     public async Task<IReadOnlyList<DistributionDashboardMonthResponse>> GetDashboardAsync(int yearId, CancellationToken cancellationToken = default)
     {
@@ -145,5 +145,158 @@ public sealed class DistributionApiClient(HttpClient httpClient) : IDistribution
 
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadFromJsonAsync<PreparationSaveResult>(cancellationToken);
+    }
+
+    public async Task<ResultsReceiptResponse?> GetResultsReceiptAsync(int yearId, int monthId, CancellationToken cancellationToken = default)
+    {
+        var response = await httpClient.GetAsync(
+            new Uri($"/api/distributions/months/{yearId}/{monthId}/results-receipt", UriKind.Relative), cancellationToken);
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<ResultsReceiptResponse>(cancellationToken);
+    }
+
+    public async Task<ResultsReceiptSaveResult?> SaveResultsReceiptAsync(
+        int yearId, int monthId, ResultsReceiptSaveRequest request, CancellationToken cancellationToken = default)
+    {
+        var response = await httpClient.PutAsJsonAsync($"/api/distributions/months/{yearId}/{monthId}/results-receipt", request, cancellationToken);
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<ResultsReceiptSaveResult>(cancellationToken);
+    }
+
+    public async Task<TabulationsResponse?> GetTabulationsAsync(int yearId, int monthId, CancellationToken cancellationToken = default)
+    {
+        var response = await httpClient.GetAsync(
+            new Uri($"/api/distributions/months/{yearId}/{monthId}/tabulations", UriKind.Relative), cancellationToken);
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<TabulationsResponse>(cancellationToken);
+    }
+
+    public async Task<SampleReceiptResponse?> GetSampleReceiptAsync(
+        Guid monthlyDistributionSchemeId, Guid distributionParticipantId, CancellationToken cancellationToken = default)
+    {
+        var response = await httpClient.GetAsync(
+            new Uri($"/api/distributions/schemes/{monthlyDistributionSchemeId}/participants/{distributionParticipantId}/sample-receipt", UriKind.Relative),
+            cancellationToken);
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<SampleReceiptResponse>(cancellationToken);
+    }
+
+    public async Task<SampleReceiptSaveResult?> SaveSampleReceiptAsync(
+        Guid monthlyDistributionSchemeId, Guid distributionParticipantId, SampleReceiptSaveRequest request, CancellationToken cancellationToken = default)
+    {
+        var response = await httpClient.PutAsJsonAsync(
+            $"/api/distributions/schemes/{monthlyDistributionSchemeId}/participants/{distributionParticipantId}/sample-receipt", request, cancellationToken);
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<SampleReceiptSaveResult>(cancellationToken);
+    }
+
+    public async Task<ActualResultsResponse?> GetActualResultsAsync(
+        Guid monthlyDistributionSchemeId, Guid distributionParticipantId, CancellationToken cancellationToken = default)
+    {
+        var response = await httpClient.GetAsync(
+            new Uri($"/api/distributions/schemes/{monthlyDistributionSchemeId}/participants/{distributionParticipantId}/actual-results", UriKind.Relative),
+            cancellationToken);
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<ActualResultsResponse>(cancellationToken);
+    }
+
+    public async Task<ActualResultsSaveResult?> SaveActualResultsAsync(
+        Guid monthlyDistributionSchemeId, Guid distributionParticipantId, ActualResultsSaveRequest request, CancellationToken cancellationToken = default)
+    {
+        var response = await httpClient.PutAsJsonAsync(
+            $"/api/distributions/schemes/{monthlyDistributionSchemeId}/participants/{distributionParticipantId}/actual-results", request, cancellationToken);
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<ActualResultsSaveResult>(cancellationToken);
+    }
+
+    public async Task<PackagingSheetResponse?> GetPackagingAsync(int yearId, int monthId, int mode, int week, CancellationToken cancellationToken = default)
+    {
+        var response = await httpClient.GetAsync(
+            new Uri($"/api/distributions/months/{yearId}/{monthId}/packaging?mode={mode}&week={week}", UriKind.Relative), cancellationToken);
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<PackagingSheetResponse>(cancellationToken);
+    }
+
+    public async Task<PackagingSaveResult?> SavePackagingAsync(
+        int yearId, int monthId, PackagingSaveRequest request, CancellationToken cancellationToken = default)
+    {
+        var response = await httpClient.PutAsJsonAsync($"/api/distributions/months/{yearId}/{monthId}/packaging", request, cancellationToken);
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<PackagingSaveResult>(cancellationToken);
+    }
+
+    public async Task<PackagingLabelsResponse?> GetPackagingLabelsAsync(
+        int yearId, int monthId, PackagingSelectionRequest request, CancellationToken cancellationToken = default)
+    {
+        var response = await httpClient.PostAsJsonAsync($"/api/distributions/months/{yearId}/{monthId}/packaging/labels", request, cancellationToken);
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<PackagingLabelsResponse>(cancellationToken);
+    }
+
+    public async Task<PackagingCustomsResult> GetPackagingCustomsAsync(
+        int yearId, int monthId, PackagingSelectionRequest request, CancellationToken cancellationToken = default)
+    {
+        var response = await httpClient.PostAsJsonAsync($"/api/distributions/months/{yearId}/{monthId}/packaging/customs", request, cancellationToken);
+
+        // Legacy surfaced the business message (e.g. "Please select schemes to print") on the page.
+        if (response.StatusCode == System.Net.HttpStatusCode.BadRequest)
+        {
+            var problem = await response.Content.ReadFromJsonAsync<Microsoft.AspNetCore.Mvc.ProblemDetails>(cancellationToken);
+            return new PackagingCustomsResult(null, string.Empty, problem?.Detail ?? "There was a problem with the Mail Merge");
+        }
+
+        response.EnsureSuccessStatusCode();
+        var fileName = response.Content.Headers.ContentDisposition?.FileNameStar ?? response.Content.Headers.ContentDisposition?.FileName?.Trim('"') ?? "Customs.docx";
+        return new PackagingCustomsResult(await response.Content.ReadAsByteArrayAsync(cancellationToken), fileName, null);
     }
 }

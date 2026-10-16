@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc.ViewFeatures;
 using PTL.ApiClient.Distribution;
 using PTL.Contracts.Distribution;
 using PTL.InternalWeb.Features.Distribution;
+using PTL.InternalWeb.Navigation;
 using PTL.InternalWeb.Tests.TestSupport;
 using PTL.SharedUI.Notifications;
 
@@ -314,6 +315,29 @@ public class DistributionControllerTests
 
         Assert.IsType<ViewResult>(result);
         Assert.True(controller.ModelState.IsValid);
+    }
+
+    [Fact]
+    public void ToggleCancelled_PublishesScheduleAsTheBreadcrumbAction()
+    {
+        var controller = CreateController(new FakeDistributionApiClient());
+
+        controller.ToggleCancelled(2026, 4, Guid.NewGuid(), new MonthlyDistributionScheduleViewModel());
+
+        Assert.Equal(nameof(DistributionController.Schedule), controller.ViewData[BreadcrumbRouteValues.Action]);
+    }
+
+    [Fact]
+    public async Task ChangeDeadlineAndRepeatDistribution_PublishParticipantsAsTheBreadcrumbAction()
+    {
+        var changeController = CreateController(new FakeDistributionApiClient { ChangeDeadlineResult = new ChangeDeadlineResult(true, null, null) });
+        await changeController.ChangeDeadline(2026, 4, ParticipantsSchemeId, DistributionParticipantId, PostedParticipantsModel(new DateTime(2026, 5, 1), "A reason"), CancellationToken.None);
+
+        var repeatController = CreateController(new FakeDistributionApiClient { RepeatDistributionResult = new RepeatDistributionResult(true, null) });
+        await repeatController.RepeatDistribution(2026, 4, ParticipantsSchemeId, PostedRepeatModel(), CancellationToken.None);
+
+        Assert.Equal(nameof(DistributionController.Participants), changeController.ViewData[BreadcrumbRouteValues.Action]);
+        Assert.Equal(nameof(DistributionController.Participants), repeatController.ViewData[BreadcrumbRouteValues.Action]);
     }
 
     [Fact]

@@ -126,6 +126,10 @@
                                 <th scope="col" class="govuk-table__header">
                                     @resultItem.Name
                                     <input type="hidden" asp-for="Tests[t].ResultItems[r].TestResultItemId" />
+                                    @if (!resultItem.IsDropdown)
+                                    {
+                                        <div id="intended-results-hint-@t-@r" class="govuk-hint govuk-!-font-size-16 govuk-!-margin-bottom-1">Input format: @resultItem.ReturnValueType</div>
+                                    }
                                     <div class="govuk-checkboxes govuk-checkboxes--small govuk-!-margin-top-1" data-module="govuk-checkboxes">
                                         <div class="govuk-checkboxes__item">
                                             @* aria-label disambiguates the accessible name - every column renders a checkbox labelled
@@ -133,8 +137,9 @@
                                             <input class="govuk-checkboxes__input intended-results-range-toggle" type="checkbox" asp-for="Tests[t].ResultItems[r].IsRange"
                                                    data-range-group="@rangeGroup"
                                                    aria-label="@($"{resultItem.Name} is a range of values")"
-                                                   title="Click here to set whether the Intended Result for this Result Item is a Range of values" />
+                                                   aria-describedby="intended-results-range-hint-@t-@r" />
                                             <label class="govuk-label govuk-checkboxes__label" for="@rangeId">Range</label>
+                                            <div id="intended-results-range-hint-@t-@r" class="govuk-hint govuk-checkboxes__hint govuk-!-font-size-16">Click here to set whether the Intended Result for this Result Item is a Range of values</div>
                                         </div>
                                     </div>
                                 </th>
@@ -178,7 +183,7 @@
                                                 else
                                                 {
                                                     <govuk-input asp-for="Tests[t].Samples[s].Values[v].IntendedResult" label="@valueLabel" label-class="govuk-label govuk-visually-hidden"
-                                                                 input-class="govuk-input govuk-input--width-10" disabled="@disabled" />
+                                                                 input-class="govuk-input govuk-input--width-10" disabled="@disabled" described-by="intended-results-hint-@t-@r" />
                                                 }
                                                 <span class="intended-results-range-value" data-range-group="@valueRangeGroup" hidden="@(!resultItem.IsRange)">
                                                     &nbsp;to&nbsp;
@@ -191,7 +196,7 @@
                                                     else
                                                     {
                                                         <govuk-input asp-for="Tests[t].Samples[s].Values[v].IntendedResult2" label="@($"{valueLabel} (upper value)")" label-class="govuk-label govuk-visually-hidden"
-                                                                     input-class="govuk-input govuk-input--width-10" disabled="@disabled" />
+                                                                     input-class="govuk-input govuk-input--width-10" disabled="@disabled" described-by="intended-results-hint-@t-@r" />
                                                     }
                                                 </span>
                                             }
@@ -224,8 +229,10 @@
                                         }
                                         else
                                         {
+                                            var methodHintId = $"intended-results-hint-{t}-m{m}";
+                                            <div id="@methodHintId" class="govuk-hint govuk-!-font-size-16 govuk-!-margin-bottom-1">Input format: @methodItem.ReturnValueType</div>
                                             <govuk-input asp-for="Tests[t].MethodItems[m].IntendedResult" label="@methodItem.Name" label-class="govuk-label govuk-visually-hidden"
-                                                         input-class="govuk-input govuk-input--width-20" />
+                                                         input-class="govuk-input govuk-input--width-20" described-by="@methodHintId" />
                                         }
                                     </td>
                                 </tr>

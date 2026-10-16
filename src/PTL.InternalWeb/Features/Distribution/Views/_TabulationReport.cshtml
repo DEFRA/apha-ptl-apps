@@ -1,0 +1,268 @@
+@using PTL.Contracts.Distribution
+@model PTL.InternalWeb.Features.Distribution.TabulationReportViewModel
+@{
+    var report = Model.Report;
+    var isIssued = Model.PublishedTabulationId is not null;
+    var nbsp = new Microsoft.AspNetCore.Html.HtmlString("&nbsp;");
+
+    var pageRoute = new Dictionary<string, string>
+    {
+        ["year"] = Model.YearId.ToString(System.Globalization.CultureInfo.InvariantCulture),
+        ["monthId"] = Model.MonthId.ToString(System.Globalization.CultureInfo.InvariantCulture),
+    };
+    var backAction = "Tabulations";
+    if (isIssued)
+    {
+        pageRoute["tabulationId"] = Model.TabulationId.ToString();
+        backAction = "PublishedTabulations";
+    }
+
+    Dictionary<string, string> AssessmentRoute(Guid testId)
+    {
+        var route = new Dictionary<string, string>(pageRoute) { ["tabulationId"] = Model.TabulationId.ToString(), ["testId"] = testId.ToString() };
+        if (isIssued)
+        {
+            route["publishedTabulationId"] = Model.PublishedTabulationId!.Value.ToString();
+        }
+
+        return route;
+    }
+
+    string? CellClass(TabulationCellResponse cell)
+    {
+        var kind = cell.Kind switch
+        {
+            "Header1" => "TabulationHeader1",
+            "Header2" => "TabulationHeader2",
+            "Cell" => "TabulationCell",
+            _ => null,
+        };
+        if (!cell.IsNilReturn)
+        {
+            return kind;
+        }
+
+        return kind is null ? "NilReturn" : kind + " NilReturn";
+    }
+
+    object CellText(TabulationCellResponse cell) => string.IsNullOrEmpty(cell.Text) ? nbsp : cell.Text;
+
+    int? Span(int span) => span > 1 ? span : null;
+
+    async Task RenderRow(TabulationGridRowResponse row, bool firstIsRowHeader)
+    {
+        <tr>
+            @for (var c = 0; c < row.Cells.Count; c++)
+            {
+                var cell = row.Cells[c];
+                if (row.IsHeader)
+                {
+                    <th scope="col" class="@CellClass(cell)" colspan="@Span(cell.ColSpan)" rowspan="@Span(cell.RowSpan)">@CellText(cell)</th>
+                }
+                else if (c == 0 && firstIsRowHeader)
+                {
+                    <th scope="row" class="@CellClass(cell)" colspan="@Span(cell.ColSpan)" rowspan="@Span(cell.RowSpan)">@CellText(cell)</th>
+                }
+                else if (cell.Kind is "Header1" or "Header2")
+                {
+                    <th scope="col" class="@CellClass(cell)" colspan="@Span(cell.ColSpan)" rowspan="@Span(cell.RowSpan)">@CellText(cell)</th>
+                }
+                else
+                {
+                    <td class="@CellClass(cell)" colspan="@Span(cell.ColSpan)" rowspan="@Span(cell.RowSpan)">@CellText(cell)</td>
+                }
+            }
+        </tr>
+    }
+
+    async Task RenderTable(TabulationTableResponse table)
+    {
+        var headerRowCount = table.Rows.TakeWhile(r => r.IsHeader).Count();
+
+        // A row starts with a row header only when column 0 is not still covered by a rowspan above it.
+        var rowHeaderFlags = new List<bool>(table.Rows.Count);
+        var covered = 0;
+        foreach (var row in table.Rows)
+        {
+            if (covered > 0)
+            {
+                rowHeaderFlags.Add(false);
+                covered--;
+                continue;
+            }
+
+            var first = row.Cells.Count > 0 ? row.Cells[0] : null;
+            rowHeaderFlags.Add(!row.IsHeader && first is not null);
+            covered = first is null ? 0 : first.RowSpan - 1;
+        }
+
+        <section class="ptl-table-scroll ptl-tabulation-scroll" aria-label="@table.Caption">
+            <table class="TabulationTable">
+                <caption class="govuk-visually-hidden">@table.Caption</caption>
+                @if (headerRowCount > 0)
+                {
+                    <thead>
+                        @for (var r = 0; r < headerRowCount; r++)
+                        {
+                            <tr>
+                                @foreach (var cell in table.Rows[r].Cells)
+                                {
+                                    <th scope="col" class="@CellClass(cell)" colspan="@Span(cell.ColSpan)" rowspan="@Span(cell.RowSpan)">@CellText(cell)</th>
+                                }
+                            </tr>
+                        }
+                    </thead>
+                }
+                <tbody>
+                    @for (var r = headerRowCount; r < table.Rows.Count; r++)
+                    {
+                        await RenderRow(table.Rows[r], rowHeaderFlags[r]);
+                    }
+                </tbody>
+            </table>
+        </section>
+        @if (table.AssessmentTestId is { } testId)
+        {
+            <p class="govuk-body">
+                <a class="govuk-link" asp-action="@(isIssued ? "PublishedAssessmentResults" : "TabulationAssessmentResults")" asp-all-route-data="AssessmentRoute(testId)">View assessment results<span class="govuk-visually-hidden"> for @table.Caption</span></a>
+            </p>
+        }
+    }
+}
+
+<a class="govuk-back-link noprint" asp-action="@backAction" asp-all-route-data="pageRoute">Back</a>
+
+<div class="noprint">
+    <h1 class="govuk-heading-l">@report.Title</h1>
+    <h2 class="govuk-heading-m">@report.TabulationName</h2>
+    @if (isIssued)
+    {
+        <p class="govuk-body">@report.DistributionDateText</p>
+    }
+
+    @if (report.ParticipantOptions.Count > 0 || report.ViewerOptions.Count > 0)
+    {
+        <form method="get" asp-action="@(isIssued ? "PublishedTabulation" : "Tabulation")" class="govuk-!-margin-bottom-6" novalidate>
+            <input type="hidden" name="year" value="@Model.YearId" />
+            <input type="hidden" name="monthId" value="@Model.MonthId" />
+            <input type="hidden" name="tabulationId" value="@Model.TabulationId" />
+            @if (isIssued)
+            {
+                <input type="hidden" name="publishedTabulationId" value="@Model.PublishedTabulationId" />
+            }
+            @if (report.ParticipantOptions.Count > 0)
+            {
+                <div class="govuk-form-group">
+                    <label class="govuk-label" for="participantId">Select Participant:</label>
+                    <select class="govuk-select" id="participantId" name="participantId">
+                        @foreach (var option in report.ParticipantOptions)
+                        {
+                            <option value="@option.Value" selected="@(option.Value == report.SelectedParticipantId ? "selected" : null)">@option.Text</option>
+                        }
+                    </select>
+                </div>
+            }
+            @if (report.ViewerOptions.Count > 0)
+            {
+                <div class="govuk-form-group">
+                    <label class="govuk-label" for="viewerId">Select Viewer:</label>
+                    <select class="govuk-select" id="viewerId" name="viewerId">
+                        @foreach (var option in report.ViewerOptions)
+                        {
+                            <option value="@option.Value" selected="@(option.Value == report.SelectedViewerId ? "selected" : null)">@option.Text</option>
+                        }
+                    </select>
+                </div>
+            }
+            <button type="submit" class="govuk-button govuk-button--secondary" data-module="govuk-button">View</button>
+        </form>
+    }
+
+    @foreach (var table in report.Tables)
+    {
+        await RenderTable(table);
+    }
+    @if (report.Ratings is not null)
+    {
+        await RenderTable(report.Ratings);
+    }
+</div>
+
+<div class="printonly ptl-tabulation-print-header">
+    <img class="ptl-tabulation-print-logo" src="~/images/vetqasheader-greyscale.png" alt="" />
+    <div class="ptl-tabulation-print-titles">
+        <div class="ptl-tabulation-print-title tabulationtitle">@report.Title</div>
+        <div class="tabulationtitle tabulationtitle-alignright">@report.DistributionDateText</div>
+    </div>
+</div>
+
+@* Filled by tabulation-print.js; it must be laid out (not display:none) while the script measures it. *@
+<div id="tabulation-print-tables"></div>
+<script type="application/json" id="tabulation-print-data">@Html.Raw(System.Text.Json.JsonSerializer.Serialize(report.Print, new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web)))</script>
+
+<div id="commentsDiv">
+    @if (!string.IsNullOrEmpty(report.StandardTabulationTextHtml))
+    {
+        <div class="divTestConsultantComments">
+            @Html.Raw(report.StandardTabulationTextHtml)
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(report.CommentsHtml))
+    {
+        <div class="divTestConsultantComments">
+            @Html.Raw(report.CommentsHtml)
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(report.TestConsultantCommentsHtml))
+    {
+        <div class="divTestConsultantComments">
+            <p class="commentsTitle">@report.TestConsultantCommentsTitle</p>
+            @Html.Raw(report.TestConsultantCommentsHtml)
+        </div>
+    }
+
+    @if (report.Attachment is not null)
+    {
+        <p class="govuk-body noprint">
+            <strong>Supporting Document: </strong>
+            @if (isIssued)
+            {
+                <a class="govuk-link" asp-action="PublishedTabulationAttachment" asp-route-publishedTabulationId="@Model.PublishedTabulationId" asp-route-attachmentId="@report.Attachment.AttachmentId">View Supporting Document</a>
+            }
+            else
+            {
+                <a class="govuk-link" asp-action="TabulationAttachment" asp-route-tabulationId="@Model.TabulationId" asp-route-attachmentId="@report.Attachment.AttachmentId">View Supporting Document</a>
+            }
+        </p>
+    }
+
+    @if (report.ShowUkasLogo)
+    {
+        <div class="ptl-tabulation-ukas">
+            <img src="~/images/ukas.png" alt="UKAS accredited" width="60" />
+            <div>0004</div>
+        </div>
+    }
+
+    @if (isIssued && report.Signatory is { } signatory)
+    {
+        <div class="signatureTable">
+            <div class="cellVersionDate">@signatory.VersionText</div>
+            <div class="cellTabulationSignature">
+                <div>@signatory.Signatory</div>
+                @foreach (var line in signatory.AddressLines)
+                {
+                    <div class="cellTabulationSignature2">@line</div>
+                }
+                <div class="cellTabulationSignature2">@signatory.IssuedText</div>
+            </div>
+        </div>
+    }
+</div>
+
+<div class="govuk-button-group noprint">
+    <a class="govuk-button govuk-button--secondary" asp-action="@backAction" asp-all-route-data="pageRoute">Back</a>
+    <button type="button" class="govuk-button" data-module="ptl-print-button" data-ptl-print>Print</button>
+</div>

@@ -4,7 +4,7 @@ using PTL.Data.Infrastructure;
 
 namespace PTL.Data.Distribution;
 
-public sealed class DistributionRepository(IDbConnectionFactory connectionFactory) : IDistributionRepository
+public sealed partial class DistributionRepository(IDbConnectionFactory connectionFactory) : IDistributionRepository
 {
     public async Task<IReadOnlyList<DistributionMonthSummaryEntity>> GetMonthlyDistributionSummariesAsync(CancellationToken cancellationToken = default)
     {
@@ -692,6 +692,382 @@ public sealed class DistributionRepository(IDbConnectionFactory connectionFactor
         }
 
         transaction.Commit();
+    }
+
+    public async Task<ResultsReceiptData?> GetResultsReceiptAsync(int yearId, int monthId, CancellationToken cancellationToken = default)
+    {
+        // @ReferenceDate is left to its NULL default - the stored procedure then uses today's date.
+        using var connection = connectionFactory.CreateConnection();
+        using var results = await connection.QueryMultipleAsync(
+            "EXEC dbo.spgMonthlyDistributionForResultsReceipt @YearId = @YearId, @MonthId = @MonthId",
+            new { YearId = yearId, MonthId = monthId });
+
+        var header = await results.ReadFirstOrDefaultAsync<ResultsReceiptHeaderEntity>();
+        if (header is null)
+        {
+            return null;
+        }
+
+        var schemes = (await results.ReadAsync<ResultsReceiptSchemeEntity>()).ToList();
+        var participants = (await results.ReadAsync<ResultsReceiptParticipantEntity>()).ToList();
+        var statuses = (await results.ReadAsync<ResultsReceiptSampleStatusEntity>()).ToDictionary(s => s.DistributionParticipantId, s => s.HasUnaccountedSamples);
+
+        var schemesById = schemes.ToDictionary(s => s.MonthlyDistributionSchemeId);
+        foreach (var participant in participants)
+        {
+            if (statuses.TryGetValue(participant.DistributionParticipantId, out var hasUnaccounted))
+            {
+                participant.HasUnaccountedSamples = hasUnaccounted;
+            }
+
+            if (schemesById.TryGetValue(participant.MonthlyDistributionSchemeId, out var scheme))
+            {
+                scheme.Participants.Add(participant);
+            }
+        }
+
+        return new ResultsReceiptData(header.MonthlyDistributionId, header.YearId, header.MonthId, schemes);
+    }
+
+    public async Task<IReadOnlyList<TabulationsSchemeEntity>> GetTabulationsAsync(Guid monthlyDistributionId, CancellationToken cancellationToken = default)
+    {
+        // @ReferenceDate is left to its NULL default - the stored procedure then uses today's date.
+        using var connection = connectionFactory.CreateConnection();
+        List<TabulationsSchemeEntity> schemes;
+
+        using (var results = await connection.QueryMultipleAsync(
+            "EXEC dbo.spgMonthlyDistributionInfoForTabulationsById @MonthlyDistributionId = @MonthlyDistributionId",
+            new { MonthlyDistributionId = monthlyDistributionId }))
+        {
+            // The first result set is the month header, which the caller already has.
+            _ = await results.ReadAsync();
+            schemes = (await results.ReadAsync<TabulationsSchemeEntity>()).ToList();
+            var tabulations = (await results.ReadAsync<TabulationEntity>()).ToList();
+
+            var schemesById = schemes.ToDictionary(s => s.MonthlyDistributionSchemeId);
+            foreach (var tabulation in tabulations)
+            {
+                if (schemesById.TryGetValue(tabulation.MonthlyDistributionSchemeId, out var scheme))
+                {
+                    scheme.Tabulations.Add(tabulation);
+                }
+            }
+        }
+
+        // Legacy reads this for every scheme but only consults it when the scheme requires assessment.
+        foreach (var scheme in schemes.Where(s => s.RequiresAssessment))
+        {
+            scheme.AssessmentStatuses = (await connection.QueryAsync<TabulationAssessmentStatusEntity>(
+                "EXEC dbo.spgAssessmentStatus @MonthlyDistributionSchemeId = @MonthlyDistributionSchemeId",
+                new { scheme.MonthlyDistributionSchemeId })).ToList();
+        }
+
+        return schemes;
+    }
+
+    public async Task UpdateResultsReceiptAsync(IReadOnlyList<ResultsReceiptParticipantEntity> participants, CancellationToken cancellationToken = default)
+    {
+        if (participants.Count == 0)
+        {
+            return;
+        }
+
+        using var connection = connectionFactory.CreateConnection();
+        connection.Open();
+        using var transaction = connection.BeginTransaction();
+
+        const string updateSql = """
+            EXEC dbo.spuDistributionParticipantForResultsReceipt
+                @DistributionParticipantId = @DistributionParticipantId,
+                @ExtraDocumentsReturned = @ExtraDocumentsReturned,
+                @ReturnedDate = @ReturnedDate
+            """;
+
+        foreach (var participant in participants)
+        {
+            await connection.ExecuteAsync(updateSql, participant, transaction);
+        }
+
+        transaction.Commit();
+    }
+
+    public async Task<SampleReceiptData?> GetSampleReceiptAsync(
+        Guid distributionParticipantId, Guid monthlyDistributionSchemeId, CancellationToken cancellationToken = default)
+    {
+        using var connection = connectionFactory.CreateConnection();
+        using var results = await connection.QueryMultipleAsync(
+            "EXEC dbo.spgSampleReceipt @DistributionParticipantId = @DistributionParticipantId, @MonthlyDistributionSchemeId = @MonthlyDistributionSchemeId",
+            new { DistributionParticipantId = distributionParticipantId, MonthlyDistributionSchemeId = monthlyDistributionSchemeId });
+
+        var tests = (await results.ReadAsync<SampleReceiptTestEntity>()).ToList();
+        var samples = (await results.ReadAsync<SampleReceiptSampleEntity>()).ToList();
+        var lab = await results.ReadFirstOrDefaultAsync<SampleReceiptLabEntity>();
+        var scheme = await results.ReadFirstOrDefaultAsync<SampleReceiptSchemeEntity>();
+
+        return lab is null || scheme is null ? null : new SampleReceiptData(scheme, lab, tests, samples);
+    }
+
+    public async Task UpdateSampleReceiptAsync(IReadOnlyList<SampleReceiptSampleEntity> samples, CancellationToken cancellationToken = default)
+    {
+        if (samples.Count == 0)
+        {
+            return;
+        }
+
+        using var connection = connectionFactory.CreateConnection();
+        connection.Open();
+        using var transaction = connection.BeginTransaction();
+
+        const string updateSql = """
+            EXEC dbo.spuSampleReceipt
+                @SampleReceiptId = @SampleReceiptId,
+                @SubmissionDate = @SubmissionDate,
+                @NonSubmissionDate = @NonSubmissionDate,
+                @NonCapableDate = @NonCapableDate
+            """;
+
+        foreach (var sample in samples)
+        {
+            await connection.ExecuteAsync(updateSql, sample, transaction);
+        }
+
+        transaction.Commit();
+    }
+
+    public async Task<PackagingRawData?> GetPackagingSheetAsync(
+        Guid monthlyDistributionId, PackagingMode mode, int week, CancellationToken cancellationToken = default)
+    {
+        // @ReferenceDate is left to its NULL default - the stored procedures then use today's date
+        // (legacy only overrides it from the ResultsTestDate test-harness appSetting).
+        var (sql, parameters) = mode switch
+        {
+            PackagingMode.GroupAddress => (
+                "EXEC dbo.spgGroupedPackagingSheet @MonthlyDistributionId = @MonthlyDistributionId, @WeekNumber = @WeekNumber",
+                new { MonthlyDistributionId = monthlyDistributionId, WeekNumber = week }),
+            PackagingMode.ParticipantCombined => (
+                "EXEC dbo.spgPartGroupedPackagingSheet @MonthlyDistributionId = @MonthlyDistributionId, @WeekNumber = @WeekNumber",
+                new { MonthlyDistributionId = monthlyDistributionId, WeekNumber = week }),
+            _ => (
+                "EXEC dbo.spgWeeklyPackagingSheet @MonthlyDistributionId = @MonthlyDistributionId",
+                new { MonthlyDistributionId = monthlyDistributionId, WeekNumber = 0 }),
+        };
+
+        using var connection = connectionFactory.CreateConnection();
+        using var results = await connection.QueryMultipleAsync(sql, parameters);
+
+        var header = await results.ReadFirstOrDefaultAsync<PreparationHeaderEntity>();
+        if (header is null)
+        {
+            return null;
+        }
+
+        var groups = (await results.ReadAsync<PackagingGroupEntity>()).ToList();
+
+        if (mode == PackagingMode.ParticipantCombined)
+        {
+            var schemeItems = (await results.ReadAsync<PackagingSchemeItemEntity>()).ToList();
+            return new PackagingRawData(header.YearId, header.MonthId, groups, [], [], schemeItems);
+        }
+
+        var items = (await results.ReadAsync<PackagingItemEntity>()).ToList();
+        var participants = (await results.ReadAsync<PackagingParticipantEntity>()).ToList();
+        return new PackagingRawData(header.YearId, header.MonthId, groups, items, participants, []);
+    }
+
+    public async Task UpdatePackagingAsync(
+        IReadOnlyList<PackagingProgressUpdate> updates,
+        IReadOnlyList<DistributionPostedEmailEntity> emails,
+        CancellationToken cancellationToken = default)
+    {
+        using var connection = connectionFactory.CreateConnection();
+        connection.Open();
+        using var transaction = connection.BeginTransaction();
+
+        const string updateSql = """
+            EXEC dbo.spuDistributionParticipantPacking
+                @DistributionParticipantId = @DistributionParticipantId,
+                @PackagedDate = @PackagedDate,
+                @PostedDate = @PostedDate
+            """;
+
+        foreach (var update in updates)
+        {
+            await connection.ExecuteAsync(updateSql, update, transaction);
+        }
+
+        const string insertEmailSql = """
+            EXEC dbo.spiDistributionPostedEmail
+                @DistributionPostedEmailId = @DistributionPostedEmailId,
+                @ParticipantId = @ParticipantId,
+                @MonthlyDistributionSchemeId = @MonthlyDistributionSchemeId,
+                @Email = @Email,
+                @Distribution = @Distribution,
+                @SchemeName = @SchemeName
+            """;
+
+        foreach (var email in emails)
+        {
+            await connection.ExecuteAsync(insertEmailSql, email, transaction);
+        }
+
+        transaction.Commit();
+    }
+
+    public async Task<ActualResultsData?> GetActualResultsAsync(Guid distributionParticipantId, CancellationToken cancellationToken = default)
+    {
+        // @ReferenceDate is left to its NULL default - the procedure then uses today's date
+        // (legacy only overrides it from the ResultsTestDate test-harness appSetting).
+        using var connection = connectionFactory.CreateConnection();
+        using var results = await connection.QueryMultipleAsync(
+            "EXEC dbo.spgActualResults @ActualResultsId = @ActualResultsId",
+            new { ActualResultsId = distributionParticipantId });
+
+        var header = await results.ReadFirstOrDefaultAsync<ActualResultsHeaderEntity>();
+        if (header is null)
+        {
+            return null;
+        }
+
+        var sampleResults = (await results.ReadAsync<ActualSampleResultEntity>()).ToList();
+        var methodItemResults = (await results.ReadAsync<ActualMethodItemResultEntity>()).ToList();
+        return new ActualResultsData(header, sampleResults, methodItemResults);
+    }
+
+    public async Task<IReadOnlyList<Guid>> GetRatingIdsAsync(CancellationToken cancellationToken = default)
+    {
+        using var connection = connectionFactory.CreateConnection();
+        return (await connection.QueryAsync<Guid>("EXEC dbo.spgaRating")).ToList();
+    }
+
+    public async Task SaveActualResultsAsync(ActualResultsWrite write, CancellationToken cancellationToken = default)
+    {
+        using var connection = connectionFactory.CreateConnection();
+        connection.Open();
+        using var transaction = connection.BeginTransaction();
+
+        var actualResultsParameters = new
+        {
+            ActualResultsId = write.DistributionParticipantId,
+            write.FirstEditDate,
+            write.LastEditDate,
+        };
+
+        await connection.ExecuteAsync(
+            write.IsNew
+                ? "EXEC dbo.spiActualResults @ActualResultsId = @ActualResultsId, @FirstEditDate = @FirstEditDate, @LastEditDate = @LastEditDate"
+                : "EXEC dbo.spuActualResults @ActualResultsId = @ActualResultsId, @FirstEditDate = @FirstEditDate, @LastEditDate = @LastEditDate",
+            actualResultsParameters,
+            transaction);
+
+        // The audit procedures record the row's CURRENT (pre-update) value, so they must run
+        // immediately BEFORE the matching spu* call.
+        foreach (var item in write.MethodItems)
+        {
+            var parameters = new { ActualResultsId = write.DistributionParticipantId, TestMethodItemId = item.ItemId, item.Result, write.AuditWho, write.AuditWhy };
+
+            if (item.IsInsert)
+            {
+                await connection.ExecuteAsync(
+                    "EXEC dbo.spiActualMethodItemResult @ActualResultsId = @ActualResultsId, @TestMethodItemId = @TestMethodItemId, @Result = @Result",
+                    parameters,
+                    transaction);
+                continue;
+            }
+
+            await connection.ExecuteAsync(
+                """
+                EXEC dbo.spiAuditActualTestMethodItem
+                    @ActualResultsId = @ActualResultsId,
+                    @TestMethodItemId = @TestMethodItemId,
+                    @AuditWho = @AuditWho,
+                    @AuditWhy = @AuditWhy,
+                    @Result = @Result,
+                    @ResultUpdate = 1
+                """,
+                parameters,
+                transaction);
+
+            await connection.ExecuteAsync(
+                "EXEC dbo.spuActualMethodItemResult @ActualResultsId = @ActualResultsId, @TestMethodItemId = @TestMethodItemId, @Result = @Result",
+                parameters,
+                transaction);
+        }
+
+        foreach (var item in write.SampleItems)
+        {
+            var parameters = new { ActualResultsId = write.DistributionParticipantId, SampleResultItemId = item.ItemId, item.Result, write.AuditWho, write.AuditWhy };
+
+            if (item.IsInsert)
+            {
+                await connection.ExecuteAsync(
+                    "EXEC dbo.spiActualResultItemResult @ActualResultsId = @ActualResultsId, @SampleResultItemId = @SampleResultItemId, @Result = @Result",
+                    parameters,
+                    transaction);
+                continue;
+            }
+
+            await connection.ExecuteAsync(
+                """
+                EXEC dbo.spiAuditActualSampleResultItem
+                    @ActualResultsId = @ActualResultsId,
+                    @SampleResultItemId = @SampleResultItemId,
+                    @AuditWho = @AuditWho,
+                    @AuditWhy = @AuditWhy,
+                    @Result = @Result,
+                    @ResultUpdate = 1
+                """,
+                parameters,
+                transaction);
+
+            await connection.ExecuteAsync(
+                "EXEC dbo.spuActualResultItemResult @ActualResultsId = @ActualResultsId, @SampleResultItemId = @SampleResultItemId, @Result = @Result",
+                parameters,
+                transaction);
+        }
+
+        if (write.DefaultRatingId is { } ratingId)
+        {
+            foreach (var sampleId in write.RatingSampleIds)
+            {
+                await connection.ExecuteAsync(
+                    "EXEC dbo.spiSampleRating @SampleId = @SampleId, @ParticipantId = @ParticipantId, @RatingId = @RatingId",
+                    new { SampleId = sampleId, ParticipantId = write.DistributionParticipantId, RatingId = ratingId },
+                    transaction);
+            }
+        }
+
+        transaction.Commit();
+    }
+
+    public async Task<IReadOnlyList<DistributionPostedEmailEntity>> GetUnsentDistributionPostedEmailsAsync(CancellationToken cancellationToken = default)
+    {
+        using var connection = connectionFactory.CreateConnection();
+        return (await connection.QueryAsync<DistributionPostedEmailEntity>("EXEC dbo.spgaDistributionPostedEmail")).ToList();
+    }
+
+    public async Task MarkDistributionPostedEmailSentAsync(Guid distributionPostedEmailId, DateTime dateSent, CancellationToken cancellationToken = default)
+    {
+        using var connection = connectionFactory.CreateConnection();
+        await connection.ExecuteAsync(
+            "EXEC dbo.spuDistributionPostedEmail @DistributionPostedEmailId = @DistributionPostedEmailId, @DateSent = @DateSent",
+            new { DistributionPostedEmailId = distributionPostedEmailId, DateSent = dateSent });
+    }
+
+    public async Task<PackagingLabelAddressEntity?> GetLabelParticipantAddressAsync(
+        Guid participantId, Guid monthlyDistributionSchemeId, CancellationToken cancellationToken = default)
+    {
+        using var connection = connectionFactory.CreateConnection();
+        return await connection.QueryFirstOrDefaultAsync<PackagingLabelAddressEntity>(
+            "EXEC dbo.spgLabelParticipantAddress @ParticipantId = @ParticipantId, @MonthlyDistributionSchemeId = @MonthlyDistributionSchemeId",
+            new { ParticipantId = participantId, MonthlyDistributionSchemeId = monthlyDistributionSchemeId });
+    }
+
+    public async Task<PackagingLabelAddressEntity?> GetLabelGroupAddressAsync(Guid groupAddressId, CancellationToken cancellationToken = default)
+    {
+        using var connection = connectionFactory.CreateConnection();
+        return await connection.QueryFirstOrDefaultAsync<PackagingLabelAddressEntity>(
+            "EXEC dbo.spgLabelGroupAddress @GroupAddressId = @GroupAddressId",
+            new { GroupAddressId = groupAddressId });
     }
 }
 

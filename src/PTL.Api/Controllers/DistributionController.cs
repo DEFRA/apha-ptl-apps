@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 using PTL.Contracts.Distribution;
 using PTL.Core.Distribution;
 
@@ -6,16 +7,21 @@ namespace PTL.Api.Controllers;
 
 // Distribution Dashboard (legacy Distributions/MenuDistributions.aspx) - see
 // docs/analysis/distribution-analysis.md and docs/migration/distribution-migration.md. Scheduling,
-// Sample Numbers, Intended Results, Participants and Sample Preparation are also implemented here -
-// Packaging, Results (dashboard) and Tabulations remain out of scope.
+// Sample Numbers, Intended Results, Participants, Sample Preparation and Sample Packaging are also
+// implemented here - Results (dashboard) and Tabulations remain out of scope.
 [ApiController]
 [Route("api/distributions")]
-public sealed class DistributionController(
+public sealed partial class DistributionController(
     IDistributionService distributionService,
     ISampleNumbersService sampleNumbersService,
     IIntendedResultsService intendedResultsService,
     IDistributionParticipantsService distributionParticipantsService,
     IPreparationService preparationService,
+    IResultsReceiptService resultsReceiptService,
+    ITabulationsService tabulationsService,
+    IActualResultsService actualResultsService,
+    IPackagingService packagingService,
+    IPackagingOutputService packagingOutputService,
     ILogger<DistributionController> logger) : ControllerBase
 {
     private static readonly Action<ILogger, Guid, Exception?> LogStructureCreationFailedMessage =
@@ -96,6 +102,219 @@ public sealed class DistributionController(
 
         var outcome = await preparationService.SavePreparationAsync(yearId, monthId, updates, cancellationToken);
         return outcome.Success ? Ok(new PreparationSaveResult(true)) : NotFound();
+    }
+
+    // GET /api/distributions/months/{yearId}/{monthId}/results-receipt - the Results Receipt screen,
+    // legacy ResultsReceipt.MonthlyDistribution.FetchMonthlyDistribution.
+    [HttpGet("months/{yearId:int}/{monthId:int}/results-receipt")]
+    public async Task<ActionResult<ResultsReceiptResponse>> GetResultsReceipt(int yearId, int monthId, CancellationToken cancellationToken)
+    {
+        var data = await resultsReceiptService.GetResultsReceiptAsync(yearId, monthId, cancellationToken);
+        return data is null ? NotFound() : Ok(ToResponse(data));
+    }
+
+    // PUT /api/distributions/months/{yearId}/{monthId}/results-receipt - legacy
+    // MonthlyDistribution.Save() (ButtonSave_Click/ButtonApply_Click both call this; the
+    // save-vs-stay distinction is owned entirely by InternalWeb).
+    [HttpPut("months/{yearId:int}/{monthId:int}/results-receipt")]
+    public async Task<ActionResult<ResultsReceiptSaveResult>> SaveResultsReceipt(
+        int yearId, int monthId, [FromBody] ResultsReceiptSaveRequest request, CancellationToken cancellationToken)
+    {
+        var updates = request.Updates.Select(u => new ResultsReceiptParticipantUpdate(
+            u.DistributionParticipantId, u.ExtraDocumentsReturned, u.ReturnedChecked)).ToList();
+
+        var outcome = await resultsReceiptService.SaveResultsReceiptAsync(yearId, monthId, updates, cancellationToken);
+        return outcome.Success ? Ok(new ResultsReceiptSaveResult(true)) : NotFound();
+    }
+
+    // GET /api/distributions/months/{yearId}/{monthId}/tabulations - Monthly Distributions -
+    // Tabulations, legacy ResultsTabulation.MonthlyDistribution.FetchMonthlyDistribution. Read only:
+    // the Send/Amend/Comments commands are shown in their legacy state but not executed.
+    [HttpGet("months/{yearId:int}/{monthId:int}/tabulations")]
+    public async Task<ActionResult<TabulationsResponse>> GetTabulations(int yearId, int monthId, CancellationToken cancellationToken)
+    {
+        var page = await tabulationsService.GetTabulationsAsync(yearId, monthId, cancellationToken);
+        return page is null ? NotFound() : Ok(ToTabulationsResponse(page));
+    }
+
+    // GET /api/distributions/schemes/{monthlyDistributionSchemeId}/participants/{distributionParticipantId}/sample-receipt -
+    // the Sample Receipt screen, legacy ResultsReceipt.TestCollection.FetchTestCollection(participantId, mdsId).
+    [HttpGet("schemes/{monthlyDistributionSchemeId:guid}/participants/{distributionParticipantId:guid}/sample-receipt")]
+    public async Task<ActionResult<SampleReceiptResponse>> GetSampleReceipt(
+        Guid monthlyDistributionSchemeId, Guid distributionParticipantId, CancellationToken cancellationToken)
+    {
+        var page = await resultsReceiptService.GetSampleReceiptAsync(distributionParticipantId, monthlyDistributionSchemeId, cancellationToken);
+        return page is null ? NotFound() : Ok(ToResponse(page));
+    }
+
+    // PUT /api/distributions/schemes/{monthlyDistributionSchemeId}/participants/{distributionParticipantId}/sample-receipt -
+    // legacy SampleReceipt.aspx ButtonSave_Click / ButtonApply_Click -> TestCollection.Save() (the
+    // save-vs-stay distinction is owned by InternalWeb).
+    [HttpPut("schemes/{monthlyDistributionSchemeId:guid}/participants/{distributionParticipantId:guid}/sample-receipt")]
+    public async Task<ActionResult<SampleReceiptSaveResult>> SaveSampleReceipt(
+        Guid monthlyDistributionSchemeId, Guid distributionParticipantId, [FromBody] SampleReceiptSaveRequest request, CancellationToken cancellationToken)
+    {
+        var updates = request.Samples.Select(s => new SampleReceiptUpdate(s.SampleReceiptId, s.Submitted, s.NotSubmitted, s.NotInRepertoire)).ToList();
+
+        var outcome = await resultsReceiptService.SaveSampleReceiptAsync(distributionParticipantId, monthlyDistributionSchemeId, updates, cancellationToken);
+
+        return outcome.Status == SampleReceiptSaveStatus.NotFound
+            ? NotFound()
+            : Ok(new SampleReceiptSaveResult(outcome.Success, outcome.Status == SampleReceiptSaveStatus.ReadOnly));
+    }
+
+    // GET /api/distributions/schemes/{monthlyDistributionSchemeId}/participants/{distributionParticipantId}/actual-results -
+    // the Actual Results screen, legacy ActualResultsSet.FetchActualResults(participantId, mdsId).
+    [HttpGet("schemes/{monthlyDistributionSchemeId:guid}/participants/{distributionParticipantId:guid}/actual-results")]
+    public async Task<ActionResult<ActualResultsResponse>> GetActualResults(
+        Guid monthlyDistributionSchemeId, Guid distributionParticipantId, CancellationToken cancellationToken)
+    {
+        var page = await actualResultsService.GetActualResultsAsync(distributionParticipantId, monthlyDistributionSchemeId, cancellationToken);
+        return page is null ? NotFound() : Ok(ToResponse(page));
+    }
+
+    // PUT /api/distributions/schemes/{monthlyDistributionSchemeId}/participants/{distributionParticipantId}/actual-results -
+    // legacy ActualResults.aspx ButtonSave_Click / ButtonApply_Click -> ActualResultsSet.Save() (the
+    // save-vs-stay distinction is owned by InternalWeb).
+    [HttpPut("schemes/{monthlyDistributionSchemeId:guid}/participants/{distributionParticipantId:guid}/actual-results")]
+    public async Task<ActionResult<ActualResultsSaveResult>> SaveActualResults(
+        Guid monthlyDistributionSchemeId, Guid distributionParticipantId, [FromBody] ActualResultsSaveRequest request, CancellationToken cancellationToken)
+    {
+        var update = new ActualResultsUpdate(
+            [.. request.SampleValues.Select(v => new ActualResultsSampleValueUpdate(v.SampleResultItemId, v.Result))],
+            [.. request.MethodItems.Select(m => new ActualResultsMethodItemUpdate(m.TestMethodItemId, m.Result))],
+            User?.Identity?.Name ?? "Guest",
+            request.AuditWhy ?? string.Empty);
+
+        var outcome = await actualResultsService.SaveActualResultsAsync(distributionParticipantId, monthlyDistributionSchemeId, update, cancellationToken);
+
+        return outcome.Status == ActualResultsSaveStatus.NotFound
+            ? NotFound()
+            : Ok(new ActualResultsSaveResult(
+                outcome.Success,
+                outcome.FieldErrorsByItemId,
+                outcome.Status == ActualResultsSaveStatus.DeadlinePassed,
+                outcome.Status == ActualResultsSaveStatus.AuditReasonRequired,
+                outcome.AuditObjectName));
+    }
+
+    private static TabulationsResponse ToTabulationsResponse(TabulationsPage page) =>
+        new(
+            page.YearId,
+            page.MonthId,
+            [.. page.Schemes.Select(s => new TabulationsSchemeResponse(
+                s.MonthlyDistributionSchemeId,
+                s.SchemeNameFull,
+                s.DistributionReferenceFull,
+                s.DeadlineDate,
+                s.ResultsIssueTargetDate,
+                s.RequiresAssessment,
+                s.Consultants,
+                [.. s.Tabulations.Select(t => new TabulationRowResponse(t.TabulationId, t.Name, t.IsTestConsultant, t.PublishCount))],
+                new TabulationActionsResponse(
+                    ToTabulationActionResponse(s.Actions.AmendResults),
+                    ToTabulationActionResponse(s.Actions.SendToTestConsultant),
+                    ToTabulationActionResponse(s.Actions.SendForAssessment),
+                    ToTabulationActionResponse(s.Actions.SendToResultsSignOff))))]);
+
+    private static TabulationActionResponse ToTabulationActionResponse(TabulationAction action) =>
+        new(action.Text, action.IsEnabled, action.Hint, action.Command.ToString(), action.IsOverdue, action.IsLabel);
+
+    // GET /api/distributions/months/{yearId}/{monthId}/packaging?mode={0|1|2}&week={1-4} - the
+    // Sample Packaging screen, legacy GroupedPackagingSheet / PartGroupedPackagingSheet /
+    // WeeklyPackagingSheet.Fetch*. Week is required for the two Combined options only.
+    [HttpGet("months/{yearId:int}/{monthId:int}/packaging")]
+    public async Task<ActionResult<PackagingSheetResponse>> GetPackaging(
+        int yearId, int monthId, [FromQuery] int mode, [FromQuery] int week, CancellationToken cancellationToken)
+    {
+        if (!TryParsePackagingSelection(mode, week, out var packagingMode, out var packagingWeek))
+        {
+            return ValidationProblem(PackagingSelectionErrors());
+        }
+
+        var sheet = await packagingService.GetPackagingAsync(yearId, monthId, packagingMode, packagingWeek, cancellationToken);
+        return sheet is null ? NotFound() : Ok(ToResponse(sheet));
+    }
+
+    // PUT /api/distributions/months/{yearId}/{monthId}/packaging - legacy ButtonSave_Click /
+    // ButtonApply_Click, which save every packaging sheet the user touched (the save-vs-stay
+    // distinction is owned by InternalWeb).
+    [HttpPut("months/{yearId:int}/{monthId:int}/packaging")]
+    public async Task<ActionResult<PackagingSaveResult>> SavePackaging(
+        int yearId, int monthId, [FromBody] PackagingSaveRequest request, CancellationToken cancellationToken)
+    {
+        var updates = new List<PackagingStageUpdate>();
+        foreach (var update in request.Updates)
+        {
+            if (!TryParsePackagingSelection(update.Mode, update.Week, out var packagingMode, out var packagingWeek))
+            {
+                return ValidationProblem(PackagingSelectionErrors());
+            }
+
+            updates.Add(new PackagingStageUpdate(packagingMode, packagingWeek, update.DistributionParticipantId, update.Packed, update.Posted));
+        }
+
+        var outcome = await packagingService.SavePackagingAsync(yearId, monthId, updates, cancellationToken);
+        return outcome.Success ? Ok(new PackagingSaveResult(true, outcome.EmailFailures ?? [])) : NotFound();
+    }
+
+    // POST /api/distributions/months/{yearId}/{monthId}/packaging/labels - legacy Print Labels,
+    // returned as printable label text rather than sent to a server-side label printer.
+    [HttpPost("months/{yearId:int}/{monthId:int}/packaging/labels")]
+    public async Task<ActionResult<PackagingLabelsResponse>> GetPackagingLabels(
+        int yearId, int monthId, [FromBody] PackagingSelectionRequest request, CancellationToken cancellationToken)
+    {
+        if (!TryParsePackagingSelection(request.Mode, request.Week, out var packagingMode, out var packagingWeek))
+        {
+            return ValidationProblem(PackagingSelectionErrors());
+        }
+
+        var labels = await packagingOutputService.GetLabelsAsync(yearId, monthId, packagingMode, packagingWeek, request.SelectedKeys, cancellationToken);
+        return labels is null
+            ? NotFound()
+            : Ok(new PackagingLabelsResponse([.. labels.Select(l => new PackagingLabelResponse(l.Lines))]));
+    }
+
+    // POST /api/distributions/months/{yearId}/{monthId}/packaging/customs - legacy Print Customs
+    // (Participant Combined and Daily only): the Customs Pro-Forma Word document.
+    [HttpPost("months/{yearId:int}/{monthId:int}/packaging/customs")]
+    public async Task<IActionResult> GetPackagingCustoms(
+        int yearId, int monthId, [FromBody] PackagingSelectionRequest request, CancellationToken cancellationToken)
+    {
+        if (!TryParsePackagingSelection(request.Mode, request.Week, out var packagingMode, out var packagingWeek))
+        {
+            return ValidationProblem(PackagingSelectionErrors());
+        }
+
+        var outcome = await packagingOutputService.GetCustomsDocumentAsync(yearId, monthId, packagingMode, packagingWeek, request.SelectedKeys, cancellationToken);
+        return outcome.Success
+            ? File(outcome.Content, "application/vnd.openxmlformats-officedocument.wordprocessingml.document", outcome.FileName)
+            : Problem(detail: outcome.Error, statusCode: StatusCodes.Status400BadRequest);
+    }
+
+    private static bool TryParsePackagingSelection(int mode, int week, out PackagingMode packagingMode, out int packagingWeek)
+    {
+        packagingMode = (PackagingMode)mode;
+        packagingWeek = 0;
+
+        if (!Enum.IsDefined(packagingMode))
+        {
+            return false;
+        }
+
+        if (packagingMode == PackagingMode.Daily)
+        {
+            return true;
+        }
+
+        packagingWeek = week;
+        return week is >= 1 and <= 4;
+    }
+
+    private ModelStateDictionary PackagingSelectionErrors()
+    {
+        ModelState.AddModelError("mode", "Select a valid Packaging option and, for Combined Packaging, a Week from 1 to 4.");
+        return ModelState;
     }
 
     // GET /api/distributions/schemes/{monthlyDistributionSchemeId}/sample-numbers - the Sample
@@ -235,6 +454,35 @@ public sealed class DistributionController(
         return Ok(new RepeatDistributionResult(outcome.Success, outcome.Error));
     }
 
+    private static SampleReceiptResponse ToResponse(SampleReceiptPage page) =>
+        new(
+            page.SchemeHeading,
+            page.LabHeading,
+            page.IsReadOnly,
+            [.. page.Tests.Select(t => new SampleReceiptTestResponse(
+                t.TestId,
+                t.TestType,
+                [.. t.Samples.Select(s => new SampleReceiptSampleResponse(s.SampleReceiptId, s.SampleNumber, s.Submitted, s.NotSubmitted, s.NotInRepertoire))]))]);
+
+    private static ActualResultsResponse ToResponse(ActualResultsPage page) =>
+        new(
+            page.DistributionParticipantId,
+            page.MonthlyDistributionSchemeId,
+            page.Heading,
+            page.AuditObjectName,
+            page.DeadlineDate,
+            page.IsNew,
+            [.. page.Tests.Select(t => new ActualResultsTestResponse(
+                t.TestId,
+                t.TestName,
+                [.. t.ResultItems.Select(r => new ActualResultsResultItemResponse(r.TestResultItemId, r.Name, r.FormatString, r.ReturnValueType))],
+                [.. t.MethodItems.Select(m => new ActualResultsMethodItemResponse(m.TestMethodItemId, m.Name, m.FormatString, m.ReturnValueType, m.Result))],
+                [.. t.Samples.Select(s => new ActualResultsSampleRowResponse(
+                    s.SampleId,
+                    s.SampleNumber,
+                    [.. s.Values.Select(v => new ActualResultsSampleValueResponse(v.SampleResultItemId, v.TestResultItemId, v.Result))]))]))],
+            page.IsReadOnly);
+
     private static DistributionParticipantsResponse ToResponse(DistributionParticipantsData data) =>
         new(
             data.Scheme.MonthlyDistributionSchemeId,
@@ -317,6 +565,60 @@ public sealed class DistributionController(
             scheme.IsCancelled,
             scheme.IsAsAvailable,
             scheme.IsAccredited);
+
+    private static PackagingSheetResponse ToResponse(PackagingSheet sheet) =>
+        new(
+            (int)sheet.Mode,
+            sheet.Week,
+            sheet.YearId,
+            sheet.MonthId,
+            [.. sheet.Blocks.Select(b => new PackagingBlockResponse(
+                b.PrintKey,
+                b.Date,
+                b.Heading,
+                b.PackingInfo,
+                b.DueToBePosted,
+                b.ShowAllPacked,
+                b.ShowAllPosted,
+                [.. b.Schemes.Select(ToResponse)]))]);
+
+    private static PackagingSchemeResponse ToResponse(PackagingSchemeRow scheme) =>
+        new(
+            scheme.MonthlyDistributionSchemeId,
+            scheme.Description,
+            scheme.PreparationComplete,
+            scheme.PackingInfo,
+            scheme.CustomerPackingInfo,
+            scheme.PSLevelPackingInfo,
+            scheme.ImportPermitStatus,
+            scheme.DistributionParticipantId,
+            scheme.PackagedDate,
+            scheme.PostedDate,
+            (int)scheme.PackedTotal,
+            (int)scheme.PostedTotal,
+            [.. scheme.Participants.Select(p => new PackagingParticipantResponse(
+                p.DistributionParticipantId, p.Description, p.PackagedDate, p.PostedDate, p.ImportPermitStatus))]);
+
+    private static ResultsReceiptResponse ToResponse(ResultsReceiptData data) =>
+        new(
+            data.MonthlyDistributionId,
+            data.YearId,
+            data.MonthId,
+            [.. data.Schemes.Select(s => new ResultsReceiptSchemeResponse(
+                s.MonthlyDistributionSchemeId,
+                s.Description,
+                s.RequiresAssessment,
+                s.ProgressPercentage,
+                [.. s.Participants.Select(p => new ResultsReceiptParticipantResponse(
+                    p.DistributionParticipantId,
+                    p.FullName,
+                    p.DeadlineDate ?? s.DeadlineDate,
+                    p.FirstEditDate,
+                    p.LastEditDate,
+                    p.ExtraDocumentsReturned,
+                    s.CanViewResults(p),
+                    p.HasUnaccountedSamples,
+                    p.ReturnedDate))]))]);
 
     private static PreparationSheetResponse ToResponse(PreparationSheetData sheet) =>
         new(

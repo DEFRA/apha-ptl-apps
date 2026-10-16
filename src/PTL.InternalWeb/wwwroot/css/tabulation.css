@@ -1,0 +1,233 @@
+/* Tabulation / Issued Tabulation / Assessment Results - legacy style/Tabulations.css (only the rules
+   these pages use) plus the print rules that replace legacy Master.HideTitleOnPrint. */
+
+table.TabulationTable {
+    font-size: small;
+    border: solid 1px #DFCACA;
+    empty-cells: show;
+    border-collapse: collapse;
+}
+
+/* th cells (row/column headers for screen readers) keep the legacy td look. */
+.TabulationTable :where(th) {
+    font-weight: inherit;
+    text-align: left;
+}
+
+.TabulationHeader1 {
+
+    font-size: 90%;
+    font-weight: bold;
+    
+    border: solid 1px black;
+    padding: 3px;
+}
+
+.TabulationHeader2 {
+    
+    font-size: 80%;
+    
+    border: solid 1px black;
+    padding: 3px;
+    vertical-align: bottom;
+}
+
+.TabulationCell {
+    font-size: 80%;
+    border: solid 1px black;
+    padding: 3px;
+}
+
+/* Chromium double-renders the collapsed border where thead meets tbody, so the line under the header looks
+   thicker than the rest; the header's own bottom border alone then draws it (as printable-scheme.css does). */
+.TabulationTable thead + tbody tr:first-child > * {
+    border-top: none;
+}
+
+.NilReturn {
+    background-color: #eeeeee;
+}
+
+/* The scroll region is focusable so keyboard users can scroll wide tables; give it the GOV.UK focus style. */
+.ptl-tabulation-scroll:focus {
+    outline: 3px solid #ffdd00;
+    outline-offset: 0;
+    box-shadow: inset 0 0 0 2px #0b0c0c;
+}
+
+.divTestConsultantComments {
+    border-top: 1px solid black;
+    border-bottom: 1px solid black;
+    border-left: 1px dotted black;
+    border-right: 1px dotted black;
+    font-size: 80%;
+    padding: 4px;
+    margin-top: 1em;
+    background-color: #fcfcfc;
+}
+
+.divTestConsultantComments .commentsTitle {
+    font-weight: bold;
+    margin: 0 0 1em;
+}
+
+.divTestConsultantComments p {
+    margin-top: 0;
+}
+
+.ptl-tabulation-ukas {
+    margin: 1em 0;
+    text-align: center;
+}
+
+.signatureTable {
+    display: flex;
+    width: 100%;
+    margin-bottom: 1em;
+}
+
+.cellVersionDate {
+    text-align: left;
+    font-size: smaller;
+    width: 15%;
+}
+
+.cellTabulationSignature {
+    flex: 1;
+    text-align: right;
+    font-size: smaller;
+}
+
+.cellTabulationSignature2 {
+    text-align: right;
+}
+
+/* Print-only output (legacy divPrintableTabulation). */
+.printonly {
+    display: none;
+}
+
+.ptl-tabulation-print-titles {
+    display: flex;
+    width: 100%;
+}
+
+.ptl-tabulation-print-title {
+    width: 60%;
+}
+
+.tabulationtitle-alignright {
+    flex: 1;
+    text-align: right;
+}
+
+/* tabulation-print.js measures these tables before adding .printonly, so until then they are laid
+   out off-screen (not display:none, which would give them no width). */
+#tabulation-print-tables:not(.printonly) {
+    position: absolute;
+    left: -10000px;
+    top: 0;
+    visibility: hidden;
+}
+
+#tabulation-print-tables {
+    font-family: verdana, arial, helvetica, sans-serif;
+}
+
+/* The Print button only works with JavaScript. */
+body:not(.js-enabled) [data-ptl-print] {
+    display: none;
+}
+
+/* Amend Results: Recalculate only works with JavaScript. */
+body:not(.js-enabled) [data-amend-recalculate] {
+    display: none;
+}
+
+.ptl-assessment-chart {
+    display: block;
+    max-width: 100%;
+    height: auto;
+    margin-bottom: 30px;
+}
+
+@media print {
+    .noprint {
+        display: none;
+    }
+
+    .printonly {
+        display: block;
+    }
+
+    /* The printed page is the report only - matches legacy's master-chrome suppression. */
+    .govuk-skip-link,
+    .govuk-template__header,
+    .govuk-breadcrumbs,
+    .app-side-navigation,
+    .govuk-notification-banner,
+    .govuk-template__footer {
+        display: none;
+    }
+
+    .govuk-grid-column-one-quarter {
+        display: none;
+    }
+
+    .govuk-grid-column-three-quarters {
+        width: 100%;
+    }
+
+    #tabulation-print-tables,
+    .ptl-tabulation-print-header,
+    #commentsDiv {
+        width: 650px;
+    }
+
+    .ptl-tabulation-print-logo {
+        width: 600px;
+        vertical-align: middle;
+    }
+
+    .tabulationtitle {
+        font-size: 8pt;
+    }
+
+    table.TabulationTable {
+        border: solid 1px black;
+        margin-left: 2px;
+    }
+
+    .TabulationHeader1,
+    .TabulationHeader2 {
+        font-size: 8pt;
+        color: black;
+        background-color: white;
+        border: solid 1px black;
+    }
+
+    .TabulationCell {
+        font-size: 7.5pt;
+        border: solid 1px black;
+        color: black;
+        background-color: white;
+    }
+
+    .TabulationTable thead + tbody tr:first-child > * {
+        border-top: none;
+    }
+
+    .cellTabulationSignature2,
+    .cellTabulationSignature,
+    .cellVersionDate,
+    .divTestConsultantComments {
+        font-size: 8.5pt;
+        color: black;
+        font-weight: normal;
+    }
+
+    .cellVersionDate,
+    .cellTabulationSignature {
+        width: 50%;
+    }
+}

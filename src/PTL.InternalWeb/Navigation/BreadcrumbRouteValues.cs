@@ -10,6 +10,10 @@ public static class BreadcrumbRouteValues
     public const string CustomerId = "BreadcrumbCustomerId";
     public const string ContractId = "BreadcrumbContractId";
 
+    // A POST sub-action that re-renders another page (e.g. ToggleCancelled shows Schedule) publishes
+    // that page's action name so the breadcrumb resolves the page the user actually sees.
+    public const string Action = "BreadcrumbAction";
+
     // Ambient value names a SideNavigationItem can reference via LinkRouteValueKey.
     public const string CustomerIdKey = "customerId";
     public const string ContractIdKey = "contractId";
