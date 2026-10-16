@@ -138,8 +138,9 @@ public sealed class InvoiceService(
     private async Task NotifyRecipientsAsync(string stage, Guid generationId, string storageKey, DateTime generatedAt, CancellationToken cancellationToken)
     {
         var options = notificationOptions.Value;
-        LogDiagnosticMessage(logger, $"Stage={stage} TemplateId={InvoiceNotificationOptions.TemplateId} RecipientCount={options.Recipients.Count}", null);
-        if (options.Recipients.Count == 0)
+        var recipient = options.Recipients?.Trim();
+        LogDiagnosticMessage(logger, $"Stage={stage} TemplateId={InvoiceNotificationOptions.TemplateId} RecipientConfigured={!string.IsNullOrEmpty(recipient)}", null);
+        if (string.IsNullOrEmpty(recipient))
         {
             return;
         }
@@ -154,26 +155,23 @@ public sealed class InvoiceService(
             ["downloadUrl"] = BuildDownloadUrl(internalOptions.Value.AppUrl, generationId)
         };
 
-        foreach (var recipient in options.Recipients)
+        try
         {
-            try
-            {
-                LogNotifySendingMessage(
-                    logger,
-                    $"recipient={recipient} templateId={InvoiceNotificationOptions.TemplateId} generationId={generationId} personalisation=[{string.Join(", ", personalisation.Select(p => $"{p.Key}={p.Value}"))}]",
-                    null);
-                await notifyClient.SendEmailAsync(InvoiceNotificationOptions.TemplateId, recipient, personalisation, reference: storageKey, cancellationToken);
-                // The Notify client surfaces only whether the send threw, so "response" is logged
-                // as Accepted/Failed rather than an HTTP status.
-                LogDiagnosticMessage(logger, $"Stage={stage} NotifyResponse=Accepted Recipient={recipient}", null);
-            }
-            catch (Exception ex)
-            {
-                // A notification failure does not roll back generation - the invoices are already
-                // marked sent and audited; this only means staff must be told some other way.
-                LogNotificationFailedMessage(logger, recipient, ex);
-                LogDiagnosticMessage(logger, $"Stage={stage} NotifyResponse=Failed Recipient={recipient} Exception={ex.GetType().Name}", null);
-            }
+            LogNotifySendingMessage(
+                logger,
+                $"recipient={recipient} templateId={InvoiceNotificationOptions.TemplateId} generationId={generationId} personalisation=[{string.Join(", ", personalisation.Select(p => $"{p.Key}={p.Value}"))}]",
+                null);
+            await notifyClient.SendEmailAsync(InvoiceNotificationOptions.TemplateId, recipient, personalisation, reference: storageKey, cancellationToken);
+            // The Notify client surfaces only whether the send threw, so "response" is logged
+            // as Accepted/Failed rather than an HTTP status.
+            LogDiagnosticMessage(logger, $"Stage={stage} NotifyResponse=Accepted Recipient={recipient}", null);
+        }
+        catch (Exception ex)
+        {
+            // A notification failure does not roll back generation - the invoices are already
+            // marked sent and audited; this only means staff must be told some other way.
+            LogNotificationFailedMessage(logger, recipient, ex);
+            LogDiagnosticMessage(logger, $"Stage={stage} NotifyResponse=Failed Recipient={recipient} Exception={ex.GetType().Name}", null);
         }
     }
 
