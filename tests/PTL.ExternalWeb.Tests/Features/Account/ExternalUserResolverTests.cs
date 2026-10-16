@@ -9,13 +9,15 @@ namespace PTL.ExternalWeb.Tests.Features.Account;
 
 public class ExternalUserResolverTests
 {
+    private static readonly NullLogger<ExternalUserResolver> Logger = NullLogger<ExternalUserResolver>.Instance;
+
     private static ClaimsPrincipal CreatePrincipal(params Claim[] claims) =>
         new(new ClaimsIdentity(claims, "Test"));
 
     [Fact]
     public async Task ResolveAsync_NullPrincipal_Throws()
     {
-        var resolver = new ExternalUserResolver(new FakeExternalUserApiClient(new ResolveExternalUserResponse("", [], null, null, null)), NullLogger<ExternalUserResolver>.Instance);
+        var resolver = new ExternalUserResolver(new FakeExternalUserApiClient(new ResolveExternalUserResponse("", [], null, null, null, null)), NullLogger<ExternalUserResolver>.Instance);
 
         await Assert.ThrowsAsync<ArgumentNullException>(() => resolver.ResolveAsync(null!, CancellationToken.None));
     }
@@ -24,7 +26,7 @@ public class ExternalUserResolverTests
     public async Task ResolveAsync_MissingContactIdClaim_DeniesWithNotPermittedRedirect()
     {
         var principal = CreatePrincipal(new Claim(ClaimTypes.Email, "user@example.com"));
-        var resolver = new ExternalUserResolver(new FakeExternalUserApiClient(new ResolveExternalUserResponse("", [], null, null, null)), NullLogger<ExternalUserResolver>.Instance);
+        var resolver = new ExternalUserResolver(new FakeExternalUserApiClient(new ResolveExternalUserResponse("", [], null, null, null, null)), NullLogger<ExternalUserResolver>.Instance);
 
         var result = await resolver.ResolveAsync(principal, CancellationToken.None);
 
@@ -38,7 +40,7 @@ public class ExternalUserResolverTests
         var principal = CreatePrincipal(
             new Claim(CidmClaimTypes.ContactId, Guid.NewGuid().ToString()),
             new Claim(ClaimTypes.Email, "user@example.com"));
-        var apiClient = new FakeExternalUserApiClient(new ResolveExternalUserResponse("Jane Doe", [], null, null, null));
+        var apiClient = new FakeExternalUserApiClient(new ResolveExternalUserResponse("Jane Doe", [], null, null, null, null));
         var resolver = new ExternalUserResolver(apiClient, NullLogger<ExternalUserResolver>.Instance);
 
         var result = await resolver.ResolveAsync(principal, CancellationToken.None);
@@ -56,7 +58,7 @@ public class ExternalUserResolverTests
             new Claim(ClaimTypes.Email, "user@example.com"),
             new Claim(ClaimTypes.Role, "Viewer"),
             new Claim(ClaimTypes.Role, "Participant"));
-        var apiClient = new FakeExternalUserApiClient(new ResolveExternalUserResponse("Jane Doe", ["Viewer", "Participant"], Guid.NewGuid(), Guid.NewGuid(), null));
+        var apiClient = new FakeExternalUserApiClient(new ResolveExternalUserResponse("Jane Doe", ["Viewer", "Participant"], Guid.NewGuid(), "LAB001", Guid.NewGuid(), null));
         var resolver = new ExternalUserResolver(apiClient, NullLogger<ExternalUserResolver>.Instance);
 
         var result = await resolver.ResolveAsync(principal, CancellationToken.None);
@@ -64,8 +66,56 @@ public class ExternalUserResolverTests
         Assert.True(result.IsAllowed);
         Assert.Equal("Jane Doe", result.Claims![ExternalUserClaimTypes.DisplayName]);
         Assert.Equal("Viewer,Participant", result.Claims![ExternalUserClaimTypes.ResolvedRoles]);
+        Assert.Equal("LAB001", result.Claims![ExternalUserClaimTypes.LabCode]);
         Assert.Equal(ssoIdExt, apiClient.ReceivedRequest!.SsoIdExt);
         Assert.Equal(["Viewer", "Participant"], apiClient.ReceivedRequest!.Roles);
+    }
+
+    [Fact]
+    public async Task ResolveAsync_NoLabCodeInResponse_DoesNotAddLabCodeClaim()
+    {
+        var principal = CreatePrincipal(
+            new Claim(CidmClaimTypes.ContactId, Guid.NewGuid().ToString()),
+            new Claim(ClaimTypes.Role, "Viewer"));
+        var apiClient = new FakeExternalUserApiClient(new ResolveExternalUserResponse("Jane Doe", ["Viewer"], null, null, Guid.NewGuid(), null));
+        var resolver = new ExternalUserResolver(apiClient, Logger);
+
+        var result = await resolver.ResolveAsync(principal, CancellationToken.None);
+
+        Assert.True(result.IsAllowed);
+        Assert.False(result.Claims!.ContainsKey(ExternalUserClaimTypes.LabCode));
+    }
+
+    [Fact]
+    public async Task ResolveAsync_CanOrderOnlineTrue_AddsCanOrderOnlineClaim()
+    {
+        var principal = CreatePrincipal(
+            new Claim(CidmClaimTypes.ContactId, Guid.NewGuid().ToString()),
+            new Claim(ClaimTypes.Role, "Participant"));
+        var apiClient = new FakeExternalUserApiClient(
+            new ResolveExternalUserResponse("Jane Doe", ["Participant"], Guid.NewGuid(), "LAB001", null, null, CanOrderOnline: true));
+        var resolver = new ExternalUserResolver(apiClient, Logger);
+
+        var result = await resolver.ResolveAsync(principal, CancellationToken.None);
+
+        Assert.True(result.IsAllowed);
+        Assert.Equal("true", result.Claims![ExternalUserClaimTypes.CanOrderOnline]);
+    }
+
+    [Fact]
+    public async Task ResolveAsync_CanOrderOnlineFalse_DoesNotAddCanOrderOnlineClaim()
+    {
+        var principal = CreatePrincipal(
+            new Claim(CidmClaimTypes.ContactId, Guid.NewGuid().ToString()),
+            new Claim(ClaimTypes.Role, "Participant"));
+        var apiClient = new FakeExternalUserApiClient(
+            new ResolveExternalUserResponse("Jane Doe", ["Participant"], Guid.NewGuid(), "LAB001", null, null, CanOrderOnline: false));
+        var resolver = new ExternalUserResolver(apiClient, Logger);
+
+        var result = await resolver.ResolveAsync(principal, CancellationToken.None);
+
+        Assert.True(result.IsAllowed);
+        Assert.False(result.Claims!.ContainsKey(ExternalUserClaimTypes.CanOrderOnline));
     }
 
     [Fact]
@@ -77,7 +127,7 @@ public class ExternalUserResolverTests
             new Claim("lastName", "Doe"),
             new Claim(ClaimTypes.Name, "fallback-name"),
             new Claim(ClaimTypes.Role, "Viewer"));
-        var apiClient = new FakeExternalUserApiClient(new ResolveExternalUserResponse("Jane Doe", ["Viewer"], null, Guid.NewGuid(), null));
+        var apiClient = new FakeExternalUserApiClient(new ResolveExternalUserResponse("Jane Doe", ["Viewer"], null, null, Guid.NewGuid(), null));
         var resolver = new ExternalUserResolver(apiClient, NullLogger<ExternalUserResolver>.Instance);
 
         await resolver.ResolveAsync(principal, CancellationToken.None);
@@ -92,7 +142,7 @@ public class ExternalUserResolverTests
             new Claim(CidmClaimTypes.ContactId, Guid.NewGuid().ToString()),
             new Claim("name", "Jane Fallback"),
             new Claim(ClaimTypes.Role, "Viewer"));
-        var apiClient = new FakeExternalUserApiClient(new ResolveExternalUserResponse("Jane Fallback", ["Viewer"], null, Guid.NewGuid(), null));
+        var apiClient = new FakeExternalUserApiClient(new ResolveExternalUserResponse("Jane Fallback", ["Viewer"], null, null, Guid.NewGuid(), null));
         var resolver = new ExternalUserResolver(apiClient, NullLogger<ExternalUserResolver>.Instance);
 
         await resolver.ResolveAsync(principal, CancellationToken.None);
@@ -106,7 +156,7 @@ public class ExternalUserResolverTests
         var principal = CreatePrincipal(
             new Claim(CidmClaimTypes.ContactId, Guid.NewGuid().ToString()),
             new Claim(ClaimTypes.Role, "Viewer"));
-        var apiClient = new FakeExternalUserApiClient(new ResolveExternalUserResponse("", ["Viewer"], null, Guid.NewGuid(), null));
+        var apiClient = new FakeExternalUserApiClient(new ResolveExternalUserResponse("", ["Viewer"], null, null, Guid.NewGuid(), null));
         var resolver = new ExternalUserResolver(apiClient, NullLogger<ExternalUserResolver>.Instance);
 
         await resolver.ResolveAsync(principal, CancellationToken.None);
@@ -121,7 +171,7 @@ public class ExternalUserResolverTests
             new Claim(CidmClaimTypes.ContactId, Guid.NewGuid().ToString()),
             new Claim(ClaimTypes.Role, "Viewer"),
             new Claim(ClaimTypes.Role, "Viewer"));
-        var apiClient = new FakeExternalUserApiClient(new ResolveExternalUserResponse("Jane Doe", ["Viewer"], null, Guid.NewGuid(), null));
+        var apiClient = new FakeExternalUserApiClient(new ResolveExternalUserResponse("Jane Doe", ["Viewer"], null, null, Guid.NewGuid(), null));
         var resolver = new ExternalUserResolver(apiClient, NullLogger<ExternalUserResolver>.Instance);
 
         await resolver.ResolveAsync(principal, CancellationToken.None);
@@ -135,7 +185,7 @@ public class ExternalUserResolverTests
         var principal = CreatePrincipal(
             new Claim(CidmClaimTypes.ContactId, Guid.NewGuid().ToString()),
             new Claim(ClaimTypes.Role, "Viewer"));
-        var apiClient = new FakeExternalUserApiClient(new ResolveExternalUserResponse("Jane Doe", ["Viewer"], null, Guid.NewGuid(), null));
+        var apiClient = new FakeExternalUserApiClient(new ResolveExternalUserResponse("Jane Doe", ["Viewer"], null, null, Guid.NewGuid(), null));
         var resolver = new ExternalUserResolver(apiClient, NullLogger<ExternalUserResolver>.Instance);
 
         await resolver.ResolveAsync(principal, CancellationToken.None);
@@ -150,7 +200,7 @@ public class ExternalUserResolverTests
             new Claim(CidmClaimTypes.ContactId, Guid.NewGuid().ToString()),
             new Claim("email", "lowercase@example.com"),
             new Claim(ClaimTypes.Role, "Viewer"));
-        var apiClient = new FakeExternalUserApiClient(new ResolveExternalUserResponse("Jane Doe", ["Viewer"], null, Guid.NewGuid(), null));
+        var apiClient = new FakeExternalUserApiClient(new ResolveExternalUserResponse("Jane Doe", ["Viewer"], null, null, Guid.NewGuid(), null));
         var resolver = new ExternalUserResolver(apiClient, NullLogger<ExternalUserResolver>.Instance);
 
         await resolver.ResolveAsync(principal, CancellationToken.None);
@@ -166,7 +216,7 @@ public class ExternalUserResolverTests
             new Claim(ClaimTypes.GivenName, "Jane"),
             new Claim(ClaimTypes.Surname, "Doe"),
             new Claim(ClaimTypes.Role, "Viewer"));
-        var apiClient = new FakeExternalUserApiClient(new ResolveExternalUserResponse("Jane Doe", ["Viewer"], null, Guid.NewGuid(), null));
+        var apiClient = new FakeExternalUserApiClient(new ResolveExternalUserResponse("Jane Doe", ["Viewer"], null, null, Guid.NewGuid(), null));
         var resolver = new ExternalUserResolver(apiClient, NullLogger<ExternalUserResolver>.Instance);
 
         await resolver.ResolveAsync(principal, CancellationToken.None);
@@ -180,7 +230,7 @@ public class ExternalUserResolverTests
         var principal = CreatePrincipal(
             new Claim(CidmClaimTypes.ContactId, Guid.NewGuid().ToString()),
             new Claim(ClaimTypes.Email, "user@example.com"));
-        var apiClient = new FakeExternalUserApiClient(new ResolveExternalUserResponse("", [], null, null, null), new HttpRequestException("Connection refused"));
+        var apiClient = new FakeExternalUserApiClient(new ResolveExternalUserResponse("", [], null, null, null, null), new HttpRequestException("Connection refused"));
         var resolver = new ExternalUserResolver(apiClient, NullLogger<ExternalUserResolver>.Instance);
 
         var result = await resolver.ResolveAsync(principal, CancellationToken.None);

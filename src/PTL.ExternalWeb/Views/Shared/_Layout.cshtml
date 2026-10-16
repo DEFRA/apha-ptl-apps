@@ -7,21 +7,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="theme-color" content="blue">
     <link rel="stylesheet" href="/css/govuk-frontend-6.5.0.min.css">
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true">
     <link rel="icon" sizes="48x48" href="/assets/images/favicon.ico">
     <link rel="icon" sizes="any" href="/assets/images/favicon.svg" type="image/svg+xml">
     <link rel="mask-icon" href="/assets/images/govuk-icon-mask.svg" color="blue">
     <link rel="apple-touch-icon" href="/assets/images/govuk-icon-180.png">
     <link rel="manifest" href="/assets/manifest.json">
     <meta property="og:image" content="YOUR-DOMAIN/images/govuk-opengraph-image.png">
-    <style>
-        /* Sign out must be a form post for CSRF protection; reset button chrome so it reads as a service navigation link */
-        .app-signout-form { display: inline; margin: 0; }
-        .app-signout-button { background: none; border: 0; padding: 0; font: inherit; cursor: pointer; }
-        .govuk-header__container { min-height: 56px; display: flex; align-items: center; }
-        .app-service-bar { background: #ffffff; border-bottom: 1px solid #b1b4b6; }
-        .app-service-bar__container { min-height: 70px; display: flex; align-items: center; }
-        .app-account-panel { margin-left: auto; display: flex; align-items: center; gap: 1rem; }
-    </style>
 </head>
 
 <body class="govuk-template__body app-body-class" data-test="My value" data-other="report:details">
@@ -39,14 +31,24 @@
             || string.Equals(currentAction, "SignedOut", StringComparison.OrdinalIgnoreCase));
 }
 
-@await Html.PartialAsync("_Header", ("Proficiency Testing - External", "height:40px; width:auto;"))
+@await Html.PartialAsync("_Header", ("Proficiency Testing - External", "height:80px; width:auto;"))
 <div class="govuk-width-container app-width-container">
-    <main role="main" class="pb-3">
+    <main role="main" class="pb-3" id="main-content">
         @if (!isAccountFlowPage)
         {
             @await Html.PartialAsync("_Breadcrumbs")
         }
-        @RenderBody()
+        <div class="govuk-grid-row">
+            @if (!isAccountFlowPage)
+            {
+                <div class="govuk-grid-column-one-quarter">
+                    @await Html.PartialAsync("_SideNavigation")
+                </div>
+            }
+            <div class="@(isAccountFlowPage ? "govuk-grid-column-full" : "govuk-grid-column-three-quarters")">
+                @RenderBody()
+            </div>
+        </div>
     </main>
 </div>
 @await Html.PartialAsync("_Footer", "#")

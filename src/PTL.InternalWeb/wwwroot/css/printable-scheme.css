@@ -100,3 +100,87 @@
         width: 100%;
     }
 }
+
+/* Sample Instruction grid (Printable Results) - legacy GVsampleInstruction / IntendedResults.css;
+   deliberately NOT govuk-table - no Print.css override exists for these classes, so the printed
+   output keeps this exact light border rather than govuk-table's styling. */
+.ptl-worksheet .tblSampleInstruction {
+    font-size: small;
+    border: solid 1px #DFCACA;
+    empty-cells: show;
+    border-collapse: collapse;
+    width: 100%;
+}
+
+.ptl-worksheet .cellSampleInstruction {
+    border: solid 1px black;
+    padding: 0.3em;
+    text-align: left;
+}
+
+/* Chromium double-renders the collapsed border where thead meets tbody, making that line look
+   thicker than the rest of the grid - dropping the header cells' own bottom border leaves the
+   body row's top border as the single 1px line, matching the rest of the table. */
+.ptl-worksheet .tblSampleInstruction thead .cellSampleInstruction {
+    border-bottom: none;
+}
+
+.cellWorkSheetAddress {
+    width: 50%;
+    vertical-align: top;
+}
+
+.cellWorkSheetUkaslogo {
+    width: 70px;
+    text-align: center;
+    vertical-align: top;
+}
+
+.cellWorkSheetDeadline {
+    width: 200px;
+    vertical-align: top;
+}
+
+.cellWorkSheetFooter {
+    padding-top: 0.5em;
+}
+
+/* Sample Preparation print-only worksheet rows (Preparation.cshtml) - these exist in the DOM
+   always but are only ever shown when printing, independent of the on-screen details expand/
+   collapse state, so every selected scheme's full sample list always prints regardless of what
+   is currently expanded on screen. */
+.ptl-preparation-print-row {
+    display: none;
+}
+
+@media print {
+    .ptl-preparation-print-row {
+        display: table-row;
+    }
+
+    /* Equal specificity to .noprint above would otherwise let source order decide the winner -
+       this combined selector guarantees an unselected scheme's sample rows stay hidden. */
+    .ptl-preparation-print-row.noprint {
+        display: none;
+    }
+
+    .ptl-preparation-print-sample {
+        padding: 0.3em;
+        border: 1px solid black;
+    }
+
+    /* Legacy .tblPrepSheet/.cellPrepSheet - bordered worksheet grid on print only; the screen's
+       own govuk-table styling (no borders) is untouched outside this @media print block. */
+    #preparation-table {
+        border: 1px solid black;
+        border-collapse: collapse;
+        width: 100%;
+    }
+
+    #preparation-table th,
+    #preparation-table td {
+        border: 1px solid black;
+        padding: 0.3em;
+        font-size: 75%;
+    }
+}

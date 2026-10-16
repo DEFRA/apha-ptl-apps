@@ -34,6 +34,9 @@ public class MonthlyDistributionSchemeEntity
     public int ParticipantCount { get; set; }
     public int TotalSetsOfSamplesRequired { get; set; }
 
+    // Only used by Printable Results - legacy PnlUkasLogo.Visible, the UKAS accreditation mark.
+    public bool IsAccredited { get; set; }
+
     // Legacy MonthlyDistributionScheme.vb: Reference + Suffix + "/" + ScheduleCode (e.g. "17152/BA").
     public string DistributionReferenceFull => $"{DistributionReference}{DistributionReferenceSuffix}/{ScheduleCode}";
 }

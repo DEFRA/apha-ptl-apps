@@ -2,7 +2,7 @@
 @{
     // Legacy diverts to a separate Audit.aspx page; here it is a second step of the same view.
     ViewData["Title"] = Model.RequiresAuditReason
-        ? $"Reason for these changes - {Model.DistributionHeading}"
+        ? $"Audit Trail - {Model.DistributionHeading}"
         : $"Sample Numbers - {Model.DistributionHeading}";
 
     // Hand-rolled to match the GOV.UK Design System error summary exactly - same pattern as
@@ -17,7 +17,7 @@
 {
     <a class="govuk-back-link" asp-action="SampleNumbers" asp-route-year="@Model.YearId" asp-route-monthId="@Model.MonthId" asp-route-schemeId="@Model.MonthlyDistributionSchemeId">Back</a>
 
-    <h1 class="govuk-heading-l">@Model.DistributionHeading</h1>
+    <h1 class="govuk-heading-l">Audit Trail</h1>
 
     <govuk-error-summary errors="@errors" />
 
@@ -70,7 +70,9 @@
 
 <a class="govuk-back-link" asp-action="Schedule" asp-route-year="@Model.YearId" asp-route-monthId="@Model.MonthId">Back</a>
 
-<h1 class="govuk-heading-l">@Model.DistributionHeading</h1>
+<h1 class="govuk-heading-l">Sample Numbers</h1>
+
+<h2 class="govuk-heading-m">@Model.DistributionHeading</h2>
 
 <hr class="govuk-section-break govuk-section-break--visible govuk-section-break--m">
 

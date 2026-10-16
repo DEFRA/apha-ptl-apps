@@ -9,8 +9,12 @@ public sealed record ExternalUserResolutionResult(
     string DisplayName,
     IReadOnlyList<string> Roles,
     Guid? ParticipantId,
+    string? LabCode,
     Guid? ViewerId,
-    Guid? TestConsultantId)
+    Guid? TestConsultantId,
+    // Only ever true for a resolved Participant whose linked Customer has CanOrderOnline set -
+    // see ExternalUserService.ResolveParticipantAsync.
+    bool CanOrderOnline = false)
 {
     public bool IsResolved => Roles.Count > 0;
 }

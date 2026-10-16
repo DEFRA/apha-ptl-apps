@@ -27,6 +27,7 @@ using PTL.Core.Notifications;
 using PTL.Core.Participant;
 using PTL.Core.PostagePricingPlan;
 using PTL.Core.Scheme;
+using PTL.Core.SystemMessage;
 using PTL.Core.TestConsultant;
 using PTL.Core.User;
 using PTL.Core.Viewer;
@@ -53,6 +54,7 @@ using PTL.Data.Participant;
 using PTL.Data.PostagePricingPlan;
 using PTL.Data.Scheme;
 using PTL.Data.Storage;
+using PTL.Data.SystemMessage;
 using PTL.Data.TestConsultant;
 using PTL.Data.User;
 using PTL.Data.Viewer;
@@ -115,6 +117,9 @@ builder.Services.AddScoped<ITestConsultantRepository, TestConsultantRepository>(
 builder.Services.AddScoped<IExternalUserService, ExternalUserService>();
 builder.Services.AddScoped<IExternalLoginService, StubExternalLoginService>();
 builder.Services.AddScoped<ITestConsultantService, TestConsultantService>();
+
+builder.Services.AddScoped<ISystemMessageRepository, SystemMessageRepository>();
+builder.Services.AddScoped<ISystemMessageService, SystemMessageService>();
 
 builder.Services.AddScoped<IInternalUserRepository, InternalUserRepository>();
 builder.Services.AddScoped<IInternalUserService, InternalUserService>();
@@ -180,6 +185,9 @@ builder.Services.AddScoped<ILookupService, LookupService>();
 builder.Services.AddScoped<IDistributionRepository, DistributionRepository>();
 builder.Services.AddScoped<IDistributionService, DistributionService>();
 builder.Services.AddScoped<ISampleNumbersService, SampleNumbersService>();
+builder.Services.AddScoped<IIntendedResultsService, IntendedResultsService>();
+builder.Services.AddScoped<IDistributionParticipantsService, DistributionParticipantsService>();
+builder.Services.AddScoped<IPreparationService, PreparationService>();
 
 builder.Services.AddScoped<IAdministrationChargeRepository, AdministrationChargeRepository>();
 builder.Services.AddScoped<IAdministrationChargeService, AdministrationChargeService>();

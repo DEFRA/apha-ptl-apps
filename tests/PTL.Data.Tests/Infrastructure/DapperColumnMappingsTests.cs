@@ -293,15 +293,15 @@ public class DapperColumnMappingsTests
         table.Columns.Add("fldTestConsultantTabulationId", typeof(Guid));
         table.Columns.Add("fldStoreRatings", typeof(bool));
         table.Columns.Add("fldSchemeVersionDate", typeof(DateTime));
-        table.Columns.Add("fldDateOfReceipt", typeof(DateTime));
-        table.Columns.Add("fldStorageConditions", typeof(string));
-        table.Columns.Add("fldConditionOnReceipt", typeof(string));
+        table.Columns.Add("fldDateOfReceipt", typeof(bool));
+        table.Columns.Add("fldStorageConditions", typeof(bool));
+        table.Columns.Add("fldConditionOnReceipt", typeof(bool));
         table.Columns.Add("fldInstructions", typeof(string));
         table.Columns.Add("fldRequiresAssessment", typeof(bool));
         table.Columns.Add("fldIsReadyForAssessor", typeof(DateTime));
         table.Rows.Add(
             schemeId, "Some comments", true, true, tabulationId, true,
-            new DateTime(2026, 1, 1), DBNull.Value, "Chilled", "Good", "Instructions",
+            new DateTime(2026, 1, 1), true, true, false, "Instructions",
             true, new DateTime(2026, 4, 1));
 
         var header = Parse<IntendedResultsHeaderEntity>(table).Single();
@@ -314,6 +314,11 @@ public class DapperColumnMappingsTests
         Assert.True(header.StoreRatings);
         Assert.True(header.RequiresAssessment);
         Assert.Equal(new DateTime(2026, 4, 1), header.IsReadyForAssessor);
+        Assert.Equal(new DateTime(2026, 1, 1), header.SchemeVersionDate);
+        Assert.True(header.DateOfReceipt);
+        Assert.True(header.StorageConditions);
+        Assert.False(header.ConditionOnReceipt);
+        Assert.Equal("Instructions", header.Instructions);
     }
 
     [Fact]
@@ -489,6 +494,96 @@ public class DapperColumnMappingsTests
         Assert.Equal(testId, criterionItem.TestId);
         Assert.Equal(5, criterionItem.Order);
         Assert.Equal("Colour", criterionItem.Name);
+    }
+
+    // spgPreparationSheet.sql's 3 result sets - header row, scheme rows, sample rows.
+    [Fact]
+    public void Register_MapsPreparationHeader_ColumnsToProperties()
+    {
+        var table = new DataTable();
+        table.Columns.Add("fldYearId", typeof(int));
+        table.Columns.Add("fldMonthId", typeof(int));
+        table.Rows.Add(2026, 4);
+
+        var header = Parse<PreparationHeaderEntity>(table).Single();
+
+        Assert.Equal(2026, header.YearId);
+        Assert.Equal(4, header.MonthId);
+    }
+
+    [Fact]
+    public void Register_MapsPreparationScheme_ColumnsToProperties()
+    {
+        var schemeId = Guid.NewGuid();
+        var table = new DataTable();
+        table.Columns.Add("fldMonthlyDistributionSchemeId", typeof(Guid));
+        table.Columns.Add("fldIdentifier", typeof(string));
+        table.Columns.Add("fldName", typeof(string));
+        table.Columns.Add("fldDistributionReference", typeof(string));
+        table.Columns.Add("fldDistributionReferenceSuffix", typeof(string));
+        table.Columns.Add("fldScheduleCode", typeof(string));
+        table.Columns.Add("fldNumberOfSetsRequired", typeof(int));
+        table.Columns.Add("fldSamplePackingInstructions", typeof(string));
+        table.Columns.Add("fldDiaryEntry", typeof(DateTime));
+        table.Columns.Add("fldPrepStartDate", typeof(DateTime));
+        table.Columns.Add("fldPrepCompleteDate", typeof(DateTime));
+        table.Rows.Add(
+            schemeId, "PT0060", "Mastitis bovine", "17152", "A", "BA", 9, "Keep chilled",
+            DBNull.Value, DBNull.Value, DBNull.Value);
+
+        var scheme = Parse<PreparationSchemeEntity>(table).Single();
+
+        Assert.Equal(schemeId, scheme.MonthlyDistributionSchemeId);
+        Assert.Equal("PT0060", scheme.SchemeIdentifier);
+        Assert.Equal("Mastitis bovine", scheme.SchemeName);
+        Assert.Equal("17152", scheme.DistributionReference);
+        Assert.Equal("A", scheme.DistributionReferenceSuffix);
+        Assert.Equal("BA", scheme.ScheduleCode);
+        Assert.Equal(9, scheme.NumberOfSetsRequired);
+        Assert.Equal("Keep chilled", scheme.SamplePackingInstructions);
+        Assert.Null(scheme.DiaryEntry);
+        Assert.Null(scheme.PrepStartDate);
+        Assert.Null(scheme.PrepCompleteDate);
+    }
+
+    [Fact]
+    public void Register_MapsPreparationScheme_SetDates_ColumnsToProperties()
+    {
+        var diaryEntry = new DateTime(2026, 1, 1, 9, 0, 0, DateTimeKind.Utc);
+        var prepStart = new DateTime(2026, 1, 2, 9, 0, 0, DateTimeKind.Utc);
+        var prepComplete = new DateTime(2026, 1, 3, 9, 0, 0, DateTimeKind.Utc);
+        var table = new DataTable();
+        table.Columns.Add("fldMonthlyDistributionSchemeId", typeof(Guid));
+        table.Columns.Add("fldDiaryEntry", typeof(DateTime));
+        table.Columns.Add("fldPrepStartDate", typeof(DateTime));
+        table.Columns.Add("fldPrepCompleteDate", typeof(DateTime));
+        table.Rows.Add(Guid.NewGuid(), diaryEntry, prepStart, prepComplete);
+
+        var scheme = Parse<PreparationSchemeEntity>(table).Single();
+
+        Assert.Equal(diaryEntry, scheme.DiaryEntry);
+        Assert.Equal(prepStart, scheme.PrepStartDate);
+        Assert.Equal(prepComplete, scheme.PrepCompleteDate);
+    }
+
+    [Fact]
+    public void Register_MapsPreparationSample_ColumnsToProperties()
+    {
+        var schemeId = Guid.NewGuid();
+        var sampleId = Guid.NewGuid();
+        var table = new DataTable();
+        table.Columns.Add("fldMonthlyDistributionSchemeId", typeof(Guid));
+        table.Columns.Add("fldSampleId", typeof(Guid));
+        table.Columns.Add("fldSampleNumber", typeof(string));
+        table.Columns.Add("fldInternalDescription", typeof(string));
+        table.Rows.Add(schemeId, sampleId, "S1", "Internal 1");
+
+        var sample = Parse<PreparationSampleEntity>(table).Single();
+
+        Assert.Equal(schemeId, sample.MonthlyDistributionSchemeId);
+        Assert.Equal(sampleId, sample.SampleId);
+        Assert.Equal("S1", sample.SampleNumber);
+        Assert.Equal("Internal 1", sample.InternalDescription);
     }
 
     private static List<T> Parse<T>(DataTable table)

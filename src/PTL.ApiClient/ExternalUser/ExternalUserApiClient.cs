@@ -11,6 +11,6 @@ public sealed class ExternalUserApiClient(HttpClient httpClient) : IExternalUser
         response.EnsureSuccessStatusCode();
 
         var result = await response.Content.ReadFromJsonAsync<ResolveExternalUserResponse>(cancellationToken);
-        return result ?? new ResolveExternalUserResponse(request.DisplayName, [], null, null, null);
+        return result ?? new ResolveExternalUserResponse(request.DisplayName, [], null, null, null, null);
     }
 }
