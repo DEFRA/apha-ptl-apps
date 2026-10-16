@@ -54,7 +54,7 @@ public class UserServiceTests
         var repository = new FakeUserRepository();
         var service = CreateService(repository);
 
-        var created = await service.CreateUserAsync("m100001", "jane@apha.gov.uk", "Jane Smith", "Jane", "Smith", "Science");
+        var created = await service.CreateUserAsync(new NewUserDetails("m100001", "jane@apha.gov.uk", "Jane Smith", "Jane", "Smith", "Science"));
 
         Assert.Equal("m100001", created.Username);
         Assert.False(created.IsInactive);
@@ -67,7 +67,7 @@ public class UserServiceTests
         var service = CreateService(new FakeUserRepository());
 
         var ex = await Assert.ThrowsAsync<UserValidationException>(
-            () => service.CreateUserAsync("m100001", string.Empty, "Jane Smith", "Jane", "Smith", "Science"));
+            () => service.CreateUserAsync(new NewUserDetails("m100001", string.Empty, "Jane Smith", "Jane", "Smith", "Science")));
 
         Assert.Contains(ex.Errors, e => e.Message == UserValidator.NoEmailMessage);
     }
@@ -82,7 +82,7 @@ public class UserServiceTests
         var service = CreateService(repository);
 
         var ex = await Assert.ThrowsAsync<UserValidationException>(
-            () => service.CreateUserAsync("M100001", "jane@apha.gov.uk", "Jane Smith", "Jane", "Smith", "Science"));
+            () => service.CreateUserAsync(new NewUserDetails("M100001", "jane@apha.gov.uk", "Jane Smith", "Jane", "Smith", "Science")));
 
         Assert.Contains(ex.Errors, e => e.Message == UserValidator.DuplicateMessage);
         Assert.Empty(repository.Created);
@@ -97,7 +97,7 @@ public class UserServiceTests
         var service = CreateService(repository);
 
         await Assert.ThrowsAsync<InvalidOperationException>(
-            () => service.CreateUserAsync("m100001", "jane@apha.gov.uk", "Jane Smith", "Jane", "Smith", "Science"));
+            () => service.CreateUserAsync(new NewUserDetails("m100001", "jane@apha.gov.uk", "Jane Smith", "Jane", "Smith", "Science")));
 
         Assert.Empty(repository.Created);
         Assert.Empty(repository.Users);

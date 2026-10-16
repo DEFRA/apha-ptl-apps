@@ -16,14 +16,11 @@ builder.Services.AddScoped<IEntraInternalUserResolver, InternalUserResolver>();
 // at sign-in (InternalUserResolver) - see SystemAdministrationPolicy remarks for why this checks
 // our own database role, not an Entra ID group.
 // TEMPORARY (testing phase): any signed-in user passes, so the Admin role is NOT enforced.
-// To restore the Admin-only rule, delete the RequireAuthenticatedUser line and uncomment the
-// RequireAssertion block below.
+// To restore the Admin-only rule, replace RequireAuthenticatedUser with a RequireAssertion that
+// checks the Admin role in the InternalUserClaimTypes.ResolvedRoles claim
+// (SystemAdministrationPolicy.AdminRoleName).
 builder.Services.AddAuthorizationBuilder()
     .AddPolicy(SystemAdministrationPolicy.Name, policy => policy.RequireAuthenticatedUser());
-    // .AddPolicy(SystemAdministrationPolicy.Name, policy => policy.RequireAssertion(context =>
-    //     context.User.FindFirst(InternalUserClaimTypes.ResolvedRoles)?.Value
-    //         .Split(',', StringSplitOptions.RemoveEmptyEntries)
-    //         .Contains(SystemAdministrationPolicy.AdminRoleName, StringComparer.OrdinalIgnoreCase) ?? false));
 
 // Logs every refused request ("non-Admin request is refused AND LOGGED") - without this
 // registration ASP.NET Core silently uses its default handler and refusals go unlogged.

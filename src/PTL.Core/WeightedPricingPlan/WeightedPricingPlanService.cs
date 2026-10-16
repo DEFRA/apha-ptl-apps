@@ -1,3 +1,4 @@
+using System.Globalization;
 using PTL.Core.Audit;
 using PTL.Core.Lookup;
 
@@ -42,7 +43,7 @@ public sealed class WeightedPricingPlanService(IWeightedPricingPlanRepository re
             actingUser.ActingUserId,
             "RenewWeightedPricingPlan",
             "WeightedPricingPlan",
-            years.NextYearId.Value.ToString(),
+            years.NextYearId.Value.ToString(CultureInfo.InvariantCulture),
             $"Renewed for financial year {years.NextYearLabel}");
 
         await repository.RenewAsync(years.NextYearId.Value, audit, cancellationToken);
