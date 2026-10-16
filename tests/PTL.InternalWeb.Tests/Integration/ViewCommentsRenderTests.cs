@@ -70,6 +70,17 @@ public class ViewCommentsRenderTests : IClassFixture<WebApplicationFactory<Progr
     private static bool HasUploadInput(string html) => html.Contains("name=\"file\" type=\"file\"", StringComparison.Ordinal);
 
     [Fact]
+    public async Task Get_ShowsThePageNameAsTheH1AndTheDistributionAsTheH2()
+    {
+        Seed();
+
+        var html = MainContent(await GetHtmlAsync());
+
+        Assert.Contains("<h1 class=\"govuk-heading-l\">View Comments</h1>", html, StringComparison.Ordinal);
+        Assert.Contains("<h2 class=\"govuk-heading-m\">D1a/S1 BT: Brucella</h2>", html, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Get_NoAttachments_ShowsTheUploadInputSaveCancelAndSubmit()
     {
         Seed();

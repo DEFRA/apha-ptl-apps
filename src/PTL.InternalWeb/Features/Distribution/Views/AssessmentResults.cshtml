@@ -39,9 +39,11 @@
 
 <h1 class="govuk-heading-l">@ViewData["Title"]</h1>
 
+<h2 class="govuk-heading-m">@results.DistributionHeading</h2>
+
 @if (results.IsAssessmentSubmitted)
 {
-    <h2 class="govuk-heading-m">@chartTitle</h2>
+    <h3 class="govuk-heading-s">@chartTitle</h3>
 
     @if (results.Titles.Skip(1).Any(t => !string.IsNullOrWhiteSpace(t)))
     {
