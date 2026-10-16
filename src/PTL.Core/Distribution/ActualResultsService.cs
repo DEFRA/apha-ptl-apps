@@ -97,13 +97,7 @@ public sealed class ActualResultsService(IDistributionRepository distributionRep
         Guid? defaultRatingId = null;
         if (isNew && state.Structure.Header.StoreRatings)
         {
-            var ratings = await distributionRepository.GetRatingIdsAsync(cancellationToken);
-            if (ratings.Count == 0)
-            {
-                throw new InvalidOperationException("No Default Rating in database.");
-            }
-
-            defaultRatingId = ratings[0];
+            defaultRatingId = await DefaultRatingIdAsync(cancellationToken);
             ratingSampleIds.AddRange(state.Structure.Samples.Select(s => s.SampleId));
         }
 
@@ -122,6 +116,17 @@ public sealed class ActualResultsService(IDistributionRepository distributionRep
             cancellationToken);
 
         return ActualResultsSaveOutcome.Of(ActualResultsSaveStatus.Saved);
+    }
+
+    private async Task<Guid> DefaultRatingIdAsync(CancellationToken cancellationToken)
+    {
+        var ratings = await distributionRepository.GetRatingIdsAsync(cancellationToken);
+        if (ratings.Count == 0)
+        {
+            throw new InvalidOperationException("No Default Rating in database.");
+        }
+
+        return ratings[0];
     }
 
     private async Task<State?> LoadAsync(Guid distributionParticipantId, Guid monthlyDistributionSchemeId, CancellationToken cancellationToken)
@@ -230,12 +235,12 @@ public sealed class ActualResultsService(IDistributionRepository distributionRep
                 }
 
                 var values = new List<ActualResultsSampleValue>();
-                foreach (var resultItem in resultItems)
+                foreach (var testResultItemId in resultItems.Select(r => r.TestResultItemId))
                 {
-                    if (sampleResultItems.TryGetValue((sampleTest.SampleTestId, resultItem.TestResultItemId), out var sri))
+                    if (sampleResultItems.TryGetValue((sampleTest.SampleTestId, testResultItemId), out var sri))
                     {
                         values.Add(new ActualResultsSampleValue(
-                            sri.SampleResultItemId, resultItem.TestResultItemId, state.SampleResults.GetValueOrDefault(sri.SampleResultItemId, string.Empty)));
+                            sri.SampleResultItemId, testResultItemId, state.SampleResults.GetValueOrDefault(sri.SampleResultItemId, string.Empty)));
                     }
                 }
 

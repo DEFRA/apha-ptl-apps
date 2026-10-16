@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 
 namespace PTL.InternalWeb.Features.Distribution;
 
@@ -30,9 +31,11 @@ public sealed class ActualResultsViewModel : IValidatableObject
     public string? AuditObjectName { get; set; }
 
     // Legacy "Save Failed: No results can be saved after the deadline date." panel.
+    [BindNever]
     public bool SaveFailed { get; set; }
 
     // Deadline has passed: the page shows the results read-only. Re-read from the API, never posted.
+    [BindNever]
     public bool IsReadOnly { get; set; }
 
     // Which button the user pressed before the audit-reason step (save or apply), so the audited

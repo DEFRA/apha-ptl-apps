@@ -194,7 +194,7 @@ body:not(.js-enabled) [data-amend-recalculate] {
     }
 
     table.TabulationTable {
-        border: solid 1px black !important;
+        border: solid 1px black;
         margin-left: 2px;
     }
 
@@ -203,18 +203,18 @@ body:not(.js-enabled) [data-amend-recalculate] {
         font-size: 8pt;
         color: black;
         background-color: white;
-        border: solid 1px black !important;
+        border: solid 1px black;
     }
 
     .TabulationCell {
         font-size: 7.5pt;
-        border: solid 1px black !important;
+        border: solid 1px black;
         color: black;
         background-color: white;
     }
 
     .TabulationTable thead + tbody tr:first-child > * {
-        border-top: none !important;
+        border-top: none;
     }
 
     .cellTabulationSignature2,

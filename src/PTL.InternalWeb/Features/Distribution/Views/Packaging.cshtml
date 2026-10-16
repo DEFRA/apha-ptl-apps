@@ -37,12 +37,12 @@
         return lines;
     }
 
-    void Tick(string cssClass, string? name, string? value, bool isChecked, string label, bool labelVisible, string? kind, string? scheme)
+    void Tick(string cssClass, string? name, string? value, bool isChecked, string label, bool labelVisible, (string? Kind, string? Scheme) data)
     {
         var id = $"packaging-tick-{++tickId}";
         <div class="govuk-checkboxes govuk-checkboxes--small" data-module="govuk-checkboxes">
             <div class="govuk-checkboxes__item">
-                <input class="govuk-checkboxes__input @cssClass" type="checkbox" id="@id" name="@name" value="@value" checked="@isChecked" data-kind="@kind" data-scheme="@scheme" />
+                <input class="govuk-checkboxes__input @cssClass" type="checkbox" id="@id" name="@name" value="@value" checked="@isChecked" data-kind="@data.Kind" data-scheme="@data.Scheme" />
                 <label class="govuk-label govuk-checkboxes__label" for="@id">
                     @if (labelVisible)
                     {
@@ -73,7 +73,7 @@
         {
             var packed = kind == "packed";
             Tick("ptl-tick", packed ? "PackedTicks" : "PostedTicks", Model.RowTickKey(id.Value),
-                packed ? Model.IsPacked(id.Value) : Model.IsPosted(id.Value), label, false, kind, scheme);
+                packed ? Model.IsPacked(id.Value) : Model.IsPosted(id.Value), label, false, (kind, scheme));
         }
     }
 
@@ -86,7 +86,7 @@
         }
         else if (total == 2)
         {
-            Tick("ptl-tick-scheme", null, null, false, label, false, kind, scheme);
+            Tick("ptl-tick-scheme", null, null, false, label, false, (kind, scheme));
         }
     }
 
@@ -131,11 +131,11 @@
                         <hr class="govuk-section-break govuk-section-break--visible govuk-!-margin-top-2 govuk-!-margin-bottom-2" />
                         @if (block.ShowAllPacked)
                         {
-                            Tick("ptl-tick-block", null, null, false, "All Packed:", true, "packed", null);
+                            Tick("ptl-tick-block", null, null, false, "All Packed:", true, ("packed", null));
                         }
                         @if (block.ShowAllPosted)
                         {
-                            Tick("ptl-tick-block", null, null, false, "All Posted:", true, "posted", null);
+                            Tick("ptl-tick-block", null, null, false, "All Posted:", true, ("posted", null));
                         }
                     </div>
                 }
@@ -144,7 +144,7 @@
 
         <td class="govuk-table__cell noprint" rowspan="@rowCount">
             @{
-                Tick("ptl-print-checkbox", "PrintKeys", block.PrintKey, Model.PrintKeys.Contains(block.PrintKey), $"Print {printLabel}", false, null, null);
+                Tick("ptl-print-checkbox", "PrintKeys", block.PrintKey, Model.PrintKeys.Contains(block.PrintKey), $"Print {printLabel}", false, (null, null));
             }
         </td>
     }

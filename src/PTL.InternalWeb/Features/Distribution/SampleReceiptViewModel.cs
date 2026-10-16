@@ -1,3 +1,5 @@
+using Microsoft.AspNetCore.Mvc.ModelBinding;
+
 namespace PTL.InternalWeb.Features.Distribution;
 
 // Sample Receipt screen - legacy Internal User/SampleReceipt.aspx (sitemap title "Submission Status").
@@ -21,6 +23,7 @@ public sealed class SampleReceiptViewModel
     public string? LabHeading { get; set; }
 
     // No Tests, or the scheme is ready for the assessor: legacy disables the tick boxes and Save/Apply.
+    [BindNever]
     public bool IsReadOnly { get; set; }
 
     public List<SampleReceiptTestViewModel> Tests { get; set; } = [];

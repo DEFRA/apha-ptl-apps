@@ -9,6 +9,8 @@
         return;
     }
 
+    var NOT_SCORED = "Not Scored";
+
     function each(selector, fn) {
         Array.prototype.forEach.call(form.querySelectorAll(selector), fn);
     }
@@ -18,7 +20,7 @@
     each("input[data-amend-range]", function (box) {
         box.addEventListener("change", function () {
             each("[data-amend-range-second]", function (span) {
-                if (span.getAttribute("data-amend-range-second") === box.name) {
+                if (span.dataset.amendRangeSecond === box.name) {
                     span.hidden = !box.checked;
                 }
             });
@@ -29,7 +31,7 @@
 
     form.addEventListener("input", function (event) {
         var source = event.target;
-        if (!source.matches || !source.matches("input[data-amend-nil-return]")) {
+        if (!source.matches?.("input[data-amend-nil-return]")) {
             return;
         }
         each("input[data-amend-nil-return]", function (other) {
@@ -48,8 +50,8 @@
     }
 
     function setStat(stat, sampleId, text) {
-        each("[data-stat='" + stat + "']", function (cell) {
-            if (cell.getAttribute("data-sample-id") === sampleId) {
+        each(`[data-stat='${stat}']`, function (cell) {
+            if (cell.dataset.sampleId === sampleId) {
                 cell.textContent = text;
             }
         });
@@ -58,7 +60,7 @@
     function sampleIds() {
         var ids = [];
         each("[data-stat='mean']", function (cell) {
-            ids.push(cell.getAttribute("data-sample-id"));
+            ids.push(cell.dataset.sampleId);
         });
         return ids;
     }
@@ -82,7 +84,7 @@
             var percentageCorrect;
 
             each("select[data-amend-rating]", function (select) {
-                if (select.getAttribute("data-sample-id") !== sampleId || select.selectedIndex < 0) {
+                if (select.dataset.sampleId !== sampleId || select.selectedIndex < 0) {
                     return;
                 }
                 var rating = select.options[select.selectedIndex].text;
@@ -96,7 +98,7 @@
                     participantCount++;
                     sum = sum + value;
                 }
-                if (rating === "Not Scored") {
+                if (rating === NOT_SCORED) {
                     isNotScored = true;
                     participantCount++;
                 }
@@ -104,19 +106,19 @@
 
             var labsReporting = String(labsReportingCount);
             if (isNotScored) {
-                meanScore = "Not Scored";
-                percentageCorrect = "Not Scored";
-                labsReporting = "Not Scored";
+                meanScore = NOT_SCORED;
+                percentageCorrect = NOT_SCORED;
+                labsReporting = NOT_SCORED;
             } else {
                 if (participantCount !== 0) {
                     meanScore = (sum / participantCount).toFixed(1);
-                    percentageCorrect = ((labsReportingCount / participantCount) * 100).toFixed(1) + "%";
+                    percentageCorrect = `${((labsReportingCount / participantCount) * 100).toFixed(1)}%`;
                 } else {
                     meanScore = (0).toFixed(1);
-                    percentageCorrect = (0).toFixed(1) + "%";
+                    percentageCorrect = `${(0).toFixed(1)}%`;
                 }
                 if (labsReportingCount === 0) {
-                    percentageCorrect = (0).toFixed(1) + "%";
+                    percentageCorrect = `${(0).toFixed(1)}%`;
                 }
                 if (sum === 0) {
                     meanScore = (0).toFixed(1);

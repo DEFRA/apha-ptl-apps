@@ -503,9 +503,9 @@ else
                     {
                         <tr>
                             <th scope="row" class="TabulationCell">@label</th>
-                            @foreach (var sample in amend.RatingSamples)
+                            @foreach (var sampleId in amend.RatingSamples.Select(s => s.SampleId))
                             {
-                                var statistics = amend.Statistics.FirstOrDefault(s => s.SampleId == sample.SampleId);
+                                var statistics = amend.Statistics.FirstOrDefault(s => s.SampleId == sampleId);
                                 var text = stat switch
                                 {
                                     "mean" => statistics?.MeanScore,
@@ -513,7 +513,7 @@ else
                                     "count" => statistics?.ParticipantCount,
                                     _ => statistics?.PercentageCorrect,
                                 };
-                                <td class="TabulationCell" data-stat="@stat" data-sample-id="@sample.SampleId">@text</td>
+                                <td class="TabulationCell" data-stat="@stat" data-sample-id="@sampleId">@text</td>
                             }
                         </tr>
                     }
@@ -523,7 +523,7 @@ else
 
         @if (!audit)
         {
-            <p class="govuk-visually-hidden" role="status" data-amend-stats-status></p>
+            <output class="govuk-visually-hidden" data-amend-stats-status></output>
             <button type="button" class="govuk-button govuk-button--secondary" data-module="govuk-button" data-amend-recalculate>Recalculate</button>
         }
     }

@@ -77,26 +77,8 @@ public sealed class ResultsReceiptService(IDistributionRepository distributionRe
         {
             foreach (var participant in scheme.Participants)
             {
-                if (!updatesById.TryGetValue(participant.DistributionParticipantId, out var update))
-                {
-                    continue;
-                }
-
-                var changed = false;
-
-                if (participant.ExtraDocumentsReturned != update.ExtraDocumentsReturned)
-                {
-                    participant.ExtraDocumentsReturned = update.ExtraDocumentsReturned;
-                    changed = true;
-                }
-
-                if (scheme.RequiresAssessment && update.ReturnedChecked && participant.ReturnedDate is null)
-                {
-                    participant.ReturnedDate = today;
-                    changed = true;
-                }
-
-                if (changed)
+                if (updatesById.TryGetValue(participant.DistributionParticipantId, out var update)
+                    && ApplyParticipantUpdate(participant, update, scheme.RequiresAssessment, today))
                 {
                     dirty.Add(participant);
                 }
@@ -109,6 +91,27 @@ public sealed class ResultsReceiptService(IDistributionRepository distributionRe
         }
 
         return new ResultsReceiptSaveOutcome(true);
+    }
+
+    // True when the participant's stored values changed.
+    private static bool ApplyParticipantUpdate(
+        ResultsReceiptParticipantEntity participant, ResultsReceiptParticipantUpdate update, bool requiresAssessment, DateTime today)
+    {
+        var changed = false;
+
+        if (participant.ExtraDocumentsReturned != update.ExtraDocumentsReturned)
+        {
+            participant.ExtraDocumentsReturned = update.ExtraDocumentsReturned;
+            changed = true;
+        }
+
+        if (requiresAssessment && update.ReturnedChecked && participant.ReturnedDate is null)
+        {
+            participant.ReturnedDate = today;
+            changed = true;
+        }
+
+        return changed;
     }
 
     public async Task<SampleReceiptPage?> GetSampleReceiptAsync(
@@ -205,14 +208,7 @@ public sealed class ResultsReceiptService(IDistributionRepository distributionRe
             return false;
         }
 
-        var chosen =
-            update.Submitted && !storedSubmitted ? SampleReceiptKind.Submitted
-            : update.NotSubmitted && !storedNotSubmitted ? SampleReceiptKind.NotSubmitted
-            : update.NotInRepertoire && !storedNotInRepertoire ? SampleReceiptKind.NotInRepertoire
-            : update.Submitted ? SampleReceiptKind.Submitted
-            : update.NotSubmitted ? SampleReceiptKind.NotSubmitted
-            : update.NotInRepertoire ? SampleReceiptKind.NotInRepertoire
-            : SampleReceiptKind.None;
+        var chosen = NewlyTicked(update, storedSubmitted, storedNotSubmitted, storedNotInRepertoire);
 
         var submissionDate = chosen == SampleReceiptKind.Submitted ? sample.SubmissionDate ?? today : (DateTime?)null;
         var nonSubmissionDate = chosen == SampleReceiptKind.NotSubmitted ? sample.NonSubmissionDate ?? today : (DateTime?)null;
@@ -226,5 +222,36 @@ public sealed class ResultsReceiptService(IDistributionRepository distributionRe
         sample.NonSubmissionDate = nonSubmissionDate;
         sample.NonCapableDate = nonCapableDate;
         return changed;
+    }
+
+    // The tick that differs from what is stored is the one just made; failing that, the first tick set.
+    private static SampleReceiptKind NewlyTicked(SampleReceiptUpdate update, bool storedSubmitted, bool storedNotSubmitted, bool storedNotInRepertoire)
+    {
+        if (update.Submitted && !storedSubmitted)
+        {
+            return SampleReceiptKind.Submitted;
+        }
+
+        if (update.NotSubmitted && !storedNotSubmitted)
+        {
+            return SampleReceiptKind.NotSubmitted;
+        }
+
+        if (update.NotInRepertoire && !storedNotInRepertoire)
+        {
+            return SampleReceiptKind.NotInRepertoire;
+        }
+
+        if (update.Submitted)
+        {
+            return SampleReceiptKind.Submitted;
+        }
+
+        if (update.NotSubmitted)
+        {
+            return SampleReceiptKind.NotSubmitted;
+        }
+
+        return update.NotInRepertoire ? SampleReceiptKind.NotInRepertoire : SampleReceiptKind.None;
     }
 }

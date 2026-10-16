@@ -232,7 +232,7 @@ public class TabulationReportRenderTests : IClassFixture<WebApplicationFactory<P
 
         var html = await GetHtmlAsync(TabulationUrl);
 
-        Assert.Contains("role=\"region\" aria-label=\"Clinical\"", html, StringComparison.Ordinal);
+        Assert.Contains("<section class=\"ptl-table-scroll ptl-tabulation-scroll\" tabindex=\"0\" aria-label=\"Clinical\"", html, StringComparison.Ordinal);
         var table = TableHtml(html, "Clinical");
         var head = Regex.Match(table, "<thead>(.*?)</thead>", RegexOptions.Singleline).Groups[1].Value;
         Assert.Equal(2, Regex.Matches(head, "<tr>").Count);

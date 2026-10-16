@@ -64,12 +64,12 @@ public sealed class PackagingOutputService(
     {
         AddLabel(labels, await distributionRepository.GetLabelGroupAddressAsync(block.KeyId, cancellationToken), isGroup: true);
 
-        foreach (var item in raw.Items.Where(i => i.GroupAddressId == block.KeyId && i.DistributionDate.Date == block.Date))
+        foreach (var schemeId in raw.Items.Where(i => i.GroupAddressId == block.KeyId && i.DistributionDate.Date == block.Date).Select(i => i.MonthlyDistributionSchemeId))
         {
             foreach (var participant in raw.Participants.Where(p =>
-                p.GroupAddressId == block.KeyId && p.MonthlyDistributionSchemeId == item.MonthlyDistributionSchemeId && p.DistributionDate.Date == block.Date))
+                p.GroupAddressId == block.KeyId && p.MonthlyDistributionSchemeId == schemeId && p.DistributionDate.Date == block.Date))
             {
-                AddLabel(labels, await distributionRepository.GetLabelParticipantAddressAsync(participant.ParticipantId, item.MonthlyDistributionSchemeId, cancellationToken), isGroup: false);
+                AddLabel(labels, await distributionRepository.GetLabelParticipantAddressAsync(participant.ParticipantId, schemeId, cancellationToken), isGroup: false);
             }
         }
     }
@@ -80,9 +80,9 @@ public sealed class PackagingOutputService(
     {
         AddLabel(labels, await distributionRepository.GetLabelParticipantAddressAsync(block.KeyId, Guid.Empty, cancellationToken), isGroup: false);
 
-        foreach (var scheme in block.Schemes)
+        foreach (var schemeId in block.Schemes.Select(s => s.MonthlyDistributionSchemeId))
         {
-            AddLabel(labels, await distributionRepository.GetLabelParticipantAddressAsync(block.KeyId, scheme.MonthlyDistributionSchemeId, cancellationToken), isGroup: false);
+            AddLabel(labels, await distributionRepository.GetLabelParticipantAddressAsync(block.KeyId, schemeId, cancellationToken), isGroup: false);
         }
     }
 

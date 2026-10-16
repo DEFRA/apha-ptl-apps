@@ -226,6 +226,12 @@
     vertical-align: top;
 }
 
+/* Chromium double-renders the collapsed border where thead meets the first tbody; the header's own
+   bottom border then draws the line once, matching the rest of the grid. */
+#packaging-table thead + tbody tr:first-child > * {
+    border-top: none;
+}
+
 .cellWorkSheetScheme {
     font-weight: bold;
 }
@@ -257,6 +263,12 @@
     #packaging-table th,
     #packaging-table td {
         font-size: 75%;
+    }
+
+    /* Unticked blocks are hidden, so the first printed block need not follow the thead; the line above
+       every block is the previous row's bottom border. */
+    #packaging-table tbody tr:first-child > * {
+        border-top: none;
     }
 }
 

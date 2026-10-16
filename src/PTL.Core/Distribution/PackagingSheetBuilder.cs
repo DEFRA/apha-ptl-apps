@@ -32,7 +32,12 @@ public static class PackagingSheetBuilder
         foreach (var date in raw.Groups.Select(g => g.DistributionDate.Date).Distinct())
         {
             var groups = raw.Groups.Where(g => g.DistributionDate.Date == date).ToList();
-            var totalSets = groups.Sum(g => ItemsFor(raw, g.GroupAddressId, date).Sum(i => i.NumberOfSetsRequired));
+            var totalSets = 0;
+            foreach (var group in groups)
+            {
+                totalSets += ItemsFor(raw, group.GroupAddressId, date).Sum(i => i.NumberOfSetsRequired);
+            }
+
             if (totalSets <= 0)
             {
                 continue;

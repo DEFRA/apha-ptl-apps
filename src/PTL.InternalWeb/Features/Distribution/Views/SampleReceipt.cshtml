@@ -8,11 +8,20 @@
     const string notSubmittedLabel = "Not submitted";
     const string notInRepertoireLabel = "Not in reportoire";
 
-    string StatusOf(SampleReceiptSampleViewModel sample) =>
-        sample.Submitted ? submittedLabel
-        : sample.NotSubmitted ? notSubmittedLabel
-        : sample.NotInRepertoire ? notInRepertoireLabel
-        : string.Empty;
+    string StatusOf(SampleReceiptSampleViewModel sample)
+    {
+        if (sample.Submitted)
+        {
+            return submittedLabel;
+        }
+
+        if (sample.NotSubmitted)
+        {
+            return notSubmittedLabel;
+        }
+
+        return sample.NotInRepertoire ? notInRepertoireLabel : string.Empty;
+    }
 }
 
 <a class="govuk-back-link" asp-action="ResultsReceipt" asp-route-year="@Model.YearId" asp-route-monthId="@Model.MonthId">Back</a>
@@ -29,7 +38,7 @@
 {
     <p class="govuk-body">There are no samples allocated to tests for this distribution.</p>
 
-    <a class="govuk-button govuk-button--secondary" role="button" draggable="false" data-module="govuk-button" asp-action="ResultsReceipt" asp-route-year="@Model.YearId" asp-route-monthId="@Model.MonthId">Back</a>
+    <a class="govuk-button govuk-button--secondary" asp-action="ResultsReceipt" asp-route-year="@Model.YearId" asp-route-monthId="@Model.MonthId">Back</a>
 
     return;
 }
@@ -72,7 +81,7 @@
         </table>
     }
 
-    <a class="govuk-button govuk-button--secondary" role="button" draggable="false" data-module="govuk-button" asp-action="ResultsReceipt" asp-route-year="@Model.YearId" asp-route-monthId="@Model.MonthId">Back</a>
+    <a class="govuk-button govuk-button--secondary" asp-action="ResultsReceipt" asp-route-year="@Model.YearId" asp-route-monthId="@Model.MonthId">Back</a>
 
     return;
 }
