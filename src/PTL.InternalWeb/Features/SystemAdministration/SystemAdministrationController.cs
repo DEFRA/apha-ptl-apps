@@ -93,7 +93,7 @@ public class SystemAdministrationController : Controller
             "Country {CountryId} could not be removed");
     // Landing page for the System Administration section (moved from the removed Menu feature) -
     // shows only a heading and a short description, relying on the left nav (SideNavigationProvider)
-    // for the actual section contents (Administration Charges, Weighted Charging Plan, etc.).
+    // for the actual section contents (Administration Charges, Weighted Pricing Plan, etc.).
     public IActionResult SystemAdministration() => View();
 
     public async Task<IActionResult> AdministrationCharge(CancellationToken cancellationToken) =>

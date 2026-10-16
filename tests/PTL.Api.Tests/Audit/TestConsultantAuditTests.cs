@@ -1,3 +1,4 @@
+using PTL.Api.Tests.Customer;
 using PTL.Api.Tests.ExternalUser;
 using PTL.Api.Tests.Participant;
 using PTL.Core.ExternalUser;
@@ -100,7 +101,7 @@ public class TestConsultantAuditTests
     {
         var id = Guid.NewGuid();
         _repository.Seed(new CoreTestConsultant { ExternalTestConsultantId = id, Email = "jane@example.com" });
-        var service = new ExternalUserService(new FakeParticipantRepository(), new FakeViewerRepository(), _repository);
+        var service = new ExternalUserService(new FakeParticipantRepository(), new FakeViewerRepository(), _repository, new FakeCustomerRepository());
 
         var result = await service.ResolveAsync(Guid.NewGuid(), "jane@example.com", "Jane", ["Test Consultant"]);
 

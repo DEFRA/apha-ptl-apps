@@ -1,3 +1,4 @@
+using PTL.Api.Tests.Customer;
 using PTL.Api.Tests.ExternalUser;
 using PTL.Api.Tests.Participant;
 using PTL.Core.Audit;
@@ -100,7 +101,7 @@ public class ViewerAuditTests
     public async Task ExternalUserSignInLink_UpdatesViewerWithoutAuditEntry()
     {
         var viewer = SeedViewer();
-        var service = new ExternalUserService(new FakeParticipantRepository(), _repository, new FakeTestConsultantRepository());
+        var service = new ExternalUserService(new FakeParticipantRepository(), _repository, new FakeTestConsultantRepository(), new FakeCustomerRepository());
 
         var result = await service.ResolveAsync(Guid.NewGuid(), "jane@example.com", "Jane", ["Viewer"]);
 

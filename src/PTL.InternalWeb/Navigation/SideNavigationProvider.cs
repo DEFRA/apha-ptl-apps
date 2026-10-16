@@ -53,7 +53,7 @@ public static class SideNavigationProvider
                 new SideNavigationItem { Text = "Administration Charges Management", ControllerName = SystemAdministrationControllerName, ActionName = "AdministrationCharge" },
                 new SideNavigationItem
                 {
-                    Text = "Weighted Charging Plan",
+                    Text = "Weighted Pricing Plan",
                     ControllerName = SystemAdministrationControllerName,
                     ActionName = "WeightedPricingPlan",
                     Children =
