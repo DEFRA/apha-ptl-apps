@@ -404,7 +404,7 @@ public class DistributionControllerCommentsTests
         var model = Posted();
         model.StagedAttachments.Add($"{OtherToken}|other.pdf");
         var controller = CreateController(apiClient);
-        controller.ModelState.AddModelError("File", "stale");
+        controller.ModelState.AddModelError("Comments", "stale");
 
         var shown = AssertRedisplayed(await RemoveAsync(controller, Token, model));
 
@@ -412,6 +412,36 @@ public class DistributionControllerCommentsTests
         Assert.Equal([SavedId], shown.RemovedAttachmentIds);
         Assert.Equal([Token], Assert.Single(apiClient.DiscardedStagedAttachments));
         Assert.True(controller.ModelState.IsValid);
+    }
+
+    [Fact]
+    public async Task Remove_InvalidPostedField_RedisplaysTheFormWithoutChangingIt()
+    {
+        var apiClient = ApiClient();
+        var model = Posted();
+        model.StagedAttachments.Add($"{OtherToken}|other.pdf");
+        var controller = CreateController(apiClient);
+        controller.ModelState.AddModelError("AuditWhy", "too long");
+
+        var shown = AssertRedisplayed(await RemoveAsync(controller, Token, model));
+
+        Assert.Equal([$"{Token}|new.pdf", $"{OtherToken}|other.pdf"], shown.StagedAttachments);
+        Assert.Empty(apiClient.DiscardedStagedAttachments);
+        Assert.False(controller.ModelState.IsValid);
+    }
+
+    [Fact]
+    public async Task Upload_InvalidPostedField_RedisplaysTheFormWithoutCallingTheApi()
+    {
+        var apiClient = ApiClient();
+        var controller = CreateController(apiClient);
+        controller.ModelState.AddModelError("AuditWhy", "too long");
+
+        var shown = AssertRedisplayed(await UploadAsync(controller, Posted(), File([1, 2, 3])));
+
+        Assert.Empty(apiClient.StagedAttachmentRequests);
+        Assert.Equal([$"{Token}|new.pdf"], shown.StagedAttachments);
+        Assert.False(controller.ModelState.IsValid);
     }
 
     [Fact]

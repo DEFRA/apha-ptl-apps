@@ -35,9 +35,11 @@ public class TabulationPublishedNotifierTests
                 Notify,
                 Guard,
                 Options.Create(new PublicationNotificationOptions { Enabled = enabled }),
-                Options.Create(new TabulationEmailOptions()),
-                Options.Create(new ExternalOptions { AppUrl = externalUrl }),
-                Clock,
+                new TabulationEmailContext(
+                    Clock,
+                    Options.Create(new TabulationEmailOptions()),
+                    Options.Create(new InternalOptions()),
+                    Options.Create(new ExternalOptions { AppUrl = externalUrl })),
                 Logger);
         }
 

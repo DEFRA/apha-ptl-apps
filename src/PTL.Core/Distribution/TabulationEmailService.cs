@@ -1,6 +1,5 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using PTL.Core.Configuration;
 using PTL.Core.Notifications;
 
 namespace PTL.Core.Distribution;
@@ -23,13 +22,19 @@ public sealed partial class TabulationEmailService(
     INotifyClient notifyClient,
     TabulationEmailGuard guard,
     IOptions<TabulationEmailOptions> options,
-    IOptions<InternalOptions> internalOptions,
-    IOptions<ExternalOptions> externalOptions,
-    TimeProvider timeProvider,
+    TabulationEmailContext context,
     ILogger<TabulationEmailService> logger) : ITabulationEmailService
 {
     // Legacy <<WebAddress>> value.
     private const string WebAddressPrefix = "You can access the tabulation at the following address: ";
+
+    private static readonly EmailTemplate FirstRequestTemplate =
+        new(TabulationEmailType.FirstRequest, TabulationEmailTemplates.FirstRequestId, TabulationEmailTemplates.FirstRequestName);
+
+    private static readonly EmailTemplate ChaserTemplate =
+        new(TabulationEmailType.Chaser, TabulationEmailTemplates.ChaserId, TabulationEmailTemplates.ChaserName);
+
+    private readonly record struct EmailTemplate(TabulationEmailType Type, string Id, string Name);
 
     private readonly record struct SendResult(int Sent, int Skipped, int Failed);
 
@@ -110,7 +115,7 @@ public sealed partial class TabulationEmailService(
         }
     }
 
-    private DateTime Today() => TabulationEmailClock.Today(timeProvider, options.Value.TimeZone);
+    private DateTime Today() => context.Today();
 
     // The ready date of a distribution still inside the chaser window.
     private static DateTime WindowStart(DateTime today) => today.AddDays(-(TabulationEmailSchedule.OverdueDay - 1));
@@ -147,7 +152,7 @@ public sealed partial class TabulationEmailService(
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 failed++;
-                LogProcessingFailed(logger, stage.Value.ToString(), candidate.SchemeId, candidate.MonthlyDistributionSchemeId, ex);
+                LogProcessingFailed(logger, stage.Value, candidate.SchemeId, candidate.MonthlyDistributionSchemeId, ex);
             }
         }
 
@@ -183,9 +188,7 @@ public sealed partial class TabulationEmailService(
 
             var sent = await TrySendAsync(
                 candidate,
-                TabulationEmailType.FirstRequest,
-                TabulationEmailTemplates.FirstRequestId,
-                TabulationEmailTemplates.FirstRequestName,
+                FirstRequestTemplate,
                 consultant.Email,
                 Personalise(candidate, consultant, consultant.FriendlyName, TabulationEmailSchedule.FirstEmailDeadlineDays, today),
                 $"{id}:first",
@@ -237,9 +240,7 @@ public sealed partial class TabulationEmailService(
 
             var delivered = await TrySendAsync(
                 candidate,
-                TabulationEmailType.Chaser,
-                TabulationEmailTemplates.ChaserId,
-                TabulationEmailTemplates.ChaserName,
+                ChaserTemplate,
                 consultant.Email,
                 Personalise(candidate, consultant, commenter.FriendlyName, TabulationEmailSchedule.ChaserDeadlineDays, today),
                 $"{candidate.MonthlyDistributionSchemeId}:chaser:{slot}",
@@ -267,9 +268,7 @@ public sealed partial class TabulationEmailService(
 
     private async Task<bool> TrySendAsync(
         TabulationEmailCandidateEntity candidate,
-        TabulationEmailType emailType,
-        string templateId,
-        string templateName,
+        EmailTemplate template,
         string emailAddress,
         Dictionary<string, string> personalisation,
         string reference,
@@ -277,13 +276,13 @@ public sealed partial class TabulationEmailService(
     {
         try
         {
-            await notifyClient.SendEmailAsync(templateId, emailAddress, personalisation, reference, cancellationToken);
-            LogSent(logger, emailType.ToString(), candidate.SchemeId, candidate.MonthlyDistributionSchemeId, templateName, templateId);
+            await notifyClient.SendEmailAsync(template.Id, emailAddress, personalisation, reference, cancellationToken);
+            LogSent(logger, template.Type, candidate.SchemeId, candidate.MonthlyDistributionSchemeId, template.Name, template.Id);
             return true;
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            LogSendFailed(logger, emailType.ToString(), candidate.SchemeId, candidate.MonthlyDistributionSchemeId, templateName, templateId, ex);
+            LogSendFailed(logger, template.Type, candidate.SchemeId, candidate.MonthlyDistributionSchemeId, template.Name, template.Id, ex);
             return false;
         }
     }
@@ -298,13 +297,9 @@ public sealed partial class TabulationEmailService(
             ["SchemeName"] = candidate.SchemeName,
             ["MonthlyDistributionReferenceFull"] = candidate.ReferenceFull,
             ["CommentDeadlineDays"] = deadlineDays.ToString(System.Globalization.CultureInfo.InvariantCulture),
-            ["WebAddress"] = WebAddressPrefix + CommentsLink(candidate, recipient),
-            ["DateTimeNow"] = TabulationEmailClock.Format(today),
+            ["WebAddress"] = WebAddressPrefix + context.CommentsLink(candidate.MonthlyDistributionSchemeId, recipient.IsExternal),
+            ["DateTimeNow"] = TabulationEmailContext.Format(today),
         };
-
-    private string CommentsLink(TabulationEmailCandidateEntity candidate, TabulationConsultantEntity recipient) => recipient.IsExternal
-        ? $"{externalOptions.Value.AppUrl.TrimEnd('/')}/{options.Value.ExternalCommentsPath.Trim('/')}?ref={candidate.MonthlyDistributionSchemeId}"
-        : $"{internalOptions.Value.AppUrl.TrimEnd('/')}/{options.Value.InternalCommentsPath.Trim('/')}?MonthlyDistributionSchemeId={candidate.MonthlyDistributionSchemeId}";
 
     private static TabulationConsultantEntity? Find(Dictionary<Guid, TabulationConsultantEntity> consultants, Guid? id) =>
         id is { } key && key != Guid.Empty && consultants.TryGetValue(key, out var consultant) ? consultant : null;
@@ -313,25 +308,25 @@ public sealed partial class TabulationEmailService(
     {
         if (guard.FirstWarningToday(candidate.MonthlyDistributionSchemeId, slot, today))
         {
-            LogMissingRecipient(logger, emailType.ToString(), candidate.SchemeId, candidate.MonthlyDistributionSchemeId, slot);
+            LogMissingRecipient(logger, emailType, candidate.SchemeId, candidate.MonthlyDistributionSchemeId, slot);
         }
     }
 
     [LoggerMessage(EventId = 1, Level = LogLevel.Information,
         Message = "Tabulation email sent. EmailType={EmailType} SchemeId={SchemeId} MonthlyDistributionSchemeId={MonthlyDistributionSchemeId} TemplateName={TemplateName} TemplateId={TemplateId}")]
-    private static partial void LogSent(ILogger logger, string emailType, Guid schemeId, Guid monthlyDistributionSchemeId, string templateName, string templateId);
+    private static partial void LogSent(ILogger logger, TabulationEmailType emailType, Guid schemeId, Guid monthlyDistributionSchemeId, string templateName, string templateId);
 
     [LoggerMessage(EventId = 2, Level = LogLevel.Error,
         Message = "Tabulation email could not be sent; EmailState is unchanged and the scheduler will retry. EmailType={EmailType} SchemeId={SchemeId} MonthlyDistributionSchemeId={MonthlyDistributionSchemeId} TemplateName={TemplateName} TemplateId={TemplateId}")]
-    private static partial void LogSendFailed(ILogger logger, string emailType, Guid schemeId, Guid monthlyDistributionSchemeId, string templateName, string templateId, Exception exception);
+    private static partial void LogSendFailed(ILogger logger, TabulationEmailType emailType, Guid schemeId, Guid monthlyDistributionSchemeId, string templateName, string templateId, Exception exception);
 
     [LoggerMessage(EventId = 3, Level = LogLevel.Warning,
         Message = "Tabulation email has no recipient with an email address; EmailState is unchanged. EmailType={EmailType} SchemeId={SchemeId} MonthlyDistributionSchemeId={MonthlyDistributionSchemeId} TestConsultantSlot={Slot}")]
-    private static partial void LogMissingRecipient(ILogger logger, string emailType, Guid schemeId, Guid monthlyDistributionSchemeId, int slot);
+    private static partial void LogMissingRecipient(ILogger logger, TabulationEmailType emailType, Guid schemeId, Guid monthlyDistributionSchemeId, int slot);
 
     [LoggerMessage(EventId = 4, Level = LogLevel.Error,
         Message = "Tabulation email processing failed. EmailType={EmailType} SchemeId={SchemeId} MonthlyDistributionSchemeId={MonthlyDistributionSchemeId}")]
-    private static partial void LogProcessingFailed(ILogger logger, string emailType, Guid schemeId, Guid monthlyDistributionSchemeId, Exception exception);
+    private static partial void LogProcessingFailed(ILogger logger, TabulationEmailType emailType, Guid schemeId, Guid monthlyDistributionSchemeId, Exception exception);
 
     [LoggerMessage(EventId = 5, Level = LogLevel.Error, Message = "The first Test Consultant emails could not be sent after Save; the scheduler will retry.")]
     private static partial void LogImmediateSendFailed(ILogger logger, Exception exception);

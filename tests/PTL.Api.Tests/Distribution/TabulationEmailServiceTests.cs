@@ -37,9 +37,11 @@ public class TabulationEmailServiceTests
                 notify ?? Notify,
                 Guard,
                 Options.Create(EmailOptions),
-                Options.Create(new InternalOptions { AppUrl = internalUrl }),
-                Options.Create(new ExternalOptions { AppUrl = externalUrl }),
-                Clock,
+                new TabulationEmailContext(
+                    Clock,
+                    Options.Create(EmailOptions),
+                    Options.Create(new InternalOptions { AppUrl = internalUrl }),
+                    Options.Create(new ExternalOptions { AppUrl = externalUrl })),
                 Logger);
         }
 

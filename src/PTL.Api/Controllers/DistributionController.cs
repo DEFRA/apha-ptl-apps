@@ -134,7 +134,7 @@ public sealed partial class DistributionController(
     public async Task<ActionResult<TabulationsResponse>> GetTabulations(int yearId, int monthId, CancellationToken cancellationToken)
     {
         var page = await tabulationsService.GetTabulationsAsync(yearId, monthId, cancellationToken);
-        return page is null ? NotFound() : Ok(ToResponse(page));
+        return page is null ? NotFound() : Ok(ToTabulationsResponse(page));
     }
 
     // GET /api/distributions/schemes/{monthlyDistributionSchemeId}/participants/{distributionParticipantId}/sample-receipt -
@@ -198,7 +198,7 @@ public sealed partial class DistributionController(
                 outcome.AuditObjectName));
     }
 
-    private static TabulationsResponse ToResponse(TabulationsPage page) =>
+    private static TabulationsResponse ToTabulationsResponse(TabulationsPage page) =>
         new(
             page.YearId,
             page.MonthId,
@@ -212,12 +212,12 @@ public sealed partial class DistributionController(
                 s.Consultants,
                 [.. s.Tabulations.Select(t => new TabulationRowResponse(t.TabulationId, t.Name, t.IsTestConsultant, t.PublishCount))],
                 new TabulationActionsResponse(
-                    ToResponse(s.Actions.AmendResults),
-                    ToResponse(s.Actions.SendToTestConsultant),
-                    ToResponse(s.Actions.SendForAssessment),
-                    ToResponse(s.Actions.SendToResultsSignOff))))]);
+                    ToTabulationActionResponse(s.Actions.AmendResults),
+                    ToTabulationActionResponse(s.Actions.SendToTestConsultant),
+                    ToTabulationActionResponse(s.Actions.SendForAssessment),
+                    ToTabulationActionResponse(s.Actions.SendToResultsSignOff))))]);
 
-    private static TabulationActionResponse ToResponse(TabulationAction action) =>
+    private static TabulationActionResponse ToTabulationActionResponse(TabulationAction action) =>
         new(action.Text, action.IsEnabled, action.Hint, action.Command.ToString(), action.IsOverdue, action.IsLabel);
 
     private static SampleReceiptResponse ToResponse(SampleReceiptPage page) =>

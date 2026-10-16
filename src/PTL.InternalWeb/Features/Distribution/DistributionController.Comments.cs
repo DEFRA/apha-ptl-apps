@@ -103,6 +103,13 @@ public sealed partial class DistributionController
     {
         ArgumentNullException.ThrowIfNull(model);
 
+        // Comments is only echoed back on an upload; its Required rule applies at Save.
+        ModelState.Remove(CommentsField);
+        if (!ModelState.IsValid)
+        {
+            return await RedisplayViewCommentsAsync(year, monthId, schemeId, model, cancellationToken);
+        }
+
         byte[]? data = null;
         if (file is { Length: > 0 })
         {
@@ -143,6 +150,13 @@ public sealed partial class DistributionController
         int year, int monthId, Guid schemeId, Guid attachmentId, ViewCommentsViewModel model, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(model);
+
+        // Comments is only echoed back when a file is removed; its Required rule applies at Save.
+        ModelState.Remove(CommentsField);
+        if (!ModelState.IsValid)
+        {
+            return await RedisplayViewCommentsAsync(year, monthId, schemeId, model, cancellationToken);
+        }
 
         ModelState.Clear();
         var staged = model.StagedFiles.FirstOrDefault(f => f.Token == attachmentId);

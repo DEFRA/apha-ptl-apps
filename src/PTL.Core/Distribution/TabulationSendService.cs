@@ -126,7 +126,7 @@ public sealed class TabulationSendService(
         public List<TabulationsSchemeEntity> Schemes => schemes;
 
         // The schemes newly sent to the Test Consultant, whose first email is due once Save commits.
-        public IReadOnlyList<Guid> TestConsultantSends => testConsultantSends;
+        public List<Guid> TestConsultantSends => testConsultantSends;
 
         public DateTime Now => now;
 

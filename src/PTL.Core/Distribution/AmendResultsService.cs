@@ -131,14 +131,7 @@ public sealed class AmendResultsService(IDistributionRepository distributionRepo
 
     private static List<AmendSampleResponse> RatingSamples(AmendResultsSource source)
     {
-        var samples = new List<AmendSourceSample>();
-        foreach (var sample in source.Tests.SelectMany(t => t.Samples))
-        {
-            if (!samples.Exists(s => s.SampleId == sample.SampleId))
-            {
-                samples.Add(sample);
-            }
-        }
+        var samples = source.Tests.SelectMany(t => t.Samples).DistinctBy(s => s.SampleId).ToList();
 
         samples.Sort((a, b) => string.CompareOrdinal(a.SampleNumber, b.SampleNumber));
         return [.. samples.Select(s => new AmendSampleResponse(s.SampleId, s.SampleNumber))];
@@ -278,7 +271,7 @@ public sealed class AmendResultsService(IDistributionRepository distributionRepo
                 }
 
                 var value = posted.Value ?? string.Empty;
-                var value2 = isRange[posted.ItemId] && posted.Value2 is not null ? posted.Value2 : current.Value2;
+                var value2 = EffectiveValue2(isRange[posted.ItemId], posted.Value2, current.Value2);
                 var valueChanged = value != current.Value
                     && Validate(AmendResultsFieldKeys.IntendedResult(posted.SampleId, posted.ItemId, 1), item.Item, value);
                 var value2Changed = value2 != current.Value2
@@ -288,14 +281,26 @@ public sealed class AmendResultsService(IDistributionRepository distributionRepo
                 {
                     intendedResults.Add(new AmendIntendedResultWrite(
                         item.Test.TestId, posted.SampleId, posted.ItemId,
-                        valueChanged ? value : current.Value, valueChanged,
-                        value2Changed ? value2 : current.Value2, value2Changed));
+                        Pick(valueChanged, value, current.Value), valueChanged,
+                        Pick(value2Changed, value2, current.Value2), value2Changed));
                     IsAuditDirty = true;
                 }
             }
         }
 
+        // The upper value only follows the post when the item is a range.
+        private static string EffectiveValue2(bool isRange, string? posted, string current) => isRange && posted is not null ? posted : current;
+
+        private static T Pick<T>(bool changed, T posted, T current) => changed ? posted : current;
+
         private void CollectParticipantValues()
+        {
+            CollectParticipantMethodResults();
+            CollectParticipantResultItems();
+            CollectParticipantCategoryScores();
+        }
+
+        private void CollectParticipantMethodResults()
         {
             foreach (var posted in request.MethodResults ?? [])
             {
@@ -312,7 +317,10 @@ public sealed class AmendResultsService(IDistributionRepository distributionRepo
                     }
                 }
             }
+        }
 
+        private void CollectParticipantResultItems()
+        {
             foreach (var posted in request.ResultItemResults ?? [])
             {
                 if (participants.TryGetValue(posted.DistributionParticipantId, out var participant)
@@ -327,7 +335,10 @@ public sealed class AmendResultsService(IDistributionRepository distributionRepo
                     }
                 }
             }
+        }
 
+        private void CollectParticipantCategoryScores()
+        {
             foreach (var posted in request.CategoryResults ?? [])
             {
                 if (participants.TryGetValue(posted.DistributionParticipantId, out var participant)
@@ -366,7 +377,7 @@ public sealed class AmendResultsService(IDistributionRepository distributionRepo
                 if (commentChanged || scoreChanged)
                 {
                     For(participant).Assessments.Add(new AmendAssessmentWrite(
-                        current.SampleReceiptId, comment, commentChanged, scoreChanged ? posted.Score : current.Score, scoreChanged));
+                        current.SampleReceiptId, comment, commentChanged, Pick(scoreChanged, posted.Score, current.Score), scoreChanged));
                     IsAuditDirty = true;
                 }
             }

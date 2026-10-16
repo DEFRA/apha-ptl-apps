@@ -183,12 +183,24 @@ else
         var categoryCount = test.CategoryItems.Count;
         var categorySpan = Math.Max(categoryCount, 1);
         var assess = amend.RequiresAssessment;
-        var headerRows = assess && categoryCount > 0 ? 3 : (test.ResultItems.Count > 0 || assess ? 2 : 1);
+        int headerRows;
+        if (assess && categoryCount > 0)
+        {
+            headerRows = 3;
+        }
+        else if (test.ResultItems.Count > 0 || assess)
+        {
+            headerRows = 2;
+        }
+        else
+        {
+            headerRows = 1;
+        }
         var totalColumns = 1 + test.MethodItems.Count + test.ResultItems.Count * samples.Count
             + (assess ? samples.Count * categorySpan + samples.Count * 2 : 0);
         var nilSpan = Math.Clamp(test.MethodItems.Count + test.ResultItems.Count * samples.Count + categoryCount * samples.Count, 1, Math.Max(totalColumns - 1, 1));
 
-        <div class="ptl-table-scroll ptl-tabulation-scroll" tabindex="0" role="region" aria-label="@test.Name">
+        <section class="ptl-table-scroll ptl-tabulation-scroll" tabindex="0" aria-label="@test.Name">
             <table class="TabulationTable">
                 <caption class="govuk-visually-hidden">@test.Name</caption>
                 <thead>
@@ -420,12 +432,12 @@ else
                     }
                 </tbody>
             </table>
-        </div>
+        </section>
     }
 
     @if (amend.StoreRatings)
     {
-        <div class="ptl-table-scroll ptl-tabulation-scroll" tabindex="0" role="region" aria-label="QAU Ratings">
+        <section class="ptl-table-scroll ptl-tabulation-scroll" tabindex="0" aria-label="QAU Ratings">
             <table class="TabulationTable">
                 <caption class="govuk-visually-hidden">QAU Ratings</caption>
                 <thead>
@@ -507,7 +519,7 @@ else
                     }
                 </tbody>
             </table>
-        </div>
+        </section>
 
         @if (!audit)
         {

@@ -15,7 +15,7 @@ public sealed partial class DistributionController
         int yearId, int monthId, TabulationsStagedRequest request, [FromServices] ITabulationSendService tabulationSendService, CancellationToken cancellationToken)
     {
         var page = await tabulationSendService.PreviewAsync(yearId, monthId, request?.Staged ?? [], cancellationToken);
-        return page is null ? NotFound() : Ok(ToResponse(page));
+        return page is null ? NotFound() : Ok(ToTabulationsResponse(page));
     }
 
     [HttpPost("months/{yearId:int}/{monthId:int}/tabulations/stage")]

@@ -12,6 +12,7 @@ public static class TabulationActionRules
     private const string UnaccountedSamples = "Unaccounted samples on the distribution";
     private const string AssessmentNotSubmitted = "Assessment not submitted";
     private const string ViewTabulationComments = "Click to view the Tabulation Comments";
+    private const string ViewEnterComments = "View/Enter Comments";
     private const string WaitingForSignOff = "This Distribution has been made available for Results Sign-Off and is waiting to be published";
 
     public static TabulationSchemeActions Compute(TabulationsSchemeEntity scheme, DateTime now)
@@ -55,49 +56,59 @@ public static class TabulationActionRules
 
             if (requiresAssessment && IsSet(scheme.IsReadyForAssessor))
             {
-                forAssessment = forAssessment with { Text = isAssessmentComplete ? "View/Enter Comments" : "Awaiting Assessment" };
+                forAssessment = forAssessment with { Text = isAssessmentComplete ? ViewEnterComments : "Awaiting Assessment" };
             }
         }
         else
         {
-            var hasBeenPublishedBefore = scheme.Tabulations.Any(t => t.PublishCount > 0);
-            var hasDecisionMadeBefore = scheme.Tabulations.Any(t => t.PublishState > 0);
-
-            toTestConsultant = toTestConsultant with { Hint = "Send these results to the Test Consultant for comments" };
-            forAssessment = forAssessment with { Hint = "Send this distribution for assessment" };
-
-            toSignOff = requiresAssessment && !isAssessmentComplete
-                ? toSignOff.Disabled(AssessmentNotSubmitted)
-                : toSignOff with { Hint = "Send this Distribution's Tabulation(s) for Results Sign-Off" };
-
-            if (scheme.IsCommentSubmitted || hasBeenPublishedBefore)
-            {
-                toTestConsultant = ViewComments(toTestConsultant, "View Comments", "Click to view the Test Consultant's Comments");
-                forAssessment = ViewComments(forAssessment, "View/Enter Comments", ViewTabulationComments);
-            }
-            else if (IsSet(scheme.IsReadyForResultsSignOff))
-            {
-                toTestConsultant = ViewComments(
-                    toTestConsultant,
-                    "Comments not submitted",
-                    "The Comments Provided by the Test Consultant for this Distribution were not Submitted or no Comments were provided");
-                forAssessment = ViewComments(forAssessment, "View/Enter Comments", ViewTabulationComments);
-            }
-            else if (IsSet(scheme.IsReadyForTestConsultant))
-            {
-                toTestConsultant = ApplyEmailState(toTestConsultant, scheme, today);
-            }
-            else if (IsSet(scheme.IsReadyForAssessor))
-            {
-                forAssessment = isAssessmentComplete
-                    ? ViewComments(forAssessment, "View/Enter Comments", ViewTabulationComments)
-                    : forAssessment.Disabled(AssessmentNotSubmitted) with { Text = "Awaiting Assessment" };
-            }
-
-            toSignOff = ApplySignOffState(toSignOff, scheme, today, hasBeenPublishedBefore, hasDecisionMadeBefore);
+            (toTestConsultant, forAssessment, toSignOff) = ApplyDeadlinePassed(scheme, today, toTestConsultant, forAssessment, toSignOff);
         }
 
         return new TabulationSchemeActions(amend, toTestConsultant, forAssessment, toSignOff);
+    }
+
+    // The deadline has passed: the Test Consultant and assessment links follow the comments/email progress.
+    private static (TabulationAction ToTestConsultant, TabulationAction ForAssessment, TabulationAction ToSignOff) ApplyDeadlinePassed(
+        TabulationsSchemeEntity scheme, DateTime today, TabulationAction toTestConsultant, TabulationAction forAssessment, TabulationAction toSignOff)
+    {
+        var requiresAssessment = scheme.RequiresAssessment;
+        var isAssessmentComplete = scheme.IsAssessmentComplete;
+        var hasBeenPublishedBefore = scheme.Tabulations.Any(t => t.PublishCount > 0);
+        var hasDecisionMadeBefore = scheme.Tabulations.Any(t => t.PublishState > 0);
+
+        toTestConsultant = toTestConsultant with { Hint = "Send these results to the Test Consultant for comments" };
+        forAssessment = forAssessment with { Hint = "Send this distribution for assessment" };
+
+        toSignOff = requiresAssessment && !isAssessmentComplete
+            ? toSignOff.Disabled(AssessmentNotSubmitted)
+            : toSignOff with { Hint = "Send this Distribution's Tabulation(s) for Results Sign-Off" };
+
+        if (scheme.IsCommentSubmitted || hasBeenPublishedBefore)
+        {
+            toTestConsultant = ViewComments(toTestConsultant, "View Comments", "Click to view the Test Consultant's Comments");
+            forAssessment = ViewComments(forAssessment, ViewEnterComments, ViewTabulationComments);
+        }
+        else if (IsSet(scheme.IsReadyForResultsSignOff))
+        {
+            toTestConsultant = ViewComments(
+                toTestConsultant,
+                "Comments not submitted",
+                "The Comments Provided by the Test Consultant for this Distribution were not Submitted or no Comments were provided");
+            forAssessment = ViewComments(forAssessment, ViewEnterComments, ViewTabulationComments);
+        }
+        else if (IsSet(scheme.IsReadyForTestConsultant))
+        {
+            toTestConsultant = ApplyEmailState(toTestConsultant, scheme, today);
+        }
+        else if (IsSet(scheme.IsReadyForAssessor))
+        {
+            forAssessment = isAssessmentComplete
+                ? ViewComments(forAssessment, ViewEnterComments, ViewTabulationComments)
+                : forAssessment.Disabled(AssessmentNotSubmitted) with { Text = "Awaiting Assessment" };
+        }
+
+        toSignOff = ApplySignOffState(toSignOff, scheme, today, hasBeenPublishedBefore, hasDecisionMadeBefore);
+        return (toTestConsultant, forAssessment, toSignOff);
     }
 
     // The Test Consultant's comments are outstanding: the Email Service's progress is the state, except that

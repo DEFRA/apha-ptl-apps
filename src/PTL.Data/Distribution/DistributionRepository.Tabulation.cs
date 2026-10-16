@@ -44,74 +44,8 @@ public sealed partial class DistributionRepository
             StandardTabulationText = header.StandardTabulationText ?? string.Empty,
         };
 
-        var tests = new Dictionary<Guid, TabulationSourceTest>();
-        foreach (var row in await results.ReadAsync<Rows.DraftTest>())
-        {
-            var test = new TabulationSourceTest { TestId = row.TestId, Name = row.TestType ?? string.Empty, IsAssessmentSubmitted = row.AssessmentSubmitted is not null };
-            tests[row.TestId] = test;
-            source.Tests.Add(test);
-        }
-
-        foreach (var row in await results.ReadAsync<Rows.DraftMethodItem>())
-        {
-            tests.GetValueOrDefault(row.TestId)?.MethodItems.Add(new(row.TestMethodItemId, row.TestMethodItemType ?? string.Empty));
-        }
-
-        foreach (var row in await results.ReadAsync<Rows.DraftResultItem>())
-        {
-            tests.GetValueOrDefault(row.TestId)?.ResultItems.Add(new(row.TestResultItemId, row.TestResultItemType ?? string.Empty));
-        }
-
-        foreach (var row in await results.ReadAsync<Rows.DraftCategoryItem>())
-        {
-            tests.GetValueOrDefault(row.TestId)?.CategoryItems.Add(new(row.CategoryItemId, row.Name ?? string.Empty));
-        }
-
-        // The scheme's criterion items are not shown on the page.
-        _ = await results.ReadAsync();
-
-        foreach (var row in await results.ReadAsync<Rows.DraftSample>())
-        {
-            tests.GetValueOrDefault(row.TestId)?.Samples.Add(new(row.SampleId, row.SampleTestId, row.SampleNumber ?? string.Empty, row.TabulationDescription ?? string.Empty));
-        }
-
-        var participants = new Dictionary<Guid, TabulationSourceParticipant>();
-        foreach (var row in await results.ReadAsync<Rows.DraftParticipant>())
-        {
-            var participant = new TabulationSourceParticipant { ParticipantId = row.ParticipantId, LabCode = row.LabCode ?? string.Empty, NilReturnReason = row.NilReturnReason ?? string.Empty };
-            participants[row.ParticipantId] = participant;
-            source.Participants.Add(participant);
-        }
-
-        foreach (var row in await results.ReadAsync<Rows.DraftRating>())
-        {
-            participants.GetValueOrDefault(row.ParticipantId)?.SampleRatings.TryAdd(row.SampleId, row.Rating ?? string.Empty);
-        }
-
-        foreach (var row in await results.ReadAsync<Rows.DraftParticipantMethod>())
-        {
-            participants.GetValueOrDefault(row.ParticipantId)?.MethodResults.TryAdd(row.TestMethodItemId, row.AmendedResult ?? string.Empty);
-        }
-
-        foreach (var row in await results.ReadAsync<Rows.DraftParticipantResult>())
-        {
-            participants.GetValueOrDefault(row.ParticipantId)?.ResultItemResults.TryAdd((row.SampleId, row.TestResultItemId), row.AmendedResult ?? string.Empty);
-        }
-
-        foreach (var row in await results.ReadAsync<Rows.DraftParticipantCategory>())
-        {
-            participants.GetValueOrDefault(row.ParticipantId)?.CategoryResults.TryAdd(
-                (row.SampleId, row.CategoryItemId),
-                new TabulationSourceCategoryResult { SampleTestId = row.SampleTestId, Score = row.CategoryScore ?? 0, IsAssessmentSubmitted = row.AssessmentSubmitted is not null });
-        }
-
-        foreach (var row in await results.ReadAsync<Rows.DraftParticipantCriterion>())
-        {
-            if (participants.GetValueOrDefault(row.ParticipantId)?.CategoryResults.GetValueOrDefault((row.SampleId, row.CategoryItemId)) is { } category)
-            {
-                category.Criteria.Add(row.Name ?? string.Empty);
-            }
-        }
+        await ReadDraftTestsAsync(results, source);
+        var participants = await ReadDraftParticipantsAsync(results, source);
 
         foreach (var row in await results.ReadAsync<Rows.DraftIntendedMethod>())
         {
@@ -178,75 +112,8 @@ public sealed partial class DistributionRepository
             CreationDate = header.CreationDate,
         };
 
-        var tests = new Dictionary<Guid, TabulationSourceTest>();
-        foreach (var row in await results.ReadAsync<Rows.PublishedTest>())
-        {
-            // Legacy PublishedTabulation.aspx.vb links every test of an assessment scheme to its results.
-            var test = new TabulationSourceTest { TestId = row.PublishedTestId, Name = row.Name ?? string.Empty, IsAssessmentSubmitted = true };
-            tests[row.PublishedTestId] = test;
-            source.Tests.Add(test);
-        }
-
-        foreach (var row in await results.ReadAsync<Rows.PublishedSample>())
-        {
-            tests.GetValueOrDefault(row.PublishedTestId)?.Samples.Add(new(row.PublishedSampleId, null, row.SampleNumber ?? string.Empty, row.TabulationDescription ?? string.Empty));
-        }
-
-        foreach (var row in await results.ReadAsync<Rows.PublishedMethodItem>())
-        {
-            tests.GetValueOrDefault(row.PublishedTestId)?.MethodItems.Add(new(row.PublishedTestMethodItemId, row.Name ?? string.Empty));
-        }
-
-        foreach (var row in await results.ReadAsync<Rows.PublishedResultItem>())
-        {
-            tests.GetValueOrDefault(row.PublishedTestId)?.ResultItems.Add(new(row.PublishedTestResultItemId, row.Name ?? string.Empty));
-        }
-
-        foreach (var row in await results.ReadAsync<Rows.PublishedCategoryItem>())
-        {
-            tests.GetValueOrDefault(row.PublishedTestId)?.CategoryItems.Add(new(row.PublishedCategoryItemId, row.Name ?? string.Empty));
-        }
-
-        // The tabulation's criterion items are not shown on the page.
-        _ = await results.ReadAsync();
-
-        var participants = new Dictionary<Guid, TabulationSourceParticipant>();
-        foreach (var row in await results.ReadAsync<Rows.PublishedParticipant>())
-        {
-            var participant = new TabulationSourceParticipant { ParticipantId = row.PublishedParticipantId, LabCode = row.LabCode ?? string.Empty, NilReturnReason = row.NilReturnReason ?? string.Empty };
-            participants[row.PublishedParticipantId] = participant;
-            source.Participants.Add(participant);
-        }
-
-        foreach (var row in await results.ReadAsync<Rows.PublishedRating>())
-        {
-            participants.GetValueOrDefault(row.PublishedParticipantId)?.SampleRatings.TryAdd(row.PublishedSampleId, row.Rating ?? string.Empty);
-        }
-
-        foreach (var row in await results.ReadAsync<Rows.PublishedParticipantMethod>())
-        {
-            participants.GetValueOrDefault(row.PublishedParticipantId)?.MethodResults.TryAdd(row.PublishedTestMethodItemId, row.Result ?? string.Empty);
-        }
-
-        foreach (var row in await results.ReadAsync<Rows.PublishedParticipantResult>())
-        {
-            participants.GetValueOrDefault(row.PublishedParticipantId)?.ResultItemResults.TryAdd((row.PublishedSampleId, row.PublishedTestResultItemId), row.Result ?? string.Empty);
-        }
-
-        foreach (var row in await results.ReadAsync<Rows.PublishedParticipantCategory>())
-        {
-            participants.GetValueOrDefault(row.PublishedParticipantId)?.CategoryResults.TryAdd(
-                (row.PublishedSampleId, row.PublishedCategoryItemId),
-                new TabulationSourceCategoryResult { Score = row.Score ?? 0, IsAssessmentSubmitted = true });
-        }
-
-        foreach (var row in await results.ReadAsync<Rows.PublishedParticipantCriterion>())
-        {
-            if (participants.GetValueOrDefault(row.PublishedParticipantId)?.CategoryResults.GetValueOrDefault((row.PublishedSampleId, row.PublishedCategoryItemId)) is { } category)
-            {
-                category.Criteria.Add(row.Name ?? string.Empty);
-            }
-        }
+        await ReadPublishedTestsAsync(results, source);
+        var participants = await ReadPublishedParticipantsAsync(results, source);
 
         foreach (var row in await results.ReadAsync<Rows.PublishedIntendedMethod>())
         {
@@ -297,11 +164,14 @@ public sealed partial class DistributionRepository
 
     public async Task<AssessmentScoreSource?> GetAssessmentScoresAsync(Guid testId, Guid tabulationId, bool isPublished, CancellationToken cancellationToken = default)
     {
-        var procedure = isPublished ? "dbo.spgPublishedAssessmentScoreByTestId" : "dbo.spgAssessmentScoreByTestId";
+        // Each branch is a complete, literal command text - nothing is built from a runtime value.
+        var sql = isPublished
+            ? "EXEC dbo.spgPublishedAssessmentScoreByTestId @TestId = @TestId, @TabulationId = @TabulationId"
+            : "EXEC dbo.spgAssessmentScoreByTestId @TestId = @TestId, @TabulationId = @TabulationId";
 
         using var connection = connectionFactory.CreateConnection();
         using var results = await connection.QueryMultipleAsync(
-            $"EXEC {procedure} @TestId = @TestId, @TabulationId = @TabulationId",
+            sql,
             new { TestId = testId, TabulationId = tabulationId });
 
         var header = await results.ReadFirstOrDefaultAsync<Rows.AssessmentScoreHeader>();
@@ -322,17 +192,169 @@ public sealed partial class DistributionRepository
             [.. receipts.Select(r => new AssessmentScoreReceipt(r.SubmissionDate, r.NonSubmissionDate, r.NonCapableDate, r.Score ?? 0, r.AssessmentDate))]);
     }
 
+    private static async Task ReadDraftTestsAsync(SqlMapper.GridReader results, TabulationSource source)
+    {
+        var tests = new Dictionary<Guid, TabulationSourceTest>();
+        foreach (var row in await results.ReadAsync<Rows.DraftTest>())
+        {
+            var test = new TabulationSourceTest { TestId = row.TestId, Name = row.TestType ?? string.Empty, IsAssessmentSubmitted = row.AssessmentSubmitted is not null };
+            tests[row.TestId] = test;
+            source.Tests.Add(test);
+        }
+
+        foreach (var row in await results.ReadAsync<Rows.DraftMethodItem>())
+        {
+            tests.GetValueOrDefault(row.TestId)?.MethodItems.Add(new(row.TestMethodItemId, row.TestMethodItemType ?? string.Empty));
+        }
+
+        foreach (var row in await results.ReadAsync<Rows.DraftResultItem>())
+        {
+            tests.GetValueOrDefault(row.TestId)?.ResultItems.Add(new(row.TestResultItemId, row.TestResultItemType ?? string.Empty));
+        }
+
+        foreach (var row in await results.ReadAsync<Rows.DraftCategoryItem>())
+        {
+            tests.GetValueOrDefault(row.TestId)?.CategoryItems.Add(new(row.CategoryItemId, row.Name ?? string.Empty));
+        }
+
+        // The scheme's criterion items are not shown on the page.
+        _ = await results.ReadAsync();
+
+        foreach (var row in await results.ReadAsync<Rows.DraftSample>())
+        {
+            tests.GetValueOrDefault(row.TestId)?.Samples.Add(new(row.SampleId, row.SampleTestId, row.SampleNumber ?? string.Empty, row.TabulationDescription ?? string.Empty));
+        }
+    }
+
+    private static async Task<Dictionary<Guid, TabulationSourceParticipant>> ReadDraftParticipantsAsync(SqlMapper.GridReader results, TabulationSource source)
+    {
+        var participants = new Dictionary<Guid, TabulationSourceParticipant>();
+        foreach (var row in await results.ReadAsync<Rows.DraftParticipant>())
+        {
+            var participant = new TabulationSourceParticipant { ParticipantId = row.ParticipantId, LabCode = row.LabCode ?? string.Empty, NilReturnReason = row.NilReturnReason ?? string.Empty };
+            participants[row.ParticipantId] = participant;
+            source.Participants.Add(participant);
+        }
+
+        foreach (var row in await results.ReadAsync<Rows.DraftRating>())
+        {
+            participants.GetValueOrDefault(row.ParticipantId)?.SampleRatings.TryAdd(row.SampleId, row.Rating ?? string.Empty);
+        }
+
+        foreach (var row in await results.ReadAsync<Rows.DraftParticipantMethod>())
+        {
+            participants.GetValueOrDefault(row.ParticipantId)?.MethodResults.TryAdd(row.TestMethodItemId, row.AmendedResult ?? string.Empty);
+        }
+
+        foreach (var row in await results.ReadAsync<Rows.DraftParticipantResult>())
+        {
+            participants.GetValueOrDefault(row.ParticipantId)?.ResultItemResults.TryAdd((row.SampleId, row.TestResultItemId), row.AmendedResult ?? string.Empty);
+        }
+
+        foreach (var row in await results.ReadAsync<Rows.DraftParticipantCategory>())
+        {
+            participants.GetValueOrDefault(row.ParticipantId)?.CategoryResults.TryAdd(
+                (row.SampleId, row.CategoryItemId),
+                new TabulationSourceCategoryResult { SampleTestId = row.SampleTestId, Score = row.CategoryScore ?? 0, IsAssessmentSubmitted = row.AssessmentSubmitted is not null });
+        }
+
+        foreach (var row in await results.ReadAsync<Rows.DraftParticipantCriterion>())
+        {
+            if (participants.GetValueOrDefault(row.ParticipantId)?.CategoryResults.GetValueOrDefault((row.SampleId, row.CategoryItemId)) is { } category)
+            {
+                category.Criteria.Add(row.Name ?? string.Empty);
+            }
+        }
+
+        return participants;
+    }
+
+    private static async Task ReadPublishedTestsAsync(SqlMapper.GridReader results, TabulationSource source)
+    {
+        var tests = new Dictionary<Guid, TabulationSourceTest>();
+        foreach (var row in await results.ReadAsync<Rows.PublishedTest>())
+        {
+            // Legacy PublishedTabulation.aspx.vb links every test of an assessment scheme to its results.
+            var test = new TabulationSourceTest { TestId = row.PublishedTestId, Name = row.Name ?? string.Empty, IsAssessmentSubmitted = true };
+            tests[row.PublishedTestId] = test;
+            source.Tests.Add(test);
+        }
+
+        foreach (var row in await results.ReadAsync<Rows.PublishedSample>())
+        {
+            tests.GetValueOrDefault(row.PublishedTestId)?.Samples.Add(new(row.PublishedSampleId, null, row.SampleNumber ?? string.Empty, row.TabulationDescription ?? string.Empty));
+        }
+
+        foreach (var row in await results.ReadAsync<Rows.PublishedMethodItem>())
+        {
+            tests.GetValueOrDefault(row.PublishedTestId)?.MethodItems.Add(new(row.PublishedTestMethodItemId, row.Name ?? string.Empty));
+        }
+
+        foreach (var row in await results.ReadAsync<Rows.PublishedResultItem>())
+        {
+            tests.GetValueOrDefault(row.PublishedTestId)?.ResultItems.Add(new(row.PublishedTestResultItemId, row.Name ?? string.Empty));
+        }
+
+        foreach (var row in await results.ReadAsync<Rows.PublishedCategoryItem>())
+        {
+            tests.GetValueOrDefault(row.PublishedTestId)?.CategoryItems.Add(new(row.PublishedCategoryItemId, row.Name ?? string.Empty));
+        }
+
+        // The tabulation's criterion items are not shown on the page.
+        _ = await results.ReadAsync();
+    }
+
+    private static async Task<Dictionary<Guid, TabulationSourceParticipant>> ReadPublishedParticipantsAsync(SqlMapper.GridReader results, TabulationSource source)
+    {
+        var participants = new Dictionary<Guid, TabulationSourceParticipant>();
+        foreach (var row in await results.ReadAsync<Rows.PublishedParticipant>())
+        {
+            var participant = new TabulationSourceParticipant { ParticipantId = row.PublishedParticipantId, LabCode = row.LabCode ?? string.Empty, NilReturnReason = row.NilReturnReason ?? string.Empty };
+            participants[row.PublishedParticipantId] = participant;
+            source.Participants.Add(participant);
+        }
+
+        foreach (var row in await results.ReadAsync<Rows.PublishedRating>())
+        {
+            participants.GetValueOrDefault(row.PublishedParticipantId)?.SampleRatings.TryAdd(row.PublishedSampleId, row.Rating ?? string.Empty);
+        }
+
+        foreach (var row in await results.ReadAsync<Rows.PublishedParticipantMethod>())
+        {
+            participants.GetValueOrDefault(row.PublishedParticipantId)?.MethodResults.TryAdd(row.PublishedTestMethodItemId, row.Result ?? string.Empty);
+        }
+
+        foreach (var row in await results.ReadAsync<Rows.PublishedParticipantResult>())
+        {
+            participants.GetValueOrDefault(row.PublishedParticipantId)?.ResultItemResults.TryAdd((row.PublishedSampleId, row.PublishedTestResultItemId), row.Result ?? string.Empty);
+        }
+
+        foreach (var row in await results.ReadAsync<Rows.PublishedParticipantCategory>())
+        {
+            participants.GetValueOrDefault(row.PublishedParticipantId)?.CategoryResults.TryAdd(
+                (row.PublishedSampleId, row.PublishedCategoryItemId),
+                new TabulationSourceCategoryResult { Score = row.Score ?? 0, IsAssessmentSubmitted = true });
+        }
+
+        foreach (var row in await results.ReadAsync<Rows.PublishedParticipantCriterion>())
+        {
+            if (participants.GetValueOrDefault(row.PublishedParticipantId)?.CategoryResults.GetValueOrDefault((row.PublishedSampleId, row.PublishedCategoryItemId)) is { } category)
+            {
+                category.Criteria.Add(row.Name ?? string.Empty);
+            }
+        }
+
+        return participants;
+    }
+
     private static async Task ReadViewersAsync(SqlMapper.GridReader results, TabulationSource source)
     {
         var viewers = new Dictionary<Guid, TabulationSourceViewer>();
-        foreach (var row in await results.ReadAsync<Rows.Viewer>())
+        foreach (var row in (await results.ReadAsync<Rows.Viewer>()).DistinctBy(r => r.ViewerId))
         {
-            if (!viewers.ContainsKey(row.ViewerId))
-            {
-                var viewer = new TabulationSourceViewer { ViewerId = row.ViewerId, Name = row.Name ?? string.Empty };
-                viewers[row.ViewerId] = viewer;
-                source.Viewers.Add(viewer);
-            }
+            var viewer = new TabulationSourceViewer { ViewerId = row.ViewerId, Name = row.Name ?? string.Empty };
+            viewers[row.ViewerId] = viewer;
+            source.Viewers.Add(viewer);
         }
 
         foreach (var row in await results.ReadAsync<Rows.ViewerParticipant>())

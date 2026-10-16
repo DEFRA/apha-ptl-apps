@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 using PTL.Contracts.Distribution;
 
 namespace PTL.InternalWeb.Features.Distribution;
@@ -8,12 +9,17 @@ namespace PTL.InternalWeb.Features.Distribution;
 // RemovedAttachmentIds) until Save, as legacy kept them in Session.
 public sealed class ViewCommentsViewModel
 {
+    // Display-only: set from the route and the API, never from the posted form.
+    [BindNever]
     public int YearId { get; set; }
+    [BindNever]
     public int MonthId { get; set; }
+    [BindNever]
     public Guid MonthlyDistributionSchemeId { get; set; }
 
     public string DistributionTitle { get; set; } = string.Empty;
     public string AuthorText { get; set; } = string.Empty;
+    [BindNever]
     public bool CanSubmit { get; set; }
     public IReadOnlyList<CommentsAttachmentResponse> SavedAttachments { get; set; } = [];
     public IReadOnlyList<string> AllowedFileTypes { get; set; } = [];

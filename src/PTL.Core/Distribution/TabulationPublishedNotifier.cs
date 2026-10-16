@@ -1,6 +1,5 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using PTL.Core.Configuration;
 using PTL.Core.Notifications;
 
 namespace PTL.Core.Distribution;
@@ -18,9 +17,7 @@ public sealed partial class TabulationPublishedNotifier(
     INotifyClient notifyClient,
     TabulationEmailGuard guard,
     IOptions<PublicationNotificationOptions> options,
-    IOptions<TabulationEmailOptions> emailOptions,
-    IOptions<ExternalOptions> externalOptions,
-    TimeProvider timeProvider,
+    TabulationEmailContext context,
     ILogger<TabulationPublishedNotifier> logger) : ITabulationPublishedNotifier
 {
     public async Task<PublicationNotificationRunSummary> SendUnsentAsync(CancellationToken cancellationToken = default)
@@ -33,9 +30,9 @@ public sealed partial class TabulationPublishedNotifier(
         await guard.Lock.WaitAsync(cancellationToken);
         try
         {
-            var today = TabulationEmailClock.Today(timeProvider, emailOptions.Value.TimeZone);
+            var today = context.Today();
             var unsent = await repository.GetUnsentNotificationEmailsAsync(cancellationToken);
-            var (server, address) = ExternalLocation();
+            var (server, address) = context.ExternalLocation();
             int sent = 0, skipped = 0, failed = 0;
 
             foreach (var email in unsent)
@@ -59,7 +56,7 @@ public sealed partial class TabulationPublishedNotifier(
                         Personalise(email, server, address, today),
                         email.NotificationEmailId.ToString(),
                         cancellationToken);
-                    await repository.MarkNotificationEmailSentAsync(email.NotificationEmailId, timeProvider.GetUtcNow().UtcDateTime, CancellationToken.None);
+                    await repository.MarkNotificationEmailSentAsync(email.NotificationEmailId, context.UtcNow.UtcDateTime, CancellationToken.None);
                     sent++;
                     LogSent(logger, nameof(TabulationEmailType.PublishedNotification), email.NotificationEmailId, email.PublishedTabulationId, TabulationEmailTemplates.PublishedName, TabulationEmailTemplates.PublishedId);
                 }
@@ -90,17 +87,8 @@ public sealed partial class TabulationPublishedNotifier(
             ["ExternalServer"] = externalServer,
             ["ExternalAddress"] = externalAddress,
             ["PublishedTabulationId"] = email.PublishedTabulationId.ToString(),
-            ["DateTimeNow"] = TabulationEmailClock.Format(today),
+            ["DateTimeNow"] = TabulationEmailContext.Format(today),
         };
-
-    // Legacy <<ExternalServer>>/<<ExternalAddress>> were two settings; here both come from External:AppUrl.
-    private (string Server, string Address) ExternalLocation()
-    {
-        var appUrl = externalOptions.Value.AppUrl;
-        return Uri.TryCreate(appUrl, UriKind.Absolute, out var uri)
-            ? (uri.GetLeftPart(UriPartial.Authority), uri.AbsolutePath.Trim('/'))
-            : (appUrl.TrimEnd('/'), string.Empty);
-    }
 
     [LoggerMessage(EventId = 21, Level = LogLevel.Information,
         Message = "Publication notification sent. EmailType={EmailType} NotificationEmailId={NotificationEmailId} PublishedTabulationId={PublishedTabulationId} TemplateName={TemplateName} TemplateId={TemplateId}")]

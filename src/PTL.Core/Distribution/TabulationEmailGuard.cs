@@ -37,11 +37,3 @@ public sealed class TabulationEmailGuard
         return true;
     }
 }
-
-internal static class TabulationEmailClock
-{
-    public static DateTime Today(TimeProvider timeProvider, string timeZoneId) =>
-        TimeZoneInfo.ConvertTime(timeProvider.GetUtcNow(), TimeZoneInfo.FindSystemTimeZoneById(timeZoneId)).Date;
-
-    public static string Format(DateTime day) => day.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture);
-}

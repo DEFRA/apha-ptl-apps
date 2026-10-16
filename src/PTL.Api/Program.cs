@@ -201,6 +201,7 @@ builder.Services.AddScoped<IDistributionPostedNotifier, DistributionPostedNotifi
 builder.Services.Configure<TabulationEmailOptions>(builder.Configuration.GetSection(TabulationEmailOptions.SectionName));
 builder.Services.Configure<PublicationNotificationOptions>(builder.Configuration.GetSection(PublicationNotificationOptions.SectionName));
 builder.Services.AddSingleton<TabulationEmailGuard>();
+builder.Services.AddSingleton<TabulationEmailContext>();
 builder.Services.AddScoped<ITabulationEmailService, TabulationEmailService>();
 builder.Services.AddScoped<ITabulationPublishedNotifier, TabulationPublishedNotifier>();
 builder.Services.AddHostedService<PTL.Api.BackgroundServices.TabulationEmailBackgroundService>();

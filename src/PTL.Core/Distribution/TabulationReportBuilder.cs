@@ -340,14 +340,7 @@ public static class TabulationReportBuilder
 
     private static List<TabulationSourceSample> UsedSamples(TabulationSource source)
     {
-        var used = new List<TabulationSourceSample>();
-        foreach (var sample in source.Tests.SelectMany(t => t.Samples))
-        {
-            if (!used.Exists(s => s.SampleId == sample.SampleId))
-            {
-                used.Add(sample);
-            }
-        }
+        var used = source.Tests.SelectMany(t => t.Samples).DistinctBy(s => s.SampleId).ToList();
 
         // Legacy SampleInfo.CompareTo is a binary comparison of the sample numbers.
         used.Sort((a, b) => string.CompareOrdinal(a.SampleNumber, b.SampleNumber));
@@ -460,7 +453,7 @@ public static class TabulationReportBuilder
     private static string SampleMeanText(TabulationSource source, Guid sampleId)
     {
         var mean = CalculateSampleMean(source, sampleId);
-        return mean == NotScored ? NotScoredText : mean.ToString("N1", UkCulture);
+        return IsNotScored(mean) ? NotScoredText : mean.ToString("N1", UkCulture);
     }
 
     private static string NumberReportingText(TabulationSource source, Guid sampleId)
@@ -472,8 +465,11 @@ public static class TabulationReportBuilder
     private static string PassRateText(TabulationSource source, Guid sampleId)
     {
         var rate = CalculateSamplePassRate(source, sampleId);
-        return rate == NotScored ? NotScoredText : (rate * 100).ToString("N1", UkCulture) + "%";
+        return IsNotScored(rate) ? NotScoredText : (rate * 100).ToString("N1", UkCulture) + "%";
     }
+
+    // NotScored is a sentinel stored in a double; the ratings are whole numbers, so a range compare is exact in practice.
+    private static bool IsNotScored(double value) => Math.Abs(value - NotScored) < 0.0001;
 
     private static TabulationPrintResponse BuildPrint(
         TabulationSource source,
@@ -527,19 +523,24 @@ public static class TabulationReportBuilder
 
         // An unscored participant's text spans the category and assessment columns: the first
         // category column carries the span and the rest are covered (span 0).
-        columns.AddRange(test.CategoryItems.Select((c, index) => new TabulationPrintResultColumnResponse(
-            c.Name,
-            string.Empty,
-            [.. assessments.Select(a => IsScored(source, a.Assessment)
-                ? new TabulationPrintResultResponse(PrintCategoryText(source, a.Participant, sample.SampleId, c.ItemId), 1)
-                : new TabulationPrintResultResponse(ScoreText(source, a.Assessment), index > 0 ? 0 : categories + 2))])));
+        columns.AddRange(test.CategoryItems.Select((c, index) =>
+        {
+            var unscoredSpan = index > 0 ? 0 : categories + 2;
+            return new TabulationPrintResultColumnResponse(
+                c.Name,
+                string.Empty,
+                [.. assessments.Select(a => IsScored(source, a.Assessment)
+                    ? new TabulationPrintResultResponse(PrintCategoryText(source, a.Participant, sample.SampleId, c.ItemId), 1)
+                    : new TabulationPrintResultResponse(ScoreText(source, a.Assessment), unscoredSpan))]);
+        }));
 
+        var unscoredCommentSpan = categories > 0 ? 0 : 2;
         columns.Add(new TabulationPrintResultColumnResponse(
             "Assessment Comment",
             string.Empty,
             [.. assessments.Select(a => IsScored(source, a.Assessment)
                 ? new TabulationPrintResultResponse(AssessmentComment(source, a.Assessment), 1)
-                : new TabulationPrintResultResponse(ScoreText(source, a.Assessment), categories > 0 ? 0 : 2))]));
+                : new TabulationPrintResultResponse(ScoreText(source, a.Assessment), unscoredCommentSpan))]));
 
         columns.Add(new TabulationPrintResultColumnResponse(
             "Overall score",
