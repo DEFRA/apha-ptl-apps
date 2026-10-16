@@ -64,16 +64,26 @@ public sealed partial class DistributionController(IDistributionApiClient distri
         return View("FeatureNotAvailable", title);
     }
 
-    // Placeholder for "Initialise this Month" - the confirmation text is preserved and the button
-    // is shown exactly where legacy shows it, but the write path (sppSetupMonthlyDistribution's
-    // full persisted-save chain) is unconfirmed - see docs/migration/distribution-migration.md's
-    // "Initialise Month" NEEDS INVESTIGATION items. Do not wire this to a real write until that is
-    // resolved.
+    // Legacy GridView1_RowCommand "Initialise": MonthlyDistribution.CreateMonthlyDistribution(yearID,
+    // monthID) then the dashboard redraws. year is the calendar year of the month's row; a month that
+    // already exists is left exactly as it is, as in legacy, so no message is shown for it.
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public IActionResult InitialiseMonth(int year, int monthId)
+    public async Task<IActionResult> InitialiseMonth(int year, int monthId, CancellationToken cancellationToken)
     {
-        return View("FeatureNotAvailable", "Initialise This Month");
+        if (monthId is < 1 or > 12 || year < 1)
+        {
+            return BadRequest();
+        }
+
+        var result = await distributionApiClient.InitialiseMonthAsync(year, monthId, cancellationToken);
+        if (result is { Initialised: true })
+        {
+            TempData.SetNotification(NotificationType.Success, "Month initialised successfully.");
+        }
+
+        // The dashboard is keyed by financial year (April to March); January to March belong to the year before.
+        return RedirectToAction(nameof(Index), new { year = monthId < 4 ? year - 1 : year });
     }
 
     // Monthly Distributions (Scheduling) - legacy Scheduling/monthlys.aspx. Reached from the

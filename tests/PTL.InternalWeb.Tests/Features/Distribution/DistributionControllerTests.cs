@@ -66,16 +66,52 @@ public class DistributionControllerTests
         Assert.Equal("Scheduling", view.Model);
     }
 
-    [Fact]
-    public void InitialiseMonth_ReturnsFeatureNotAvailable()
+    [Theory]
+    [InlineData(2026, 4, 2026)]
+    [InlineData(2026, 12, 2026)]
+    [InlineData(2027, 1, 2026)]
+    [InlineData(2027, 3, 2026)]
+    public async Task InitialiseMonth_Initialised_ShowsTheBannerAndReturnsToTheFinancialYear(int year, int monthId, int financialYear)
     {
-        var controller = CreateController(new FakeDistributionApiClient());
+        var apiClient = new FakeDistributionApiClient { InitialiseMonthResult = new InitialiseMonthResult(true) };
+        var controller = CreateController(apiClient);
 
-        var result = controller.InitialiseMonth(2026, 4);
+        var result = await controller.InitialiseMonth(year, monthId, CancellationToken.None);
 
-        var view = Assert.IsType<ViewResult>(result);
-        Assert.Equal("FeatureNotAvailable", view.ViewName);
-        Assert.Equal("Initialise This Month", view.Model);
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal("Index", redirect.ActionName);
+        Assert.Equal(financialYear, redirect.RouteValues!["year"]);
+        Assert.Equal([(year, monthId)], apiClient.InitialisedMonths);
+        var notification = controller.TempData.GetNotification();
+        Assert.Equal(NotificationType.Success, notification!.Type);
+        Assert.Equal("Month initialised successfully.", notification.Message);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task InitialiseMonth_AlreadyInitialisedOrNoResult_ShowsNoBannerAndRedisplaysTheDashboard(bool hasResult)
+    {
+        var apiClient = new FakeDistributionApiClient { InitialiseMonthResult = hasResult ? new InitialiseMonthResult(false) : null };
+        var controller = CreateController(apiClient);
+
+        var result = await controller.InitialiseMonth(2026, 5, CancellationToken.None);
+
+        Assert.Equal("Index", Assert.IsType<RedirectToActionResult>(result).ActionName);
+        Assert.Null(controller.TempData.GetNotification());
+    }
+
+    [Theory]
+    [InlineData(2026, 0)]
+    [InlineData(2026, 13)]
+    [InlineData(0, 5)]
+    public async Task InitialiseMonth_InvalidMonth_ReturnsBadRequestWithoutCallingTheApi(int year, int monthId)
+    {
+        var apiClient = new FakeDistributionApiClient();
+        var controller = CreateController(apiClient);
+
+        Assert.IsType<BadRequestResult>(await controller.InitialiseMonth(year, monthId, CancellationToken.None));
+        Assert.Empty(apiClient.InitialisedMonths);
     }
 
     [Fact]
