@@ -1,4 +1,4 @@
-﻿using System.Globalization;
+using System.Globalization;
 using PTL.Contracts.Distribution;
 using PTL.Core.Scheme;
 

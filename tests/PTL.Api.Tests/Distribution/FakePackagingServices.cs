@@ -1,9 +1,9 @@
 using Microsoft.Extensions.Logging;
+using PTL.Contracts.Contract;
 using PTL.Core.Contract.Document;
 using PTL.Core.Distribution;
 using PTL.Core.Notifications;
 using PTL.Core.Participant;
-using PTL.Contracts.Contract;
 using ParticipantEntity = PTL.Core.Participant.Participant;
 
 namespace PTL.Api.Tests.Distribution;

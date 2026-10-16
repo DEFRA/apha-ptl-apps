@@ -64,7 +64,11 @@ public sealed partial class DistributionController
 
         return View("AssessmentResults", new AssessmentResultsViewModel
         {
-            YearId = year, MonthId = monthId, TabulationId = tabulationId, TestId = testId, Results = results,
+            YearId = year,
+            MonthId = monthId,
+            TabulationId = tabulationId,
+            TestId = testId,
+            Results = results,
         });
     }
 

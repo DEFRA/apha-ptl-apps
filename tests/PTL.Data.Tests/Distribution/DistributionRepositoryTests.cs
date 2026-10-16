@@ -1433,7 +1433,9 @@ public class DistributionRepositoryTests
         connection.RespondToNonQuery(UpdateResultsReceiptSql, 1);
         var one = new PTL.Core.Distribution.ResultsReceiptParticipantEntity
         {
-            DistributionParticipantId = Guid.NewGuid(), ExtraDocumentsReturned = true, ReturnedDate = new DateTime(2026, 5, 12),
+            DistributionParticipantId = Guid.NewGuid(),
+            ExtraDocumentsReturned = true,
+            ReturnedDate = new DateTime(2026, 5, 12),
         };
         var two = new PTL.Core.Distribution.ResultsReceiptParticipantEntity { DistributionParticipantId = Guid.NewGuid() };
 

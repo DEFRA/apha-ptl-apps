@@ -2,8 +2,8 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using PTL.Core.Configuration;
 using PTL.Core.Distribution;
-using ParticipantEntity = PTL.Core.Participant.Participant;
 using static PTL.Api.Tests.Distribution.PackagingTestData;
+using ParticipantEntity = PTL.Core.Participant.Participant;
 
 namespace PTL.Api.Tests.Distribution;
 

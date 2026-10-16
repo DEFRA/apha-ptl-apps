@@ -1,7 +1,7 @@
+using Microsoft.AspNetCore.Mvc;
 using PTL.Contracts.Distribution;
 using PTL.InternalWeb.Features.Distribution;
 using PTL.InternalWeb.Tests.TestSupport;
-using Microsoft.AspNetCore.Mvc;
 
 namespace PTL.InternalWeb.Tests.Features.Distribution;
 

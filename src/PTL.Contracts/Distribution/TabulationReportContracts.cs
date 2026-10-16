@@ -1,4 +1,4 @@
-﻿namespace PTL.Contracts.Distribution;
+namespace PTL.Contracts.Distribution;
 
 // Tabulation (legacy Scheduling/Tabulation.aspx) and Issued Tabulation (Scheduling/PublishedTabulation.aspx).
 // Both pages build the same tables from different stored procedures, so they share this model.

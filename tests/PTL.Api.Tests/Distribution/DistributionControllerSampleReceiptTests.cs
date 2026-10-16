@@ -32,7 +32,11 @@ public class DistributionControllerSampleReceiptTests
         repository.SampleReceipts[(ParticipantId, SchemeId)] = new SampleReceiptData(
             new SampleReceiptSchemeEntity
             {
-                DistributionReference = "D1", ScheduleCode = "S1", SchemeIdentifier = "BT", SchemeName = "Brucella", IsReadyForAssessor = readyForAssessor,
+                DistributionReference = "D1",
+                ScheduleCode = "S1",
+                SchemeIdentifier = "BT",
+                SchemeName = "Brucella",
+                IsReadyForAssessor = readyForAssessor,
             },
             new SampleReceiptLabEntity { LabCode = "L001", LabName = "Lab One" },
             [new SampleReceiptTestEntity { TestId = TestId, TestType = "Culture" }],

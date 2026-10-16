@@ -132,7 +132,8 @@ public static class TabulationActionRules
         {
             case TabulationEmailState.None:
                 return action.Disabled("Waiting for Email Service to send 1st email to Test Consultant")
-                    with { Text = $"Waiting to send Email {readyDate.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture)}" };
+                    with
+                { Text = $"Waiting to send Email {readyDate.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture)}" };
 
             case TabulationEmailState.FirstEmailSent:
                 return action.Disabled("1st Email has been sent to Test Consultant") with { Text = "First Email Sent" };

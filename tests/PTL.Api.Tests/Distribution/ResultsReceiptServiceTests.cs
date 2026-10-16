@@ -285,7 +285,11 @@ public class ResultsReceiptDataTests
     {
         var scheme = new ResultsReceiptSchemeEntity
         {
-            DistributionReference = "D1", DistributionReferenceSuffix = "a", ScheduleCode = "S1", SchemeIdentifier = "BT", SchemeName = "Brucella",
+            DistributionReference = "D1",
+            DistributionReferenceSuffix = "a",
+            ScheduleCode = "S1",
+            SchemeIdentifier = "BT",
+            SchemeName = "Brucella",
         };
 
         Assert.Equal("D1a/S1", scheme.DistributionReferenceFull);
