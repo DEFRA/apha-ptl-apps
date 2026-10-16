@@ -128,8 +128,6 @@
 
 @if (audit)
 {
-    <a class="govuk-back-link" asp-action="AmendResults" asp-route-year="@Model.YearId" asp-route-monthId="@Model.MonthId" asp-route-schemeId="@Model.MonthlyDistributionSchemeId">Back</a>
-
     <govuk-error-summary errors="@errors" />
 
     <h1 class="govuk-heading-l">Audit Trail</h1>
@@ -142,8 +140,6 @@
 }
 else
 {
-    <a class="govuk-back-link" asp-action="Tabulations" asp-route-year="@Model.YearId" asp-route-monthId="@Model.MonthId">Back</a>
-
     <govuk-error-summary errors="@errors" />
 
     <h1 class="govuk-heading-l">Amend Results</h1>

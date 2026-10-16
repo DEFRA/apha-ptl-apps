@@ -16,8 +16,6 @@
 
 @if (Model.IsAuditStep is true)
 {
-    <a class="govuk-back-link" asp-action="ViewComments" asp-route-year="@Model.YearId" asp-route-monthId="@Model.MonthId" asp-route-schemeId="@Model.MonthlyDistributionSchemeId">Back</a>
-
     <h1 class="govuk-heading-l">Audit Trail</h1>
 
     <govuk-error-summary errors="@errors" />
@@ -75,8 +73,6 @@
         : null;
     var fileDescribedBy = fileError is null ? "attachments-hint" : "attachments-hint File-error";
 }
-
-<a class="govuk-back-link" asp-action="Tabulations" asp-route-year="@Model.YearId" asp-route-monthId="@Model.MonthId">Back</a>
 
 <govuk-error-summary errors="@errors" />
 
