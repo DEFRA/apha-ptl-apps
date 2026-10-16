@@ -200,7 +200,7 @@ else
             + (assess ? samples.Count * categorySpan + samples.Count * 2 : 0);
         var nilSpan = Math.Clamp(test.MethodItems.Count + test.ResultItems.Count * samples.Count + categoryCount * samples.Count, 1, Math.Max(totalColumns - 1, 1));
 
-        <section class="ptl-table-scroll ptl-tabulation-scroll" tabindex="0" aria-label="@test.Name">
+        <section class="ptl-table-scroll ptl-tabulation-scroll" aria-label="@test.Name">
             <table class="TabulationTable">
                 <caption class="govuk-visually-hidden">@test.Name</caption>
                 <thead>
@@ -437,7 +437,7 @@ else
 
     @if (amend.StoreRatings)
     {
-        <section class="ptl-table-scroll ptl-tabulation-scroll" tabindex="0" aria-label="QAU Ratings">
+        <section class="ptl-table-scroll ptl-tabulation-scroll" aria-label="QAU Ratings">
             <table class="TabulationTable">
                 <caption class="govuk-visually-hidden">QAU Ratings</caption>
                 <thead>

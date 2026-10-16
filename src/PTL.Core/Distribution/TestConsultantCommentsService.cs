@@ -128,8 +128,9 @@ public sealed class TestConsultantCommentsService(
             current.TestConsultantCommentsAuthorId,
             isSubmitted,
             new CommentsAudit(auditWho, request.AuditWhy, comments, commentsChanged, string.Join(", ", remainingNames.Concat(staged.Select(s => s.File.FileName))), filesChanged),
-            removed,
-            [.. staged.Select(s => new NewCommentsAttachment(s.File.FileName, s.File.ContentType, s.File.FileData, uploadDate))],
+            new CommentsAttachmentChanges(
+                removed,
+                [.. staged.Select(s => new NewCommentsAttachment(s.File.FileName, s.File.ContentType, s.File.FileData, uploadDate))]),
             cancellationToken);
 
         foreach (var (token, _) in staged)

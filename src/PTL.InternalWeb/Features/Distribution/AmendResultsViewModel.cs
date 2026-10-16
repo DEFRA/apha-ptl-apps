@@ -27,3 +27,12 @@ public sealed class AmendResultsViewModel
         return Values.ContainsKey(name + "_shown") ? Values.ContainsKey(name) : resultItem.IsRange;
     }
 }
+
+// The audit-step fields the Amend Results form posts back (names bind without a prefix).
+public sealed class AmendResultsAuditForm
+{
+    public bool? IsAuditStep { get; set; }
+    public string? PendingCommand { get; set; }
+    public string? AuditObjectName { get; set; }
+    public string? AuditWhy { get; set; }
+}

@@ -232,7 +232,7 @@ public class TabulationReportRenderTests : IClassFixture<WebApplicationFactory<P
 
         var html = await GetHtmlAsync(TabulationUrl);
 
-        Assert.Contains("<section class=\"ptl-table-scroll ptl-tabulation-scroll\" tabindex=\"0\" aria-label=\"Clinical\"", html, StringComparison.Ordinal);
+        Assert.Contains("<section class=\"ptl-table-scroll ptl-tabulation-scroll\" aria-label=\"Clinical\"", html, StringComparison.Ordinal);
         var table = TableHtml(html, "Clinical");
         var head = Regex.Match(table, "<thead>(.*?)</thead>", RegexOptions.Singleline).Groups[1].Value;
         Assert.Equal(2, Regex.Matches(head, "<tr>").Count);
@@ -267,7 +267,7 @@ public class TabulationReportRenderTests : IClassFixture<WebApplicationFactory<P
         Assert.Equal(string.Empty, rows[1]);
         Assert.Equal("<th scope=\"row\" class=\"TabulationCell\">L001</th><td class=\"TabulationCell NilReturn\" colspan=\"3\">Late</td>", rows[4]);
         Assert.Equal(string.Empty, rows[5]);
-        Assert.Equal("<th scope=\"row\" class=\"TabulationCell\">Note</th><th class=\"TabulationHeader2\">Sub heading</th>", rows[6]);
+        Assert.Equal("<th scope=\"row\" class=\"TabulationCell\">Note</th><th scope=\"col\" class=\"TabulationHeader2\">Sub heading</th>", rows[6]);
         Assert.DoesNotContain("View assessment results<span class=\"govuk-visually-hidden\"> for Methods", html, StringComparison.Ordinal);
     }
 

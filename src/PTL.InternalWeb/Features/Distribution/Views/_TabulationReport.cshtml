@@ -65,7 +65,7 @@
                 }
                 else if (cell.Kind is "Header1" or "Header2")
                 {
-                    <th class="@CellClass(cell)" colspan="@Span(cell.ColSpan)" rowspan="@Span(cell.RowSpan)">@CellText(cell)</th>
+                    <th scope="col" class="@CellClass(cell)" colspan="@Span(cell.ColSpan)" rowspan="@Span(cell.RowSpan)">@CellText(cell)</th>
                 }
                 else
                 {
@@ -96,7 +96,7 @@
             covered = first is null ? 0 : first.RowSpan - 1;
         }
 
-        <section class="ptl-table-scroll ptl-tabulation-scroll" tabindex="0" aria-label="@table.Caption">
+        <section class="ptl-table-scroll ptl-tabulation-scroll" aria-label="@table.Caption">
             <table class="TabulationTable">
                 <caption class="govuk-visually-hidden">@table.Caption</caption>
                 @if (headerRowCount > 0)
@@ -104,7 +104,12 @@
                     <thead>
                         @for (var r = 0; r < headerRowCount; r++)
                         {
-                            await RenderRow(table.Rows[r], rowHeaderFlags[r]);
+                            <tr>
+                                @foreach (var cell in table.Rows[r].Cells)
+                                {
+                                    <th scope="col" class="@CellClass(cell)" colspan="@Span(cell.ColSpan)" rowspan="@Span(cell.RowSpan)">@CellText(cell)</th>
+                                }
+                            </tr>
                         }
                     </thead>
                 }

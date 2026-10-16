@@ -38,7 +38,7 @@ public sealed class ViewCommentsViewModel
     public List<Guid> RemovedAttachmentIds { get; set; } = [];
 
     // Legacy Audit.aspx, shown once Save/Submit has changed something.
-    public bool IsAuditStep { get; set; }
+    public bool? IsAuditStep { get; set; } = false;
     public string? AuditObjectName { get; set; }
     public string? PendingCommand { get; set; }
 

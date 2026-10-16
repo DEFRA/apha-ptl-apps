@@ -50,7 +50,7 @@ public sealed partial class DistributionController
             return await RedisplayViewCommentsAsync(year, monthId, schemeId, model, cancellationToken);
         }
 
-        if (model.IsAuditStep && string.IsNullOrWhiteSpace(model.AuditWhy))
+        if (model.IsAuditStep is true && string.IsNullOrWhiteSpace(model.AuditWhy))
         {
             ModelState.AddModelError(AuditWhyField, "The reason for these changes must be specified");
         }
@@ -64,7 +64,7 @@ public sealed partial class DistributionController
         var result = await distributionApiClient.SaveTestConsultantCommentsAsync(
             schemeId,
             new TestConsultantCommentsSaveRequest(
-                model.Comments, submit, model.IsAuditStep ? model.AuditWhy : null, [.. model.StagedFiles.Select(f => f.Token)], model.RemovedAttachmentIds),
+                model.Comments, submit, model.IsAuditStep is true ? model.AuditWhy : null, [.. model.StagedFiles.Select(f => f.Token)], model.RemovedAttachmentIds),
             cancellationToken);
         if (result is null)
         {

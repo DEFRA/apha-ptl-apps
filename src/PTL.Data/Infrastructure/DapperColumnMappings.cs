@@ -105,6 +105,16 @@ public static partial class DapperColumnMappings
     private const string ColDistributionDate = "fldDistributionDate";
     private const string ColSampleId = "fldSampleId";
     private const string ColTestResultItemId = "fldTestResultItemId";
+    private const string ColSchemeName = "fldSchemeName";
+    private const string ColImportExportLicenceRequired = "fldImportExportLicenceRequired";
+    private const string ColRequiresAssessment = "fldRequiresAssessment";
+    private const string ColScheduleCode = "fldScheduleCode";
+    private const string ColMonthlyDistributionId = "fldMonthlyDistributionId";
+    private const string ColDistributionReference = "fldDistributionReference";
+    private const string ColDistributionReferenceSuffix = "fldDistributionReferenceSuffix";
+    private const string ColDeadlineDate = "fldDeadlineDate";
+    private const string ColDistributionParticipantId = "fldDistributionParticipantId";
+    private const string ColTestMethodItemId = "fldTestMethodItemId";
 
     public static void Register()
     {
@@ -431,7 +441,7 @@ public static partial class DapperColumnMappings
             [ColParticipantId] = nameof(PendingOrderSchemeEntity.ParticipantId),
             ["fldParticipantName"] = nameof(PendingOrderSchemeEntity.ParticipantName),
             [ColSchemeId] = nameof(PendingOrderSchemeEntity.SchemeId),
-            ["fldSchemeName"] = nameof(PendingOrderSchemeEntity.SchemeName),
+            [ColSchemeName] = nameof(PendingOrderSchemeEntity.SchemeName),
             [ColIdentifier] = nameof(PendingOrderSchemeEntity.SchemeIdentifier),
             ["fldJan"] = nameof(PendingOrderSchemeEntity.DistributionMonthJan),
             ["fldFeb"] = nameof(PendingOrderSchemeEntity.DistributionMonthFeb),
@@ -445,7 +455,7 @@ public static partial class DapperColumnMappings
             ["fldOct"] = nameof(PendingOrderSchemeEntity.DistributionMonthOct),
             ["fldNov"] = nameof(PendingOrderSchemeEntity.DistributionMonthNov),
             ["fldDec"] = nameof(PendingOrderSchemeEntity.DistributionMonthDec),
-            ["fldImportExportLicenceRequired"] = nameof(PendingOrderSchemeEntity.ImportExportLicenceRequired),
+            [ColImportExportLicenceRequired] = nameof(PendingOrderSchemeEntity.ImportExportLicenceRequired),
             ["fldIsSelected"] = nameof(PendingOrderSchemeEntity.IsSelected),
             ["fldIsRemoved"] = nameof(PendingOrderSchemeEntity.IsRemoved),
             ["fldDataConsentDeclarationGiven"] = nameof(PendingOrderSchemeEntity.DataConsentDeclarationGiven),
@@ -482,7 +492,7 @@ public static partial class DapperColumnMappings
             ["SchemeNumber"] = nameof(ImportPermitEntity.SchemeNumber),
             ["SchemeName"] = nameof(ImportPermitEntity.SchemeName),
             ["LabID"] = nameof(ImportPermitEntity.LabId),
-            ["fldImportExportLicenceRequired"] = nameof(ImportPermitEntity.ImportPermitRequired),
+            [ColImportExportLicenceRequired] = nameof(ImportPermitEntity.ImportPermitRequired),
             ["fldImportPermitReceived"] = nameof(ImportPermitEntity.ImportPermitReceived),
             ["fldImportPermitExpiry"] = nameof(ImportPermitEntity.ImportPermitExpiry),
         });
@@ -549,7 +559,7 @@ public static partial class DapperColumnMappings
             ["fldParticipantId"] = nameof(BulkContractItemEntity.ParticipantId),
             [ColSchemeId] = nameof(BulkContractItemEntity.SchemeId),
             [ColIdentifier] = nameof(BulkContractItemEntity.Identifier),
-            ["fldSchemeName"] = nameof(BulkContractItemEntity.SchemeName),
+            [ColSchemeName] = nameof(BulkContractItemEntity.SchemeName),
             ["fldLabCode"] = nameof(BulkContractItemEntity.LabCode),
             [ColLabName] = nameof(BulkContractItemEntity.LabName),
             ["fldNoOfDistributions"] = nameof(BulkContractItemEntity.NoOfDistributions),
@@ -609,7 +619,7 @@ public static partial class DapperColumnMappings
             ["fldAssessor2"] = nameof(CoreScheme.Assessor2),
             ["fldAssessor3"] = nameof(CoreScheme.Assessor3),
             ["fldAssessor4"] = nameof(CoreScheme.Assessor4),
-            ["fldRequiresAssessment"] = nameof(CoreScheme.RequiresAssessment),
+            [ColRequiresAssessment] = nameof(CoreScheme.RequiresAssessment),
             ["fldStandardTabulationText"] = nameof(CoreScheme.StandardTabulationText),
             ["fldPostage"] = nameof(CoreScheme.Postage),
             ["fldCustomsDocumentDescription"] = nameof(CoreScheme.CustomsDescription),
@@ -683,7 +693,7 @@ public static partial class DapperColumnMappings
         Map<ScheduleCodeEntity>(new(StringComparer.OrdinalIgnoreCase)
         {
             ["fldScheduleCodeId"] = nameof(ScheduleCodeEntity.ScheduleCodeId),
-            ["fldScheduleCode"] = nameof(ScheduleCodeEntity.ScheduleCode),
+            [ColScheduleCode] = nameof(ScheduleCodeEntity.ScheduleCode),
         });
 
         Map<MonthlyDistributionEntity>(new(StringComparer.OrdinalIgnoreCase)
@@ -694,7 +704,7 @@ public static partial class DapperColumnMappings
 
         Map<DistributionMonthSummaryEntity>(new(StringComparer.OrdinalIgnoreCase)
         {
-            ["fldMonthlyDistributionId"] = nameof(DistributionMonthSummaryEntity.MonthlyDistributionId),
+            [ColMonthlyDistributionId] = nameof(DistributionMonthSummaryEntity.MonthlyDistributionId),
             [ColYearId] = nameof(DistributionMonthSummaryEntity.YearId),
             [ColMonthId] = nameof(DistributionMonthSummaryEntity.MonthId),
             ["fldNumberOfSchemes"] = nameof(DistributionMonthSummaryEntity.NumberOfSchemes),
@@ -715,7 +725,7 @@ public static partial class DapperColumnMappings
 
         Map<PTL.Data.Distribution.MonthlyDistributionHeaderEntity>(new(StringComparer.OrdinalIgnoreCase)
         {
-            ["fldMonthlyDistributionId"] = nameof(PTL.Data.Distribution.MonthlyDistributionHeaderEntity.MonthlyDistributionId),
+            [ColMonthlyDistributionId] = nameof(PTL.Data.Distribution.MonthlyDistributionHeaderEntity.MonthlyDistributionId),
             [ColYearId] = nameof(PTL.Data.Distribution.MonthlyDistributionHeaderEntity.YearId),
             [ColMonthId] = nameof(PTL.Data.Distribution.MonthlyDistributionHeaderEntity.MonthId),
         });
@@ -723,18 +733,18 @@ public static partial class DapperColumnMappings
         Map<MonthlyDistributionSchemeEntity>(new(StringComparer.OrdinalIgnoreCase)
         {
             [ColMonthlyDistributionSchemeId] = nameof(MonthlyDistributionSchemeEntity.MonthlyDistributionSchemeId),
-            ["fldMonthlyDistributionId"] = nameof(MonthlyDistributionSchemeEntity.MonthlyDistributionId),
+            [ColMonthlyDistributionId] = nameof(MonthlyDistributionSchemeEntity.MonthlyDistributionId),
             [ColSchemeId] = nameof(MonthlyDistributionSchemeEntity.SchemeId),
             [ColYearId] = nameof(MonthlyDistributionSchemeEntity.YearId),
             [ColMonthId] = nameof(MonthlyDistributionSchemeEntity.MonthId),
             ["SchemeIdentifier"] = nameof(MonthlyDistributionSchemeEntity.SchemeIdentifier),
             ["SchemeName"] = nameof(MonthlyDistributionSchemeEntity.SchemeName),
-            ["fldDistributionReference"] = nameof(MonthlyDistributionSchemeEntity.DistributionReference),
-            ["fldDistributionReferenceSuffix"] = nameof(MonthlyDistributionSchemeEntity.DistributionReferenceSuffix),
-            ["fldScheduleCode"] = nameof(MonthlyDistributionSchemeEntity.ScheduleCode),
+            [ColDistributionReference] = nameof(MonthlyDistributionSchemeEntity.DistributionReference),
+            [ColDistributionReferenceSuffix] = nameof(MonthlyDistributionSchemeEntity.DistributionReferenceSuffix),
+            [ColScheduleCode] = nameof(MonthlyDistributionSchemeEntity.ScheduleCode),
             ["fldDistributionDate"] = nameof(MonthlyDistributionSchemeEntity.DistributionDate),
             ["fldOverseasPostingDate"] = nameof(MonthlyDistributionSchemeEntity.OverseasPostingDate),
-            ["fldDeadlineDate"] = nameof(MonthlyDistributionSchemeEntity.DeadlineDate),
+            [ColDeadlineDate] = nameof(MonthlyDistributionSchemeEntity.DeadlineDate),
             ["fldResultsIssueTargetDate"] = nameof(MonthlyDistributionSchemeEntity.ResultsIssueTargetDate),
             [ColComments] = nameof(MonthlyDistributionSchemeEntity.Comments),
             ["fldHasIntendedResults"] = nameof(MonthlyDistributionSchemeEntity.HasIntendedResults),
@@ -754,12 +764,12 @@ public static partial class DapperColumnMappings
 
         Map<DistributionParticipantEntity>(new(StringComparer.OrdinalIgnoreCase)
         {
-            ["fldDistributionParticipantId"] = nameof(DistributionParticipantEntity.DistributionParticipantId),
+            [ColDistributionParticipantId] = nameof(DistributionParticipantEntity.DistributionParticipantId),
             [ColParticipantId] = nameof(DistributionParticipantEntity.ParticipantId),
             [ColLabCode] = nameof(DistributionParticipantEntity.LabCode),
             [ColLabName] = nameof(DistributionParticipantEntity.LabName),
             [ColDistributionSchemeId] = nameof(DistributionParticipantEntity.MonthlyDistributionSchemeId),
-            ["fldDeadlineDate"] = nameof(DistributionParticipantEntity.DeadlineDate),
+            [ColDeadlineDate] = nameof(DistributionParticipantEntity.DeadlineDate),
             ["fldMDSDeadlineDate"] = nameof(DistributionParticipantEntity.SchemeDeadlineDate),
             ["fldDeadlineChangeReason"] = nameof(DistributionParticipantEntity.DeadlineChangeReason),
             [ColContractId] = nameof(DistributionParticipantEntity.ContractId),
@@ -786,7 +796,7 @@ public static partial class DapperColumnMappings
             ["fldHasSampleNumbersDefined"] = nameof(IntendedResultsHeaderEntity.HasSampleNumbersDefined),
             ["fldTestConsultantTabulationId"] = nameof(IntendedResultsHeaderEntity.TestConsultantTabulationId),
             ["fldStoreRatings"] = nameof(IntendedResultsHeaderEntity.StoreRatings),
-            ["fldRequiresAssessment"] = nameof(IntendedResultsHeaderEntity.RequiresAssessment),
+            [ColRequiresAssessment] = nameof(IntendedResultsHeaderEntity.RequiresAssessment),
             ["fldIsReadyForAssessor"] = nameof(IntendedResultsHeaderEntity.IsReadyForAssessor),
             ["fldSchemeVersionDate"] = nameof(IntendedResultsHeaderEntity.SchemeVersionDate),
             ["fldDateOfReceipt"] = nameof(IntendedResultsHeaderEntity.DateOfReceipt),
@@ -824,7 +834,7 @@ public static partial class DapperColumnMappings
 
         Map<DistributionTestMethodItemEntity>(new(StringComparer.OrdinalIgnoreCase)
         {
-            ["fldTestMethodItemId"] = nameof(DistributionTestMethodItemEntity.TestMethodItemId),
+            [ColTestMethodItemId] = nameof(DistributionTestMethodItemEntity.TestMethodItemId),
             [ColTestId] = nameof(DistributionTestMethodItemEntity.TestId),
             ["fldTestMethodItemTypeId"] = nameof(DistributionTestMethodItemEntity.TestMethodItemTypeId),
             ["TestMethodItemTypeName"] = nameof(DistributionTestMethodItemEntity.Name),
@@ -869,9 +879,9 @@ public static partial class DapperColumnMappings
             [ColMonthlyDistributionSchemeId] = nameof(PreparationSchemeEntity.MonthlyDistributionSchemeId),
             [ColIdentifier] = nameof(PreparationSchemeEntity.SchemeIdentifier),
             [ColName] = nameof(PreparationSchemeEntity.SchemeName),
-            ["fldDistributionReference"] = nameof(PreparationSchemeEntity.DistributionReference),
-            ["fldDistributionReferenceSuffix"] = nameof(PreparationSchemeEntity.DistributionReferenceSuffix),
-            ["fldScheduleCode"] = nameof(PreparationSchemeEntity.ScheduleCode),
+            [ColDistributionReference] = nameof(PreparationSchemeEntity.DistributionReference),
+            [ColDistributionReferenceSuffix] = nameof(PreparationSchemeEntity.DistributionReferenceSuffix),
+            [ColScheduleCode] = nameof(PreparationSchemeEntity.ScheduleCode),
             [ColNumberOfSetsRequired] = nameof(PreparationSchemeEntity.NumberOfSetsRequired),
             ["fldSamplePackingInstructions"] = nameof(PreparationSchemeEntity.SamplePackingInstructions),
             ["fldDiaryEntry"] = nameof(PreparationSchemeEntity.DiaryEntry),
@@ -881,7 +891,7 @@ public static partial class DapperColumnMappings
 
         Map<ResultsReceiptHeaderEntity>(new(StringComparer.OrdinalIgnoreCase)
         {
-            ["fldMonthlyDistributionId"] = nameof(ResultsReceiptHeaderEntity.MonthlyDistributionId),
+            [ColMonthlyDistributionId] = nameof(ResultsReceiptHeaderEntity.MonthlyDistributionId),
             [ColYearId] = nameof(ResultsReceiptHeaderEntity.YearId),
             [ColMonthId] = nameof(ResultsReceiptHeaderEntity.MonthId),
         });
@@ -891,24 +901,24 @@ public static partial class DapperColumnMappings
             [ColMonthlyDistributionSchemeId] = nameof(ResultsReceiptSchemeEntity.MonthlyDistributionSchemeId),
             [ColIdentifier] = nameof(ResultsReceiptSchemeEntity.SchemeIdentifier),
             [ColName] = nameof(ResultsReceiptSchemeEntity.SchemeName),
-            ["fldDistributionReference"] = nameof(ResultsReceiptSchemeEntity.DistributionReference),
-            ["fldDistributionReferenceSuffix"] = nameof(ResultsReceiptSchemeEntity.DistributionReferenceSuffix),
-            ["fldScheduleCode"] = nameof(ResultsReceiptSchemeEntity.ScheduleCode),
+            [ColDistributionReference] = nameof(ResultsReceiptSchemeEntity.DistributionReference),
+            [ColDistributionReferenceSuffix] = nameof(ResultsReceiptSchemeEntity.DistributionReferenceSuffix),
+            [ColScheduleCode] = nameof(ResultsReceiptSchemeEntity.ScheduleCode),
             ["fldHasSampleNumbersDefined"] = nameof(ResultsReceiptSchemeEntity.HasSampleNumbersDefined),
-            ["fldDeadlineDate"] = nameof(ResultsReceiptSchemeEntity.DeadlineDate),
-            ["fldRequiresAssessment"] = nameof(ResultsReceiptSchemeEntity.RequiresAssessment),
+            [ColDeadlineDate] = nameof(ResultsReceiptSchemeEntity.DeadlineDate),
+            [ColRequiresAssessment] = nameof(ResultsReceiptSchemeEntity.RequiresAssessment),
         });
 
         Map<ResultsReceiptParticipantEntity>(new(StringComparer.OrdinalIgnoreCase)
         {
-            ["fldDistributionParticipantId"] = nameof(ResultsReceiptParticipantEntity.DistributionParticipantId),
+            [ColDistributionParticipantId] = nameof(ResultsReceiptParticipantEntity.DistributionParticipantId),
             [ColMonthlyDistributionSchemeId] = nameof(ResultsReceiptParticipantEntity.MonthlyDistributionSchemeId),
             [ColLabCode] = nameof(ResultsReceiptParticipantEntity.LabCode),
             [ColLabName] = nameof(ResultsReceiptParticipantEntity.LabName),
             ["fldExtraDocumentsReturned"] = nameof(ResultsReceiptParticipantEntity.ExtraDocumentsReturned),
             ["fldFirstEditDate"] = nameof(ResultsReceiptParticipantEntity.FirstEditDate),
             ["fldLastEditDate"] = nameof(ResultsReceiptParticipantEntity.LastEditDate),
-            ["fldDeadlineDate"] = nameof(ResultsReceiptParticipantEntity.DeadlineDate),
+            [ColDeadlineDate] = nameof(ResultsReceiptParticipantEntity.DeadlineDate),
             ["fldDeadlineChangeReason"] = nameof(ResultsReceiptParticipantEntity.DeadlineChangeReason),
             ["fldPostedDate"] = nameof(ResultsReceiptParticipantEntity.PostedDate),
             ["fldReturnedDate"] = nameof(ResultsReceiptParticipantEntity.ReturnedDate),
@@ -916,7 +926,7 @@ public static partial class DapperColumnMappings
 
         Map<ResultsReceiptSampleStatusEntity>(new(StringComparer.OrdinalIgnoreCase)
         {
-            ["fldDistributionParticipantId"] = nameof(ResultsReceiptSampleStatusEntity.DistributionParticipantId),
+            [ColDistributionParticipantId] = nameof(ResultsReceiptSampleStatusEntity.DistributionParticipantId),
             ["fldHasUnaccountedSamples"] = nameof(ResultsReceiptSampleStatusEntity.HasUnaccountedSamples),
         });
 
@@ -944,9 +954,9 @@ public static partial class DapperColumnMappings
 
         Map<SampleReceiptSchemeEntity>(new(StringComparer.OrdinalIgnoreCase)
         {
-            ["fldDistributionReference"] = nameof(SampleReceiptSchemeEntity.DistributionReference),
-            ["fldDistributionReferenceSuffix"] = nameof(SampleReceiptSchemeEntity.DistributionReferenceSuffix),
-            ["fldScheduleCode"] = nameof(SampleReceiptSchemeEntity.ScheduleCode),
+            [ColDistributionReference] = nameof(SampleReceiptSchemeEntity.DistributionReference),
+            [ColDistributionReferenceSuffix] = nameof(SampleReceiptSchemeEntity.DistributionReferenceSuffix),
+            [ColScheduleCode] = nameof(SampleReceiptSchemeEntity.ScheduleCode),
             ["fldIsReadyForAssessor"] = nameof(SampleReceiptSchemeEntity.IsReadyForAssessor),
             [ColName] = nameof(SampleReceiptSchemeEntity.SchemeName),
             [ColIdentifier] = nameof(SampleReceiptSchemeEntity.SchemeIdentifier),
@@ -958,8 +968,8 @@ public static partial class DapperColumnMappings
             ["fldLastEditDate"] = nameof(ActualResultsHeaderEntity.LastEditDate),
             ["fldDistribution"] = nameof(ActualResultsHeaderEntity.Distribution),
             ["fldSchemeIdentifier"] = nameof(ActualResultsHeaderEntity.SchemeIdentifier),
-            ["fldSchemeName"] = nameof(ActualResultsHeaderEntity.SchemeName),
-            ["fldDeadlineDate"] = nameof(ActualResultsHeaderEntity.DeadlineDate),
+            [ColSchemeName] = nameof(ActualResultsHeaderEntity.SchemeName),
+            [ColDeadlineDate] = nameof(ActualResultsHeaderEntity.DeadlineDate),
         });
 
         Map<ActualSampleResultEntity>(new(StringComparer.OrdinalIgnoreCase)
@@ -970,7 +980,7 @@ public static partial class DapperColumnMappings
 
         Map<ActualMethodItemResultEntity>(new(StringComparer.OrdinalIgnoreCase)
         {
-            ["fldTestMethodItemId"] = nameof(ActualMethodItemResultEntity.TestMethodItemId),
+            [ColTestMethodItemId] = nameof(ActualMethodItemResultEntity.TestMethodItemId),
             ["fldResult"] = nameof(ActualMethodItemResultEntity.Result),
         });
 
@@ -1054,7 +1064,7 @@ public static partial class DapperColumnMappings
 
         Map<SchemeTestMethodItem>(new(StringComparer.OrdinalIgnoreCase)
         {
-            ["fldTestMethodItemId"] = nameof(SchemeTestMethodItem.TestMethodItemId),
+            [ColTestMethodItemId] = nameof(SchemeTestMethodItem.TestMethodItemId),
             ["fldTestMethodItemTypeId"] = nameof(SchemeTestMethodItem.TestMethodItemTypeId),
             ["fldTestMethodItemType"] = nameof(SchemeTestMethodItem.TestMethodItemType),
             [ColTestId] = nameof(SchemeTestMethodItem.TestId),
@@ -1100,7 +1110,7 @@ public static partial class DapperColumnMappings
             ["fldTabulationTestMethodItemId"] = nameof(SchemeTabulationItemLink.LinkId),
             ["fldTabulationId"] = nameof(SchemeTabulationItemLink.TabulationId),
             [ColTestResultItemId] = nameof(SchemeTabulationItemLink.ItemId),
-            ["fldTestMethodItemId"] = nameof(SchemeTabulationItemLink.ItemId),
+            [ColTestMethodItemId] = nameof(SchemeTabulationItemLink.ItemId),
         });
 
         Map<SchemeItemTypeEntity>(new(StringComparer.OrdinalIgnoreCase)
@@ -1351,7 +1361,7 @@ public static partial class DapperColumnMappings
             [ColContractId] = nameof(InvoiceContractItemEntity.ContractId),
             [ColParticipantSchemeId] = nameof(InvoiceContractItemEntity.ParticipantSchemeId),
             [ColIdentifier] = nameof(InvoiceContractItemEntity.SchemeIdentifier),
-            ["fldSchemeName"] = nameof(InvoiceContractItemEntity.SchemeName),
+            [ColSchemeName] = nameof(InvoiceContractItemEntity.SchemeName),
             [ColPrice] = nameof(InvoiceContractItemEntity.Price),
             ["fldNonFeePaying"] = nameof(InvoiceContractItemEntity.NonFeePaying),
             ["fldHasOverride"] = nameof(InvoiceContractItemEntity.HasOverride),
@@ -1382,13 +1392,13 @@ public static partial class DapperColumnMappings
         Map<TabulationsSchemeEntity>(new(StringComparer.OrdinalIgnoreCase)
         {
             [ColMonthlyDistributionSchemeId] = nameof(TabulationsSchemeEntity.MonthlyDistributionSchemeId),
-            ["fldSchemeName"] = nameof(TabulationsSchemeEntity.SchemeName),
+            [ColSchemeName] = nameof(TabulationsSchemeEntity.SchemeName),
             ["fldSchemeIdentifier"] = nameof(TabulationsSchemeEntity.SchemeIdentifier),
-            ["fldDistributionReference"] = nameof(TabulationsSchemeEntity.DistributionReference),
-            ["fldDistributionReferenceSuffix"] = nameof(TabulationsSchemeEntity.DistributionReferenceSuffix),
-            ["fldScheduleCode"] = nameof(TabulationsSchemeEntity.ScheduleCode),
+            [ColDistributionReference] = nameof(TabulationsSchemeEntity.DistributionReference),
+            [ColDistributionReferenceSuffix] = nameof(TabulationsSchemeEntity.DistributionReferenceSuffix),
+            [ColScheduleCode] = nameof(TabulationsSchemeEntity.ScheduleCode),
             ["fldResultsIssueTargetDate"] = nameof(TabulationsSchemeEntity.ResultsIssueTargetDate),
-            ["fldDeadlineDate"] = nameof(TabulationsSchemeEntity.DeadlineDate),
+            [ColDeadlineDate] = nameof(TabulationsSchemeEntity.DeadlineDate),
             ["fldTestConsultant1Name"] = nameof(TabulationsSchemeEntity.TestConsultant1Name),
             ["fldTestConsultant2Name"] = nameof(TabulationsSchemeEntity.TestConsultant2Name),
             ["fldTestConsultant3Name"] = nameof(TabulationsSchemeEntity.TestConsultant3Name),
@@ -1403,7 +1413,7 @@ public static partial class DapperColumnMappings
             ["fldAssessor3Name"] = nameof(TabulationsSchemeEntity.Assessor3Name),
             ["fldAssessor4Name"] = nameof(TabulationsSchemeEntity.Assessor4Name),
             ["fldHasIntendedResults"] = nameof(TabulationsSchemeEntity.HasIntendedResults),
-            ["fldRequiresAssessment"] = nameof(TabulationsSchemeEntity.RequiresAssessment),
+            [ColRequiresAssessment] = nameof(TabulationsSchemeEntity.RequiresAssessment),
         });
 
         Map<TabulationEntity>(new(StringComparer.OrdinalIgnoreCase)
@@ -1453,9 +1463,9 @@ public static partial class DapperColumnMappings
             ["fldPreparationComplete"] = nameof(PackagingItemEntity.PreparationComplete),
             [ColName] = nameof(PackagingItemEntity.SchemeName),
             [ColIdentifier] = nameof(PackagingItemEntity.SchemeIdentifier),
-            ["fldDistributionReference"] = nameof(PackagingItemEntity.DistributionReference),
-            ["fldDistributionReferenceSuffix"] = nameof(PackagingItemEntity.DistributionReferenceSuffix),
-            ["fldScheduleCode"] = nameof(PackagingItemEntity.ScheduleCode),
+            [ColDistributionReference] = nameof(PackagingItemEntity.DistributionReference),
+            [ColDistributionReferenceSuffix] = nameof(PackagingItemEntity.DistributionReferenceSuffix),
+            [ColScheduleCode] = nameof(PackagingItemEntity.ScheduleCode),
             [ColPackingInfo] = nameof(PackagingItemEntity.PackingInfo),
             [ColNumberOfSetsRequired] = nameof(PackagingItemEntity.NumberOfSetsRequired),
             [ColDistributionDate] = nameof(PackagingItemEntity.DistributionDate),
@@ -1468,7 +1478,7 @@ public static partial class DapperColumnMappings
         {
             [ColGroupAddressId] = nameof(PackagingParticipantEntity.GroupAddressId),
             [ColMonthlyDistributionSchemeId] = nameof(PackagingParticipantEntity.MonthlyDistributionSchemeId),
-            ["fldDistributionParticipantId"] = nameof(PackagingParticipantEntity.DistributionParticipantId),
+            [ColDistributionParticipantId] = nameof(PackagingParticipantEntity.DistributionParticipantId),
             [ColParticipantId] = nameof(PackagingParticipantEntity.ParticipantId),
             ["fldPackagedDate"] = nameof(PackagingParticipantEntity.PackagedDate),
             ["fldPostedDate"] = nameof(PackagingParticipantEntity.PostedDate),
@@ -1478,7 +1488,7 @@ public static partial class DapperColumnMappings
             ["fldCustomerPackingInfo"] = nameof(PackagingParticipantEntity.CustomerPackingInfo),
             ["fldPSLevelPackingInfo"] = nameof(PackagingParticipantEntity.PSLevelPackingInfo),
             [ColNumberOfSetsRequired] = nameof(PackagingParticipantEntity.NumberOfSetsRequired),
-            ["fldImportExportLicenceRequired"] = nameof(PackagingParticipantEntity.ImportExportLicenceRequired),
+            [ColImportExportLicenceRequired] = nameof(PackagingParticipantEntity.ImportExportLicenceRequired),
             ["fldImportPermitReceived"] = nameof(PackagingParticipantEntity.ImportPermitReceived),
             ["fldCustomsCertificateRequired"] = nameof(PackagingParticipantEntity.CustomsCertificateRequired),
             [ColContactName] = nameof(PackagingParticipantEntity.ContactName),
@@ -1496,23 +1506,23 @@ public static partial class DapperColumnMappings
         Map<PackagingSchemeItemEntity>(new(StringComparer.OrdinalIgnoreCase)
         {
             [ColParticipantId] = nameof(PackagingSchemeItemEntity.ParticipantId),
-            ["fldDistributionParticipantId"] = nameof(PackagingSchemeItemEntity.DistributionParticipantId),
+            [ColDistributionParticipantId] = nameof(PackagingSchemeItemEntity.DistributionParticipantId),
             [ColMonthlyDistributionSchemeId] = nameof(PackagingSchemeItemEntity.MonthlyDistributionSchemeId),
             ["fldPreparationComplete"] = nameof(PackagingSchemeItemEntity.PreparationComplete),
-            ["fldDistributionReference"] = nameof(PackagingSchemeItemEntity.DistributionReference),
-            ["fldDistributionReferenceSuffix"] = nameof(PackagingSchemeItemEntity.DistributionReferenceSuffix),
-            ["fldScheduleCode"] = nameof(PackagingSchemeItemEntity.ScheduleCode),
+            [ColDistributionReference] = nameof(PackagingSchemeItemEntity.DistributionReference),
+            [ColDistributionReferenceSuffix] = nameof(PackagingSchemeItemEntity.DistributionReferenceSuffix),
+            [ColScheduleCode] = nameof(PackagingSchemeItemEntity.ScheduleCode),
             ["fldPackagedDate"] = nameof(PackagingSchemeItemEntity.PackagedDate),
             ["fldPostedDate"] = nameof(PackagingSchemeItemEntity.PostedDate),
             [ColPackingInfo] = nameof(PackagingSchemeItemEntity.PackingInfo),
-            ["fldSchemeName"] = nameof(PackagingSchemeItemEntity.SchemeName),
+            [ColSchemeName] = nameof(PackagingSchemeItemEntity.SchemeName),
             ["fldSchemeIdentifier"] = nameof(PackagingSchemeItemEntity.SchemeIdentifier),
             ["fldCustomsDocumentDescription"] = nameof(PackagingSchemeItemEntity.CustomsDocumentDescription),
             ["fldCustomsDocumentVolume"] = nameof(PackagingSchemeItemEntity.CustomsDocumentVolume),
             ["fldNumberOfSamples"] = nameof(PackagingSchemeItemEntity.NumberOfSamples),
             [ColNumberOfSetsRequired] = nameof(PackagingSchemeItemEntity.NumberOfSetsRequired),
             ["fldPSLevelPackingInfo"] = nameof(PackagingSchemeItemEntity.PSLevelPackingInfo),
-            ["fldImportExportLicenceRequired"] = nameof(PackagingSchemeItemEntity.ImportExportLicenceRequired),
+            [ColImportExportLicenceRequired] = nameof(PackagingSchemeItemEntity.ImportExportLicenceRequired),
             ["fldImportPermitReceived"] = nameof(PackagingSchemeItemEntity.ImportPermitReceived),
             ["fldCustomsCertificateRequired"] = nameof(PackagingSchemeItemEntity.CustomsCertificateRequired),
             ["fldCustomerPackingInfo"] = nameof(PackagingSchemeItemEntity.CustomerPackingInfo),
@@ -1526,7 +1536,7 @@ public static partial class DapperColumnMappings
             [ColMonthlyDistributionSchemeId] = nameof(DistributionPostedEmailEntity.MonthlyDistributionSchemeId),
             [ColEmail] = nameof(DistributionPostedEmailEntity.Email),
             ["fldDistribution"] = nameof(DistributionPostedEmailEntity.Distribution),
-            ["fldSchemeName"] = nameof(DistributionPostedEmailEntity.SchemeName),
+            [ColSchemeName] = nameof(DistributionPostedEmailEntity.SchemeName),
         });
 
         Map<PackagingLabelAddressEntity>(new(StringComparer.OrdinalIgnoreCase)

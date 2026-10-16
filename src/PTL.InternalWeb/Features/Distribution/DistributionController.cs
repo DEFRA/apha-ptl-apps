@@ -877,19 +877,7 @@ public sealed partial class DistributionController(IDistributionApiClient distri
                 ModelState.AddModelError(nameof(model.Comments), message);
             }
 
-            foreach (var (sampleId, errors) in result?.FieldErrorsBySampleId ?? new Dictionary<Guid, SampleNumbersFieldError[]>())
-            {
-                var index = model.Samples.FindIndex(s => s.SampleId == sampleId);
-                if (index < 0)
-                {
-                    continue;
-                }
-
-                foreach (var error in errors)
-                {
-                    ModelState.AddModelError($"{nameof(model.Samples)}[{index}].{error.Field}", error.Message);
-                }
-            }
+            ApplySampleNumbersFieldErrors(model, result?.FieldErrorsBySampleId);
 
             return View(await RehydrateSampleNumbersAsync(year, monthId, schemeId, model, cancellationToken));
         }
@@ -897,6 +885,23 @@ public sealed partial class DistributionController(IDistributionApiClient distri
         TempData.SetNotification(NotificationType.Success, "Sample Numbers updated successfully.");
 
         return RedirectToDestination(command, year, monthId, schemeId);
+    }
+
+    private void ApplySampleNumbersFieldErrors(SampleNumbersViewModel model, IReadOnlyDictionary<Guid, SampleNumbersFieldError[]>? errorsBySampleId)
+    {
+        foreach (var (sampleId, errors) in errorsBySampleId ?? new Dictionary<Guid, SampleNumbersFieldError[]>())
+        {
+            var index = model.Samples.FindIndex(s => s.SampleId == sampleId);
+            if (index < 0)
+            {
+                continue;
+            }
+
+            foreach (var error in errors)
+            {
+                ModelState.AddModelError($"{nameof(model.Samples)}[{index}].{error.Field}", error.Message);
+            }
+        }
     }
 
     private RedirectToActionResult RedirectToDestination(string? command, int year, int monthId, Guid schemeId) =>

@@ -2,7 +2,7 @@
 @{
     // Legacy diverts to a separate Audit.aspx page; here it is a second step of the same view -
     // same pattern as Features/Distribution/Views/IntendedResults.cshtml.
-    ViewData["Title"] = Model.IsAuditStep
+    ViewData["Title"] = Model.IsAuditStep is true
         ? $"Audit Trail - {Model.DistributionTitle}"
         : $"View Comments - {Model.DistributionTitle}";
 
@@ -14,7 +14,7 @@
         .ToList();
 }
 
-@if (Model.IsAuditStep)
+@if (Model.IsAuditStep is true)
 {
     <a class="govuk-back-link" asp-action="ViewComments" asp-route-year="@Model.YearId" asp-route-monthId="@Model.MonthId" asp-route-schemeId="@Model.MonthlyDistributionSchemeId">Back</a>
 

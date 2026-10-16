@@ -1,3 +1,4 @@
+using System.Data;
 using Dapper;
 using PTL.Core.Distribution;
 using Rows = PTL.Data.Distribution.TabulationReportRows;
@@ -131,8 +132,7 @@ public sealed partial class DistributionRepository
         using var connection = connectionFactory.CreateConnection();
         connection.Open();
         using var transaction = connection.BeginTransaction();
-        var audited = write.AuditWhy.Length > 0;
-        var audit = new { write.AuditWho, write.AuditWhy };
+        var audit = new AmendAudit(write.AuditWho, write.AuditWhy);
 
         // mTests.Update: only IsRange is editable on a test result item.
         foreach (var range in write.Ranges)
@@ -145,107 +145,113 @@ public sealed partial class DistributionRepository
         // mParticipants.Update: each changed participant, then its children in legacy order.
         foreach (var participant in write.Participants)
         {
-            await connection.ExecuteAsync(
-                "EXEC dbo.spuDistributionParticipantForAmendResults @DistributionParticipantId = @DistributionParticipantId, @NilReturnReason = @NilReturnReason",
-                new { participant.DistributionParticipantId, participant.NilReturnReason }, transaction);
-
-            foreach (var item in participant.MethodResults)
-            {
-                var parameters = new { item.TestId, item.MethodItemId, ParticipantId = participant.DistributionParticipantId, item.Value, audit.AuditWho, audit.AuditWhy };
-                if (audited)
-                {
-                    await connection.ExecuteAsync(
-                        "EXEC dbo.spiAuditAmendedTestMethodItem @ActualResultsId = @ParticipantId, @TestMethodItemId = @MethodItemId, @AuditWho = @AuditWho, @AuditWhy = @AuditWhy, @Result = @Value, @ResultUpdate = 1",
-                        parameters, transaction);
-                }
-
-                await connection.ExecuteAsync(
-                    "EXEC dbo.spuAmendedMethodItem @TestMethodItemId = @MethodItemId, @TestId = @TestId, @ParticipantId = @ParticipantId, @AmendedResult = @Value",
-                    parameters, transaction);
-            }
-
-            foreach (var item in participant.ResultItemResults)
-            {
-                var parameters = new { item.TestId, item.SampleId, item.ResultItemId, ParticipantId = participant.DistributionParticipantId, item.Value, audit.AuditWho, audit.AuditWhy };
-                if (audited)
-                {
-                    await connection.ExecuteAsync(
-                        "EXEC dbo.spiAuditAmendedSampleResultItem @ActualResultsId = @ParticipantId, @TestResultItemId = @ResultItemId, @TestId = @TestId, @SampleId = @SampleId, @AuditWho = @AuditWho, @AuditWhy = @AuditWhy, @Result = @Value, @ResultUpdate = 1",
-                        parameters, transaction);
-                }
-
-                await connection.ExecuteAsync(
-                    "EXEC dbo.spuAmendedResultItem @TestResultItemId = @ResultItemId, @SampleId = @SampleId, @TestId = @TestId, @ParticipantId = @ParticipantId, @AmendedResult = @Value",
-                    parameters, transaction);
-            }
-
-            foreach (var item in participant.Assessments)
-            {
-                var parameters = new { item.SampleReceiptId, item.Comment, item.CommentChanged, item.Score, item.ScoreChanged, audit.AuditWho, audit.AuditWhy };
-                if (audited)
-                {
-                    await connection.ExecuteAsync(
-                        "EXEC dbo.spiAuditAssessmentItem @SampleReceiptId = @SampleReceiptId, @AuditWho = @AuditWho, @AuditWhy = @AuditWhy, @AssessmentComment = @Comment, @AssessmentCommentUpdate = @CommentChanged, @Score = @Score, @ScoreUpdate = @ScoreChanged",
-                        parameters, transaction);
-                }
-
-                await connection.ExecuteAsync(
-                    "EXEC dbo.spuAmendedAssessmentItem @SampleReceiptId = @SampleReceiptId, @AssessmentComment = @Comment, @AssessmentScore = @Score",
-                    parameters, transaction);
-            }
-
-            foreach (var rating in participant.Ratings)
-            {
-                await connection.ExecuteAsync(
-                    "EXEC dbo.spuSampleRating @SampleRatingId = @SampleRatingId, @RatingId = @RatingId", rating, transaction);
-            }
-
-            foreach (var item in participant.CategoryResults)
-            {
-                var parameters = new { item.TestId, item.SampleId, item.CategoryItemId, item.SampleTestId, item.Score, ParticipantId = participant.DistributionParticipantId, audit.AuditWho, audit.AuditWhy };
-                if (audited)
-                {
-                    await connection.ExecuteAsync(
-                        "EXEC dbo.spiAuditAmendedCategoryItem @ActualResultsId = @ParticipantId, @CategoryItemId = @CategoryItemId, @SampleTestId = @SampleTestId, @TestId = @TestId, @SampleId = @SampleId, @AuditWho = @AuditWho, @AuditWhy = @AuditWhy, @Result = @Score, @ResultUpdate = 1",
-                        parameters, transaction);
-                }
-
-                await connection.ExecuteAsync(
-                    "EXEC dbo.spuAmendedCategoryItem @CategoryItemId = @CategoryItemId, @SampleId = @SampleId, @TestId = @TestId, @ParticipantId = @ParticipantId, @AmendedCategoryScore = @Score, @SampleTestId = @SampleTestId",
-                    parameters, transaction);
-            }
+            await WriteParticipantAsync(connection, transaction, audit, participant);
         }
 
         foreach (var item in write.IntendedResults)
         {
             var parameters = new { item.TestId, item.SampleId, item.ResultItemId, item.Value, item.ValueChanged, item.Value2, item.Value2Changed, audit.AuditWho, audit.AuditWhy };
-            if (audited)
-            {
-                await connection.ExecuteAsync(
-                    "EXEC dbo.spiAuditAmendSampleResultItem @TestResultItemId = @ResultItemId, @TestId = @TestId, @SampleId = @SampleId, @AuditWho = @AuditWho, @AuditWhy = @AuditWhy, @IntendedResult = @Value, @IntendedResultUpdate = @ValueChanged, @IntendedResult2 = @Value2, @IntendedResult2Update = @Value2Changed",
-                    parameters, transaction);
-            }
-
-            await connection.ExecuteAsync(
+            await WriteWithAuditAsync(
+                connection,
+                transaction,
+                audit,
+                "EXEC dbo.spiAuditAmendSampleResultItem @TestResultItemId = @ResultItemId, @TestId = @TestId, @SampleId = @SampleId, @AuditWho = @AuditWho, @AuditWhy = @AuditWhy, @IntendedResult = @Value, @IntendedResultUpdate = @ValueChanged, @IntendedResult2 = @Value2, @IntendedResult2Update = @Value2Changed",
                 "EXEC dbo.spuDistributionTestResultItemForAmendResults @TestResultItemId = @ResultItemId, @SampleId = @SampleId, @TestId = @TestId, @IntendedResult = @Value, @IntendedResult2 = @Value2",
-                parameters, transaction);
+                parameters);
         }
 
         foreach (var item in write.IntendedMethods)
         {
             var parameters = new { item.TestId, item.MethodItemId, item.Value, audit.AuditWho, audit.AuditWhy };
-            if (audited)
-            {
-                await connection.ExecuteAsync(
-                    "EXEC dbo.spiAuditAmendTestMethodItem @DistributionTestMethodItemId = @MethodItemId, @AuditWho = @AuditWho, @AuditWhy = @AuditWhy, @IntendedResult = @Value, @IntendedResultUpdate = 1",
-                    parameters, transaction);
-            }
-
-            await connection.ExecuteAsync(
+            await WriteWithAuditAsync(
+                connection,
+                transaction,
+                audit,
+                "EXEC dbo.spiAuditAmendTestMethodItem @DistributionTestMethodItemId = @MethodItemId, @AuditWho = @AuditWho, @AuditWhy = @AuditWhy, @IntendedResult = @Value, @IntendedResultUpdate = 1",
                 "EXEC dbo.spuDistributionTestMethodItemForAmendResults @TestMethodItemId = @MethodItemId, @TestId = @TestId, @IntendedResult = @Value",
-                parameters, transaction);
+                parameters);
         }
 
         transaction.Commit();
+    }
+
+    // mParticipants.Update: the participant, then its children in legacy order.
+    private static async Task WriteParticipantAsync(
+        IDbConnection connection, IDbTransaction transaction, AmendAudit audit, AmendParticipantWrite participant)
+    {
+        await connection.ExecuteAsync(
+            "EXEC dbo.spuDistributionParticipantForAmendResults @DistributionParticipantId = @DistributionParticipantId, @NilReturnReason = @NilReturnReason",
+            new { participant.DistributionParticipantId, participant.NilReturnReason }, transaction);
+
+        foreach (var item in participant.MethodResults)
+        {
+            var parameters = new { item.TestId, item.MethodItemId, ParticipantId = participant.DistributionParticipantId, item.Value, audit.AuditWho, audit.AuditWhy };
+            await WriteWithAuditAsync(
+                connection,
+                transaction,
+                audit,
+                "EXEC dbo.spiAuditAmendedTestMethodItem @ActualResultsId = @ParticipantId, @TestMethodItemId = @MethodItemId, @AuditWho = @AuditWho, @AuditWhy = @AuditWhy, @Result = @Value, @ResultUpdate = 1",
+                "EXEC dbo.spuAmendedMethodItem @TestMethodItemId = @MethodItemId, @TestId = @TestId, @ParticipantId = @ParticipantId, @AmendedResult = @Value",
+                parameters);
+        }
+
+        foreach (var item in participant.ResultItemResults)
+        {
+            var parameters = new { item.TestId, item.SampleId, item.ResultItemId, ParticipantId = participant.DistributionParticipantId, item.Value, audit.AuditWho, audit.AuditWhy };
+            await WriteWithAuditAsync(
+                connection,
+                transaction,
+                audit,
+                "EXEC dbo.spiAuditAmendedSampleResultItem @ActualResultsId = @ParticipantId, @TestResultItemId = @ResultItemId, @TestId = @TestId, @SampleId = @SampleId, @AuditWho = @AuditWho, @AuditWhy = @AuditWhy, @Result = @Value, @ResultUpdate = 1",
+                "EXEC dbo.spuAmendedResultItem @TestResultItemId = @ResultItemId, @SampleId = @SampleId, @TestId = @TestId, @ParticipantId = @ParticipantId, @AmendedResult = @Value",
+                parameters);
+        }
+
+        foreach (var item in participant.Assessments)
+        {
+            var parameters = new { item.SampleReceiptId, item.Comment, item.CommentChanged, item.Score, item.ScoreChanged, audit.AuditWho, audit.AuditWhy };
+            await WriteWithAuditAsync(
+                connection,
+                transaction,
+                audit,
+                "EXEC dbo.spiAuditAssessmentItem @SampleReceiptId = @SampleReceiptId, @AuditWho = @AuditWho, @AuditWhy = @AuditWhy, @AssessmentComment = @Comment, @AssessmentCommentUpdate = @CommentChanged, @Score = @Score, @ScoreUpdate = @ScoreChanged",
+                "EXEC dbo.spuAmendedAssessmentItem @SampleReceiptId = @SampleReceiptId, @AssessmentComment = @Comment, @AssessmentScore = @Score",
+                parameters);
+        }
+
+        foreach (var rating in participant.Ratings)
+        {
+            await connection.ExecuteAsync(
+                "EXEC dbo.spuSampleRating @SampleRatingId = @SampleRatingId, @RatingId = @RatingId", rating, transaction);
+        }
+
+        foreach (var item in participant.CategoryResults)
+        {
+            var parameters = new { item.TestId, item.SampleId, item.CategoryItemId, item.SampleTestId, item.Score, ParticipantId = participant.DistributionParticipantId, audit.AuditWho, audit.AuditWhy };
+            await WriteWithAuditAsync(
+                connection,
+                transaction,
+                audit,
+                "EXEC dbo.spiAuditAmendedCategoryItem @ActualResultsId = @ParticipantId, @CategoryItemId = @CategoryItemId, @SampleTestId = @SampleTestId, @TestId = @TestId, @SampleId = @SampleId, @AuditWho = @AuditWho, @AuditWhy = @AuditWhy, @Result = @Score, @ResultUpdate = 1",
+                "EXEC dbo.spuAmendedCategoryItem @CategoryItemId = @CategoryItemId, @SampleId = @SampleId, @TestId = @TestId, @ParticipantId = @ParticipantId, @AmendedCategoryScore = @Score, @SampleTestId = @SampleTestId",
+                parameters);
+        }
+    }
+
+    // The audit row (only when a reason was captured) is written before the update it describes.
+    private static async Task WriteWithAuditAsync(
+        IDbConnection connection, IDbTransaction transaction, AmendAudit audit, string auditSql, string updateSql, object parameters)
+    {
+        if (audit.Audited)
+        {
+            await connection.ExecuteAsync(auditSql, parameters, transaction);
+        }
+
+        await connection.ExecuteAsync(updateSql, parameters, transaction);
+    }
+
+    private sealed record AmendAudit(string AuditWho, string AuditWhy)
+    {
+        public bool Audited => AuditWhy.Length > 0;
     }
 }

@@ -191,64 +191,77 @@ public static class TabulationReportBuilder
 
     private static List<TabulationCellResponse> ParticipantCells(TabulationSource source, TabulationSourceTest test, TabulationSourceParticipant participant)
     {
-        var assess = source.RequiresAssessment;
-        var results = test.ResultItems.Count;
-        var categories = test.CategoryItems.Count;
         var cells = new List<TabulationCellResponse> { new(participant.LabCode, 1, 1, Cell, false) };
 
         if (HasAnyResults(participant))
         {
             cells.AddRange(test.MethodItems.Select(m => ResultCell(participant.MethodResults.GetValueOrDefault(m.ItemId))));
-
             foreach (var sample in test.Samples)
             {
-                cells.AddRange(test.ResultItems.Select(r =>
-                    ResultCell(participant.ResultItemResults.GetValueOrDefault((sample.SampleId, r.ItemId)))));
-
-                if (!assess)
-                {
-                    continue;
-                }
-
-                var assessment = Assessment(participant, sample.SampleId, test.TestId);
-                if (IsScored(source, assessment))
-                {
-                    if (participant.CategoryResults.Count > 0)
-                    {
-                        cells.AddRange(test.CategoryItems.Select(c => ResultCell(ScreenCategoryText(source, participant, sample, c.ItemId))));
-                    }
-
-                    cells.Add(ResultCell(AssessmentComment(source, assessment)));
-                    cells.Add(ResultCell(ScoreText(source, assessment)));
-                }
-                else
-                {
-                    cells.Add(new(ScoreText(source, assessment), Span(categories + 2), 1, Cell, false));
-                }
+                cells.AddRange(SampleResultCells(source, test, participant, sample));
             }
         }
-        else if (assess)
+        else if (source.RequiresAssessment)
         {
-            if (test.MethodItems.Count > 0)
-            {
-                cells.Add(new(participant.NilReturnReason, test.MethodItems.Count, 1, Cell, true));
-            }
-
-            // Legacy only draws a cell for samples whose raw score is outside Fail..Excellent.
-            foreach (var sample in test.Samples)
-            {
-                var assessment = Assessment(participant, sample.SampleId, test.TestId);
-                if (assessment.Score is < 1 or > 5)
-                {
-                    cells.Add(new(ScoreText(source, assessment), Span(results + categories + 2), 1, Cell, false));
-                }
-            }
+            cells.AddRange(NoResultAssessmentCells(source, test, participant));
         }
         else
         {
             // Legacy adds the assessment column count here even for non-assessment schemes.
-            var span = test.MethodItems.Count + ((results + categories + 2) * test.Samples.Count);
+            var span = test.MethodItems.Count + ((test.ResultItems.Count + test.CategoryItems.Count + 2) * test.Samples.Count);
             cells.Add(new(participant.NilReturnReason, Span(span), 1, Cell, true));
+        }
+
+        return cells;
+    }
+
+    private static List<TabulationCellResponse> SampleResultCells(
+        TabulationSource source, TabulationSourceTest test, TabulationSourceParticipant participant, TabulationSourceSample sample)
+    {
+        var cells = new List<TabulationCellResponse>();
+        cells.AddRange(test.ResultItems.Select(r =>
+            ResultCell(participant.ResultItemResults.GetValueOrDefault((sample.SampleId, r.ItemId)))));
+
+        if (!source.RequiresAssessment)
+        {
+            return cells;
+        }
+
+        var assessment = Assessment(participant, sample.SampleId, test.TestId);
+        if (!IsScored(source, assessment))
+        {
+            cells.Add(new(ScoreText(source, assessment), Span(test.CategoryItems.Count + 2), 1, Cell, false));
+            return cells;
+        }
+
+        if (participant.CategoryResults.Count > 0)
+        {
+            cells.AddRange(test.CategoryItems.Select(c => ResultCell(ScreenCategoryText(source, participant, sample, c.ItemId))));
+        }
+
+        cells.Add(ResultCell(AssessmentComment(source, assessment)));
+        cells.Add(ResultCell(ScoreText(source, assessment)));
+        return cells;
+    }
+
+    private static List<TabulationCellResponse> NoResultAssessmentCells(
+        TabulationSource source, TabulationSourceTest test, TabulationSourceParticipant participant)
+    {
+        var cells = new List<TabulationCellResponse>();
+        if (test.MethodItems.Count > 0)
+        {
+            cells.Add(new(participant.NilReturnReason, test.MethodItems.Count, 1, Cell, true));
+        }
+
+        // Legacy only draws a cell for samples whose raw score is outside Fail..Excellent.
+        var span = Span(test.ResultItems.Count + test.CategoryItems.Count + 2);
+        foreach (var sample in test.Samples)
+        {
+            var assessment = Assessment(participant, sample.SampleId, test.TestId);
+            if (!IsValidScore(assessment.Score))
+            {
+                cells.Add(new(ScoreText(source, assessment), span, 1, Cell, false));
+            }
         }
 
         return cells;

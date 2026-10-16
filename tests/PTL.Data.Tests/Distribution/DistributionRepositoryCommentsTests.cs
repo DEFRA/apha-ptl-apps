@@ -156,9 +156,10 @@ public class DistributionRepositoryCommentsTests
     {
         var (repository, _) = CreateRepository();
 
-        await Assert.ThrowsAsync<ArgumentNullException>(() => repository.UpdateTestConsultantCommentsAsync(SchemeId, "c", AuthorId, false, null!, [], []));
-        await Assert.ThrowsAsync<ArgumentNullException>(() => repository.UpdateTestConsultantCommentsAsync(SchemeId, "c", AuthorId, false, Audit, null!, []));
-        await Assert.ThrowsAsync<ArgumentNullException>(() => repository.UpdateTestConsultantCommentsAsync(SchemeId, "c", AuthorId, false, Audit, [], null!));
+        await Assert.ThrowsAsync<ArgumentNullException>(() => repository.UpdateTestConsultantCommentsAsync(SchemeId, "c", AuthorId, false, null!, new([], [])));
+        await Assert.ThrowsAsync<ArgumentNullException>(() => repository.UpdateTestConsultantCommentsAsync(SchemeId, "c", AuthorId, false, Audit, null!));
+        await Assert.ThrowsAsync<ArgumentNullException>(() => repository.UpdateTestConsultantCommentsAsync(SchemeId, "c", AuthorId, false, Audit, new(null!, [])));
+        await Assert.ThrowsAsync<ArgumentNullException>(() => repository.UpdateTestConsultantCommentsAsync(SchemeId, "c", AuthorId, false, Audit, new([], null!)));
     }
 
     [Fact]
@@ -168,7 +169,7 @@ public class DistributionRepositoryCommentsTests
         RespondToEveryWrite(connection);
         var file = new NewCommentsAttachment("new.pdf", "application/pdf", [7, 8], UploadDate);
 
-        await repository.UpdateTestConsultantCommentsAsync(SchemeId, "New text", AuthorId, true, Audit, [AttachmentId, OtherAttachmentId], [file]);
+        await repository.UpdateTestConsultantCommentsAsync(SchemeId, "New text", AuthorId, true, Audit, new([AttachmentId, OtherAttachmentId], [file]));
 
         var transaction = connection.LastTransaction!;
         Assert.True(transaction.Committed);
@@ -207,7 +208,7 @@ public class DistributionRepositoryCommentsTests
         var (repository, connection) = CreateRepository();
         RespondToEveryWrite(connection);
 
-        await repository.UpdateTestConsultantCommentsAsync(SchemeId, "c", Guid.Empty, false, Audit, [], []);
+        await repository.UpdateTestConsultantCommentsAsync(SchemeId, "c", Guid.Empty, false, Audit, new([], []));
 
         Assert.True(connection.LastTransaction!.Committed);
         Assert.Equal([Normalise(AuditSql), Normalise(UpdateSql)], connection.ExecutedCommands.Select(c => Normalise(c.CommandText)));

@@ -30,12 +30,11 @@ public sealed partial class DistributionController
         int monthId,
         Guid schemeId,
         string? command,
-        bool isAuditStep,
-        string? pendingCommand,
-        string? auditObjectName,
-        string? auditWhy,
+        AmendResultsAuditForm audit,
         CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(audit);
+
         if (string.Equals(command, CancelCommand, StringComparison.OrdinalIgnoreCase))
         {
             return RedirectToAction(nameof(Tabulations), new { year, monthId });
@@ -66,6 +65,7 @@ public sealed partial class DistributionController
             }
         }
 
+        var isAuditStep = audit.IsAuditStep is true;
         var model = new AmendResultsViewModel
         {
             YearId = year,
@@ -74,20 +74,20 @@ public sealed partial class DistributionController
             Page = page,
             Values = values,
             IsAuditStep = isAuditStep,
-            AuditObjectName = auditObjectName,
-            PendingCommand = pendingCommand,
-            AuditWhy = auditWhy,
+            AuditObjectName = audit.AuditObjectName,
+            PendingCommand = audit.PendingCommand,
+            AuditWhy = audit.AuditWhy,
         };
 
-        if (isAuditStep && string.IsNullOrWhiteSpace(auditWhy))
+        if (isAuditStep && string.IsNullOrWhiteSpace(audit.AuditWhy))
         {
             ModelState.AddModelError(nameof(AmendResultsViewModel.AuditWhy), AuditWhyRequiredMessage);
             return View(model);
         }
 
-        var effectiveCommand = isAuditStep ? pendingCommand : command;
+        var effectiveCommand = isAuditStep ? audit.PendingCommand : command;
         var result = await distributionApiClient.SaveAmendResultsAsync(
-            schemeId, ToAmendResultsRequest(page, model, isAuditStep ? auditWhy : null), cancellationToken);
+            schemeId, ToAmendResultsRequest(page, model, isAuditStep ? audit.AuditWhy : null), cancellationToken);
         if (result is null)
         {
             return NotFound();

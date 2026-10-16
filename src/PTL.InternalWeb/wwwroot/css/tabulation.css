@@ -153,11 +153,11 @@ body:not(.js-enabled) [data-amend-recalculate] {
 
 @media print {
     .noprint {
-        display: none !important;
+        display: none;
     }
 
     .printonly {
-        display: block !important;
+        display: block;
     }
 
     /* The printed page is the report only - matches legacy's master-chrome suppression. */
@@ -167,7 +167,7 @@ body:not(.js-enabled) [data-amend-recalculate] {
     .app-side-navigation,
     .govuk-notification-banner,
     .govuk-template__footer {
-        display: none !important;
+        display: none;
     }
 
     .govuk-grid-column-one-quarter {
@@ -190,7 +190,7 @@ body:not(.js-enabled) [data-amend-recalculate] {
     }
 
     .tabulationtitle {
-        font-size: 8pt !important;
+        font-size: 8pt;
     }
 
     table.TabulationTable {

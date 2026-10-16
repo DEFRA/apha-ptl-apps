@@ -53,17 +53,8 @@ public sealed class ActualResultsService(IDistributionRepository distributionRep
             return ActualResultsSaveOutcome.Of(ActualResultsSaveStatus.NotFound);
         }
 
-        var postedSamples = new Dictionary<Guid, string>();
-        foreach (var value in update.SampleValues)
-        {
-            postedSamples[value.SampleResultItemId] = value.Result ?? string.Empty;
-        }
-
-        var postedMethods = new Dictionary<Guid, string>();
-        foreach (var item in update.MethodItems)
-        {
-            postedMethods[item.TestMethodItemId] = item.Result ?? string.Empty;
-        }
+        var postedSamples = LastWins(update.SampleValues, v => v.SampleResultItemId, v => v.Result);
+        var postedMethods = LastWins(update.MethodItems, i => i.TestMethodItemId, i => i.Result);
 
         var errors = CollectErrors(state.Structure, postedSamples, postedMethods);
         if (errors.Count > 0)
@@ -116,6 +107,17 @@ public sealed class ActualResultsService(IDistributionRepository distributionRep
             cancellationToken);
 
         return ActualResultsSaveOutcome.Of(ActualResultsSaveStatus.Saved);
+    }
+
+    private static Dictionary<Guid, string> LastWins<T>(IEnumerable<T> items, Func<T, Guid> key, Func<T, string?> value)
+    {
+        var result = new Dictionary<Guid, string>();
+        foreach (var item in items)
+        {
+            result[key(item)] = value(item) ?? string.Empty;
+        }
+
+        return result;
     }
 
     private async Task<Guid> DefaultRatingIdAsync(CancellationToken cancellationToken)
@@ -221,52 +223,13 @@ public sealed class ActualResultsService(IDistributionRepository distributionRep
         var tests = new List<ActualResultsTest>();
         foreach (var test in structure.Tests.OrderBy(t => t.Order))
         {
-            var resultItems = structure.TestResultItems
-                .Where(r => r.TestId == test.TestId)
-                .OrderBy(r => r.Order)
-                .ToList();
-
-            var samples = new List<ActualResultsSampleRow>();
-            foreach (var sample in structure.Samples)
-            {
-                if (!sampleTests.TryGetValue((sample.SampleId, test.TestId), out var sampleTest) || !sampleTest.IsApplicable)
-                {
-                    continue;
-                }
-
-                var values = new List<ActualResultsSampleValue>();
-                foreach (var testResultItemId in resultItems.Select(r => r.TestResultItemId))
-                {
-                    if (sampleResultItems.TryGetValue((sampleTest.SampleTestId, testResultItemId), out var sri))
-                    {
-                        values.Add(new ActualResultsSampleValue(
-                            sri.SampleResultItemId, testResultItemId, state.SampleResults.GetValueOrDefault(sri.SampleResultItemId, string.Empty)));
-                    }
-                }
-
-                samples.Add(new ActualResultsSampleRow(sample.SampleId, sample.SampleNumber ?? string.Empty, values));
-            }
+            var built = BuildTest(state, test, sampleTests, sampleResultItems);
 
             // Legacy: a Test with no applicable Sample is not rendered at all.
-            if (samples.Count == 0)
+            if (built is not null)
             {
-                continue;
+                tests.Add(built);
             }
-
-            var methodItems = structure.TestMethodItems
-                .Where(m => m.TestId == test.TestId)
-                .OrderBy(m => m.Order)
-                .Select(m => new ActualResultsMethodItem(
-                    m.TestMethodItemId, m.Name ?? string.Empty, m.FormatString ?? string.Empty, m.ReturnValueType ?? string.Empty,
-                    state.MethodResults.GetValueOrDefault(m.TestMethodItemId, string.Empty)))
-                .ToList();
-
-            tests.Add(new ActualResultsTest(
-                test.TestId,
-                test.TestName ?? string.Empty,
-                [.. resultItems.Select(r => new ActualResultsResultItem(r.TestResultItemId, r.Name ?? string.Empty, r.FormatString ?? string.Empty, r.ReturnValueType ?? string.Empty))],
-                methodItems,
-                samples));
         }
 
         var header = state.Header;
@@ -279,5 +242,67 @@ public sealed class ActualResultsService(IDistributionRepository distributionRep
             header.FirstEditDate is null,
             tests,
             isReadOnly);
+    }
+
+    private static ActualResultsTest? BuildTest(
+        State state,
+        DistributionTestEntity test,
+        Dictionary<(Guid SampleId, Guid TestId), DistributionSampleTestEntity> sampleTests,
+        Dictionary<(Guid SampleTestId, Guid TestResultItemId), DistributionSampleResultItemEntity> sampleResultItems)
+    {
+        var structure = state.Structure;
+        var resultItems = structure.TestResultItems
+            .Where(r => r.TestId == test.TestId)
+            .OrderBy(r => r.Order)
+            .ToList();
+
+        var samples = new List<ActualResultsSampleRow>();
+        foreach (var sample in structure.Samples)
+        {
+            if (sampleTests.TryGetValue((sample.SampleId, test.TestId), out var sampleTest) && sampleTest.IsApplicable)
+            {
+                var values = SampleValues(state, sampleTest, resultItems.Select(r => r.TestResultItemId), sampleResultItems);
+                samples.Add(new ActualResultsSampleRow(sample.SampleId, sample.SampleNumber ?? string.Empty, values));
+            }
+        }
+
+        if (samples.Count == 0)
+        {
+            return null;
+        }
+
+        var methodItems = structure.TestMethodItems
+            .Where(m => m.TestId == test.TestId)
+            .OrderBy(m => m.Order)
+            .Select(m => new ActualResultsMethodItem(
+                m.TestMethodItemId, m.Name ?? string.Empty, m.FormatString ?? string.Empty, m.ReturnValueType ?? string.Empty,
+                state.MethodResults.GetValueOrDefault(m.TestMethodItemId, string.Empty)))
+            .ToList();
+
+        return new ActualResultsTest(
+            test.TestId,
+            test.TestName ?? string.Empty,
+            [.. resultItems.Select(r => new ActualResultsResultItem(r.TestResultItemId, r.Name ?? string.Empty, r.FormatString ?? string.Empty, r.ReturnValueType ?? string.Empty))],
+            methodItems,
+            samples);
+    }
+
+    private static List<ActualResultsSampleValue> SampleValues(
+        State state,
+        DistributionSampleTestEntity sampleTest,
+        IEnumerable<Guid> testResultItemIds,
+        Dictionary<(Guid SampleTestId, Guid TestResultItemId), DistributionSampleResultItemEntity> sampleResultItems)
+    {
+        var values = new List<ActualResultsSampleValue>();
+        foreach (var testResultItemId in testResultItemIds)
+        {
+            if (sampleResultItems.TryGetValue((sampleTest.SampleTestId, testResultItemId), out var sri))
+            {
+                values.Add(new ActualResultsSampleValue(
+                    sri.SampleResultItemId, testResultItemId, state.SampleResults.GetValueOrDefault(sri.SampleResultItemId, string.Empty)));
+            }
+        }
+
+        return values;
     }
 }

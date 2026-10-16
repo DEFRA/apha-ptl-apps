@@ -13,9 +13,10 @@ public partial interface IDistributionRepository
         Guid authorId,
         bool isCommentSubmitted,
         CommentsAudit audit,
-        IReadOnlyList<Guid> removedAttachmentIds,
-        IReadOnlyList<NewCommentsAttachment> newAttachments,
+        CommentsAttachmentChanges attachments,
         CancellationToken cancellationToken = default);
 }
 
 public sealed record NewCommentsAttachment(string FileName, string ContentType, byte[] FileData, DateTime UploadDate);
+
+public sealed record CommentsAttachmentChanges(IReadOnlyList<Guid> RemovedAttachmentIds, IReadOnlyList<NewCommentsAttachment> NewAttachments);

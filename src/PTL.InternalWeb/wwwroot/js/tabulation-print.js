@@ -19,131 +19,134 @@
         return (text || "") + "\u00a0";
     }
 
-    function CustomTable(testName, participants) {
-        this.table = document.createElement("table");
-        this.table.className = "TabulationTable";
-        var body = document.createElement("tbody");
+    // Rows 0-3 are the test header, sample header, intended description and intended value rows;
+    // participant rows follow.
+    const FIRST_PARTICIPANT_ROW = 4;
 
-        var header = document.createElement("tr");
-        var headerCell = cell(testName, "TabulationHeader1");
-        headerCell.rowSpan = 2;
-        header.appendChild(headerCell);
-        body.appendChild(header);
-        body.appendChild(document.createElement("tr"));
+    class CustomTable {
+        constructor(testName, participants) {
+            this.table = document.createElement("table");
+            this.table.className = "TabulationTable";
+            const body = document.createElement("tbody");
 
-        var intended = document.createElement("tr");
-        var intendedCell = cell("Intended", "TabulationCell");
-        intendedCell.rowSpan = 2;
-        intended.appendChild(intendedCell);
-        body.appendChild(intended);
-        body.appendChild(document.createElement("tr"));
+            const header = document.createElement("tr");
+            const headerCell = cell(testName, "TabulationHeader1");
+            headerCell.rowSpan = 2;
+            header.appendChild(headerCell);
+            body.appendChild(header);
+            body.appendChild(document.createElement("tr"));
 
-        participants.forEach(function (p) {
-            var row = document.createElement("tr");
-            row.appendChild(cell(withSpace(p.labCode), "TabulationCell"));
-            body.appendChild(row);
-        });
+            const intended = document.createElement("tr");
+            const intendedCell = cell("Intended", "TabulationCell");
+            intendedCell.rowSpan = 2;
+            intended.appendChild(intendedCell);
+            body.appendChild(intended);
+            body.appendChild(document.createElement("tr"));
 
-        this.table.appendChild(body);
-        this.participants = participants;
-    }
+            participants.forEach(function (p) {
+                const row = document.createElement("tr");
+                row.appendChild(cell(withSpace(p.labCode), "TabulationCell"));
+                body.appendChild(row);
+            });
 
-    // A participant without results gets one Nil Return cell that grows across the columns.
-    CustomTable.prototype.addNilReturn = function (rowIndex, isFirstColumn) {
-        var row = this.table.rows[4 + rowIndex];
-        if (isFirstColumn) {
-            row.appendChild(cell(this.participants[rowIndex].nilReturnReason, "TabulationCell NilReturn"));
-        } else {
-            row.cells[row.cells.length - 1].colSpan += 1;
+            this.table.appendChild(body);
+            this.participants = participants;
         }
-    };
 
-    CustomTable.prototype.addMethodColumn = function (column) {
-        var header = cell(column.headerText, "TabulationHeader2");
-        header.rowSpan = 2;
-        this.table.rows[0].appendChild(header);
-        this.table.rows[2].appendChild(cell("\u00a0", "TabulationCell"));
-        this.table.rows[3].appendChild(cell(withSpace(column.intendedResult), "TabulationCell"));
-
-        var isFirstColumn = this.table.rows[0].cells.length === 2;
-        for (var i = 0; i < column.results.length; i++) {
-            if (this.participants[i].hasResults) {
-                this.table.rows[4 + i].appendChild(cell(column.results[i], "TabulationCell"));
+        // A participant without results gets one Nil Return cell that grows across the columns.
+        addNilReturn(rowIndex, isFirstColumn) {
+            const row = this.table.rows[FIRST_PARTICIPANT_ROW + rowIndex];
+            if (isFirstColumn) {
+                row.appendChild(cell(this.participants[rowIndex].nilReturnReason, "TabulationCell NilReturn"));
             } else {
-                this.addNilReturn(i, isFirstColumn);
+                row.cells[row.cells.length - 1].colSpan += 1;
             }
         }
-    };
 
-    CustomTable.prototype.addSampleColumn = function (sample) {
-        var header = cell(sample.sampleNumber, "TabulationHeader1");
-        header.colSpan = sample.resultColumns.length;
-        this.table.rows[0].appendChild(header);
-
-        var intended = cell(withSpace(sample.tabulationDescription), "TabulationCell");
-        intended.colSpan = sample.resultColumns.length;
-        this.table.rows[2].appendChild(intended);
-
-        for (var i = 0; i < sample.resultColumns.length; i++) {
-            var column = sample.resultColumns[i];
-            this.table.rows[1].appendChild(cell(column.headerText, "TabulationHeader2"));
+        addMethodColumn(column) {
+            const header = cell(column.headerText, "TabulationHeader2");
+            header.rowSpan = 2;
+            this.table.rows[0].appendChild(header);
+            this.table.rows[2].appendChild(cell("\u00a0", "TabulationCell"));
             this.table.rows[3].appendChild(cell(withSpace(column.intendedResult), "TabulationCell"));
 
-            for (var j = 0; j < column.results.length; j++) {
-                if (this.participants[j].hasResults) {
-                    var result = column.results[j];
-                    if (result.span > 0) {
-                        var td = cell(result.result, "TabulationCell");
-                        td.colSpan = result.span;
-                        this.table.rows[4 + j].appendChild(td);
-                    }
+            const isFirstColumn = this.table.rows[0].cells.length === 2;
+            for (let i = 0; i < column.results.length; i++) {
+                if (this.participants[i].hasResults) {
+                    this.table.rows[FIRST_PARTICIPANT_ROW + i].appendChild(cell(column.results[i], "TabulationCell"));
                 } else {
-                    this.addNilReturn(j, this.table.rows[4 + j].cells.length === 1);
+                    this.addNilReturn(i, isFirstColumn);
                 }
             }
         }
-    };
 
-    function RatingTable(participants) {
-        this.table = document.createElement("table");
-        this.table.className = "TabulationTable";
-        var body = document.createElement("tbody");
+        addSampleColumn(sample) {
+            const header = cell(sample.sampleNumber, "TabulationHeader1");
+            header.colSpan = sample.resultColumns.length;
+            this.table.rows[0].appendChild(header);
 
-        var header = document.createElement("tr");
-        header.appendChild(cell("QAU Ratings", "TabulationHeader1"));
-        body.appendChild(header);
+            const intended = cell(withSpace(sample.tabulationDescription), "TabulationCell");
+            intended.colSpan = sample.resultColumns.length;
+            this.table.rows[2].appendChild(intended);
 
-        participants.forEach(function (p) {
-            var row = document.createElement("tr");
-            row.appendChild(cell(withSpace(p.labCode), "TabulationCell"));
-            body.appendChild(row);
-        });
-
-        ["Mean score of all laboratories: ",
-            "No. of Labs reporting intended results: ",
-            "No. Of Participants: ",
-            "Percent Correct: "].forEach(function (label) {
-            var row = document.createElement("tr");
-            row.appendChild(cell(label, "TabulationCell"));
-            body.appendChild(row);
-        });
-
-        this.table.appendChild(body);
-    }
-
-    RatingTable.prototype.addRatingColumn = function (column) {
-        var rows = this.table.rows;
-        rows[0].appendChild(cell(column.sampleNumber, "TabulationHeader2"));
-        for (var i = 0; i < column.ratings.length; i++) {
-            rows[1 + i].appendChild(cell(column.ratings[i], "TabulationCell"));
+            for (const column of sample.resultColumns) {
+                this.table.rows[1].appendChild(cell(column.headerText, "TabulationHeader2"));
+                this.table.rows[3].appendChild(cell(withSpace(column.intendedResult), "TabulationCell"));
+                this.addSampleResults(column.results);
+            }
         }
 
-        var offset = column.ratings.length;
-        rows[1 + offset].appendChild(cell(column.sampleMean, "TabulationHeader2"));
-        rows[2 + offset].appendChild(cell(column.numberReportingIntendedResult, "TabulationHeader2"));
-        rows[3 + offset].appendChild(cell(column.numberOfParticipants, "TabulationHeader2"));
-        rows[4 + offset].appendChild(cell(column.samplePassRate, "TabulationHeader2"));
-    };
+        addSampleResults(results) {
+            for (let j = 0; j < results.length; j++) {
+                const row = this.table.rows[FIRST_PARTICIPANT_ROW + j];
+                if (!this.participants[j].hasResults) {
+                    this.addNilReturn(j, row.cells.length === 1);
+                } else if (results[j].span > 0) {
+                    const td = cell(results[j].result, "TabulationCell");
+                    td.colSpan = results[j].span;
+                    row.appendChild(td);
+                }
+            }
+        }
+    }
+
+    class RatingTable {
+        constructor(participants) {
+            this.table = document.createElement("table");
+            this.table.className = "TabulationTable";
+            const body = document.createElement("tbody");
+
+            const header = document.createElement("tr");
+            header.appendChild(cell("QAU Ratings", "TabulationHeader1"));
+            body.appendChild(header);
+
+            const labels = participants.map(function (p) { return withSpace(p.labCode); })
+                .concat(["Mean score of all laboratories: ",
+                    "No. of Labs reporting intended results: ",
+                    "No. Of Participants: ",
+                    "Percent Correct: "]);
+            labels.forEach(function (label) {
+                const row = document.createElement("tr");
+                row.appendChild(cell(label, "TabulationCell"));
+                body.appendChild(row);
+            });
+
+            this.table.appendChild(body);
+        }
+
+        addRatingColumn(column) {
+            const rows = this.table.rows;
+            rows[0].appendChild(cell(column.sampleNumber, "TabulationHeader2"));
+            column.ratings.forEach(function (rating, i) {
+                rows[1 + i].appendChild(cell(rating, "TabulationCell"));
+            });
+
+            const statistics = [column.sampleMean, column.numberReportingIntendedResult, column.numberOfParticipants, column.samplePassRate];
+            statistics.forEach(function (value, i) {
+                rows[1 + column.ratings.length + i].appendChild(cell(value, "TabulationHeader2"));
+            });
+        }
+    }
 
     // Adds columns one at a time; when a column pushes the table past the page width (and it is not
     // the table's first column) that column is removed and drawn again at the start of a new table.
@@ -195,9 +198,9 @@
         }
 
         var tables = container.getElementsByTagName("table");
-        for (var t = 0; t < tables.length; t++) {
-            if (tables[t].offsetWidth >= stretchWidth) {
-                tables[t].style.width = pageWidth + "px";
+        for (const printTable of tables) {
+            if (printTable.offsetWidth >= stretchWidth) {
+                printTable.style.width = pageWidth + "px";
             }
         }
 

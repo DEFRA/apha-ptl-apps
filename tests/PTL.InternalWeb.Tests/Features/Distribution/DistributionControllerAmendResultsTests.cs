@@ -72,7 +72,27 @@ public class DistributionControllerAmendResultsTests
 
     private static Task<IActionResult> PostAsync(
         DistributionController controller, string? command, bool isAuditStep = false, string? pendingCommand = null, string? auditWhy = null) =>
-        controller.AmendResults(2026, 5, SchemeId, command, isAuditStep, pendingCommand, isAuditStep ? AuditObject : null, auditWhy, CancellationToken.None);
+        controller.AmendResults(
+            2026,
+            5,
+            SchemeId,
+            command,
+            new AmendResultsAuditForm
+            {
+                IsAuditStep = isAuditStep,
+                PendingCommand = pendingCommand,
+                AuditObjectName = isAuditStep ? AuditObject : null,
+                AuditWhy = auditWhy,
+            },
+            CancellationToken.None);
+
+    [Fact]
+    public async Task AmendResults_NullAuditForm_Throws()
+    {
+        var controller = CreateController(new FakeDistributionApiClient());
+
+        await Assert.ThrowsAsync<ArgumentNullException>(() => controller.AmendResults(2026, 5, SchemeId, "save", null!, CancellationToken.None));
+    }
 
     private static async Task<AmendResultsSaveRequest> SavedRequestAsync(params (string Key, string[] Values)[] form)
     {

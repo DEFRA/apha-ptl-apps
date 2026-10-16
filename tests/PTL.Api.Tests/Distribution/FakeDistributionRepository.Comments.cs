@@ -17,11 +17,10 @@ internal sealed partial class FakeDistributionRepository
         Guid authorId,
         bool isCommentSubmitted,
         CommentsAudit audit,
-        IReadOnlyList<Guid> removedAttachmentIds,
-        IReadOnlyList<NewCommentsAttachment> newAttachments,
+        CommentsAttachmentChanges attachments,
         CancellationToken cancellationToken = default)
     {
-        UpdatedComments.Add((monthlyDistributionSchemeId, comments, authorId, isCommentSubmitted, audit, removedAttachmentIds, newAttachments));
+        UpdatedComments.Add((monthlyDistributionSchemeId, comments, authorId, isCommentSubmitted, audit, attachments.RemovedAttachmentIds, attachments.NewAttachments));
         return Task.CompletedTask;
     }
 }

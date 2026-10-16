@@ -53,13 +53,13 @@ public sealed partial class DistributionRepository
         Guid authorId,
         bool isCommentSubmitted,
         CommentsAudit audit,
-        IReadOnlyList<Guid> removedAttachmentIds,
-        IReadOnlyList<NewCommentsAttachment> newAttachments,
+        CommentsAttachmentChanges attachments,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(audit);
-        ArgumentNullException.ThrowIfNull(removedAttachmentIds);
-        ArgumentNullException.ThrowIfNull(newAttachments);
+        ArgumentNullException.ThrowIfNull(attachments);
+        ArgumentNullException.ThrowIfNull(attachments.RemovedAttachmentIds);
+        ArgumentNullException.ThrowIfNull(attachments.NewAttachments);
 
         using var connection = connectionFactory.CreateConnection();
         connection.Open();
@@ -85,7 +85,7 @@ public sealed partial class DistributionRepository
             transaction);
 
         // Legacy MonthlyDistributionSchemeAttachmentList.Update: removals first, then new files.
-        foreach (var attachmentId in removedAttachmentIds)
+        foreach (var attachmentId in attachments.RemovedAttachmentIds)
         {
             await connection.ExecuteAsync(
                 "EXEC dbo.spuMonthlyDistributionSchemeAttachmentSetDeleted @AttachmentId = @AttachmentId",
@@ -93,7 +93,7 @@ public sealed partial class DistributionRepository
                 transaction);
         }
 
-        foreach (var attachment in newAttachments)
+        foreach (var attachment in attachments.NewAttachments)
         {
             var parameters = new DynamicParameters(new
             {

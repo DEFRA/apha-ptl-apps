@@ -220,35 +220,6 @@ public sealed partial class DistributionController(
     private static TabulationActionResponse ToTabulationActionResponse(TabulationAction action) =>
         new(action.Text, action.IsEnabled, action.Hint, action.Command.ToString(), action.IsOverdue, action.IsLabel);
 
-    private static SampleReceiptResponse ToResponse(SampleReceiptPage page) =>
-        new(
-            page.SchemeHeading,
-            page.LabHeading,
-            page.IsReadOnly,
-            [.. page.Tests.Select(t => new SampleReceiptTestResponse(
-                t.TestId,
-                t.TestType,
-                [.. t.Samples.Select(s => new SampleReceiptSampleResponse(s.SampleReceiptId, s.SampleNumber, s.Submitted, s.NotSubmitted, s.NotInRepertoire))]))]);
-
-    private static ActualResultsResponse ToResponse(ActualResultsPage page) =>
-        new(
-            page.DistributionParticipantId,
-            page.MonthlyDistributionSchemeId,
-            page.Heading,
-            page.AuditObjectName,
-            page.DeadlineDate,
-            page.IsNew,
-            [.. page.Tests.Select(t => new ActualResultsTestResponse(
-                t.TestId,
-                t.TestName,
-                [.. t.ResultItems.Select(r => new ActualResultsResultItemResponse(r.TestResultItemId, r.Name, r.FormatString, r.ReturnValueType))],
-                [.. t.MethodItems.Select(m => new ActualResultsMethodItemResponse(m.TestMethodItemId, m.Name, m.FormatString, m.ReturnValueType, m.Result))],
-                [.. t.Samples.Select(s => new ActualResultsSampleRowResponse(
-                    s.SampleId,
-                    s.SampleNumber,
-                    [.. s.Values.Select(v => new ActualResultsSampleValueResponse(v.SampleResultItemId, v.TestResultItemId, v.Result))]))]))],
-            page.IsReadOnly);
-
     // GET /api/distributions/months/{yearId}/{monthId}/packaging?mode={0|1|2}&week={1-4} - the
     // Sample Packaging screen, legacy GroupedPackagingSheet / PartGroupedPackagingSheet /
     // WeeklyPackagingSheet.Fetch*. Week is required for the two Combined options only.
@@ -482,6 +453,35 @@ public sealed partial class DistributionController(
         var outcome = await distributionParticipantsService.RepeatDistributionAsync(monthlyDistributionSchemeId, selections, cancellationToken);
         return Ok(new RepeatDistributionResult(outcome.Success, outcome.Error));
     }
+
+    private static SampleReceiptResponse ToResponse(SampleReceiptPage page) =>
+        new(
+            page.SchemeHeading,
+            page.LabHeading,
+            page.IsReadOnly,
+            [.. page.Tests.Select(t => new SampleReceiptTestResponse(
+                t.TestId,
+                t.TestType,
+                [.. t.Samples.Select(s => new SampleReceiptSampleResponse(s.SampleReceiptId, s.SampleNumber, s.Submitted, s.NotSubmitted, s.NotInRepertoire))]))]);
+
+    private static ActualResultsResponse ToResponse(ActualResultsPage page) =>
+        new(
+            page.DistributionParticipantId,
+            page.MonthlyDistributionSchemeId,
+            page.Heading,
+            page.AuditObjectName,
+            page.DeadlineDate,
+            page.IsNew,
+            [.. page.Tests.Select(t => new ActualResultsTestResponse(
+                t.TestId,
+                t.TestName,
+                [.. t.ResultItems.Select(r => new ActualResultsResultItemResponse(r.TestResultItemId, r.Name, r.FormatString, r.ReturnValueType))],
+                [.. t.MethodItems.Select(m => new ActualResultsMethodItemResponse(m.TestMethodItemId, m.Name, m.FormatString, m.ReturnValueType, m.Result))],
+                [.. t.Samples.Select(s => new ActualResultsSampleRowResponse(
+                    s.SampleId,
+                    s.SampleNumber,
+                    [.. s.Values.Select(v => new ActualResultsSampleValueResponse(v.SampleResultItemId, v.TestResultItemId, v.Result))]))]))],
+            page.IsReadOnly);
 
     private static DistributionParticipantsResponse ToResponse(DistributionParticipantsData data) =>
         new(
