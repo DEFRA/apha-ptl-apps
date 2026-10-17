@@ -174,10 +174,12 @@ public static class SideNavigationProvider
                                     [
                                         new SideNavigationItem { Text = "Contract Item Details", ControllerName = ParticipantSchemeControllerName, ActionName = DetailsAction, IsHidden = true },
                                         new SideNavigationItem { Text = "Add Contract Item", ControllerName = ParticipantSchemeControllerName, ActionName = CreateAction, IsHidden = true },
-                                        new SideNavigationItem { Text = "Edit Contract Item", ControllerName = ParticipantSchemeControllerName, ActionName = EditAction, IsHidden = true },
-                                        new SideNavigationItem { Text = "Import Permits", ControllerName = ContractControllerName, ActionName = "ImportPermits", IsHidden = true }
+                                        new SideNavigationItem { Text = "Edit Contract Item", ControllerName = ParticipantSchemeControllerName, ActionName = EditAction, IsHidden = true }
                                     ]
                                 },
+
+                                // Hidden: reached from the Contracts list's Import Permit(s) link, not from Contract Items.
+                                new SideNavigationItem { Text = "Import Permit(s)", ControllerName = ContractControllerName, ActionName = "ImportPermits", IsHidden = true },
 
                                 // Hidden: a download action that only renders a page when the
                                 // requested document type has no template (FeatureNotAvailable).

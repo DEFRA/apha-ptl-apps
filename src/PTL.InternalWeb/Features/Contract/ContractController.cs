@@ -128,6 +128,17 @@ public class ContractController(IContractApiClient contractApiClient, ICustomerA
         int pageSize = PTL.SharedUI.Pagination.PaginationModel.DefaultPageSize,
         CancellationToken cancellationToken = default)
     {
+        // Links back to this list (breadcrumb, Cancel, Back) carry only the customer, so with no
+        // criteria in the URL the user's last search is restored instead of the defaults.
+        if (ContractSearchState.HasCriteria(HttpContext))
+        {
+            ContractSearchState.Save(HttpContext, new ContractSearchViewModel(customerId, yearId, period, searchTerm, page, pageSize));
+        }
+        else if (ContractSearchState.TryRestore(HttpContext, customerId) is { } saved)
+        {
+            (yearId, period, searchTerm, page, pageSize) = (saved.YearId, saved.Period, saved.SearchTerm, saved.Page, saved.PageSize);
+        }
+
         var result = await contractApiClient.GetContractsForCustomerAsync(customerId, new ContractSearchRequest(yearId, period, searchTerm, page, pageSize), cancellationToken);
         LogDisplayedContractListMessage(logger, customerId, yearId, searchTerm, page, result.TotalCount, null);
 
@@ -531,6 +542,7 @@ public class ContractController(IContractApiClient contractApiClient, ICustomerA
     {
         var permits = await importPermitApiClient.GetImportPermitsAsync(id, cancellationToken);
         LogDisplayedImportPermitsMessage(logger, id, permits.Count, null);
+        await PublishImportPermitsBreadcrumbAsync(id, cancellationToken);
         return ImportPermitsView(ToImportPermitsViewModel(id, permits));
     }
 
@@ -553,6 +565,7 @@ public class ContractController(IContractApiClient contractApiClient, ICustomerA
         }
 
         var model = await BuildPendingImportPermitsModelAsync(id, pending ?? [], cancellationToken);
+        await PublishImportPermitsBreadcrumbAsync(id, cancellationToken);
 
         if (string.Equals(command, ImportPermitCommands.Edit, StringComparison.OrdinalIgnoreCase))
         {
@@ -585,6 +598,16 @@ public class ContractController(IContractApiClient contractApiClient, ICustomerA
     {
         ViewData[BreadcrumbRouteValues.ContractId] = model.ContractId;
         return View(nameof(ImportPermits), model);
+    }
+
+    // The Contracts crumb links to the customer's contract list, so it needs the customer id.
+    private async Task PublishImportPermitsBreadcrumbAsync(Guid contractId, CancellationToken cancellationToken)
+    {
+        var contract = await contractApiClient.GetContractAsync(contractId, cancellationToken);
+        if (contract is not null)
+        {
+            ViewData[BreadcrumbRouteValues.CustomerId] = contract.CustomerId;
+        }
     }
 
     // Legacy returns to ContractList.aspx from Save and Cancel/Back.
@@ -733,6 +756,9 @@ public class ContractController(IContractApiClient contractApiClient, ICustomerA
         }
 
         TempData.SetNotification(NotificationType.Success, "Contract renewed successfully.");
+
+        // The renewed contracts are for the next year, so a saved Historical filter would hide them.
+        ContractSearchState.Clear(HttpContext);
         return RedirectToAction(nameof(Index), new { customerId });
     }
 

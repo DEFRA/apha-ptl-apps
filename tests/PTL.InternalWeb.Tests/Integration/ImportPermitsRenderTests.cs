@@ -95,6 +95,20 @@ public class ImportPermitsRenderTests : IClassFixture<WebApplicationFactory<Prog
     }
 
     [Fact]
+    public async Task Get_BreadcrumbGoesStraightFromContractsToImportPermits_WithoutContractItems()
+    {
+        var html = await _factory.CreateClient().GetStringAsync(Url);
+
+        var crumbs = Regex.Match(html, "<nav class=\"govuk-breadcrumbs\".*?</nav>", RegexOptions.Singleline).Value;
+        var labels = Regex.Matches(crumbs, "<li class=\"govuk-breadcrumbs__list-item\"[^>]*>(.*?)</li>", RegexOptions.Singleline)
+            .Select(m => Regex.Replace(m.Groups[1].Value, "<[^>]+>", string.Empty).Trim())
+            .ToList();
+
+        Assert.Equal(["Home", "Manage Contracts", "Customers", "Contracts", "Import Permit(s)"], labels);
+        Assert.Contains($"customerId={CustomerId}", crumbs, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Edit_RendersEditControlsAndUpdateAndCancelButtonsForThatRow()
     {
         var html = MainContent(await PostAsync("edit", First));
