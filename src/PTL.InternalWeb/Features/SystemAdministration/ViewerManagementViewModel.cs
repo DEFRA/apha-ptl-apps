@@ -31,10 +31,14 @@ public sealed class ViewerRowViewModel
     // same convention as CountryManagement/ExternalTestConsultantManagement.
     public bool IsEditing { get; set; }
 
-    // Pre-built, JS-string-escaped confirm() text for the Remove button - always at least "Are
-    // you sure...?", enriched with the assigned schemes/participants listing when any exist
-    // (matches legacy's GridViewTC_RowDataBound warning, built server-side here instead of in
-    // markup so the JS-escaping only has to be done in one place).
+    // True when the viewer still has scheme/participant assignments. ViewerService.DeleteAsync
+    // refuses to remove such a viewer (tlnkViewerScheme/tlnkViewerParticipant FK to tblViewer),
+    // so the view shows RemoveConfirmMessage as an alert instead of a confirm().
+    public bool IsRemoveBlocked { get; set; }
+
+    // Pre-built, JS-string-escaped text for the Remove button. When IsRemoveBlocked it lists the
+    // assignments that must be removed first; otherwise it is a plain "Are you sure...?" confirm.
+    // Built server-side so the JS-escaping only has to be done in one place.
     public string RemoveConfirmMessage { get; set; } = string.Empty;
 }
 

@@ -41,7 +41,10 @@ public sealed class UserController(IUserService userService) : ControllerBase
     {
         try
         {
-            var created = await userService.CreateUserAsync(request.Username, request.Email, request.FriendlyName, request.FirstName, request.LastName, request.Department, cancellationToken);
+            var created = await userService.CreateUserAsync(
+                new NewUserDetails(request.Username, request.Email, request.FriendlyName, request.FirstName, request.LastName, request.Department),
+                request.ActingUserId,
+                cancellationToken);
             return Ok(ToResponse(created));
         }
         catch (UserValidationException ex)

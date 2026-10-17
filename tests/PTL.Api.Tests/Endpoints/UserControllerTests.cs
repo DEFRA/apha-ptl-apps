@@ -12,7 +12,7 @@ public class UserControllerTests
 {
     private static UserController CreateController(FakeUserRepository repository, FakeStaffDirectoryService? directory = null)
     {
-        var controller = new UserController(new UserService(repository, directory ?? new FakeStaffDirectoryService()));
+        var controller = new UserController(new UserService(repository, directory ?? new FakeStaffDirectoryService(), new PTL.Api.Tests.Audit.FakeActingUserAccessor()));
 
         var services = new ServiceCollection().AddMvc().Services.BuildServiceProvider();
         controller.ControllerContext = new ControllerContext

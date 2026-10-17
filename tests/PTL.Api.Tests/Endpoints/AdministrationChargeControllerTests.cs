@@ -12,7 +12,7 @@ public class AdministrationChargeControllerTests
 {
     private static AdministrationChargeController CreateController(FakeAdministrationChargeRepository repository)
     {
-        var controller = new AdministrationChargeController(new AdministrationChargeService(repository));
+        var controller = new AdministrationChargeController(new AdministrationChargeService(repository, new PTL.Api.Tests.Audit.FakeActingUserAccessor()));
 
         // ValidationProblem() resolves ProblemDetailsFactory from HttpContext.RequestServices,
         // which a bare controller instance does not have without this wiring.

@@ -1,5 +1,7 @@
 using Dapper;
+using PTL.Core.Audit;
 using PTL.Core.ExternalSiteMessage;
+using PTL.Data.Audit;
 using PTL.Data.Infrastructure;
 using CoreExternalSiteMessage = PTL.Core.ExternalSiteMessage.ExternalSiteMessage;
 
@@ -16,11 +18,13 @@ public sealed class ExternalSiteMessageRepository(IDbConnectionFactory connectio
         return result ?? throw new InvalidOperationException("tblExtWebsiteMessage must have a row with Id = 0.");
     }
 
-    public async Task UpdateAsync(CoreExternalSiteMessage message, CancellationToken cancellationToken = default)
-    {
-        using var connection = connectionFactory.CreateConnection();
-        await connection.ExecuteAsync(
-            "EXEC dbo.spuMainPageMessage @Message, @ImportantMessage, @SupportEmailAddress",
-            new { message.Message, message.ImportantMessage, message.SupportEmailAddress });
-    }
+    public Task UpdateAsync(CoreExternalSiteMessage message, AuditEntry? auditEntry = null, CancellationToken cancellationToken = default) =>
+        AuditTrailWriter.ExecuteAsync(
+            connectionFactory,
+            auditEntry,
+            (connection, transaction) => connection.ExecuteAsync(
+                "EXEC dbo.spuMainPageMessage @Message, @ImportantMessage, @SupportEmailAddress",
+                new { message.Message, message.ImportantMessage, message.SupportEmailAddress },
+                transaction),
+            cancellationToken);
 }

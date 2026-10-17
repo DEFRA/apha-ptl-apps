@@ -1,6 +1,8 @@
+using PTL.Core.Audit;
+
 namespace PTL.Core.Country;
 
-public sealed class CountryService(ICountryRepository repository) : ICountryService
+public sealed class CountryService(ICountryRepository repository, IActingUserAccessor actingUser) : ICountryService
 {
     public Task<IReadOnlyList<Country>> GetAllAsync(CancellationToken cancellationToken = default) =>
         repository.GetAllAsync(cancellationToken);
@@ -17,7 +19,7 @@ public sealed class CountryService(ICountryRepository repository) : ICountryServ
         EnsureNameNotDuplicated(existing, name, excludingCountryId: null);
 
         var newCountry = new Country { CountryId = Guid.NewGuid(), CountryName = name, CountryTypeId = countryTypeId };
-        await repository.CreateAsync(newCountry, cancellationToken);
+        await repository.CreateAsync(newCountry, Audit("CreateCountry", newCountry.CountryId, $"Name={name}"), cancellationToken);
         return newCountry;
     }
 
@@ -35,7 +37,7 @@ public sealed class CountryService(ICountryRepository repository) : ICountryServ
         EnsureNameNotDuplicated(existingCountries, name, excludingCountryId: countryId);
 
         var updated = new Country { CountryId = countryId, CountryName = name, CountryTypeId = countryTypeId };
-        await repository.UpdateAsync(updated, cancellationToken);
+        await repository.UpdateAsync(updated, Audit("UpdateCountry", countryId, $"Name={name}"), cancellationToken);
         return updated;
     }
 
@@ -52,9 +54,12 @@ public sealed class CountryService(ICountryRepository repository) : ICountryServ
             return new CountryDeleteResult(false, $"This country is being used by {existing.AllocationCount} customer(s)/participant(s)/Group Addresses.");
         }
 
-        await repository.DeleteAsync(countryId, cancellationToken);
+        await repository.DeleteAsync(countryId, Audit("DeleteCountry", countryId, $"Name={existing.CountryName}"), cancellationToken);
         return new CountryDeleteResult(true, null);
     }
+
+    private AuditEntry Audit(string action, Guid countryId, string details) =>
+        new(actingUser.ActingUserId, action, "Country", countryId.ToString(), details);
 
     private static void Validate(string country, Guid countryTypeId)
     {

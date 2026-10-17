@@ -1,3 +1,4 @@
+using PTL.Core.Audit;
 using PTL.Core.Viewer;
 
 namespace PTL.Api.Tests.Participant;
@@ -7,6 +8,9 @@ internal sealed class FakeViewerRepository : IViewerRepository
     public List<ViewerEntity> Viewers { get; } = [];
 
     public List<SchemeViewerEntity> SchemeViewers { get; } = [];
+
+    // Audit entry passed to the most recent CreateAsync/UpdateAsync/DeleteAsync (null when none was supplied).
+    public AuditEntry? LastAuditEntry { get; private set; }
 
     public Task<IReadOnlyList<ViewerEntity>> GetAllAsync(CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<ViewerEntity>>(Viewers);
@@ -20,15 +24,17 @@ internal sealed class FakeViewerRepository : IViewerRepository
     public Task<ViewerEntity?> GetByEmailAsync(string email, CancellationToken cancellationToken = default) =>
         Task.FromResult(Viewers.FirstOrDefault(v => string.Equals(v.Email, email, StringComparison.OrdinalIgnoreCase)));
 
-    public Task<ViewerEntity> CreateAsync(ViewerEntity viewer, CancellationToken cancellationToken = default)
+    public Task<ViewerEntity> CreateAsync(ViewerEntity viewer, AuditEntry? auditEntry = null, CancellationToken cancellationToken = default)
     {
+        LastAuditEntry = auditEntry;
         viewer.ViewerId = viewer.ViewerId == Guid.Empty ? Guid.NewGuid() : viewer.ViewerId;
         Viewers.Add(viewer);
         return Task.FromResult(viewer);
     }
 
-    public Task<ViewerEntity?> UpdateAsync(ViewerEntity viewer, CancellationToken cancellationToken = default)
+    public Task<ViewerEntity?> UpdateAsync(ViewerEntity viewer, AuditEntry? auditEntry = null, CancellationToken cancellationToken = default)
     {
+        LastAuditEntry = auditEntry;
         var index = Viewers.FindIndex(v => v.ViewerId == viewer.ViewerId);
         if (index < 0)
         {
@@ -39,8 +45,9 @@ internal sealed class FakeViewerRepository : IViewerRepository
         return Task.FromResult<ViewerEntity?>(viewer);
     }
 
-    public Task<bool> DeleteAsync(Guid viewerId, CancellationToken cancellationToken = default)
+    public Task<bool> DeleteAsync(Guid viewerId, AuditEntry? auditEntry = null, CancellationToken cancellationToken = default)
     {
+        LastAuditEntry = auditEntry;
         var index = Viewers.FindIndex(v => v.ViewerId == viewerId);
         if (index < 0)
         {

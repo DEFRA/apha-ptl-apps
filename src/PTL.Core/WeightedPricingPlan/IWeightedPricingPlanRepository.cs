@@ -1,3 +1,4 @@
+using PTL.Core.Audit;
 using PTL.Core.Lookup;
 
 namespace PTL.Core.WeightedPricingPlan;
@@ -13,5 +14,5 @@ public interface IWeightedPricingPlanRepository
 
     // sppRenewPricingPlan - idempotent copy-forward from (newYearId - 1) into newYearId; a no-op
     // if newYearId already has rows or if there's nothing to copy from.
-    Task RenewAsync(int newYearId, CancellationToken cancellationToken = default);
+    Task RenewAsync(int newYearId, AuditEntry? auditEntry = null, CancellationToken cancellationToken = default);
 }

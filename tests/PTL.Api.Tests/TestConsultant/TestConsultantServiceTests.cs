@@ -1,3 +1,4 @@
+using PTL.Api.Tests.Audit;
 using PTL.Api.Tests.ExternalUser;
 using PTL.Core.TestConsultant;
 
@@ -6,7 +7,7 @@ namespace PTL.Api.Tests.TestConsultant;
 public class TestConsultantServiceTests
 {
     private static TestConsultantService CreateService(FakeTestConsultantRepository? repository = null, FakeExternalLoginService? loginService = null) =>
-        new(repository ?? new FakeTestConsultantRepository(), loginService ?? new FakeExternalLoginService());
+        new(repository ?? new FakeTestConsultantRepository(), loginService ?? new FakeExternalLoginService(), new FakeActingUserAccessor());
 
     [Fact]
     public async Task CreateAsync_ValidInput_PersistsAndReturnsConsultant()
