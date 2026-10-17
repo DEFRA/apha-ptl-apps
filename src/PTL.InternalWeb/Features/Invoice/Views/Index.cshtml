@@ -14,8 +14,7 @@
     @Html.AntiForgeryToken()
     @if (Model.CanGenerate)
     {
-        <button class="govuk-button" data-module="govuk-button" type="submit"
-                onclick="return confirm('@InvoiceGenerationViewModel.GenerateConfirmation');">
+        <button class="govuk-button" data-module="govuk-button" type="submit">
             Generate Invoices
         </button>
     }

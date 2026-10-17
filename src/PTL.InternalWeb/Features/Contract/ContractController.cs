@@ -6,6 +6,7 @@ using PTL.ApiClient;
 using PTL.Contracts.Contract;
 using PTL.Core.Contract.Document;
 using PTL.Core.Contract.Export.Templates;
+using PTL.InternalWeb.Confirmation;
 using PTL.InternalWeb.Navigation;
 using PTL.SharedUI.Notifications;
 
@@ -172,8 +173,23 @@ public class ContractController(IContractApiClient contractApiClient, ICustomerA
     // later" flow - removes immediately, then redisplays the Contract Items page.
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> RemoveContractItem(Guid id, Guid participantSchemeId, CancellationToken cancellationToken)
+    public async Task<IActionResult> RemoveContractItem(Guid id, Guid participantSchemeId, string? confirmation, CancellationToken cancellationToken)
     {
+        if (!ConfirmationFlow.IsConfirmed(confirmation))
+        {
+            ViewData[BreadcrumbRouteValues.ContractId] = id;
+            return this.ConfirmationPage(
+                new ConfirmationPageViewModel
+                {
+                    Title = "Remove Contract Item",
+                    Message = "Are you sure you want to remove this Contract Item?",
+                    ConfirmText = "Remove",
+                    IsDestructive = true,
+                    CancelUrl = Url.Action(nameof(ContractItems), new { id }),
+                },
+                nameof(ContractItems));
+        }
+
         var result = await contractApiClient.RemoveContractItemAsync(id, participantSchemeId, cancellationToken);
         if (!result.Success)
         {
@@ -338,8 +354,22 @@ public class ContractController(IContractApiClient contractApiClient, ICustomerA
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> DeleteExportTemplate(Guid fileId, string documentType, CancellationToken cancellationToken = default)
+    public async Task<IActionResult> DeleteExportTemplate(Guid fileId, string documentType, string? confirmation, CancellationToken cancellationToken = default)
     {
+        if (!ConfirmationFlow.IsConfirmed(confirmation))
+        {
+            return this.ConfirmationPage(
+                new ConfirmationPageViewModel
+                {
+                    Title = "Delete Template",
+                    Message = ExportTemplatesViewModel.DeleteConfirmation,
+                    ConfirmText = "Delete",
+                    IsDestructive = true,
+                    CancelUrl = Url.Action(ExportActionFor(documentType)),
+                },
+                ExportActionFor(documentType));
+        }
+
         var deleted = await exportTemplateApiClient.DeleteTemplateAsync(fileId, cancellationToken);
 
         TempData.SetNotification(

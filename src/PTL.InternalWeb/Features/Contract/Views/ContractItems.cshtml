@@ -37,7 +37,7 @@ else
                             @if (!items.IsReadOnly)
                             {
                                 <text> | </text>
-                                <form method="post" asp-action="RemoveContractItem" class="ptl-inline-form" onsubmit="return confirm('Are you sure you want to remove this Contract Item?');">
+                                <form method="post" asp-action="RemoveContractItem" class="ptl-inline-form">
                                     <input type="hidden" name="id" value="@Model.Items.ContractId" />
                                     <input type="hidden" name="participantSchemeId" value="@participant.ParticipantSchemeId" />
                                     @Html.AntiForgeryToken()

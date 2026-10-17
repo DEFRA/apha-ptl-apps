@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Hosting;
 using PTL.ApiClient;
+using PTL.InternalWeb.Confirmation;
 using PTL.SharedUI.Notifications;
 
 namespace PTL.InternalWeb.Features.Invoice;
@@ -42,8 +43,21 @@ public class InvoiceController(
     // notify in a single server-side action (docs/analysis/invoice-analysis.md).
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Generate(CancellationToken cancellationToken)
+    public async Task<IActionResult> Generate(string? confirmation, CancellationToken cancellationToken)
     {
+        if (!ConfirmationFlow.IsConfirmed(confirmation))
+        {
+            return this.ConfirmationPage(
+                new ConfirmationPageViewModel
+                {
+                    Title = "Generate Invoices",
+                    Message = InvoiceGenerationViewModel.GenerateConfirmation,
+                    ConfirmText = "Generate Invoices",
+                    CancelUrl = Url.Action(nameof(Index)),
+                },
+                nameof(Index));
+        }
+
         var pending = await invoiceApiClient.GetPendingAsync(cancellationToken);
         if (pending is not { EligibleContractCount: > 0 })
         {

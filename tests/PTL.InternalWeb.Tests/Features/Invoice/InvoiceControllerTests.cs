@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ViewFeatures;
 using Microsoft.Extensions.Logging.Abstractions;
 using PTL.Contracts.Invoice;
+using PTL.InternalWeb.Confirmation;
 using PTL.InternalWeb.Features.Invoice;
 using PTL.InternalWeb.Tests.TestSupport;
 using PTL.SharedUI.Notifications;
@@ -80,6 +81,27 @@ public class InvoiceControllerTests
     }
 
     [Fact]
+    public async Task Generate_NotConfirmed_ShowsTheConfirmationPageAndGeneratesNothing()
+    {
+        var apiClient = new FakeInvoiceApiClient
+        {
+            Pending = new PendingInvoiceSummaryResponse(2026, "2025/26", 5, 0, 0, ["ops@example.com"])
+        };
+        var controller = CreateController(apiClient);
+        controller.Url = new FakeUrlHelper();
+
+        var result = await controller.Generate(null, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        Assert.Equal(ConfirmationFlow.ViewName, view.ViewName);
+        var model = Assert.IsType<ConfirmationPageViewModel>(view.Model);
+        Assert.Equal(InvoiceGenerationViewModel.GenerateConfirmation, model.Message);
+        Assert.EndsWith("/Index", model.CancelUrl, StringComparison.Ordinal);
+        Assert.False(apiClient.GenerateCalled);
+        Assert.Null(controller.TempData.GetNotification());
+    }
+
+    [Fact]
     public async Task Generate_Success_SetsSuccessNotificationAndRedirects()
     {
         var apiClient = new FakeInvoiceApiClient
@@ -89,7 +111,7 @@ public class InvoiceControllerTests
         };
         var controller = CreateController(apiClient);
 
-        var result = await controller.Generate(CancellationToken.None);
+        var result = await controller.Generate(ConfirmationFlow.Confirmed, CancellationToken.None);
 
         Assert.IsType<RedirectToActionResult>(result);
         var notification = controller.TempData.GetNotification();
@@ -107,7 +129,7 @@ public class InvoiceControllerTests
         };
         var controller = CreateController(apiClient);
 
-        var result = await controller.Generate(CancellationToken.None);
+        var result = await controller.Generate(ConfirmationFlow.Confirmed, CancellationToken.None);
 
         Assert.IsType<RedirectToActionResult>(result);
         var notification = controller.TempData.GetNotification();
@@ -125,7 +147,7 @@ public class InvoiceControllerTests
         };
         var controller = CreateController(apiClient);
 
-        var result = await controller.Generate(CancellationToken.None);
+        var result = await controller.Generate(ConfirmationFlow.Confirmed, CancellationToken.None);
 
         Assert.IsType<RedirectToActionResult>(result);
         Assert.False(apiClient.GenerateCalled);

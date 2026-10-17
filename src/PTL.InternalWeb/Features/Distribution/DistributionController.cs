@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using PTL.ApiClient.Distribution;
 using PTL.Contracts.Distribution;
+using PTL.InternalWeb.Confirmation;
 using PTL.InternalWeb.Navigation;
 using PTL.SharedUI.Notifications;
 
@@ -69,11 +70,28 @@ public sealed partial class DistributionController(IDistributionApiClient distri
     // already exists is left exactly as it is, as in legacy, so no message is shown for it.
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> InitialiseMonth(int year, int monthId, CancellationToken cancellationToken)
+    public async Task<IActionResult> InitialiseMonth(int year, int monthId, string? confirmation, CancellationToken cancellationToken)
     {
         if (monthId is < 1 or > 12 || year < 1)
         {
             return BadRequest();
+        }
+
+        // The dashboard is keyed by financial year (April to March); January to March belong to the year before.
+        var financialYear = monthId < 4 ? year - 1 : year;
+
+        if (!ConfirmationFlow.IsConfirmed(confirmation))
+        {
+            return this.ConfirmationPage(
+                new ConfirmationPageViewModel
+                {
+                    Title = "Initialise this Month",
+                    Message = "Are you sure you wish to initialise this month?",
+                    WarningText = "If you do, you will no longer be able to add schemes to this month (participants can still be added up to a day before the posting date).",
+                    ConfirmText = "Initialise",
+                    CancelUrl = Url.Action(nameof(Index), new { year = financialYear }),
+                },
+                nameof(Index));
         }
 
         var result = await distributionApiClient.InitialiseMonthAsync(year, monthId, cancellationToken);
@@ -82,8 +100,7 @@ public sealed partial class DistributionController(IDistributionApiClient distri
             TempData.SetNotification(NotificationType.Success, "Month initialised successfully.");
         }
 
-        // The dashboard is keyed by financial year (April to March); January to March belong to the year before.
-        return RedirectToAction(nameof(Index), new { year = monthId < 4 ? year - 1 : year });
+        return RedirectToAction(nameof(Index), new { year = financialYear });
     }
 
     // Monthly Distributions (Scheduling) - legacy Scheduling/monthlys.aspx. Reached from the
@@ -167,16 +184,30 @@ public sealed partial class DistributionController(IDistributionApiClient distri
     // server-side state beyond this one request.
     // S6967 (ModelState.IsValid not checked) suppressed deliberately: legacy dlMonth_RowCommand
     // runs with CausesValidation=False, so a half-filled form can still be toggled and redisplayed.
+    // The toggle first asks for confirmation; Confirm and Cancel both post the unsaved form back, so a
+    // declined toggle redisplays the page exactly as it was.
     [HttpPost]
     [ValidateAntiForgeryToken]
 #pragma warning disable S6967
-    public IActionResult ToggleCancelled(int year, int monthId, Guid schemeId, MonthlyDistributionScheduleViewModel model)
+    public IActionResult ToggleCancelled(int year, int monthId, Guid schemeId, MonthlyDistributionScheduleViewModel model, string? confirmation)
 #pragma warning restore S6967
     {
         ModelState.Clear();
         ViewData[BreadcrumbRouteValues.Action] = nameof(Schedule);
         var row = model.Schemes.FirstOrDefault(s => s.MonthlyDistributionSchemeId == schemeId);
-        if (row is not null)
+        if (row is not null && !ConfirmationFlow.IsConfirmed(confirmation) && !ConfirmationFlow.IsCancelled(confirmation))
+        {
+            return this.ConfirmationPage(
+                new ConfirmationPageViewModel
+                {
+                    Title = row.CancelCommenceLinkText,
+                    Caption = row.SchemeHeading,
+                    Message = row.CancelCommenceConfirmText,
+                },
+                nameof(Schedule));
+        }
+
+        if (row is not null && !ConfirmationFlow.IsCancelled(confirmation))
         {
             row.IsCancelled = !row.IsCancelled;
         }
