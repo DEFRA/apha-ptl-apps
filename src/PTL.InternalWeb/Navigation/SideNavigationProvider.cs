@@ -7,7 +7,7 @@ namespace PTL.InternalWeb.Navigation;
 // Legacy behaviour this reproduces: the left nav is context-based, not a permanent full tree.
 // Each page shows only its OWN node's title plus that node's direct children - never the whole
 // menu at once. Navigating to "Manage Contracts" shows the Contracts Administration landing page
-// and its children (Customers, Search, Group Addresses, Exports, Invoice Generation); navigating
+// and its children (Customers, Group Addresses, Exports, Invoice Generation); navigating
 // on to "Customers" replaces that with the Customer children (Create Customer, Review Pending
 // Customer/Participant Updates, Review Pending Orders); navigating to "Create Customer" (a leaf)
 // shows only "Create Customer". See _SideNavigation.cshtml for the rendering logic.
@@ -186,7 +186,6 @@ public static class SideNavigationProvider
                         }
                     ]
                 },
-                Disabled("Search"),
                 new SideNavigationItem
                 {
                     Text = "Group Addresses",
@@ -260,7 +259,6 @@ public static class SideNavigationProvider
                         new SideNavigationItem { Text = "Printable Scheme", ControllerName = SchemeControllerName, ActionName = "PrintableScheme", IsHidden = true }
                     ]
                 },
-                Disabled("Search"),
                 Disabled("Test Types"),
                 Disabled("Test Result Items"),
                 Disabled("Test Method Items"),
