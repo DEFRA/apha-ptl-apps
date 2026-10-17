@@ -30,6 +30,9 @@ public class ContractIndexSearchStateTests : IClassFixture<WebApplicationFactory
                 services.AddSingleton<ICustomerApiClient>(new FakeCustomerApiClient());
             }));
 
+    private HttpClient CreateHttpsClient() =>
+        _factory.CreateClient(new WebApplicationFactoryClientOptions { BaseAddress = new Uri("https://localhost") });
+
     private async Task<ContractSearchRequest> GetAsync(HttpClient client, string url)
     {
         var response = await client.GetAsync(url);
@@ -41,7 +44,7 @@ public class ContractIndexSearchStateTests : IClassFixture<WebApplicationFactory
     [Fact]
     public async Task ReturningWithOnlyTheCustomer_RestoresTheLastSearch()
     {
-        var client = _factory.CreateClient();
+        var client = CreateHttpsClient();
         await GetAsync(client, $"/Contract/Index?customerId={CustomerId}&period=Historical&page=2&pageSize=50");
 
         var restored = await GetAsync(client, $"/Contract/Index?customerId={CustomerId}");
@@ -54,7 +57,7 @@ public class ContractIndexSearchStateTests : IClassFixture<WebApplicationFactory
     [Fact]
     public async Task ChoosingTheDefaultPeriodExplicitly_ReplacesTheSavedSearch()
     {
-        var client = _factory.CreateClient();
+        var client = CreateHttpsClient();
         await GetAsync(client, $"/Contract/Index?customerId={CustomerId}&period=All");
         await GetAsync(client, $"/Contract/Index?customerId={CustomerId}&period=CurrentAndNext");
 
@@ -66,7 +69,7 @@ public class ContractIndexSearchStateTests : IClassFixture<WebApplicationFactory
     [Fact]
     public async Task ADifferentCustomer_GetsTheDefaults()
     {
-        var client = _factory.CreateClient();
+        var client = CreateHttpsClient();
         await GetAsync(client, $"/Contract/Index?customerId={CustomerId}&period=All");
 
         var other = await GetAsync(client, $"/Contract/Index?customerId={OtherCustomerId}");
@@ -77,7 +80,7 @@ public class ContractIndexSearchStateTests : IClassFixture<WebApplicationFactory
     [Fact]
     public async Task NoSavedSearch_UsesTheDefaults()
     {
-        var request = await GetAsync(_factory.CreateClient(), $"/Contract/Index?customerId={CustomerId}");
+        var request = await GetAsync(CreateHttpsClient(), $"/Contract/Index?customerId={CustomerId}");
 
         Assert.Equal(ContractPeriodFilter.CurrentAndNext, request.Period);
         Assert.Equal(1, request.Page);

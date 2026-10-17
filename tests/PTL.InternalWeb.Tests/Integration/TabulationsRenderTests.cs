@@ -132,7 +132,7 @@ public class TabulationsRenderTests : IClassFixture<WebApplicationFactory<Progra
         new(schemeId, "BT: Brucella", "D1a/S1", command, "Send To Test Consultant", question);
 
     [Fact]
-    public async Task Get_RendersLegacyTitleHeadingIntroAndBackLink()
+    public async Task Get_RendersLegacyTitleHeadingAndIntro_WithoutABackLink()
     {
         Seed(Plain());
 
@@ -141,12 +141,7 @@ public class TabulationsRenderTests : IClassFixture<WebApplicationFactory<Progra
         Assert.Contains("Monthly Distributions - May 2026", Regex.Match(html, "<title>(.*?)</title>", RegexOptions.Singleline).Groups[1].Value, StringComparison.Ordinal);
         Assert.Equal("Monthly Distributions - May 2026", Text(Regex.Match(html, "<h1[^>]*>(.*?)</h1>", RegexOptions.Singleline).Groups[1].Value));
         Assert.Contains("The table below lists the Tabulations that are available for each of this month's Distributions.", WebUtility.HtmlDecode(html), StringComparison.Ordinal);
-
-        var back = Regex.Match(html, "<a class=\"govuk-back-link[^\"]*\" href=\"([^\"]+)\">Back</a>");
-        Assert.True(back.Success);
-        var href = WebUtility.HtmlDecode(back.Groups[1].Value);
-        Assert.StartsWith("/Distribution", href, StringComparison.Ordinal);
-        Assert.Contains("year=2026", href, StringComparison.Ordinal);
+        Assert.DoesNotContain("govuk-back-link", html, StringComparison.Ordinal);
     }
 
     [Fact]

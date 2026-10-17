@@ -100,7 +100,7 @@ public static class MonthlyDistributionPlanner
     // Legacy: the first Monday that falls inside the month, then the Friday three days before it.
     private static DateTime FirstFriday(int yearId, int monthId)
     {
-        var firstOfMonth = new DateTime(yearId, monthId, 1);
+        var firstOfMonth = new DateTime(yearId, monthId, 1, 0, 0, 0, DateTimeKind.Unspecified);
         var firstMonday = firstOfMonth.AddDays(1 - (int)firstOfMonth.DayOfWeek);
         if (firstMonday.Month != monthId)
         {

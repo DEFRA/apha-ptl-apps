@@ -13,15 +13,17 @@ public class ContractControllerImportPermitTests
 {
     private static readonly Guid CustomerId = Guid.NewGuid();
 
-    private static ContractController CreateController(FakeImportPermitApiClient importPermitApiClient)
+    private static ContractController CreateController(FakeImportPermitApiClient importPermitApiClient, bool contractExists = true)
     {
         var contractId = Guid.NewGuid();
         var contractApiClient = new FakeContractApiClient
         {
-            ContractResponse = new ContractResponse(
-                contractId, CustomerId, "Sample Laboratories Ltd", "QAL/00001", DateTime.UtcNow.Year, "UT3/306",
-                string.Empty, "Alice Example", string.Empty, string.Empty, 0.1m, 25m, 2, 5m, 3, 4m, 1, 6m,
-                null, null, null, string.Empty, null, true, false, "A", DateTime.UtcNow, string.Empty, false, false, false, null, null)
+            ContractResponse = contractExists
+                ? new ContractResponse(
+                    contractId, CustomerId, "Sample Laboratories Ltd", "QAL/00001", DateTime.UtcNow.Year, "UT3/306",
+                    string.Empty, "Alice Example", string.Empty, string.Empty, 0.1m, 25m, 2, 5m, 3, 4m, 1, 6m,
+                    null, null, null, string.Empty, null, true, false, "A", DateTime.UtcNow, string.Empty, false, false, false, null, null)
+                : null
         };
 
         return new(contractApiClient, new FakeCustomerApiClient(), new FakeLookupApiClient(), importPermitApiClient, NullLogger<ContractController>.Instance, new FakeContractExportApiClient(), new FakeContractRenewalApiClient(), new FakeExportTemplateApiClient(), new FakeBulkExportApiClient(), new PTL.Core.Contract.Document.TemplateMergeService())
@@ -247,6 +249,119 @@ public class ContractControllerImportPermitTests
         Assert.Equal(nameof(ContractController.Index), redirect.ActionName);
         Assert.Empty(importPermitApiClient.UpdateCalls);
         Assert.Null(controller.TempData.GetNotification());
+    }
+
+    [Fact]
+    public async Task Cancel_WhenTheContractNoLongerExists_ReturnsToTheManageContractsPage()
+    {
+        var controller = CreateController(new FakeImportPermitApiClient(), contractExists: false);
+
+        var result = await controller.ImportPermits(Guid.NewGuid(), null, ImportPermitCommands.Cancel, null, null, null, CancellationToken.None);
+
+        Assert.Equal(nameof(ContractController.ManageContracts), Assert.IsType<RedirectToActionResult>(result).ActionName);
+    }
+
+    [Fact]
+    public async Task Save_WhenTheContractNoLongerExists_ReturnsToTheManageContractsPage()
+    {
+        var participantSchemeId = Guid.NewGuid();
+        var importPermitApiClient = new FakeImportPermitApiClient { Permits = [Permit(participantSchemeId)] };
+        var controller = CreateController(importPermitApiClient, contractExists: false);
+
+        var result = await controller.ImportPermits(Guid.NewGuid(), [Pending(participantSchemeId, false, null)], ImportPermitCommands.Save, null, null, null, CancellationToken.None);
+
+        Assert.Equal(nameof(ContractController.ManageContracts), Assert.IsType<RedirectToActionResult>(result).ActionName);
+        Assert.Single(importPermitApiClient.UpdateCalls);
+    }
+
+    [Fact]
+    public async Task Get_PublishesTheCustomerForTheContractsBreadcrumb_OnlyWhenTheContractExists()
+    {
+        var withContract = CreateController(new FakeImportPermitApiClient());
+        var withoutContract = CreateController(new FakeImportPermitApiClient(), contractExists: false);
+
+        await withContract.ImportPermits(Guid.NewGuid(), CancellationToken.None);
+        await withoutContract.ImportPermits(Guid.NewGuid(), CancellationToken.None);
+
+        Assert.Equal(CustomerId, withContract.ViewData[PTL.InternalWeb.Navigation.BreadcrumbRouteValues.CustomerId]);
+        Assert.False(withoutContract.ViewData.ContainsKey(PTL.InternalWeb.Navigation.BreadcrumbRouteValues.CustomerId));
+    }
+
+    [Fact]
+    public async Task Post_WithNoPendingValuesOrCommand_RedisplaysTheSavedPermitsOutsideEditMode()
+    {
+        var participantSchemeId = Guid.NewGuid();
+        var importPermitApiClient = new FakeImportPermitApiClient { Permits = [Permit(participantSchemeId, received: true, expiry: new DateTime(2027, 1, 1))] };
+        var controller = CreateController(importPermitApiClient);
+
+        var result = await controller.ImportPermits(Guid.NewGuid(), null, null, null, null, null, CancellationToken.None);
+
+        var model = Assert.IsType<ImportPermitsViewModel>(Assert.IsType<ViewResult>(result).Model);
+        Assert.Null(model.EditParticipantSchemeId);
+        Assert.True(model.Permits[0].ImportPermitReceived);
+        Assert.Equal("01/01/2027", model.Permits[0].ImportPermitExpiry);
+    }
+
+    [Fact]
+    public async Task Post_PendingBlankExpiryOrNoReceivedValue_KeepsTheSavedReceivedAndClearsTheExpiry()
+    {
+        var participantSchemeId = Guid.NewGuid();
+        var importPermitApiClient = new FakeImportPermitApiClient { Permits = [Permit(participantSchemeId, received: true, expiry: new DateTime(2027, 1, 1))] };
+        var controller = CreateController(importPermitApiClient);
+        var pending = new ImportPermitPendingRow { ParticipantSchemeId = participantSchemeId, ImportPermitReceived = null, ImportPermitExpiry = "  " };
+
+        var result = await controller.ImportPermits(Guid.NewGuid(), [pending], null, null, null, null, CancellationToken.None);
+
+        var model = Assert.IsType<ImportPermitsViewModel>(Assert.IsType<ViewResult>(result).Model);
+        Assert.True(model.Permits[0].ImportPermitReceived);
+        Assert.Null(model.Permits[0].ImportPermitExpiry);
+    }
+
+    [Fact]
+    public async Task Update_ForARowThatIsNotInThePermits_ChangesNothing()
+    {
+        var participantSchemeId = Guid.NewGuid();
+        var importPermitApiClient = new FakeImportPermitApiClient { Permits = [Permit(participantSchemeId)] };
+        var controller = CreateController(importPermitApiClient);
+
+        var result = await controller.ImportPermits(
+            Guid.NewGuid(), [Pending(participantSchemeId, false, null)], ImportPermitCommands.Update, Guid.NewGuid(), true, "01/01/2027", CancellationToken.None);
+
+        var model = Assert.IsType<ImportPermitsViewModel>(Assert.IsType<ViewResult>(result).Model);
+        Assert.False(model.Permits[0].ImportPermitReceived);
+        Assert.Null(model.Permits[0].ImportPermitExpiry);
+        Assert.True(controller.ModelState.IsValid);
+    }
+
+    [Fact]
+    public async Task Update_ForAPermitThatIsNotRequired_KeepsTheReceivedValueAndNeverKeepsAnExpiry()
+    {
+        var participantSchemeId = Guid.NewGuid();
+        var importPermitApiClient = new FakeImportPermitApiClient { Permits = [Permit(participantSchemeId, required: false)] };
+        var controller = CreateController(importPermitApiClient);
+
+        var result = await controller.ImportPermits(
+            Guid.NewGuid(), [Pending(participantSchemeId, false, null)], ImportPermitCommands.Update, participantSchemeId, null, "01/01/2027", CancellationToken.None);
+
+        var model = Assert.IsType<ImportPermitsViewModel>(Assert.IsType<ViewResult>(result).Model);
+        Assert.True(controller.ModelState.IsValid);
+        Assert.False(model.Permits[0].ImportPermitReceived);
+        Assert.Null(model.Permits[0].ImportPermitExpiry);
+    }
+
+    [Fact]
+    public async Task Update_AlreadyReceivedWithAnExpiryTypedWithSpaces_KeepsTheTrimmedExpiryInTheLegacyFormat()
+    {
+        var participantSchemeId = Guid.NewGuid();
+        var importPermitApiClient = new FakeImportPermitApiClient { Permits = [Permit(participantSchemeId)] };
+        var controller = CreateController(importPermitApiClient);
+
+        var result = await controller.ImportPermits(
+            Guid.NewGuid(), [Pending(participantSchemeId, true, "01/01/2027")], ImportPermitCommands.Update, participantSchemeId, null, " 05/06/2027 ", CancellationToken.None);
+
+        var model = Assert.IsType<ImportPermitsViewModel>(Assert.IsType<ViewResult>(result).Model);
+        Assert.True(model.Permits[0].ImportPermitReceived);
+        Assert.Equal("05/06/2027", model.Permits[0].ImportPermitExpiry);
     }
 
     [Fact]

@@ -44,6 +44,31 @@ public class ConfirmationControllerExtensionsTests
     }
 
     [Fact]
+    public void ConfirmationPage_ARequestWithoutAForm_HasNoFieldsAndKeepsTheUrl()
+    {
+        var context = new DefaultHttpContext();
+        context.Request.Method = "GET";
+        context.Request.Path = "/Invoice/Index";
+        var controller = new TestController { ControllerContext = new ControllerContext { HttpContext = context } };
+
+        var model = Assert.IsType<ConfirmationPageViewModel>(controller.ConfirmationPage(new ConfirmationPageViewModel { Title = "Remove" }).Model);
+
+        Assert.Empty(model.Fields);
+        Assert.Equal("/Invoice/Index", model.PostUrl);
+        Assert.False(controller.ViewData.ContainsKey(BreadcrumbRouteValues.Action));
+    }
+
+    [Fact]
+    public void ConfirmationPage_AFieldWithANullValue_IsEchoedAsAnEmptyString()
+    {
+        var controller = ControllerPosting(new() { ["Name"] = [null!] });
+
+        var model = Assert.IsType<ConfirmationPageViewModel>(controller.ConfirmationPage(new ConfirmationPageViewModel { Title = "Remove" }).Model);
+
+        Assert.Equal([new KeyValuePair<string, string>("Name", string.Empty)], model.Fields);
+    }
+
+    [Fact]
     public void ConfirmationPage_WithoutARequest_HasNoFieldsAndNoPostUrl()
     {
         var controller = new TestController();

@@ -546,6 +546,36 @@ public class SchemeControllerTests
         Assert.Single(model.Tests);
     }
 
+    [Theory]
+    [InlineData("remove-test:0", "Are you sure you want to remove this Test?")]
+    [InlineData("remove-category:0:0", "Are you sure you want to remove this Category?")]
+    public async Task Create_Post_RemoveCommand_NotConfirmed_AsksFirstAndChangesNothing(string testCommand, string message)
+    {
+        var controller = CreateController(new FakeSchemeApiClient());
+        var model = new PTL.InternalWeb.Features.Scheme.SchemeFormViewModel { YearId = 2027 };
+        model.Tests.Add(new PTL.InternalWeb.Features.Scheme.SchemeTestViewModel { TestTypeId = Guid.NewGuid(), TestType = "Serology" });
+
+        var result = await controller.Create(model, testCommand: testCommand, cancellationToken: CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        Assert.Equal(ConfirmationFlow.ViewName, view.ViewName);
+        Assert.Equal(message, Assert.IsType<ConfirmationPageViewModel>(view.Model).Message);
+        Assert.Single(model.Tests);
+    }
+
+    [Fact]
+    public async Task Create_Post_RemoveCommand_Declined_RedisplaysTheFormWithoutRemoving()
+    {
+        var controller = CreateController(new FakeSchemeApiClient());
+        var model = new PTL.InternalWeb.Features.Scheme.SchemeFormViewModel { YearId = 2027 };
+        model.Tests.Add(new PTL.InternalWeb.Features.Scheme.SchemeTestViewModel { TestTypeId = Guid.NewGuid(), TestType = "Serology" });
+
+        var result = await controller.Create(model, testCommand: "remove-test:0", confirmation: ConfirmationFlow.Cancelled, cancellationToken: CancellationToken.None);
+
+        Assert.Same(model, Assert.IsType<ViewResult>(result).Model);
+        Assert.Single(model.Tests);
+    }
+
     [Fact]
     public async Task Edit_Post_NonRemoveCommand_DoesNotAsk()
     {

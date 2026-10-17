@@ -17,15 +17,8 @@ internal static class ContractSearchState
     public static bool HasCriteria(HttpContext? context) =>
         context is not null && CriteriaKeys.Any(context.Request.Query.ContainsKey);
 
-    public static void Save(HttpContext? context, ContractSearchViewModel search)
-    {
-        if (context is null)
-        {
-            return;
-        }
-
+    public static void Save(HttpContext context, ContractSearchViewModel search) =>
         context.Response.Cookies.Append(CookieName, JsonSerializer.Serialize(search), BuildCookieOptions(context));
-    }
 
     // Only the search for this customer is restored, and only if the cookie still holds sane values.
     public static ContractSearchViewModel? TryRestore(HttpContext? context, Guid customerId)
@@ -65,7 +58,7 @@ internal static class ContractSearchState
         HttpOnly = true,
         IsEssential = true,
         SameSite = SameSiteMode.Lax,
-        Secure = context.Request.IsHttps,
+        Secure = true,
         Path = context.Request.PathBase.HasValue ? context.Request.PathBase.Value : "/",
     };
 }

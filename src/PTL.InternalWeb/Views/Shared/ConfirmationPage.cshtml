@@ -52,7 +52,7 @@ else
         <button type="submit" class="govuk-button@(Model.IsDestructive ? " govuk-button--warning" : null)" data-module="govuk-button">@Model.ConfirmText</button>
         @if (Model.CancelUrl is not null)
         {
-            <a class="govuk-button govuk-button--secondary" role="button" draggable="false" data-module="govuk-button" href="@Model.CancelUrl">@Model.CancelText</a>
+            <a class="govuk-link" href="@Model.CancelUrl">@Model.CancelText</a>
         }
         else
         {

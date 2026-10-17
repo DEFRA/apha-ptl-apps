@@ -139,14 +139,13 @@ public partial class AmendResultsRenderTests : IClassFixture<WebApplicationFacto
     }
 
     [Fact]
-    public async Task Get_BackLinkReturnsToTheTabulationsForTheSameMonth()
+    public async Task Get_HasNoBackLink()
     {
         Seed();
 
-        var back = Regex.Match(await GetHtmlAsync(), "<a class=\"govuk-back-link[^\"]*\" href=\"([^\"]+)\">Back</a>");
+        var html = await GetHtmlAsync();
 
-        Assert.True(back.Success);
-        Assert.Equal("/Distribution/Tabulations?year=2026&monthId=5", WebUtility.HtmlDecode(back.Groups[1].Value));
+        Assert.DoesNotContain("govuk-back-link", html, StringComparison.Ordinal);
     }
 
     [Fact]
