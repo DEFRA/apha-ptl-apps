@@ -1,7 +1,7 @@
 @model PTL.InternalWeb.Confirmation.ConfirmationPageViewModel
 @using PTL.InternalWeb.Confirmation
 @{
-    ViewData["Title"] = Model.Title;
+    ViewData["Title"] = Model.PageTitle ?? Model.Title;
 }
 
 @if (!string.IsNullOrEmpty(Model.Caption))
@@ -9,7 +9,20 @@
     <span class="govuk-caption-l">@Model.Caption</span>
 }
 
-<h1 class="govuk-heading-l">@Model.Title</h1>
+@if (Model.IsWarningTitle)
+{
+    <div class="govuk-warning-text">
+        <span class="govuk-warning-text__icon" aria-hidden="true">!</span>
+        <h1 class="govuk-heading-l govuk-warning-text__text govuk-!-margin-bottom-0">
+            <span class="govuk-visually-hidden">Warning</span>
+            @Model.Title
+        </h1>
+    </div>
+}
+else
+{
+    <h1 class="govuk-heading-l">@Model.Title</h1>
+}
 
 @if (!string.IsNullOrEmpty(Model.Message))
 {

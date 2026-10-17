@@ -6,11 +6,17 @@ public sealed record ConfirmationPageViewModel
 {
     public required string Title { get; init; }
 
+    // Browser tab title when it differs from the heading.
+    public string? PageTitle { get; init; }
+
     public string? Caption { get; init; }
 
     public string? Message { get; init; }
 
     public string? WarningText { get; init; }
+
+    // Renders the heading itself as GOV.UK warning text, for a question that is the warning.
+    public bool IsWarningTitle { get; init; }
 
     public string ConfirmText { get; init; } = "Confirm";
 
