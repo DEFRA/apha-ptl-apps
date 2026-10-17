@@ -638,7 +638,7 @@ public class ContractController(IContractApiClient contractApiClient, ICustomerA
             }
         }
 
-        TempData.SetNotification(NotificationType.Success, "Saved successfully.");
+        TempData.SetNotification(NotificationType.Success, "Import Permit(s) saved successfully.");
         return true;
     }
 
