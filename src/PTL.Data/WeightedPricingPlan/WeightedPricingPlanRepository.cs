@@ -1,6 +1,8 @@
 using Dapper;
+using PTL.Core.Audit;
 using PTL.Core.Lookup;
 using PTL.Core.WeightedPricingPlan;
+using PTL.Data.Audit;
 using PTL.Data.Infrastructure;
 
 namespace PTL.Data.WeightedPricingPlan;
@@ -25,10 +27,10 @@ public sealed class WeightedPricingPlanRepository(IDbConnectionFactory connectio
             new { YearId = yearId })).ToList();
     }
 
-    public async Task RenewAsync(int newYearId, CancellationToken cancellationToken = default)
-    {
-        using var connection = connectionFactory.CreateConnection();
-
-        await connection.ExecuteAsync("EXEC dbo.sppRenewPricingPlan @YearId", new { YearId = newYearId });
-    }
+    public Task RenewAsync(int newYearId, AuditEntry? auditEntry = null, CancellationToken cancellationToken = default) =>
+        AuditTrailWriter.ExecuteAsync(
+            connectionFactory,
+            auditEntry,
+            (connection, transaction) => connection.ExecuteAsync("EXEC dbo.sppRenewPricingPlan @YearId", new { YearId = newYearId }, transaction),
+            cancellationToken);
 }

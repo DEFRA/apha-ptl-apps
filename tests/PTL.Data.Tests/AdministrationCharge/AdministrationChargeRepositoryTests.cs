@@ -1,4 +1,5 @@
 using System.Data;
+using PTL.Core.Audit;
 using PTL.Data.AdministrationCharge;
 using PTL.Data.Infrastructure;
 using PTL.Data.Tests.Fakes;
@@ -123,5 +124,46 @@ public class AdministrationChargeRepositoryTests
 
         var command = Assert.Single(connection.ExecutedCommands, c => c.CommandText == UpdateSql);
         Assert.Equal(price.Price, command.ParameterValue("@Price"));
+    }
+
+    private const string AuditSql = "EXEC dbo.spiSystemAdministrationAudit @AuditId, @ActingUserId, @Action, @EntityType, @EntityId, @Details";
+
+    private static Core.AdministrationCharge.AdministrationChargeCurrencyEntity NewPrice() => new()
+    {
+        AdministrationChargeCurrencyId = Guid.NewGuid(),
+        AdministrationChargeId = Guid.NewGuid(),
+        CurrencyId = Guid.NewGuid(),
+        Price = 40.00m
+    };
+
+    [Fact]
+    public async Task UpdatePriceAsync_WithAudit_CommitsChangeAndAuditInOneTransaction()
+    {
+        var (repository, connection) = CreateRepository();
+        connection.RespondToNonQuery(UpdateSql, 1);
+        connection.RespondToNonQuery(AuditSql, 1);
+        var audit = new AuditEntry(Guid.NewGuid(), "SetAdministrationCharge", "AdministrationCharge", Guid.NewGuid().ToString(), "Price=40");
+
+        await repository.UpdatePriceAsync(NewPrice(), audit);
+
+        Assert.NotNull(connection.LastTransaction);
+        Assert.True(connection.LastTransaction!.Committed);
+        Assert.Contains(connection.ExecutedCommands, c => c.CommandText == UpdateSql);
+        var auditCommand = Assert.Single(connection.ExecutedCommands, c => c.CommandText == AuditSql);
+        Assert.Equal("SetAdministrationCharge", auditCommand.ParameterValue("@Action"));
+    }
+
+    [Fact]
+    public async Task InsertPriceAsync_AuditWriteFails_RollsBackTheTransaction()
+    {
+        var (repository, connection) = CreateRepository();
+        connection.RespondToNonQuery(InsertSql, 1);
+        var audit = new AuditEntry(Guid.NewGuid(), "SetAdministrationCharge", "AdministrationCharge", Guid.NewGuid().ToString(), "Price=40");
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => repository.InsertPriceAsync(NewPrice(), audit));
+
+        Assert.NotNull(connection.LastTransaction);
+        Assert.True(connection.LastTransaction!.RolledBack);
+        Assert.False(connection.LastTransaction!.Committed);
     }
 }

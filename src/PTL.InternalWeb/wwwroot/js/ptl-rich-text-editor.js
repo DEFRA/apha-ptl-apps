@@ -35,7 +35,7 @@
             target: textarea,
             base_url: '/lib/tinymce',
             license_key: 'gpl',
-            plugins: 'charmap',
+            plugins: 'lists save charmap',
             toolbar: textarea.dataset.toolbar,
             height: Number.parseInt(textarea.dataset.height, 10) || DEFAULT_EDITOR_HEIGHT,
             readonly: textarea.dataset.readonly === 'true',
@@ -51,6 +51,16 @@
                 // Legacy SaveContent hook.
                 editor.on('SaveContent', function (e) {
                     e.content = e.content.replaceAll('&#39', '&apos');
+                });
+
+                // Legacy BeforeSetContent hook - unescapes content that was stored entity-escaped.
+                editor.on('BeforeSetContent', function (e) {
+                    if (e.content?.includes('&lt;')) {
+                        e.content = e.content
+                            .replaceAll('&lt;', '<')
+                            .replaceAll('&gt;', '>')
+                            .replaceAll('&amp;', '&');
+                    }
                 });
 
                 // The error summary links to the field id, so focus has to reach the editor.

@@ -203,6 +203,38 @@ public class ExternalUserServiceTests
         Assert.Null(result.TestConsultantId);
     }
 
+    // System Administration business rule: an Inactive External Test Consultant must be denied
+    // access to Test Consultant functionality, even if previously linked via SsoIdExt.
+    [Fact]
+    public async Task ResolveAsync_InactiveTestConsultant_MatchedBySsoIdExt_OmitsRole()
+    {
+        var ssoIdExt = Guid.NewGuid();
+        var testConsultantRepository = new FakeTestConsultantRepository();
+        testConsultantRepository.Seed(new CoreTestConsultant { ExternalTestConsultantId = Guid.NewGuid(), SsoIdExt = ssoIdExt, Name = "Test Consultant One", IsInactive = true });
+        var service = CreateService(testConsultantRepository: testConsultantRepository);
+
+        var result = await service.ResolveAsync(ssoIdExt, "consultant@example.com", "Jane Doe", ["Test Consultant"]);
+
+        Assert.Empty(result.Roles);
+        Assert.Null(result.TestConsultantId);
+    }
+
+    [Fact]
+    public async Task ResolveAsync_InactiveTestConsultant_MatchedByEmail_OmitsRoleAndDoesNotBackfillSsoIdExt()
+    {
+        const string email = "consultant@example.com";
+        var testConsultantId = Guid.NewGuid();
+        var testConsultantRepository = new FakeTestConsultantRepository();
+        testConsultantRepository.Seed(new CoreTestConsultant { ExternalTestConsultantId = testConsultantId, Email = email, Name = "Test Consultant One", IsInactive = true });
+        var service = CreateService(testConsultantRepository: testConsultantRepository);
+
+        var result = await service.ResolveAsync(Guid.NewGuid(), email, "Jane Doe", ["Test Consultant"]);
+
+        Assert.Empty(result.Roles);
+        Assert.Null(result.TestConsultantId);
+        Assert.Empty(testConsultantRepository.UpdateCalls);
+    }
+
     [Fact]
     public async Task ResolveAsync_MultipleRolesWithMixedOutcomes_ReturnsOnlyResolvedRoles()
     {

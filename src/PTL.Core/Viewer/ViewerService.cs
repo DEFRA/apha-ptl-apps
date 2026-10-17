@@ -1,3 +1,4 @@
+using PTL.Core.Audit;
 using PTL.Core.TestConsultant;
 
 namespace PTL.Core.Viewer;
@@ -5,8 +6,13 @@ namespace PTL.Core.Viewer;
 // Reuses TestConsultant's IExternalLoginService/StubExternalLoginService as-is - the stub is
 // already generic (id/name/email in, bool out) and the story's Developer Note flags the same
 // CIDM/GOV.UK One Login business decision for Viewers' Generate Login as for Test Consultants'.
-public sealed class ViewerService(IViewerRepository repository, IExternalLoginService externalLoginService) : IViewerService
+public sealed class ViewerService(IViewerRepository repository, IExternalLoginService externalLoginService, IActingUserAccessor actingUser) : IViewerService
 {
+    private const string EntityType = "Viewer";
+
+    private AuditEntry Audit(string action, Guid id, string? details) =>
+        new(actingUser.ActingUserId, action, EntityType, id.ToString(), details);
+
     public Task<IReadOnlyList<ViewerEntity>> GetAllAsync(CancellationToken cancellationToken = default) =>
         repository.GetAllWithAssignmentsAsync(cancellationToken);
 
@@ -23,7 +29,7 @@ public sealed class ViewerService(IViewerRepository repository, IExternalLoginSe
             SsoIdExt = null
         };
 
-        await repository.CreateAsync(newViewer, cancellationToken);
+        await repository.CreateAsync(newViewer, Audit("CreateViewer", newViewer.ViewerId, $"Name: {newViewer.Name}"), cancellationToken);
         return newViewer;
     }
 
@@ -40,7 +46,7 @@ public sealed class ViewerService(IViewerRepository repository, IExternalLoginSe
         existing.Name = name.Trim();
         existing.Email = email.Trim();
 
-        await repository.UpdateAsync(existing, cancellationToken);
+        await repository.UpdateAsync(existing, Audit("UpdateViewer", existing.ViewerId, $"Name: {existing.Name}"), cancellationToken);
         return existing;
     }
 
@@ -62,7 +68,7 @@ public sealed class ViewerService(IViewerRepository repository, IExternalLoginSe
             return (false, "This viewer is assigned to one or more schemes or participants. Remove those assignments before removing the viewer.");
         }
 
-        var deleted = await repository.DeleteAsync(viewerId, cancellationToken);
+        var deleted = await repository.DeleteAsync(viewerId, Audit("DeleteViewer", viewerId, $"Name: {existing.Name}"), cancellationToken);
         return deleted ? (true, null) : (false, "Viewer was not found.");
     }
 
@@ -81,7 +87,7 @@ public sealed class ViewerService(IViewerRepository repository, IExternalLoginSe
         }
 
         existing.SsoId = Guid.NewGuid();
-        await repository.UpdateAsync(existing, cancellationToken);
+        await repository.UpdateAsync(existing, Audit("GenerateViewerLogin", existing.ViewerId, $"Name: {existing.Name}"), cancellationToken);
         return (true, null);
     }
 

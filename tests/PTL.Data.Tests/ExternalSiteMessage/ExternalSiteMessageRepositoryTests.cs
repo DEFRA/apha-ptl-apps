@@ -1,4 +1,5 @@
 using System.Data;
+using PTL.Core.Audit;
 using PTL.Data.ExternalSiteMessage;
 using PTL.Data.Infrastructure;
 using PTL.Data.Tests.Fakes;
@@ -65,5 +66,46 @@ public class ExternalSiteMessageRepositoryTests
         });
 
         Assert.Contains(connection.ExecutedCommands, c => c.CommandText == updateSql);
+    }
+
+    private const string AuditSql = "EXEC dbo.spiSystemAdministrationAudit @AuditId, @ActingUserId, @Action, @EntityType, @EntityId, @Details";
+    private const string UpdateSql = "EXEC dbo.spuMainPageMessage @Message, @ImportantMessage, @SupportEmailAddress";
+
+    private static PTL.Core.ExternalSiteMessage.ExternalSiteMessage NewMessage() => new()
+    {
+        Message = "Body",
+        ImportantMessage = "Notice",
+        SupportEmailAddress = "vetqas@apha.gov.uk"
+    };
+
+    [Fact]
+    public async Task UpdateAsync_WithAudit_CommitsChangeAndAuditInOneTransaction()
+    {
+        var (repository, connection) = CreateRepository();
+        connection.RespondToNonQuery(UpdateSql, 1);
+        connection.RespondToNonQuery(AuditSql, 1);
+        var audit = new AuditEntry(Guid.NewGuid(), "UpdateExternalSiteMessage", "ExternalSiteMessage", "0", "Updated external site message");
+
+        await repository.UpdateAsync(NewMessage(), audit);
+
+        Assert.NotNull(connection.LastTransaction);
+        Assert.True(connection.LastTransaction!.Committed);
+        Assert.Contains(connection.ExecutedCommands, c => c.CommandText == UpdateSql);
+        var auditCommand = Assert.Single(connection.ExecutedCommands, c => c.CommandText == AuditSql);
+        Assert.Equal("UpdateExternalSiteMessage", auditCommand.ParameterValue("@Action"));
+    }
+
+    [Fact]
+    public async Task UpdateAsync_AuditWriteFails_RollsBackTheTransaction()
+    {
+        var (repository, connection) = CreateRepository();
+        connection.RespondToNonQuery(UpdateSql, 1);
+        var audit = new AuditEntry(Guid.NewGuid(), "UpdateExternalSiteMessage", "ExternalSiteMessage", "0", "Updated external site message");
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => repository.UpdateAsync(NewMessage(), audit));
+
+        Assert.NotNull(connection.LastTransaction);
+        Assert.True(connection.LastTransaction!.RolledBack);
+        Assert.False(connection.LastTransaction!.Committed);
     }
 }

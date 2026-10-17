@@ -12,7 +12,7 @@ public class CountryControllerTests
 {
     private static CountryController CreateController(FakeCountryRepository repository)
     {
-        var controller = new CountryController(new CountryService(repository));
+        var controller = new CountryController(new CountryService(repository, new PTL.Api.Tests.Audit.FakeActingUserAccessor()));
 
         // ValidationProblem() resolves ProblemDetailsFactory from HttpContext.RequestServices,
         // which a bare controller instance does not have without this wiring.

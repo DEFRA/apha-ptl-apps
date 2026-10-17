@@ -1,3 +1,5 @@
+using PTL.Core.Audit;
+
 namespace PTL.Core.Country;
 
 public interface ICountryRepository
@@ -9,11 +11,11 @@ public interface ICountryRepository
     Task<IReadOnlyList<CountryTypeEntity>> GetCountryTypesAsync(CancellationToken cancellationToken = default);
 
     // spiCountry
-    Task CreateAsync(Country country, CancellationToken cancellationToken = default);
+    Task CreateAsync(Country country, AuditEntry? auditEntry = null, CancellationToken cancellationToken = default);
 
     // spuCountry
-    Task UpdateAsync(Country country, CancellationToken cancellationToken = default);
+    Task UpdateAsync(Country country, AuditEntry? auditEntry = null, CancellationToken cancellationToken = default);
 
     // spdCountry
-    Task DeleteAsync(Guid countryId, CancellationToken cancellationToken = default);
+    Task DeleteAsync(Guid countryId, AuditEntry? auditEntry = null, CancellationToken cancellationToken = default);
 }

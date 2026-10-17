@@ -1,5 +1,7 @@
 using Dapper;
 using PTL.Core.AdministrationCharge;
+using PTL.Core.Audit;
+using PTL.Data.Audit;
 using PTL.Data.Infrastructure;
 
 namespace PTL.Data.AdministrationCharge;
@@ -31,19 +33,19 @@ public sealed class AdministrationChargeRepository(IDbConnectionFactory connecti
             new { AdministrationChargeId = administrationChargeId, CurrencyId = currencyId });
     }
 
-    public async Task InsertPriceAsync(AdministrationChargeCurrencyEntity price, CancellationToken cancellationToken = default)
-    {
-        using var connection = connectionFactory.CreateConnection();
+    public Task InsertPriceAsync(AdministrationChargeCurrencyEntity price, AuditEntry? auditEntry = null, CancellationToken cancellationToken = default) =>
+        AuditTrailWriter.ExecuteAsync(
+            connectionFactory,
+            auditEntry,
+            (connection, transaction) => connection.ExecuteAsync(InsertSql, BuildParameters(price), transaction),
+            cancellationToken);
 
-        await connection.ExecuteAsync(InsertSql, BuildParameters(price));
-    }
-
-    public async Task UpdatePriceAsync(AdministrationChargeCurrencyEntity price, CancellationToken cancellationToken = default)
-    {
-        using var connection = connectionFactory.CreateConnection();
-
-        await connection.ExecuteAsync(UpdateSql, BuildParameters(price));
-    }
+    public Task UpdatePriceAsync(AdministrationChargeCurrencyEntity price, AuditEntry? auditEntry = null, CancellationToken cancellationToken = default) =>
+        AuditTrailWriter.ExecuteAsync(
+            connectionFactory,
+            auditEntry,
+            (connection, transaction) => connection.ExecuteAsync(UpdateSql, BuildParameters(price), transaction),
+            cancellationToken);
 
     private const string InsertSql =
         "EXEC dbo.spiAdministrationChargeCurrency @AdministrationChargeCurrencyId, @AdministrationChargeId, @CurrencyId, @Price";

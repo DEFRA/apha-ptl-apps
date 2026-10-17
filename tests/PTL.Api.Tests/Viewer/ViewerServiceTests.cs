@@ -1,3 +1,4 @@
+using PTL.Api.Tests.Audit;
 using PTL.Api.Tests.ExternalUser;
 using PTL.Api.Tests.Participant;
 using PTL.Core.Viewer;
@@ -7,7 +8,7 @@ namespace PTL.Api.Tests.Viewer;
 public class ViewerServiceTests
 {
     private static ViewerService CreateService(FakeViewerRepository? repository = null, FakeExternalLoginService? loginService = null) =>
-        new(repository ?? new FakeViewerRepository(), loginService ?? new FakeExternalLoginService());
+        new(repository ?? new FakeViewerRepository(), loginService ?? new FakeExternalLoginService(), new FakeActingUserAccessor());
 
     [Fact]
     public async Task CreateAsync_ValidInput_PersistsAndReturnsViewer()

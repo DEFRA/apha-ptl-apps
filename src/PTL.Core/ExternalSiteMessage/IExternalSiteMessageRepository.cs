@@ -1,3 +1,5 @@
+using PTL.Core.Audit;
+
 namespace PTL.Core.ExternalSiteMessage;
 
 public interface IExternalSiteMessageRepository
@@ -7,5 +9,5 @@ public interface IExternalSiteMessageRepository
     Task<ExternalSiteMessage> GetAsync(CancellationToken cancellationToken = default);
 
     // spuMainPageMessage
-    Task UpdateAsync(ExternalSiteMessage message, CancellationToken cancellationToken = default);
+    Task UpdateAsync(ExternalSiteMessage message, AuditEntry? auditEntry = null, CancellationToken cancellationToken = default);
 }

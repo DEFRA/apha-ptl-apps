@@ -1,4 +1,5 @@
 using System.Data;
+using PTL.Core.Audit;
 using PTL.Data.Country;
 using PTL.Data.Infrastructure;
 using PTL.Data.Tests.Fakes;
@@ -91,5 +92,41 @@ public class CountryRepositoryTests
         await repository.DeleteAsync(Guid.NewGuid());
 
         Assert.Contains(connection.ExecutedCommands, c => c.CommandText == deleteSql);
+    }
+
+    private const string AuditSql = "EXEC dbo.spiSystemAdministrationAudit @AuditId, @ActingUserId, @Action, @EntityType, @EntityId, @Details";
+
+    [Fact]
+    public async Task DeleteAsync_WithAudit_CommitsChangeAndAuditInOneTransaction()
+    {
+        var (repository, connection) = CreateRepository();
+        const string deleteSql = "EXEC dbo.spdCountry @CountryId";
+        connection.RespondToNonQuery(deleteSql, 1);
+        connection.RespondToNonQuery(AuditSql, 1);
+        var countryId = Guid.NewGuid();
+        var audit = new AuditEntry(Guid.NewGuid(), "DeleteCountry", "Country", countryId.ToString(), "Name=France");
+
+        await repository.DeleteAsync(countryId, audit);
+
+        Assert.NotNull(connection.LastTransaction);
+        Assert.True(connection.LastTransaction!.Committed);
+        Assert.Contains(connection.ExecutedCommands, c => c.CommandText == deleteSql);
+        var auditCommand = Assert.Single(connection.ExecutedCommands, c => c.CommandText == AuditSql);
+        Assert.Equal("DeleteCountry", auditCommand.ParameterValue("@Action"));
+    }
+
+    [Fact]
+    public async Task CreateAsync_AuditWriteFails_RollsBackTheTransaction()
+    {
+        var (repository, connection) = CreateRepository();
+        connection.RespondToNonQuery("EXEC dbo.spiCountry @CountryId, @Country, @CountryTypeId", 1);
+        var country = new PTL.Core.Country.Country { CountryId = Guid.NewGuid(), CountryName = "France", CountryTypeId = Guid.NewGuid() };
+        var audit = new AuditEntry(Guid.NewGuid(), "CreateCountry", "Country", country.CountryId.ToString(), "Name=France");
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => repository.CreateAsync(country, audit));
+
+        Assert.NotNull(connection.LastTransaction);
+        Assert.True(connection.LastTransaction!.RolledBack);
+        Assert.False(connection.LastTransaction!.Committed);
     }
 }

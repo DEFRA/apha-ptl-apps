@@ -1230,6 +1230,25 @@ public class SystemAdministrationControllerTests
         var row = Assert.Single(model.Rows);
         Assert.Contains("SFW1234: Heavy Metals", row.RemoveConfirmMessage);
         Assert.Contains("LAB001: Example Lab", row.RemoveConfirmMessage);
+        Assert.Contains("Remove these assignments before removing this viewer.", row.RemoveConfirmMessage);
+        Assert.True(row.IsRemoveBlocked);
+    }
+
+    [Fact]
+    public async Task ViewerManagement_Get_WithoutAssignments_UsesPlainConfirmAndIsNotBlocked()
+    {
+        var apiClient = new FakeViewerApiClient
+        {
+            Viewers = [new ViewerResponse(Guid.NewGuid(), "Jane Smith", "jane@example.com", false, [], [])]
+        };
+        var controller = CreateController(viewerApiClient: apiClient);
+
+        var result = await controller.ViewerManagement(editId: null, CancellationToken.None);
+
+        var model = Assert.IsType<ViewerManagementViewModel>(Assert.IsType<ViewResult>(result).Model);
+        var row = Assert.Single(model.Rows);
+        Assert.False(row.IsRemoveBlocked);
+        Assert.Equal("Are you sure you want to remove this viewer?", row.RemoveConfirmMessage);
     }
 
     [Fact]
