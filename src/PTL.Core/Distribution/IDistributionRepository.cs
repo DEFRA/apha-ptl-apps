@@ -76,6 +76,14 @@ public partial interface IDistributionRepository
         IReadOnlyList<DistributionParticipantEntity> newParticipants,
         CancellationToken cancellationToken = default);
 
+    // Legacy SetupMonthlyDistribution (MenuDistributions "Initialise this Month"), one transaction:
+    // spgMonthlyDistribution to see whether the month already exists, sppSetupMonthlyDistribution
+    // (which seeds the distribution references and returns the schemes and participants), then
+    // spiMonthlyDistribution, spiMonthlyDistributionScheme and spiDistributionParticipant for the
+    // plan the caller builds from those rows. Returns false, writing nothing, when the month exists.
+    Task<bool> InitialiseMonthAsync(
+        int yearId, int monthId, MonthSetupPlanner planner, CancellationToken cancellationToken = default);
+
     // spgPreparationSheet - the Sample Preparation screen's scheme+sample listing for a
     // distribution month, legacy PreparationSheet.FetchPreparationSheet. Returns null when the
     // header row itself is not found.

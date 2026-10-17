@@ -22,7 +22,8 @@ public sealed record TabulationReportResponse(
     IReadOnlyList<TabulationTableResponse> Tables,
     TabulationTableResponse? Ratings,
     TabulationAttachmentResponse? Attachment,
-    TabulationPrintResponse Print);
+    TabulationPrintResponse Print,
+    string DistributionHeading = "");
 
 // Issued Tabulation only: the signature block printed under the tables.
 public sealed record TabulationSignatoryResponse(
@@ -96,6 +97,7 @@ public sealed record AssessmentResultsResponse(
     IReadOnlyList<string> Titles,
     string XAxisTitle,
     string YAxisTitle,
-    IReadOnlyList<AssessmentScoreFrequencyResponse> Scores);
+    IReadOnlyList<AssessmentScoreFrequencyResponse> Scores,
+    string DistributionHeading = "");
 
 public sealed record AssessmentScoreFrequencyResponse(int Score, string Label, int Frequency);

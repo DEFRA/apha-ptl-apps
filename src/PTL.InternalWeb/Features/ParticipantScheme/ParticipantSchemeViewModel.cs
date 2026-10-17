@@ -6,8 +6,8 @@ namespace PTL.InternalWeb.Features.ParticipantScheme;
 
 // Details.cshtml model. Legacy has no separate view screen - ParticipantScheme.aspx serves both
 // Create and Edit and locks every control when mContract.IsReadOnly or mParticipantScheme.IsRemoved,
-// so Details renders the same field partial with Fields.IsReadOnly always true. IsReadOnly here is
-// the item's own removed/closed-year state, driving the page title and the Edit button only.
+// so Details shows the same fields as read-only text (Fields.IsReadOnly is always true). IsReadOnly
+// here is the item's own removed/closed-year state, driving the page title and the Edit button only.
 public sealed record ParticipantSchemeDetailsViewModel(ParticipantSchemeFormViewModel Fields, bool IsReadOnly);
 
 // Shared by Create.cshtml and Edit.cshtml. Participant/Scheme selection only happens on Create -

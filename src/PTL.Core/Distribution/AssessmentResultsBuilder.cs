@@ -71,6 +71,7 @@ public static class AssessmentResultsBuilder
             ],
             "Assessment Score",
             "Frequency",
-            [.. Bars.Select(b => new AssessmentScoreFrequencyResponse(b.Score, b.Label, frequencies[b.Score]))]);
+            [.. Bars.Select(b => new AssessmentScoreFrequencyResponse(b.Score, b.Label, frequencies[b.Score]))],
+            $"{source.Distribution}: {source.SchemeName}");
     }
 }

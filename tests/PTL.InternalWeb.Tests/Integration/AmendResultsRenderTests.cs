@@ -103,6 +103,8 @@ public partial class AmendResultsRenderTests : IClassFixture<WebApplicationFacto
 
     private static string H1(string html) => Text(Regex.Match(html, "<h1[^>]*>(.*?)</h1>", RegexOptions.Singleline).Groups[1].Value);
 
+    private static string H2(string html) => Text(Regex.Match(html, "<h2[^>]*>(.*?)</h2>", RegexOptions.Singleline).Groups[1].Value);
+
     private static string MainContent(string html) => Regex.Match(html, "<main.*?</main>", RegexOptions.Singleline).Value;
 
     private static bool HasCommandButton(string html, string value, string label) =>
@@ -129,21 +131,21 @@ public partial class AmendResultsRenderTests : IClassFixture<WebApplicationFacto
 
         Assert.Contains("Amend Results", WebUtility.HtmlDecode(PageTitle(html)), StringComparison.Ordinal);
         Assert.DoesNotContain("Audit Trail", PageTitle(html), StringComparison.Ordinal);
-        Assert.Equal(Title, H1(html));
+        Assert.Equal("Amend Results", H1(html));
+        Assert.Equal(Title, H2(html));
         Assert.Contains(
             "All of the Intended Results and the Results received from Participants are shown below for Amending.",
             Text(MainContent(html)), StringComparison.Ordinal);
     }
 
     [Fact]
-    public async Task Get_BackLinkReturnsToTheTabulationsForTheSameMonth()
+    public async Task Get_HasNoBackLink()
     {
         Seed();
 
-        var back = Regex.Match(await GetHtmlAsync(), "<a class=\"govuk-back-link[^\"]*\" href=\"([^\"]+)\">Back</a>");
+        var html = await GetHtmlAsync();
 
-        Assert.True(back.Success);
-        Assert.Equal("/Distribution/Tabulations?year=2026&monthId=5", WebUtility.HtmlDecode(back.Groups[1].Value));
+        Assert.DoesNotContain("govuk-back-link", html, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -281,7 +283,7 @@ public partial class AmendResultsRenderTests : IClassFixture<WebApplicationFacto
 
         var html = await PostHtmlAsync("save", (key, "Neg"));
 
-        Assert.Equal(Title, H1(html));
+        Assert.Equal("Amend Results", H1(html));
         Assert.Matches($"<p id=\"{key}-error\" class=\"govuk-error-message[^\"]*\"><span class=\"govuk-visually-hidden\">Error:</span> Result is not valid</p>", html);
         Assert.Matches($"<select class=\"govuk-select govuk-select--error\" id=\"{key}\"", html);
         Assert.Contains("govuk-error-summary", html, StringComparison.Ordinal);

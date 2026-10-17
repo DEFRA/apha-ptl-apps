@@ -81,6 +81,21 @@ public sealed partial class DistributionController(
         return Ok(new MonthlyDistributionScheduleSaveResult(outcome.Success, fieldErrors));
     }
 
+    // POST /api/distributions/months/{yearId}/{monthId}/initialise - legacy "Initialise this Month":
+    // seeds the month's distributions from the Scheme configuration in one transaction. yearId is the
+    // calendar year of the month, as the dashboard row carries it.
+    [HttpPost("months/{yearId:int}/{monthId:int}/initialise")]
+    public async Task<ActionResult<InitialiseMonthResult>> InitialiseMonth(int yearId, int monthId, CancellationToken cancellationToken)
+    {
+        if (monthId is < 1 or > 12 || yearId < 1)
+        {
+            return BadRequest();
+        }
+
+        var initialised = await distributionService.InitialiseMonthAsync(yearId, monthId, cancellationToken);
+        return Ok(new InitialiseMonthResult(initialised));
+    }
+
     // GET /api/distributions/months/{yearId}/{monthId}/preparation - the Sample Preparation
     // screen, legacy PreparationSheet.FetchPreparationSheet.
     [HttpGet("months/{yearId:int}/{monthId:int}/preparation")]

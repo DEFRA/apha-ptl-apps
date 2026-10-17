@@ -10,8 +10,6 @@
         .ToList();
 }
 
-<a class="govuk-back-link" asp-action="Index" asp-route-year="@Model.YearId">Back</a>
-
 <h1 class="govuk-heading-l">Monthly Distributions - @Model.MonthYearLabel</h1>
 
 <p class="govuk-body">This page shows all of the Schemes that have a Distribution for the selected month.</p>
@@ -103,8 +101,7 @@
                             <button type="submit" class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0"
                                     formaction="@Url.Action("ToggleCancelled", new { year = Model.YearId, monthId = Model.MonthId, schemeId = scheme.MonthlyDistributionSchemeId })"
                                     formnovalidate
-                                    data-module="govuk-button"
-                                    onclick="return confirm('@scheme.CancelCommenceConfirmText');">
+                                    data-module="govuk-button">
                                 @scheme.CancelCommenceLinkText<span class="govuk-visually-hidden"> for @scheme.SchemeHeading</span>
                             </button>
                         </li>

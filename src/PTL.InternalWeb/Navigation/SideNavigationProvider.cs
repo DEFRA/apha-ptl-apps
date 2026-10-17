@@ -7,7 +7,7 @@ namespace PTL.InternalWeb.Navigation;
 // Legacy behaviour this reproduces: the left nav is context-based, not a permanent full tree.
 // Each page shows only its OWN node's title plus that node's direct children - never the whole
 // menu at once. Navigating to "Manage Contracts" shows the Contracts Administration landing page
-// and its children (Customers, Search, Group Addresses, Exports, Invoice Generation); navigating
+// and its children (Customers, Group Addresses, Exports, Invoice Generation); navigating
 // on to "Customers" replaces that with the Customer children (Create Customer, Review Pending
 // Customer/Participant Updates, Review Pending Orders); navigating to "Create Customer" (a leaf)
 // shows only "Create Customer". See _SideNavigation.cshtml for the rendering logic.
@@ -174,10 +174,12 @@ public static class SideNavigationProvider
                                     [
                                         new SideNavigationItem { Text = "Contract Item Details", ControllerName = ParticipantSchemeControllerName, ActionName = DetailsAction, IsHidden = true },
                                         new SideNavigationItem { Text = "Add Contract Item", ControllerName = ParticipantSchemeControllerName, ActionName = CreateAction, IsHidden = true },
-                                        new SideNavigationItem { Text = "Edit Contract Item", ControllerName = ParticipantSchemeControllerName, ActionName = EditAction, IsHidden = true },
-                                        new SideNavigationItem { Text = "Import Permits", ControllerName = ContractControllerName, ActionName = "ImportPermits", IsHidden = true }
+                                        new SideNavigationItem { Text = "Edit Contract Item", ControllerName = ParticipantSchemeControllerName, ActionName = EditAction, IsHidden = true }
                                     ]
                                 },
+
+                                // Hidden: reached from the Contracts list's Import Permit(s) link, not from Contract Items.
+                                new SideNavigationItem { Text = "Import Permit(s)", ControllerName = ContractControllerName, ActionName = "ImportPermits", IsHidden = true },
 
                                 // Hidden: a download action that only renders a page when the
                                 // requested document type has no template (FeatureNotAvailable).
@@ -186,7 +188,6 @@ public static class SideNavigationProvider
                         }
                     ]
                 },
-                Disabled("Search"),
                 new SideNavigationItem
                 {
                     Text = "Group Addresses",
@@ -260,7 +261,6 @@ public static class SideNavigationProvider
                         new SideNavigationItem { Text = "Printable Scheme", ControllerName = SchemeControllerName, ActionName = "PrintableScheme", IsHidden = true }
                     ]
                 },
-                Disabled("Search"),
                 Disabled("Test Types"),
                 Disabled("Test Result Items"),
                 Disabled("Test Method Items"),

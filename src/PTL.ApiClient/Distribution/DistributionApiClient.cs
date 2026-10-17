@@ -32,6 +32,14 @@ public sealed partial class DistributionApiClient(HttpClient httpClient) : IDist
         return await response.Content.ReadFromJsonAsync<MonthlyDistributionScheduleSaveResult>(cancellationToken);
     }
 
+    public async Task<InitialiseMonthResult?> InitialiseMonthAsync(int yearId, int monthId, CancellationToken cancellationToken = default)
+    {
+        var response = await httpClient.PostAsync(
+            new Uri($"/api/distributions/months/{yearId}/{monthId}/initialise", UriKind.Relative), content: null, cancellationToken);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<InitialiseMonthResult>(cancellationToken);
+    }
+
     public async Task<SampleNumbersPageResult> GetSampleNumbersAsync(Guid monthlyDistributionSchemeId, CancellationToken cancellationToken = default)
     {
         var response = await httpClient.GetAsync(

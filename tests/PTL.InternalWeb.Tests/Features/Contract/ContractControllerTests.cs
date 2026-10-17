@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using PTL.Contracts.Contract;
 using PTL.Core.Contract.Document;
 using PTL.Core.Contract.Export.Templates;
+using PTL.InternalWeb.Confirmation;
 using PTL.InternalWeb.Tests.TestSupport;
 using PTL.SharedUI.Notifications;
 
@@ -599,13 +600,31 @@ public class ContractControllerTests
     }
 
     [Fact]
+    public async Task RemoveContractItem_NotConfirmed_ShowsTheConfirmationPageAndRemovesNothing()
+    {
+        var contractId = Guid.NewGuid();
+        var apiClient = new FakeContractApiClient { RemovalResult = new ContractItemRemovalResult(true, false, null) };
+        var controller = CreateController(apiClient);
+        controller.Url = new FakeUrlHelper();
+
+        var result = await controller.RemoveContractItem(contractId, Guid.NewGuid(), null, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        Assert.Equal(ConfirmationFlow.ViewName, view.ViewName);
+        var model = Assert.IsType<ConfirmationPageViewModel>(view.Model);
+        Assert.Equal("Are you sure you want to remove this Contract Item?", model.Message);
+        Assert.EndsWith("/ContractItems", model.CancelUrl, StringComparison.Ordinal);
+        Assert.Null(controller.TempData.GetNotification());
+    }
+
+    [Fact]
     public async Task RemoveContractItem_Success_SetsSuccessNotificationAndRedirects()
     {
         var contractId = Guid.NewGuid();
         var controller = CreateController(new FakeContractApiClient { RemovalResult = new ContractItemRemovalResult(true, false, null) });
         controller.TempData = CreateTempData();
 
-        var result = await controller.RemoveContractItem(contractId, Guid.NewGuid(), CancellationToken.None);
+        var result = await controller.RemoveContractItem(contractId, Guid.NewGuid(), ConfirmationFlow.Confirmed, CancellationToken.None);
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
         Assert.Equal("ContractItems", redirect.ActionName);
@@ -622,7 +641,7 @@ public class ContractControllerTests
         var controller = CreateController(new FakeContractApiClient { RemovalResult = new ContractItemRemovalResult(false, false, "Item is in use") });
         controller.TempData = CreateTempData();
 
-        var result = await controller.RemoveContractItem(contractId, Guid.NewGuid(), CancellationToken.None);
+        var result = await controller.RemoveContractItem(contractId, Guid.NewGuid(), ConfirmationFlow.Confirmed, CancellationToken.None);
 
         Assert.IsType<RedirectToActionResult>(result);
         var notification = controller.TempData.GetNotification();
@@ -636,7 +655,7 @@ public class ContractControllerTests
         var controller = CreateController(new FakeContractApiClient { RemovalResult = new ContractItemRemovalResult(false, true, null) });
         controller.TempData = CreateTempData();
 
-        await controller.RemoveContractItem(Guid.NewGuid(), Guid.NewGuid(), CancellationToken.None);
+        await controller.RemoveContractItem(Guid.NewGuid(), Guid.NewGuid(), ConfirmationFlow.Confirmed, CancellationToken.None);
 
         Assert.Equal("The contract item could not be removed.", controller.TempData.GetNotification()!.Message);
     }

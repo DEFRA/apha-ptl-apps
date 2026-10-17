@@ -1,9 +1,11 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ViewFeatures;
 using PTL.ApiClient.Distribution;
 using PTL.Contracts.Distribution;
 using PTL.InternalWeb.Features.Distribution;
 using PTL.InternalWeb.Tests.TestSupport;
+using PTL.SharedUI.Notifications;
 
 namespace PTL.InternalWeb.Tests.Features.Distribution;
 
@@ -29,7 +31,11 @@ public class DistributionControllerCommentsTests
         new() { TestConsultantComments = Comments(), CommentsSaveResult = save };
 
     private static DistributionController CreateController(FakeDistributionApiClient apiClient) =>
-        new(apiClient) { ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() } };
+        new(apiClient)
+        {
+            ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() },
+            TempData = new TempDataDictionary(new DefaultHttpContext(), new FakeTempDataProvider()),
+        };
 
     private static TestConsultantCommentsSaveResult Saved() => new(true, false, string.Empty, new Dictionary<string, string>());
 
@@ -237,6 +243,46 @@ public class DistributionControllerCommentsTests
         var request = Assert.Single(apiClient.SavedComments);
         Assert.Equal(submit, request.Submit);
         Assert.Equal("Typo", request.AuditWhy);
+    }
+
+    [Theory]
+    [InlineData("save", "Comments updated successfully.")]
+    [InlineData("submit", "Comments submitted successfully.")]
+    public async Task Post_SaveSucceeds_ShowsTheSuccessBanner(string command, string message)
+    {
+        var controller = CreateController(ApiClient(Saved()));
+
+        AssertRedirectToTabulations(await PostAsync(controller, Posted(), command));
+
+        var notification = controller.TempData.GetNotification();
+        Assert.Equal(NotificationType.Success, notification!.Type);
+        Assert.Equal(message, notification.Message);
+    }
+
+    [Fact]
+    public async Task Post_AuditStepSaveSucceeds_ShowsTheSuccessBanner()
+    {
+        var controller = CreateController(ApiClient(Saved()));
+        var model = Posted();
+        model.IsAuditStep = true;
+        model.PendingCommand = "save";
+        model.AuditWhy = "Typo";
+
+        AssertRedirectToTabulations(await PostAsync(controller, model, "save"));
+
+        Assert.Equal("Comments updated successfully.", controller.TempData.GetNotification()!.Message);
+    }
+
+    [Fact]
+    public async Task Post_AuditReasonRequiredOrErrors_ShowNoSuccessBanner()
+    {
+        var auditController = CreateController(ApiClient(AuditRequired()));
+        AssertRedisplayed(await PostAsync(auditController, Posted(), "save"));
+        Assert.Null(auditController.TempData.GetNotification());
+
+        var errorController = CreateController(ApiClient(new TestConsultantCommentsSaveResult(false, false, string.Empty, new Dictionary<string, string> { ["Comments"] = "bad" })));
+        AssertRedisplayed(await PostAsync(errorController, Posted(), "save"));
+        Assert.Null(errorController.TempData.GetNotification());
     }
 
     [Fact]

@@ -1,3 +1,4 @@
+@using PTL.InternalWeb.Features.Contract
 @model PTL.InternalWeb.Features.Contract.ImportPermitsViewModel
 @{
     ViewData["Title"] = "Import Permit(s)";
@@ -11,10 +12,16 @@
 @if (Model.Permits.Count == 0)
 {
     <p class="govuk-body">There are no import permits to display.</p>
-    <a class="govuk-button govuk-button--secondary" data-module="govuk-button" asp-action="ContractItems" asp-route-id="@Model.ContractId">Back</a>
+    <form method="post" asp-action="ImportPermits" asp-route-id="@Model.ContractId">
+        <button class="govuk-button govuk-button--secondary" data-module="govuk-button" type="submit" formaction="@Url.Action("ImportPermits", new { id = Model.ContractId, command = ImportPermitCommands.Cancel })">Back</button>
+    </form>
 }
 else
 {
+    @* Legacy kept row edits in an in-memory list (ViewState) until Apply/Save. Every button below
+    posts this one form, which carries each row's pending Received/Expiry (pending[i].*) so that
+    Edit/Update/Cancel never touch the database - only Apply/Save do. *@
+    <form method="post" asp-action="ImportPermits" asp-route-id="@Model.ContractId">
     <table class="govuk-table">
         <thead class="govuk-table__head">
             <tr class="govuk-table__row">
@@ -28,11 +35,19 @@ else
             </tr>
         </thead>
         <tbody class="govuk-table__body">
-            @foreach (var permit in Model.Permits)
+            @for (var i = 0; i < Model.Permits.Count; i++)
             {
+                var permit = Model.Permits[i];
                 var isEditing = permit.ParticipantSchemeId == Model.EditParticipantSchemeId;
                 <tr class="govuk-table__row">
-                    <td class="govuk-table__cell">@permit.SchemeNumber</td>
+                    <td class="govuk-table__cell">
+                        @* Literal hidden inputs (not asp-for) so a redisplayed page always carries the
+                        pending values, never a stale ModelState value from the previous post. *@
+                        <input type="hidden" name="pending[@i].ParticipantSchemeId" value="@permit.ParticipantSchemeId" />
+                        <input type="hidden" name="pending[@i].ImportPermitReceived" value="@(permit.ImportPermitReceived ? "true" : "false")" />
+                        <input type="hidden" name="pending[@i].ImportPermitExpiry" value="@permit.ImportPermitExpiry" />
+                        @permit.SchemeNumber
+                    </td>
                     <td class="govuk-table__cell">@permit.SchemeName</td>
                     <td class="govuk-table__cell">@permit.LabId</td>
                     <td class="govuk-table__cell">
@@ -48,28 +63,30 @@ else
                     </td>
                     @if (isEditing)
                     {
+                        var editReceived = Model.EditReceived ?? permit.ImportPermitReceived;
+                        var editExpiry = Model.EditExpiry ?? permit.ImportPermitExpiry;
+                        var expiryError = ViewData.ModelState["importPermitExpiry"]?.Errors.FirstOrDefault()?.ErrorMessage;
                         <td class="govuk-table__cell" colspan="2">
-                            <form method="post" asp-action="UpdateImportPermit" id="editForm-@permit.ParticipantSchemeId">
-                                @Html.AntiForgeryToken()
-                                <input type="hidden" name="id" value="@Model.ContractId" />
-                                <input type="hidden" name="participantSchemeId" value="@permit.ParticipantSchemeId" />
-                                <div class="govuk-form-group">
-                                    <label class="govuk-label" for="received-@permit.ParticipantSchemeId">Import Permit Received</label>
-                                    <select class="govuk-select ptl-permit-received" id="received-@permit.ParticipantSchemeId" name="importPermitReceived" data-row="@permit.ParticipantSchemeId" disabled="@(!permit.ImportPermitRequired)">
-                                        <option value="false" selected="@(!permit.ImportPermitReceived ? "selected" : null)">No</option>
-                                        <option value="true" selected="@(permit.ImportPermitReceived ? "selected" : null)">Yes</option>
-                                    </select>
-                                </div>
-                                <div class="govuk-form-group">
-                                    <label class="govuk-label" for="expiry-@permit.ParticipantSchemeId">Import Permit Expiry</label>
-                                    <input class="govuk-input ptl-permit-expiry" id="expiry-@permit.ParticipantSchemeId" name="importPermitExpiry" placeholder="dd/mm/yyyy" data-row="@permit.ParticipantSchemeId" value="@permit.ImportPermitExpiry" disabled="@(!(permit.ImportPermitRequired && permit.ImportPermitReceived))" />
-                                </div>
-                            </form>
+                            <div class="govuk-form-group">
+                                <label class="govuk-label" for="received-@permit.ParticipantSchemeId">Import Permit Received</label>
+                                <select class="govuk-select ptl-permit-received" id="received-@permit.ParticipantSchemeId" name="editReceived" data-row="@permit.ParticipantSchemeId" disabled="@(!permit.ImportPermitRequired)">
+                                    <option value="false" selected="@(!editReceived ? "selected" : null)">No</option>
+                                    <option value="true" selected="@(editReceived ? "selected" : null)">Yes</option>
+                                </select>
+                            </div>
+                            <div id="importPermitExpiry" class="govuk-form-group @(expiryError is null ? null : "govuk-form-group--error")">
+                                <label class="govuk-label" for="expiry-@permit.ParticipantSchemeId">Import Permit Expiry</label>
+                                @if (expiryError is not null)
+                                {
+                                    <p id="importPermitExpiry-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @expiryError</p>
+                                }
+                                <input class="govuk-input ptl-permit-expiry @(expiryError is null ? null : "govuk-input--error")" id="expiry-@permit.ParticipantSchemeId" name="editExpiry" placeholder="dd/mm/yyyy" data-row="@permit.ParticipantSchemeId" value="@editExpiry" disabled="@(!(permit.ImportPermitRequired && editReceived))" />
+                            </div>
                         </td>
                         <td class="govuk-table__cell">
                             <div class="govuk-button-group">
-                                <button class="govuk-button govuk-button--small" data-module="govuk-button" type="submit" form="editForm-@permit.ParticipantSchemeId">Update</button>
-                                <a class="govuk-button govuk-button--secondary govuk-button--small" data-module="govuk-button" asp-action="ImportPermits" asp-route-id="@Model.ContractId">Cancel</a>
+                                <button class="govuk-button govuk-button--small" data-module="govuk-button" type="submit" id="update-@permit.ParticipantSchemeId" formaction="@Url.Action("ImportPermits", new { id = Model.ContractId, command = ImportPermitCommands.Update, rowId = permit.ParticipantSchemeId })">Update</button>
+                                <button class="govuk-button govuk-button--secondary govuk-button--small" data-module="govuk-button" type="submit" formnovalidate formaction="@Url.Action("ImportPermits", new { id = Model.ContractId, command = ImportPermitCommands.CancelEdit, rowId = permit.ParticipantSchemeId })">Cancel</button>
                             </div>
                         </td>
                     }
@@ -94,7 +111,7 @@ else
                         </td>
                         <td class="govuk-table__cell">@permit.ImportPermitExpiry</td>
                         <td class="govuk-table__cell">
-                            <a class="govuk-link" asp-action="ImportPermits" asp-route-id="@Model.ContractId" asp-route-editParticipantSchemeId="@permit.ParticipantSchemeId">Edit</a>
+                            <button class="govuk-button govuk-button--primary" data-module="govuk-button" type="submit" formaction="@Url.Action("ImportPermits", new { id = Model.ContractId, command = ImportPermitCommands.Edit, rowId = permit.ParticipantSchemeId })">Edit</button>
                         </td>
                     }
                 </tr>
@@ -102,16 +119,29 @@ else
         </tbody>
     </table>
 
+    @* Matches legacy btnApply (persist, stay), btnSave (persist, return to the contract list) and
+    btnCancel (discard, return to the contract list). *@
     <div class="govuk-button-group">
-        <a class="govuk-button" data-module="govuk-button" asp-action="ContractItems" asp-route-id="@Model.ContractId">Save</a>
-        <a class="govuk-button govuk-button--secondary" data-module="govuk-button" asp-action="ImportPermits" asp-route-id="@Model.ContractId">Apply</a>
-        <a class="govuk-button govuk-button--secondary" data-module="govuk-button" asp-action="ContractItems" asp-route-id="@Model.ContractId">Cancel</a>
+        <button class="govuk-button" data-module="govuk-button" type="submit" formaction="@Url.Action("ImportPermits", new { id = Model.ContractId, command = ImportPermitCommands.Apply })">Apply</button>
+        <button class="govuk-button" data-module="govuk-button" type="submit" formaction="@Url.Action("ImportPermits", new { id = Model.ContractId, command = ImportPermitCommands.Save })">Save</button>
+        <button class="govuk-button govuk-button--secondary" data-module="govuk-button" type="submit" formnovalidate formaction="@Url.Action("ImportPermits", new { id = Model.ContractId, command = ImportPermitCommands.Cancel })">Cancel</button>
     </div>
+    </form>
 
     <script>
         // Matches legacy ddlPermitReceived_SelectedIndexChanged: the expiry field is only enabled
         // (and required) while the edited row's Received dropdown is "Yes".
         (function () {
+            // Enter in the expiry box must run that row's Update, not the form's first submit button.
+            document.querySelectorAll('.ptl-permit-expiry').forEach(function (input) {
+                input.addEventListener('keydown', function (event) {
+                    if (event.key !== 'Enter') { return; }
+                    event.preventDefault();
+                    var update = document.getElementById('update-' + input.dataset.row);
+                    if (update) { update.click(); }
+                });
+            });
+
             document.querySelectorAll('.ptl-permit-received').forEach(function (select) {
                 select.addEventListener('change', function () {
                     var row = select.dataset.row;

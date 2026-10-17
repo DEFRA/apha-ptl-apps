@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using PTL.Contracts.Distribution;
+using PTL.SharedUI.Notifications;
 
 namespace PTL.InternalWeb.Features.Distribution;
 
@@ -89,6 +90,7 @@ public sealed partial class DistributionController
             return await RedisplayViewCommentsAsync(year, monthId, schemeId, model, cancellationToken);
         }
 
+        TempData.SetNotification(NotificationType.Success, submit ? "Comments submitted successfully." : "Comments updated successfully.");
         return RedirectToAction(nameof(Tabulations), new { year, monthId });
     }
 

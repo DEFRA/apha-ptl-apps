@@ -132,7 +132,7 @@ public class TabulationsRenderTests : IClassFixture<WebApplicationFactory<Progra
         new(schemeId, "BT: Brucella", "D1a/S1", command, "Send To Test Consultant", question);
 
     [Fact]
-    public async Task Get_RendersLegacyTitleHeadingIntroAndBackLink()
+    public async Task Get_RendersLegacyTitleHeadingAndIntro_WithoutABackLink()
     {
         Seed(Plain());
 
@@ -141,12 +141,7 @@ public class TabulationsRenderTests : IClassFixture<WebApplicationFactory<Progra
         Assert.Contains("Monthly Distributions - May 2026", Regex.Match(html, "<title>(.*?)</title>", RegexOptions.Singleline).Groups[1].Value, StringComparison.Ordinal);
         Assert.Equal("Monthly Distributions - May 2026", Text(Regex.Match(html, "<h1[^>]*>(.*?)</h1>", RegexOptions.Singleline).Groups[1].Value));
         Assert.Contains("The table below lists the Tabulations that are available for each of this month's Distributions.", WebUtility.HtmlDecode(html), StringComparison.Ordinal);
-
-        var back = Regex.Match(html, "<a class=\"govuk-back-link[^\"]*\" href=\"([^\"]+)\">Back</a>");
-        Assert.True(back.Success);
-        var href = WebUtility.HtmlDecode(back.Groups[1].Value);
-        Assert.StartsWith("/Distribution", href, StringComparison.Ordinal);
-        Assert.Contains("year=2026", href, StringComparison.Ordinal);
+        Assert.DoesNotContain("govuk-back-link", html, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -598,28 +593,28 @@ public class TabulationsRenderTests : IClassFixture<WebApplicationFactory<Progra
             "Are you sure you want to send these results to the Test Consultant?",
             Text(Regex.Match(html, "<h1[^>]*>(.*?)</h1>", RegexOptions.Singleline).Groups[1].Value));
         Assert.DoesNotContain("govuk-warning-text", html, StringComparison.Ordinal);
-        // Earlier staged sends would be lost by a GET back link, so it is not offered.
         Assert.DoesNotContain("govuk-back-link", html, StringComparison.Ordinal);
 
         var forms = Regex.Matches(html, "<form ([^>]*)>(.*?)</form>", RegexOptions.Singleline);
-        var ok = forms.Single(f => !f.Groups[1].Value.Contains("send-tabulation-cancel", StringComparison.Ordinal) && f.Groups[2].Value.Contains(">OK</button>", StringComparison.Ordinal));
-        var cancel = forms.Single(f => f.Groups[1].Value.Contains("id=\"send-tabulation-cancel\"", StringComparison.Ordinal));
+        var ok = forms.Single(f => !f.Groups[1].Value.Contains("confirmation-cancel", StringComparison.Ordinal) && f.Groups[2].Value.Contains(">OK</button>", StringComparison.Ordinal));
+        var cancel = forms.Single(f => f.Groups[1].Value.Contains("id=\"confirmation-cancel\"", StringComparison.Ordinal));
 
         Assert.Contains("action=\"/Distribution/Tabulations?year=2026&amp;monthId=5\"", ok.Groups[1].Value, StringComparison.Ordinal);
         Assert.Contains($"<input type=\"hidden\" name=\"stage\" value=\"{Stage(scheme.MonthlyDistributionSchemeId, "SendToTestConsultant")}\"", ok.Groups[2].Value, StringComparison.Ordinal);
-        Assert.Contains("<input type=\"hidden\" name=\"confirmed\" value=\"true\"", ok.Groups[2].Value, StringComparison.Ordinal);
+        Assert.Contains("<input type=\"hidden\" name=\"confirmation\" value=\"confirm\"", ok.Groups[2].Value, StringComparison.Ordinal);
         Assert.Contains($"<input type=\"hidden\" name=\"staged\" value=\"{Stage(earlier, "SendToResultsSignOff")}\"", ok.Groups[2].Value, StringComparison.Ordinal);
-        Assert.Matches("<button type=\"submit\" form=\"send-tabulation-cancel\"[^>]*>Cancel</button>", ok.Groups[2].Value);
+        Assert.Matches("<button type=\"submit\" form=\"confirmation-cancel\"[^>]*>Cancel</button>", ok.Groups[2].Value);
 
+        // Cancel posts the same form back declined, so the earlier staged sends are kept.
         Assert.Contains("action=\"/Distribution/Tabulations?year=2026&amp;monthId=5\"", cancel.Groups[1].Value, StringComparison.Ordinal);
         Assert.Contains($"<input type=\"hidden\" name=\"staged\" value=\"{Stage(earlier, "SendToResultsSignOff")}\"", cancel.Groups[2].Value, StringComparison.Ordinal);
-        Assert.DoesNotContain("name=\"stage\"", cancel.Groups[2].Value, StringComparison.Ordinal);
-        Assert.DoesNotContain("name=\"confirmed\"", cancel.Groups[2].Value, StringComparison.Ordinal);
+        Assert.Contains("<input type=\"hidden\" name=\"confirmation\" value=\"cancel\"", cancel.Groups[2].Value, StringComparison.Ordinal);
+        Assert.DoesNotContain("value=\"confirm\"", cancel.Groups[2].Value, StringComparison.Ordinal);
         Assert.Empty(_apiClient.PreviewedTabulations);
     }
 
     [Fact]
-    public async Task Post_StageWithADiscardQuestionAndNothingStaged_RendersAWarningAndTheBackLink()
+    public async Task Post_StageWithADiscardQuestionAndNothingStaged_RendersAWarning()
     {
         var scheme = Plain();
         Seed(scheme);
@@ -631,8 +626,7 @@ public class TabulationsRenderTests : IClassFixture<WebApplicationFactory<Progra
         Assert.True(warning.Success);
         Assert.Contains("<h1 class=\"govuk-heading-l govuk-warning-text__text", warning.Groups[1].Value, StringComparison.Ordinal);
         Assert.Equal("! Warning Discard the Test Consultant's comments and send again?", Text(warning.Groups[1].Value));
-        var back = Regex.Match(html, "<a class=\"govuk-back-link[^\"]*\" href=\"([^\"]+)\">Back</a>");
-        Assert.Equal("/Distribution/Tabulations?year=2026&monthId=5", WebUtility.HtmlDecode(back.Groups[1].Value));
+        Assert.DoesNotContain("govuk-back-link", html, StringComparison.Ordinal);
         Assert.DoesNotContain("name=\"staged\"", html, StringComparison.Ordinal);
     }
 
