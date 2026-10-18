@@ -18,5 +18,6 @@ public sealed class InvoiceNotificationOptions
     /// </summary>
     public const string TemplateId = "b2eb52ee-abda-49f9-80c3-6871326f25a8";
 
-    public IReadOnlyList<string> Recipients { get; set; } = [];
+    /// <summary>The single email address notified when an invoice CSV is ready; empty disables the notification.</summary>
+    public string Recipients { get; set; } = string.Empty;
 }

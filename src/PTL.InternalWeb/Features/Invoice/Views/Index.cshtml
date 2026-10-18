@@ -14,8 +14,7 @@
     @Html.AntiForgeryToken()
     @if (Model.CanGenerate)
     {
-        <button class="govuk-button" data-module="govuk-button" type="submit"
-                onclick="return confirm('@InvoiceGenerationViewModel.GenerateConfirmation');">
+        <button class="govuk-button" data-module="govuk-button" type="submit">
             Generate Invoices
         </button>
     }
@@ -24,7 +23,7 @@
         <button class="govuk-button" data-module="govuk-button" type="submit" disabled="disabled" aria-disabled="true">
             Generate Invoices
         </button>
-        <p class="govuk-body govuk-hint">There are no outstanding invoices to generate. Use Reset All Invoices to make them available again.</p>
+        <p class="govuk-body govuk-hint">There are no outstanding invoices to generate.@(Model.CanReset ? " Use Reset All Invoices to make them available again." : null)</p>
     }
 </form>
 

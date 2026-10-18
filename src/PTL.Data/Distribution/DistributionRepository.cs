@@ -599,42 +599,7 @@ public sealed partial class DistributionRepository(IDbConnectionFactory connecti
         connection.Open();
         using var transaction = connection.BeginTransaction();
 
-        await connection.ExecuteAsync(
-            """
-            EXEC dbo.spiMonthlyDistributionScheme
-                @MonthlyDistributionSchemeId = @MonthlyDistributionSchemeId,
-                @MonthlyDistributionId = @MonthlyDistributionId,
-                @SchemeId = @SchemeId,
-                @MonthlyDistributionReference = @DistributionReference,
-                @MonthlyDistributionReferenceSuffix = @DistributionReferenceSuffix,
-                @MonthlyDistributionDate = @DistributionDate,
-                @DeadlineDate = @DeadlineDate,
-                @OverseasPostingDate = @OverseasPostingDate,
-                @ResultsIssueTargetDate = @ResultsIssueTargetDate,
-                @Comments = @Comments,
-                @HasIntendedResults = @HasIntendedResults,
-                @HasSampleNumbersDefined = @HasSampleNumbersDefined,
-                @IsCancelled = @IsCancelled,
-                @StoreRatings = @StoreRatings,
-                @SchemeVersionDate = @SchemeVersionDate
-            """,
-            newScheme,
-            transaction);
-
-        const string insertParticipantSql = """
-            EXEC dbo.spiDistributionParticipant
-                @DistributionParticipantId = @DistributionParticipantId,
-                @ParticipantId = @ParticipantId,
-                @MonthlyDistributionSchemeId = @MonthlyDistributionSchemeId,
-                @DeadlineDate = @DeadlineDate,
-                @DeadlineChangeReason = @DeadlineChangeReason,
-                @AdditionalParticipant = @AdditionalParticipant
-            """;
-
-        foreach (var participant in newParticipants)
-        {
-            await connection.ExecuteAsync(insertParticipantSql, participant, transaction);
-        }
+        await InsertSchemesAndParticipantsAsync(connection, transaction, [newScheme], newParticipants);
 
         transaction.Commit();
     }

@@ -35,13 +35,13 @@
     double Y(int value) => axisY - (plotHeight * value / yMax);
 }
 
-<a class="govuk-back-link noprint" asp-action="@backAction" asp-all-route-data="backRoute">Back</a>
-
 <h1 class="govuk-heading-l">@ViewData["Title"]</h1>
+
+<h2 class="govuk-heading-m">@results.DistributionHeading</h2>
 
 @if (results.IsAssessmentSubmitted)
 {
-    <h2 class="govuk-heading-m">@chartTitle</h2>
+    <h3 class="govuk-heading-s">@chartTitle</h3>
 
     @if (results.Titles.Skip(1).Any(t => !string.IsNullOrWhiteSpace(t)))
     {

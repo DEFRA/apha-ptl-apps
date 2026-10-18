@@ -127,4 +127,55 @@ public class IntendedResultsRenderTests : IClassFixture<WebApplicationFactory<Pr
         Assert.Contains("aria-describedby=\"intended-results-range-hint-0-0\"", html, StringComparison.Ordinal);
         Assert.DoesNotContain("title=", html, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public async Task Post_FirstSaveThatNeedsAnAudit_PostsIsAuditStepTrueFromTheAuditForm()
+    {
+        _apiClient.IntendedResults = Page() with { RequiresAuditReason = true };
+        _apiClient.IntendedResultsSaveResult = new IntendedResultsSaveResult(
+            false, new Dictionary<Guid, IntendedResultsFieldError[]>(), AuditReasonRequired: true, AuditObjectName: "Intended Results Set");
+
+        var client = _factory.CreateClient();
+        var page = await (await client.GetAsync(Url)).Content.ReadAsStringAsync();
+        var token = Regex.Match(page, "__RequestVerificationToken[^>]*value=\"([^\"]+)\"").Groups[1].Value;
+
+        // The browser posts the editing form's hidden IsAuditStep=False and RequiresAuditReason=True.
+        var response = await client.PostAsync(Url, new FormUrlEncodedContent(
+        [
+            new("__RequestVerificationToken", token),
+            new("command", "save"),
+            new("IsAuditStep", "False"),
+            new("RequiresAuditReason", "True"),
+        ]));
+        var html = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("<h1 class=\"govuk-heading-l\">Audit Trail</h1>", html, StringComparison.Ordinal);
+        Assert.Matches("name=\"IsAuditStep\" value=\"true\"", html);
+        Assert.DoesNotMatch("name=\"IsAuditStep\" value=\"False\"", html);
+    }
+
+    [Fact]
+    public async Task Post_AuditStepWithABlankReason_ShowsTheRequiredErrorOnTheAuditStep()
+    {
+        _apiClient.IntendedResults = Page() with { RequiresAuditReason = true };
+
+        var client = _factory.CreateClient();
+        var page = await (await client.GetAsync(Url)).Content.ReadAsStringAsync();
+        var token = Regex.Match(page, "__RequestVerificationToken[^>]*value=\"([^\"]+)\"").Groups[1].Value;
+
+        var response = await client.PostAsync(Url, new FormUrlEncodedContent(
+        [
+            new("__RequestVerificationToken", token),
+            new("command", "save"),
+            new("IsAuditStep", "true"),
+            new("RequiresAuditReason", "True"),
+            new("AuditWhy", " "),
+        ]));
+        var html = await response.Content.ReadAsStringAsync();
+
+        Assert.Contains("<h1 class=\"govuk-heading-l\">Audit Trail</h1>", html, StringComparison.Ordinal);
+        Assert.Contains("The reason for these changes must be specified", html, StringComparison.Ordinal);
+        Assert.Empty(_apiClient.SavedIntendedResults);
+    }
 }

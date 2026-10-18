@@ -35,6 +35,29 @@ public class DistributionApiClientTests
     }
 
     [Fact]
+    public async Task InitialiseMonthAsync_PostsToTheMonthAndReturnsTheResult()
+    {
+        var handler = new StubHttpMessageHandler(HttpStatusCode.OK, """{"initialised":true}""");
+        HttpRequestMessage? sent = null;
+        handler.OnRequest = request => sent = request;
+        var client = new DistributionApiClient(new HttpClient(handler) { BaseAddress = new Uri("http://localhost") });
+
+        var result = await client.InitialiseMonthAsync(2026, 5);
+
+        Assert.True(result!.Initialised);
+        Assert.Equal(HttpMethod.Post, sent!.Method);
+        Assert.Equal("/api/distributions/months/2026/5/initialise", sent.RequestUri!.AbsolutePath);
+    }
+
+    [Fact]
+    public async Task InitialiseMonthAsync_ServerError_Throws()
+    {
+        var client = CreateClient(HttpStatusCode.InternalServerError, null);
+
+        await Assert.ThrowsAsync<HttpRequestException>(() => client.InitialiseMonthAsync(2026, 5));
+    }
+
+    [Fact]
     public async Task GetYearsAsync_ReturnsDeserializedList()
     {
         const string json = """[{"yearId":2026,"label":"2026/27"}]""";

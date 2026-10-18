@@ -29,6 +29,14 @@ internal sealed partial class FakeDistributionApiClient : IDistributionApiClient
 
     public SampleNumbersResponse? SampleNumbers { get; set; }
     public IReadOnlyList<string> SampleNumbersErrors { get; set; } = [];
+    public InitialiseMonthResult? InitialiseMonthResult { get; set; }
+    public List<(int YearId, int MonthId)> InitialisedMonths { get; } = [];
+
+    public Task<InitialiseMonthResult?> InitialiseMonthAsync(int yearId, int monthId, CancellationToken cancellationToken = default)
+    {
+        InitialisedMonths.Add((yearId, monthId));
+        return Task.FromResult(InitialiseMonthResult);
+    }
     public SampleNumbersSaveResult? SampleNumbersSaveResult { get; set; }
     public List<SampleNumbersSaveRequest> SavedSampleNumbers { get; } = [];
 

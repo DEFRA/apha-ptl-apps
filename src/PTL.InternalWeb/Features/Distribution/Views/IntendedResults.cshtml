@@ -14,8 +14,6 @@
 
 @if (Model.IsAuditStep)
 {
-    <a class="govuk-back-link" asp-action="IntendedResults" asp-route-year="@Model.YearId" asp-route-monthId="@Model.MonthId" asp-route-schemeId="@Model.MonthlyDistributionSchemeId">Back</a>
-
     <h1 class="govuk-heading-l">Audit Trail</h1>
 
     <govuk-error-summary errors="@errors" />
@@ -35,7 +33,8 @@
         <input type="hidden" asp-for="YearId" />
         <input type="hidden" asp-for="MonthId" />
         <input type="hidden" asp-for="RequiresAuditReason" />
-        <input type="hidden" asp-for="IsAuditStep" />
+        @* Literal, not asp-for: the editing form posted IsAuditStep=False and the tag helper would echo that stale value back. *@
+        <input type="hidden" name="IsAuditStep" value="true" />
         <input type="hidden" asp-for="AuditObjectName" />
         <input type="hidden" asp-for="PendingCommand" />
         @for (var t = 0; t < Model.Tests.Count; t++)
@@ -77,8 +76,6 @@
 
     return;
 }
-
-<a class="govuk-back-link" asp-action="Schedule" asp-route-year="@Model.YearId" asp-route-monthId="@Model.MonthId">Back</a>
 
 <h1 class="govuk-heading-l">Intended Results</h1>
 

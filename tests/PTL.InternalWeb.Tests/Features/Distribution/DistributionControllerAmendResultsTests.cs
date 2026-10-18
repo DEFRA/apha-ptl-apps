@@ -1,9 +1,11 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ViewFeatures;
 using Microsoft.Extensions.Primitives;
 using PTL.Contracts.Distribution;
 using PTL.InternalWeb.Features.Distribution;
 using PTL.InternalWeb.Tests.TestSupport;
+using PTL.SharedUI.Notifications;
 using Keys = PTL.Contracts.Distribution.AmendResultsFieldKeys;
 
 namespace PTL.InternalWeb.Tests.Features.Distribution;
@@ -65,7 +67,43 @@ public class DistributionControllerAmendResultsTests
         var httpContext = new DefaultHttpContext();
         httpContext.Request.ContentType = "application/x-www-form-urlencoded";
         httpContext.Request.Form = new FormCollection(form.ToDictionary(f => f.Key, f => new StringValues(f.Values)));
-        return new(apiClient) { ControllerContext = new ControllerContext { HttpContext = httpContext } };
+        return new(apiClient)
+        {
+            ControllerContext = new ControllerContext { HttpContext = httpContext },
+            TempData = new TempDataDictionary(new DefaultHttpContext(), new FakeTempDataProvider()),
+        };
+    }
+
+    [Fact]
+    public async Task Post_SaveSucceeds_ShowsTheSuccessBannerAndReturnsToTabulations()
+    {
+        var controller = CreateController(ApiClient(Saved()));
+
+        AssertRedirectToTabulations(await PostAsync(controller, "save"));
+
+        var notification = controller.TempData.GetNotification();
+        Assert.Equal(NotificationType.Success, notification!.Type);
+        Assert.Equal("Amended Results updated successfully.", notification.Message);
+    }
+
+    [Fact]
+    public async Task Post_AuditStepSaveSucceeds_ShowsTheSuccessBanner()
+    {
+        var controller = CreateController(ApiClient(Saved()));
+
+        AssertRedirectToTabulations(await PostAsync(controller, "save", isAuditStep: true, pendingCommand: "save", auditWhy: "Typo corrected"));
+
+        Assert.Equal("Amended Results updated successfully.", controller.TempData.GetNotification()!.Message);
+    }
+
+    [Fact]
+    public async Task Post_AuditReasonRequired_ShowsNoSuccessBanner()
+    {
+        var controller = CreateController(ApiClient(AuditRequired()));
+
+        AssertRedisplayed(await PostAsync(controller, "save"));
+
+        Assert.Null(controller.TempData.GetNotification());
     }
 
     private static (string, string[]) Field(string key, params string[] values) => (key, values);

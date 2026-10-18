@@ -16,8 +16,6 @@
 
 @if (Model.IsAuditStep is true)
 {
-    <a class="govuk-back-link" asp-action="ViewComments" asp-route-year="@Model.YearId" asp-route-monthId="@Model.MonthId" asp-route-schemeId="@Model.MonthlyDistributionSchemeId">Back</a>
-
     <h1 class="govuk-heading-l">Audit Trail</h1>
 
     <govuk-error-summary errors="@errors" />
@@ -42,7 +40,8 @@
     <form method="post" asp-action="ViewComments" asp-route-year="@Model.YearId" asp-route-monthId="@Model.MonthId" asp-route-schemeId="@Model.MonthlyDistributionSchemeId" novalidate>
         @* No server-side session (legacy kept the comments in Session while Audit.aspx ran), so the
            unsaved comments ride along hidden or they are lost when the audited save runs. *@
-        <input type="hidden" asp-for="IsAuditStep" />
+        @* Literal, not asp-for: the editing form posted IsAuditStep=False and the tag helper would echo that stale value back. *@
+        <input type="hidden" name="IsAuditStep" value="true" />
         <input type="hidden" asp-for="AuditObjectName" />
         <input type="hidden" asp-for="PendingCommand" />
         <input type="hidden" asp-for="Comments" />
@@ -75,11 +74,11 @@
     var fileDescribedBy = fileError is null ? "attachments-hint" : "attachments-hint File-error";
 }
 
-<a class="govuk-back-link" asp-action="Tabulations" asp-route-year="@Model.YearId" asp-route-monthId="@Model.MonthId">Back</a>
-
 <govuk-error-summary errors="@errors" />
 
-<h1 class="govuk-heading-l">@Model.DistributionTitle</h1>
+<h1 class="govuk-heading-l">View Comments</h1>
+
+<h2 class="govuk-heading-m">@Model.DistributionTitle</h2>
 
 <p class="govuk-body">@Model.AuthorText</p>
 
