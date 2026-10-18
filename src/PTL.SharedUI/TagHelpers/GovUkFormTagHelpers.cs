@@ -39,6 +39,10 @@ public class GovUkInputTagHelper(IHtmlGenerator generator) : TagHelper
 
     public bool Disabled { get; set; }
 
+    /// <summary>Id of a hint rendered elsewhere (e.g. a table column header) to link to the &lt;input&gt; via aria-describedby.</summary>
+    [HtmlAttributeName("described-by")]
+    public string? DescribedBy { get; set; }
+
     /// <summary>Overrides the rendered &lt;input&gt;'s type attribute (e.g. "date"); defaults to "text".</summary>
     public string? Type { get; set; }
 
@@ -56,9 +60,9 @@ public class GovUkInputTagHelper(IHtmlGenerator generator) : TagHelper
         {
             ["class"] = hasError ? $"{InputCssClass} {InputCssClass}--error" : InputCssClass
         };
-        if (describedBy is not null)
+        if (describedBy is not null || !string.IsNullOrEmpty(DescribedBy))
         {
-            htmlAttributes["aria-describedby"] = describedBy;
+            htmlAttributes["aria-describedby"] = string.Join(' ', new[] { DescribedBy, describedBy }.Where(id => !string.IsNullOrEmpty(id)));
         }
         if (MaxLength > 0)
         {

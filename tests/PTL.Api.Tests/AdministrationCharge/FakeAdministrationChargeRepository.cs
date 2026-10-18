@@ -1,4 +1,5 @@
 using PTL.Core.AdministrationCharge;
+using PTL.Core.Audit;
 
 namespace PTL.Api.Tests.AdministrationCharge;
 
@@ -20,15 +21,19 @@ internal sealed class FakeAdministrationChargeRepository : IAdministrationCharge
     public Task<AdministrationChargeCurrencyEntity?> GetPriceAsync(Guid administrationChargeId, Guid currencyId, CancellationToken cancellationToken = default) =>
         Task.FromResult(Prices.SingleOrDefault(p => p.AdministrationChargeId == administrationChargeId && p.CurrencyId == currencyId));
 
-    public Task InsertPriceAsync(AdministrationChargeCurrencyEntity price, CancellationToken cancellationToken = default)
+    public AuditEntry? LastAuditEntry { get; private set; }
+
+    public Task InsertPriceAsync(AdministrationChargeCurrencyEntity price, AuditEntry? auditEntry = null, CancellationToken cancellationToken = default)
     {
+        LastAuditEntry = auditEntry;
         Inserted.Add(price);
         Prices.Add(price);
         return Task.CompletedTask;
     }
 
-    public Task UpdatePriceAsync(AdministrationChargeCurrencyEntity price, CancellationToken cancellationToken = default)
+    public Task UpdatePriceAsync(AdministrationChargeCurrencyEntity price, AuditEntry? auditEntry = null, CancellationToken cancellationToken = default)
     {
+        LastAuditEntry = auditEntry;
         Updated.Add(price);
         return Task.CompletedTask;
     }

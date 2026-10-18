@@ -1,4 +1,5 @@
 using System.Data;
+using PTL.Core.Audit;
 using PTL.Data.Infrastructure;
 using PTL.Data.Tests.Fakes;
 using PTL.Data.WeightedPricingPlan;
@@ -65,5 +66,38 @@ public class WeightedPricingPlanRepositoryTests
 
         var command = Assert.Single(connection.ExecutedCommands, c => c.CommandText == RenewSql);
         Assert.Equal(2027, command.ParameterValue("@YearId"));
+    }
+
+    private const string AuditSql = "EXEC dbo.spiSystemAdministrationAudit @AuditId, @ActingUserId, @Action, @EntityType, @EntityId, @Details";
+
+    [Fact]
+    public async Task RenewAsync_WithAudit_CommitsChangeAndAuditInOneTransaction()
+    {
+        var (repository, connection) = CreateRepository();
+        connection.RespondToNonQuery(RenewSql, 1);
+        connection.RespondToNonQuery(AuditSql, 1);
+        var audit = new AuditEntry(Guid.NewGuid(), "RenewWeightedPricingPlan", "WeightedPricingPlan", "2027", "Renewed");
+
+        await repository.RenewAsync(2027, audit);
+
+        Assert.NotNull(connection.LastTransaction);
+        Assert.True(connection.LastTransaction!.Committed);
+        Assert.Contains(connection.ExecutedCommands, c => c.CommandText == RenewSql);
+        var auditCommand = Assert.Single(connection.ExecutedCommands, c => c.CommandText == AuditSql);
+        Assert.Equal("RenewWeightedPricingPlan", auditCommand.ParameterValue("@Action"));
+    }
+
+    [Fact]
+    public async Task RenewAsync_AuditWriteFails_RollsBackTheTransaction()
+    {
+        var (repository, connection) = CreateRepository();
+        connection.RespondToNonQuery(RenewSql, 1);
+        var audit = new AuditEntry(Guid.NewGuid(), "RenewWeightedPricingPlan", "WeightedPricingPlan", "2027", "Renewed");
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => repository.RenewAsync(2027, audit));
+
+        Assert.NotNull(connection.LastTransaction);
+        Assert.True(connection.LastTransaction!.RolledBack);
+        Assert.False(connection.LastTransaction!.Committed);
     }
 }

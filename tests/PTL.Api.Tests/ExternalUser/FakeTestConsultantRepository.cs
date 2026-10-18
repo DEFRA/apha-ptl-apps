@@ -1,3 +1,4 @@
+using PTL.Core.Audit;
 using PTL.Core.TestConsultant;
 using CoreTestConsultant = PTL.Core.TestConsultant.TestConsultant;
 
@@ -8,6 +9,9 @@ internal sealed class FakeTestConsultantRepository : ITestConsultantRepository
     private readonly Dictionary<Guid, CoreTestConsultant> _testConsultants = [];
 
     public List<CoreTestConsultant> UpdateCalls { get; } = [];
+
+    // Audit entry passed to the most recent CreateAsync/UpdateAsync (null when none was supplied).
+    public AuditEntry? LastAuditEntry { get; private set; }
 
     public void Seed(CoreTestConsultant testConsultant) =>
         _testConsultants[testConsultant.ExternalTestConsultantId] = testConsultant;
@@ -24,16 +28,18 @@ internal sealed class FakeTestConsultantRepository : ITestConsultantRepository
         return Task.FromResult(match);
     }
 
-    public Task<CoreTestConsultant> CreateAsync(CoreTestConsultant testConsultant, CancellationToken cancellationToken = default)
+    public Task<CoreTestConsultant> CreateAsync(CoreTestConsultant testConsultant, AuditEntry? auditEntry = null, CancellationToken cancellationToken = default)
     {
+        LastAuditEntry = auditEntry;
         testConsultant.ExternalTestConsultantId = testConsultant.ExternalTestConsultantId == Guid.Empty ? Guid.NewGuid() : testConsultant.ExternalTestConsultantId;
         _testConsultants[testConsultant.ExternalTestConsultantId] = testConsultant;
         return Task.FromResult(testConsultant);
     }
 
-    public Task<CoreTestConsultant?> UpdateAsync(CoreTestConsultant testConsultant, CancellationToken cancellationToken = default)
+    public Task<CoreTestConsultant?> UpdateAsync(CoreTestConsultant testConsultant, AuditEntry? auditEntry = null, CancellationToken cancellationToken = default)
     {
         UpdateCalls.Add(testConsultant);
+        LastAuditEntry = auditEntry;
         if (!_testConsultants.ContainsKey(testConsultant.ExternalTestConsultantId))
         {
             return Task.FromResult<CoreTestConsultant?>(null);

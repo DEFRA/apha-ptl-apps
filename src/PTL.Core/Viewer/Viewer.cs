@@ -1,3 +1,5 @@
+using PTL.Core.Audit;
+
 namespace PTL.Core.Viewer;
 
 // tblViewer - legacy Viewers.ViewerInfo. Originally read-only master data for CIDM external-user
@@ -51,12 +53,14 @@ public interface IViewerRepository
     /// <summary>Reads the viewer row matching an email address via <c>spgViewerByEmail</c>, used only as a CIDM fallback.</summary>
     Task<ViewerEntity?> GetByEmailAsync(string email, CancellationToken cancellationToken = default);
 
-    Task<ViewerEntity> CreateAsync(ViewerEntity viewer, CancellationToken cancellationToken = default);
-    Task<ViewerEntity?> UpdateAsync(ViewerEntity viewer, CancellationToken cancellationToken = default);
+    // A non-null auditEntry is written in the same transaction as the change (System Administration
+    // changes); null is for system-initiated updates such as the SSO link at external sign-in.
+    Task<ViewerEntity> CreateAsync(ViewerEntity viewer, AuditEntry? auditEntry = null, CancellationToken cancellationToken = default);
+    Task<ViewerEntity?> UpdateAsync(ViewerEntity viewer, AuditEntry? auditEntry = null, CancellationToken cancellationToken = default);
 
     // spdViewer - unconditional delete, no allocation block (matches legacy; see
     // ViewerDeleteResponse remarks). Returns false if the viewer no longer exists.
-    Task<bool> DeleteAsync(Guid viewerId, CancellationToken cancellationToken = default);
+    Task<bool> DeleteAsync(Guid viewerId, AuditEntry? auditEntry = null, CancellationToken cancellationToken = default);
 
     // spgaViewers result set 2 - the tlnkViewerScheme links for one scheme.
     Task<IReadOnlyList<SchemeViewerEntity>> GetSchemeViewersAsync(Guid schemeId, CancellationToken cancellationToken = default);

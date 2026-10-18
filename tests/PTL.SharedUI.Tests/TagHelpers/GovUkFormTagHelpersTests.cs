@@ -185,6 +185,49 @@ public class GovUkFormTagHelpersTests
     }
 
     [Fact]
+    public void Input_WithDescribedBy_LinksTheExternalHintViaAriaDescribedBy()
+    {
+        var model = new TestModel();
+        var (viewContext, expression, generator) = TagHelperRenderContext.Create(model, nameof(TestModel.Name));
+        var helper = new GovUkInputTagHelper(generator) { For = expression, Label = "Name", DescribedBy = "column-hint", ViewContext = viewContext };
+        var (context, output) = CreateTagHelperContext("govuk-input");
+
+        helper.Process(context, output);
+
+        var html = output.Content.GetContent();
+        Assert.Contains("aria-describedby=\"column-hint\"", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("title=", html, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Input_WithDescribedByAndError_ListsBothIds()
+    {
+        var model = new TestModel();
+        var modelState = new ModelStateDictionary();
+        modelState.AddModelError(nameof(TestModel.Name), "Enter a name");
+        var (viewContext, expression, generator) = TagHelperRenderContext.Create(model, nameof(TestModel.Name), modelState);
+        var helper = new GovUkInputTagHelper(generator) { For = expression, Label = "Name", DescribedBy = "column-hint", ViewContext = viewContext };
+        var (context, output) = CreateTagHelperContext("govuk-input");
+
+        helper.Process(context, output);
+
+        Assert.Matches("aria-describedby=\"column-hint [^\"]*error[^\"]*\"", output.Content.GetContent());
+    }
+
+    [Fact]
+    public void Input_WithoutDescribedBy_OmitsAriaDescribedBy()
+    {
+        var model = new TestModel();
+        var (viewContext, expression, generator) = TagHelperRenderContext.Create(model, nameof(TestModel.Name));
+        var helper = new GovUkInputTagHelper(generator) { For = expression, Label = "Name", ViewContext = viewContext };
+        var (context, output) = CreateTagHelperContext("govuk-input");
+
+        helper.Process(context, output);
+
+        Assert.DoesNotContain("aria-describedby", output.Content.GetContent(), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Input_WithoutMaxLength_OmitsMaxLengthAttribute()
     {
         var model = new TestModel();

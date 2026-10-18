@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
 using PTL.Api.Controllers;
+using PTL.Api.Tests.Audit;
 using PTL.Api.Tests.ExternalUser;
 using PTL.Api.Tests.Participant;
 using PTL.Contracts.Viewer;
@@ -13,7 +14,7 @@ public class ViewerControllerTests
 {
     private static ViewerController CreateController(FakeViewerRepository? repository = null, FakeExternalLoginService? loginService = null)
     {
-        var controller = new ViewerController(new ViewerService(repository ?? new FakeViewerRepository(), loginService ?? new FakeExternalLoginService()));
+        var controller = new ViewerController(new ViewerService(repository ?? new FakeViewerRepository(), loginService ?? new FakeExternalLoginService(), new FakeActingUserAccessor()));
 
         var services = new ServiceCollection().AddMvc().Services.BuildServiceProvider();
         controller.ControllerContext = new ControllerContext

@@ -12,18 +12,29 @@ public class InvoiceControllerTests
     private static InvoiceController CreateController(
         FakeInvoiceRepository repository,
         FakeLookupServiceForInvoice? lookupService = null,
-        IReadOnlyList<string>? recipients = null)
+        string? recipients = null)
     {
         var service = new InvoiceService(
             repository,
             new FakeInvoiceStorageService(),
             new FakeNotifyClient(),
             Options.Create(new InvoiceStorageOptions()),
-            Options.Create(new InvoiceNotificationOptions { Recipients = recipients ?? ["ops@example.com"] }),
+            Options.Create(new InvoiceNotificationOptions { Recipients = recipients ?? "ops@example.com" }),
             Options.Create(new InternalOptions()),
             Microsoft.Extensions.Logging.Abstractions.NullLogger<InvoiceService>.Instance);
 
-        return new InvoiceController(service, lookupService ?? new FakeLookupServiceForInvoice(), Options.Create(new InvoiceNotificationOptions { Recipients = recipients ?? ["ops@example.com"] }));
+        return new InvoiceController(service, lookupService ?? new FakeLookupServiceForInvoice(), Options.Create(new InvoiceNotificationOptions { Recipients = recipients ?? "ops@example.com" }));
+    }
+
+    [Fact]
+    public async Task GetPending_NoRecipientConfigured_ReturnsNoRecipients()
+    {
+        var controller = CreateController(new FakeInvoiceRepository(), recipients: " ");
+
+        var result = await controller.GetPending(CancellationToken.None);
+
+        var summary = Assert.IsType<PTL.Contracts.Invoice.PendingInvoiceSummaryResponse>(Assert.IsType<Microsoft.AspNetCore.Mvc.OkObjectResult>(result.Result).Value);
+        Assert.Empty(summary.NotificationRecipients);
     }
 
     [Fact]
@@ -35,7 +46,7 @@ public class InvoiceControllerTests
             [new InvoiceContractEntity { ContractId = contractId, OptOutOfInvoiceGeneration = true }],
             [new InvoiceContractItemEntity { ContractId = contractId, NonFeePaying = true }]);
         var lookup = new FakeLookupServiceForInvoice { CurrentYears = [new YearEntity { YearId = 2026, Year = "2025/26" }] };
-        var controller = CreateController(repository, lookup, recipients: ["ops@example.com"]);
+        var controller = CreateController(repository, lookup, recipients: "ops@example.com");
 
         var result = await controller.GetPending(CancellationToken.None);
 
@@ -144,7 +155,7 @@ public class InvoiceControllerTests
             storage,
             new FakeNotifyClient(),
             Options.Create(new InvoiceStorageOptions()),
-            Options.Create(new InvoiceNotificationOptions { Recipients = ["ops@example.com"] }),
+            Options.Create(new InvoiceNotificationOptions { Recipients = "ops@example.com" }),
             Options.Create(new InternalOptions()),
             Microsoft.Extensions.Logging.Abstractions.NullLogger<InvoiceService>.Instance);
         var generationId = Guid.NewGuid();

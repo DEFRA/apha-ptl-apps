@@ -2,6 +2,8 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using PTL.ApiClient.Distribution;
 using PTL.Contracts.Distribution;
+using PTL.InternalWeb.Confirmation;
+using PTL.InternalWeb.Navigation;
 using PTL.SharedUI.Notifications;
 
 namespace PTL.InternalWeb.Features.Distribution;
@@ -15,15 +17,20 @@ namespace PTL.InternalWeb.Features.Distribution;
 // Commence, Save/Apply/Cancel), the Sample Numbers screen, the Intended Results screen, the
 // Distribution Participants screen (view, Change Deadline Date, Repeat Distribution), the Sample
 // Preparation screen (Diary Entry/Prep Started/Prep Completed, Save/Apply/Cancel, Print) and its
-// per-scheme Printable Results view are implemented. The Packaging/Results(dashboard)/Tabulations
-// "View" links, plus "Initialise this Month" itself, all remain placeholders (ViewStage/
-// InitialiseMonth below) - those workflows (and the exact legacy persisted-save chain behind
-// Initialise) are out of scope and flagged [NEEDS INVESTIGATION] in
+// per-scheme Printable Results view, and the Sample Packaging screen (Group Address / Participant
+// Combined / Daily, Save/Apply/Cancel, Print, Print Labels, Print Customs) are implemented. The
+// Results(dashboard)/Tabulations "View" links, plus "Initialise this Month" itself, all remain
+// placeholders (ViewStage/InitialiseMonth below) - those workflows (and the exact legacy
+// persisted-save chain behind Initialise) are out of scope and flagged [NEEDS INVESTIGATION] in
 // docs/migration/distribution-migration.md.
-public sealed class DistributionController(IDistributionApiClient distributionApiClient) : Controller
+public sealed partial class DistributionController(IDistributionApiClient distributionApiClient) : Controller
 {
-    private static readonly string[] MonthOrder = ["Scheduling", "Preparation", "Packaging", "Results", "Tabulations"];
+    private static readonly string[] MonthOrder =
+    [
+        "Scheduling", "Preparation", "Packaging", "Results", "Tabulations", "Actual Results", "Sample Receipt",
+    ];
     private const string CancelCommand = "cancel";
+    private const string ApplyCommand = "apply";
 
     [HttpGet]
     public async Task<IActionResult> Index(int? year, CancellationToken cancellationToken)
@@ -58,16 +65,42 @@ public sealed class DistributionController(IDistributionApiClient distributionAp
         return View("FeatureNotAvailable", title);
     }
 
-    // Placeholder for "Initialise this Month" - the confirmation text is preserved and the button
-    // is shown exactly where legacy shows it, but the write path (sppSetupMonthlyDistribution's
-    // full persisted-save chain) is unconfirmed - see docs/migration/distribution-migration.md's
-    // "Initialise Month" NEEDS INVESTIGATION items. Do not wire this to a real write until that is
-    // resolved.
+    // Legacy GridView1_RowCommand "Initialise": MonthlyDistribution.CreateMonthlyDistribution(yearID,
+    // monthID) then the dashboard redraws. year is the calendar year of the month's row; a month that
+    // already exists is left exactly as it is, as in legacy, so no message is shown for it.
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public IActionResult InitialiseMonth(int year, int monthId)
+    public async Task<IActionResult> InitialiseMonth(int year, int monthId, string? confirmation, CancellationToken cancellationToken)
     {
-        return View("FeatureNotAvailable", "Initialise This Month");
+        if (monthId is < 1 or > 12 || year < 1)
+        {
+            return BadRequest();
+        }
+
+        // The dashboard is keyed by financial year (April to March); January to March belong to the year before.
+        var financialYear = monthId < 4 ? year - 1 : year;
+
+        if (!ConfirmationFlow.IsConfirmed(confirmation))
+        {
+            return this.ConfirmationPage(
+                new ConfirmationPageViewModel
+                {
+                    Title = "Initialise this Month",
+                    Message = "Are you sure you wish to initialise this month?",
+                    WarningText = "If you do, you will no longer be able to add schemes to this month (participants can still be added up to a day before the posting date).",
+                    ConfirmText = "Initialise",
+                    CancelUrl = Url.Action(nameof(Index), new { year = financialYear }),
+                },
+                nameof(Index));
+        }
+
+        var result = await distributionApiClient.InitialiseMonthAsync(year, monthId, cancellationToken);
+        if (result is { Initialised: true })
+        {
+            TempData.SetNotification(NotificationType.Success, "Month initialised successfully.");
+        }
+
+        return RedirectToAction(nameof(Index), new { year = financialYear });
     }
 
     // Monthly Distributions (Scheduling) - legacy Scheduling/monthlys.aspx. Reached from the
@@ -135,7 +168,7 @@ public sealed class DistributionController(IDistributionApiClient distributionAp
 
         TempData.SetNotification(NotificationType.Success, "Monthly Distributions updated successfully.");
 
-        if (string.Equals(command, "apply", StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(command, ApplyCommand, StringComparison.OrdinalIgnoreCase))
         {
             return RedirectToAction(nameof(Schedule), new { year, monthId });
         }
@@ -151,15 +184,30 @@ public sealed class DistributionController(IDistributionApiClient distributionAp
     // server-side state beyond this one request.
     // S6967 (ModelState.IsValid not checked) suppressed deliberately: legacy dlMonth_RowCommand
     // runs with CausesValidation=False, so a half-filled form can still be toggled and redisplayed.
+    // The toggle first asks for confirmation; Confirm and Cancel both post the unsaved form back, so a
+    // declined toggle redisplays the page exactly as it was.
     [HttpPost]
     [ValidateAntiForgeryToken]
 #pragma warning disable S6967
-    public IActionResult ToggleCancelled(int year, int monthId, Guid schemeId, MonthlyDistributionScheduleViewModel model)
+    public IActionResult ToggleCancelled(int year, int monthId, Guid schemeId, MonthlyDistributionScheduleViewModel model, string? confirmation)
 #pragma warning restore S6967
     {
         ModelState.Clear();
+        ViewData[BreadcrumbRouteValues.Action] = nameof(Schedule);
         var row = model.Schemes.FirstOrDefault(s => s.MonthlyDistributionSchemeId == schemeId);
-        if (row is not null)
+        if (row is not null && !ConfirmationFlow.IsConfirmed(confirmation) && !ConfirmationFlow.IsCancelled(confirmation))
+        {
+            return this.ConfirmationPage(
+                new ConfirmationPageViewModel
+                {
+                    Title = row.CancelCommenceLinkText,
+                    Caption = row.SchemeHeading,
+                    Message = row.CancelCommenceConfirmText,
+                },
+                nameof(Schedule));
+        }
+
+        if (row is not null && !ConfirmationFlow.IsCancelled(confirmation))
         {
             row.IsCancelled = !row.IsCancelled;
         }
@@ -205,12 +253,585 @@ public sealed class DistributionController(IDistributionApiClient distributionAp
 
         TempData.SetNotification(NotificationType.Success, "Sample Preparation updated successfully.");
 
-        if (string.Equals(command, "apply", StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(command, ApplyCommand, StringComparison.OrdinalIgnoreCase))
         {
             return RedirectToAction(nameof(Preparation), new { year, monthId });
         }
 
         return RedirectToAction(nameof(Index));
+    }
+
+    // Results Receipt - legacy Internal User/ResultsReceipt.aspx. Reached from the Dashboard's
+    // "Results: View" link. Participant View/Edit links open Actual Results / Sample Receipt, which
+    // are separate legacy screens outside this feature (ViewStage placeholder).
+    [HttpGet]
+    public async Task<IActionResult> ResultsReceipt(int year, int monthId, CancellationToken cancellationToken)
+    {
+        var receipt = await distributionApiClient.GetResultsReceiptAsync(year, monthId, cancellationToken);
+        return receipt is null ? NotFound() : View(ToResultsReceiptViewModel(year, monthId, receipt));
+    }
+
+    // Save = persist then leave (legacy ButtonSave_Click -> Save() -> LeavePage() -> MenuDistributions.aspx).
+    // Apply = persist then stay, re-reading fresh data (legacy ButtonApply_Click -> Save() -> re-fetch).
+    // Cancel = discard then leave, no save at all (legacy ButtonCancel_Click -> LeavePage()).
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ResultsReceipt(int year, int monthId, ResultsReceiptViewModel model, string command, CancellationToken cancellationToken)
+    {
+        if (string.Equals(command, CancelCommand, StringComparison.OrdinalIgnoreCase))
+        {
+            return RedirectToAction(nameof(Index));
+        }
+
+        var updates = model.Schemes
+            .SelectMany(s => s.Participants)
+            .Select(p => new ResultsReceiptParticipantUpdateRequest(p.DistributionParticipantId, p.ExtraDocumentsReturned, p.ReturnedChecked))
+            .ToList();
+
+        var result = await distributionApiClient.SaveResultsReceiptAsync(year, monthId, new ResultsReceiptSaveRequest(updates), cancellationToken);
+
+        if (result is null || !result.Success)
+        {
+            TempData.SetNotification(NotificationType.Error, "Results Receipt could not be saved. Please try again later.");
+            return RedirectToAction(nameof(ResultsReceipt), new { year, monthId });
+        }
+
+        TempData.SetNotification(NotificationType.Success, "Results Receipt updated successfully.");
+
+        return string.Equals(command, ApplyCommand, StringComparison.OrdinalIgnoreCase)
+            ? RedirectToAction(nameof(ResultsReceipt), new { year, monthId })
+            : RedirectToAction(nameof(Index));
+    }
+
+    // Monthly Distributions - Tabulations - legacy Scheduling/Tabulations.aspx. Reached from the
+    // Dashboard's "Tabulations: View" link. Read only: every legacy action is shown in its legacy
+    // state, but the commands behind them (Send To Test Consultant/For Assessment/For Results
+    // Sign-Off) and the Tabulation, Issued, Amend Results and View Comments pages are not migrated
+    // yet (ViewStage placeholder). The legacy emails are sent by the Windows Email Service, which
+    // is out of scope - [EMAIL FUNCTIONALITY DEFERRED].
+    [HttpGet]
+    public async Task<IActionResult> Tabulations(int year, int monthId, CancellationToken cancellationToken)
+    {
+        var page = await distributionApiClient.GetTabulationsAsync(year, monthId, cancellationToken);
+        if (page is null)
+        {
+            return NotFound();
+        }
+
+        return View(new TabulationsViewModel
+        {
+            YearId = year,
+            MonthId = monthId,
+            MonthDescription = PackagingMonthDescription(year, monthId),
+            Schemes = page.Schemes,
+        });
+    }
+
+    // Sample Receipt - legacy Internal User/SampleReceipt.aspx (sitemap "Submission Status"). Reached
+    // from the Results Receipt screen's per-participant Submission Status "View/Edit" link; year/monthId
+    // are carried through purely so Save, Cancel and Back return to the Results Receipt screen.
+    [HttpGet]
+    public async Task<IActionResult> SampleReceipt(int year, int monthId, Guid schemeId, Guid participantId, CancellationToken cancellationToken)
+    {
+        var page = await distributionApiClient.GetSampleReceiptAsync(schemeId, participantId, cancellationToken);
+        return page is null ? NotFound() : View(ToSampleReceiptViewModel(year, monthId, schemeId, participantId, page));
+    }
+
+    // Save = persist then return to Results Receipt (legacy ButtonSave_Click -> LeavePage()).
+    // Apply = persist then stay (legacy ButtonApply_Click). Cancel = discard, no save.
+    // Every sample posts several fields, so a large page exceeds the 1,024-value default.
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    [RequestFormLimits(ValueCountLimit = 20000)]
+    public async Task<IActionResult> SampleReceipt(
+        int year, int monthId, Guid schemeId, Guid participantId, SampleReceiptViewModel model, string command, CancellationToken cancellationToken)
+    {
+        if (string.Equals(command, CancelCommand, StringComparison.OrdinalIgnoreCase))
+        {
+            return RedirectToAction(nameof(ResultsReceipt), new { year, monthId });
+        }
+
+        var request = new SampleReceiptSaveRequest(
+            [.. model.Tests.SelectMany(t => t.Samples)
+                .Select(s => new SampleReceiptSampleUpdateRequest(s.SampleReceiptId, s.Submitted, s.NotSubmitted, s.NotInRepertoire))]);
+
+        var result = await distributionApiClient.SaveSampleReceiptAsync(schemeId, participantId, request, cancellationToken);
+
+        if (result is null || !result.Success)
+        {
+            TempData.SetNotification(
+                NotificationType.Error,
+                result is { ReadOnly: true }
+                    ? "Submission Status can no longer be changed."
+                    : "Submission Status could not be saved. Please try again later.");
+            return RedirectToAction(nameof(SampleReceipt), new { year, monthId, schemeId, participantId });
+        }
+
+        TempData.SetNotification(NotificationType.Success, "Submission Status updated successfully.");
+
+        return string.Equals(command, ApplyCommand, StringComparison.OrdinalIgnoreCase)
+            ? RedirectToAction(nameof(SampleReceipt), new { year, monthId, schemeId, participantId })
+            : RedirectToAction(nameof(ResultsReceipt), new { year, monthId });
+    }
+
+    private static SampleReceiptViewModel ToSampleReceiptViewModel(int year, int monthId, Guid schemeId, Guid participantId, SampleReceiptResponse page) =>
+        new()
+        {
+            YearId = year,
+            MonthId = monthId,
+            MonthlyDistributionSchemeId = schemeId,
+            DistributionParticipantId = participantId,
+            SchemeHeading = page.SchemeHeading,
+            LabHeading = page.LabHeading,
+            IsReadOnly = page.IsReadOnly,
+            Tests = [.. page.Tests.Select(t => new SampleReceiptTestViewModel
+            {
+                TestId = t.TestId,
+                TestType = t.TestType,
+                Samples = [.. t.Samples.Select(s => new SampleReceiptSampleViewModel
+                {
+                    SampleReceiptId = s.SampleReceiptId,
+                    SampleNumber = s.SampleNumber,
+                    Submitted = s.Submitted,
+                    NotSubmitted = s.NotSubmitted,
+                    NotInRepertoire = s.NotInRepertoire,
+                })],
+            })],
+        };
+
+    // Actual Results - legacy Internal User/ActualResults.aspx. Reached from the Results Receipt
+    // screen's per-participant Results "View/Edit" link; year/monthId are carried through purely so
+    // Save and Cancel can return to the Results Receipt screen the user came from.
+    [HttpGet]
+    public async Task<IActionResult> ActualResults(int year, int monthId, Guid schemeId, Guid participantId, CancellationToken cancellationToken)
+    {
+        var page = await distributionApiClient.GetActualResultsAsync(schemeId, participantId, cancellationToken);
+        return page is null ? NotFound() : View(ToActualResultsViewModel(year, monthId, page));
+    }
+
+    // Save = persist then return to Results Receipt (legacy ButtonSave_Click -> LeavePage()).
+    // Apply = persist then stay on Actual Results (legacy ButtonApply_Click, and Audit.aspx's
+    // AuditLeavePage). Cancel = discard, no save (legacy ButtonCancel_Click, CausesValidation=False).
+    // cancelAudit = Cancel on the audit-reason step: return to where the user was heading, unsaved.
+    // Every result value posts several fields, so a large grid exceeds the 1,024-value default.
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    [RequestFormLimits(ValueCountLimit = 20000)]
+    public async Task<IActionResult> ActualResults(
+        int year, int monthId, Guid schemeId, Guid participantId, ActualResultsViewModel model, string command, CancellationToken cancellationToken)
+    {
+        if (string.Equals(command, CancelCommand, StringComparison.OrdinalIgnoreCase))
+        {
+            return RedirectToAction(nameof(ResultsReceipt), new { year, monthId });
+        }
+
+        if (string.Equals(command, "cancelAudit", StringComparison.OrdinalIgnoreCase))
+        {
+            return string.Equals(model.PendingCommand, ApplyCommand, StringComparison.OrdinalIgnoreCase)
+                ? RedirectToAction(nameof(ActualResults), new { year, monthId, schemeId, participantId })
+                : RedirectToAction(nameof(ResultsReceipt), new { year, monthId });
+        }
+
+        model.YearId = year;
+        model.MonthId = monthId;
+        model.MonthlyDistributionSchemeId = schemeId;
+        model.DistributionParticipantId = participantId;
+
+        if (!ModelState.IsValid)
+        {
+            return View(await RehydrateActualResultsAsync(year, monthId, schemeId, participantId, model, cancellationToken));
+        }
+
+        var request = new ActualResultsSaveRequest(
+            [.. model.Tests.SelectMany(t => t.Samples).SelectMany(s => s.Values)
+                .Select(v => new ActualResultsSampleValueRequest(v.SampleResultItemId, v.Result ?? string.Empty))],
+            [.. model.Tests.SelectMany(t => t.MethodItems).Select(m => new ActualResultsMethodItemRequest(m.TestMethodItemId, m.Result ?? string.Empty))],
+            model.AuditWhy);
+
+        var result = await distributionApiClient.SaveActualResultsAsync(schemeId, participantId, request, cancellationToken);
+
+        if (result is null)
+        {
+            TempData.SetNotification(NotificationType.Error, "Results could not be saved. Please try again later.");
+            return View(await RehydrateActualResultsAsync(year, monthId, schemeId, participantId, model, cancellationToken));
+        }
+
+        // Legacy: results already exist, so the save is diverted through Audit.aspx for a reason.
+        if (result.AuditReasonRequired)
+        {
+            var auditModel = await RehydrateActualResultsAsync(year, monthId, schemeId, participantId, model, cancellationToken);
+            auditModel.IsAuditStep = true;
+            auditModel.AuditObjectName = result.AuditObjectName;
+            auditModel.PendingCommand = command;
+            return View(auditModel);
+        }
+
+        if (!result.Success)
+        {
+            var invalid = await RehydrateActualResultsAsync(year, monthId, schemeId, participantId, model, cancellationToken);
+            invalid.SaveFailed = result.DeadlinePassed;
+            ApplyActualResultsFieldErrors(invalid, result.FieldErrorsByItemId);
+            return View(invalid);
+        }
+
+        var applying = string.Equals(command, ApplyCommand, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(model.PendingCommand, ApplyCommand, StringComparison.OrdinalIgnoreCase);
+
+        TempData.SetNotification(NotificationType.Success, "Results updated successfully.");
+
+        return applying
+            ? RedirectToAction(nameof(ActualResults), new { year, monthId, schemeId, participantId })
+            : RedirectToAction(nameof(ResultsReceipt), new { year, monthId });
+    }
+
+    // Legacy keeps the whole ActualResultsSet in Session, so a failed Save redisplays the page with
+    // the server's structure intact and only the typed values overlaid. There is no server-side
+    // session here, so re-read the page and overlay the posted editable values onto it.
+    private async Task<ActualResultsViewModel> RehydrateActualResultsAsync(
+        int year, int monthId, Guid schemeId, Guid participantId, ActualResultsViewModel posted, CancellationToken cancellationToken)
+    {
+        var page = await distributionApiClient.GetActualResultsAsync(schemeId, participantId, cancellationToken);
+        if (page is null)
+        {
+            return posted;
+        }
+
+        var model = ToActualResultsViewModel(year, monthId, page);
+        model.IsAuditStep = posted.IsAuditStep;
+        model.AuditObjectName = posted.AuditObjectName;
+        model.PendingCommand = posted.PendingCommand;
+        model.AuditWhy = posted.AuditWhy;
+
+        var postedSampleValues = posted.Tests.SelectMany(t => t.Samples).SelectMany(s => s.Values)
+            .GroupBy(v => v.SampleResultItemId)
+            .ToDictionary(g => g.Key, g => g.Last().Result);
+        var postedMethodItems = posted.Tests.SelectMany(t => t.MethodItems)
+            .GroupBy(m => m.TestMethodItemId)
+            .ToDictionary(g => g.Key, g => g.Last().Result);
+
+        foreach (var test in model.Tests)
+        {
+            foreach (var value in test.Samples.SelectMany(s => s.Values))
+            {
+                if (postedSampleValues.TryGetValue(value.SampleResultItemId, out var result))
+                {
+                    value.Result = result;
+                }
+            }
+
+            foreach (var methodItem in test.MethodItems)
+            {
+                if (postedMethodItems.TryGetValue(methodItem.TestMethodItemId, out var result))
+                {
+                    methodItem.Result = result;
+                }
+            }
+        }
+
+        return model;
+    }
+
+    private void ApplyActualResultsFieldErrors(ActualResultsViewModel model, IReadOnlyDictionary<Guid, string> errorsByItemId)
+    {
+        for (var t = 0; t < model.Tests.Count; t++)
+        {
+            var test = model.Tests[t];
+
+            for (var s = 0; s < test.Samples.Count; s++)
+            {
+                for (var v = 0; v < test.Samples[s].Values.Count; v++)
+                {
+                    if (errorsByItemId.TryGetValue(test.Samples[s].Values[v].SampleResultItemId, out var message))
+                    {
+                        ModelState.AddModelError($"Tests[{t}].Samples[{s}].Values[{v}].Result", message);
+                    }
+                }
+            }
+
+            for (var m = 0; m < test.MethodItems.Count; m++)
+            {
+                if (errorsByItemId.TryGetValue(test.MethodItems[m].TestMethodItemId, out var message))
+                {
+                    ModelState.AddModelError($"Tests[{t}].MethodItems[{m}].Result", message);
+                }
+            }
+        }
+    }
+
+    private static ActualResultsViewModel ToActualResultsViewModel(int year, int monthId, ActualResultsResponse page) =>
+        new()
+        {
+            YearId = year,
+            MonthId = monthId,
+            MonthlyDistributionSchemeId = page.MonthlyDistributionSchemeId,
+            DistributionParticipantId = page.DistributionParticipantId,
+            Heading = page.Heading,
+            IsReadOnly = page.IsReadOnly,
+            Tests = [.. page.Tests.Select(t => new ActualResultsTestViewModel
+            {
+                TestId = t.TestId,
+                TestName = t.TestName,
+                ResultItems = [.. t.ResultItems.Select(r => new ActualResultsResultItemViewModel
+                {
+                    TestResultItemId = r.TestResultItemId,
+                    Name = r.Name,
+                    FormatString = r.FormatString,
+                    ReturnValueType = r.ReturnValueType,
+                })],
+                MethodItems = [.. t.MethodItems.Select(m => new ActualResultsMethodItemViewModel
+                {
+                    TestMethodItemId = m.TestMethodItemId,
+                    Name = m.Name,
+                    FormatString = m.FormatString,
+                    ReturnValueType = m.ReturnValueType,
+                    Result = m.Result,
+                })],
+                Samples = [.. t.Samples.Select(s => new ActualResultsSampleRowViewModel
+                {
+                    SampleId = s.SampleId,
+                    SampleNumber = s.SampleNumber,
+                    Values = [.. s.Values.Select(v => new ActualResultsSampleValueViewModel
+                    {
+                        SampleResultItemId = v.SampleResultItemId,
+                        TestResultItemId = v.TestResultItemId,
+                        Result = v.Result,
+                    })],
+                })],
+            })],
+        };
+
+    private static ResultsReceiptViewModel ToResultsReceiptViewModel(int year, int monthId, ResultsReceiptResponse receipt) =>
+        new()
+        {
+            YearId = year,
+            MonthId = monthId,
+            MonthDescription = PackagingMonthDescription(year, monthId),
+            Schemes =
+            [
+                .. receipt.Schemes.Select(s => new ResultsReceiptSchemeRowViewModel
+                {
+                    MonthlyDistributionSchemeId = s.MonthlyDistributionSchemeId,
+                    Description = s.Description,
+                    RequiresAssessment = s.RequiresAssessment,
+                    ProgressPercentage = s.ProgressPercentage,
+                    Participants =
+                    [
+                        .. s.Participants.Select(p => new ResultsReceiptParticipantRowViewModel
+                        {
+                            DistributionParticipantId = p.DistributionParticipantId,
+                            FullName = p.FullName,
+                            DeadlineDate = p.DeadlineDate,
+                            FirstEditDate = p.FirstEditDate,
+                            LastEditDate = p.LastEditDate,
+                            ExtraDocumentsReturned = p.ExtraDocumentsReturned,
+                            CanViewResults = p.CanViewResults,
+                            HasUnaccountedSamples = p.HasUnaccountedSamples,
+                            ReturnedDate = p.ReturnedDate,
+                        }),
+                    ],
+                }),
+            ],
+        };
+
+    // Sample Packaging - legacy Internal User/PackagingSheet.aspx. Reached from the Dashboard's
+    // "Packaging: View" link. Print is the browser's own print of this page (legacy window.print()
+    // with the Print column choosing which rows appear), so it has no server action.
+    [HttpGet]
+    public async Task<IActionResult> Packaging(int year, int monthId, int? mode, int week, CancellationToken cancellationToken)
+    {
+        var model = await BuildPackagingViewModelAsync(year, monthId, new PackagingViewModel { Mode = mode, Week = week }, cancellationToken);
+        return model is null ? NotFound() : View(model);
+    }
+
+    // select = explicit View button after choosing the Packaging/Week values: redisplay, keeping unsaved ticks.
+    // Save = persist then leave (legacy ButtonSave_Click -> LeavePage() -> MenuDistributions.aspx).
+    // Apply = persist then stay (legacy ButtonApply_Click redraws from the saved data).
+    // Cancel = discard then leave. labels/customs = Print Labels / Print Customs.
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Packaging(int year, int monthId, PackagingViewModel model, string command, CancellationToken cancellationToken)
+    {
+        if (string.Equals(command, CancelCommand, StringComparison.OrdinalIgnoreCase))
+        {
+            return RedirectToAction(nameof(Index));
+        }
+
+        if (!ValidatePackagingSelection(model))
+        {
+            var invalid = await BuildPackagingViewModelAsync(year, monthId, model, cancellationToken);
+            return invalid is null ? NotFound() : View(invalid);
+        }
+
+        if (string.Equals(command, "save", StringComparison.OrdinalIgnoreCase) || string.Equals(command, ApplyCommand, StringComparison.OrdinalIgnoreCase))
+        {
+            return await SavePackagingAsync(year, monthId, model, command, cancellationToken);
+        }
+
+        var printed = await TryPrintPackagingAsync(year, monthId, model, command, cancellationToken);
+        if (printed is not null)
+        {
+            return printed;
+        }
+
+        var rebuilt = await BuildPackagingViewModelAsync(year, monthId, model, cancellationToken);
+        return rebuilt is null ? NotFound() : View(rebuilt);
+    }
+
+    // The labels / customs print commands; null means redisplay the page (with model.Message set).
+    private async Task<IActionResult?> TryPrintPackagingAsync(int year, int monthId, PackagingViewModel model, string command, CancellationToken cancellationToken)
+    {
+        if (string.Equals(command, "labels", StringComparison.OrdinalIgnoreCase) && model.Mode is { } labelMode)
+        {
+            var labels = await distributionApiClient.GetPackagingLabelsAsync(
+                year, monthId, new PackagingSelectionRequest(labelMode, model.Week, model.PrintKeys), cancellationToken);
+
+            if (labels is { Labels.Count: > 0 })
+            {
+                return View("PackagingLabels", new PackagingLabelsViewModel
+                {
+                    YearId = year,
+                    MonthId = monthId,
+                    Mode = labelMode,
+                    Week = model.Week,
+                    MonthDescription = PackagingMonthDescription(year, monthId),
+                    Labels = labels.Labels,
+                });
+            }
+
+            model.Message = "No Labels to Print";
+        }
+        else if (string.Equals(command, "customs", StringComparison.OrdinalIgnoreCase) && model.Mode is { } customsMode)
+        {
+            var customs = await distributionApiClient.GetPackagingCustomsAsync(
+                year, monthId, new PackagingSelectionRequest(customsMode, model.Week, model.PrintKeys), cancellationToken);
+
+            if (customs.Content is not null)
+            {
+                return File(customs.Content, "application/vnd.openxmlformats-officedocument.wordprocessingml.document", customs.FileName);
+            }
+
+            model.Message = "There was a problem with the Mail Merge";
+            model.MessageDetail = customs.Error;
+        }
+        else if (string.Equals(command, "labels", StringComparison.OrdinalIgnoreCase))
+        {
+            model.Message = "No Labels to Print";
+        }
+
+        return null;
+    }
+
+    private static bool ValidatePackagingSelection(PackagingViewModel model)
+    {
+        if (model.Mode is not (0 or 1 or 2))
+        {
+            model.Mode = null;
+            model.ModeError = "Select a packaging option";
+        }
+        else if (model.Mode is 0 or 1 && model.Week is < 1 or > 4)
+        {
+            model.WeekError = "Select a week";
+        }
+
+        return !model.HasSelectionError;
+    }
+
+    private async Task<IActionResult> SavePackagingAsync(int year, int monthId, PackagingViewModel model, string command, CancellationToken cancellationToken)
+    {
+        var result = await distributionApiClient.SavePackagingAsync(year, monthId, new PackagingSaveRequest(ToPackagingUpdates(model)), cancellationToken);
+
+        if (result is null || !result.Success)
+        {
+            TempData.SetNotification(NotificationType.Error, "Sample Packaging could not be saved. Please try again later.");
+            return RedirectToAction(nameof(Packaging), new { year, monthId, mode = model.Mode, week = model.Week });
+        }
+
+        if (result.EmailFailures is { Count: > 0 } emailFailures)
+        {
+            TempData.SetNotification(
+                NotificationType.Warning,
+                $"Sample Packaging updated, but the Distribution Posted email could not be sent to: {string.Join(", ", emailFailures)}. Please notify the participant another way.");
+        }
+        else
+        {
+            TempData.SetNotification(NotificationType.Success, "Sample Packaging updated successfully.");
+        }
+
+        return string.Equals(command, ApplyCommand, StringComparison.OrdinalIgnoreCase)
+            ? RedirectToAction(nameof(Packaging), new { year, monthId, mode = model.Mode, week = model.Week })
+            : RedirectToAction(nameof(Index));
+    }
+
+    private async Task<PackagingViewModel?> BuildPackagingViewModelAsync(int year, int monthId, PackagingViewModel model, CancellationToken cancellationToken)
+    {
+        model.YearId = year;
+        model.MonthId = monthId;
+        model.MonthDescription = PackagingMonthDescription(year, monthId);
+        model.PrintTitle = PackagingPrintTitle(model.Mode, model.Week, model.MonthDescription);
+        model.Sheet = null;
+
+        var weekNeeded = model.Mode is 0 or 1;
+        if (model.Mode is not (0 or 1 or 2) || (weekNeeded && model.Week is < 1 or > 4))
+        {
+            return model;
+        }
+
+        model.Sheet = await distributionApiClient.GetPackagingAsync(year, monthId, model.Mode.Value, weekNeeded ? model.Week : 0, cancellationToken);
+        return model.Sheet is null ? null : model;
+    }
+
+    private static string PackagingMonthDescription(int year, int monthId) =>
+        $"{System.Globalization.CultureInfo.GetCultureInfo("en-GB").DateTimeFormat.GetMonthName(monthId)} {year}";
+
+    // Legacy LblPrintTitle2 - printed beneath "Sample Packaging - ".
+    private static string PackagingPrintTitle(int? mode, int week, string monthDescription) =>
+        mode switch
+        {
+            0 when week > 0 => $"Week {week} - {monthDescription} - Group Packaging",
+            1 when week > 0 => $"Week {week} - {monthDescription} - Participant Combined Packaging",
+            2 => $"{monthDescription} - Weekly",
+            _ => string.Empty,
+        };
+
+    // Ticks are "{mode}:{week}:{distributionParticipantId}"; ticking Posted alone is enough, the API
+    // stamps Packed as well.
+    private static List<PackagingStageUpdateRequest> ToPackagingUpdates(PackagingViewModel model)
+    {
+        var updates = new Dictionary<(int Mode, int Week, Guid Id), (bool Packed, bool Posted)>();
+
+        foreach (var tick in model.PackedTicks)
+        {
+            if (TryParsePackagingTick(tick, out var key))
+            {
+                updates[key] = (true, updates.TryGetValue(key, out var current) && current.Posted);
+            }
+        }
+
+        foreach (var tick in model.PostedTicks)
+        {
+            if (TryParsePackagingTick(tick, out var key))
+            {
+                updates[key] = (updates.TryGetValue(key, out var current) && current.Packed, true);
+            }
+        }
+
+        return [.. updates.Select(u => new PackagingStageUpdateRequest(u.Key.Mode, u.Key.Week, u.Key.Id, u.Value.Packed, u.Value.Posted))];
+    }
+
+    private static bool TryParsePackagingTick(string tick, out (int Mode, int Week, Guid Id) key)
+    {
+        key = default;
+        var parts = tick.Split(':');
+        if (parts.Length != 3
+            || !int.TryParse(parts[0], System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var mode)
+            || !int.TryParse(parts[1], System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var week)
+            || !Guid.TryParse(parts[2], out var id))
+        {
+            return false;
+        }
+
+        key = (mode, week, id);
+        return true;
     }
 
     // Sample Numbers - legacy Scheduling/SampleNumbers.aspx. Opened from the Scheduling screen's
@@ -309,19 +930,7 @@ public sealed class DistributionController(IDistributionApiClient distributionAp
                 ModelState.AddModelError(nameof(model.Comments), message);
             }
 
-            foreach (var (sampleId, errors) in result?.FieldErrorsBySampleId ?? new Dictionary<Guid, SampleNumbersFieldError[]>())
-            {
-                var index = model.Samples.FindIndex(s => s.SampleId == sampleId);
-                if (index < 0)
-                {
-                    continue;
-                }
-
-                foreach (var error in errors)
-                {
-                    ModelState.AddModelError($"{nameof(model.Samples)}[{index}].{error.Field}", error.Message);
-                }
-            }
+            ApplySampleNumbersFieldErrors(model, result?.FieldErrorsBySampleId);
 
             return View(await RehydrateSampleNumbersAsync(year, monthId, schemeId, model, cancellationToken));
         }
@@ -329,6 +938,23 @@ public sealed class DistributionController(IDistributionApiClient distributionAp
         TempData.SetNotification(NotificationType.Success, "Sample Numbers updated successfully.");
 
         return RedirectToDestination(command, year, monthId, schemeId);
+    }
+
+    private void ApplySampleNumbersFieldErrors(SampleNumbersViewModel model, IReadOnlyDictionary<Guid, SampleNumbersFieldError[]>? errorsBySampleId)
+    {
+        foreach (var (sampleId, errors) in errorsBySampleId ?? new Dictionary<Guid, SampleNumbersFieldError[]>())
+        {
+            var index = model.Samples.FindIndex(s => s.SampleId == sampleId);
+            if (index < 0)
+            {
+                continue;
+            }
+
+            foreach (var error in errors)
+            {
+                ModelState.AddModelError($"{nameof(model.Samples)}[{index}].{error.Field}", error.Message);
+            }
+        }
     }
 
     private RedirectToActionResult RedirectToDestination(string? command, int year, int monthId, Guid schemeId) =>
@@ -785,6 +1411,7 @@ public sealed class DistributionController(IDistributionApiClient distributionAp
     public async Task<IActionResult> ChangeDeadline(
         int year, int monthId, Guid schemeId, Guid participantId, DistributionParticipantsViewModel model, CancellationToken cancellationToken)
     {
+        ViewData[BreadcrumbRouteValues.Action] = nameof(Participants);
         if (!ModelState.IsValid)
         {
             return View(nameof(Participants), await RehydrateParticipantsAsync(year, monthId, schemeId, model, cancellationToken));
@@ -827,6 +1454,7 @@ public sealed class DistributionController(IDistributionApiClient distributionAp
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> RepeatDistribution(int year, int monthId, Guid schemeId, DistributionParticipantsViewModel model, CancellationToken cancellationToken)
     {
+        ViewData[BreadcrumbRouteValues.Action] = nameof(Participants);
         if (!ModelState.IsValid)
         {
             return View(nameof(Participants), await RehydrateParticipantsAsync(year, monthId, schemeId, model, cancellationToken));

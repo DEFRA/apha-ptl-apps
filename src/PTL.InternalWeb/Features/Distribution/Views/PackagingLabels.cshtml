@@ -1,0 +1,32 @@
+@model PTL.InternalWeb.Features.Distribution.PackagingLabelsViewModel
+@{
+    ViewData["Title"] = $"Sample Packaging Labels - {Model.MonthDescription}";
+}
+
+@section Styles {
+    <link rel="stylesheet" href="~/css/printable-scheme.css" />
+}
+
+<a class="govuk-back-link noprint" asp-action="Packaging" asp-route-year="@Model.YearId" asp-route-monthId="@Model.MonthId" asp-route-mode="@Model.Mode" asp-route-week="@Model.Week">Back</a>
+
+<h1 class="govuk-heading-l noprint">Sample Packaging Labels - @Model.MonthDescription</h1>
+
+<div class="noprint">
+    <button type="button" id="labels-print-button" class="govuk-button govuk-button--secondary" data-module="govuk-button">Print</button>
+</div>
+
+<div class="ptl-labels">
+    @foreach (var label in Model.Labels)
+    {
+        <div class="ptl-label">
+            @foreach (var line in label.Lines)
+            {
+                <p class="govuk-body ptl-label__line">@line</p>
+            }
+        </div>
+    }
+</div>
+
+<script>
+    document.getElementById('labels-print-button').addEventListener('click', function () { window.print(); });
+</script>

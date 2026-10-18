@@ -1,5 +1,7 @@
 using Dapper;
+using PTL.Core.Audit;
 using PTL.Core.Country;
+using PTL.Data.Audit;
 using PTL.Data.Infrastructure;
 using CoreCountry = PTL.Core.Country.Country;
 
@@ -21,25 +23,30 @@ public sealed class CountryRepository(IDbConnectionFactory connectionFactory) : 
         return (await connection.QueryAsync<CountryTypeEntity>("EXEC dbo.spgaCountryType")).ToList();
     }
 
-    public async Task CreateAsync(CoreCountry country, CancellationToken cancellationToken = default)
-    {
-        using var connection = connectionFactory.CreateConnection();
-        await connection.ExecuteAsync(
-            "EXEC dbo.spiCountry @CountryId, @Country, @CountryTypeId",
-            new { country.CountryId, Country = country.CountryName, country.CountryTypeId });
-    }
+    public Task CreateAsync(CoreCountry country, AuditEntry? auditEntry = null, CancellationToken cancellationToken = default) =>
+        AuditTrailWriter.ExecuteAsync(
+            connectionFactory,
+            auditEntry,
+            (connection, transaction) => connection.ExecuteAsync(
+                "EXEC dbo.spiCountry @CountryId, @Country, @CountryTypeId",
+                new { country.CountryId, Country = country.CountryName, country.CountryTypeId },
+                transaction),
+            cancellationToken);
 
-    public async Task UpdateAsync(CoreCountry country, CancellationToken cancellationToken = default)
-    {
-        using var connection = connectionFactory.CreateConnection();
-        await connection.ExecuteAsync(
-            "EXEC dbo.spuCountry @CountryId, @Country, @CountryTypeId",
-            new { country.CountryId, Country = country.CountryName, country.CountryTypeId });
-    }
+    public Task UpdateAsync(CoreCountry country, AuditEntry? auditEntry = null, CancellationToken cancellationToken = default) =>
+        AuditTrailWriter.ExecuteAsync(
+            connectionFactory,
+            auditEntry,
+            (connection, transaction) => connection.ExecuteAsync(
+                "EXEC dbo.spuCountry @CountryId, @Country, @CountryTypeId",
+                new { country.CountryId, Country = country.CountryName, country.CountryTypeId },
+                transaction),
+            cancellationToken);
 
-    public async Task DeleteAsync(Guid countryId, CancellationToken cancellationToken = default)
-    {
-        using var connection = connectionFactory.CreateConnection();
-        await connection.ExecuteAsync("EXEC dbo.spdCountry @CountryId", new { CountryId = countryId });
-    }
+    public Task DeleteAsync(Guid countryId, AuditEntry? auditEntry = null, CancellationToken cancellationToken = default) =>
+        AuditTrailWriter.ExecuteAsync(
+            connectionFactory,
+            auditEntry,
+            (connection, transaction) => connection.ExecuteAsync("EXEC dbo.spdCountry @CountryId", new { CountryId = countryId }, transaction),
+            cancellationToken);
 }

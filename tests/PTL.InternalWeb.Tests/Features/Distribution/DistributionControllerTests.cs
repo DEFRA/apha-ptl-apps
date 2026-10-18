@@ -3,7 +3,9 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ViewFeatures;
 using PTL.ApiClient.Distribution;
 using PTL.Contracts.Distribution;
+using PTL.InternalWeb.Confirmation;
 using PTL.InternalWeb.Features.Distribution;
+using PTL.InternalWeb.Navigation;
 using PTL.InternalWeb.Tests.TestSupport;
 using PTL.SharedUI.Notifications;
 
@@ -65,16 +67,72 @@ public class DistributionControllerTests
         Assert.Equal("Scheduling", view.Model);
     }
 
-    [Fact]
-    public void InitialiseMonth_ReturnsFeatureNotAvailable()
+    [Theory]
+    [InlineData(2026, 4, 2026)]
+    [InlineData(2026, 12, 2026)]
+    [InlineData(2027, 1, 2026)]
+    [InlineData(2027, 3, 2026)]
+    public async Task InitialiseMonth_Initialised_ShowsTheBannerAndReturnsToTheFinancialYear(int year, int monthId, int financialYear)
     {
-        var controller = CreateController(new FakeDistributionApiClient());
+        var apiClient = new FakeDistributionApiClient { InitialiseMonthResult = new InitialiseMonthResult(true) };
+        var controller = CreateController(apiClient);
 
-        var result = controller.InitialiseMonth(2026, 4);
+        var result = await controller.InitialiseMonth(year, monthId, ConfirmationFlow.Confirmed, CancellationToken.None);
+
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal("Index", redirect.ActionName);
+        Assert.Equal(financialYear, redirect.RouteValues!["year"]);
+        Assert.Equal([(year, monthId)], apiClient.InitialisedMonths);
+        var notification = controller.TempData.GetNotification();
+        Assert.Equal(NotificationType.Success, notification!.Type);
+        Assert.Equal("Month initialised successfully.", notification.Message);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task InitialiseMonth_AlreadyInitialisedOrNoResult_ShowsNoBannerAndRedisplaysTheDashboard(bool hasResult)
+    {
+        var apiClient = new FakeDistributionApiClient { InitialiseMonthResult = hasResult ? new InitialiseMonthResult(false) : null };
+        var controller = CreateController(apiClient);
+
+        var result = await controller.InitialiseMonth(2026, 5, ConfirmationFlow.Confirmed, CancellationToken.None);
+
+        Assert.Equal("Index", Assert.IsType<RedirectToActionResult>(result).ActionName);
+        Assert.Null(controller.TempData.GetNotification());
+    }
+
+    [Theory]
+    [InlineData(2026, 0)]
+    [InlineData(2026, 13)]
+    [InlineData(0, 5)]
+    public async Task InitialiseMonth_InvalidMonth_ReturnsBadRequestWithoutCallingTheApi(int year, int monthId)
+    {
+        var apiClient = new FakeDistributionApiClient();
+        var controller = CreateController(apiClient);
+
+        Assert.IsType<BadRequestResult>(await controller.InitialiseMonth(year, monthId, ConfirmationFlow.Confirmed, CancellationToken.None));
+        Assert.Empty(apiClient.InitialisedMonths);
+    }
+
+    [Fact]
+    public async Task InitialiseMonth_NotConfirmed_ShowsTheConfirmationPageAndInitialisesNothing()
+    {
+        var apiClient = new FakeDistributionApiClient { InitialiseMonthResult = new InitialiseMonthResult(true) };
+        var controller = CreateController(apiClient);
+        controller.Url = new FakeUrlHelper();
+
+        var result = await controller.InitialiseMonth(2026, 5, null, CancellationToken.None);
 
         var view = Assert.IsType<ViewResult>(result);
-        Assert.Equal("FeatureNotAvailable", view.ViewName);
-        Assert.Equal("Initialise This Month", view.Model);
+        Assert.Equal(ConfirmationFlow.ViewName, view.ViewName);
+        var model = Assert.IsType<ConfirmationPageViewModel>(view.Model);
+        Assert.Equal("Are you sure you wish to initialise this month?", model.Message);
+        Assert.Contains("you will no longer be able to add schemes to this month", model.WarningText, StringComparison.Ordinal);
+        Assert.EndsWith("/Index", model.CancelUrl, StringComparison.Ordinal);
+        Assert.Equal(nameof(DistributionController.Index), controller.ViewData[BreadcrumbRouteValues.Action]);
+        Assert.Empty(apiClient.InitialisedMonths);
+        Assert.Null(controller.TempData.GetNotification());
     }
 
     [Fact]
@@ -266,13 +324,50 @@ public class DistributionControllerTests
             Schemes = [new MonthlyDistributionScheduleRowViewModel { MonthlyDistributionSchemeId = schemeId, IsCancelled = false }],
         };
 
-        var result = controller.ToggleCancelled(2026, 4, schemeId, model);
+        var result = controller.ToggleCancelled(2026, 4, schemeId, model, ConfirmationFlow.Confirmed);
 
         var view = Assert.IsType<ViewResult>(result);
         Assert.Equal("Schedule", view.ViewName);
         var updatedModel = Assert.IsType<MonthlyDistributionScheduleViewModel>(view.Model);
         Assert.True(updatedModel.Schemes.Single().IsCancelled);
         Assert.Empty(apiClient.SavedRows);
+    }
+
+    [Fact]
+    public void ToggleCancelled_NotConfirmed_AsksFirstAndLeavesTheRowUnchanged()
+    {
+        var schemeId = Guid.NewGuid();
+        var controller = CreateController(new FakeDistributionApiClient());
+        var model = new MonthlyDistributionScheduleViewModel
+        {
+            Schemes = [new MonthlyDistributionScheduleRowViewModel { MonthlyDistributionSchemeId = schemeId, IsCancelled = false }],
+        };
+
+        var result = controller.ToggleCancelled(2026, 4, schemeId, model, null);
+
+        var view = Assert.IsType<ViewResult>(result);
+        Assert.Equal(ConfirmationFlow.ViewName, view.ViewName);
+        var page = Assert.IsType<ConfirmationPageViewModel>(view.Model);
+        Assert.Equal("Are you sure you wish to Cancel this Distribution?", page.Message);
+        Assert.Null(page.CancelUrl);
+        Assert.False(model.Schemes.Single().IsCancelled);
+    }
+
+    [Fact]
+    public void ToggleCancelled_Declined_RedisplaysTheScheduleUnchanged()
+    {
+        var schemeId = Guid.NewGuid();
+        var controller = CreateController(new FakeDistributionApiClient());
+        var model = new MonthlyDistributionScheduleViewModel
+        {
+            Schemes = [new MonthlyDistributionScheduleRowViewModel { MonthlyDistributionSchemeId = schemeId, IsCancelled = false }],
+        };
+
+        var result = controller.ToggleCancelled(2026, 4, schemeId, model, ConfirmationFlow.Cancelled);
+
+        var view = Assert.IsType<ViewResult>(result);
+        Assert.Equal("Schedule", view.ViewName);
+        Assert.False(Assert.IsType<MonthlyDistributionScheduleViewModel>(view.Model).Schemes.Single().IsCancelled);
     }
 
     [Fact]
@@ -317,6 +412,29 @@ public class DistributionControllerTests
     }
 
     [Fact]
+    public void ToggleCancelled_PublishesScheduleAsTheBreadcrumbAction()
+    {
+        var controller = CreateController(new FakeDistributionApiClient());
+
+        controller.ToggleCancelled(2026, 4, Guid.NewGuid(), new MonthlyDistributionScheduleViewModel(), ConfirmationFlow.Confirmed);
+
+        Assert.Equal(nameof(DistributionController.Schedule), controller.ViewData[BreadcrumbRouteValues.Action]);
+    }
+
+    [Fact]
+    public async Task ChangeDeadlineAndRepeatDistribution_PublishParticipantsAsTheBreadcrumbAction()
+    {
+        var changeController = CreateController(new FakeDistributionApiClient { ChangeDeadlineResult = new ChangeDeadlineResult(true, null, null) });
+        await changeController.ChangeDeadline(2026, 4, ParticipantsSchemeId, DistributionParticipantId, PostedParticipantsModel(new DateTime(2026, 5, 1), "A reason"), CancellationToken.None);
+
+        var repeatController = CreateController(new FakeDistributionApiClient { RepeatDistributionResult = new RepeatDistributionResult(true, null) });
+        await repeatController.RepeatDistribution(2026, 4, ParticipantsSchemeId, PostedRepeatModel(), CancellationToken.None);
+
+        Assert.Equal(nameof(DistributionController.Participants), changeController.ViewData[BreadcrumbRouteValues.Action]);
+        Assert.Equal(nameof(DistributionController.Participants), repeatController.ViewData[BreadcrumbRouteValues.Action]);
+    }
+
+    [Fact]
     public void ToggleCancelled_UnknownScheme_LeavesEveryRowUnchanged()
     {
         var schemeId = Guid.NewGuid();
@@ -326,7 +444,7 @@ public class DistributionControllerTests
             Schemes = [new MonthlyDistributionScheduleRowViewModel { MonthlyDistributionSchemeId = schemeId, IsCancelled = false }],
         };
 
-        var result = controller.ToggleCancelled(2026, 4, Guid.NewGuid(), model);
+        var result = controller.ToggleCancelled(2026, 4, Guid.NewGuid(), model, ConfirmationFlow.Confirmed);
 
         var view = Assert.IsType<ViewResult>(result);
         var updatedModel = Assert.IsType<MonthlyDistributionScheduleViewModel>(view.Model);

@@ -2,7 +2,7 @@ using PTL.Core.Distribution;
 
 namespace PTL.Api.Tests.Distribution;
 
-internal sealed class FakeDistributionRepository : IDistributionRepository
+internal sealed partial class FakeDistributionRepository : IDistributionRepository
 {
     public List<DistributionMonthSummaryEntity> Summaries { get; } = [];
 
@@ -111,6 +111,23 @@ internal sealed class FakeDistributionRepository : IDistributionRepository
         return Task.CompletedTask;
     }
 
+    public bool InitialiseMonthResult { get; set; } = true;
+
+    public List<MonthSetupSchemeRow> SetupSchemeRows { get; } = [];
+
+    public List<MonthSetupParticipantRow> SetupParticipantRows { get; } = [];
+
+    public List<(int YearId, int MonthId)> InitialisedMonths { get; } = [];
+
+    public MonthSetupPlan? LastMonthPlan { get; private set; }
+
+    public Task<bool> InitialiseMonthAsync(int yearId, int monthId, MonthSetupPlanner planner, CancellationToken cancellationToken = default)
+    {
+        InitialisedMonths.Add((yearId, monthId));
+        LastMonthPlan = planner(SetupSchemeRows, SetupParticipantRows);
+        return Task.FromResult(InitialiseMonthResult);
+    }
+
     public Dictionary<Guid, PreparationSheetData> PreparationSheets { get; } = [];
 
     public List<PreparationSchemeEntity> UpdatedPreparationSchemes { get; } = [];
@@ -122,5 +139,124 @@ internal sealed class FakeDistributionRepository : IDistributionRepository
     {
         UpdatedPreparationSchemes.AddRange(schemes);
         return Task.CompletedTask;
+    }
+
+    // Keyed by (yearId, monthId); a missing key means "no distribution for the month" (null).
+    public Dictionary<(int YearId, int MonthId), ResultsReceiptData> ResultsReceipts { get; } = [];
+
+    public List<ResultsReceiptParticipantEntity> UpdatedResultsReceiptParticipants { get; } = [];
+
+    public Task<ResultsReceiptData?> GetResultsReceiptAsync(int yearId, int monthId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(ResultsReceipts.GetValueOrDefault((yearId, monthId)));
+
+    public Dictionary<Guid, IReadOnlyList<TabulationsSchemeEntity>> Tabulations { get; } = [];
+
+    public List<Guid> TabulationRequests { get; } = [];
+
+    public Task<IReadOnlyList<TabulationsSchemeEntity>> GetTabulationsAsync(Guid monthlyDistributionId, CancellationToken cancellationToken = default)
+    {
+        TabulationRequests.Add(monthlyDistributionId);
+        return Task.FromResult(Tabulations.GetValueOrDefault(monthlyDistributionId) ?? []);
+    }
+
+    public Task UpdateResultsReceiptAsync(IReadOnlyList<ResultsReceiptParticipantEntity> participants, CancellationToken cancellationToken = default)
+    {
+        UpdatedResultsReceiptParticipants.AddRange(participants);
+        return Task.CompletedTask;
+    }
+
+    // Keyed by (distributionParticipantId, monthlyDistributionSchemeId); a missing key means "not found" (null).
+    public Dictionary<(Guid ParticipantId, Guid SchemeId), SampleReceiptData> SampleReceipts { get; } = [];
+
+    public List<SampleReceiptSampleEntity> UpdatedSampleReceipts { get; } = [];
+
+    public Task<SampleReceiptData?> GetSampleReceiptAsync(
+        Guid distributionParticipantId, Guid monthlyDistributionSchemeId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(SampleReceipts.GetValueOrDefault((distributionParticipantId, monthlyDistributionSchemeId)));
+
+    public Task UpdateSampleReceiptAsync(IReadOnlyList<SampleReceiptSampleEntity> samples, CancellationToken cancellationToken = default)
+    {
+        UpdatedSampleReceipts.AddRange(samples);
+        return Task.CompletedTask;
+    }
+
+    // Keyed by distributionParticipantId; a missing key means "participant not returned" (null).
+    public Dictionary<Guid, ActualResultsData> ActualResults { get; } = [];
+
+    public List<Guid> RatingIds { get; } = [];
+
+    public List<ActualResultsWrite> SavedActualResults { get; } = [];
+
+    public Task<ActualResultsData?> GetActualResultsAsync(Guid distributionParticipantId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(ActualResults.GetValueOrDefault(distributionParticipantId));
+
+    public Task<IReadOnlyList<Guid>> GetRatingIdsAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<Guid>>(RatingIds);
+
+    public Task SaveActualResultsAsync(ActualResultsWrite write, CancellationToken cancellationToken = default)
+    {
+        SavedActualResults.Add(write);
+        return Task.CompletedTask;
+    }
+
+    // Keyed by (monthlyDistributionId, mode, week); a missing key means "no packaging header" (null).
+    public Dictionary<(Guid MonthlyDistributionId, PackagingMode Mode, int Week), PackagingRawData> PackagingSheets { get; } = [];
+
+    public List<(Guid MonthlyDistributionId, PackagingMode Mode, int Week)> PackagingSheetRequests { get; } = [];
+
+    public List<(IReadOnlyList<PackagingProgressUpdate> Updates, IReadOnlyList<DistributionPostedEmailEntity> Emails)> PackagingUpdates { get; } = [];
+
+    public List<DistributionPostedEmailEntity> UnsentPostedEmails { get; } = [];
+
+    public int UnsentPostedEmailRequests { get; private set; }
+
+    public List<(Guid Id, DateTime DateSent)> MarkedSentEmails { get; } = [];
+
+    // Keyed by (participantId, schemeId) - an absent key returns null (no address row).
+    public Dictionary<(Guid ParticipantId, Guid SchemeId), PackagingLabelAddressEntity> ParticipantLabelAddresses { get; } = [];
+
+    public Dictionary<Guid, PackagingLabelAddressEntity> GroupLabelAddresses { get; } = [];
+
+    public List<(Guid ParticipantId, Guid SchemeId)> ParticipantLabelRequests { get; } = [];
+
+    public List<Guid> GroupLabelRequests { get; } = [];
+
+    public Task<PackagingRawData?> GetPackagingSheetAsync(
+        Guid monthlyDistributionId, PackagingMode mode, int week, CancellationToken cancellationToken = default)
+    {
+        PackagingSheetRequests.Add((monthlyDistributionId, mode, week));
+        return Task.FromResult(PackagingSheets.GetValueOrDefault((monthlyDistributionId, mode, week)));
+    }
+
+    public Task UpdatePackagingAsync(
+        IReadOnlyList<PackagingProgressUpdate> updates, IReadOnlyList<DistributionPostedEmailEntity> emails, CancellationToken cancellationToken = default)
+    {
+        PackagingUpdates.Add((updates, emails));
+        return Task.CompletedTask;
+    }
+
+    public Task<IReadOnlyList<DistributionPostedEmailEntity>> GetUnsentDistributionPostedEmailsAsync(CancellationToken cancellationToken = default)
+    {
+        UnsentPostedEmailRequests++;
+        return Task.FromResult<IReadOnlyList<DistributionPostedEmailEntity>>([.. UnsentPostedEmails]);
+    }
+
+    public Task MarkDistributionPostedEmailSentAsync(Guid distributionPostedEmailId, DateTime dateSent, CancellationToken cancellationToken = default)
+    {
+        MarkedSentEmails.Add((distributionPostedEmailId, dateSent));
+        return Task.CompletedTask;
+    }
+
+    public Task<PackagingLabelAddressEntity?> GetLabelParticipantAddressAsync(
+        Guid participantId, Guid monthlyDistributionSchemeId, CancellationToken cancellationToken = default)
+    {
+        ParticipantLabelRequests.Add((participantId, monthlyDistributionSchemeId));
+        return Task.FromResult(ParticipantLabelAddresses.GetValueOrDefault((participantId, monthlyDistributionSchemeId)));
+    }
+
+    public Task<PackagingLabelAddressEntity?> GetLabelGroupAddressAsync(Guid groupAddressId, CancellationToken cancellationToken = default)
+    {
+        GroupLabelRequests.Add(groupAddressId);
+        return Task.FromResult(GroupLabelAddresses.GetValueOrDefault(groupAddressId));
     }
 }

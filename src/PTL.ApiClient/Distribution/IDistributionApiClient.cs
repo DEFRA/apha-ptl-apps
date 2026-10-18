@@ -2,7 +2,7 @@ using PTL.Contracts.Distribution;
 
 namespace PTL.ApiClient.Distribution;
 
-public interface IDistributionApiClient
+public partial interface IDistributionApiClient
 {
     Task<IReadOnlyList<DistributionDashboardMonthResponse>> GetDashboardAsync(int yearId, CancellationToken cancellationToken = default);
 
@@ -12,6 +12,9 @@ public interface IDistributionApiClient
 
     Task<MonthlyDistributionScheduleSaveResult?> SaveScheduleAsync(
         int yearId, int monthId, IReadOnlyList<MonthlyDistributionScheduleRowRequest> rows, CancellationToken cancellationToken = default);
+
+    // Legacy "Initialise this Month"; Initialised is false when the month already existed.
+    Task<InitialiseMonthResult?> InitialiseMonthAsync(int yearId, int monthId, CancellationToken cancellationToken = default);
 
     Task<SampleNumbersPageResult> GetSampleNumbersAsync(Guid monthlyDistributionSchemeId, CancellationToken cancellationToken = default);
 
@@ -35,4 +38,38 @@ public interface IDistributionApiClient
 
     Task<PreparationSaveResult?> SavePreparationAsync(
         int yearId, int monthId, PreparationSaveRequest request, CancellationToken cancellationToken = default);
+
+    // Null when the month has not been initialised.
+    Task<ResultsReceiptResponse?> GetResultsReceiptAsync(int yearId, int monthId, CancellationToken cancellationToken = default);
+
+    Task<ResultsReceiptSaveResult?> SaveResultsReceiptAsync(
+        int yearId, int monthId, ResultsReceiptSaveRequest request, CancellationToken cancellationToken = default);
+
+    Task<TabulationsResponse?> GetTabulationsAsync(int yearId, int monthId, CancellationToken cancellationToken = default);
+
+    // Null when the participant or scheme is not found.
+    Task<SampleReceiptResponse?> GetSampleReceiptAsync(
+        Guid monthlyDistributionSchemeId, Guid distributionParticipantId, CancellationToken cancellationToken = default);
+
+    Task<SampleReceiptSaveResult?> SaveSampleReceiptAsync(
+        Guid monthlyDistributionSchemeId, Guid distributionParticipantId, SampleReceiptSaveRequest request, CancellationToken cancellationToken = default);
+
+    // Null when the participant is not found.
+    Task<ActualResultsResponse?> GetActualResultsAsync(
+        Guid monthlyDistributionSchemeId, Guid distributionParticipantId, CancellationToken cancellationToken = default);
+
+    Task<ActualResultsSaveResult?> SaveActualResultsAsync(
+        Guid monthlyDistributionSchemeId, Guid distributionParticipantId, ActualResultsSaveRequest request, CancellationToken cancellationToken = default);
+
+    // Null when the month has not been initialised.
+    Task<PackagingSheetResponse?> GetPackagingAsync(int yearId, int monthId, int mode, int week, CancellationToken cancellationToken = default);
+
+    Task<PackagingSaveResult?> SavePackagingAsync(
+        int yearId, int monthId, PackagingSaveRequest request, CancellationToken cancellationToken = default);
+
+    Task<PackagingLabelsResponse?> GetPackagingLabelsAsync(
+        int yearId, int monthId, PackagingSelectionRequest request, CancellationToken cancellationToken = default);
+
+    Task<PackagingCustomsResult> GetPackagingCustomsAsync(
+        int yearId, int monthId, PackagingSelectionRequest request, CancellationToken cancellationToken = default);
 }
