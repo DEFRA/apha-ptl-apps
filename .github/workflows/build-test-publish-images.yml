@@ -363,6 +363,19 @@ jobs:
           echo "::error::No Dockerfile is mapped for component '${{ matrix.component }}'."
           exit 1
 
+      # Baked into the image by the component Dockerfiles - never committed to source, fetched here
+      # from a GitHub secret so the build context has it before `docker build` runs.
+      - name: Install FortiGate TLS-inspection CA certificate
+        shell: pwsh
+        env:
+          FORTIGATE_CA_CERT_BASE64: ${{ secrets.FORTIGATE_CA_CERT_BASE64 }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          $certDir = Join-Path $env:GITHUB_WORKSPACE "build/certs"
+          New-Item -ItemType Directory -Force -Path $certDir | Out-Null
+          $bytes = [System.Convert]::FromBase64String($env:FORTIGATE_CA_CERT_BASE64)
+          [System.IO.File]::WriteAllBytes((Join-Path $certDir "fortigate-ca.cer"), $bytes)
+
       # The Windows Docker builder cannot use the Linux BuildKit NuGet cache mount.
       # Modify only a temporary Dockerfile, never the committed file.
       - name: Prepare Windows-compatible Dockerfile
