@@ -8,7 +8,6 @@ using CoreCustomer = PTL.Core.Customer.Customer;
 namespace PTL.InternalWeb.Features.Customer;
 
 public sealed record CustomerListViewModel(
-    string? SearchTerm,
     CustomerStatusFilter SelectedStatus,
     int Page,
     int PageSize,

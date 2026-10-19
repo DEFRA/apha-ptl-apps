@@ -12,11 +12,11 @@ namespace PTL.InternalWeb.Features.Participant;
 
 public class ParticipantController(IParticipantApiClient participantApiClient, ICustomerApiClient customerApiClient, ILookupApiClient lookupApiClient, ILogger<ParticipantController> logger) : Controller
 {
-    private static readonly Action<ILogger, string?, bool, int, int, Exception?> LogDisplayedParticipantListMessage =
-        LoggerMessage.Define<string?, bool, int, int>(
+    private static readonly Action<ILogger, bool, int, int, Exception?> LogDisplayedParticipantListMessage =
+        LoggerMessage.Define<bool, int, int>(
             LogLevel.Information,
             new EventId(1, nameof(LogDisplayedParticipantListMessage)),
-            "Displayed participant list: searchTerm={SearchTerm} includeInactive={IncludeInactive} page={Page} totalResults={TotalCount}");
+            "Displayed participant list: includeInactive={IncludeInactive} page={Page} totalResults={TotalCount}");
 
     private static readonly Action<ILogger, Guid, Exception?> LogParticipantNotFoundMessage =
         LoggerMessage.Define<Guid>(
@@ -48,11 +48,11 @@ public class ParticipantController(IParticipantApiClient participantApiClient, I
             new EventId(6, nameof(LogFailedToReactivateParticipantMessage)),
             "Failed to reactivate participant {ParticipantId}");
 
-    public async Task<IActionResult> Index(Guid customerId, string? searchTerm = null, bool includeInactive = false, int page = 1, int pageSize = PTL.SharedUI.Pagination.PaginationModel.DefaultPageSize, CancellationToken cancellationToken = default)
+    public async Task<IActionResult> Index(Guid customerId, bool includeInactive = false, int page = 1, int pageSize = PTL.SharedUI.Pagination.PaginationModel.DefaultPageSize, CancellationToken cancellationToken = default)
     {
-        var result = await participantApiClient.SearchParticipantsAsync(new ParticipantSearchRequest(customerId, searchTerm, includeInactive, page, pageSize), cancellationToken);
-        LogDisplayedParticipantListMessage(logger, searchTerm, includeInactive, page, result.TotalCount, null);
-        return View(new ParticipantListViewModel(customerId, searchTerm, includeInactive, page, pageSize, result.TotalCount, result.Items));
+        var result = await participantApiClient.SearchParticipantsAsync(new ParticipantSearchRequest(customerId, includeInactive, page, pageSize), cancellationToken);
+        LogDisplayedParticipantListMessage(logger, includeInactive, page, result.TotalCount, null);
+        return View(new ParticipantListViewModel(customerId, includeInactive, page, pageSize, result.TotalCount, result.Items));
     }
 
     public async Task<IActionResult> Details(Guid id, CancellationToken cancellationToken)

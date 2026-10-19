@@ -11,7 +11,7 @@
         CurrentPage = Model.Page,
         PageSize = Model.PageSize,
         TotalRecords = Model.TotalCount,
-        RouteValues = new Dictionary<string, object?> { ["searchTerm"] = Model.SearchTerm, ["status"] = Model.SelectedStatus }
+        RouteValues = new Dictionary<string, object?> { ["status"] = Model.SelectedStatus }
     };
 }
 
@@ -20,11 +20,6 @@
 
 <form method="get" asp-action="Index" class="govuk-!-margin-bottom-6">
     <div class="govuk-form-group">
-        <label class="govuk-label" for="searchTerm">Search</label>
-        <div class="govuk-hint">Matches Name, QAL Number, Organisation, Contact Name, Account Number, Country.</div>
-        <input class="govuk-input" id="searchTerm" name="searchTerm" value="@Model.SearchTerm" />
-    </div>
-    <div class="govuk-form-group">
         <label class="govuk-label" for="status">Status</label>
         <select class="govuk-select" id="status" name="status">
             <option value="@CustomerStatusFilter.Active" selected="@activeSelected">Active</option>
@@ -32,7 +27,7 @@
             <option value="@CustomerStatusFilter.All" selected="@allSelected">All</option>
         </select>
     </div>
-    <button class="govuk-button" data-module="govuk-button" type="submit">Search</button>
+    <button class="govuk-button" data-module="govuk-button" type="submit">Filter</button>
 </form>
 
 @if (Model.Customers.Count == 0)

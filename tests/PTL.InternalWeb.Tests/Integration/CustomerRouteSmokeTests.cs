@@ -129,11 +129,12 @@ public partial class CustomerRouteSmokeTests : IClassFixture<WebApplicationFacto
         _fakeApiClient.SearchResponse = new CustomerSearchResponse([], 0, 1, 20);
         var client = _factory.CreateClient();
 
-        var response = await client.GetAsync("/Customer/Index?searchTerm=nothing-matches");
+        var response = await client.GetAsync("/Customer/Index");
         var body = await response.Content.ReadAsStringAsync();
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Contains("There are no customers to display.", body);
+        Assert.DoesNotContain("searchTerm", body, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

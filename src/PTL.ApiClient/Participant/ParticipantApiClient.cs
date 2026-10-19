@@ -28,7 +28,7 @@ public sealed class ParticipantApiClient(HttpClient httpClient) : IParticipantAp
 
     public async Task<ParticipantSearchResponse> SearchParticipantsAsync(ParticipantSearchRequest request, CancellationToken cancellationToken = default)
     {
-        var query = $"searchTerm={Uri.EscapeDataString(request.SearchTerm ?? string.Empty)}&includeInactive={request.IncludeInactive}&page={request.Page}&pageSize={request.PageSize}";
+        var query = $"includeInactive={request.IncludeInactive}&page={request.Page}&pageSize={request.PageSize}";
         var result = await httpClient.GetFromJsonAsync<ParticipantSearchResponse>($"/api/customers/{request.CustomerId}/participants/search?{query}", cancellationToken);
         return result ?? new ParticipantSearchResponse([], 0, request.Page, request.PageSize);
     }

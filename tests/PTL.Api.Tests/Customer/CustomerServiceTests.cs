@@ -77,7 +77,7 @@ public class CustomerServiceTests
     }
 
     [Fact]
-    public async Task SearchCustomersAsync_FiltersByStatusAndSearchTermWithPaging()
+    public async Task SearchCustomersAsync_FiltersByStatusWithPaging()
     {
         var repository = new FakeCustomerRepository();
         var service = CreateService(repository);
@@ -88,71 +88,38 @@ public class CustomerServiceTests
         inactive.CustomerStatusId = Guid.NewGuid();
         await service.CreateCustomerAsync(inactive);
 
-        var activeResults = await service.SearchCustomersAsync(null, CustomerStatusFilter.Active, page: 1, pageSize: 20);
-        var searchResults = await service.SearchCustomersAsync("Beta", CustomerStatusFilter.All, page: 1, pageSize: 20);
-        var pagedResults = await service.SearchCustomersAsync(null, CustomerStatusFilter.All, page: 1, pageSize: 1);
+        var activeResults = await service.SearchCustomersAsync(CustomerStatusFilter.Active, page: 1, pageSize: 20);
+        var inactiveResults = await service.SearchCustomersAsync(CustomerStatusFilter.Inactive, page: 1, pageSize: 20);
+        var pagedResults = await service.SearchCustomersAsync(CustomerStatusFilter.All, page: 1, pageSize: 1);
+        var secondPage = await service.SearchCustomersAsync(CustomerStatusFilter.All, page: 2, pageSize: 2);
 
         Assert.Equal(2, activeResults.TotalCount);
-        Assert.Single(searchResults.Items);
-        Assert.Equal("Beta Labs", searchResults.Items[0].Name);
+        Assert.Equal(1, inactiveResults.TotalCount);
+        Assert.Equal("Gamma Labs", Assert.Single(inactiveResults.Items).Name);
         Assert.Equal(3, pagedResults.TotalCount);
         Assert.Single(pagedResults.Items);
-    }
-
-    // Field set mirrors legacy dbo.spgSearchCustomer (Contracts Admin/Search.aspx).
-    [Theory]
-    [InlineData("Alpha Labs")]
-    [InlineData("QAL/00001")]
-    [InlineData("ACC-12345")]
-    [InlineData("United Kingdom")]
-    [InlineData("Alice Example")]
-    public async Task SearchCustomersAsync_MatchesEverySearchableField(string searchTerm)
-    {
-        var repository = new FakeCustomerRepository();
-        var service = CreateService(repository);
-        var countryId = Guid.NewGuid();
-        repository.CountryNames[countryId] = "United Kingdom";
-
-        var match = ValidActiveCustomer("Alpha Labs");
-        match.AccountNumber = "ACC-12345";
-        match.CountryId = countryId;
-        await service.CreateCustomerAsync(match);
-        var other = ValidActiveCustomer("Beta Labs");
-        other.ContactName = "Bob Other";
-        await service.CreateCustomerAsync(other);
-
-        var results = await service.SearchCustomersAsync(searchTerm, CustomerStatusFilter.All, page: 1, pageSize: 20);
-
-        Assert.Single(results.Items);
-        Assert.Equal("Alpha Labs", results.Items[0].Name);
+        Assert.Equal(3, secondPage.TotalCount);
+        Assert.Single(secondPage.Items);
     }
 
     [Fact]
-    public async Task SearchCustomersAsync_IsCaseInsensitiveOnTheNewFields()
+    public async Task SearchCustomersAsync_PageBeyondLastPage_ReturnsEmptyItemsWithTotalCount()
     {
-        var repository = new FakeCustomerRepository();
-        var service = CreateService(repository);
-        var countryId = Guid.NewGuid();
-        repository.CountryNames[countryId] = "United Kingdom";
-
-        var customer = ValidActiveCustomer("Alpha Labs");
-        customer.AccountNumber = "ACC-12345";
-        customer.CountryId = countryId;
-        await service.CreateCustomerAsync(customer);
-
-        Assert.Single((await service.SearchCustomersAsync("acc-123", CustomerStatusFilter.All, 1, 20)).Items);
-        Assert.Single((await service.SearchCustomersAsync("united", CustomerStatusFilter.All, 1, 20)).Items);
-        Assert.Single((await service.SearchCustomersAsync("alice", CustomerStatusFilter.All, 1, 20)).Items);
-    }
-
-    [Fact]
-    public async Task SearchCustomersAsync_NoMatch_ReturnsEmptyResult()
-    {
-        var repository = new FakeCustomerRepository();
-        var service = CreateService(repository);
+        var service = CreateService(new FakeCustomerRepository());
         await service.CreateCustomerAsync(ValidActiveCustomer("Alpha Labs"));
 
-        var result = await service.SearchCustomersAsync("no-such-term", CustomerStatusFilter.All, 1, 20);
+        var result = await service.SearchCustomersAsync(CustomerStatusFilter.All, page: 5, pageSize: 20);
+
+        Assert.Empty(result.Items);
+        Assert.Equal(1, result.TotalCount);
+    }
+
+    [Fact]
+    public async Task SearchCustomersAsync_NoCustomers_ReturnsEmptyResult()
+    {
+        var service = CreateService(new FakeCustomerRepository());
+
+        var result = await service.SearchCustomersAsync(CustomerStatusFilter.All, 1, 20);
 
         Assert.Empty(result.Items);
         Assert.Equal(0, result.TotalCount);
@@ -167,7 +134,7 @@ public class CustomerServiceTests
         var service = CreateService(repository);
         await service.CreateCustomerAsync(ValidActiveCustomer("Alpha Labs"));
 
-        var result = await service.SearchCustomersAsync(null, CustomerStatusFilter.All, page, pageSize);
+        var result = await service.SearchCustomersAsync(CustomerStatusFilter.All, page, pageSize);
 
         Assert.Single(result.Items);
     }

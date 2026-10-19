@@ -1,0 +1,235 @@
+@model PTL.InternalWeb.Features.Search.SearchViewModel
+@using PTL.InternalWeb.Features.Search
+@{
+    ViewData["Title"] = "Search";
+
+    var customersActive = Model.ActiveTab == SearchTab.Customers;
+    var participantsActive = Model.ActiveTab == SearchTab.Participants;
+
+    // Same top-to-bottom order as the fields so the summary links follow the page layout.
+    string[] fieldOrder =
+    [
+        "Customer.QalNumber", "Customer.AccountNumber", "Customer.Name", "Customer.ContactName", "Customer.Organisation",
+        "Participant.LabCode", "Participant.LabName", "Participant.ContactName"
+    ];
+
+    var errors = ViewData.ModelState
+        .Where(entry => entry.Value?.Errors.Count > 0)
+        .SelectMany(entry => entry.Value!.Errors.Select(error => (Field: entry.Key, Message: error.ErrorMessage)))
+        .OrderBy(error => Array.IndexOf(fieldOrder, error.Field))
+        .ToList();
+
+    string? FirstError(string key) =>
+        ViewData.ModelState.TryGetValue(key, out var entry) ? entry.Errors.FirstOrDefault()?.ErrorMessage : null;
+
+    var qalError = FirstError("Customer.QalNumber");
+    var accountError = FirstError("Customer.AccountNumber");
+    var nameError = FirstError("Customer.Name");
+    var contactError = FirstError("Customer.ContactName");
+    var organisationError = FirstError("Customer.Organisation");
+    var labCodeError = FirstError("Participant.LabCode");
+    var labNameError = FirstError("Participant.LabName");
+    var participantContactError = FirstError("Participant.ContactName");
+}
+
+<govuk-error-summary errors="@errors" />
+
+<h1 class="govuk-heading-l">Search</h1>
+
+<p class="govuk-body">This page can be used to search for Customers and Participants.</p>
+
+@* govuk-tabs works without JavaScript (panels stack, each with its own form). With JavaScript the
+   component selects the tab named by the URL fragment, so each form's action carries its panel id
+   as a fragment and the searched tab is re-selected when the results page loads. *@
+<div class="govuk-tabs" data-module="govuk-tabs">
+    <h2 class="govuk-tabs__title">Contents</h2>
+    <ul class="govuk-tabs__list">
+        <li class="govuk-tabs__list-item @(customersActive ? "govuk-tabs__list-item--selected" : null)">
+            <a class="govuk-tabs__tab" href="#customers">Customers</a>
+        </li>
+        <li class="govuk-tabs__list-item @(participantsActive ? "govuk-tabs__list-item--selected" : null)">
+            <a class="govuk-tabs__tab" href="#participants">Participants</a>
+        </li>
+    </ul>
+
+    <div class="govuk-tabs__panel @(customersActive ? null : "govuk-tabs__panel--hidden")" id="customers">
+        <p class="govuk-body">Use the search criteria below to identify the required Customer by either QAL Number, Name, Contact Name, Organisation or Country.</p>
+
+        <form method="get" asp-action="Index" asp-fragment="customers">
+            <input type="hidden" name="tab" value="Customers" />
+
+            <div class="govuk-form-group @(qalError is null ? null : "govuk-form-group--error")">
+                <label class="govuk-label" for="Customer_QalNumber">QAL Number</label>
+                @if (qalError is not null)
+                {
+                    <p id="Customer_QalNumber-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @qalError</p>
+                }
+                <input asp-for="Customer.QalNumber" class="govuk-input govuk-input--width-10 @(qalError is null ? null : "govuk-input--error")" maxlength="10" aria-describedby="@(qalError is null ? null : "Customer_QalNumber-error")" />
+            </div>
+
+            <div class="govuk-form-group @(accountError is null ? null : "govuk-form-group--error")">
+                <label class="govuk-label" for="Customer_AccountNumber">Account Number</label>
+                @if (accountError is not null)
+                {
+                    <p id="Customer_AccountNumber-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @accountError</p>
+                }
+                <input asp-for="Customer.AccountNumber" class="govuk-input govuk-input--width-20 @(accountError is null ? null : "govuk-input--error")" maxlength="20" aria-describedby="@(accountError is null ? null : "Customer_AccountNumber-error")" />
+            </div>
+
+            <div class="govuk-form-group @(nameError is null ? null : "govuk-form-group--error")">
+                <label class="govuk-label" for="Customer_Name">Name</label>
+                @if (nameError is not null)
+                {
+                    <p id="Customer_Name-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @nameError</p>
+                }
+                <input asp-for="Customer.Name" class="govuk-input @(nameError is null ? null : "govuk-input--error")" maxlength="50" aria-describedby="@(nameError is null ? null : "Customer_Name-error")" />
+            </div>
+
+            <div class="govuk-form-group @(contactError is null ? null : "govuk-form-group--error")">
+                <label class="govuk-label" for="Customer_ContactName">Contact Name</label>
+                @if (contactError is not null)
+                {
+                    <p id="Customer_ContactName-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @contactError</p>
+                }
+                <input asp-for="Customer.ContactName" class="govuk-input @(contactError is null ? null : "govuk-input--error")" maxlength="50" aria-describedby="@(contactError is null ? null : "Customer_ContactName-error")" />
+            </div>
+
+            <div class="govuk-form-group @(organisationError is null ? null : "govuk-form-group--error")">
+                <label class="govuk-label" for="Customer_Organisation">Organisation</label>
+                @if (organisationError is not null)
+                {
+                    <p id="Customer_Organisation-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @organisationError</p>
+                }
+                <input asp-for="Customer.Organisation" class="govuk-input @(organisationError is null ? null : "govuk-input--error")" maxlength="50" aria-describedby="@(organisationError is null ? null : "Customer_Organisation-error")" />
+            </div>
+
+            <div class="govuk-form-group">
+                <label class="govuk-label" for="Customer_CountryId">Country</label>
+                <select asp-for="Customer.CountryId" asp-items="Model.CountryOptions" class="govuk-select"></select>
+            </div>
+
+            <button class="govuk-button" data-module="govuk-button" type="submit">Search</button>
+        </form>
+
+        @if (Model.CustomerResults is not null)
+        {
+            <hr class="govuk-section-break govuk-section-break--m govuk-section-break--visible">
+            <h2 class="govuk-heading-m">Search Results:</h2>
+
+            @if (Model.CustomerResults.Count == 0)
+            {
+                <p class="govuk-body">There are no Results to Display</p>
+            }
+            else
+            {
+                <table class="govuk-table">
+                    <caption class="govuk-table__caption govuk-visually-hidden">Customer search results</caption>
+                    <thead class="govuk-table__head">
+                        <tr class="govuk-table__row">
+                            <th scope="col" class="govuk-table__header">QAL Number</th>
+                            <th scope="col" class="govuk-table__header">Account Number</th>
+                            <th scope="col" class="govuk-table__header">Name</th>
+                            <th scope="col" class="govuk-table__header">Contact Name</th>
+                            <th scope="col" class="govuk-table__header">Organisation</th>
+                            <th scope="col" class="govuk-table__header">Country</th>
+                            <th scope="col" class="govuk-table__header">Details</th>
+                        </tr>
+                    </thead>
+                    <tbody class="govuk-table__body">
+                        @foreach (var row in Model.CustomerResults)
+                        {
+                            <tr class="govuk-table__row">
+                                <td class="govuk-table__cell">@row.QalNumber</td>
+                                <td class="govuk-table__cell">@row.AccountNumber</td>
+                                <td class="govuk-table__cell">@row.Name</td>
+                                <td class="govuk-table__cell">@row.ContactName</td>
+                                <td class="govuk-table__cell">@row.Organisation</td>
+                                <td class="govuk-table__cell">@row.Country</td>
+                                <td class="govuk-table__cell">
+                                    <a class="govuk-link" asp-controller="Customer" asp-action="Details" asp-route-id="@row.CustomerId">Details<span class="govuk-visually-hidden"> for @row.QalNumber @row.Name</span></a>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+        }
+    </div>
+
+    <div class="govuk-tabs__panel @(participantsActive ? null : "govuk-tabs__panel--hidden")" id="participants">
+        <p class="govuk-body">Use the search criteria below to identify the required Participant by either Lab Code, Lab Name or Contact Name.</p>
+
+        <form method="get" asp-action="Index" asp-fragment="participants">
+            <input type="hidden" name="tab" value="Participants" />
+
+            <div class="govuk-form-group @(labCodeError is null ? null : "govuk-form-group--error")">
+                <label class="govuk-label" for="Participant_LabCode">Lab Code</label>
+                @if (labCodeError is not null)
+                {
+                    <p id="Participant_LabCode-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @labCodeError</p>
+                }
+                <input asp-for="Participant.LabCode" class="govuk-input govuk-input--width-10 @(labCodeError is null ? null : "govuk-input--error")" maxlength="8" aria-describedby="@(labCodeError is null ? null : "Participant_LabCode-error")" />
+            </div>
+
+            <div class="govuk-form-group @(labNameError is null ? null : "govuk-form-group--error")">
+                <label class="govuk-label" for="Participant_LabName">Lab Name</label>
+                @if (labNameError is not null)
+                {
+                    <p id="Participant_LabName-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @labNameError</p>
+                }
+                <input asp-for="Participant.LabName" class="govuk-input @(labNameError is null ? null : "govuk-input--error")" maxlength="50" aria-describedby="@(labNameError is null ? null : "Participant_LabName-error")" />
+            </div>
+
+            <div class="govuk-form-group @(participantContactError is null ? null : "govuk-form-group--error")">
+                <label class="govuk-label" for="Participant_ContactName">Contact Name</label>
+                @if (participantContactError is not null)
+                {
+                    <p id="Participant_ContactName-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @participantContactError</p>
+                }
+                <input asp-for="Participant.ContactName" class="govuk-input @(participantContactError is null ? null : "govuk-input--error")" maxlength="50" aria-describedby="@(participantContactError is null ? null : "Participant_ContactName-error")" />
+            </div>
+
+            <button class="govuk-button" data-module="govuk-button" type="submit">Search</button>
+        </form>
+
+        @if (Model.ParticipantResults is not null)
+        {
+            <hr class="govuk-section-break govuk-section-break--m govuk-section-break--visible">
+            <h2 class="govuk-heading-m">Search Results:</h2>
+
+            @if (Model.ParticipantResults.Count == 0)
+            {
+                <p class="govuk-body">There are no Results to Display</p>
+            }
+            else
+            {
+                <table class="govuk-table">
+                    <caption class="govuk-table__caption govuk-visually-hidden">Participant search results</caption>
+                    <thead class="govuk-table__head">
+                        <tr class="govuk-table__row">
+                            <th scope="col" class="govuk-table__header">Lab Code</th>
+                            <th scope="col" class="govuk-table__header">Previous Lab Code</th>
+                            <th scope="col" class="govuk-table__header">Lab Name</th>
+                            <th scope="col" class="govuk-table__header">Contact Name</th>
+                            <th scope="col" class="govuk-table__header">Details</th>
+                        </tr>
+                    </thead>
+                    <tbody class="govuk-table__body">
+                        @foreach (var row in Model.ParticipantResults)
+                        {
+                            <tr class="govuk-table__row">
+                                <td class="govuk-table__cell">@row.LabCode</td>
+                                <td class="govuk-table__cell">@row.OldLabCode</td>
+                                <td class="govuk-table__cell">@row.LabName</td>
+                                <td class="govuk-table__cell">@row.ContactName</td>
+                                <td class="govuk-table__cell">
+                                    <a class="govuk-link" asp-controller="Participant" asp-action="Details" asp-route-id="@row.ParticipantId">Details<span class="govuk-visually-hidden"> for @row.LabCode @row.LabName</span></a>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+        }
+    </div>
+</div>
