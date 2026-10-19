@@ -272,6 +272,41 @@ public class CidmOpenIdConnectEventsTests
         Assert.Contains("text/html", httpContext.Response.ContentType);
     }
 
+    private sealed class CapturingStateDataFormat : ISecureDataFormat<AuthenticationProperties>
+    {
+        public AuthenticationProperties? Protected { get; private set; }
+
+        public string Protect(AuthenticationProperties data)
+        {
+            Protected = data;
+            return "protected-state";
+        }
+
+        public string Protect(AuthenticationProperties data, string? purpose) => Protect(data);
+
+        public AuthenticationProperties? Unprotect(string? protectedText) => new();
+
+        public AuthenticationProperties? Unprotect(string? protectedText, string? purpose) => new();
+    }
+
+    [Fact]
+    public async Task RedirectToIdentityProviderForSignOut_StateCarriesOnlyTheRedirectTarget_NotTheTokens()
+    {
+        var stateFormat = new CapturingStateDataFormat();
+        var properties = new AuthenticationProperties { RedirectUri = "/Account/SignedOut" };
+        properties.StoreTokens([new AuthenticationToken { Name = "id_token", Value = "a-very-long-id-token" }]);
+        var httpContext = new DefaultHttpContext { Response = { Body = new MemoryStream() } };
+        var context = new RedirectContext(httpContext, CreateScheme(), new OpenIdConnectOptions { StateDataFormat = stateFormat }, properties)
+        {
+            ProtocolMessage = new OpenIdConnectMessage { IssuerAddress = "https://cidm.test/signout", IdTokenHint = "id-token" }
+        };
+
+        await CreateEvents().RedirectToIdentityProviderForSignOut(context);
+
+        Assert.Equal("/Account/SignedOut", stateFormat.Protected!.RedirectUri);
+        Assert.DoesNotContain(stateFormat.Protected.Items.Keys, key => key.StartsWith(".Token", StringComparison.Ordinal));
+    }
+
     [Fact]
     public async Task RedirectToIdentityProviderForSignOut_NoIssuerAddress_DoesNotWriteResponse()
     {
