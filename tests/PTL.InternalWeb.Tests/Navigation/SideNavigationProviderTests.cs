@@ -5,6 +5,24 @@ namespace PTL.InternalWeb.Tests.Navigation;
 public class SideNavigationProviderTests
 {
     [Fact]
+    public void Build_ManageContracts_ListsSearchBetweenCustomersAndGroupAddresses()
+    {
+        var manageContracts = SideNavigationProvider.Build().Single(i => i.Text == "Manage Contracts");
+
+        var visible = manageContracts.Children.Select(c => c.Text).ToList();
+
+        var customers = visible.IndexOf("Customers");
+        Assert.True(customers >= 0);
+        Assert.Equal("Search", visible[customers + 1]);
+        Assert.Equal("Group Addresses", visible[customers + 2]);
+
+        var search = SideNavigationProvider.FindNode(SideNavigationProvider.Build(), "Search", "Index");
+        Assert.NotNull(search);
+        Assert.True(search!.IsEnabled);
+        Assert.False(search.IsHidden);
+    }
+
+    [Fact]
     public void Build_ReturnsNonEmptyTree()
     {
         var tree = SideNavigationProvider.Build();

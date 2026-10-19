@@ -6,7 +6,6 @@ namespace PTL.InternalWeb.Features.Participant;
 
 public sealed record ParticipantListViewModel(
     Guid CustomerId,
-    string? SearchTerm,
     bool IncludeInactive,
     int Page,
     int PageSize,

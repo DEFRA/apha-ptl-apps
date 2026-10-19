@@ -44,7 +44,7 @@ public class ParticipantControllerTests
         Guid.NewGuid(), string.Empty, string.Empty, string.Empty, string.Empty, true, false, null, null);
 
     [Fact]
-    public async Task Index_ReturnsViewWithSearchResults()
+    public async Task Index_ReturnsViewWithTheCustomersParticipants()
     {
         var customerId = Guid.NewGuid();
         var participantId = Guid.NewGuid();
@@ -58,7 +58,7 @@ public class ParticipantControllerTests
         };
         var controller = CreateController(apiClient);
 
-        var result = await controller.Index(customerId, "Sample", false, 1, 20, CancellationToken.None);
+        var result = await controller.Index(customerId, false, 1, 20, CancellationToken.None);
 
         var view = Assert.IsType<ViewResult>(result);
         var model = Assert.IsType<PTL.InternalWeb.Features.Participant.ParticipantListViewModel>(view.Model);

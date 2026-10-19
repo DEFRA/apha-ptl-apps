@@ -8,7 +8,7 @@ public interface ICustomerService
     Task<IReadOnlyList<CustomerSummaryEntity>> GetCustomersAsync(CustomerStatusFilter status, CancellationToken cancellationToken = default);
 
     // In-memory search/filter/paging over GetCustomersAsync's result set - see CustomerService for rationale.
-    Task<CustomerSearchResult> SearchCustomersAsync(string? searchTerm, CustomerStatusFilter status, int page, int pageSize, CancellationToken cancellationToken = default);
+    Task<CustomerSearchResult> SearchCustomersAsync(CustomerStatusFilter status, int page, int pageSize, CancellationToken cancellationToken = default);
 
     // Throws CustomerValidationException when business rules are violated.
     Task<Customer> CreateCustomerAsync(Customer customer, CancellationToken cancellationToken = default);

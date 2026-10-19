@@ -1000,6 +1000,8 @@ public static partial class DapperColumnMappings
 
         RegisterMonthSetupMappings();
 
+        RegisterSearchMappings();
+
         RegisterPackagingMappings();
 
         Map<DistributionCategoryItemEntity>(new(StringComparer.OrdinalIgnoreCase)
