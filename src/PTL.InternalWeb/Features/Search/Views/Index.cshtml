@@ -64,7 +64,7 @@
                 {
                     <p id="Customer_QalNumber-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @qalError</p>
                 }
-                <input asp-for="Customer.QalNumber" class="govuk-input govuk-input--width-10 @(qalError is null ? null : "govuk-input--error")" maxlength="10" aria-describedby="@(qalError is null ? null : "Customer_QalNumber-error")" />
+                <input asp-for="Customer.QalNumber" id="Customer_QalNumber" class="govuk-input govuk-input--width-10 @(qalError is null ? null : "govuk-input--error")" maxlength="10" aria-describedby="@(qalError is null ? null : "Customer_QalNumber-error")" />
             </div>
 
             <div class="govuk-form-group @(accountError is null ? null : "govuk-form-group--error")">
@@ -73,7 +73,7 @@
                 {
                     <p id="Customer_AccountNumber-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @accountError</p>
                 }
-                <input asp-for="Customer.AccountNumber" class="govuk-input govuk-input--width-20 @(accountError is null ? null : "govuk-input--error")" maxlength="20" aria-describedby="@(accountError is null ? null : "Customer_AccountNumber-error")" />
+                <input asp-for="Customer.AccountNumber" id="Customer_AccountNumber" class="govuk-input govuk-input--width-20 @(accountError is null ? null : "govuk-input--error")" maxlength="20" aria-describedby="@(accountError is null ? null : "Customer_AccountNumber-error")" />
             </div>
 
             <div class="govuk-form-group @(nameError is null ? null : "govuk-form-group--error")">
@@ -82,7 +82,7 @@
                 {
                     <p id="Customer_Name-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @nameError</p>
                 }
-                <input asp-for="Customer.Name" class="govuk-input @(nameError is null ? null : "govuk-input--error")" maxlength="50" aria-describedby="@(nameError is null ? null : "Customer_Name-error")" />
+                <input asp-for="Customer.Name" id="Customer_Name" class="govuk-input @(nameError is null ? null : "govuk-input--error")" maxlength="50" aria-describedby="@(nameError is null ? null : "Customer_Name-error")" />
             </div>
 
             <div class="govuk-form-group @(contactError is null ? null : "govuk-form-group--error")">
@@ -91,7 +91,7 @@
                 {
                     <p id="Customer_ContactName-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @contactError</p>
                 }
-                <input asp-for="Customer.ContactName" class="govuk-input @(contactError is null ? null : "govuk-input--error")" maxlength="50" aria-describedby="@(contactError is null ? null : "Customer_ContactName-error")" />
+                <input asp-for="Customer.ContactName" id="Customer_ContactName" class="govuk-input @(contactError is null ? null : "govuk-input--error")" maxlength="50" aria-describedby="@(contactError is null ? null : "Customer_ContactName-error")" />
             </div>
 
             <div class="govuk-form-group @(organisationError is null ? null : "govuk-form-group--error")">
@@ -100,12 +100,12 @@
                 {
                     <p id="Customer_Organisation-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @organisationError</p>
                 }
-                <input asp-for="Customer.Organisation" class="govuk-input @(organisationError is null ? null : "govuk-input--error")" maxlength="50" aria-describedby="@(organisationError is null ? null : "Customer_Organisation-error")" />
+                <input asp-for="Customer.Organisation" id="Customer_Organisation" class="govuk-input @(organisationError is null ? null : "govuk-input--error")" maxlength="50" aria-describedby="@(organisationError is null ? null : "Customer_Organisation-error")" />
             </div>
 
             <div class="govuk-form-group">
                 <label class="govuk-label" for="Customer_CountryId">Country</label>
-                <select asp-for="Customer.CountryId" asp-items="Model.CountryOptions" class="govuk-select"></select>
+                <select asp-for="Customer.CountryId" id="Customer_CountryId" asp-items="Model.CountryOptions" class="govuk-select"></select>
             </div>
 
             <button class="govuk-button" data-module="govuk-button" type="submit">Search</button>
@@ -168,7 +168,7 @@
                 {
                     <p id="Participant_LabCode-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @labCodeError</p>
                 }
-                <input asp-for="Participant.LabCode" class="govuk-input govuk-input--width-10 @(labCodeError is null ? null : "govuk-input--error")" maxlength="8" aria-describedby="@(labCodeError is null ? null : "Participant_LabCode-error")" />
+                <input asp-for="Participant.LabCode" id="Participant_LabCode" class="govuk-input govuk-input--width-10 @(labCodeError is null ? null : "govuk-input--error")" maxlength="8" aria-describedby="@(labCodeError is null ? null : "Participant_LabCode-error")" />
             </div>
 
             <div class="govuk-form-group @(labNameError is null ? null : "govuk-form-group--error")">
@@ -177,7 +177,7 @@
                 {
                     <p id="Participant_LabName-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @labNameError</p>
                 }
-                <input asp-for="Participant.LabName" class="govuk-input @(labNameError is null ? null : "govuk-input--error")" maxlength="50" aria-describedby="@(labNameError is null ? null : "Participant_LabName-error")" />
+                <input asp-for="Participant.LabName" id="Participant_LabName" class="govuk-input @(labNameError is null ? null : "govuk-input--error")" maxlength="50" aria-describedby="@(labNameError is null ? null : "Participant_LabName-error")" />
             </div>
 
             <div class="govuk-form-group @(participantContactError is null ? null : "govuk-form-group--error")">
@@ -186,7 +186,7 @@
                 {
                     <p id="Participant_ContactName-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @participantContactError</p>
                 }
-                <input asp-for="Participant.ContactName" class="govuk-input @(participantContactError is null ? null : "govuk-input--error")" maxlength="50" aria-describedby="@(participantContactError is null ? null : "Participant_ContactName-error")" />
+                <input asp-for="Participant.ContactName" id="Participant_ContactName" class="govuk-input @(participantContactError is null ? null : "govuk-input--error")" maxlength="50" aria-describedby="@(participantContactError is null ? null : "Participant_ContactName-error")" />
             </div>
 
             <button class="govuk-button" data-module="govuk-button" type="submit">Search</button>

@@ -23,11 +23,14 @@ public class SearchController(ISearchApiClient searchApiClient, ILookupApiClient
         customer ??= new CustomerSearchForm();
         participant ??= new ParticipantSearchForm();
 
-        var customerResults = tab == SearchTab.Customers && IsValid(nameof(SearchViewModel.Customer))
+        // Each tab's form submits only its own fields, so errors here belong to the searched tab.
+        var isValid = ModelState.IsValid;
+
+        var customerResults = tab == SearchTab.Customers && isValid
             ? await searchApiClient.SearchCustomersAsync(customer.ToCriteria(), cancellationToken)
             : null;
 
-        var participantResults = tab == SearchTab.Participants && IsValid(nameof(SearchViewModel.Participant))
+        var participantResults = tab == SearchTab.Participants && isValid
             ? await searchApiClient.SearchParticipantsAsync(participant.ToCriteria(), cancellationToken)
             : null;
 
@@ -47,8 +50,4 @@ public class SearchController(ISearchApiClient searchApiClient, ILookupApiClient
             ParticipantResults = participantResults,
         });
     }
-
-    // Only the submitted tab's fields can block its own search.
-    private bool IsValid(string prefix) =>
-        !ModelState.Any(entry => entry.Key.StartsWith(prefix + ".", StringComparison.Ordinal) && entry.Value?.Errors.Count > 0);
 }

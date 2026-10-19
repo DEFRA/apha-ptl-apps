@@ -150,29 +150,6 @@ public class SearchControllerTests
         Assert.Null(model.ParticipantResults);
     }
 
-    [Fact]
-    public async Task Index_ErrorsOnTheOtherTab_DoNotBlockTheSubmittedTabsSearch()
-    {
-        var (controller, search) = Create();
-        controller.ModelState.AddModelError("Participant.LabCode", "Lab Code must be 8 characters or fewer");
-
-        var model = ModelOf(await controller.Index(SearchTab.Customers, new CustomerSearchForm(), null, CancellationToken.None));
-
-        Assert.Single(search.CustomerSearches);
-        Assert.NotNull(model.CustomerResults);
-    }
-
-    [Fact]
-    public async Task Index_AnErrorKeyWithNoMessage_DoesNotBlockTheSearch()
-    {
-        var (controller, search) = Create();
-        controller.ModelState.SetModelValue("Customer.QalNumber", "x", "x");
-
-        await controller.Index(SearchTab.Customers, new CustomerSearchForm(), null, CancellationToken.None);
-
-        Assert.Single(search.CustomerSearches);
-    }
-
     [Theory]
     [InlineData("QalNumber", 10)]
     [InlineData("AccountNumber", 20)]
