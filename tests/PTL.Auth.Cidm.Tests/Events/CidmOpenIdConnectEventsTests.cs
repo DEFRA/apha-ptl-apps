@@ -183,6 +183,61 @@ public class CidmOpenIdConnectEventsTests
     }
 
     [Fact]
+    public async Task TokenValidated_TrimsBulkyClaims_ButKeepsTheOnesTheAppReadsAndTheResolvedOnes()
+    {
+        var identity = new ClaimsIdentity(
+        [
+            new Claim("contactId", "22222222-2222-2222-2222-222222222222"),
+            new Claim(ClaimTypes.Email, "jane@example.com"),
+            new Claim("currentRelationshipId", "23950a2d-c37d-43da-9fcb-0a4ce9aa11ee"),
+            new Claim("relationships", "23950a2d-c37d-43da-9fcb-0a4ce9aa11ee:bc19305a-f9b6-ea11-a812-000d3ab4653d:ABC Organisation2:0:Employee:0"),
+            new Claim(ClaimTypes.Role, "23950a2d-c37d-43da-9fcb-0a4ce9aa11ee:Participant:3"),
+            new Claim("sessionId", "bulky"),
+            new Claim("aud", "bulky")
+        ]);
+        var resolver = new FakeCidmExternalUserResolver(CidmExternalUserResolution.Allow(new Dictionary<string, string>
+        {
+            ["displayName"] = "Jane Doe",
+            ["sessionId"] = "added-by-resolver"
+        }));
+        var context = CreateTokenValidatedContext(new ClaimsPrincipal(identity), resolver);
+
+        await CreateEvents().TokenValidated(context);
+
+        Assert.Contains(identity.Claims, c => c.Type == ClaimTypes.Email);
+        Assert.Contains(identity.Claims, c => c.Type == "currentRelationshipId");
+        Assert.Contains(identity.Claims, c => c.Type == ClaimTypes.Role && c.Value == "Participant");
+        Assert.Contains(identity.Claims, c => c.Type == "cidm:relationship");
+        Assert.Contains(identity.Claims, c => c.Type == "cidm:role");
+        Assert.Contains(identity.Claims, c => c.Type == "displayName");
+        Assert.Contains(identity.Claims, c => c.Type == "sessionId" && c.Value == "added-by-resolver");
+        Assert.DoesNotContain(identity.Claims, c => c.Type == "contactId");
+        Assert.DoesNotContain(identity.Claims, c => c.Type == "relationships");
+        Assert.DoesNotContain(identity.Claims, c => c.Type == "aud");
+        Assert.DoesNotContain(identity.Claims, c => c.Type == "sessionId" && c.Value == "bulky");
+    }
+
+    [Fact]
+    public async Task TicketReceived_RemovesTheAccessToken_AndKeepsTheOthers()
+    {
+        var properties = new AuthenticationProperties();
+        properties.StoreTokens(
+        [
+            new AuthenticationToken { Name = "access_token", Value = "access" },
+            new AuthenticationToken { Name = "id_token", Value = "id" },
+            new AuthenticationToken { Name = "refresh_token", Value = "refresh" }
+        ]);
+        var ticket = new AuthenticationTicket(new ClaimsPrincipal(new ClaimsIdentity()), properties, "cidm");
+        var context = new TicketReceivedContext(new DefaultHttpContext(), CreateScheme(), new OpenIdConnectOptions(), ticket);
+
+        await CreateEvents().TicketReceived(context);
+
+        Assert.Null(properties.GetTokenValue("access_token"));
+        Assert.Equal("id", properties.GetTokenValue("id_token"));
+        Assert.Equal("refresh", properties.GetTokenValue("refresh_token"));
+    }
+
+    [Fact]
     public async Task RemoteFailure_HandlesResponseAndRedirectsToGenericErrorPage()
     {
         var httpContext = new DefaultHttpContext();

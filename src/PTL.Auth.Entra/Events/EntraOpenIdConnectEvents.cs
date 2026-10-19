@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using PTL.Auth.Entra.Claims;
 using PTL.Common.Auth;
 
 namespace PTL.Auth.Entra.Events;
@@ -13,6 +14,14 @@ namespace PTL.Auth.Entra.Events;
 /// </summary>
 public sealed partial class EntraOpenIdConnectEvents : OpenIdConnectEvents
 {
+    // Claims the app reads after sign-in, on top of the common identity claims.
+    private static readonly IReadOnlySet<string> RetainedClaimTypes = OpenIdConnectEventHelpers.RetainedClaims(
+        EntraClaimTypes.ObjectId,
+        EntraClaimTypes.ObjectIdLongClaimUri,
+        "sid",
+        "displayname",
+        "preferred_username");
+
     private readonly ILogger<EntraOpenIdConnectEvents> _logger;
 
     public EntraOpenIdConnectEvents(ILogger<EntraOpenIdConnectEvents> logger)
@@ -35,8 +44,11 @@ public sealed partial class EntraOpenIdConnectEvents : OpenIdConnectEvents
             ? null
             : async (principal, ct) => await resolver.ResolveAsync(principal, ct);
 
-        await OpenIdConnectEventHelpers.ResolveOrDenyAsync(context, identity, resolve);
+        await OpenIdConnectEventHelpers.ResolveOrDenyAsync(context, identity, resolve, RetainedClaimTypes);
     }
+
+    public override Task TicketReceived(TicketReceivedContext context) =>
+        OpenIdConnectEventHelpers.RemoveAccessTokenAsync(context);
 
     public override Task RemoteFailure(RemoteFailureContext context) =>
         OpenIdConnectEventHelpers.HandleRemoteFailureAsync(context, LogAuthenticationFailed);

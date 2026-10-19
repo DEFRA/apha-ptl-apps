@@ -19,6 +19,16 @@ namespace PTL.Auth.Cidm.Events;
 /// </summary>
 public sealed partial class CidmOpenIdConnectEvents : OpenIdConnectEvents
 {
+    // Claims the app reads after sign-in, on top of the common identity claims. The raw relationships/roles
+    // arrays are dropped because the parsed claims below carry the same data.
+    private static readonly IReadOnlySet<string> RetainedClaimTypes = OpenIdConnectEventHelpers.RetainedClaims(
+        ClaimTypes.Role,
+        "firstName",
+        "lastName",
+        CidmClaimTypes.CurrentRelationshipId,
+        CidmClaimTypes.Relationship,
+        CidmClaimTypes.Role);
+
     private readonly CidmOptions _cidmOptions;
     private readonly ILogger<CidmOpenIdConnectEvents> _logger;
 
@@ -90,8 +100,11 @@ public sealed partial class CidmOpenIdConnectEvents : OpenIdConnectEvents
             ? null
             : async (principal, ct) => await resolver.ResolveAsync(principal, ct);
 
-        await OpenIdConnectEventHelpers.ResolveOrDenyAsync(context, identity, resolve);
+        await OpenIdConnectEventHelpers.ResolveOrDenyAsync(context, identity, resolve, RetainedClaimTypes);
     }
+
+    public override Task TicketReceived(TicketReceivedContext context) =>
+        OpenIdConnectEventHelpers.RemoveAccessTokenAsync(context);
 
     public override Task RemoteFailure(RemoteFailureContext context) =>
         OpenIdConnectEventHelpers.HandleRemoteFailureAsync(context, LogAuthenticationFailed);
