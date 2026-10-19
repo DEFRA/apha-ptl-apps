@@ -34,8 +34,9 @@ ENV ASPNETCORE_URLS=http://+:8081 \
 
 # FortiGate egress performs TLS inspection on outbound calls to CIDM/Azure AD B2C (b2clogin.com) -
 # without trusting its inspection CA, the OIDC handler's metadata/JWKS fetch fails with PartialChain.
+COPY ["build/certs/fortigate-root-ca.cer", "C:/certs/fortigate-root-ca.cer"]
 COPY ["build/certs/fortigate-ca.cer", "C:/certs/fortigate-ca.cer"]
-RUN certutil -addstore -f Root C:/certs/fortigate-ca.cer
+RUN certutil -addstore -f Root C:/certs/fortigate-root-ca.cer && certutil -addstore -f CA C:/certs/fortigate-ca.cer
 
 USER $APP_UID
 COPY --from=build /app/publish .
