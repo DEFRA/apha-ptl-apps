@@ -8,11 +8,11 @@ public sealed class CustomerService(
     IPendingCustomerUpdateRepository pendingCustomerUpdateRepository,
     ILogger<CustomerService> logger) : ICustomerService
 {
-    private static readonly Action<ILogger, string?, CustomerStatusFilter, int, int, int, Exception?> LogCustomerSearchMessage =
-        LoggerMessage.Define<string?, CustomerStatusFilter, int, int, int>(
+    private static readonly Action<ILogger, CustomerStatusFilter, int, int, int, Exception?> LogCustomerSearchMessage =
+        LoggerMessage.Define<CustomerStatusFilter, int, int, int>(
             LogLevel.Information,
             new EventId(1, nameof(LogCustomerSearchMessage)),
-            "Customer search: searchTerm={SearchTerm} status={Status} page={Page} pageSize={PageSize} totalResults={TotalCount}");
+            "Customer list: status={Status} page={Page} pageSize={PageSize} totalResults={TotalCount}");
 
     private static readonly Action<ILogger, Guid, string, Exception?> LogCreatedCustomerMessage =
         LoggerMessage.Define<Guid, string>(
@@ -44,30 +44,17 @@ public sealed class CustomerService(
     public Task<IReadOnlyList<CustomerSummaryEntity>> GetCustomersAsync(CustomerStatusFilter status, CancellationToken cancellationToken = default) =>
         customerRepository.GetSummariesAsync(status, cancellationToken);
 
-    public async Task<CustomerSearchResult> SearchCustomersAsync(string? searchTerm, CustomerStatusFilter status, int page, int pageSize, CancellationToken cancellationToken = default)
+    public async Task<CustomerSearchResult> SearchCustomersAsync(CustomerStatusFilter status, int page, int pageSize, CancellationToken cancellationToken = default)
     {
         page = page < 1 ? 1 : page;
         pageSize = pageSize is < 1 or > 200 ? 20 : pageSize;
 
         var all = await customerRepository.GetSummariesAsync(status, cancellationToken);
 
-        // Field set matches legacy dbo.spgSearchCustomer (Search.aspx), except that a single term
-        // is ORed across the fields rather than ANDed across separate inputs.
-        var filtered = string.IsNullOrWhiteSpace(searchTerm)
-            ? all
-            : all.Where(c =>
-                c.Name.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
-                c.QalNumber.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
-                c.Organisation.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
-                c.ContactName.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
-                c.AccountNumber.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
-                c.Country.Contains(searchTerm, StringComparison.OrdinalIgnoreCase))
-                .ToList();
+        var totalCount = all.Count;
+        var page1 = all.Skip((page - 1) * pageSize).Take(pageSize).ToList();
 
-        var totalCount = filtered.Count;
-        var page1 = filtered.Skip((page - 1) * pageSize).Take(pageSize).ToList();
-
-        LogCustomerSearchMessage(logger, searchTerm, status, page, pageSize, totalCount, null);
+        LogCustomerSearchMessage(logger, status, page, pageSize, totalCount, null);
 
         return new CustomerSearchResult(page1, totalCount);
     }

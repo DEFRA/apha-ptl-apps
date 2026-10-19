@@ -29,20 +29,6 @@ body {
 
 /* Shared layout styling */
 
-/* Sign out must be a form post for CSRF protection; reset button chrome so it reads as a service navigation link */
-.app-signout-form {
-  display: inline;
-  margin: 0;
-}
-
-.app-signout-button {
-  background: none;
-  border: 0;
-  padding: 0;
-  font: inherit;
-  cursor: pointer;
-}
-
 .govuk-header__container {
   min-height: 56px;
   display: flex;

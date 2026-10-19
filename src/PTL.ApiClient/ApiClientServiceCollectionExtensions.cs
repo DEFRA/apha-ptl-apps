@@ -54,6 +54,13 @@ public static class ApiClientServiceCollectionExtensions
             .AddHttpMessageHandler<CorrelationIdDelegatingHandler>()
             .AddStandardResilienceHandler();
 
+        services.AddHttpClient<ISearchApiClient, SearchApiClient>(client =>
+        {
+            client.BaseAddress = new Uri(apiBaseUrl);
+        })
+            .AddHttpMessageHandler<CorrelationIdDelegatingHandler>()
+            .AddStandardResilienceHandler();
+
         services.AddHttpClient<IParticipantSchemeApiClient, ParticipantSchemeApiClient>(client =>
         {
             client.BaseAddress = new Uri(apiBaseUrl);

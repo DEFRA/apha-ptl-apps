@@ -140,7 +140,7 @@ internal sealed class FakePostedParticipantService : IParticipantService
     public Task<IReadOnlyList<ParticipantSummaryEntity>> GetParticipantsAsync(Guid customerId, bool includeInactive = false, CancellationToken cancellationToken = default) =>
         throw new NotSupportedException();
 
-    public Task<ParticipantSearchResult> SearchParticipantsAsync(Guid customerId, string? searchTerm, bool includeInactive, int page, int pageSize, CancellationToken cancellationToken = default) =>
+    public Task<ParticipantSearchResult> SearchParticipantsAsync(Guid customerId, bool includeInactive, int page, int pageSize, CancellationToken cancellationToken = default) =>
         throw new NotSupportedException();
 
     public Task<ParticipantEntity> CreateParticipantAsync(ParticipantEntity participant, CancellationToken cancellationToken = default) =>

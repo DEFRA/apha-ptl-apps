@@ -15,11 +15,11 @@ public class CustomerController(ICustomerApiClient customerApiClient, ILookupApi
     // Legacy DropDownXxx.Items.Insert(0, New ListItem("- Please Select -", Guid.Empty)) placeholder.
     private const string PleaseSelectOptionText = "- Please Select -";
 
-    private static readonly Action<ILogger, string?, CustomerStatusFilter, int, int, Exception?> LogDisplayedCustomerListMessage =
-        LoggerMessage.Define<string?, CustomerStatusFilter, int, int>(
+    private static readonly Action<ILogger, CustomerStatusFilter, int, int, Exception?> LogDisplayedCustomerListMessage =
+        LoggerMessage.Define<CustomerStatusFilter, int, int>(
             LogLevel.Information,
             new EventId(1, nameof(LogDisplayedCustomerListMessage)),
-            "Displayed customer list: searchTerm={SearchTerm} status={Status} page={Page} totalResults={TotalCount}");
+            "Displayed customer list: status={Status} page={Page} totalResults={TotalCount}");
 
     private static readonly Action<ILogger, Guid, Exception?> LogCustomerNotFoundMessage =
         LoggerMessage.Define<Guid>(
@@ -52,15 +52,14 @@ public class CustomerController(ICustomerApiClient customerApiClient, ILookupApi
             "Updated customer {CustomerId}");
 
     public async Task<IActionResult> Index(
-        string? searchTerm,
         CustomerStatusFilter status = CustomerStatusFilter.Active,
         int page = 1,
         int pageSize = PTL.SharedUI.Pagination.PaginationModel.DefaultPageSize,
         CancellationToken cancellationToken = default)
     {
-        var result = await customerApiClient.SearchCustomersAsync(new CustomerSearchRequest(searchTerm, status, page, pageSize), cancellationToken);
-        LogDisplayedCustomerListMessage(logger, searchTerm, status, page, result.TotalCount, null);
-        return View(new CustomerListViewModel(searchTerm, status, result.Page, result.PageSize, result.TotalCount, result.Items));
+        var result = await customerApiClient.SearchCustomersAsync(new CustomerSearchRequest(status, page, pageSize), cancellationToken);
+        LogDisplayedCustomerListMessage(logger, status, page, result.TotalCount, null);
+        return View(new CustomerListViewModel(status, result.Page, result.PageSize, result.TotalCount, result.Items));
     }
 
     public async Task<IActionResult> Details(Guid id, CancellationToken cancellationToken)

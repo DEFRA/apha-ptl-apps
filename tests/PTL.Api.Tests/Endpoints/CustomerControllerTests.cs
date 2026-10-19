@@ -132,18 +132,20 @@ public class CustomerControllerTests
     }
 
     [Fact]
-    public async Task SearchCustomers_FiltersAndPagesResults()
+    public async Task SearchCustomers_FiltersByStatusAndPagesResults()
     {
         var controller = CreateController(new FakeCustomerRepository());
         await controller.CreateCustomer(ValidCreateRequest("Alpha Labs"), CancellationToken.None);
         await controller.CreateCustomer(ValidCreateRequest("Beta Labs"), CancellationToken.None);
 
-        var result = await controller.SearchCustomers(new CustomerSearchRequest("Beta", CustomerStatusFilter.Active, 1, 20), CancellationToken.None);
+        var result = await controller.SearchCustomers(new CustomerSearchRequest(CustomerStatusFilter.Active, 2, 1), CancellationToken.None);
 
         var ok = Assert.IsType<OkObjectResult>(result.Result);
         var response = Assert.IsType<CustomerSearchResponse>(ok.Value);
-        Assert.Single(response.Items);
-        Assert.Equal("Beta Labs", response.Items[0].Name);
+        Assert.Equal(2, response.TotalCount);
+        Assert.Equal(2, response.Page);
+        Assert.Equal(1, response.PageSize);
+        Assert.Equal("Beta Labs", Assert.Single(response.Items).Name);
     }
 
     [Fact]

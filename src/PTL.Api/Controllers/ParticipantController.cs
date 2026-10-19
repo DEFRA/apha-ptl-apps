@@ -23,9 +23,9 @@ public sealed class ParticipantController(IParticipantService participantService
     }
 
     [HttpGet("customers/{customerId:guid}/participants/search")]
-    public async Task<ActionResult<ParticipantSearchResponse>> SearchParticipants(Guid customerId, [FromQuery] string? searchTerm, [FromQuery] bool includeInactive = false, [FromQuery] int page = 1, [FromQuery] int pageSize = 20, CancellationToken cancellationToken = default)
+    public async Task<ActionResult<ParticipantSearchResponse>> SearchParticipants(Guid customerId, [FromQuery] bool includeInactive = false, [FromQuery] int page = 1, [FromQuery] int pageSize = 20, CancellationToken cancellationToken = default)
     {
-        var result = await participantService.SearchParticipantsAsync(customerId, searchTerm, includeInactive, page, pageSize, cancellationToken);
+        var result = await participantService.SearchParticipantsAsync(customerId, includeInactive, page, pageSize, cancellationToken);
         return Ok(new ParticipantSearchResponse(result.Items.Select(ToSummaryResponse).ToList(), result.TotalCount, page, pageSize));
     }
 

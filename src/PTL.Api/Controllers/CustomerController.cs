@@ -38,11 +38,11 @@ public sealed class CustomerController(ICustomerService customerService, ILogger
         return Ok(ToResponse(customer));
     }
 
-    // GET /api/customers/search?searchTerm=...&status=Active|Inactive|All&page=1&pageSize=20
+    // GET /api/customers/search?status=Active|Inactive|All&page=1&pageSize=20 - the Customers list (legacy CustomerList.aspx).
     [HttpGet("search")]
     public async Task<ActionResult<CustomerSearchResponse>> SearchCustomers([FromQuery] CustomerSearchRequest request, CancellationToken cancellationToken)
     {
-        var result = await customerService.SearchCustomersAsync(request.SearchTerm, request.Status, request.Page, request.PageSize, cancellationToken);
+        var result = await customerService.SearchCustomersAsync(request.Status, request.Page, request.PageSize, cancellationToken);
         return Ok(new CustomerSearchResponse(result.Items.Select(ToSummaryResponse).ToList(), result.TotalCount, request.Page, request.PageSize));
     }
 
