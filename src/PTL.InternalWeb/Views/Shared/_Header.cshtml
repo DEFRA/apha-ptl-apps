@@ -1,3 +1,5 @@
+@using PTL.Common.Auth
+@using PTL.InternalWeb.Features.Account
 @model (string ServiceName, string? LogoStyle)
 <header class="govuk-template__header">
     <div class="govuk-header">
@@ -16,13 +18,14 @@
             </div>
             @if (User.Identity is not null && User.Identity.IsAuthenticated)
             {
-                <div class="app-account-panel">
-                    <span class="govuk-body govuk-!-margin-bottom-0">Signed in as: <strong>@User.Identity.Name</strong></span>
-                    <form asp-controller="Account" asp-action="Logout" method="post" class="app-signout-form">
-                        @Html.AntiForgeryToken()
-                        <button type="submit" class="app-signout-button govuk-link govuk-!-margin-bottom-0">Sign out</button>
-                    </form>
-                </div>
+                // Entra id_token claims first; the tblUsers name resolved at sign-in is a last resort.
+                var displayName = User.GetDisplayName(lastResortClaimType: InternalUserClaimTypes.FullName);
+                if (!string.IsNullOrWhiteSpace(displayName))
+                {
+                    <div class="app-account-panel">
+                        <span class="govuk-body govuk-!-margin-bottom-0">Signed in as: <strong>@displayName</strong></span>
+                    </div>
+                }
             }
         </div>
     </section>
