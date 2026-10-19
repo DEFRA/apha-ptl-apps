@@ -23,6 +23,10 @@ public interface IDistributionService
 
     Task<MonthlyDistributionScheduleSaveOutcome> SaveMonthlyDistributionScheduleAsync(
         int yearId, int monthId, IReadOnlyList<MonthlyDistributionScheduleRowUpdate> rows, CancellationToken cancellationToken = default);
+
+    // Legacy MonthlyDistribution.CreateMonthlyDistribution(yearId, monthId): true when the month was
+    // initialised, false when it already existed and nothing was written.
+    Task<bool> InitialiseMonthAsync(int yearId, int monthId, CancellationToken cancellationToken = default);
 }
 
 public sealed class DistributionService(IDistributionRepository distributionRepository) : IDistributionService
@@ -38,6 +42,13 @@ public sealed class DistributionService(IDistributionRepository distributionRepo
         var distributionYears = await distributionRepository.GetDistributionYearsAsync(cancellationToken);
         return DistributionYearOptionsBuilder.Build(distributionYears, DateTime.UtcNow);
     }
+
+    public Task<bool> InitialiseMonthAsync(int yearId, int monthId, CancellationToken cancellationToken = default) =>
+        distributionRepository.InitialiseMonthAsync(
+            yearId,
+            monthId,
+            (schemes, participants) => MonthlyDistributionPlanner.Build(yearId, monthId, schemes, participants),
+            cancellationToken);
 
     public Task<(Guid MonthlyDistributionId, IReadOnlyList<MonthlyDistributionSchemeEntity> Schemes)?> GetMonthlyDistributionSchedulesAsync(
         int yearId, int monthId, CancellationToken cancellationToken = default) =>

@@ -70,6 +70,17 @@ public class ViewCommentsRenderTests : IClassFixture<WebApplicationFactory<Progr
     private static bool HasUploadInput(string html) => html.Contains("name=\"file\" type=\"file\"", StringComparison.Ordinal);
 
     [Fact]
+    public async Task Get_ShowsThePageNameAsTheH1AndTheDistributionAsTheH2()
+    {
+        Seed();
+
+        var html = MainContent(await GetHtmlAsync());
+
+        Assert.Contains("<h1 class=\"govuk-heading-l\">View Comments</h1>", html, StringComparison.Ordinal);
+        Assert.Contains("<h2 class=\"govuk-heading-m\">D1a/S1 BT: Brucella</h2>", html, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Get_NoAttachments_ShowsTheUploadInputSaveCancelAndSubmit()
     {
         Seed();
@@ -144,6 +155,20 @@ public class ViewCommentsRenderTests : IClassFixture<WebApplicationFactory<Progr
 
         Assert.DoesNotContain("saved.pdf", html, StringComparison.Ordinal);
         Assert.True(HasUploadInput(html));
+    }
+
+    [Fact]
+    public async Task Post_FirstSaveThatNeedsAnAudit_PostsIsAuditStepTrueFromTheAuditForm()
+    {
+        Seed();
+        _apiClient.CommentsSaveResult = new TestConsultantCommentsSaveResult(false, true, "Comments for D1a/S1", new Dictionary<string, string>());
+
+        // The browser posts the editing form's hidden IsAuditStep=False; the audit form must not echo that back.
+        var html = MainContent(await PostHtmlAsync(("command", "save"), ("IsAuditStep", "False")));
+
+        Assert.Contains("<h1 class=\"govuk-heading-l\">Audit Trail</h1>", html, StringComparison.Ordinal);
+        Assert.Matches("name=\"IsAuditStep\" value=\"true\"", html);
+        Assert.DoesNotMatch("name=\"IsAuditStep\" value=\"False\"", html);
     }
 
     [Theory]

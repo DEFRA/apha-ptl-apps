@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using PTL.Contracts.Distribution;
+using PTL.InternalWeb.Confirmation;
 using PTL.SharedUI.Notifications;
 
 namespace PTL.InternalWeb.Features.Distribution;
@@ -14,7 +15,7 @@ public sealed partial class DistributionController
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Tabulations(
-        int year, int monthId, string? command, string? stage, bool confirmed, string[]? staged, CancellationToken cancellationToken)
+        int year, int monthId, string? command, string? stage, string? confirmation, string[]? staged, CancellationToken cancellationToken)
     {
         var stagedSends = ParseStaged(staged);
 
@@ -28,6 +29,7 @@ public sealed partial class DistributionController
         {
             if (await distributionApiClient.SaveTabulationsAsync(year, monthId, stagedSends, cancellationToken))
             {
+                TempData.SetNotification(NotificationType.Success, "Tabulations updated successfully.");
                 return RedirectToAction(nameof(Index), new { year });
             }
 
@@ -35,17 +37,18 @@ public sealed partial class DistributionController
             return RedirectToAction(nameof(Tabulations), new { year, monthId });
         }
 
-        if (ParseStaged(stage is null ? [] : [stage]) is [var send])
+        // Cancel on the confirmation page posts the form back declined: the send is dropped and the
+        // page redisplays with only the earlier staged sends.
+        if (!ConfirmationFlow.IsCancelled(confirmation) && ParseStaged(stage is null ? [] : [stage]) is [var send])
         {
-            var confirmation = await distributionApiClient.StageTabulationSendAsync(
+            var sendConfirmation = await distributionApiClient.StageTabulationSendAsync(
                 year, monthId, new TabulationStageRequest(stagedSends, send.MonthlyDistributionSchemeId, send.Command), cancellationToken);
 
-            if (confirmation is not null)
+            if (sendConfirmation is not null)
             {
-                if (confirmation.ConfirmationQuestion.Length > 0 && !confirmed)
+                if (sendConfirmation.ConfirmationQuestion.Length > 0 && !ConfirmationFlow.IsConfirmed(confirmation))
                 {
-                    ViewData[Navigation.BreadcrumbRouteValues.Action] = nameof(Tabulations);
-                    return View("SendTabulation", new TabulationSendViewModel { YearId = year, MonthId = monthId, Send = confirmation, Staged = stagedSends });
+                    return this.ConfirmationPage(ToSendConfirmationPage(sendConfirmation), nameof(Tabulations));
                 }
 
                 stagedSends.Add(send);
@@ -74,12 +77,14 @@ public sealed partial class DistributionController
             .Select(v => v.Split(':', 2))
             .Where(p => p.Length == 2 && Guid.TryParse(p[0], out _) && p[1].Length > 0)
             .Select(p => new TabulationStagedSendRequest(Guid.Parse(p[0]), p[1]))];
-}
 
-public sealed class TabulationSendViewModel
-{
-    public required int YearId { get; init; }
-    public required int MonthId { get; init; }
-    public required TabulationSendResponse Send { get; init; }
-    public IReadOnlyList<TabulationStagedSendRequest> Staged { get; init; } = [];
+    // The legacy confirm() question is the heading. Cancel posts the form back so earlier staged sends are kept.
+    private static ConfirmationPageViewModel ToSendConfirmationPage(TabulationSendResponse send) => new()
+    {
+        Title = send.ConfirmationQuestion,
+        PageTitle = send.ActionText,
+        Caption = $"{send.DistributionReferenceFull} {send.SchemeNameFull}",
+        IsWarningTitle = send.ConfirmationQuestion.Contains("Discard", StringComparison.Ordinal),
+        ConfirmText = "OK",
+    };
 }

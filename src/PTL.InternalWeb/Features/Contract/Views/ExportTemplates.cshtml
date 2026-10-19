@@ -45,8 +45,7 @@
                     <td class="govuk-table__cell">
                         <form class="ptl-inline-form" method="post" asp-action="DeleteExportTemplate"
                               asp-route-fileId="@template.FileId" asp-route-documentType="@Model.DocumentType">
-                            <button class="govuk-link ptl-link-button" type="submit"
-                                    onclick="return confirm('@ExportTemplatesViewModel.DeleteConfirmation');">Delete</button>
+                            <button class="govuk-link ptl-link-button" type="submit">Delete</button>
                         </form>
                     </td>
                     <td class="govuk-table__cell">

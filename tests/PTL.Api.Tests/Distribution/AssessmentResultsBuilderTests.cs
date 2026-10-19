@@ -38,6 +38,7 @@ public class AssessmentResultsBuilderTests
             result.Scores.Select(s => (s.Score, s.Label, s.Frequency)));
         Assert.Equal("Number of samples assessed: 4", result.Titles[6]);
         Assert.Equal("Average score: 3.5", result.Titles[7]);
+        Assert.Equal("D1a/S1: Brucella", result.DistributionHeading);
     }
 
     [Fact]

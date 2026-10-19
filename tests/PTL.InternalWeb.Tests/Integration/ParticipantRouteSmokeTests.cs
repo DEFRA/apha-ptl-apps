@@ -97,6 +97,7 @@ public partial class ParticipantRouteSmokeTests : IClassFixture<WebApplicationFa
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Contains("There are no participants to display.", body);
+        Assert.DoesNotContain("searchTerm", body, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

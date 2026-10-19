@@ -84,6 +84,37 @@ public class ParticipantControllerTests
     }
 
     [Fact]
+    public async Task SearchParticipants_ReturnsPagedSummariesForTheCustomer()
+    {
+        var customerId = Guid.NewGuid();
+        var controller = CreateController(new FakeParticipantRepository());
+        await controller.CreateParticipant(ValidCreateRequest(customerId, "Alpha Lab"), CancellationToken.None);
+        await controller.CreateParticipant(ValidCreateRequest(customerId, "Beta Lab"), CancellationToken.None);
+        await controller.CreateParticipant(ValidCreateRequest(Guid.NewGuid(), "Other Lab"), CancellationToken.None);
+
+        var result = await controller.SearchParticipants(customerId, includeInactive: false, page: 2, pageSize: 1, cancellationToken: CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var response = Assert.IsType<ParticipantSearchResponse>(ok.Value);
+        Assert.Equal(2, response.TotalCount);
+        Assert.Equal(2, response.Page);
+        Assert.Equal(1, response.PageSize);
+        Assert.Single(response.Items);
+    }
+
+    [Fact]
+    public async Task SearchParticipants_NoParticipants_ReturnsEmptyResponse()
+    {
+        var controller = CreateController(new FakeParticipantRepository());
+
+        var result = await controller.SearchParticipants(Guid.NewGuid(), cancellationToken: CancellationToken.None);
+
+        var response = Assert.IsType<ParticipantSearchResponse>(Assert.IsType<OkObjectResult>(result.Result).Value);
+        Assert.Empty(response.Items);
+        Assert.Equal(0, response.TotalCount);
+    }
+
+    [Fact]
     public async Task UpdateParticipant_InvalidRequest_ReturnsValidationProblem()
     {
         var repository = new FakeParticipantRepository();
@@ -139,19 +170,20 @@ public class ParticipantControllerTests
     }
 
     [Fact]
-    public async Task SearchParticipants_FiltersAndPagesResults()
+    public async Task SearchParticipants_FiltersByStatusAndPagesResults()
     {
         var controller = CreateController(new FakeParticipantRepository());
         var customerId = Guid.NewGuid();
         await controller.CreateParticipant(ValidCreateRequest(customerId, "Alpha Lab"), CancellationToken.None);
-        await controller.CreateParticipant(ValidCreateRequest(customerId, "Beta Lab"), CancellationToken.None);
+        await controller.CreateParticipant(ValidCreateRequest(customerId, "Beta Lab") with { IsActive = false }, CancellationToken.None);
 
-        var result = await controller.SearchParticipants(customerId, "Beta", includeInactive: false, page: 1, pageSize: 20, CancellationToken.None);
+        var activeOnly = await controller.SearchParticipants(customerId, includeInactive: false, page: 1, pageSize: 20, cancellationToken: CancellationToken.None);
+        var everyone = await controller.SearchParticipants(customerId, includeInactive: true, page: 1, pageSize: 20, cancellationToken: CancellationToken.None);
 
-        var ok = Assert.IsType<OkObjectResult>(result.Result);
-        var response = Assert.IsType<ParticipantSearchResponse>(ok.Value);
-        Assert.Single(response.Items);
-        Assert.Equal("Beta Lab", response.Items[0].LabName);
+        var activeResponse = Assert.IsType<ParticipantSearchResponse>(Assert.IsType<OkObjectResult>(activeOnly.Result).Value);
+        Assert.Equal("Alpha Lab", Assert.Single(activeResponse.Items).LabName);
+        var allResponse = Assert.IsType<ParticipantSearchResponse>(Assert.IsType<OkObjectResult>(everyone.Result).Value);
+        Assert.Equal(2, allResponse.TotalCount);
     }
 
     [Fact]

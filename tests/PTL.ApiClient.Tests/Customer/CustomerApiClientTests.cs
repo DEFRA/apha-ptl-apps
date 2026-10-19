@@ -39,14 +39,14 @@ public class CustomerApiClientTests
         const string json = """{"items":[],"totalCount":0,"page":1,"pageSize":20}""";
         var client = CreateClient(HttpStatusCode.OK, json);
 
-        var result = await client.SearchCustomersAsync(new CustomerSearchRequest("test", CustomerStatusFilter.Active, 1, 20));
+        var result = await client.SearchCustomersAsync(new CustomerSearchRequest(CustomerStatusFilter.Active, 1, 20));
 
         Assert.Empty(result.Items);
         Assert.Equal(0, result.TotalCount);
     }
 
     [Fact]
-    public async Task SearchCustomersAsync_WithNullSearchTerm_ReturnsDeserializedSearchResponse()
+    public async Task SearchCustomersAsync_DefaultRequest_ReturnsDeserializedSearchResponse()
     {
         const string json = """{"items":[],"totalCount":0,"page":1,"pageSize":20}""";
         var client = CreateClient(HttpStatusCode.OK, json);
@@ -54,6 +54,21 @@ public class CustomerApiClientTests
         var result = await client.SearchCustomersAsync(new CustomerSearchRequest());
 
         Assert.Empty(result.Items);
+    }
+
+    [Fact]
+    public async Task SearchCustomersAsync_SendsStatusPageAndPageSizeOnly_WithNoSearchTerm()
+    {
+        var handler = new StubHttpMessageHandler(HttpStatusCode.OK, """{"items":[],"totalCount":0,"page":2,"pageSize":50}""");
+        Uri? requestUri = null;
+        handler.OnRequest = request => requestUri = request.RequestUri;
+        var client = new CustomerApiClient(new HttpClient(handler) { BaseAddress = new Uri("http://localhost") });
+
+        await client.SearchCustomersAsync(new CustomerSearchRequest(CustomerStatusFilter.All, 2, 50));
+
+        Assert.Equal("/api/customers/search", requestUri!.AbsolutePath);
+        Assert.Equal("?status=All&page=2&pageSize=50", requestUri.Query);
+        Assert.DoesNotContain("searchTerm", requestUri.Query, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -117,7 +132,7 @@ public class CustomerApiClientTests
     {
         var client = CreateClient(HttpStatusCode.OK, "null");
 
-        var result = await client.SearchCustomersAsync(new CustomerSearchRequest("test", CustomerStatusFilter.Active, 2, 50));
+        var result = await client.SearchCustomersAsync(new CustomerSearchRequest(CustomerStatusFilter.Active, 2, 50));
 
         Assert.Empty(result.Items);
         Assert.Equal(0, result.TotalCount);

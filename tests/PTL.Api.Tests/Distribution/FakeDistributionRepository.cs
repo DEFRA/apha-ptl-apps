@@ -111,6 +111,23 @@ internal sealed partial class FakeDistributionRepository : IDistributionReposito
         return Task.CompletedTask;
     }
 
+    public bool InitialiseMonthResult { get; set; } = true;
+
+    public List<MonthSetupSchemeRow> SetupSchemeRows { get; } = [];
+
+    public List<MonthSetupParticipantRow> SetupParticipantRows { get; } = [];
+
+    public List<(int YearId, int MonthId)> InitialisedMonths { get; } = [];
+
+    public MonthSetupPlan? LastMonthPlan { get; private set; }
+
+    public Task<bool> InitialiseMonthAsync(int yearId, int monthId, MonthSetupPlanner planner, CancellationToken cancellationToken = default)
+    {
+        InitialisedMonths.Add((yearId, monthId));
+        LastMonthPlan = planner(SetupSchemeRows, SetupParticipantRows);
+        return Task.FromResult(InitialiseMonthResult);
+    }
+
     public Dictionary<Guid, PreparationSheetData> PreparationSheets { get; } = [];
 
     public List<PreparationSchemeEntity> UpdatedPreparationSchemes { get; } = [];

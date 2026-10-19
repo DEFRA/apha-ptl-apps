@@ -998,6 +998,10 @@ public static partial class DapperColumnMappings
 
         RegisterTabulationEmailMappings();
 
+        RegisterMonthSetupMappings();
+
+        RegisterSearchMappings();
+
         RegisterPackagingMappings();
 
         Map<DistributionCategoryItemEntity>(new(StringComparer.OrdinalIgnoreCase)

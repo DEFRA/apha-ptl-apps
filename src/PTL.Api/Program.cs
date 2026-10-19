@@ -102,6 +102,9 @@ builder.Services.AddScoped<ICustomerRepository, CustomerRepository>();
 builder.Services.AddScoped<IPendingCustomerUpdateRepository, PendingCustomerUpdateRepository>();
 builder.Services.AddScoped<ICustomerService, CustomerService>();
 
+builder.Services.AddScoped<PTL.Core.Search.ISearchRepository, PTL.Data.Search.SearchRepository>();
+builder.Services.AddScoped<PTL.Core.Search.ISearchService, PTL.Core.Search.SearchService>();
+
 builder.Services.AddScoped<IGroupAddressRepository, GroupAddressRepository>();
 builder.Services.AddScoped<IGroupAddressService, GroupAddressService>();
 
