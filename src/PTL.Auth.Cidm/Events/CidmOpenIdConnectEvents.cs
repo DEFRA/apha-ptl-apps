@@ -1,9 +1,7 @@
 using System.Security.Claims;
 using System.Text.Json;
-using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using PTL.Auth.Cidm.Claims;
@@ -17,7 +15,7 @@ namespace PTL.Auth.Cidm.Events;
 /// maps the relationships/roles array claims, hides OIDC failure detail from the user, and renders the
 /// POST-based sign-out form CIDM recommends.
 /// </summary>
-public sealed partial class CidmOpenIdConnectEvents : OpenIdConnectEvents
+public sealed class CidmOpenIdConnectEvents : OidcProviderEvents<ICidmExternalUserResolver, CidmExternalUserResolution>
 {
     // Claims the app reads after sign-in, on top of the common identity claims. The raw relationships/roles
     // arrays are dropped because the parsed claims below carry the same data.
@@ -30,12 +28,11 @@ public sealed partial class CidmOpenIdConnectEvents : OpenIdConnectEvents
         CidmClaimTypes.Role);
 
     private readonly CidmOptions _cidmOptions;
-    private readonly ILogger<CidmOpenIdConnectEvents> _logger;
 
     public CidmOpenIdConnectEvents(IOptions<CidmOptions> cidmOptions, ILogger<CidmOpenIdConnectEvents> logger)
+        : base(logger, "CIDM", RetainedClaimTypes)
     {
         _cidmOptions = cidmOptions.Value;
-        _logger = logger;
     }
 
     public override Task RedirectToIdentityProvider(RedirectContext context)
@@ -59,14 +56,9 @@ public sealed partial class CidmOpenIdConnectEvents : OpenIdConnectEvents
         return Task.CompletedTask;
     }
 
-    public override async Task TokenValidated(TokenValidatedContext context)
+    protected override void MapClaims(ClaimsPrincipal principal, ClaimsIdentity identity)
     {
-        if (context.Principal?.Identity is not ClaimsIdentity identity)
-        {
-            return;
-        }
-
-        var rawRelationships = context.Principal.FindAll(CidmClaimTypes.RawRelationships).Select(c => c.Value);
+        var rawRelationships = principal.FindAll(CidmClaimTypes.RawRelationships).Select(c => c.Value);
         foreach (var relationship in CidmClaimsMapper.ParseRelationships(rawRelationships))
         {
             identity.AddClaim(new Claim(CidmClaimTypes.Relationship, JsonSerializer.Serialize(relationship)));
@@ -76,8 +68,8 @@ public sealed partial class CidmOpenIdConnectEvents : OpenIdConnectEvents
         // mapping has already renamed it to ClaimTypes.Role (keeping its raw, unparsed
         // "relationshipId:roleName:status" value) by the time this handler runs - CidmClaimTypes.RawRoles
         // only ever matches in tests that build the principal directly, never against a real CIDM token.
-        var rawRoleClaims = context.Principal.FindAll(CidmClaimTypes.RawRoles)
-            .Concat(context.Principal.FindAll(ClaimTypes.Role))
+        var rawRoleClaims = principal.FindAll(CidmClaimTypes.RawRoles)
+            .Concat(principal.FindAll(ClaimTypes.Role))
             .ToList();
         foreach (var rawRoleClaim in rawRoleClaims)
         {
@@ -91,26 +83,11 @@ public sealed partial class CidmOpenIdConnectEvents : OpenIdConnectEvents
             identity.AddClaim(new Claim(ClaimTypes.Role, role.RoleName));
             identity.AddClaim(new Claim(CidmClaimTypes.Role, JsonSerializer.Serialize(role)));
         }
-
-        // Resolved per-request rather than constructor-injected (this class is a singleton) - if
-        // the consuming app hasn't registered one (or RequestServices isn't set, as in some unit
-        // test contexts), sign-in proceeds exactly as before this hook existed.
-        var resolver = context.HttpContext.RequestServices?.GetService<ICidmExternalUserResolver>();
-        Func<ClaimsPrincipal, CancellationToken, Task<IIdentityResolution>>? resolve = resolver is null
-            ? null
-            : async (principal, ct) => await resolver.ResolveAsync(principal, ct);
-
-        await OpenIdConnectEventHelpers.ResolveOrDenyAsync(context, identity, resolve, RetainedClaimTypes);
     }
 
-    public override Task TicketReceived(TicketReceivedContext context) =>
-        OpenIdConnectEventHelpers.RemoveAccessTokenAsync(context);
-
-    public override Task RemoteFailure(RemoteFailureContext context) =>
-        OpenIdConnectEventHelpers.HandleRemoteFailureAsync(context, LogAuthenticationFailed);
-
-    [LoggerMessage(Level = LogLevel.Error, Message = "CIDM authentication failed")]
-    private partial void LogAuthenticationFailed(Exception? exception);
+    protected override Task<CidmExternalUserResolution> ResolveAsync(
+        ICidmExternalUserResolver resolver, ClaimsPrincipal principal, CancellationToken cancellationToken) =>
+        resolver.ResolveAsync(principal, cancellationToken);
 
     public override async Task RedirectToIdentityProviderForSignOut(RedirectContext context)
     {
