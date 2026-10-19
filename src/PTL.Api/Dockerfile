@@ -27,6 +27,11 @@ EXPOSE 8080
 ENV ASPNETCORE_URLS=http://+:8080 \
     DOTNET_EnableDiagnostics=0
 
+# FortiGate egress performs TLS inspection on outbound calls to CIDM/Entra ID (bearer token
+# validation) - without trusting its inspection CA, metadata/JWKS fetches fail with PartialChain.
+COPY ["build/certs/fortigate-ca.cer", "C:/certs/fortigate-ca.cer"]
+RUN certutil -addstore -f Root C:/certs/fortigate-ca.cer
+
 USER $APP_UID
 COPY --from=build /app/publish .
 ENTRYPOINT ["dotnet", "PTL.Api.dll"]

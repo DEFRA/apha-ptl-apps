@@ -32,6 +32,11 @@ EXPOSE 8081
 ENV ASPNETCORE_URLS=http://+:8081 \
     DOTNET_EnableDiagnostics=0
 
+# FortiGate egress performs TLS inspection on outbound calls to CIDM/Azure AD B2C (b2clogin.com) -
+# without trusting its inspection CA, the OIDC handler's metadata/JWKS fetch fails with PartialChain.
+COPY ["build/certs/fortigate-ca.cer", "C:/certs/fortigate-ca.cer"]
+RUN certutil -addstore -f Root C:/certs/fortigate-ca.cer
+
 USER $APP_UID
 COPY --from=build /app/publish .
 ENTRYPOINT ["dotnet", "PTL.ExternalWeb.dll"]
