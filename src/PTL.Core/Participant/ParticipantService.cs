@@ -58,22 +58,15 @@ public sealed class ParticipantService(
     public Task<IReadOnlyList<ParticipantSummaryEntity>> GetParticipantsAsync(Guid customerId, bool includeInactive = false, CancellationToken cancellationToken = default) =>
         participantRepository.GetSummariesAsync(customerId, includeInactive, cancellationToken);
 
-    public async Task<ParticipantSearchResult> SearchParticipantsAsync(Guid customerId, string? searchTerm, bool includeInactive, int page, int pageSize, CancellationToken cancellationToken = default)
+    public async Task<ParticipantSearchResult> SearchParticipantsAsync(Guid customerId, bool includeInactive, int page, int pageSize, CancellationToken cancellationToken = default)
     {
         page = page < 1 ? 1 : page;
         pageSize = pageSize is < 1 or > 200 ? 20 : pageSize;
 
         var all = await participantRepository.GetSummariesAsync(customerId, includeInactive, cancellationToken);
-        var filtered = string.IsNullOrWhiteSpace(searchTerm)
-            ? all
-            : all.Where(p =>
-                p.LabName.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
-                p.LabCode.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
-                p.ContactName.Contains(searchTerm, StringComparison.OrdinalIgnoreCase))
-                .ToList();
 
-        var totalCount = filtered.Count;
-        var items = filtered.Skip((page - 1) * pageSize).Take(pageSize).ToList();
+        var totalCount = all.Count;
+        var items = all.Skip((page - 1) * pageSize).Take(pageSize).ToList();
         return new ParticipantSearchResult(items, totalCount);
     }
 

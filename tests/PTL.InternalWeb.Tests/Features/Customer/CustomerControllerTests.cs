@@ -26,7 +26,7 @@ public class CustomerControllerTests
         isActive ? null : DateTime.UtcNow, isActive ? null : Guid.NewGuid());
 
     [Fact]
-    public async Task Index_ReturnsViewWithSearchResults()
+    public async Task Index_ReturnsViewWithTheStatusFilteredPage()
     {
         var customerId = Guid.NewGuid();
         var apiClient = new FakeCustomerApiClient
@@ -37,10 +37,11 @@ public class CustomerControllerTests
         };
         var controller = CreateController(apiClient);
 
-        var result = await controller.Index("Sample", CustomerStatusFilter.Active, 1, 20, CancellationToken.None);
+        var result = await controller.Index(CustomerStatusFilter.Inactive, 1, 20, CancellationToken.None);
 
         var view = Assert.IsType<ViewResult>(result);
         var model = Assert.IsType<PTL.InternalWeb.Features.Customer.CustomerListViewModel>(view.Model);
+        Assert.Equal(CustomerStatusFilter.Inactive, model.SelectedStatus);
         Assert.Single(model.Customers);
         Assert.Equal(1, model.TotalCount);
     }

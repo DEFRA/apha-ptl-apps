@@ -233,7 +233,7 @@ public class HomeNavigationSmokeTests : IClassFixture<PtlExternalWebTestFactory>
         var homeResponse = await CookieForwardingHttpClient.SendWithCookiesAsync(client, HttpMethod.Get, "/Home/Index", cookies);
         var body = await homeResponse.Content.ReadAsStringAsync();
 
-        Assert.Contains($"Signed in as <strong>{longName}</strong>", body);
+        Assert.Contains($"Signed in as: <strong>{longName}</strong>", body);
         Assert.Contains("Lab Number: <strong>LAB001</strong>", body);
         Assert.Contains("Sign out", body);
     }

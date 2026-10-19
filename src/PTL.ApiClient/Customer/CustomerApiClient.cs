@@ -43,7 +43,7 @@ public sealed class CustomerApiClient(HttpClient httpClient) : ICustomerApiClien
 
     public async Task<CustomerSearchResponse> SearchCustomersAsync(CustomerSearchRequest request, CancellationToken cancellationToken = default)
     {
-        var query = $"searchTerm={Uri.EscapeDataString(request.SearchTerm ?? string.Empty)}&status={request.Status}&page={request.Page}&pageSize={request.PageSize}";
+        var query = $"status={request.Status}&page={request.Page}&pageSize={request.PageSize}";
         var result = await httpClient.GetFromJsonAsync<CustomerSearchResponse>($"/api/customers/search?{query}", cancellationToken);
         return result ?? new CustomerSearchResponse([], 0, request.Page, request.PageSize);
     }
