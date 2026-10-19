@@ -13,11 +13,11 @@ public class InternalUserResolverTests
     private static ClaimsPrincipal CreatePrincipal(params Claim[] claims) =>
         new(new ClaimsIdentity(claims, "Test"));
 
-    private static IConfiguration CreateConfiguration(bool bypassEnabled = false) =>
+    private static IConfiguration CreateConfiguration(bool enforceAccess = true) =>
         new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["Entra:BypassUserResolutionForLocalTesting"] = bypassEnabled ? "true" : "false"
+                ["Entra:EnforceInternalUserAccess"] = enforceAccess ? "true" : "false"
             })
             .Build();
 
@@ -70,19 +70,46 @@ public class InternalUserResolverTests
     }
 
     [Fact]
-    public async Task ResolveAsync_NotPermittedByApi_WithBypassEnabled_AllowsWithSyntheticAdminClaims()
+    public async Task ResolveAsync_NotPermittedByApi_WithEnforcementDisabled_AllowsWithSyntheticAdminClaims()
     {
         var principal = CreatePrincipal(
             new Claim(EntraClaimTypes.ObjectId, Guid.NewGuid().ToString()),
             new Claim(EntraClaimTypes.OnPremisesSamAccountName, "auser"),
             new Claim(EntraClaimTypes.OnPremisesDomainName, "DEFRA"));
         var apiClient = new FakeInternalUserApiClient(new ResolveInternalUserResponse(false, null, "", "", []));
-        var resolver = new InternalUserResolver(apiClient, CreateConfiguration(bypassEnabled: true), NullLogger<InternalUserResolver>.Instance);
+        var resolver = new InternalUserResolver(apiClient, CreateConfiguration(enforceAccess: false), NullLogger<InternalUserResolver>.Instance);
 
         var result = await resolver.ResolveAsync(principal, CancellationToken.None);
 
         Assert.True(result.IsAllowed);
         Assert.Equal("Admin", result.Claims![InternalUserClaimTypes.ResolvedRoles]);
+    }
+
+    [Fact]
+    public async Task ResolveAsync_MissingOnPremClaims_WithEnforcementDisabled_AllowsWithSyntheticAdminClaims()
+    {
+        var principal = CreatePrincipal(new Claim(EntraClaimTypes.ObjectId, Guid.NewGuid().ToString()));
+        var resolver = new InternalUserResolver(new FakeInternalUserApiClient(new ResolveInternalUserResponse(false, null, "", "", [])), CreateConfiguration(enforceAccess: false), NullLogger<InternalUserResolver>.Instance);
+
+        var result = await resolver.ResolveAsync(principal, CancellationToken.None);
+
+        Assert.True(result.IsAllowed);
+        Assert.Equal("Admin", result.Claims![InternalUserClaimTypes.ResolvedRoles]);
+    }
+
+    [Fact]
+    public async Task ResolveAsync_NotPermittedByApi_WithSettingAbsent_DeniesByDefault()
+    {
+        var principal = CreatePrincipal(
+            new Claim(EntraClaimTypes.ObjectId, Guid.NewGuid().ToString()),
+            new Claim(EntraClaimTypes.OnPremisesSamAccountName, "auser"),
+            new Claim(EntraClaimTypes.OnPremisesDomainName, "DEFRA"));
+        var apiClient = new FakeInternalUserApiClient(new ResolveInternalUserResponse(false, null, "", "", []));
+        var resolver = new InternalUserResolver(apiClient, new ConfigurationBuilder().Build(), NullLogger<InternalUserResolver>.Instance);
+
+        var result = await resolver.ResolveAsync(principal, CancellationToken.None);
+
+        Assert.False(result.IsAllowed);
     }
 
     [Fact]

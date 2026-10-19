@@ -15,8 +15,7 @@ namespace PTL.InternalWeb.Features.Account;
 /// requirement for PT-LIMS.
 /// </summary>
 /// <param name="internalUserApiClient">Calls PTL.Api's internal-user resolve endpoint.</param>
-/// <param name="internalUserApiClient">Calls PTL.Api's internal-user resolve endpoint.</param>
-/// <param name="configuration">Used only to read the local-testing bypass flag below.</param>
+/// <param name="configuration">Used only to read the "Entra:EnforceInternalUserAccess" switch.</param>
 /// <param name="logger">Logs resolution failures so a sign-in landing on /Home/Error is diagnosable.</param>
 public sealed partial class InternalUserResolver(IInternalUserApiClient internalUserApiClient, IConfiguration configuration, ILogger<InternalUserResolver> logger) : IEntraInternalUserResolver
 {
@@ -34,7 +33,7 @@ public sealed partial class InternalUserResolver(IInternalUserApiClient internal
             ?? principal.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         if (!Guid.TryParse(entraSsoIdClaim, out var entraSsoId))
         {
-            return EntraInternalUserResolution.Deny("/Account/NotPermitted");
+            return DenyOrAllowUnrestricted();
         }
 
         // Requires the Entra ID app registration to configure onprem_samaccountname and
@@ -54,7 +53,7 @@ public sealed partial class InternalUserResolver(IInternalUserApiClient internal
 
         if (string.IsNullOrEmpty(username))
         {
-            return EntraInternalUserResolution.Deny("/Account/NotPermitted");
+            return DenyOrAllowUnrestricted();
         }
 
         ResolveInternalUserResponse response;
@@ -76,26 +75,7 @@ public sealed partial class InternalUserResolver(IInternalUserApiClient internal
 
         if (!response.IsPermitted)
         {
-            // LOCAL-TESTING BYPASS - grants a synthetic Admin identity instead of denying sign-in,
-            // so System Administration pages are reachable without a seeded tblUsers row. This is
-            // an auth bypass: it lets ANY signed-in Entra user into PT-LIMS as Admin, with no
-            // database record at all. Safe to leave in source control only because it is OFF by
-            // default - it activates solely via the "Entra:BypassUserResolutionForLocalTesting"
-            // flag, which must be set in a developer's own user-secrets/environment and must never
-            // be added to appsettings.json or any other committed config. Do not enable this flag
-            // outside a local dev machine.
-            if (configuration.GetValue<bool>("Entra:BypassUserResolutionForLocalTesting"))
-            {
-                return EntraInternalUserResolution.Allow(new Dictionary<string, string>
-                {
-                    [InternalUserClaimTypes.InternalUserId] = Guid.Empty.ToString(),
-                    [InternalUserClaimTypes.FullName] = "Local Test User (bypass)",
-                    [InternalUserClaimTypes.Department] = "N/A",
-                    [InternalUserClaimTypes.ResolvedRoles] = "Admin"
-                });
-            }
-
-            return EntraInternalUserResolution.Deny("/Account/NotPermitted");
+            return DenyOrAllowUnrestricted();
         }
 
         return EntraInternalUserResolution.Allow(new Dictionary<string, string>
@@ -106,6 +86,33 @@ public sealed partial class InternalUserResolver(IInternalUserApiClient internal
             [InternalUserClaimTypes.ResolvedRoles] = string.Join(',', response.Roles)
         });
     }
+
+    /// <summary>
+    /// Applies the "Entra:EnforceInternalUserAccess" switch (appsettings.json). When false, a signed-in
+    /// Entra user with no matching tblUsers row (or without the on-premises claims needed to look one up)
+    /// gets a synthetic Admin identity instead of being denied. This is an auth bypass: any signed-in
+    /// Entra user becomes Admin. Defaults to enforced when the key is absent, so it is only open where
+    /// configuration explicitly says so.
+    /// </summary>
+    private EntraInternalUserResolution DenyOrAllowUnrestricted()
+    {
+        if (configuration.GetValue("Entra:EnforceInternalUserAccess", true))
+        {
+            return EntraInternalUserResolution.Deny("/Account/NotPermitted");
+        }
+
+        LogUnrestrictedAccessGranted();
+        return EntraInternalUserResolution.Allow(new Dictionary<string, string>
+        {
+            [InternalUserClaimTypes.InternalUserId] = Guid.Empty.ToString(),
+            [InternalUserClaimTypes.FullName] = "Unrestricted Access User",
+            [InternalUserClaimTypes.Department] = "N/A",
+            [InternalUserClaimTypes.ResolvedRoles] = "Admin"
+        });
+    }
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Entra:EnforceInternalUserAccess is false - granting unrestricted Admin access to a user with no tblUsers match")]
+    private partial void LogUnrestrictedAccessGranted();
 
     [LoggerMessage(Level = LogLevel.Error, Message = "Failed to resolve internal user (SsoIdInt={SsoIdInt}) against PTL.Api")]
     private partial void LogInternalUserResolutionFailed(Guid ssoIdInt, Exception exception);
