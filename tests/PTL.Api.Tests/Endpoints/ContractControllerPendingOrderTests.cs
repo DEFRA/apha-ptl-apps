@@ -99,7 +99,7 @@ public class ContractControllerPendingOrderTests
             lookupRepository);
 
         var controller = new ContractController(
-            new ContractService(new FakeContractRepository(), new FakeParticipantSchemeRepository(), NullLogger<ContractService>.Instance),
+            new ContractService(new FakeContractRepository(), new FakeParticipantSchemeRepository(), new PTL.Api.Tests.Contract.FakeContractPostageService(), new PTL.Api.Tests.Contract.FakeAuditActorResolver(), NullLogger<ContractService>.Instance),
             new ImportPermitService(new FakeImportPermitRepository()),
             new StubSampleAddressService(),
             new StubContractRenewalService(),

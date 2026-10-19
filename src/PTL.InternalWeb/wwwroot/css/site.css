@@ -115,6 +115,13 @@ body {
   display: inline;
 }
 
+/* Legacy .contractRemoved: a Non Fee Paying price, and a removed (or pending removal) item's participant and
+   price, are struck through in grey. GOV.UK secondary text colour keeps the contrast accessible. */
+.ptl-removed {
+  text-decoration: line-through;
+  color: var(--govuk-secondary-text-colour, #505a5f);
+}
+
 .ptl-link-button {
   background: none;
   border: none;

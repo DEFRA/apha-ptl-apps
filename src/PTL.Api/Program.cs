@@ -130,6 +130,8 @@ builder.Services.AddScoped<IInternalUserService, InternalUserService>();
 
 builder.Services.AddScoped<IContractRepository, ContractRepository>();
 builder.Services.AddScoped<IContractService, ContractService>();
+builder.Services.AddScoped<IContractPostageService, ContractPostageService>();
+builder.Services.AddScoped<PTL.Core.Audit.IAuditActorResolver, PTL.Core.Audit.AuditActorResolver>();
 
 builder.Services.AddScoped<IImportPermitRepository, ImportPermitRepository>();
 builder.Services.AddScoped<IImportPermitService, ImportPermitService>();

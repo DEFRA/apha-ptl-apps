@@ -78,7 +78,9 @@ public class ParticipantSchemeDetailsRenderTests : IClassFixture<WebApplicationF
         Assert.Contains("<dt class=\"govuk-summary-list__key\">Participant</dt>", html, StringComparison.Ordinal);
         Assert.Contains("<dd class=\"govuk-summary-list__value\">Lab One: LAB1</dd>", html, StringComparison.Ordinal);
         Assert.Contains("<dd class=\"govuk-summary-list__value\">REF-1</dd>", html, StringComparison.Ordinal);
-        Assert.Contains("<dd class=\"govuk-summary-list__value\">42.50</dd>", html, StringComparison.Ordinal);
+        // Legacy ParticipantScheme.aspx has no price - it only appears on the Contract Items grid.
+        Assert.DoesNotContain("42.50", html, StringComparison.Ordinal);
+        Assert.DoesNotContain(">Price<", html, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -97,7 +99,7 @@ public class ParticipantSchemeDetailsRenderTests : IClassFixture<WebApplicationF
     {
         var html = await MainContentAsync();
 
-        Assert.Contains("<caption class=\"govuk-table__caption govuk-table__caption--m\">Distribution months</caption>", html, StringComparison.Ordinal);
+        Assert.Contains("<caption class=\"govuk-table__caption govuk-table__caption--m\">Months</caption>", html, StringComparison.Ordinal);
         Assert.Matches("<th scope=\"row\" class=\"govuk-table__header\">January</th>\\s*<td class=\"govuk-table__cell\">Yes</td>\\s*<td class=\"govuk-table__cell\">No</td>", html);
         Assert.Matches("<th scope=\"row\" class=\"govuk-table__header\">February</th>\\s*<td class=\"govuk-table__cell\">No</td>", html);
     }

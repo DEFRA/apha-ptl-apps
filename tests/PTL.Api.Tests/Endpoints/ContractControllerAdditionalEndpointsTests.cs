@@ -29,7 +29,7 @@ public class ContractControllerAdditionalEndpointsTests
         IPendingOrderService? pendingOrderService = null)
     {
         var controller = new ContractController(
-            new ContractService(contractRepository ?? new FakeContractRepository(), participantSchemeRepository ?? new FakeParticipantSchemeRepository(), NullLogger<ContractService>.Instance),
+            new ContractService(contractRepository ?? new FakeContractRepository(), participantSchemeRepository ?? new FakeParticipantSchemeRepository(), new PTL.Api.Tests.Contract.FakeContractPostageService(), new PTL.Api.Tests.Contract.FakeAuditActorResolver(), NullLogger<ContractService>.Instance),
             new ImportPermitService(new FakeImportPermitRepository()),
             sampleAddressService ?? new StubSampleAddressService(),
             contractRenewalService ?? new StubContractRenewalService(),
@@ -72,7 +72,7 @@ public class ContractControllerAdditionalEndpointsTests
         var repository = new FakeContractRepository { ContractItems = ValidItems(Guid.NewGuid()) };
         var controller = CreateController(repository);
 
-        var result = await controller.GetContractItems(repository.ContractItems!.ContractId, CancellationToken.None);
+        var result = await controller.GetContractItems(repository.ContractItems!.ContractId, null, CancellationToken.None);
 
         var ok = Assert.IsType<OkObjectResult>(result.Result);
         var response = Assert.IsType<ContractItemsResponse>(ok.Value);
@@ -84,7 +84,7 @@ public class ContractControllerAdditionalEndpointsTests
     {
         var controller = CreateController();
 
-        var result = await controller.GetContractItems(Guid.NewGuid(), CancellationToken.None);
+        var result = await controller.GetContractItems(Guid.NewGuid(), null, CancellationToken.None);
 
         Assert.IsType<NotFoundResult>(result.Result);
     }
@@ -100,7 +100,7 @@ public class ContractControllerAdditionalEndpointsTests
         participantSchemeRepository.Add(new ParticipantSchemeRecord { ParticipantSchemeId = participantSchemeId, ContractId = contractId });
         var controller = CreateController(contractRepository, participantSchemeRepository);
 
-        var result = await controller.RemoveContractItem(contractId, participantSchemeId, CancellationToken.None);
+        var result = await controller.RemoveContractItem(contractId, participantSchemeId, null, CancellationToken.None);
 
         Assert.IsType<NoContentResult>(result);
     }
@@ -110,7 +110,7 @@ public class ContractControllerAdditionalEndpointsTests
     {
         var controller = CreateController();
 
-        var result = await controller.RemoveContractItem(Guid.NewGuid(), Guid.NewGuid(), CancellationToken.None);
+        var result = await controller.RemoveContractItem(Guid.NewGuid(), Guid.NewGuid(), null, CancellationToken.None);
 
         Assert.IsType<NotFoundResult>(result);
     }
@@ -123,7 +123,7 @@ public class ContractControllerAdditionalEndpointsTests
         contractRepository.Seed(new PTL.Core.Contract.Contract { ContractId = contractId, IsReadOnly = true });
         var controller = CreateController(contractRepository);
 
-        var result = await controller.RemoveContractItem(contractId, Guid.NewGuid(), CancellationToken.None);
+        var result = await controller.RemoveContractItem(contractId, Guid.NewGuid(), null, CancellationToken.None);
 
         var problem = Assert.IsType<BadRequestObjectResult>(result);
         Assert.IsType<Microsoft.AspNetCore.Mvc.ValidationProblemDetails>(problem.Value, exactMatch: false);
@@ -251,7 +251,7 @@ public class ContractControllerAdditionalEndpointsTests
 
         var controller = CreateController(contractRepository: new FakeContractRepository { ContractItems = items });
 
-        var result = await controller.GetContractItems(contractId, CancellationToken.None);
+        var result = await controller.GetContractItems(contractId, null, CancellationToken.None);
 
         var ok = Assert.IsType<OkObjectResult>(result.Result);
         var response = Assert.IsType<ContractItemsResponse>(ok.Value);

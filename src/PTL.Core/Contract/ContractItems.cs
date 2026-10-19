@@ -4,13 +4,8 @@ namespace PTL.Core.Contract;
 // built from spgContractItems by PTL.Data.Contract.ContractRepository.GetContractItemsAsync. Mirrors
 // PtaBusinessObjects.BusinessObjects.Contracts.ContractItems' pricing computations exactly for the
 // non-online-order case (mNumberCourier/mNumberPostage/mNumberSpecialDelivery trusted as stored,
-// price = count * unit price).
-//
-// [NEEDS INVESTIGATION] Legacy ContractItems.CourierPriceTotal/PostagePriceTotal/
-// SpecialDeliveryPriceTotal silently ignore the stored counts and dynamically recompute them from
-// live scheme/participant-scheme distribution-month data when the owning Contract.IsOnlineOrder is
-// true. docs/migration/contract-migration.md explicitly calls for this to become a separate,
-// testable pricing service rather than being replatformed ad hoc - not implemented in this pass.
+// price = count * unit price). For an online order the counts are replaced by a live count when the
+// items are read (ContractPostageService.ApplyOnlineOrderCountsAsync), as the legacy getters do.
 public sealed class ContractItemsAggregate
 {
     public Guid ContractId { get; set; }
@@ -53,7 +48,7 @@ public sealed class ContractItemsAggregate
     // ContractItems.TotalPriceItems.
     public decimal TotalPriceItems => Schemes
         .SelectMany(s => s.Participants)
-        .Where(p => !p.NonFeePaying)
+        .Where(p => !p.NonFeePaying && !p.IsRemoved)
         .Sum(p => p.Price);
 
     // Matches legacy ContractItems.DiscountPrice: negative because DiscountRate is a positive
@@ -95,6 +90,15 @@ public sealed class ContractItemLine
     public bool NonFeePaying { get; set; }
 
     public bool HasOverride { get; set; }
+
+    // Stored as removed: legacy still lists it, struck through, as "[Item Removed]".
+    public bool IsRemoved { get; set; }
+
+    // Marked for removal on the page but not saved yet (legacy "Pending Deletion"); counts as removed for totals.
+    public bool IsPendingRemoval { get; set; }
+
+    // Jan..Dec - the postage counts need the months an item is actually ticked for.
+    public bool[] Months { get; set; } = new bool[12];
 
     public string FullName => $"{LabCode}: {LabName}";
 }

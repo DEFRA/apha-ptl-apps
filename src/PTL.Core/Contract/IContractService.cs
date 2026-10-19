@@ -20,11 +20,13 @@ public interface IContractService
     Task<Contract?> UpdateContractAsync(Guid contractId, Contract updatedFields, CancellationToken cancellationToken = default);
 
     // Aggregated read-model over spgContractItems - see PTL.Core.Contract.ContractItemsAggregate.
+    // pendingRemovalIds are items the page has marked for removal but not saved: they count as removed.
     // Returns null when contractId does not exist.
-    Task<ContractItemsAggregate?> GetContractItemsAsync(Guid contractId, CancellationToken cancellationToken = default);
+    Task<ContractItemsAggregate?> GetContractItemsAsync(Guid contractId, IReadOnlyCollection<Guid>? pendingRemovalIds = null, CancellationToken cancellationToken = default);
 
     // Removes (soft-deletes) a single participant-scheme line item from a contract's items list.
+    // auditWhy, when given, is recorded with the acting user (legacy SetAudit) before the item is saved.
     // Returns false when the contract or the item does not exist, or the item does not belong to
     // this contract. Throws ContractValidationException when the contract IsReadOnly (closed year).
-    Task<bool> RemoveContractItemAsync(Guid contractId, Guid participantSchemeId, CancellationToken cancellationToken = default);
+    Task<bool> RemoveContractItemAsync(Guid contractId, Guid participantSchemeId, string? auditWhy = null, CancellationToken cancellationToken = default);
 }

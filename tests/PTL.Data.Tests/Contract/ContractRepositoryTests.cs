@@ -288,16 +288,20 @@ public class ContractRepositoryTests
     }
 
     [Fact]
-    public async Task GetContractItemsAsync_RemovedParticipant_IsExcluded()
+    public async Task GetContractItemsAsync_RemovedParticipant_IsReturnedFlaggedRemoved()
     {
         var (repository, connection) = CreateRepository();
         var contractId = Guid.NewGuid();
-        connection.RespondToQuery(GetContractItemsSql, ContractItemsDataSet(contractId, Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), isRemoved: true));
+        var participantSchemeId = Guid.NewGuid();
+        connection.RespondToQuery(GetContractItemsSql, ContractItemsDataSet(contractId, Guid.NewGuid(), participantSchemeId, Guid.NewGuid(), isRemoved: true));
 
         var result = await repository.GetContractItemsAsync(contractId);
 
-        Assert.NotNull(result);
-        Assert.Empty(result!.Schemes);
+        // Legacy shows removed items on the Contract Items grid as "[Item Removed]".
+        var participant = Assert.Single(Assert.Single(result!.Schemes).Participants);
+        Assert.Equal(participantSchemeId, participant.ParticipantSchemeId);
+        Assert.True(participant.IsRemoved);
+        Assert.False(participant.IsPendingRemoval);
     }
 
     [Fact]

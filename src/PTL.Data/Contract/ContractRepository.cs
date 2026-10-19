@@ -145,6 +145,8 @@ public sealed class ContractRepository(IDbConnectionFactory connectionFactory) :
                 };
             });
 
+        string[] monthColumns = ["fldJan", "fldFeb", "fldMar", "fldApr", "fldMay", "fldJun", "fldJul", "fldAug", "fldSep", "fldOct", "fldNov", "fldDec"];
+
         string[] overrideMonthColumns =
         [
             "fldIsOverrideJan", "fldIsOverrideFeb", "fldIsOverrideMar", "fldIsOverrideApr",
@@ -156,14 +158,6 @@ public sealed class ContractRepository(IDbConnectionFactory connectionFactory) :
         {
             var row = Row(participantRow);
 
-            // Explicit-delete model (see docs/migration/contract-migration.md): once removed via
-            // DELETE /api/contracts/{contractId}/items/{participantSchemeId}, an item no longer
-            // appears in this read model at all - unlike legacy's deferred-delete "[Item Removed]" row.
-            if (GetBool(row, "fldIsRemoved"))
-            {
-                continue;
-            }
-
             var schemeId = (Guid)row["fldSchemeId"];
             if (!schemesById.TryGetValue(schemeId, out var group))
             {
@@ -172,6 +166,7 @@ public sealed class ContractRepository(IDbConnectionFactory connectionFactory) :
 
             group.Participants.Add(new ContractItemLine
             {
+                IsRemoved = GetBool(row, "fldIsRemoved"),
                 ParticipantSchemeId = (Guid)row["fldParticipantSchemeId"],
                 ParticipantId = (Guid)row["fldParticipantId"],
                 SchemeId = schemeId,
@@ -180,7 +175,8 @@ public sealed class ContractRepository(IDbConnectionFactory connectionFactory) :
                 NumberOfDistributions = Convert.ToInt32(row["fldNumberOfDistributions"], CultureInfo.InvariantCulture),
                 Price = Convert.ToDecimal(row["fldPrice"], CultureInfo.InvariantCulture),
                 NonFeePaying = GetBool(row, "fldNonFeePaying"),
-                HasOverride = overrideMonthColumns.Any(column => GetBool(row, column))
+                HasOverride = overrideMonthColumns.Any(column => GetBool(row, column)),
+                Months = [.. monthColumns.Select(column => GetBool(row, column))]
             });
         }
 

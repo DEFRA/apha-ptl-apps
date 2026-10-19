@@ -342,20 +342,20 @@ public sealed class ContractController(
 
     // Aggregated read-model over spgContractItems - see docs/migration/contract-migration.md.
     [HttpGet("contracts/{contractId:guid}/items")]
-    public async Task<ActionResult<ContractItemsResponse>> GetContractItems(Guid contractId, CancellationToken cancellationToken)
+    public async Task<ActionResult<ContractItemsResponse>> GetContractItems(Guid contractId, [FromQuery] Guid[]? pending, CancellationToken cancellationToken)
     {
-        var items = await contractService.GetContractItemsAsync(contractId, cancellationToken);
+        var items = await contractService.GetContractItemsAsync(contractId, pending, cancellationToken);
         return items is null ? NotFound() : Ok(ToItemsResponse(items));
     }
 
-    // Explicit REST mutation replacing legacy ContractItems.aspx's deferred "mark removed, save
-    // later" flow - see docs/migration/contract-migration.md.
+    // Legacy ContractItems.aspx BtnSave_Click: SetAudit(why, who) + Delete + Save per item. auditWhy is the
+    // reason the audit dialog captured; the acting user is taken from the forwarded identity.
     [HttpDelete("contracts/{contractId:guid}/items/{participantSchemeId:guid}")]
-    public async Task<IActionResult> RemoveContractItem(Guid contractId, Guid participantSchemeId, CancellationToken cancellationToken)
+    public async Task<IActionResult> RemoveContractItem(Guid contractId, Guid participantSchemeId, [FromQuery] string? auditWhy, CancellationToken cancellationToken)
     {
         try
         {
-            var removed = await contractService.RemoveContractItemAsync(contractId, participantSchemeId, cancellationToken);
+            var removed = await contractService.RemoveContractItemAsync(contractId, participantSchemeId, auditWhy, cancellationToken);
             return removed ? NoContent() : NotFound();
         }
         catch (ContractValidationException ex)
@@ -517,7 +517,9 @@ public sealed class ContractController(
         item.NumberOfDistributions,
         item.Price,
         item.NonFeePaying,
-        item.HasOverride);
+        item.HasOverride,
+        item.IsRemoved,
+        item.IsPendingRemoval);
 
     private static ContractResponse ToResponse(Contract contract) => new(
         contract.ContractId,

@@ -15,7 +15,7 @@ public class ContractControllerTests
     private static ContractController CreateController(FakeContractRepository repository, FakeParticipantSchemeRepository? participantSchemeRepository = null)
     {
         var controller = new ContractController(
-            new ContractService(repository, participantSchemeRepository ?? new FakeParticipantSchemeRepository(), NullLogger<ContractService>.Instance),
+            new ContractService(repository, participantSchemeRepository ?? new FakeParticipantSchemeRepository(), new PTL.Api.Tests.Contract.FakeContractPostageService(), new PTL.Api.Tests.Contract.FakeAuditActorResolver(), NullLogger<ContractService>.Instance),
             new ImportPermitService(new FakeImportPermitRepository()),
             new StubSampleAddressService(),
             new StubContractRenewalService(),

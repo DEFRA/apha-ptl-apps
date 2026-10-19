@@ -34,11 +34,21 @@ internal sealed class FakeContractApiClient : IContractApiClient
     public ContractItemsResponse? ItemsResponse { get; set; }
     public ContractItemRemovalResult RemovalResult { get; set; } = new(true, false, null);
 
-    public Task<ContractItemsResponse?> GetContractItemsAsync(Guid contractId, CancellationToken cancellationToken = default) =>
-        Task.FromResult(ItemsResponse);
+    // What the page asked for: the items it had marked for removal, and the audited removals it saved.
+    public IReadOnlyCollection<Guid>? LastPendingRemovalIds { get; private set; }
+    public List<(Guid ParticipantSchemeId, string? AuditWhy)> Removals { get; } = [];
 
-    public Task<ContractItemRemovalResult> RemoveContractItemAsync(Guid contractId, Guid participantSchemeId, CancellationToken cancellationToken = default) =>
-        Task.FromResult(RemovalResult);
+    public Task<ContractItemsResponse?> GetContractItemsAsync(Guid contractId, IReadOnlyCollection<Guid>? pendingRemovalIds = null, CancellationToken cancellationToken = default)
+    {
+        LastPendingRemovalIds = pendingRemovalIds;
+        return Task.FromResult(ItemsResponse);
+    }
+
+    public Task<ContractItemRemovalResult> RemoveContractItemAsync(Guid contractId, Guid participantSchemeId, string? auditWhy = null, CancellationToken cancellationToken = default)
+    {
+        Removals.Add((participantSchemeId, auditWhy));
+        return Task.FromResult(RemovalResult);
+    }
 
     public PendingOrderListResponse PendingOrders { get; set; } = new([], []);
     public PendingOrderDetailsResponse? PendingOrder { get; set; }

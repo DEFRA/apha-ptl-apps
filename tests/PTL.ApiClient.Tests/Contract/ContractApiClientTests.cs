@@ -161,6 +161,34 @@ public class ContractApiClientTests
     }
 
     [Fact]
+    public async Task GetContractItemsAsync_PendingRemovals_AreSentAsRepeatedQueryValues()
+    {
+        var first = Guid.NewGuid();
+        var second = Guid.NewGuid();
+        var handler = new StubHttpMessageHandler(HttpStatusCode.NotFound, null);
+        Uri? sent = null;
+        handler.OnRequest = request => sent = request.RequestUri;
+        var client = new ContractApiClient(new HttpClient(handler) { BaseAddress = new Uri("http://localhost") });
+
+        await client.GetContractItemsAsync(Guid.NewGuid(), [first, second]);
+
+        Assert.Equal($"?pending={first}&pending={second}", sent!.Query);
+    }
+
+    [Fact]
+    public async Task RemoveContractItemAsync_AuditReason_IsSentEscapedInTheQueryString()
+    {
+        var handler = new StubHttpMessageHandler(HttpStatusCode.OK, null);
+        Uri? sent = null;
+        handler.OnRequest = request => sent = request.RequestUri;
+        var client = new ContractApiClient(new HttpClient(handler) { BaseAddress = new Uri("http://localhost") });
+
+        await client.RemoveContractItemAsync(Guid.NewGuid(), Guid.NewGuid(), "Left & gone");
+
+        Assert.Equal("?auditWhy=Left%20%26%20gone", sent!.Query);
+    }
+
+    [Fact]
     public async Task RemoveContractItemAsync_NotFound_ReturnsNotFoundResult()
     {
         var client = CreateClient(HttpStatusCode.NotFound, null);

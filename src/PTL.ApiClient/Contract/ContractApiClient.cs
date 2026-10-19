@@ -12,8 +12,8 @@ public interface IContractApiClient
     Task<ContractSearchResponse> GetContractsForCustomerByYearAsync(Guid customerId, int yearId, CancellationToken cancellationToken = default);
     Task<ContractSaveResult> CreateContractAsync(Guid customerId, ContractRequest request, CancellationToken cancellationToken = default);
     Task<ContractSaveResult> UpdateContractAsync(Guid contractId, ContractRequest request, CancellationToken cancellationToken = default);
-    Task<ContractItemsResponse?> GetContractItemsAsync(Guid contractId, CancellationToken cancellationToken = default);
-    Task<ContractItemRemovalResult> RemoveContractItemAsync(Guid contractId, Guid participantSchemeId, CancellationToken cancellationToken = default);
+    Task<ContractItemsResponse?> GetContractItemsAsync(Guid contractId, IReadOnlyCollection<Guid>? pendingRemovalIds = null, CancellationToken cancellationToken = default);
+    Task<ContractItemRemovalResult> RemoveContractItemAsync(Guid contractId, Guid participantSchemeId, string? auditWhy = null, CancellationToken cancellationToken = default);
     Task<PendingOrderListResponse> GetPendingOrdersAsync(CancellationToken cancellationToken = default);
     Task<PendingOrderDetailsResponse?> GetPendingOrderAsync(Guid pendingContractId, CancellationToken cancellationToken = default);
     Task<bool> UpdatePendingOrderSchemeAsync(Guid pendingContractId, Guid pendingParticipantSchemeId, PendingOrderSchemeUpdateRequest request, CancellationToken cancellationToken = default);
@@ -137,9 +137,10 @@ public sealed class ContractApiClient(HttpClient httpClient) : IContractApiClien
         return new ContractSaveResult(true, contract, new Dictionary<string, string[]>());
     }
 
-    public async Task<ContractItemsResponse?> GetContractItemsAsync(Guid contractId, CancellationToken cancellationToken = default)
+    public async Task<ContractItemsResponse?> GetContractItemsAsync(Guid contractId, IReadOnlyCollection<Guid>? pendingRemovalIds = null, CancellationToken cancellationToken = default)
     {
-        var response = await httpClient.GetAsync($"/api/contracts/{contractId}/items", cancellationToken);
+        var query = pendingRemovalIds is { Count: > 0 } ? "?" + string.Join('&', pendingRemovalIds.Select(id => $"pending={id}")) : string.Empty;
+        var response = await httpClient.GetAsync($"/api/contracts/{contractId}/items{query}", cancellationToken);
         if (response.StatusCode == HttpStatusCode.NotFound)
         {
             return null;
@@ -149,9 +150,10 @@ public sealed class ContractApiClient(HttpClient httpClient) : IContractApiClien
         return await response.Content.ReadFromJsonAsync<ContractItemsResponse>(cancellationToken);
     }
 
-    public async Task<ContractItemRemovalResult> RemoveContractItemAsync(Guid contractId, Guid participantSchemeId, CancellationToken cancellationToken = default)
+    public async Task<ContractItemRemovalResult> RemoveContractItemAsync(Guid contractId, Guid participantSchemeId, string? auditWhy = null, CancellationToken cancellationToken = default)
     {
-        var response = await httpClient.DeleteAsync($"/api/contracts/{contractId}/items/{participantSchemeId}", cancellationToken);
+        var query = string.IsNullOrWhiteSpace(auditWhy) ? string.Empty : $"?auditWhy={Uri.EscapeDataString(auditWhy)}";
+        var response = await httpClient.DeleteAsync($"/api/contracts/{contractId}/items/{participantSchemeId}{query}", cancellationToken);
         if (response.StatusCode == HttpStatusCode.NotFound)
         {
             return new ContractItemRemovalResult(false, true, "This contract item was not found.");
