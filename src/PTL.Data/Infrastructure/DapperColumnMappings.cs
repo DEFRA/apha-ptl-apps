@@ -421,6 +421,19 @@ public static partial class DapperColumnMappings
             [ColQalNumber] = nameof(PendingOrderSummaryEntity.QalNumber),
         });
 
+        // spgaOnlineContractOrderEmail also returns the customer/QAL/lab-code joins, which are left unmapped on purpose.
+        Map<OnlineOrderEmailEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldOnlineContractOrderEmailId"] = nameof(OnlineOrderEmailEntity.Id),
+            [ColEmail] = nameof(OnlineOrderEmailEntity.Email),
+            [ColContractId] = nameof(OnlineOrderEmailEntity.ContractId),
+            ["fldPendingContractId"] = nameof(OnlineOrderEmailEntity.PendingContractId),
+            ["fldCustomerName"] = nameof(OnlineOrderEmailEntity.CustomerName),
+            [ColYearId] = nameof(OnlineOrderEmailEntity.YearId),
+            ["fldNotes"] = nameof(OnlineOrderEmailEntity.Notes),
+            ["fldIsApproved"] = nameof(OnlineOrderEmailEntity.IsApproved),
+        });
+
         Map<PendingOrderEntity>(new(StringComparer.OrdinalIgnoreCase)
         {
             ["fldPendingContractId"] = nameof(PendingOrderEntity.PendingContractId),

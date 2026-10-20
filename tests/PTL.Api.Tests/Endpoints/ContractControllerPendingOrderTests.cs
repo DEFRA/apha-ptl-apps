@@ -98,7 +98,8 @@ public class ContractControllerPendingOrderTests
             customerRepository,
             lookupRepository,
             new PTL.Api.Tests.Participant.FakeParticipantRepository(),
-            new FakeAuditActorResolver());
+            new FakeAuditActorResolver(),
+            new PTL.Api.Tests.Contract.FakePendingOrderNotifier());
 
         var controller = new ContractController(
             new ContractService(new FakeContractRepository(), new FakeParticipantSchemeRepository(), new PTL.Api.Tests.Contract.FakeContractPostageService(), new PTL.Api.Tests.Contract.FakeAuditActorResolver(), NullLogger<ContractService>.Instance),

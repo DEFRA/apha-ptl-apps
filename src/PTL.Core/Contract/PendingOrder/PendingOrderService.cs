@@ -21,11 +21,11 @@ public interface IPendingOrderService
     // not part of the given outstanding order.
     Task<bool> UpdateSchemeAsync(Guid pendingContractId, Guid pendingParticipantSchemeId, PendingOrderSchemeEdit edit, CancellationToken cancellationToken = default);
 
-    // Creates the contract and its participant schemes, soft-deletes the pending order, then queues the
-    // approval emails. Throws PendingOrderValidationException for an over-long purchase order number/comments.
+    // Creates the contract and its participant schemes, soft-deletes the pending order, then sends the
+    // approval emails (a failed send never undoes the approval; the scheduler retries it). Throws PendingOrderValidationException for an over-long purchase order number/comments.
     Task<bool> ApprovePendingOrderAsync(Guid pendingContractId, string purchaseOrderNumber, string comments = "", CancellationToken cancellationToken = default);
 
-    // Deletes every pending scheme line, soft-deletes the pending order, then queues the decline emails.
+    // Deletes every pending scheme line, soft-deletes the pending order, then sends the decline emails.
     // The live contract records are untouched.
     Task<bool> DeclinePendingOrderAsync(Guid pendingContractId, string comments = "", CancellationToken cancellationToken = default);
 }
@@ -75,7 +75,8 @@ public sealed class PendingOrderService(
     PTL.Core.Customer.ICustomerRepository customerRepository,
     ILookupRepository lookupRepository,
     IParticipantRepository participantRepository,
-    IAuditActorResolver auditActor) : IPendingOrderService
+    IAuditActorResolver auditActor,
+    IPendingOrderNotifier pendingOrderNotifier) : IPendingOrderService
 {
     // Legacy getNewContractSuffix supports at most 51 contracts per customer per year.
     private const string Alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
@@ -276,6 +277,7 @@ public sealed class PendingOrderService(
         if (decided)
         {
             await QueueNotificationsAsync(order, created.ContractId, comments, isApproved: true, cancellationToken);
+            await pendingOrderNotifier.SendForOrderAsync(order.PendingContractId, CancellationToken.None);
         }
 
         return decided;
@@ -304,6 +306,7 @@ public sealed class PendingOrderService(
         if (decided)
         {
             await QueueNotificationsAsync(order, Guid.Empty, comments, isApproved: false, cancellationToken);
+            await pendingOrderNotifier.SendForOrderAsync(order.PendingContractId, CancellationToken.None);
         }
 
         return decided;
@@ -336,8 +339,8 @@ public sealed class PendingOrderService(
     }
 
     // Legacy EmailOrderNotifications: the customer, the customer's first active participant and that
-    // participant's second address each get a queued row (tblOnlineContractOrderEmail) for the order
-    // email service to send. Blank addresses are skipped rather than queued.
+    // participant's second address each get a row in tblOnlineContractOrderEmail, which the caller then
+    // sends at once (retried by the scheduler if that fails). Blank addresses are skipped rather than queued.
     private async Task QueueNotificationsAsync(PendingOrderEntity order, Guid contractId, string comments, bool isApproved, CancellationToken cancellationToken)
     {
         var customer = await customerRepository.GetByIdAsync(order.CustomerId, cancellationToken);

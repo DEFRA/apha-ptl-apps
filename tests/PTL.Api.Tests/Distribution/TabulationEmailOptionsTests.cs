@@ -12,8 +12,6 @@ public class TabulationEmailOptionsTests
 
         Assert.Equal("TabulationEmails", TabulationEmailOptions.SectionName);
         Assert.True(options.Enabled);
-        Assert.Equal(TimeSpan.FromMinutes(5), options.PollInterval);
-        Assert.Equal(TimeSpan.FromSeconds(30), options.StartupDelay);
         Assert.Equal("Europe/London", options.TimeZone);
         Assert.Equal("Test%20Consultant/Tabulation", options.InternalCommentsPath);
         Assert.Equal("CommentsEntry", options.ExternalCommentsPath);

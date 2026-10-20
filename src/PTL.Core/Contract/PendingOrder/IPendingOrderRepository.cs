@@ -32,8 +32,14 @@ public interface IPendingOrderRepository
     // the order is still outstanding afterwards.
     Task<bool> MarkDecidedAsync(Guid customerId, Guid pendingContractId, CancellationToken cancellationToken = default);
 
-    // spiOnlineContractOrderEmail - queues one approve/decline email for the order notification service.
+    // spiOnlineContractOrderEmail - records one approve/decline email; it stays unsent until PendingOrderNotifier sends it.
     Task QueueNotificationAsync(PendingOrderNotification notification, CancellationToken cancellationToken = default);
+
+    // spgaOnlineContractOrderEmail - every unsent row, once each (the procedure repeats a row per active participant).
+    Task<IReadOnlyList<OnlineOrderEmailEntity>> GetUnsentNotificationsAsync(CancellationToken cancellationToken = default);
+
+    // spuOnlineContractOrderEmail - stamps fldDateSent.
+    Task MarkNotificationSentAsync(Guid notificationId, DateTime sentAt, CancellationToken cancellationToken = default);
 }
 
 // One row of tblOnlineContractOrderEmail (legacy PendingContractOrder.EmailOrderNotifications). ContractId is

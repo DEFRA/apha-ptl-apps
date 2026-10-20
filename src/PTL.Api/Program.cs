@@ -147,6 +147,11 @@ builder.Services.AddScoped<IRenewContractsService, RenewContractsService>();
 builder.Services.AddScoped<IPendingOrderRepository, PendingOrderRepository>();
 builder.Services.AddScoped<IPendingOrderService, PendingOrderService>();
 
+// Approve/Decline emails: sent through GOV.UK Notify straight after the decision, retried by the hosted scheduler.
+builder.Services.Configure<OnlineOrderEmailOptions>(builder.Configuration.GetSection(OnlineOrderEmailOptions.SectionName));
+builder.Services.AddSingleton<PendingOrderEmailGuard>();
+builder.Services.AddScoped<IPendingOrderNotifier, PendingOrderNotifier>();
+
 // Single shared S3 configuration root for every S3-backed feature (export templates, invoice
 // archives) - one bucket, one prefix per feature (docs/migration/invoice-migration.md). Provider
 // and region never vary by environment, so they are not bound from configuration at all - see
@@ -205,14 +210,15 @@ builder.Services.AddScoped<IActualResultsService, ActualResultsService>();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddScoped<IDistributionPostedNotifier, DistributionPostedNotifier>();
 
-// Test Consultant and publication emails: sent through GOV.UK Notify, with the scheduler hosted in this process.
+// Test Consultant and publication emails: sent through GOV.UK Notify; the one scheduler for all email jobs is hosted in this process.
+builder.Services.Configure<NotificationSchedulerOptions>(builder.Configuration.GetSection(NotificationSchedulerOptions.SectionName));
 builder.Services.Configure<TabulationEmailOptions>(builder.Configuration.GetSection(TabulationEmailOptions.SectionName));
 builder.Services.Configure<PublicationNotificationOptions>(builder.Configuration.GetSection(PublicationNotificationOptions.SectionName));
 builder.Services.AddSingleton<TabulationEmailGuard>();
 builder.Services.AddSingleton<TabulationEmailContext>();
 builder.Services.AddScoped<ITabulationEmailService, TabulationEmailService>();
 builder.Services.AddScoped<ITabulationPublishedNotifier, TabulationPublishedNotifier>();
-builder.Services.AddHostedService<PTL.Api.BackgroundServices.TabulationEmailBackgroundService>();
+builder.Services.AddHostedService<PTL.Api.BackgroundServices.NotificationBackgroundService>();
 builder.Services.AddScoped<IPackagingService, PackagingService>();
 builder.Services.AddScoped<IPackagingOutputService, PackagingOutputService>();
 builder.Services.AddScoped<ITemplateMergeService, TemplateMergeService>();

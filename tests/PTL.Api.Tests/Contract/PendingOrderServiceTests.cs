@@ -21,6 +21,7 @@ public class PendingOrderServiceTests
         FakeParticipantSchemeRepository ParticipantSchemes,
         FakeSchemeRepository Schemes,
         PTL.Api.Tests.Participant.FakeParticipantRepository Participants,
+        FakePendingOrderNotifier Notifier,
         Guid CustomerId,
         Guid PendingContractId,
         Guid SchemeId);
@@ -116,9 +117,10 @@ public class PendingOrderServiceTests
 
         var participants = new PTL.Api.Tests.Participant.FakeParticipantRepository();
         await participants.CreateAsync(new PTL.Core.Participant.Participant { CustomerId = customer.CustomerId, LabCode = "001", Email = "participant@example.com", Email2 = "participant2@example.com", IsActive = true });
-        var service = new PendingOrderService(pendingOrders, contracts, participantSchemes, schemeRepository, customerRepository, lookupRepository, participants, new FakeAuditActorResolver(actor));
+        var notifier = new FakePendingOrderNotifier();
+        var service = new PendingOrderService(pendingOrders, contracts, participantSchemes, schemeRepository, customerRepository, lookupRepository, participants, new FakeAuditActorResolver(actor), notifier);
 
-        return new Harness(service, pendingOrders, contracts, participantSchemes, schemeRepository, participants, customer.CustomerId, pendingContractId, realScheme.SchemeId);
+        return new Harness(service, pendingOrders, contracts, participantSchemes, schemeRepository, participants, notifier, customer.CustomerId, pendingContractId, realScheme.SchemeId);
     }
 
     [Fact]
@@ -547,6 +549,39 @@ public class PendingOrderServiceTests
         Assert.True(await harness.Service.DeclinePendingOrderAsync(harness.PendingContractId));
 
         Assert.False(await harness.Service.DeclinePendingOrderAsync(harness.PendingContractId));
+    }
+
+    [Fact]
+    public async Task ApprovePendingOrderAsync_SendsTheOrdersEmailsOnceTheyAreQueued()
+    {
+        var harness = await CreateAsync();
+
+        await harness.Service.ApprovePendingOrderAsync(harness.PendingContractId, "PO-2");
+
+        Assert.Equal([harness.PendingContractId], harness.Notifier.SentForOrders);
+        Assert.Equal(3, harness.PendingOrders.QueuedNotifications.Count);
+    }
+
+    [Fact]
+    public async Task DeclinePendingOrderAsync_SendsTheOrdersEmailsOnceTheyAreQueued()
+    {
+        var harness = await CreateAsync();
+
+        await harness.Service.DeclinePendingOrderAsync(harness.PendingContractId, "Not eligible");
+
+        Assert.Equal([harness.PendingContractId], harness.Notifier.SentForOrders);
+    }
+
+    [Fact]
+    public async Task ApproveAndDecline_NothingDecided_SendNothing()
+    {
+        var harness = await CreateAsync();
+
+        Assert.False(await harness.Service.ApprovePendingOrderAsync(Guid.NewGuid(), "PO-2"));
+        Assert.False(await harness.Service.DeclinePendingOrderAsync(Guid.NewGuid()));
+        await Assert.ThrowsAsync<PendingOrderValidationException>(() => harness.Service.ApprovePendingOrderAsync(harness.PendingContractId, "PO-2", new string('x', 2001)));
+
+        Assert.Empty(harness.Notifier.SentForOrders);
     }
 
     private static PendingOrderSchemeEdit Edit(bool importExportLicence = false, bool isRemoved = false) =>

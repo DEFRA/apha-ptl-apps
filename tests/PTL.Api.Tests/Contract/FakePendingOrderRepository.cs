@@ -49,9 +49,41 @@ internal sealed class FakePendingOrderRepository : IPendingOrderRepository
 
     public List<PendingOrderNotification> QueuedNotifications { get; } = [];
 
+    // Rows of tblOnlineContractOrderEmail that have no fldDateSent yet.
+    public List<OnlineOrderEmailEntity> Unsent { get; } = [];
+    public Dictionary<Guid, DateTime> MarkedSent { get; } = [];
+    public Exception? GetUnsentFailure { get; set; }
+    public int GetUnsentCalls { get; private set; }
+
     public Task QueueNotificationAsync(PendingOrderNotification notification, CancellationToken cancellationToken = default)
     {
         QueuedNotifications.Add(notification);
+        Unsent.Add(new OnlineOrderEmailEntity
+        {
+            Id = Guid.NewGuid(),
+            Email = notification.Email,
+            ContractId = notification.ContractId,
+            PendingContractId = notification.PendingContractId,
+            CustomerName = notification.CustomerName,
+            YearId = notification.YearId,
+            Notes = notification.Notes,
+            IsApproved = notification.IsApproved
+        });
+        return Task.CompletedTask;
+    }
+
+    public Task<IReadOnlyList<OnlineOrderEmailEntity>> GetUnsentNotificationsAsync(CancellationToken cancellationToken = default)
+    {
+        GetUnsentCalls++;
+        return GetUnsentFailure is null
+            ? Task.FromResult<IReadOnlyList<OnlineOrderEmailEntity>>([.. Unsent])
+            : Task.FromException<IReadOnlyList<OnlineOrderEmailEntity>>(GetUnsentFailure);
+    }
+
+    public Task MarkNotificationSentAsync(Guid notificationId, DateTime sentAt, CancellationToken cancellationToken = default)
+    {
+        Unsent.RemoveAll(e => e.Id == notificationId);
+        MarkedSent[notificationId] = sentAt;
         return Task.CompletedTask;
     }
 
