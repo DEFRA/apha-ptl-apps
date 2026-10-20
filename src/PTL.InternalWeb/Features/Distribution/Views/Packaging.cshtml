@@ -3,14 +3,17 @@
 @model PTL.InternalWeb.Features.Distribution.PackagingViewModel
 @{
     var hasMessage = !string.IsNullOrEmpty(Model.Message);
-    ViewData["Title"] = $"{(hasMessage || Model.HasSelectionError ? "Error: " : string.Empty)}Sample Packaging - {Model.MonthDescription}";
+    ViewData["Title"] = $"{(hasMessage || Model.HasSelectionError ? "Error: " : string.Empty)}Sample packaging – {Model.MonthDescription}";
 
     var sheet = Model.Sheet;
     var isDaily = sheet?.Mode == 2;
     var isParticipantCombined = sheet?.Mode == 1;
     var columnCount = isDaily ? 6 : 8;
     var tickId = 0;
-    const string preparationIncompleteText = "The preparation for this Scheme is not complete";
+    const string preparationIncompleteText = "The preparation for this scheme is not complete";
+
+    // GOV.UK date style (4 April 2026); the sheet's own LongDate/ShortDate stay for the merged documents.
+    string Day(DateTime date) => date.ToString("d MMMM yyyy", System.Globalization.CultureInfo.GetCultureInfo("en-GB"));
 
     // Extra full-width rows shown beneath a Scheme row (legacy cellWorkSheetSchemePacking).
     List<string> PackingLines(PackagingSchemeResponse scheme)
@@ -67,7 +70,7 @@
 
         if (date.HasValue)
         {
-            @PackagingSheetBuilder.ShortDate(date.Value)
+            @Day(date.Value)
         }
         else if (id.HasValue)
         {
@@ -112,18 +115,26 @@
 
         if (isDaily)
         {
-            <td class="govuk-table__cell cellWorkSheetScheme" rowspan="@rowCount">
+            <th scope="rowgroup" class="govuk-table__header cellWorkSheetScheme" rowspan="@rowCount">
+                @Day(block.Date)
                 @if (block.DueToBePosted)
                 {
-                    <span class="govuk-visually-hidden">Due to be posted: </span>
+                    <br />
+                    <strong class="govuk-tag govuk-tag--yellow">Due to be posted</strong>
                 }
-                @PackagingSheetBuilder.LongDate(block.Date)
-            </td>
+            </th>
         }
         else
         {
-            <td class="govuk-table__cell cellWorkSheetGroup" rowspan="@rowCount">@PackagingSheetBuilder.LongDate(block.Date)</td>
-            <td class="govuk-table__cell cellWorkSheetGroup" rowspan="@rowCount">
+            <th scope="rowgroup" class="govuk-table__header govuk-!-font-weight-regular cellWorkSheetGroup" rowspan="@rowCount">
+                @Day(block.Date)
+                @if (block.DueToBePosted)
+                {
+                    <br />
+                    <strong class="govuk-tag govuk-tag--yellow">Due to be posted</strong>
+                }
+            </th>
+            <th scope="rowgroup" class="govuk-table__header govuk-!-font-weight-regular cellWorkSheetGroup" rowspan="@rowCount">
                 @block.Heading
                 @if (isParticipantCombined && (block.ShowAllPacked || block.ShowAllPosted))
                 {
@@ -131,15 +142,15 @@
                         <hr class="govuk-section-break govuk-section-break--visible govuk-!-margin-top-2 govuk-!-margin-bottom-2" />
                         @if (block.ShowAllPacked)
                         {
-                            Tick("ptl-tick-block", null, null, false, "All Packed:", true, ("packed", null));
+                            Tick("ptl-tick-block", null, null, false, "All packed:", true, ("packed", null));
                         }
                         @if (block.ShowAllPosted)
                         {
-                            Tick("ptl-tick-block", null, null, false, "All Posted:", true, ("posted", null));
+                            Tick("ptl-tick-block", null, null, false, "All posted:", true, ("posted", null));
                         }
                     </div>
                 }
-            </td>
+            </th>
         }
 
         <td class="govuk-table__cell noprint" rowspan="@rowCount">
@@ -154,9 +165,50 @@
     <link rel="stylesheet" href="~/css/printable-scheme.css" />
 }
 
-<a class="govuk-back-link noprint" asp-action="Index" asp-route-year="@Model.YearId">Back</a>
+@section BackLink {
+    <a class="govuk-back-link noprint" asp-action="Index" asp-route-year="@Model.YearId">Back</a>
+}
 
-<h1 class="govuk-heading-l noprint">Sample Packaging - @Model.MonthDescription</h1>
+@if (Model.HasSelectionError)
+{
+    <div class="govuk-error-summary noprint" data-module="govuk-error-summary">
+        <div role="alert">
+            <h2 class="govuk-error-summary__title">There is a problem</h2>
+            <div class="govuk-error-summary__body">
+                <ul class="govuk-list govuk-error-summary__list">
+                    @if (Model.ModeError is not null)
+                    {
+                        <li><a href="#packaging-mode">@Model.ModeError</a></li>
+                    }
+                    @if (Model.WeekError is not null)
+                    {
+                        <li><a href="#packaging-week">@Model.WeekError</a></li>
+                    }
+                </ul>
+            </div>
+        </div>
+    </div>
+}
+
+@if (hasMessage)
+{
+    <div class="govuk-error-summary noprint" data-module="govuk-error-summary">
+        <div role="alert">
+            <h2 class="govuk-error-summary__title">There is a problem</h2>
+            <div class="govuk-error-summary__body">
+                <ul class="govuk-list govuk-error-summary__list">
+                    <li>@Model.Message</li>
+                </ul>
+                @if (!string.IsNullOrEmpty(Model.MessageDetail))
+                {
+                    <p class="govuk-body">@Model.MessageDetail</p>
+                }
+            </div>
+        </div>
+    </div>
+}
+
+<h1 class="govuk-heading-l noprint">Sample packaging – @Model.MonthDescription</h1>
 
 <form method="post" asp-action="Packaging" asp-route-year="@Model.YearId" asp-route-monthId="@Model.MonthId" id="packaging-form">
     @foreach (var tick in Model.CarriedTicks(Model.PackedTicks))
@@ -172,42 +224,6 @@
     <div class="noprint">
         <p class="govuk-body">Select a packaging option and, if needed, a week. Then choose View to show the sample packaging list and any special packing instructions.</p>
 
-        @if (Model.HasSelectionError)
-        {
-            <div class="govuk-error-summary" data-module="govuk-error-summary">
-                <div role="alert">
-                    <h2 class="govuk-error-summary__title">There is a problem</h2>
-                    <div class="govuk-error-summary__body">
-                        <ul class="govuk-list govuk-error-summary__list">
-                            @if (Model.ModeError is not null)
-                            {
-                                <li><a href="#packaging-mode">@Model.ModeError</a></li>
-                            }
-                            @if (Model.WeekError is not null)
-                            {
-                                <li><a href="#packaging-week">@Model.WeekError</a></li>
-                            }
-                        </ul>
-                    </div>
-                </div>
-            </div>
-        }
-
-        @if (hasMessage)
-        {
-            <div class="govuk-error-summary" data-module="govuk-error-summary">
-                <div role="alert">
-                    <h2 class="govuk-error-summary__title">@Model.Message</h2>
-                    @if (!string.IsNullOrEmpty(Model.MessageDetail))
-                    {
-                        <div class="govuk-error-summary__body">
-                            <p class="govuk-body">@Model.MessageDetail</p>
-                        </div>
-                    }
-                </div>
-            </div>
-        }
-
         <div class="ptl-packaging-selects">
             <div class="govuk-form-group @(Model.ModeError is null ? "" : "govuk-form-group--error")">
                 <label class="govuk-label" for="packaging-mode">Packaging option</label>
@@ -218,11 +234,11 @@
                 <select class="govuk-select @(Model.ModeError is null ? "" : "govuk-select--error")" id="packaging-mode" name="Mode" aria-describedby="@(Model.ModeError is null ? null : "packaging-mode-error")">
                     @if (Model.Mode is null)
                     {
-                        <option value="" selected="selected">- Please Select -</option>
+                        <option value="" selected="selected">Select</option>
                     }
-                    <option value="0" selected="@(Model.Mode == 0)">Group Address Packaging</option>
-                    <option value="1" selected="@(Model.Mode == 1)">Participant Combined Packaging</option>
-                    <option value="2" selected="@(Model.Mode == 2)">Daily Packaging</option>
+                    <option value="0" selected="@(Model.Mode == 0)">Group address packaging</option>
+                    <option value="1" selected="@(Model.Mode == 1)">Participant combined packaging</option>
+                    <option value="2" selected="@(Model.Mode == 2)">Daily packaging</option>
                 </select>
             </div>
             @if (Model.ShowWeek)
@@ -236,7 +252,7 @@
                     <select class="govuk-select @(Model.WeekError is null ? "" : "govuk-select--error")" id="packaging-week" name="Week" aria-describedby="@(Model.WeekError is null ? null : "packaging-week-error")">
                         @if (Model.Week == 0)
                         {
-                            <option value="0" selected="selected">- Please Select -</option>
+                            <option value="0" selected="selected">Select</option>
                         }
                         @for (var week = 1; week <= 4; week++)
                         {
@@ -251,8 +267,9 @@
 
     @if (sheet is not null)
     {
+        <div class="ptl-table-scroll" role="region" aria-label="Sample packaging" tabindex="0">
         <table class="govuk-table" id="packaging-table">
-            <caption class="govuk-table__caption govuk-visually-hidden">Sample Packaging</caption>
+            <caption class="govuk-table__caption govuk-visually-hidden">Sample packaging</caption>
             <thead class="govuk-table__head">
                 <tr class="govuk-table__row">
                     @if (isDaily)
@@ -262,7 +279,7 @@
                     else
                     {
                         <th scope="col" class="govuk-table__header">Date</th>
-                        <th scope="col" class="govuk-table__header">@(isParticipantCombined ? "Participant" : "Group Address")</th>
+                        <th scope="col" class="govuk-table__header">@(isParticipantCombined ? "Participant" : "Group address")</th>
                     }
                     @{
                         SelectAllHeader("print", "Print", "Select all rows to print", true);
@@ -272,10 +289,10 @@
                         SelectAllHeader("packed", "Packed", "Select all rows as packed", false);
                         SelectAllHeader("posted", "Posted", "Select all rows as posted", false);
                     }
-                    <th scope="col" class="govuk-table__header">Import Permit</th>
+                    <th scope="col" class="govuk-table__header">Import permit</th>
                     @if (!isDaily)
                     {
-                        <th scope="col" class="govuk-table__header">Packing Instructions</th>
+                        <th scope="col" class="govuk-table__header">Packing instructions</th>
                     }
                 </tr>
             </thead>
@@ -330,7 +347,7 @@
                                 }
                                 else
                                 {
-                                    TotalStageCell("packed", scheme.PackedTotal, $"All Packed: {scheme.Description}", schemeId);
+                                    TotalStageCell("packed", scheme.PackedTotal, $"All packed: {scheme.Description}", schemeId);
                                 }
                             </td>
                             <td class="govuk-table__cell cellWorkSheetCompleteTotal" rowspan="@(1 + lines.Count)">
@@ -340,7 +357,7 @@
                                 }
                                 else
                                 {
-                                    TotalStageCell("posted", scheme.PostedTotal, $"All Posted: {scheme.Description}", schemeId);
+                                    TotalStageCell("posted", scheme.PostedTotal, $"All posted: {scheme.Description}", schemeId);
                                 }
                             </td>
                             <td class="govuk-table__cell cellWorkSheetImportPermit" rowspan="@(1 + lines.Count)">@(isParticipantCombined ? scheme.ImportPermitStatus : null)</td>
@@ -360,7 +377,7 @@
                         @foreach (var participant in scheme.Participants)
                         {
                             <tr class="@rowClass">
-                                <td class="govuk-table__cell cellWorkSheetParticipant">@participant.Description</td>
+                                <th scope="row" class="govuk-table__header govuk-!-font-weight-regular cellWorkSheetParticipant">@participant.Description</th>
                                 <td class="govuk-table__cell cellWorkSheetComplete">
                                     @{
                                         RowStageCell("packed", participant.DistributionParticipantId, participant.PackagedDate, scheme.PreparationComplete, $"Packed: {participant.Description}, {scheme.Description}", schemeId);
@@ -378,6 +395,7 @@
                 </tbody>
             }
         </table>
+        </div>
     }
 
     <div class="noprint">
@@ -385,15 +403,15 @@
             <div class="govuk-button-group">
                 <button type="submit" name="command" value="save" class="govuk-button" data-module="govuk-button">Save</button>
                 <button type="submit" name="command" value="apply" class="govuk-button govuk-button--secondary" data-module="govuk-button">Apply</button>
-                <button type="submit" name="command" value="cancel" class="govuk-button govuk-button--secondary" data-module="govuk-button" formnovalidate>Cancel</button>
+                <a class="govuk-link" asp-action="Index">Cancel</a>
             </div>
             <div class="govuk-button-group">
                 @if (Model.ShowCustoms)
                 {
-                    <button type="submit" name="command" value="customs" class="govuk-button govuk-button--secondary" data-module="govuk-button">Print Customs</button>
+                    <button type="submit" name="command" value="customs" class="govuk-button govuk-button--secondary" data-module="govuk-button">Print customs</button>
                 }
                 <button type="button" id="packaging-print-button" class="govuk-button govuk-button--secondary" data-module="govuk-button">Print</button>
-                <button type="submit" name="command" value="labels" class="govuk-button govuk-button--secondary" data-module="govuk-button">Print Labels</button>
+                <button type="submit" name="command" value="labels" class="govuk-button govuk-button--secondary" data-module="govuk-button">Print labels</button>
             </div>
         </div>
     </div>

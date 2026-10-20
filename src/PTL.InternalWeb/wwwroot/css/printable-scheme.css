@@ -298,3 +298,21 @@
         page-break-after: auto;
     }
 }
+
+/* Wide tables scroll inside their own region rather than the page (WCAG 1.4.10 reflow); tabindex=0 makes
+   the region keyboard-scrollable, so it carries the GOV.UK focus style. */
+.ptl-table-scroll {
+    overflow-x: auto;
+}
+
+.ptl-table-scroll:focus {
+    outline: 3px solid #fd0;
+    outline-offset: 0;
+    box-shadow: inset 0 0 0 3px #0b0c0c;
+}
+
+@media print {
+    .ptl-table-scroll {
+        overflow: visible;
+    }
+}

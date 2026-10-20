@@ -731,7 +731,7 @@ public class DistributionControllerTests
         var model = Assert.IsType<PreparationViewModel>(view.Model);
         Assert.Equal(2026, model.YearId);
         Assert.Equal(4, model.MonthId);
-        Assert.Equal("Apr 2026", model.MonthDescription);
+        Assert.Equal("April 2026", model.MonthDescription);
         var row = Assert.Single(model.Schemes);
         Assert.Equal(PreparationSchemeId, row.MonthlyDistributionSchemeId);
         Assert.Equal("17152A/BA PT0060: Mastitis bovine", row.SchemeHeading);

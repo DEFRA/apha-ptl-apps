@@ -1374,7 +1374,7 @@ public sealed partial class DistributionController(IDistributionApiClient distri
         {
             YearId = year,
             MonthId = monthId,
-            MonthDescription = new DateTime(2000, monthId, 1, 0, 0, 0, DateTimeKind.Utc).ToString("MMM", System.Globalization.CultureInfo.InvariantCulture) + " " + year,
+            MonthDescription = PackagingMonthDescription(year, monthId),
             Schemes = [.. sheet.Schemes.Select(s => new PreparationSchemeRowViewModel
             {
                 MonthlyDistributionSchemeId = s.MonthlyDistributionSchemeId,
