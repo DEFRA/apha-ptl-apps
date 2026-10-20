@@ -16,6 +16,10 @@ internal sealed class FakeCategoryItemTypeApiClient : ICategoryItemTypeApiClient
     public List<(Guid CategoryItemTypeId, CategoryItemTypeNoLongerInUseRequest Request)> AllNoLongerInUseRequests { get; } = [];
     public Guid? LastDeletedCategoryItemTypeId { get; private set; }
 
+    // Set to simulate a downstream API failure (e.g. HttpRequestException) during
+    // SetNoLongerInUseAsync, exercising SchemeAdminController.IsTransientApiFailure.
+    public Exception? SetNoLongerInUseException { get; set; }
+
     public Task<IReadOnlyList<CategoryItemTypeResponse>> GetByYearAsync(int yearId, CancellationToken cancellationToken = default) =>
         Task.FromResult(Items);
 
@@ -33,6 +37,11 @@ internal sealed class FakeCategoryItemTypeApiClient : ICategoryItemTypeApiClient
 
     public Task<CategoryItemTypeSaveResult> SetNoLongerInUseAsync(Guid categoryItemTypeId, CategoryItemTypeNoLongerInUseRequest request, CancellationToken cancellationToken = default)
     {
+        if (SetNoLongerInUseException is not null)
+        {
+            throw SetNoLongerInUseException;
+        }
+
         LastNoLongerInUseRequest = (categoryItemTypeId, request);
         AllNoLongerInUseRequests.Add((categoryItemTypeId, request));
         return Task.FromResult(SaveResult);

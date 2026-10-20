@@ -175,6 +175,45 @@ public class SchemeAdminControllerTests
         Assert.False(apiClient.AllNoLongerInUseRequests.Single().Request.NoLongerInUse);
     }
 
+    // Covers SchemeAdminController.IsTransientApiFailure, shared by all 3 entities' SaveAllNoLongerInUse.
+    [Fact]
+    public async Task CategoryItemTypeSaveAllNoLongerInUse_ApiThrowsTransientFailure_RedisplaysWithFailureMessage()
+    {
+        var itemId = Guid.NewGuid();
+        var apiClient = new FakeCategoryItemTypeApiClient
+        {
+            Items = [new CategoryItemTypeResponse(itemId, "Colour", CurrentYearId, 9999, false, 0, string.Empty)],
+            SetNoLongerInUseException = new HttpRequestException("Connection refused")
+        };
+        var controller = CreateController(apiClient);
+
+        var result = await controller.CategoryItemTypeSaveAllNoLongerInUse(
+            pageCategoryItemTypeIds: [itemId],
+            checkedCategoryItemTypeIds: [itemId],
+            CurrentYearId, 1, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<CategoryItemTypeViewModel>(view.Model);
+        Assert.True(model.MessageIsError);
+        Assert.Contains("did not respond", model.Message);
+    }
+
+    // Covers ResolveSelectedYearId's fallback when no years exist at all (currentYearId is null
+    // and availableYears is empty), distinct from the usual "falls back to the first year" path.
+    [Fact]
+    public async Task CategoryItemType_Get_NoYearsAvailable_SelectsZeroWithEmptyYearOptions()
+    {
+        var apiClient = new FakeCategoryItemTypeApiClient();
+        var controller = CreateController(apiClient, lookupApiClient: new FakeLookupApiClient { Years = [] });
+
+        var result = await controller.CategoryItemType(null, null, null, cancellationToken: CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<CategoryItemTypeViewModel>(view.Model);
+        Assert.Equal(0, model.SelectedYearId);
+        Assert.Empty(model.YearOptions);
+    }
+
     [Fact]
     public async Task CategoryItemTypeRemove_Blocked_RedisplaysWithMessage()
     {
