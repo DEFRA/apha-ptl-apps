@@ -149,8 +149,14 @@ builder.Services.AddScoped<IPendingOrderService, PendingOrderService>();
 
 // Approve/Decline emails: sent through GOV.UK Notify straight after the decision, retried by the hosted scheduler.
 builder.Services.Configure<OnlineOrderEmailOptions>(builder.Configuration.GetSection(OnlineOrderEmailOptions.SectionName));
-builder.Services.AddSingleton<PendingOrderEmailGuard>();
+builder.Services.AddSingleton<EmailSendGuard>();
 builder.Services.AddScoped<IPendingOrderNotifier, PendingOrderNotifier>();
+
+// Customer and participant update emails: same pattern - sent through GOV.UK Notify when the update is decided, retried by the scheduler.
+builder.Services.Configure<CustomerUpdateEmailOptions>(builder.Configuration.GetSection(CustomerUpdateEmailOptions.SectionName));
+builder.Services.Configure<ParticipantUpdateEmailOptions>(builder.Configuration.GetSection(ParticipantUpdateEmailOptions.SectionName));
+builder.Services.AddScoped<ICustomerUpdateNotifier, CustomerUpdateNotifier>();
+builder.Services.AddScoped<IParticipantUpdateNotifier, ParticipantUpdateNotifier>();
 
 // Single shared S3 configuration root for every S3-backed feature (export templates, invoice
 // archives) - one bucket, one prefix per feature (docs/migration/invoice-migration.md). Provider

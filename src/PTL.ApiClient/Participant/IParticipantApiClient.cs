@@ -11,8 +11,8 @@ public interface IParticipantApiClient
     Task<ParticipantSaveResult> UpdateParticipantAsync(Guid participantId, ParticipantRequest request, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<PendingParticipantUpdateSummaryResponse>> GetPendingParticipantUpdatesAsync(CancellationToken cancellationToken = default);
     Task<PendingParticipantUpdateComparisonResponse?> GetPendingParticipantUpdateAsync(Guid participantId, CancellationToken cancellationToken = default);
-    Task<PendingParticipantUpdateDecisionResult> ApprovePendingParticipantUpdateAsync(Guid participantId, PendingParticipantUpdateSaveRequest? request = null, CancellationToken cancellationToken = default);
-    Task<bool> DeclinePendingParticipantUpdateAsync(Guid participantId, CancellationToken cancellationToken = default);
+    Task<PendingParticipantUpdateDecisionResult> ApprovePendingParticipantUpdateAsync(Guid participantId, PendingParticipantUpdateSaveRequest? request = null, string? comments = null, CancellationToken cancellationToken = default);
+    Task<bool> DeclinePendingParticipantUpdateAsync(Guid participantId, string? comments = null, CancellationToken cancellationToken = default);
 
     // Legacy ParticipantViewers.aspx. Returns null when the participant does not exist.
     Task<ParticipantViewerAssignmentResponse?> GetParticipantViewersAsync(Guid participantId, CancellationToken cancellationToken = default);

@@ -34,7 +34,7 @@ public sealed partial class PendingOrderNotifier(
     IParticipantRepository participantRepository,
     ILookupRepository lookupRepository,
     INotifyClient notifyClient,
-    PendingOrderEmailGuard guard,
+    EmailSendGuard guard,
     IOptions<OnlineOrderEmailOptions> options,
     TimeProvider timeProvider,
     ILogger<PendingOrderNotifier> logger) : IPendingOrderNotifier

@@ -112,4 +112,78 @@ public class PendingCustomerUpdateRepositoryTests
 
         Assert.False(result);
     }
+
+    [Fact]
+    public async Task QueueNotificationAsync_InsertsOneEmailRowBoundByName()
+    {
+        const string queueSql = "EXEC dbo.spiUpdatedCustomerDetailsEmail @UpdatedCustomerDetailsEmailId = @Id, @Email = @Email, @PendingCustomerDetailsEditId = @PendingCustomerUpdateId, @CustomerName = @CustomerName, @Notes = @Notes, @IsApproved = @IsApproved";
+        var (repository, connection) = CreateRepository();
+        var pendingId = Guid.NewGuid();
+        connection.RespondToNonQuery(queueSql, -1);
+
+        await repository.QueueNotificationAsync(new CustomerUpdateNotification("a@example.com", pendingId, "Sample Labs", "Thanks", IsApproved: true));
+
+        var command = Assert.Single(connection.ExecutedCommands);
+        Assert.Equal(queueSql, command.CommandText);
+        Assert.NotEqual(Guid.Empty, (Guid?)command.ParameterValue("Id"));
+        Assert.Equal("a@example.com", (string?)command.ParameterValue("Email"));
+        Assert.Equal(pendingId, (Guid?)command.ParameterValue("PendingCustomerUpdateId"));
+        Assert.Equal("Sample Labs", (string?)command.ParameterValue("CustomerName"));
+        Assert.Equal("Thanks", (string?)command.ParameterValue("Notes"));
+        Assert.Equal(true, (bool?)command.ParameterValue("IsApproved"));
+    }
+
+    [Fact]
+    public async Task GetUnsentNotificationsAsync_MapsTheRowAndTheLookedUpQalNumberAndLabCode()
+    {
+        var (repository, connection) = CreateRepository();
+        var table = new DataTable();
+        table.Columns.Add("fldUpdatedCustomerDetailsEmailId", typeof(Guid));
+        table.Columns.Add("fldEmail", typeof(string));
+        table.Columns.Add("fldPendingCustomerDetailsEditId", typeof(Guid));
+        table.Columns.Add("fldCustomerName", typeof(string));
+        table.Columns.Add("fldNotes", typeof(string));
+        table.Columns.Add("fldDateSent", typeof(DateTime));
+        table.Columns.Add("fldIsApproved", typeof(bool));
+        table.Columns.Add("fldQalNumber", typeof(string));
+        table.Columns.Add("fldLabCode", typeof(string));
+        var id = Guid.NewGuid();
+        var pendingId = Guid.NewGuid();
+        table.Rows.Add(id, "a@example.com", pendingId, "Sample Labs", "Thanks", DBNull.Value, true, "QAL/00001", "001");
+        table.Rows.Add(Guid.NewGuid(), DBNull.Value, pendingId, "Other Labs", "No", DBNull.Value, false, DBNull.Value, DBNull.Value);
+        connection.RespondToQuery("EXEC dbo.spgaUpdatedCustomerDetailsEmail", table);
+
+        var result = await repository.GetUnsentNotificationsAsync();
+
+        Assert.Equal(2, result.Count);
+        var accepted = Assert.Single(result, r => r.Id == id);
+        Assert.Equal("a@example.com", accepted.Email);
+        Assert.Equal(pendingId, accepted.PendingCustomerUpdateId);
+        Assert.Equal("Sample Labs", accepted.CustomerName);
+        Assert.Equal("Thanks", accepted.Notes);
+        Assert.True(accepted.IsApproved);
+        Assert.Equal("QAL/00001", accepted.QalNumber);
+        Assert.Equal("001", accepted.LabCode);
+        var declined = Assert.Single(result, r => r.Id != id);
+        Assert.Null(declined.Email);
+        Assert.Null(declined.QalNumber);
+        Assert.False(declined.IsApproved);
+    }
+
+    [Fact]
+    public async Task MarkNotificationSentAsync_StampsTheRowBoundByName()
+    {
+        const string markSql = "EXEC dbo.spuUpdatedCustomerDetailsEmail @UpdatedCustomerDetailsEmailId = @Id, @DateSent = @SentAt";
+        var (repository, connection) = CreateRepository();
+        var id = Guid.NewGuid();
+        var sentAt = new DateTime(2026, 10, 20, 9, 0, 0, DateTimeKind.Utc);
+        connection.RespondToNonQuery(markSql, -1);
+
+        await repository.MarkNotificationSentAsync(id, sentAt);
+
+        var command = Assert.Single(connection.ExecutedCommands);
+        Assert.Equal(markSql, command.CommandText);
+        Assert.Equal(id, (Guid?)command.ParameterValue("Id"));
+        Assert.Equal(sentAt, (DateTime?)command.ParameterValue("SentAt"));
+    }
 }

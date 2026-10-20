@@ -73,6 +73,12 @@ public sealed record PendingCustomerUpdateSaveRequest(
     string InvoiceFax,
     string InvoiceEmail);
 
+// Optional body of the approve endpoint: amended values (null = approve the stored values) plus the
+// reviewer's comments, which legacy sent as the notification email's "Additional Information".
+public sealed record PendingCustomerUpdateApproveRequest(PendingCustomerUpdateSaveRequest? Edits = null, string? Comments = null);
+
+public sealed record PendingCustomerUpdateDeclineRequest(string? Comments = null);
+
 // Outcome of an Approve/Decline. NotFound distinguishes "no outstanding pending update" from a
 // validation failure so the caller can return 404 rather than redisplaying the form.
 public sealed record PendingCustomerUpdateDecisionResult(

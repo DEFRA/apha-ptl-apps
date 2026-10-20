@@ -19,8 +19,12 @@ public sealed record ParticipantDetailsViewModel(
     string LabTypeName,
     string CountryName);
 
-// Review Pending Participant Updates list (legacy ReviewPendingParticipantUpdates.aspx).
-public sealed record PendingParticipantUpdateListViewModel(IReadOnlyList<PTL.Contracts.Participant.PendingParticipantUpdateSummaryResponse> Updates);
+// Review Pending Participant Updates list (legacy ReviewPendingParticipantUpdates.aspx). Updates is the current page only.
+public sealed record PendingParticipantUpdateListViewModel(
+    IReadOnlyList<PTL.Contracts.Participant.PendingParticipantUpdateSummaryResponse> Updates,
+    int Page,
+    int PageSize,
+    int TotalCount);
 
 // One aligned comparison row - the label appears once and both values sit on the same line,
 // replacing legacy's "editable pending value with the current value in green beside it".
@@ -103,9 +107,8 @@ public sealed class PendingParticipantUpdateFormViewModel
     [OptionalEmailAddress(ErrorMessage = "Enter a valid secondary email address")]
     public string? Email2 { get; set; }
 
-    // Legacy captures Comments purely to include in the approval/decline notification email
-    // (EmailUpdateNotifications). Email notification is not migrated - [NEEDS INVESTIGATION].
-    [StringLength(2000, ErrorMessage = "Comments must not exceed 2000 characters")]
+    // The reviewer's comments, sent as the notification email's "Additional Information" (legacy EmailUpdateNotifications).
+    [StringLength(2000, ErrorMessage = "The comments field allows maximum 2000 characters")]
     public string? Comments { get; set; }
 }
 

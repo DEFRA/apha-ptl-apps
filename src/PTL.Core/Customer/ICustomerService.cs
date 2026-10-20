@@ -26,10 +26,11 @@ public interface ICustomerService
     // soft-deletes the pending update. When editedFields is supplied those values are applied in
     // place of the stored pending values (legacy ButtonApprove_Click writes the on-screen values to
     // both records). Returns false when no matching pending update exists. Throws
-    // CustomerValidationException when the resulting customer breaks business rules.
-    Task<bool> ApprovePendingCustomerUpdateAsync(Guid customerId, PendingCustomerUpdate? editedFields = null, CancellationToken cancellationToken = default);
+    // CustomerValidationException when the resulting customer breaks business rules or the comments
+    // exceed 2000 characters. The comments become the notification email's "Additional Information".
+    Task<bool> ApprovePendingCustomerUpdateAsync(Guid customerId, PendingCustomerUpdate? editedFields = null, string comments = "", CancellationToken cancellationToken = default);
 
     // Soft-deletes the pending update without changing the live customer record. Returns false
     // when no matching pending update exists.
-    Task<bool> DeclinePendingCustomerUpdateAsync(Guid customerId, CancellationToken cancellationToken = default);
+    Task<bool> DeclinePendingCustomerUpdateAsync(Guid customerId, string comments = "", CancellationToken cancellationToken = default);
 }

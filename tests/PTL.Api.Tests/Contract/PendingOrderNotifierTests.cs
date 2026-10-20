@@ -27,7 +27,7 @@ public class PendingOrderNotifierTests
         public FakePendingOrderRepository PendingOrders { get; } = new();
         public FakeContractRepository Contracts { get; } = new();
         public RecordingNotifyClient Notify { get; } = new();
-        public PendingOrderEmailGuard Guard { get; } = new();
+        public EmailSendGuard Guard { get; } = new();
         public MessageCapturingLogger<PendingOrderNotifier> Logger { get; } = new();
         public PendingOrderNotifier Notifier { get; private set; } = null!;
         public Guid PendingContractId { get; } = Guid.NewGuid();

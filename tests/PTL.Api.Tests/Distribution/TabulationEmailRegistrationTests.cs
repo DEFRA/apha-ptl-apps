@@ -5,8 +5,10 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using PTL.Api.BackgroundServices;
 using PTL.Core.Contract.PendingOrder;
+using PTL.Core.Customer;
 using PTL.Core.Distribution;
 using PTL.Core.Notifications;
+using PTL.Core.Participant;
 
 namespace PTL.Api.Tests.Distribution;
 
@@ -31,7 +33,20 @@ public class TabulationEmailRegistrationTests : IClassFixture<WebApplicationFact
                 ["TabulationEmails:Enabled"] = "false",
                 ["PublicationNotifications:Enabled"] = "false",
                 ["OnlineOrderEmails:Enabled"] = "false",
+                ["CustomerUpdateEmails:Enabled"] = "false",
+                ["ParticipantUpdateEmails:Enabled"] = "false",
             })));
+    }
+
+    [Fact]
+    public void UpdateNotifiers_ResolveFromTheRealContainerAndTheServicesDependOnThem()
+    {
+        using var scope = _factory.Services.CreateScope();
+
+        Assert.IsType<CustomerUpdateNotifier>(scope.ServiceProvider.GetRequiredService<ICustomerUpdateNotifier>());
+        Assert.IsType<ParticipantUpdateNotifier>(scope.ServiceProvider.GetRequiredService<IParticipantUpdateNotifier>());
+        Assert.IsType<CustomerService>(scope.ServiceProvider.GetRequiredService<ICustomerService>());
+        Assert.IsType<ParticipantService>(scope.ServiceProvider.GetRequiredService<IParticipantService>());
     }
 
     [Fact]
@@ -44,12 +59,12 @@ public class TabulationEmailRegistrationTests : IClassFixture<WebApplicationFact
     }
 
     [Fact]
-    public void PendingOrderEmailGuard_IsOneSingletonSharedByEveryScope()
+    public void EmailSendGuard_IsOneSingletonSharedByEveryScope()
     {
-        var root = _factory.Services.GetRequiredService<PendingOrderEmailGuard>();
+        var root = _factory.Services.GetRequiredService<EmailSendGuard>();
         using var scope = _factory.Services.CreateScope();
 
-        Assert.Same(root, scope.ServiceProvider.GetRequiredService<PendingOrderEmailGuard>());
+        Assert.Same(root, scope.ServiceProvider.GetRequiredService<EmailSendGuard>());
     }
 
     [Fact]
@@ -101,6 +116,8 @@ public class TabulationEmailRegistrationTests : IClassFixture<WebApplicationFact
         Assert.False(_factory.Services.GetRequiredService<IOptions<TabulationEmailOptions>>().Value.Enabled);
         Assert.False(_factory.Services.GetRequiredService<IOptions<PublicationNotificationOptions>>().Value.Enabled);
         Assert.False(_factory.Services.GetRequiredService<IOptions<OnlineOrderEmailOptions>>().Value.Enabled);
+        Assert.False(_factory.Services.GetRequiredService<IOptions<CustomerUpdateEmailOptions>>().Value.Enabled);
+        Assert.False(_factory.Services.GetRequiredService<IOptions<ParticipantUpdateEmailOptions>>().Value.Enabled);
         Assert.Equal(TimeSpan.FromMinutes(5), _factory.Services.GetRequiredService<IOptions<NotificationSchedulerOptions>>().Value.PollInterval);
     }
 }

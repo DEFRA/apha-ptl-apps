@@ -71,6 +71,8 @@ internal sealed class FakeParticipantApiClient : IParticipantApiClient
     public PendingParticipantUpdateDecisionResult ApprovePendingParticipantUpdateResult { get; set; } = new(true, false, new Dictionary<string, string[]>());
     public bool DeclinePendingParticipantUpdateResult { get; set; } = true;
     public PendingParticipantUpdateSaveRequest? LastApproveRequest { get; private set; }
+    public string? LastApproveComments { get; private set; }
+    public string? LastDeclineComments { get; private set; }
 
     public Task<IReadOnlyList<PendingParticipantUpdateSummaryResponse>> GetPendingParticipantUpdatesAsync(CancellationToken cancellationToken = default) =>
         Task.FromResult(PendingParticipantUpdates);
@@ -78,14 +80,18 @@ internal sealed class FakeParticipantApiClient : IParticipantApiClient
     public Task<PendingParticipantUpdateComparisonResponse?> GetPendingParticipantUpdateAsync(Guid participantId, CancellationToken cancellationToken = default) =>
         Task.FromResult(PendingParticipantUpdateComparison);
 
-    public Task<PendingParticipantUpdateDecisionResult> ApprovePendingParticipantUpdateAsync(Guid participantId, PendingParticipantUpdateSaveRequest? request = null, CancellationToken cancellationToken = default)
+    public Task<PendingParticipantUpdateDecisionResult> ApprovePendingParticipantUpdateAsync(Guid participantId, PendingParticipantUpdateSaveRequest? request = null, string? comments = null, CancellationToken cancellationToken = default)
     {
         LastApproveRequest = request;
+        LastApproveComments = comments;
         return Task.FromResult(ApprovePendingParticipantUpdateResult);
     }
 
-    public Task<bool> DeclinePendingParticipantUpdateAsync(Guid participantId, CancellationToken cancellationToken = default) =>
-        Task.FromResult(DeclinePendingParticipantUpdateResult);
+    public Task<bool> DeclinePendingParticipantUpdateAsync(Guid participantId, string? comments = null, CancellationToken cancellationToken = default)
+    {
+        LastDeclineComments = comments;
+        return Task.FromResult(DeclinePendingParticipantUpdateResult);
+    }
 
     public ParticipantViewerAssignmentResponse? ParticipantViewerAssignmentResponse { get; set; }
     public bool UpdateParticipantViewersResult { get; set; } = true;

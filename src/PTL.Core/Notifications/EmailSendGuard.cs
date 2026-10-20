@@ -1,8 +1,8 @@
-namespace PTL.Core.Contract.PendingOrder;
+namespace PTL.Core.Notifications;
 
-// Singleton shared by the immediate send after Approve/Decline and the scheduler, so only one of them sends at a time
-// (single PTL.Api instance). The warning set is in-process memory that keeps a failing row from logging on every poll.
-public sealed class PendingOrderEmailGuard
+// Singleton shared by every immediate send (after a decision is saved) and the scheduler, so only one of them sends at a
+// time (single PTL.Api instance). The warning set is in-process memory that keeps a failing row from logging on every poll.
+public sealed class EmailSendGuard
 {
     private readonly Dictionary<Guid, DateTime> warnedOn = [];
 

@@ -5,6 +5,7 @@ using PTL.ApiClient;
 using PTL.Contracts.Customer;
 using PTL.Core.Labels;
 using PTL.SharedUI.Notifications;
+using PTL.SharedUI.Pagination;
 
 namespace PTL.InternalWeb.Features.Customer;
 
@@ -14,6 +15,9 @@ public class CustomerController(ICustomerApiClient customerApiClient, ILookupApi
 {
     // Legacy DropDownXxx.Items.Insert(0, New ListItem("- Please Select -", Guid.Empty)) placeholder.
     private const string PleaseSelectOptionText = "- Please Select -";
+
+    // Legacy ReviewPendingCustomerUpdates.aspx GridView.PageSize.
+    private const int PendingUpdatesPageSize = 20;
 
     private static readonly Action<ILogger, CustomerStatusFilter, int, int, Exception?> LogDisplayedCustomerListMessage =
         LoggerMessage.Define<CustomerStatusFilter, int, int>(
@@ -165,11 +169,18 @@ public class CustomerController(ICustomerApiClient customerApiClient, ILookupApi
         return RedirectToAction(nameof(Details), new { id });
     }
 
-    // Review Pending Customer Updates (legacy ReviewPendingCustomerUpdates.aspx).
-    public async Task<IActionResult> ReviewPendingCustomerUpdates(CancellationToken cancellationToken)
+    // Review Pending Customer Updates (legacy ReviewPendingCustomerUpdates.aspx). Legacy loaded every pending
+    // update and paged the grid in memory at 20 rows, which is what happens here.
+    public async Task<IActionResult> ReviewPendingCustomerUpdates(int page = 1, int pageSize = PendingUpdatesPageSize, CancellationToken cancellationToken = default)
     {
         var updates = await customerApiClient.GetPendingCustomerUpdatesAsync(cancellationToken);
-        return View(new PendingCustomerUpdateListViewModel(updates));
+
+        pageSize = PaginationModel.AvailablePageSizes.Contains(pageSize) ? pageSize : PendingUpdatesPageSize;
+        var totalPages = Math.Max(1, (int)Math.Ceiling(updates.Count / (double)pageSize));
+        page = Math.Clamp(page, 1, totalPages);
+
+        var pageOfUpdates = updates.Skip((page - 1) * pageSize).Take(pageSize).ToList();
+        return View(new PendingCustomerUpdateListViewModel(pageOfUpdates, page, pageSize, updates.Count));
     }
 
     // Pending Customer Update Details (legacy PendingCustomerUpdateDetails.aspx) - current vs
@@ -212,7 +223,7 @@ public class CustomerController(ICustomerApiClient customerApiClient, ILookupApi
             return View(model);
         }
 
-        var result = await customerApiClient.ApprovePendingCustomerUpdateAsync(customerId, ToPendingSaveRequest(model), cancellationToken);
+        var result = await customerApiClient.ApprovePendingCustomerUpdateAsync(customerId, ToPendingSaveRequest(model), model.Comments, cancellationToken);
         if (result.NotFound)
         {
             return NotFound();
@@ -225,16 +236,16 @@ public class CustomerController(ICustomerApiClient customerApiClient, ILookupApi
             return View(model);
         }
 
-        TempData.SetNotification(NotificationType.Success, "Customer update approved successfully.");
+        TempData.SetNotification(NotificationType.Success, "Customer details updated successfully.");
         return RedirectToAction(nameof(ReviewPendingCustomerUpdates));
     }
 
     // Only approved changes update the live customer record - declined changes do not.
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> ApprovePendingCustomerUpdate(Guid customerId, CancellationToken cancellationToken)
+    public async Task<IActionResult> ApprovePendingCustomerUpdate(Guid customerId, string? comments, CancellationToken cancellationToken)
     {
-        var result = await customerApiClient.ApprovePendingCustomerUpdateAsync(customerId, request: null, cancellationToken);
+        var result = await customerApiClient.ApprovePendingCustomerUpdateAsync(customerId, request: null, comments, cancellationToken);
         if (result.NotFound)
         {
             return NotFound();
@@ -249,21 +260,21 @@ public class CustomerController(ICustomerApiClient customerApiClient, ILookupApi
             return RedirectToAction(nameof(EditPendingCustomerUpdate), new { customerId });
         }
 
-        TempData.SetNotification(NotificationType.Success, "Customer update approved successfully.");
+        TempData.SetNotification(NotificationType.Success, "Customer details updated successfully.");
         return RedirectToAction(nameof(ReviewPendingCustomerUpdates));
     }
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> DeclinePendingCustomerUpdate(Guid customerId, CancellationToken cancellationToken)
+    public async Task<IActionResult> DeclinePendingCustomerUpdate(Guid customerId, string? comments, CancellationToken cancellationToken)
     {
-        var declined = await customerApiClient.DeclinePendingCustomerUpdateAsync(customerId, cancellationToken);
+        var declined = await customerApiClient.DeclinePendingCustomerUpdateAsync(customerId, comments, cancellationToken);
         if (!declined)
         {
             return NotFound();
         }
 
-        TempData.SetNotification(NotificationType.Success, "Customer update declined successfully.");
+        TempData.SetNotification(NotificationType.Success, "Customer updates declined successfully.");
         return RedirectToAction(nameof(ReviewPendingCustomerUpdates));
     }
 

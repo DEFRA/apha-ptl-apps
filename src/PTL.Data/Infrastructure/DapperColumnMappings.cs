@@ -422,6 +422,30 @@ public static partial class DapperColumnMappings
         });
 
         // spgaOnlineContractOrderEmail also returns the customer/QAL/lab-code joins, which are left unmapped on purpose.
+        Map<CustomerUpdateEmailEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldUpdatedCustomerDetailsEmailId"] = nameof(CustomerUpdateEmailEntity.Id),
+            [ColEmail] = nameof(CustomerUpdateEmailEntity.Email),
+            ["fldPendingCustomerDetailsEditId"] = nameof(CustomerUpdateEmailEntity.PendingCustomerUpdateId),
+            ["fldCustomerName"] = nameof(CustomerUpdateEmailEntity.CustomerName),
+            ["fldNotes"] = nameof(CustomerUpdateEmailEntity.Notes),
+            ["fldIsApproved"] = nameof(CustomerUpdateEmailEntity.IsApproved),
+            [ColQalNumber] = nameof(CustomerUpdateEmailEntity.QalNumber),
+            [ColLabCode] = nameof(CustomerUpdateEmailEntity.LabCode),
+        });
+
+        Map<ParticipantUpdateEmailEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldUpdatedParticipantDetailsEmailId"] = nameof(ParticipantUpdateEmailEntity.Id),
+            [ColEmail] = nameof(ParticipantUpdateEmailEntity.Email),
+            [ColLabCode] = nameof(ParticipantUpdateEmailEntity.LabCode),
+            ["fldPendingParticipantDetailsEditId"] = nameof(ParticipantUpdateEmailEntity.PendingParticipantUpdateId),
+            ["fldParticipantName"] = nameof(ParticipantUpdateEmailEntity.ParticipantName),
+            ["fldNotes"] = nameof(ParticipantUpdateEmailEntity.Notes),
+            ["fldIsApproved"] = nameof(ParticipantUpdateEmailEntity.IsApproved),
+            [ColQalNumber] = nameof(ParticipantUpdateEmailEntity.QalNumber),
+        });
+
         Map<OnlineOrderEmailEntity>(new(StringComparer.OrdinalIgnoreCase)
         {
             ["fldOnlineContractOrderEmailId"] = nameof(OnlineOrderEmailEntity.Id),

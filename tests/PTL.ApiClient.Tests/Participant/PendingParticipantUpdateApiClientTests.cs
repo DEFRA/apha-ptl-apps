@@ -120,6 +120,73 @@ public class PendingParticipantUpdateApiClientTests
         Assert.True(result);
     }
 
+    private static (ParticipantApiClient Client, List<(HttpMethod Method, string Path, string? Body)> Requests) RecordingClient(HttpStatusCode statusCode)
+    {
+        var requests = new List<(HttpMethod, string, string?)>();
+        var handler = new StubHttpMessageHandler(statusCode, null)
+        {
+            OnRequest = r => requests.Add((r.Method, r.RequestUri!.PathAndQuery, r.Content?.ReadAsStringAsync().GetAwaiter().GetResult()))
+        };
+        return (new ParticipantApiClient(new HttpClient(handler) { BaseAddress = new Uri("http://localhost") }), requests);
+    }
+
+    [Fact]
+    public async Task ApprovePendingParticipantUpdateAsync_NoAmendmentsAndNoComments_PostsNoBody()
+    {
+        var (client, requests) = RecordingClient(HttpStatusCode.NoContent);
+
+        await client.ApprovePendingParticipantUpdateAsync(Guid.NewGuid());
+
+        Assert.Null(Assert.Single(requests).Body);
+    }
+
+    [Fact]
+    public async Task ApprovePendingParticipantUpdateAsync_CommentsOnly_PostsTheCommentsWithNoEdits()
+    {
+        var (client, requests) = RecordingClient(HttpStatusCode.NoContent);
+
+        await client.ApprovePendingParticipantUpdateAsync(Guid.NewGuid(), comments: "Thanks for the update");
+
+        var body = Assert.Single(requests).Body!;
+        Assert.Contains("\"comments\":\"Thanks for the update\"", body, StringComparison.Ordinal);
+        Assert.Contains("\"edits\":null", body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ApprovePendingParticipantUpdateAsync_AmendmentsAndComments_PostsBoth()
+    {
+        var (client, requests) = RecordingClient(HttpStatusCode.NoContent);
+
+        await client.ApprovePendingParticipantUpdateAsync(Guid.NewGuid(), AmendedRequest(), "Amended");
+
+        var body = Assert.Single(requests).Body!;
+        Assert.Contains("\"comments\":\"Amended\"", body, StringComparison.Ordinal);
+        Assert.Contains("\"contactName\":\"New Contact\"", body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task DeclinePendingParticipantUpdateAsync_WithComments_PostsTheComments()
+    {
+        var (client, requests) = RecordingClient(HttpStatusCode.NoContent);
+
+        var result = await client.DeclinePendingParticipantUpdateAsync(Guid.NewGuid(), "Not eligible");
+
+        Assert.True(result);
+        var request = Assert.Single(requests);
+        Assert.EndsWith("/pending-update/decline", request.Path, StringComparison.Ordinal);
+        Assert.Contains("\"comments\":\"Not eligible\"", request.Body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task DeclinePendingParticipantUpdateAsync_NoComments_PostsNoBody()
+    {
+        var (client, requests) = RecordingClient(HttpStatusCode.NoContent);
+
+        await client.DeclinePendingParticipantUpdateAsync(Guid.NewGuid());
+
+        Assert.Null(Assert.Single(requests).Body);
+    }
+
     private static PendingParticipantUpdateSaveRequest AmendedRequest() => new(
         "New Contact", "New Organisation", "Address 1", "Address 2", string.Empty, string.Empty, string.Empty,
         Guid.NewGuid(), "01234 567890", string.Empty, "new@example.com", string.Empty);

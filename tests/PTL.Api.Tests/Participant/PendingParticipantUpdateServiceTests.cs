@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging.Abstractions;
+using PTL.Api.Tests.Notifications;
 using PTL.Core.Participant;
 using ParticipantEntity = PTL.Core.Participant.Participant;
 
@@ -6,8 +7,8 @@ namespace PTL.Api.Tests.Participant;
 
 public class PendingParticipantUpdateServiceTests
 {
-    private static ParticipantService CreateService(FakeParticipantRepository repository, FakePendingParticipantUpdateRepository? pendingRepository = null) =>
-        new(repository, pendingRepository ?? new FakePendingParticipantUpdateRepository(), new FakeParticipantViewerRepository(), new FakeViewerRepository(), NullLogger<ParticipantService>.Instance);
+    private static ParticipantService CreateService(FakeParticipantRepository repository, FakePendingParticipantUpdateRepository? pendingRepository = null, FakeParticipantUpdateNotifier? notifier = null) =>
+        new(repository, pendingRepository ?? new FakePendingParticipantUpdateRepository(), notifier ?? new FakeParticipantUpdateNotifier(), new FakeParticipantViewerRepository(), new FakeViewerRepository(), NullLogger<ParticipantService>.Instance);
 
     private static ParticipantEntity ValidActiveParticipant() => new()
     {
@@ -177,5 +178,157 @@ public class PendingParticipantUpdateServiceTests
         var declined = await service.DeclinePendingParticipantUpdateAsync(Guid.NewGuid());
 
         Assert.False(declined);
+    }
+
+    [Fact]
+    public async Task ApprovePendingParticipantUpdateAsync_QueuesAnAcceptedEmailForEachNewAddressAndSendsThem()
+    {
+        var repository = new FakeParticipantRepository();
+        var participant = await repository.CreateAsync(ValidActiveParticipant());
+        var pendingRepository = new FakePendingParticipantUpdateRepository();
+        var pending = SamplePendingUpdate(participant.ParticipantId);
+        pendingRepository.Seed(pending);
+        var notifier = new FakeParticipantUpdateNotifier();
+        var service = CreateService(repository, pendingRepository, notifier);
+
+        await service.ApprovePendingParticipantUpdateAsync(participant.ParticipantId, comments: "Thanks for the update");
+
+        Assert.Equal(["new@example.com", "new-secondary@example.com"], pendingRepository.QueuedNotifications.Select(n => n.Email));
+        Assert.All(pendingRepository.QueuedNotifications, n =>
+        {
+            Assert.Equal("001", n.LabCode);
+            Assert.Equal("001: Alpha Lab", n.ParticipantName);
+            Assert.Equal(pending.PendingParticipantUpdateId, n.PendingParticipantUpdateId);
+            Assert.Equal("Thanks for the update", n.Notes);
+            Assert.True(n.IsApproved);
+        });
+        Assert.Equal([pending.PendingParticipantUpdateId], notifier.SentForUpdates);
+    }
+
+    [Fact]
+    public async Task ApprovePendingParticipantUpdateAsync_NoSecondaryEmail_QueuesOneEmail()
+    {
+        var repository = new FakeParticipantRepository();
+        var participant = await repository.CreateAsync(ValidActiveParticipant());
+        var pendingRepository = new FakePendingParticipantUpdateRepository();
+        pendingRepository.Seed(SamplePendingUpdate(participant.ParticipantId));
+        var service = CreateService(repository, pendingRepository);
+        var edited = SamplePendingUpdate(participant.ParticipantId);
+        edited.Email2 = string.Empty;
+
+        await service.ApprovePendingParticipantUpdateAsync(participant.ParticipantId, edited);
+
+        Assert.Equal("new@example.com", Assert.Single(pendingRepository.QueuedNotifications).Email);
+    }
+
+    [Fact]
+    public async Task DeclinePendingParticipantUpdateAsync_QueuesDeclinedEmailsForTheCurrentAddressesAndSendsThem()
+    {
+        var repository = new FakeParticipantRepository();
+        var withSecondary = ValidActiveParticipant();
+        withSecondary.Email2 = "alice-secondary@example.com";
+        var participant = await repository.CreateAsync(withSecondary);
+        var pendingRepository = new FakePendingParticipantUpdateRepository();
+        var pending = SamplePendingUpdate(participant.ParticipantId);
+        pendingRepository.Seed(pending);
+        var notifier = new FakeParticipantUpdateNotifier();
+        var service = CreateService(repository, pendingRepository, notifier);
+
+        await service.DeclinePendingParticipantUpdateAsync(participant.ParticipantId, "Not eligible");
+
+        Assert.Equal(["alice@example.com", "alice-secondary@example.com"], pendingRepository.QueuedNotifications.Select(n => n.Email));
+        Assert.All(pendingRepository.QueuedNotifications, n =>
+        {
+            Assert.False(n.IsApproved);
+            Assert.Equal("Not eligible", n.Notes);
+        });
+        Assert.Equal([pending.PendingParticipantUpdateId], notifier.SentForUpdates);
+    }
+
+    [Fact]
+    public async Task ApproveAndDecline_NothingDecided_QueueAndSendNothing()
+    {
+        var repository = new FakeParticipantRepository();
+        var pendingRepository = new FakePendingParticipantUpdateRepository();
+        var notifier = new FakeParticipantUpdateNotifier();
+        var service = CreateService(repository, pendingRepository, notifier);
+
+        Assert.False(await service.ApprovePendingParticipantUpdateAsync(Guid.NewGuid()));
+        Assert.False(await service.DeclinePendingParticipantUpdateAsync(Guid.NewGuid()));
+
+        Assert.Empty(pendingRepository.QueuedNotifications);
+        Assert.Empty(notifier.SentForUpdates);
+    }
+
+    [Fact]
+    public async Task DeclinePendingParticipantUpdateAsync_NoEmailAddresses_QueuesAndSendsNothing()
+    {
+        var repository = new FakeParticipantRepository();
+        var noEmail = ValidActiveParticipant();
+        noEmail.Email = string.Empty;
+        var participant = await repository.CreateAsync(noEmail);
+        var pendingRepository = new FakePendingParticipantUpdateRepository();
+        pendingRepository.Seed(SamplePendingUpdate(participant.ParticipantId));
+        var notifier = new FakeParticipantUpdateNotifier();
+        var service = CreateService(repository, pendingRepository, notifier);
+
+        Assert.True(await service.DeclinePendingParticipantUpdateAsync(participant.ParticipantId));
+
+        Assert.Empty(pendingRepository.QueuedNotifications);
+        Assert.Empty(notifier.SentForUpdates);
+    }
+
+    [Fact]
+    public async Task DeclinePendingParticipantUpdateAsync_LongValues_AreCutToTheQueueColumnLengths()
+    {
+        var repository = new FakeParticipantRepository();
+        var longParticipant = ValidActiveParticipant();
+        longParticipant.LabCode = "LABCODE123";
+        longParticipant.LabName = new string('L', 80);
+        longParticipant.Email = new string('e', 120);
+        var participant = await repository.CreateAsync(longParticipant);
+        var pendingRepository = new FakePendingParticipantUpdateRepository();
+        pendingRepository.Seed(SamplePendingUpdate(participant.ParticipantId));
+        var service = CreateService(repository, pendingRepository);
+
+        await service.DeclinePendingParticipantUpdateAsync(participant.ParticipantId);
+
+        var queued = Assert.Single(pendingRepository.QueuedNotifications);
+        Assert.Equal(8, queued.LabCode.Length);
+        Assert.Equal(50, queued.ParticipantName.Length);
+        Assert.Equal(100, queued.Email.Length);
+    }
+
+    [Fact]
+    public async Task ApprovePendingParticipantUpdateAsync_CommentsTooLong_ThrowsAndChangesNothing()
+    {
+        var repository = new FakeParticipantRepository();
+        var participant = await repository.CreateAsync(ValidActiveParticipant());
+        var pendingRepository = new FakePendingParticipantUpdateRepository();
+        pendingRepository.Seed(SamplePendingUpdate(participant.ParticipantId));
+        var notifier = new FakeParticipantUpdateNotifier();
+        var service = CreateService(repository, pendingRepository, notifier);
+
+        var ex = await Assert.ThrowsAsync<ParticipantValidationException>(() => service.ApprovePendingParticipantUpdateAsync(participant.ParticipantId, comments: new string('x', 2001)));
+
+        Assert.Equal("Comments", Assert.Single(ex.Errors).Field);
+        Assert.Equal("Alice Example", (await repository.GetByIdAsync(participant.ParticipantId))!.ContactName);
+        Assert.NotNull(await pendingRepository.GetByParticipantIdAsync(participant.ParticipantId));
+        Assert.Empty(pendingRepository.QueuedNotifications);
+        Assert.Empty(notifier.SentForUpdates);
+    }
+
+    [Fact]
+    public async Task DeclinePendingParticipantUpdateAsync_CommentsTooLong_ThrowsAndKeepsTheUpdatePending()
+    {
+        var repository = new FakeParticipantRepository();
+        var participant = await repository.CreateAsync(ValidActiveParticipant());
+        var pendingRepository = new FakePendingParticipantUpdateRepository();
+        pendingRepository.Seed(SamplePendingUpdate(participant.ParticipantId));
+        var service = CreateService(repository, pendingRepository);
+
+        await Assert.ThrowsAsync<ParticipantValidationException>(() => service.DeclinePendingParticipantUpdateAsync(participant.ParticipantId, new string('x', 2001)));
+
+        Assert.NotNull(await pendingRepository.GetByParticipantIdAsync(participant.ParticipantId));
     }
 }
