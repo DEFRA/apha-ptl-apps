@@ -178,7 +178,7 @@ public class TabulationReportRenderTests : IClassFixture<WebApplicationFactory<P
         Assert.Contains("Tabulation", Title(html), StringComparison.Ordinal);
         Assert.Equal("Tabulation", Heading(html, 1));
         Assert.Equal("D1a/S1 BT: Brucella", Heading(html, 2));
-        Assert.Contains("<h2 class=\"govuk-heading-s\">Summary</h2>", html, StringComparison.Ordinal);
+        Assert.Contains("<h3 class=\"govuk-heading-s\">Summary</h3>", html, StringComparison.Ordinal);
         Assert.DoesNotContain("govuk-caption-l", html, StringComparison.Ordinal);
         // The draft only shows the distribution date in the print header.
         Assert.DoesNotContain("<p class=\"govuk-body\">Date Of Distribution", html, StringComparison.Ordinal);
@@ -337,7 +337,7 @@ public class TabulationReportRenderTests : IClassFixture<WebApplicationFactory<P
         Assert.Equal(3, Regex.Count(comments, "<div class=\"divTestConsultantComments\">"));
         Assert.Contains("<p>Standard text</p>", comments, StringComparison.Ordinal);
         Assert.Contains("<p>Sample <b>comments</b></p>", comments, StringComparison.Ordinal);
-        Assert.Contains("<p class=\"commentsTitle\">Comments provided by Dr A, QAU:</p>", comments, StringComparison.Ordinal);
+        Assert.Contains("<h2 class=\"govuk-heading-m commentsTitle\">Comments provided by Dr A, QAU:</h2>", comments, StringComparison.Ordinal);
         Assert.Contains("<p>Consultant note</p>", comments, StringComparison.Ordinal);
         Assert.Contains("alt=\"UKAS accredited\"", comments, StringComparison.Ordinal);
     }
@@ -387,7 +387,7 @@ public class TabulationReportRenderTests : IClassFixture<WebApplicationFactory<P
         Assert.Contains("Issued Tabulation", Title(html), StringComparison.Ordinal);
         Assert.Equal("Issued Tabulation", Heading(html, 1));
         Assert.Equal("D1a/S1 BT: Brucella", Heading(html, 2));
-        Assert.Contains("<h2 class=\"govuk-heading-s\">Summary</h2>", html, StringComparison.Ordinal);
+        Assert.Contains("<h3 class=\"govuk-heading-s\">Summary</h3>", html, StringComparison.Ordinal);
         Assert.Contains("<p class=\"govuk-body\">Distribution Date: 03/05/2026</p>", html, StringComparison.Ordinal);
         Assert.Equal([(PublishedId, Guid.Empty, Guid.Empty)], _apiClient.RequestedTabulations);
 

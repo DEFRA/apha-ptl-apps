@@ -316,3 +316,45 @@
         overflow: visible;
     }
 }
+/* ---- Printable Results on screen (GOV.UK typography) ----
+   Screen-only: the preview takes the GOV.UK type scale, grey borders and the column width, while the
+   rules above - A4 width, Verdana, black borders, page-break behaviour - still drive the printed page. */
+@media screen {
+    .ptl-worksheet {
+        width: auto;
+        margin: 0 0 30px;
+        padding: 20px;
+        border: 1px solid #b1b4b6;
+        font-family: "GDS Transport", arial, sans-serif;
+        font-size: 1.1875rem;
+        line-height: 1.3158;
+        color: var(--govuk-text-colour, #0b0c0c);
+    }
+
+    .ptl-worksheet .tablePrintableResults,
+    .ptl-worksheet .tblSampleInstruction {
+        font-size: 1rem;
+        line-height: 1.25;
+        border-color: #b1b4b6;
+    }
+
+    .ptl-worksheet .tablePrintableResults td,
+    .ptl-worksheet .tablePrintableResults th,
+    .ptl-worksheet .cellSampleInstruction {
+        border-color: #b1b4b6;
+        padding: 5px 8px;
+    }
+
+    .ptl-worksheet .tablePrintableResults th,
+    .ptl-worksheet th.cellSampleInstruction {
+        font-weight: 700;
+    }
+
+    .ptl-worksheet .rowHeader {
+        background-color: #f3f2f1;
+    }
+
+    .ptl-worksheet .cellWorkSheetDistItem {
+        padding: 5px 8px;
+    }
+}
