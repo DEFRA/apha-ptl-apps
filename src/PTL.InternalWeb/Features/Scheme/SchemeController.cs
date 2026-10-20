@@ -179,6 +179,7 @@ public class SchemeController(ISchemeApiClient schemeApiClient, ILookupApiClient
             return View(model);
         }
 
+        ValidatePriceText(model);
         if (!ModelState.IsValid)
         {
             model.Instructions = SchemeInstructions.Sanitise(model.Instructions);
@@ -302,6 +303,7 @@ public class SchemeController(ISchemeApiClient schemeApiClient, ILookupApiClient
             return View(model);
         }
 
+        ValidatePriceText(model);
         if (!ModelState.IsValid)
         {
             model.Instructions = SchemeInstructions.Sanitise(model.Instructions);
@@ -512,6 +514,35 @@ public class SchemeController(ISchemeApiClient schemeApiClient, ILookupApiClient
     }
 
     private void AddErrors(IReadOnlyDictionary<string, string[]> fieldErrors) => this.AddFieldErrors(fieldErrors);
+
+    // Legacy ValidatorPriceRegEx accepted whole numbers or exactly two decimals, and its string CompareValidator
+    // (> "0") rejected only a bare "0" - so "0.0" is an invalid number while "0.00" is accepted.
+    private static readonly System.Text.RegularExpressions.Regex PriceFormat = new(
+        @"^(?:[0-9]*\.[0-9]{2}|[0-9]+)$",
+        System.Text.RegularExpressions.RegexOptions.CultureInvariant,
+        TimeSpan.FromSeconds(1));
+
+    private void ValidatePriceText(SchemeFormViewModel model)
+    {
+        for (var i = 0; i < model.Prices.Count; i++)
+        {
+            var key = $"Prices[{i}].Price";
+            var text = ModelState[key]?.AttemptedValue?.Trim();
+            if (string.IsNullOrEmpty(text) || ModelState[key]!.Errors.Count > 0)
+            {
+                continue;
+            }
+
+            if (!PriceFormat.IsMatch(text))
+            {
+                ModelState.AddModelError(key, SchemeCurrencyPriceViewModel.PriceInvalidNumber);
+            }
+            else if (text == "0")
+            {
+                ModelState.AddModelError(key, SchemeCurrencyPriceViewModel.PriceMustBePositive);
+            }
+        }
+    }
 
     // Legacy shows the year as a read-only textbox on every path - the entry point decides it and
     // the user never picks it (Scheme.aspx.vb SetYearTextBox). All years are searched, not just

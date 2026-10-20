@@ -295,6 +295,100 @@ public class SchemeControllerTests
     }
 
     [Fact]
+    public async Task Create_Post_ZeroPriceTypedAsPoundsAndPence_IsAccepted()
+    {
+        var apiClient = new FakeSchemeApiClient
+        {
+            SaveResult = new SchemeSaveResult(true, SampleScheme(Guid.NewGuid(), Guid.NewGuid()), new Dictionary<string, string[]>())
+        };
+        var controller = CreateController(apiClient);
+        controller.ModelState.SetModelValue("Prices[0].Price", "0.00", "0.00");
+        controller.ModelState.MarkFieldValid("Prices[0].Price");
+        var model = new PTL.InternalWeb.Features.Scheme.SchemeFormViewModel { YearId = 2027, Prices = [new() { CurrencyId = Guid.NewGuid(), Price = 0m }] };
+
+        var result = await controller.Create(model, cancellationToken: CancellationToken.None);
+
+        Assert.IsType<RedirectToActionResult>(result);
+        Assert.True(controller.ModelState.IsValid);
+    }
+
+    [Fact]
+    public async Task Create_Post_BareZeroPrice_IsRejectedLikeLegacy()
+    {
+        var controller = CreateController(new FakeSchemeApiClient());
+        controller.ModelState.SetModelValue("Prices[0].Price", "0", "0");
+        var model = new PTL.InternalWeb.Features.Scheme.SchemeFormViewModel { YearId = 2027, Prices = [new() { CurrencyId = Guid.NewGuid(), Price = 0m }] };
+
+        var result = await controller.Create(model, cancellationToken: CancellationToken.None);
+
+        Assert.IsType<ViewResult>(result);
+        Assert.Equal("Price must be positive", Assert.Single(controller.ModelState["Prices[0].Price"]!.Errors).ErrorMessage);
+    }
+
+    [Theory]
+    [InlineData("0.0")]
+    [InlineData("12.5")]
+    [InlineData("12.345")]
+    public async Task Create_Post_PriceNotWholeOrTwoDecimals_IsRejectedAsInvalidNumber(string typed)
+    {
+        var controller = CreateController(new FakeSchemeApiClient());
+        controller.ModelState.SetModelValue("Prices[0].Price", typed, typed);
+        var model = new PTL.InternalWeb.Features.Scheme.SchemeFormViewModel { YearId = 2027, Prices = [new() { CurrencyId = Guid.NewGuid(), Price = decimal.Parse(typed, System.Globalization.CultureInfo.InvariantCulture) }] };
+
+        var result = await controller.Create(model, cancellationToken: CancellationToken.None);
+
+        Assert.IsType<ViewResult>(result);
+        Assert.Equal("Invalid Number", Assert.Single(controller.ModelState["Prices[0].Price"]!.Errors).ErrorMessage);
+    }
+
+    [Theory]
+    [InlineData("0.00")]
+    [InlineData("12")]
+    [InlineData("12.50")]
+    [InlineData(".50")]
+    public async Task Create_Post_PriceWholeOrTwoDecimals_IsAccepted(string typed)
+    {
+        var apiClient = new FakeSchemeApiClient
+        {
+            SaveResult = new SchemeSaveResult(true, SampleScheme(Guid.NewGuid(), Guid.NewGuid()), new Dictionary<string, string[]>())
+        };
+        var controller = CreateController(apiClient);
+        controller.ModelState.SetModelValue("Prices[0].Price", typed, typed);
+        controller.ModelState.MarkFieldValid("Prices[0].Price");
+        var model = new PTL.InternalWeb.Features.Scheme.SchemeFormViewModel { YearId = 2027, Prices = [new() { CurrencyId = Guid.NewGuid(), Price = decimal.Parse(typed, System.Globalization.CultureInfo.InvariantCulture) }] };
+
+        var result = await controller.Create(model, cancellationToken: CancellationToken.None);
+
+        Assert.IsType<RedirectToActionResult>(result);
+    }
+
+    [Fact]
+    public async Task Edit_Post_BareZeroPrice_IsRejectedLikeLegacy()
+    {
+        var controller = CreateController(new FakeSchemeApiClient());
+        controller.ModelState.SetModelValue("Prices[0].Price", "0", "0");
+        var model = new PTL.InternalWeb.Features.Scheme.SchemeFormViewModel { YearId = 2027, Prices = [new() { CurrencyId = Guid.NewGuid(), Price = 0m }] };
+
+        var result = await controller.Edit(Guid.NewGuid(), model, cancellationToken: CancellationToken.None);
+
+        Assert.IsType<ViewResult>(result);
+        Assert.False(controller.ModelState.IsValid);
+    }
+
+    [Theory]
+    [InlineData(0, true)]
+    [InlineData(12.5, true)]
+    [InlineData(-1, false)]
+    public void Price_RangeAllowsZeroButNotNegatives(double value, bool valid)
+    {
+        var range = (System.ComponentModel.DataAnnotations.RangeAttribute)Attribute.GetCustomAttribute(
+            typeof(PTL.InternalWeb.Features.Scheme.SchemeCurrencyPriceViewModel).GetProperty(nameof(PTL.InternalWeb.Features.Scheme.SchemeCurrencyPriceViewModel.Price))!,
+            typeof(System.ComponentModel.DataAnnotations.RangeAttribute))!;
+
+        Assert.Equal(valid, range.IsValid((decimal)value));
+    }
+
+    [Fact]
     public async Task Create_Post_ApiFailure_AddsErrorsAndReturnsView()
     {
         var apiClient = new FakeSchemeApiClient

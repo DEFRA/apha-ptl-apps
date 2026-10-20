@@ -26,6 +26,10 @@ public sealed record SchemeHistoryRowViewModel(Guid SchemeId, string YearLabel, 
 // only; SchemeCurrencyId is Guid.Empty for a currency the scheme has no price row for yet.
 public sealed class SchemeCurrencyPriceViewModel
 {
+    public const string PriceMustBePositive = "Price must be positive";
+
+    public const string PriceInvalidNumber = "Invalid Number";
+
     public Guid SchemeCurrencyId { get; set; }
 
     public Guid CurrencyId { get; set; }
@@ -35,7 +39,7 @@ public sealed class SchemeCurrencyPriceViewModel
     public string CurrencySymbol { get; set; } = string.Empty;
 
     [Required(ErrorMessage = "Enter a price for every currency")]
-    [Range(0.01, double.MaxValue, ErrorMessage = "Price must be greater than zero")]
+    [Range(0, double.MaxValue, ErrorMessage = PriceMustBePositive)]
     public decimal? Price { get; set; }
 }
 
