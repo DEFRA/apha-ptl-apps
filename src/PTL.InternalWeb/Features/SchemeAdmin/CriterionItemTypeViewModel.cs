@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Mvc.Rendering;
 
 namespace PTL.InternalWeb.Features.SchemeAdmin;
 
-public sealed class CriterionItemTypeViewModel
+public sealed class CriterionItemTypeViewModel : IItemTypeListViewModel
 {
     public int SelectedYearId { get; set; }
 
@@ -27,9 +27,34 @@ public sealed class CriterionItemTypeViewModel
     public string? Message { get; set; }
 
     public bool MessageIsError { get; set; }
+
+    // IItemTypeListViewModel: shared _ItemTypeAdminList.cshtml rendering contract - see
+    // CategoryItemTypeViewModel's remarks. Entity-bound field name strings here must match
+    // SchemeAdminController exactly.
+    string IItemTypeListViewModel.PageHeading => "Criterion Items";
+    string IItemTypeListViewModel.PageDescription => "This page defines the Criterion Item Types that will be available for use on Tests.";
+    string IItemTypeListViewModel.ColumnHeaderLabel => "Criterion item type name";
+    string IItemTypeListViewModel.EmptyMessage => "There are no Criterion Item Types to display.";
+    string IItemTypeListViewModel.AddHeading => "Add a Criterion Item";
+    string IItemTypeListViewModel.AddNameLabel => "New criterion item name";
+    int IItemTypeListViewModel.EditNameMaxLength => 50;
+    int IItemTypeListViewModel.PageSize => PageSize;
+    string IItemTypeListViewModel.ActionName => "CriterionItemType";
+    string IItemTypeListViewModel.AddActionName => "CriterionItemTypeAdd";
+    string IItemTypeListViewModel.SaveActionName => "CriterionItemTypeSave";
+    string IItemTypeListViewModel.SaveAllNoLongerInUseActionName => "CriterionItemTypeSaveAllNoLongerInUse";
+    string IItemTypeListViewModel.RemoveActionName => "CriterionItemTypeRemove";
+    string IItemTypeListViewModel.EditFormId => "criterionItemTypeEditForm";
+    string IItemTypeListViewModel.EditIdFieldName => "Edit.CriterionItemTypeId";
+    string IItemTypeListViewModel.RemoveIdRouteParamName => "criterionItemTypeId";
+    string IItemTypeListViewModel.PageIdsFieldName => "pageCriterionItemTypeIds";
+    string IItemTypeListViewModel.CheckedIdsFieldName => "checkedCriterionItemTypeIds";
+    IReadOnlyList<IItemTypeRowViewModel> IItemTypeListViewModel.Rows => Rows;
+    string IItemTypeListViewModel.AddName => Add.Name;
+    bool IItemTypeListViewModel.AddNoLongerInUse => Add.NoLongerInUse;
 }
 
-public sealed class CriterionItemTypeRowViewModel
+public sealed class CriterionItemTypeRowViewModel : IItemTypeRowViewModel
 {
     public Guid CriterionItemTypeId { get; set; }
 
@@ -50,6 +75,8 @@ public sealed class CriterionItemTypeRowViewModel
 
     // Replaces a native confirm() popup with a GOV.UK warning-text + explicit Yes/Cancel step.
     public bool IsConfirmingRemove { get; set; }
+
+    Guid IItemTypeRowViewModel.ItemId => CriterionItemTypeId;
 }
 
 // Posted by the single "Add" button at the bottom of the list - matches legacy ButtonAdd_Click.

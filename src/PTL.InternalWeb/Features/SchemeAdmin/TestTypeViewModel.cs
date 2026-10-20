@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Mvc.Rendering;
 
 namespace PTL.InternalWeb.Features.SchemeAdmin;
 
-public sealed class TestTypeViewModel
+public sealed class TestTypeViewModel : IItemTypeListViewModel
 {
     public int SelectedYearId { get; set; }
 
@@ -27,9 +27,34 @@ public sealed class TestTypeViewModel
     public string? Message { get; set; }
 
     public bool MessageIsError { get; set; }
+
+    // IItemTypeListViewModel: shared _ItemTypeAdminList.cshtml rendering contract - see
+    // CategoryItemTypeViewModel's remarks. Entity-bound field name strings here must match
+    // SchemeAdminController exactly.
+    string IItemTypeListViewModel.PageHeading => "Test Types";
+    string IItemTypeListViewModel.PageDescription => "This page defines the types of Test that will be available for use when setting up next year's Schemes.";
+    string IItemTypeListViewModel.ColumnHeaderLabel => "Test type name";
+    string IItemTypeListViewModel.EmptyMessage => "There are no Test Types to display.";
+    string IItemTypeListViewModel.AddHeading => "Add a Test Type";
+    string IItemTypeListViewModel.AddNameLabel => "New test type name";
+    int IItemTypeListViewModel.EditNameMaxLength => 30;
+    int IItemTypeListViewModel.PageSize => PageSize;
+    string IItemTypeListViewModel.ActionName => "TestType";
+    string IItemTypeListViewModel.AddActionName => "TestTypeAdd";
+    string IItemTypeListViewModel.SaveActionName => "TestTypeSave";
+    string IItemTypeListViewModel.SaveAllNoLongerInUseActionName => "TestTypeSaveAllNoLongerInUse";
+    string IItemTypeListViewModel.RemoveActionName => "TestTypeRemove";
+    string IItemTypeListViewModel.EditFormId => "testTypeEditForm";
+    string IItemTypeListViewModel.EditIdFieldName => "Edit.TestTypeId";
+    string IItemTypeListViewModel.RemoveIdRouteParamName => "testTypeId";
+    string IItemTypeListViewModel.PageIdsFieldName => "pageTestTypeIds";
+    string IItemTypeListViewModel.CheckedIdsFieldName => "checkedTestTypeIds";
+    IReadOnlyList<IItemTypeRowViewModel> IItemTypeListViewModel.Rows => Rows;
+    string IItemTypeListViewModel.AddName => Add.Name;
+    bool IItemTypeListViewModel.AddNoLongerInUse => Add.NoLongerInUse;
 }
 
-public sealed class TestTypeRowViewModel
+public sealed class TestTypeRowViewModel : IItemTypeRowViewModel
 {
     public Guid TestTypeId { get; set; }
 
@@ -50,6 +75,8 @@ public sealed class TestTypeRowViewModel
 
     // Replaces a native confirm() popup with a GOV.UK warning-text + explicit Yes/Cancel step.
     public bool IsConfirmingRemove { get; set; }
+
+    Guid IItemTypeRowViewModel.ItemId => TestTypeId;
 }
 
 // Posted by the single "Add" button at the bottom of the list - matches legacy ButtonAdd_Click.

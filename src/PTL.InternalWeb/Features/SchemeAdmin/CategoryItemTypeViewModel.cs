@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Mvc.Rendering;
 
 namespace PTL.InternalWeb.Features.SchemeAdmin;
 
-public sealed class CategoryItemTypeViewModel
+public sealed class CategoryItemTypeViewModel : IItemTypeListViewModel
 {
     public int SelectedYearId { get; set; }
 
@@ -28,9 +28,33 @@ public sealed class CategoryItemTypeViewModel
     public string? Message { get; set; }
 
     public bool MessageIsError { get; set; }
+
+    // IItemTypeListViewModel: shared _ItemTypeAdminList.cshtml rendering contract - see that file's
+    // remarks. Entity-bound field name strings here must match SchemeAdminController exactly.
+    string IItemTypeListViewModel.PageHeading => "Category Items";
+    string IItemTypeListViewModel.PageDescription => "This page defines the Category Item Types that will be available for use on Tests.";
+    string IItemTypeListViewModel.ColumnHeaderLabel => "Category item type name";
+    string IItemTypeListViewModel.EmptyMessage => "There are no Category Item Types to display.";
+    string IItemTypeListViewModel.AddHeading => "Add a Category Item";
+    string IItemTypeListViewModel.AddNameLabel => "New category name";
+    int IItemTypeListViewModel.EditNameMaxLength => 50;
+    int IItemTypeListViewModel.PageSize => PageSize;
+    string IItemTypeListViewModel.ActionName => "CategoryItemType";
+    string IItemTypeListViewModel.AddActionName => "CategoryItemTypeAdd";
+    string IItemTypeListViewModel.SaveActionName => "CategoryItemTypeSave";
+    string IItemTypeListViewModel.SaveAllNoLongerInUseActionName => "CategoryItemTypeSaveAllNoLongerInUse";
+    string IItemTypeListViewModel.RemoveActionName => "CategoryItemTypeRemove";
+    string IItemTypeListViewModel.EditFormId => "categoryItemTypeEditForm";
+    string IItemTypeListViewModel.EditIdFieldName => "Edit.CategoryItemTypeId";
+    string IItemTypeListViewModel.RemoveIdRouteParamName => "categoryItemTypeId";
+    string IItemTypeListViewModel.PageIdsFieldName => "pageCategoryItemTypeIds";
+    string IItemTypeListViewModel.CheckedIdsFieldName => "checkedCategoryItemTypeIds";
+    IReadOnlyList<IItemTypeRowViewModel> IItemTypeListViewModel.Rows => Rows;
+    string IItemTypeListViewModel.AddName => Add.Name;
+    bool IItemTypeListViewModel.AddNoLongerInUse => Add.NoLongerInUse;
 }
 
-public sealed class CategoryItemTypeRowViewModel
+public sealed class CategoryItemTypeRowViewModel : IItemTypeRowViewModel
 {
     public Guid CategoryItemTypeId { get; set; }
 
@@ -51,6 +75,8 @@ public sealed class CategoryItemTypeRowViewModel
 
     // Replaces a native confirm() popup with a GOV.UK warning-text + explicit Yes/Cancel step.
     public bool IsConfirmingRemove { get; set; }
+
+    Guid IItemTypeRowViewModel.ItemId => CategoryItemTypeId;
 }
 
 // Posted by the single "Add" button at the bottom of the list - matches legacy

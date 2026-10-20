@@ -41,7 +41,7 @@ public class SchemeAdminController(ICategoryItemTypeApiClient categoryItemTypeAp
 
     public async Task<IActionResult> CategoryItemType(int? yearId, Guid? editId, Guid? removeConfirmId, int page = 1, CancellationToken cancellationToken = default) =>
         View(await BuildCategoryItemTypeViewModelAsync(
-            new CategoryItemTypeViewModelRequest(yearId, editId, page, Message: null, MessageIsError: false, AddValues: null, EditValues: null, removeConfirmId),
+            new(yearId, editId, page, Message: null, MessageIsError: false, AddValues: null, EditValues: null, removeConfirmId),
             cancellationToken));
 
     // Matches legacy ButtonAddCategory_Click - Name is required; the new item always starts in
@@ -68,7 +68,7 @@ public class SchemeAdminController(ICategoryItemTypeApiClient categoryItemTypeAp
         }
 
         return View(nameof(CategoryItemType), await BuildCategoryItemTypeViewModelAsync(
-            new CategoryItemTypeViewModelRequest(yearId, EditId: null, page, Message: null, MessageIsError: false, model, EditValues: null),
+            new(yearId, EditId: null, page, Message: null, MessageIsError: false, model, EditValues: null),
             cancellationToken));
     }
 
@@ -91,7 +91,7 @@ public class SchemeAdminController(ICategoryItemTypeApiClient categoryItemTypeAp
             if (result.FieldErrors.TryGetValue(string.Empty, out var conflictMessages))
             {
                 return View(nameof(CategoryItemType), await BuildCategoryItemTypeViewModelAsync(
-                    new CategoryItemTypeViewModelRequest(yearId, model.CategoryItemTypeId, page, conflictMessages[0], MessageIsError: true, AddValues: null, EditValues: null),
+                    new(yearId, model.CategoryItemTypeId, page, conflictMessages[0], MessageIsError: true, AddValues: null, EditValues: null),
                     cancellationToken));
             }
 
@@ -105,7 +105,7 @@ public class SchemeAdminController(ICategoryItemTypeApiClient categoryItemTypeAp
         }
 
         return View(nameof(CategoryItemType), await BuildCategoryItemTypeViewModelAsync(
-            new CategoryItemTypeViewModelRequest(yearId, model.CategoryItemTypeId, page, Message: null, MessageIsError: false, AddValues: null, model),
+            new(yearId, model.CategoryItemTypeId, page, Message: null, MessageIsError: false, AddValues: null, model),
             cancellationToken));
     }
 
@@ -131,7 +131,7 @@ public class SchemeAdminController(ICategoryItemTypeApiClient categoryItemTypeAp
         catch (Exception ex) when (IsTransientApiFailure(ex, cancellationToken))
         {
             return View(nameof(CategoryItemType), await BuildCategoryItemTypeViewModelAsync(
-                new CategoryItemTypeViewModelRequest(yearId, EditId: null, page, NoLongerInUseSaveFailedMessage, MessageIsError: true, AddValues: null, EditValues: null),
+                new(yearId, EditId: null, page, NoLongerInUseSaveFailedMessage, MessageIsError: true, AddValues: null, EditValues: null),
                 cancellationToken));
         }
 
@@ -149,61 +149,114 @@ public class SchemeAdminController(ICategoryItemTypeApiClient categoryItemTypeAp
         }
 
         return View(nameof(CategoryItemType), await BuildCategoryItemTypeViewModelAsync(
-            new CategoryItemTypeViewModelRequest(yearId, EditId: null, page, result.Message, !result.Success, AddValues: null, EditValues: null),
+            new(yearId, EditId: null, page, result.Message, !result.Success, AddValues: null, EditValues: null),
             cancellationToken));
     }
 
-    // Bundles BuildCategoryItemTypeViewModelAsync's render-state inputs into one object - the
-    // method itself was flagged for exceeding Sonar's 7-parameter limit (S107).
-    private sealed record CategoryItemTypeViewModelRequest(
+    // Bundles each BuildXViewModelAsync's render-state inputs into one object - the method itself
+    // was flagged for exceeding Sonar's 7-parameter limit (S107). Generic over the entity's own
+    // Add/Edit view-model types so CategoryItemType/TestType/CriterionItemType share one record
+    // instead of 3 near-identical copies.
+    private sealed record ItemTypeViewModelRequest<TAdd, TEdit>(
         int? YearId,
         Guid? EditId,
         int Page,
         string? Message,
         bool MessageIsError,
-        CategoryItemTypeAddViewModel? AddValues,
-        CategoryItemTypeEditViewModel? EditValues,
+        TAdd? AddValues,
+        TEdit? EditValues,
         Guid? RemoveConfirmId = null);
 
-    private async Task<CategoryItemTypeViewModel> BuildCategoryItemTypeViewModelAsync(
-        CategoryItemTypeViewModelRequest request,
+    // Shared body of BuildXViewModelAsync: years fetch -> selected year -> fetch items for year ->
+    // edit-blocked check (forced ?editId= on an in-use item) -> sort by name. Row mapping/paging
+    // stays in each entity's own BuildXViewModelAsync since the row view-model/edit-values types
+    // differ per entity.
+    private async Task<ItemTypeYearData<TResponse>> ResolveItemTypeYearDataAsync<TResponse>(
+        int? requestedYearId,
+        Guid? editId,
+        string? message,
+        bool messageIsError,
+        string entityDisplayName,
+        Func<int, CancellationToken, Task<IReadOnlyList<TResponse>>> fetchItemsAsync,
+        Func<TResponse, Guid> idSelector,
+        Func<TResponse, string> nameSelector,
+        Func<TResponse, int> foreignInstancesSelector,
+        Func<TResponse, string> foreignInstancesStringSelector,
         CancellationToken cancellationToken)
+        where TResponse : class
     {
-        var yearId = request.YearId;
-        var editId = request.EditId;
-        var page = request.Page;
-        var message = request.Message;
-        var messageIsError = request.MessageIsError;
-        var addValues = request.AddValues;
-        var editValues = request.EditValues;
-        var removeConfirmId = request.RemoveConfirmId;
-
         var years = await lookupApiClient.GetCurrentYearsAsync(cancellationToken);
         var currentYearId = years.Count > 0 ? years[0].YearId : (int?)null;
-        var selectedYearId = ResolveSelectedYearId(yearId, years, currentYearId);
+        var selectedYearId = ResolveSelectedYearId(requestedYearId, years, currentYearId);
 
-        var items = await categoryItemTypeApiClient.GetByYearAsync(selectedYearId, cancellationToken);
+        var items = await fetchItemsAsync(selectedYearId, cancellationToken);
 
         // Defence in depth against a forced ?editId= for an in-use item (the Edit link itself is
         // never rendered for such a row) - refuses to open edit mode and surfaces the same
         // dependency message Save/Remove would, rather than silently rendering an editable row.
-        var editTarget = editId is null ? null : items.FirstOrDefault(i => i.CategoryItemTypeId == editId);
-        if (editTarget is not null && editTarget.ForeignInstances != 0 && message is null)
+        var editTarget = editId is null ? null : items.FirstOrDefault(i => idSelector(i) == editId);
+        if (editTarget is not null && foreignInstancesSelector(editTarget) != 0 && message is null)
         {
-            message = BuildInUseMessage(editTarget, "edited");
+            message = BuildInUseMessage(entityDisplayName, foreignInstancesSelector(editTarget), foreignInstancesStringSelector(editTarget), "edited");
             messageIsError = true;
             editId = null;
         }
 
-        // Matches legacy CategoryItemTypeCollection.GetSortedFilteredList's ApplySort("Name",
-        // Ascending) - the grid's one and only default sort order.
-        var sortedItems = items.OrderBy(i => i.Name, StringComparer.OrdinalIgnoreCase).ToList();
+        // Matches legacy *Collection.GetSortedFilteredList's ApplySort("Name", Ascending) - the
+        // grid's one and only default sort order.
+        var sortedItems = items.OrderBy(nameSelector, StringComparer.OrdinalIgnoreCase).ToList();
+
+        return new ItemTypeYearData<TResponse>(
+            selectedYearId,
+            // Legacy's DropDownListYear.Items.Add(CurrentYearId) shows the plain year ("2026"),
+            // not the shared Year lookup's financial-year label ("2026/27") used elsewhere (e.g.
+            // Contract/PostagePricingPlan) - this dropdown only ever needs the YearId anyway.
+            years.Select(y => new SelectListItem(y.YearId.ToString(System.Globalization.CultureInfo.InvariantCulture), y.YearId.ToString(System.Globalization.CultureInfo.InvariantCulture))),
+            sortedItems,
+            sortedItems.Count,
+            editId,
+            message,
+            messageIsError);
+    }
+
+    private readonly record struct ItemTypeYearData<TResponse>(
+        int SelectedYearId,
+        IEnumerable<SelectListItem> YearOptions,
+        IReadOnlyList<TResponse> SortedItems,
+        int TotalRecords,
+        Guid? EditId,
+        string? Message,
+        bool MessageIsError);
+
+    // Matches the exact wording each entity's *Service used server-side, so a blocked Edit
+    // attempt (forced ?editId=) reads identically to a blocked Save/Remove.
+    private static string BuildInUseMessage(string entityDisplayName, int foreignInstances, string foreignInstancesString, string action) =>
+        foreignInstances == -1
+            ? $"This {entityDisplayName} is being used on a distribution and cannot be {action}. It is also being used on the following Scheme(s): {foreignInstancesString}"
+            : $"This {entityDisplayName} is being used on {foreignInstances} Scheme(s): {foreignInstancesString} and cannot be {action}.";
+
+    private async Task<CategoryItemTypeViewModel> BuildCategoryItemTypeViewModelAsync(
+        ItemTypeViewModelRequest<CategoryItemTypeAddViewModel, CategoryItemTypeEditViewModel> request,
+        CancellationToken cancellationToken)
+    {
+        var yearData = await ResolveItemTypeYearDataAsync(
+            request.YearId,
+            request.EditId,
+            request.Message,
+            request.MessageIsError,
+            "Category Item",
+            categoryItemTypeApiClient.GetByYearAsync,
+            i => i.CategoryItemTypeId,
+            i => i.Name,
+            i => i.ForeignInstances,
+            i => i.ForeignInstancesString,
+            cancellationToken);
 
         // Matches legacy GridViewCategoryItemType.AllowPaging/PageSize = 15 - the grid paginates
         // the full year's in-memory collection client-side, not via a separate server round-trip
         // per page, so the same client-side Skip/Take here is a faithful reproduction, not a gap.
-        var currentPage = page < 1 ? 1 : page;
-        var pagedItems = sortedItems
+        var currentPage = request.Page < 1 ? 1 : request.Page;
+        var pagedItems = yearData.SortedItems
             .Skip((currentPage - 1) * CategoryItemTypeViewModel.PageSize)
             .Take(CategoryItemTypeViewModel.PageSize);
 
@@ -211,37 +264,27 @@ public class SchemeAdminController(ICategoryItemTypeApiClient categoryItemTypeAp
             .Select(i => new CategoryItemTypeRowViewModel
             {
                 CategoryItemTypeId = i.CategoryItemTypeId,
-                Name = editId == i.CategoryItemTypeId && editValues is not null ? editValues.Name : i.Name,
-                NoLongerInUse = editId == i.CategoryItemTypeId && editValues is not null ? editValues.NoLongerInUse : i.NoLongerInUse,
+                Name = yearData.EditId == i.CategoryItemTypeId && request.EditValues is not null ? request.EditValues.Name : i.Name,
+                NoLongerInUse = yearData.EditId == i.CategoryItemTypeId && request.EditValues is not null ? request.EditValues.NoLongerInUse : i.NoLongerInUse,
                 ForeignInstances = i.ForeignInstances,
                 ForeignInstancesString = i.ForeignInstancesString,
-                IsEditing = editId == i.CategoryItemTypeId,
-                IsConfirmingRemove = removeConfirmId == i.CategoryItemTypeId
+                IsEditing = yearData.EditId == i.CategoryItemTypeId,
+                IsConfirmingRemove = request.RemoveConfirmId == i.CategoryItemTypeId
             })
             .ToList();
 
         return new CategoryItemTypeViewModel
         {
-            SelectedYearId = selectedYearId,
-            // Legacy's DropDownListYear.Items.Add(CurrentYearId) shows the plain year ("2026"),
-            // not the shared Year lookup's financial-year label ("2026/27") used elsewhere (e.g.
-            // Contract/PostagePricingPlan) - this dropdown only ever needs the YearId anyway.
-            YearOptions = years.Select(y => new SelectListItem(y.YearId.ToString(System.Globalization.CultureInfo.InvariantCulture), y.YearId.ToString(System.Globalization.CultureInfo.InvariantCulture))),
+            SelectedYearId = yearData.SelectedYearId,
+            YearOptions = yearData.YearOptions,
             Rows = rows,
             Page = currentPage,
-            TotalRecords = sortedItems.Count,
-            Add = addValues ?? new CategoryItemTypeAddViewModel(),
-            Message = message,
-            MessageIsError = messageIsError
+            TotalRecords = yearData.TotalRecords,
+            Add = request.AddValues ?? new CategoryItemTypeAddViewModel(),
+            Message = yearData.Message,
+            MessageIsError = yearData.MessageIsError
         };
     }
-
-    // Matches the exact wording CategoryItemTypeService uses server-side, so a blocked Edit
-    // attempt (forced ?editId=) reads identically to a blocked Save/Remove.
-    private static string BuildInUseMessage(CategoryItemTypeResponse item, string action) =>
-        item.ForeignInstances == -1
-            ? $"This Category Item is being used on a distribution and cannot be {action}. It is also being used on the following Scheme(s): {item.ForeignInstancesString}"
-            : $"This Category Item is being used on {item.ForeignInstances} Scheme(s): {item.ForeignInstancesString} and cannot be {action}.";
 
     private static int ResolveSelectedYearId(int? requestedYearId, IReadOnlyList<YearResponse> availableYears, int? currentYearId)
     {
@@ -260,7 +303,7 @@ public class SchemeAdminController(ICategoryItemTypeApiClient categoryItemTypeAp
 
     public async Task<IActionResult> TestType(int? yearId, Guid? editId, Guid? removeConfirmId, int page = 1, CancellationToken cancellationToken = default) =>
         View(await BuildTestTypeViewModelAsync(
-            new TestTypeViewModelRequest(yearId, editId, page, Message: null, MessageIsError: false, AddValues: null, EditValues: null, removeConfirmId),
+            new(yearId, editId, page, Message: null, MessageIsError: false, AddValues: null, EditValues: null, removeConfirmId),
             cancellationToken));
 
     // Matches legacy ButtonAdd_Click - Name is required; the new item always starts in whichever
@@ -287,7 +330,7 @@ public class SchemeAdminController(ICategoryItemTypeApiClient categoryItemTypeAp
         }
 
         return View(nameof(TestType), await BuildTestTypeViewModelAsync(
-            new TestTypeViewModelRequest(yearId, EditId: null, page, Message: null, MessageIsError: false, model, EditValues: null),
+            new(yearId, EditId: null, page, Message: null, MessageIsError: false, model, EditValues: null),
             cancellationToken));
     }
 
@@ -310,7 +353,7 @@ public class SchemeAdminController(ICategoryItemTypeApiClient categoryItemTypeAp
             if (result.FieldErrors.TryGetValue(string.Empty, out var conflictMessages))
             {
                 return View(nameof(TestType), await BuildTestTypeViewModelAsync(
-                    new TestTypeViewModelRequest(yearId, model.TestTypeId, page, conflictMessages[0], MessageIsError: true, AddValues: null, EditValues: null),
+                    new(yearId, model.TestTypeId, page, conflictMessages[0], MessageIsError: true, AddValues: null, EditValues: null),
                     cancellationToken));
             }
 
@@ -324,7 +367,7 @@ public class SchemeAdminController(ICategoryItemTypeApiClient categoryItemTypeAp
         }
 
         return View(nameof(TestType), await BuildTestTypeViewModelAsync(
-            new TestTypeViewModelRequest(yearId, model.TestTypeId, page, Message: null, MessageIsError: false, AddValues: null, model),
+            new(yearId, model.TestTypeId, page, Message: null, MessageIsError: false, AddValues: null, model),
             cancellationToken));
     }
 
@@ -346,7 +389,7 @@ public class SchemeAdminController(ICategoryItemTypeApiClient categoryItemTypeAp
         catch (Exception ex) when (IsTransientApiFailure(ex, cancellationToken))
         {
             return View(nameof(TestType), await BuildTestTypeViewModelAsync(
-                new TestTypeViewModelRequest(yearId, EditId: null, page, NoLongerInUseSaveFailedMessage, MessageIsError: true, AddValues: null, EditValues: null),
+                new(yearId, EditId: null, page, NoLongerInUseSaveFailedMessage, MessageIsError: true, AddValues: null, EditValues: null),
                 cancellationToken));
         }
 
@@ -364,58 +407,30 @@ public class SchemeAdminController(ICategoryItemTypeApiClient categoryItemTypeAp
         }
 
         return View(nameof(TestType), await BuildTestTypeViewModelAsync(
-            new TestTypeViewModelRequest(yearId, EditId: null, page, result.Message, !result.Success, AddValues: null, EditValues: null),
+            new(yearId, EditId: null, page, result.Message, !result.Success, AddValues: null, EditValues: null),
             cancellationToken));
     }
 
-    // Bundles BuildTestTypeViewModelAsync's render-state inputs into one object - see
-    // CategoryItemTypeViewModelRequest remarks (Sonar S107, 7-parameter limit).
-    private sealed record TestTypeViewModelRequest(
-        int? YearId,
-        Guid? EditId,
-        int Page,
-        string? Message,
-        bool MessageIsError,
-        TestTypeAddViewModel? AddValues,
-        TestTypeEditViewModel? EditValues,
-        Guid? RemoveConfirmId = null);
-
     private async Task<TestTypeViewModel> BuildTestTypeViewModelAsync(
-        TestTypeViewModelRequest request,
+        ItemTypeViewModelRequest<TestTypeAddViewModel, TestTypeEditViewModel> request,
         CancellationToken cancellationToken)
     {
-        var yearId = request.YearId;
-        var editId = request.EditId;
-        var page = request.Page;
-        var message = request.Message;
-        var messageIsError = request.MessageIsError;
-        var addValues = request.AddValues;
-        var editValues = request.EditValues;
-        var removeConfirmId = request.RemoveConfirmId;
-
-        var years = await lookupApiClient.GetCurrentYearsAsync(cancellationToken);
-        var currentYearId = years.Count > 0 ? years[0].YearId : (int?)null;
-        var selectedYearId = ResolveSelectedYearId(yearId, years, currentYearId);
-
-        var items = await testTypeApiClient.GetByYearAsync(selectedYearId, cancellationToken);
-
-        // Defence in depth against a forced ?editId= for an in-use item (the Edit link itself is
-        // never rendered for such a row) - refuses to open edit mode and surfaces the same
-        // dependency message Save/Remove would, rather than silently rendering an editable row.
-        var editTarget = editId is null ? null : items.FirstOrDefault(i => i.TestTypeId == editId);
-        if (editTarget is not null && editTarget.ForeignInstances != 0 && message is null)
-        {
-            message = BuildTestTypeInUseMessage(editTarget, "edited");
-            messageIsError = true;
-            editId = null;
-        }
-
-        // Matches legacy TestTypeCollection.GetSortedFilteredList's ApplySort("Name", Ascending).
-        var sortedItems = items.OrderBy(i => i.Name, StringComparer.OrdinalIgnoreCase).ToList();
+        var yearData = await ResolveItemTypeYearDataAsync(
+            request.YearId,
+            request.EditId,
+            request.Message,
+            request.MessageIsError,
+            "Test",
+            testTypeApiClient.GetByYearAsync,
+            i => i.TestTypeId,
+            i => i.Name,
+            i => i.ForeignInstances,
+            i => i.ForeignInstancesString,
+            cancellationToken);
 
         // Matches legacy GridViewTestType.AllowPaging/PageSize = 15.
-        var currentPage = page < 1 ? 1 : page;
-        var pagedItems = sortedItems
+        var currentPage = request.Page < 1 ? 1 : request.Page;
+        var pagedItems = yearData.SortedItems
             .Skip((currentPage - 1) * TestTypeViewModel.PageSize)
             .Take(TestTypeViewModel.PageSize);
 
@@ -423,40 +438,31 @@ public class SchemeAdminController(ICategoryItemTypeApiClient categoryItemTypeAp
             .Select(i => new TestTypeRowViewModel
             {
                 TestTypeId = i.TestTypeId,
-                Name = editId == i.TestTypeId && editValues is not null ? editValues.Name : i.Name,
-                NoLongerInUse = editId == i.TestTypeId && editValues is not null ? editValues.NoLongerInUse : i.NoLongerInUse,
+                Name = yearData.EditId == i.TestTypeId && request.EditValues is not null ? request.EditValues.Name : i.Name,
+                NoLongerInUse = yearData.EditId == i.TestTypeId && request.EditValues is not null ? request.EditValues.NoLongerInUse : i.NoLongerInUse,
                 ForeignInstances = i.ForeignInstances,
                 ForeignInstancesString = i.ForeignInstancesString,
-                IsEditing = editId == i.TestTypeId,
-                IsConfirmingRemove = removeConfirmId == i.TestTypeId
+                IsEditing = yearData.EditId == i.TestTypeId,
+                IsConfirmingRemove = request.RemoveConfirmId == i.TestTypeId
             })
             .ToList();
 
         return new TestTypeViewModel
         {
-            SelectedYearId = selectedYearId,
-            // See CategoryItemTypeViewModel's YearOptions remarks: plain year, not the shared
-            // financial-year label.
-            YearOptions = years.Select(y => new SelectListItem(y.YearId.ToString(System.Globalization.CultureInfo.InvariantCulture), y.YearId.ToString(System.Globalization.CultureInfo.InvariantCulture))),
+            SelectedYearId = yearData.SelectedYearId,
+            YearOptions = yearData.YearOptions,
             Rows = rows,
             Page = currentPage,
-            TotalRecords = sortedItems.Count,
-            Add = addValues ?? new TestTypeAddViewModel(),
-            Message = message,
-            MessageIsError = messageIsError
+            TotalRecords = yearData.TotalRecords,
+            Add = request.AddValues ?? new TestTypeAddViewModel(),
+            Message = yearData.Message,
+            MessageIsError = yearData.MessageIsError
         };
     }
 
-    // Matches the exact wording TestTypeService uses server-side, so a blocked Edit attempt
-    // (forced ?editId=) reads identically to a blocked Save/Remove.
-    private static string BuildTestTypeInUseMessage(TestTypeResponse item, string action) =>
-        item.ForeignInstances == -1
-            ? $"This Test is being used on a distribution and cannot be {action}. It is also being used on the following Scheme(s): {item.ForeignInstancesString}"
-            : $"This Test is being used on {item.ForeignInstances} Scheme(s): {item.ForeignInstancesString} and cannot be {action}.";
-
     public async Task<IActionResult> CriterionItemType(int? yearId, Guid? editId, Guid? removeConfirmId, int page = 1, CancellationToken cancellationToken = default) =>
         View(await BuildCriterionItemTypeViewModelAsync(
-            new CriterionItemTypeViewModelRequest(yearId, editId, page, Message: null, MessageIsError: false, AddValues: null, EditValues: null, removeConfirmId),
+            new(yearId, editId, page, Message: null, MessageIsError: false, AddValues: null, EditValues: null, removeConfirmId),
             cancellationToken));
 
     // Matches legacy ButtonAdd_Click - Name is required; the new item always starts in whichever
@@ -483,7 +489,7 @@ public class SchemeAdminController(ICategoryItemTypeApiClient categoryItemTypeAp
         }
 
         return View(nameof(CriterionItemType), await BuildCriterionItemTypeViewModelAsync(
-            new CriterionItemTypeViewModelRequest(yearId, EditId: null, page, Message: null, MessageIsError: false, model, EditValues: null),
+            new(yearId, EditId: null, page, Message: null, MessageIsError: false, model, EditValues: null),
             cancellationToken));
     }
 
@@ -506,7 +512,7 @@ public class SchemeAdminController(ICategoryItemTypeApiClient categoryItemTypeAp
             if (result.FieldErrors.TryGetValue(string.Empty, out var conflictMessages))
             {
                 return View(nameof(CriterionItemType), await BuildCriterionItemTypeViewModelAsync(
-                    new CriterionItemTypeViewModelRequest(yearId, model.CriterionItemTypeId, page, conflictMessages[0], MessageIsError: true, AddValues: null, EditValues: null),
+                    new(yearId, model.CriterionItemTypeId, page, conflictMessages[0], MessageIsError: true, AddValues: null, EditValues: null),
                     cancellationToken));
             }
 
@@ -520,7 +526,7 @@ public class SchemeAdminController(ICategoryItemTypeApiClient categoryItemTypeAp
         }
 
         return View(nameof(CriterionItemType), await BuildCriterionItemTypeViewModelAsync(
-            new CriterionItemTypeViewModelRequest(yearId, model.CriterionItemTypeId, page, Message: null, MessageIsError: false, AddValues: null, model),
+            new(yearId, model.CriterionItemTypeId, page, Message: null, MessageIsError: false, AddValues: null, model),
             cancellationToken));
     }
 
@@ -541,7 +547,7 @@ public class SchemeAdminController(ICategoryItemTypeApiClient categoryItemTypeAp
         catch (Exception ex) when (IsTransientApiFailure(ex, cancellationToken))
         {
             return View(nameof(CriterionItemType), await BuildCriterionItemTypeViewModelAsync(
-                new CriterionItemTypeViewModelRequest(yearId, EditId: null, page, NoLongerInUseSaveFailedMessage, MessageIsError: true, AddValues: null, EditValues: null),
+                new(yearId, EditId: null, page, NoLongerInUseSaveFailedMessage, MessageIsError: true, AddValues: null, EditValues: null),
                 cancellationToken));
         }
 
@@ -559,59 +565,30 @@ public class SchemeAdminController(ICategoryItemTypeApiClient categoryItemTypeAp
         }
 
         return View(nameof(CriterionItemType), await BuildCriterionItemTypeViewModelAsync(
-            new CriterionItemTypeViewModelRequest(yearId, EditId: null, page, result.Message, !result.Success, AddValues: null, EditValues: null),
+            new(yearId, EditId: null, page, result.Message, !result.Success, AddValues: null, EditValues: null),
             cancellationToken));
     }
 
-    // Bundles BuildCriterionItemTypeViewModelAsync's render-state inputs into one object - see
-    // CategoryItemTypeViewModelRequest remarks (Sonar S107, 7-parameter limit).
-    private sealed record CriterionItemTypeViewModelRequest(
-        int? YearId,
-        Guid? EditId,
-        int Page,
-        string? Message,
-        bool MessageIsError,
-        CriterionItemTypeAddViewModel? AddValues,
-        CriterionItemTypeEditViewModel? EditValues,
-        Guid? RemoveConfirmId = null);
-
     private async Task<CriterionItemTypeViewModel> BuildCriterionItemTypeViewModelAsync(
-        CriterionItemTypeViewModelRequest request,
+        ItemTypeViewModelRequest<CriterionItemTypeAddViewModel, CriterionItemTypeEditViewModel> request,
         CancellationToken cancellationToken)
     {
-        var yearId = request.YearId;
-        var editId = request.EditId;
-        var page = request.Page;
-        var message = request.Message;
-        var messageIsError = request.MessageIsError;
-        var addValues = request.AddValues;
-        var editValues = request.EditValues;
-        var removeConfirmId = request.RemoveConfirmId;
-
-        var years = await lookupApiClient.GetCurrentYearsAsync(cancellationToken);
-        var currentYearId = years.Count > 0 ? years[0].YearId : (int?)null;
-        var selectedYearId = ResolveSelectedYearId(yearId, years, currentYearId);
-
-        var items = await criterionItemTypeApiClient.GetByYearAsync(selectedYearId, cancellationToken);
-
-        // Defence in depth against a forced ?editId= for an in-use item (the Edit link itself is
-        // never rendered for such a row) - refuses to open edit mode and surfaces the same
-        // dependency message Save/Remove would, rather than silently rendering an editable row.
-        var editTarget = editId is null ? null : items.FirstOrDefault(i => i.CriterionItemTypeId == editId);
-        if (editTarget is not null && editTarget.ForeignInstances != 0 && message is null)
-        {
-            message = BuildCriterionItemTypeInUseMessage(editTarget, "edited");
-            messageIsError = true;
-            editId = null;
-        }
-
-        // Matches legacy CriterionItemTypeCollection.GetSortedFilteredList's ApplySort("Name",
-        // Ascending).
-        var sortedItems = items.OrderBy(i => i.Name, StringComparer.OrdinalIgnoreCase).ToList();
+        var yearData = await ResolveItemTypeYearDataAsync(
+            request.YearId,
+            request.EditId,
+            request.Message,
+            request.MessageIsError,
+            "Criterion Item",
+            criterionItemTypeApiClient.GetByYearAsync,
+            i => i.CriterionItemTypeId,
+            i => i.Name,
+            i => i.ForeignInstances,
+            i => i.ForeignInstancesString,
+            cancellationToken);
 
         // Matches legacy GridViewCriterionItemType.AllowPaging/PageSize = 15.
-        var currentPage = page < 1 ? 1 : page;
-        var pagedItems = sortedItems
+        var currentPage = request.Page < 1 ? 1 : request.Page;
+        var pagedItems = yearData.SortedItems
             .Skip((currentPage - 1) * CriterionItemTypeViewModel.PageSize)
             .Take(CriterionItemTypeViewModel.PageSize);
 
@@ -619,34 +596,25 @@ public class SchemeAdminController(ICategoryItemTypeApiClient categoryItemTypeAp
             .Select(i => new CriterionItemTypeRowViewModel
             {
                 CriterionItemTypeId = i.CriterionItemTypeId,
-                Name = editId == i.CriterionItemTypeId && editValues is not null ? editValues.Name : i.Name,
-                NoLongerInUse = editId == i.CriterionItemTypeId && editValues is not null ? editValues.NoLongerInUse : i.NoLongerInUse,
+                Name = yearData.EditId == i.CriterionItemTypeId && request.EditValues is not null ? request.EditValues.Name : i.Name,
+                NoLongerInUse = yearData.EditId == i.CriterionItemTypeId && request.EditValues is not null ? request.EditValues.NoLongerInUse : i.NoLongerInUse,
                 ForeignInstances = i.ForeignInstances,
                 ForeignInstancesString = i.ForeignInstancesString,
-                IsEditing = editId == i.CriterionItemTypeId,
-                IsConfirmingRemove = removeConfirmId == i.CriterionItemTypeId
+                IsEditing = yearData.EditId == i.CriterionItemTypeId,
+                IsConfirmingRemove = request.RemoveConfirmId == i.CriterionItemTypeId
             })
             .ToList();
 
         return new CriterionItemTypeViewModel
         {
-            SelectedYearId = selectedYearId,
-            // See CategoryItemTypeViewModel's YearOptions remarks: plain year, not the shared
-            // financial-year label.
-            YearOptions = years.Select(y => new SelectListItem(y.YearId.ToString(System.Globalization.CultureInfo.InvariantCulture), y.YearId.ToString(System.Globalization.CultureInfo.InvariantCulture))),
+            SelectedYearId = yearData.SelectedYearId,
+            YearOptions = yearData.YearOptions,
             Rows = rows,
             Page = currentPage,
-            TotalRecords = sortedItems.Count,
-            Add = addValues ?? new CriterionItemTypeAddViewModel(),
-            Message = message,
-            MessageIsError = messageIsError
+            TotalRecords = yearData.TotalRecords,
+            Add = request.AddValues ?? new CriterionItemTypeAddViewModel(),
+            Message = yearData.Message,
+            MessageIsError = yearData.MessageIsError
         };
     }
-
-    // Matches the exact wording CriterionItemTypeService uses server-side, so a blocked Edit
-    // attempt (forced ?editId=) reads identically to a blocked Save/Remove.
-    private static string BuildCriterionItemTypeInUseMessage(CriterionItemTypeResponse item, string action) =>
-        item.ForeignInstances == -1
-            ? $"This Criterion Item is being used on a distribution and cannot be {action}. It is also being used on the following Scheme(s): {item.ForeignInstancesString}"
-            : $"This Criterion Item is being used on {item.ForeignInstances} Scheme(s): {item.ForeignInstancesString} and cannot be {action}.";
 }
