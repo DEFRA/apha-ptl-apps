@@ -1,3 +1,4 @@
+using PTL.Core.Audit;
 using PTL.Core.Lookup;
 using PTL.Core.Participant;
 using PTL.Core.Scheme;
@@ -12,19 +13,21 @@ public interface IPendingOrderService
     // year, each sorted by submit date.
     Task<(IReadOnlyList<PendingOrderSummaryEntity> CurrentYear, IReadOnlyList<PendingOrderSummaryEntity> NextYear)> GetPendingOrdersAsync(CancellationToken cancellationToken = default);
 
-    // Returns null when the pending order does not exist.
+    // Returns null when the pending order does not exist or is no longer outstanding (already
+    // approved/declined, or never submitted) - legacy only ever loaded submitted, non-deleted orders.
     Task<PendingOrderDetail?> GetPendingOrderAsync(Guid pendingContractId, CancellationToken cancellationToken = default);
 
     // Per-row month / Import-Export Licence / Remove edit. Returns false when the scheme line is
-    // not part of the given order.
+    // not part of the given outstanding order.
     Task<bool> UpdateSchemeAsync(Guid pendingContractId, Guid pendingParticipantSchemeId, PendingOrderSchemeEdit edit, CancellationToken cancellationToken = default);
 
-    // Creates the contract and its participant schemes, then soft-deletes the pending order.
-    Task<bool> ApprovePendingOrderAsync(Guid pendingContractId, string purchaseOrderNumber, string approvedBy, CancellationToken cancellationToken = default);
+    // Creates the contract and its participant schemes, soft-deletes the pending order, then queues the
+    // approval emails. Throws PendingOrderValidationException for an over-long purchase order number/comments.
+    Task<bool> ApprovePendingOrderAsync(Guid pendingContractId, string purchaseOrderNumber, string comments = "", CancellationToken cancellationToken = default);
 
-    // Deletes every pending scheme line, then soft-deletes the pending order. The live contract
-    // records are untouched.
-    Task<bool> DeclinePendingOrderAsync(Guid pendingContractId, CancellationToken cancellationToken = default);
+    // Deletes every pending scheme line, soft-deletes the pending order, then queues the decline emails.
+    // The live contract records are untouched.
+    Task<bool> DeclinePendingOrderAsync(Guid pendingContractId, string comments = "", CancellationToken cancellationToken = default);
 }
 
 // The fully-priced pending order the details screen renders.
@@ -70,10 +73,26 @@ public sealed class PendingOrderService(
     IParticipantSchemeRepository participantSchemeRepository,
     ISchemeRepository schemeRepository,
     PTL.Core.Customer.ICustomerRepository customerRepository,
-    ILookupRepository lookupRepository) : IPendingOrderService
+    ILookupRepository lookupRepository,
+    IParticipantRepository participantRepository,
+    IAuditActorResolver auditActor) : IPendingOrderService
 {
     // Legacy getNewContractSuffix supports at most 51 contracts per customer per year.
     private const string Alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
+    // Contract.PurchaseOrderNumber's CSLA StringMaxLength rule and PendingContractOrder.aspx's comments regex.
+    private const int PurchaseOrderNumberMaxLength = 255;
+    private const int CommentsMaxLength = 2000;
+
+    // tblOnlineContractOrderEmail.fldEmail / fldCustomerName are varchar(50).
+    private const int EmailColumnLength = 50;
+
+    // Legacy only loads FetchPendingContractOrder(customerId, True, yearId) - submitted and not deleted.
+    private async Task<PendingOrderEntity?> GetOutstandingOrderAsync(Guid pendingContractId, CancellationToken cancellationToken)
+    {
+        var order = await pendingOrderRepository.GetByIdAsync(pendingContractId, cancellationToken);
+        return order is { IsSubmitted: true, IsDeleted: false } ? order : null;
+    }
 
     public async Task<(IReadOnlyList<PendingOrderSummaryEntity> CurrentYear, IReadOnlyList<PendingOrderSummaryEntity> NextYear)> GetPendingOrdersAsync(CancellationToken cancellationToken = default)
     {
@@ -96,7 +115,7 @@ public sealed class PendingOrderService(
 
     public async Task<PendingOrderDetail?> GetPendingOrderAsync(Guid pendingContractId, CancellationToken cancellationToken = default)
     {
-        var order = await pendingOrderRepository.GetByIdAsync(pendingContractId, cancellationToken);
+        var order = await GetOutstandingOrderAsync(pendingContractId, cancellationToken);
         if (order is null)
         {
             return null;
@@ -133,7 +152,8 @@ public sealed class PendingOrderService(
     }
 
     // Mirrors legacy RepeaterPendingOrderSchemes_DataBound:
-    //   chk.Enabled = scheme.DistributionMonthX And scheme.CanEditX And scheme.CanEditXParticipants
+    //   Jan-Mar: chk.Enabled = scheme.DistributionMonthX And scheme.CanEditX And scheme.CanEditXParticipants
+    //   Apr-Dec: chk.Enabled = scheme.DistributionMonthX And scheme.CanEditXParticipants   (no scheme.CanEditX)
     //   chk.Checked = If(chk.Enabled, pendingScheme.DistributionMonthX, scheme.DistributionMonthX)
     //   If pendingScheme.DistributionMonthXIsContracted Then FlagCheckboxAsAlreadyParticipating(chk)
     // CanEditXParticipants is fnIsDistributionNotPosted, which the pending-scheme procedures also
@@ -154,7 +174,8 @@ public sealed class PendingOrderService(
             }
 
             var (schemeOffersMonth, schemeCanEdit) = offered.GetValueOrDefault(monthNumber);
-            var enabled = schemeOffersMonth && schemeCanEdit && canEditParticipants;
+            var schemeAllowsEdit = monthNumber > 3 || schemeCanEdit;
+            var enabled = schemeOffersMonth && schemeAllowsEdit && canEditParticipants;
 
             cells.Add(new PendingOrderMonthCell(label, monthNumber, enabled ? selected : schemeOffersMonth, enabled, AlreadyParticipating: false));
         }
@@ -183,6 +204,11 @@ public sealed class PendingOrderService(
 
     public async Task<bool> UpdateSchemeAsync(Guid pendingContractId, Guid pendingParticipantSchemeId, PendingOrderSchemeEdit edit, CancellationToken cancellationToken = default)
     {
+        if (await GetOutstandingOrderAsync(pendingContractId, cancellationToken) is null)
+        {
+            return false;
+        }
+
         var schemes = await pendingOrderRepository.GetSchemesAsync(pendingContractId, cancellationToken);
         var scheme = schemes.FirstOrDefault(s => s.PendingParticipantSchemeId == pendingParticipantSchemeId);
         if (scheme is null)
@@ -190,18 +216,25 @@ public sealed class PendingOrderService(
             return false;
         }
 
-        scheme.DistributionMonthJan = edit.DistributionMonthJan;
-        scheme.DistributionMonthFeb = edit.DistributionMonthFeb;
-        scheme.DistributionMonthMar = edit.DistributionMonthMar;
-        scheme.DistributionMonthApr = edit.DistributionMonthApr;
-        scheme.DistributionMonthMay = edit.DistributionMonthMay;
-        scheme.DistributionMonthJun = edit.DistributionMonthJun;
-        scheme.DistributionMonthJul = edit.DistributionMonthJul;
-        scheme.DistributionMonthAug = edit.DistributionMonthAug;
-        scheme.DistributionMonthSep = edit.DistributionMonthSep;
-        scheme.DistributionMonthOct = edit.DistributionMonthOct;
-        scheme.DistributionMonthNov = edit.DistributionMonthNov;
-        scheme.DistributionMonthDec = edit.DistributionMonthDec;
+        // Legacy Check_Clicked sets only the one control the user changed, so a month the page shows locked keeps
+        // its stored value; the whole row posts back here, so only months the legacy grid enables take the posted value.
+        var detailed = await pendingOrderRepository.GetSchemeByIdAsync(pendingParticipantSchemeId, cancellationToken) ?? scheme;
+        var realScheme = await schemeRepository.GetByIdAsync(scheme.SchemeId, cancellationToken);
+        var editable = BuildMonthCells(detailed, realScheme).Where(m => m.Enabled).Select(m => m.MonthNumber).ToHashSet();
+        bool Month(int monthNumber, bool posted, bool stored) => editable.Contains(monthNumber) ? posted : stored;
+
+        scheme.DistributionMonthJan = Month(1, edit.DistributionMonthJan, scheme.DistributionMonthJan);
+        scheme.DistributionMonthFeb = Month(2, edit.DistributionMonthFeb, scheme.DistributionMonthFeb);
+        scheme.DistributionMonthMar = Month(3, edit.DistributionMonthMar, scheme.DistributionMonthMar);
+        scheme.DistributionMonthApr = Month(4, edit.DistributionMonthApr, scheme.DistributionMonthApr);
+        scheme.DistributionMonthMay = Month(5, edit.DistributionMonthMay, scheme.DistributionMonthMay);
+        scheme.DistributionMonthJun = Month(6, edit.DistributionMonthJun, scheme.DistributionMonthJun);
+        scheme.DistributionMonthJul = Month(7, edit.DistributionMonthJul, scheme.DistributionMonthJul);
+        scheme.DistributionMonthAug = Month(8, edit.DistributionMonthAug, scheme.DistributionMonthAug);
+        scheme.DistributionMonthSep = Month(9, edit.DistributionMonthSep, scheme.DistributionMonthSep);
+        scheme.DistributionMonthOct = Month(10, edit.DistributionMonthOct, scheme.DistributionMonthOct);
+        scheme.DistributionMonthNov = Month(11, edit.DistributionMonthNov, scheme.DistributionMonthNov);
+        scheme.DistributionMonthDec = Month(12, edit.DistributionMonthDec, scheme.DistributionMonthDec);
         scheme.ImportExportLicenceRequired = edit.ImportExportLicenceRequired;
         scheme.IsRemoved = edit.IsRemoved;
 
@@ -210,20 +243,24 @@ public sealed class PendingOrderService(
     }
 
     // Port of PendingContractOrder.aspx.vb's ButtonApprove_Click.
-    public async Task<bool> ApprovePendingOrderAsync(Guid pendingContractId, string purchaseOrderNumber, string approvedBy, CancellationToken cancellationToken = default)
+    public async Task<bool> ApprovePendingOrderAsync(Guid pendingContractId, string purchaseOrderNumber, string comments = "", CancellationToken cancellationToken = default)
     {
-        var order = await pendingOrderRepository.GetByIdAsync(pendingContractId, cancellationToken);
+        var order = await GetOutstandingOrderAsync(pendingContractId, cancellationToken);
         if (order is null)
         {
             return false;
         }
+
+        purchaseOrderNumber ??= string.Empty;
+        comments ??= string.Empty;
+        Validate(purchaseOrderNumber, comments);
 
         var schemes = await pendingOrderRepository.GetSchemesAsync(pendingContractId, cancellationToken);
         var context = await BuildPricingContextAsync(order, schemes, cancellationToken);
 
         await pendingOrderRepository.UpdatePurchaseOrderNumberAsync(pendingContractId, purchaseOrderNumber, cancellationToken);
 
-        var contract = await BuildContractAsync(order, schemes, context, purchaseOrderNumber, approvedBy, cancellationToken);
+        var contract = await BuildContractAsync(order, schemes, context, purchaseOrderNumber, await ApprovedByAsync(cancellationToken), cancellationToken);
 
         // Created via the repository rather than ContractService: the latter force-sets
         // IsOnlineOrder to false and stamps CommencementDate, neither of which legacy's approval
@@ -235,18 +272,27 @@ public sealed class PendingOrderService(
             await participantSchemeRepository.CreateAsync(ToParticipantScheme(created.ContractId, scheme), cancellationToken);
         }
 
-        return await pendingOrderRepository.MarkDecidedAsync(order.CustomerId, pendingContractId, cancellationToken);
+        var decided = await pendingOrderRepository.MarkDecidedAsync(order.CustomerId, pendingContractId, cancellationToken);
+        if (decided)
+        {
+            await QueueNotificationsAsync(order, created.ContractId, comments, isApproved: true, cancellationToken);
+        }
+
+        return decided;
     }
 
     // Port of ButtonDecline_Click - every pending scheme line is deleted outright, then the order
     // is soft-deleted. Nothing is written to the live contract tables.
-    public async Task<bool> DeclinePendingOrderAsync(Guid pendingContractId, CancellationToken cancellationToken = default)
+    public async Task<bool> DeclinePendingOrderAsync(Guid pendingContractId, string comments = "", CancellationToken cancellationToken = default)
     {
-        var order = await pendingOrderRepository.GetByIdAsync(pendingContractId, cancellationToken);
+        var order = await GetOutstandingOrderAsync(pendingContractId, cancellationToken);
         if (order is null)
         {
             return false;
         }
+
+        comments ??= string.Empty;
+        Validate(string.Empty, comments);
 
         var schemes = await pendingOrderRepository.GetSchemesAsync(pendingContractId, cancellationToken);
         foreach (var scheme in schemes)
@@ -254,8 +300,79 @@ public sealed class PendingOrderService(
             await pendingOrderRepository.DeleteSchemeAsync(scheme.PendingParticipantSchemeId, cancellationToken);
         }
 
-        return await pendingOrderRepository.MarkDecidedAsync(order.CustomerId, pendingContractId, cancellationToken);
+        var decided = await pendingOrderRepository.MarkDecidedAsync(order.CustomerId, pendingContractId, cancellationToken);
+        if (decided)
+        {
+            await QueueNotificationsAsync(order, Guid.Empty, comments, isApproved: false, cancellationToken);
+        }
+
+        return decided;
     }
+
+    private static void Validate(string purchaseOrderNumber, string comments)
+    {
+        var errors = new Dictionary<string, string[]>();
+        if (purchaseOrderNumber.Length > PurchaseOrderNumberMaxLength)
+        {
+            errors["PurchaseOrderNumber"] = [$"The purchase order number must be {PurchaseOrderNumberMaxLength} characters or fewer"];
+        }
+
+        if (comments.Length > CommentsMaxLength)
+        {
+            errors["Comments"] = ["The comments field allows maximum 2000 characters"];
+        }
+
+        if (errors.Count > 0)
+        {
+            throw new PendingOrderValidationException(errors);
+        }
+    }
+
+    // Legacy GetCurrentUser(): the signed-in user's name lower-cased, "Guest" when nobody is signed in.
+    private async Task<string> ApprovedByAsync(CancellationToken cancellationToken)
+    {
+        var name = await auditActor.GetAuditNameAsync(cancellationToken);
+        return string.Equals(name, "Guest", StringComparison.Ordinal) ? name : name.ToLowerInvariant();
+    }
+
+    // Legacy EmailOrderNotifications: the customer, the customer's first active participant and that
+    // participant's second address each get a queued row (tblOnlineContractOrderEmail) for the order
+    // email service to send. Blank addresses are skipped rather than queued.
+    private async Task QueueNotificationsAsync(PendingOrderEntity order, Guid contractId, string comments, bool isApproved, CancellationToken cancellationToken)
+    {
+        var customer = await customerRepository.GetByIdAsync(order.CustomerId, cancellationToken);
+        var customerName = Truncate(customer?.Name ?? order.CustomerName, EmailColumnLength);
+
+        var recipients = new List<string>();
+        if (!string.IsNullOrWhiteSpace(customer?.Email))
+        {
+            recipients.Add(customer.Email);
+        }
+
+        var activeParticipants = await participantRepository.GetSummariesAsync(order.CustomerId, false, cancellationToken);
+        if (activeParticipants.Count > 0)
+        {
+            var participant = await participantRepository.GetByIdAsync(activeParticipants[0].ParticipantId, cancellationToken);
+            if (!string.IsNullOrWhiteSpace(participant?.Email))
+            {
+                recipients.Add(participant.Email);
+            }
+
+            if (!string.IsNullOrWhiteSpace(participant?.Email2))
+            {
+                recipients.Add(participant.Email2);
+            }
+        }
+
+        foreach (var email in recipients)
+        {
+            await pendingOrderRepository.QueueNotificationAsync(
+                new PendingOrderNotification(Truncate(email, EmailColumnLength), contractId, order.PendingContractId, order.YearId, customerName, comments, isApproved),
+                cancellationToken);
+        }
+    }
+
+    private static string Truncate(string value, int length) => value.Length > length ? value[..length] : value;
 
     private async Task<PricingContext> BuildPricingContextAsync(PendingOrderEntity order, IReadOnlyList<PendingOrderSchemeEntity> schemes, CancellationToken cancellationToken)
     {

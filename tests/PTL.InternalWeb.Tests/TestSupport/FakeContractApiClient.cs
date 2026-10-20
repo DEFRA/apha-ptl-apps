@@ -54,7 +54,8 @@ internal sealed class FakeContractApiClient : IContractApiClient
     public PendingOrderDetailsResponse? PendingOrder { get; set; }
     public bool UpdatePendingOrderSchemeResult { get; set; } = true;
     public PendingOrderDecisionResult ApprovePendingOrderResult { get; set; } = new(true, false, new Dictionary<string, string[]>());
-    public bool DeclinePendingOrderResult { get; set; } = true;
+    public PendingOrderDecisionResult DeclinePendingOrderResult { get; set; } = new(true, false, new Dictionary<string, string[]>());
+    public PendingOrderDeclineRequest? LastDeclineRequest { get; private set; }
     public PendingOrderSchemeUpdateRequest? LastSchemeUpdate { get; private set; }
     public PendingOrderApproveRequest? LastApproveRequest { get; private set; }
 
@@ -76,6 +77,9 @@ internal sealed class FakeContractApiClient : IContractApiClient
         return Task.FromResult(ApprovePendingOrderResult);
     }
 
-    public Task<bool> DeclinePendingOrderAsync(Guid pendingContractId, CancellationToken cancellationToken = default) =>
-        Task.FromResult(DeclinePendingOrderResult);
+    public Task<PendingOrderDecisionResult> DeclinePendingOrderAsync(Guid pendingContractId, PendingOrderDeclineRequest request, CancellationToken cancellationToken = default)
+    {
+        LastDeclineRequest = request;
+        return Task.FromResult(DeclinePendingOrderResult);
+    }
 }

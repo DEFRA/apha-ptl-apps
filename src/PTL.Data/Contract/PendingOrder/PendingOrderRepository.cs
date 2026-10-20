@@ -121,6 +121,25 @@ public sealed class PendingOrderRepository(IDbConnectionFactory connectionFactor
         return order is null || order.IsDeleted;
     }
 
+    public async Task QueueNotificationAsync(PendingOrderNotification notification, CancellationToken cancellationToken = default)
+    {
+        using var connection = connectionFactory.CreateConnection();
+
+        await connection.ExecuteAsync(
+            "EXEC dbo.spiOnlineContractOrderEmail @fldOnlineContractOrderEmailId = @Id, @fldEmail = @Email, @fldContractId = @ContractId, @fldPendingContractId = @PendingContractId, @fldCustomerName = @CustomerName, @fldYearId = @YearId, @fldNotes = @Notes, @IsApproved = @IsApproved",
+            new
+            {
+                Id = Guid.NewGuid(),
+                notification.Email,
+                notification.ContractId,
+                notification.PendingContractId,
+                notification.CustomerName,
+                notification.YearId,
+                notification.Notes,
+                notification.IsApproved
+            });
+    }
+
     // Bound by name rather than position - this procedure takes 17 arguments, so a silent ordering
     // mismatch would be both easy to introduce and hard to spot.
     private const string UpdateSchemeSql =

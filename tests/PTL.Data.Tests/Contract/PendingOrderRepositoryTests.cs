@@ -258,4 +258,27 @@ public class PendingOrderRepositoryTests
         Assert.Equal(false, (bool?)command.ParameterValue("IsRemoved"));
         Assert.Equal(true, (bool?)command.ParameterValue("DataConsentDeclarationGiven"));
     }
+
+    [Fact]
+    public async Task QueueNotificationAsync_InsertsOneEmailRowBoundByName()
+    {
+        const string queueSql = "EXEC dbo.spiOnlineContractOrderEmail @fldOnlineContractOrderEmailId = @Id, @fldEmail = @Email, @fldContractId = @ContractId, @fldPendingContractId = @PendingContractId, @fldCustomerName = @CustomerName, @fldYearId = @YearId, @fldNotes = @Notes, @IsApproved = @IsApproved";
+        var (repository, connection) = CreateRepository();
+        var contractId = Guid.NewGuid();
+        var pendingContractId = Guid.NewGuid();
+        connection.RespondToNonQuery(queueSql, -1);
+
+        await repository.QueueNotificationAsync(new PendingOrderNotification("a@example.com", contractId, pendingContractId, 2026, "Sample Labs", "Welcome", IsApproved: true));
+
+        var command = Assert.Single(connection.ExecutedCommands);
+        Assert.Equal(queueSql, command.CommandText);
+        Assert.NotEqual(Guid.Empty, (Guid?)command.ParameterValue("Id"));
+        Assert.Equal("a@example.com", (string?)command.ParameterValue("Email"));
+        Assert.Equal(contractId, (Guid?)command.ParameterValue("ContractId"));
+        Assert.Equal(pendingContractId, (Guid?)command.ParameterValue("PendingContractId"));
+        Assert.Equal("Sample Labs", (string?)command.ParameterValue("CustomerName"));
+        Assert.Equal(2026, (int?)command.ParameterValue("YearId"));
+        Assert.Equal("Welcome", (string?)command.ParameterValue("Notes"));
+        Assert.Equal(true, (bool?)command.ParameterValue("IsApproved"));
+    }
 }

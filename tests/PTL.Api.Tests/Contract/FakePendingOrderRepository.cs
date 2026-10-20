@@ -47,6 +47,14 @@ internal sealed class FakePendingOrderRepository : IPendingOrderRepository
         return Task.CompletedTask;
     }
 
+    public List<PendingOrderNotification> QueuedNotifications { get; } = [];
+
+    public Task QueueNotificationAsync(PendingOrderNotification notification, CancellationToken cancellationToken = default)
+    {
+        QueuedNotifications.Add(notification);
+        return Task.CompletedTask;
+    }
+
     public Task<bool> MarkDecidedAsync(Guid customerId, Guid pendingContractId, CancellationToken cancellationToken = default)
     {
         if (!_orders.TryGetValue(pendingContractId, out var order))

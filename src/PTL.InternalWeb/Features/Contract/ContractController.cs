@@ -1004,10 +1004,15 @@ public class ContractController(IContractApiClient contractApiClient, ICustomerA
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> ApprovePendingOrder(Guid pendingContractId, string? purchaseOrderNumber, CancellationToken cancellationToken)
+    public async Task<IActionResult> ApprovePendingOrder(Guid pendingContractId, PendingOrderDecisionForm form, CancellationToken cancellationToken)
     {
+        if (!ModelState.IsValid)
+        {
+            return await RedisplayPendingOrderAsync(pendingContractId, form, cancellationToken);
+        }
+
         var result = await contractApiClient.ApprovePendingOrderAsync(
-            pendingContractId, new PendingOrderApproveRequest(purchaseOrderNumber ?? string.Empty), cancellationToken);
+            pendingContractId, new PendingOrderApproveRequest(form.PurchaseOrderNumber ?? string.Empty, form.Comments), cancellationToken);
 
         if (result.NotFound)
         {
@@ -1016,9 +1021,8 @@ public class ContractController(IContractApiClient contractApiClient, ICustomerA
 
         if (!result.Success)
         {
-            var messages = string.Join(" ", result.FieldErrors.SelectMany(e => e.Value));
-            TempData.SetNotification(NotificationType.Error, $"Order could not be approved. {messages}");
-            return RedirectToAction(nameof(PendingOrderDetails), new { pendingContractId });
+            AddErrors(result.FieldErrors);
+            return await RedisplayPendingOrderAsync(pendingContractId, form, cancellationToken);
         }
 
         TempData.SetNotification(NotificationType.Success, "Order approved successfully.");
@@ -1027,16 +1031,36 @@ public class ContractController(IContractApiClient contractApiClient, ICustomerA
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> DeclinePendingOrder(Guid pendingContractId, CancellationToken cancellationToken)
+    public async Task<IActionResult> DeclinePendingOrder(Guid pendingContractId, PendingOrderDecisionForm form, CancellationToken cancellationToken)
     {
-        var declined = await contractApiClient.DeclinePendingOrderAsync(pendingContractId, cancellationToken);
-        if (!declined)
+        // Decline never reads the purchase order number, so its length is not a reason to refuse it.
+        ModelState.Remove(nameof(PendingOrderDecisionForm.PurchaseOrderNumber));
+        if (!ModelState.IsValid)
+        {
+            return await RedisplayPendingOrderAsync(pendingContractId, form, cancellationToken);
+        }
+
+        var result = await contractApiClient.DeclinePendingOrderAsync(pendingContractId, new PendingOrderDeclineRequest(form.Comments), cancellationToken);
+        if (result.NotFound)
         {
             return NotFound();
         }
 
+        if (!result.Success)
+        {
+            AddErrors(result.FieldErrors);
+            return await RedisplayPendingOrderAsync(pendingContractId, form, cancellationToken);
+        }
+
         TempData.SetNotification(NotificationType.Success, "Order declined successfully.");
         return RedirectToAction(nameof(ReviewPendingOrders));
+    }
+
+    // The error summary and the typed values need the order's schemes again, so the page is rebuilt, not redirected to.
+    private async Task<IActionResult> RedisplayPendingOrderAsync(Guid pendingContractId, PendingOrderDecisionForm form, CancellationToken cancellationToken)
+    {
+        var order = await contractApiClient.GetPendingOrderAsync(pendingContractId, cancellationToken);
+        return order is null ? NotFound() : View(nameof(PendingOrderDetails), new PendingOrderDetailsViewModel(order, form));
     }
 
     private void AddErrors(IReadOnlyDictionary<string, string[]> fieldErrors) => this.AddFieldErrors(fieldErrors);

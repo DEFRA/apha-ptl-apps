@@ -18,7 +18,7 @@ public interface IContractApiClient
     Task<PendingOrderDetailsResponse?> GetPendingOrderAsync(Guid pendingContractId, CancellationToken cancellationToken = default);
     Task<bool> UpdatePendingOrderSchemeAsync(Guid pendingContractId, Guid pendingParticipantSchemeId, PendingOrderSchemeUpdateRequest request, CancellationToken cancellationToken = default);
     Task<PendingOrderDecisionResult> ApprovePendingOrderAsync(Guid pendingContractId, PendingOrderApproveRequest request, CancellationToken cancellationToken = default);
-    Task<bool> DeclinePendingOrderAsync(Guid pendingContractId, CancellationToken cancellationToken = default);
+    Task<PendingOrderDecisionResult> DeclinePendingOrderAsync(Guid pendingContractId, PendingOrderDeclineRequest request, CancellationToken cancellationToken = default);
 }
 
 // Thin typed HttpClient wrapper around PTL.Api's contract endpoints, shared by every web
@@ -50,9 +50,15 @@ public sealed class ContractApiClient(HttpClient httpClient) : IContractApiClien
         return response.IsSuccessStatusCode;
     }
 
-    public async Task<PendingOrderDecisionResult> ApprovePendingOrderAsync(Guid pendingContractId, PendingOrderApproveRequest request, CancellationToken cancellationToken = default)
+    public async Task<PendingOrderDecisionResult> ApprovePendingOrderAsync(Guid pendingContractId, PendingOrderApproveRequest request, CancellationToken cancellationToken = default) =>
+        await PostPendingOrderDecisionAsync($"/api/contracts/pending-orders/{pendingContractId}/approve", request, cancellationToken);
+
+    public async Task<PendingOrderDecisionResult> DeclinePendingOrderAsync(Guid pendingContractId, PendingOrderDeclineRequest request, CancellationToken cancellationToken = default) =>
+        await PostPendingOrderDecisionAsync($"/api/contracts/pending-orders/{pendingContractId}/decline", request, cancellationToken);
+
+    private async Task<PendingOrderDecisionResult> PostPendingOrderDecisionAsync<TRequest>(string url, TRequest request, CancellationToken cancellationToken)
     {
-        var response = await httpClient.PostAsJsonAsync($"/api/contracts/pending-orders/{pendingContractId}/approve", request, cancellationToken);
+        var response = await httpClient.PostAsJsonAsync(url, request, cancellationToken);
         if (response.StatusCode == HttpStatusCode.NotFound)
         {
             return new PendingOrderDecisionResult(false, true, new Dictionary<string, string[]>());
@@ -69,12 +75,6 @@ public sealed class ContractApiClient(HttpClient httpClient) : IContractApiClien
 
         response.EnsureSuccessStatusCode();
         return new PendingOrderDecisionResult(true, false, new Dictionary<string, string[]>());
-    }
-
-    public async Task<bool> DeclinePendingOrderAsync(Guid pendingContractId, CancellationToken cancellationToken = default)
-    {
-        var response = await httpClient.PostAsync($"/api/contracts/pending-orders/{pendingContractId}/decline", content: null, cancellationToken);
-        return response.IsSuccessStatusCode;
     }
 
     public async Task<ContractResponse?> GetContractAsync(Guid contractId, CancellationToken cancellationToken = default)

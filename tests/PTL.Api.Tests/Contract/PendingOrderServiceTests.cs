@@ -20,17 +20,21 @@ public class PendingOrderServiceTests
         FakeContractRepository Contracts,
         FakeParticipantSchemeRepository ParticipantSchemes,
         FakeSchemeRepository Schemes,
+        PTL.Api.Tests.Participant.FakeParticipantRepository Participants,
         Guid CustomerId,
         Guid PendingContractId,
         Guid SchemeId);
 
-    private static async Task<Harness> CreateAsync(params PendingOrderSchemeEntity[] schemes)
+    private static Task<Harness> CreateAsync(params PendingOrderSchemeEntity[] schemes) => CreateWithActorAsync("tester", schemes);
+
+    private static async Task<Harness> CreateWithActorAsync(string actor, PendingOrderSchemeEntity[] schemes)
     {
         var customerRepository = new FakeCustomerRepository();
         var customer = await customerRepository.CreateAsync(new PTL.Core.Customer.Customer
         {
             CustomerId = Guid.NewGuid(),
             Name = "Sample Laboratories Ltd",
+            Email = "customer@example.com",
             CountryId = UkCountryId,
             IsActive = true
         });
@@ -110,9 +114,11 @@ public class PendingOrderServiceTests
         var contracts = new FakeContractRepository();
         var participantSchemes = new FakeParticipantSchemeRepository();
 
-        var service = new PendingOrderService(pendingOrders, contracts, participantSchemes, schemeRepository, customerRepository, lookupRepository);
+        var participants = new PTL.Api.Tests.Participant.FakeParticipantRepository();
+        await participants.CreateAsync(new PTL.Core.Participant.Participant { CustomerId = customer.CustomerId, LabCode = "001", Email = "participant@example.com", Email2 = "participant2@example.com", IsActive = true });
+        var service = new PendingOrderService(pendingOrders, contracts, participantSchemes, schemeRepository, customerRepository, lookupRepository, participants, new FakeAuditActorResolver(actor));
 
-        return new Harness(service, pendingOrders, contracts, participantSchemes, schemeRepository, customer.CustomerId, pendingContractId, realScheme.SchemeId);
+        return new Harness(service, pendingOrders, contracts, participantSchemes, schemeRepository, participants, customer.CustomerId, pendingContractId, realScheme.SchemeId);
     }
 
     [Fact]
@@ -185,17 +191,21 @@ public class PendingOrderServiceTests
             line.Months.Select(m => m.Label));
     }
 
-    // Legacy: chk.Enabled = scheme.DistributionMonthX And scheme.CanEditX And scheme.CanEditXParticipants.
+    // Legacy: Jan-Mar chk.Enabled = scheme.DistributionMonthX And scheme.CanEditX And scheme.CanEditXParticipants;
+    // Apr-Dec chk.Enabled = scheme.DistributionMonthX And scheme.CanEditXParticipants (no scheme.CanEditX).
     [Fact]
-    public async Task GetPendingOrderAsync_EnablesMonthOnlyWhenSchemeOffersItAndNothingIsLocked()
+    public async Task GetPendingOrderAsync_EnablesMonthOnlyWhenSchemeOffersItAndNothingIsPosted()
     {
         var harness = await CreateAsync();
         var scheme = await harness.Schemes.GetByIdAsync(harness.SchemeId);
         scheme!.DistributionMonthApr = true;   // offered and fully editable
-        scheme.DistributionMonthMay = true;    // offered but the year's distribution is defined
+        scheme.DistributionMonthMay = true;    // offered; the scheme's own CanEdit is ignored for Apr-Dec
         scheme.CanEditMay = false;
         scheme.DistributionMonthJun = true;    // offered but a distribution has been posted
         scheme.DistributionMonthJul = false;   // not offered at all
+        scheme.DistributionMonthJan = true;    // offered, but Jan-Mar also need the scheme's own CanEdit
+        scheme.CanEditJan = false;
+        scheme.DistributionMonthFeb = true;
         await harness.Schemes.UpdateAsync(scheme);
 
         var lines = await harness.PendingOrders.GetSchemesAsync(harness.PendingContractId);
@@ -205,9 +215,11 @@ public class PendingOrderServiceTests
         var months = Assert.Single(detail!.Schemes).Months.ToDictionary(m => m.Label);
 
         Assert.True(months["Apr"].Enabled);
-        Assert.False(months["May"].Enabled);
+        Assert.True(months["May"].Enabled);
         Assert.False(months["Jun"].Enabled);
         Assert.False(months["Jul"].Enabled);
+        Assert.False(months["Jan"].Enabled);
+        Assert.True(months["Feb"].Enabled);
     }
 
     // Legacy: Checked = If(Enabled, pendingScheme.DistributionMonthX, scheme.DistributionMonthX).
@@ -218,12 +230,12 @@ public class PendingOrderServiceTests
         var scheme = await harness.Schemes.GetByIdAsync(harness.SchemeId);
         scheme!.DistributionMonthApr = true;
         scheme.DistributionMonthMay = true;
-        scheme.CanEditMay = false;
         await harness.Schemes.UpdateAsync(scheme);
 
         var lines = await harness.PendingOrders.GetSchemesAsync(harness.PendingContractId);
         lines[0].DistributionMonthApr = false;
         lines[0].DistributionMonthMay = false;
+        lines[0].CanEditMay = false;
 
         var detail = await harness.Service.GetPendingOrderAsync(harness.PendingContractId);
         var months = Assert.Single(detail!.Schemes).Months.ToDictionary(m => m.Label);
@@ -283,7 +295,7 @@ public class PendingOrderServiceTests
     {
         var harness = await CreateAsync();
 
-        Assert.False(await harness.Service.ApprovePendingOrderAsync(Guid.NewGuid(), "PO-2", "tester"));
+        Assert.False(await harness.Service.ApprovePendingOrderAsync(Guid.NewGuid(), "PO-2"));
     }
 
     [Fact]
@@ -291,7 +303,7 @@ public class PendingOrderServiceTests
     {
         var harness = await CreateAsync();
 
-        var approved = await harness.Service.ApprovePendingOrderAsync(harness.PendingContractId, "PO-2", "tester");
+        var approved = await harness.Service.ApprovePendingOrderAsync(harness.PendingContractId, "PO-2");
 
         Assert.True(approved);
         Assert.Equal("PO-2", harness.PendingOrders.LastPurchaseOrderNumber);
@@ -338,7 +350,7 @@ public class PendingOrderServiceTests
         };
         var harness = await CreateAsync(removed, retained);
 
-        await harness.Service.ApprovePendingOrderAsync(harness.PendingContractId, "PO-2", "tester");
+        await harness.Service.ApprovePendingOrderAsync(harness.PendingContractId, "PO-2");
 
         var created = Assert.Single(harness.ParticipantSchemes.Records.Values);
         Assert.Equal(retained.ParticipantId, created.ParticipantId);
@@ -357,7 +369,7 @@ public class PendingOrderServiceTests
         var harness = await CreateAsync();
         harness.Contracts.Seed(new PTL.Core.Contract.Contract { ContractId = Guid.NewGuid(), CustomerId = harness.CustomerId, YearId = CurrentYearId });
 
-        await harness.Service.ApprovePendingOrderAsync(harness.PendingContractId, "PO-2", "tester");
+        await harness.Service.ApprovePendingOrderAsync(harness.PendingContractId, "PO-2");
 
         var contract = harness.Contracts.Contracts.Values.Single(c => c.IsOnlineOrder);
         Assert.Equal("A", contract.Suffix);
@@ -383,6 +395,158 @@ public class PendingOrderServiceTests
         var harness = await CreateAsync();
 
         Assert.False(await harness.Service.DeclinePendingOrderAsync(Guid.NewGuid()));
+    }
+
+    [Fact]
+    public async Task GetPendingOrderAsync_DecidedOrUnsubmittedOrder_ReturnsNull()
+    {
+        var harness = await CreateAsync();
+        await harness.Service.DeclinePendingOrderAsync(harness.PendingContractId);
+
+        Assert.Null(await harness.Service.GetPendingOrderAsync(harness.PendingContractId));
+    }
+
+    [Fact]
+    public async Task UpdateSchemeAsync_LockedMonthsKeepTheirStoredValue_WhileEditableOnesTakeThePostedValue()
+    {
+        var harness = await CreateAsync();
+        var scheme = await harness.Schemes.GetByIdAsync(harness.SchemeId);
+        scheme!.DistributionMonthApr = true;
+        scheme.DistributionMonthMay = true;
+        await harness.Schemes.UpdateAsync(scheme);
+        var lines = await harness.PendingOrders.GetSchemesAsync(harness.PendingContractId);
+        lines[0].DistributionMonthApr = true;
+        lines[0].DistributionMonthMay = false;
+        lines[0].CanEditMay = false;   // posted distribution: May is locked, so the page only displays the scheme's own value
+
+        // The locked May posts back ticked (the scheme's value), Apr is un-ticked by the user.
+        await harness.Service.UpdateSchemeAsync(harness.PendingContractId, lines[0].PendingParticipantSchemeId, Edit() with { DistributionMonthApr = false, DistributionMonthMay = true });
+
+        Assert.False(lines[0].DistributionMonthApr);
+        Assert.False(lines[0].DistributionMonthMay);
+    }
+
+    [Fact]
+    public async Task ApprovePendingOrderAsync_AlreadyApprovedOrder_ReturnsFalseAndCreatesNothingMore()
+    {
+        var harness = await CreateAsync();
+        Assert.True(await harness.Service.ApprovePendingOrderAsync(harness.PendingContractId, "PO-2"));
+
+        Assert.False(await harness.Service.ApprovePendingOrderAsync(harness.PendingContractId, "PO-3"));
+
+        Assert.Single(harness.Contracts.Contracts);
+    }
+
+    [Fact]
+    public async Task ApprovePendingOrderAsync_RecordsTheSignedInUserLowerCased()
+    {
+        var harness = await CreateWithActorAsync("DT2\\ALICE", []);
+
+        await harness.Service.ApprovePendingOrderAsync(harness.PendingContractId, "PO-2");
+
+        Assert.Equal("dt2\\alice", Assert.Single(harness.Contracts.Contracts.Values).ApprovedBy);
+    }
+
+    [Fact]
+    public async Task ApprovePendingOrderAsync_NobodySignedIn_RecordsGuest()
+    {
+        var harness = await CreateWithActorAsync("Guest", []);
+
+        await harness.Service.ApprovePendingOrderAsync(harness.PendingContractId, "PO-2");
+
+        Assert.Equal("Guest", Assert.Single(harness.Contracts.Contracts.Values).ApprovedBy);
+    }
+
+    [Fact]
+    public async Task ApprovePendingOrderAsync_OverLongPurchaseOrderNumber_ThrowsAndChangesNothing()
+    {
+        var harness = await CreateAsync();
+
+        var ex = await Assert.ThrowsAsync<PendingOrderValidationException>(() => harness.Service.ApprovePendingOrderAsync(harness.PendingContractId, new string('x', 256)));
+
+        Assert.Contains("PurchaseOrderNumber", ex.Errors.Keys);
+        Assert.Empty(harness.Contracts.Contracts);
+    }
+
+    [Fact]
+    public async Task ApprovePendingOrderAsync_OverLongComments_Throws()
+    {
+        var harness = await CreateAsync();
+
+        var ex = await Assert.ThrowsAsync<PendingOrderValidationException>(() => harness.Service.ApprovePendingOrderAsync(harness.PendingContractId, "PO-2", new string('x', 2001)));
+
+        Assert.Equal("The comments field allows maximum 2000 characters", ex.Errors["Comments"][0]);
+    }
+
+    [Fact]
+    public async Task ApprovePendingOrderAsync_QueuesApprovalEmailsForCustomerAndTheFirstActiveParticipant()
+    {
+        var harness = await CreateAsync();
+
+        await harness.Service.ApprovePendingOrderAsync(harness.PendingContractId, "PO-2", "Welcome aboard");
+
+        var contractId = Assert.Single(harness.Contracts.Contracts.Values).ContractId;
+        Assert.Equal(
+            ["customer@example.com", "participant@example.com", "participant2@example.com"],
+            harness.PendingOrders.QueuedNotifications.Select(n => n.Email));
+        Assert.All(harness.PendingOrders.QueuedNotifications, n =>
+        {
+            Assert.True(n.IsApproved);
+            Assert.Equal(contractId, n.ContractId);
+            Assert.Equal(harness.PendingContractId, n.PendingContractId);
+            Assert.Equal(CurrentYearId, n.YearId);
+            Assert.Equal("Welcome aboard", n.Notes);
+            Assert.Equal("Sample Laboratories Ltd", n.CustomerName);
+        });
+    }
+
+    [Fact]
+    public async Task ApprovePendingOrderAsync_NoSecondParticipantEmail_QueuesTwoEmails()
+    {
+        var harness = await CreateAsync();
+        var participant = (await harness.Participants.GetSummariesAsync(harness.CustomerId, false)).Single();
+        var entity = (await harness.Participants.GetByIdAsync(participant.ParticipantId))!;
+        entity.Email2 = string.Empty;
+        await harness.Participants.UpdateAsync(entity);
+
+        await harness.Service.ApprovePendingOrderAsync(harness.PendingContractId, "PO-2");
+
+        Assert.Equal(2, harness.PendingOrders.QueuedNotifications.Count);
+    }
+
+    [Fact]
+    public async Task DeclinePendingOrderAsync_QueuesDeclineEmailsWithNoContract()
+    {
+        var harness = await CreateAsync();
+
+        await harness.Service.DeclinePendingOrderAsync(harness.PendingContractId, "Not eligible");
+
+        Assert.Equal(3, harness.PendingOrders.QueuedNotifications.Count);
+        Assert.All(harness.PendingOrders.QueuedNotifications, n =>
+        {
+            Assert.False(n.IsApproved);
+            Assert.Equal(Guid.Empty, n.ContractId);
+            Assert.Equal("Not eligible", n.Notes);
+        });
+    }
+
+    [Fact]
+    public async Task DeclinePendingOrderAsync_OverLongComments_ThrowsAndDeletesNothing()
+    {
+        var harness = await CreateAsync();
+
+        await Assert.ThrowsAsync<PendingOrderValidationException>(() => harness.Service.DeclinePendingOrderAsync(harness.PendingContractId, new string('x', 2001)));
+
+        Assert.Empty(harness.PendingOrders.DeletedSchemeIds);
+    }
+
+    [Fact]
+    public async Task DeclinePendingOrderAsync_AlreadyDeclinedOrder_ReturnsFalse()
+    {
+        var harness = await CreateAsync();
+        Assert.True(await harness.Service.DeclinePendingOrderAsync(harness.PendingContractId));
+
+        Assert.False(await harness.Service.DeclinePendingOrderAsync(harness.PendingContractId));
     }
 
     private static PendingOrderSchemeEdit Edit(bool importExportLicence = false, bool isRemoved = false) =>

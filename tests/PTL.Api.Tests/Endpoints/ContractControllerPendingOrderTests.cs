@@ -96,7 +96,9 @@ public class ContractControllerPendingOrderTests
             new FakeParticipantSchemeRepository(),
             schemeRepository,
             customerRepository,
-            lookupRepository);
+            lookupRepository,
+            new PTL.Api.Tests.Participant.FakeParticipantRepository(),
+            new FakeAuditActorResolver());
 
         var controller = new ContractController(
             new ContractService(new FakeContractRepository(), new FakeParticipantSchemeRepository(), new PTL.Api.Tests.Contract.FakeContractPostageService(), new PTL.Api.Tests.Contract.FakeAuditActorResolver(), NullLogger<ContractService>.Instance),
@@ -214,15 +216,15 @@ public class ContractControllerPendingOrderTests
     }
 
     [Fact]
-    public async Task ApprovePendingOrder_AuthenticatedUser_RecordsLowercasedUserNameAsApprovedBy()
+    public async Task ApprovePendingOrder_OverLongPurchaseOrderNumber_ReturnsValidationProblem()
     {
         var harness = await CreateAsync();
-        var identity = new System.Security.Claims.ClaimsIdentity([new System.Security.Claims.Claim(System.Security.Claims.ClaimTypes.Name, "ALICE")], "Test");
-        harness.Controller.ControllerContext.HttpContext.User = new System.Security.Claims.ClaimsPrincipal(identity);
 
-        var result = await harness.Controller.ApprovePendingOrder(harness.PendingContractId, new PendingOrderApproveRequest("PO-2"), CancellationToken.None);
+        var result = await harness.Controller.ApprovePendingOrder(harness.PendingContractId, new PendingOrderApproveRequest(new string('x', 256)), CancellationToken.None);
 
-        Assert.IsType<NoContentResult>(result);
+        var problem = Assert.IsAssignableFrom<ObjectResult>(result);
+        var details = Assert.IsType<Microsoft.AspNetCore.Mvc.ValidationProblemDetails>(problem.Value);
+        Assert.Contains("PurchaseOrderNumber", details.Errors.Keys);
     }
 
     [Fact]
@@ -230,7 +232,7 @@ public class ContractControllerPendingOrderTests
     {
         var harness = await CreateAsync();
 
-        var result = await harness.Controller.DeclinePendingOrder(Guid.NewGuid(), CancellationToken.None);
+        var result = await harness.Controller.DeclinePendingOrder(Guid.NewGuid(), new PendingOrderDeclineRequest(), CancellationToken.None);
 
         Assert.IsType<NotFoundResult>(result);
     }
@@ -240,10 +242,32 @@ public class ContractControllerPendingOrderTests
     {
         var harness = await CreateAsync();
 
-        var result = await harness.Controller.DeclinePendingOrder(harness.PendingContractId, CancellationToken.None);
+        var result = await harness.Controller.DeclinePendingOrder(harness.PendingContractId, new PendingOrderDeclineRequest("Not eligible"), CancellationToken.None);
 
         Assert.IsType<NoContentResult>(result);
         Assert.Single(harness.PendingOrders.DeletedSchemeIds);
+    }
+
+    [Fact]
+    public async Task DeclinePendingOrder_NoBody_StillDeclines()
+    {
+        var harness = await CreateAsync();
+
+        var result = await harness.Controller.DeclinePendingOrder(harness.PendingContractId, request: null, CancellationToken.None);
+
+        Assert.IsType<NoContentResult>(result);
+    }
+
+    [Fact]
+    public async Task DeclinePendingOrder_OverLongComments_ReturnsValidationProblem()
+    {
+        var harness = await CreateAsync();
+
+        var result = await harness.Controller.DeclinePendingOrder(harness.PendingContractId, new PendingOrderDeclineRequest(new string('x', 2001)), CancellationToken.None);
+
+        var problem = Assert.IsAssignableFrom<ObjectResult>(result);
+        Assert.Contains("Comments", Assert.IsType<Microsoft.AspNetCore.Mvc.ValidationProblemDetails>(problem.Value).Errors.Keys);
+        Assert.Empty(harness.PendingOrders.DeletedSchemeIds);
     }
 
     private static PendingOrderSchemeUpdateRequest UpdateRequest(bool isRemoved = false) =>
