@@ -221,6 +221,8 @@ public static class ApiClientServiceCollectionExtensions
         services.AddHealthChecks()
             .AddCheck<ApiConnectivityHealthCheck>("api-connectivity");
 
+        services.AddHostedService<ApiStartupConnectivityCheck>();
+
         return services;
     }
 }

@@ -111,6 +111,52 @@ public class EntraOpenIdConnectEventsTests
     }
 
     [Fact]
+    public async Task TokenValidated_TrimsBulkyIdTokenClaims_ButKeepsTheOnesTheAppReadsAndTheResolvedOnes()
+    {
+        var identity = new ClaimsIdentity(
+        [
+            new Claim(ClaimTypes.Name, "Jane Internal"),
+            new Claim("oid", "22222222-2222-2222-2222-222222222222"),
+            new Claim("preferred_username", "jane@example.com"),
+            new Claim("onprem_samaccountname", "jane"),
+            new Claim("aio", "bulky"),
+            new Claim("groups", "g1")
+        ]);
+        var resolver = new FakeEntraInternalUserResolver(EntraInternalUserResolution.Allow(new Dictionary<string, string> { ["fullName"] = "Jane Internal" }));
+        var context = CreateTokenValidatedContext(new ClaimsPrincipal(identity), resolver);
+
+        await CreateEvents().TokenValidated(context);
+
+        Assert.Contains(identity.Claims, c => c.Type == ClaimTypes.Name);
+        Assert.Contains(identity.Claims, c => c.Type == "oid");
+        Assert.Contains(identity.Claims, c => c.Type == "preferred_username");
+        Assert.Contains(identity.Claims, c => c.Type == "fullName");
+        Assert.DoesNotContain(identity.Claims, c => c.Type == "onprem_samaccountname");
+        Assert.DoesNotContain(identity.Claims, c => c.Type == "aio");
+        Assert.DoesNotContain(identity.Claims, c => c.Type == "groups");
+    }
+
+    [Fact]
+    public async Task TicketReceived_RemovesTheAccessToken_AndKeepsTheOthers()
+    {
+        var properties = new AuthenticationProperties();
+        properties.StoreTokens(
+        [
+            new AuthenticationToken { Name = "access_token", Value = "access" },
+            new AuthenticationToken { Name = "id_token", Value = "id" },
+            new AuthenticationToken { Name = "refresh_token", Value = "refresh" }
+        ]);
+        var ticket = new AuthenticationTicket(new ClaimsPrincipal(new ClaimsIdentity()), properties, "entra");
+        var context = new TicketReceivedContext(new DefaultHttpContext(), CreateScheme(), new OpenIdConnectOptions(), ticket);
+
+        await CreateEvents().TicketReceived(context);
+
+        Assert.Null(properties.GetTokenValue("access_token"));
+        Assert.Equal("id", properties.GetTokenValue("id_token"));
+        Assert.Equal("refresh", properties.GetTokenValue("refresh_token"));
+    }
+
+    [Fact]
     public async Task RemoteFailure_HandlesResponseAndRedirectsToGenericErrorPage()
     {
         var httpContext = new DefaultHttpContext();
