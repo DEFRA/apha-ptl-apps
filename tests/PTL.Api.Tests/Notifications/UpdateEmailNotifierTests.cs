@@ -13,8 +13,10 @@ namespace PTL.Api.Tests.Notifications;
 // through GOV.UK Notify and marked sent only afterwards, so a failed send stays unsent for the next run.
 public class UpdateEmailNotifierTests
 {
-    private const string AcceptedTemplate = "accepted-template-id";
-    private const string DeclinedTemplate = "declined-template-id";
+    private const string CustomerAccepted = CustomerUpdateEmailTemplates.AcceptedId;
+    private const string CustomerDeclined = CustomerUpdateEmailTemplates.DeclinedId;
+    private const string ParticipantAccepted = ParticipantUpdateEmailTemplates.AcceptedId;
+    private const string ParticipantDeclined = ParticipantUpdateEmailTemplates.DeclinedId;
 
     private static readonly DateTimeOffset Now = new(2026, 10, 20, 9, 0, 0, TimeSpan.Zero);
 
@@ -27,12 +29,12 @@ public class UpdateEmailNotifierTests
         public CustomerUpdateNotifier Notifier { get; }
         public Guid PendingId { get; } = Guid.NewGuid();
 
-        public CustomerHarness(bool enabled = true, string acceptedTemplate = AcceptedTemplate, string declinedTemplate = DeclinedTemplate, PTL.Core.Notifications.INotifyClient? client = null) =>
+        public CustomerHarness(bool enabled = true, PTL.Core.Notifications.INotifyClient? client = null) =>
             Notifier = new CustomerUpdateNotifier(
                 Repository,
                 client ?? Notify,
                 Guard,
-                Options.Create(new CustomerUpdateEmailOptions { Enabled = enabled, AcceptedTemplateId = acceptedTemplate, DeclinedTemplateId = declinedTemplate }),
+                Options.Create(new CustomerUpdateEmailOptions { Enabled = enabled }),
                 new SettableTimeProvider(Now),
                 Logger);
 
@@ -63,12 +65,12 @@ public class UpdateEmailNotifierTests
         public ParticipantUpdateNotifier Notifier { get; }
         public Guid PendingId { get; } = Guid.NewGuid();
 
-        public ParticipantHarness(bool enabled = true, string acceptedTemplate = AcceptedTemplate, string declinedTemplate = DeclinedTemplate) =>
+        public ParticipantHarness(bool enabled = true) =>
             Notifier = new ParticipantUpdateNotifier(
                 Repository,
                 Notify,
                 Guard,
-                Options.Create(new ParticipantUpdateEmailOptions { Enabled = enabled, AcceptedTemplateId = acceptedTemplate, DeclinedTemplateId = declinedTemplate }),
+                Options.Create(new ParticipantUpdateEmailOptions { Enabled = enabled }),
                 new SettableTimeProvider(Now),
                 Logger);
 
@@ -101,7 +103,7 @@ public class UpdateEmailNotifierTests
         await h.Notifier.SendUnsentAsync();
 
         var sent = Assert.Single(h.Notify.Sent);
-        Assert.Equal(AcceptedTemplate, sent.TemplateId);
+        Assert.Equal(CustomerAccepted, sent.TemplateId);
         Assert.Equal("customer@example.com", sent.Email);
         Assert.Equal(row.Id.ToString(), sent.Reference);
         Assert.Equal("042", sent.Personalisation!["ParticipantName"]);
@@ -121,7 +123,7 @@ public class UpdateEmailNotifierTests
         await h.Notifier.SendUnsentAsync();
 
         var sent = Assert.Single(h.Notify.Sent);
-        Assert.Equal(DeclinedTemplate, sent.TemplateId);
+        Assert.Equal(CustomerDeclined, sent.TemplateId);
         Assert.Equal("Declined", sent.Personalisation!["status"]);
         Assert.Equal("Not eligible", sent.Personalisation["Notes"]);
     }
@@ -180,19 +182,6 @@ public class UpdateEmailNotifierTests
         Assert.Empty(h.Notify.Sent);
         Assert.Single(h.Repository.Unsent);
         Assert.Single(h.Logger.At(LogLevel.Warning));
-    }
-
-    [Fact]
-    public async Task Customer_TemplateIdNotConfigured_StaysUnsent()
-    {
-        var h = new CustomerHarness(acceptedTemplate: string.Empty);
-        h.Queue("customer@example.com");
-        h.Queue("customer@example.com", isApproved: false);
-
-        await h.Notifier.SendUnsentAsync();
-
-        Assert.Equal(DeclinedTemplate, Assert.Single(h.Notify.Sent).TemplateId);
-        Assert.True(Assert.Single(h.Repository.Unsent).IsApproved);
     }
 
     [Fact]
@@ -294,7 +283,7 @@ public class UpdateEmailNotifierTests
         await h.Notifier.SendUnsentAsync();
 
         var sent = Assert.Single(h.Notify.Sent);
-        Assert.Equal(AcceptedTemplate, sent.TemplateId);
+        Assert.Equal(ParticipantAccepted, sent.TemplateId);
         Assert.Equal("lab@example.com", sent.Email);
         Assert.Equal(row.Id.ToString(), sent.Reference);
         Assert.Equal("042", sent.Personalisation!["ParticipantName"]);
@@ -314,7 +303,7 @@ public class UpdateEmailNotifierTests
         await h.Notifier.SendUnsentAsync();
 
         var sent = Assert.Single(h.Notify.Sent);
-        Assert.Equal(DeclinedTemplate, sent.TemplateId);
+        Assert.Equal(ParticipantDeclined, sent.TemplateId);
         Assert.Equal("Declined", sent.Personalisation!["status"]);
         Assert.Equal("Not eligible", sent.Personalisation["Notes"]);
     }
@@ -355,11 +344,11 @@ public class UpdateEmailNotifierTests
     }
 
     [Fact]
-    public async Task Participant_BlankAddressOrMissingTemplate_StaysUnsentAndWarnsOnlyOncePerDay()
+    public async Task Participant_BlankAddress_StaysUnsentAndWarnsOnlyOncePerDay()
     {
-        var h = new ParticipantHarness(declinedTemplate: string.Empty);
+        var h = new ParticipantHarness();
         h.Queue(" ");
-        h.Queue("lab@example.com", isApproved: false);
+        h.Queue("", isApproved: false);
 
         await h.Notifier.SendUnsentAsync();
         await h.Notifier.SendUnsentAsync();

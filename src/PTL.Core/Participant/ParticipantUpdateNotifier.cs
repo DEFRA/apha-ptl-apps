@@ -62,13 +62,13 @@ public sealed partial class ParticipantUpdateNotifier(
 
             foreach (var email in unsent)
             {
-                var templateId = email.IsApproved ? settings.AcceptedTemplateId : settings.DeclinedTemplateId;
-                if (string.IsNullOrWhiteSpace(email.Email) || string.IsNullOrWhiteSpace(templateId))
+                var templateId = email.IsApproved ? ParticipantUpdateEmailTemplates.AcceptedId : ParticipantUpdateEmailTemplates.DeclinedId;
+                if (string.IsNullOrWhiteSpace(email.Email))
                 {
                     skipped++;
                     if (guard.FirstWarningToday(email.Id, now.Date))
                     {
-                        LogSkipped(logger, email.Id, email.PendingParticipantUpdateId, string.IsNullOrWhiteSpace(email.Email) ? "no email address" : "no Notify template id configured");
+                        LogSkipped(logger, email.Id, email.PendingParticipantUpdateId, "no email address");
                     }
 
                     continue;

@@ -82,13 +82,13 @@ public sealed partial class PendingOrderNotifier(
 
             foreach (var email in unsent)
             {
-                var templateId = email.IsApproved ? settings.ApprovedTemplateId : settings.DeclinedTemplateId;
-                if (string.IsNullOrWhiteSpace(email.Email) || string.IsNullOrWhiteSpace(templateId))
+                var templateId = email.IsApproved ? OnlineOrderEmailTemplates.ApprovedId : OnlineOrderEmailTemplates.DeclinedId;
+                if (string.IsNullOrWhiteSpace(email.Email))
                 {
                     skipped++;
                     if (guard.FirstWarningToday(email.Id, now.Date))
                     {
-                        LogSkipped(logger, email.Id, email.PendingContractId, string.IsNullOrWhiteSpace(email.Email) ? "no email address" : "no Notify template id configured");
+                        LogSkipped(logger, email.Id, email.PendingContractId, "no email address");
                     }
 
                     continue;

@@ -16,8 +16,8 @@ namespace PTL.Api.Tests.Contract;
 // GOV.UK Notify and marked sent only afterwards, so a failed send stays unsent for the next run.
 public class PendingOrderNotifierTests
 {
-    private const string ApprovedTemplate = "approved-template-id";
-    private const string DeclinedTemplate = "declined-template-id";
+    private const string ApprovedTemplate = OnlineOrderEmailTemplates.ApprovedId;
+    private const string DeclinedTemplate = OnlineOrderEmailTemplates.DeclinedId;
     private const int YearId = 2026;
 
     private static readonly DateTimeOffset Now = new(2026, 10, 20, 9, 0, 0, TimeSpan.Zero);
@@ -34,7 +34,7 @@ public class PendingOrderNotifierTests
         public Guid ContractId { get; } = Guid.NewGuid();
         public string QalNumber { get; private set; } = string.Empty;
 
-        public static async Task<Harness> CreateAsync(bool enabled = true, string approvedTemplate = ApprovedTemplate, string declinedTemplate = DeclinedTemplate, INotifyClient? client = null)
+        public static async Task<Harness> CreateAsync(bool enabled = true, INotifyClient? client = null)
         {
             var h = new Harness();
 
@@ -95,7 +95,7 @@ public class PendingOrderNotifierTests
                 lookups,
                 client ?? h.Notify,
                 h.Guard,
-                Options.Create(new OnlineOrderEmailOptions { Enabled = enabled, ApprovedTemplateId = approvedTemplate, DeclinedTemplateId = declinedTemplate }),
+                Options.Create(new OnlineOrderEmailOptions { Enabled = enabled }),
                 new SettableTimeProvider(Now),
                 h.Logger);
 
@@ -222,20 +222,6 @@ public class PendingOrderNotifierTests
         Assert.Empty(h.Notify.Sent);
         Assert.Single(h.PendingOrders.Unsent);
         Assert.Single(h.Logger.At(LogLevel.Warning));
-    }
-
-    [Fact]
-    public async Task SendUnsentAsync_TemplateIdNotConfigured_StaysUnsent()
-    {
-        var h = await Harness.CreateAsync(approvedTemplate: string.Empty);
-        h.Queue("customer@example.com");
-        h.Queue("customer@example.com", isApproved: false);
-
-        var summary = await h.Notifier.SendUnsentAsync();
-
-        Assert.Equal(new OnlineOrderEmailRunSummary(2, 1, 1, 0), summary);
-        Assert.Equal(DeclinedTemplate, Assert.Single(h.Notify.Sent).TemplateId);
-        Assert.True(Assert.Single(h.PendingOrders.Unsent).IsApproved);
     }
 
     [Fact]

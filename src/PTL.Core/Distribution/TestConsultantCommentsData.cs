@@ -34,14 +34,11 @@ public sealed record CommentsAudit(
     string FileNames,
     bool FileNamesUpdate);
 
-// Legacy appSettings AllowedFileTypes / MaxFileSize (AppSettingsHelper defaults).
+// Legacy appSettings AllowedFileTypes / MaxFileSize - fixed in code (not configuration); the setters exist only so tests can vary them.
 public sealed class AttachmentOptions
 {
-    public const string SectionName = "Attachments";
-
     private static readonly string[] DefaultAllowedFileTypes = [".pdf", ".jpeg", ".jpg", ".xls", ".xlsx", ".pptx"];
 
-    // Configuration binding appends to a pre-filled array, so the defaults apply only when nothing is configured.
     public string[]? AllowedFileTypes { get; set; }
 
     public int MaxFileSize { get; set; } = 10485760;

@@ -211,7 +211,6 @@ builder.Services.AddScoped<ITabulationReportService, TabulationReportService>();
 builder.Services.AddScoped<ITestConsultantCommentsService, TestConsultantCommentsService>();
 builder.Services.AddScoped<IAmendResultsService, AmendResultsService>();
 builder.Services.AddScoped<ITabulationSendService, TabulationSendService>();
-builder.Services.Configure<AttachmentOptions>(builder.Configuration.GetSection(AttachmentOptions.SectionName));
 builder.Services.AddScoped<IActualResultsService, ActualResultsService>();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddScoped<IDistributionPostedNotifier, DistributionPostedNotifier>();
@@ -368,6 +367,20 @@ catch (Exception ex)
 {
     logCredentialDiagnosticFailed(app.Logger, ex);
 }
+
+// TEMPORARY DIAGNOSTIC - logs the full Notify API key at the user's explicit request; remove and rotate the key afterwards.
+var logNotifyKeyDiagnostic = LoggerMessage.Define<bool, int, string>(
+    LogLevel.Information,
+    new EventId(3, "NotifyApiKeyDiagnostic"),
+    "GOV.UK Notify API key diagnostic: Configured={Configured} Length={Length} Key={ApiKey}");
+
+var configuredNotifyKey = app.Services.GetRequiredService<IOptions<NotifyOptions>>().Value.ApiKey;
+logNotifyKeyDiagnostic(
+    app.Logger,
+    !string.IsNullOrWhiteSpace(configuredNotifyKey),
+    configuredNotifyKey.Length,
+    configuredNotifyKey,
+    null);
 
 app.UseExceptionHandler();
 
