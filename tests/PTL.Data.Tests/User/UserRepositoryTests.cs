@@ -1,4 +1,5 @@
 using System.Data;
+using PTL.Core.Audit;
 using PTL.Data.Infrastructure;
 using PTL.Data.Tests.Fakes;
 using PTL.Data.User;
@@ -80,6 +81,49 @@ public class UserRepositoryTests
         Assert.Contains(connection.ExecutedCommands, c => c.CommandText == deleteSql);
     }
 
+    private const string InsertUserSql = "EXEC dbo.spiUser @UserId, @Username, @FriendlyName, @FirstName, @LastName, @Email, @Department, @IsInactive, @InactiveDate";
+    private const string AuditSql = "EXEC dbo.spiSystemAdministrationAudit @AuditId, @ActingUserId, @Action, @EntityType, @EntityId, @Details";
+
+    [Fact]
+    public async Task CreateWithAuditAsync_CommitsTheInsertAndAuditInOneTransaction()
+    {
+        var (repository, connection) = CreateRepository();
+        var userId = Guid.NewGuid();
+        connection.RespondToNonQuery(InsertUserSql, 1);
+        connection.RespondToNonQuery(AuditSql, 1);
+        var auditEntry = new AuditEntry(null, "CreateUser", "User", userId.ToString(), "Username: m100001");
+
+        await repository.CreateWithAuditAsync(
+            new PTL.Core.User.User { UserId = userId, Username = "m100001", FriendlyName = "Jane Smith", FirstName = "Jane", LastName = "Smith", Email = "jane@apha.gov.uk", Department = "Science" },
+            auditEntry);
+
+        Assert.NotNull(connection.LastTransaction);
+        Assert.True(connection.LastTransaction!.Committed);
+        Assert.Contains(connection.ExecutedCommands, c => c.CommandText == InsertUserSql);
+        var auditCommand = Assert.Single(connection.ExecutedCommands, c => c.CommandText == AuditSql);
+        Assert.Equal("CreateUser", auditCommand.ParameterValue("@Action"));
+    }
+
+    // System Administration business rule: if the audit trail write fails, the account creation
+    // is rolled back - no unaudited change is ever persisted.
+    [Fact]
+    public async Task CreateWithAuditAsync_AuditWriteFails_RollsBackTheTransaction()
+    {
+        var (repository, connection) = CreateRepository();
+        var userId = Guid.NewGuid();
+        connection.RespondToNonQuery(InsertUserSql, 1);
+        // AuditSql deliberately has no configured response - simulates the audit write failing.
+        var auditEntry = new AuditEntry(null, "CreateUser", "User", userId.ToString(), "Username: m100001");
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => repository.CreateWithAuditAsync(
+            new PTL.Core.User.User { UserId = userId, Username = "m100001", FriendlyName = "Jane Smith", FirstName = "Jane", LastName = "Smith", Email = "jane@apha.gov.uk", Department = "Science" },
+            auditEntry));
+
+        Assert.NotNull(connection.LastTransaction);
+        Assert.True(connection.LastTransaction!.RolledBack);
+        Assert.False(connection.LastTransaction!.Committed);
+    }
+
     [Fact]
     public async Task GetTestConsultantsAsync_ReturnsMappedUsers()
     {
@@ -114,5 +158,71 @@ public class UserRepositoryTests
         await repository.UpdateDepartmentAsync(userId, "Science", true, new DateTime(2026, 10, 8, 0, 0, 0, DateTimeKind.Utc));
 
         Assert.Contains(connection.ExecutedCommands, c => c.CommandText == updateSql);
+    }
+
+    private const string UpdateDeptSql = "EXEC dbo.spuUserDept @UserId, @Department, @IsInactive, @InactiveDate";
+    private const string DeleteUserRoleSql = "EXEC dbo.spdUserRole @UserRoleId";
+    private const string DeleteUserSql = "EXEC dbo.spdUser @UserId";
+
+    [Fact]
+    public async Task UpdateDepartmentAsync_WithAudit_CommitsUpdateAndAuditInOneTransaction()
+    {
+        var (repository, connection) = CreateRepository();
+        var userId = Guid.NewGuid();
+        connection.RespondToNonQuery(UpdateDeptSql, 1);
+        connection.RespondToNonQuery(AuditSql, 1);
+
+        await repository.UpdateDepartmentAsync(userId, "Science", true, null, new AuditEntry(null, "UpdateInternalTestConsultant", "User", userId.ToString(), "Inactive: True"));
+
+        Assert.True(connection.LastTransaction!.Committed);
+        Assert.Single(connection.ExecutedCommands, c => c.CommandText == AuditSql);
+    }
+
+    [Fact]
+    public async Task UpdateDepartmentAsync_AuditWriteFails_RollsBackTheTransaction()
+    {
+        var (repository, connection) = CreateRepository();
+        var userId = Guid.NewGuid();
+        connection.RespondToNonQuery(UpdateDeptSql, 1);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => repository.UpdateDepartmentAsync(
+            userId, "Science", true, null, new AuditEntry(null, "UpdateInternalTestConsultant", "User", userId.ToString(), null)));
+
+        Assert.True(connection.LastTransaction!.RolledBack);
+        Assert.False(connection.LastTransaction!.Committed);
+    }
+
+    [Fact]
+    public async Task DeleteWithAuditAsync_RemovesRolesAndUserAndAuditsInOneTransaction()
+    {
+        var (repository, connection) = CreateRepository();
+        var userId = Guid.NewGuid();
+        connection.RespondToNonQuery(DeleteUserRoleSql, 1);
+        connection.RespondToNonQuery(DeleteUserSql, 1);
+        connection.RespondToNonQuery(AuditSql, 1);
+
+        await repository.DeleteWithAuditAsync(userId, [Guid.NewGuid()], new AuditEntry(null, "RemoveUser", "User", userId.ToString(), null));
+
+        Assert.True(connection.LastTransaction!.Committed);
+        Assert.Contains(connection.ExecutedCommands, c => c.CommandText == DeleteUserRoleSql);
+        Assert.Contains(connection.ExecutedCommands, c => c.CommandText == DeleteUserSql);
+        Assert.Single(connection.ExecutedCommands, c => c.CommandText == AuditSql);
+    }
+
+    // System Administration business rule: if the audit trail write fails, the user and their
+    // role assignments are left exactly as they were.
+    [Fact]
+    public async Task DeleteWithAuditAsync_AuditWriteFails_RollsBackTheTransaction()
+    {
+        var (repository, connection) = CreateRepository();
+        var userId = Guid.NewGuid();
+        connection.RespondToNonQuery(DeleteUserRoleSql, 1);
+        connection.RespondToNonQuery(DeleteUserSql, 1);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => repository.DeleteWithAuditAsync(
+            userId, [Guid.NewGuid()], new AuditEntry(null, "RemoveUser", "User", userId.ToString(), null)));
+
+        Assert.True(connection.LastTransaction!.RolledBack);
+        Assert.False(connection.LastTransaction!.Committed);
     }
 }

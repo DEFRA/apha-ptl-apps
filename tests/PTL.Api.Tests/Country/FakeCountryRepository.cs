@@ -1,3 +1,4 @@
+using PTL.Core.Audit;
 using PTL.Core.Country;
 
 namespace PTL.Api.Tests.Country;
@@ -16,21 +17,26 @@ internal sealed class FakeCountryRepository : ICountryRepository
     public Task<IReadOnlyList<CountryTypeEntity>> GetCountryTypesAsync(CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<CountryTypeEntity>>(CountryTypes);
 
-    public Task CreateAsync(PTL.Core.Country.Country country, CancellationToken cancellationToken = default)
+    public AuditEntry? LastAuditEntry { get; private set; }
+
+    public Task CreateAsync(PTL.Core.Country.Country country, AuditEntry? auditEntry = null, CancellationToken cancellationToken = default)
     {
+        LastAuditEntry = auditEntry;
         Created.Add(country);
         Countries.Add(country);
         return Task.CompletedTask;
     }
 
-    public Task UpdateAsync(PTL.Core.Country.Country country, CancellationToken cancellationToken = default)
+    public Task UpdateAsync(PTL.Core.Country.Country country, AuditEntry? auditEntry = null, CancellationToken cancellationToken = default)
     {
+        LastAuditEntry = auditEntry;
         Updated.Add(country);
         return Task.CompletedTask;
     }
 
-    public Task DeleteAsync(Guid countryId, CancellationToken cancellationToken = default)
+    public Task DeleteAsync(Guid countryId, AuditEntry? auditEntry = null, CancellationToken cancellationToken = default)
     {
+        LastAuditEntry = auditEntry;
         Deleted.Add(countryId);
         Countries.RemoveAll(c => c.CountryId == countryId);
         return Task.CompletedTask;

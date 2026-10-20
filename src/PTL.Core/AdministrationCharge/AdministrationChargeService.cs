@@ -1,6 +1,8 @@
+using PTL.Core.Audit;
+
 namespace PTL.Core.AdministrationCharge;
 
-public sealed class AdministrationChargeService(IAdministrationChargeRepository repository) : IAdministrationChargeService
+public sealed class AdministrationChargeService(IAdministrationChargeRepository repository, IActingUserAccessor actingUser) : IAdministrationChargeService
 {
     public Task<IReadOnlyList<AdministrationChargeEntity>> GetChargesAsync(CancellationToken cancellationToken = default) =>
         repository.GetChargesAsync(cancellationToken);
@@ -16,6 +18,13 @@ public sealed class AdministrationChargeService(IAdministrationChargeRepository 
             return validation;
         }
 
+        var audit = new AuditEntry(
+            actingUser.ActingUserId,
+            "SetAdministrationCharge",
+            "AdministrationCharge",
+            administrationChargeId.ToString(),
+            $"CurrencyId={currencyId}; Price={price}");
+
         var existing = await repository.GetPriceAsync(administrationChargeId, currencyId, cancellationToken);
         if (existing is null)
         {
@@ -25,12 +34,12 @@ public sealed class AdministrationChargeService(IAdministrationChargeRepository 
                 AdministrationChargeId = administrationChargeId,
                 CurrencyId = currencyId,
                 Price = price
-            }, cancellationToken);
+            }, audit, cancellationToken);
         }
         else
         {
             existing.Price = price;
-            await repository.UpdatePriceAsync(existing, cancellationToken);
+            await repository.UpdatePriceAsync(existing, audit, cancellationToken);
         }
 
         return validation;

@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
 using PTL.Api.Controllers;
+using PTL.Api.Tests.Audit;
 using PTL.Api.Tests.ExternalUser;
 using PTL.Contracts.TestConsultant;
 using PTL.Core.TestConsultant;
@@ -12,7 +13,7 @@ public class ExternalTestConsultantControllerTests
 {
     private static ExternalTestConsultantController CreateController(FakeTestConsultantRepository? repository = null, FakeExternalLoginService? loginService = null)
     {
-        var controller = new ExternalTestConsultantController(new TestConsultantService(repository ?? new FakeTestConsultantRepository(), loginService ?? new FakeExternalLoginService()));
+        var controller = new ExternalTestConsultantController(new TestConsultantService(repository ?? new FakeTestConsultantRepository(), loginService ?? new FakeExternalLoginService(), new FakeActingUserAccessor()));
 
         var services = new ServiceCollection().AddMvc().Services.BuildServiceProvider();
         controller.ControllerContext = new ControllerContext

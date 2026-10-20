@@ -71,8 +71,10 @@
                     </td>
                     <td class="govuk-table__cell">@(row.HasLogin ? "Login generated" : "")</td>
                     <td class="govuk-table__cell">
-                        <button form="tcEditForm" class="govuk-button govuk-!-margin-bottom-0" data-module="govuk-button" type="submit">Save</button>
-                        <a class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0" data-module="govuk-button" asp-action="ExternalTestConsultantManagement">Cancel</a>
+                        <div class="govuk-button-group govuk-!-margin-bottom-0">
+                            <button form="tcEditForm" class="govuk-button govuk-!-margin-bottom-0" data-module="govuk-button" type="submit">Save</button>
+                            <a class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0" data-module="govuk-button" asp-action="ExternalTestConsultantManagement">Cancel</a>
+                        </div>
                     </td>
                 }
                 else
@@ -87,14 +89,16 @@
                         }
                     </td>
                     <td class="govuk-table__cell">
-                        <a class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0" data-module="govuk-button" asp-action="ExternalTestConsultantManagement" asp-route-editId="@row.ExternalTestConsultantId">Edit</a>
-                        <form method="post" asp-action="ExternalTestConsultantManagementToggleStatus" class="govuk-!-display-inline">
-                            <input type="hidden" name="externalTestConsultantId" value="@row.ExternalTestConsultantId" />
-                            <input type="hidden" name="isInactive" value="@row.IsInactive" />
-                            <button class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0" data-module="govuk-button" type="submit">
-                                @(row.IsInactive ? "Activate" : "Deactivate")
-                            </button>
-                        </form>
+                        <div class="govuk-button-group govuk-!-margin-bottom-0">
+                            <a class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0" data-module="govuk-button" asp-action="ExternalTestConsultantManagement" asp-route-editId="@row.ExternalTestConsultantId">Edit</a>
+                            <form method="post" asp-action="ExternalTestConsultantManagementToggleStatus" class="govuk-!-display-inline">
+                                <input type="hidden" name="externalTestConsultantId" value="@row.ExternalTestConsultantId" />
+                                <input type="hidden" name="isInactive" value="@row.IsInactive" />
+                                <button class="govuk-button @(row.IsInactive ? "govuk-button--secondary" : "govuk-button--warning") govuk-!-margin-bottom-0" data-module="govuk-button" type="submit">
+                                    @(row.IsInactive ? "Activate" : "Deactivate")
+                                </button>
+                            </form>
+                        </div>
                     </td>
                 }
                 <td class="govuk-table__cell">@(row.IsInactive ? "Inactive" : "Active")</td>

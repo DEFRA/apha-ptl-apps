@@ -16,11 +16,11 @@
 <govuk-error-summary errors="@errors" />
 
 <form method="post" asp-action="ExternalSiteManagement" novalidate>
-    <govuk-textarea asp-for="Message" label="Further Information message" hint="Update content of Further Information screen on External site." rows="10" />
+    <govuk-rich-text asp-for="Message" label="Further Information message" hint="Update content of Further Information screen on External site." height="400" />
 
-    <govuk-textarea asp-for="ImportantMessage" label="Important Message"
+    <govuk-rich-text asp-for="ImportantMessage" label="Important Message"
                      hint="A section to provide an urgent message on the external site homepage. Clearing this field and saving removes the message from the external site (max 500 characters)."
-                     rows="10" />
+                     height="400" />
 
     <govuk-input asp-for="SupportEmailAddress" label="Edit error screen email address" />
 
@@ -31,27 +31,6 @@
 </form>
 
 @section Scripts {
-    <script src="~/lib/tinymce/tinymce.min.js"></script>
-    <script>
-        // Toolbar/plugins match the legacy EditMessageOnWebsite.aspx configuration
-        // (undo redo | bold italic underline | superscript subscript charmap) plus a link
-        // button/plugin, which legacy never had despite supporting hyperlinks in stored content.
-        tinymce.init({
-            selector: '#Message, #ImportantMessage',
-            plugins: 'lists save charmap link',
-            toolbar: 'undo redo | bold italic underline | link | superscript subscript charmap',
-            menubar: false,
-            branding: false,
-            license_key: 'gpl',
-            height: 300
-        });
-
-        // Mirrors legacy's SaveAllTinyMCEContent/tinyMCE.triggerSave() - copies each editor's
-        // current content back into its underlying <textarea> before the form posts.
-        document.querySelector('form').addEventListener('submit', function () {
-            if (typeof tinymce !== 'undefined') {
-                tinymce.triggerSave();
-            }
-        });
-    </script>
+    <script src="~/lib/tinymce/tinymce.min.js" asp-append-version="true"></script>
+    <script src="~/js/ptl-rich-text-editor.js" asp-append-version="true"></script>
 }

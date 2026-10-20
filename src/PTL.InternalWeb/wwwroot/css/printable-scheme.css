@@ -184,3 +184,117 @@
         font-size: 75%;
     }
 }
+
+/* Sample Packaging (Packaging.cshtml) - legacy PackagingSheet.css. */
+.ptl-print-title {
+    display: none;
+}
+
+.ptl-packaging-selects {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 0 20px;
+    margin-bottom: 30px;
+}
+
+.ptl-packaging-selects > .govuk-form-group,
+.ptl-packaging-selects > .govuk-button {
+    margin-bottom: 0;
+}
+
+.ptl-packaging-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 0 20px;
+}
+
+/* Legacy .tblWorkSheet/.cellWorkSheet: the table-level rule outranks the cell classes, so every
+   cell ends up with the same light 1px grid line. Applied on screen as well as print because the
+   rowspan layout is unreadable without cell borders. */
+#packaging-table {
+    border: 1px solid black;
+    border-collapse: collapse;
+    width: 100%;
+}
+
+#packaging-table th,
+#packaging-table td {
+    border: 1px solid black;
+    padding: 0.3em;
+    vertical-align: top;
+}
+
+/* Chromium double-renders the collapsed border where thead meets the first tbody; the header's own
+   bottom border then draws the line once, matching the rest of the grid. */
+#packaging-table thead + tbody tr:first-child > * {
+    border-top: none;
+}
+
+.cellWorkSheetScheme {
+    font-weight: bold;
+}
+
+.cellWorkSheetSchemePacking,
+.cellWorkSheetParticipant,
+.cellWorkSheetPacking,
+.cellWorkSheetNoSchemes {
+    font-style: italic;
+}
+
+/* Legacy colour was Gray (3.95:1 on white); GOV.UK secondary text colour keeps AA contrast. */
+.cellWorkSheetPreparationIncomplete {
+    font-style: italic;
+    color: #505a5f;
+}
+
+.rowDueToBePosted {
+    background-color: #FFFFEE;
+}
+
+@media print {
+    .ptl-print-title {
+        display: block;
+        font-weight: bold;
+        margin-bottom: 0.5em;
+    }
+
+    #packaging-table th,
+    #packaging-table td {
+        font-size: 75%;
+    }
+
+    /* Unticked blocks are hidden, so the first printed block need not follow the thead; the line above
+       every block is the previous row's bottom border. */
+    #packaging-table tbody tr:first-child > * {
+        border-top: none;
+    }
+}
+
+/* Sample Packaging Labels (PackagingLabels.cshtml) - one label per printed page. */
+.ptl-label {
+    border: 1px solid black;
+    padding: 0.5em 1em;
+    margin-bottom: 1em;
+    break-inside: avoid;
+    page-break-inside: avoid;
+}
+
+.ptl-label .ptl-label__line {
+    margin: 0;
+    min-height: 1.4em;
+}
+
+@media print {
+    .ptl-label {
+        margin-bottom: 0;
+        break-after: page;
+        page-break-after: always;
+    }
+
+    .ptl-label:last-child {
+        break-after: auto;
+        page-break-after: auto;
+    }
+}

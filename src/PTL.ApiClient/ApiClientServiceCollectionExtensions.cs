@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using PTL.Common.Audit;
 using PTL.Common.Correlation;
 
 namespace PTL.ApiClient;
@@ -29,6 +30,9 @@ public static class ApiClientServiceCollectionExtensions
         services.AddHttpContextAccessor();
         services.AddTransient<CorrelationIdDelegatingHandler>();
 
+        // Forwards the signed-in user's ID so System Administration changes are audited against them.
+        services.AddTransient<ActingUserDelegatingHandler>();
+
         services.AddHttpClient<IApiClient, ApiClient>(client =>
         {
             client.BaseAddress = baseUri;
@@ -44,6 +48,13 @@ public static class ApiClientServiceCollectionExtensions
             .AddStandardResilienceHandler();
 
         services.AddHttpClient<IParticipantApiClient, ParticipantApiClient>(client =>
+        {
+            client.BaseAddress = new Uri(apiBaseUrl);
+        })
+            .AddHttpMessageHandler<CorrelationIdDelegatingHandler>()
+            .AddStandardResilienceHandler();
+
+        services.AddHttpClient<ISearchApiClient, SearchApiClient>(client =>
         {
             client.BaseAddress = new Uri(apiBaseUrl);
         })
@@ -136,24 +147,28 @@ public static class ApiClientServiceCollectionExtensions
         {
             client.BaseAddress = new Uri(apiBaseUrl);
         })
+            .AddHttpMessageHandler<ActingUserDelegatingHandler>()
             .AddStandardResilienceHandler();
 
         services.AddHttpClient<IWeightedPricingPlanApiClient, WeightedPricingPlanApiClient>(client =>
         {
             client.BaseAddress = new Uri(apiBaseUrl);
         })
+            .AddHttpMessageHandler<ActingUserDelegatingHandler>()
             .AddStandardResilienceHandler();
 
         services.AddHttpClient<IPostagePricingPlanApiClient, PostagePricingPlanApiClient>(client =>
         {
             client.BaseAddress = new Uri(apiBaseUrl);
         })
+            .AddHttpMessageHandler<ActingUserDelegatingHandler>()
             .AddStandardResilienceHandler();
 
         services.AddHttpClient<ICountryApiClient, CountryApiClient>(client =>
         {
             client.BaseAddress = new Uri(apiBaseUrl);
         })
+            .AddHttpMessageHandler<ActingUserDelegatingHandler>()
             .AddStandardResilienceHandler();
 
         services.AddHttpClient<ICategoryItemTypeApiClient, CategoryItemTypeApiClient>(client =>
@@ -178,12 +193,14 @@ public static class ApiClientServiceCollectionExtensions
         {
             client.BaseAddress = new Uri(apiBaseUrl);
         })
+            .AddHttpMessageHandler<ActingUserDelegatingHandler>()
             .AddStandardResilienceHandler();
 
         services.AddHttpClient<IUserApiClient, UserApiClient>(client =>
         {
             client.BaseAddress = new Uri(apiBaseUrl);
         })
+            .AddHttpMessageHandler<ActingUserDelegatingHandler>()
             .AddStandardResilienceHandler();
 
         services.AddHttpClient<IRoleApiClient, RoleApiClient>(client =>
@@ -202,12 +219,14 @@ public static class ApiClientServiceCollectionExtensions
         {
             client.BaseAddress = new Uri(apiBaseUrl);
         })
+            .AddHttpMessageHandler<ActingUserDelegatingHandler>()
             .AddStandardResilienceHandler();
 
         services.AddHttpClient<IViewerApiClient, ViewerApiClient>(client =>
         {
             client.BaseAddress = new Uri(apiBaseUrl);
         })
+            .AddHttpMessageHandler<ActingUserDelegatingHandler>()
             .AddStandardResilienceHandler();
 
         services.AddHttpClient<PTL.ApiClient.Distribution.IDistributionApiClient, PTL.ApiClient.Distribution.DistributionApiClient>(client =>
@@ -219,6 +238,8 @@ public static class ApiClientServiceCollectionExtensions
 
         services.AddHealthChecks()
             .AddCheck<ApiConnectivityHealthCheck>("api-connectivity");
+
+        services.AddHostedService<ApiStartupConnectivityCheck>();
 
         return services;
     }

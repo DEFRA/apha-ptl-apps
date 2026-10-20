@@ -8,7 +8,7 @@ namespace PTL.Api.Tests.Invoice;
 public class InvoiceServiceTests
 {
     private static (InvoiceService Service, FakeInvoiceRepository Repository, FakeInvoiceStorageService Storage, FakeNotifyClient Notify) CreateService(
-        IReadOnlyList<string>? recipients = null)
+        string? recipients = null)
     {
         var repository = new FakeInvoiceRepository();
         var storage = new FakeInvoiceStorageService();
@@ -20,7 +20,7 @@ public class InvoiceServiceTests
             Options.Create(new InvoiceStorageOptions { Prefix = "invoices" }),
             Options.Create(new InvoiceNotificationOptions
             {
-                Recipients = recipients ?? ["ops@example.com"]
+                Recipients = recipients ?? "ops@example.com"
             }),
             Options.Create(new InternalOptions { AppUrl = "https://ptlims.example" }),
             NullLogger<InvoiceService>.Instance);
@@ -68,7 +68,7 @@ public class InvoiceServiceTests
     [Fact]
     public async Task GenerateInvoicesAsync_Success_SavesCsvMarksInvoicedAndNotifiesRecipients()
     {
-        var (service, repository, storage, notify) = CreateService(recipients: ["ops@example.com", "finance@example.com"]);
+        var (service, repository, storage, notify) = CreateService(recipients: "ops@example.com");
         var contractId = Guid.NewGuid();
         repository.PendingData = new InvoicePendingData([Contract(contractId)], [Item(contractId)]);
 
@@ -85,7 +85,7 @@ public class InvoiceServiceTests
         Assert.Equal("test.user", repository.LastAuditWho);
         Assert.Equal(storage.LastStorageKey, outcome.CsvStorageKey);
         Assert.NotNull(storage.LastContent);
-        Assert.Equal(["ops@example.com", "finance@example.com"], notify.SentTo);
+        Assert.Equal(["ops@example.com"], notify.SentTo);
         Assert.NotNull(notify.LastPersonalisation);
         Assert.Contains("generationDateTime", notify.LastPersonalisation!.Keys);
 
@@ -111,7 +111,7 @@ public class InvoiceServiceTests
     [Fact]
     public async Task GenerateInvoicesAsync_NotificationFailure_DoesNotRollBackGeneration()
     {
-        var (service, repository, _, notify) = CreateService(recipients: ["bad@example.com", "good@example.com"]);
+        var (service, repository, _, notify) = CreateService(recipients: "bad@example.com");
         notify.ThrowForEmailAddress = "bad@example.com";
         var contractId = Guid.NewGuid();
         repository.PendingData = new InvoicePendingData([Contract(contractId)], [Item(contractId)]);
@@ -120,7 +120,7 @@ public class InvoiceServiceTests
 
         Assert.True(outcome.Success);
         Assert.True(repository.MarkInvoicedCalled);
-        Assert.Equal(["good@example.com"], notify.SentTo);
+        Assert.Empty(notify.SentTo);
     }
 
     [Fact]
@@ -204,7 +204,7 @@ public class InvoiceServiceTests
     [Fact]
     public async Task GenerateInvoicesAsync_NoRecipientsConfigured_SkipsNotificationButStillSucceeds()
     {
-        var (service, repository, _, notify) = CreateService(recipients: []);
+        var (service, repository, _, notify) = CreateService(recipients: "");
         var contractId = Guid.NewGuid();
         repository.PendingData = new InvoicePendingData([Contract(contractId)], [Item(contractId)]);
 

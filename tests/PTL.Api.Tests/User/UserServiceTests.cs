@@ -4,8 +4,8 @@ namespace PTL.Api.Tests.User;
 
 public class UserServiceTests
 {
-    private static UserService CreateService(FakeUserRepository repository, FakeStaffDirectoryService? directory = null) =>
-        new(repository, directory ?? new FakeStaffDirectoryService());
+    private static UserService CreateService(FakeUserRepository repository, FakeStaffDirectoryService? directory = null, PTL.Api.Tests.Audit.FakeActingUserAccessor? actingUser = null) =>
+        new(repository, directory ?? new FakeStaffDirectoryService(), actingUser ?? new PTL.Api.Tests.Audit.FakeActingUserAccessor());
 
     [Fact]
     public async Task SearchStaffDirectoryAsync_FiltersOutCandidatesWithExistingAccounts()
@@ -54,7 +54,7 @@ public class UserServiceTests
         var repository = new FakeUserRepository();
         var service = CreateService(repository);
 
-        var created = await service.CreateUserAsync("m100001", "jane@apha.gov.uk", "Jane Smith", "Jane", "Smith", "Science");
+        var created = await service.CreateUserAsync(new NewUserDetails("m100001", "jane@apha.gov.uk", "Jane Smith", "Jane", "Smith", "Science"));
 
         Assert.Equal("m100001", created.Username);
         Assert.False(created.IsInactive);
@@ -67,7 +67,7 @@ public class UserServiceTests
         var service = CreateService(new FakeUserRepository());
 
         var ex = await Assert.ThrowsAsync<UserValidationException>(
-            () => service.CreateUserAsync("m100001", string.Empty, "Jane Smith", "Jane", "Smith", "Science"));
+            () => service.CreateUserAsync(new NewUserDetails("m100001", string.Empty, "Jane Smith", "Jane", "Smith", "Science")));
 
         Assert.Contains(ex.Errors, e => e.Message == UserValidator.NoEmailMessage);
     }
@@ -82,10 +82,25 @@ public class UserServiceTests
         var service = CreateService(repository);
 
         var ex = await Assert.ThrowsAsync<UserValidationException>(
-            () => service.CreateUserAsync("M100001", "jane@apha.gov.uk", "Jane Smith", "Jane", "Smith", "Science"));
+            () => service.CreateUserAsync(new NewUserDetails("M100001", "jane@apha.gov.uk", "Jane Smith", "Jane", "Smith", "Science")));
 
         Assert.Contains(ex.Errors, e => e.Message == UserValidator.DuplicateMessage);
         Assert.Empty(repository.Created);
+    }
+
+    // System Administration business rule: if the audit trail write fails, the account creation
+    // itself is rolled back too - no unaudited change is ever persisted.
+    [Fact]
+    public async Task CreateUserAsync_AuditWriteFails_RollsBackAndDoesNotPersistTheAccount()
+    {
+        var repository = new FakeUserRepository { ThrowOnAudit = true };
+        var service = CreateService(repository);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => service.CreateUserAsync(new NewUserDetails("m100001", "jane@apha.gov.uk", "Jane Smith", "Jane", "Smith", "Science")));
+
+        Assert.Empty(repository.Created);
+        Assert.Empty(repository.Users);
     }
 
     [Fact]
@@ -117,5 +132,31 @@ public class UserServiceTests
         Assert.Equal("Science", update.Department);
         Assert.True(update.IsInactive);
         Assert.Equal(inactiveDate, update.InactiveDate);
+    }
+
+    [Fact]
+    public async Task UpdateTestConsultantAsync_AuditsTheChangeAgainstTheActingUser()
+    {
+        var userId = Guid.NewGuid();
+        var actingUserId = Guid.NewGuid();
+        var repository = new FakeUserRepository();
+        var service = CreateService(repository, actingUser: new PTL.Api.Tests.Audit.FakeActingUserAccessor { ActingUserId = actingUserId });
+
+        await service.UpdateTestConsultantAsync(userId, "Science", true, null);
+
+        Assert.Equal("UpdateInternalTestConsultant", repository.LastAuditEntry?.Action);
+        Assert.Equal(actingUserId, repository.LastAuditEntry?.ActingUserId);
+        Assert.Equal(userId.ToString(), repository.LastAuditEntry?.EntityId);
+    }
+
+    [Fact]
+    public async Task UpdateTestConsultantAsync_AuditWriteFails_NothingIsPersisted()
+    {
+        var repository = new FakeUserRepository { ThrowOnAudit = true };
+        var service = CreateService(repository);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => service.UpdateTestConsultantAsync(Guid.NewGuid(), "Science", true, null));
+
+        Assert.Empty(repository.DepartmentUpdates);
     }
 }

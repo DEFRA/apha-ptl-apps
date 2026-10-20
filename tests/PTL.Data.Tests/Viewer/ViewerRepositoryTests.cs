@@ -1,4 +1,5 @@
 using System.Data;
+using PTL.Core.Audit;
 using PTL.Core.Viewer;
 using PTL.Data.Infrastructure;
 using PTL.Data.Tests.Fakes;
@@ -17,6 +18,119 @@ public class ViewerRepositoryTests
     private const string GetByEmailSql = "EXEC dbo.spgViewerByEmail @Email";
     private const string InsertSql = "EXEC dbo.spiViewer @ViewerId, @Name, @Email, @SsoId, @SsoIdExt";
     private const string UpdateSql = "EXEC dbo.spuViewer @ViewerId, @Name, @Email, @SsoId, @SsoIdExt";
+    private const string DeleteSql = "EXEC dbo.spdViewer @ViewerId";
+    private const string AuditSql = "EXEC dbo.spiSystemAdministrationAudit @AuditId, @ActingUserId, @Action, @EntityType, @EntityId, @Details";
+
+    private static AuditEntry AuditFor(Guid viewerId, string action) =>
+        new(Guid.NewGuid(), action, "Viewer", viewerId.ToString(), "Name: Jane");
+
+    [Fact]
+    public async Task CreateAsync_WithAudit_CommitsInsertAndAuditInOneTransaction()
+    {
+        var (repository, connection) = CreateRepository();
+        var viewer = new ViewerEntity { ViewerId = Guid.NewGuid(), Name = "Jane" };
+        connection.RespondToNonQuery(InsertSql, 1);
+        connection.RespondToNonQuery(AuditSql, 1);
+
+        await repository.CreateAsync(viewer, AuditFor(viewer.ViewerId, "CreateViewer"));
+
+        Assert.NotNull(connection.LastTransaction);
+        Assert.True(connection.LastTransaction!.Committed);
+        Assert.Contains(connection.ExecutedCommands, c => c.CommandText == InsertSql);
+        var auditCommand = Assert.Single(connection.ExecutedCommands, c => c.CommandText == AuditSql);
+        Assert.Equal("CreateViewer", auditCommand.ParameterValue("@Action"));
+    }
+
+    [Fact]
+    public async Task CreateAsync_AuditWriteFails_RollsBackTheTransaction()
+    {
+        var (repository, connection) = CreateRepository();
+        var viewer = new ViewerEntity { ViewerId = Guid.NewGuid(), Name = "Jane" };
+        connection.RespondToNonQuery(InsertSql, 1);
+        // AuditSql deliberately has no configured response, so the audit write throws.
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => repository.CreateAsync(viewer, AuditFor(viewer.ViewerId, "CreateViewer")));
+
+        Assert.NotNull(connection.LastTransaction);
+        Assert.True(connection.LastTransaction!.RolledBack);
+        Assert.False(connection.LastTransaction!.Committed);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_WithAudit_CommitsUpdateAndAuditInOneTransaction()
+    {
+        var (repository, connection) = CreateRepository();
+        var viewer = new ViewerEntity { ViewerId = Guid.NewGuid(), Name = "Jane" };
+        connection.RespondToNonQuery(UpdateSql, 1);
+        connection.RespondToNonQuery(AuditSql, 1);
+
+        var result = await repository.UpdateAsync(viewer, AuditFor(viewer.ViewerId, "UpdateViewer"));
+
+        Assert.Same(viewer, result);
+        Assert.NotNull(connection.LastTransaction);
+        Assert.True(connection.LastTransaction!.Committed);
+        Assert.Single(connection.ExecutedCommands, c => c.CommandText == AuditSql);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_AuditWriteFails_RollsBackTheTransaction()
+    {
+        var (repository, connection) = CreateRepository();
+        var viewer = new ViewerEntity { ViewerId = Guid.NewGuid(), Name = "Jane" };
+        connection.RespondToNonQuery(UpdateSql, 1);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => repository.UpdateAsync(viewer, AuditFor(viewer.ViewerId, "UpdateViewer")));
+
+        Assert.NotNull(connection.LastTransaction);
+        Assert.True(connection.LastTransaction!.RolledBack);
+        Assert.False(connection.LastTransaction!.Committed);
+    }
+
+    [Fact]
+    public async Task DeleteAsync_WithAudit_CommitsDeleteAndAuditInOneTransaction()
+    {
+        var (repository, connection) = CreateRepository();
+        var viewerId = Guid.NewGuid();
+        connection.RespondToNonQuery(DeleteSql, 1);
+        connection.RespondToNonQuery(AuditSql, 1);
+
+        var result = await repository.DeleteAsync(viewerId, AuditFor(viewerId, "DeleteViewer"));
+
+        Assert.True(result);
+        Assert.NotNull(connection.LastTransaction);
+        Assert.True(connection.LastTransaction!.Committed);
+        Assert.Single(connection.ExecutedCommands, c => c.CommandText == AuditSql);
+    }
+
+    [Fact]
+    public async Task DeleteAsync_AuditWriteFails_RollsBackTheTransaction()
+    {
+        var (repository, connection) = CreateRepository();
+        var viewerId = Guid.NewGuid();
+        connection.RespondToNonQuery(DeleteSql, 1);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => repository.DeleteAsync(viewerId, AuditFor(viewerId, "DeleteViewer")));
+
+        Assert.NotNull(connection.LastTransaction);
+        Assert.True(connection.LastTransaction!.RolledBack);
+        Assert.False(connection.LastTransaction!.Committed);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_WithoutAudit_DoesNotUseATransactionOrWriteAudit()
+    {
+        var (repository, connection) = CreateRepository();
+        var viewer = new ViewerEntity { ViewerId = Guid.NewGuid() };
+        connection.RespondToNonQuery(UpdateSql, 1);
+
+        await repository.UpdateAsync(viewer);
+
+        Assert.Null(connection.LastTransaction);
+        Assert.DoesNotContain(connection.ExecutedCommands, c => c.CommandText == AuditSql);
+    }
 
     private static DataTable ViewerTable(Guid viewerId, Guid? ssoIdExt = null, string email = "", string name = "Test Viewer")
     {

@@ -1,3 +1,4 @@
+@using PTL.Common.Auth
 @using PTL.InternalWeb.Features.Account
 @model (string ServiceName, string? LogoStyle)
 <header class="govuk-template__header">
@@ -23,20 +24,14 @@
             </span>
             @if (User.Identity is not null && User.Identity.IsAuthenticated)
             {
-                <nav aria-label="Account navigation" class="govuk-service-navigation__wrapper">
-                    <ul class="govuk-service-navigation__list">
-                        <li class="govuk-service-navigation__item">
-                            @* InternalUserResolver never sets ClaimTypes.Name - FullName (tblUsers.fldFriendlyName) is the real display name. *@
-                            Signed in as <strong>@(User.FindFirst(InternalUserClaimTypes.FullName)?.Value ?? User.Identity.Name)</strong>
-                        </li>
-                        <li class="govuk-service-navigation__item">
-                            <form asp-controller="Account" asp-action="Logout" method="post" class="app-signout-form">
-                                @Html.AntiForgeryToken()
-                                <button type="submit" class="app-signout-button govuk-service-navigation__link">Sign out</button>
-                            </form>
-                        </li>
-                    </ul>
-                </nav>
+                // Entra id_token claims first; the tblUsers name resolved at sign-in is a last resort.
+                var displayName = User.GetDisplayName(lastResortClaimType: InternalUserClaimTypes.FullName);
+                if (!string.IsNullOrWhiteSpace(displayName))
+                {
+                    <div class="app-account-panel">
+                        <span class="govuk-body govuk-!-margin-bottom-0">Signed in as: <strong>@displayName</strong></span>
+                    </div>
+                }
             }
         </div>
     </section>

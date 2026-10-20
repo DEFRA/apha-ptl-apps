@@ -1,3 +1,4 @@
+using PTL.Core.Audit;
 using PTL.Core.ExternalSiteMessage;
 
 namespace PTL.Api.Tests.ExternalSiteMessage;
@@ -10,8 +11,11 @@ internal sealed class FakeExternalSiteMessageRepository : IExternalSiteMessageRe
     public Task<PTL.Core.ExternalSiteMessage.ExternalSiteMessage> GetAsync(CancellationToken cancellationToken = default) =>
         Task.FromResult(Message);
 
-    public Task UpdateAsync(PTL.Core.ExternalSiteMessage.ExternalSiteMessage message, CancellationToken cancellationToken = default)
+    public AuditEntry? LastAuditEntry { get; private set; }
+
+    public Task UpdateAsync(PTL.Core.ExternalSiteMessage.ExternalSiteMessage message, AuditEntry? auditEntry = null, CancellationToken cancellationToken = default)
     {
+        LastAuditEntry = auditEntry;
         Updated = message;
         Message = message;
         return Task.CompletedTask;

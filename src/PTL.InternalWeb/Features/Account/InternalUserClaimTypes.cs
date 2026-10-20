@@ -4,7 +4,7 @@ namespace PTL.InternalWeb.Features.Account;
 public static class InternalUserClaimTypes
 {
     /// <summary>The resolved tblUsers.fldUserId, as a string GUID.</summary>
-    public const string InternalUserId = "internalUserId";
+    public const string InternalUserId = PTL.Common.Audit.ActingUser.ClaimType;
 
     /// <summary>The resolved display name (fldFriendlyName, falling back to first+last name).</summary>
     public const string FullName = "fullName";

@@ -1,4 +1,5 @@
 using System.Data;
+using PTL.Core.Distribution;
 using PTL.Data.Distribution;
 using PTL.Data.Infrastructure;
 using PTL.Data.Tests.Fakes;
@@ -1266,4 +1267,690 @@ public class DistributionRepositoryTests
         Assert.True(connection.LastTransaction!.Committed);
     }
 
+    // ---------- Results Receipt ----------
+
+    private const string GetResultsReceiptSql =
+        "EXEC dbo.spgMonthlyDistributionForResultsReceipt @YearId = @YearId, @MonthId = @MonthId";
+
+    private const string UpdateResultsReceiptSql = """
+        EXEC dbo.spuDistributionParticipantForResultsReceipt
+            @DistributionParticipantId = @DistributionParticipantId,
+            @ExtraDocumentsReturned = @ExtraDocumentsReturned,
+            @ReturnedDate = @ReturnedDate
+        """;
+
+    private static DataTable ResultsReceiptHeaderTable()
+    {
+        var table = new DataTable();
+        table.Columns.Add("fldMonthlyDistributionId", typeof(Guid));
+        table.Columns.Add("fldYearId", typeof(int));
+        table.Columns.Add("fldMonthId", typeof(int));
+        return table;
+    }
+
+    private static DataTable ResultsReceiptSchemeTable()
+    {
+        var table = new DataTable();
+        table.Columns.Add("fldMonthlyDistributionSchemeId", typeof(Guid));
+        table.Columns.Add("fldIdentifier", typeof(string));
+        table.Columns.Add("fldName", typeof(string));
+        table.Columns.Add("fldDistributionReference", typeof(string));
+        table.Columns.Add("fldDistributionReferenceSuffix", typeof(string));
+        table.Columns.Add("fldScheduleCode", typeof(string));
+        table.Columns.Add("fldHasSampleNumbersDefined", typeof(bool));
+        table.Columns.Add("fldDeadlineDate", typeof(DateTime));
+        table.Columns.Add("fldRequiresAssessment", typeof(bool));
+        return table;
+    }
+
+    private static DataTable ResultsReceiptParticipantTable()
+    {
+        var table = new DataTable();
+        table.Columns.Add("fldDistributionParticipantId", typeof(Guid));
+        table.Columns.Add("fldMonthlyDistributionSchemeId", typeof(Guid));
+        table.Columns.Add("fldLabCode", typeof(string));
+        table.Columns.Add("fldLabName", typeof(string));
+        table.Columns.Add("fldExtraDocumentsReturned", typeof(bool));
+        table.Columns.Add("fldFirstEditDate", typeof(DateTime));
+        table.Columns.Add("fldLastEditDate", typeof(DateTime));
+        table.Columns.Add("fldDeadlineDate", typeof(DateTime));
+        table.Columns.Add("fldDeadlineChangeReason", typeof(string));
+        table.Columns.Add("fldPostedDate", typeof(DateTime));
+        table.Columns.Add("fldReturnedDate", typeof(DateTime));
+        return table;
+    }
+
+    private static DataTable ResultsReceiptStatusTable()
+    {
+        var table = new DataTable();
+        table.Columns.Add("fldDistributionParticipantId", typeof(Guid));
+        table.Columns.Add("fldHasUnaccountedSamples", typeof(bool));
+        return table;
+    }
+
+    [Fact]
+    public async Task GetResultsReceiptAsync_HeaderNotFound_ReturnsNull()
+    {
+        var (repository, connection) = CreateRepository();
+        var dataSet = new DataSet();
+        dataSet.Tables.Add(ResultsReceiptHeaderTable());
+        dataSet.Tables.Add(ResultsReceiptSchemeTable());
+        dataSet.Tables.Add(ResultsReceiptParticipantTable());
+        dataSet.Tables.Add(ResultsReceiptStatusTable());
+        connection.RespondToQuery(GetResultsReceiptSql, dataSet);
+
+        Assert.Null(await repository.GetResultsReceiptAsync(2026, 5));
+    }
+
+    [Fact]
+    public async Task GetResultsReceiptAsync_AttachesParticipantsToSchemesAndAppliesSampleStatuses()
+    {
+        var (repository, connection) = CreateRepository();
+        var monthlyDistributionId = Guid.NewGuid();
+        var schemeId = Guid.NewGuid();
+        var emptySchemeId = Guid.NewGuid();
+        var accounted = Guid.NewGuid();
+        var unaccounted = Guid.NewGuid();
+        var orphan = Guid.NewGuid();
+
+        var header = ResultsReceiptHeaderTable();
+        header.Rows.Add(monthlyDistributionId, 2026, 5);
+
+        var schemes = ResultsReceiptSchemeTable();
+        schemes.Rows.Add(schemeId, "BT", "Brucella", "D1", "a", "S1", true, new DateTime(2026, 6, 30), true);
+        schemes.Rows.Add(emptySchemeId, "TB", "Tuberculosis", "D2", "", "S2", false, new DateTime(2026, 6, 30), false);
+
+        var participants = ResultsReceiptParticipantTable();
+        participants.Rows.Add(accounted, schemeId, "L001", "Lab One", true,
+            new DateTime(2026, 5, 3), new DateTime(2026, 5, 4), DBNull.Value, "Late", new DateTime(2026, 5, 2), new DateTime(2026, 5, 5));
+        participants.Rows.Add(unaccounted, schemeId, "L002", "Lab Two", false,
+            DBNull.Value, DBNull.Value, new DateTime(2026, 7, 1), DBNull.Value, DBNull.Value, DBNull.Value);
+        participants.Rows.Add(orphan, Guid.NewGuid(), "L003", "Lab Three", false,
+            DBNull.Value, DBNull.Value, DBNull.Value, DBNull.Value, DBNull.Value, DBNull.Value);
+
+        var statuses = ResultsReceiptStatusTable();
+        statuses.Rows.Add(unaccounted, true);
+        statuses.Rows.Add(accounted, false);
+
+        var dataSet = new DataSet();
+        dataSet.Tables.Add(header);
+        dataSet.Tables.Add(schemes);
+        dataSet.Tables.Add(participants);
+        dataSet.Tables.Add(statuses);
+        connection.RespondToQuery(GetResultsReceiptSql, dataSet);
+
+        var result = await repository.GetResultsReceiptAsync(2026, 5);
+
+        Assert.NotNull(result);
+        Assert.Equal((monthlyDistributionId, 2026, 5), (result!.MonthlyDistributionId, result.YearId, result.MonthId));
+        var query = connection.ExecutedCommands.Single(c => c.CommandText == GetResultsReceiptSql);
+        Assert.Equal(2026, query.ParameterValue("YearId"));
+        Assert.Equal(5, query.ParameterValue("MonthId"));
+
+        var scheme = result.Schemes.Single(s => s.MonthlyDistributionSchemeId == schemeId);
+        Assert.Equal("D1a/S1: BT Brucella", scheme.Description);
+        Assert.True(scheme.HasSampleNumbersDefined);
+        Assert.True(scheme.RequiresAssessment);
+        Assert.Equal(new DateTime(2026, 6, 30), scheme.DeadlineDate);
+        Assert.Equal(2, scheme.Participants.Count);
+
+        var first = scheme.Participants.Single(p => p.DistributionParticipantId == accounted);
+        Assert.Equal("L001: Lab One", first.FullName);
+        Assert.True(first.ExtraDocumentsReturned);
+        Assert.Equal(new DateTime(2026, 5, 3), first.FirstEditDate);
+        Assert.Equal(new DateTime(2026, 5, 4), first.LastEditDate);
+        Assert.Null(first.DeadlineDate);
+        Assert.Equal("Late", first.DeadlineChangeReason);
+        Assert.Equal(new DateTime(2026, 5, 2), first.PostedDate);
+        Assert.Equal(new DateTime(2026, 5, 5), first.ReturnedDate);
+        Assert.False(first.HasUnaccountedSamples);
+
+        var second = scheme.Participants.Single(p => p.DistributionParticipantId == unaccounted);
+        Assert.True(second.HasUnaccountedSamples);
+        Assert.Equal(new DateTime(2026, 7, 1), second.DeadlineDate);
+        Assert.Null(second.FirstEditDate);
+
+        // Participants of unknown schemes are dropped; schemes without participants stay listed.
+        Assert.Empty(result.Schemes.Single(s => s.MonthlyDistributionSchemeId == emptySchemeId).Participants);
+        Assert.DoesNotContain(result.Schemes.SelectMany(s => s.Participants), p => p.DistributionParticipantId == orphan);
+    }
+
+    [Fact]
+    public async Task UpdateResultsReceiptAsync_NoParticipants_DoesNotOpenATransaction()
+    {
+        var (repository, connection) = CreateRepository();
+
+        await repository.UpdateResultsReceiptAsync([]);
+
+        Assert.Empty(connection.ExecutedCommands);
+        Assert.Null(connection.LastTransaction);
+    }
+
+    [Fact]
+    public async Task UpdateResultsReceiptAsync_ExecutesEachParticipantInOneTransactionAndCommits()
+    {
+        var (repository, connection) = CreateRepository();
+        connection.RespondToNonQuery(UpdateResultsReceiptSql, 1);
+        var one = new PTL.Core.Distribution.ResultsReceiptParticipantEntity
+        {
+            DistributionParticipantId = Guid.NewGuid(),
+            ExtraDocumentsReturned = true,
+            ReturnedDate = new DateTime(2026, 5, 12),
+        };
+        var two = new PTL.Core.Distribution.ResultsReceiptParticipantEntity { DistributionParticipantId = Guid.NewGuid() };
+
+        await repository.UpdateResultsReceiptAsync([one, two]);
+
+        var commands = connection.ExecutedCommands.Where(c => c.CommandText == UpdateResultsReceiptSql).ToList();
+        Assert.Equal(2, commands.Count);
+        Assert.Equal(one.DistributionParticipantId, commands[0].ParameterValue("DistributionParticipantId"));
+        Assert.Equal(true, commands[0].ParameterValue("ExtraDocumentsReturned"));
+        Assert.Equal(new DateTime(2026, 5, 12), commands[0].ParameterValue("ReturnedDate"));
+        Assert.Equal(two.DistributionParticipantId, commands[1].ParameterValue("DistributionParticipantId"));
+        Assert.True(connection.LastTransaction!.Committed);
+    }
+
+    // ---------- Sample Packaging ----------
+
+    private const string GroupedPackagingSheetSql =
+        "EXEC dbo.spgGroupedPackagingSheet @MonthlyDistributionId = @MonthlyDistributionId, @WeekNumber = @WeekNumber";
+
+    private const string PartGroupedPackagingSheetSql =
+        "EXEC dbo.spgPartGroupedPackagingSheet @MonthlyDistributionId = @MonthlyDistributionId, @WeekNumber = @WeekNumber";
+
+    private const string WeeklyPackagingSheetSql =
+        "EXEC dbo.spgWeeklyPackagingSheet @MonthlyDistributionId = @MonthlyDistributionId";
+
+    private static DataTable PackagingGroupTable()
+    {
+        var table = new DataTable();
+        table.Columns.Add("fldGroupAddressId", typeof(Guid));
+        table.Columns.Add("fldParticipantId", typeof(Guid));
+        table.Columns.Add("fldIdentifier", typeof(string));
+        table.Columns.Add("fldLabCode", typeof(string));
+        table.Columns.Add("fldLabName", typeof(string));
+        table.Columns.Add("fldPackingInfo", typeof(string));
+        table.Columns.Add("fldDistributionDate", typeof(DateTime));
+        return table;
+    }
+
+    private static DataTable PackagingDayTable()
+    {
+        var table = new DataTable();
+        table.Columns.Add("fldDistributionDate", typeof(DateTime));
+        return table;
+    }
+
+    private static DataTable PackagingItemTable()
+    {
+        var table = new DataTable();
+        table.Columns.Add("fldMonthlyDistributionSchemeId", typeof(Guid));
+        table.Columns.Add("fldGroupAddressId", typeof(Guid));
+        table.Columns.Add("fldPreparationComplete", typeof(bool));
+        table.Columns.Add("fldName", typeof(string));
+        table.Columns.Add("fldIdentifier", typeof(string));
+        table.Columns.Add("fldDistributionReference", typeof(string));
+        table.Columns.Add("fldDistributionReferenceSuffix", typeof(string));
+        table.Columns.Add("fldScheduleCode", typeof(string));
+        table.Columns.Add("fldPackingInfo", typeof(string));
+        table.Columns.Add("fldNumberOfSetsRequired", typeof(int));
+        table.Columns.Add("fldDistributionDate", typeof(DateTime));
+        return table;
+    }
+
+    private static DataTable PackagingParticipantTable()
+    {
+        var table = new DataTable();
+        table.Columns.Add("fldGroupAddressId", typeof(Guid));
+        table.Columns.Add("fldMonthlyDistributionSchemeId", typeof(Guid));
+        table.Columns.Add("fldDistributionParticipantId", typeof(Guid));
+        table.Columns.Add("fldParticipantId", typeof(Guid));
+        table.Columns.Add("fldPackagedDate", typeof(DateTime));
+        table.Columns.Add("fldPostedDate", typeof(DateTime));
+        table.Columns.Add("fldLabCode", typeof(string));
+        table.Columns.Add("fldLabName", typeof(string));
+        table.Columns.Add("fldNumberOfSetsRequired", typeof(int));
+        table.Columns.Add("fldDistributionDate", typeof(DateTime));
+        return table;
+    }
+
+    private static DataTable PackagingSchemeItemTable()
+    {
+        var table = new DataTable();
+        table.Columns.Add("fldParticipantId", typeof(Guid));
+        table.Columns.Add("fldDistributionParticipantId", typeof(Guid));
+        table.Columns.Add("fldMonthlyDistributionSchemeId", typeof(Guid));
+        table.Columns.Add("fldPreparationComplete", typeof(bool));
+        table.Columns.Add("fldSchemeName", typeof(string));
+        table.Columns.Add("fldSchemeIdentifier", typeof(string));
+        table.Columns.Add("fldPackagedDate", typeof(DateTime));
+        table.Columns.Add("fldPostedDate", typeof(DateTime));
+        table.Columns.Add("fldDistributionDate", typeof(DateTime));
+        return table;
+    }
+
+    private static DataSet DataSetOf(params DataTable[] tables)
+    {
+        var dataSet = new DataSet();
+        foreach (var table in tables)
+        {
+            dataSet.Tables.Add(table);
+        }
+
+        return dataSet;
+    }
+
+    private static List<string> ParameterNames(FakeDbCommand command) =>
+        command.Parameters.Cast<System.Data.Common.DbParameter>().Select(p => p.ParameterName.TrimStart('@')).ToList();
+
+    [Fact]
+    public async Task GetPackagingSheetAsync_GroupAddress_ReadsHeaderGroupsItemsAndParticipantsInOrder()
+    {
+        var (repository, connection) = CreateRepository();
+        var monthlyDistributionId = Guid.NewGuid();
+        var groupId = Guid.NewGuid();
+        var schemeId = Guid.NewGuid();
+        var distributionParticipantId = Guid.NewGuid();
+        var participantId = Guid.NewGuid();
+
+        var header = PreparationHeaderTable();
+        header.Rows.Add(2026, 5);
+        var groups = PackagingGroupTable();
+        groups.Rows.Add(groupId, Guid.Empty, "G1", "", "", "Keep cool", new DateTime(2026, 5, 13));
+        var items = PackagingItemTable();
+        items.Rows.Add(schemeId, groupId, true, "Mastitis bovine", "PT0060", "17152", "A", "BA", "Scheme pack", 3, new DateTime(2026, 5, 13));
+        var participants = PackagingParticipantTable();
+        participants.Rows.Add(
+            groupId, schemeId, distributionParticipantId, participantId, new DateTime(2026, 5, 12), DBNull.Value, "L001", "Lab One", 3,
+            new DateTime(2026, 5, 13));
+        connection.RespondToQuery(GroupedPackagingSheetSql, DataSetOf(header, groups, items, participants));
+
+        var result = await repository.GetPackagingSheetAsync(monthlyDistributionId, PackagingMode.GroupAddress, 2);
+
+        Assert.NotNull(result);
+        Assert.Equal(2026, result.YearId);
+        Assert.Equal(5, result.MonthId);
+
+        var group = Assert.Single(result.Groups);
+        Assert.Equal(groupId, group.GroupAddressId);
+        Assert.Equal("G1", group.Identifier);
+        Assert.Equal("Keep cool", group.PackingInfo);
+        Assert.Equal(new DateTime(2026, 5, 13), group.DistributionDate);
+
+        var item = Assert.Single(result.Items);
+        Assert.Equal(schemeId, item.MonthlyDistributionSchemeId);
+        Assert.Equal(groupId, item.GroupAddressId);
+        Assert.True(item.PreparationComplete);
+        Assert.Equal("Mastitis bovine", item.SchemeName);
+        Assert.Equal("PT0060", item.SchemeIdentifier);
+        Assert.Equal(3, item.NumberOfSetsRequired);
+
+        var participant = Assert.Single(result.Participants);
+        Assert.Equal(distributionParticipantId, participant.DistributionParticipantId);
+        Assert.Equal(participantId, participant.ParticipantId);
+        Assert.Equal(new DateTime(2026, 5, 12), participant.PackagedDate);
+        Assert.Null(participant.PostedDate);
+        Assert.Equal("L001", participant.LabCode);
+
+        Assert.Empty(result.SchemeItems);
+    }
+
+    [Fact]
+    public async Task GetPackagingSheetAsync_GroupAddress_ExecutesTheGroupedProcedureWithMonthAndWeek()
+    {
+        var (repository, connection) = CreateRepository();
+        var monthlyDistributionId = Guid.NewGuid();
+        var header = PreparationHeaderTable();
+        header.Rows.Add(2026, 5);
+        connection.RespondToQuery(
+            GroupedPackagingSheetSql, DataSetOf(header, PackagingGroupTable(), PackagingItemTable(), PackagingParticipantTable()));
+
+        var result = await repository.GetPackagingSheetAsync(monthlyDistributionId, PackagingMode.GroupAddress, 3);
+
+        Assert.NotNull(result);
+        Assert.Empty(result.Groups);
+        Assert.Empty(result.Items);
+        Assert.Empty(result.Participants);
+        var command = Assert.Single(connection.ExecutedCommands);
+        Assert.Equal(GroupedPackagingSheetSql, command.CommandText);
+        Assert.Equal(monthlyDistributionId, command.ParameterValue("MonthlyDistributionId"));
+        Assert.Equal(3, command.ParameterValue("WeekNumber"));
+    }
+
+    [Fact]
+    public async Task GetPackagingSheetAsync_ParticipantCombined_ReadsParticipantsAsGroupsAndSchemeItems()
+    {
+        var (repository, connection) = CreateRepository();
+        var monthlyDistributionId = Guid.NewGuid();
+        var participantId = Guid.NewGuid();
+        var schemeId = Guid.NewGuid();
+        var distributionParticipantId = Guid.NewGuid();
+
+        var header = PreparationHeaderTable();
+        header.Rows.Add(2026, 5);
+        var groups = PackagingGroupTable();
+        groups.Rows.Add(Guid.Empty, participantId, "", "L001", "Lab One", "Pack 1", new DateTime(2026, 5, 13));
+        var schemeItems = PackagingSchemeItemTable();
+        schemeItems.Rows.Add(
+            participantId, distributionParticipantId, schemeId, true, "Mastitis bovine", "PT0060", DBNull.Value, DBNull.Value,
+            new DateTime(2026, 5, 13));
+        connection.RespondToQuery(PartGroupedPackagingSheetSql, DataSetOf(header, groups, schemeItems));
+
+        var result = await repository.GetPackagingSheetAsync(monthlyDistributionId, PackagingMode.ParticipantCombined, 1);
+
+        Assert.NotNull(result);
+        Assert.Equal(2026, result.YearId);
+        Assert.Equal(5, result.MonthId);
+        var participant = Assert.Single(result.Groups);
+        Assert.Equal(participantId, participant.ParticipantId);
+        Assert.Equal("L001", participant.LabCode);
+        Assert.Equal("Lab One", participant.LabName);
+        Assert.Equal("Pack 1", participant.PackingInfo);
+
+        var schemeItem = Assert.Single(result.SchemeItems);
+        Assert.Equal(distributionParticipantId, schemeItem.DistributionParticipantId);
+        Assert.Equal(schemeId, schemeItem.MonthlyDistributionSchemeId);
+        Assert.True(schemeItem.PreparationComplete);
+        Assert.Equal("Mastitis bovine", schemeItem.SchemeName);
+        Assert.Equal("PT0060", schemeItem.SchemeIdentifier);
+        Assert.Null(schemeItem.PackagedDate);
+        Assert.Null(schemeItem.PostedDate);
+
+        Assert.Empty(result.Items);
+        Assert.Empty(result.Participants);
+
+        var command = Assert.Single(connection.ExecutedCommands);
+        Assert.Equal(PartGroupedPackagingSheetSql, command.CommandText);
+        Assert.Equal(monthlyDistributionId, command.ParameterValue("MonthlyDistributionId"));
+        Assert.Equal(1, command.ParameterValue("WeekNumber"));
+    }
+
+    [Fact]
+    public async Task GetPackagingSheetAsync_Daily_ReadsDaysItemsAndParticipantsAndSendsNoWeek()
+    {
+        var (repository, connection) = CreateRepository();
+        var monthlyDistributionId = Guid.NewGuid();
+        var schemeId = Guid.NewGuid();
+        var distributionParticipantId = Guid.NewGuid();
+
+        var header = PreparationHeaderTable();
+        header.Rows.Add(2026, 5);
+        var days = PackagingDayTable();
+        days.Rows.Add(new DateTime(2026, 5, 13));
+        days.Rows.Add(new DateTime(2026, 5, 14));
+        var items = PackagingItemTable();
+        items.Rows.Add(schemeId, Guid.Empty, false, "Mastitis bovine", "PT0060", "17152", "A", "BA", "", 2, new DateTime(2026, 5, 13));
+        var participants = PackagingParticipantTable();
+        participants.Rows.Add(
+            Guid.Empty, schemeId, distributionParticipantId, Guid.NewGuid(), DBNull.Value, DBNull.Value, "L001", "Lab One", 2,
+            new DateTime(2026, 5, 13));
+        connection.RespondToQuery(WeeklyPackagingSheetSql, DataSetOf(header, days, items, participants));
+
+        var result = await repository.GetPackagingSheetAsync(monthlyDistributionId, PackagingMode.Daily, 4);
+
+        Assert.NotNull(result);
+        Assert.Equal(2026, result.YearId);
+        Assert.Equal(5, result.MonthId);
+        Assert.Equal(
+            [new DateTime(2026, 5, 13), new DateTime(2026, 5, 14)],
+            result.Groups.Select(g => g.DistributionDate));
+        var item = Assert.Single(result.Items);
+        Assert.Equal(schemeId, item.MonthlyDistributionSchemeId);
+        Assert.False(item.PreparationComplete);
+        Assert.Equal(2, item.NumberOfSetsRequired);
+        Assert.Equal(distributionParticipantId, Assert.Single(result.Participants).DistributionParticipantId);
+        Assert.Empty(result.SchemeItems);
+
+        var command = Assert.Single(connection.ExecutedCommands);
+        Assert.Equal(WeeklyPackagingSheetSql, command.CommandText);
+        Assert.Equal(monthlyDistributionId, command.ParameterValue("MonthlyDistributionId"));
+        Assert.DoesNotContain("WeekNumber", ParameterNames(command));
+    }
+
+    [Theory]
+    [InlineData(PackagingMode.GroupAddress, GroupedPackagingSheetSql)]
+    [InlineData(PackagingMode.ParticipantCombined, PartGroupedPackagingSheetSql)]
+    [InlineData(PackagingMode.Daily, WeeklyPackagingSheetSql)]
+    public async Task GetPackagingSheetAsync_HeaderMissing_ReturnsNull(PackagingMode mode, string sql)
+    {
+        var (repository, connection) = CreateRepository();
+        connection.RespondToQuery(
+            sql, DataSetOf(PreparationHeaderTable(), PackagingGroupTable(), PackagingItemTable(), PackagingParticipantTable()));
+
+        Assert.Null(await repository.GetPackagingSheetAsync(Guid.NewGuid(), mode, 1));
+    }
+
+    private const string UpdatePackingSql = """
+        EXEC dbo.spuDistributionParticipantPacking
+            @DistributionParticipantId = @DistributionParticipantId,
+            @PackagedDate = @PackagedDate,
+            @PostedDate = @PostedDate
+        """;
+
+    private const string InsertPostedEmailSql = """
+        EXEC dbo.spiDistributionPostedEmail
+            @DistributionPostedEmailId = @DistributionPostedEmailId,
+            @ParticipantId = @ParticipantId,
+            @MonthlyDistributionSchemeId = @MonthlyDistributionSchemeId,
+            @Email = @Email,
+            @Distribution = @Distribution,
+            @SchemeName = @SchemeName
+        """;
+
+    private static DistributionPostedEmailEntity PostedEmail(Guid? id = null, string email = "lab@example.org") =>
+        new()
+        {
+            DistributionPostedEmailId = id ?? Guid.NewGuid(),
+            ParticipantId = Guid.NewGuid(),
+            MonthlyDistributionSchemeId = Guid.NewGuid(),
+            Email = email,
+            Distribution = "17152A/BA",
+            SchemeName = "PT0060: Mastitis bovine",
+        };
+
+    [Fact]
+    public async Task UpdatePackagingAsync_WritesEveryProgressUpdateBeforeEveryEmailInOneCommittedTransaction()
+    {
+        var (repository, connection) = CreateRepository();
+        connection.RespondToNonQuery(UpdatePackingSql, 1);
+        connection.RespondToNonQuery(InsertPostedEmailSql, 1);
+        var first = new PackagingProgressUpdate(Guid.NewGuid(), new DateTime(2026, 5, 13), null);
+        var second = new PackagingProgressUpdate(Guid.NewGuid(), new DateTime(2026, 5, 13), new DateTime(2026, 5, 14));
+        var firstEmail = PostedEmail(email: "one@example.org");
+        var secondEmail = PostedEmail(email: "two@example.org");
+
+        await repository.UpdatePackagingAsync([first, second], [firstEmail, secondEmail]);
+
+        Assert.Equal(
+            [UpdatePackingSql, UpdatePackingSql, InsertPostedEmailSql, InsertPostedEmailSql],
+            connection.ExecutedCommands.Select(c => c.CommandText));
+        Assert.True(connection.LastTransaction!.Committed);
+        Assert.False(connection.LastTransaction.RolledBack);
+
+        var firstCommand = connection.ExecutedCommands[0];
+        Assert.Equal(first.DistributionParticipantId, firstCommand.ParameterValue("DistributionParticipantId"));
+        Assert.Equal(new DateTime(2026, 5, 13), firstCommand.ParameterValue("PackagedDate"));
+        Assert.Equal(DBNull.Value, firstCommand.ParameterValue("PostedDate"));
+        var secondCommand = connection.ExecutedCommands[1];
+        Assert.Equal(new DateTime(2026, 5, 14), secondCommand.ParameterValue("PostedDate"));
+
+        var emailCommand = connection.ExecutedCommands[2];
+        Assert.Equal(firstEmail.DistributionPostedEmailId, emailCommand.ParameterValue("DistributionPostedEmailId"));
+        Assert.Equal(firstEmail.ParticipantId, emailCommand.ParameterValue("ParticipantId"));
+        Assert.Equal(firstEmail.MonthlyDistributionSchemeId, emailCommand.ParameterValue("MonthlyDistributionSchemeId"));
+        Assert.Equal("one@example.org", emailCommand.ParameterValue("Email"));
+        Assert.Equal("17152A/BA", emailCommand.ParameterValue("Distribution"));
+        Assert.Equal("PT0060: Mastitis bovine", emailCommand.ParameterValue("SchemeName"));
+        Assert.Equal("two@example.org", connection.ExecutedCommands[3].ParameterValue("Email"));
+    }
+
+    [Fact]
+    public async Task UpdatePackagingAsync_ProgressOnly_WritesNoEmailRows()
+    {
+        var (repository, connection) = CreateRepository();
+        connection.RespondToNonQuery(UpdatePackingSql, 1);
+
+        await repository.UpdatePackagingAsync([new PackagingProgressUpdate(Guid.NewGuid(), new DateTime(2026, 5, 13), null)], []);
+
+        Assert.Equal(UpdatePackingSql, Assert.Single(connection.ExecutedCommands).CommandText);
+        Assert.True(connection.LastTransaction!.Committed);
+    }
+
+    [Fact]
+    public async Task UpdatePackagingAsync_EmailsOnly_WritesNoProgressRows()
+    {
+        var (repository, connection) = CreateRepository();
+        connection.RespondToNonQuery(InsertPostedEmailSql, 1);
+
+        await repository.UpdatePackagingAsync([], [PostedEmail()]);
+
+        Assert.Equal(InsertPostedEmailSql, Assert.Single(connection.ExecutedCommands).CommandText);
+        Assert.True(connection.LastTransaction!.Committed);
+    }
+
+    [Fact]
+    public async Task UpdatePackagingAsync_EmptyLists_ExecutesNothingButStillCommits()
+    {
+        var (repository, connection) = CreateRepository();
+
+        await repository.UpdatePackagingAsync([], []);
+
+        Assert.Empty(connection.ExecutedCommands);
+        Assert.True(connection.LastTransaction!.Committed);
+    }
+
+    [Fact]
+    public async Task GetUnsentDistributionPostedEmailsAsync_ReturnsMappedQueueRows()
+    {
+        var (repository, connection) = CreateRepository();
+        var emailId = Guid.NewGuid();
+        var participantId = Guid.NewGuid();
+        var schemeId = Guid.NewGuid();
+        var table = new DataTable();
+        table.Columns.Add("fldDistributionPostedEmailId", typeof(Guid));
+        table.Columns.Add("fldParticipantId", typeof(Guid));
+        table.Columns.Add("fldMonthlyDistributionSchemeId", typeof(Guid));
+        table.Columns.Add("fldEmail", typeof(string));
+        table.Columns.Add("fldDistribution", typeof(string));
+        table.Columns.Add("fldSchemeName", typeof(string));
+        table.Rows.Add(emailId, participantId, schemeId, "lab@example.org", "17152A/BA", "PT0060: Mastitis bovine");
+        connection.RespondToQuery("EXEC dbo.spgaDistributionPostedEmail", table);
+
+        var result = await repository.GetUnsentDistributionPostedEmailsAsync();
+
+        var email = Assert.Single(result);
+        Assert.Equal(emailId, email.DistributionPostedEmailId);
+        Assert.Equal(participantId, email.ParticipantId);
+        Assert.Equal(schemeId, email.MonthlyDistributionSchemeId);
+        Assert.Equal("lab@example.org", email.Email);
+        Assert.Equal("17152A/BA", email.Distribution);
+        Assert.Equal("PT0060: Mastitis bovine", email.SchemeName);
+    }
+
+    [Fact]
+    public async Task GetUnsentDistributionPostedEmailsAsync_NothingQueued_ReturnsEmpty()
+    {
+        var (repository, connection) = CreateRepository();
+        connection.RespondToQuery("EXEC dbo.spgaDistributionPostedEmail", new DataTable());
+
+        Assert.Empty(await repository.GetUnsentDistributionPostedEmailsAsync());
+    }
+
+    [Fact]
+    public async Task MarkDistributionPostedEmailSentAsync_ExecutesSpuDistributionPostedEmailWithTheSendDate()
+    {
+        var (repository, connection) = CreateRepository();
+        const string sql = "EXEC dbo.spuDistributionPostedEmail @DistributionPostedEmailId = @DistributionPostedEmailId, @DateSent = @DateSent";
+        connection.RespondToNonQuery(sql, 1);
+        var emailId = Guid.NewGuid();
+        var sent = new DateTime(2026, 5, 13, 10, 30, 0);
+
+        await repository.MarkDistributionPostedEmailSentAsync(emailId, sent);
+
+        var command = Assert.Single(connection.ExecutedCommands);
+        Assert.Equal(sql, command.CommandText);
+        Assert.Equal(emailId, command.ParameterValue("DistributionPostedEmailId"));
+        Assert.Equal(sent, command.ParameterValue("DateSent"));
+    }
+
+    private static DataTable LabelAddressTable()
+    {
+        var table = new DataTable();
+        table.Columns.Add("fldContactName", typeof(string));
+        table.Columns.Add("fldOrganisation", typeof(string));
+        table.Columns.Add("fldAddress1", typeof(string));
+        table.Columns.Add("fldAddress2", typeof(string));
+        table.Columns.Add("fldAddress3", typeof(string));
+        table.Columns.Add("fldAddress4", typeof(string));
+        table.Columns.Add("fldAddress5", typeof(string));
+        table.Columns.Add("fldCountry", typeof(string));
+        table.Columns.Add("fldTelephone", typeof(string));
+        return table;
+    }
+
+    private const string LabelParticipantAddressSql =
+        "EXEC dbo.spgLabelParticipantAddress @ParticipantId = @ParticipantId, @MonthlyDistributionSchemeId = @MonthlyDistributionSchemeId";
+
+    private const string LabelGroupAddressSql = "EXEC dbo.spgLabelGroupAddress @GroupAddressId = @GroupAddressId";
+
+    [Fact]
+    public async Task GetLabelParticipantAddressAsync_ReturnsTheMappedAddressForTheParticipantAndScheme()
+    {
+        var (repository, connection) = CreateRepository();
+        var participantId = Guid.NewGuid();
+        var schemeId = Guid.NewGuid();
+        var table = LabelAddressTable();
+        table.Rows.Add("A Contact", "An Org", "1 High St", "Town", "County", "Four", "Five", "UK", "0123");
+        connection.RespondToQuery(LabelParticipantAddressSql, table);
+
+        var result = await repository.GetLabelParticipantAddressAsync(participantId, schemeId);
+
+        Assert.NotNull(result);
+        Assert.Equal("A Contact", result.ContactName);
+        Assert.Equal("An Org", result.Organisation);
+        Assert.Equal("1 High St", result.Address1);
+        Assert.Equal("UK", result.Country);
+        Assert.Equal("0123", result.Telephone);
+        var command = Assert.Single(connection.ExecutedCommands);
+        Assert.Equal(participantId, command.ParameterValue("ParticipantId"));
+        Assert.Equal(schemeId, command.ParameterValue("MonthlyDistributionSchemeId"));
+    }
+
+    [Fact]
+    public async Task GetLabelParticipantAddressAsync_NoRow_ReturnsNull()
+    {
+        var (repository, connection) = CreateRepository();
+        connection.RespondToQuery(LabelParticipantAddressSql, LabelAddressTable());
+
+        Assert.Null(await repository.GetLabelParticipantAddressAsync(Guid.NewGuid(), Guid.Empty));
+    }
+
+    [Fact]
+    public async Task GetLabelGroupAddressAsync_ReturnsTheMappedAddressForTheGroup()
+    {
+        var (repository, connection) = CreateRepository();
+        var groupAddressId = Guid.NewGuid();
+        var table = LabelAddressTable();
+        table.Rows.Add(DBNull.Value, DBNull.Value, "2 Low Rd", "Village", DBNull.Value, DBNull.Value, DBNull.Value, "UK", "0456");
+        connection.RespondToQuery(LabelGroupAddressSql, table);
+
+        var result = await repository.GetLabelGroupAddressAsync(groupAddressId);
+
+        Assert.NotNull(result);
+        Assert.Equal(string.Empty, result.ContactName);
+        Assert.Equal("2 Low Rd", result.Address1);
+        Assert.Equal("Village", result.Address2);
+        Assert.Equal("0456", result.Telephone);
+        var command = Assert.Single(connection.ExecutedCommands);
+        Assert.Equal(groupAddressId, command.ParameterValue("GroupAddressId"));
+    }
+
+    [Fact]
+    public async Task GetLabelGroupAddressAsync_NoRow_ReturnsNull()
+    {
+        var (repository, connection) = CreateRepository();
+        connection.RespondToQuery(LabelGroupAddressSql, LabelAddressTable());
+
+        Assert.Null(await repository.GetLabelGroupAddressAsync(Guid.NewGuid()));
+    }
 }

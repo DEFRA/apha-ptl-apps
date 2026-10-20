@@ -6,6 +6,7 @@ using PTL.ApiClient;
 using PTL.Contracts.Lookup;
 using PTL.Contracts.Scheme;
 using PTL.Core.Scheme;
+using PTL.InternalWeb.Confirmation;
 using PTL.SharedUI.Notifications;
 using CoreScheme = PTL.Core.Scheme.Scheme;
 using SchemeStartDate = PTL.Core.Scheme.SchemeStartDate;
@@ -166,9 +167,14 @@ public class SchemeController(ISchemeApiClient schemeApiClient, ILookupApiClient
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Create(SchemeFormViewModel model, string? testCommand = null, Guid? selectedItemTypeId = null, CancellationToken cancellationToken = default)
+    public async Task<IActionResult> Create(SchemeFormViewModel model, string? testCommand = null, Guid? selectedItemTypeId = null, string? confirmation = null, CancellationToken cancellationToken = default)
     {
-        if (await TryHandleTestCommandAsync(model, testCommand, selectedItemTypeId, cancellationToken))
+        if (ConfirmRemoval(testCommand, confirmation) is { } confirmationPage)
+        {
+            return confirmationPage;
+        }
+
+        if (await TryHandleTestCommandAsync(model, testCommand, selectedItemTypeId, confirmation, cancellationToken))
         {
             return View(model);
         }
@@ -284,9 +290,14 @@ public class SchemeController(ISchemeApiClient schemeApiClient, ILookupApiClient
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Edit(Guid id, SchemeFormViewModel model, string? testCommand = null, Guid? selectedItemTypeId = null, CancellationToken cancellationToken = default)
+    public async Task<IActionResult> Edit(Guid id, SchemeFormViewModel model, string? testCommand = null, Guid? selectedItemTypeId = null, string? confirmation = null, CancellationToken cancellationToken = default)
     {
-        if (await TryHandleTestCommandAsync(model, testCommand, selectedItemTypeId, cancellationToken))
+        if (ConfirmRemoval(testCommand, confirmation) is { } confirmationPage)
+        {
+            return confirmationPage;
+        }
+
+        if (await TryHandleTestCommandAsync(model, testCommand, selectedItemTypeId, confirmation, cancellationToken))
         {
             return View(model);
         }
@@ -313,19 +324,57 @@ public class SchemeController(ISchemeApiClient schemeApiClient, ILookupApiClient
         return RedirectToAction(nameof(Details), new { id });
     }
 
+    // Removing a Test or Category asks first; Confirm and Cancel both post the unsaved form back, so a
+    // declined removal redisplays the form exactly as it was.
+    private ViewResult? ConfirmRemoval(string? testCommand, string? confirmation)
+    {
+        if (ConfirmationFlow.IsConfirmed(confirmation) || ConfirmationFlow.IsCancelled(confirmation) || testCommand is null)
+        {
+            return null;
+        }
+
+        string title;
+        string message;
+        if (testCommand.StartsWith("remove-test:", StringComparison.Ordinal))
+        {
+            (title, message) = ("Remove Test", "Are you sure you want to remove this Test?");
+        }
+        else if (testCommand.StartsWith("remove-category:", StringComparison.Ordinal))
+        {
+            (title, message) = ("Remove Category", "Are you sure you want to remove this Category?");
+        }
+        else
+        {
+            return null;
+        }
+
+        return this.ConfirmationPage(new ConfirmationPageViewModel
+        {
+            Title = title,
+            Message = message,
+            ConfirmText = "Remove",
+            IsDestructive = true,
+        });
+    }
+
     // Tests tab Add/Remove/Up/Down: mutate the staged tree and re-render without saving or
     // validating, mirroring legacy's ViewState-only behaviour. ModelState is cleared so the
     // re-rendered tree reflects the mutated model rather than the posted values.
     // The Tests tab always posts its hidden picker field, empty unless an Add button filled it,
     // so it has to be nullable or every Save fails to bind it.
-    private async Task<bool> TryHandleTestCommandAsync(SchemeFormViewModel model, string? testCommand, Guid? selectedItemTypeId, CancellationToken cancellationToken)
+    private async Task<bool> TryHandleTestCommandAsync(SchemeFormViewModel model, string? testCommand, Guid? selectedItemTypeId, string? confirmation, CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(testCommand))
+        var declined = ConfirmationFlow.IsCancelled(confirmation);
+        if (!declined && string.IsNullOrWhiteSpace(testCommand))
         {
             return false;
         }
 
-        SchemeTestCommands.TryApply(model, testCommand, selectedItemTypeId ?? Guid.Empty);
+        if (!declined)
+        {
+            SchemeTestCommands.TryApply(model, testCommand!, selectedItemTypeId ?? Guid.Empty);
+        }
+
         ModelState.Clear();
         model.Instructions = SchemeInstructions.Sanitise(model.Instructions);
         await PopulateFormAsync(model, cancellationToken);

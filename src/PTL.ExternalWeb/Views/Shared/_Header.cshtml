@@ -1,3 +1,4 @@
+@using PTL.Common.Auth
 @using PTL.ExternalWeb.Features.Account
 @model (string ServiceName, string? LogoStyle)
 <header class="govuk-template__header">
@@ -23,10 +24,10 @@
             </span>
             @if (User.Identity is not null && User.Identity.IsAuthenticated)
             {
-                // Identity.Name is a last-resort fallback - CIDM's id_token has no "name" claim
-                // without the "profile" scope, so it's usually empty for external users.
+                // CIDM's id_token has no "name" claim without the "profile" scope, so the resolved
+                // displayName claim leads and the shared id_token fallbacks follow.
                 var labCode = User.FindFirst(ExternalUserClaimTypes.LabCode)?.Value;
-                var friendlyName = User.FindFirst(ExternalUserClaimTypes.DisplayName)?.Value ?? User.Identity.Name;
+                var friendlyName = User.GetDisplayName(preferredClaimType: ExternalUserClaimTypes.DisplayName);
                 <nav aria-label="Account navigation" class="govuk-service-navigation__wrapper">
                     <ul class="govuk-service-navigation__list">
                         @if (!string.IsNullOrWhiteSpace(labCode))
@@ -35,9 +36,12 @@
                                 Lab Number: <strong>@labCode</strong>
                             </li>
                         }
-                        <li class="govuk-service-navigation__item">
-                            Signed in as <strong>@friendlyName</strong>
-                        </li>
+                        @if (!string.IsNullOrWhiteSpace(friendlyName))
+                        {
+                            <li class="govuk-service-navigation__item">
+                                Signed in as: <strong>@friendlyName</strong>
+                            </li>
+                        }
                         <li class="govuk-service-navigation__item">
                             <form asp-controller="Account" asp-action="Logout" method="post" class="app-signout-form">
                                 @Html.AntiForgeryToken()

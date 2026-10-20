@@ -1,10 +1,14 @@
+using PTL.Api.Tests.Audit;
+using PTL.Core.Audit;
 using PTL.Core.ExternalSiteMessage;
 
 namespace PTL.Api.Tests.ExternalSiteMessage;
 
 public class ExternalSiteMessageServiceTests
 {
-    private static ExternalSiteMessageService CreateService(FakeExternalSiteMessageRepository repository) => new(repository);
+    private static readonly FakeActingUserAccessor ActingUser = new() { ActingUserId = Guid.NewGuid() };
+
+    private static ExternalSiteMessageService CreateService(FakeExternalSiteMessageRepository repository) => new(repository, ActingUser);
 
     [Fact]
     public async Task GetAsync_ReturnsRepositoryValue()
@@ -31,6 +35,10 @@ public class ExternalSiteMessageServiceTests
         Assert.Equal("<p>Body</p>", result.Message);
         Assert.NotNull(repository.Updated);
         Assert.Equal("vetqas@apha.gov.uk", repository.Updated!.SupportEmailAddress);
+        var audit = Assert.IsType<AuditEntry>(repository.LastAuditEntry);
+        Assert.Equal("UpdateExternalSiteMessage", audit.Action);
+        Assert.Equal("ExternalSiteMessage", audit.EntityType);
+        Assert.Equal(ActingUser.ActingUserId, audit.ActingUserId);
     }
 
     [Fact]
@@ -44,6 +52,7 @@ public class ExternalSiteMessageServiceTests
 
         Assert.Contains(ex.Errors, e => e.Field == "ImportantMessage");
         Assert.Null(repository.Updated);
+        Assert.Null(repository.LastAuditEntry);
     }
 
     [Fact]

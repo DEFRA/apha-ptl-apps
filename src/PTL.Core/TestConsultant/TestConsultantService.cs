@@ -1,7 +1,14 @@
+using PTL.Core.Audit;
+
 namespace PTL.Core.TestConsultant;
 
-public sealed class TestConsultantService(ITestConsultantRepository repository, IExternalLoginService externalLoginService) : ITestConsultantService
+public sealed class TestConsultantService(ITestConsultantRepository repository, IExternalLoginService externalLoginService, IActingUserAccessor actingUser) : ITestConsultantService
 {
+    private const string EntityType = "ExternalTestConsultant";
+
+    private AuditEntry Audit(string action, Guid id, string? details) =>
+        new(actingUser.ActingUserId, action, EntityType, id.ToString(), details);
+
     public Task<IReadOnlyList<TestConsultant>> GetAllAsync(CancellationToken cancellationToken = default) =>
         repository.GetAllAsync(cancellationToken);
 
@@ -20,7 +27,7 @@ public sealed class TestConsultantService(ITestConsultantRepository repository, 
             InactiveDate = null
         };
 
-        await repository.CreateAsync(newConsultant, cancellationToken);
+        await repository.CreateAsync(newConsultant, Audit("CreateExternalTestConsultant", newConsultant.ExternalTestConsultantId, $"Name: {newConsultant.Name}"), cancellationToken);
         return newConsultant;
     }
 
@@ -38,7 +45,7 @@ public sealed class TestConsultantService(ITestConsultantRepository repository, 
         existing.Department = department.Trim();
         existing.Email = email.Trim();
 
-        await repository.UpdateAsync(existing, cancellationToken);
+        await repository.UpdateAsync(existing, Audit("UpdateExternalTestConsultant", existing.ExternalTestConsultantId, $"Name: {existing.Name}"), cancellationToken);
         return existing;
     }
 
@@ -53,7 +60,7 @@ public sealed class TestConsultantService(ITestConsultantRepository repository, 
         existing.IsInactive = isInactive;
         existing.InactiveDate = isInactive ? DateTime.UtcNow : null;
 
-        await repository.UpdateAsync(existing, cancellationToken);
+        await repository.UpdateAsync(existing, Audit("SetExternalTestConsultantStatus", existing.ExternalTestConsultantId, $"Inactive: {isInactive}"), cancellationToken);
         return existing;
     }
 
@@ -72,7 +79,7 @@ public sealed class TestConsultantService(ITestConsultantRepository repository, 
         }
 
         existing.SsoId = Guid.NewGuid();
-        await repository.UpdateAsync(existing, cancellationToken);
+        await repository.UpdateAsync(existing, Audit("GenerateExternalTestConsultantLogin", existing.ExternalTestConsultantId, $"Name: {existing.Name}"), cancellationToken);
         return (true, null);
     }
 

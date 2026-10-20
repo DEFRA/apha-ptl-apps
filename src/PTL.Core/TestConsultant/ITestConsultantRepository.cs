@@ -1,3 +1,5 @@
+using PTL.Core.Audit;
+
 namespace PTL.Core.TestConsultant;
 
 public interface ITestConsultantRepository
@@ -11,6 +13,8 @@ public interface ITestConsultantRepository
     /// <summary>The External Test Consultant Management grid (spgaExtTestConsultants).</summary>
     Task<IReadOnlyList<TestConsultant>> GetAllAsync(CancellationToken cancellationToken = default);
 
-    Task<TestConsultant> CreateAsync(TestConsultant testConsultant, CancellationToken cancellationToken = default);
-    Task<TestConsultant?> UpdateAsync(TestConsultant testConsultant, CancellationToken cancellationToken = default);
+    // A non-null auditEntry is written in the same transaction as the change (System Administration
+    // changes); null is for system-initiated updates such as the SSO link at external sign-in.
+    Task<TestConsultant> CreateAsync(TestConsultant testConsultant, AuditEntry? auditEntry = null, CancellationToken cancellationToken = default);
+    Task<TestConsultant?> UpdateAsync(TestConsultant testConsultant, AuditEntry? auditEntry = null, CancellationToken cancellationToken = default);
 }

@@ -1,7 +1,11 @@
+using PTL.Core.Audit;
+
 namespace PTL.Core.User;
 
-public sealed class UserService(IUserRepository userRepository, IStaffDirectoryService staffDirectoryService) : IUserService
+public sealed class UserService(IUserRepository userRepository, IStaffDirectoryService staffDirectoryService, IActingUserAccessor actingUser) : IUserService
 {
+    private const string UserEntityType = "User";
+
     public Task<IReadOnlyList<User>> GetAllAsync(CancellationToken cancellationToken = default) =>
         userRepository.GetAllAsync(cancellationToken);
 
@@ -15,17 +19,17 @@ public sealed class UserService(IUserRepository userRepository, IStaffDirectoryS
         return candidates.Where(c => !existingUsernames.Contains(c.Username)).ToList();
     }
 
-    public async Task<User> CreateUserAsync(string username, string email, string friendlyName, string firstName, string lastName, string department, CancellationToken cancellationToken = default)
+    public async Task<User> CreateUserAsync(NewUserDetails details, Guid? actingUserId = null, CancellationToken cancellationToken = default)
     {
-        var deptValue = department.Trim();
-        var validation = UserValidator.Validate(email, deptValue);
+        var deptValue = details.Department.Trim();
+        var validation = UserValidator.Validate(details.Email, deptValue);
         if (!validation.IsValid)
         {
             throw new UserValidationException(validation.Errors);
         }
 
         var existing = await userRepository.GetAllAsync(cancellationToken);
-        if (existing.Any(u => string.Equals(u.Username, username, StringComparison.OrdinalIgnoreCase)))
+        if (existing.Any(u => string.Equals(u.Username, details.Username, StringComparison.OrdinalIgnoreCase)))
         {
             throw new UserValidationException([new UserValidationError(string.Empty, UserValidator.DuplicateMessage)]);
         }
@@ -33,23 +37,29 @@ public sealed class UserService(IUserRepository userRepository, IStaffDirectoryS
         var newUser = new User
         {
             UserId = Guid.NewGuid(),
-            Username = username,
-            Email = email,
-            FriendlyName = friendlyName,
-            FirstName = firstName,
-            LastName = lastName,
+            Username = details.Username,
+            Email = details.Email,
+            FriendlyName = details.FriendlyName,
+            FirstName = details.FirstName,
+            LastName = details.LastName,
             Department = deptValue,
             IsInactive = false,
             InactiveDate = null
         };
 
-        await userRepository.CreateAsync(newUser, cancellationToken);
+        // Audited in the SAME transaction as the insert - if the audit write fails, the account
+        // itself is never persisted either (see IUserRepository.CreateWithAuditAsync remarks).
+        var auditEntry = new AuditEntry(actingUserId, "CreateUser", UserEntityType, newUser.UserId.ToString(), $"Username: {details.Username}");
+        await userRepository.CreateWithAuditAsync(newUser, auditEntry, cancellationToken);
         return newUser;
     }
 
     public Task<IReadOnlyList<User>> GetTestConsultantsAsync(CancellationToken cancellationToken = default) =>
         userRepository.GetTestConsultantsAsync(cancellationToken);
 
-    public Task UpdateTestConsultantAsync(Guid userId, string department, bool isInactive, DateTime? inactiveDate, CancellationToken cancellationToken = default) =>
-        userRepository.UpdateDepartmentAsync(userId, department, isInactive, inactiveDate, cancellationToken);
+    public async Task UpdateTestConsultantAsync(Guid userId, string department, bool isInactive, DateTime? inactiveDate, CancellationToken cancellationToken = default)
+    {
+        var auditEntry = new AuditEntry(actingUser.ActingUserId, "UpdateInternalTestConsultant", UserEntityType, userId.ToString(), $"Department: {department}; Inactive: {isInactive}");
+        await userRepository.UpdateDepartmentAsync(userId, department, isInactive, inactiveDate, auditEntry, cancellationToken);
+    }
 }

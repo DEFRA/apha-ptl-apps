@@ -10,20 +10,33 @@ namespace PTL.Api.Tests.Distribution;
 
 public class DistributionControllerTests
 {
-    private static DistributionController CreateController(FakeDistributionRepository repository, FakeSchemeService? schemeService = null) =>
+    private static DistributionController CreateController(
+        FakeDistributionRepository repository,
+        FakeSchemeService? schemeService = null,
+        IPackagingService? packagingService = null,
+        IPackagingOutputService? packagingOutputService = null) =>
         new(
             new DistributionService(repository),
             new SampleNumbersService(repository, schemeService ?? new FakeSchemeService()),
             new IntendedResultsService(repository),
             new DistributionParticipantsService(repository),
             new PreparationService(repository),
+            new ResultsReceiptService(repository, TimeProvider.System),
+            new TabulationsService(repository, TimeProvider.System),
+            new ActualResultsService(repository, TimeProvider.System),
+            packagingService ?? new FakePackagingService(),
+            packagingOutputService ?? new FakePackagingOutputService(),
             Microsoft.Extensions.Logging.Abstractions.NullLogger<DistributionController>.Instance);
 
     // ValidationProblem() resolves ProblemDetailsFactory from HttpContext.RequestServices,
     // which a bare controller instance does not have without this wiring.
-    private static DistributionController CreateControllerWithProblemDetails(FakeDistributionRepository repository, FakeSchemeService? schemeService = null)
+    private static DistributionController CreateControllerWithProblemDetails(
+        FakeDistributionRepository repository,
+        FakeSchemeService? schemeService = null,
+        IPackagingService? packagingService = null,
+        IPackagingOutputService? packagingOutputService = null)
     {
-        var controller = CreateController(repository, schemeService);
+        var controller = CreateController(repository, schemeService, packagingService, packagingOutputService);
         var services = new ServiceCollection().AddMvc().Services.BuildServiceProvider();
         controller.ControllerContext = new ControllerContext
         {

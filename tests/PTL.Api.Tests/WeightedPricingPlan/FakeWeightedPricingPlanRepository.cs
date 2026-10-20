@@ -1,3 +1,4 @@
+using PTL.Core.Audit;
 using PTL.Core.Lookup;
 using PTL.Core.WeightedPricingPlan;
 
@@ -18,8 +19,11 @@ internal sealed class FakeWeightedPricingPlanRepository : IWeightedPricingPlanRe
     public Task<IReadOnlyList<PricingPercentageEntity>> GetPercentagesForYearAsync(int yearId, CancellationToken cancellationToken = default) =>
         Task.FromResult(PercentagesByYear.GetValueOrDefault(yearId, []));
 
-    public Task RenewAsync(int newYearId, CancellationToken cancellationToken = default)
+    public AuditEntry? LastAuditEntry { get; private set; }
+
+    public Task RenewAsync(int newYearId, AuditEntry? auditEntry = null, CancellationToken cancellationToken = default)
     {
+        LastAuditEntry = auditEntry;
         RenewedYearIds.Add(newYearId);
         YearsWithPercentages = [.. YearsWithPercentages, new YearEntity { YearId = newYearId, Year = $"{newYearId}/{(newYearId + 1) % 100:00}" }];
         return Task.CompletedTask;

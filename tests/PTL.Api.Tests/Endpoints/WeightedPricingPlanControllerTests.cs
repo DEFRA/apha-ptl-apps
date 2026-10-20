@@ -9,7 +9,7 @@ namespace PTL.Api.Tests.Endpoints;
 public class WeightedPricingPlanControllerTests
 {
     private static WeightedPricingPlanController CreateController(FakeWeightedPricingPlanRepository repository, FakeLookupServiceForWeightedPricingPlan? lookupService = null) =>
-        new(new WeightedPricingPlanService(repository, lookupService ?? new FakeLookupServiceForWeightedPricingPlan()));
+        new(new WeightedPricingPlanService(repository, lookupService ?? new FakeLookupServiceForWeightedPricingPlan(), new PTL.Api.Tests.Audit.FakeActingUserAccessor()));
 
     [Fact]
     public async Task GetYears_ReturnsMappedYearsAndRenewEligibility()

@@ -85,7 +85,7 @@ public class ParticipantApiClientTests
         const string json = """{"items":[],"totalCount":0,"page":1,"pageSize":20}""";
         var client = CreateClient(HttpStatusCode.OK, json);
 
-        var result = await client.SearchParticipantsAsync(new ParticipantSearchRequest(Guid.NewGuid(), "test", false, 1, 20));
+        var result = await client.SearchParticipantsAsync(new ParticipantSearchRequest(Guid.NewGuid(), false, 1, 20));
 
         Assert.Empty(result.Items);
         Assert.Equal(0, result.TotalCount);
@@ -98,7 +98,7 @@ public class ParticipantApiClientTests
         const string json = """{"items":[{"participantId":"22222222-2222-2222-2222-222222222222","labCode":"LAB001","labName":"Lab 1","isActive":true}],"totalCount":1,"page":1,"pageSize":20}""";
         var client = CreateClient(HttpStatusCode.OK, json);
 
-        var result = await client.SearchParticipantsAsync(new ParticipantSearchRequest(Guid.NewGuid(), "test", false, 1, 20));
+        var result = await client.SearchParticipantsAsync(new ParticipantSearchRequest(Guid.NewGuid(), false, 1, 20));
 
         Assert.Single(result.Items);
         Assert.Equal(1, result.TotalCount);
@@ -109,7 +109,7 @@ public class ParticipantApiClientTests
     {
         var client = CreateClient(HttpStatusCode.OK, "null");
 
-        var result = await client.SearchParticipantsAsync(new ParticipantSearchRequest(Guid.NewGuid(), "test", false, 2, 50));
+        var result = await client.SearchParticipantsAsync(new ParticipantSearchRequest(Guid.NewGuid(), false, 2, 50));
 
         Assert.Empty(result.Items);
         Assert.Equal(0, result.TotalCount);
@@ -118,7 +118,7 @@ public class ParticipantApiClientTests
     }
 
     [Fact]
-    public async Task SearchParticipantsAsync_WithNullSearchTerm_ReturnsDeserializedSearchResponse()
+    public async Task SearchParticipantsAsync_DefaultRequest_ReturnsDeserializedSearchResponse()
     {
         const string json = """{"items":[],"totalCount":0,"page":1,"pageSize":20}""";
         var client = CreateClient(HttpStatusCode.OK, json);
@@ -126,6 +126,22 @@ public class ParticipantApiClientTests
         var result = await client.SearchParticipantsAsync(new ParticipantSearchRequest(Guid.NewGuid()));
 
         Assert.Empty(result.Items);
+    }
+
+    [Fact]
+    public async Task SearchParticipantsAsync_SendsIncludeInactivePageAndPageSizeOnly_WithNoSearchTerm()
+    {
+        var customerId = Guid.NewGuid();
+        var handler = new StubHttpMessageHandler(HttpStatusCode.OK, """{"items":[],"totalCount":0,"page":3,"pageSize":10}""");
+        Uri? requestUri = null;
+        handler.OnRequest = request => requestUri = request.RequestUri;
+        var client = new ParticipantApiClient(new HttpClient(handler) { BaseAddress = new Uri("http://localhost") });
+
+        await client.SearchParticipantsAsync(new ParticipantSearchRequest(customerId, true, 3, 10));
+
+        Assert.Equal($"/api/customers/{customerId}/participants/search", requestUri!.AbsolutePath);
+        Assert.Equal("?includeInactive=True&page=3&pageSize=10", requestUri.Query);
+        Assert.DoesNotContain("searchTerm", requestUri.Query, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
