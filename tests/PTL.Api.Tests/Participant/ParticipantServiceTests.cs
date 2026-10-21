@@ -15,6 +15,7 @@ public class ParticipantServiceTests
         new(
             repository,
             pendingRepository ?? new FakePendingParticipantUpdateRepository(),
+            new PTL.Api.Tests.Notifications.FakeParticipantUpdateNotifier(),
             participantViewerRepository ?? new FakeParticipantViewerRepository(),
             viewerRepository ?? new FakeViewerRepository(),
             NullLogger<ParticipantService>.Instance);

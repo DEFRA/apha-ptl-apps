@@ -1,6 +1,8 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Hosting;
 using PTL.ApiClient;
+using PTL.InternalWeb.Authorization;
 using PTL.InternalWeb.Confirmation;
 using PTL.SharedUI.Notifications;
 
@@ -8,8 +10,9 @@ namespace PTL.InternalWeb.Features.Invoice;
 
 // Invoice Generation is its own domain (docs/migration/invoice-migration.md "Controller Ownership") -
 // a batch-processing workflow with its own audit/CSV/notification concerns, deliberately not merged
-// into ContractController. Authentication/authorization are out of scope for this phase, consistent
-// with every other InternalWeb controller.
+// into ContractController. Legacy requires both the Contracts Admin folder role and the "Generate
+// Invoices" role (PtlPolicies.InvoiceGeneration) for every action.
+[Authorize(Policy = PtlPolicies.InvoiceGeneration)]
 public class InvoiceController(
     IInvoiceApiClient invoiceApiClient,
     IHostEnvironment hostEnvironment,

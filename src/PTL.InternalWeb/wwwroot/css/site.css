@@ -119,6 +119,13 @@ body {
   display: inline;
 }
 
+/* Legacy .contractRemoved: a Non Fee Paying price, and a removed (or pending removal) item's participant and
+   price, are struck through in grey. GOV.UK secondary text colour keeps the contrast accessible. */
+.ptl-removed {
+  text-decoration: line-through;
+  color: var(--govuk-secondary-text-colour, #505a5f);
+}
+
 .ptl-link-button {
   background: none;
   border: none;
@@ -172,6 +179,9 @@ body {
    few of them. Scroll it horizontally instead of letting it overflow the layout; width:auto lets
    the columns keep their natural size rather than being squeezed by the container. */
 .ptl-table-scroll {
+  /* Positioned so the absolutely positioned .govuk-visually-hidden text inside the table is clipped with it
+     rather than extending the page's own scroll width. */
+  position: relative;
   overflow-x: auto;
   margin-bottom: 20px;
 }
@@ -355,4 +365,35 @@ span.app-side-navigation__link--disabled {
 .ptl-distribution-initialise-cell {
   text-align: center;
   vertical-align: middle;
+}
+
+/* Pending Order Details: 12 month columns plus licence, three prices and actions - scrolls in its own region
+   (.ptl-table-scroll) rather than overflowing the content column, so the cells are kept compact. */
+.ptl-pending-order-table .govuk-table__header,
+.ptl-pending-order-table .govuk-table__cell {
+  padding-right: 10px;
+}
+
+.ptl-pending-order-table .ptl-pending-order-month {
+  text-align: center;
+  padding-left: 4px;
+  padding-right: 4px;
+}
+
+.ptl-pending-order-table .ptl-pending-order-scheme {
+  white-space: nowrap;
+}
+
+/* A removed line is struck through, but its Add action must stay readable. */
+.ptl-inactive-row th.ptl-pending-order-scheme {
+  text-decoration: line-through;
+}
+
+.ptl-inactive-row td.ptl-no-strike {
+  text-decoration: none;
+}
+
+/* Long customer names and values wrap inside the container instead of pushing it wider. */
+.ptl-break-word {
+  overflow-wrap: anywhere;
 }

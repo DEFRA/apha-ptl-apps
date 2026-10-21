@@ -1,4 +1,5 @@
 using System.Globalization;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.Extensions.Logging;
@@ -6,6 +7,7 @@ using PTL.ApiClient;
 using PTL.Contracts.Lookup;
 using PTL.Contracts.Scheme;
 using PTL.Core.Scheme;
+using PTL.InternalWeb.Authorization;
 using PTL.InternalWeb.Confirmation;
 using PTL.SharedUI.Notifications;
 using CoreScheme = PTL.Core.Scheme.Scheme;
@@ -13,9 +15,8 @@ using SchemeStartDate = PTL.Core.Scheme.SchemeStartDate;
 
 namespace PTL.InternalWeb.Features.Scheme;
 
-// Authentication/authorization are out of scope for this phase - assume the current user is
-// already authenticated with full access to Scheme functionality. Policies will be added later
-// (see docs/migration/scheme-migration.md, "Authentication Mapping").
+// Legacy "Scheme Admin" folder - requires the Scheme Admin role (PtlPolicies.SchemeAdmin).
+[Authorize(Policy = PtlPolicies.SchemeAdmin)]
 public class SchemeController(ISchemeApiClient schemeApiClient, ILookupApiClient lookupApiClient, ILogger<SchemeController> logger) : Controller
 {
     private static readonly Action<ILogger, int, string?, int, int, Exception?> LogDisplayedSchemeListMessage =
@@ -179,6 +180,7 @@ public class SchemeController(ISchemeApiClient schemeApiClient, ILookupApiClient
             return View(model);
         }
 
+        ValidatePriceText(model);
         if (!ModelState.IsValid)
         {
             model.Instructions = SchemeInstructions.Sanitise(model.Instructions);
@@ -302,6 +304,7 @@ public class SchemeController(ISchemeApiClient schemeApiClient, ILookupApiClient
             return View(model);
         }
 
+        ValidatePriceText(model);
         if (!ModelState.IsValid)
         {
             model.Instructions = SchemeInstructions.Sanitise(model.Instructions);
@@ -523,6 +526,35 @@ public class SchemeController(ISchemeApiClient schemeApiClient, ILookupApiClient
     }
 
     private void AddErrors(IReadOnlyDictionary<string, string[]> fieldErrors) => this.AddFieldErrors(fieldErrors);
+
+    // Legacy ValidatorPriceRegEx accepted whole numbers or exactly two decimals, and its string CompareValidator
+    // (> "0") rejected only a bare "0" - so "0.0" is an invalid number while "0.00" is accepted.
+    private static readonly System.Text.RegularExpressions.Regex PriceFormat = new(
+        @"^(?:[0-9]*\.[0-9]{2}|[0-9]+)$",
+        System.Text.RegularExpressions.RegexOptions.CultureInvariant,
+        TimeSpan.FromSeconds(1));
+
+    private void ValidatePriceText(SchemeFormViewModel model)
+    {
+        for (var i = 0; i < model.Prices.Count; i++)
+        {
+            var key = $"Prices[{i}].Price";
+            var text = ModelState[key]?.AttemptedValue?.Trim();
+            if (string.IsNullOrEmpty(text) || ModelState[key]!.Errors.Count > 0)
+            {
+                continue;
+            }
+
+            if (!PriceFormat.IsMatch(text))
+            {
+                ModelState.AddModelError(key, SchemeCurrencyPriceViewModel.PriceInvalidNumber);
+            }
+            else if (text == "0")
+            {
+                ModelState.AddModelError(key, SchemeCurrencyPriceViewModel.PriceMustBePositive);
+            }
+        }
+    }
 
     // Legacy shows the year as a read-only textbox on every path - the entry point decides it and
     // the user never picks it (Scheme.aspx.vb SetYearTextBox). All years are searched, not just

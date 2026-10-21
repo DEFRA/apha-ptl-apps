@@ -12,13 +12,13 @@ public interface IContractApiClient
     Task<ContractSearchResponse> GetContractsForCustomerByYearAsync(Guid customerId, int yearId, CancellationToken cancellationToken = default);
     Task<ContractSaveResult> CreateContractAsync(Guid customerId, ContractRequest request, CancellationToken cancellationToken = default);
     Task<ContractSaveResult> UpdateContractAsync(Guid contractId, ContractRequest request, CancellationToken cancellationToken = default);
-    Task<ContractItemsResponse?> GetContractItemsAsync(Guid contractId, CancellationToken cancellationToken = default);
-    Task<ContractItemRemovalResult> RemoveContractItemAsync(Guid contractId, Guid participantSchemeId, CancellationToken cancellationToken = default);
+    Task<ContractItemsResponse?> GetContractItemsAsync(Guid contractId, IReadOnlyCollection<Guid>? pendingRemovalIds = null, CancellationToken cancellationToken = default);
+    Task<ContractItemRemovalResult> RemoveContractItemAsync(Guid contractId, Guid participantSchemeId, string? auditWhy = null, CancellationToken cancellationToken = default);
     Task<PendingOrderListResponse> GetPendingOrdersAsync(CancellationToken cancellationToken = default);
     Task<PendingOrderDetailsResponse?> GetPendingOrderAsync(Guid pendingContractId, CancellationToken cancellationToken = default);
     Task<bool> UpdatePendingOrderSchemeAsync(Guid pendingContractId, Guid pendingParticipantSchemeId, PendingOrderSchemeUpdateRequest request, CancellationToken cancellationToken = default);
     Task<PendingOrderDecisionResult> ApprovePendingOrderAsync(Guid pendingContractId, PendingOrderApproveRequest request, CancellationToken cancellationToken = default);
-    Task<bool> DeclinePendingOrderAsync(Guid pendingContractId, CancellationToken cancellationToken = default);
+    Task<PendingOrderDecisionResult> DeclinePendingOrderAsync(Guid pendingContractId, PendingOrderDeclineRequest request, CancellationToken cancellationToken = default);
 }
 
 // Thin typed HttpClient wrapper around PTL.Api's contract endpoints, shared by every web
@@ -50,9 +50,15 @@ public sealed class ContractApiClient(HttpClient httpClient) : IContractApiClien
         return response.IsSuccessStatusCode;
     }
 
-    public async Task<PendingOrderDecisionResult> ApprovePendingOrderAsync(Guid pendingContractId, PendingOrderApproveRequest request, CancellationToken cancellationToken = default)
+    public async Task<PendingOrderDecisionResult> ApprovePendingOrderAsync(Guid pendingContractId, PendingOrderApproveRequest request, CancellationToken cancellationToken = default) =>
+        await PostPendingOrderDecisionAsync($"/api/contracts/pending-orders/{pendingContractId}/approve", request, cancellationToken);
+
+    public async Task<PendingOrderDecisionResult> DeclinePendingOrderAsync(Guid pendingContractId, PendingOrderDeclineRequest request, CancellationToken cancellationToken = default) =>
+        await PostPendingOrderDecisionAsync($"/api/contracts/pending-orders/{pendingContractId}/decline", request, cancellationToken);
+
+    private async Task<PendingOrderDecisionResult> PostPendingOrderDecisionAsync<TRequest>(string url, TRequest request, CancellationToken cancellationToken)
     {
-        var response = await httpClient.PostAsJsonAsync($"/api/contracts/pending-orders/{pendingContractId}/approve", request, cancellationToken);
+        var response = await httpClient.PostAsJsonAsync(url, request, cancellationToken);
         if (response.StatusCode == HttpStatusCode.NotFound)
         {
             return new PendingOrderDecisionResult(false, true, new Dictionary<string, string[]>());
@@ -69,12 +75,6 @@ public sealed class ContractApiClient(HttpClient httpClient) : IContractApiClien
 
         response.EnsureSuccessStatusCode();
         return new PendingOrderDecisionResult(true, false, new Dictionary<string, string[]>());
-    }
-
-    public async Task<bool> DeclinePendingOrderAsync(Guid pendingContractId, CancellationToken cancellationToken = default)
-    {
-        var response = await httpClient.PostAsync($"/api/contracts/pending-orders/{pendingContractId}/decline", content: null, cancellationToken);
-        return response.IsSuccessStatusCode;
     }
 
     public async Task<ContractResponse?> GetContractAsync(Guid contractId, CancellationToken cancellationToken = default)
@@ -137,9 +137,10 @@ public sealed class ContractApiClient(HttpClient httpClient) : IContractApiClien
         return new ContractSaveResult(true, contract, new Dictionary<string, string[]>());
     }
 
-    public async Task<ContractItemsResponse?> GetContractItemsAsync(Guid contractId, CancellationToken cancellationToken = default)
+    public async Task<ContractItemsResponse?> GetContractItemsAsync(Guid contractId, IReadOnlyCollection<Guid>? pendingRemovalIds = null, CancellationToken cancellationToken = default)
     {
-        var response = await httpClient.GetAsync($"/api/contracts/{contractId}/items", cancellationToken);
+        var query = pendingRemovalIds is { Count: > 0 } ? "?" + string.Join('&', pendingRemovalIds.Select(id => $"pending={id}")) : string.Empty;
+        var response = await httpClient.GetAsync($"/api/contracts/{contractId}/items{query}", cancellationToken);
         if (response.StatusCode == HttpStatusCode.NotFound)
         {
             return null;
@@ -149,9 +150,16 @@ public sealed class ContractApiClient(HttpClient httpClient) : IContractApiClien
         return await response.Content.ReadFromJsonAsync<ContractItemsResponse>(cancellationToken);
     }
 
-    public async Task<ContractItemRemovalResult> RemoveContractItemAsync(Guid contractId, Guid participantSchemeId, CancellationToken cancellationToken = default)
+    public async Task<ContractItemRemovalResult> RemoveContractItemAsync(Guid contractId, Guid participantSchemeId, string? auditWhy = null, CancellationToken cancellationToken = default)
     {
-        var response = await httpClient.DeleteAsync($"/api/contracts/{contractId}/items/{participantSchemeId}", cancellationToken);
+        // An id that is not a well-formed, non-empty GUID cannot name an item, so no request is made for it.
+        if (!TryGetRouteSegment(contractId, out var contractSegment) || !TryGetRouteSegment(participantSchemeId, out var itemSegment))
+        {
+            return new ContractItemRemovalResult(false, true, "This contract item was not found.");
+        }
+
+        var query = string.IsNullOrWhiteSpace(auditWhy) ? string.Empty : $"?auditWhy={Uri.EscapeDataString(auditWhy)}";
+        var response = await httpClient.DeleteAsync($"/api/contracts/{contractSegment}/items/{itemSegment}{query}", cancellationToken);
         if (response.StatusCode == HttpStatusCode.NotFound)
         {
             return new ContractItemRemovalResult(false, true, "This contract item was not found.");
@@ -166,5 +174,19 @@ public sealed class ContractApiClient(HttpClient httpClient) : IContractApiClien
 
         response.EnsureSuccessStatusCode();
         return new ContractItemRemovalResult(true, false, null);
+    }
+
+    // Canonical "D" form of a non-empty GUID, escaped as a single path segment, so nothing but hex digits and hyphens
+    // (never "/", ".." or "?") can reach the request path.
+    private static bool TryGetRouteSegment(Guid id, out string segment)
+    {
+        segment = string.Empty;
+        if (id == Guid.Empty || !Guid.TryParseExact(id.ToString("D"), "D", out var parsed))
+        {
+            return false;
+        }
+
+        segment = Uri.EscapeDataString(parsed.ToString("D"));
+        return true;
     }
 }

@@ -1,16 +1,26 @@
 @model PTL.InternalWeb.Features.Participant.PendingParticipantUpdateListViewModel
+@using PTL.SharedUI.Pagination
 @{
     ViewData["Title"] = "Review Pending Participant Updates";
+    var pagination = new PaginationModel
+    {
+        CurrentPage = Model.Page,
+        PageSize = Model.PageSize,
+        TotalRecords = Model.TotalCount,
+        Action = "ReviewPendingParticipantUpdates"
+    };
 }
 
 <h1 class="govuk-heading-l">Review Pending Participant Updates</h1>
 
-@if (Model.Updates.Count == 0)
+@if (Model.TotalCount == 0)
 {
-    <p class="govuk-body">There are no pending participant updates to review.</p>
+    <p class="govuk-body">There are no pending participants to display.</p>
 }
 else
 {
+    <govuk-page-size-selector model="pagination" />
+
     <table class="govuk-table">
         <thead class="govuk-table__head">
             <tr class="govuk-table__row">
@@ -32,4 +42,6 @@ else
             }
         </tbody>
     </table>
+
+    <govuk-pagination model="pagination" />
 }

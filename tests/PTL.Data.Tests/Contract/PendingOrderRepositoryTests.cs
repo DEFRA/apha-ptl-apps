@@ -258,4 +258,87 @@ public class PendingOrderRepositoryTests
         Assert.Equal(false, (bool?)command.ParameterValue("IsRemoved"));
         Assert.Equal(true, (bool?)command.ParameterValue("DataConsentDeclarationGiven"));
     }
+
+    [Fact]
+    public async Task QueueNotificationAsync_InsertsOneEmailRowBoundByName()
+    {
+        const string queueSql = "EXEC dbo.spiOnlineContractOrderEmail @fldOnlineContractOrderEmailId = @Id, @fldEmail = @Email, @fldContractId = @ContractId, @fldPendingContractId = @PendingContractId, @fldCustomerName = @CustomerName, @fldYearId = @YearId, @fldNotes = @Notes, @IsApproved = @IsApproved";
+        var (repository, connection) = CreateRepository();
+        var contractId = Guid.NewGuid();
+        var pendingContractId = Guid.NewGuid();
+        connection.RespondToNonQuery(queueSql, -1);
+
+        await repository.QueueNotificationAsync(new PendingOrderNotification("a@example.com", contractId, pendingContractId, 2026, "Sample Labs", "Welcome", IsApproved: true));
+
+        var command = Assert.Single(connection.ExecutedCommands);
+        Assert.Equal(queueSql, command.CommandText);
+        Assert.NotEqual(Guid.Empty, (Guid?)command.ParameterValue("Id"));
+        Assert.Equal("a@example.com", (string?)command.ParameterValue("Email"));
+        Assert.Equal(contractId, (Guid?)command.ParameterValue("ContractId"));
+        Assert.Equal(pendingContractId, (Guid?)command.ParameterValue("PendingContractId"));
+        Assert.Equal("Sample Labs", (string?)command.ParameterValue("CustomerName"));
+        Assert.Equal(2026, (int?)command.ParameterValue("YearId"));
+        Assert.Equal("Welcome", (string?)command.ParameterValue("Notes"));
+        Assert.Equal(true, (bool?)command.ParameterValue("IsApproved"));
+    }
+
+    // spgaOnlineContractOrderEmail joins every active participant, so one queued email can come back several times.
+    [Fact]
+    public async Task GetUnsentNotificationsAsync_MapsRowsAndReturnsEachEmailOnce()
+    {
+        var (repository, connection) = CreateRepository();
+        var table = new DataTable();
+        table.Columns.Add("fldOnlineContractOrderEmailId", typeof(Guid));
+        table.Columns.Add("fldEmail", typeof(string));
+        table.Columns.Add("fldContractId", typeof(Guid));
+        table.Columns.Add("fldPendingContractId", typeof(Guid));
+        table.Columns.Add("fldCustomerName", typeof(string));
+        table.Columns.Add("fldYearId", typeof(int));
+        table.Columns.Add("fldNotes", typeof(string));
+        table.Columns.Add("fldDateSent", typeof(DateTime));
+        table.Columns.Add("fldIsApproved", typeof(bool));
+        table.Columns.Add("fldCustomerId", typeof(Guid));
+        table.Columns.Add("fldQalNumber", typeof(string));
+        table.Columns.Add("fldLabCode", typeof(string));
+        var id = Guid.NewGuid();
+        var contractId = Guid.NewGuid();
+        var pendingContractId = Guid.NewGuid();
+        table.Rows.Add(id, "a@example.com", contractId, pendingContractId, "Sample Labs", 2026, "Welcome", DBNull.Value, true, Guid.NewGuid(), "QAL/0001", "001");
+        table.Rows.Add(id, "a@example.com", contractId, pendingContractId, "Sample Labs", 2026, "Welcome", DBNull.Value, true, Guid.NewGuid(), "QAL/0001", "002");
+        table.Rows.Add(Guid.NewGuid(), DBNull.Value, Guid.Empty, pendingContractId, "Sample Labs", 2026, "No", DBNull.Value, false, DBNull.Value, DBNull.Value, DBNull.Value);
+        connection.RespondToQuery("EXEC dbo.spgaOnlineContractOrderEmail", table);
+
+        var result = await repository.GetUnsentNotificationsAsync();
+
+        Assert.Equal(2, result.Count);
+        var approved = Assert.Single(result, r => r.Id == id);
+        Assert.Equal("a@example.com", approved.Email);
+        Assert.Equal(contractId, approved.ContractId);
+        Assert.Equal(pendingContractId, approved.PendingContractId);
+        Assert.Equal("Sample Labs", approved.CustomerName);
+        Assert.Equal(2026, approved.YearId);
+        Assert.Equal("Welcome", approved.Notes);
+        Assert.True(approved.IsApproved);
+        var declined = Assert.Single(result, r => r.Id != id);
+        Assert.Null(declined.Email);
+        Assert.False(declined.IsApproved);
+        Assert.Equal(Guid.Empty, declined.ContractId);
+    }
+
+    [Fact]
+    public async Task MarkNotificationSentAsync_StampsTheRowBoundByName()
+    {
+        const string markSql = "EXEC dbo.spuOnlineContractOrderEmail @fldOnlineContractOrderEmailId = @Id, @DateSent = @SentAt";
+        var (repository, connection) = CreateRepository();
+        var id = Guid.NewGuid();
+        var sentAt = new DateTime(2026, 10, 20, 9, 0, 0, DateTimeKind.Utc);
+        connection.RespondToNonQuery(markSql, -1);
+
+        await repository.MarkNotificationSentAsync(id, sentAt);
+
+        var command = Assert.Single(connection.ExecutedCommands);
+        Assert.Equal(markSql, command.CommandText);
+        Assert.Equal(id, (Guid?)command.ParameterValue("Id"));
+        Assert.Equal(sentAt, (DateTime?)command.ParameterValue("SentAt"));
+    }
 }

@@ -18,7 +18,7 @@ public partial class PackagingRenderTests : IClassFixture<WebApplicationFactory<
     [GeneratedRegex("__RequestVerificationToken[^>]*value=\"([^\"]+)\"", RegexOptions.None)]
     private static partial Regex AntiforgeryTokenPattern();
 
-    private const string PreparationIncomplete = "The preparation for this Scheme is not complete";
+    private const string PreparationIncomplete = "The preparation for this scheme is not complete";
     private const string BlurbText = "Select a packaging option and, if needed, a week. Then choose View to show the sample packaging list and any special packing instructions.";
     private const string BaseQuery = "year=2026&monthId=4";
 
@@ -140,7 +140,7 @@ public partial class PackagingRenderTests : IClassFixture<WebApplicationFactory<
     }
 
     private static List<string> Cells(string html, string cssClass) =>
-        [.. Regex.Matches(html, $"<td class=\"[^\"]*\\b{cssClass}\\b[^\"]*\"[^>]*>(.*?)</td>", RegexOptions.Singleline)
+        [.. Regex.Matches(html, $"<(?:td|th) (?:scope=\"[a-z]+\" )?class=\"[^\"]*\\b{cssClass}\\b[^\"]*\"[^>]*>(.*?)</(?:td|th)>", RegexOptions.Singleline)
             .Select(m => Text(m.Groups[1].Value))];
 
     private static List<(string Value, string Text, bool Selected)> Options(string html, string selectId)
@@ -156,20 +156,21 @@ public partial class PackagingRenderTests : IClassFixture<WebApplicationFactory<
 
     private static void AssertButtons(string html, bool customs)
     {
-        foreach (var (command, text) in new[] { ("select", "View"), ("save", "Save"), ("apply", "Apply"), ("cancel", "Cancel"), ("labels", "Print Labels") })
+        foreach (var (command, text) in new[] { ("select", "View"), ("save", "Save"), ("apply", "Apply"), ("labels", "Print labels") })
         {
             Assert.Matches($"<button[^>]*name=\"command\" value=\"{command}\"[^>]*>{text}</button>", html);
         }
 
         Assert.Matches("<button[^>]*id=\"packaging-print-button\"[^>]*>Print</button>", html);
+        Assert.Matches("<a class=\"govuk-link\" href=\"[^\"]*\">Cancel</a>", html);
 
         if (customs)
         {
-            Assert.Matches("<button[^>]*name=\"command\" value=\"customs\"[^>]*>Print Customs</button>", html);
+            Assert.Matches("<button[^>]*name=\"command\" value=\"customs\"[^>]*>Print customs</button>", html);
         }
         else
         {
-            Assert.DoesNotContain("Print Customs", html, StringComparison.Ordinal);
+            Assert.DoesNotContain("Print customs", html, StringComparison.Ordinal);
             Assert.DoesNotContain("value=\"customs\"", html, StringComparison.Ordinal);
         }
     }
@@ -183,11 +184,11 @@ public partial class PackagingRenderTests : IClassFixture<WebApplicationFactory<
 
         var html = await GetHtmlAsync(BaseQuery);
 
-        Assert.Contains("<title>Sample Packaging - April 2026", html, StringComparison.Ordinal);
-        Assert.Contains("Sample Packaging - April 2026</h1>", html, StringComparison.Ordinal);
+        Assert.Contains("<title>Sample packaging &#x2013; April 2026", html, StringComparison.Ordinal);
+        Assert.Contains("Sample packaging – April 2026</h1>", html, StringComparison.Ordinal);
 
         Assert.Equal(
-            [("", "- Please Select -", true), ("0", "Group Address Packaging", false), ("1", "Participant Combined Packaging", false), ("2", "Daily Packaging", false)],
+            [("", "Select", true), ("0", "Group address packaging", false), ("1", "Participant combined packaging", false), ("2", "Daily packaging", false)],
             Options(html, "packaging-mode"));
 
         Assert.Contains(BlurbText, html, StringComparison.Ordinal);
@@ -207,10 +208,10 @@ public partial class PackagingRenderTests : IClassFixture<WebApplicationFactory<
 
         var modes = Options(html, "packaging-mode");
         Assert.Equal(3, modes.Count);
-        Assert.Equal([("0", "Group Address Packaging", true), ("1", "Participant Combined Packaging", false), ("2", "Daily Packaging", false)], modes);
+        Assert.Equal([("0", "Group address packaging", true), ("1", "Participant combined packaging", false), ("2", "Daily packaging", false)], modes);
 
         Assert.Equal(
-            [("0", "- Please Select -", true), ("1", "Week 1", false), ("2", "Week 2", false), ("3", "Week 3", false), ("4", "Week 4", false)],
+            [("0", "Select", true), ("1", "Week 1", false), ("2", "Week 2", false), ("3", "Week 3", false), ("4", "Week 4", false)],
             Options(html, "packaging-week"));
 
         Assert.DoesNotContain("<table", html, StringComparison.Ordinal);
@@ -223,7 +224,7 @@ public partial class PackagingRenderTests : IClassFixture<WebApplicationFactory<
     {
         var html = await GetHtmlAsync($"{BaseQuery}&mode=1&week=0");
 
-        Assert.Equal(["Participant Combined Packaging"], Options(html, "packaging-mode").Where(o => o.Selected).Select(o => o.Text));
+        Assert.Equal(["Participant combined packaging"], Options(html, "packaging-mode").Where(o => o.Selected).Select(o => o.Text));
         Assert.Equal(5, Options(html, "packaging-week").Count);
         Assert.DoesNotContain("<table", html, StringComparison.Ordinal);
         AssertButtons(html, customs: false);
@@ -255,7 +256,7 @@ public partial class PackagingRenderTests : IClassFixture<WebApplicationFactory<
         var html = await GetHtmlAsync($"{BaseQuery}&mode=0&week=1");
 
         Assert.Equal(
-            ["Date", "Group Address", "Print", "Scheme", "Packed", "Posted", "Import Permit", "Packing Instructions"],
+            ["Date", "Group address", "Print", "Scheme", "Packed", "Posted", "Import permit", "Packing instructions"],
             Headers(html));
         Assert.Equal((2026, 4, 0, 1), Assert.Single(_apiClient.PackagingRequests));
 
@@ -278,7 +279,7 @@ public partial class PackagingRenderTests : IClassFixture<WebApplicationFactory<
         // Per-participant cells: a recorded date replaces the checkbox, an incomplete scheme shows neither.
         var stage = Cells(html, "cellWorkSheetComplete");
         Assert.Equal(6, stage.Count);
-        Assert.Equal("10/04/2026", stage[0]);
+        Assert.Equal("10 April 2026", stage[0]);
         Assert.Contains("Posted: Lab 1: Alpha, 17152A/BA PT0060: Mastitis bovine - 9 Sets", stage[1], StringComparison.Ordinal);
         Assert.Contains("Packed: Lab 2: Beta", stage[2], StringComparison.Ordinal);
         Assert.Equal(string.Empty, stage[4]);
@@ -294,7 +295,7 @@ public partial class PackagingRenderTests : IClassFixture<WebApplicationFactory<
         // Scheme totals: "Complete" text, an "All" checkbox, or nothing.
         var totals = Cells(html, "cellWorkSheetCompleteTotal");
         Assert.Equal("Complete", totals[0]);
-        Assert.Contains("All Posted: 17152A/BA PT0060: Mastitis bovine - 9 Sets", totals[1], StringComparison.Ordinal);
+        Assert.Contains("All posted: 17152A/BA PT0060: Mastitis bovine - 9 Sets", totals[1], StringComparison.Ordinal);
         Assert.Equal(string.Empty, totals[2]);
         Assert.Equal(string.Empty, totals[3]);
 
@@ -309,9 +310,9 @@ public partial class PackagingRenderTests : IClassFixture<WebApplicationFactory<
         Assert.Null(Attr(print, "checked"));
         Assert.Matches("Print Group A</span>", html);
 
-        Assert.DoesNotContain("All Packed:", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("All packed:", html, StringComparison.Ordinal);
         AssertButtons(html, customs: false);
-        Assert.Contains("<title>Sample Packaging - April 2026", html, StringComparison.Ordinal);
+        Assert.Contains("<title>Sample packaging &#x2013; April 2026", html, StringComparison.Ordinal);
         Assert.Contains("Sample Packaging - Week 1 - April 2026 - Group Packaging", html, StringComparison.Ordinal);
     }
 
@@ -324,12 +325,12 @@ public partial class PackagingRenderTests : IClassFixture<WebApplicationFactory<
         var html = await GetHtmlAsync($"{BaseQuery}&mode=0&week=2");
 
         var totals = Cells(html, "cellWorkSheetCompleteTotal");
-        Assert.Contains("All Packed: Scheme A", totals[0], StringComparison.Ordinal);
+        Assert.Contains("All packed: Scheme A", totals[0], StringComparison.Ordinal);
         Assert.Equal("Complete", totals[1]);
 
-        // The block-level "All Packed:/All Posted:" controls belong to Participant Combined only.
+        // The block-level "All packed:/All posted:" controls belong to Participant Combined only.
         Assert.DoesNotContain("<input class=\"govuk-checkboxes__input ptl-tick-block", html, StringComparison.Ordinal);
-        Assert.Equal(["10/04/2026", "11/04/2026"], Cells(html, "cellWorkSheetComplete"));
+        Assert.Equal(["10 April 2026", "11 April 2026"], Cells(html, "cellWorkSheetComplete"));
     }
 
     // ---- 4: Participant Combined --------------------------------------------------------------
@@ -350,17 +351,17 @@ public partial class PackagingRenderTests : IClassFixture<WebApplicationFactory<
         var html = await GetHtmlAsync($"{BaseQuery}&mode=1&week=2");
 
         Assert.Equal(
-            ["Date", "Participant", "Print", "Scheme", "Packed", "Posted", "Import Permit", "Packing Instructions"],
+            ["Date", "Participant", "Print", "Scheme", "Packed", "Posted", "Import permit", "Packing instructions"],
             Headers(html));
         Assert.Equal((2026, 4, 1, 2), Assert.Single(_apiClient.PackagingRequests));
 
         var groups = Cells(html, "cellWorkSheetGroup");
         Assert.Equal(6, groups.Count);
         Assert.Contains("LAB01: Lab One", groups[1], StringComparison.Ordinal);
-        Assert.Contains("All Packed:", groups[1], StringComparison.Ordinal);
-        Assert.Contains("All Posted:", groups[1], StringComparison.Ordinal);
-        Assert.Contains("All Packed:", groups[3], StringComparison.Ordinal);
-        Assert.DoesNotContain("All Posted:", groups[3], StringComparison.Ordinal);
+        Assert.Contains("All packed:", groups[1], StringComparison.Ordinal);
+        Assert.Contains("All posted:", groups[1], StringComparison.Ordinal);
+        Assert.Contains("All packed:", groups[3], StringComparison.Ordinal);
+        Assert.DoesNotContain("All posted:", groups[3], StringComparison.Ordinal);
         Assert.Equal("LAB03: Lab Three", groups[5]);
 
         var blockTicks = Regex.Matches(html, "<input[^>]*ptl-tick-block[^>]*>").Select(m => Attr(m.Value, "data-kind")).ToList();
@@ -379,8 +380,8 @@ public partial class PackagingRenderTests : IClassFixture<WebApplicationFactory<
 
         var totals = Cells(html, "cellWorkSheetCompleteTotal");
         Assert.Contains("Packed: LAB01: Lab One, S1 desc", totals[0], StringComparison.Ordinal);
-        Assert.Equal("11/04/2026", totals[1]);
-        Assert.Equal("12/04/2026", totals[2]);
+        Assert.Equal("11 April 2026", totals[1]);
+        Assert.Equal("12 April 2026", totals[2]);
         Assert.Contains("Posted: LAB01: Lab One, S2 desc", totals[3], StringComparison.Ordinal);
 
         Assert.Equal("Permit OK", Cells(html, "cellWorkSheetImportPermit")[0]);
@@ -406,7 +407,7 @@ public partial class PackagingRenderTests : IClassFixture<WebApplicationFactory<
 
         var html = await GetHtmlAsync($"{BaseQuery}&mode=2&week=0");
 
-        Assert.Equal(["Day", "Print", "Scheme", "Packed", "Posted", "Import Permit"], Headers(html));
+        Assert.Equal(["Day", "Print", "Scheme", "Packed", "Posted", "Import permit"], Headers(html));
         Assert.Empty(Cells(html, "cellWorkSheetPacking"));
         Assert.Empty(Cells(html, "cellWorkSheetGroup"));
         Assert.DoesNotContain("<select class=\"govuk-select\" id=\"packaging-week\"", html, StringComparison.Ordinal);
@@ -414,7 +415,7 @@ public partial class PackagingRenderTests : IClassFixture<WebApplicationFactory<
 
         // Only the due block's rows (scheme row + its two participant rows) are highlighted.
         Assert.Equal(3, Regex.Count(html, "<tr class=\"govuk-table__row rowDueToBePosted\""));
-        Assert.Equal(1, Regex.Count(html, "Due to be posted: "));
+        Assert.Equal(1, Regex.Count(html, "Due to be posted</strong>"));
         Assert.Contains("13 April 2026", html, StringComparison.Ordinal);
         Assert.Contains("12 April 2026", html, StringComparison.Ordinal);
         Assert.Contains("11 April 2026", html, StringComparison.Ordinal);
@@ -429,8 +430,8 @@ public partial class PackagingRenderTests : IClassFixture<WebApplicationFactory<
         Assert.Matches(">Print PT0062</span>", html);
         Assert.Equal(["d1", "d2", "d3"], Checkboxes(html, "PrintKeys").Select(t => Attr(t, "value")!));
 
-        Assert.Contains("All Packed: Daily Scheme desc", html, StringComparison.Ordinal);
-        Assert.Contains("All Posted: Other scheme desc", html, StringComparison.Ordinal);
+        Assert.Contains("All packed: Daily Scheme desc", html, StringComparison.Ordinal);
+        Assert.Contains("All posted: Other scheme desc", html, StringComparison.Ordinal);
         AssertButtons(html, customs: true);
         Assert.Contains("Sample Packaging - April 2026 - Weekly", html, StringComparison.Ordinal);
     }
@@ -523,9 +524,10 @@ public partial class PackagingRenderTests : IClassFixture<WebApplicationFactory<
 
         var html = await PostHtmlAsync(("command", "customs"), ("Mode", "1"), ("Week", "2"), ("PrintKeys", "k2"));
 
-        Assert.Contains("<title>Error: Sample Packaging - April 2026", html, StringComparison.Ordinal);
+        Assert.Contains("<title>Error: Sample packaging &#x2013; April 2026", html, StringComparison.Ordinal);
         Assert.Contains("data-module=\"govuk-error-summary\"", html, StringComparison.Ordinal);
-        Assert.Contains("<h2 class=\"govuk-error-summary__title\">There was a problem with the Mail Merge</h2>", html, StringComparison.Ordinal);
+        Assert.Contains("<h2 class=\"govuk-error-summary__title\">There is a problem</h2>", html, StringComparison.Ordinal);
+        Assert.Contains("<li>There was a problem with the Mail Merge</li>", html, StringComparison.Ordinal);
         Assert.Contains("<p class=\"govuk-body\">The Customs template could not be found</p>", html, StringComparison.Ordinal);
 
         // The sheet is still shown beneath the error, and the Customs request carried the ticked rows.
@@ -543,8 +545,9 @@ public partial class PackagingRenderTests : IClassFixture<WebApplicationFactory<
 
         var html = await PostHtmlAsync(("command", "customs"), ("Mode", "2"), ("Week", "0"));
 
-        Assert.Contains("<h2 class=\"govuk-error-summary__title\">There was a problem with the Mail Merge</h2>", html, StringComparison.Ordinal);
-        Assert.DoesNotContain("govuk-error-summary__body", html, StringComparison.Ordinal);
+        Assert.Contains("<li>There was a problem with the Mail Merge</li>", html, StringComparison.Ordinal);
+        var summaryStart = html.IndexOf("govuk-error-summary__body", StringComparison.Ordinal);
+        Assert.DoesNotContain("<p class=\"govuk-body\">", html[summaryStart..html.IndexOf("</ul>", summaryStart, StringComparison.Ordinal)], StringComparison.Ordinal);
         Assert.Contains("<title>Error: ", html, StringComparison.Ordinal);
     }
 
@@ -569,9 +572,9 @@ public partial class PackagingRenderTests : IClassFixture<WebApplicationFactory<
 
         var html = await PostHtmlAsync(("command", "labels"), ("Mode", "0"), ("Week", "1"), ("PrintKeys", "k1"));
 
-        Assert.Contains("<title>Error: Sample Packaging - April 2026", html, StringComparison.Ordinal);
-        Assert.Contains("<h2 class=\"govuk-error-summary__title\">No Labels to Print</h2>", html, StringComparison.Ordinal);
-        Assert.DoesNotContain("govuk-error-summary__body", html, StringComparison.Ordinal);
+        Assert.Contains("<title>Error: Sample packaging &#x2013; April 2026", html, StringComparison.Ordinal);
+        Assert.Contains("<h2 class=\"govuk-error-summary__title\">There is a problem</h2>", html, StringComparison.Ordinal);
+        Assert.Contains("<li>No Labels to Print</li>", html, StringComparison.Ordinal);
         Assert.Contains("id=\"packaging-table\"", html, StringComparison.Ordinal);
         Assert.DoesNotContain("ptl-label", html, StringComparison.Ordinal);
     }
@@ -581,7 +584,7 @@ public partial class PackagingRenderTests : IClassFixture<WebApplicationFactory<
     {
         var html = await PostHtmlAsync(("command", "labels"));
 
-        Assert.Contains("<title>Error: Sample Packaging", html, StringComparison.Ordinal);
+        Assert.Contains("<title>Error: Sample packaging &#x2013;", html, StringComparison.Ordinal);
         Assert.Contains("<a href=\"#packaging-mode\">Select a packaging option</a>", html, StringComparison.Ordinal);
         Assert.Contains("id=\"packaging-mode-error\"", html, StringComparison.Ordinal);
         Assert.DoesNotContain("<table", html, StringComparison.Ordinal);

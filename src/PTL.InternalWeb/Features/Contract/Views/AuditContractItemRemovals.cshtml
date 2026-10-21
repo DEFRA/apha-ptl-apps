@@ -1,0 +1,27 @@
+@model PTL.InternalWeb.Features.Contract.ContractItemRemovalAuditViewModel
+@{
+    ViewData["Title"] = "Audit Trail";
+    var errors = ViewData.ModelState
+        .Where(entry => entry.Value?.Errors.Count > 0)
+        .SelectMany(entry => entry.Value!.Errors.Select(error => (Field: entry.Key, Message: error.ErrorMessage)))
+        .ToList();
+}
+
+<h1 class="govuk-heading-l">Audit Trail</h1>
+
+<govuk-error-summary errors="@errors" />
+
+<form method="post" asp-action="AuditContractItemRemovals" novalidate>
+    <input type="hidden" asp-for="ContractId" />
+    @foreach (var participantSchemeId in Model.Pending)
+    {
+        <input type="hidden" name="Pending" value="@participantSchemeId" />
+    }
+
+    <govuk-textarea asp-for="AuditWhy" label="Before these modifications can be saved, you must enter your reasons for making these changes below:" rows="5" max-length="255" />
+
+    <div class="govuk-button-group">
+        <button type="submit" class="govuk-button" data-module="govuk-button">Save</button>
+        <a class="govuk-button govuk-button--secondary" data-module="govuk-button" href="@Url.Action("ContractItems", new { id = Model.ContractId, pending = Model.Pending })">Cancel</a>
+    </div>
+</form>

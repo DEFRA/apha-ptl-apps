@@ -289,11 +289,68 @@ public class CustomerControllerTests
         };
         var controller = CreateController(apiClient);
 
-        var result = await controller.ReviewPendingCustomerUpdates(CancellationToken.None);
+        var result = await controller.ReviewPendingCustomerUpdates(cancellationToken: CancellationToken.None);
 
         var view = Assert.IsType<ViewResult>(result);
         var model = Assert.IsType<PTL.InternalWeb.Features.Customer.PendingCustomerUpdateListViewModel>(view.Model);
         Assert.Single(model.Updates);
+        Assert.Equal(1, model.TotalCount);
+    }
+
+    private static IReadOnlyList<PendingCustomerUpdateSummaryResponse> PendingUpdates(int count) =>
+        [.. Enumerable.Range(1, count).Select(i => new PendingCustomerUpdateSummaryResponse(Guid.NewGuid(), $"QAL/{i:D5}", $"Customer {i}"))];
+
+    [Fact]
+    public async Task ReviewPendingCustomerUpdates_PagesTheListAtTwentyRowsLikeLegacy()
+    {
+        var controller = CreateController(new FakeCustomerApiClient { PendingCustomerUpdates = PendingUpdates(45) });
+
+        var first = Assert.IsType<PTL.InternalWeb.Features.Customer.PendingCustomerUpdateListViewModel>(Assert.IsType<ViewResult>(await controller.ReviewPendingCustomerUpdates(cancellationToken: CancellationToken.None)).Model);
+        var third = Assert.IsType<PTL.InternalWeb.Features.Customer.PendingCustomerUpdateListViewModel>(Assert.IsType<ViewResult>(await controller.ReviewPendingCustomerUpdates(page: 3, cancellationToken: CancellationToken.None)).Model);
+
+        Assert.Equal(20, first.Updates.Count);
+        Assert.Equal((1, 20, 45), (first.Page, first.PageSize, first.TotalCount));
+        Assert.Equal("QAL/00001", first.Updates[0].QalNumber);
+        Assert.Equal(5, third.Updates.Count);
+        Assert.Equal("QAL/00041", third.Updates[0].QalNumber);
+    }
+
+    [Theory]
+    [InlineData(0, 1)]
+    [InlineData(-4, 1)]
+    [InlineData(99, 3)]
+    public async Task ReviewPendingCustomerUpdates_PageOutOfRange_IsClampedToTheFirstOrLastPage(int requested, int expected)
+    {
+        var controller = CreateController(new FakeCustomerApiClient { PendingCustomerUpdates = PendingUpdates(45) });
+
+        var model = Assert.IsType<PTL.InternalWeb.Features.Customer.PendingCustomerUpdateListViewModel>(Assert.IsType<ViewResult>(await controller.ReviewPendingCustomerUpdates(page: requested, cancellationToken: CancellationToken.None)).Model);
+
+        Assert.Equal(expected, model.Page);
+    }
+
+    [Theory]
+    [InlineData(10, 10)]
+    [InlineData(50, 50)]
+    [InlineData(7, 20)]
+    public async Task ReviewPendingCustomerUpdates_PageSize_UsesTheSharedSizesElseTheLegacyTwenty(int requested, int expected)
+    {
+        var controller = CreateController(new FakeCustomerApiClient { PendingCustomerUpdates = PendingUpdates(45) });
+
+        var model = Assert.IsType<PTL.InternalWeb.Features.Customer.PendingCustomerUpdateListViewModel>(Assert.IsType<ViewResult>(await controller.ReviewPendingCustomerUpdates(pageSize: requested, cancellationToken: CancellationToken.None)).Model);
+
+        Assert.Equal(expected, model.PageSize);
+        Assert.Equal(Math.Min(expected, 45), model.Updates.Count);
+    }
+
+    [Fact]
+    public async Task ReviewPendingCustomerUpdates_NoUpdates_ReturnsAnEmptyFirstPage()
+    {
+        var controller = CreateController(new FakeCustomerApiClient());
+
+        var model = Assert.IsType<PTL.InternalWeb.Features.Customer.PendingCustomerUpdateListViewModel>(Assert.IsType<ViewResult>(await controller.ReviewPendingCustomerUpdates(cancellationToken: CancellationToken.None)).Model);
+
+        Assert.Empty(model.Updates);
+        Assert.Equal((1, 0), (model.Page, model.TotalCount));
     }
 
     [Fact]
@@ -405,16 +462,17 @@ public class CustomerControllerTests
     {
         var apiClient = new FakeCustomerApiClient();
         var controller = CreateController(apiClient);
-        var model = new PTL.InternalWeb.Features.Customer.PendingCustomerUpdateFormViewModel { ContactName = "Amended Contact" };
+        var model = new PTL.InternalWeb.Features.Customer.PendingCustomerUpdateFormViewModel { ContactName = "Amended Contact", Comments = "Thanks for the update" };
 
         var result = await controller.EditPendingCustomerUpdate(Guid.NewGuid(), model, CancellationToken.None);
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
         Assert.Equal(nameof(PTL.InternalWeb.Features.Customer.CustomerController.ReviewPendingCustomerUpdates), redirect.ActionName);
         Assert.Equal("Amended Contact", apiClient.LastApproveRequest!.ContactName);
+        Assert.Equal("Thanks for the update", apiClient.LastApproveComments);
         var notification = controller.TempData.GetNotification();
         Assert.Equal(NotificationType.Success, notification!.Type);
-        Assert.Equal("Customer update approved successfully.", notification.Message);
+        Assert.Equal("Customer details updated successfully.", notification.Message);
     }
 
     [Fact]
@@ -425,7 +483,7 @@ public class CustomerControllerTests
             ApprovePendingCustomerUpdateResult = new PendingCustomerUpdateDecisionResult(false, true, new Dictionary<string, string[]>())
         });
 
-        var result = await controller.ApprovePendingCustomerUpdate(Guid.NewGuid(), CancellationToken.None);
+        var result = await controller.ApprovePendingCustomerUpdate(Guid.NewGuid(), comments: null, CancellationToken.None);
 
         Assert.IsType<NotFoundResult>(result);
     }
@@ -438,7 +496,7 @@ public class CustomerControllerTests
             ApprovePendingCustomerUpdateResult = new PendingCustomerUpdateDecisionResult(false, false, new Dictionary<string, string[]> { ["ContactName"] = ["Contact name is required."] })
         });
 
-        var result = await controller.ApprovePendingCustomerUpdate(Guid.NewGuid(), CancellationToken.None);
+        var result = await controller.ApprovePendingCustomerUpdate(Guid.NewGuid(), comments: null, CancellationToken.None);
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
         Assert.Equal(nameof(PTL.InternalWeb.Features.Customer.CustomerController.EditPendingCustomerUpdate), redirect.ActionName);
@@ -447,15 +505,18 @@ public class CustomerControllerTests
     [Fact]
     public async Task ApprovePendingCustomerUpdate_Success_RedirectsToReviewListWithSuccessNotification()
     {
-        var controller = CreateController(new FakeCustomerApiClient());
+        var apiClient = new FakeCustomerApiClient();
+        var controller = CreateController(apiClient);
 
-        var result = await controller.ApprovePendingCustomerUpdate(Guid.NewGuid(), CancellationToken.None);
+        var result = await controller.ApprovePendingCustomerUpdate(Guid.NewGuid(), "Thanks for the update", CancellationToken.None);
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
         Assert.Equal(nameof(PTL.InternalWeb.Features.Customer.CustomerController.ReviewPendingCustomerUpdates), redirect.ActionName);
+        Assert.Null(apiClient.LastApproveRequest);
+        Assert.Equal("Thanks for the update", apiClient.LastApproveComments);
         var notification = controller.TempData.GetNotification();
         Assert.Equal(NotificationType.Success, notification!.Type);
-        Assert.Equal("Customer update approved successfully.", notification.Message);
+        Assert.Equal("Customer details updated successfully.", notification.Message);
     }
 
     [Fact]
@@ -463,7 +524,7 @@ public class CustomerControllerTests
     {
         var controller = CreateController(new FakeCustomerApiClient { DeclinePendingCustomerUpdateResult = false });
 
-        var result = await controller.DeclinePendingCustomerUpdate(Guid.NewGuid(), CancellationToken.None);
+        var result = await controller.DeclinePendingCustomerUpdate(Guid.NewGuid(), comments: null, CancellationToken.None);
 
         Assert.IsType<NotFoundResult>(result);
     }
@@ -471,15 +532,17 @@ public class CustomerControllerTests
     [Fact]
     public async Task DeclinePendingCustomerUpdate_Success_RedirectsToReviewListWithSuccessNotification()
     {
-        var controller = CreateController(new FakeCustomerApiClient { DeclinePendingCustomerUpdateResult = true });
+        var apiClient = new FakeCustomerApiClient { DeclinePendingCustomerUpdateResult = true };
+        var controller = CreateController(apiClient);
 
-        var result = await controller.DeclinePendingCustomerUpdate(Guid.NewGuid(), CancellationToken.None);
+        var result = await controller.DeclinePendingCustomerUpdate(Guid.NewGuid(), "Not eligible", CancellationToken.None);
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
         Assert.Equal(nameof(PTL.InternalWeb.Features.Customer.CustomerController.ReviewPendingCustomerUpdates), redirect.ActionName);
+        Assert.Equal("Not eligible", apiClient.LastDeclineComments);
         var notification = controller.TempData.GetNotification();
         Assert.Equal(NotificationType.Success, notification!.Type);
-        Assert.Equal("Customer update declined successfully.", notification.Message);
+        Assert.Equal("Customer updates declined successfully.", notification.Message);
     }
 
     [Fact]

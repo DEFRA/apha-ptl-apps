@@ -161,6 +161,77 @@ public class ContractApiClientTests
     }
 
     [Fact]
+    public async Task GetContractItemsAsync_PendingRemovals_AreSentAsRepeatedQueryValues()
+    {
+        var first = Guid.NewGuid();
+        var second = Guid.NewGuid();
+        var handler = new StubHttpMessageHandler(HttpStatusCode.NotFound, null);
+        Uri? sent = null;
+        handler.OnRequest = request => sent = request.RequestUri;
+        var client = new ContractApiClient(new HttpClient(handler) { BaseAddress = new Uri("http://localhost") });
+
+        await client.GetContractItemsAsync(Guid.NewGuid(), [first, second]);
+
+        Assert.Equal($"?pending={first}&pending={second}", sent!.Query);
+    }
+
+    [Fact]
+    public async Task RemoveContractItemAsync_AuditReason_IsSentEscapedInTheQueryString()
+    {
+        var handler = new StubHttpMessageHandler(HttpStatusCode.OK, null);
+        Uri? sent = null;
+        handler.OnRequest = request => sent = request.RequestUri;
+        var client = new ContractApiClient(new HttpClient(handler) { BaseAddress = new Uri("http://localhost") });
+
+        await client.RemoveContractItemAsync(Guid.NewGuid(), Guid.NewGuid(), "Left & gone");
+
+        Assert.Equal("?auditWhy=Left%20%26%20gone", sent!.Query);
+    }
+
+    [Fact]
+    public async Task RemoveContractItemAsync_ValidIds_AreSentAsTheTwoPathSegments()
+    {
+        var contractId = Guid.NewGuid();
+        var participantSchemeId = Guid.NewGuid();
+        var handler = new StubHttpMessageHandler(HttpStatusCode.OK, null);
+        HttpMethod? method = null;
+        Uri? sent = null;
+        handler.OnRequest = request =>
+        {
+            method = request.Method;
+            sent = request.RequestUri;
+        };
+        var client = new ContractApiClient(new HttpClient(handler) { BaseAddress = new Uri("http://localhost") });
+
+        await client.RemoveContractItemAsync(contractId, participantSchemeId);
+
+        Assert.Equal(HttpMethod.Delete, method);
+        Assert.Equal($"/api/contracts/{contractId:D}/items/{participantSchemeId:D}", sent!.AbsolutePath);
+        Assert.Equal(string.Empty, sent.Query);
+    }
+
+    [Theory]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public async Task RemoveContractItemAsync_EmptyId_ReturnsNotFoundWithoutCallingTheApi(bool emptyContract, bool emptyItem)
+    {
+        var handler = new StubHttpMessageHandler(HttpStatusCode.OK, null);
+        var called = false;
+        handler.OnRequest = _ => called = true;
+        var client = new ContractApiClient(new HttpClient(handler) { BaseAddress = new Uri("http://localhost") });
+
+        var result = await client.RemoveContractItemAsync(
+            emptyContract ? Guid.Empty : Guid.NewGuid(),
+            emptyItem ? Guid.Empty : Guid.NewGuid(),
+            "reason");
+
+        Assert.False(result.Success);
+        Assert.True(result.NotFound);
+        Assert.False(called);
+    }
+
+    [Fact]
     public async Task RemoveContractItemAsync_NotFound_ReturnsNotFoundResult()
     {
         var client = CreateClient(HttpStatusCode.NotFound, null);

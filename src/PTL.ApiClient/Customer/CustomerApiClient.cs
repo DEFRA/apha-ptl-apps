@@ -14,8 +14,8 @@ public interface ICustomerApiClient
     Task<CustomerSaveResult> UpdateCustomerAsync(Guid customerId, CustomerSaveRequest request, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<PendingCustomerUpdateSummaryResponse>> GetPendingCustomerUpdatesAsync(CancellationToken cancellationToken = default);
     Task<PendingCustomerUpdateComparisonResponse?> GetPendingCustomerUpdateAsync(Guid customerId, CancellationToken cancellationToken = default);
-    Task<PendingCustomerUpdateDecisionResult> ApprovePendingCustomerUpdateAsync(Guid customerId, PendingCustomerUpdateSaveRequest? request = null, CancellationToken cancellationToken = default);
-    Task<bool> DeclinePendingCustomerUpdateAsync(Guid customerId, CancellationToken cancellationToken = default);
+    Task<PendingCustomerUpdateDecisionResult> ApprovePendingCustomerUpdateAsync(Guid customerId, PendingCustomerUpdateSaveRequest? request = null, string? comments = null, CancellationToken cancellationToken = default);
+    Task<bool> DeclinePendingCustomerUpdateAsync(Guid customerId, string? comments = null, CancellationToken cancellationToken = default);
 }
 
 // Thin typed HttpClient wrapper around PTL.Api's customer endpoints, shared by every web
@@ -100,15 +100,15 @@ public sealed class CustomerApiClient(HttpClient httpClient) : ICustomerApiClien
         return await response.Content.ReadFromJsonAsync<PendingCustomerUpdateComparisonResponse>(cancellationToken);
     }
 
-    public async Task<PendingCustomerUpdateDecisionResult> ApprovePendingCustomerUpdateAsync(Guid customerId, PendingCustomerUpdateSaveRequest? request = null, CancellationToken cancellationToken = default)
+    public async Task<PendingCustomerUpdateDecisionResult> ApprovePendingCustomerUpdateAsync(Guid customerId, PendingCustomerUpdateSaveRequest? request = null, string? comments = null, CancellationToken cancellationToken = default)
     {
         var url = $"/api/customers/{customerId}/pending-update/approve";
 
-        // Approving without amendments posts no body at all rather than a JSON "null" literal, so
+        // Approving without amendments or comments posts no body at all rather than a JSON "null" literal, so
         // the endpoint's optional [FromBody] parameter binds cleanly.
-        var response = request is null
+        var response = request is null && string.IsNullOrEmpty(comments)
             ? await httpClient.PostAsync(url, content: null, cancellationToken)
-            : await httpClient.PostAsJsonAsync(url, request, cancellationToken);
+            : await httpClient.PostAsJsonAsync(url, new PendingCustomerUpdateApproveRequest(request, comments), cancellationToken);
         if (response.StatusCode == HttpStatusCode.NotFound)
         {
             return new PendingCustomerUpdateDecisionResult(false, true, new Dictionary<string, string[]>());
@@ -127,9 +127,12 @@ public sealed class CustomerApiClient(HttpClient httpClient) : ICustomerApiClien
         return new PendingCustomerUpdateDecisionResult(true, false, new Dictionary<string, string[]>());
     }
 
-    public async Task<bool> DeclinePendingCustomerUpdateAsync(Guid customerId, CancellationToken cancellationToken = default)
+    public async Task<bool> DeclinePendingCustomerUpdateAsync(Guid customerId, string? comments = null, CancellationToken cancellationToken = default)
     {
-        var response = await httpClient.PostAsync($"/api/customers/{customerId}/pending-update/decline", content: null, cancellationToken);
+        var url = $"/api/customers/{customerId}/pending-update/decline";
+        var response = string.IsNullOrEmpty(comments)
+            ? await httpClient.PostAsync(url, content: null, cancellationToken)
+            : await httpClient.PostAsJsonAsync(url, new PendingCustomerUpdateDeclineRequest(comments), cancellationToken);
         return response.IsSuccessStatusCode;
     }
 }

@@ -407,11 +407,20 @@ public sealed class RenewContractsServiceTests
             return Task.FromResult(record);
         }
 
+        public Task<bool> RemoveAsync(ParticipantSchemeRecord record, ParticipantSchemeAudit audit, CancellationToken cancellationToken = default) =>
+            UpdateAsync(record, cancellationToken);
+
         public Task<bool> UpdateAsync(ParticipantSchemeRecord record, CancellationToken cancellationToken = default)
         {
             _records[record.ParticipantSchemeId] = record;
             return Task.FromResult(true);
         }
+
+        public Task<ParticipantSchemeContext> GetSchemeContextAsync(Guid schemeId, Guid contractId, bool nonUk, CancellationToken cancellationToken = default) =>
+            Task.FromResult(new ParticipantSchemeContext());
+
+        public Task<IReadOnlyList<OtherParticipantScheme>> GetByParticipantAndSchemeAsync(Guid participantId, Guid schemeId, CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<OtherParticipantScheme>>([]);
     }
 
     private sealed class TestSchemeRepository(IReadOnlyList<CoreScheme> schemes) : ISchemeRepository

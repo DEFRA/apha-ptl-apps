@@ -122,13 +122,14 @@ public sealed class ParticipantController(IParticipantService participantService
 
     // POST /api/participants/{participantId}/pending-update/approve - applies the pending changes
     // to the live participant record, then soft-deletes the pending update. An optional body
-    // carries amended values, matching legacy PendingParticipantUpdateDetails.aspx's editable Approve.
+    // carries amended values, matching legacy PendingParticipantUpdateDetails.aspx's editable Approve,
+    // and the reviewer's comments for the notification email.
     [HttpPost("participants/{participantId:guid}/pending-update/approve")]
-    public async Task<IActionResult> ApprovePendingParticipantUpdate(Guid participantId, [FromBody] PendingParticipantUpdateSaveRequest? request, CancellationToken cancellationToken)
+    public async Task<IActionResult> ApprovePendingParticipantUpdate(Guid participantId, [FromBody] PendingParticipantUpdateApproveRequest? request, CancellationToken cancellationToken)
     {
         try
         {
-            var approved = await participantService.ApprovePendingParticipantUpdateAsync(participantId, ToPendingEntity(participantId, request), cancellationToken);
+            var approved = await participantService.ApprovePendingParticipantUpdateAsync(participantId, ToPendingEntity(participantId, request?.Edits), request?.Comments ?? string.Empty, cancellationToken);
             return approved ? NoContent() : NotFound();
         }
         catch (ParticipantValidationException ex)
@@ -140,10 +141,17 @@ public sealed class ParticipantController(IParticipantService participantService
     // POST /api/participants/{participantId}/pending-update/decline - soft-deletes the pending
     // update without changing the live participant record.
     [HttpPost("participants/{participantId:guid}/pending-update/decline")]
-    public async Task<IActionResult> DeclinePendingParticipantUpdate(Guid participantId, CancellationToken cancellationToken)
+    public async Task<IActionResult> DeclinePendingParticipantUpdate(Guid participantId, [FromBody] PendingParticipantUpdateDeclineRequest? request, CancellationToken cancellationToken)
     {
-        var declined = await participantService.DeclinePendingParticipantUpdateAsync(participantId, cancellationToken);
-        return declined ? NoContent() : NotFound();
+        try
+        {
+            var declined = await participantService.DeclinePendingParticipantUpdateAsync(participantId, request?.Comments ?? string.Empty, cancellationToken);
+            return declined ? NoContent() : NotFound();
+        }
+        catch (ParticipantValidationException ex)
+        {
+            return ToValidationProblem(ex);
+        }
     }
 
     // Legacy ParticipantViewers.aspx.

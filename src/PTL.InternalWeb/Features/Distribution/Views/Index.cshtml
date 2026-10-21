@@ -1,6 +1,14 @@
 @model PTL.InternalWeb.Features.Distribution.DistributionDashboardViewModel
+@using Microsoft.AspNetCore.Authorization
+@using PTL.InternalWeb.Authorization
+@inject IAuthorizationService Authorization
 @{
     ViewData["Title"] = "Distributions";
+
+    // Legacy MenuDistributions.aspx hid the Scheduling/Tabulations links without the Scheduling role and the
+    // Preparation/Packaging/Results links without the Internal User role; the progress bars stay visible.
+    var canScheduling = (await Authorization.AuthorizeAsync(User, PtlPolicies.Scheduling)).Succeeded;
+    var canInternalUser = (await Authorization.AuthorizeAsync(User, PtlPolicies.InternalUser)).Succeeded;
 }
 
 <h1 class="govuk-heading-l">Distributions</h1>
@@ -37,7 +45,7 @@
                 @if (!month.IsInitialised)
                 {
                     <td class="govuk-table__cell ptl-distribution-initialise-cell" colspan="5">
-                        @if (month.IsInitialisable)
+                        @if (month.IsInitialisable && canScheduling)
                         {
                             <form method="post" asp-action="InitialiseMonth">
                                 <input type="hidden" name="year" value="@month.YearId" />
@@ -59,27 +67,42 @@
                     <td class="govuk-table__cell">
                         <progress class="ptl-progress-bar" max="100" value="@month.SchedulingCompletePercentage" aria-label="Scheduling for @month.MonthDescription">@month.SchedulingCompletePercentage% complete</progress>
                         <span class="govuk-body-s ptl-progress-bar__label">@month.SchedulingCompletePercentage%</span><br />
-                        <a class="govuk-link" asp-action="Schedule" asp-route-year="@month.YearId" asp-route-monthId="@month.MonthId">View<span class="govuk-visually-hidden"> Scheduling for @month.MonthDescription</span></a>
+                        @if (canScheduling)
+                        {
+                            <a class="govuk-link" asp-action="Schedule" asp-route-year="@month.YearId" asp-route-monthId="@month.MonthId">View<span class="govuk-visually-hidden"> Scheduling for @month.MonthDescription</span></a>
+                        }
                     </td>
                     <td class="govuk-table__cell">
                         <progress class="ptl-progress-bar" max="100" value="@month.PreparationCompletePercentage" aria-label="Preparation for @month.MonthDescription">@month.PreparationCompletePercentage% complete</progress>
                         <span class="govuk-body-s ptl-progress-bar__label">@month.PreparationCompletePercentage%</span><br />
-                        <a class="govuk-link" asp-action="Preparation" asp-route-year="@month.YearId" asp-route-monthId="@month.MonthId">View<span class="govuk-visually-hidden"> Preparation for @month.MonthDescription</span></a>
+                        @if (canInternalUser)
+                        {
+                            <a class="govuk-link" asp-action="Preparation" asp-route-year="@month.YearId" asp-route-monthId="@month.MonthId">View<span class="govuk-visually-hidden"> Preparation for @month.MonthDescription</span></a>
+                        }
                     </td>
                     <td class="govuk-table__cell">
                         <progress class="ptl-progress-bar" max="100" value="@month.PackagingCompletePercentage" aria-label="Packaging for @month.MonthDescription">@month.PackagingCompletePercentage% complete</progress>
                         <span class="govuk-body-s ptl-progress-bar__label">@month.PackagingCompletePercentage%</span><br />
-                        <a class="govuk-link" asp-action="Packaging" asp-route-year="@month.YearId" asp-route-monthId="@month.MonthId">View<span class="govuk-visually-hidden"> Packaging for @month.MonthDescription</span></a>
+                        @if (canInternalUser)
+                        {
+                            <a class="govuk-link" asp-action="Packaging" asp-route-year="@month.YearId" asp-route-monthId="@month.MonthId">View<span class="govuk-visually-hidden"> Packaging for @month.MonthDescription</span></a>
+                        }
                     </td>
                     <td class="govuk-table__cell">
                         <progress class="ptl-progress-bar" max="100" value="@month.ResultsCompletePercentage" aria-label="Results for @month.MonthDescription">@month.ResultsCompletePercentage% complete</progress>
                         <span class="govuk-body-s ptl-progress-bar__label">@month.ResultsCompletePercentage%</span><br />
-                        <a class="govuk-link" asp-action="ResultsReceipt" asp-route-year="@month.YearId" asp-route-monthId="@month.MonthId">View<span class="govuk-visually-hidden"> Results for @month.MonthDescription</span></a>
+                        @if (canInternalUser)
+                        {
+                            <a class="govuk-link" asp-action="ResultsReceipt" asp-route-year="@month.YearId" asp-route-monthId="@month.MonthId">View<span class="govuk-visually-hidden"> Results for @month.MonthDescription</span></a>
+                        }
                     </td>
                     <td class="govuk-table__cell">
                         <progress class="ptl-progress-bar" max="100" value="@month.TabulationsCompletePercentage" aria-label="Tabulations for @month.MonthDescription">@month.TabulationsCompletePercentage% complete</progress>
                         <span class="govuk-body-s ptl-progress-bar__label">@month.TabulationsCompletePercentage%</span><br />
-                        <a class="govuk-link" asp-action="Tabulations" asp-route-year="@month.YearId" asp-route-monthId="@month.MonthId">View<span class="govuk-visually-hidden"> Tabulations for @month.MonthDescription</span></a>
+                        @if (canScheduling)
+                        {
+                            <a class="govuk-link" asp-action="Tabulations" asp-route-year="@month.YearId" asp-route-monthId="@month.MonthId">View<span class="govuk-visually-hidden"> Tabulations for @month.MonthDescription</span></a>
+                        }
                     </td>
                 }
             </tr>

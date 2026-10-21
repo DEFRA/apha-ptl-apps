@@ -8,7 +8,8 @@ namespace PTL.Data.Contract.PendingOrder;
 // spgPendingContractByPendingContractId, spgPendingParticipantSchemeByPendingContractId,
 // spuPendingParticipantSchemeByPendingParticipantSchemeId,
 // spdPendingParticipantSchemeByPendingParticipantSchemeId, spuPendingContractByPendingContractID,
-// spdPendingContractByPendingContractID.
+// spdPendingContractByPendingContractID, and the order email queue: spiOnlineContractOrderEmail,
+// spgaOnlineContractOrderEmail, spuOnlineContractOrderEmail.
 public sealed class PendingOrderRepository(IDbConnectionFactory connectionFactory) : IPendingOrderRepository
 {
     public async Task<IReadOnlyList<PendingOrderSummaryEntity>> GetSummariesAsync(CancellationToken cancellationToken = default)
@@ -119,6 +120,43 @@ public sealed class PendingOrderRepository(IDbConnectionFactory connectionFactor
 
         var order = await GetByIdAsync(pendingContractId, cancellationToken);
         return order is null || order.IsDeleted;
+    }
+
+    public async Task QueueNotificationAsync(PendingOrderNotification notification, CancellationToken cancellationToken = default)
+    {
+        using var connection = connectionFactory.CreateConnection();
+
+        await connection.ExecuteAsync(
+            "EXEC dbo.spiOnlineContractOrderEmail @fldOnlineContractOrderEmailId = @Id, @fldEmail = @Email, @fldContractId = @ContractId, @fldPendingContractId = @PendingContractId, @fldCustomerName = @CustomerName, @fldYearId = @YearId, @fldNotes = @Notes, @IsApproved = @IsApproved",
+            new
+            {
+                Id = Guid.NewGuid(),
+                notification.Email,
+                notification.ContractId,
+                notification.PendingContractId,
+                notification.CustomerName,
+                notification.YearId,
+                notification.Notes,
+                notification.IsApproved
+            });
+    }
+
+    public async Task<IReadOnlyList<OnlineOrderEmailEntity>> GetUnsentNotificationsAsync(CancellationToken cancellationToken = default)
+    {
+        using var connection = connectionFactory.CreateConnection();
+
+        // The procedure joins every active participant of the customer, so one queued email can come back several times.
+        var rows = await connection.QueryAsync<OnlineOrderEmailEntity>("EXEC dbo.spgaOnlineContractOrderEmail");
+        return rows.DistinctBy(r => r.Id).ToList();
+    }
+
+    public async Task MarkNotificationSentAsync(Guid notificationId, DateTime sentAt, CancellationToken cancellationToken = default)
+    {
+        using var connection = connectionFactory.CreateConnection();
+
+        await connection.ExecuteAsync(
+            "EXEC dbo.spuOnlineContractOrderEmail @fldOnlineContractOrderEmailId = @Id, @DateSent = @SentAt",
+            new { Id = notificationId, SentAt = sentAt });
     }
 
     // Bound by name rather than position - this procedure takes 17 arguments, so a silent ordering

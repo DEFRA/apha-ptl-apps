@@ -5,7 +5,7 @@ using PTL.Core.Distribution;
 
 namespace PTL.Api.Tests.Distribution;
 
-// Program.cs registrations for View Comments: the service and the "Attachments" appsettings section.
+// Program.cs registrations for View Comments: the service and its fixed attachment limits.
 public class TestConsultantCommentsRegistrationTests(WebApplicationFactory<Program> factory) : IClassFixture<WebApplicationFactory<Program>>
 {
     [Fact]
@@ -17,7 +17,7 @@ public class TestConsultantCommentsRegistrationTests(WebApplicationFactory<Progr
     }
 
     [Fact]
-    public void AttachmentOptions_AreBoundFromAppSettingsWithoutDuplicatingTheDefaults()
+    public void AttachmentOptions_InTheRealContainer_AreTheFixedLegacyLimits()
     {
         using var scope = factory.Services.CreateScope();
 

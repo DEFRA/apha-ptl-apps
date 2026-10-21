@@ -16,7 +16,7 @@ public class ParticipantSchemeControllerTests
     {
         var repository = new FakeParticipantSchemeRepository();
         var contracts = new FakeContractRepository();
-        var service = new ParticipantSchemeService(repository, contracts, NullLogger<ParticipantSchemeService>.Instance);
+        var service = new ParticipantSchemeService(repository, contracts, new PTL.Api.Tests.Customer.FakeCustomerRepository(), new PTL.Api.Tests.Contract.FakeContractPostageService(), NullLogger<ParticipantSchemeService>.Instance);
         var controller = new ParticipantSchemeController(service, NullLogger<ParticipantSchemeController>.Instance);
 
         var services = new ServiceCollection().AddMvc().Services.BuildServiceProvider();
@@ -38,6 +38,25 @@ public class ParticipantSchemeControllerTests
         true, false, false, false, false, false, false, false, false, false, false, false,
         2, "EXT-2", "Contact updated", false, false, false, "Instructions updated", true, false,
         false, false, false, false, false, false, false, false, false, false, false, false);
+
+    [Fact]
+    public async Task GetParticipantSchemeContext_ReturnsTheLockedMonthsAndInitialisedMonths()
+    {
+        var (controller, repository, contracts) = CreateController();
+        var contractId = Guid.NewGuid();
+        contracts.Seed(new CoreContract { ContractId = contractId, CustomerId = Guid.NewGuid(), YearId = DateTime.UtcNow.Year });
+        repository.Context = new ParticipantSchemeContext
+        {
+            CanEdit = [true, false, true, true, true, true, true, true, true, true, true, true],
+            InitialisedMonthIds = [4]
+        };
+
+        var result = await controller.GetParticipantSchemeContext(contractId, Guid.NewGuid(), CancellationToken.None);
+
+        var response = Assert.IsType<ParticipantSchemeContextResponse>(Assert.IsType<OkObjectResult>(result.Result).Value);
+        Assert.False(response.CanEdit[1]);
+        Assert.Equal([4], response.InitialisedMonthIds);
+    }
 
     [Fact]
     public async Task GetParticipantScheme_UnknownId_ReturnsNotFound()

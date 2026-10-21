@@ -1,16 +1,21 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.Extensions.Logging;
 using PTL.ApiClient;
 using PTL.Contracts.Participant;
 using PTL.Contracts.Scheme;
+using PTL.InternalWeb.Authorization;
+using PTL.InternalWeb.Confirmation;
+using PTL.InternalWeb.Features.Account;
 using PTL.InternalWeb.Navigation;
 using PTL.SharedUI.Notifications;
 
 namespace PTL.InternalWeb.Features.ParticipantScheme;
 
-// Authentication/authorization are out of scope for this phase - assume the current user is
-// already authenticated with full access to Participant Scheme functionality.
+// Legacy "Contracts Admin" folder - requires the Contracts Admin role. The one finer rule on this page is
+// legacy's "Override Schemes" gate on the Override button (see ApplyOverridePermission).
+[Authorize(Policy = PtlPolicies.ContractsAdmin)]
 public class ParticipantSchemeController(
     IParticipantSchemeApiClient participantSchemeApiClient,
     IContractApiClient contractApiClient,
@@ -21,6 +26,7 @@ public class ParticipantSchemeController(
 {
     private const string WeightedPricingPlan = "Weighted";
     private const string ProRataPricingPlan = "ProRata";
+    private const string FullPricingPlan = "Full";
 
     private static readonly Action<ILogger, Guid, Exception?> LogNotFoundMessage =
         LoggerMessage.Define<Guid>(
@@ -119,8 +125,9 @@ public class ParticipantSchemeController(
             IsReadOnly = contract.IsReadOnly
         };
 
+        ApplyOverridePermission(model);
         await PopulateParticipantOptionsAsync(model, cancellationToken);
-        await PopulateSchemeContextAsync(model, cancellationToken);
+        await PopulateSchemeContextAsync(model, cancellationToken, applyDefaultMonths: true);
         await PopulatePricingPlanAsync(model, isFreshLoad: true, cancellationToken);
         await PopulateGroupAddressOptionsAsync(model, cancellationToken);
         SetBreadcrumbContext(customerId, contractId);
@@ -129,8 +136,22 @@ public class ParticipantSchemeController(
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Create(ParticipantSchemeFormViewModel model, CancellationToken cancellationToken)
+    public async Task<IActionResult> Create(ParticipantSchemeFormViewModel model, string? confirmation = null, CancellationToken cancellationToken = default)
     {
+        ApplyOverridePermission(model);
+
+        // Cancel on the confirmation page posts the unsaved form back; show it exactly as it was.
+        if (ConfirmationFlow.IsCancelled(confirmation))
+        {
+            ModelState.Clear();
+            return await RedisplayCreateAsync(model, cancellationToken);
+        }
+
+        if (model.SchemeId is not null)
+        {
+            await ValidateDataConsentAsync(model, cancellationToken);
+        }
+
         if (!ModelState.IsValid || model.ParticipantId is null || model.SchemeId is null)
         {
             if (model.ParticipantId is null)
@@ -143,11 +164,13 @@ public class ParticipantSchemeController(
                 ModelState.AddModelError(nameof(model.SchemeId), "Select a Scheme from the list");
             }
 
-            await PopulateParticipantOptionsAsync(model, cancellationToken);
-            await PopulateSchemeContextAsync(model, cancellationToken);
-            await PopulatePricingPlanAsync(model, isFreshLoad: false, cancellationToken);
-            await PopulateGroupAddressOptionsAsync(model, cancellationToken);
-            return View(model);
+            return await RedisplayCreateAsync(model, cancellationToken);
+        }
+
+        if (!ConfirmationFlow.IsConfirmed(confirmation)
+            && await InitialisedMonthConfirmationAsync(model, model.SchemeId.Value, null, cancellationToken) is { } confirmationPage)
+        {
+            return this.ConfirmationPage(confirmationPage);
         }
 
         try
@@ -157,11 +180,7 @@ public class ParticipantSchemeController(
             {
                 LogCreateFailedMessage(logger, model.ContractId.GetValueOrDefault(), null);
                 this.AddFieldErrors(result.FieldErrors);
-                await PopulateParticipantOptionsAsync(model, cancellationToken);
-                await PopulateSchemeContextAsync(model, cancellationToken);
-                await PopulatePricingPlanAsync(model, isFreshLoad: false, cancellationToken);
-                await PopulateGroupAddressOptionsAsync(model, cancellationToken);
-                return View(model);
+                return await RedisplayCreateAsync(model, cancellationToken);
             }
 
             LogCreatedMessage(logger, result.ParticipantScheme!.ParticipantSchemeId, null);
@@ -172,12 +191,17 @@ public class ParticipantSchemeController(
         {
             LogSaveErrorMessage(logger, model.ContractId.GetValueOrDefault(), ex);
             ModelState.AddModelError(string.Empty, "The contract item could not be saved. Please try again.");
-            await PopulateParticipantOptionsAsync(model, cancellationToken);
-            await PopulateSchemeContextAsync(model, cancellationToken);
-            await PopulatePricingPlanAsync(model, isFreshLoad: false, cancellationToken);
-            await PopulateGroupAddressOptionsAsync(model, cancellationToken);
-            return View(model);
+            return await RedisplayCreateAsync(model, cancellationToken);
         }
+    }
+
+    private async Task<IActionResult> RedisplayCreateAsync(ParticipantSchemeFormViewModel model, CancellationToken cancellationToken)
+    {
+        await PopulateParticipantOptionsAsync(model, cancellationToken);
+        await PopulateSchemeContextAsync(model, cancellationToken);
+        await PopulatePricingPlanAsync(model, isFreshLoad: false, cancellationToken);
+        await PopulateGroupAddressOptionsAsync(model, cancellationToken);
+        return View(model);
     }
 
     [HttpGet]
@@ -196,7 +220,9 @@ public class ParticipantSchemeController(
         }
 
         var model = ToFormViewModel(participantScheme, contract.CustomerId, contract.YearId, participantScheme.IsRemoved || contract.IsReadOnly);
+        ApplyOverridePermission(model);
         await PopulateDataConsentAsync(model, cancellationToken);
+        await PopulateWarningsAsync(model, cancellationToken);
         await PopulatePricingPlanAsync(model, isFreshLoad: true, cancellationToken);
         await PopulateGroupAddressOptionsAsync(model, cancellationToken);
         SetBreadcrumbContext(contract.CustomerId, participantScheme.ContractId);
@@ -205,14 +231,32 @@ public class ParticipantSchemeController(
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Edit(Guid id, ParticipantSchemeFormViewModel model, CancellationToken cancellationToken)
+    public async Task<IActionResult> Edit(Guid id, ParticipantSchemeFormViewModel model, string? confirmation = null, CancellationToken cancellationToken = default)
     {
+        ApplyOverridePermission(model);
+
+        // Cancel on the confirmation page posts the unsaved form back; show it exactly as it was.
+        if (ConfirmationFlow.IsCancelled(confirmation))
+        {
+            ModelState.Clear();
+            return await RedisplayEditAsync(id, model, cancellationToken);
+        }
+
+        await ValidateDataConsentAsync(model, cancellationToken);
+
         if (!ModelState.IsValid)
         {
-            await PopulateDataConsentAsync(model, cancellationToken);
-            await PopulatePricingPlanAsync(model, isFreshLoad: false, cancellationToken);
-            await PopulateGroupAddressOptionsAsync(model, cancellationToken);
-            return View(model);
+            return await RedisplayEditAsync(id, model, cancellationToken);
+        }
+
+        if (!ConfirmationFlow.IsConfirmed(confirmation) && model.SchemeId is { } schemeId)
+        {
+            var stored = await participantSchemeApiClient.GetParticipantSchemeAsync(id, cancellationToken);
+            var storedMonths = stored is null ? null : ToFormViewModel(stored, model.CustomerId.GetValueOrDefault(), model.YearId.GetValueOrDefault(), isReadOnly: false).DistributionMonths();
+            if (await InitialisedMonthConfirmationAsync(model, schemeId, storedMonths, cancellationToken) is { } confirmationPage)
+            {
+                return this.ConfirmationPage(confirmationPage);
+            }
         }
 
         try
@@ -222,10 +266,7 @@ public class ParticipantSchemeController(
             {
                 LogUpdateFailedMessage(logger, id, null);
                 this.AddFieldErrors(result.FieldErrors);
-                await PopulateDataConsentAsync(model, cancellationToken);
-                await PopulatePricingPlanAsync(model, isFreshLoad: false, cancellationToken);
-                await PopulateGroupAddressOptionsAsync(model, cancellationToken);
-                return View(model);
+                return await RedisplayEditAsync(id, model, cancellationToken);
             }
 
             LogUpdatedMessage(logger, id, null);
@@ -236,12 +277,55 @@ public class ParticipantSchemeController(
         {
             LogSaveErrorMessage(logger, model.ContractId.GetValueOrDefault(), ex);
             ModelState.AddModelError(string.Empty, "The contract item could not be saved. Please try again.");
-            await PopulateDataConsentAsync(model, cancellationToken);
-            await PopulatePricingPlanAsync(model, isFreshLoad: false, cancellationToken);
-            await PopulateGroupAddressOptionsAsync(model, cancellationToken);
-            return View(model);
+            return await RedisplayEditAsync(id, model, cancellationToken);
         }
     }
+
+    private async Task<IActionResult> RedisplayEditAsync(Guid id, ParticipantSchemeFormViewModel model, CancellationToken cancellationToken)
+    {
+        await PopulateEditRedisplayAsync(id, model, cancellationToken);
+        await PopulatePricingPlanAsync(model, isFreshLoad: false, cancellationToken);
+        await PopulateGroupAddressOptionsAsync(model, cancellationToken);
+        return View(model);
+    }
+
+    // Legacy runs the Override button only for "Override Schemes" users (ButtonOverride.Visible); a posted
+    // override flag from anyone else is ignored so the role cannot be bypassed by editing the form.
+    private void ApplyOverridePermission(ParticipantSchemeFormViewModel model)
+    {
+        model.CanOverride = User.HasInternalRole(InternalRoleNames.OverrideSchemes);
+        if (!model.CanOverride)
+        {
+            model.OverrideModeActive = false;
+        }
+    }
+
+    // Legacy put alert('Warning: This Distribution has already been initialised.') on every such month
+    // checkbox. Here the page shows the same warning inline, and Save asks for confirmation (shared
+    // confirmation page) when the user actually changed one of those months.
+    private async Task<ConfirmationPageViewModel?> InitialisedMonthConfirmationAsync(ParticipantSchemeFormViewModel model, Guid schemeId, bool[]? storedMonths, CancellationToken cancellationToken)
+    {
+        var context = await participantSchemeApiClient.GetParticipantSchemeContextAsync(model.ContractId.GetValueOrDefault(), schemeId, cancellationToken);
+        var posted = model.DistributionMonths();
+        var changed = context.InitialisedMonthIds
+            .Where(monthId => monthId is >= 1 and <= 12 && posted[monthId - 1] != (storedMonths?[monthId - 1] ?? false))
+            .Order()
+            .ToList();
+        if (changed.Count == 0)
+        {
+            return null;
+        }
+
+        return new ConfirmationPageViewModel
+        {
+            Title = "Change an initialised distribution?",
+            Message = $"Warning: This Distribution has already been initialised ({string.Join(", ", changed.Select(MonthName))}).",
+            ConfirmText = "Continue",
+        };
+    }
+
+    private static string MonthName(int monthId) =>
+        System.Globalization.CultureInfo.InvariantCulture.DateTimeFormat.GetMonthName(monthId);
 
     private async Task PopulateParticipantOptionsAsync(ParticipantSchemeFormViewModel model, CancellationToken cancellationToken)
     {
@@ -253,7 +337,7 @@ public class ParticipantSchemeController(
 
     // Matches legacy GridViewSchemes (SchemeInfoCollection.FetchSchemeInfoCollectionByYearId, paged
     // at 15/page) - reuses the existing Scheme domain's search/paging rather than duplicating it.
-    private async Task PopulateSchemeContextAsync(ParticipantSchemeFormViewModel model, CancellationToken cancellationToken)
+    private async Task PopulateSchemeContextAsync(ParticipantSchemeFormViewModel model, CancellationToken cancellationToken, bool applyDefaultMonths = false)
     {
         if (model.SchemeId is { } schemeId)
         {
@@ -261,6 +345,7 @@ public class ParticipantSchemeController(
             model.SchemeDisplayName = scheme is null ? string.Empty : $"{scheme.Identifier}: {scheme.Name}";
             model.SchemeRequiresDataConsent = scheme?.DataConsentDeclarationActive ?? false;
             ApplySchemeMonths(model, scheme);
+            await ApplyNewItemContextAsync(model, schemeId, applyDefaultMonths, cancellationToken);
             return;
         }
 
@@ -275,6 +360,64 @@ public class ParticipantSchemeController(
         var scheme = await schemeApiClient.GetSchemeAsync(model.SchemeId.GetValueOrDefault(), cancellationToken);
         model.SchemeRequiresDataConsent = scheme?.DataConsentDeclarationActive ?? false;
         ApplySchemeMonths(model, scheme);
+    }
+
+    // Legacy HasDataConsentBeenGiven: when the scheme asks for consent, Save is blocked until ticked.
+    private async Task ValidateDataConsentAsync(ParticipantSchemeFormViewModel model, CancellationToken cancellationToken)
+    {
+        var scheme = await schemeApiClient.GetSchemeAsync(model.SchemeId.GetValueOrDefault(), cancellationToken);
+        if (scheme?.DataConsentDeclarationActive == true && !model.DataConsentDeclarationGiven)
+        {
+            ModelState.AddModelError(nameof(model.DataConsentDeclarationGiven), "Accept 'Data Consent Declaration' before saving");
+        }
+    }
+
+    // Legacy ParticipantScheme.SchemeId setter: which months are already posted (locked) for this
+    // customer, and, on first selection (legacy Schemes_RowCommand), every month the scheme offers
+    // and that is still open starts ticked.
+    private async Task ApplyNewItemContextAsync(ParticipantSchemeFormViewModel model, Guid schemeId, bool applyDefaultMonths, CancellationToken cancellationToken)
+    {
+        var context = await participantSchemeApiClient.GetParticipantSchemeContextAsync(model.ContractId.GetValueOrDefault(), schemeId, cancellationToken);
+        model.SetCanEditMonths(context.CanEdit);
+        model.InitialisedMonthIds = context.InitialisedMonthIds;
+
+        if (applyDefaultMonths)
+        {
+            var offered = model.SchemeOffersMonths();
+            model.SetDistributionMonths([.. offered.Select((offeredMonth, i) => offeredMonth && context.CanEdit[i])]);
+        }
+    }
+
+    private async Task PopulateWarningsAsync(ParticipantSchemeFormViewModel model, CancellationToken cancellationToken)
+    {
+        var context = await participantSchemeApiClient.GetParticipantSchemeContextAsync(model.ContractId.GetValueOrDefault(), model.SchemeId.GetValueOrDefault(), cancellationToken);
+        model.InitialisedMonthIds = context.InitialisedMonthIds;
+    }
+
+    // Month checkboxes that are disabled post nothing, and CanEdit*/IsOverride* are display-only - so a
+    // failed save is redisplayed from the stored item: locked months keep their stored tick (legacy
+    // shows `scheme month And stored month`), unless Override mode is active where legacy shows them clear.
+    private async Task PopulateEditRedisplayAsync(Guid id, ParticipantSchemeFormViewModel model, CancellationToken cancellationToken)
+    {
+        var existing = await participantSchemeApiClient.GetParticipantSchemeAsync(id, cancellationToken);
+        if (existing is not null)
+        {
+            var stored = ToFormViewModel(existing, model.CustomerId.GetValueOrDefault(), model.YearId.GetValueOrDefault(), isReadOnly: false);
+            model.ParticipantDisplayName = stored.ParticipantDisplayName;
+            model.SchemeDisplayName = stored.SchemeDisplayName;
+            model.SetCanEditMonths(stored.CanEditMonths());
+            model.SetOverrideMonths(stored.OverrideMonths());
+
+            var posted = model.DistributionMonths();
+            var storedMonths = stored.DistributionMonths();
+            var canEdit = stored.CanEditMonths();
+            var overridden = stored.OverrideMonths();
+            var overrideMode = model.OverrideModeActive.GetValueOrDefault();
+            model.SetDistributionMonths([.. posted.Select((month, i) => canEdit[i] || (overrideMode && !overridden[i]) ? month : storedMonths[i])]);
+        }
+
+        await PopulateDataConsentAsync(model, cancellationToken);
+        await PopulateWarningsAsync(model, cancellationToken);
     }
 
     // Matches legacy GroupAddressCollection.FetchGroupAddressCollection() (populates the "Select a
@@ -302,11 +445,15 @@ public class ParticipantSchemeController(
         model.GroupAddressCountry = selected?.CountryName;
     }
 
-    // Matches legacy LoadPricingOptions: DdlPricingPlan only ever offers "Full scheme pricing" once
-    // every scheme month the participant could possibly have is already selected (or none at all
-    // when the whole scheme is fully available), otherwise it offers "Weighted pricing plan"/
-    // "Pro rata"; hidden entirely when the contract's year has no weighted-pricing plan configured
-    // (WeightedPricingYearCollection.PricingPlanExists).
+    // Matches legacy LoadPricingOptions(numOnScheme, numAvailableOnScheme, numOnParticipantScheme, isWeighted):
+    // "Full scheme pricing" is the only option when the participant has every scheme month, or none yet
+    // while the whole scheme is still open; otherwise "Weighted pricing plan" / "Pro rata" (new items
+    // default to Weighted, saved ones to their stored plan). Hidden entirely when the contract's year has
+    // no weighted-pricing plan (WeightedPricingYearCollection.PricingPlanExists). numOnScheme/
+    // numAvailableOnScheme are the SCHEME's months (the latter minus months whose distribution is already
+    // defined), not the participant's posted months. A brand-new item starts from zero months, as legacy
+    // does when a Scheme is selected; later redisplays use the months actually chosen. The page script
+    // (_ParticipantSchemeFields) repeats this on every month/consent change, replacing legacy's AutoPostBack.
     private async Task PopulatePricingPlanAsync(ParticipantSchemeFormViewModel model, bool isFreshLoad, CancellationToken cancellationToken)
     {
         var weightedYears = await lookupApiClient.GetWeightedPricingYearsAsync(cancellationToken);
@@ -319,14 +466,12 @@ public class ParticipantSchemeController(
             return;
         }
 
-        var numberOnScheme = CountSchemeMonths(model);
-        var numberAvailableOnScheme = CountAvailableSchemeMonths(model);
-        var numberOnParticipantScheme = CountParticipantSchemeMonths(model);
+        var numberOnParticipantScheme = isFreshLoad && model.ParticipantSchemeId is null ? 0 : CountParticipantSchemeMonths(model);
 
-        if (numberOnParticipantScheme == numberOnScheme || (numberOnParticipantScheme == 0 && numberOnScheme == numberAvailableOnScheme))
+        if (numberOnParticipantScheme == model.NumberOnScheme || (numberOnParticipantScheme == 0 && model.NumberOnScheme == model.NumberAvailableOnScheme))
         {
-            model.PricingPlanOptions = [new SelectListItem("Full scheme pricing", "Full")];
-            model.PricingPlan = "Full";
+            model.PricingPlanOptions = [new SelectListItem("Full scheme pricing", FullPricingPlan)];
+            model.PricingPlan = FullPricingPlan;
             return;
         }
 
@@ -336,35 +481,12 @@ public class ParticipantSchemeController(
             new SelectListItem("Pro rata", ProRataPricingPlan)
         ];
 
-        if (isFreshLoad)
+        // A redisplay keeps the plan the user chose; only a plan that is no longer on offer is reset.
+        if (isFreshLoad || model.PricingPlan is not (WeightedPricingPlan or ProRataPricingPlan))
         {
-            if (model.ParticipantSchemeId is null)
-            {
-                model.PricingPlan = WeightedPricingPlan;
-            }
-            else
-            {
-                model.PricingPlan = model.IsWeightedPricing.GetValueOrDefault() ? WeightedPricingPlan : ProRataPricingPlan;
-            }
+            model.PricingPlan = model.ParticipantSchemeId is null || model.IsWeightedPricing.GetValueOrDefault() ? WeightedPricingPlan : ProRataPricingPlan;
         }
     }
-
-    private static int CountSchemeMonths(ParticipantSchemeFormViewModel m) => new[]
-    {
-        m.SchemeDistributionMonthJan, m.SchemeDistributionMonthFeb, m.SchemeDistributionMonthMar, m.SchemeDistributionMonthApr,
-        m.SchemeDistributionMonthMay, m.SchemeDistributionMonthJun, m.SchemeDistributionMonthJul, m.SchemeDistributionMonthAug,
-        m.SchemeDistributionMonthSep, m.SchemeDistributionMonthOct, m.SchemeDistributionMonthNov, m.SchemeDistributionMonthDec
-    }.Count(x => x);
-
-    private static int CountAvailableSchemeMonths(ParticipantSchemeFormViewModel m) => new[]
-    {
-        m.SchemeDistributionMonthJan && m.CanEditJan, m.SchemeDistributionMonthFeb && m.CanEditFeb,
-        m.SchemeDistributionMonthMar && m.CanEditMar, m.SchemeDistributionMonthApr && m.CanEditApr,
-        m.SchemeDistributionMonthMay && m.CanEditMay, m.SchemeDistributionMonthJun && m.CanEditJun,
-        m.SchemeDistributionMonthJul && m.CanEditJul, m.SchemeDistributionMonthAug && m.CanEditAug,
-        m.SchemeDistributionMonthSep && m.CanEditSep, m.SchemeDistributionMonthOct && m.CanEditOct,
-        m.SchemeDistributionMonthNov && m.CanEditNov, m.SchemeDistributionMonthDec && m.CanEditDec
-    }.Count(x => x);
 
     private static int CountParticipantSchemeMonths(ParticipantSchemeFormViewModel m) => new[]
     {
@@ -392,6 +514,16 @@ public class ParticipantSchemeController(
         model.SchemeDistributionMonthOct = scheme?.DistributionMonthOct ?? true;
         model.SchemeDistributionMonthNov = scheme?.DistributionMonthNov ?? true;
         model.SchemeDistributionMonthDec = scheme?.DistributionMonthDec ?? true;
+
+        // Legacy Scheme.NumberDistributionsOnScheme / NumberDistributionsAvailableOnScheme.
+        var offered = model.SchemeOffersMonths();
+        var defined = scheme?.CanEdit;
+        bool[] open = defined is null
+            ? [.. offered.Select(_ => true)]
+            : [defined.Jan, defined.Feb, defined.Mar, defined.Apr, defined.May, defined.Jun, defined.Jul, defined.Aug, defined.Sep, defined.Oct, defined.Nov, defined.Dec];
+        model.NumberOnScheme = offered.Count(x => x);
+        model.NumberAvailableOnScheme = offered.Where((offeredMonth, i) => offeredMonth && open[i]).Count();
+        model.SchemeDistributionAsAvailable = scheme?.DistributionAsAvailable ?? false;
     }
 
     private static CreateParticipantSchemeRequest ToCreateRequest(ParticipantSchemeFormViewModel model)
@@ -536,7 +668,6 @@ public class ParticipantSchemeController(
         IsOverrideOct = participantScheme.IsOverrideOct,
         IsOverrideNov = participantScheme.IsOverrideNov,
         IsOverrideDec = participantScheme.IsOverrideDec,
-        Price = participantScheme.Price,
         IsReadOnly = isReadOnly,
         GroupAddressId = participantScheme.GroupAddressId
     };

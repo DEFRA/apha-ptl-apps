@@ -29,6 +29,13 @@ public sealed class ParticipantSchemeController(IParticipantSchemeService partic
         return Ok(ToResponse(participantScheme));
     }
 
+    [HttpGet("participant-schemes/context")]
+    public async Task<ActionResult<ParticipantSchemeContextResponse>> GetParticipantSchemeContext([FromQuery] Guid contractId, [FromQuery] Guid schemeId, CancellationToken cancellationToken)
+    {
+        var context = await participantSchemeService.GetParticipantSchemeContextAsync(contractId, schemeId, cancellationToken);
+        return Ok(new ParticipantSchemeContextResponse([.. context.CanEdit], [.. context.InitialisedMonthIds]));
+    }
+
     [HttpPost("participant-schemes")]
     public async Task<ActionResult<ParticipantSchemeResponse>> CreateParticipantScheme([FromBody] CreateParticipantSchemeRequest request, CancellationToken cancellationToken)
     {

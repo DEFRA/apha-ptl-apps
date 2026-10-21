@@ -8,6 +8,7 @@ namespace PTL.ApiClient;
 public interface IParticipantSchemeApiClient
 {
     Task<ParticipantSchemeResponse?> GetParticipantSchemeAsync(Guid participantSchemeId, CancellationToken cancellationToken = default);
+    Task<ParticipantSchemeContextResponse> GetParticipantSchemeContextAsync(Guid contractId, Guid schemeId, CancellationToken cancellationToken = default);
     Task<ParticipantSchemeSaveResult> CreateParticipantSchemeAsync(CreateParticipantSchemeRequest request, CancellationToken cancellationToken = default);
     Task<ParticipantSchemeSaveResult> UpdateParticipantSchemeAsync(Guid participantSchemeId, UpdateParticipantSchemeRequest request, CancellationToken cancellationToken = default);
     Task<ParticipantSchemeSaveResult> DeleteParticipantSchemeAsync(Guid participantSchemeId, CancellationToken cancellationToken = default);
@@ -27,6 +28,14 @@ public sealed class ParticipantSchemeApiClient(HttpClient httpClient) : IPartici
 
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadFromJsonAsync<ParticipantSchemeResponse>(cancellationToken);
+    }
+
+    public async Task<ParticipantSchemeContextResponse> GetParticipantSchemeContextAsync(Guid contractId, Guid schemeId, CancellationToken cancellationToken = default)
+    {
+        var response = await httpClient.GetAsync($"/api/participant-schemes/context?contractId={contractId}&schemeId={schemeId}", cancellationToken);
+        response.EnsureSuccessStatusCode();
+        var context = await response.Content.ReadFromJsonAsync<ParticipantSchemeContextResponse>(cancellationToken);
+        return context ?? new ParticipantSchemeContextResponse(Enumerable.Repeat(true, 12).ToArray(), []);
     }
 
     public async Task<ParticipantSchemeSaveResult> CreateParticipantSchemeAsync(CreateParticipantSchemeRequest request, CancellationToken cancellationToken = default)

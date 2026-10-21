@@ -1,17 +1,24 @@
 using System.Globalization;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.Extensions.Logging;
 using PTL.ApiClient;
 using PTL.Contracts.Participant;
 using PTL.Core.Labels;
+using PTL.InternalWeb.Authorization;
 using PTL.InternalWeb.Navigation;
 using PTL.SharedUI.Notifications;
 
 namespace PTL.InternalWeb.Features.Participant;
 
+// Legacy "Contracts Admin" folder - requires the Contracts Admin role (PtlPolicies.ContractsAdmin).
+[Authorize(Policy = PtlPolicies.ContractsAdmin)]
 public class ParticipantController(IParticipantApiClient participantApiClient, ICustomerApiClient customerApiClient, ILookupApiClient lookupApiClient, ILogger<ParticipantController> logger) : Controller
 {
+    // Legacy ReviewPendingParticipantUpdates.aspx GridView.PageSize.
+    private const int PendingUpdatesPageSize = 20;
+
     private static readonly Action<ILogger, bool, int, int, Exception?> LogDisplayedParticipantListMessage =
         LoggerMessage.Define<bool, int, int>(
             LogLevel.Information,
@@ -209,11 +216,18 @@ public class ParticipantController(IParticipantApiClient participantApiClient, I
         return RedirectToAction(nameof(Details), new { id = result.Participant.ParticipantId });
     }
 
-    // Review Pending Participant Updates (legacy ReviewPendingParticipantUpdates.aspx).
-    public async Task<IActionResult> ReviewPendingParticipantUpdates(CancellationToken cancellationToken)
+    // Review Pending Participant Updates (legacy ReviewPendingParticipantUpdates.aspx). Legacy loaded every pending
+    // update and paged the grid in memory at 20 rows, which is what happens here.
+    public async Task<IActionResult> ReviewPendingParticipantUpdates(int page = 1, int pageSize = PendingUpdatesPageSize, CancellationToken cancellationToken = default)
     {
         var updates = await participantApiClient.GetPendingParticipantUpdatesAsync(cancellationToken);
-        return View(new PendingParticipantUpdateListViewModel(updates));
+
+        pageSize = PTL.SharedUI.Pagination.PaginationModel.AvailablePageSizes.Contains(pageSize) ? pageSize : PendingUpdatesPageSize;
+        var totalPages = Math.Max(1, (int)Math.Ceiling(updates.Count / (double)pageSize));
+        page = Math.Clamp(page, 1, totalPages);
+
+        var pageOfUpdates = updates.Skip((page - 1) * pageSize).Take(pageSize).ToList();
+        return View(new PendingParticipantUpdateListViewModel(pageOfUpdates, page, pageSize, updates.Count));
     }
 
     // Pending Participant Update Details (legacy PendingParticipantUpdateDetails.aspx) - current vs
@@ -256,7 +270,7 @@ public class ParticipantController(IParticipantApiClient participantApiClient, I
             return View(model);
         }
 
-        var result = await participantApiClient.ApprovePendingParticipantUpdateAsync(participantId, ToPendingSaveRequest(model), cancellationToken);
+        var result = await participantApiClient.ApprovePendingParticipantUpdateAsync(participantId, ToPendingSaveRequest(model), model.Comments, cancellationToken);
         if (result.NotFound)
         {
             return NotFound();
@@ -269,16 +283,16 @@ public class ParticipantController(IParticipantApiClient participantApiClient, I
             return View(model);
         }
 
-        TempData.SetNotification(NotificationType.Success, "Participant update approved successfully.");
+        TempData.SetNotification(NotificationType.Success, "Participant details updated successfully.");
         return RedirectToAction(nameof(ReviewPendingParticipantUpdates));
     }
 
     // Only approved changes update the live participant record - declined changes do not.
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> ApprovePendingParticipantUpdate(Guid participantId, CancellationToken cancellationToken)
+    public async Task<IActionResult> ApprovePendingParticipantUpdate(Guid participantId, string? comments, CancellationToken cancellationToken)
     {
-        var result = await participantApiClient.ApprovePendingParticipantUpdateAsync(participantId, request: null, cancellationToken);
+        var result = await participantApiClient.ApprovePendingParticipantUpdateAsync(participantId, request: null, comments, cancellationToken);
         if (result.NotFound)
         {
             return NotFound();
@@ -293,21 +307,21 @@ public class ParticipantController(IParticipantApiClient participantApiClient, I
             return RedirectToAction(nameof(EditPendingParticipantUpdate), new { participantId });
         }
 
-        TempData.SetNotification(NotificationType.Success, "Participant update approved successfully.");
+        TempData.SetNotification(NotificationType.Success, "Participant details updated successfully.");
         return RedirectToAction(nameof(ReviewPendingParticipantUpdates));
     }
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> DeclinePendingParticipantUpdate(Guid participantId, CancellationToken cancellationToken)
+    public async Task<IActionResult> DeclinePendingParticipantUpdate(Guid participantId, string? comments, CancellationToken cancellationToken)
     {
-        var declined = await participantApiClient.DeclinePendingParticipantUpdateAsync(participantId, cancellationToken);
+        var declined = await participantApiClient.DeclinePendingParticipantUpdateAsync(participantId, comments, cancellationToken);
         if (!declined)
         {
             return NotFound();
         }
 
-        TempData.SetNotification(NotificationType.Success, "Participant update declined successfully.");
+        TempData.SetNotification(NotificationType.Success, "Participant updates declined successfully.");
         return RedirectToAction(nameof(ReviewPendingParticipantUpdates));
     }
 

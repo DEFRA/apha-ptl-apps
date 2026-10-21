@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging.Abstractions;
+using PTL.Api.Tests.Notifications;
 using PTL.Contracts.Customer;
 using PTL.Core.Customer;
 
@@ -6,8 +7,8 @@ namespace PTL.Api.Tests.Customer;
 
 public class CustomerServiceTests
 {
-    private static CustomerService CreateService(FakeCustomerRepository repository, FakePendingCustomerUpdateRepository? pendingRepository = null) =>
-        new(repository, pendingRepository ?? new FakePendingCustomerUpdateRepository(), NullLogger<CustomerService>.Instance);
+    private static CustomerService CreateService(FakeCustomerRepository repository, FakePendingCustomerUpdateRepository? pendingRepository = null, FakeCustomerUpdateNotifier? notifier = null) =>
+        new(repository, pendingRepository ?? new FakePendingCustomerUpdateRepository(), notifier ?? new FakeCustomerUpdateNotifier(), NullLogger<CustomerService>.Instance);
 
     private static PTL.Core.Customer.Customer ValidActiveCustomer(string name = "Sample Laboratories Ltd") => new()
     {
@@ -350,5 +351,148 @@ public class CustomerServiceTests
         var declined = await service.DeclinePendingCustomerUpdateAsync(Guid.NewGuid());
 
         Assert.False(declined);
+    }
+
+    [Fact]
+    public async Task ApprovePendingCustomerUpdateAsync_QueuesTheAcceptedEmailForTheNewAddressAndSendsIt()
+    {
+        var repository = new FakeCustomerRepository();
+        var customer = await repository.CreateAsync(ValidActiveCustomer());
+        var pendingRepository = new FakePendingCustomerUpdateRepository();
+        var pending = SamplePendingUpdate(customer.CustomerId);
+        pendingRepository.Seed(pending);
+        var notifier = new FakeCustomerUpdateNotifier();
+        var service = CreateService(repository, pendingRepository, notifier);
+
+        await service.ApprovePendingCustomerUpdateAsync(customer.CustomerId, comments: "Thanks for the update");
+
+        var queued = Assert.Single(pendingRepository.QueuedNotifications);
+        Assert.Equal(pending.Email, queued.Email);
+        Assert.NotEqual(customer.Email, queued.Email);
+        Assert.Equal(pending.PendingCustomerUpdateId, queued.PendingCustomerUpdateId);
+        Assert.Equal(customer.Name, queued.CustomerName);
+        Assert.Equal("Thanks for the update", queued.Notes);
+        Assert.True(queued.IsApproved);
+        Assert.Equal([pending.PendingCustomerUpdateId], notifier.SentForUpdates);
+    }
+
+    [Fact]
+    public async Task ApprovePendingCustomerUpdateAsync_EditedEmail_IsTheOneNotified()
+    {
+        var repository = new FakeCustomerRepository();
+        var customer = await repository.CreateAsync(ValidActiveCustomer());
+        var pendingRepository = new FakePendingCustomerUpdateRepository();
+        pendingRepository.Seed(SamplePendingUpdate(customer.CustomerId));
+        var service = CreateService(repository, pendingRepository);
+        var edited = SamplePendingUpdate(customer.CustomerId);
+        edited.Email = "amended@example.com";
+
+        await service.ApprovePendingCustomerUpdateAsync(customer.CustomerId, edited);
+
+        Assert.Equal("amended@example.com", Assert.Single(pendingRepository.QueuedNotifications).Email);
+    }
+
+    [Fact]
+    public async Task DeclinePendingCustomerUpdateAsync_QueuesTheDeclinedEmailForTheCurrentAddressAndSendsIt()
+    {
+        var repository = new FakeCustomerRepository();
+        var customer = await repository.CreateAsync(ValidActiveCustomer());
+        var pendingRepository = new FakePendingCustomerUpdateRepository();
+        var pending = SamplePendingUpdate(customer.CustomerId);
+        pendingRepository.Seed(pending);
+        var notifier = new FakeCustomerUpdateNotifier();
+        var service = CreateService(repository, pendingRepository, notifier);
+
+        await service.DeclinePendingCustomerUpdateAsync(customer.CustomerId, "Not eligible");
+
+        var queued = Assert.Single(pendingRepository.QueuedNotifications);
+        Assert.Equal(customer.Email, queued.Email);
+        Assert.Equal("Not eligible", queued.Notes);
+        Assert.False(queued.IsApproved);
+        Assert.Equal([pending.PendingCustomerUpdateId], notifier.SentForUpdates);
+    }
+
+    [Fact]
+    public async Task ApproveAndDecline_NothingDecided_QueueAndSendNothing()
+    {
+        var repository = new FakeCustomerRepository();
+        var pendingRepository = new FakePendingCustomerUpdateRepository();
+        var notifier = new FakeCustomerUpdateNotifier();
+        var service = CreateService(repository, pendingRepository, notifier);
+
+        Assert.False(await service.ApprovePendingCustomerUpdateAsync(Guid.NewGuid()));
+        Assert.False(await service.DeclinePendingCustomerUpdateAsync(Guid.NewGuid()));
+
+        Assert.Empty(pendingRepository.QueuedNotifications);
+        Assert.Empty(notifier.SentForUpdates);
+    }
+
+    [Fact]
+    public async Task DeclinePendingCustomerUpdateAsync_BlankCustomerEmail_QueuesAndSendsNothing()
+    {
+        var repository = new FakeCustomerRepository();
+        var noEmail = ValidActiveCustomer();
+        noEmail.Email = string.Empty;
+        var customer = await repository.CreateAsync(noEmail);
+        var pendingRepository = new FakePendingCustomerUpdateRepository();
+        pendingRepository.Seed(SamplePendingUpdate(customer.CustomerId));
+        var notifier = new FakeCustomerUpdateNotifier();
+        var service = CreateService(repository, pendingRepository, notifier);
+
+        Assert.True(await service.DeclinePendingCustomerUpdateAsync(customer.CustomerId));
+
+        Assert.Empty(pendingRepository.QueuedNotifications);
+        Assert.Empty(notifier.SentForUpdates);
+    }
+
+    [Fact]
+    public async Task DeclinePendingCustomerUpdateAsync_LongNameAndEmail_AreCutToTheQueueColumnLengths()
+    {
+        var repository = new FakeCustomerRepository();
+        var longCustomer = ValidActiveCustomer(new string('N', 80));
+        longCustomer.Email = new string('e', 120);
+        var customer = await repository.CreateAsync(longCustomer);
+        var pendingRepository = new FakePendingCustomerUpdateRepository();
+        pendingRepository.Seed(SamplePendingUpdate(customer.CustomerId));
+        var service = CreateService(repository, pendingRepository);
+
+        await service.DeclinePendingCustomerUpdateAsync(customer.CustomerId);
+
+        var queued = Assert.Single(pendingRepository.QueuedNotifications);
+        Assert.Equal(50, queued.CustomerName.Length);
+        Assert.Equal(100, queued.Email.Length);
+    }
+
+    [Fact]
+    public async Task ApprovePendingCustomerUpdateAsync_CommentsTooLong_ThrowsAndChangesNothing()
+    {
+        var repository = new FakeCustomerRepository();
+        var customer = await repository.CreateAsync(ValidActiveCustomer());
+        var pendingRepository = new FakePendingCustomerUpdateRepository();
+        pendingRepository.Seed(SamplePendingUpdate(customer.CustomerId));
+        var notifier = new FakeCustomerUpdateNotifier();
+        var service = CreateService(repository, pendingRepository, notifier);
+
+        var ex = await Assert.ThrowsAsync<CustomerValidationException>(() => service.ApprovePendingCustomerUpdateAsync(customer.CustomerId, comments: new string('x', 2001)));
+
+        Assert.Equal("Comments", Assert.Single(ex.Errors).Field);
+        Assert.Equal("Alice Example", (await repository.GetByIdAsync(customer.CustomerId))!.ContactName);
+        Assert.NotNull(await pendingRepository.GetByCustomerIdAsync(customer.CustomerId));
+        Assert.Empty(pendingRepository.QueuedNotifications);
+        Assert.Empty(notifier.SentForUpdates);
+    }
+
+    [Fact]
+    public async Task DeclinePendingCustomerUpdateAsync_CommentsTooLong_ThrowsAndKeepsTheUpdatePending()
+    {
+        var repository = new FakeCustomerRepository();
+        var customer = await repository.CreateAsync(ValidActiveCustomer());
+        var pendingRepository = new FakePendingCustomerUpdateRepository();
+        pendingRepository.Seed(SamplePendingUpdate(customer.CustomerId));
+        var service = CreateService(repository, pendingRepository);
+
+        await Assert.ThrowsAsync<CustomerValidationException>(() => service.DeclinePendingCustomerUpdateAsync(customer.CustomerId, new string('x', 2001)));
+
+        Assert.NotNull(await pendingRepository.GetByCustomerIdAsync(customer.CustomerId));
     }
 }

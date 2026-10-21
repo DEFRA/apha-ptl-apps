@@ -20,11 +20,12 @@ public interface IParticipantService
     // pending update. When editedFields is supplied those values are applied in place of the stored
     // pending values (legacy ButtonApprove_Click writes the on-screen values to both records).
     // Returns false when no matching pending update exists. Throws ParticipantValidationException
-    // when the resulting participant breaks business rules.
-    Task<bool> ApprovePendingParticipantUpdateAsync(Guid participantId, PendingParticipantUpdate? editedFields = null, CancellationToken cancellationToken = default);
+    // when the resulting participant breaks business rules or the comments exceed 2000 characters.
+    // The comments become the notification email's "Additional Information".
+    Task<bool> ApprovePendingParticipantUpdateAsync(Guid participantId, PendingParticipantUpdate? editedFields = null, string comments = "", CancellationToken cancellationToken = default);
 
     // Soft-deletes the pending update without changing the live participant record.
-    Task<bool> DeclinePendingParticipantUpdateAsync(Guid participantId, CancellationToken cancellationToken = default);
+    Task<bool> DeclinePendingParticipantUpdateAsync(Guid participantId, string comments = "", CancellationToken cancellationToken = default);
 
     // Legacy ParticipantViewers.aspx. Returns null when the participant does not exist.
     Task<ParticipantViewerAssignment?> GetParticipantViewersAsync(Guid participantId, CancellationToken cancellationToken = default);

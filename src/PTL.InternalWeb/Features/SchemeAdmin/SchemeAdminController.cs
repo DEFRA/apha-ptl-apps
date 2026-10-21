@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using PTL.ApiClient;
@@ -7,11 +8,13 @@ using PTL.Contracts.Lookup;
 using PTL.Contracts.TestMethodItemType;
 using PTL.Contracts.TestResultItemType;
 using PTL.Contracts.TestType;
+using PTL.InternalWeb.Authorization;
 
 namespace PTL.InternalWeb.Features.SchemeAdmin;
 
-// Authentication/authorization are out of scope for this phase - same convention as
+// Legacy "Scheme Admin" folder - requires the Scheme Admin role (PtlPolicies.SchemeAdmin), same as
 // Features/Scheme/SchemeController.cs, which this "Manage Schemes" sub-area sits alongside.
+[Authorize(Policy = PtlPolicies.SchemeAdmin)]
 public class SchemeAdminController(ICategoryItemTypeApiClient categoryItemTypeApiClient, ITestTypeApiClient testTypeApiClient, ICriterionItemTypeApiClient criterionItemTypeApiClient, ITestResultItemTypeApiClient testResultItemTypeApiClient, ITestMethodItemTypeApiClient testMethodItemTypeApiClient, ILookupApiClient lookupApiClient, ILogger<SchemeAdminController> logger) : Controller
 {
     private static readonly Action<ILogger, Guid, Exception?> LogCategoryItemTypeRemoveBlockedMessage =

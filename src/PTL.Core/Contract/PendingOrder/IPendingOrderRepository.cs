@@ -31,4 +31,30 @@ public interface IPendingOrderRepository
     // spdPendingContractByPendingContractID - soft-deletes (fldIsDeleted = 1). Returns false when
     // the order is still outstanding afterwards.
     Task<bool> MarkDecidedAsync(Guid customerId, Guid pendingContractId, CancellationToken cancellationToken = default);
+
+    // spiOnlineContractOrderEmail - records one approve/decline email; it stays unsent until PendingOrderNotifier sends it.
+    Task QueueNotificationAsync(PendingOrderNotification notification, CancellationToken cancellationToken = default);
+
+    // spgaOnlineContractOrderEmail - every unsent row, once each (the procedure repeats a row per active participant).
+    Task<IReadOnlyList<OnlineOrderEmailEntity>> GetUnsentNotificationsAsync(CancellationToken cancellationToken = default);
+
+    // spuOnlineContractOrderEmail - stamps fldDateSent.
+    Task MarkNotificationSentAsync(Guid notificationId, DateTime sentAt, CancellationToken cancellationToken = default);
+}
+
+// One row of tblOnlineContractOrderEmail (legacy PendingContractOrder.EmailOrderNotifications). ContractId is
+// Guid.Empty for a declined order, as legacy passed Nothing.
+public sealed record PendingOrderNotification(
+    string Email,
+    Guid ContractId,
+    Guid PendingContractId,
+    int YearId,
+    string CustomerName,
+    string Notes,
+    bool IsApproved);
+
+// Thrown when Approve/Decline input breaks a legacy rule (purchase order number 255, comments 2000).
+public sealed class PendingOrderValidationException(IReadOnlyDictionary<string, string[]> errors) : Exception("Pending order validation failed.")
+{
+    public IReadOnlyDictionary<string, string[]> Errors { get; } = errors;
 }
