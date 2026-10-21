@@ -1,42 +1,22 @@
 @using PTL.Common.Auth
 @using PTL.InternalWeb.Features.Account
 @model (string ServiceName, string? LogoStyle)
-<header class="govuk-template__header">
-    <div class="govuk-header">
-        <div class="govuk-header__container govuk-width-container">
-            <div class="govuk-header__content">
-                <span class="govuk-header__link govuk-header__service-name">@Model.ServiceName</span>
-            </div>
-        </div>
-    </div>
-    <section aria-label="Service information" class="app-service-bar">
-        <div class="govuk-width-container app-service-bar__container">
-            <div>
-                <a asp-controller="Home" asp-action="Index" aria-label="Home">
-                    <img src="~/assets/images/AphaLogo.png" alt="APHA" style="@Model.LogoStyle" />
-                </a>
-            </div>
-            @if (User.Identity is not null && User.Identity.IsAuthenticated)
-            {
-                // Entra id_token claims first; the tblUsers name resolved at sign-in is a last resort.
-                var displayName = User.GetDisplayName(lastResortClaimType: InternalUserClaimTypes.FullName);
-                if (!string.IsNullOrWhiteSpace(displayName))
-                {
-                    <div class="app-account-panel">
-                        <span class="govuk-body govuk-!-margin-bottom-0">Signed in as: <strong>@displayName</strong></span>
-                    </div>
-                }
-            }
-        </div>
-    </section>
-    <div class="govuk-phase-banner govuk-width-container">
-        <p class="govuk-phase-banner__content">
-            <strong class="govuk-tag govuk-phase-banner__content__tag">
-                Alpha
-            </strong>
-            <span class="govuk-phase-banner__text">
-                This is a new service – your <a class="govuk-link" href="#">feedback</a> will help us to improve it.
-            </span>
-        </p>
-    </div>
-</header>
+<govuk-page-header service-name="@Model.ServiceName" logo-style="@Model.LogoStyle">
+    @if (User.Identity is not null && User.Identity.IsAuthenticated)
+    {
+        // Entra id_token claims first; the tblUsers name resolved at sign-in is a last resort.
+        var displayName = User.GetDisplayName(lastResortClaimType: InternalUserClaimTypes.FullName);
+        if (!string.IsNullOrWhiteSpace(displayName))
+        {
+            // govuk-service-navigation__wrapper is right-aligned via site.css (margin-left: auto)
+            // - matches ExternalWeb's header layout.
+            <nav aria-label="Account navigation" class="govuk-service-navigation__wrapper">
+                <ul class="govuk-service-navigation__list">
+                    <li class="govuk-service-navigation__item">
+                        Signed in as: <strong>@displayName</strong>
+                    </li>
+                </ul>
+            </nav>
+        }
+    }
+</govuk-page-header>

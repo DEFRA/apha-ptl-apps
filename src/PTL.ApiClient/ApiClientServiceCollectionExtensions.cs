@@ -171,6 +171,24 @@ public static class ApiClientServiceCollectionExtensions
             .AddHttpMessageHandler<ActingUserDelegatingHandler>()
             .AddStandardResilienceHandler();
 
+        services.AddHttpClient<ICategoryItemTypeApiClient, CategoryItemTypeApiClient>(client =>
+        {
+            client.BaseAddress = new Uri(apiBaseUrl);
+        })
+            .AddStandardResilienceHandler();
+
+        services.AddHttpClient<ITestTypeApiClient, TestTypeApiClient>(client =>
+        {
+            client.BaseAddress = new Uri(apiBaseUrl);
+        })
+            .AddStandardResilienceHandler();
+
+        services.AddHttpClient<ICriterionItemTypeApiClient, CriterionItemTypeApiClient>(client =>
+        {
+            client.BaseAddress = new Uri(apiBaseUrl);
+        })
+            .AddStandardResilienceHandler();
+
         services.AddHttpClient<IExternalSiteMessageApiClient, ExternalSiteMessageApiClient>(client =>
         {
             client.BaseAddress = new Uri(apiBaseUrl);

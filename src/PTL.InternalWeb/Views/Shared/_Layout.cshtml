@@ -38,7 +38,7 @@
             document.body.className += ' js-enabled' + ('noModule' in HTMLScriptElement.prototype ? ' govuk-frontend-supported' : '');
     </script>
     <a href="#main-content" class="govuk-skip-link" data-module="govuk-skip-link">Skip to main content</a>
-    @await Html.PartialAsync("_Header", ("Proficiency Testing - Internal", (string?)null))
+    @await Html.PartialAsync("_Header", ("Proficiency Testing - Internal", "height:80px; width:auto;"))
     <div class="govuk-width-container app-width-container">
         @* Breadcrumbs and the side navigation sit outside <main> so that the skip link lands on the
            page's own content, and so <main> holds only what is unique to this page. *@

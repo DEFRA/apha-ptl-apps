@@ -1,6 +1,7 @@
 using System.Reflection;
 using Dapper;
 using PTL.Core.AdministrationCharge;
+using PTL.Core.CategoryItemType;
 using PTL.Core.Contract;
 using PTL.Core.Contract.Export.Bulk;
 using PTL.Core.Contract.Export.Templates;
@@ -10,6 +11,7 @@ using PTL.Core.Contract.Renew;
 using PTL.Core.Contract.Renewal;
 using PTL.Core.Contract.SampleAddress;
 using PTL.Core.Country;
+using PTL.Core.CriterionItemType;
 using PTL.Core.Customer;
 using PTL.Core.Distribution;
 using PTL.Core.ExternalSiteMessage;
@@ -19,17 +21,21 @@ using PTL.Core.Invoice;
 using PTL.Core.Lookup;
 using PTL.Core.Participant;
 using PTL.Core.Scheme;
+using PTL.Core.TestType;
 using PTL.Core.User;
 using PTL.Core.Viewer;
 using PTL.Core.WeightedPricingPlan;
+using CoreCategoryItemType = PTL.Core.CategoryItemType.CategoryItemType;
 using CoreContract = PTL.Core.Contract.Contract;
 using CoreCountry = PTL.Core.Country.Country;
+using CoreCriterionItemType = PTL.Core.CriterionItemType.CriterionItemType;
 using CoreCustomer = PTL.Core.Customer.Customer;
 using CoreExternalSiteMessage = PTL.Core.ExternalSiteMessage.ExternalSiteMessage;
 using CoreGroupAddress = PTL.Core.GroupAddress.GroupAddress;
 using CoreInternalUser = PTL.Core.InternalUser.InternalUser;
 using CoreParticipant = PTL.Core.Participant.Participant;
 using CoreScheme = PTL.Core.Scheme.Scheme;
+using CoreTestType = PTL.Core.TestType.TestType;
 using CoreUser = PTL.Core.User.User;
 
 namespace PTL.Data.Infrastructure;
@@ -116,6 +122,7 @@ public static partial class DapperColumnMappings
     private const string ColDeadlineDate = "fldDeadlineDate";
     private const string ColDistributionParticipantId = "fldDistributionParticipantId";
     private const string ColTestMethodItemId = "fldTestMethodItemId";
+    private const string ColTestTypeId = "fldTestTypeId";
 
     public static void Register()
     {
@@ -373,6 +380,41 @@ public static partial class DapperColumnMappings
             ["CurrentYearId"] = nameof(SystemSettingsEntity.CurrentYearId),
             ["NextYearId"] = nameof(SystemSettingsEntity.NextYearId),
             ["fldContractStartDate"] = nameof(SystemSettingsEntity.ContractStartDate),
+            ["FinalYearId"] = nameof(SystemSettingsEntity.FinalYearId),
+        });
+
+        Map<CoreCategoryItemType>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldCategoryItemTypeId"] = nameof(CoreCategoryItemType.CategoryItemTypeId),
+            [ColName] = nameof(CoreCategoryItemType.Name),
+            ["fldStartYearId"] = nameof(CoreCategoryItemType.StartYearId),
+            ["fldEndYearId"] = nameof(CoreCategoryItemType.EndYearId),
+            ["fldNoLongerInUse"] = nameof(CoreCategoryItemType.NoLongerInUse),
+            ["ForeignInstances"] = nameof(CoreCategoryItemType.ForeignInstances),
+            ["ForeignInstancesString"] = nameof(CoreCategoryItemType.ForeignInstancesString),
+        });
+
+        Map<CoreCriterionItemType>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldCriterionItemTypeId"] = nameof(CoreCriterionItemType.CriterionItemTypeId),
+            [ColName] = nameof(CoreCriterionItemType.Name),
+            ["fldStartYearId"] = nameof(CoreCriterionItemType.StartYearId),
+            ["fldEndYearId"] = nameof(CoreCriterionItemType.EndYearId),
+            ["fldNoLongerInUse"] = nameof(CoreCriterionItemType.NoLongerInUse),
+            ["ForeignInstances"] = nameof(CoreCriterionItemType.ForeignInstances),
+            ["ForeignInstancesString"] = nameof(CoreCriterionItemType.ForeignInstancesString),
+        });
+
+        Map<CoreTestType>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            [ColTestTypeId] = nameof(CoreTestType.TestTypeId),
+            ["fldSharedId"] = nameof(CoreTestType.SharedId),
+            ["fldTestType"] = nameof(CoreTestType.Name),
+            ["fldStartYearId"] = nameof(CoreTestType.StartYearId),
+            ["fldEndYearId"] = nameof(CoreTestType.EndYearId),
+            ["fldNoLongerInUse"] = nameof(CoreTestType.NoLongerInUse),
+            ["ForeignInstances"] = nameof(CoreTestType.ForeignInstances),
+            ["ForeignInstancesString"] = nameof(CoreTestType.ForeignInstancesString),
         });
 
         // spgContractMerge result set 1 (legacy ContractMergeInfo).
@@ -865,7 +907,7 @@ public static partial class DapperColumnMappings
         Map<DistributionTestEntity>(new(StringComparer.OrdinalIgnoreCase)
         {
             [ColTestId] = nameof(DistributionTestEntity.TestId),
-            ["fldTestTypeId"] = nameof(DistributionTestEntity.TestTypeId),
+            [ColTestTypeId] = nameof(DistributionTestEntity.TestTypeId),
             ["TestName"] = nameof(DistributionTestEntity.TestName),
             [ColOrder] = nameof(DistributionTestEntity.Order),
         });
@@ -1088,7 +1130,7 @@ public static partial class DapperColumnMappings
         Map<SchemeTest>(new(StringComparer.OrdinalIgnoreCase)
         {
             [ColTestId] = nameof(SchemeTest.TestId),
-            ["fldTestTypeId"] = nameof(SchemeTest.TestTypeId),
+            [ColTestTypeId] = nameof(SchemeTest.TestTypeId),
             ["fldTestType"] = nameof(SchemeTest.TestType),
             [ColSchemeId] = nameof(SchemeTest.SchemeId),
             [ColOrder] = nameof(SchemeTest.Order),
@@ -1157,7 +1199,7 @@ public static partial class DapperColumnMappings
 
         Map<SchemeItemTypeEntity>(new(StringComparer.OrdinalIgnoreCase)
         {
-            ["fldTestTypeId"] = nameof(SchemeItemTypeEntity.ItemTypeId),
+            [ColTestTypeId] = nameof(SchemeItemTypeEntity.ItemTypeId),
             ["fldTestType"] = nameof(SchemeItemTypeEntity.Name),
             ["fldTestResultItemTypeId"] = nameof(SchemeItemTypeEntity.ItemTypeId),
             ["fldTestResultItemType"] = nameof(SchemeItemTypeEntity.Name),
