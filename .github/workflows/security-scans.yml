@@ -228,7 +228,7 @@ jobs:
             else
               echo "| Blocking | Rule | Severity | Location |"
               echo "|---|---|---|---|"
-              jq -r 'sort_by(-.severity) | .[] | "| \(if .blocking then "yes" else "no" end) | \(.rule) | \(.severity) | \(.file):\(.line) |"' <<< "${FINDINGS}"
+              jq -r 'sort_by(-.severity) | .[] | "| \(if .blocking then "yes" elif .accepted then "accepted" else "no" end) | \(.rule) | \(.severity) | \(.file):\(.line) |"' <<< "${FINDINGS}"
             fi
           } >> "${GITHUB_STEP_SUMMARY}"
 
