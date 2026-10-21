@@ -371,14 +371,14 @@ public sealed class ContractController(
         return items is null ? NotFound() : Ok(ToItemsResponse(items));
     }
 
-    // Legacy ContractItems.aspx BtnSave_Click: SetAudit(why, who) + Delete + Save per item. auditWhy is the
+    // Legacy ContractItems.aspx BtnSave_Click: SetAudit(why, who) + Delete + Save per item. The body carries the
     // reason the audit dialog captured; the acting user is taken from the forwarded identity.
     [HttpDelete("contracts/{contractId:guid}/items/{participantSchemeId:guid}")]
-    public async Task<IActionResult> RemoveContractItem(Guid contractId, Guid participantSchemeId, [FromQuery] string? auditWhy, CancellationToken cancellationToken)
+    public async Task<IActionResult> RemoveContractItem(Guid contractId, Guid participantSchemeId, [FromBody] ContractItemRemovalRequest? request, CancellationToken cancellationToken)
     {
         try
         {
-            var removed = await contractService.RemoveContractItemAsync(contractId, participantSchemeId, auditWhy, cancellationToken);
+            var removed = await contractService.RemoveContractItemAsync(contractId, participantSchemeId, request?.AuditWhy, cancellationToken);
             return removed ? NoContent() : NotFound();
         }
         catch (ContractValidationException ex)

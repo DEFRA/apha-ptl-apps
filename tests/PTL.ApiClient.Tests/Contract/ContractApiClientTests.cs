@@ -176,16 +176,35 @@ public class ContractApiClientTests
     }
 
     [Fact]
-    public async Task RemoveContractItemAsync_AuditReason_IsSentEscapedInTheQueryString()
+    public async Task RemoveContractItemAsync_AuditReason_IsSentInTheRequestBodyNotTheUrl()
     {
         var handler = new StubHttpMessageHandler(HttpStatusCode.OK, null);
         Uri? sent = null;
-        handler.OnRequest = request => sent = request.RequestUri;
+        string? body = null;
+        handler.OnRequest = request =>
+        {
+            sent = request.RequestUri;
+            body = request.Content?.ReadAsStringAsync().GetAwaiter().GetResult();
+        };
         var client = new ContractApiClient(new HttpClient(handler) { BaseAddress = new Uri("http://localhost") });
 
         await client.RemoveContractItemAsync(Guid.NewGuid(), Guid.NewGuid(), "Left & gone");
 
-        Assert.Equal("?auditWhy=Left%20%26%20gone", sent!.Query);
+        Assert.Equal(string.Empty, sent!.Query);
+        Assert.Equal("""{"auditWhy":"Left \u0026 gone"}""", body);
+    }
+
+    [Fact]
+    public async Task RemoveContractItemAsync_NoAuditReason_SendsNoBody()
+    {
+        var handler = new StubHttpMessageHandler(HttpStatusCode.OK, null);
+        var hadBody = true;
+        handler.OnRequest = request => hadBody = request.Content is not null;
+        var client = new ContractApiClient(new HttpClient(handler) { BaseAddress = new Uri("http://localhost") });
+
+        await client.RemoveContractItemAsync(Guid.NewGuid(), Guid.NewGuid(), "  ");
+
+        Assert.False(hadBody);
     }
 
     [Fact]
