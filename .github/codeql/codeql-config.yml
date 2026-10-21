@@ -1,0 +1,8 @@
+name: PTL CodeQL configuration
+
+# Vendored third-party code and tests are not ours to fix. The blocking-findings.jq gate
+# applies the same exclusions to compiled (C#) results, where paths-ignore does not apply.
+paths-ignore:
+  - "**/wwwroot/lib/**"
+  - "**/*.min.js"
+  - "tests/**"
