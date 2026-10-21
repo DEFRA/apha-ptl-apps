@@ -48,9 +48,9 @@
 <form method="get" asp-action="@Model.ActionName" class="govuk-!-margin-bottom-6">
     <div class="govuk-form-group govuk-!-margin-bottom-2">
         <label class="govuk-label" for="yearId">Select Year to Edit:</label>
-        <select class="govuk-select" id="yearId" name="yearId" onchange="this.form.submit()" asp-items="Model.YearOptions" asp-for="SelectedYearId"></select>
-        @* WCAG 2.2 SC 3.2.2 (On Input): auto-submit on change is only a sufficient technique (G80)
-           when a visible submit button is also provided as a non-JavaScript fallback. *@
+        <select class="govuk-select" id="yearId" name="yearId" asp-items="Model.YearOptions" asp-for="SelectedYearId"></select>
+        @* No auto-submit-on-change - View is the only, explicit trigger, so there's no WCAG 2.2
+           SC 3.2.2 "automatic change of context" concern to mitigate for this control. *@
         <button class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0 govuk-!-margin-left-3" data-module="govuk-button" type="submit">View</button>
     </div>
 </form>

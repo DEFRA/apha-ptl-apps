@@ -177,11 +177,7 @@ public class SchemeAdminController(ICategoryItemTypeApiClient categoryItemTypeAp
         string? message,
         bool messageIsError,
         string entityDisplayName,
-        Func<int, CancellationToken, Task<IReadOnlyList<TResponse>>> fetchItemsAsync,
-        Func<TResponse, Guid> idSelector,
-        Func<TResponse, string> nameSelector,
-        Func<TResponse, int> foreignInstancesSelector,
-        Func<TResponse, string> foreignInstancesStringSelector,
+        ItemTypeResponseAccessors<TResponse> accessors,
         CancellationToken cancellationToken)
         where TResponse : class
     {
@@ -189,22 +185,22 @@ public class SchemeAdminController(ICategoryItemTypeApiClient categoryItemTypeAp
         var currentYearId = years.Count > 0 ? years[0].YearId : (int?)null;
         var selectedYearId = ResolveSelectedYearId(requestedYearId, years, currentYearId);
 
-        var items = await fetchItemsAsync(selectedYearId, cancellationToken);
+        var items = await accessors.FetchItemsAsync(selectedYearId, cancellationToken);
 
         // Defence in depth against a forced ?editId= for an in-use item (the Edit link itself is
         // never rendered for such a row) - refuses to open edit mode and surfaces the same
         // dependency message Save/Remove would, rather than silently rendering an editable row.
-        var editTarget = editId is null ? null : items.FirstOrDefault(i => idSelector(i) == editId);
-        if (editTarget is not null && foreignInstancesSelector(editTarget) != 0 && message is null)
+        var editTarget = editId is null ? null : items.FirstOrDefault(i => accessors.IdSelector(i) == editId);
+        if (editTarget is not null && accessors.ForeignInstancesSelector(editTarget) != 0 && message is null)
         {
-            message = BuildInUseMessage(entityDisplayName, foreignInstancesSelector(editTarget), foreignInstancesStringSelector(editTarget), "edited");
+            message = BuildInUseMessage(entityDisplayName, accessors.ForeignInstancesSelector(editTarget), accessors.ForeignInstancesStringSelector(editTarget), "edited");
             messageIsError = true;
             editId = null;
         }
 
         // Matches legacy *Collection.GetSortedFilteredList's ApplySort("Name", Ascending) - the
         // grid's one and only default sort order.
-        var sortedItems = items.OrderBy(nameSelector, StringComparer.OrdinalIgnoreCase).ToList();
+        var sortedItems = items.OrderBy(accessors.NameSelector, StringComparer.OrdinalIgnoreCase).ToList();
 
         return new ItemTypeYearData<TResponse>(
             selectedYearId,
@@ -218,6 +214,15 @@ public class SchemeAdminController(ICategoryItemTypeApiClient categoryItemTypeAp
             message,
             messageIsError);
     }
+
+    // Bundles the entity-specific response accessors passed to ResolveItemTypeYearDataAsync into
+    // one object - the method itself was flagged for exceeding Sonar's 7-parameter limit (S107).
+    private sealed record ItemTypeResponseAccessors<TResponse>(
+        Func<int, CancellationToken, Task<IReadOnlyList<TResponse>>> FetchItemsAsync,
+        Func<TResponse, Guid> IdSelector,
+        Func<TResponse, string> NameSelector,
+        Func<TResponse, int> ForeignInstancesSelector,
+        Func<TResponse, string> ForeignInstancesStringSelector);
 
     private readonly record struct ItemTypeYearData<TResponse>(
         int SelectedYearId,
@@ -245,11 +250,12 @@ public class SchemeAdminController(ICategoryItemTypeApiClient categoryItemTypeAp
             request.Message,
             request.MessageIsError,
             "Category Item",
-            categoryItemTypeApiClient.GetByYearAsync,
-            i => i.CategoryItemTypeId,
-            i => i.Name,
-            i => i.ForeignInstances,
-            i => i.ForeignInstancesString,
+            new ItemTypeResponseAccessors<CategoryItemTypeResponse>(
+                categoryItemTypeApiClient.GetByYearAsync,
+                i => i.CategoryItemTypeId,
+                i => i.Name,
+                i => i.ForeignInstances,
+                i => i.ForeignInstancesString),
             cancellationToken);
 
         // Matches legacy GridViewCategoryItemType.AllowPaging/PageSize = 15 - the grid paginates
@@ -421,11 +427,12 @@ public class SchemeAdminController(ICategoryItemTypeApiClient categoryItemTypeAp
             request.Message,
             request.MessageIsError,
             "Test",
-            testTypeApiClient.GetByYearAsync,
-            i => i.TestTypeId,
-            i => i.Name,
-            i => i.ForeignInstances,
-            i => i.ForeignInstancesString,
+            new ItemTypeResponseAccessors<TestTypeResponse>(
+                testTypeApiClient.GetByYearAsync,
+                i => i.TestTypeId,
+                i => i.Name,
+                i => i.ForeignInstances,
+                i => i.ForeignInstancesString),
             cancellationToken);
 
         // Matches legacy GridViewTestType.AllowPaging/PageSize = 15.
@@ -579,11 +586,12 @@ public class SchemeAdminController(ICategoryItemTypeApiClient categoryItemTypeAp
             request.Message,
             request.MessageIsError,
             "Criterion Item",
-            criterionItemTypeApiClient.GetByYearAsync,
-            i => i.CriterionItemTypeId,
-            i => i.Name,
-            i => i.ForeignInstances,
-            i => i.ForeignInstancesString,
+            new ItemTypeResponseAccessors<CriterionItemTypeResponse>(
+                criterionItemTypeApiClient.GetByYearAsync,
+                i => i.CriterionItemTypeId,
+                i => i.Name,
+                i => i.ForeignInstances,
+                i => i.ForeignInstancesString),
             cancellationToken);
 
         // Matches legacy GridViewCriterionItemType.AllowPaging/PageSize = 15.
