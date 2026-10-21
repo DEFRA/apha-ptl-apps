@@ -21,4 +21,9 @@ public class SystemSettingsEntity
     // tblSystemSettings.fldContractStartDate - the month of this date decides whether a scheme's
     // derived start date falls in its own year or the next one (legacy Scheme.RecalucalateStartDate).
     public DateTime ContractStartDate { get; set; }
+
+    // Hardcoded 9999 in spgaSystemSettings - the "open-ended" sentinel legacy's year-versioned
+    // reference lists (Category/Criterion/Test Method/Test Result Item Types, Test Types) use as
+    // EndYearId for a row with no known end date (legacy CategoryItemType.DataPortal_Create).
+    public int FinalYearId { get; set; }
 }

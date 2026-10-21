@@ -475,7 +475,19 @@ public class SchemeController(ISchemeApiClient schemeApiClient, ILookupApiClient
         {
             var itemTypes = await lookupApiClient.GetSchemeItemTypesAsync(kind, yearId, cancellationToken);
             namesByKind[kind] = itemTypes.ToDictionary(t => t.ItemTypeId, t => t.Name);
-            optionsByKind[kind] = itemTypes.Select(t => new SelectListItem(t.Name, t.ItemTypeId.ToString())).ToList();
+
+            // AC: "Given a test type/criterion item is marked No Longer in Use, When a new
+            // scheme/test is configured, Then the retired item is not offered for selection but
+            // remains visible on existing schemes." namesByKind (above) stays unfiltered so an
+            // already-assigned retired type's name still renders correctly on existing schemes;
+            // only the Add dropdown's options are filtered. Scoped to TestType (story 744589) and
+            // CriterionItemType (story 744593) so far - the same NoLongerInUse gap likely applies
+            // to the remaining 2 kinds too (see docs/Parity-Analysis/
+            // 11-InternalWeb-SchemeItemTypes-Parity-Analysis.md), to be fixed in their own slices.
+            var selectableItemTypes = kind is SchemeItemTypeKind.TestType or SchemeItemTypeKind.CriterionItemType
+                ? itemTypes.Where(t => !t.NoLongerInUse)
+                : itemTypes;
+            optionsByKind[kind] = selectableItemTypes.Select(t => new SelectListItem(t.Name, t.ItemTypeId.ToString())).ToList();
         }
 
         model.TestTypeOptions = optionsByKind[SchemeItemTypeKind.TestType];
