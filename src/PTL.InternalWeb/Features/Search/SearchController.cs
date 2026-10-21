@@ -1,12 +1,14 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using PTL.ApiClient;
+using PTL.InternalWeb.Authorization;
 
 namespace PTL.InternalWeb.Features.Search;
 
 // Legacy Contracts Admin/Search.aspx - "This page can be used to search for Customers and
-// Participants." Authentication/authorization are out of scope for this phase, consistent with every
-// other InternalWeb controller (legacy: Manage Contracts section, ProficiencyTestingInternalUser).
+// Participants." Requires the Contracts Admin role (PtlPolicies.ContractsAdmin).
+[Authorize(Policy = PtlPolicies.ContractsAdmin)]
 public class SearchController(ISearchApiClient searchApiClient, ILookupApiClient lookupApiClient) : Controller
 {
     private const string NotSpecifiedOptionText = "- Not Specified -";

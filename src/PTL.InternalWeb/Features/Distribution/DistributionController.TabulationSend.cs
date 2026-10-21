@@ -1,5 +1,7 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using PTL.Contracts.Distribution;
+using PTL.InternalWeb.Authorization;
 using PTL.InternalWeb.Confirmation;
 using PTL.SharedUI.Notifications;
 
@@ -14,6 +16,7 @@ public sealed partial class DistributionController
 
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [Authorize(Policy = PtlPolicies.Scheduling)]
     public async Task<IActionResult> Tabulations(
         int year, int monthId, string? command, string? stage, string? confirmation, string[]? staged, CancellationToken cancellationToken)
     {

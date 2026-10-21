@@ -1,4 +1,6 @@
+@using Microsoft.AspNetCore.Authorization
 @using PTL.InternalWeb.Navigation
+@inject IAuthorizationService Authorization
 @{
     // Legacy behaviour (ProficiencyTestingWeb/Admin ListControl): each page shows only its OWN
     // node's title plus that node's direct children - never a permanent tree of every domain.
@@ -30,6 +32,8 @@
     {
         visibleItems = currentNode.Children.Where(child => !child.IsHidden).ToList();
     }
+
+    visibleItems = await SideNavigationAuthorization.FilterAsync(visibleItems, User, Authorization);
 }
 
 <nav aria-label="Primary navigation" class="app-side-navigation">

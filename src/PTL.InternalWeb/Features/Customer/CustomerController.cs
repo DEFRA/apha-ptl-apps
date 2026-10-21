@@ -1,16 +1,18 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.Extensions.Logging;
 using PTL.ApiClient;
 using PTL.Contracts.Customer;
 using PTL.Core.Labels;
+using PTL.InternalWeb.Authorization;
 using PTL.SharedUI.Notifications;
 using PTL.SharedUI.Pagination;
 
 namespace PTL.InternalWeb.Features.Customer;
 
-// Authentication/authorization are out of scope for this phase - assume the current user is
-// already authenticated with full access to Customer functionality. Policies will be added later.
+// Legacy "Contracts Admin" folder - requires the Contracts Admin role (PtlPolicies.ContractsAdmin).
+[Authorize(Policy = PtlPolicies.ContractsAdmin)]
 public class CustomerController(ICustomerApiClient customerApiClient, ILookupApiClient lookupApiClient, ILogger<CustomerController> logger) : Controller
 {
     // Legacy DropDownXxx.Items.Insert(0, New ListItem("- Please Select -", Guid.Empty)) placeholder.

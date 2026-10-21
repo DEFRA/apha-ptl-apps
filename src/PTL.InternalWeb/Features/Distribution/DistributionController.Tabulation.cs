@@ -1,4 +1,6 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using PTL.InternalWeb.Authorization;
 
 namespace PTL.InternalWeb.Features.Distribution;
 
@@ -9,6 +11,7 @@ namespace PTL.InternalWeb.Features.Distribution;
 public sealed partial class DistributionController
 {
     [HttpGet]
+    [Authorize(Policy = PtlPolicies.Scheduling)]
     public async Task<IActionResult> Tabulation(
         int year, int monthId, Guid tabulationId, Guid? participantId, Guid? viewerId, CancellationToken cancellationToken)
     {
@@ -22,6 +25,7 @@ public sealed partial class DistributionController
     }
 
     [HttpGet]
+    [Authorize(Policy = PtlPolicies.Scheduling)]
     public async Task<IActionResult> PublishedTabulations(int year, int monthId, Guid tabulationId, CancellationToken cancellationToken)
     {
         var page = await distributionApiClient.GetPublishedTabulationsAsync(tabulationId, cancellationToken);
@@ -34,6 +38,7 @@ public sealed partial class DistributionController
     }
 
     [HttpGet]
+    [Authorize(Policy = PtlPolicies.Scheduling)]
     public async Task<IActionResult> PublishedTabulation(
         int year, int monthId, Guid tabulationId, Guid publishedTabulationId, Guid? participantId, Guid? viewerId, CancellationToken cancellationToken)
     {
@@ -54,6 +59,7 @@ public sealed partial class DistributionController
     }
 
     [HttpGet]
+    [Authorize(Policy = PtlPolicies.Scheduling)]
     public async Task<IActionResult> TabulationAssessmentResults(int year, int monthId, Guid tabulationId, Guid testId, CancellationToken cancellationToken)
     {
         var results = await distributionApiClient.GetAssessmentResultsAsync(tabulationId, testId, false, cancellationToken);
@@ -73,6 +79,7 @@ public sealed partial class DistributionController
     }
 
     [HttpGet]
+    [Authorize(Policy = PtlPolicies.Scheduling)]
     public async Task<IActionResult> PublishedAssessmentResults(
         int year, int monthId, Guid tabulationId, Guid publishedTabulationId, Guid testId, CancellationToken cancellationToken)
     {
@@ -95,10 +102,12 @@ public sealed partial class DistributionController
 
     // Legacy AttachmentDisplay "View Supporting Document" (Attachment.aspx), without the session hand-off.
     [HttpGet]
+    [Authorize(Policy = PtlPolicies.Scheduling)]
     public Task<IActionResult> TabulationAttachment(Guid tabulationId, Guid attachmentId, CancellationToken cancellationToken) =>
         AttachmentFile(tabulationId, false, attachmentId, cancellationToken);
 
     [HttpGet]
+    [Authorize(Policy = PtlPolicies.Scheduling)]
     public Task<IActionResult> PublishedTabulationAttachment(Guid publishedTabulationId, Guid attachmentId, CancellationToken cancellationToken) =>
         AttachmentFile(publishedTabulationId, true, attachmentId, cancellationToken);
 

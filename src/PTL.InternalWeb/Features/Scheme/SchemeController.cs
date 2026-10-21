@@ -1,4 +1,5 @@
 using System.Globalization;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.Extensions.Logging;
@@ -6,6 +7,7 @@ using PTL.ApiClient;
 using PTL.Contracts.Lookup;
 using PTL.Contracts.Scheme;
 using PTL.Core.Scheme;
+using PTL.InternalWeb.Authorization;
 using PTL.InternalWeb.Confirmation;
 using PTL.SharedUI.Notifications;
 using CoreScheme = PTL.Core.Scheme.Scheme;
@@ -13,9 +15,8 @@ using SchemeStartDate = PTL.Core.Scheme.SchemeStartDate;
 
 namespace PTL.InternalWeb.Features.Scheme;
 
-// Authentication/authorization are out of scope for this phase - assume the current user is
-// already authenticated with full access to Scheme functionality. Policies will be added later
-// (see docs/migration/scheme-migration.md, "Authentication Mapping").
+// Legacy "Scheme Admin" folder - requires the Scheme Admin role (PtlPolicies.SchemeAdmin).
+[Authorize(Policy = PtlPolicies.SchemeAdmin)]
 public class SchemeController(ISchemeApiClient schemeApiClient, ILookupApiClient lookupApiClient, ILogger<SchemeController> logger) : Controller
 {
     private static readonly Action<ILogger, int, string?, int, int, Exception?> LogDisplayedSchemeListMessage =

@@ -1,4 +1,5 @@
 using System.Globalization;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.Extensions.Logging;
@@ -6,14 +7,15 @@ using PTL.ApiClient;
 using PTL.Contracts.Contract;
 using PTL.Core.Contract.Document;
 using PTL.Core.Contract.Export.Templates;
+using PTL.InternalWeb.Authorization;
 using PTL.InternalWeb.Confirmation;
 using PTL.InternalWeb.Navigation;
 using PTL.SharedUI.Notifications;
 
 namespace PTL.InternalWeb.Features.Contract;
 
-// Authentication/authorization are out of scope for this phase - assume the current user is
-// already authenticated with full access to Contract functionality. Policies will be added later.
+// Legacy "Contracts Admin" folder - requires the Contracts Admin role (PtlPolicies.ContractsAdmin).
+[Authorize(Policy = PtlPolicies.ContractsAdmin)]
 public class ContractController(IContractApiClient contractApiClient, ICustomerApiClient customerApiClient, ILookupApiClient lookupApiClient, IImportPermitApiClient importPermitApiClient, ILogger<ContractController> logger, IContractExportApiClient contractExportApiClient, IContractRenewalApiClient contractRenewalApiClient, IExportTemplateApiClient exportTemplateApiClient, IBulkExportApiClient bulkExportApiClient, ITemplateMergeService templateMergeService) : Controller
 {
     // Legacy ExportBase.ShowError text, reused verbatim across upload/open/select/delete/export.

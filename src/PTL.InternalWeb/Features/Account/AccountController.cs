@@ -15,12 +15,14 @@ namespace PTL.InternalWeb.Features.Account
             new() { ReturnUrl = returnUrl };
 
         [HttpGet]
+        [AllowAnonymous]
         public override IActionResult Login(string? returnUrl = null) =>
             ChallengeExternalLogin(EntraAuthenticationDefaults.AuthenticationScheme, returnUrl);
 
         // The username/password form this posts to is never rendered for this app (Login(GET) above
         // always challenges Entra ID instead), so this path should be unreachable.
         [HttpPost]
+        [AllowAnonymous]
         public override Task<IActionResult> Login(AccountViewModel model)
         {
             if (!ModelState.IsValid)
@@ -32,6 +34,7 @@ namespace PTL.InternalWeb.Features.Account
         }
 
         [HttpPost]
+        [AllowAnonymous]
         [ValidateAntiForgeryToken]
         public override Task<IActionResult> Logout() =>
             SignOutViaExternalSchemeAsync(EntraAuthenticationDefaults.AuthenticationScheme);
@@ -47,5 +50,15 @@ namespace PTL.InternalWeb.Features.Account
         [HttpGet]
         [AllowAnonymous]
         public IActionResult NotPermitted() => View();
+
+        // Where a refused request lands (cookie AccessDeniedPath). Anonymous so the page itself can never be
+        // refused, and it answers 403 rather than 200.
+        [HttpGet("/AccessDenied")]
+        [AllowAnonymous]
+        public IActionResult AccessDenied()
+        {
+            Response.StatusCode = StatusCodes.Status403Forbidden;
+            return View();
+        }
     }
 }
