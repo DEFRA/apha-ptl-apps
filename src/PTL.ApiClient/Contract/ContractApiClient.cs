@@ -152,13 +152,14 @@ public sealed class ContractApiClient(HttpClient httpClient) : IContractApiClien
 
     public async Task<ContractItemRemovalResult> RemoveContractItemAsync(Guid contractId, Guid participantSchemeId, string? auditWhy = null, CancellationToken cancellationToken = default)
     {
-        using var request = new HttpRequestMessage(HttpMethod.Delete, $"/api/contracts/{contractId:D}/items/{participantSchemeId:D}");
-        if (!string.IsNullOrWhiteSpace(auditWhy))
+        // An id that is not a well-formed, non-empty GUID cannot name an item, so no request is made for it.
+        if (!TryGetRouteSegment(contractId, out var contractSegment) || !TryGetRouteSegment(participantSchemeId, out var itemSegment))
         {
-            request.Content = JsonContent.Create(new ContractItemRemovalRequest(auditWhy));
+            return new ContractItemRemovalResult(false, true, "This contract item was not found.");
         }
 
-        var response = await httpClient.SendAsync(request, cancellationToken);
+        var query = string.IsNullOrWhiteSpace(auditWhy) ? string.Empty : $"?auditWhy={Uri.EscapeDataString(auditWhy)}";
+        var response = await httpClient.DeleteAsync($"/api/contracts/{contractSegment}/items/{itemSegment}{query}", cancellationToken);
         if (response.StatusCode == HttpStatusCode.NotFound)
         {
             return new ContractItemRemovalResult(false, true, "This contract item was not found.");
@@ -173,5 +174,19 @@ public sealed class ContractApiClient(HttpClient httpClient) : IContractApiClien
 
         response.EnsureSuccessStatusCode();
         return new ContractItemRemovalResult(true, false, null);
+    }
+
+    // Canonical "D" form of a non-empty GUID, escaped as a single path segment, so nothing but hex digits and hyphens
+    // (never "/", ".." or "?") can reach the request path.
+    private static bool TryGetRouteSegment(Guid id, out string segment)
+    {
+        segment = string.Empty;
+        if (id == Guid.Empty || !Guid.TryParseExact(id.ToString("D"), "D", out var parsed))
+        {
+            return false;
+        }
+
+        segment = Uri.EscapeDataString(parsed.ToString("D"));
+        return true;
     }
 }

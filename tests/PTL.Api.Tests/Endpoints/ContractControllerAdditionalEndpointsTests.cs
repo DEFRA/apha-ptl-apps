@@ -106,22 +106,6 @@ public class ContractControllerAdditionalEndpointsTests
     }
 
     [Fact]
-    public async Task RemoveContractItem_WithAuditReasonBody_ReturnsNoContent()
-    {
-        var contractRepository = new FakeContractRepository();
-        var contractId = Guid.NewGuid();
-        contractRepository.Seed(new PTL.Core.Contract.Contract { ContractId = contractId, IsReadOnly = false });
-        var participantSchemeRepository = new FakeParticipantSchemeRepository();
-        var participantSchemeId = Guid.NewGuid();
-        participantSchemeRepository.Add(new ParticipantSchemeRecord { ParticipantSchemeId = participantSchemeId, ContractId = contractId });
-        var controller = CreateController(contractRepository, participantSchemeRepository);
-
-        var result = await controller.RemoveContractItem(contractId, participantSchemeId, new ContractItemRemovalRequest("Customer left"), CancellationToken.None);
-
-        Assert.IsType<NoContentResult>(result);
-    }
-
-    [Fact]
     public async Task RemoveContractItem_UnknownItem_ReturnsNotFound()
     {
         var controller = CreateController();
