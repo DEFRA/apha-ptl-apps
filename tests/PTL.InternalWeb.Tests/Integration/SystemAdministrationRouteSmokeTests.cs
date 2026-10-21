@@ -57,28 +57,16 @@ public partial class SystemAdministrationRouteSmokeTests : IClassFixture<WebAppl
                 services.AddSingleton<IExternalTestConsultantApiClient>(new FakeExternalTestConsultantApiClient());
                 services.RemoveAll<IViewerApiClient>();
                 services.AddSingleton<IViewerApiClient>(new FakeViewerApiClient());
-
-                // Stands in for a real Entra ID sign-in (see TestAuthHandler remarks) so every
-                // existing smoke test below - which assumes full access, matching this feature
-                // set's confirmed RBAC decision - keeps working without a live Entra tenant.
-                services.AddAuthentication(TestAuthHandler.SchemeName)
-                    .AddScheme<TestAuthHandlerOptions, TestAuthHandler>(TestAuthHandler.SchemeName, _ => { });
-                services.PostConfigure<AuthenticationOptions>(options =>
-                {
-                    options.DefaultAuthenticateScheme = TestAuthHandler.SchemeName;
-                    options.DefaultChallengeScheme = TestAuthHandler.SchemeName;
-                    options.DefaultScheme = TestAuthHandler.SchemeName;
-                });
             }));
     }
 
     [Fact]
     public async Task SystemAdministration_WithoutSignIn_RedirectsAwayFromThePage()
     {
-        // Uses _rawFactory (no TestAuthHandler override) so the real Entra cookie/OIDC pipeline
-        // governs - with no cookie present, the request is anonymous and SystemAdministrationPolicy
-        // must reject it before the action body (and therefore any API call) ever runs.
-        var factory = _rawFactory.WithWebHostBuilder(builder => { });
+        // Opts out of the shared signed-in test user so the real Entra cookie/OIDC pipeline governs - with no
+        // cookie present the request is anonymous and the fallback policy must reject it before the action body
+        // (and therefore any API call) ever runs.
+        var factory = _rawFactory.WithWebHostBuilder(builder => builder.UseSetting(SignedInUserHostingStartup.UseRealAuthSetting, "true"));
         var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
 
         var response = await client.GetAsync("/SystemAdministration/SystemAdministration");

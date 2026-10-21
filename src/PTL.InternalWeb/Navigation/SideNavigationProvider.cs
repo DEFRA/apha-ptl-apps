@@ -1,3 +1,5 @@
+using PTL.InternalWeb.Authorization;
+
 namespace PTL.InternalWeb.Navigation;
 
 // Fixed configuration for PTLIMS's left-hand navigation, preserving the legacy left-sidebar menu
@@ -36,14 +38,32 @@ public static class SideNavigationProvider
     private static readonly string[] PublishedTabulationKeys = ["year", "monthId", "tabulationId", "publishedTabulationId"];
 
     // Placeholder for a menu entry whose page hasn't been migrated yet - see class remarks.
-    private static SideNavigationItem Disabled(string text) => new() { Text = text, IsEnabled = false };
+    private static SideNavigationItem Disabled(string text, string? requiredPolicy = null) =>
+        new() { Text = text, IsEnabled = false, RequiredPolicy = requiredPolicy };
 
-    public static IReadOnlyList<SideNavigationItem> Build() =>
+    public static IReadOnlyList<SideNavigationItem> Build()
+    {
+        var tree = BuildTree();
+        InheritPolicies(tree, null);
+        return tree;
+    }
+
+    private static void InheritPolicies(IReadOnlyList<SideNavigationItem> items, string? inherited)
+    {
+        foreach (var item in items)
+        {
+            item.RequiredPolicy ??= inherited;
+            InheritPolicies(item.Children, item.RequiredPolicy);
+        }
+    }
+
+    private static IReadOnlyList<SideNavigationItem> BuildTree() =>
     [
         new SideNavigationItem { Text = "Home", ControllerName = "Home", ActionName = IndexAction },
         new SideNavigationItem
         {
             Text = "System Administration",
+            RequiredPolicy = PtlPolicies.Admin,
             ControllerName = SystemAdministrationControllerName,
             ActionName = SystemAdministrationControllerName,
             Children =
@@ -77,6 +97,7 @@ public static class SideNavigationProvider
         new SideNavigationItem
         {
             Text = "Manage Contracts",
+            RequiredPolicy = PtlPolicies.ContractsAdmin,
             ControllerName = ContractControllerName,
             ActionName = "ManageContracts",
             Children =
@@ -218,6 +239,7 @@ public static class SideNavigationProvider
                 new SideNavigationItem
                 {
                     Text = "Invoice Generation",
+                    RequiredPolicy = PtlPolicies.InvoiceGeneration,
                     ControllerName = "Invoice",
                     ActionName = IndexAction
                 }
@@ -226,6 +248,7 @@ public static class SideNavigationProvider
         new SideNavigationItem
         {
             Text = "Manage Schemes",
+            RequiredPolicy = PtlPolicies.SchemeAdmin,
             ControllerName = SchemeControllerName,
             ActionName = "ManageSchemes",
             Children =
@@ -273,6 +296,7 @@ public static class SideNavigationProvider
         new SideNavigationItem
         {
             Text = "Distributions",
+            RequiredPolicy = PtlPolicies.Distributions,
             ControllerName = DistributionControllerName,
             ActionName = IndexAction,
             LinkQueryKeys = YearKey,
@@ -381,9 +405,9 @@ public static class SideNavigationProvider
                 }
             ]
         },
-        Disabled("Test Consultant"),
-        Disabled("Assessor"),
-        Disabled("Results Sign-Off")
+        Disabled("Test Consultant", PtlPolicies.TestConsultant),
+        Disabled("Assessor", PtlPolicies.Assessor),
+        Disabled("Results Sign-Off", PtlPolicies.ResultsSignOff)
     ];
 
     // Depth-first search for the node matching the current controller/action, regardless of

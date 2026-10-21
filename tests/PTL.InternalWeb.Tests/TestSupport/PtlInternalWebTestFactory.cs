@@ -11,6 +11,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Protocols;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using PTL.Auth.Entra;
+using PTL.InternalWeb.Features.Account;
 
 namespace PTL.InternalWeb.Tests.TestSupport;
 
@@ -37,6 +38,10 @@ public sealed class PtlInternalWebTestFactory : WebApplicationFactory<Program>
             ["Entra:ClientId"] = "test-client-id",
             ["Entra:ClientSecret"] = "test-client-secret"
         }));
+
+        // Host setting (not app configuration) so SignedInUserHostingStartup sees it: this factory exercises the
+        // real cookie/OIDC pipeline rather than the shared signed-in test user.
+        builder.UseSetting(SignedInUserHostingStartup.UseRealAuthSetting, "true");
 
         builder.ConfigureServices(services =>
         {
@@ -76,9 +81,16 @@ public sealed class PtlInternalWebTestFactory : WebApplicationFactory<Program>
             {
                 if (context.Request.Path == TestSignInPath)
                 {
-                    var identity = new ClaimsIdentity(
-                        [new Claim(ClaimTypes.Name, "test-user")],
-                        CookieAuthenticationDefaults.AuthenticationScheme);
+                    var claims = new List<Claim> { new(ClaimTypes.Name, "test-user") };
+
+                    // ?roles=Admin,Contracts Admin signs in with those PTL roles, as InternalUserResolver would.
+                    var roles = context.Request.Query["roles"].ToString();
+                    if (!string.IsNullOrWhiteSpace(roles))
+                    {
+                        claims.Add(new Claim(InternalUserClaimTypes.ResolvedRoles, roles));
+                    }
+
+                    var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
                     var properties = new AuthenticationProperties();
                     properties.StoreTokens([new AuthenticationToken { Name = "id_token", Value = TestIdToken }]);
                     await context.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(identity), properties);

@@ -546,7 +546,8 @@ public partial class PackagingRenderTests : IClassFixture<WebApplicationFactory<
         var html = await PostHtmlAsync(("command", "customs"), ("Mode", "2"), ("Week", "0"));
 
         Assert.Contains("<li>There was a problem with the Mail Merge</li>", html, StringComparison.Ordinal);
-        Assert.DoesNotContain("<p class=\"govuk-body\">", html[html.IndexOf("govuk-error-summary__body", StringComparison.Ordinal)..html.IndexOf("</ul>", StringComparison.Ordinal)], StringComparison.Ordinal);
+        var summaryStart = html.IndexOf("govuk-error-summary__body", StringComparison.Ordinal);
+        Assert.DoesNotContain("<p class=\"govuk-body\">", html[summaryStart..html.IndexOf("</ul>", summaryStart, StringComparison.Ordinal)], StringComparison.Ordinal);
         Assert.Contains("<title>Error: ", html, StringComparison.Ordinal);
     }
 

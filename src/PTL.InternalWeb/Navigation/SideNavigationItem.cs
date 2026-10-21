@@ -7,6 +7,10 @@ namespace PTL.InternalWeb.Navigation;
 public sealed class SideNavigationItem
 {
     public required string Text { get; init; }
+
+    // Policy a user must satisfy to see this entry (legacy MasterContent hid menu children whose folder role the
+    // user lacked). Children without their own inherit their parent's - see SideNavigationProvider.Build.
+    public string? RequiredPolicy { get; set; }
     public string? ControllerName { get; init; }
     public string? ActionName { get; init; }
     public bool IsEnabled { get; init; } = true;

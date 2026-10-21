@@ -1,15 +1,19 @@
 using System.Globalization;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.Extensions.Logging;
 using PTL.ApiClient;
 using PTL.Contracts.Participant;
 using PTL.Core.Labels;
+using PTL.InternalWeb.Authorization;
 using PTL.InternalWeb.Navigation;
 using PTL.SharedUI.Notifications;
 
 namespace PTL.InternalWeb.Features.Participant;
 
+// Legacy "Contracts Admin" folder - requires the Contracts Admin role (PtlPolicies.ContractsAdmin).
+[Authorize(Policy = PtlPolicies.ContractsAdmin)]
 public class ParticipantController(IParticipantApiClient participantApiClient, ICustomerApiClient customerApiClient, ILookupApiClient lookupApiClient, ILogger<ParticipantController> logger) : Controller
 {
     // Legacy ReviewPendingParticipantUpdates.aspx GridView.PageSize.

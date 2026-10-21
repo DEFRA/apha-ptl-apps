@@ -1,9 +1,11 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.Extensions.Logging;
 using PTL.ApiClient;
 using PTL.Contracts.Participant;
 using PTL.Contracts.Scheme;
+using PTL.InternalWeb.Authorization;
 using PTL.InternalWeb.Confirmation;
 using PTL.InternalWeb.Features.Account;
 using PTL.InternalWeb.Navigation;
@@ -11,8 +13,9 @@ using PTL.SharedUI.Notifications;
 
 namespace PTL.InternalWeb.Features.ParticipantScheme;
 
-// The only role rule on this page is legacy's "Override Schemes" gate on the Override button
-// (see ApplyOverridePermission).
+// Legacy "Contracts Admin" folder - requires the Contracts Admin role. The one finer rule on this page is
+// legacy's "Override Schemes" gate on the Override button (see ApplyOverridePermission).
+[Authorize(Policy = PtlPolicies.ContractsAdmin)]
 public class ParticipantSchemeController(
     IParticipantSchemeApiClient participantSchemeApiClient,
     IContractApiClient contractApiClient,

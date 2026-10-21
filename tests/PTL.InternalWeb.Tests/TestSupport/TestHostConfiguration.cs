@@ -20,5 +20,8 @@ internal static class TestHostConfiguration
         Environment.SetEnvironmentVariable("Entra__TenantId", "00000000-0000-0000-0000-000000000000");
         Environment.SetEnvironmentVariable("Entra__ClientId", "test-client-id");
         Environment.SetEnvironmentVariable("Entra__ClientSecret", "test-client-secret");
+
+        // Makes every WebApplicationFactory<Program> host start with a signed-in test user (see SignedInUserHostingStartup).
+        Environment.SetEnvironmentVariable("ASPNETCORE_HOSTINGSTARTUPASSEMBLIES", typeof(TestHostConfiguration).Assembly.GetName().Name);
     }
 }

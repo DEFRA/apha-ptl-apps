@@ -11,14 +11,14 @@ using PTL.Contracts.PostagePricingPlan;
 using PTL.Contracts.TestConsultant;
 using PTL.Contracts.User;
 using PTL.Contracts.Viewer;
+using PTL.InternalWeb.Authorization;
 using PTL.InternalWeb.Features.Account;
 
 namespace PTL.InternalWeb.Features.SystemAdministration;
 
-// Gated behind the "Admin" role (resolved from our own database, not an Entra ID group - see
-// SystemAdministrationPolicy remarks). PTL.Api itself remains unauthenticated for this phase
-// (tracked separately) - this is the one enforcement point today.
-[Authorize(Policy = SystemAdministrationPolicy.Name)]
+// Gated behind the "Admin" role (resolved from our own database, not an Entra ID group). PTL.Api itself
+// remains unauthenticated for this phase (tracked separately) - this is the one enforcement point today.
+[Authorize(Policy = PtlPolicies.Admin)]
 public class SystemAdministrationController : Controller
 {
     private readonly IAdministrationChargeApiClient administrationChargeApiClient;

@@ -67,14 +67,9 @@ public class ParticipantSchemeFieldsRenderTests : IClassFixture<WebApplicationFa
             builder.ConfigureServices(services =>
             {
                 ConfigureFakes(services);
-                services.AddAuthentication(TestAuthHandler.SchemeName)
-                    .AddScheme<TestAuthHandlerOptions, TestAuthHandler>(TestAuthHandler.SchemeName, options => options.ResolvedRoles = "Admin,Override Schemes");
-                services.Configure<Microsoft.AspNetCore.Authentication.AuthenticationOptions>(options =>
-                {
-                    options.DefaultAuthenticateScheme = TestAuthHandler.SchemeName;
-                    options.DefaultChallengeScheme = TestAuthHandler.SchemeName;
-                    options.DefaultScheme = TestAuthHandler.SchemeName;
-                });
+                services.Configure<TestAuthHandlerOptions>(
+                    TestAuthHandler.SchemeName,
+                    options => options.ResolvedRoles = "Contracts Admin,Override Schemes");
             }));
     }
 
