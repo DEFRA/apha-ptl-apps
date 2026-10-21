@@ -161,6 +161,15 @@ public sealed class LookupController(ILookupService lookupService, IViewerReposi
         return Ok(itemTypes.Select(t => new SchemeItemTypeResponse(t.ItemTypeId, t.Name, t.NoLongerInUse)).ToList());
     }
 
+    // GET /api/lookups/test-return-value-types - tblTestReturnValueType, every record on file;
+    // backs the Return Type dropdown on the SchemeAdmin "Test Result Items" screen.
+    [HttpGet("test-return-value-types")]
+    public async Task<ActionResult<IReadOnlyList<TestReturnValueTypeResponse>>> GetTestReturnValueTypes(CancellationToken cancellationToken)
+    {
+        var returnValueTypes = await lookupService.GetTestReturnValueTypesAsync(cancellationToken);
+        return Ok(returnValueTypes.Select(r => new TestReturnValueTypeResponse(r.TestReturnValueTypeId, r.Name)).ToList());
+    }
+
     // GET /api/lookups/postage-pricing-plans?year={yearId} - see docs/analysis/scheme-analysis.md,
     // "Postage Pricing Plan Read Operations".
     [HttpGet("postage-pricing-plans")]

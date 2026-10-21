@@ -147,6 +147,12 @@ public sealed class LookupRepository(IDbConnectionFactory connectionFactory) : I
             new { YearId = yearId })).ToList();
     }
 
+    public async Task<IReadOnlyList<TestReturnValueTypeEntity>> GetTestReturnValueTypesAsync(CancellationToken cancellationToken = default)
+    {
+        using var connection = connectionFactory.CreateConnection();
+        return (await connection.QueryAsync<TestReturnValueTypeEntity>("EXEC dbo.spgaTestReturnValueType")).ToList();
+    }
+
     public async Task<SystemSettingsEntity> GetSystemSettingsAsync(CancellationToken cancellationToken = default)
     {
         using var connection = connectionFactory.CreateConnection();

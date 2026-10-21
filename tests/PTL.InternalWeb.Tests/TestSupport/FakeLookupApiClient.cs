@@ -92,4 +92,9 @@ internal sealed class FakeLookupApiClient : ILookupApiClient
 
     public Task<IReadOnlyList<SchemeItemTypeResponse>> GetSchemeItemTypesAsync(SchemeItemTypeKind kind, int yearId, CancellationToken cancellationToken = default) =>
         Task.FromResult(SchemeItemTypes);
+
+    public IReadOnlyList<TestReturnValueTypeResponse> TestReturnValueTypes { get; set; } = [];
+
+    public Task<IReadOnlyList<TestReturnValueTypeResponse>> GetTestReturnValueTypesAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult(TestReturnValueTypes);
 }

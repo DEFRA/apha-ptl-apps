@@ -88,4 +88,9 @@ internal sealed class FakeLookupRepository : ILookupRepository
 
     public Task<IReadOnlyList<SchemeItemTypeEntity>> GetSchemeItemTypesAsync(PTL.Contracts.Lookup.SchemeItemTypeKind kind, int yearId, CancellationToken cancellationToken = default) =>
         Task.FromResult(SchemeItemTypes);
+
+    public IReadOnlyList<TestReturnValueTypeEntity> TestReturnValueTypes { get; set; } = [];
+
+    public Task<IReadOnlyList<TestReturnValueTypeEntity>> GetTestReturnValueTypesAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult(TestReturnValueTypes);
 }

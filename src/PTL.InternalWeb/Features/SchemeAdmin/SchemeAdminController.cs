@@ -4,13 +4,14 @@ using PTL.ApiClient;
 using PTL.Contracts.CategoryItemType;
 using PTL.Contracts.CriterionItemType;
 using PTL.Contracts.Lookup;
+using PTL.Contracts.TestResultItemType;
 using PTL.Contracts.TestType;
 
 namespace PTL.InternalWeb.Features.SchemeAdmin;
 
 // Authentication/authorization are out of scope for this phase - same convention as
 // Features/Scheme/SchemeController.cs, which this "Manage Schemes" sub-area sits alongside.
-public class SchemeAdminController(ICategoryItemTypeApiClient categoryItemTypeApiClient, ITestTypeApiClient testTypeApiClient, ICriterionItemTypeApiClient criterionItemTypeApiClient, ILookupApiClient lookupApiClient, ILogger<SchemeAdminController> logger) : Controller
+public class SchemeAdminController(ICategoryItemTypeApiClient categoryItemTypeApiClient, ITestTypeApiClient testTypeApiClient, ICriterionItemTypeApiClient criterionItemTypeApiClient, ITestResultItemTypeApiClient testResultItemTypeApiClient, ILookupApiClient lookupApiClient, ILogger<SchemeAdminController> logger) : Controller
 {
     private static readonly Action<ILogger, Guid, Exception?> LogCategoryItemTypeRemoveBlockedMessage =
         LoggerMessage.Define<Guid>(
@@ -29,6 +30,12 @@ public class SchemeAdminController(ICategoryItemTypeApiClient categoryItemTypeAp
             LogLevel.Information,
             new EventId(3, nameof(LogCriterionItemTypeRemoveBlockedMessage)),
             "Criterion item type {CriterionItemTypeId} removal was blocked: still in use");
+
+    private static readonly Action<ILogger, Guid, Exception?> LogTestResultItemTypeRemoveBlockedMessage =
+        LoggerMessage.Define<Guid>(
+            LogLevel.Information,
+            new EventId(4, nameof(LogTestResultItemTypeRemoveBlockedMessage)),
+            "Test result item type {TestResultItemTypeId} removal was blocked: still in use");
 
     private const string NoLongerInUseSaveFailedMessage = "Could not save all 'No Longer in Use' changes because the service did not respond. Please try again.";
 
@@ -621,6 +628,189 @@ public class SchemeAdminController(ICategoryItemTypeApiClient categoryItemTypeAp
             Page = currentPage,
             TotalRecords = yearData.TotalRecords,
             Add = request.AddValues ?? new CriterionItemTypeAddViewModel(),
+            Message = yearData.Message,
+            MessageIsError = yearData.MessageIsError
+        };
+    }
+
+    public async Task<IActionResult> TestResultItemType(int? yearId, Guid? editId, Guid? removeConfirmId, string? search, int page = 1, CancellationToken cancellationToken = default) =>
+        View(await BuildTestResultItemTypeViewModelAsync(
+            new TestResultItemTypeViewModelRequest(yearId, editId, page, Message: null, MessageIsError: false, AddValues: null, EditValues: null, removeConfirmId, search),
+            cancellationToken));
+
+    // Matches legacy ButtonAdd_Click - Name and Return Type are both required; the new item
+    // always starts in whichever year is currently selected in the dropdown.
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> TestResultItemTypeAdd([Bind(Prefix = "Add")] TestResultItemTypeAddViewModel model, int yearId, int page, string? search, CancellationToken cancellationToken)
+    {
+        if (ModelState.IsValid)
+        {
+            var result = await testResultItemTypeApiClient.CreateAsync(new TestResultItemTypeSaveRequest(model.Name, model.TestReturnValueTypeId!.Value, model.NoLongerInUse, yearId), cancellationToken);
+            if (result.Success)
+            {
+                return RedirectToAction(nameof(TestResultItemType), new { yearId, page, search });
+            }
+
+            foreach (var (field, messages) in result.FieldErrors)
+            {
+                foreach (var errorMessage in messages)
+                {
+                    ModelState.AddModelError($"Add.{field}", errorMessage);
+                }
+            }
+        }
+
+        return View(nameof(TestResultItemType), await BuildTestResultItemTypeViewModelAsync(
+            new TestResultItemTypeViewModelRequest(yearId, EditId: null, page, Message: null, MessageIsError: false, model, EditValues: null, SearchText: search),
+            cancellationToken));
+    }
+
+    // Only the row matching model.TestResultItemTypeId is ever in edit mode when this posts -
+    // matches legacy GridViewTestResultItemType_RowUpdating, which only acts on the row with
+    // EditIndex set. Blocked (in-use) edits surface the legacy warning message as a notification
+    // banner rather than a JS alert.
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> TestResultItemTypeSave([Bind(Prefix = "Edit")] TestResultItemTypeEditViewModel model, int yearId, int page, string? search, CancellationToken cancellationToken)
+    {
+        if (ModelState.IsValid)
+        {
+            var result = await testResultItemTypeApiClient.UpdateAsync(model.TestResultItemTypeId!.Value, new TestResultItemTypeSaveRequest(model.Name, model.TestReturnValueTypeId!.Value, model.NoLongerInUse, yearId), cancellationToken);
+            if (result.Success)
+            {
+                return RedirectToAction(nameof(TestResultItemType), new { yearId, page, search });
+            }
+
+            if (result.FieldErrors.TryGetValue(string.Empty, out var conflictMessages))
+            {
+                return View(nameof(TestResultItemType), await BuildTestResultItemTypeViewModelAsync(
+                    new TestResultItemTypeViewModelRequest(yearId, model.TestResultItemTypeId, page, conflictMessages[0], MessageIsError: true, AddValues: null, EditValues: null, SearchText: search),
+                    cancellationToken));
+            }
+
+            foreach (var (field, messages) in result.FieldErrors)
+            {
+                foreach (var errorMessage in messages)
+                {
+                    ModelState.AddModelError($"Edit.{field}", errorMessage);
+                }
+            }
+        }
+
+        return View(nameof(TestResultItemType), await BuildTestResultItemTypeViewModelAsync(
+            new TestResultItemTypeViewModelRequest(yearId, model.TestResultItemTypeId, page, Message: null, MessageIsError: false, AddValues: null, model, SearchText: search),
+            cancellationToken));
+    }
+
+    // "No Longer in Use" is saved for every row on the current page in one combined submit -
+    // matches legacy ButtonSave_Click's explicit comment that this flag can be changed on any
+    // item, even one otherwise blocked from editing because it is still in use.
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> TestResultItemTypeSaveAllNoLongerInUse(List<Guid>? pageTestResultItemTypeIds, List<Guid>? checkedTestResultItemTypeIds, int yearId, int page, string? search, CancellationToken cancellationToken)
+    {
+        var checkedIds = checkedTestResultItemTypeIds ?? [];
+        try
+        {
+            foreach (var id in pageTestResultItemTypeIds ?? [])
+            {
+                await testResultItemTypeApiClient.SetNoLongerInUseAsync(id, new TestResultItemTypeNoLongerInUseRequest(checkedIds.Contains(id), yearId), cancellationToken);
+            }
+        }
+        catch (Exception ex) when (IsTransientApiFailure(ex, cancellationToken))
+        {
+            return View(nameof(TestResultItemType), await BuildTestResultItemTypeViewModelAsync(
+                new TestResultItemTypeViewModelRequest(yearId, EditId: null, page, NoLongerInUseSaveFailedMessage, MessageIsError: true, AddValues: null, EditValues: null, SearchText: search),
+                cancellationToken));
+        }
+
+        return RedirectToAction(nameof(TestResultItemType), new { yearId, page, search });
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> TestResultItemTypeRemove(Guid testResultItemTypeId, int yearId, int page, string? search, CancellationToken cancellationToken)
+    {
+        var result = await testResultItemTypeApiClient.DeleteAsync(testResultItemTypeId, yearId, cancellationToken);
+        if (!result.Success)
+        {
+            LogTestResultItemTypeRemoveBlockedMessage(logger, testResultItemTypeId, null);
+        }
+
+        return View(nameof(TestResultItemType), await BuildTestResultItemTypeViewModelAsync(
+            new TestResultItemTypeViewModelRequest(yearId, EditId: null, page, result.Message, !result.Success, AddValues: null, EditValues: null, SearchText: search),
+            cancellationToken));
+    }
+
+    // Unlike CategoryItemType/TestType/CriterionItemType, this screen also carries a server-side
+    // Search term through its render pipeline, so it needs its own request-bundling record rather
+    // than reusing the shared generic ItemTypeViewModelRequest<TAdd, TEdit>.
+    private sealed record TestResultItemTypeViewModelRequest(
+        int? YearId,
+        Guid? EditId,
+        int Page,
+        string? Message,
+        bool MessageIsError,
+        TestResultItemTypeAddViewModel? AddValues,
+        TestResultItemTypeEditViewModel? EditValues,
+        Guid? RemoveConfirmId = null,
+        string? SearchText = null);
+
+    private async Task<TestResultItemTypeViewModel> BuildTestResultItemTypeViewModelAsync(
+        TestResultItemTypeViewModelRequest request,
+        CancellationToken cancellationToken)
+    {
+        var yearData = await ResolveItemTypeYearDataAsync(
+            request.YearId,
+            request.EditId,
+            request.Message,
+            request.MessageIsError,
+            "Result Item",
+            new ItemTypeResponseAccessors<TestResultItemTypeResponse>(
+                (yearId, ct) => testResultItemTypeApiClient.GetByYearAsync(yearId, request.SearchText, ct),
+                i => i.TestResultItemTypeId,
+                i => i.Name,
+                i => i.ForeignInstances,
+                i => i.ForeignInstancesString),
+            cancellationToken);
+
+        var returnValueTypes = await lookupApiClient.GetTestReturnValueTypesAsync(cancellationToken);
+        var returnValueTypeOptions = returnValueTypes
+            .Select(r => new SelectListItem(r.Name, r.TestReturnValueTypeId.ToString()))
+            .ToList();
+
+        // Matches legacy GridViewTestResultItemType.AllowPaging/PageSize = 15.
+        var currentPage = request.Page < 1 ? 1 : request.Page;
+        var pagedItems = yearData.SortedItems
+            .Skip((currentPage - 1) * TestResultItemTypeViewModel.PageSize)
+            .Take(TestResultItemTypeViewModel.PageSize);
+
+        var rows = pagedItems
+            .Select(i => new TestResultItemTypeRowViewModel
+            {
+                TestResultItemTypeId = i.TestResultItemTypeId,
+                Name = yearData.EditId == i.TestResultItemTypeId && request.EditValues is not null ? request.EditValues.Name : i.Name,
+                TestReturnValueTypeId = yearData.EditId == i.TestResultItemTypeId && request.EditValues?.TestReturnValueTypeId is not null ? request.EditValues.TestReturnValueTypeId.Value : i.TestReturnValueTypeId,
+                TestReturnValueTypeName = i.TestReturnValueTypeName,
+                NoLongerInUse = yearData.EditId == i.TestResultItemTypeId && request.EditValues is not null ? request.EditValues.NoLongerInUse : i.NoLongerInUse,
+                ForeignInstances = i.ForeignInstances,
+                ForeignInstancesString = i.ForeignInstancesString,
+                IsEditing = yearData.EditId == i.TestResultItemTypeId,
+                IsConfirmingRemove = request.RemoveConfirmId == i.TestResultItemTypeId
+            })
+            .ToList();
+
+        return new TestResultItemTypeViewModel
+        {
+            SelectedYearId = yearData.SelectedYearId,
+            YearOptions = yearData.YearOptions,
+            SearchText = request.SearchText,
+            Rows = rows,
+            Page = currentPage,
+            TotalRecords = yearData.TotalRecords,
+            ReturnValueTypeOptions = returnValueTypeOptions,
+            Add = request.AddValues ?? new TestResultItemTypeAddViewModel(),
             Message = yearData.Message,
             MessageIsError = yearData.MessageIsError
         };

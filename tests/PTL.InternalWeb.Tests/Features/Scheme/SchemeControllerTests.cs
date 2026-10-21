@@ -265,8 +265,13 @@ public class SchemeControllerTests
         Assert.Contains(model.CriterionItemTypeOptions, o => o.Value == activeId.ToString());
         Assert.DoesNotContain(model.CriterionItemTypeOptions, o => o.Value == retiredId.ToString());
 
-        // Category Item Type dropdown is unaffected by the TestType/CriterionItemType-only fix -
-        // see SchemeController.PopulateTestItemTypeOptionsAsync remarks.
+        // AC: "Given an item is marked No Longer in Use, When a new test is configured, Then the
+        // item is not offered for selection" - story 744590.
+        Assert.Contains(model.ResultItemTypeOptions, o => o.Value == activeId.ToString());
+        Assert.DoesNotContain(model.ResultItemTypeOptions, o => o.Value == retiredId.ToString());
+
+        // Category Item Type dropdown is unaffected by the TestType/CriterionItemType/
+        // TestResultItemType-only fix - see SchemeController.PopulateTestItemTypeOptionsAsync remarks.
         Assert.Contains(model.CategoryItemTypeOptions, o => o.Value == retiredId.ToString());
     }
 

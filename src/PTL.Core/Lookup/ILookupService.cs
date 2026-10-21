@@ -23,6 +23,7 @@ public interface ILookupService
     Task<IReadOnlyList<SchemeUserEntity>> GetTestConsultantsAsync(CancellationToken cancellationToken = default);
     Task<IReadOnlyList<SchemeUserEntity>> GetAssessorsAsync(CancellationToken cancellationToken = default);
     Task<IReadOnlyList<SchemeItemTypeEntity>> GetSchemeItemTypesAsync(SchemeItemTypeKind kind, int yearId, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<TestReturnValueTypeEntity>> GetTestReturnValueTypesAsync(CancellationToken cancellationToken = default);
 
     // Returns only the currency prices linked to the given scheme (spgaSchemeCurrency, filtered
     // in-memory - see docs/analysis/scheme-analysis.md, "Scheme Currency Read Operations").

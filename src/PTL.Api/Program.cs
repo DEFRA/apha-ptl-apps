@@ -32,6 +32,7 @@ using PTL.Core.PostagePricingPlan;
 using PTL.Core.Scheme;
 using PTL.Core.SystemMessage;
 using PTL.Core.TestConsultant;
+using PTL.Core.TestResultItemType;
 using PTL.Core.TestType;
 using PTL.Core.User;
 using PTL.Core.Viewer;
@@ -62,6 +63,7 @@ using PTL.Data.Scheme;
 using PTL.Data.Storage;
 using PTL.Data.SystemMessage;
 using PTL.Data.TestConsultant;
+using PTL.Data.TestResultItemType;
 using PTL.Data.TestType;
 using PTL.Data.User;
 using PTL.Data.Viewer;
@@ -239,6 +241,9 @@ builder.Services.AddScoped<ICategoryItemTypeService, CategoryItemTypeService>();
 
 builder.Services.AddScoped<ITestTypeRepository, TestTypeRepository>();
 builder.Services.AddScoped<ITestTypeService, TestTypeService>();
+
+builder.Services.AddScoped<ITestResultItemTypeRepository, TestResultItemTypeRepository>();
+builder.Services.AddScoped<ITestResultItemTypeService, TestResultItemTypeService>();
 
 builder.Services.AddScoped<ICriterionItemTypeRepository, CriterionItemTypeRepository>();
 builder.Services.AddScoped<ICriterionItemTypeService, CriterionItemTypeService>();
