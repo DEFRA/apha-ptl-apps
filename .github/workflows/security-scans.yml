@@ -1,0 +1,245 @@
+name: Security scans
+
+# Reusable workflow called by build-test-publish-images.yml. It is deliberately not triggered
+# on its own and is not part of that workflow's component path filters, so changing a scan
+# does not require release labels or publish new images.
+
+on:
+  workflow_call:
+    inputs:
+      dotnet-version:
+        description: .NET SDK version used to restore and build the solution
+        type: string
+        required: false
+        # Keep in step with DOTNET_VERSION in build-test-publish-images.yml.
+        default: "10.0.x"
+
+permissions:
+  contents: read
+
+jobs:
+  secret-scan:
+    name: Secret scan (Gitleaks)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    env:
+      GITLEAKS_VERSION: "8.30.1"
+      # SHA-256 of gitleaks_<version>_linux_x64.tar.gz, from the release's checksums file.
+      GITLEAKS_SHA256: "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb"
+    steps:
+      - name: Checkout full history
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      # The CLI is used directly because gitleaks-action needs a paid licence for organisation repositories.
+      - name: Install Gitleaks
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          curl --silent --show-error --fail --location \
+            --proto '=https' --tlsv1.2 \
+            --output "${RUNNER_TEMP}/gitleaks.tar.gz" \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          echo "${GITLEAKS_SHA256}  ${RUNNER_TEMP}/gitleaks.tar.gz" | sha256sum --check --strict
+          tar --extract --gzip --file "${RUNNER_TEMP}/gitleaks.tar.gz" --directory "${RUNNER_TEMP}" gitleaks
+
+      # --redact keeps matched values out of this job log. Reviewed false positives
+      # are listed in .gitleaksignore, which Gitleaks reads from the repository root.
+      - name: Scan history for secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          "${RUNNER_TEMP}/gitleaks" git . \
+            --redact \
+            --no-banner \
+            --verbose \
+            --exit-code 1
+
+  dependency-scan:
+    name: Dependency vulnerability scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: ${{ inputs.dotnet-version }}
+
+      - name: Restore solution
+        run: dotnet restore PTL.slnx
+
+      - name: Scan NuGet packages (direct and transitive)
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          REPORT="${RUNNER_TEMP}/nuget-vulnerabilities.json"
+
+          # `dotnet list package --vulnerable` exits 0 even when it finds vulnerabilities,
+          # so the JSON report is read to decide the result.
+          dotnet list PTL.slnx package --vulnerable --include-transitive --no-restore \
+            --format json --output-version 1 > "${REPORT}"
+
+          SCAN_ERRORS="$(jq '[(.problems // [])[] | select((.level // "" | ascii_downcase) == "error")] | length' "${REPORT}")"
+          if (( SCAN_ERRORS > 0 )); then
+            echo "::error::The NuGet vulnerability scan reported errors, so its result cannot be trusted."
+            jq '.problems' "${REPORT}"
+            exit 1
+          fi
+
+          FINDINGS="$(jq -c '[.. | objects | select(has("vulnerabilities")) as $p | $p.vulnerabilities[] | {package: $p.id, version: $p.resolvedVersion, severity: .severity, advisory: .advisoryurl}] | unique' "${REPORT}")"
+          TOTAL="$(jq 'length' <<< "${FINDINGS}")"
+          BLOCKING="$(jq 'map(select(.severity == "High" or .severity == "Critical")) | length' <<< "${FINDINGS}")"
+
+          {
+            echo "### NuGet vulnerability scan"
+            echo
+            if (( TOTAL == 0 )); then
+              echo "No known vulnerable packages."
+            else
+              echo "| Package | Version | Severity | Advisory |"
+              echo "|---|---|---|---|"
+              jq -r '.[] | "| \(.package) | \(.version) | \(.severity) | \(.advisory) |"' <<< "${FINDINGS}"
+            fi
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+          if (( BLOCKING > 0 )); then
+            echo "::error::${BLOCKING} High or Critical vulnerable NuGet package(s) found. Upgrade them before merging."
+            exit 1
+          fi
+
+          if (( TOTAL > 0 )); then
+            echo "::warning::${TOTAL} Low or Moderate vulnerable NuGet package(s) found. Not blocking; see the job summary."
+          fi
+
+  code-scanning:
+    name: CodeQL analysis (${{ matrix.language }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - language: csharp
+            build-mode: manual
+            runner: windows-2022
+          - language: javascript-typescript
+            build-mode: none
+            runner: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up .NET
+        if: matrix.language == 'csharp'
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: ${{ inputs.dotnet-version }}
+
+      - name: Initialise CodeQL
+        uses: github/codeql-action/init@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4.39.0
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+          queries: security-extended
+          config-file: ./.github/codeql/codeql-config.yml
+
+      - name: Restore solution
+        if: matrix.language == 'csharp'
+        run: dotnet restore PTL.slnx
+
+      - name: Build solution for CodeQL
+        if: matrix.language == 'csharp'
+        run: dotnet build PTL.slnx --configuration Release --no-restore -p:UseSharedCompilation=false
+
+      # Results are not uploaded by this step so that the build gate below does not depend on
+      # upload permissions (Dependabot and fork pull requests get a read-only token).
+      - name: Analyse
+        id: analyze
+        uses: github/codeql-action/analyze@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4.39.0
+        with:
+          category: /language:${{ matrix.language }}
+          upload: never
+          output: ${{ runner.temp }}/codeql-sarif
+
+      # The upload step below consumes the SARIF folder, so the gate reads its own copy.
+      - name: Keep SARIF for the findings gate
+        if: steps.analyze.outcome == 'success'
+        shell: bash
+        run: cp -r "${RUNNER_TEMP}/codeql-sarif" "${RUNNER_TEMP}/codeql-gate"
+
+      - name: Upload results to code scanning
+        if: >-
+          always() &&
+          steps.analyze.outcome == 'success' &&
+          github.actor != 'dependabot[bot]' &&
+          (github.event_name != 'pull_request' ||
+          github.event.pull_request.head.repo.full_name == github.repository)
+        continue-on-error: true
+        uses: github/codeql-action/upload-sarif@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4.39.0
+        with:
+          sarif_file: ${{ runner.temp }}/codeql-sarif
+          category: /language:${{ matrix.language }}
+
+      - name: Fail on High or Critical findings
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+
+          SARIF_FILES=("${RUNNER_TEMP}/codeql-gate"/*.sarif)
+          if (( ${#SARIF_FILES[@]} == 0 )); then
+            echo "::error::CodeQL produced no SARIF output, so the scan result cannot be trusted."
+            exit 1
+          fi
+
+          FINDINGS='[]'
+          for SARIF in "${SARIF_FILES[@]}"; do
+            FINDINGS="$(jq -c -f .github/codeql/blocking-findings.jq "${SARIF}" \
+              | jq -c --argjson previous "${FINDINGS}" '$previous + .')"
+          done
+
+          TOTAL="$(jq 'length' <<< "${FINDINGS}")"
+          BLOCKING="$(jq 'map(select(.blocking)) | length' <<< "${FINDINGS}")"
+
+          {
+            echo "### CodeQL (${{ matrix.language }}) findings"
+            echo
+            if (( TOTAL == 0 )); then
+              echo "No findings."
+            else
+              echo "| Blocking | Rule | Severity | Location |"
+              echo "|---|---|---|---|"
+              jq -r 'sort_by(-.severity) | .[] | "| \(if .blocking then "yes" else "no" end) | \(.rule) | \(.severity) | \(.file):\(.line) |"' <<< "${FINDINGS}"
+            fi
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+          if (( BLOCKING > 0 )); then
+            jq -r '.[] | select(.blocking) | "::error file=\(.file),line=\(.line)::\(.rule) (severity \(.severity)): \(.message)"' <<< "${FINDINGS}"
+            # Annotations are capped at 10 per step, so the full list is also printed as plain text.
+            jq -r '.[] | select(.blocking) | "  BLOCKING \(.file):\(.line)  \(.rule)  \(.message)"' <<< "${FINDINGS}"
+            echo "::error::${BLOCKING} High or Critical CodeQL finding(s) in ${{ matrix.language }}. Fix them before merging."
+            exit 1
+          fi
+
+          if (( TOTAL > 0 )); then
+            echo "::warning::${TOTAL} lower-severity CodeQL finding(s) in ${{ matrix.language }}. Not blocking; see the job summary."
+          fi
