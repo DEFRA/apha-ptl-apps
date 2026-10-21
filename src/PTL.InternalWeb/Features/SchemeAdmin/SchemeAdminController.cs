@@ -4,6 +4,7 @@ using PTL.ApiClient;
 using PTL.Contracts.CategoryItemType;
 using PTL.Contracts.CriterionItemType;
 using PTL.Contracts.Lookup;
+using PTL.Contracts.TestMethodItemType;
 using PTL.Contracts.TestResultItemType;
 using PTL.Contracts.TestType;
 
@@ -11,7 +12,7 @@ namespace PTL.InternalWeb.Features.SchemeAdmin;
 
 // Authentication/authorization are out of scope for this phase - same convention as
 // Features/Scheme/SchemeController.cs, which this "Manage Schemes" sub-area sits alongside.
-public class SchemeAdminController(ICategoryItemTypeApiClient categoryItemTypeApiClient, ITestTypeApiClient testTypeApiClient, ICriterionItemTypeApiClient criterionItemTypeApiClient, ITestResultItemTypeApiClient testResultItemTypeApiClient, ILookupApiClient lookupApiClient, ILogger<SchemeAdminController> logger) : Controller
+public class SchemeAdminController(ICategoryItemTypeApiClient categoryItemTypeApiClient, ITestTypeApiClient testTypeApiClient, ICriterionItemTypeApiClient criterionItemTypeApiClient, ITestResultItemTypeApiClient testResultItemTypeApiClient, ITestMethodItemTypeApiClient testMethodItemTypeApiClient, ILookupApiClient lookupApiClient, ILogger<SchemeAdminController> logger) : Controller
 {
     private static readonly Action<ILogger, Guid, Exception?> LogCategoryItemTypeRemoveBlockedMessage =
         LoggerMessage.Define<Guid>(
@@ -36,6 +37,12 @@ public class SchemeAdminController(ICategoryItemTypeApiClient categoryItemTypeAp
             LogLevel.Information,
             new EventId(4, nameof(LogTestResultItemTypeRemoveBlockedMessage)),
             "Test result item type {TestResultItemTypeId} removal was blocked: still in use");
+
+    private static readonly Action<ILogger, Guid, Exception?> LogTestMethodItemTypeRemoveBlockedMessage =
+        LoggerMessage.Define<Guid>(
+            LogLevel.Information,
+            new EventId(5, nameof(LogTestMethodItemTypeRemoveBlockedMessage)),
+            "Test method item type {TestMethodItemTypeId} removal was blocked: still in use");
 
     private const string NoLongerInUseSaveFailedMessage = "Could not save all 'No Longer in Use' changes because the service did not respond. Please try again.";
 
@@ -811,6 +818,188 @@ public class SchemeAdminController(ICategoryItemTypeApiClient categoryItemTypeAp
             TotalRecords = yearData.TotalRecords,
             ReturnValueTypeOptions = returnValueTypeOptions,
             Add = request.AddValues ?? new TestResultItemTypeAddViewModel(),
+            Message = yearData.Message,
+            MessageIsError = yearData.MessageIsError
+        };
+    }
+
+    public async Task<IActionResult> TestMethodItemType(int? yearId, Guid? editId, Guid? removeConfirmId, string? search, int page = 1, CancellationToken cancellationToken = default) =>
+        View(await BuildTestMethodItemTypeViewModelAsync(
+            new TestMethodItemTypeViewModelRequest(yearId, editId, page, Message: null, MessageIsError: false, AddValues: null, EditValues: null, removeConfirmId, search),
+            cancellationToken));
+
+    // Matches legacy ButtonAdd_Click - Name and Return Type are both required; the new item
+    // always starts in whichever year is currently selected in the dropdown.
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> TestMethodItemTypeAdd([Bind(Prefix = "Add")] TestMethodItemTypeAddViewModel model, int yearId, int page, string? search, CancellationToken cancellationToken)
+    {
+        if (ModelState.IsValid)
+        {
+            var result = await testMethodItemTypeApiClient.CreateAsync(new TestMethodItemTypeSaveRequest(model.Name, model.TestReturnValueTypeId!.Value, model.NoLongerInUse, yearId), cancellationToken);
+            if (result.Success)
+            {
+                return RedirectToAction(nameof(TestMethodItemType), new { yearId, page, search });
+            }
+
+            foreach (var (field, messages) in result.FieldErrors)
+            {
+                foreach (var errorMessage in messages)
+                {
+                    ModelState.AddModelError($"Add.{field}", errorMessage);
+                }
+            }
+        }
+
+        return View(nameof(TestMethodItemType), await BuildTestMethodItemTypeViewModelAsync(
+            new TestMethodItemTypeViewModelRequest(yearId, EditId: null, page, Message: null, MessageIsError: false, model, EditValues: null, SearchText: search),
+            cancellationToken));
+    }
+
+    // Only the row matching model.TestMethodItemTypeId is ever in edit mode when this posts -
+    // matches legacy GridViewTestMethodItemType_RowUpdating, which only acts on the row with
+    // EditIndex set. Blocked (in-use) edits surface the legacy warning message as a notification
+    // banner rather than a JS alert.
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> TestMethodItemTypeSave([Bind(Prefix = "Edit")] TestMethodItemTypeEditViewModel model, int yearId, int page, string? search, CancellationToken cancellationToken)
+    {
+        if (ModelState.IsValid)
+        {
+            var result = await testMethodItemTypeApiClient.UpdateAsync(model.TestMethodItemTypeId!.Value, new TestMethodItemTypeSaveRequest(model.Name, model.TestReturnValueTypeId!.Value, model.NoLongerInUse, yearId), cancellationToken);
+            if (result.Success)
+            {
+                return RedirectToAction(nameof(TestMethodItemType), new { yearId, page, search });
+            }
+
+            if (result.FieldErrors.TryGetValue(string.Empty, out var conflictMessages))
+            {
+                return View(nameof(TestMethodItemType), await BuildTestMethodItemTypeViewModelAsync(
+                    new TestMethodItemTypeViewModelRequest(yearId, model.TestMethodItemTypeId, page, conflictMessages[0], MessageIsError: true, AddValues: null, EditValues: null, SearchText: search),
+                    cancellationToken));
+            }
+
+            foreach (var (field, messages) in result.FieldErrors)
+            {
+                foreach (var errorMessage in messages)
+                {
+                    ModelState.AddModelError($"Edit.{field}", errorMessage);
+                }
+            }
+        }
+
+        return View(nameof(TestMethodItemType), await BuildTestMethodItemTypeViewModelAsync(
+            new TestMethodItemTypeViewModelRequest(yearId, model.TestMethodItemTypeId, page, Message: null, MessageIsError: false, AddValues: null, model, SearchText: search),
+            cancellationToken));
+    }
+
+    // "No Longer in Use" is saved for every row on the current page in one combined submit -
+    // matches legacy ButtonSave_Click's explicit comment that this flag can be changed on any
+    // item, even one otherwise blocked from editing because it is still in use.
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> TestMethodItemTypeSaveAllNoLongerInUse(List<Guid>? pageTestMethodItemTypeIds, List<Guid>? checkedTestMethodItemTypeIds, int yearId, int page, string? search, CancellationToken cancellationToken)
+    {
+        var checkedIds = checkedTestMethodItemTypeIds ?? [];
+        try
+        {
+            foreach (var id in pageTestMethodItemTypeIds ?? [])
+            {
+                await testMethodItemTypeApiClient.SetNoLongerInUseAsync(id, new TestMethodItemTypeNoLongerInUseRequest(checkedIds.Contains(id), yearId), cancellationToken);
+            }
+        }
+        catch (Exception ex) when (IsTransientApiFailure(ex, cancellationToken))
+        {
+            return View(nameof(TestMethodItemType), await BuildTestMethodItemTypeViewModelAsync(
+                new TestMethodItemTypeViewModelRequest(yearId, EditId: null, page, NoLongerInUseSaveFailedMessage, MessageIsError: true, AddValues: null, EditValues: null, SearchText: search),
+                cancellationToken));
+        }
+
+        return RedirectToAction(nameof(TestMethodItemType), new { yearId, page, search });
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> TestMethodItemTypeRemove(Guid testMethodItemTypeId, int yearId, int page, string? search, CancellationToken cancellationToken)
+    {
+        var result = await testMethodItemTypeApiClient.DeleteAsync(testMethodItemTypeId, yearId, cancellationToken);
+        if (!result.Success)
+        {
+            LogTestMethodItemTypeRemoveBlockedMessage(logger, testMethodItemTypeId, null);
+        }
+
+        return View(nameof(TestMethodItemType), await BuildTestMethodItemTypeViewModelAsync(
+            new TestMethodItemTypeViewModelRequest(yearId, EditId: null, page, result.Message, !result.Success, AddValues: null, EditValues: null, SearchText: search),
+            cancellationToken));
+    }
+
+    // Unlike CategoryItemType/TestType/CriterionItemType, this screen also carries a server-side
+    // Search term through its render pipeline - same reasoning as TestResultItemTypeViewModelRequest.
+    private sealed record TestMethodItemTypeViewModelRequest(
+        int? YearId,
+        Guid? EditId,
+        int Page,
+        string? Message,
+        bool MessageIsError,
+        TestMethodItemTypeAddViewModel? AddValues,
+        TestMethodItemTypeEditViewModel? EditValues,
+        Guid? RemoveConfirmId = null,
+        string? SearchText = null);
+
+    private async Task<TestMethodItemTypeViewModel> BuildTestMethodItemTypeViewModelAsync(
+        TestMethodItemTypeViewModelRequest request,
+        CancellationToken cancellationToken)
+    {
+        var yearData = await ResolveItemTypeYearDataAsync(
+            request.YearId,
+            request.EditId,
+            request.Message,
+            request.MessageIsError,
+            "Method Item",
+            new ItemTypeResponseAccessors<TestMethodItemTypeResponse>(
+                (yearId, ct) => testMethodItemTypeApiClient.GetByYearAsync(yearId, request.SearchText, ct),
+                i => i.TestMethodItemTypeId,
+                i => i.Name,
+                i => i.ForeignInstances,
+                i => i.ForeignInstancesString),
+            cancellationToken);
+
+        var returnValueTypes = await lookupApiClient.GetTestReturnValueTypesAsync(cancellationToken);
+        var returnValueTypeOptions = returnValueTypes
+            .Select(r => new SelectListItem(r.Name, r.TestReturnValueTypeId.ToString()))
+            .ToList();
+
+        // Matches legacy GridViewTestMethodItemType.AllowPaging/PageSize = 15.
+        var currentPage = request.Page < 1 ? 1 : request.Page;
+        var pagedItems = yearData.SortedItems
+            .Skip((currentPage - 1) * TestMethodItemTypeViewModel.PageSize)
+            .Take(TestMethodItemTypeViewModel.PageSize);
+
+        var rows = pagedItems
+            .Select(i => new TestMethodItemTypeRowViewModel
+            {
+                TestMethodItemTypeId = i.TestMethodItemTypeId,
+                Name = yearData.EditId == i.TestMethodItemTypeId && request.EditValues is not null ? request.EditValues.Name : i.Name,
+                TestReturnValueTypeId = yearData.EditId == i.TestMethodItemTypeId && request.EditValues?.TestReturnValueTypeId is not null ? request.EditValues.TestReturnValueTypeId.Value : i.TestReturnValueTypeId,
+                TestReturnValueTypeName = i.TestReturnValueTypeName,
+                NoLongerInUse = yearData.EditId == i.TestMethodItemTypeId && request.EditValues is not null ? request.EditValues.NoLongerInUse : i.NoLongerInUse,
+                ForeignInstances = i.ForeignInstances,
+                ForeignInstancesString = i.ForeignInstancesString,
+                IsEditing = yearData.EditId == i.TestMethodItemTypeId,
+                IsConfirmingRemove = request.RemoveConfirmId == i.TestMethodItemTypeId
+            })
+            .ToList();
+
+        return new TestMethodItemTypeViewModel
+        {
+            SelectedYearId = yearData.SelectedYearId,
+            YearOptions = yearData.YearOptions,
+            SearchText = request.SearchText,
+            Rows = rows,
+            Page = currentPage,
+            TotalRecords = yearData.TotalRecords,
+            ReturnValueTypeOptions = returnValueTypeOptions,
+            Add = request.AddValues ?? new TestMethodItemTypeAddViewModel(),
             Message = yearData.Message,
             MessageIsError = yearData.MessageIsError
         };

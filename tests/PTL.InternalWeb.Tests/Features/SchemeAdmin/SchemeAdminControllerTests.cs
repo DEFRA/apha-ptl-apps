@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using PTL.Contracts.CategoryItemType;
 using PTL.Contracts.CriterionItemType;
 using PTL.Contracts.Lookup;
+using PTL.Contracts.TestMethodItemType;
 using PTL.Contracts.TestResultItemType;
 using PTL.Contracts.TestType;
 using PTL.InternalWeb.Features.SchemeAdmin;
@@ -14,14 +15,16 @@ public class SchemeAdminControllerTests
 {
     private const int CurrentYearId = 2026;
 
-    private static SchemeAdminController CreateController(FakeCategoryItemTypeApiClient? categoryItemTypeApiClient = null, FakeLookupApiClient? lookupApiClient = null, FakeTestTypeApiClient? testTypeApiClient = null, FakeCriterionItemTypeApiClient? criterionItemTypeApiClient = null, FakeTestResultItemTypeApiClient? testResultItemTypeApiClient = null) =>
+    private static SchemeAdminController CreateController(FakeCategoryItemTypeApiClient? categoryItemTypeApiClient = null, FakeLookupApiClient? lookupApiClient = null, FakeTestTypeApiClient? testTypeApiClient = null, FakeCriterionItemTypeApiClient? criterionItemTypeApiClient = null, FakeTestResultItemTypeApiClient? testResultItemTypeApiClient = null, FakeTestMethodItemTypeApiClient? testMethodItemTypeApiClient = null) =>
         new(
             categoryItemTypeApiClient ?? new FakeCategoryItemTypeApiClient(),
             testTypeApiClient ?? new FakeTestTypeApiClient(),
             criterionItemTypeApiClient ?? new FakeCriterionItemTypeApiClient(),
             testResultItemTypeApiClient ?? new FakeTestResultItemTypeApiClient(),
+            testMethodItemTypeApiClient ?? new FakeTestMethodItemTypeApiClient(),
             lookupApiClient ?? new FakeLookupApiClient { Years = [new YearResponse(CurrentYearId, "2026"), new YearResponse(CurrentYearId + 1, "2027")] },
             NullLogger<SchemeAdminController>.Instance);
+
 
 
     [Fact]
@@ -788,6 +791,207 @@ public class SchemeAdminControllerTests
 
         var page2Result = await controller.TestResultItemType(CurrentYearId, null, null, search: null, page: 2, cancellationToken: CancellationToken.None);
         var page2Model = Assert.IsType<TestResultItemTypeViewModel>(Assert.IsType<ViewResult>(page2Result).Model);
+
+        Assert.Equal(15, page1Model.Rows.Count);
+        Assert.Single(page2Model.Rows);
+        Assert.Equal(16, page1Model.TotalRecords);
+        Assert.Equal(16, page2Model.TotalRecords);
+    }
+
+    [Fact]
+    public async Task TestMethodItemType_Get_BuildsRowsYearOptionsAndReturnTypeOptions()
+    {
+        var apiClient = new FakeTestMethodItemTypeApiClient
+        {
+            Items = [new TestMethodItemTypeResponse(Guid.NewGuid(), Guid.NewGuid(), "Titration", ReturnTypeId, "Numeric", CurrentYearId, 9999, false, 0, string.Empty)]
+        };
+        var controller = CreateController(testMethodItemTypeApiClient: apiClient, lookupApiClient: CreateLookupApiClientWithReturnTypes());
+
+        var result = await controller.TestMethodItemType(null, null, null, search: null, cancellationToken: CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<TestMethodItemTypeViewModel>(view.Model);
+        Assert.Single(model.Rows);
+        Assert.Equal("Numeric", model.Rows[0].TestReturnValueTypeName);
+        Assert.Single(model.ReturnValueTypeOptions);
+    }
+
+    [Fact]
+    public async Task TestMethodItemType_Get_WithEditIdOnInUseItem_RefusesEditModeAndShowsDependencyMessage()
+    {
+        var itemId = Guid.NewGuid();
+        var apiClient = new FakeTestMethodItemTypeApiClient
+        {
+            Items = [new TestMethodItemTypeResponse(itemId, Guid.NewGuid(), "Titration", ReturnTypeId, "Numeric", CurrentYearId, 9999, false, 2, "Scheme A, Scheme B")]
+        };
+        var controller = CreateController(testMethodItemTypeApiClient: apiClient, lookupApiClient: CreateLookupApiClientWithReturnTypes());
+
+        var result = await controller.TestMethodItemType(CurrentYearId, itemId, null, search: null, cancellationToken: CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<TestMethodItemTypeViewModel>(view.Model);
+        Assert.False(model.Rows[0].IsEditing);
+        Assert.True(model.MessageIsError);
+        Assert.Contains("Scheme A, Scheme B", model.Message);
+    }
+
+    // AC: "Given a year is selected and the search field is left blank, When Search is selected,
+    // Then all Test Method Items for that year are displayed."
+    [Fact]
+    public async Task TestMethodItemType_Get_BlankSearch_PassesNullSearchToApiClient()
+    {
+        var apiClient = new FakeTestMethodItemTypeApiClient { Items = [] };
+        var controller = CreateController(testMethodItemTypeApiClient: apiClient, lookupApiClient: CreateLookupApiClientWithReturnTypes());
+
+        await controller.TestMethodItemType(CurrentYearId, null, null, search: null, cancellationToken: CancellationToken.None);
+
+        Assert.Null(apiClient.LastSearch);
+    }
+
+    [Fact]
+    public async Task TestMethodItemType_Get_WithSearch_PassesSearchTextToApiClientAndPreservesItOnTheViewModel()
+    {
+        var apiClient = new FakeTestMethodItemTypeApiClient { Items = [] };
+        var controller = CreateController(testMethodItemTypeApiClient: apiClient, lookupApiClient: CreateLookupApiClientWithReturnTypes());
+
+        var result = await controller.TestMethodItemType(CurrentYearId, null, null, search: "titr", cancellationToken: CancellationToken.None);
+
+        Assert.Equal("titr", apiClient.LastSearch);
+        var model = Assert.IsType<TestMethodItemTypeViewModel>(Assert.IsType<ViewResult>(result).Model);
+        Assert.Equal("titr", model.SearchText);
+    }
+
+    // AC: "Given the administrator creates a Test Method Item with a Return Type, When Save is
+    // selected, Then the item is stored and available for assignment to tests."
+    [Fact]
+    public async Task TestMethodItemTypeAdd_ValidModel_CreatesAndRedirects()
+    {
+        var apiClient = new FakeTestMethodItemTypeApiClient();
+        var controller = CreateController(testMethodItemTypeApiClient: apiClient, lookupApiClient: CreateLookupApiClientWithReturnTypes());
+        var model = new TestMethodItemTypeAddViewModel { Name = "Titration", TestReturnValueTypeId = ReturnTypeId, NoLongerInUse = false };
+
+        var result = await controller.TestMethodItemTypeAdd(model, CurrentYearId, 1, search: null, CancellationToken.None);
+
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal(nameof(SchemeAdminController.TestMethodItemType), redirect.ActionName);
+        Assert.Equal("Titration", apiClient.LastCreateRequest?.Name);
+        Assert.Equal(ReturnTypeId, apiClient.LastCreateRequest?.TestReturnValueTypeId);
+    }
+
+    [Fact]
+    public async Task TestMethodItemTypeAdd_InvalidModel_MissingReturnType_RedisplaysWithValidationError()
+    {
+        var apiClient = new FakeTestMethodItemTypeApiClient();
+        var controller = CreateController(testMethodItemTypeApiClient: apiClient, lookupApiClient: CreateLookupApiClientWithReturnTypes());
+        var model = new TestMethodItemTypeAddViewModel { Name = "Titration", TestReturnValueTypeId = null };
+        controller.ModelState.AddModelError("Add.TestReturnValueTypeId", "Select a return type");
+
+        var result = await controller.TestMethodItemTypeAdd(model, CurrentYearId, 1, search: null, CancellationToken.None);
+
+        Assert.IsType<ViewResult>(result);
+        Assert.Null(apiClient.LastCreateRequest);
+    }
+
+    [Fact]
+    public async Task TestMethodItemTypeSave_ValidModel_UpdatesAndRedirects()
+    {
+        var itemId = Guid.NewGuid();
+        var apiClient = new FakeTestMethodItemTypeApiClient();
+        var controller = CreateController(testMethodItemTypeApiClient: apiClient, lookupApiClient: CreateLookupApiClientWithReturnTypes());
+        var model = new TestMethodItemTypeEditViewModel { TestMethodItemTypeId = itemId, Name = "Titration (renamed)", TestReturnValueTypeId = ReturnTypeId, NoLongerInUse = true };
+
+        var result = await controller.TestMethodItemTypeSave(model, CurrentYearId, 1, search: null, CancellationToken.None);
+
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal(nameof(SchemeAdminController.TestMethodItemType), redirect.ActionName);
+        Assert.Equal(itemId, apiClient.LastUpdateRequest?.TestMethodItemTypeId);
+    }
+
+    [Fact]
+    public async Task TestMethodItemTypeSave_ApiReportsInUseConflict_RedisplaysWithBannerMessage()
+    {
+        var itemId = Guid.NewGuid();
+        var apiClient = new FakeTestMethodItemTypeApiClient
+        {
+            SaveResult = new TestMethodItemTypeSaveResult(false, null, new Dictionary<string, string[]> { [string.Empty] = ["This Method Item is being used on 1 Scheme(s): Scheme A and cannot be edited."] })
+        };
+        var controller = CreateController(testMethodItemTypeApiClient: apiClient, lookupApiClient: CreateLookupApiClientWithReturnTypes());
+        var model = new TestMethodItemTypeEditViewModel { TestMethodItemTypeId = itemId, Name = "Titration", TestReturnValueTypeId = ReturnTypeId };
+
+        var result = await controller.TestMethodItemTypeSave(model, CurrentYearId, 1, search: null, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var resultModel = Assert.IsType<TestMethodItemTypeViewModel>(view.Model);
+        Assert.True(resultModel.MessageIsError);
+    }
+
+    [Fact]
+    public async Task TestMethodItemTypeSaveAllNoLongerInUse_TickedAndUntickedRows_SavesBothCorrectly()
+    {
+        var tickedId = Guid.NewGuid();
+        var untickedId = Guid.NewGuid();
+        var apiClient = new FakeTestMethodItemTypeApiClient();
+        var controller = CreateController(testMethodItemTypeApiClient: apiClient, lookupApiClient: CreateLookupApiClientWithReturnTypes());
+
+        var result = await controller.TestMethodItemTypeSaveAllNoLongerInUse(
+            pageTestMethodItemTypeIds: [tickedId, untickedId],
+            checkedTestMethodItemTypeIds: [tickedId],
+            CurrentYearId, 1, search: null, CancellationToken.None);
+
+        Assert.IsType<RedirectToActionResult>(result);
+        Assert.True(apiClient.AllNoLongerInUseRequests.Single(r => r.TestMethodItemTypeId == tickedId).Request.NoLongerInUse);
+        Assert.False(apiClient.AllNoLongerInUseRequests.Single(r => r.TestMethodItemTypeId == untickedId).Request.NoLongerInUse);
+    }
+
+    // AC: "Given a method item is in use on a distribution, When removal is attempted, Then the
+    // action is prevented and a message identifying the dependency is displayed."
+    [Fact]
+    public async Task TestMethodItemTypeRemove_Blocked_RedisplaysWithMessage()
+    {
+        var itemId = Guid.NewGuid();
+        var apiClient = new FakeTestMethodItemTypeApiClient
+        {
+            DeleteResponse = new TestMethodItemTypeDeleteResponse(false, "This Method Item is being used on 1 Scheme(s): Scheme A and cannot be removed.")
+        };
+        var controller = CreateController(testMethodItemTypeApiClient: apiClient, lookupApiClient: CreateLookupApiClientWithReturnTypes());
+
+        var result = await controller.TestMethodItemTypeRemove(itemId, CurrentYearId, 1, search: null, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<TestMethodItemTypeViewModel>(view.Model);
+        Assert.True(model.MessageIsError);
+    }
+
+    [Fact]
+    public async Task TestMethodItemTypeRemove_Success_RedisplaysWithSuccessMessage()
+    {
+        var itemId = Guid.NewGuid();
+        var apiClient = new FakeTestMethodItemTypeApiClient { DeleteResponse = new TestMethodItemTypeDeleteResponse(true, null) };
+        var controller = CreateController(testMethodItemTypeApiClient: apiClient, lookupApiClient: CreateLookupApiClientWithReturnTypes());
+
+        var result = await controller.TestMethodItemTypeRemove(itemId, CurrentYearId, 1, search: null, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<TestMethodItemTypeViewModel>(view.Model);
+        Assert.False(model.MessageIsError);
+        Assert.Equal(itemId, apiClient.LastDeletedTestMethodItemTypeId);
+    }
+
+    // Matches legacy GridViewTestMethodItemType.AllowPaging/PageSize = 15.
+    [Fact]
+    public async Task TestMethodItemType_Get_WithMoreThan15Items_PaginatesAtLegacyPageSizeOf15()
+    {
+        var items = Enumerable.Range(1, 16)
+            .Select(i => new TestMethodItemTypeResponse(Guid.NewGuid(), Guid.NewGuid(), $"Item {i:D2}", ReturnTypeId, "Numeric", CurrentYearId, 9999, false, 0, string.Empty))
+            .ToList();
+        var apiClient = new FakeTestMethodItemTypeApiClient { Items = items };
+        var controller = CreateController(testMethodItemTypeApiClient: apiClient, lookupApiClient: CreateLookupApiClientWithReturnTypes());
+
+        var page1Result = await controller.TestMethodItemType(CurrentYearId, null, null, search: null, page: 1, cancellationToken: CancellationToken.None);
+        var page1Model = Assert.IsType<TestMethodItemTypeViewModel>(Assert.IsType<ViewResult>(page1Result).Model);
+
+        var page2Result = await controller.TestMethodItemType(CurrentYearId, null, null, search: null, page: 2, cancellationToken: CancellationToken.None);
+        var page2Model = Assert.IsType<TestMethodItemTypeViewModel>(Assert.IsType<ViewResult>(page2Result).Model);
 
         Assert.Equal(15, page1Model.Rows.Count);
         Assert.Single(page2Model.Rows);
