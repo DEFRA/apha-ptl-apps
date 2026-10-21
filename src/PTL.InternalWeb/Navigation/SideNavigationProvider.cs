@@ -263,8 +263,6 @@ public static class SideNavigationProvider
                         new SideNavigationItem { Text = "Printable Scheme", ControllerName = SchemeControllerName, ActionName = "PrintableScheme", IsHidden = true }
                     ]
                 },
-                Disabled("Test Types"),
-                Disabled("Search"),
                 new SideNavigationItem { Text = "Test Types", ControllerName = "SchemeAdmin", ActionName = "TestType" },
                 Disabled("Test Result Items"),
                 Disabled("Test Method Items"),
