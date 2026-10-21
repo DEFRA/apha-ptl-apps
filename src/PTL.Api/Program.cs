@@ -136,6 +136,8 @@ builder.Services.AddScoped<IInternalUserService, InternalUserService>();
 
 builder.Services.AddScoped<IContractRepository, ContractRepository>();
 builder.Services.AddScoped<IContractService, ContractService>();
+builder.Services.AddScoped<IContractPostageService, ContractPostageService>();
+builder.Services.AddScoped<PTL.Core.Audit.IAuditActorResolver, PTL.Core.Audit.AuditActorResolver>();
 
 builder.Services.AddScoped<IImportPermitRepository, ImportPermitRepository>();
 builder.Services.AddScoped<IImportPermitService, ImportPermitService>();
@@ -150,6 +152,20 @@ builder.Services.AddScoped<IContractMergeRepository, ContractMergeRepository>();
 builder.Services.AddScoped<IRenewContractsService, RenewContractsService>();
 builder.Services.AddScoped<IPendingOrderRepository, PendingOrderRepository>();
 builder.Services.AddScoped<IPendingOrderService, PendingOrderService>();
+builder.Services.AddScoped<IPendingOrderContractWriter, PendingOrderContractWriter>();
+builder.Services.AddScoped<IPendingOrderDecisionEmails, PendingOrderDecisionEmails>();
+builder.Services.AddScoped<IPendingOrderEmailPersonaliser, PendingOrderEmailPersonaliser>();
+
+// Approve/Decline emails: sent through GOV.UK Notify straight after the decision, retried by the hosted scheduler.
+builder.Services.Configure<OnlineOrderEmailOptions>(builder.Configuration.GetSection(OnlineOrderEmailOptions.SectionName));
+builder.Services.AddSingleton<EmailSendGuard>();
+builder.Services.AddScoped<IPendingOrderNotifier, PendingOrderNotifier>();
+
+// Customer and participant update emails: same pattern - sent through GOV.UK Notify when the update is decided, retried by the scheduler.
+builder.Services.Configure<CustomerUpdateEmailOptions>(builder.Configuration.GetSection(CustomerUpdateEmailOptions.SectionName));
+builder.Services.Configure<ParticipantUpdateEmailOptions>(builder.Configuration.GetSection(ParticipantUpdateEmailOptions.SectionName));
+builder.Services.AddScoped<ICustomerUpdateNotifier, CustomerUpdateNotifier>();
+builder.Services.AddScoped<IParticipantUpdateNotifier, ParticipantUpdateNotifier>();
 
 // Single shared S3 configuration root for every S3-backed feature (export templates, invoice
 // archives) - one bucket, one prefix per feature (docs/migration/invoice-migration.md). Provider
@@ -204,19 +220,19 @@ builder.Services.AddScoped<ITabulationReportService, TabulationReportService>();
 builder.Services.AddScoped<ITestConsultantCommentsService, TestConsultantCommentsService>();
 builder.Services.AddScoped<IAmendResultsService, AmendResultsService>();
 builder.Services.AddScoped<ITabulationSendService, TabulationSendService>();
-builder.Services.Configure<AttachmentOptions>(builder.Configuration.GetSection(AttachmentOptions.SectionName));
 builder.Services.AddScoped<IActualResultsService, ActualResultsService>();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddScoped<IDistributionPostedNotifier, DistributionPostedNotifier>();
 
-// Test Consultant and publication emails: sent through GOV.UK Notify, with the scheduler hosted in this process.
+// Test Consultant and publication emails: sent through GOV.UK Notify; the one scheduler for all email jobs is hosted in this process.
+builder.Services.Configure<NotificationSchedulerOptions>(builder.Configuration.GetSection(NotificationSchedulerOptions.SectionName));
 builder.Services.Configure<TabulationEmailOptions>(builder.Configuration.GetSection(TabulationEmailOptions.SectionName));
 builder.Services.Configure<PublicationNotificationOptions>(builder.Configuration.GetSection(PublicationNotificationOptions.SectionName));
 builder.Services.AddSingleton<TabulationEmailGuard>();
 builder.Services.AddSingleton<TabulationEmailContext>();
 builder.Services.AddScoped<ITabulationEmailService, TabulationEmailService>();
 builder.Services.AddScoped<ITabulationPublishedNotifier, TabulationPublishedNotifier>();
-builder.Services.AddHostedService<PTL.Api.BackgroundServices.TabulationEmailBackgroundService>();
+builder.Services.AddHostedService<PTL.Api.BackgroundServices.NotificationBackgroundService>();
 builder.Services.AddScoped<IPackagingService, PackagingService>();
 builder.Services.AddScoped<IPackagingOutputService, PackagingOutputService>();
 builder.Services.AddScoped<ITemplateMergeService, TemplateMergeService>();
@@ -369,6 +385,20 @@ catch (Exception ex)
 {
     logCredentialDiagnosticFailed(app.Logger, ex);
 }
+
+// TEMPORARY DIAGNOSTIC - logs the full Notify API key at the user's explicit request; remove and rotate the key afterwards.
+var logNotifyKeyDiagnostic = LoggerMessage.Define<bool, int, string>(
+    LogLevel.Information,
+    new EventId(3, "NotifyApiKeyDiagnostic"),
+    "GOV.UK Notify API key diagnostic: Configured={Configured} Length={Length} Key={ApiKey}");
+
+var configuredNotifyKey = app.Services.GetRequiredService<IOptions<NotifyOptions>>().Value.ApiKey;
+logNotifyKeyDiagnostic(
+    app.Logger,
+    !string.IsNullOrWhiteSpace(configuredNotifyKey),
+    configuredNotifyKey.Length,
+    configuredNotifyKey,
+    null);
 
 app.UseExceptionHandler();
 

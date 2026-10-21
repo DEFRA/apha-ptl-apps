@@ -51,6 +51,12 @@ public sealed record PendingParticipantUpdateSaveRequest(
     string Email,
     string Email2);
 
+// Optional body of the approve endpoint: amended values (null = approve the stored values) plus the
+// reviewer's comments, which legacy sent as the notification email's "Additional Information".
+public sealed record PendingParticipantUpdateApproveRequest(PendingParticipantUpdateSaveRequest? Edits = null, string? Comments = null);
+
+public sealed record PendingParticipantUpdateDeclineRequest(string? Comments = null);
+
 // Outcome of an Approve/Decline. NotFound distinguishes "no outstanding pending update" from a
 // validation failure so the caller can return 404 rather than redisplaying the form.
 public sealed record PendingParticipantUpdateDecisionResult(

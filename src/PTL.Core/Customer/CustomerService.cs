@@ -6,8 +6,16 @@ namespace PTL.Core.Customer;
 public sealed class CustomerService(
     ICustomerRepository customerRepository,
     IPendingCustomerUpdateRepository pendingCustomerUpdateRepository,
+    ICustomerUpdateNotifier customerUpdateNotifier,
     ILogger<CustomerService> logger) : ICustomerService
 {
+    // spiUpdatedCustomerDetailsEmail takes @Email varchar(100); tblUpdatedCustomerDetailsEmail.fldCustomerName is varchar(50).
+    private const int EmailAddressMaxLength = 100;
+    private const int CustomerNameMaxLength = 50;
+
+    // PendingCustomerUpdateDetails.aspx's comments regex.
+    private const int CommentsMaxLength = 2000;
+
     private static readonly Action<ILogger, CustomerStatusFilter, int, int, int, Exception?> LogCustomerSearchMessage =
         LoggerMessage.Define<CustomerStatusFilter, int, int, int>(
             LogLevel.Information,
@@ -139,8 +147,11 @@ public sealed class CustomerService(
     // Only approved changes update the live customer record - matches
     // PendingCustomerUpdateDetails.aspx's ButtonApprove_Click (mCustomer.Save() then
     // mPendingCustomerUpdate.Save() with IsDeleted=True), including its mcustomer.IsValid check.
-    public async Task<bool> ApprovePendingCustomerUpdateAsync(Guid customerId, PendingCustomerUpdate? editedFields = null, CancellationToken cancellationToken = default)
+    public async Task<bool> ApprovePendingCustomerUpdateAsync(Guid customerId, PendingCustomerUpdate? editedFields = null, string comments = "", CancellationToken cancellationToken = default)
     {
+        comments ??= string.Empty;
+        ValidateComments(comments);
+
         var existing = await customerRepository.GetByIdAsync(customerId, cancellationToken);
         var pending = await pendingCustomerUpdateRepository.GetByCustomerIdAsync(customerId, cancellationToken);
         if (existing is null || pending is null)
@@ -151,15 +162,61 @@ public sealed class CustomerService(
         ApplyPendingFields(existing, editedFields ?? pending);
         Validate(existing);
         await customerRepository.UpdateAsync(existing, cancellationToken);
-        return await pendingCustomerUpdateRepository.MarkDecidedAsync(customerId, pending.PendingCustomerUpdateId, cancellationToken);
+        var decided = await pendingCustomerUpdateRepository.MarkDecidedAsync(customerId, pending.PendingCustomerUpdateId, cancellationToken);
+        if (decided)
+        {
+            // Legacy read the customer back after saving it, so an approved email change is notified to the new address.
+            await NotifyAsync(existing, pending.PendingCustomerUpdateId, comments, isApproved: true, cancellationToken);
+        }
+
+        return decided;
     }
 
     // Declined changes do not update the live record - only the pending row is soft-deleted.
-    public async Task<bool> DeclinePendingCustomerUpdateAsync(Guid customerId, CancellationToken cancellationToken = default)
+    public async Task<bool> DeclinePendingCustomerUpdateAsync(Guid customerId, string comments = "", CancellationToken cancellationToken = default)
     {
+        comments ??= string.Empty;
+        ValidateComments(comments);
+
         var pending = await pendingCustomerUpdateRepository.GetByCustomerIdAsync(customerId, cancellationToken);
-        return pending is not null && await pendingCustomerUpdateRepository.MarkDecidedAsync(customerId, pending.PendingCustomerUpdateId, cancellationToken);
+        if (pending is null)
+        {
+            return false;
+        }
+
+        var decided = await pendingCustomerUpdateRepository.MarkDecidedAsync(customerId, pending.PendingCustomerUpdateId, cancellationToken);
+        if (decided && await customerRepository.GetByIdAsync(customerId, cancellationToken) is { } customer)
+        {
+            await NotifyAsync(customer, pending.PendingCustomerUpdateId, comments, isApproved: false, cancellationToken);
+        }
+
+        return decided;
     }
+
+    private static void ValidateComments(string comments)
+    {
+        if (comments.Length > CommentsMaxLength)
+        {
+            throw new CustomerValidationException([new CustomerValidationError("Comments", "The comments field allows maximum 2000 characters")]);
+        }
+    }
+
+    // Legacy EmailUpdateNotifications: one row for the customer's email, which is then sent at once (retried by the
+    // scheduler if that fails). A blank address is skipped rather than queued.
+    private async Task NotifyAsync(Customer customer, Guid pendingCustomerUpdateId, string comments, bool isApproved, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(customer.Email))
+        {
+            return;
+        }
+
+        await pendingCustomerUpdateRepository.QueueNotificationAsync(
+            new CustomerUpdateNotification(Truncate(customer.Email, EmailAddressMaxLength), pendingCustomerUpdateId, Truncate(customer.Name, CustomerNameMaxLength), comments, isApproved),
+            cancellationToken);
+        await customerUpdateNotifier.SendForUpdateAsync(pendingCustomerUpdateId, CancellationToken.None);
+    }
+
+    private static string Truncate(string value, int length) => value.Length > length ? value[..length] : value;
 
     private static void ApplyPendingFields(Customer customer, PendingCustomerUpdate pending)
     {

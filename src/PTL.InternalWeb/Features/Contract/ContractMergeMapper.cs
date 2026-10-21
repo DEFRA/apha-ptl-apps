@@ -58,7 +58,7 @@ public static class ContractMergeMapper
         items is null
             ? []
             : items.Schemes
-                .SelectMany(scheme => scheme.Participants.Select(participant =>
+                .SelectMany(scheme => scheme.Participants.Where(participant => !participant.IsRemoved).Select(participant =>
                     (IReadOnlyDictionary<string, string>)new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
                     {
                         ["SchemeName"] = scheme.SchemeName,

@@ -7,11 +7,9 @@
     var fields = Model.Fields;
     var pricingPlan = fields.PricingPlanOptions.FirstOrDefault(o => o.Value == fields.PricingPlan)?.Text ?? fields.PricingPlan;
 
+    // Legacy lists the months in contract-year order, April to March.
     var months = new (string Name, bool Distribute, bool IsOverride)[]
     {
-        ("January", fields.DistributionMonthJan, fields.IsOverrideJan),
-        ("February", fields.DistributionMonthFeb, fields.IsOverrideFeb),
-        ("March", fields.DistributionMonthMar, fields.IsOverrideMar),
         ("April", fields.DistributionMonthApr, fields.IsOverrideApr),
         ("May", fields.DistributionMonthMay, fields.IsOverrideMay),
         ("June", fields.DistributionMonthJun, fields.IsOverrideJun),
@@ -21,6 +19,9 @@
         ("October", fields.DistributionMonthOct, fields.IsOverrideOct),
         ("November", fields.DistributionMonthNov, fields.IsOverrideNov),
         ("December", fields.DistributionMonthDec, fields.IsOverrideDec),
+        ("January", fields.DistributionMonthJan, fields.IsOverrideJan),
+        ("February", fields.DistributionMonthFeb, fields.IsOverrideFeb),
+        ("March", fields.DistributionMonthMar, fields.IsOverrideMar),
     };
 
     static string YesNo(bool value) => value ? "Yes" : "No";
@@ -50,11 +51,18 @@
     </div>
 </dl>
 
+@if (fields.SchemeDistributionAsAvailable)
+{
+    <h2 class="govuk-heading-m">Months</h2>
+    <p class="govuk-body">Distribution is marked 'As Available'</p>
+}
+else
+{
 <table class="govuk-table">
-    <caption class="govuk-table__caption govuk-table__caption--m">Distribution months</caption>
+    <caption class="govuk-table__caption govuk-table__caption--m">Months</caption>
     <thead class="govuk-table__head">
         <tr class="govuk-table__row">
-            <th scope="col" class="govuk-table__header">Month</th>
+            <th scope="col" class="govuk-table__header">Months</th>
             <th scope="col" class="govuk-table__header">Distribute</th>
             <th scope="col" class="govuk-table__header">Is Override</th>
         </tr>
@@ -70,6 +78,7 @@
         }
     </tbody>
 </table>
+}
 
 <h2 class="govuk-heading-m">Group Address</h2>
 <dl class="govuk-summary-list">
@@ -94,7 +103,7 @@
         <dd class="govuk-summary-list__value">@fields.NumberOfSetsRequired</dd>
     </div>
     <div class="govuk-summary-list__row">
-        <dt class="govuk-summary-list__key">External reference</dt>
+        <dt class="govuk-summary-list__key">External Reference</dt>
         <dd class="govuk-summary-list__value">@OrNotProvided(fields.ExternalReference)</dd>
     </div>
     <div class="govuk-summary-list__row">
@@ -131,11 +140,4 @@
         <dt class="govuk-summary-list__key">Other Packaging Requirements</dt>
         <dd class="govuk-summary-list__value">@OrNotProvided(fields.PackingInstructions)</dd>
     </div>
-    @if (fields.ParticipantSchemeId is not null)
-    {
-        <div class="govuk-summary-list__row">
-            <dt class="govuk-summary-list__key">Price</dt>
-            <dd class="govuk-summary-list__value">@fields.Price.GetValueOrDefault().ToString("N2")</dd>
-        </div>
-    }
 </dl>

@@ -24,6 +24,9 @@ public class ContractController(IContractApiClient contractApiClient, ICustomerA
 
     private const string MailMergeFailed = "There was a problem with the Mail Merge";
 
+    // Legacy ContractItems.js saveWithAudit alert text.
+    private const string AuditWhyRequiredMessage = "Please enter why you are making these changes before you continue";
+
     private static readonly Action<ILogger, string, int, Exception?> LogBulkExportedMessage =
         LoggerMessage.Define<string, int>(
             LogLevel.Information,
@@ -155,11 +158,12 @@ public class ContractController(IContractApiClient contractApiClient, ICustomerA
 
     // Legacy ContractItems.aspx (priced scheme line items) - see docs/migration/contract-migration.md
     // "Feature Breakdown" Phase 1/3. A single unpaginated page per contract, matching legacy exactly -
-    // no search/filtering/paging (legacy has none).
+    // no search/filtering/paging (legacy has none). `pending` carries the items marked for removal (legacy
+    // kept them in ViewState until Save).
     [HttpGet]
-    public async Task<IActionResult> ContractItems(Guid id, CancellationToken cancellationToken = default)
+    public async Task<IActionResult> ContractItems(Guid id, Guid[]? pending = null, CancellationToken cancellationToken = default)
     {
-        var items = await contractApiClient.GetContractItemsAsync(id, cancellationToken);
+        var items = await contractApiClient.GetContractItemsAsync(id, pending, cancellationToken);
         if (items is null)
         {
             LogContractNotFoundMessage(logger, id, null);
@@ -173,19 +177,25 @@ public class ContractController(IContractApiClient contractApiClient, ICustomerA
             return NotFound();
         }
 
-        var model = new ContractItemsViewModel(items, contract.CustomerId);
+        var model = new ContractItemsViewModel(items, contract.CustomerId, pending ?? []);
         ViewData[BreadcrumbRouteValues.CustomerId] = contract.CustomerId;
         ViewData[BreadcrumbRouteValues.ContractId] = id;
         LogDisplayedContractItemsMessage(logger, id, items.Schemes.Count, null);
         return View(model);
     }
 
-    // Explicit REST mutation replacing legacy ContractItems.aspx's deferred "mark removed, save
-    // later" flow - removes immediately, then redisplays the Contract Items page.
+    // Legacy GridViewParticipants_RowCommand "Remove": asks first (the shared confirmation page replaces the
+    // confirm() box), then only marks the item as pending deletion - nothing is saved until the audit step.
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> RemoveContractItem(Guid id, Guid participantSchemeId, string? confirmation, CancellationToken cancellationToken)
+    public IActionResult RemoveContractItem(Guid id, Guid participantSchemeId, Guid[]? pending, string? confirmation)
     {
+        var marked = (pending ?? []).Append(participantSchemeId).Distinct().ToArray();
+        if (ConfirmationFlow.IsCancelled(confirmation))
+        {
+            return RedirectToAction(nameof(ContractItems), new { id, pending });
+        }
+
         if (!ConfirmationFlow.IsConfirmed(confirmation))
         {
             ViewData[BreadcrumbRouteValues.ContractId] = id;
@@ -196,24 +206,74 @@ public class ContractController(IContractApiClient contractApiClient, ICustomerA
                     Message = "Are you sure you want to remove this Contract Item?",
                     ConfirmText = "Remove",
                     IsDestructive = true,
-                    CancelUrl = Url.Action(nameof(ContractItems), new { id }),
+                    CancelUrl = Url.Action(nameof(ContractItems), new { id, pending }),
                 },
                 nameof(ContractItems));
         }
 
-        var result = await contractApiClient.RemoveContractItemAsync(id, participantSchemeId, cancellationToken);
-        if (!result.Success)
+        return RedirectToAction(nameof(ContractItems), new { id, pending = marked });
+    }
+
+    // Legacy BtnAskAudit/askForAuditText dialog: the reasons for the pending removals are mandatory.
+    [HttpGet]
+    public async Task<IActionResult> AuditContractItemRemovals(Guid id, Guid[]? pending, CancellationToken cancellationToken)
+    {
+        if (pending is not { Length: > 0 })
         {
-            LogRemoveContractItemFailedMessage(logger, id, participantSchemeId, result.ErrorMessage, null);
-            TempData.SetNotification(NotificationType.Error, result.ErrorMessage ?? "The contract item could not be removed.");
-        }
-        else
-        {
-            LogRemovedContractItemMessage(logger, id, participantSchemeId, null);
-            TempData.SetNotification(NotificationType.Success, "Contract item removed successfully.");
+            return RedirectToAction(nameof(ContractItems), new { id });
         }
 
-        return RedirectToAction(nameof(ContractItems), new { id });
+        var contract = await contractApiClient.GetContractAsync(id, cancellationToken);
+        if (contract is null)
+        {
+            return NotFound();
+        }
+
+        ViewData[BreadcrumbRouteValues.CustomerId] = contract.CustomerId;
+        ViewData[BreadcrumbRouteValues.ContractId] = id;
+        ViewData[BreadcrumbRouteValues.Action] = nameof(ContractItems);
+        return View(new ContractItemRemovalAuditViewModel { ContractId = id, Pending = pending });
+    }
+
+    // Legacy BtnSave_Click: SetAudit + Delete + Save for every pending item, then back to the contract list.
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> AuditContractItemRemovals(ContractItemRemovalAuditViewModel model, CancellationToken cancellationToken)
+    {
+        var contract = await contractApiClient.GetContractAsync(model.ContractId, cancellationToken);
+        if (contract is null)
+        {
+            return NotFound();
+        }
+
+        if (string.IsNullOrWhiteSpace(model.AuditWhy))
+        {
+            ModelState.AddModelError(nameof(model.AuditWhy), AuditWhyRequiredMessage);
+        }
+
+        if (!ModelState.IsValid)
+        {
+            ViewData[BreadcrumbRouteValues.CustomerId] = contract.CustomerId;
+            ViewData[BreadcrumbRouteValues.ContractId] = model.ContractId;
+            ViewData[BreadcrumbRouteValues.Action] = nameof(ContractItems);
+            return View(model);
+        }
+
+        foreach (var participantSchemeId in model.Pending)
+        {
+            var result = await contractApiClient.RemoveContractItemAsync(model.ContractId, participantSchemeId, model.AuditWhy, cancellationToken);
+            if (!result.Success)
+            {
+                LogRemoveContractItemFailedMessage(logger, model.ContractId, participantSchemeId, result.ErrorMessage, null);
+                TempData.SetNotification(NotificationType.Error, result.ErrorMessage ?? "The contract item could not be removed.");
+                return RedirectToAction(nameof(ContractItems), new { id = model.ContractId });
+            }
+
+            LogRemovedContractItemMessage(logger, model.ContractId, participantSchemeId, null);
+        }
+
+        TempData.SetNotification(NotificationType.Success, "Contract items removed successfully.");
+        return RedirectToAction(nameof(Index), new { customerId = contract.CustomerId });
     }
 
     // Replaces legacy ContractList.aspx's MailMergeContract/MailMergeSampleAddressLetter/
@@ -513,7 +573,7 @@ public class ContractController(IContractApiClient contractApiClient, ICustomerA
             return new ContractDocumentContext(canonicalType, templateName, contract, null, null, [], [], [], renewal);
         }
 
-        var items = await contractApiClient.GetContractItemsAsync(contract.ContractId, cancellationToken);
+        var items = await contractApiClient.GetContractItemsAsync(contract.ContractId, cancellationToken: cancellationToken);
         var customer = await customerApiClient.GetCustomerAsync(contract.CustomerId, cancellationToken);
         var countries = await lookupApiClient.GetCountriesAsync(cancellationToken);
         var vatRatings = await lookupApiClient.GetVatRatingsAsync(cancellationToken);
@@ -944,10 +1004,15 @@ public class ContractController(IContractApiClient contractApiClient, ICustomerA
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> ApprovePendingOrder(Guid pendingContractId, string? purchaseOrderNumber, CancellationToken cancellationToken)
+    public async Task<IActionResult> ApprovePendingOrder(Guid pendingContractId, PendingOrderDecisionForm form, CancellationToken cancellationToken)
     {
+        if (!ModelState.IsValid)
+        {
+            return await RedisplayPendingOrderAsync(pendingContractId, form, cancellationToken);
+        }
+
         var result = await contractApiClient.ApprovePendingOrderAsync(
-            pendingContractId, new PendingOrderApproveRequest(purchaseOrderNumber ?? string.Empty), cancellationToken);
+            pendingContractId, new PendingOrderApproveRequest(form.PurchaseOrderNumber ?? string.Empty, form.Comments), cancellationToken);
 
         if (result.NotFound)
         {
@@ -956,9 +1021,8 @@ public class ContractController(IContractApiClient contractApiClient, ICustomerA
 
         if (!result.Success)
         {
-            var messages = string.Join(" ", result.FieldErrors.SelectMany(e => e.Value));
-            TempData.SetNotification(NotificationType.Error, $"Order could not be approved. {messages}");
-            return RedirectToAction(nameof(PendingOrderDetails), new { pendingContractId });
+            AddErrors(result.FieldErrors);
+            return await RedisplayPendingOrderAsync(pendingContractId, form, cancellationToken);
         }
 
         TempData.SetNotification(NotificationType.Success, "Order approved successfully.");
@@ -967,16 +1031,36 @@ public class ContractController(IContractApiClient contractApiClient, ICustomerA
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> DeclinePendingOrder(Guid pendingContractId, CancellationToken cancellationToken)
+    public async Task<IActionResult> DeclinePendingOrder(Guid pendingContractId, PendingOrderDecisionForm form, CancellationToken cancellationToken)
     {
-        var declined = await contractApiClient.DeclinePendingOrderAsync(pendingContractId, cancellationToken);
-        if (!declined)
+        // Decline never reads the purchase order number, so its length is not a reason to refuse it.
+        ModelState.Remove(nameof(PendingOrderDecisionForm.PurchaseOrderNumber));
+        if (!ModelState.IsValid)
+        {
+            return await RedisplayPendingOrderAsync(pendingContractId, form, cancellationToken);
+        }
+
+        var result = await contractApiClient.DeclinePendingOrderAsync(pendingContractId, new PendingOrderDeclineRequest(form.Comments), cancellationToken);
+        if (result.NotFound)
         {
             return NotFound();
         }
 
+        if (!result.Success)
+        {
+            AddErrors(result.FieldErrors);
+            return await RedisplayPendingOrderAsync(pendingContractId, form, cancellationToken);
+        }
+
         TempData.SetNotification(NotificationType.Success, "Order declined successfully.");
         return RedirectToAction(nameof(ReviewPendingOrders));
+    }
+
+    // The error summary and the typed values need the order's schemes again, so the page is rebuilt, not redirected to.
+    private async Task<IActionResult> RedisplayPendingOrderAsync(Guid pendingContractId, PendingOrderDecisionForm form, CancellationToken cancellationToken)
+    {
+        var order = await contractApiClient.GetPendingOrderAsync(pendingContractId, cancellationToken);
+        return order is null ? NotFound() : View(nameof(PendingOrderDetails), new PendingOrderDetailsViewModel(order, form));
     }
 
     private void AddErrors(IReadOnlyDictionary<string, string[]> fieldErrors) => this.AddFieldErrors(fieldErrors);

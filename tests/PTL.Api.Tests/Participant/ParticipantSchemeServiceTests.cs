@@ -19,10 +19,17 @@ public sealed class ParticipantSchemeServiceTests
 
     private static (ParticipantSchemeService Service, FakeParticipantSchemeRepository Repository, FakeContractRepository Contracts) CreateService()
     {
+        var (service, repository, contracts, _) = CreateServiceWithCustomers();
+        return (service, repository, contracts);
+    }
+
+    private static (ParticipantSchemeService Service, FakeParticipantSchemeRepository Repository, FakeContractRepository Contracts, PTL.Api.Tests.Customer.FakeCustomerRepository Customers) CreateServiceWithCustomers()
+    {
         var contracts = new FakeContractRepository();
         var repository = new FakeParticipantSchemeRepository();
-        var service = new ParticipantSchemeService(repository, contracts, NullLogger<ParticipantSchemeService>.Instance);
-        return (service, repository, contracts);
+        var customers = new PTL.Api.Tests.Customer.FakeCustomerRepository();
+        var service = new ParticipantSchemeService(repository, contracts, customers, new PTL.Api.Tests.Contract.FakeContractPostageService(), NullLogger<ParticipantSchemeService>.Instance);
+        return (service, repository, contracts, customers);
     }
 
     private static CoreContract ActiveContract(Guid contractId, bool isReadOnly = false) => new()
@@ -167,6 +174,201 @@ public sealed class ParticipantSchemeServiceTests
         contracts.ContractItems = ItemsWith(contractId, record.SchemeId, Guid.NewGuid(), Guid.NewGuid());
 
         var created = await service.CreateParticipantSchemeAsync(record);
+
+        Assert.NotEqual(Guid.Empty, created.ParticipantSchemeId);
+    }
+
+    [Fact]
+    public async Task UpdateParticipantSchemeAsync_NonFeePayingWithEveryMonthLocked_KeepsStoredMonthsInsteadOfFailingValidation()
+    {
+        // Disabled (locked) month checkboxes post nothing, so the request arrives with no months at all.
+        var (service, repository, contracts) = CreateService();
+        var contractId = Guid.NewGuid();
+        contracts.Seed(ActiveContract(contractId));
+        var existing = ValidRecord(contractId);
+        existing.DistributionMonthFeb = true;
+        existing.CanEditJan = false;
+        existing.CanEditFeb = false;
+        repository.Add(existing);
+
+        var updatedFields = ValidRecord(contractId);
+        updatedFields.DistributionMonthJan = false;
+        updatedFields.NonFeePaying = true;
+
+        var updated = await service.UpdateParticipantSchemeAsync(existing.ParticipantSchemeId, updatedFields);
+
+        Assert.True(updated!.DistributionMonthJan);
+        Assert.True(updated.DistributionMonthFeb);
+        Assert.True(updated.NonFeePaying);
+    }
+
+    [Fact]
+    public async Task UpdateParticipantSchemeAsync_NoMonthsAtAll_StillFailsEvenWhenNonFeePaying()
+    {
+        var (service, repository, contracts) = CreateService();
+        var contractId = Guid.NewGuid();
+        contracts.Seed(ActiveContract(contractId));
+        var existing = ValidRecord(contractId);
+        repository.Add(existing);
+
+        var updatedFields = ValidRecord(contractId);
+        updatedFields.DistributionMonthJan = false;
+        updatedFields.NonFeePaying = true;
+
+        var ex = await Assert.ThrowsAsync<ParticipantSchemeValidationException>(() => service.UpdateParticipantSchemeAsync(existing.ParticipantSchemeId, updatedFields));
+
+        Assert.Contains(ex.Errors, e => e.Message == "Distribution must have at least one selected month");
+    }
+
+    [Fact]
+    public async Task UpdateParticipantSchemeAsync_EditableMonth_FollowsTheRequest()
+    {
+        var (service, repository, contracts) = CreateService();
+        var contractId = Guid.NewGuid();
+        contracts.Seed(ActiveContract(contractId));
+        var existing = ValidRecord(contractId);
+        repository.Add(existing);
+
+        var updatedFields = ValidRecord(contractId);
+        updatedFields.DistributionMonthJan = false;
+        updatedFields.DistributionMonthMar = true;
+
+        var updated = await service.UpdateParticipantSchemeAsync(existing.ParticipantSchemeId, updatedFields);
+
+        Assert.False(updated!.DistributionMonthJan);
+        Assert.True(updated.DistributionMonthMar);
+    }
+
+    [Fact]
+    public async Task UpdateParticipantSchemeAsync_OverridingALockedMonth_SetsMonthAndOverrideFlag()
+    {
+        var (service, repository, contracts) = CreateService();
+        var contractId = Guid.NewGuid();
+        contracts.Seed(ActiveContract(contractId));
+        var existing = ValidRecord(contractId);
+        existing.CanEditFeb = false;
+        repository.Add(existing);
+
+        var updatedFields = ValidRecord(contractId);
+        updatedFields.DistributionMonthFeb = true;
+        updatedFields.IsOverrideFeb = true;
+
+        var updated = await service.UpdateParticipantSchemeAsync(existing.ParticipantSchemeId, updatedFields);
+
+        Assert.True(updated!.DistributionMonthFeb);
+        Assert.True(updated.IsOverrideFeb);
+    }
+
+    [Fact]
+    public async Task UpdateParticipantSchemeAsync_OverrideFlagOnAnEditableMonth_IsIgnored()
+    {
+        var (service, repository, contracts) = CreateService();
+        var contractId = Guid.NewGuid();
+        contracts.Seed(ActiveContract(contractId));
+        var existing = ValidRecord(contractId);
+        repository.Add(existing);
+
+        var updatedFields = ValidRecord(contractId);
+        updatedFields.IsOverrideJan = true;
+
+        var updated = await service.UpdateParticipantSchemeAsync(existing.ParticipantSchemeId, updatedFields);
+
+        Assert.True(updated!.DistributionMonthJan);
+        Assert.False(updated.IsOverrideJan);
+    }
+
+    [Fact]
+    public async Task UpdateParticipantSchemeAsync_StoredOverride_IsNeverCleared()
+    {
+        var (service, repository, contracts) = CreateService();
+        var contractId = Guid.NewGuid();
+        contracts.Seed(ActiveContract(contractId));
+        var existing = ValidRecord(contractId);
+        existing.DistributionMonthFeb = true;
+        existing.CanEditFeb = false;
+        existing.IsOverrideFeb = true;
+        repository.Add(existing);
+
+        var updated = await service.UpdateParticipantSchemeAsync(existing.ParticipantSchemeId, ValidRecord(contractId));
+
+        Assert.True(updated!.IsOverrideFeb);
+        Assert.True(updated.DistributionMonthFeb);
+    }
+
+    [Fact]
+    public async Task CreateParticipantSchemeAsync_MonthAlreadyPosted_IsNotSetWithoutOverride()
+    {
+        var (service, repository, contracts) = CreateService();
+        var contractId = Guid.NewGuid();
+        contracts.Seed(ActiveContract(contractId));
+        repository.Context = new ParticipantSchemeContext { CanEdit = [true, false, true, true, true, true, true, true, true, true, true, true] };
+        var record = ValidRecord(contractId);
+        record.DistributionMonthFeb = true;
+
+        var created = await service.CreateParticipantSchemeAsync(record);
+
+        Assert.True(created.DistributionMonthJan);
+        Assert.False(created.DistributionMonthFeb);
+        Assert.False(created.IsOverrideFeb);
+    }
+
+    [Fact]
+    public async Task CreateParticipantSchemeAsync_NonUkCustomer_AsksForTheOverseasPostingFlags()
+    {
+        var (service, repository, contracts, customers) = CreateServiceWithCustomers();
+        var contractId = Guid.NewGuid();
+        var contract = ActiveContract(contractId);
+        contracts.Seed(contract);
+        await customers.CreateAsync(new PTL.Core.Customer.Customer { CustomerId = contract.CustomerId, PaymentNonUK = true });
+
+        await service.CreateParticipantSchemeAsync(ValidRecord(contractId));
+
+        Assert.True(repository.LastNonUk);
+    }
+
+    [Fact]
+    public async Task GetParticipantSchemeContextAsync_EmptyIds_ReturnsEverythingEditableWithoutCallingTheRepository()
+    {
+        var (service, repository, _) = CreateService();
+
+        var context = await service.GetParticipantSchemeContextAsync(Guid.Empty, Guid.NewGuid());
+
+        Assert.All(context.CanEdit, Assert.True);
+        Assert.Empty(context.InitialisedMonthIds);
+        Assert.Null(repository.LastNonUk);
+    }
+
+    [Fact]
+    public async Task CreateParticipantSchemeAsync_SameMonthOnAnotherContract_ThrowsPerMonthError()
+    {
+        var (service, repository, contracts) = CreateService();
+        var contractId = Guid.NewGuid();
+        contracts.Seed(ActiveContract(contractId));
+        var other = new bool[12];
+        other[0] = true;
+        repository.OtherParticipantSchemes.Add(new OtherParticipantScheme { ParticipantSchemeId = Guid.NewGuid(), Months = other });
+
+        var ex = await Assert.ThrowsAsync<ParticipantSchemeValidationException>(() => service.CreateParticipantSchemeAsync(ValidRecord(contractId)));
+
+        var error = Assert.Single(ex.Errors);
+        Assert.Equal("DistributionMonthJan", error.Field);
+        Assert.Equal("This participant is already on this scheme, for this month", error.Message);
+    }
+
+    [Fact]
+    public async Task CreateParticipantSchemeAsync_OtherContractUsesADifferentMonthOrIsRemoved_IsAllowed()
+    {
+        var (service, repository, contracts) = CreateService();
+        var contractId = Guid.NewGuid();
+        contracts.Seed(ActiveContract(contractId));
+        var january = new bool[12];
+        january[0] = true;
+        var february = new bool[12];
+        february[1] = true;
+        repository.OtherParticipantSchemes.Add(new OtherParticipantScheme { ParticipantSchemeId = Guid.NewGuid(), IsRemoved = true, Months = january });
+        repository.OtherParticipantSchemes.Add(new OtherParticipantScheme { ParticipantSchemeId = Guid.NewGuid(), Months = february });
+
+        var created = await service.CreateParticipantSchemeAsync(ValidRecord(contractId));
 
         Assert.NotEqual(Guid.Empty, created.ParticipantSchemeId);
     }

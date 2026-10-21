@@ -56,6 +56,7 @@
                     </div>
                 }
                 <div class="@(isLoginPage ? "govuk-grid-column-full" : "govuk-grid-column-three-quarters")">
+                    @await RenderSectionAsync("BackLink", required: false)
                     <main class="app-main-class" id="main-content">
                         @await Html.PartialAsync("_NotificationBanner")
                         @RenderBody()

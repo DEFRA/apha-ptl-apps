@@ -13,7 +13,7 @@ public class PendingParticipantUpdateControllerTests
 {
     private static ParticipantController CreateController(FakeParticipantRepository repository, FakePendingParticipantUpdateRepository pendingRepository)
     {
-        var controller = new ParticipantController(new ParticipantService(repository, pendingRepository, new FakeParticipantViewerRepository(), new FakeViewerRepository(), NullLogger<ParticipantService>.Instance), NullLogger<ParticipantController>.Instance);
+        var controller = new ParticipantController(new ParticipantService(repository, pendingRepository, new PTL.Api.Tests.Notifications.FakeParticipantUpdateNotifier(), new FakeParticipantViewerRepository(), new FakeViewerRepository(), NullLogger<ParticipantService>.Instance), NullLogger<ParticipantController>.Instance);
 
         var services = new ServiceCollection().AddMvc().Services.BuildServiceProvider();
         controller.ControllerContext = new ControllerContext
@@ -141,7 +141,7 @@ public class PendingParticipantUpdateControllerTests
         pendingRepository.Seed(ValidPendingUpdate(participant.ParticipantId));
         var controller = CreateController(repository, pendingRepository);
 
-        var result = await controller.ApprovePendingParticipantUpdate(participant.ParticipantId, AmendedRequest("Amended Contact"), CancellationToken.None);
+        var result = await controller.ApprovePendingParticipantUpdate(participant.ParticipantId, new PendingParticipantUpdateApproveRequest(AmendedRequest("Amended Contact")), CancellationToken.None);
 
         Assert.IsType<NoContentResult>(result);
         var updated = await repository.GetByIdAsync(participant.ParticipantId);
@@ -157,7 +157,7 @@ public class PendingParticipantUpdateControllerTests
         pendingRepository.Seed(ValidPendingUpdate(participant.ParticipantId));
         var controller = CreateController(repository, pendingRepository);
 
-        var result = await controller.ApprovePendingParticipantUpdate(participant.ParticipantId, AmendedRequest(string.Empty), CancellationToken.None);
+        var result = await controller.ApprovePendingParticipantUpdate(participant.ParticipantId, new PendingParticipantUpdateApproveRequest(AmendedRequest(string.Empty)), CancellationToken.None);
 
         var badRequest = Assert.IsType<ObjectResult>(result, exactMatch: false);
         Assert.Equal(400, badRequest.StatusCode);
@@ -168,7 +168,7 @@ public class PendingParticipantUpdateControllerTests
     {
         var controller = CreateController(new FakeParticipantRepository(), new FakePendingParticipantUpdateRepository());
 
-        var result = await controller.DeclinePendingParticipantUpdate(Guid.NewGuid(), CancellationToken.None);
+        var result = await controller.DeclinePendingParticipantUpdate(Guid.NewGuid(), request: null, CancellationToken.None);
 
         Assert.IsType<NotFoundResult>(result);
     }
@@ -182,9 +182,40 @@ public class PendingParticipantUpdateControllerTests
         pendingRepository.Seed(ValidPendingUpdate(participant.ParticipantId));
         var controller = CreateController(repository, pendingRepository);
 
-        var result = await controller.DeclinePendingParticipantUpdate(participant.ParticipantId, CancellationToken.None);
+        var result = await controller.DeclinePendingParticipantUpdate(participant.ParticipantId, new PendingParticipantUpdateDeclineRequest("Not eligible"), CancellationToken.None);
 
         Assert.IsType<NoContentResult>(result);
+        var unchanged = await repository.GetByIdAsync(participant.ParticipantId);
+        Assert.Equal("Alice Example", unchanged!.ContactName);
+    }
+
+    [Fact]
+    public async Task DeclinePendingParticipantUpdate_CommentsTooLong_ReturnsValidationProblemAndKeepsTheUpdatePending()
+    {
+        var repository = new FakeParticipantRepository();
+        var participant = await repository.CreateAsync(ValidActiveParticipant());
+        var pendingRepository = new FakePendingParticipantUpdateRepository();
+        pendingRepository.Seed(ValidPendingUpdate(participant.ParticipantId));
+        var controller = CreateController(repository, pendingRepository);
+
+        var result = await controller.DeclinePendingParticipantUpdate(participant.ParticipantId, new PendingParticipantUpdateDeclineRequest(new string('x', 2001)), CancellationToken.None);
+
+        Assert.Equal(400, Assert.IsType<ObjectResult>(result, exactMatch: false).StatusCode);
+        Assert.NotNull(await pendingRepository.GetByParticipantIdAsync(participant.ParticipantId));
+    }
+
+    [Fact]
+    public async Task ApprovePendingParticipantUpdate_CommentsTooLong_ReturnsValidationProblemAndChangesNothing()
+    {
+        var repository = new FakeParticipantRepository();
+        var participant = await repository.CreateAsync(ValidActiveParticipant());
+        var pendingRepository = new FakePendingParticipantUpdateRepository();
+        pendingRepository.Seed(ValidPendingUpdate(participant.ParticipantId));
+        var controller = CreateController(repository, pendingRepository);
+
+        var result = await controller.ApprovePendingParticipantUpdate(participant.ParticipantId, new PendingParticipantUpdateApproveRequest(Comments: new string('x', 2001)), CancellationToken.None);
+
+        Assert.Equal(400, Assert.IsType<ObjectResult>(result, exactMatch: false).StatusCode);
         var unchanged = await repository.GetByIdAsync(participant.ParticipantId);
         Assert.Equal("Alice Example", unchanged!.ContactName);
     }

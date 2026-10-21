@@ -161,10 +161,10 @@ internal sealed class FakePostedParticipantService : IParticipantService
     public Task<(ParticipantEntity Current, PendingParticipantUpdate Pending)?> GetPendingParticipantUpdateAsync(Guid participantId, CancellationToken cancellationToken = default) =>
         throw new NotSupportedException();
 
-    public Task<bool> ApprovePendingParticipantUpdateAsync(Guid participantId, PendingParticipantUpdate? editedFields = null, CancellationToken cancellationToken = default) =>
+    public Task<bool> ApprovePendingParticipantUpdateAsync(Guid participantId, PendingParticipantUpdate? editedFields = null, string comments = "", CancellationToken cancellationToken = default) =>
         throw new NotSupportedException();
 
-    public Task<bool> DeclinePendingParticipantUpdateAsync(Guid participantId, CancellationToken cancellationToken = default) =>
+    public Task<bool> DeclinePendingParticipantUpdateAsync(Guid participantId, string comments = "", CancellationToken cancellationToken = default) =>
         throw new NotSupportedException();
 
     public Task<ParticipantViewerAssignment?> GetParticipantViewersAsync(Guid participantId, CancellationToken cancellationToken = default) =>

@@ -1,13 +1,18 @@
 @model PTL.InternalWeb.Features.Distribution.PrintableResultsWorksheet
 @{
-    ViewData["Title"] = Model.SchemeHeading;
+    ViewData["Title"] = $"Printable Results - {Model.SchemeHeading}";
 }
 
 @section Styles {
     <link rel="stylesheet" href="~/css/printable-scheme.css" />
 }
 
-<a class="govuk-back-link noprint" asp-action="Preparation" asp-route-year="@Model.YearId" asp-route-monthId="@Model.MonthId">Back</a>
+@section BackLink {
+    <a class="govuk-back-link noprint" asp-action="Preparation" asp-route-year="@Model.YearId" asp-route-monthId="@Model.MonthId">Back</a>
+}
+
+<h1 class="govuk-heading-l noprint">Printable Results</h1>
+<h2 class="govuk-heading-m noprint">@Model.SchemeHeading</h2>
 
 <form method="get" asp-action="PrintableResults" class="noprint govuk-!-margin-bottom-6">
     <input type="hidden" name="year" value="@Model.YearId" />

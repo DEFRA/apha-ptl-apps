@@ -16,11 +16,33 @@ internal sealed class FakeParticipantSchemeApiClient : IParticipantSchemeApiClie
     public Task<ParticipantSchemeResponse?> GetParticipantSchemeAsync(Guid participantSchemeId, CancellationToken cancellationToken = default) =>
         Task.FromResult(ParticipantSchemeResponse);
 
-    public Task<ParticipantSchemeSaveResult> CreateParticipantSchemeAsync(CreateParticipantSchemeRequest request, CancellationToken cancellationToken = default) =>
-        ExceptionToThrow is not null ? Task.FromException<ParticipantSchemeSaveResult>(ExceptionToThrow) : Task.FromResult(SaveResult);
+    // What a new Contract Item learns about its Scheme (months already posted / initialised).
+    public ParticipantSchemeContextResponse Context { get; set; } = new(Enumerable.Repeat(true, 12).ToArray(), []);
 
-    public Task<ParticipantSchemeSaveResult> UpdateParticipantSchemeAsync(Guid participantSchemeId, UpdateParticipantSchemeRequest request, CancellationToken cancellationToken = default) =>
-        ExceptionToThrow is not null ? Task.FromException<ParticipantSchemeSaveResult>(ExceptionToThrow) : Task.FromResult(SaveResult);
+    public Task<ParticipantSchemeContextResponse> GetParticipantSchemeContextAsync(Guid contractId, Guid schemeId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Context);
+
+    public Task<ParticipantSchemeSaveResult> CreateParticipantSchemeAsync(CreateParticipantSchemeRequest request, CancellationToken cancellationToken = default)
+    {
+        CreateCalled = true;
+        LastCreateRequest = request;
+        return ExceptionToThrow is not null ? Task.FromException<ParticipantSchemeSaveResult>(ExceptionToThrow) : Task.FromResult(SaveResult);
+    }
+
+    public Task<ParticipantSchemeSaveResult> UpdateParticipantSchemeAsync(Guid participantSchemeId, UpdateParticipantSchemeRequest request, CancellationToken cancellationToken = default)
+    {
+        UpdateCalled = true;
+        LastUpdateRequest = request;
+        return ExceptionToThrow is not null ? Task.FromException<ParticipantSchemeSaveResult>(ExceptionToThrow) : Task.FromResult(SaveResult);
+    }
+
+    public bool CreateCalled { get; private set; }
+
+    public bool UpdateCalled { get; private set; }
+
+    public CreateParticipantSchemeRequest? LastCreateRequest { get; private set; }
+
+    public UpdateParticipantSchemeRequest? LastUpdateRequest { get; private set; }
 
     public Task<ParticipantSchemeSaveResult> DeleteParticipantSchemeAsync(Guid participantSchemeId, CancellationToken cancellationToken = default) =>
         Task.FromResult(SaveResult);

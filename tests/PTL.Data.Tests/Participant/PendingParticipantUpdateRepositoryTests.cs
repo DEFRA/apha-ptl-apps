@@ -114,4 +114,74 @@ public class PendingParticipantUpdateRepositoryTests
 
         Assert.False(result);
     }
+
+    [Fact]
+    public async Task QueueNotificationAsync_InsertsOneEmailRowBoundByName()
+    {
+        const string queueSql = "EXEC dbo.spiUpdatedParticipantDetailsEmail @UpdatedParticipantDetailsEmailId = @Id, @Email = @Email, @LabCode = @LabCode, @PendingParticipantDetailsEditId = @PendingParticipantUpdateId, @ParticipantName = @ParticipantName, @Notes = @Notes, @IsApproved = @IsApproved";
+        var (repository, connection) = CreateRepository();
+        var pendingId = Guid.NewGuid();
+        connection.RespondToNonQuery(queueSql, -1);
+
+        await repository.QueueNotificationAsync(new ParticipantUpdateNotification("a@example.com", "001", pendingId, "001: Alpha Lab", "Thanks", IsApproved: false));
+
+        var command = Assert.Single(connection.ExecutedCommands);
+        Assert.Equal(queueSql, command.CommandText);
+        Assert.NotEqual(Guid.Empty, (Guid?)command.ParameterValue("Id"));
+        Assert.Equal("a@example.com", (string?)command.ParameterValue("Email"));
+        Assert.Equal("001", (string?)command.ParameterValue("LabCode"));
+        Assert.Equal(pendingId, (Guid?)command.ParameterValue("PendingParticipantUpdateId"));
+        Assert.Equal("001: Alpha Lab", (string?)command.ParameterValue("ParticipantName"));
+        Assert.Equal("Thanks", (string?)command.ParameterValue("Notes"));
+        Assert.Equal(false, (bool?)command.ParameterValue("IsApproved"));
+    }
+
+    [Fact]
+    public async Task GetUnsentNotificationsAsync_MapsTheRowAndTheLookedUpQalNumber()
+    {
+        var (repository, connection) = CreateRepository();
+        var table = new DataTable();
+        table.Columns.Add("fldUpdatedParticipantDetailsEmailId", typeof(Guid));
+        table.Columns.Add("fldEmail", typeof(string));
+        table.Columns.Add("fldLabCode", typeof(string));
+        table.Columns.Add("fldPendingParticipantDetailsEditId", typeof(Guid));
+        table.Columns.Add("fldParticipantName", typeof(string));
+        table.Columns.Add("fldNotes", typeof(string));
+        table.Columns.Add("fldDateSent", typeof(DateTime));
+        table.Columns.Add("fldIsApproved", typeof(bool));
+        table.Columns.Add("fldQalNumber", typeof(string));
+        var id = Guid.NewGuid();
+        var pendingId = Guid.NewGuid();
+        table.Rows.Add(id, "a@example.com", "001", pendingId, "001: Alpha Lab", "Thanks", DBNull.Value, true, "QAL/00001");
+        connection.RespondToQuery("EXEC dbo.spgaUpdatedParticipantDetailsEmail", table);
+
+        var result = await repository.GetUnsentNotificationsAsync();
+
+        var row = Assert.Single(result);
+        Assert.Equal(id, row.Id);
+        Assert.Equal("a@example.com", row.Email);
+        Assert.Equal("001", row.LabCode);
+        Assert.Equal(pendingId, row.PendingParticipantUpdateId);
+        Assert.Equal("001: Alpha Lab", row.ParticipantName);
+        Assert.Equal("Thanks", row.Notes);
+        Assert.True(row.IsApproved);
+        Assert.Equal("QAL/00001", row.QalNumber);
+    }
+
+    [Fact]
+    public async Task MarkNotificationSentAsync_StampsTheRowBoundByName()
+    {
+        const string markSql = "EXEC dbo.spuUpdatedParticipantDetailsEmail @UpdatedParticipantDetailsEmailId = @Id, @DateSent = @SentAt";
+        var (repository, connection) = CreateRepository();
+        var id = Guid.NewGuid();
+        var sentAt = new DateTime(2026, 10, 20, 9, 0, 0, DateTimeKind.Utc);
+        connection.RespondToNonQuery(markSql, -1);
+
+        await repository.MarkNotificationSentAsync(id, sentAt);
+
+        var command = Assert.Single(connection.ExecutedCommands);
+        Assert.Equal(markSql, command.CommandText);
+        Assert.Equal(id, (Guid?)command.ParameterValue("Id"));
+        Assert.Equal(sentAt, (DateTime?)command.ParameterValue("SentAt"));
+    }
 }

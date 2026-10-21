@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using PTL.Contracts.Scheme;
 using PTL.SharedUI.Pagination;
@@ -137,6 +138,24 @@ public sealed class ParticipantSchemeFormViewModel
     public bool CanEditDec { get; set; } = true;
 #pragma warning restore S6964
 
+    // Legacy NumberDistributionsOnScheme / NumberDistributionsAvailableOnScheme (scheme months, and
+    // scheme months not yet defined) - the inputs LoadPricingOptions compares the chosen month count
+    // against. Recomputed server-side before every read; never posted. Known S6964 false positive.
+#pragma warning disable S6964
+    public int NumberOnScheme { get; set; }
+
+    public int NumberAvailableOnScheme { get; set; }
+
+    // Legacy MultiViewMonths.ViewAsAvailable: "Distribution is marked 'As Available'" replaces the month grid.
+    public bool SchemeDistributionAsAvailable { get; set; }
+#pragma warning restore S6964
+
+    // Months (1-12) already initialised but not yet distributed - ticking one shows legacy's
+    // "This Distribution has already been initialised" warning (ParticipantSchemeWarning).
+    public IReadOnlyList<int> InitialisedMonthIds { get; set; } = [];
+
+    // Legacy DropDownNumberOfSetsRequired offers exactly 1-10.
+    [Range(1, 10, ErrorMessage = "Select the number of sets of samples required")]
     public int? NumberOfSetsRequired { get; set; } = 1;
 
     public string? ExternalReference { get; set; }
@@ -219,7 +238,12 @@ public sealed class ParticipantSchemeFormViewModel
     // should be recorded as an override on save; never persisted itself.
     public bool? OverrideModeActive { get; set; }
 
-    public decimal? Price { get; set; }
+    // Legacy shows ButtonOverride only to users in the "Override Schemes" role (IsInRole). Set from the
+    // signed-in user on every request, never read from the form. Known S6964 false positive.
+#pragma warning disable S6964
+    [Microsoft.AspNetCore.Mvc.ModelBinding.BindNever]
+    public bool CanOverride { get; set; }
+#pragma warning restore S6964
 
     // Recomputed server-side on every GET/POST-redisplay path before being read - display-only.
     // Known S6964 false positive.
@@ -241,6 +265,80 @@ public sealed class ParticipantSchemeFormViewModel
     public string? GroupAddressCountry { get; set; }
 
     public IReadOnlyList<GroupAddressOptionViewModel> GroupAddressOptions { get; set; } = [];
+
+    // Jan..Dec views over the per-month properties above, so the month rules are written once.
+    public bool[] SchemeOffersMonths() =>
+    [
+        SchemeDistributionMonthJan, SchemeDistributionMonthFeb, SchemeDistributionMonthMar, SchemeDistributionMonthApr,
+        SchemeDistributionMonthMay, SchemeDistributionMonthJun, SchemeDistributionMonthJul, SchemeDistributionMonthAug,
+        SchemeDistributionMonthSep, SchemeDistributionMonthOct, SchemeDistributionMonthNov, SchemeDistributionMonthDec
+    ];
+
+    public bool[] DistributionMonths() =>
+    [
+        DistributionMonthJan, DistributionMonthFeb, DistributionMonthMar, DistributionMonthApr, DistributionMonthMay, DistributionMonthJun,
+        DistributionMonthJul, DistributionMonthAug, DistributionMonthSep, DistributionMonthOct, DistributionMonthNov, DistributionMonthDec
+    ];
+
+    public bool[] CanEditMonths() =>
+    [
+        CanEditJan, CanEditFeb, CanEditMar, CanEditApr, CanEditMay, CanEditJun,
+        CanEditJul, CanEditAug, CanEditSep, CanEditOct, CanEditNov, CanEditDec
+    ];
+
+    public bool[] OverrideMonths() =>
+    [
+        IsOverrideJan, IsOverrideFeb, IsOverrideMar, IsOverrideApr, IsOverrideMay, IsOverrideJun,
+        IsOverrideJul, IsOverrideAug, IsOverrideSep, IsOverrideOct, IsOverrideNov, IsOverrideDec
+    ];
+
+    public void SetDistributionMonths(IReadOnlyList<bool> v)
+    {
+        DistributionMonthJan = v[0];
+        DistributionMonthFeb = v[1];
+        DistributionMonthMar = v[2];
+        DistributionMonthApr = v[3];
+        DistributionMonthMay = v[4];
+        DistributionMonthJun = v[5];
+        DistributionMonthJul = v[6];
+        DistributionMonthAug = v[7];
+        DistributionMonthSep = v[8];
+        DistributionMonthOct = v[9];
+        DistributionMonthNov = v[10];
+        DistributionMonthDec = v[11];
+    }
+
+    public void SetCanEditMonths(IReadOnlyList<bool> v)
+    {
+        CanEditJan = v[0];
+        CanEditFeb = v[1];
+        CanEditMar = v[2];
+        CanEditApr = v[3];
+        CanEditMay = v[4];
+        CanEditJun = v[5];
+        CanEditJul = v[6];
+        CanEditAug = v[7];
+        CanEditSep = v[8];
+        CanEditOct = v[9];
+        CanEditNov = v[10];
+        CanEditDec = v[11];
+    }
+
+    public void SetOverrideMonths(IReadOnlyList<bool> v)
+    {
+        IsOverrideJan = v[0];
+        IsOverrideFeb = v[1];
+        IsOverrideMar = v[2];
+        IsOverrideApr = v[3];
+        IsOverrideMay = v[4];
+        IsOverrideJun = v[5];
+        IsOverrideJul = v[6];
+        IsOverrideAug = v[7];
+        IsOverrideSep = v[8];
+        IsOverrideOct = v[9];
+        IsOverrideNov = v[10];
+        IsOverrideDec = v[11];
+    }
 }
 
 // One row of the "Select a Group Address" dropdown - CountryName is resolved server-side (via

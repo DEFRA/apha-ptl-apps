@@ -66,6 +66,7 @@ public static partial class DapperColumnMappings
     private const string ColContactName = "fldContactName";
     private const string ColOrganisation = "fldOrganisation";
     private const string ColParticipantId = "fldParticipantId";
+    private const string ColPendingContractId = "fldPendingContractId";
     private const string ColLabCode = "fldLabCode";
     private const string ColIdentifier = "fldIdentifier";
     private const string ColViewerId = "fldViewerId";
@@ -453,7 +454,7 @@ public static partial class DapperColumnMappings
 
         Map<PendingOrderSummaryEntity>(new(StringComparer.OrdinalIgnoreCase)
         {
-            ["fldPendingContractId"] = nameof(PendingOrderSummaryEntity.PendingContractId),
+            [ColPendingContractId] = nameof(PendingOrderSummaryEntity.PendingContractId),
             [ColCustomerId] = nameof(PendingOrderSummaryEntity.CustomerId),
             [ColYearId] = nameof(PendingOrderSummaryEntity.YearId),
             [ColIsSubmitted] = nameof(PendingOrderSummaryEntity.IsSubmitted),
@@ -463,9 +464,46 @@ public static partial class DapperColumnMappings
             [ColQalNumber] = nameof(PendingOrderSummaryEntity.QalNumber),
         });
 
+        // spgaOnlineContractOrderEmail also returns the customer/QAL/lab-code joins, which are left unmapped on purpose.
+        Map<CustomerUpdateEmailEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldUpdatedCustomerDetailsEmailId"] = nameof(CustomerUpdateEmailEntity.Id),
+            [ColEmail] = nameof(CustomerUpdateEmailEntity.Email),
+            ["fldPendingCustomerDetailsEditId"] = nameof(CustomerUpdateEmailEntity.PendingCustomerUpdateId),
+            ["fldCustomerName"] = nameof(CustomerUpdateEmailEntity.CustomerName),
+            ["fldNotes"] = nameof(CustomerUpdateEmailEntity.Notes),
+            ["fldIsApproved"] = nameof(CustomerUpdateEmailEntity.IsApproved),
+            [ColQalNumber] = nameof(CustomerUpdateEmailEntity.QalNumber),
+            [ColLabCode] = nameof(CustomerUpdateEmailEntity.LabCode),
+        });
+
+        Map<ParticipantUpdateEmailEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldUpdatedParticipantDetailsEmailId"] = nameof(ParticipantUpdateEmailEntity.Id),
+            [ColEmail] = nameof(ParticipantUpdateEmailEntity.Email),
+            [ColLabCode] = nameof(ParticipantUpdateEmailEntity.LabCode),
+            ["fldPendingParticipantDetailsEditId"] = nameof(ParticipantUpdateEmailEntity.PendingParticipantUpdateId),
+            ["fldParticipantName"] = nameof(ParticipantUpdateEmailEntity.ParticipantName),
+            ["fldNotes"] = nameof(ParticipantUpdateEmailEntity.Notes),
+            ["fldIsApproved"] = nameof(ParticipantUpdateEmailEntity.IsApproved),
+            [ColQalNumber] = nameof(ParticipantUpdateEmailEntity.QalNumber),
+        });
+
+        Map<OnlineOrderEmailEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldOnlineContractOrderEmailId"] = nameof(OnlineOrderEmailEntity.Id),
+            [ColEmail] = nameof(OnlineOrderEmailEntity.Email),
+            [ColContractId] = nameof(OnlineOrderEmailEntity.ContractId),
+            [ColPendingContractId] = nameof(OnlineOrderEmailEntity.PendingContractId),
+            ["fldCustomerName"] = nameof(OnlineOrderEmailEntity.CustomerName),
+            [ColYearId] = nameof(OnlineOrderEmailEntity.YearId),
+            ["fldNotes"] = nameof(OnlineOrderEmailEntity.Notes),
+            ["fldIsApproved"] = nameof(OnlineOrderEmailEntity.IsApproved),
+        });
+
         Map<PendingOrderEntity>(new(StringComparer.OrdinalIgnoreCase)
         {
-            ["fldPendingContractId"] = nameof(PendingOrderEntity.PendingContractId),
+            [ColPendingContractId] = nameof(PendingOrderEntity.PendingContractId),
             [ColCustomerId] = nameof(PendingOrderEntity.CustomerId),
             [ColYearId] = nameof(PendingOrderEntity.YearId),
             [ColIsSubmitted] = nameof(PendingOrderEntity.IsSubmitted),
@@ -479,7 +517,7 @@ public static partial class DapperColumnMappings
         Map<PendingOrderSchemeEntity>(new(StringComparer.OrdinalIgnoreCase)
         {
             ["fldPendingParticipantSchemeId"] = nameof(PendingOrderSchemeEntity.PendingParticipantSchemeId),
-            ["fldPendingContractId"] = nameof(PendingOrderSchemeEntity.PendingContractId),
+            [ColPendingContractId] = nameof(PendingOrderSchemeEntity.PendingContractId),
             [ColParticipantId] = nameof(PendingOrderSchemeEntity.ParticipantId),
             ["fldParticipantName"] = nameof(PendingOrderSchemeEntity.ParticipantName),
             [ColSchemeId] = nameof(PendingOrderSchemeEntity.SchemeId),

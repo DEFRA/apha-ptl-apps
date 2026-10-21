@@ -17,7 +17,7 @@ public class ContractControllerImportPermitTests
         var repository = new FakeImportPermitRepository();
         var service = new ImportPermitService(repository);
         var controller = new ContractController(
-            new ContractService(new FakeContractRepository(), new FakeParticipantSchemeRepository(), NullLogger<ContractService>.Instance),
+            new ContractService(new FakeContractRepository(), new FakeParticipantSchemeRepository(), new PTL.Api.Tests.Contract.FakeContractPostageService(), new PTL.Api.Tests.Contract.FakeAuditActorResolver(), NullLogger<ContractService>.Instance),
             service,
             new StubSampleAddressService(),
             new StubContractRenewalService(),

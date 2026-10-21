@@ -76,8 +76,12 @@ public sealed record PendingOrderSchemeUpdateRequest(
     bool ImportExportLicenceRequired,
     bool IsRemoved);
 
-// Approve carries the (editable) purchase order number, matching legacy TextBoxPurchaseOrderNumber.
-public sealed record PendingOrderApproveRequest(string PurchaseOrderNumber);
+// Approve carries the (editable) purchase order number, matching legacy TextBoxPurchaseOrderNumber, and the
+// comments that legacy only used in the approval email (TextboxComments).
+public sealed record PendingOrderApproveRequest(string PurchaseOrderNumber, string? Comments = null);
+
+// Decline carries the same comments for the decline email.
+public sealed record PendingOrderDeclineRequest(string? Comments = null);
 
 // Outcome of an Approve/Decline. NotFound distinguishes "no such pending order" from a validation
 // failure so the caller can return 404 rather than redisplaying the page.

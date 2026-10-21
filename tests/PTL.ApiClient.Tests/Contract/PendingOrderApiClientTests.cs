@@ -128,19 +128,35 @@ public class PendingOrderApiClientTests
     }
 
     [Fact]
-    public async Task DeclinePendingOrderAsync_Success_ReturnsTrue()
+    public async Task DeclinePendingOrderAsync_Success_ReturnsSuccessResult()
     {
         var client = CreateClient(HttpStatusCode.NoContent, null);
 
-        Assert.True(await client.DeclinePendingOrderAsync(Guid.NewGuid()));
+        var result = await client.DeclinePendingOrderAsync(Guid.NewGuid(), new PendingOrderDeclineRequest("Sorry"));
+
+        Assert.True(result.Success);
     }
 
     [Fact]
-    public async Task DeclinePendingOrderAsync_NotFound_ReturnsFalse()
+    public async Task DeclinePendingOrderAsync_NotFound_ReturnsNotFoundResult()
     {
         var client = CreateClient(HttpStatusCode.NotFound, null);
 
-        Assert.False(await client.DeclinePendingOrderAsync(Guid.NewGuid()));
+        var result = await client.DeclinePendingOrderAsync(Guid.NewGuid(), new PendingOrderDeclineRequest());
+
+        Assert.True(result.NotFound);
+    }
+
+    [Fact]
+    public async Task DeclinePendingOrderAsync_ValidationFailure_ReturnsFieldErrors()
+    {
+        const string json = """{"errors":{"Comments":["Too long."]}}""";
+        var client = CreateClient(HttpStatusCode.BadRequest, json);
+
+        var result = await client.DeclinePendingOrderAsync(Guid.NewGuid(), new PendingOrderDeclineRequest("x"));
+
+        Assert.False(result.Success);
+        Assert.True(result.FieldErrors.ContainsKey("Comments"));
     }
 
     private static PendingOrderSchemeUpdateRequest UpdateRequest() =>

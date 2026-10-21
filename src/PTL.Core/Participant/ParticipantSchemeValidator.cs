@@ -19,6 +19,9 @@ public sealed class ParticipantSchemeValidationException(IReadOnlyList<Participa
 // sizes - varchar(50)/varchar(100)/varchar(2000)). See docs/analysis/participant-analysis.md.
 public static class ParticipantSchemeValidator
 {
+    // The "at least one selected month" error is reported against the first month's checkbox.
+    public const string NoMonthsField = "DistributionMonthJan";
+
     private static readonly Dictionary<string, string> FieldLabels = new()
     {
         ["SchemeId"] = "Scheme",
@@ -51,7 +54,7 @@ public static class ParticipantSchemeValidator
         // when every CheckboxMonthX is unchecked - "Distribution must have at least one selected month".
         if (!HasAnyDistributionMonth(record))
         {
-            result.Errors.Add(new ParticipantSchemeValidationError("DistributionMonthJan", "Distribution must have at least one selected month"));
+            result.Errors.Add(new ParticipantSchemeValidationError(NoMonthsField, "Distribution must have at least one selected month"));
         }
 
         return result;

@@ -5,7 +5,8 @@ using PTL.Data.Infrastructure;
 namespace PTL.Data.Participant;
 
 // Legacy pending-participant-update stored procedures: spgaPendingParticipantDetailsEditInfo,
-// spgPendingParticipantDetailsEditByParticipantID, spdPendingParticipantDetailsEditByParticipantID.
+// spgPendingParticipantDetailsEditByParticipantID, spdPendingParticipantDetailsEditByParticipantID; and the email
+// queue: spiUpdatedParticipantDetailsEmail, spgaUpdatedParticipantDetailsEmail, spuUpdatedParticipantDetailsEmail.
 public sealed class PendingParticipantUpdateRepository(IDbConnectionFactory connectionFactory) : IPendingParticipantUpdateRepository
 {
     public async Task<IReadOnlyList<PendingParticipantUpdateSummaryEntity>> GetSummariesAsync(CancellationToken cancellationToken = default)
@@ -37,5 +38,39 @@ public sealed class PendingParticipantUpdateRepository(IDbConnectionFactory conn
             new { ParticipantId = participantId, PendingParticipantDetailsEditId = pendingParticipantUpdateId });
 
         return await GetByParticipantIdAsync(participantId, cancellationToken) is null;
+    }
+
+    public async Task QueueNotificationAsync(ParticipantUpdateNotification notification, CancellationToken cancellationToken = default)
+    {
+        using var connection = connectionFactory.CreateConnection();
+
+        await connection.ExecuteAsync(
+            "EXEC dbo.spiUpdatedParticipantDetailsEmail @UpdatedParticipantDetailsEmailId = @Id, @Email = @Email, @LabCode = @LabCode, @PendingParticipantDetailsEditId = @PendingParticipantUpdateId, @ParticipantName = @ParticipantName, @Notes = @Notes, @IsApproved = @IsApproved",
+            new
+            {
+                Id = Guid.NewGuid(),
+                notification.Email,
+                notification.LabCode,
+                notification.PendingParticipantUpdateId,
+                notification.ParticipantName,
+                notification.Notes,
+                notification.IsApproved
+            });
+    }
+
+    public async Task<IReadOnlyList<ParticipantUpdateEmailEntity>> GetUnsentNotificationsAsync(CancellationToken cancellationToken = default)
+    {
+        using var connection = connectionFactory.CreateConnection();
+
+        return (await connection.QueryAsync<ParticipantUpdateEmailEntity>("EXEC dbo.spgaUpdatedParticipantDetailsEmail")).ToList();
+    }
+
+    public async Task MarkNotificationSentAsync(Guid notificationId, DateTime sentAt, CancellationToken cancellationToken = default)
+    {
+        using var connection = connectionFactory.CreateConnection();
+
+        await connection.ExecuteAsync(
+            "EXEC dbo.spuUpdatedParticipantDetailsEmail @UpdatedParticipantDetailsEmailId = @Id, @DateSent = @SentAt",
+            new { Id = notificationId, SentAt = sentAt });
     }
 }

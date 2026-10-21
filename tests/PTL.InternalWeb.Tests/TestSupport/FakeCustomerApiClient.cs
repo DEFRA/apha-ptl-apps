@@ -15,6 +15,8 @@ internal sealed class FakeCustomerApiClient : ICustomerApiClient
     public PendingCustomerUpdateDecisionResult ApprovePendingCustomerUpdateResult { get; set; } = new(true, false, new Dictionary<string, string[]>());
     public bool DeclinePendingCustomerUpdateResult { get; set; } = true;
     public PendingCustomerUpdateSaveRequest? LastApproveRequest { get; private set; }
+    public string? LastApproveComments { get; private set; }
+    public string? LastDeclineComments { get; private set; }
     public CustomerSaveRequest? LastSaveRequest { get; private set; }
 
     public Task<IReadOnlyList<CustomerSummaryResponse>> GetCustomersAsync(CustomerStatusFilter status = CustomerStatusFilter.Active, CancellationToken cancellationToken = default) =>
@@ -44,12 +46,16 @@ internal sealed class FakeCustomerApiClient : ICustomerApiClient
     public Task<PendingCustomerUpdateComparisonResponse?> GetPendingCustomerUpdateAsync(Guid customerId, CancellationToken cancellationToken = default) =>
         Task.FromResult(PendingCustomerUpdateComparison);
 
-    public Task<PendingCustomerUpdateDecisionResult> ApprovePendingCustomerUpdateAsync(Guid customerId, PendingCustomerUpdateSaveRequest? request = null, CancellationToken cancellationToken = default)
+    public Task<PendingCustomerUpdateDecisionResult> ApprovePendingCustomerUpdateAsync(Guid customerId, PendingCustomerUpdateSaveRequest? request = null, string? comments = null, CancellationToken cancellationToken = default)
     {
         LastApproveRequest = request;
+        LastApproveComments = comments;
         return Task.FromResult(ApprovePendingCustomerUpdateResult);
     }
 
-    public Task<bool> DeclinePendingCustomerUpdateAsync(Guid customerId, CancellationToken cancellationToken = default) =>
-        Task.FromResult(DeclinePendingCustomerUpdateResult);
+    public Task<bool> DeclinePendingCustomerUpdateAsync(Guid customerId, string? comments = null, CancellationToken cancellationToken = default)
+    {
+        LastDeclineComments = comments;
+        return Task.FromResult(DeclinePendingCustomerUpdateResult);
+    }
 }
