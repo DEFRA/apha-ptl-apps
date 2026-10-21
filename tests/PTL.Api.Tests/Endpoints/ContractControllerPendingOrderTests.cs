@@ -92,14 +92,12 @@ public class ContractControllerPendingOrderTests
 
         var pendingOrderService = new PendingOrderService(
             pendingOrders,
-            new FakeContractRepository(),
-            new FakeParticipantSchemeRepository(),
+            new PendingOrderContractWriter(new FakeContractRepository(), new FakeParticipantSchemeRepository()),
             schemeRepository,
             customerRepository,
             lookupRepository,
-            new PTL.Api.Tests.Participant.FakeParticipantRepository(),
             new FakeAuditActorResolver(),
-            new PTL.Api.Tests.Contract.FakePendingOrderNotifier());
+            new PendingOrderDecisionEmails(pendingOrders, customerRepository, new PTL.Api.Tests.Participant.FakeParticipantRepository(), new PTL.Api.Tests.Contract.FakePendingOrderNotifier()));
 
         var controller = new ContractController(
             new ContractService(new FakeContractRepository(), new FakeParticipantSchemeRepository(), new PTL.Api.Tests.Contract.FakeContractPostageService(), new PTL.Api.Tests.Contract.FakeAuditActorResolver(), NullLogger<ContractService>.Instance),

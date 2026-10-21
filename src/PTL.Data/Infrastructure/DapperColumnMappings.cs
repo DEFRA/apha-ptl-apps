@@ -60,6 +60,7 @@ public static partial class DapperColumnMappings
     private const string ColContactName = "fldContactName";
     private const string ColOrganisation = "fldOrganisation";
     private const string ColParticipantId = "fldParticipantId";
+    private const string ColPendingContractId = "fldPendingContractId";
     private const string ColLabCode = "fldLabCode";
     private const string ColIdentifier = "fldIdentifier";
     private const string ColViewerId = "fldViewerId";
@@ -411,7 +412,7 @@ public static partial class DapperColumnMappings
 
         Map<PendingOrderSummaryEntity>(new(StringComparer.OrdinalIgnoreCase)
         {
-            ["fldPendingContractId"] = nameof(PendingOrderSummaryEntity.PendingContractId),
+            [ColPendingContractId] = nameof(PendingOrderSummaryEntity.PendingContractId),
             [ColCustomerId] = nameof(PendingOrderSummaryEntity.CustomerId),
             [ColYearId] = nameof(PendingOrderSummaryEntity.YearId),
             [ColIsSubmitted] = nameof(PendingOrderSummaryEntity.IsSubmitted),
@@ -451,7 +452,7 @@ public static partial class DapperColumnMappings
             ["fldOnlineContractOrderEmailId"] = nameof(OnlineOrderEmailEntity.Id),
             [ColEmail] = nameof(OnlineOrderEmailEntity.Email),
             [ColContractId] = nameof(OnlineOrderEmailEntity.ContractId),
-            ["fldPendingContractId"] = nameof(OnlineOrderEmailEntity.PendingContractId),
+            [ColPendingContractId] = nameof(OnlineOrderEmailEntity.PendingContractId),
             ["fldCustomerName"] = nameof(OnlineOrderEmailEntity.CustomerName),
             [ColYearId] = nameof(OnlineOrderEmailEntity.YearId),
             ["fldNotes"] = nameof(OnlineOrderEmailEntity.Notes),
@@ -460,7 +461,7 @@ public static partial class DapperColumnMappings
 
         Map<PendingOrderEntity>(new(StringComparer.OrdinalIgnoreCase)
         {
-            ["fldPendingContractId"] = nameof(PendingOrderEntity.PendingContractId),
+            [ColPendingContractId] = nameof(PendingOrderEntity.PendingContractId),
             [ColCustomerId] = nameof(PendingOrderEntity.CustomerId),
             [ColYearId] = nameof(PendingOrderEntity.YearId),
             [ColIsSubmitted] = nameof(PendingOrderEntity.IsSubmitted),
@@ -474,7 +475,7 @@ public static partial class DapperColumnMappings
         Map<PendingOrderSchemeEntity>(new(StringComparer.OrdinalIgnoreCase)
         {
             ["fldPendingParticipantSchemeId"] = nameof(PendingOrderSchemeEntity.PendingParticipantSchemeId),
-            ["fldPendingContractId"] = nameof(PendingOrderSchemeEntity.PendingContractId),
+            [ColPendingContractId] = nameof(PendingOrderSchemeEntity.PendingContractId),
             [ColParticipantId] = nameof(PendingOrderSchemeEntity.ParticipantId),
             ["fldParticipantName"] = nameof(PendingOrderSchemeEntity.ParticipantName),
             [ColSchemeId] = nameof(PendingOrderSchemeEntity.SchemeId),

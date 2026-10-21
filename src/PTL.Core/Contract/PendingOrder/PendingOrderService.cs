@@ -1,6 +1,5 @@
 using PTL.Core.Audit;
 using PTL.Core.Lookup;
-using PTL.Core.Participant;
 using PTL.Core.Scheme;
 using CoreContract = PTL.Core.Contract.Contract;
 using CoreScheme = PTL.Core.Scheme.Scheme;
@@ -69,24 +68,16 @@ public sealed record PendingOrderSchemeEdit(
 
 public sealed class PendingOrderService(
     IPendingOrderRepository pendingOrderRepository,
-    IContractRepository contractRepository,
-    IParticipantSchemeRepository participantSchemeRepository,
+    IPendingOrderContractWriter contractWriter,
     ISchemeRepository schemeRepository,
     PTL.Core.Customer.ICustomerRepository customerRepository,
     ILookupRepository lookupRepository,
-    IParticipantRepository participantRepository,
     IAuditActorResolver auditActor,
-    IPendingOrderNotifier pendingOrderNotifier) : IPendingOrderService
+    IPendingOrderDecisionEmails decisionEmails) : IPendingOrderService
 {
-    // Legacy getNewContractSuffix supports at most 51 contracts per customer per year.
-    private const string Alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-
     // Contract.PurchaseOrderNumber's CSLA StringMaxLength rule and PendingContractOrder.aspx's comments regex.
     private const int PurchaseOrderNumberMaxLength = 255;
     private const int CommentsMaxLength = 2000;
-
-    // tblOnlineContractOrderEmail.fldEmail / fldCustomerName are varchar(50).
-    private const int EmailColumnLength = 50;
 
     // Legacy only loads FetchPendingContractOrder(customerId, True, yearId) - submitted and not deleted.
     private async Task<PendingOrderEntity?> GetOutstandingOrderAsync(Guid pendingContractId, CancellationToken cancellationToken)
@@ -262,22 +253,12 @@ public sealed class PendingOrderService(
         await pendingOrderRepository.UpdatePurchaseOrderNumberAsync(pendingContractId, purchaseOrderNumber, cancellationToken);
 
         var contract = await BuildContractAsync(order, schemes, context, purchaseOrderNumber, await ApprovedByAsync(cancellationToken), cancellationToken);
-
-        // Created via the repository rather than ContractService: the latter force-sets
-        // IsOnlineOrder to false and stamps CommencementDate, neither of which legacy's approval
-        // path does. Same approach as RenewContractsService.
-        var created = await contractRepository.CreateAsync(contract, cancellationToken);
-
-        foreach (var scheme in schemes.Where(s => !s.IsRemoved))
-        {
-            await participantSchemeRepository.CreateAsync(ToParticipantScheme(created.ContractId, scheme), cancellationToken);
-        }
+        var created = await contractWriter.CreateAsync(contract, schemes, cancellationToken);
 
         var decided = await pendingOrderRepository.MarkDecidedAsync(order.CustomerId, pendingContractId, cancellationToken);
         if (decided)
         {
-            await QueueNotificationsAsync(order, created.ContractId, comments, isApproved: true, cancellationToken);
-            await pendingOrderNotifier.SendForOrderAsync(order.PendingContractId, CancellationToken.None);
+            await decisionEmails.QueueAndSendAsync(order, created.ContractId, comments, isApproved: true, cancellationToken);
         }
 
         return decided;
@@ -305,8 +286,7 @@ public sealed class PendingOrderService(
         var decided = await pendingOrderRepository.MarkDecidedAsync(order.CustomerId, pendingContractId, cancellationToken);
         if (decided)
         {
-            await QueueNotificationsAsync(order, Guid.Empty, comments, isApproved: false, cancellationToken);
-            await pendingOrderNotifier.SendForOrderAsync(order.PendingContractId, CancellationToken.None);
+            await decisionEmails.QueueAndSendAsync(order, Guid.Empty, comments, isApproved: false, cancellationToken);
         }
 
         return decided;
@@ -337,45 +317,6 @@ public sealed class PendingOrderService(
         var name = await auditActor.GetAuditNameAsync(cancellationToken);
         return string.Equals(name, "Guest", StringComparison.Ordinal) ? name : name.ToLowerInvariant();
     }
-
-    // Legacy EmailOrderNotifications: the customer, the customer's first active participant and that
-    // participant's second address each get a row in tblOnlineContractOrderEmail, which the caller then
-    // sends at once (retried by the scheduler if that fails). Blank addresses are skipped rather than queued.
-    private async Task QueueNotificationsAsync(PendingOrderEntity order, Guid contractId, string comments, bool isApproved, CancellationToken cancellationToken)
-    {
-        var customer = await customerRepository.GetByIdAsync(order.CustomerId, cancellationToken);
-        var customerName = Truncate(customer?.Name ?? order.CustomerName, EmailColumnLength);
-
-        var recipients = new List<string>();
-        if (!string.IsNullOrWhiteSpace(customer?.Email))
-        {
-            recipients.Add(customer.Email);
-        }
-
-        var activeParticipants = await participantRepository.GetSummariesAsync(order.CustomerId, false, cancellationToken);
-        if (activeParticipants.Count > 0)
-        {
-            var participant = await participantRepository.GetByIdAsync(activeParticipants[0].ParticipantId, cancellationToken);
-            if (!string.IsNullOrWhiteSpace(participant?.Email))
-            {
-                recipients.Add(participant.Email);
-            }
-
-            if (!string.IsNullOrWhiteSpace(participant?.Email2))
-            {
-                recipients.Add(participant.Email2);
-            }
-        }
-
-        foreach (var email in recipients)
-        {
-            await pendingOrderRepository.QueueNotificationAsync(
-                new PendingOrderNotification(Truncate(email, EmailColumnLength), contractId, order.PendingContractId, order.YearId, customerName, comments, isApproved),
-                cancellationToken);
-        }
-    }
-
-    private static string Truncate(string value, int length) => value.Length > length ? value[..length] : value;
 
     private async Task<PricingContext> BuildPricingContextAsync(PendingOrderEntity order, IReadOnlyList<PendingOrderSchemeEntity> schemes, CancellationToken cancellationToken)
     {
@@ -408,14 +349,12 @@ public sealed class PendingOrderService(
         string approvedBy,
         CancellationToken cancellationToken)
     {
-        var existingContracts = await contractRepository.GetSummariesByYearAsync(order.CustomerId, order.YearId, cancellationToken);
-
         var contract = new CoreContract
         {
             ContractId = Guid.NewGuid(),
             CustomerId = order.CustomerId,
             YearId = order.YearId,
-            Suffix = NextContractSuffix(existingContracts.Count),
+            Suffix = await contractWriter.NextSuffixAsync(order.CustomerId, order.YearId, cancellationToken),
             IsActive = true,
             PurchaseOrderNumber = purchaseOrderNumber,
             JobSheetPostedDate = DateTime.UtcNow,
@@ -463,45 +402,6 @@ public sealed class PendingOrderService(
 
         assign(contract, unitPrice, PendingOrderPricing.PostageTypeNumbers(schemes, context.RealSchemes, plan.PostageId));
     }
-
-    private static ParticipantSchemeRecord ToParticipantScheme(Guid contractId, PendingOrderSchemeEntity scheme) => new()
-    {
-        ParticipantSchemeId = Guid.NewGuid(),
-        ContractId = contractId,
-        ParticipantId = scheme.ParticipantId,
-        SchemeId = scheme.SchemeId,
-        DistributionMonthJan = scheme.DistributionMonthJan,
-        DistributionMonthFeb = scheme.DistributionMonthFeb,
-        DistributionMonthMar = scheme.DistributionMonthMar,
-        DistributionMonthApr = scheme.DistributionMonthApr,
-        DistributionMonthMay = scheme.DistributionMonthMay,
-        DistributionMonthJun = scheme.DistributionMonthJun,
-        DistributionMonthJul = scheme.DistributionMonthJul,
-        DistributionMonthAug = scheme.DistributionMonthAug,
-        DistributionMonthSep = scheme.DistributionMonthSep,
-        DistributionMonthOct = scheme.DistributionMonthOct,
-        DistributionMonthNov = scheme.DistributionMonthNov,
-        DistributionMonthDec = scheme.DistributionMonthDec,
-
-        // Every value below is fixed by legacy's approval path, not carried from the pending row.
-        NumberOfSetsRequired = 1,
-        ExternalReference = string.Empty,
-        Contact = string.Empty,
-        ImportExportLicenceRequired = scheme.ImportExportLicenceRequired,
-        CustomsCertificateRequired = true,
-        NonFeePaying = false,
-        IsWeightedPricing = true,
-        DataConsentDeclarationGiven = scheme.DataConsentDeclarationGiven
-    };
-
-    // Legacy getNewContractSuffix: "" for the first contract, then A..Z, then AA..AZ/BA.. up to 51.
-    private static string NextContractSuffix(int existingContractCount) => existingContractCount switch
-    {
-        0 => string.Empty,
-        < 27 => Alphabet[existingContractCount - 1].ToString(),
-        < 52 => $"{Alphabet[((existingContractCount - 1) / 26) - 1]}{Alphabet[(existingContractCount - 1) % 26]}",
-        _ => string.Empty
-    };
 
     private sealed record PricingContext(
         string QalNumber,

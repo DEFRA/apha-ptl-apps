@@ -58,45 +58,52 @@ public sealed partial class ParticipantUpdateNotifier(
             }
 
             var now = timeProvider.GetUtcNow().UtcDateTime;
-            int sent = 0, skipped = 0, failed = 0;
-
+            var outcomes = new List<EmailSendOutcome>(unsent.Count);
             foreach (var email in unsent)
             {
-                var templateId = email.IsApproved ? ParticipantUpdateEmailTemplates.AcceptedId : ParticipantUpdateEmailTemplates.DeclinedId;
-                if (string.IsNullOrWhiteSpace(email.Email))
-                {
-                    skipped++;
-                    if (guard.FirstWarningToday(email.Id, now.Date))
-                    {
-                        LogSkipped(logger, email.Id, email.PendingParticipantUpdateId, "no email address");
-                    }
-
-                    continue;
-                }
-
-                var status = email.IsApproved ? "Accepted" : "Declined";
-                try
-                {
-                    await notifyClient.SendEmailAsync(templateId, email.Email, Personalise(email, status), email.Id.ToString(), cancellationToken);
-                    await repository.MarkNotificationSentAsync(email.Id, now, CancellationToken.None);
-                    sent++;
-                    LogSent(logger, email.Id, email.PendingParticipantUpdateId, status, templateId);
-                }
-                catch (Exception ex) when (ex is not OperationCanceledException)
-                {
-                    failed++;
-                    if (guard.FirstWarningToday(email.Id, now.Date))
-                    {
-                        LogSendFailed(logger, email.Id, email.PendingParticipantUpdateId, status, templateId, ex);
-                    }
-                }
+                outcomes.Add(await SendOneAsync(email, now, cancellationToken));
             }
 
+            var sent = outcomes.Count(o => o == EmailSendOutcome.Sent);
+            var skipped = outcomes.Count(o => o == EmailSendOutcome.Skipped);
+            var failed = outcomes.Count(o => o == EmailSendOutcome.Failed);
             LogRunSummary(logger, unsent.Count, sent, skipped, failed);
         }
         finally
         {
             guard.Lock.Release();
+        }
+    }
+
+    private async Task<EmailSendOutcome> SendOneAsync(ParticipantUpdateEmailEntity email, DateTime now, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(email.Email))
+        {
+            if (guard.FirstWarningToday(email.Id, now.Date))
+            {
+                LogSkipped(logger, email.Id, email.PendingParticipantUpdateId, "no email address");
+            }
+
+            return EmailSendOutcome.Skipped;
+        }
+
+        var templateId = email.IsApproved ? ParticipantUpdateEmailTemplates.AcceptedId : ParticipantUpdateEmailTemplates.DeclinedId;
+        var status = email.IsApproved ? "Accepted" : "Declined";
+        try
+        {
+            await notifyClient.SendEmailAsync(templateId, email.Email, Personalise(email, status), email.Id.ToString(), cancellationToken);
+            await repository.MarkNotificationSentAsync(email.Id, now, CancellationToken.None);
+            LogSent(logger, email.Id, email.PendingParticipantUpdateId, status, templateId);
+            return EmailSendOutcome.Sent;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            if (guard.FirstWarningToday(email.Id, now.Date))
+            {
+                LogSendFailed(logger, email.Id, email.PendingParticipantUpdateId, status, templateId, ex);
+            }
+
+            return EmailSendOutcome.Failed;
         }
     }
 

@@ -146,6 +146,9 @@ builder.Services.AddScoped<IContractMergeRepository, ContractMergeRepository>();
 builder.Services.AddScoped<IRenewContractsService, RenewContractsService>();
 builder.Services.AddScoped<IPendingOrderRepository, PendingOrderRepository>();
 builder.Services.AddScoped<IPendingOrderService, PendingOrderService>();
+builder.Services.AddScoped<IPendingOrderContractWriter, PendingOrderContractWriter>();
+builder.Services.AddScoped<IPendingOrderDecisionEmails, PendingOrderDecisionEmails>();
+builder.Services.AddScoped<IPendingOrderEmailPersonaliser, PendingOrderEmailPersonaliser>();
 
 // Approve/Decline emails: sent through GOV.UK Notify straight after the decision, retried by the hosted scheduler.
 builder.Services.Configure<OnlineOrderEmailOptions>(builder.Configuration.GetSection(OnlineOrderEmailOptions.SectionName));

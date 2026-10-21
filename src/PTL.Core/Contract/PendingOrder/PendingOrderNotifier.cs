@@ -1,11 +1,6 @@
-using System.Globalization;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using PTL.Core.Lookup;
 using PTL.Core.Notifications;
-using PTL.Core.Participant;
-using PTL.Core.Scheme;
-using ICustomerRepository = PTL.Core.Customer.ICustomerRepository;
 
 namespace PTL.Core.Contract.PendingOrder;
 
@@ -28,21 +23,13 @@ public sealed record OnlineOrderEmailRunSummary(int Unsent, int Sent, int Skippe
 
 public sealed partial class PendingOrderNotifier(
     IPendingOrderRepository pendingOrderRepository,
-    IContractRepository contractRepository,
-    ISchemeRepository schemeRepository,
-    ICustomerRepository customerRepository,
-    IParticipantRepository participantRepository,
-    ILookupRepository lookupRepository,
+    IPendingOrderEmailPersonaliser personaliser,
     INotifyClient notifyClient,
     EmailSendGuard guard,
     IOptions<OnlineOrderEmailOptions> options,
     TimeProvider timeProvider,
     ILogger<PendingOrderNotifier> logger) : IPendingOrderNotifier
 {
-    // Legacy getSchemeMonths lists the contract year from April; index 0 of ContractItemLine.Months is January.
-    private static readonly int[] FinancialYearOrder = [3, 4, 5, 6, 7, 8, 9, 10, 11, 0, 1, 2];
-    private static readonly string[] MonthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-
     public async Task SendForOrderAsync(Guid pendingContractId, CancellationToken cancellationToken = default)
     {
         try
@@ -78,41 +65,17 @@ public sealed partial class PendingOrderNotifier(
             }
 
             var now = timeProvider.GetUtcNow().UtcDateTime;
-            int sent = 0, skipped = 0, failed = 0;
-
+            var outcomes = new List<EmailSendOutcome>(unsent.Count);
             foreach (var email in unsent)
             {
-                var templateId = email.IsApproved ? OnlineOrderEmailTemplates.ApprovedId : OnlineOrderEmailTemplates.DeclinedId;
-                if (string.IsNullOrWhiteSpace(email.Email))
-                {
-                    skipped++;
-                    if (guard.FirstWarningToday(email.Id, now.Date))
-                    {
-                        LogSkipped(logger, email.Id, email.PendingContractId, "no email address");
-                    }
-
-                    continue;
-                }
-
-                try
-                {
-                    var personalisation = await PersonaliseAsync(email, cancellationToken);
-                    await notifyClient.SendEmailAsync(templateId, email.Email, personalisation, email.Id.ToString(), cancellationToken);
-                    await pendingOrderRepository.MarkNotificationSentAsync(email.Id, now, CancellationToken.None);
-                    sent++;
-                    LogSent(logger, email.Id, email.PendingContractId, email.IsApproved ? "Approved" : "Declined", templateId);
-                }
-                catch (Exception ex) when (ex is not OperationCanceledException)
-                {
-                    failed++;
-                    if (guard.FirstWarningToday(email.Id, now.Date))
-                    {
-                        LogSendFailed(logger, email.Id, email.PendingContractId, email.IsApproved ? "Approved" : "Declined", templateId, ex);
-                    }
-                }
+                outcomes.Add(await SendOneAsync(email, now, cancellationToken));
             }
 
-            var summary = new OnlineOrderEmailRunSummary(unsent.Count, sent, skipped, failed);
+            var summary = new OnlineOrderEmailRunSummary(
+                unsent.Count,
+                outcomes.Count(o => o == EmailSendOutcome.Sent),
+                outcomes.Count(o => o == EmailSendOutcome.Skipped),
+                outcomes.Count(o => o == EmailSendOutcome.Failed));
             LogRunSummary(logger, summary.Unsent, summary.Sent, summary.Skipped, summary.Failed);
             return summary;
         }
@@ -122,59 +85,37 @@ public sealed partial class PendingOrderNotifier(
         }
     }
 
-    // The tokens of the legacy templates: <<ParticipantName>>, <<ApprovedSchemeOrders>>, <<Notes>> and the subject's
-    // <<ContractYear>> / <<CustomerName>> (which legacy filled with the QAL number).
-    private async Task<Dictionary<string, string>> PersonaliseAsync(OnlineOrderEmailEntity email, CancellationToken cancellationToken)
+    private async Task<EmailSendOutcome> SendOneAsync(OnlineOrderEmailEntity email, DateTime now, CancellationToken cancellationToken)
     {
-        // A decided order stays in tblPendingContract (soft-deleted), so this also serves the declined path, where no contract exists.
-        var order = await pendingOrderRepository.GetByIdAsync(email.PendingContractId, cancellationToken);
-        var customer = order is null ? null : await customerRepository.GetByIdAsync(order.CustomerId, cancellationToken);
-        var years = await lookupRepository.GetAllYearsAsync(cancellationToken);
-
-        var personalisation = new Dictionary<string, string>
+        if (string.IsNullOrWhiteSpace(email.Email))
         {
-            ["ParticipantName"] = order is null ? string.Empty : await FirstActiveLabCodeAsync(order.CustomerId, cancellationToken),
-            ["CustomerName"] = customer?.QalNumber ?? string.Empty,
-            ["status"] = email.IsApproved ? "Approved" : "Declined",
-            ["ContractYear"] = years.FirstOrDefault(y => y.YearId == email.YearId)?.Year ?? "####",
-            ["Notes"] = email.Notes,
-        };
+            if (guard.FirstWarningToday(email.Id, now.Date))
+            {
+                LogSkipped(logger, email.Id, email.PendingContractId, "no email address");
+            }
 
-        if (email.IsApproved)
-        {
-            personalisation["ApprovedSchemeOrders"] = await ApprovedSchemeOrdersAsync(email.ContractId, cancellationToken);
+            return EmailSendOutcome.Skipped;
         }
 
-        return personalisation;
-    }
-
-    // Legacy intended the first active participant's lab code for both outcomes; its declined path never found one
-    // (the pending schemes it searched had already been deleted).
-    private async Task<string> FirstActiveLabCodeAsync(Guid customerId, CancellationToken cancellationToken)
-    {
-        var participants = await participantRepository.GetSummariesAsync(customerId, false, cancellationToken);
-        return participants.Count > 0 ? participants[0].LabCode : string.Empty;
-    }
-
-    // The legacy HTML table (PT Schemes / Month / Week) as the bullet list GOV.UK Notify can render.
-    private async Task<string> ApprovedSchemeOrdersAsync(Guid contractId, CancellationToken cancellationToken)
-    {
-        var items = await contractRepository.GetContractItemsAsync(contractId, cancellationToken);
-        if (items is null)
+        var templateId = email.IsApproved ? OnlineOrderEmailTemplates.ApprovedId : OnlineOrderEmailTemplates.DeclinedId;
+        var status = email.IsApproved ? "Approved" : "Declined";
+        try
         {
-            return string.Empty;
+            var personalisation = await personaliser.PersonaliseAsync(email, cancellationToken);
+            await notifyClient.SendEmailAsync(templateId, email.Email, personalisation, email.Id.ToString(), cancellationToken);
+            await pendingOrderRepository.MarkNotificationSentAsync(email.Id, now, CancellationToken.None);
+            LogSent(logger, email.Id, email.PendingContractId, status, templateId);
+            return EmailSendOutcome.Sent;
         }
-
-        var lines = new List<string>(items.Schemes.Count);
-        foreach (var group in items.Schemes)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            var scheme = await schemeRepository.GetByIdAsync(group.SchemeId, cancellationToken);
-            var months = FinancialYearOrder.Where(m => group.Participants.Any(p => p.Months[m])).Select(m => MonthNames[m]);
-            var week = (scheme?.WeekNumber ?? 0).ToString(CultureInfo.InvariantCulture);
-            lines.Add($"* {group.SchemeIdentifier}:{group.SchemeName} - Month: {string.Join(' ', months)} - Week: {week}");
-        }
+            if (guard.FirstWarningToday(email.Id, now.Date))
+            {
+                LogSendFailed(logger, email.Id, email.PendingContractId, status, templateId, ex);
+            }
 
-        return string.Join('\n', lines);
+            return EmailSendOutcome.Failed;
+        }
     }
 
     [LoggerMessage(EventId = 61, Level = LogLevel.Information,

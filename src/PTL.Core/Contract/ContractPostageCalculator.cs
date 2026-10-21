@@ -36,39 +36,52 @@ public static class ContractPostageCalculator
 
         foreach (var group in items.Schemes)
         {
-            // getPostType(name, realScheme.YearId): the plan of that name for the scheme's own year.
-            if (!schemes.TryGetValue(group.SchemeId, out var scheme))
+            var plan = PlanForScheme(group, schemes, plans, planName, out var scheme);
+            if (plan is null || scheme is null)
             {
                 continue;
             }
 
-            var plan = plans.FirstOrDefault(p => string.Equals(p.Name, planName, StringComparison.Ordinal) && p.YearId == scheme.YearId);
-            if (plan is null || scheme.Postage != plan.PostageId)
+            foreach (var month in SelectedMonths(group))
             {
-                continue;
-            }
-
-            foreach (var line in group.Participants.Where(p => !p.IsRemoved))
-            {
-                for (var i = 0; i < line.Months.Length; i++)
+                if (scheme.CombinedPackaging)
                 {
-                    if (!line.Months[i])
-                    {
-                        continue;
-                    }
-
-                    if (scheme.CombinedPackaging)
-                    {
-                        combined.Add((i + 1, scheme.DayOfWeekId, plan.PostageId, scheme.WeekNumber));
-                    }
-                    else
-                    {
-                        uncombined++;
-                    }
+                    combined.Add((month, scheme.DayOfWeekId, plan.PostageId, scheme.WeekNumber));
+                }
+                else
+                {
+                    uncombined++;
                 }
             }
         }
 
         return combined.Count + uncombined;
     }
+
+    // getPostType(name, realScheme.YearId): the plan of that name for the scheme's own year, when the scheme uses it.
+    private static PostagePricingPlanEntity? PlanForScheme(
+        ContractItemSchemeGroup group,
+        IReadOnlyDictionary<Guid, CoreScheme> schemes,
+        IReadOnlyList<PostagePricingPlanEntity> plans,
+        string planName,
+        out CoreScheme? scheme)
+    {
+        if (!schemes.TryGetValue(group.SchemeId, out scheme))
+        {
+            return null;
+        }
+
+        var yearId = scheme.YearId;
+        var plan = plans.FirstOrDefault(p => string.Equals(p.Name, planName, StringComparison.Ordinal) && p.YearId == yearId);
+        return plan is not null && scheme.Postage == plan.PostageId ? plan : null;
+    }
+
+    // One entry (1 = January) per ticked month of each non-removed participant line.
+    private static IEnumerable<int> SelectedMonths(ContractItemSchemeGroup group) =>
+        group.Participants
+            .Where(line => !line.IsRemoved)
+            .Select(line => line.Months)
+            .SelectMany(months => months.Select((ticked, index) => (ticked, month: index + 1)))
+            .Where(m => m.ticked)
+            .Select(m => m.month);
 }

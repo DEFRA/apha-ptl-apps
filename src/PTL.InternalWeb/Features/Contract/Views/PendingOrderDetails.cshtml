@@ -30,7 +30,7 @@ else
 {
     <p class="govuk-hint">Changing a month or the Import/Export Licence option saves that scheme straight away and updates the totals.</p>
 
-    <div class="ptl-table-scroll" role="region" aria-label="Schemes on this order" tabindex="0">
+    <section class="ptl-table-scroll" aria-label="Schemes on this order">
         <table class="govuk-table ptl-pending-order-table">
             <caption class="govuk-table__caption govuk-visually-hidden">Schemes on this order, with the months, Import/Export Licence and prices for each</caption>
             <thead class="govuk-table__head">
@@ -114,7 +114,7 @@ else
                 }
             </tbody>
         </table>
-    </div>
+    </section>
 
     @* One form per row, declared outside the table so the row's inputs can reference it by id. *@
     @foreach (var pendingParticipantSchemeId in order.Schemes.Select(scheme => scheme.PendingParticipantSchemeId))

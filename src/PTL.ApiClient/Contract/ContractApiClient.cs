@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.WebUtilities;
 using PTL.Contracts.Contract;
 
 namespace PTL.ApiClient;
@@ -152,8 +153,9 @@ public sealed class ContractApiClient(HttpClient httpClient) : IContractApiClien
 
     public async Task<ContractItemRemovalResult> RemoveContractItemAsync(Guid contractId, Guid participantSchemeId, string? auditWhy = null, CancellationToken cancellationToken = default)
     {
-        var query = string.IsNullOrWhiteSpace(auditWhy) ? string.Empty : $"?auditWhy={Uri.EscapeDataString(auditWhy)}";
-        var response = await httpClient.DeleteAsync($"/api/contracts/{contractId}/items/{participantSchemeId}{query}", cancellationToken);
+        var path = $"/api/contracts/{contractId:D}/items/{participantSchemeId:D}";
+        var url = string.IsNullOrWhiteSpace(auditWhy) ? path : QueryHelpers.AddQueryString(path, "auditWhy", auditWhy);
+        var response = await httpClient.DeleteAsync(url, cancellationToken);
         if (response.StatusCode == HttpStatusCode.NotFound)
         {
             return new ContractItemRemovalResult(false, true, "This contract item was not found.");

@@ -88,11 +88,7 @@ public class PendingOrderNotifierTests
 
             h.Notifier = new PendingOrderNotifier(
                 h.PendingOrders,
-                h.Contracts,
-                schemes,
-                customers,
-                participants,
-                lookups,
+                new PendingOrderEmailPersonaliser(h.PendingOrders, h.Contracts, schemes, customers, participants, lookups),
                 client ?? h.Notify,
                 h.Guard,
                 Options.Create(new OnlineOrderEmailOptions { Enabled = enabled }),

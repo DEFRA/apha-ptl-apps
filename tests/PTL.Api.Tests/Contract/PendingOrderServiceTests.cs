@@ -118,7 +118,14 @@ public class PendingOrderServiceTests
         var participants = new PTL.Api.Tests.Participant.FakeParticipantRepository();
         await participants.CreateAsync(new PTL.Core.Participant.Participant { CustomerId = customer.CustomerId, LabCode = "001", Email = "participant@example.com", Email2 = "participant2@example.com", IsActive = true });
         var notifier = new FakePendingOrderNotifier();
-        var service = new PendingOrderService(pendingOrders, contracts, participantSchemes, schemeRepository, customerRepository, lookupRepository, participants, new FakeAuditActorResolver(actor), notifier);
+        var service = new PendingOrderService(
+            pendingOrders,
+            new PendingOrderContractWriter(contracts, participantSchemes),
+            schemeRepository,
+            customerRepository,
+            lookupRepository,
+            new FakeAuditActorResolver(actor),
+            new PendingOrderDecisionEmails(pendingOrders, customerRepository, participants, notifier));
 
         return new Harness(service, pendingOrders, contracts, participantSchemes, schemeRepository, participants, notifier, customer.CustomerId, pendingContractId, realScheme.SchemeId);
     }
