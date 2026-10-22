@@ -220,7 +220,7 @@ public class EntraCookieEventsTests
     {
         var identity = new ClaimsIdentity([new Claim("resolvedRoles", "Admin")]);
         var principal = new ClaimsPrincipal(identity);
-        var context = CreateContext(principal, new AuthenticationProperties(), new ThrowingEntraInternalUserResolver(), out var authService);
+        var context = CreateContext(principal, new AuthenticationProperties(), new ThrowingEntraInternalUserResolver(new HttpRequestException("PTL.Api unreachable")), out var authService);
 
         await CreateEvents(new FakeTokenRefreshService(TokenRefreshResult.Failed)).ValidatePrincipal(context);
 
@@ -228,6 +228,69 @@ public class EntraCookieEventsTests
         Assert.False(context.ShouldRenew);
         Assert.Equal("Admin", identity.FindFirst("resolvedRoles")!.Value);
         Assert.Empty(authService.SignOutSchemes);
+    }
+
+    [Fact]
+    public async Task ValidatePrincipal_RoleRevalidationResolverThrowsTaskCanceledException_KeepsExistingRolesAndDoesNotRenew()
+    {
+        var identity = new ClaimsIdentity([new Claim("resolvedRoles", "Admin")]);
+        var principal = new ClaimsPrincipal(identity);
+        var context = CreateContext(principal, new AuthenticationProperties(), new ThrowingEntraInternalUserResolver(new TaskCanceledException()), out var authService);
+
+        await CreateEvents(new FakeTokenRefreshService(TokenRefreshResult.Failed)).ValidatePrincipal(context);
+
+        Assert.NotNull(context.Principal);
+        Assert.False(context.ShouldRenew);
+        Assert.Equal("Admin", identity.FindFirst("resolvedRoles")!.Value);
+        Assert.Empty(authService.SignOutSchemes);
+    }
+
+    [Fact]
+    public async Task ValidatePrincipal_RoleRevalidationCheckedAtUnparsable_TreatsAsDueAndChecksAgain()
+    {
+        var identity = new ClaimsIdentity([new Claim("resolvedRoles", "Admin")]);
+        var principal = new ClaimsPrincipal(identity);
+        var properties = new AuthenticationProperties();
+        properties.StoreTokens([new AuthenticationToken { Name = "ptl_roles_checked_at", Value = "not-a-valid-date" }]);
+        var resolver = new FakeEntraInternalUserResolver(EntraInternalUserResolution.Allow(new Dictionary<string, string> { ["resolvedRoles"] = "Admin" }));
+        var context = CreateContext(principal, properties, resolver, out _);
+
+        await CreateEvents(new FakeTokenRefreshService(TokenRefreshResult.Failed)).ValidatePrincipal(context);
+
+        Assert.Equal(1, resolver.CallCount);
+    }
+
+    [Fact]
+    public async Task ValidatePrincipal_RoleRevalidationIntervalElapsed_ChecksAgain()
+    {
+        var identity = new ClaimsIdentity([new Claim("resolvedRoles", "Admin")]);
+        var principal = new ClaimsPrincipal(identity);
+        var properties = new AuthenticationProperties();
+        properties.StoreTokens([new AuthenticationToken { Name = "ptl_roles_checked_at", Value = Now.AddMinutes(-5).ToString("o") }]);
+        var resolver = new FakeEntraInternalUserResolver(EntraInternalUserResolution.Allow(new Dictionary<string, string> { ["resolvedRoles"] = "Admin" }));
+        var context = CreateContext(principal, properties, resolver, out _);
+
+        await CreateEvents(new FakeTokenRefreshService(TokenRefreshResult.Failed)).ValidatePrincipal(context);
+
+        Assert.Equal(1, resolver.CallCount);
+    }
+
+    [Fact]
+    public async Task ValidatePrincipal_RoleRevalidationDue_NewClaimTypeNotPreviouslyPresent_AddsClaimAndRenews()
+    {
+        var identity = new ClaimsIdentity([new Claim("resolvedRoles", "Admin")]);
+        var principal = new ClaimsPrincipal(identity);
+        var resolver = new FakeEntraInternalUserResolver(EntraInternalUserResolution.Allow(new Dictionary<string, string>
+        {
+            ["newClaimType"] = "newClaimValue"
+        }));
+        var context = CreateContext(principal, new AuthenticationProperties(), resolver, out _);
+
+        await CreateEvents(new FakeTokenRefreshService(TokenRefreshResult.Failed)).ValidatePrincipal(context);
+
+        Assert.True(context.ShouldRenew);
+        Assert.Equal("newClaimValue", identity.FindFirst("newClaimType")!.Value);
+        Assert.Equal("Admin", identity.FindFirst("resolvedRoles")!.Value);
     }
 
     private sealed class FakeTimeProvider(DateTimeOffset now) : TimeProvider
@@ -246,10 +309,10 @@ public class EntraCookieEventsTests
         }
     }
 
-    private sealed class ThrowingEntraInternalUserResolver : IEntraInternalUserResolver
+    private sealed class ThrowingEntraInternalUserResolver(Exception exception) : IEntraInternalUserResolver
     {
         public Task<EntraInternalUserResolution> ResolveAsync(ClaimsPrincipal principal, CancellationToken cancellationToken) =>
-            throw new HttpRequestException("PTL.Api unreachable");
+            throw exception;
     }
 
     private sealed class FakeTokenRefreshService(TokenRefreshResult result) : IEntraTokenRefreshService
