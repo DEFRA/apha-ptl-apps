@@ -69,7 +69,7 @@ public partial class SystemAdministrationRouteSmokeTests : IClassFixture<WebAppl
         var factory = _rawFactory.WithWebHostBuilder(builder => builder.UseSetting(SignedInUserHostingStartup.UseRealAuthSetting, "true"));
         var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
 
-        var response = await client.GetAsync("/SystemAdministration/SystemAdministration");
+        var response = await client.GetAsync("/SystemAdministration/Index");
 
         Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
     }
@@ -91,7 +91,7 @@ public partial class SystemAdministrationRouteSmokeTests : IClassFixture<WebAppl
     {
         var client = _factory.CreateClient();
 
-        var response = await client.GetAsync("/SystemAdministration/SystemAdministration");
+        var response = await client.GetAsync("/SystemAdministration/Index");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
@@ -101,7 +101,7 @@ public partial class SystemAdministrationRouteSmokeTests : IClassFixture<WebAppl
     {
         var client = _factory.CreateClient();
 
-        var response = await client.GetAsync("/SystemAdministration/SystemAdministration");
+        var response = await client.GetAsync("/SystemAdministration/Index");
         var body = await response.Content.ReadAsStringAsync();
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -115,7 +115,7 @@ public partial class SystemAdministrationRouteSmokeTests : IClassFixture<WebAppl
     {
         var client = _factory.CreateClient();
 
-        var response = await client.GetAsync("/SystemAdministration/SystemAdministration");
+        var response = await client.GetAsync("/SystemAdministration/Index");
         var body = await response.Content.ReadAsStringAsync();
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);

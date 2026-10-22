@@ -1,13 +1,11 @@
 using Dapper;
-using PTL.Core.Audit;
 using PTL.Core.User;
-using PTL.Data.Audit;
 using PTL.Data.Infrastructure;
 
 namespace PTL.Data.User;
 
 // Unchanged legacy stored procedures (spgUserRoleList, spiUserRole, spdUserRole) wrapping
-// tlnkUserRoles.
+// tlnkUserRoles - no audit trail, matching legacy's UserRoleCollection.Update().
 public sealed class UserRoleRepository(IDbConnectionFactory connectionFactory) : IUserRoleRepository
 {
     public async Task<IReadOnlyList<UserRoleAssignment>> GetForUserAsync(Guid userId, CancellationToken cancellationToken = default)
@@ -30,11 +28,10 @@ public sealed class UserRoleRepository(IDbConnectionFactory connectionFactory) :
         await connection.ExecuteAsync("EXEC dbo.spdUserRole @UserRoleId", new { UserRoleId = userRoleId });
     }
 
-    public async Task ApplyRoleChangesWithAuditAsync(
+    public async Task ApplyRoleChangesAsync(
         Guid userId,
         IReadOnlyList<Guid> roleIdsToAdd,
         IReadOnlyList<Guid> userRoleIdsToRemove,
-        AuditEntry auditEntry,
         CancellationToken cancellationToken = default)
     {
         using var connection = connectionFactory.CreateConnection();
@@ -55,8 +52,6 @@ public sealed class UserRoleRepository(IDbConnectionFactory connectionFactory) :
             {
                 await connection.ExecuteAsync("EXEC dbo.spdUserRole @UserRoleId", new { UserRoleId = userRoleId }, transaction);
             }
-
-            await AuditTrailWriter.WriteAsync(connection, transaction, auditEntry, cancellationToken);
 
             transaction.Commit();
         }

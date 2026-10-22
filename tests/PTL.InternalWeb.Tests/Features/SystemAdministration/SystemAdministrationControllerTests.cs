@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ViewFeatures;
 using Microsoft.Extensions.Logging.Abstractions;
 using PTL.Contracts.AdministrationCharge;
 using PTL.Contracts.Lookup;
@@ -12,6 +13,7 @@ using PTL.Contracts.WeightedPricingPlan;
 using PTL.InternalWeb.Features.Account;
 using PTL.InternalWeb.Features.SystemAdministration;
 using PTL.InternalWeb.Tests.TestSupport;
+using PTL.SharedUI.Notifications;
 using CountryDeleteResponse = PTL.Contracts.Country.CountryDeleteResponse;
 using CountryResponse = PTL.Contracts.Country.CountryResponse;
 using CountrySaveResult = PTL.Contracts.Country.CountrySaveResult;
@@ -48,14 +50,17 @@ public class SystemAdministrationControllerTests
                 ExternalTestConsultant = externalTestConsultantApiClient ?? new FakeExternalTestConsultantApiClient(),
                 Viewer = viewerApiClient ?? new FakeViewerApiClient()
             },
-            NullLogger<SystemAdministrationController>.Instance);
+                NullLogger<SystemAdministrationController>.Instance)
+            {
+                TempData = new TempDataDictionary(new DefaultHttpContext(), new FakeTempDataProvider())
+            };
 
     [Fact]
-    public void SystemAdministration_ReturnsView()
+    public void Index_ReturnsView()
     {
         var controller = CreateController();
 
-        var result = controller.SystemAdministration();
+        var result = controller.Index();
 
         Assert.IsType<ViewResult>(result);
     }
@@ -834,10 +839,11 @@ public class SystemAdministrationControllerTests
 
         var result = await controller.ManageUserRoles(model, CancellationToken.None);
 
-        var view = Assert.IsType<ViewResult>(result);
-        var resultModel = Assert.IsType<ManageUserRolesViewModel>(view.Model);
-        Assert.False(resultModel.MessageIsError);
-        Assert.Equal("Role assignments updated successfully.", resultModel.Message);
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal("Index", redirect.ActionName);
+        var notification = controller.TempData.GetNotification();
+        Assert.Equal(NotificationType.Success, notification!.Type);
+        Assert.Equal("Role assignments updated successfully.", notification.Message);
         var call = Assert.Single(userApiClient.SetRolesCalls);
         Assert.Equal(userId, call.UserId);
         Assert.Contains(roleId, call.Request.RoleIds);
@@ -885,10 +891,11 @@ public class SystemAdministrationControllerTests
 
         var result = await controller.ManageUserRoles(model, CancellationToken.None);
 
-        var view = Assert.IsType<ViewResult>(result);
-        var resultModel = Assert.IsType<ManageUserRolesViewModel>(view.Model);
-        Assert.True(resultModel.MessageIsError);
-        Assert.Contains("You cannot remove your own Admin access.", resultModel.Message);
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal("Index", redirect.ActionName);
+        var notification = controller.TempData.GetNotification();
+        Assert.Equal(NotificationType.Error, notification!.Type);
+        Assert.Contains("You cannot remove your own Admin access.", notification.Message);
     }
 
     [Fact]
