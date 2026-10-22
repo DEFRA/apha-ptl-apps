@@ -211,7 +211,7 @@ public static class SideNavigationProvider
                         }
                     ]
                 },
-                new SideNavigationItem { Text = "Search", ControllerName = SearchControllerName, ActionName = IndexAction },
+                new SideNavigationItem { Text = SearchControllerName, ControllerName = SearchControllerName, ActionName = IndexAction },
                 new SideNavigationItem
                 {
                     Text = "Group Addresses",
@@ -309,7 +309,7 @@ public static class SideNavigationProvider
                 // migrated.
                 Disabled("Participant Address Labels"),
                 Disabled("Group Address Labels"),
-                new SideNavigationItem { Text = "Search", ControllerName = DistributionControllerName, ActionName = "Search" },
+                new SideNavigationItem { Text = SearchControllerName, ControllerName = DistributionControllerName, ActionName = SearchControllerName },
                 new SideNavigationItem
                 {
                     Text = "Monthly Distributions",
