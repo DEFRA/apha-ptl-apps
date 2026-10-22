@@ -25,6 +25,7 @@ public interface ILookupApiClient
     Task<IReadOnlyList<SchemeItemTypeResponse>> GetSchemeItemTypesAsync(SchemeItemTypeKind kind, int yearId, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<PostagePricingPlanResponse>> GetPostagePricingPlansForYearAsync(int yearId, CancellationToken cancellationToken = default);
     Task<SystemSettingsResponse> GetSystemSettingsAsync(CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<TestReturnValueTypeResponse>> GetTestReturnValueTypesAsync(CancellationToken cancellationToken = default);
 }
 
 // Thin typed HttpClient wrapper around PTL.Api's read-only lookup endpoints, shared by every web
@@ -151,5 +152,11 @@ public sealed class LookupApiClient(HttpClient httpClient) : ILookupApiClient
     {
         var settings = await httpClient.GetFromJsonAsync<SystemSettingsResponse>("/api/lookups/system-settings", cancellationToken);
         return settings ?? new SystemSettingsResponse(string.Empty);
+    }
+
+    public async Task<IReadOnlyList<TestReturnValueTypeResponse>> GetTestReturnValueTypesAsync(CancellationToken cancellationToken = default)
+    {
+        var returnValueTypes = await httpClient.GetFromJsonAsync<IReadOnlyList<TestReturnValueTypeResponse>>("/api/lookups/test-return-value-types", cancellationToken);
+        return returnValueTypes ?? [];
     }
 }

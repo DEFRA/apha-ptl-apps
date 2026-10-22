@@ -171,4 +171,21 @@ public class LookupServiceTests
 
         Assert.Equal("UT3/306", result.UTNumber);
     }
+
+    [Fact]
+    public async Task GetTestReturnValueTypesAsync_ReturnsRepositoryResult()
+    {
+        var returnTypeId = Guid.NewGuid();
+        var repository = new FakeLookupRepository
+        {
+            TestReturnValueTypes = [new TestReturnValueTypeEntity { TestReturnValueTypeId = returnTypeId, Name = "Numeric" }]
+        };
+        var service = new LookupService(repository);
+
+        var result = await service.GetTestReturnValueTypesAsync();
+
+        Assert.Single(result);
+        Assert.Equal(returnTypeId, result[0].TestReturnValueTypeId);
+        Assert.Equal("Numeric", result[0].Name);
+    }
 }

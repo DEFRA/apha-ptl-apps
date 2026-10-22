@@ -288,8 +288,8 @@ public static class SideNavigationProvider
                     ]
                 },
                 new SideNavigationItem { Text = "Test Types", ControllerName = "SchemeAdmin", ActionName = "TestType" },
-                Disabled("Test Result Items"),
-                Disabled("Test Method Items"),
+                new SideNavigationItem { Text = "Test Result Items", ControllerName = "SchemeAdmin", ActionName = "TestResultItemType" },
+                new SideNavigationItem { Text = "Test Method Items", ControllerName = "SchemeAdmin", ActionName = "TestMethodItemType" },
                 new SideNavigationItem { Text = "Category Items", ControllerName = "SchemeAdmin", ActionName = "CategoryItemType" },
                 new SideNavigationItem { Text = "Criterion Items", ControllerName = "SchemeAdmin", ActionName = "CriterionItemType" }
             ]
