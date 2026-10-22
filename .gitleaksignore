@@ -1,4 +1,7 @@
 # Reviewed Gitleaks false positives (one fingerprint per line).
 
-# Test compares a result key with a constant (`kv.Key == _s.CultureS1Count`); the old line text matched generic-api-key.
+# Test code that compares a result key with a constant; not a secret.
 ae938c2a2ce19bc6196a1386d86a5c886979874e:tests/PTL.Api.Tests/Distribution/ActualResultsServiceTests.cs:generic-api-key:610
+
+# An earlier version of the comment above quoted that test code, which matched the same rule. Not a secret.
+5ce9f30dce0a6187f25a403d9c1c90e5b788624a:.gitleaksignore:generic-api-key:3
