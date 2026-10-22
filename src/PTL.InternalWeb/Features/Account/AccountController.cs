@@ -23,6 +23,7 @@ namespace PTL.InternalWeb.Features.Account
         // always challenges Entra ID instead), so this path should be unreachable.
         [HttpPost]
         [AllowAnonymous]
+        [ValidateAntiForgeryToken]
         public override Task<IActionResult> Login(AccountViewModel model)
         {
             if (!ModelState.IsValid)
