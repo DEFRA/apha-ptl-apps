@@ -6,10 +6,20 @@ namespace PTL.Core.Participant;
 public sealed class ParticipantService(
     IParticipantRepository participantRepository,
     IPendingParticipantUpdateRepository pendingParticipantUpdateRepository,
+    IParticipantUpdateNotifier participantUpdateNotifier,
     IParticipantViewerRepository participantViewerRepository,
     IViewerRepository viewerRepository,
     ILogger<ParticipantService> logger) : IParticipantService
 {
+    // spiUpdatedParticipantDetailsEmail takes @Email varchar(100); tblUpdatedParticipantDetailsEmail.fldLabCode is varchar(8)
+    // and fldParticipantName varchar(50).
+    private const int EmailAddressMaxLength = 100;
+    private const int LabCodeMaxLength = 8;
+    private const int ParticipantNameMaxLength = 50;
+
+    // PendingParticipantUpdateDetails.aspx's comments regex.
+    private const int CommentsMaxLength = 2000;
+
     private static readonly Action<ILogger, Guid, string, Exception?> LogCreatedParticipantMessage =
         LoggerMessage.Define<Guid, string>(
             LogLevel.Information,
@@ -58,22 +68,15 @@ public sealed class ParticipantService(
     public Task<IReadOnlyList<ParticipantSummaryEntity>> GetParticipantsAsync(Guid customerId, bool includeInactive = false, CancellationToken cancellationToken = default) =>
         participantRepository.GetSummariesAsync(customerId, includeInactive, cancellationToken);
 
-    public async Task<ParticipantSearchResult> SearchParticipantsAsync(Guid customerId, string? searchTerm, bool includeInactive, int page, int pageSize, CancellationToken cancellationToken = default)
+    public async Task<ParticipantSearchResult> SearchParticipantsAsync(Guid customerId, bool includeInactive, int page, int pageSize, CancellationToken cancellationToken = default)
     {
         page = page < 1 ? 1 : page;
         pageSize = pageSize is < 1 or > 200 ? 20 : pageSize;
 
         var all = await participantRepository.GetSummariesAsync(customerId, includeInactive, cancellationToken);
-        var filtered = string.IsNullOrWhiteSpace(searchTerm)
-            ? all
-            : all.Where(p =>
-                p.LabName.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
-                p.LabCode.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
-                p.ContactName.Contains(searchTerm, StringComparison.OrdinalIgnoreCase))
-                .ToList();
 
-        var totalCount = filtered.Count;
-        var items = filtered.Skip((page - 1) * pageSize).Take(pageSize).ToList();
+        var totalCount = all.Count;
+        var items = all.Skip((page - 1) * pageSize).Take(pageSize).ToList();
         return new ParticipantSearchResult(items, totalCount);
     }
 
@@ -177,8 +180,11 @@ public sealed class ParticipantService(
 
     // Only approved changes update the live participant record - matches
     // PendingParticipantUpdateDetails.aspx's ButtonApprove_Click, including its mParticipant.IsValid check.
-    public async Task<bool> ApprovePendingParticipantUpdateAsync(Guid participantId, PendingParticipantUpdate? editedFields = null, CancellationToken cancellationToken = default)
+    public async Task<bool> ApprovePendingParticipantUpdateAsync(Guid participantId, PendingParticipantUpdate? editedFields = null, string comments = "", CancellationToken cancellationToken = default)
     {
+        comments ??= string.Empty;
+        ValidateComments(comments);
+
         var existing = await participantRepository.GetByIdAsync(participantId, cancellationToken);
         var pending = await pendingParticipantUpdateRepository.GetByParticipantIdAsync(participantId, cancellationToken);
         if (existing is null || pending is null)
@@ -189,15 +195,68 @@ public sealed class ParticipantService(
         ApplyPendingFields(existing, editedFields ?? pending);
         Validate(existing);
         await participantRepository.UpdateAsync(existing, cancellationToken);
-        return await pendingParticipantUpdateRepository.MarkDecidedAsync(participantId, pending.PendingParticipantUpdateId, cancellationToken);
+        var decided = await pendingParticipantUpdateRepository.MarkDecidedAsync(participantId, pending.PendingParticipantUpdateId, cancellationToken);
+        if (decided)
+        {
+            // Legacy read the participant back after saving it, so approved email changes are notified to the new addresses.
+            await NotifyAsync(existing, pending.PendingParticipantUpdateId, comments, isApproved: true, cancellationToken);
+        }
+
+        return decided;
     }
 
     // Declined changes do not update the live record - only the pending row is soft-deleted.
-    public async Task<bool> DeclinePendingParticipantUpdateAsync(Guid participantId, CancellationToken cancellationToken = default)
+    public async Task<bool> DeclinePendingParticipantUpdateAsync(Guid participantId, string comments = "", CancellationToken cancellationToken = default)
     {
+        comments ??= string.Empty;
+        ValidateComments(comments);
+
         var pending = await pendingParticipantUpdateRepository.GetByParticipantIdAsync(participantId, cancellationToken);
-        return pending is not null && await pendingParticipantUpdateRepository.MarkDecidedAsync(participantId, pending.PendingParticipantUpdateId, cancellationToken);
+        if (pending is null)
+        {
+            return false;
+        }
+
+        var decided = await pendingParticipantUpdateRepository.MarkDecidedAsync(participantId, pending.PendingParticipantUpdateId, cancellationToken);
+        if (decided && await participantRepository.GetByIdAsync(participantId, cancellationToken) is { } participant)
+        {
+            await NotifyAsync(participant, pending.PendingParticipantUpdateId, comments, isApproved: false, cancellationToken);
+        }
+
+        return decided;
     }
+
+    private static void ValidateComments(string comments)
+    {
+        if (comments.Length > CommentsMaxLength)
+        {
+            throw new ParticipantValidationException([new ParticipantValidationError("Comments", "The comments field allows maximum 2000 characters")]);
+        }
+    }
+
+    // Legacy EmailUpdateNotifications: one row for the participant's primary email and one for the secondary when it is
+    // set, which are then sent at once (retried by the scheduler if that fails). Blank addresses are skipped rather than queued.
+    private async Task NotifyAsync(Participant participant, Guid pendingParticipantUpdateId, string comments, bool isApproved, CancellationToken cancellationToken)
+    {
+        var labCode = Truncate(participant.LabCode, LabCodeMaxLength);
+        var participantName = Truncate($"{participant.LabCode}: {participant.LabName}", ParticipantNameMaxLength);
+
+        var queued = false;
+        foreach (var address in new[] { participant.Email, participant.Email2 }.Where(a => !string.IsNullOrWhiteSpace(a)))
+        {
+            await pendingParticipantUpdateRepository.QueueNotificationAsync(
+                new ParticipantUpdateNotification(Truncate(address, EmailAddressMaxLength), labCode, pendingParticipantUpdateId, participantName, comments, isApproved),
+                cancellationToken);
+            queued = true;
+        }
+
+        if (queued)
+        {
+            await participantUpdateNotifier.SendForUpdateAsync(pendingParticipantUpdateId, CancellationToken.None);
+        }
+    }
+
+    private static string Truncate(string value, int length) => value.Length > length ? value[..length] : value;
 
     public async Task<ParticipantViewerAssignment?> GetParticipantViewersAsync(Guid participantId, CancellationToken cancellationToken = default)
     {

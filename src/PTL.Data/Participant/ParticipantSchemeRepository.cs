@@ -5,7 +5,7 @@ using PTL.Data.Infrastructure;
 
 namespace PTL.Data.Participant;
 
-public sealed class ParticipantSchemeRepository(IDbConnectionFactory connectionFactory) : IParticipantSchemeRepository
+public sealed partial class ParticipantSchemeRepository(IDbConnectionFactory connectionFactory) : IParticipantSchemeRepository
 {
     public async Task<ParticipantSchemeRecord?> GetByIdAsync(Guid participantSchemeId, CancellationToken cancellationToken = default)
     {
@@ -98,18 +98,104 @@ public sealed class ParticipantSchemeRepository(IDbConnectionFactory connectionF
     public async Task<ParticipantSchemeRecord> CreateAsync(ParticipantSchemeRecord record, CancellationToken cancellationToken = default)
     {
         using var connection = connectionFactory.CreateConnection();
+        connection.Open();
 
-        await connection.ExecuteAsync(InsertSql, BuildParameters(record));
+        // Legacy Insert: the item first, then UpdateDistributions.
+        using (var transaction = connection.BeginTransaction())
+        {
+            await connection.ExecuteAsync(InsertSql, BuildParameters(record), transaction);
+            await SyncDistributionsAsync(connection, transaction, record);
+            transaction.Commit();
+        }
+
         var created = await GetByIdAsync(record.ParticipantSchemeId, cancellationToken);
         return created ?? throw new InvalidOperationException($"ParticipantScheme {record.ParticipantSchemeId} was inserted but could not be re-read.");
     }
 
-    public async Task<bool> UpdateAsync(ParticipantSchemeRecord record, CancellationToken cancellationToken = default)
+    public Task<bool> UpdateAsync(ParticipantSchemeRecord record, CancellationToken cancellationToken = default) =>
+        UpdateCoreAsync(record, null);
+
+    public Task<bool> RemoveAsync(ParticipantSchemeRecord record, ParticipantSchemeAudit audit, CancellationToken cancellationToken = default) =>
+        UpdateCoreAsync(record, audit);
+
+    private async Task<bool> UpdateCoreAsync(ParticipantSchemeRecord record, ParticipantSchemeAudit? audit)
+    {
+        using var connection = connectionFactory.CreateConnection();
+        connection.Open();
+        using var transaction = connection.BeginTransaction();
+
+        // Legacy Update: UpdateDistributions first, while the stored item still holds its old months.
+        await SyncDistributionsAsync(connection, transaction, record);
+
+        if (audit is not null)
+        {
+            await connection.ExecuteAsync(
+                "EXEC dbo.spiAuditParticipantScheme @ParticipantSchemeId, @ContractId, @ParticipantId, @SchemeId, @AuditWho, @AuditWhy",
+                new { record.ParticipantSchemeId, record.ContractId, record.ParticipantId, record.SchemeId, audit.AuditWho, audit.AuditWhy },
+                transaction);
+        }
+
+        // spuParticipantScheme runs SET NOCOUNT ON, so ExecuteNonQuery would report -1; @@ROWCOUNT still holds the UPDATE's count.
+        var rowsAffected = await connection.ExecuteScalarAsync<int>(UpdateSql + "; SELECT @@ROWCOUNT", BuildParameters(record), transaction);
+        if (rowsAffected > 0)
+        {
+            transaction.Commit();
+            return true;
+        }
+
+        transaction.Rollback();
+        return false;
+    }
+
+    private static readonly string[] MonthAbbreviations = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+    public async Task<ParticipantSchemeContext> GetSchemeContextAsync(Guid schemeId, Guid contractId, bool nonUk, CancellationToken cancellationToken = default)
     {
         using var connection = connectionFactory.CreateConnection();
 
-        var rowsAffected = await connection.ExecuteAsync(UpdateSql, BuildParameters(record));
-        return rowsAffected > 0;
+        // spgSchemeBySchemeId returns several result sets; only the first (the scheme row) is needed. The
+        // reader must be disposed before the next query runs - the connection has no MARS.
+        IDictionary<string, object>? schemeRow;
+        using (var grid = await connection.QueryMultipleAsync("EXEC dbo.spgSchemeBySchemeId @SchemeId", new { SchemeId = schemeId }))
+        {
+            schemeRow = (IDictionary<string, object>?)await grid.ReadFirstOrDefaultAsync();
+        }
+
+        var canEdit = Enumerable.Repeat(true, ParticipantSchemeMonths.Count).ToArray();
+        if (schemeRow is not null)
+        {
+            var suffix = nonUk ? "ParticipantsOverseas" : "Participants";
+            for (var i = 0; i < canEdit.Length; i++)
+            {
+                canEdit[i] = !schemeRow.TryGetValue($"fldCanEdit{MonthAbbreviations[i]}{suffix}", out var value) || value is not bool flag || flag;
+            }
+        }
+
+        var warningMonths = await connection.QueryAsync<int>(
+            "EXEC dbo.spgParticipantSchemeWarning @SchemeId, @ContractId",
+            new { SchemeId = schemeId, ContractId = contractId });
+
+        return new ParticipantSchemeContext { CanEdit = canEdit, InitialisedMonthIds = [.. warningMonths.Distinct()] };
+    }
+
+    public async Task<IReadOnlyList<OtherParticipantScheme>> GetByParticipantAndSchemeAsync(Guid participantId, Guid schemeId, CancellationToken cancellationToken = default)
+    {
+        using var connection = connectionFactory.CreateConnection();
+
+        var rows = await connection.QueryAsync(
+            "EXEC dbo.spgParticipantSchemeInfoByParticipantIdAndSchemeId @ParticipantId, @SchemeId",
+            new { ParticipantId = participantId, SchemeId = schemeId });
+
+        return [.. rows.Select(row =>
+        {
+            IDictionary<string, object> r = row;
+            return new OtherParticipantScheme
+            {
+                ParticipantSchemeId = (Guid)r["fldParticipantSchemeId"],
+                IsRemoved = GetBool(r, "fldIsRemoved"),
+                Months = [.. MonthAbbreviations.Select(m => GetBool(r, $"fld{m}"))]
+            };
+        })];
     }
 
     private const string InsertSql =

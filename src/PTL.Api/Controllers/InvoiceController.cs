@@ -26,7 +26,7 @@ public sealed class InvoiceController(IInvoiceService invoiceService, ILookupSer
             EligibleContractCount: summary.EligibleContractCount,
             OptOutContractCount: summary.OptOutContractCount,
             NonFeePayingItemCount: summary.NonFeePayingItemCount,
-            NotificationRecipients: notificationOptions.Value.Recipients));
+            NotificationRecipients: string.IsNullOrWhiteSpace(notificationOptions.Value.Recipients) ? [] : [notificationOptions.Value.Recipients.Trim()]));
     }
 
     [HttpPost("generate")]

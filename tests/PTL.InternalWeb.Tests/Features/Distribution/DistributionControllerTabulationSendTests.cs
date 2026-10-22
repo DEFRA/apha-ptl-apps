@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ViewFeatures;
 using PTL.Contracts.Distribution;
+using PTL.InternalWeb.Confirmation;
 using PTL.InternalWeb.Features.Distribution;
 using PTL.InternalWeb.Navigation;
 using PTL.InternalWeb.Tests.TestSupport;
@@ -16,7 +17,7 @@ public class DistributionControllerTabulationSendTests
     private static readonly Guid SchemeB = Guid.Parse("aaaaaaaa-0000-0000-0000-0000000000f2");
 
     private static DistributionController CreateController(FakeDistributionApiClient apiClient) =>
-        new(apiClient) { TempData = new TempDataDictionary(new DefaultHttpContext(), new FakeTempDataProvider()) };
+        new(apiClient) { TempData = new TempDataDictionary(new DefaultHttpContext(), new FakeTempDataProvider()), Url = new FakeUrlHelper() };
 
     private static TabulationsSchemeResponse Scheme(Guid id) =>
         new(
@@ -38,8 +39,8 @@ public class DistributionControllerTabulationSendTests
     private static string Value(Guid scheme, string command) => $"{scheme}:{command}";
 
     private static Task<IActionResult> PostAsync(
-        DistributionController controller, string? command = null, string? stage = null, bool confirmed = false, string[]? staged = null) =>
-        controller.Tabulations(2026, 5, command, stage, confirmed, staged, CancellationToken.None);
+        DistributionController controller, string? command = null, string? stage = null, string? confirmation = null, string[]? staged = null) =>
+        controller.Tabulations(2026, 5, command, stage, confirmation, staged, CancellationToken.None);
 
     private static TabulationsViewModel AssertTabulationsView(IActionResult result)
     {
@@ -83,7 +84,9 @@ public class DistributionControllerTabulationSendTests
         Assert.Equal(
             [new TabulationStagedSendRequest(SchemeA, "SendToTestConsultant"), new TabulationStagedSendRequest(SchemeB, "SendToResultsSignOff")],
             Assert.Single(apiClient.SavedTabulations));
-        Assert.Null(controller.TempData.GetNotification());
+        var notification = controller.TempData.GetNotification();
+        Assert.Equal(NotificationType.Success, notification!.Type);
+        Assert.Equal("Tabulations updated successfully.", notification.Message);
     }
 
     [Fact]
@@ -117,11 +120,14 @@ public class DistributionControllerTabulationSendTests
         var result = await PostAsync(controller, stage: Value(SchemeA, "SendToTestConsultant"), staged: [Value(SchemeB, "SendToResultsSignOff")]);
 
         var view = Assert.IsType<ViewResult>(result);
-        Assert.Equal("SendTabulation", view.ViewName);
-        var model = Assert.IsType<TabulationSendViewModel>(view.Model);
-        Assert.Equal((2026, 5), (model.YearId, model.MonthId));
-        Assert.Same(send, model.Send);
-        Assert.Equal([new TabulationStagedSendRequest(SchemeB, "SendToResultsSignOff")], model.Staged);
+        Assert.Equal(ConfirmationFlow.ViewName, view.ViewName);
+        var model = Assert.IsType<ConfirmationPageViewModel>(view.Model);
+        Assert.Equal("Are you sure?", model.Title);
+        Assert.Equal("Send To Test Consultant", model.PageTitle);
+        Assert.Equal("D1a/S1 BT: Brucella", model.Caption);
+        Assert.Equal("OK", model.ConfirmText);
+        Assert.False(model.IsWarningTitle);
+        Assert.Null(model.CancelUrl);
         Assert.Equal("Tabulations", controller.ViewData[BreadcrumbRouteValues.Action]);
         Assert.Equal(
             new TabulationStageRequest([new TabulationStagedSendRequest(SchemeB, "SendToResultsSignOff")], SchemeA, "SendToTestConsultant"),
@@ -131,12 +137,37 @@ public class DistributionControllerTabulationSendTests
     }
 
     [Fact]
+    public async Task Post_DiscardQuestion_ShowsAWarningTitle()
+    {
+        var controller = CreateController(ApiClient(Send("Discard the Test Consultant's comments and send again?")));
+
+        var result = await PostAsync(controller, stage: Value(SchemeA, "SendToTestConsultant"));
+
+        var model = Assert.IsType<ConfirmationPageViewModel>(Assert.IsType<ViewResult>(result).Model);
+        Assert.True(model.IsWarningTitle);
+    }
+
+    [Fact]
+    public async Task Post_StageDeclined_DropsTheSendWithoutAskingAgainAndKeepsTheEarlierStagedSends()
+    {
+        var apiClient = ApiClient(Send("Are you sure?"));
+
+        var result = await PostAsync(
+            CreateController(apiClient), stage: Value(SchemeA, "SendToTestConsultant"), confirmation: ConfirmationFlow.Cancelled, staged: [Value(SchemeB, "SendToResultsSignOff")]);
+
+        var model = AssertTabulationsView(result);
+        Assert.Equal([new TabulationStagedSendRequest(SchemeB, "SendToResultsSignOff")], model.Staged);
+        Assert.Empty(apiClient.StagedTabulationSends);
+        Assert.Empty(apiClient.SavedTabulations);
+    }
+
+    [Fact]
     public async Task Post_StageWithAQuestionConfirmed_AddsTheSendToTheStagedListShownByThePreview()
     {
         var apiClient = ApiClient(Send("Are you sure?"));
 
         var result = await PostAsync(
-            CreateController(apiClient), stage: Value(SchemeA, "SendToTestConsultant"), confirmed: true, staged: [Value(SchemeB, "SendToResultsSignOff")]);
+            CreateController(apiClient), stage: Value(SchemeA, "SendToTestConsultant"), confirmation: ConfirmationFlow.Confirmed, staged: [Value(SchemeB, "SendToResultsSignOff")]);
 
         var model = AssertTabulationsView(result);
         TabulationStagedSendRequest[] expected =
@@ -163,7 +194,7 @@ public class DistributionControllerTabulationSendTests
         var apiClient = ApiClient(stage: null);
 
         var result = await PostAsync(
-            CreateController(apiClient), stage: Value(SchemeA, "SendToTestConsultant"), confirmed: true, staged: [Value(SchemeB, "SendToResultsSignOff")]);
+            CreateController(apiClient), stage: Value(SchemeA, "SendToTestConsultant"), confirmation: ConfirmationFlow.Confirmed, staged: [Value(SchemeB, "SendToResultsSignOff")]);
 
         var model = AssertTabulationsView(result);
         Assert.Single(apiClient.StagedTabulationSends);
@@ -191,7 +222,7 @@ public class DistributionControllerTabulationSendTests
     {
         var apiClient = ApiClient();
 
-        var result = await CreateController(apiClient).Tabulations(2026, 5, null, null, false, null, CancellationToken.None);
+        var result = await CreateController(apiClient).Tabulations(2026, 5, null, null, null, null, CancellationToken.None);
 
         var model = AssertTabulationsView(result);
         Assert.Empty(model.Staged);
@@ -222,14 +253,6 @@ public class DistributionControllerTabulationSendTests
         Assert.Equal((2026, 5, "May 2026"), (model.YearId, model.MonthId, model.MonthDescription));
         Assert.Equal(apiClient.TabulationsPreview!.Schemes, model.Schemes);
         Assert.Equal([new TabulationStagedSendRequest(SchemeA, "SendToTestConsultant")], model.Staged);
-    }
-
-    [Fact]
-    public void TabulationSendViewModel_DefaultsToNothingStaged()
-    {
-        var model = new TabulationSendViewModel { YearId = 2026, MonthId = 5, Send = Send("q") };
-
-        Assert.Empty(model.Staged);
     }
 
     // TabulationStageRequest holds a list, so record equality is by reference.

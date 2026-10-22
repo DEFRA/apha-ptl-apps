@@ -1,5 +1,8 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using PTL.Contracts.Distribution;
+using PTL.InternalWeb.Authorization;
+using PTL.SharedUI.Notifications;
 
 namespace PTL.InternalWeb.Features.Distribution;
 
@@ -14,6 +17,7 @@ public sealed partial class DistributionController
     private const string FileField = "File";
 
     [HttpGet]
+    [Authorize(Policy = PtlPolicies.Scheduling)]
     public async Task<IActionResult> ViewComments(int year, int monthId, Guid schemeId, CancellationToken cancellationToken)
     {
         var comments = await distributionApiClient.GetTestConsultantCommentsAsync(schemeId, cancellationToken);
@@ -29,6 +33,7 @@ public sealed partial class DistributionController
 
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [Authorize(Policy = PtlPolicies.Scheduling)]
     public async Task<IActionResult> ViewComments(
         int year, int monthId, Guid schemeId, ViewCommentsViewModel model, string? command, CancellationToken cancellationToken)
     {
@@ -89,6 +94,7 @@ public sealed partial class DistributionController
             return await RedisplayViewCommentsAsync(year, monthId, schemeId, model, cancellationToken);
         }
 
+        TempData.SetNotification(NotificationType.Success, submit ? "Comments submitted successfully." : "Comments updated successfully.");
         return RedirectToAction(nameof(Tabulations), new { year, monthId });
     }
 
@@ -98,6 +104,7 @@ public sealed partial class DistributionController
     [ValidateAntiForgeryToken]
     [RequestSizeLimit(15 * 1024 * 1024)]
     [RequestFormLimits(MultipartBodyLengthLimit = 15 * 1024 * 1024)]
+    [Authorize(Policy = PtlPolicies.Scheduling)]
     public async Task<IActionResult> ViewCommentsUpload(
         int year, int monthId, Guid schemeId, ViewCommentsViewModel model, IFormFile? file, CancellationToken cancellationToken)
     {
@@ -146,6 +153,7 @@ public sealed partial class DistributionController
     // Legacy AttachmentsList delete: a saved file is marked for removal, an unsaved upload is dropped.
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [Authorize(Policy = PtlPolicies.Scheduling)]
     public async Task<IActionResult> ViewCommentsRemoveAttachment(
         int year, int monthId, Guid schemeId, Guid attachmentId, ViewCommentsViewModel model, CancellationToken cancellationToken)
     {
@@ -174,10 +182,12 @@ public sealed partial class DistributionController
     }
 
     [HttpGet]
+    [Authorize(Policy = PtlPolicies.Scheduling)]
     public async Task<IActionResult> ViewCommentsAttachment(Guid schemeId, Guid attachmentId, CancellationToken cancellationToken) =>
         AttachmentResult(await distributionApiClient.GetTestConsultantCommentsAttachmentAsync(schemeId, attachmentId, cancellationToken));
 
     [HttpGet]
+    [Authorize(Policy = PtlPolicies.Scheduling)]
     public async Task<IActionResult> ViewCommentsStagedAttachment(Guid schemeId, Guid token, CancellationToken cancellationToken) =>
         AttachmentResult(await distributionApiClient.GetStagedTestConsultantCommentsAttachmentAsync(schemeId, token, cancellationToken));
 

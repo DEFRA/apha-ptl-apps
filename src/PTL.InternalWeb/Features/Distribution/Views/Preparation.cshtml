@@ -1,30 +1,35 @@
 @model PTL.InternalWeb.Features.Distribution.PreparationViewModel
 @{
-    ViewData["Title"] = $"Sample Preparation - {Model.MonthDescription}";
+    ViewData["Title"] = $"Sample preparation – {Model.MonthDescription}";
+
+    // GOV.UK date style (4 April 2026).
+    string Day(DateTime date) => date.ToString("d MMMM yyyy", System.Globalization.CultureInfo.GetCultureInfo("en-GB"));
 }
 
 @section Styles {
     <link rel="stylesheet" href="~/css/printable-scheme.css" />
 }
 
-<a class="govuk-back-link noprint" asp-action="Index" asp-route-year="@Model.YearId">Back</a>
+@section BackLink {
+    <a class="govuk-back-link noprint" asp-action="Index" asp-route-year="@Model.YearId">Back</a>
+}
 
-<h1 class="govuk-heading-l">Sample Preparation - @Model.MonthDescription</h1>
+<h1 class="govuk-heading-l">Sample preparation – @Model.MonthDescription</h1>
 
 <form method="post" asp-action="Preparation" asp-route-year="@Model.YearId" asp-route-monthId="@Model.MonthId">
-    @Html.AntiForgeryToken()
     <input type="hidden" asp-for="YearId" />
     <input type="hidden" asp-for="MonthId" />
     <input type="hidden" asp-for="MonthDescription" />
 
     @if (Model.Schemes.Count == 0)
     {
-        <p class="govuk-body">There are no Schemes to prepare this month.</p>
+        <p class="govuk-body">There are no schemes to prepare this month.</p>
     }
     else
     {
+        <section class="ptl-table-scroll" aria-label="Sample preparation">
         <table class="govuk-table" id="preparation-table">
-            <caption class="govuk-table__caption govuk-visually-hidden">Sample Preparation by Scheme</caption>
+            <caption class="govuk-table__caption govuk-visually-hidden">Sample preparation by scheme</caption>
             <thead class="govuk-table__head">
                 <tr class="govuk-table__row">
                     <th scope="col" class="govuk-table__header noprint">
@@ -39,10 +44,10 @@
                         </div>
                     </th>
                     <th scope="col" class="govuk-table__header">Scheme</th>
-                    <th scope="col" class="govuk-table__header">No. Of Sets</th>
-                    <th scope="col" class="govuk-table__header">Diary Entry</th>
-                    <th scope="col" class="govuk-table__header">Prep. Started</th>
-                    <th scope="col" class="govuk-table__header">Prep. Completed</th>
+                    <th scope="col" class="govuk-table__header">Number of sets</th>
+                    <th scope="col" class="govuk-table__header">Diary entry</th>
+                    <th scope="col" class="govuk-table__header">Preparation started</th>
+                    <th scope="col" class="govuk-table__header">Preparation completed</th>
                     <th scope="col" class="govuk-table__header noprint">Results</th>
                 </tr>
             </thead>
@@ -50,10 +55,9 @@
                 @for (var i = 0; i < Model.Schemes.Count; i++)
                 {
                     var scheme = Model.Schemes[i];
-                    <input type="hidden" asp-for="Schemes[i].MonthlyDistributionSchemeId" />
-
                     <tr class="govuk-table__row ptl-preparation-row" data-scheme-index="@i">
                         <td class="govuk-table__cell noprint">
+                            <input type="hidden" asp-for="Schemes[i].MonthlyDistributionSchemeId" />
                             @{
                                 var printId = Html.IdFor(m => m.Schemes[i].Selected);
                             }
@@ -67,14 +71,14 @@
                             </div>
                         </td>
                         <th scope="row" class="govuk-table__header">
-                            <h2 class="govuk-heading-s govuk-!-margin-bottom-2">@scheme.SchemeHeading</h2>
+                            <span class="govuk-heading-s govuk-!-margin-bottom-2">@scheme.SchemeHeading</span>
                             <p class="govuk-body govuk-!-margin-bottom-2">@scheme.SamplePackingInstructions</p>
                             @if (scheme.HasSamples)
                             {
                                 <details class="govuk-details govuk-!-margin-bottom-0 noprint">
                                     <summary class="govuk-details__summary">
                                         <span class="govuk-details__summary-text">
-                                            Show/hide samples<span class="govuk-visually-hidden"> for @scheme.SchemeHeading</span>
+                                            Show or hide samples<span class="govuk-visually-hidden"> for @scheme.SchemeHeading</span>
                                         </span>
                                     </summary>
                                     <div class="govuk-details__text">
@@ -91,14 +95,14 @@
                         <td class="govuk-table__cell">@scheme.NumberOfSetsRequired</td>
                         @if (!scheme.HasSamples)
                         {
-                            <td class="govuk-table__cell" colspan="4">The Sample Numbers for this Scheme have not yet been defined</td>
+                            <td class="govuk-table__cell" colspan="4">The sample numbers for this scheme have not yet been defined</td>
                         }
                         else
                         {
                             <td class="govuk-table__cell">
                                 @if (scheme.DiaryEntry.HasValue)
                                 {
-                                    @scheme.DiaryEntry.Value.ToShortDateString()
+                                    @Day(scheme.DiaryEntry.Value)
                                 }
                                 else
                                 {
@@ -107,7 +111,7 @@
                                         <div class="govuk-checkboxes__item">
                                             <input class="govuk-checkboxes__input" type="checkbox" id="@diaryEntryId" asp-for="Schemes[i].DiaryEntryChecked" />
                                             <label class="govuk-label govuk-checkboxes__label" for="@diaryEntryId">
-                                                <span class="govuk-visually-hidden">Mark Diary Entry Started for @scheme.SchemeHeading</span>
+                                                <span class="govuk-visually-hidden">Mark diary entry started for @scheme.SchemeHeading</span>
                                             </label>
                                         </div>
                                     </div>
@@ -116,7 +120,7 @@
                             <td class="govuk-table__cell">
                                 @if (scheme.PrepStartDate.HasValue)
                                 {
-                                    @scheme.PrepStartDate.Value.ToShortDateString()
+                                    @Day(scheme.PrepStartDate.Value)
                                 }
                                 else
                                 {
@@ -125,7 +129,7 @@
                                         <div class="govuk-checkboxes__item">
                                             <input class="govuk-checkboxes__input" type="checkbox" id="@prepStartId" asp-for="Schemes[i].PrepStartChecked" />
                                             <label class="govuk-label govuk-checkboxes__label" for="@prepStartId">
-                                                <span class="govuk-visually-hidden">Mark Prep Started for @scheme.SchemeHeading</span>
+                                                <span class="govuk-visually-hidden">Mark preparation started for @scheme.SchemeHeading</span>
                                             </label>
                                         </div>
                                     </div>
@@ -134,7 +138,7 @@
                             <td class="govuk-table__cell">
                                 @if (scheme.PrepCompleteDate.HasValue)
                                 {
-                                    @scheme.PrepCompleteDate.Value.ToShortDateString()
+                                    @Day(scheme.PrepCompleteDate.Value)
                                 }
                                 else
                                 {
@@ -143,7 +147,7 @@
                                         <div class="govuk-checkboxes__item">
                                             <input class="govuk-checkboxes__input" type="checkbox" id="@prepCompleteId" asp-for="Schemes[i].PrepCompleteChecked" />
                                             <label class="govuk-label govuk-checkboxes__label" for="@prepCompleteId">
-                                                <span class="govuk-visually-hidden">Mark Prep Completed for @scheme.SchemeHeading</span>
+                                                <span class="govuk-visually-hidden">Mark preparation completed for @scheme.SchemeHeading</span>
                                             </label>
                                         </div>
                                     </div>
@@ -166,11 +170,12 @@
                 }
             </tbody>
         </table>
+        </section>
     }
 
     <div class="govuk-button-group noprint">
         <button type="submit" name="command" value="save" class="govuk-button" data-module="govuk-button">Save</button>
-        <button type="submit" name="command" value="cancel" class="govuk-button govuk-button--secondary" data-module="govuk-button" formnovalidate>Cancel</button>
+        <a class="govuk-link" asp-action="Index">Cancel</a>
         <button type="button" id="preparation-print-button" class="govuk-button govuk-button--secondary noprint" data-module="govuk-button">Print</button>
     </div>
 </form>

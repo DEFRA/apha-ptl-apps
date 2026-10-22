@@ -15,6 +15,7 @@ public class ParticipantServiceTests
         new(
             repository,
             pendingRepository ?? new FakePendingParticipantUpdateRepository(),
+            new PTL.Api.Tests.Notifications.FakeParticipantUpdateNotifier(),
             participantViewerRepository ?? new FakeParticipantViewerRepository(),
             viewerRepository ?? new FakeViewerRepository(),
             NullLogger<ParticipantService>.Instance);
@@ -58,6 +59,75 @@ public class ParticipantServiceTests
         var created = await service.CreateParticipantAsync(participant);
 
         Assert.NotEqual(Guid.Empty, created.SsoId);
+    }
+
+    [Fact]
+    public async Task SearchParticipantsAsync_ExcludesInactiveUnlessRequestedAndOnlyReturnsTheCustomersParticipants()
+    {
+        var service = CreateService(new FakeParticipantRepository());
+        var customerId = Guid.NewGuid();
+        var active = ValidActiveParticipant("Alpha Lab");
+        active.CustomerId = customerId;
+        var inactive = ValidActiveParticipant("Beta Lab");
+        inactive.CustomerId = customerId;
+        inactive.IsActive = false;
+        await service.CreateParticipantAsync(active);
+        await service.CreateParticipantAsync(inactive);
+        await service.CreateParticipantAsync(ValidActiveParticipant("Other Customer Lab"));
+
+        var activeOnly = await service.SearchParticipantsAsync(customerId, includeInactive: false, page: 1, pageSize: 20);
+        var everyone = await service.SearchParticipantsAsync(customerId, includeInactive: true, page: 1, pageSize: 20);
+
+        Assert.Equal(1, activeOnly.TotalCount);
+        Assert.Equal("Alpha Lab", Assert.Single(activeOnly.Items).LabName);
+        Assert.Equal(2, everyone.TotalCount);
+    }
+
+    [Fact]
+    public async Task SearchParticipantsAsync_PagesResults()
+    {
+        var service = CreateService(new FakeParticipantRepository());
+        var customerId = Guid.NewGuid();
+        foreach (var name in new[] { "Alpha Lab", "Beta Lab", "Gamma Lab" })
+        {
+            var participant = ValidActiveParticipant(name);
+            participant.CustomerId = customerId;
+            await service.CreateParticipantAsync(participant);
+        }
+
+        var secondPage = await service.SearchParticipantsAsync(customerId, false, page: 2, pageSize: 2);
+        var beyondLastPage = await service.SearchParticipantsAsync(customerId, false, page: 3, pageSize: 2);
+
+        Assert.Equal(3, secondPage.TotalCount);
+        Assert.Single(secondPage.Items);
+        Assert.Empty(beyondLastPage.Items);
+        Assert.Equal(3, beyondLastPage.TotalCount);
+    }
+
+    [Theory]
+    [InlineData(0, 20)]
+    [InlineData(-3, 500)]
+    [InlineData(1, 0)]
+    public async Task SearchParticipantsAsync_InvalidPageOrPageSize_NormalisesToDefaults(int page, int pageSize)
+    {
+        var service = CreateService(new FakeParticipantRepository());
+        var participant = ValidActiveParticipant();
+        await service.CreateParticipantAsync(participant);
+
+        var result = await service.SearchParticipantsAsync(participant.CustomerId, false, page, pageSize);
+
+        Assert.Single(result.Items);
+    }
+
+    [Fact]
+    public async Task SearchParticipantsAsync_UnknownCustomer_ReturnsEmptyResult()
+    {
+        var service = CreateService(new FakeParticipantRepository());
+
+        var result = await service.SearchParticipantsAsync(Guid.NewGuid(), false, 1, 20);
+
+        Assert.Empty(result.Items);
+        Assert.Equal(0, result.TotalCount);
     }
 
     [Fact]

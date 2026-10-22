@@ -1,4 +1,5 @@
 using System.Globalization;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.Extensions.Logging;
@@ -6,15 +7,16 @@ using PTL.ApiClient;
 using PTL.Contracts.Lookup;
 using PTL.Contracts.Scheme;
 using PTL.Core.Scheme;
+using PTL.InternalWeb.Authorization;
+using PTL.InternalWeb.Confirmation;
 using PTL.SharedUI.Notifications;
 using CoreScheme = PTL.Core.Scheme.Scheme;
 using SchemeStartDate = PTL.Core.Scheme.SchemeStartDate;
 
 namespace PTL.InternalWeb.Features.Scheme;
 
-// Authentication/authorization are out of scope for this phase - assume the current user is
-// already authenticated with full access to Scheme functionality. Policies will be added later
-// (see docs/migration/scheme-migration.md, "Authentication Mapping").
+// Legacy "Scheme Admin" folder - requires the Scheme Admin role (PtlPolicies.SchemeAdmin).
+[Authorize(Policy = PtlPolicies.SchemeAdmin)]
 public class SchemeController(ISchemeApiClient schemeApiClient, ILookupApiClient lookupApiClient, ILogger<SchemeController> logger) : Controller
 {
     private static readonly Action<ILogger, int, string?, int, int, Exception?> LogDisplayedSchemeListMessage =
@@ -166,13 +168,19 @@ public class SchemeController(ISchemeApiClient schemeApiClient, ILookupApiClient
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Create(SchemeFormViewModel model, string? testCommand = null, Guid? selectedItemTypeId = null, CancellationToken cancellationToken = default)
+    public async Task<IActionResult> Create(SchemeFormViewModel model, string? testCommand = null, Guid? selectedItemTypeId = null, string? confirmation = null, CancellationToken cancellationToken = default)
     {
-        if (await TryHandleTestCommandAsync(model, testCommand, selectedItemTypeId, cancellationToken))
+        if (ConfirmRemoval(testCommand, confirmation) is { } confirmationPage)
+        {
+            return confirmationPage;
+        }
+
+        if (await TryHandleTestCommandAsync(model, testCommand, selectedItemTypeId, confirmation, cancellationToken))
         {
             return View(model);
         }
 
+        ValidatePriceText(model);
         if (!ModelState.IsValid)
         {
             model.Instructions = SchemeInstructions.Sanitise(model.Instructions);
@@ -284,13 +292,19 @@ public class SchemeController(ISchemeApiClient schemeApiClient, ILookupApiClient
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Edit(Guid id, SchemeFormViewModel model, string? testCommand = null, Guid? selectedItemTypeId = null, CancellationToken cancellationToken = default)
+    public async Task<IActionResult> Edit(Guid id, SchemeFormViewModel model, string? testCommand = null, Guid? selectedItemTypeId = null, string? confirmation = null, CancellationToken cancellationToken = default)
     {
-        if (await TryHandleTestCommandAsync(model, testCommand, selectedItemTypeId, cancellationToken))
+        if (ConfirmRemoval(testCommand, confirmation) is { } confirmationPage)
+        {
+            return confirmationPage;
+        }
+
+        if (await TryHandleTestCommandAsync(model, testCommand, selectedItemTypeId, confirmation, cancellationToken))
         {
             return View(model);
         }
 
+        ValidatePriceText(model);
         if (!ModelState.IsValid)
         {
             model.Instructions = SchemeInstructions.Sanitise(model.Instructions);
@@ -313,19 +327,57 @@ public class SchemeController(ISchemeApiClient schemeApiClient, ILookupApiClient
         return RedirectToAction(nameof(Details), new { id });
     }
 
+    // Removing a Test or Category asks first; Confirm and Cancel both post the unsaved form back, so a
+    // declined removal redisplays the form exactly as it was.
+    private ViewResult? ConfirmRemoval(string? testCommand, string? confirmation)
+    {
+        if (ConfirmationFlow.IsConfirmed(confirmation) || ConfirmationFlow.IsCancelled(confirmation) || testCommand is null)
+        {
+            return null;
+        }
+
+        string title;
+        string message;
+        if (testCommand.StartsWith("remove-test:", StringComparison.Ordinal))
+        {
+            (title, message) = ("Remove Test", "Are you sure you want to remove this Test?");
+        }
+        else if (testCommand.StartsWith("remove-category:", StringComparison.Ordinal))
+        {
+            (title, message) = ("Remove Category", "Are you sure you want to remove this Category?");
+        }
+        else
+        {
+            return null;
+        }
+
+        return this.ConfirmationPage(new ConfirmationPageViewModel
+        {
+            Title = title,
+            Message = message,
+            ConfirmText = "Remove",
+            IsDestructive = true,
+        });
+    }
+
     // Tests tab Add/Remove/Up/Down: mutate the staged tree and re-render without saving or
     // validating, mirroring legacy's ViewState-only behaviour. ModelState is cleared so the
     // re-rendered tree reflects the mutated model rather than the posted values.
     // The Tests tab always posts its hidden picker field, empty unless an Add button filled it,
     // so it has to be nullable or every Save fails to bind it.
-    private async Task<bool> TryHandleTestCommandAsync(SchemeFormViewModel model, string? testCommand, Guid? selectedItemTypeId, CancellationToken cancellationToken)
+    private async Task<bool> TryHandleTestCommandAsync(SchemeFormViewModel model, string? testCommand, Guid? selectedItemTypeId, string? confirmation, CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(testCommand))
+        var declined = ConfirmationFlow.IsCancelled(confirmation);
+        if (!declined && string.IsNullOrWhiteSpace(testCommand))
         {
             return false;
         }
 
-        SchemeTestCommands.TryApply(model, testCommand, selectedItemTypeId ?? Guid.Empty);
+        if (!declined)
+        {
+            SchemeTestCommands.TryApply(model, testCommand!, selectedItemTypeId ?? Guid.Empty);
+        }
+
         ModelState.Clear();
         model.Instructions = SchemeInstructions.Sanitise(model.Instructions);
         await PopulateFormAsync(model, cancellationToken);
@@ -426,7 +478,19 @@ public class SchemeController(ISchemeApiClient schemeApiClient, ILookupApiClient
         {
             var itemTypes = await lookupApiClient.GetSchemeItemTypesAsync(kind, yearId, cancellationToken);
             namesByKind[kind] = itemTypes.ToDictionary(t => t.ItemTypeId, t => t.Name);
-            optionsByKind[kind] = itemTypes.Select(t => new SelectListItem(t.Name, t.ItemTypeId.ToString())).ToList();
+
+            // AC: "Given a test type/criterion item is marked No Longer in Use, When a new
+            // scheme/test is configured, Then the retired item is not offered for selection but
+            // remains visible on existing schemes." namesByKind (above) stays unfiltered so an
+            // already-assigned retired type's name still renders correctly on existing schemes;
+            // only the Add dropdown's options are filtered. Scoped to TestType (story 744589) and
+            // CriterionItemType (story 744593) so far - the same NoLongerInUse gap likely applies
+            // to the remaining 2 kinds too (see docs/Parity-Analysis/
+            // 11-InternalWeb-SchemeItemTypes-Parity-Analysis.md), to be fixed in their own slices.
+            var selectableItemTypes = kind is SchemeItemTypeKind.TestType or SchemeItemTypeKind.CriterionItemType
+                ? itemTypes.Where(t => !t.NoLongerInUse)
+                : itemTypes;
+            optionsByKind[kind] = selectableItemTypes.Select(t => new SelectListItem(t.Name, t.ItemTypeId.ToString())).ToList();
         }
 
         model.TestTypeOptions = optionsByKind[SchemeItemTypeKind.TestType];
@@ -463,6 +527,35 @@ public class SchemeController(ISchemeApiClient schemeApiClient, ILookupApiClient
     }
 
     private void AddErrors(IReadOnlyDictionary<string, string[]> fieldErrors) => this.AddFieldErrors(fieldErrors);
+
+    // Legacy ValidatorPriceRegEx accepted whole numbers or exactly two decimals, and its string CompareValidator
+    // (> "0") rejected only a bare "0" - so "0.0" is an invalid number while "0.00" is accepted.
+    private static readonly System.Text.RegularExpressions.Regex PriceFormat = new(
+        @"^(?:[0-9]*\.[0-9]{2}|[0-9]+)$",
+        System.Text.RegularExpressions.RegexOptions.CultureInvariant,
+        TimeSpan.FromSeconds(1));
+
+    private void ValidatePriceText(SchemeFormViewModel model)
+    {
+        for (var i = 0; i < model.Prices.Count; i++)
+        {
+            var key = $"Prices[{i}].Price";
+            var text = ModelState[key]?.AttemptedValue?.Trim();
+            if (string.IsNullOrEmpty(text) || ModelState[key]!.Errors.Count > 0)
+            {
+                continue;
+            }
+
+            if (!PriceFormat.IsMatch(text))
+            {
+                ModelState.AddModelError(key, SchemeCurrencyPriceViewModel.PriceInvalidNumber);
+            }
+            else if (text == "0")
+            {
+                ModelState.AddModelError(key, SchemeCurrencyPriceViewModel.PriceMustBePositive);
+            }
+        }
+    }
 
     // Legacy shows the year as a read-only textbox on every path - the entry point decides it and
     // the user never picks it (Scheme.aspx.vb SetYearTextBox). All years are searched, not just

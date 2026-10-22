@@ -1,0 +1,6 @@
+@model PTL.InternalWeb.Features.SchemeAdmin.CategoryItemTypeViewModel
+@{
+    ViewData["Title"] = "Category Items";
+}
+
+@await Html.PartialAsync("_ItemTypeAdminList", Model)

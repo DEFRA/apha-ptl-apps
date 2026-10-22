@@ -4,6 +4,10 @@ public interface IParticipantSchemeService
 {
     Task<ParticipantSchemeRecord?> GetParticipantSchemeAsync(Guid participantSchemeId, CancellationToken cancellationToken = default);
 
+    // Which months of the scheme are already posted (locked) for this contract's customer, and which
+    // are initialised but not yet distributed (warning) - needed to open a new Contract Item.
+    Task<ParticipantSchemeContext> GetParticipantSchemeContextAsync(Guid contractId, Guid schemeId, CancellationToken cancellationToken = default);
+
     // Throws ParticipantSchemeValidationException on invalid input or when the owning contract IsReadOnly.
     Task<ParticipantSchemeRecord> CreateParticipantSchemeAsync(ParticipantSchemeRecord record, CancellationToken cancellationToken = default);
 

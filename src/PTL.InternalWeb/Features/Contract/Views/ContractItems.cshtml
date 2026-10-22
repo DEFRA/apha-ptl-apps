@@ -29,23 +29,35 @@ else
             <tbody class="govuk-table__body">
                 @foreach (var participant in scheme.Participants)
                 {
+                    // Stored removals and unsaved (pending) removals both read as removed; legacy struck the
+                    // participant and price and replaced Remove with "[Item Removed]" / "Pending Deletion".
+                    var removed = participant.IsRemoved;
                     <tr class="govuk-table__row">
-                        <td class="govuk-table__cell">@participant.FullName@(participant.HasOverride ? " - Has Override" : "")</td>
+                        <td class="govuk-table__cell@(removed ? " ptl-removed" : "")">@participant.FullName@(participant.HasOverride ? " - Has Override" : "")</td>
                         <td class="govuk-table__cell">@participant.NumberOfDistributions</td>
                         <td class="govuk-table__cell">
-                            <a class="govuk-link" asp-controller="ParticipantScheme" asp-action="Details" asp-route-id="@participant.ParticipantSchemeId">@(items.IsReadOnly ? "View" : "View / Edit")</a>
-                            @if (!items.IsReadOnly)
+                            <a class="govuk-link" asp-controller="ParticipantScheme" asp-action="Details" asp-route-id="@participant.ParticipantSchemeId">@(removed || items.IsReadOnly ? "View" : "View / Edit")</a>
+                            @if (removed)
                             {
                                 <text> | </text>
-                                <form method="post" asp-action="RemoveContractItem" class="ptl-inline-form" onsubmit="return confirm('Are you sure you want to remove this Contract Item?');">
+                                @(participant.IsPendingRemoval ? "Pending Deletion" : "[Item Removed]")
+                            }
+                            else if (!items.IsReadOnly)
+                            {
+                                <text> | </text>
+                                <form method="post" asp-action="RemoveContractItem" class="ptl-inline-form">
                                     <input type="hidden" name="id" value="@Model.Items.ContractId" />
                                     <input type="hidden" name="participantSchemeId" value="@participant.ParticipantSchemeId" />
+                                    @foreach (var pendingId in Model.PendingRemovalIds)
+                                    {
+                                        <input type="hidden" name="pending" value="@pendingId" />
+                                    }
                                     @Html.AntiForgeryToken()
                                     <button type="submit" class="govuk-link ptl-link-button">Remove</button>
                                 </form>
                             }
                         </td>
-                        <td class="govuk-table__cell@(participant.NonFeePaying ? " ptl-non-fee-paying" : "")">@participant.Price.ToString("N2")</td>
+                        <td class="govuk-table__cell@(removed || participant.NonFeePaying ? " ptl-removed" : "")">@participant.Price.ToString("N2")</td>
                     </tr>
                 }
             </tbody>
@@ -90,8 +102,16 @@ else
 
 <div class="govuk-button-group">
     <a class="govuk-button govuk-button--secondary" data-module="govuk-button" asp-action="Index" asp-route-customerId="@Model.CustomerId">Back</a>
+    @if (Model.PendingRemovalIds.Count > 0)
+    {
+        <a class="govuk-button govuk-button--secondary" data-module="govuk-button" asp-action="ContractItems" asp-route-id="@Model.Items.ContractId">Reset</a>
+    }
     @if (!items.IsReadOnly)
     {
         <a class="govuk-button" data-module="govuk-button" asp-controller="ParticipantScheme" asp-action="Create" asp-route-contractId="@Model.Items.ContractId" asp-route-customerId="@Model.CustomerId">Add Contract Item</a>
+    }
+    @if (Model.PendingRemovalIds.Count > 0)
+    {
+        <a class="govuk-button" data-module="govuk-button" href="@Url.Action("AuditContractItemRemovals", new { id = Model.Items.ContractId, pending = Model.PendingRemovalIds.ToArray() })">Save</a>
     }
 </div>

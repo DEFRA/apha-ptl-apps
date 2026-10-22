@@ -28,7 +28,7 @@ public sealed class ParticipantApiClient(HttpClient httpClient) : IParticipantAp
 
     public async Task<ParticipantSearchResponse> SearchParticipantsAsync(ParticipantSearchRequest request, CancellationToken cancellationToken = default)
     {
-        var query = $"searchTerm={Uri.EscapeDataString(request.SearchTerm ?? string.Empty)}&includeInactive={request.IncludeInactive}&page={request.Page}&pageSize={request.PageSize}";
+        var query = $"includeInactive={request.IncludeInactive}&page={request.Page}&pageSize={request.PageSize}";
         var result = await httpClient.GetFromJsonAsync<ParticipantSearchResponse>($"/api/customers/{request.CustomerId}/participants/search?{query}", cancellationToken);
         return result ?? new ParticipantSearchResponse([], 0, request.Page, request.PageSize);
     }
@@ -58,15 +58,15 @@ public sealed class ParticipantApiClient(HttpClient httpClient) : IParticipantAp
         return await response.Content.ReadFromJsonAsync<PendingParticipantUpdateComparisonResponse>(cancellationToken);
     }
 
-    public async Task<PendingParticipantUpdateDecisionResult> ApprovePendingParticipantUpdateAsync(Guid participantId, PendingParticipantUpdateSaveRequest? request = null, CancellationToken cancellationToken = default)
+    public async Task<PendingParticipantUpdateDecisionResult> ApprovePendingParticipantUpdateAsync(Guid participantId, PendingParticipantUpdateSaveRequest? request = null, string? comments = null, CancellationToken cancellationToken = default)
     {
         var url = $"/api/participants/{participantId}/pending-update/approve";
 
-        // Approving without amendments posts no body at all rather than a JSON "null" literal, so
+        // Approving without amendments or comments posts no body at all rather than a JSON "null" literal, so
         // the endpoint's optional [FromBody] parameter binds cleanly.
-        var response = request is null
+        var response = request is null && string.IsNullOrEmpty(comments)
             ? await httpClient.PostAsync(url, content: null, cancellationToken)
-            : await httpClient.PostAsJsonAsync(url, request, cancellationToken);
+            : await httpClient.PostAsJsonAsync(url, new PendingParticipantUpdateApproveRequest(request, comments), cancellationToken);
 
         if (response.StatusCode == HttpStatusCode.NotFound)
         {
@@ -86,9 +86,12 @@ public sealed class ParticipantApiClient(HttpClient httpClient) : IParticipantAp
         return new PendingParticipantUpdateDecisionResult(true, false, new Dictionary<string, string[]>());
     }
 
-    public async Task<bool> DeclinePendingParticipantUpdateAsync(Guid participantId, CancellationToken cancellationToken = default)
+    public async Task<bool> DeclinePendingParticipantUpdateAsync(Guid participantId, string? comments = null, CancellationToken cancellationToken = default)
     {
-        var response = await httpClient.PostAsync($"/api/participants/{participantId}/pending-update/decline", content: null, cancellationToken);
+        var url = $"/api/participants/{participantId}/pending-update/decline";
+        var response = string.IsNullOrEmpty(comments)
+            ? await httpClient.PostAsync(url, content: null, cancellationToken)
+            : await httpClient.PostAsJsonAsync(url, new PendingParticipantUpdateDeclineRequest(comments), cancellationToken);
         return response.IsSuccessStatusCode;
     }
 

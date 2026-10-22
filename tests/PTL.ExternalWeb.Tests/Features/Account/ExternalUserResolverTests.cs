@@ -238,4 +238,19 @@ public class ExternalUserResolverTests
         Assert.False(result.IsAllowed);
         Assert.Equal("/Home/Error", result.DenialRedirectPath);
     }
+
+    [Fact]
+    public async Task ResolveAsync_ApiCallThrowsResilienceTimeout_DeniesWithErrorRedirect()
+    {
+        var principal = CreatePrincipal(
+            new Claim(CidmClaimTypes.ContactId, Guid.NewGuid().ToString()),
+            new Claim(ClaimTypes.Email, "user@example.com"));
+        var apiClient = new FakeExternalUserApiClient(new ResolveExternalUserResponse("", [], null, null, null, null), new Polly.Timeout.TimeoutRejectedException());
+        var resolver = new ExternalUserResolver(apiClient, NullLogger<ExternalUserResolver>.Instance);
+
+        var result = await resolver.ResolveAsync(principal, CancellationToken.None);
+
+        Assert.False(result.IsAllowed);
+        Assert.Equal("/Home/Error", result.DenialRedirectPath);
+    }
 }

@@ -38,11 +38,11 @@ public sealed class CustomerController(ICustomerService customerService, ILogger
         return Ok(ToResponse(customer));
     }
 
-    // GET /api/customers/search?searchTerm=...&status=Active|Inactive|All&page=1&pageSize=20
+    // GET /api/customers/search?status=Active|Inactive|All&page=1&pageSize=20 - the Customers list (legacy CustomerList.aspx).
     [HttpGet("search")]
     public async Task<ActionResult<CustomerSearchResponse>> SearchCustomers([FromQuery] CustomerSearchRequest request, CancellationToken cancellationToken)
     {
-        var result = await customerService.SearchCustomersAsync(request.SearchTerm, request.Status, request.Page, request.PageSize, cancellationToken);
+        var result = await customerService.SearchCustomersAsync(request.Status, request.Page, request.PageSize, cancellationToken);
         return Ok(new CustomerSearchResponse(result.Items.Select(ToSummaryResponse).ToList(), result.TotalCount, request.Page, request.PageSize));
     }
 
@@ -112,13 +112,14 @@ public sealed class CustomerController(ICustomerService customerService, ILogger
 
     // POST /api/customers/{customerId}/pending-update/approve - applies the pending changes to the
     // live customer record, then soft-deletes the pending update. An optional body carries amended
-    // values, matching legacy PendingCustomerUpdateDetails.aspx's editable Approve.
+    // values, matching legacy PendingCustomerUpdateDetails.aspx's editable Approve, and the
+    // reviewer's comments for the notification email.
     [HttpPost("{customerId:guid}/pending-update/approve")]
-    public async Task<IActionResult> ApprovePendingCustomerUpdate(Guid customerId, [FromBody] PendingCustomerUpdateSaveRequest? request, CancellationToken cancellationToken)
+    public async Task<IActionResult> ApprovePendingCustomerUpdate(Guid customerId, [FromBody] PendingCustomerUpdateApproveRequest? request, CancellationToken cancellationToken)
     {
         try
         {
-            var approved = await customerService.ApprovePendingCustomerUpdateAsync(customerId, ToPendingEntity(customerId, request), cancellationToken);
+            var approved = await customerService.ApprovePendingCustomerUpdateAsync(customerId, ToPendingEntity(customerId, request?.Edits), request?.Comments ?? string.Empty, cancellationToken);
             return approved ? NoContent() : NotFound();
         }
         catch (CustomerValidationException ex)
@@ -130,10 +131,17 @@ public sealed class CustomerController(ICustomerService customerService, ILogger
     // POST /api/customers/{customerId}/pending-update/decline - soft-deletes the pending update
     // without changing the live customer record.
     [HttpPost("{customerId:guid}/pending-update/decline")]
-    public async Task<IActionResult> DeclinePendingCustomerUpdate(Guid customerId, CancellationToken cancellationToken)
+    public async Task<IActionResult> DeclinePendingCustomerUpdate(Guid customerId, [FromBody] PendingCustomerUpdateDeclineRequest? request, CancellationToken cancellationToken)
     {
-        var declined = await customerService.DeclinePendingCustomerUpdateAsync(customerId, cancellationToken);
-        return declined ? NoContent() : NotFound();
+        try
+        {
+            var declined = await customerService.DeclinePendingCustomerUpdateAsync(customerId, request?.Comments ?? string.Empty, cancellationToken);
+            return declined ? NoContent() : NotFound();
+        }
+        catch (CustomerValidationException ex)
+        {
+            return ToValidationProblem(ex);
+        }
     }
 
     private static PendingCustomerUpdate? ToPendingEntity(Guid customerId, PendingCustomerUpdateSaveRequest? request) => request is null ? null : new PendingCustomerUpdate

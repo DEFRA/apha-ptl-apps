@@ -7,7 +7,7 @@
         CurrentPage = Model.Page,
         PageSize = Model.PageSize,
         TotalRecords = Model.TotalCount,
-        RouteValues = new Dictionary<string, object?> { ["customerId"] = Model.CustomerId, ["searchTerm"] = Model.SearchTerm, ["includeInactive"] = Model.IncludeInactive }
+        RouteValues = new Dictionary<string, object?> { ["customerId"] = Model.CustomerId, ["includeInactive"] = Model.IncludeInactive }
     };
 }
 
@@ -16,18 +16,13 @@
 <form method="get" asp-action="Index" class="govuk-!-margin-bottom-6">
     <input type="hidden" name="customerId" value="@Model.CustomerId" />
     <div class="govuk-form-group">
-        <label class="govuk-label" for="searchTerm">Search</label>
-        <div class="govuk-hint">Matches Lab Code, Lab Name, or Contact Name.</div>
-        <input class="govuk-input" id="searchTerm" name="searchTerm" value="@Model.SearchTerm" />
-    </div>
-    <div class="govuk-form-group">
         <label class="govuk-label" for="includeInactive">Status</label>
         <select class="govuk-select" id="includeInactive" name="includeInactive">
             <option value="false" selected="@(Model.IncludeInactive ? null : "selected")">Active</option>
             <option value="true" selected="@(Model.IncludeInactive ? "selected" : null)">Inactive</option>
         </select>
     </div>
-    <button class="govuk-button" data-module="govuk-button" type="submit">Search</button>
+    <button class="govuk-button" data-module="govuk-button" type="submit">Filter</button>
 </form>
 
 @if (Model.Participants.Count == 0)

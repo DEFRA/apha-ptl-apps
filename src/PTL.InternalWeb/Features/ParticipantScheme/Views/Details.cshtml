@@ -1,6 +1,31 @@
 @model PTL.InternalWeb.Features.ParticipantScheme.ParticipantSchemeDetailsViewModel
 @{
     ViewData["Title"] = Model.IsReadOnly ? "Contract Item (Removed)" : "Contract Item Details";
+
+    // Read-only page: values are shown as text (summary lists), never as disabled form controls,
+    // which GOV.UK Design System guidance advises against for information that cannot be changed.
+    var fields = Model.Fields;
+    var pricingPlan = fields.PricingPlanOptions.FirstOrDefault(o => o.Value == fields.PricingPlan)?.Text ?? fields.PricingPlan;
+
+    // Legacy lists the months in contract-year order, April to March.
+    var months = new (string Name, bool Distribute, bool IsOverride)[]
+    {
+        ("April", fields.DistributionMonthApr, fields.IsOverrideApr),
+        ("May", fields.DistributionMonthMay, fields.IsOverrideMay),
+        ("June", fields.DistributionMonthJun, fields.IsOverrideJun),
+        ("July", fields.DistributionMonthJul, fields.IsOverrideJul),
+        ("August", fields.DistributionMonthAug, fields.IsOverrideAug),
+        ("September", fields.DistributionMonthSep, fields.IsOverrideSep),
+        ("October", fields.DistributionMonthOct, fields.IsOverrideOct),
+        ("November", fields.DistributionMonthNov, fields.IsOverrideNov),
+        ("December", fields.DistributionMonthDec, fields.IsOverrideDec),
+        ("January", fields.DistributionMonthJan, fields.IsOverrideJan),
+        ("February", fields.DistributionMonthFeb, fields.IsOverrideFeb),
+        ("March", fields.DistributionMonthMar, fields.IsOverrideMar),
+    };
+
+    static string YesNo(bool value) => value ? "Yes" : "No";
+    static string OrNotProvided(string? value) => string.IsNullOrWhiteSpace(value) ? "Not provided" : value;
 }
 
 <div class="govuk-grid-row">
@@ -10,12 +35,109 @@
     <div class="govuk-grid-column-one-third govuk-!-text-align-right">
         @if (!Model.IsReadOnly)
         {
-            <a class="govuk-button" data-module="govuk-button" asp-action="Edit" asp-route-id="@Model.Fields.ParticipantSchemeId">Edit Contract Item</a>
+            <a class="govuk-button" data-module="govuk-button" asp-action="Edit" asp-route-id="@fields.ParticipantSchemeId">Edit Contract Item</a>
         }
     </div>
 </div>
 
-<p class="govuk-body"><strong>Participant:</strong> @Model.Fields.ParticipantDisplayName</p>
-<p class="govuk-body"><strong>Scheme:</strong> @Model.Fields.SchemeDisplayName</p>
+<dl class="govuk-summary-list">
+    <div class="govuk-summary-list__row">
+        <dt class="govuk-summary-list__key">Participant</dt>
+        <dd class="govuk-summary-list__value">@fields.ParticipantDisplayName</dd>
+    </div>
+    <div class="govuk-summary-list__row">
+        <dt class="govuk-summary-list__key">Scheme</dt>
+        <dd class="govuk-summary-list__value">@fields.SchemeDisplayName</dd>
+    </div>
+</dl>
 
-<partial name="_ParticipantSchemeFields" model="Model.Fields" />
+@if (fields.SchemeDistributionAsAvailable)
+{
+    <h2 class="govuk-heading-m">Months</h2>
+    <p class="govuk-body">Distribution is marked 'As Available'</p>
+}
+else
+{
+<table class="govuk-table">
+    <caption class="govuk-table__caption govuk-table__caption--m">Months</caption>
+    <thead class="govuk-table__head">
+        <tr class="govuk-table__row">
+            <th scope="col" class="govuk-table__header">Months</th>
+            <th scope="col" class="govuk-table__header">Distribute</th>
+            <th scope="col" class="govuk-table__header">Is Override</th>
+        </tr>
+    </thead>
+    <tbody class="govuk-table__body">
+        @foreach (var month in months)
+        {
+            <tr class="govuk-table__row">
+                <th scope="row" class="govuk-table__header">@month.Name</th>
+                <td class="govuk-table__cell">@YesNo(month.Distribute)</td>
+                <td class="govuk-table__cell">@YesNo(month.IsOverride)</td>
+            </tr>
+        }
+    </tbody>
+</table>
+}
+
+<h2 class="govuk-heading-m">Group Address</h2>
+<dl class="govuk-summary-list">
+    <div class="govuk-summary-list__row">
+        <dt class="govuk-summary-list__key">Group Address Identifier</dt>
+        <dd class="govuk-summary-list__value">@OrNotProvided(fields.GroupAddressIdentifier)</dd>
+    </div>
+    <div class="govuk-summary-list__row">
+        <dt class="govuk-summary-list__key">Group Address 1</dt>
+        <dd class="govuk-summary-list__value">@OrNotProvided(fields.GroupAddressAddress1)</dd>
+    </div>
+    <div class="govuk-summary-list__row">
+        <dt class="govuk-summary-list__key">Group Country</dt>
+        <dd class="govuk-summary-list__value">@OrNotProvided(fields.GroupAddressCountry)</dd>
+    </div>
+</dl>
+
+<h2 class="govuk-heading-m">Contract item information</h2>
+<dl class="govuk-summary-list">
+    <div class="govuk-summary-list__row">
+        <dt class="govuk-summary-list__key">Sets of Samples Required</dt>
+        <dd class="govuk-summary-list__value">@fields.NumberOfSetsRequired</dd>
+    </div>
+    <div class="govuk-summary-list__row">
+        <dt class="govuk-summary-list__key">External Reference</dt>
+        <dd class="govuk-summary-list__value">@OrNotProvided(fields.ExternalReference)</dd>
+    </div>
+    <div class="govuk-summary-list__row">
+        <dt class="govuk-summary-list__key">Contact</dt>
+        <dd class="govuk-summary-list__value">@OrNotProvided(fields.Contact)</dd>
+    </div>
+    @if (fields.IsWeightedSchemeAvailable)
+    {
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Pricing Plan</dt>
+            <dd class="govuk-summary-list__value">@pricingPlan</dd>
+        </div>
+    }
+    <div class="govuk-summary-list__row">
+        <dt class="govuk-summary-list__key">Import/Export Licence Required</dt>
+        <dd class="govuk-summary-list__value">@YesNo(fields.ImportExportLicenceRequired)</dd>
+    </div>
+    <div class="govuk-summary-list__row">
+        <dt class="govuk-summary-list__key">Customs Certificate Required</dt>
+        <dd class="govuk-summary-list__value">@YesNo(fields.CustomsCertificateRequired)</dd>
+    </div>
+    <div class="govuk-summary-list__row">
+        <dt class="govuk-summary-list__key">Non Fee Paying</dt>
+        <dd class="govuk-summary-list__value">@YesNo(fields.NonFeePaying)</dd>
+    </div>
+    @if (fields.SchemeRequiresDataConsent)
+    {
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Consent received for sharing information</dt>
+            <dd class="govuk-summary-list__value">@YesNo(fields.DataConsentDeclarationGiven)</dd>
+        </div>
+    }
+    <div class="govuk-summary-list__row">
+        <dt class="govuk-summary-list__key">Other Packaging Requirements</dt>
+        <dd class="govuk-summary-list__value">@OrNotProvided(fields.PackingInstructions)</dd>
+    </div>
+</dl>

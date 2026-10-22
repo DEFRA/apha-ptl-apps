@@ -1,6 +1,9 @@
 using System.Globalization;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using PTL.Contracts.Distribution;
+using PTL.InternalWeb.Authorization;
+using PTL.SharedUI.Notifications;
 using Keys = PTL.Contracts.Distribution.AmendResultsFieldKeys;
 
 namespace PTL.InternalWeb.Features.Distribution;
@@ -14,6 +17,7 @@ public sealed partial class DistributionController
     private static readonly string[] AmendInputPrefixes = ["im_", "ir1_", "ir2_", "pm_", "pr_", "ac_", "as_", "pc_", "rr_", "rg_", "nr_"];
 
     [HttpGet]
+    [Authorize(Policy = PtlPolicies.Scheduling)]
     public async Task<IActionResult> AmendResults(int year, int monthId, Guid schemeId, CancellationToken cancellationToken)
     {
         var page = await distributionApiClient.GetAmendResultsAsync(schemeId, cancellationToken);
@@ -25,6 +29,7 @@ public sealed partial class DistributionController
     [HttpPost]
     [ValidateAntiForgeryToken]
     [RequestFormLimits(ValueCountLimit = 20000)]
+    [Authorize(Policy = PtlPolicies.Scheduling)]
     public async Task<IActionResult> AmendResults(
         int year,
         int monthId,
@@ -111,6 +116,7 @@ public sealed partial class DistributionController
             return View(model);
         }
 
+        TempData.SetNotification(NotificationType.Success, "Amended Results updated successfully.");
         return RedirectToAction(nameof(Tabulations), new { year, monthId });
     }
 

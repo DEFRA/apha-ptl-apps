@@ -6,10 +6,6 @@ public sealed class TabulationEmailOptions
 
     public bool Enabled { get; set; } = true;
 
-    public TimeSpan PollInterval { get; set; } = TimeSpan.FromMinutes(5);
-
-    public TimeSpan StartupDelay { get; set; } = TimeSpan.FromSeconds(30);
-
     // The ready date and "today" are calendar days in this zone.
     public string TimeZone { get; set; } = "Europe/London";
 

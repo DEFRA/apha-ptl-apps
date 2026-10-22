@@ -6,6 +6,7 @@ using PTL.ApiClient;
 using PTL.Contracts.Contract;
 using PTL.Core.Contract.Document;
 using PTL.Core.Contract.Export.Templates;
+using PTL.InternalWeb.Confirmation;
 using PTL.InternalWeb.Features.Contract;
 using PTL.InternalWeb.Tests.TestSupport;
 using PTL.SharedUI.Notifications;
@@ -198,13 +199,31 @@ public class ContractControllerExportsTests
     }
 
     [Fact]
+    public async Task DeleteExportTemplate_NotConfirmed_ShowsTheConfirmationPageAndDeletesNothing()
+    {
+        var apiClient = new FakeExportTemplateApiClient();
+        var controller = CreateController(apiClient);
+        controller.Url = new FakeUrlHelper();
+
+        var result = await controller.DeleteExportTemplate(Guid.NewGuid(), ExportDocumentTypes.Contracts, null);
+
+        var view = Assert.IsType<ViewResult>(result);
+        Assert.Equal(ConfirmationFlow.ViewName, view.ViewName);
+        var model = Assert.IsType<ConfirmationPageViewModel>(view.Model);
+        Assert.Equal(ExportTemplatesViewModel.DeleteConfirmation, model.Message);
+        Assert.EndsWith("/ExportContracts", model.CancelUrl, StringComparison.Ordinal);
+        Assert.Null(apiClient.LastDeletedFileId);
+        Assert.Null(controller.TempData.GetNotification());
+    }
+
+    [Fact]
     public async Task DeleteExportTemplate_Success_NotifiesAndReturnsToTheScreen()
     {
         var apiClient = new FakeExportTemplateApiClient();
         var controller = CreateController(apiClient);
         var fileId = Guid.NewGuid();
 
-        await controller.DeleteExportTemplate(fileId, ExportDocumentTypes.Contracts);
+        await controller.DeleteExportTemplate(fileId, ExportDocumentTypes.Contracts, ConfirmationFlow.Confirmed);
 
         Assert.Equal(fileId, apiClient.LastDeletedFileId);
         Assert.Equal("Template deleted successfully.", controller.TempData.GetNotification()!.Message);
@@ -216,7 +235,7 @@ public class ContractControllerExportsTests
         var apiClient = new FakeExportTemplateApiClient { DeleteResult = false };
         var controller = CreateController(apiClient);
 
-        await controller.DeleteExportTemplate(Guid.NewGuid(), ExportDocumentTypes.Contracts);
+        await controller.DeleteExportTemplate(Guid.NewGuid(), ExportDocumentTypes.Contracts, ConfirmationFlow.Confirmed);
 
         Assert.Equal("File not found", controller.TempData.GetNotification()!.Message);
     }

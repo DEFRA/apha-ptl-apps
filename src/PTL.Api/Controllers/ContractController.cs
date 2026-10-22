@@ -240,26 +240,49 @@ public sealed class ContractController(
     }
 
     // POST /api/contracts/pending-orders/{pendingContractId}/approve - creates the contract and its
-    // participant schemes, then soft-deletes the pending order.
+    // participant schemes, soft-deletes the pending order and queues the approval emails.
     [HttpPost("contracts/pending-orders/{pendingContractId:guid}/approve")]
     public async Task<IActionResult> ApprovePendingOrder(Guid pendingContractId, [FromBody] PendingOrderApproveRequest? request, CancellationToken cancellationToken)
     {
-        // Authentication is out of scope, so there is no signed-in user to record yet; legacy
-        // GetCurrentUser() falls back to "Guest" for the same reason.
-        var approvedBy = User?.Identity?.Name is { Length: > 0 } name ? name.ToLowerInvariant() : "Guest";
-
-        var approved = await pendingOrderService.ApprovePendingOrderAsync(
-            pendingContractId, request?.PurchaseOrderNumber ?? string.Empty, approvedBy, cancellationToken);
-        return approved ? NoContent() : NotFound();
+        try
+        {
+            var approved = await pendingOrderService.ApprovePendingOrderAsync(
+                pendingContractId, request?.PurchaseOrderNumber ?? string.Empty, request?.Comments ?? string.Empty, cancellationToken);
+            return approved ? NoContent() : NotFound();
+        }
+        catch (PendingOrderValidationException ex)
+        {
+            return ToPendingOrderValidationProblem(ex);
+        }
     }
 
     // POST /api/contracts/pending-orders/{pendingContractId}/decline - discards the pending order
-    // without creating a contract.
+    // without creating a contract and queues the decline emails.
     [HttpPost("contracts/pending-orders/{pendingContractId:guid}/decline")]
-    public async Task<IActionResult> DeclinePendingOrder(Guid pendingContractId, CancellationToken cancellationToken)
+    public async Task<IActionResult> DeclinePendingOrder(Guid pendingContractId, [FromBody] PendingOrderDeclineRequest? request, CancellationToken cancellationToken)
     {
-        var declined = await pendingOrderService.DeclinePendingOrderAsync(pendingContractId, cancellationToken);
-        return declined ? NoContent() : NotFound();
+        try
+        {
+            var declined = await pendingOrderService.DeclinePendingOrderAsync(pendingContractId, request?.Comments ?? string.Empty, cancellationToken);
+            return declined ? NoContent() : NotFound();
+        }
+        catch (PendingOrderValidationException ex)
+        {
+            return ToPendingOrderValidationProblem(ex);
+        }
+    }
+
+    private ActionResult ToPendingOrderValidationProblem(PendingOrderValidationException exception)
+    {
+        foreach (var (field, messages) in exception.Errors)
+        {
+            foreach (var message in messages)
+            {
+                ModelState.AddModelError(field, message);
+            }
+        }
+
+        return ValidationProblem(ModelState);
     }
 
     private static PendingOrderSummaryResponse ToPendingOrderSummaryResponse(PendingOrderSummaryEntity order) => new(
@@ -342,20 +365,20 @@ public sealed class ContractController(
 
     // Aggregated read-model over spgContractItems - see docs/migration/contract-migration.md.
     [HttpGet("contracts/{contractId:guid}/items")]
-    public async Task<ActionResult<ContractItemsResponse>> GetContractItems(Guid contractId, CancellationToken cancellationToken)
+    public async Task<ActionResult<ContractItemsResponse>> GetContractItems(Guid contractId, [FromQuery] Guid[]? pending, CancellationToken cancellationToken)
     {
-        var items = await contractService.GetContractItemsAsync(contractId, cancellationToken);
+        var items = await contractService.GetContractItemsAsync(contractId, pending, cancellationToken);
         return items is null ? NotFound() : Ok(ToItemsResponse(items));
     }
 
-    // Explicit REST mutation replacing legacy ContractItems.aspx's deferred "mark removed, save
-    // later" flow - see docs/migration/contract-migration.md.
+    // Legacy ContractItems.aspx BtnSave_Click: SetAudit(why, who) + Delete + Save per item. auditWhy is the
+    // reason the audit dialog captured; the acting user is taken from the forwarded identity.
     [HttpDelete("contracts/{contractId:guid}/items/{participantSchemeId:guid}")]
-    public async Task<IActionResult> RemoveContractItem(Guid contractId, Guid participantSchemeId, CancellationToken cancellationToken)
+    public async Task<IActionResult> RemoveContractItem(Guid contractId, Guid participantSchemeId, [FromQuery] string? auditWhy, CancellationToken cancellationToken)
     {
         try
         {
-            var removed = await contractService.RemoveContractItemAsync(contractId, participantSchemeId, cancellationToken);
+            var removed = await contractService.RemoveContractItemAsync(contractId, participantSchemeId, auditWhy, cancellationToken);
             return removed ? NoContent() : NotFound();
         }
         catch (ContractValidationException ex)
@@ -517,7 +540,9 @@ public sealed class ContractController(
         item.NumberOfDistributions,
         item.Price,
         item.NonFeePaying,
-        item.HasOverride);
+        item.HasOverride,
+        item.IsRemoved,
+        item.IsPendingRemoval);
 
     private static ContractResponse ToResponse(Contract contract) => new(
         contract.ContractId,

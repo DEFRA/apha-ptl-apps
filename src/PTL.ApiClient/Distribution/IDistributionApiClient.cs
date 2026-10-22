@@ -13,6 +13,9 @@ public partial interface IDistributionApiClient
     Task<MonthlyDistributionScheduleSaveResult?> SaveScheduleAsync(
         int yearId, int monthId, IReadOnlyList<MonthlyDistributionScheduleRowRequest> rows, CancellationToken cancellationToken = default);
 
+    // Legacy "Initialise this Month"; Initialised is false when the month already existed.
+    Task<InitialiseMonthResult?> InitialiseMonthAsync(int yearId, int monthId, CancellationToken cancellationToken = default);
+
     Task<SampleNumbersPageResult> GetSampleNumbersAsync(Guid monthlyDistributionSchemeId, CancellationToken cancellationToken = default);
 
     Task<SampleNumbersSaveResult?> SaveSampleNumbersAsync(

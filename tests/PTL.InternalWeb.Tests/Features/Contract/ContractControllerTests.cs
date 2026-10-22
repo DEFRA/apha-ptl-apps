@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using PTL.Contracts.Contract;
 using PTL.Core.Contract.Document;
 using PTL.Core.Contract.Export.Templates;
+using PTL.InternalWeb.Confirmation;
 using PTL.InternalWeb.Tests.TestSupport;
 using PTL.SharedUI.Notifications;
 
@@ -565,7 +566,7 @@ public class ContractControllerTests
         };
         var controller = CreateController(apiClient);
 
-        var result = await controller.ContractItems(contractId, CancellationToken.None);
+        var result = await controller.ContractItems(contractId, null, CancellationToken.None);
 
         var view = Assert.IsType<ViewResult>(result);
         var model = Assert.IsType<PTL.InternalWeb.Features.Contract.ContractItemsViewModel>(view.Model);
@@ -578,7 +579,7 @@ public class ContractControllerTests
     {
         var controller = CreateController(new FakeContractApiClient { ItemsResponse = null });
 
-        var result = await controller.ContractItems(Guid.NewGuid(), CancellationToken.None);
+        var result = await controller.ContractItems(Guid.NewGuid(), null, CancellationToken.None);
 
         Assert.IsType<NotFoundResult>(result);
     }
@@ -593,50 +594,190 @@ public class ContractControllerTests
             ContractResponse = null
         });
 
-        var result = await controller.ContractItems(contractId, CancellationToken.None);
+        var result = await controller.ContractItems(contractId, null, CancellationToken.None);
 
         Assert.IsType<NotFoundResult>(result);
     }
 
     [Fact]
-    public async Task RemoveContractItem_Success_SetsSuccessNotificationAndRedirects()
+    public void RemoveContractItem_NotConfirmed_ShowsTheConfirmationPageAndMarksNothing()
     {
         var contractId = Guid.NewGuid();
-        var controller = CreateController(new FakeContractApiClient { RemovalResult = new ContractItemRemovalResult(true, false, null) });
-        controller.TempData = CreateTempData();
+        var apiClient = new FakeContractApiClient();
+        var controller = CreateController(apiClient);
+        controller.Url = new FakeUrlHelper();
 
-        var result = await controller.RemoveContractItem(contractId, Guid.NewGuid(), CancellationToken.None);
+        var result = controller.RemoveContractItem(contractId, Guid.NewGuid(), null, null);
+
+        var view = Assert.IsType<ViewResult>(result);
+        Assert.Equal(ConfirmationFlow.ViewName, view.ViewName);
+        var model = Assert.IsType<ConfirmationPageViewModel>(view.Model);
+        Assert.Equal("Are you sure you want to remove this Contract Item?", model.Message);
+        Assert.EndsWith("/ContractItems", model.CancelUrl, StringComparison.Ordinal);
+        Assert.Empty(apiClient.Removals);
+    }
+
+    [Fact]
+    public void RemoveContractItem_Confirmed_MarksTheItemPendingWithoutDeletingIt()
+    {
+        var contractId = Guid.NewGuid();
+        var first = Guid.NewGuid();
+        var second = Guid.NewGuid();
+        var apiClient = new FakeContractApiClient();
+        var controller = CreateController(apiClient);
+
+        var result = controller.RemoveContractItem(contractId, second, [first], ConfirmationFlow.Confirmed);
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
         Assert.Equal("ContractItems", redirect.ActionName);
         Assert.Equal(contractId, redirect.RouteValues!["id"]);
-        var notification = controller.TempData.GetNotification();
-        Assert.Equal(NotificationType.Success, notification!.Type);
-        Assert.Equal("Contract item removed successfully.", notification.Message);
+        Assert.Equal(new[] { first, second }, Assert.IsType<Guid[]>(redirect.RouteValues["pending"]));
+        Assert.Empty(apiClient.Removals);
     }
 
     [Fact]
-    public async Task RemoveContractItem_Failure_SetsErrorNotificationAndRedirects()
+    public void RemoveContractItem_Cancelled_KeepsTheExistingPendingList()
+    {
+        var first = Guid.NewGuid();
+        var controller = CreateController(new FakeContractApiClient());
+
+        var result = controller.RemoveContractItem(Guid.NewGuid(), Guid.NewGuid(), [first], ConfirmationFlow.Cancelled);
+
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal(new[] { first }, Assert.IsType<Guid[]>(redirect.RouteValues!["pending"]));
+    }
+
+    [Fact]
+    public async Task ContractItems_PendingIds_AreForwardedToTheApi()
     {
         var contractId = Guid.NewGuid();
-        var controller = CreateController(new FakeContractApiClient { RemovalResult = new ContractItemRemovalResult(false, false, "Item is in use") });
+        var pending = Guid.NewGuid();
+        var apiClient = new FakeContractApiClient
+        {
+            ContractResponse = SampleContract(contractId, Guid.NewGuid()),
+            ItemsResponse = EmptyItems(contractId)
+        };
+        var controller = CreateController(apiClient);
+
+        var result = await controller.ContractItems(contractId, [pending], CancellationToken.None);
+
+        var model = Assert.IsType<PTL.InternalWeb.Features.Contract.ContractItemsViewModel>(Assert.IsType<ViewResult>(result).Model);
+        Assert.Equal([pending], model.PendingRemovalIds);
+        Assert.Equal([pending], apiClient.LastPendingRemovalIds);
+    }
+
+    [Fact]
+    public async Task AuditContractItemRemovals_Get_WithNothingPending_RedirectsToTheGrid()
+    {
+        var controller = CreateController(new FakeContractApiClient());
+
+        var result = await controller.AuditContractItemRemovals(Guid.NewGuid(), null, CancellationToken.None);
+
+        Assert.Equal("ContractItems", Assert.IsType<RedirectToActionResult>(result).ActionName);
+    }
+
+    [Fact]
+    public async Task AuditContractItemRemovals_Get_ShowsTheAuditPage()
+    {
+        var contractId = Guid.NewGuid();
+        var pending = Guid.NewGuid();
+        var controller = CreateController(new FakeContractApiClient { ContractResponse = SampleContract(contractId, Guid.NewGuid()) });
+
+        var result = await controller.AuditContractItemRemovals(contractId, [pending], CancellationToken.None);
+
+        var model = Assert.IsType<PTL.InternalWeb.Features.Contract.ContractItemRemovalAuditViewModel>(Assert.IsType<ViewResult>(result).Model);
+        Assert.Equal(contractId, model.ContractId);
+        Assert.Equal([pending], model.Pending);
+    }
+
+    [Fact]
+    public async Task AuditContractItemRemovals_Get_UnknownContract_ReturnsNotFound()
+    {
+        var controller = CreateController(new FakeContractApiClient { ContractResponse = null });
+
+        var result = await controller.AuditContractItemRemovals(Guid.NewGuid(), [Guid.NewGuid()], CancellationToken.None);
+
+        Assert.IsType<NotFoundResult>(result);
+    }
+
+    [Fact]
+    public async Task AuditContractItemRemovals_Post_UnknownContract_ReturnsNotFound()
+    {
+        var controller = CreateController(new FakeContractApiClient { ContractResponse = null });
+
+        var result = await controller.AuditContractItemRemovals(new PTL.InternalWeb.Features.Contract.ContractItemRemovalAuditViewModel { Pending = [Guid.NewGuid()], AuditWhy = "why" }, CancellationToken.None);
+
+        Assert.IsType<NotFoundResult>(result);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("   ")]
+    public async Task AuditContractItemRemovals_Post_WithoutAReason_RedisplaysWithLegacyMessageAndRemovesNothing(string? why)
+    {
+        var contractId = Guid.NewGuid();
+        var apiClient = new FakeContractApiClient { ContractResponse = SampleContract(contractId, Guid.NewGuid()) };
+        var controller = CreateController(apiClient);
+
+        var result = await controller.AuditContractItemRemovals(new PTL.InternalWeb.Features.Contract.ContractItemRemovalAuditViewModel { ContractId = contractId, Pending = [Guid.NewGuid()], AuditWhy = why }, CancellationToken.None);
+
+        Assert.IsType<ViewResult>(result);
+        Assert.Equal("Please enter why you are making these changes before you continue", controller.ModelState["AuditWhy"]!.Errors[0].ErrorMessage);
+        Assert.Empty(apiClient.Removals);
+    }
+
+    [Fact]
+    public async Task AuditContractItemRemovals_Post_RemovesEveryPendingItemWithTheReason()
+    {
+        var contractId = Guid.NewGuid();
+        var customerId = Guid.NewGuid();
+        var first = Guid.NewGuid();
+        var second = Guid.NewGuid();
+        var apiClient = new FakeContractApiClient { ContractResponse = SampleContract(contractId, customerId) };
+        var controller = CreateController(apiClient);
         controller.TempData = CreateTempData();
 
-        var result = await controller.RemoveContractItem(contractId, Guid.NewGuid(), CancellationToken.None);
+        var result = await controller.AuditContractItemRemovals(new PTL.InternalWeb.Features.Contract.ContractItemRemovalAuditViewModel { ContractId = contractId, Pending = [first, second], AuditWhy = "Customer left" }, CancellationToken.None);
 
-        Assert.IsType<RedirectToActionResult>(result);
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal("Index", redirect.ActionName);
+        Assert.Equal(customerId, redirect.RouteValues!["customerId"]);
+        Assert.Equal([(first, "Customer left"), (second, "Customer left")], apiClient.Removals);
+        Assert.Equal(NotificationType.Success, controller.TempData.GetNotification()!.Type);
+    }
+
+    [Fact]
+    public async Task AuditContractItemRemovals_Post_Failure_SetsErrorNotificationAndReturnsToTheGrid()
+    {
+        var contractId = Guid.NewGuid();
+        var apiClient = new FakeContractApiClient
+        {
+            ContractResponse = SampleContract(contractId, Guid.NewGuid()),
+            RemovalResult = new ContractItemRemovalResult(false, false, "Item is in use")
+        };
+        var controller = CreateController(apiClient);
+        controller.TempData = CreateTempData();
+
+        var result = await controller.AuditContractItemRemovals(new PTL.InternalWeb.Features.Contract.ContractItemRemovalAuditViewModel { ContractId = contractId, Pending = [Guid.NewGuid()], AuditWhy = "why" }, CancellationToken.None);
+
+        Assert.Equal("ContractItems", Assert.IsType<RedirectToActionResult>(result).ActionName);
         var notification = controller.TempData.GetNotification();
         Assert.Equal(NotificationType.Error, notification!.Type);
         Assert.Equal("Item is in use", notification.Message);
     }
 
     [Fact]
-    public async Task RemoveContractItem_FailureWithoutMessage_UsesFallbackMessage()
+    public async Task AuditContractItemRemovals_Post_FailureWithoutMessage_UsesFallbackMessage()
     {
-        var controller = CreateController(new FakeContractApiClient { RemovalResult = new ContractItemRemovalResult(false, true, null) });
+        var contractId = Guid.NewGuid();
+        var controller = CreateController(new FakeContractApiClient
+        {
+            ContractResponse = SampleContract(contractId, Guid.NewGuid()),
+            RemovalResult = new ContractItemRemovalResult(false, true, null)
+        });
         controller.TempData = CreateTempData();
 
-        await controller.RemoveContractItem(Guid.NewGuid(), Guid.NewGuid(), CancellationToken.None);
+        await controller.AuditContractItemRemovals(new PTL.InternalWeb.Features.Contract.ContractItemRemovalAuditViewModel { ContractId = contractId, Pending = [Guid.NewGuid()], AuditWhy = "why" }, CancellationToken.None);
 
         Assert.Equal("The contract item could not be removed.", controller.TempData.GetNotification()!.Message);
     }

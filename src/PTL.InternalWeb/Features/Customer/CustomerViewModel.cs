@@ -8,7 +8,6 @@ using CoreCustomer = PTL.Core.Customer.Customer;
 namespace PTL.InternalWeb.Features.Customer;
 
 public sealed record CustomerListViewModel(
-    string? SearchTerm,
     CustomerStatusFilter SelectedStatus,
     int Page,
     int PageSize,
@@ -23,8 +22,12 @@ public sealed record CustomerDetailsViewModel(
     string CountryName,
     string InvoiceCountryName);
 
-// Review Pending Customer Updates list (legacy ReviewPendingCustomerUpdates.aspx).
-public sealed record PendingCustomerUpdateListViewModel(IReadOnlyList<PendingCustomerUpdateSummaryResponse> Updates);
+// Review Pending Customer Updates list (legacy ReviewPendingCustomerUpdates.aspx). Updates is the current page only.
+public sealed record PendingCustomerUpdateListViewModel(
+    IReadOnlyList<PendingCustomerUpdateSummaryResponse> Updates,
+    int Page,
+    int PageSize,
+    int TotalCount);
 
 // One aligned comparison row - the label appears once and both values sit on the same line,
 // replacing legacy's "editable pending value with the current value in green beside it".
@@ -162,9 +165,8 @@ public sealed class PendingCustomerUpdateFormViewModel
     [OptionalEmailAddress(ErrorMessage = "Enter a valid invoice email address")]
     public string? InvoiceEmail { get; set; }
 
-    // Legacy captures Comments purely to include in the approval/decline notification email
-    // (EmailUpdateNotifications). Email notification is not migrated - [NEEDS INVESTIGATION].
-    [StringLength(2000, ErrorMessage = "Comments must not exceed 2000 characters")]
+    // The reviewer's comments, sent as the notification email's "Additional Information" (legacy EmailUpdateNotifications).
+    [StringLength(2000, ErrorMessage = "The comments field allows maximum 2000 characters")]
     public string? Comments { get; set; }
 }
 

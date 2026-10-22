@@ -1,4 +1,5 @@
 using System.Globalization;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.Extensions.Logging;
@@ -6,13 +7,15 @@ using PTL.ApiClient;
 using PTL.Contracts.Contract;
 using PTL.Core.Contract.Document;
 using PTL.Core.Contract.Export.Templates;
+using PTL.InternalWeb.Authorization;
+using PTL.InternalWeb.Confirmation;
 using PTL.InternalWeb.Navigation;
 using PTL.SharedUI.Notifications;
 
 namespace PTL.InternalWeb.Features.Contract;
 
-// Authentication/authorization are out of scope for this phase - assume the current user is
-// already authenticated with full access to Contract functionality. Policies will be added later.
+// Legacy "Contracts Admin" folder - requires the Contracts Admin role (PtlPolicies.ContractsAdmin).
+[Authorize(Policy = PtlPolicies.ContractsAdmin)]
 public class ContractController(IContractApiClient contractApiClient, ICustomerApiClient customerApiClient, ILookupApiClient lookupApiClient, IImportPermitApiClient importPermitApiClient, ILogger<ContractController> logger, IContractExportApiClient contractExportApiClient, IContractRenewalApiClient contractRenewalApiClient, IExportTemplateApiClient exportTemplateApiClient, IBulkExportApiClient bulkExportApiClient, ITemplateMergeService templateMergeService) : Controller
 {
     // Legacy ExportBase.ShowError text, reused verbatim across upload/open/select/delete/export.
@@ -22,6 +25,9 @@ public class ContractController(IContractApiClient contractApiClient, ICustomerA
     private const string NoSelectedTemplate = "Template file not found";
 
     private const string MailMergeFailed = "There was a problem with the Mail Merge";
+
+    // Legacy ContractItems.js saveWithAudit alert text.
+    private const string AuditWhyRequiredMessage = "Please enter why you are making these changes before you continue";
 
     private static readonly Action<ILogger, string, int, Exception?> LogBulkExportedMessage =
         LoggerMessage.Define<string, int>(
@@ -127,6 +133,17 @@ public class ContractController(IContractApiClient contractApiClient, ICustomerA
         int pageSize = PTL.SharedUI.Pagination.PaginationModel.DefaultPageSize,
         CancellationToken cancellationToken = default)
     {
+        // Links back to this list (breadcrumb, Cancel, Back) carry only the customer, so with no
+        // criteria in the URL the user's last search is restored instead of the defaults.
+        if (ContractSearchState.HasCriteria(HttpContext))
+        {
+            ContractSearchState.Save(HttpContext, new ContractSearchViewModel(customerId, yearId, period, searchTerm, page, pageSize));
+        }
+        else if (ContractSearchState.TryRestore(HttpContext, customerId) is { } saved)
+        {
+            (yearId, period, searchTerm, page, pageSize) = (saved.YearId, saved.Period, saved.SearchTerm, saved.Page, saved.PageSize);
+        }
+
         var result = await contractApiClient.GetContractsForCustomerAsync(customerId, new ContractSearchRequest(yearId, period, searchTerm, page, pageSize), cancellationToken);
         LogDisplayedContractListMessage(logger, customerId, yearId, searchTerm, page, result.TotalCount, null);
 
@@ -143,11 +160,12 @@ public class ContractController(IContractApiClient contractApiClient, ICustomerA
 
     // Legacy ContractItems.aspx (priced scheme line items) - see docs/migration/contract-migration.md
     // "Feature Breakdown" Phase 1/3. A single unpaginated page per contract, matching legacy exactly -
-    // no search/filtering/paging (legacy has none).
+    // no search/filtering/paging (legacy has none). `pending` carries the items marked for removal (legacy
+    // kept them in ViewState until Save).
     [HttpGet]
-    public async Task<IActionResult> ContractItems(Guid id, CancellationToken cancellationToken = default)
+    public async Task<IActionResult> ContractItems(Guid id, Guid[]? pending = null, CancellationToken cancellationToken = default)
     {
-        var items = await contractApiClient.GetContractItemsAsync(id, cancellationToken);
+        var items = await contractApiClient.GetContractItemsAsync(id, pending, cancellationToken);
         if (items is null)
         {
             LogContractNotFoundMessage(logger, id, null);
@@ -161,32 +179,103 @@ public class ContractController(IContractApiClient contractApiClient, ICustomerA
             return NotFound();
         }
 
-        var model = new ContractItemsViewModel(items, contract.CustomerId);
+        var model = new ContractItemsViewModel(items, contract.CustomerId, pending ?? []);
         ViewData[BreadcrumbRouteValues.CustomerId] = contract.CustomerId;
         ViewData[BreadcrumbRouteValues.ContractId] = id;
         LogDisplayedContractItemsMessage(logger, id, items.Schemes.Count, null);
         return View(model);
     }
 
-    // Explicit REST mutation replacing legacy ContractItems.aspx's deferred "mark removed, save
-    // later" flow - removes immediately, then redisplays the Contract Items page.
+    // Legacy GridViewParticipants_RowCommand "Remove": asks first (the shared confirmation page replaces the
+    // confirm() box), then only marks the item as pending deletion - nothing is saved until the audit step.
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> RemoveContractItem(Guid id, Guid participantSchemeId, CancellationToken cancellationToken)
+    public IActionResult RemoveContractItem(Guid id, Guid participantSchemeId, Guid[]? pending, string? confirmation)
     {
-        var result = await contractApiClient.RemoveContractItemAsync(id, participantSchemeId, cancellationToken);
-        if (!result.Success)
+        var marked = (pending ?? []).Append(participantSchemeId).Distinct().ToArray();
+        if (ConfirmationFlow.IsCancelled(confirmation))
         {
-            LogRemoveContractItemFailedMessage(logger, id, participantSchemeId, result.ErrorMessage, null);
-            TempData.SetNotification(NotificationType.Error, result.ErrorMessage ?? "The contract item could not be removed.");
-        }
-        else
-        {
-            LogRemovedContractItemMessage(logger, id, participantSchemeId, null);
-            TempData.SetNotification(NotificationType.Success, "Contract item removed successfully.");
+            return RedirectToAction(nameof(ContractItems), new { id, pending });
         }
 
-        return RedirectToAction(nameof(ContractItems), new { id });
+        if (!ConfirmationFlow.IsConfirmed(confirmation))
+        {
+            ViewData[BreadcrumbRouteValues.ContractId] = id;
+            return this.ConfirmationPage(
+                new ConfirmationPageViewModel
+                {
+                    Title = "Remove Contract Item",
+                    Message = "Are you sure you want to remove this Contract Item?",
+                    ConfirmText = "Remove",
+                    IsDestructive = true,
+                    CancelUrl = Url.Action(nameof(ContractItems), new { id, pending }),
+                },
+                nameof(ContractItems));
+        }
+
+        return RedirectToAction(nameof(ContractItems), new { id, pending = marked });
+    }
+
+    // Legacy BtnAskAudit/askForAuditText dialog: the reasons for the pending removals are mandatory.
+    [HttpGet]
+    public async Task<IActionResult> AuditContractItemRemovals(Guid id, Guid[]? pending, CancellationToken cancellationToken)
+    {
+        if (pending is not { Length: > 0 })
+        {
+            return RedirectToAction(nameof(ContractItems), new { id });
+        }
+
+        var contract = await contractApiClient.GetContractAsync(id, cancellationToken);
+        if (contract is null)
+        {
+            return NotFound();
+        }
+
+        ViewData[BreadcrumbRouteValues.CustomerId] = contract.CustomerId;
+        ViewData[BreadcrumbRouteValues.ContractId] = id;
+        ViewData[BreadcrumbRouteValues.Action] = nameof(ContractItems);
+        return View(new ContractItemRemovalAuditViewModel { ContractId = id, Pending = pending });
+    }
+
+    // Legacy BtnSave_Click: SetAudit + Delete + Save for every pending item, then back to the contract list.
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> AuditContractItemRemovals(ContractItemRemovalAuditViewModel model, CancellationToken cancellationToken)
+    {
+        var contract = await contractApiClient.GetContractAsync(model.ContractId, cancellationToken);
+        if (contract is null)
+        {
+            return NotFound();
+        }
+
+        if (string.IsNullOrWhiteSpace(model.AuditWhy))
+        {
+            ModelState.AddModelError(nameof(model.AuditWhy), AuditWhyRequiredMessage);
+        }
+
+        if (!ModelState.IsValid)
+        {
+            ViewData[BreadcrumbRouteValues.CustomerId] = contract.CustomerId;
+            ViewData[BreadcrumbRouteValues.ContractId] = model.ContractId;
+            ViewData[BreadcrumbRouteValues.Action] = nameof(ContractItems);
+            return View(model);
+        }
+
+        foreach (var participantSchemeId in model.Pending)
+        {
+            var result = await contractApiClient.RemoveContractItemAsync(model.ContractId, participantSchemeId, model.AuditWhy, cancellationToken);
+            if (!result.Success)
+            {
+                LogRemoveContractItemFailedMessage(logger, model.ContractId, participantSchemeId, result.ErrorMessage, null);
+                TempData.SetNotification(NotificationType.Error, result.ErrorMessage ?? "The contract item could not be removed.");
+                return RedirectToAction(nameof(ContractItems), new { id = model.ContractId });
+            }
+
+            LogRemovedContractItemMessage(logger, model.ContractId, participantSchemeId, null);
+        }
+
+        TempData.SetNotification(NotificationType.Success, "Contract items removed successfully.");
+        return RedirectToAction(nameof(Index), new { customerId = contract.CustomerId });
     }
 
     // Replaces legacy ContractList.aspx's MailMergeContract/MailMergeSampleAddressLetter/
@@ -338,8 +427,22 @@ public class ContractController(IContractApiClient contractApiClient, ICustomerA
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> DeleteExportTemplate(Guid fileId, string documentType, CancellationToken cancellationToken = default)
+    public async Task<IActionResult> DeleteExportTemplate(Guid fileId, string documentType, string? confirmation, CancellationToken cancellationToken = default)
     {
+        if (!ConfirmationFlow.IsConfirmed(confirmation))
+        {
+            return this.ConfirmationPage(
+                new ConfirmationPageViewModel
+                {
+                    Title = "Delete Template",
+                    Message = ExportTemplatesViewModel.DeleteConfirmation,
+                    ConfirmText = "Delete",
+                    IsDestructive = true,
+                    CancelUrl = Url.Action(ExportActionFor(documentType)),
+                },
+                ExportActionFor(documentType));
+        }
+
         var deleted = await exportTemplateApiClient.DeleteTemplateAsync(fileId, cancellationToken);
 
         TempData.SetNotification(
@@ -472,7 +575,7 @@ public class ContractController(IContractApiClient contractApiClient, ICustomerA
             return new ContractDocumentContext(canonicalType, templateName, contract, null, null, [], [], [], renewal);
         }
 
-        var items = await contractApiClient.GetContractItemsAsync(contract.ContractId, cancellationToken);
+        var items = await contractApiClient.GetContractItemsAsync(contract.ContractId, cancellationToken: cancellationToken);
         var customer = await customerApiClient.GetCustomerAsync(contract.CustomerId, cancellationToken);
         var countries = await lookupApiClient.GetCountriesAsync(cancellationToken);
         var vatRatings = await lookupApiClient.GetVatRatingsAsync(cancellationToken);
@@ -495,59 +598,174 @@ public class ContractController(IContractApiClient contractApiClient, ICustomerA
     // button per row; clicking it switches that row into edit mode (Update/Cancel). Only the
     // "Import Permit Received"/"Import Permit Expiry" cells have an EditItemTemplate - "Import
     // Permit Required" has none, so it stays the same read-only, disabled checkbox in both view and
-    // edit mode (it is never itself editable - see ImportPermitViewModel.cs). editParticipantSchemeId
-    // carries which single row is in edit mode across the GET, replacing WebForms' GridView.EditIndex
-    // ViewState.
+    // edit mode (it is never itself editable - see ImportPermitViewModel.cs).
     [HttpGet]
-    public async Task<IActionResult> ImportPermits(Guid id, Guid? editParticipantSchemeId, CancellationToken cancellationToken)
+    public async Task<IActionResult> ImportPermits(Guid id, CancellationToken cancellationToken)
     {
         var permits = await importPermitApiClient.GetImportPermitsAsync(id, cancellationToken);
         LogDisplayedImportPermitsMessage(logger, id, permits.Count, null);
-        var model = ToImportPermitsViewModel(id, permits);
-        model.EditParticipantSchemeId = editParticipantSchemeId;
-        ViewData[BreadcrumbRouteValues.ContractId] = id;
-        return View(model);
+        await PublishImportPermitsBreadcrumbAsync(id, cancellationToken);
+        return ImportPermitsView(ToImportPermitsViewModel(id, permits));
     }
 
-    // Matches legacy GridViewImportPermits_RowUpdating - commits the single edited row and returns
-    // to view mode (EditIndex = -1). Received/Expiry are posted as individual values (not the whole
-    // list) since only one row is ever editable at a time.
+    // Legacy ImportPermit.aspx workflow, driven by the page's submit buttons (command):
+    //   edit       - GridViewImportPermits_RowEditing: puts one row into edit mode.
+    //   update     - GridViewImportPermits_RowUpdating: applies the edited row to the pending (in-memory)
+    //                list only and leaves edit mode. Nothing is written to the database and no
+    //                notification is shown.
+    //   cancelEdit - RowCancelingEdit: discards the row's edit, keeping other rows' pending changes.
+    //   apply/save - btnApply/btnSave: write every row to the database; save then leaves the page.
+    //   cancel     - btnCancel: leaves the page, discarding all pending changes.
+    // Legacy held the pending list in ViewState; here it is round-tripped via the form (pending).
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> UpdateImportPermit(Guid id, Guid participantSchemeId, bool importPermitReceived, string? importPermitExpiry, CancellationToken cancellationToken)
+    public async Task<IActionResult> ImportPermits(Guid id, List<ImportPermitPendingRow>? pending, string? command, Guid? rowId, bool? editReceived, string? editExpiry, CancellationToken cancellationToken)
     {
-        var expiry = ParseExpiry(importPermitExpiry);
-        if (importPermitReceived && expiry is null)
+        if (string.Equals(command, ImportPermitCommands.Cancel, StringComparison.OrdinalIgnoreCase))
         {
-            ModelState.AddModelError(
-                nameof(importPermitExpiry),
-                string.IsNullOrWhiteSpace(importPermitExpiry) ? "Expiry date required" : "Invalid date. Please enter a valid date in dd/mm/yyyy format.");
-
-            var permits = await importPermitApiClient.GetImportPermitsAsync(id, cancellationToken);
-            var model = ToImportPermitsViewModel(id, permits);
-            model.EditParticipantSchemeId = participantSchemeId;
-
-            // Redisplay the row still in edit mode with what the user actually typed, not the
-            // last-saved value, matching legacy redisplaying the postback's own EditItemTemplate values.
-            var row = model.Permits.FirstOrDefault(p => p.ParticipantSchemeId == participantSchemeId);
-            if (row is not null)
-            {
-                row.ImportPermitReceived = importPermitReceived;
-                row.ImportPermitExpiry = importPermitExpiry;
-            }
-
-            return View(nameof(ImportPermits), model);
+            return await RedirectToContractListAsync(id, cancellationToken);
         }
 
-        await importPermitApiClient.UpdateImportPermitAsync(participantSchemeId, new UpdateImportPermitRequest(importPermitReceived, expiry), cancellationToken);
-        TempData.SetNotification(NotificationType.Success, "Import permit updated successfully.");
-        return RedirectToAction(nameof(ImportPermits), new { id });
+        var model = await BuildPendingImportPermitsModelAsync(id, pending ?? [], cancellationToken);
+        await PublishImportPermitsBreadcrumbAsync(id, cancellationToken);
+
+        if (string.Equals(command, ImportPermitCommands.Edit, StringComparison.OrdinalIgnoreCase))
+        {
+            model.EditParticipantSchemeId = rowId;
+            return ImportPermitsView(model);
+        }
+
+        if (string.Equals(command, ImportPermitCommands.Update, StringComparison.OrdinalIgnoreCase))
+        {
+            return ApplyImportPermitRowEdit(model, rowId, editReceived, editExpiry);
+        }
+
+        if (string.Equals(command, ImportPermitCommands.Apply, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(command, ImportPermitCommands.Save, StringComparison.OrdinalIgnoreCase))
+        {
+            var saved = await SaveImportPermitsAsync(model, cancellationToken);
+            if (saved && string.Equals(command, ImportPermitCommands.Save, StringComparison.OrdinalIgnoreCase))
+            {
+                return await RedirectToContractListAsync(id, cancellationToken);
+            }
+
+            return ImportPermitsView(model);
+        }
+
+        // cancelEdit (or no command): redisplay the pending list with no row in edit mode.
+        return ImportPermitsView(model);
+    }
+
+    private ViewResult ImportPermitsView(ImportPermitsViewModel model)
+    {
+        ViewData[BreadcrumbRouteValues.ContractId] = model.ContractId;
+        return View(nameof(ImportPermits), model);
+    }
+
+    // The Contracts crumb links to the customer's contract list, so it needs the customer id.
+    private async Task PublishImportPermitsBreadcrumbAsync(Guid contractId, CancellationToken cancellationToken)
+    {
+        var contract = await contractApiClient.GetContractAsync(contractId, cancellationToken);
+        if (contract is not null)
+        {
+            ViewData[BreadcrumbRouteValues.CustomerId] = contract.CustomerId;
+        }
+    }
+
+    // Legacy returns to ContractList.aspx from Save and Cancel/Back.
+    private async Task<IActionResult> RedirectToContractListAsync(Guid contractId, CancellationToken cancellationToken)
+    {
+        var contract = await contractApiClient.GetContractAsync(contractId, cancellationToken);
+        return contract is null
+            ? RedirectToAction(nameof(ManageContracts))
+            : RedirectToAction(nameof(Index), new { customerId = contract.CustomerId });
+    }
+
+    // Reloads the read-only columns (and Required) from the database, then overlays each row's
+    // pending Received/Expiry posted by the form.
+    private async Task<ImportPermitsViewModel> BuildPendingImportPermitsModelAsync(Guid contractId, IReadOnlyList<ImportPermitPendingRow> pending, CancellationToken cancellationToken)
+    {
+        var permits = await importPermitApiClient.GetImportPermitsAsync(contractId, cancellationToken);
+        var model = ToImportPermitsViewModel(contractId, permits);
+        foreach (var row in model.Permits)
+        {
+            var pendingRow = pending.LastOrDefault(p => p.ParticipantSchemeId == row.ParticipantSchemeId);
+            if (pendingRow is null)
+            {
+                continue;
+            }
+
+            row.ImportPermitReceived = pendingRow.ImportPermitReceived ?? row.ImportPermitReceived;
+            row.ImportPermitExpiry = string.IsNullOrWhiteSpace(pendingRow.ImportPermitExpiry) ? null : pendingRow.ImportPermitExpiry.Trim();
+        }
+
+        return model;
+    }
+
+    // Matches legacy GridViewImportPermits_RowUpdating: the expiry is only kept while the permit is
+    // required AND received (otherwise it is cleared), and is required/validated only in that case.
+    // Only the in-memory model changes - no database write, no notification.
+    private ViewResult ApplyImportPermitRowEdit(ImportPermitsViewModel model, Guid? rowId, bool? editReceived, string? editExpiry)
+    {
+        var row = model.Permits.FirstOrDefault(p => p.ParticipantSchemeId == rowId);
+        if (row is null)
+        {
+            return ImportPermitsView(model);
+        }
+
+        // A disabled Received dropdown (permit not required) is not posted - keep the pending value.
+        var received = editReceived ?? row.ImportPermitReceived;
+        var expiryKept = row.ImportPermitRequired && received;
+        var expiry = expiryKept ? ParseExpiry(editExpiry) : null;
+
+        if (expiryKept && expiry is null)
+        {
+            ModelState.AddModelError(
+                ImportPermitExpiryField,
+                string.IsNullOrWhiteSpace(editExpiry) ? "Expiry date required" : "Invalid date. Please enter a valid date in dd/mm/yyyy format.");
+
+            // Redisplay the row still in edit mode with what the user actually typed.
+            model.EditParticipantSchemeId = row.ParticipantSchemeId;
+            model.EditReceived = received;
+            model.EditExpiry = editExpiry;
+            return ImportPermitsView(model);
+        }
+
+        row.ImportPermitReceived = received;
+        row.ImportPermitExpiry = expiry?.ToString(ExpiryFormat, CultureInfo.InvariantCulture);
+        return ImportPermitsView(model);
+    }
+
+    // Matches legacy btnApply/btnSave: writes every row (not just the changed ones) to the database.
+    // Returns false (with an error banner) if any write is rejected.
+    private async Task<bool> SaveImportPermitsAsync(ImportPermitsViewModel model, CancellationToken cancellationToken)
+    {
+        foreach (var row in model.Permits)
+        {
+            var updated = await importPermitApiClient.UpdateImportPermitAsync(
+                row.ParticipantSchemeId,
+                new UpdateImportPermitRequest(row.ImportPermitReceived, ParseExpiry(row.ImportPermitExpiry)),
+                cancellationToken);
+            if (!updated)
+            {
+                TempData.SetNotification(NotificationType.Error, "The import permits could not be saved.");
+                return false;
+            }
+        }
+
+        TempData.SetNotification(NotificationType.Success, "Import Permit(s) saved successfully.");
+        return true;
     }
 
     // Matches legacy validatePermitExpiry()/cvPermitExpiry_ServerValidate's exact dd/MM/yyyy format.
+    private const string ExpiryFormat = "dd/MM/yyyy";
+
+    // ModelState key / input id of the edited row's expiry field.
+    private const string ImportPermitExpiryField = "importPermitExpiry";
+
     private static DateTime? ParseExpiry(string? text) =>
         !string.IsNullOrWhiteSpace(text) &&
-        DateTime.TryParseExact(text.Trim(), "dd/MM/yyyy", CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsed)
+        DateTime.TryParseExact(text.Trim(), ExpiryFormat, CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsed)
             ? parsed
             : null;
 
@@ -600,6 +818,9 @@ public class ContractController(IContractApiClient contractApiClient, ICustomerA
         }
 
         TempData.SetNotification(NotificationType.Success, "Contract renewed successfully.");
+
+        // The renewed contracts are for the next year, so a saved Historical filter would hide them.
+        ContractSearchState.Clear(HttpContext);
         return RedirectToAction(nameof(Index), new { customerId });
     }
 
@@ -785,10 +1006,15 @@ public class ContractController(IContractApiClient contractApiClient, ICustomerA
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> ApprovePendingOrder(Guid pendingContractId, string? purchaseOrderNumber, CancellationToken cancellationToken)
+    public async Task<IActionResult> ApprovePendingOrder(Guid pendingContractId, PendingOrderDecisionForm form, CancellationToken cancellationToken)
     {
+        if (!ModelState.IsValid)
+        {
+            return await RedisplayPendingOrderAsync(pendingContractId, form, cancellationToken);
+        }
+
         var result = await contractApiClient.ApprovePendingOrderAsync(
-            pendingContractId, new PendingOrderApproveRequest(purchaseOrderNumber ?? string.Empty), cancellationToken);
+            pendingContractId, new PendingOrderApproveRequest(form.PurchaseOrderNumber ?? string.Empty, form.Comments), cancellationToken);
 
         if (result.NotFound)
         {
@@ -797,9 +1023,8 @@ public class ContractController(IContractApiClient contractApiClient, ICustomerA
 
         if (!result.Success)
         {
-            var messages = string.Join(" ", result.FieldErrors.SelectMany(e => e.Value));
-            TempData.SetNotification(NotificationType.Error, $"Order could not be approved. {messages}");
-            return RedirectToAction(nameof(PendingOrderDetails), new { pendingContractId });
+            AddErrors(result.FieldErrors);
+            return await RedisplayPendingOrderAsync(pendingContractId, form, cancellationToken);
         }
 
         TempData.SetNotification(NotificationType.Success, "Order approved successfully.");
@@ -808,16 +1033,36 @@ public class ContractController(IContractApiClient contractApiClient, ICustomerA
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> DeclinePendingOrder(Guid pendingContractId, CancellationToken cancellationToken)
+    public async Task<IActionResult> DeclinePendingOrder(Guid pendingContractId, PendingOrderDecisionForm form, CancellationToken cancellationToken)
     {
-        var declined = await contractApiClient.DeclinePendingOrderAsync(pendingContractId, cancellationToken);
-        if (!declined)
+        // Decline never reads the purchase order number, so its length is not a reason to refuse it.
+        ModelState.Remove(nameof(PendingOrderDecisionForm.PurchaseOrderNumber));
+        if (!ModelState.IsValid)
+        {
+            return await RedisplayPendingOrderAsync(pendingContractId, form, cancellationToken);
+        }
+
+        var result = await contractApiClient.DeclinePendingOrderAsync(pendingContractId, new PendingOrderDeclineRequest(form.Comments), cancellationToken);
+        if (result.NotFound)
         {
             return NotFound();
         }
 
+        if (!result.Success)
+        {
+            AddErrors(result.FieldErrors);
+            return await RedisplayPendingOrderAsync(pendingContractId, form, cancellationToken);
+        }
+
         TempData.SetNotification(NotificationType.Success, "Order declined successfully.");
         return RedirectToAction(nameof(ReviewPendingOrders));
+    }
+
+    // The error summary and the typed values need the order's schemes again, so the page is rebuilt, not redirected to.
+    private async Task<IActionResult> RedisplayPendingOrderAsync(Guid pendingContractId, PendingOrderDecisionForm form, CancellationToken cancellationToken)
+    {
+        var order = await contractApiClient.GetPendingOrderAsync(pendingContractId, cancellationToken);
+        return order is null ? NotFound() : View(nameof(PendingOrderDetails), new PendingOrderDetailsViewModel(order, form));
     }
 
     private void AddErrors(IReadOnlyDictionary<string, string[]> fieldErrors) => this.AddFieldErrors(fieldErrors);

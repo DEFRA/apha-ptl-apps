@@ -1,0 +1,75 @@
+@model PTL.InternalWeb.Confirmation.ConfirmationPageViewModel
+@using PTL.InternalWeb.Confirmation
+@{
+    ViewData["Title"] = Model.PageTitle ?? Model.Title;
+}
+
+@if (!string.IsNullOrEmpty(Model.Caption))
+{
+    <span class="govuk-caption-l">@Model.Caption</span>
+}
+
+@if (Model.IsWarningTitle)
+{
+    <div class="govuk-warning-text">
+        <span class="govuk-warning-text__icon" aria-hidden="true">!</span>
+        <h1 class="govuk-heading-l govuk-warning-text__text govuk-!-margin-bottom-0">
+            <span class="govuk-visually-hidden">Warning</span>
+            @Model.Title
+        </h1>
+    </div>
+}
+else
+{
+    <h1 class="govuk-heading-l">@Model.Title</h1>
+}
+
+@if (!string.IsNullOrEmpty(Model.Message))
+{
+    <p class="govuk-body">@Model.Message</p>
+}
+
+@if (!string.IsNullOrEmpty(Model.WarningText))
+{
+    <div class="govuk-warning-text">
+        <span class="govuk-warning-text__icon" aria-hidden="true">!</span>
+        <strong class="govuk-warning-text__text">
+            <span class="govuk-visually-hidden">Warning</span>
+            @Model.WarningText
+        </strong>
+    </div>
+}
+
+<form method="post" action="@Model.PostUrl" novalidate>
+    @Html.AntiForgeryToken()
+    @foreach (var field in Model.Fields)
+    {
+        <input type="hidden" name="@field.Key" value="@field.Value" />
+    }
+    <input type="hidden" name="@ConfirmationFlow.FieldName" value="@ConfirmationFlow.Confirmed" />
+
+    <div class="govuk-button-group">
+        <button type="submit" class="govuk-button@(Model.IsDestructive ? " govuk-button--warning" : null)" data-module="govuk-button">@Model.ConfirmText</button>
+        @if (Model.CancelUrl is not null)
+        {
+            <a class="govuk-link" href="@Model.CancelUrl">@Model.CancelText</a>
+        }
+        else
+        {
+            @* Belongs to the form below so the original form's unsaved state goes back with it. *@
+            <button type="submit" form="confirmation-cancel" class="govuk-button govuk-button--secondary" data-module="govuk-button">@Model.CancelText</button>
+        }
+    </div>
+</form>
+
+@if (Model.CancelUrl is null)
+{
+    <form id="confirmation-cancel" method="post" action="@Model.PostUrl" novalidate>
+        @Html.AntiForgeryToken()
+        @foreach (var field in Model.Fields)
+        {
+            <input type="hidden" name="@field.Key" value="@field.Value" />
+        }
+        <input type="hidden" name="@ConfirmationFlow.FieldName" value="@ConfirmationFlow.Cancelled" />
+    </form>
+}

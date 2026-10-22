@@ -15,8 +15,6 @@
 
 @if (Model.RequiresAuditReason)
 {
-    <a class="govuk-back-link" asp-action="SampleNumbers" asp-route-year="@Model.YearId" asp-route-monthId="@Model.MonthId" asp-route-schemeId="@Model.MonthlyDistributionSchemeId">Back</a>
-
     <h1 class="govuk-heading-l">Audit Trail</h1>
 
     <govuk-error-summary errors="@errors" />
@@ -67,8 +65,6 @@
 
     return;
 }
-
-<a class="govuk-back-link" asp-action="Schedule" asp-route-year="@Model.YearId" asp-route-monthId="@Model.MonthId">Back</a>
 
 <h1 class="govuk-heading-l">Sample Numbers</h1>
 

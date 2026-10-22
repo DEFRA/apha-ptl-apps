@@ -25,6 +25,30 @@ public class ParticipantSchemeApiClientTests
         false, false, false, false, false, false, false, false, false, false, false, false);
 
     [Fact]
+    public async Task GetParticipantSchemeContextAsync_Success_ReturnsTheMonthFlags()
+    {
+        const string json = """{"canEdit":[true,false,true,true,true,true,true,true,true,true,true,true],"initialisedMonthIds":[4,5]}""";
+        var client = CreateClient(HttpStatusCode.OK, json);
+
+        var result = await client.GetParticipantSchemeContextAsync(Guid.NewGuid(), Guid.NewGuid());
+
+        Assert.False(result.CanEdit[1]);
+        Assert.Equal([4, 5], result.InitialisedMonthIds);
+    }
+
+    [Fact]
+    public async Task GetParticipantSchemeContextAsync_EmptyBody_FallsBackToEverythingEditable()
+    {
+        var client = CreateClient(HttpStatusCode.OK, "null");
+
+        var result = await client.GetParticipantSchemeContextAsync(Guid.NewGuid(), Guid.NewGuid());
+
+        Assert.Equal(12, result.CanEdit.Count);
+        Assert.All(result.CanEdit, Assert.True);
+        Assert.Empty(result.InitialisedMonthIds);
+    }
+
+    [Fact]
     public async Task GetParticipantSchemeAsync_NotFound_ReturnsNull()
     {
         var client = CreateClient(HttpStatusCode.NotFound, null);

@@ -8,10 +8,10 @@ using PTL.InternalWeb.Features.Account;
 namespace PTL.InternalWeb.Tests.TestSupport;
 
 // Always-succeeds authentication handler for WebApplicationFactory-based integration tests -
-// stands in for a real Entra ID sign-in so tests can assert on SystemAdministrationController's
-// [Authorize(Policy = SystemAdministrationPolicy.Name)] gate without a live Entra tenant. Register
-// as the default scheme (see SystemAdministrationRouteSmokeTests) to simulate a signed-in Admin;
-// omit it from a factory's service overrides to simulate an anonymous request instead.
+// stands in for a real Entra ID sign-in so tests can reach the role-gated controllers without a live
+// Entra tenant. SignedInUserHostingStartup registers it as the default scheme for every host (the claims
+// go through the app's real PtlRoleClaimsTransformation and policies); a fixture that needs the real
+// cookie/OIDC pipeline opts out with PtlTests:UseRealAuth. Roles use the tblRoles names.
 public sealed class TestAuthHandler(IOptionsMonitor<TestAuthHandlerOptions> options, ILoggerFactory logger, UrlEncoder encoder)
     : AuthenticationHandler<TestAuthHandlerOptions>(options, logger, encoder)
 {
@@ -35,5 +35,8 @@ public sealed class TestAuthHandler(IOptionsMonitor<TestAuthHandlerOptions> opti
 public sealed class TestAuthHandlerOptions : AuthenticationSchemeOptions
 {
     public Guid UserId { get; set; } = Guid.NewGuid();
-    public string ResolvedRoles { get; set; } = "Admin";
+
+    // Every gating role except Override Schemes and Support, which individual tests add when they need them.
+    public string ResolvedRoles { get; set; } =
+        "Admin,Contracts Admin,Scheme Admin,Internal User,Scheduling,Distributions,Test Consultant,Assessor,Results Sign-off,Generate Invoices";
 }

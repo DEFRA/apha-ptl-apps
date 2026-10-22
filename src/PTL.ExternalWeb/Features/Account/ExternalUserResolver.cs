@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Microsoft.Extensions.Logging;
+using Polly;
 using PTL.ApiClient;
 using PTL.Auth.Cidm.Claims;
 using PTL.Auth.Cidm.Events;
@@ -46,10 +47,12 @@ public sealed partial class ExternalUserResolver(IExternalUserApiClient external
                 new ResolveExternalUserRequest(ssoIdExt, email, displayName, cidmRoles),
                 cancellationToken);
         }
-        catch (Exception exception) when (exception is HttpRequestException or TaskCanceledException or NotSupportedException)
+        catch (Exception exception) when (exception is HttpRequestException or TaskCanceledException or ExecutionRejectedException or NotSupportedException)
         {
             // HttpRequestException: network/DNS failure, connection refused, or EnsureSuccessStatusCode
-            // threw for a non-success response. TaskCanceledException: request timeout. NotSupportedException:
+            // threw for a non-success response. TaskCanceledException: request timeout. ExecutionRejectedException:
+            // the standard resilience handler's total timeout (TimeoutRejectedException) or open circuit
+            // breaker (BrokenCircuitException). NotSupportedException:
             // response wasn't valid JSON for the expected DTO. Without this, a PTL.Api connectivity
             // problem during sign-in produces zero diagnostic trace - it just lands on /Home/Error.
             LogExternalUserResolutionFailed(ssoIdExt, exception);

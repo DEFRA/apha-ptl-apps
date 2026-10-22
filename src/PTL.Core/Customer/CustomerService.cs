@@ -6,13 +6,21 @@ namespace PTL.Core.Customer;
 public sealed class CustomerService(
     ICustomerRepository customerRepository,
     IPendingCustomerUpdateRepository pendingCustomerUpdateRepository,
+    ICustomerUpdateNotifier customerUpdateNotifier,
     ILogger<CustomerService> logger) : ICustomerService
 {
-    private static readonly Action<ILogger, string?, CustomerStatusFilter, int, int, int, Exception?> LogCustomerSearchMessage =
-        LoggerMessage.Define<string?, CustomerStatusFilter, int, int, int>(
+    // spiUpdatedCustomerDetailsEmail takes @Email varchar(100); tblUpdatedCustomerDetailsEmail.fldCustomerName is varchar(50).
+    private const int EmailAddressMaxLength = 100;
+    private const int CustomerNameMaxLength = 50;
+
+    // PendingCustomerUpdateDetails.aspx's comments regex.
+    private const int CommentsMaxLength = 2000;
+
+    private static readonly Action<ILogger, CustomerStatusFilter, int, int, int, Exception?> LogCustomerSearchMessage =
+        LoggerMessage.Define<CustomerStatusFilter, int, int, int>(
             LogLevel.Information,
             new EventId(1, nameof(LogCustomerSearchMessage)),
-            "Customer search: searchTerm={SearchTerm} status={Status} page={Page} pageSize={PageSize} totalResults={TotalCount}");
+            "Customer list: status={Status} page={Page} pageSize={PageSize} totalResults={TotalCount}");
 
     private static readonly Action<ILogger, Guid, string, Exception?> LogCreatedCustomerMessage =
         LoggerMessage.Define<Guid, string>(
@@ -44,30 +52,17 @@ public sealed class CustomerService(
     public Task<IReadOnlyList<CustomerSummaryEntity>> GetCustomersAsync(CustomerStatusFilter status, CancellationToken cancellationToken = default) =>
         customerRepository.GetSummariesAsync(status, cancellationToken);
 
-    public async Task<CustomerSearchResult> SearchCustomersAsync(string? searchTerm, CustomerStatusFilter status, int page, int pageSize, CancellationToken cancellationToken = default)
+    public async Task<CustomerSearchResult> SearchCustomersAsync(CustomerStatusFilter status, int page, int pageSize, CancellationToken cancellationToken = default)
     {
         page = page < 1 ? 1 : page;
         pageSize = pageSize is < 1 or > 200 ? 20 : pageSize;
 
         var all = await customerRepository.GetSummariesAsync(status, cancellationToken);
 
-        // Field set matches legacy dbo.spgSearchCustomer (Search.aspx), except that a single term
-        // is ORed across the fields rather than ANDed across separate inputs.
-        var filtered = string.IsNullOrWhiteSpace(searchTerm)
-            ? all
-            : all.Where(c =>
-                c.Name.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
-                c.QalNumber.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
-                c.Organisation.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
-                c.ContactName.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
-                c.AccountNumber.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
-                c.Country.Contains(searchTerm, StringComparison.OrdinalIgnoreCase))
-                .ToList();
+        var totalCount = all.Count;
+        var page1 = all.Skip((page - 1) * pageSize).Take(pageSize).ToList();
 
-        var totalCount = filtered.Count;
-        var page1 = filtered.Skip((page - 1) * pageSize).Take(pageSize).ToList();
-
-        LogCustomerSearchMessage(logger, searchTerm, status, page, pageSize, totalCount, null);
+        LogCustomerSearchMessage(logger, status, page, pageSize, totalCount, null);
 
         return new CustomerSearchResult(page1, totalCount);
     }
@@ -152,8 +147,11 @@ public sealed class CustomerService(
     // Only approved changes update the live customer record - matches
     // PendingCustomerUpdateDetails.aspx's ButtonApprove_Click (mCustomer.Save() then
     // mPendingCustomerUpdate.Save() with IsDeleted=True), including its mcustomer.IsValid check.
-    public async Task<bool> ApprovePendingCustomerUpdateAsync(Guid customerId, PendingCustomerUpdate? editedFields = null, CancellationToken cancellationToken = default)
+    public async Task<bool> ApprovePendingCustomerUpdateAsync(Guid customerId, PendingCustomerUpdate? editedFields = null, string comments = "", CancellationToken cancellationToken = default)
     {
+        comments ??= string.Empty;
+        ValidateComments(comments);
+
         var existing = await customerRepository.GetByIdAsync(customerId, cancellationToken);
         var pending = await pendingCustomerUpdateRepository.GetByCustomerIdAsync(customerId, cancellationToken);
         if (existing is null || pending is null)
@@ -164,15 +162,61 @@ public sealed class CustomerService(
         ApplyPendingFields(existing, editedFields ?? pending);
         Validate(existing);
         await customerRepository.UpdateAsync(existing, cancellationToken);
-        return await pendingCustomerUpdateRepository.MarkDecidedAsync(customerId, pending.PendingCustomerUpdateId, cancellationToken);
+        var decided = await pendingCustomerUpdateRepository.MarkDecidedAsync(customerId, pending.PendingCustomerUpdateId, cancellationToken);
+        if (decided)
+        {
+            // Legacy read the customer back after saving it, so an approved email change is notified to the new address.
+            await NotifyAsync(existing, pending.PendingCustomerUpdateId, comments, isApproved: true, cancellationToken);
+        }
+
+        return decided;
     }
 
     // Declined changes do not update the live record - only the pending row is soft-deleted.
-    public async Task<bool> DeclinePendingCustomerUpdateAsync(Guid customerId, CancellationToken cancellationToken = default)
+    public async Task<bool> DeclinePendingCustomerUpdateAsync(Guid customerId, string comments = "", CancellationToken cancellationToken = default)
     {
+        comments ??= string.Empty;
+        ValidateComments(comments);
+
         var pending = await pendingCustomerUpdateRepository.GetByCustomerIdAsync(customerId, cancellationToken);
-        return pending is not null && await pendingCustomerUpdateRepository.MarkDecidedAsync(customerId, pending.PendingCustomerUpdateId, cancellationToken);
+        if (pending is null)
+        {
+            return false;
+        }
+
+        var decided = await pendingCustomerUpdateRepository.MarkDecidedAsync(customerId, pending.PendingCustomerUpdateId, cancellationToken);
+        if (decided && await customerRepository.GetByIdAsync(customerId, cancellationToken) is { } customer)
+        {
+            await NotifyAsync(customer, pending.PendingCustomerUpdateId, comments, isApproved: false, cancellationToken);
+        }
+
+        return decided;
     }
+
+    private static void ValidateComments(string comments)
+    {
+        if (comments.Length > CommentsMaxLength)
+        {
+            throw new CustomerValidationException([new CustomerValidationError("Comments", "The comments field allows maximum 2000 characters")]);
+        }
+    }
+
+    // Legacy EmailUpdateNotifications: one row for the customer's email, which is then sent at once (retried by the
+    // scheduler if that fails). A blank address is skipped rather than queued.
+    private async Task NotifyAsync(Customer customer, Guid pendingCustomerUpdateId, string comments, bool isApproved, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(customer.Email))
+        {
+            return;
+        }
+
+        await pendingCustomerUpdateRepository.QueueNotificationAsync(
+            new CustomerUpdateNotification(Truncate(customer.Email, EmailAddressMaxLength), pendingCustomerUpdateId, Truncate(customer.Name, CustomerNameMaxLength), comments, isApproved),
+            cancellationToken);
+        await customerUpdateNotifier.SendForUpdateAsync(pendingCustomerUpdateId, CancellationToken.None);
+    }
+
+    private static string Truncate(string value, int length) => value.Length > length ? value[..length] : value;
 
     private static void ApplyPendingFields(Customer customer, PendingCustomerUpdate pending)
     {

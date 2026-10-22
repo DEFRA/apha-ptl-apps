@@ -11,4 +11,6 @@ public sealed record ContractItemResponse(
     int NumberOfDistributions,
     decimal Price,
     bool NonFeePaying,
-    bool HasOverride);
+    bool HasOverride,
+    bool IsRemoved = false,
+    bool IsPendingRemoval = false);

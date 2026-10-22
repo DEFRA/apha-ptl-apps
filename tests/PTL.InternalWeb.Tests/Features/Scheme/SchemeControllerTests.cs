@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging.Abstractions;
 using PTL.Contracts.Lookup;
 using PTL.Contracts.Scheme;
+using PTL.InternalWeb.Confirmation;
 using PTL.InternalWeb.Tests.TestSupport;
 
 namespace PTL.InternalWeb.Tests.Features.Scheme;
@@ -235,6 +236,40 @@ public class SchemeControllerTests
         Assert.True(model.CanEditApr);
     }
 
+    // AC (stories 744589, 744593): "Given a test type/criterion item is marked No Longer in Use,
+    // When a new scheme/test is configured, Then the retired item is not offered for selection but
+    // remains visible on existing schemes." FakeLookupApiClient.GetSchemeItemTypesAsync returns the
+    // same list for every SchemeItemTypeKind, so this also confirms the filter is scoped to
+    // TestType/CriterionItemType only - a retired item of a different kind (here simulated via the
+    // same fake list) is not expected to be dropped from a kind the filter doesn't apply to yet.
+    [Fact]
+    public async Task Create_Get_ExcludesNoLongerInUseTestTypesAndCriterionItemsFromAddDropdownButKeepsOtherKindsUnfiltered()
+    {
+        var activeId = Guid.NewGuid();
+        var retiredId = Guid.NewGuid();
+        var lookup = new FakeLookupApiClient
+        {
+            SchemeItemTypes =
+            [
+                new PTL.Contracts.Lookup.SchemeItemTypeResponse(activeId, "Chemical", false),
+                new PTL.Contracts.Lookup.SchemeItemTypeResponse(retiredId, "Retired Test", true)
+            ]
+        };
+        var controller = CreateController(new FakeSchemeApiClient(), lookup);
+
+        var result = await controller.Create(cancellationToken: CancellationToken.None);
+
+        var model = Assert.IsType<PTL.InternalWeb.Features.Scheme.SchemeFormViewModel>(Assert.IsType<ViewResult>(result).Model);
+        Assert.Contains(model.TestTypeOptions, o => o.Value == activeId.ToString());
+        Assert.DoesNotContain(model.TestTypeOptions, o => o.Value == retiredId.ToString());
+        Assert.Contains(model.CriterionItemTypeOptions, o => o.Value == activeId.ToString());
+        Assert.DoesNotContain(model.CriterionItemTypeOptions, o => o.Value == retiredId.ToString());
+
+        // Category Item Type dropdown is unaffected by the TestType/CriterionItemType-only fix -
+        // see SchemeController.PopulateTestItemTypeOptionsAsync remarks.
+        Assert.Contains(model.CategoryItemTypeOptions, o => o.Value == retiredId.ToString());
+    }
+
     [Fact]
     public async Task CreateForCurrentYear_Get_DefaultsToCurrentYearAndRendersTheCreateView()
     {
@@ -291,6 +326,100 @@ public class SchemeControllerTests
 
         var view = Assert.IsType<ViewResult>(result);
         Assert.Same(model, view.Model);
+    }
+
+    [Fact]
+    public async Task Create_Post_ZeroPriceTypedAsPoundsAndPence_IsAccepted()
+    {
+        var apiClient = new FakeSchemeApiClient
+        {
+            SaveResult = new SchemeSaveResult(true, SampleScheme(Guid.NewGuid(), Guid.NewGuid()), new Dictionary<string, string[]>())
+        };
+        var controller = CreateController(apiClient);
+        controller.ModelState.SetModelValue("Prices[0].Price", "0.00", "0.00");
+        controller.ModelState.MarkFieldValid("Prices[0].Price");
+        var model = new PTL.InternalWeb.Features.Scheme.SchemeFormViewModel { YearId = 2027, Prices = [new() { CurrencyId = Guid.NewGuid(), Price = 0m }] };
+
+        var result = await controller.Create(model, cancellationToken: CancellationToken.None);
+
+        Assert.IsType<RedirectToActionResult>(result);
+        Assert.True(controller.ModelState.IsValid);
+    }
+
+    [Fact]
+    public async Task Create_Post_BareZeroPrice_IsRejectedLikeLegacy()
+    {
+        var controller = CreateController(new FakeSchemeApiClient());
+        controller.ModelState.SetModelValue("Prices[0].Price", "0", "0");
+        var model = new PTL.InternalWeb.Features.Scheme.SchemeFormViewModel { YearId = 2027, Prices = [new() { CurrencyId = Guid.NewGuid(), Price = 0m }] };
+
+        var result = await controller.Create(model, cancellationToken: CancellationToken.None);
+
+        Assert.IsType<ViewResult>(result);
+        Assert.Equal("Price must be positive", Assert.Single(controller.ModelState["Prices[0].Price"]!.Errors).ErrorMessage);
+    }
+
+    [Theory]
+    [InlineData("0.0")]
+    [InlineData("12.5")]
+    [InlineData("12.345")]
+    public async Task Create_Post_PriceNotWholeOrTwoDecimals_IsRejectedAsInvalidNumber(string typed)
+    {
+        var controller = CreateController(new FakeSchemeApiClient());
+        controller.ModelState.SetModelValue("Prices[0].Price", typed, typed);
+        var model = new PTL.InternalWeb.Features.Scheme.SchemeFormViewModel { YearId = 2027, Prices = [new() { CurrencyId = Guid.NewGuid(), Price = decimal.Parse(typed, System.Globalization.CultureInfo.InvariantCulture) }] };
+
+        var result = await controller.Create(model, cancellationToken: CancellationToken.None);
+
+        Assert.IsType<ViewResult>(result);
+        Assert.Equal("Invalid Number", Assert.Single(controller.ModelState["Prices[0].Price"]!.Errors).ErrorMessage);
+    }
+
+    [Theory]
+    [InlineData("0.00")]
+    [InlineData("12")]
+    [InlineData("12.50")]
+    [InlineData(".50")]
+    public async Task Create_Post_PriceWholeOrTwoDecimals_IsAccepted(string typed)
+    {
+        var apiClient = new FakeSchemeApiClient
+        {
+            SaveResult = new SchemeSaveResult(true, SampleScheme(Guid.NewGuid(), Guid.NewGuid()), new Dictionary<string, string[]>())
+        };
+        var controller = CreateController(apiClient);
+        controller.ModelState.SetModelValue("Prices[0].Price", typed, typed);
+        controller.ModelState.MarkFieldValid("Prices[0].Price");
+        var model = new PTL.InternalWeb.Features.Scheme.SchemeFormViewModel { YearId = 2027, Prices = [new() { CurrencyId = Guid.NewGuid(), Price = decimal.Parse(typed, System.Globalization.CultureInfo.InvariantCulture) }] };
+
+        var result = await controller.Create(model, cancellationToken: CancellationToken.None);
+
+        Assert.IsType<RedirectToActionResult>(result);
+    }
+
+    [Fact]
+    public async Task Edit_Post_BareZeroPrice_IsRejectedLikeLegacy()
+    {
+        var controller = CreateController(new FakeSchemeApiClient());
+        controller.ModelState.SetModelValue("Prices[0].Price", "0", "0");
+        var model = new PTL.InternalWeb.Features.Scheme.SchemeFormViewModel { YearId = 2027, Prices = [new() { CurrencyId = Guid.NewGuid(), Price = 0m }] };
+
+        var result = await controller.Edit(Guid.NewGuid(), model, cancellationToken: CancellationToken.None);
+
+        Assert.IsType<ViewResult>(result);
+        Assert.False(controller.ModelState.IsValid);
+    }
+
+    [Theory]
+    [InlineData(0, true)]
+    [InlineData(12.5, true)]
+    [InlineData(-1, false)]
+    public void Price_RangeAllowsZeroButNotNegatives(double value, bool valid)
+    {
+        var range = (System.ComponentModel.DataAnnotations.RangeAttribute)Attribute.GetCustomAttribute(
+            typeof(PTL.InternalWeb.Features.Scheme.SchemeCurrencyPriceViewModel).GetProperty(nameof(PTL.InternalWeb.Features.Scheme.SchemeCurrencyPriceViewModel.Price))!,
+            typeof(System.ComponentModel.DataAnnotations.RangeAttribute))!;
+
+        Assert.Equal(valid, range.IsValid((decimal)value));
     }
 
     [Fact]
@@ -505,11 +634,87 @@ public class SchemeControllerTests
         var model = new PTL.InternalWeb.Features.Scheme.SchemeFormViewModel { YearId = 2027 };
         model.Tests.Add(new PTL.InternalWeb.Features.Scheme.SchemeTestViewModel { TestTypeId = Guid.NewGuid(), TestType = "Serology" });
 
-        var result = await controller.Edit(Guid.NewGuid(), model, testCommand: "remove-test:0", cancellationToken: CancellationToken.None);
+        var result = await controller.Edit(Guid.NewGuid(), model, testCommand: "remove-test:0", confirmation: ConfirmationFlow.Confirmed, cancellationToken: CancellationToken.None);
 
         var view = Assert.IsType<ViewResult>(result);
         Assert.Same(model, view.Model);
         Assert.Empty(model.Tests);
+    }
+
+    [Theory]
+    [InlineData("remove-test:0", "Are you sure you want to remove this Test?")]
+    [InlineData("remove-category:0:0", "Are you sure you want to remove this Category?")]
+    public async Task Edit_Post_RemoveCommand_NotConfirmed_AsksFirstAndChangesNothing(string testCommand, string message)
+    {
+        var controller = CreateController(new FakeSchemeApiClient());
+        var model = new PTL.InternalWeb.Features.Scheme.SchemeFormViewModel { YearId = 2027 };
+        model.Tests.Add(new PTL.InternalWeb.Features.Scheme.SchemeTestViewModel { TestTypeId = Guid.NewGuid(), TestType = "Serology" });
+
+        var result = await controller.Edit(Guid.NewGuid(), model, testCommand: testCommand, cancellationToken: CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        Assert.Equal(ConfirmationFlow.ViewName, view.ViewName);
+        var page = Assert.IsType<ConfirmationPageViewModel>(view.Model);
+        Assert.Equal(message, page.Message);
+        Assert.Null(page.CancelUrl);
+        Assert.Single(model.Tests);
+    }
+
+    [Fact]
+    public async Task Edit_Post_RemoveCommand_Declined_RedisplaysTheFormWithoutRemoving()
+    {
+        var controller = CreateController(new FakeSchemeApiClient());
+        var model = new PTL.InternalWeb.Features.Scheme.SchemeFormViewModel { YearId = 2027 };
+        model.Tests.Add(new PTL.InternalWeb.Features.Scheme.SchemeTestViewModel { TestTypeId = Guid.NewGuid(), TestType = "Serology" });
+
+        var result = await controller.Edit(Guid.NewGuid(), model, testCommand: "remove-test:0", confirmation: ConfirmationFlow.Cancelled, cancellationToken: CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        Assert.Same(model, view.Model);
+        Assert.Single(model.Tests);
+    }
+
+    [Theory]
+    [InlineData("remove-test:0", "Are you sure you want to remove this Test?")]
+    [InlineData("remove-category:0:0", "Are you sure you want to remove this Category?")]
+    public async Task Create_Post_RemoveCommand_NotConfirmed_AsksFirstAndChangesNothing(string testCommand, string message)
+    {
+        var controller = CreateController(new FakeSchemeApiClient());
+        var model = new PTL.InternalWeb.Features.Scheme.SchemeFormViewModel { YearId = 2027 };
+        model.Tests.Add(new PTL.InternalWeb.Features.Scheme.SchemeTestViewModel { TestTypeId = Guid.NewGuid(), TestType = "Serology" });
+
+        var result = await controller.Create(model, testCommand: testCommand, cancellationToken: CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        Assert.Equal(ConfirmationFlow.ViewName, view.ViewName);
+        Assert.Equal(message, Assert.IsType<ConfirmationPageViewModel>(view.Model).Message);
+        Assert.Single(model.Tests);
+    }
+
+    [Fact]
+    public async Task Create_Post_RemoveCommand_Declined_RedisplaysTheFormWithoutRemoving()
+    {
+        var controller = CreateController(new FakeSchemeApiClient());
+        var model = new PTL.InternalWeb.Features.Scheme.SchemeFormViewModel { YearId = 2027 };
+        model.Tests.Add(new PTL.InternalWeb.Features.Scheme.SchemeTestViewModel { TestTypeId = Guid.NewGuid(), TestType = "Serology" });
+
+        var result = await controller.Create(model, testCommand: "remove-test:0", confirmation: ConfirmationFlow.Cancelled, cancellationToken: CancellationToken.None);
+
+        Assert.Same(model, Assert.IsType<ViewResult>(result).Model);
+        Assert.Single(model.Tests);
+    }
+
+    [Fact]
+    public async Task Edit_Post_NonRemoveCommand_DoesNotAsk()
+    {
+        var controller = CreateController(new FakeSchemeApiClient());
+        var model = new PTL.InternalWeb.Features.Scheme.SchemeFormViewModel { YearId = 2027 };
+        var testTypeId = Guid.NewGuid();
+
+        var result = await controller.Edit(Guid.NewGuid(), model, testCommand: "add-test", selectedItemTypeId: testTypeId, cancellationToken: CancellationToken.None);
+
+        Assert.Same(model, Assert.IsType<ViewResult>(result).Model);
+        Assert.Single(model.Tests);
     }
 
     [Fact]

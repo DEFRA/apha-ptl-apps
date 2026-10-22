@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using PTL.ApiClient;
+using PTL.Common.Auth;
 using PTL.ExternalWeb.Features.Account;
 
 namespace PTL.ExternalWeb.Features.Home;
@@ -14,7 +15,7 @@ public class HomeController(IApiClient apiClient, ISystemMessageApiClient system
     // doesn't belong in the shared base used by both front-ends.
     public override async Task<IActionResult> Index()
     {
-        var displayName = User.FindFirst(ExternalUserClaimTypes.DisplayName)?.Value ?? User.Identity?.Name ?? string.Empty;
+        var displayName = User.GetDisplayName(preferredClaimType: ExternalUserClaimTypes.DisplayName) ?? string.Empty;
         var importantMessage = await systemMessageApiClient.GetImportantMessageAsync(HttpContext.RequestAborted);
         return View(new HomeIndexViewModel(displayName, User.GetResolvedExternalRoles(), importantMessage.ImportantMessage));
     }

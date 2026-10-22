@@ -1,10 +1,11 @@
 using Microsoft.Extensions.Logging;
 using PTL.Contracts.Contract;
+using PTL.Core.Audit;
 using PTL.Core.Participant;
 
 namespace PTL.Core.Contract;
 
-public sealed class ContractService(IContractRepository contractRepository, IParticipantSchemeRepository participantSchemeRepository, ILogger<ContractService> logger) : IContractService
+public sealed class ContractService(IContractRepository contractRepository, IParticipantSchemeRepository participantSchemeRepository, IContractPostageService contractPostageService, IAuditActorResolver auditActor, ILogger<ContractService> logger) : IContractService
 {
     private static readonly Action<ILogger, Guid, Exception?> LogContractItemsNotFoundMessage =
         LoggerMessage.Define<Guid>(
@@ -160,18 +161,30 @@ public sealed class ContractService(IContractRepository contractRepository, IPar
         }
     }
 
-    public async Task<ContractItemsAggregate?> GetContractItemsAsync(Guid contractId, CancellationToken cancellationToken = default)
+    public async Task<ContractItemsAggregate?> GetContractItemsAsync(Guid contractId, IReadOnlyCollection<Guid>? pendingRemovalIds = null, CancellationToken cancellationToken = default)
     {
         var items = await contractRepository.GetContractItemsAsync(contractId, cancellationToken);
         if (items is null)
         {
             LogContractItemsNotFoundMessage(logger, contractId, null);
+            return null;
         }
 
+        // Legacy flags a removal in the page's copy of the contract, so totals and postage already exclude it.
+        if (pendingRemovalIds is { Count: > 0 })
+        {
+            foreach (var line in items.Schemes.SelectMany(s => s.Participants).Where(p => !p.IsRemoved && pendingRemovalIds.Contains(p.ParticipantSchemeId)))
+            {
+                line.IsRemoved = true;
+                line.IsPendingRemoval = true;
+            }
+        }
+
+        await contractPostageService.ApplyOnlineOrderCountsAsync(items, cancellationToken);
         return items;
     }
 
-    public async Task<bool> RemoveContractItemAsync(Guid contractId, Guid participantSchemeId, CancellationToken cancellationToken = default)
+    public async Task<bool> RemoveContractItemAsync(Guid contractId, Guid participantSchemeId, string? auditWhy = null, CancellationToken cancellationToken = default)
     {
         var contract = await contractRepository.GetByIdAsync(contractId, cancellationToken);
         if (contract is null)
@@ -195,7 +208,9 @@ public sealed class ContractService(IContractRepository contractRepository, IPar
         }
 
         item.IsRemoved = true;
-        var removed = await participantSchemeRepository.UpdateAsync(item, cancellationToken);
+        var removed = string.IsNullOrWhiteSpace(auditWhy)
+            ? await participantSchemeRepository.UpdateAsync(item, cancellationToken)
+            : await participantSchemeRepository.RemoveAsync(item, new ParticipantSchemeAudit(await auditActor.GetAuditNameAsync(cancellationToken), auditWhy.Trim()), cancellationToken);
         if (removed)
         {
             LogRemovedContractItemMessage(logger, contractId, participantSchemeId, null);

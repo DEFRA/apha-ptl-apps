@@ -118,7 +118,8 @@ public class TabulationReportRenderTests : IClassFixture<WebApplicationFactory<P
             [AssessedTable(), MethodsTable()],
             RatingsTable(),
             attachment,
-            Print(labCode));
+            Print(labCode),
+            "D1a/S1 BT: Brucella");
 
     private async Task<string> GetHtmlAsync(string url)
     {
@@ -175,8 +176,10 @@ public class TabulationReportRenderTests : IClassFixture<WebApplicationFactory<P
         var html = await GetHtmlAsync(TabulationUrl);
 
         Assert.Contains("Tabulation", Title(html), StringComparison.Ordinal);
-        Assert.Equal("FINAL REPORT for D1a/S1 BT: Brucella", Heading(html, 1));
-        Assert.Equal("Summary", Heading(html, 2));
+        Assert.Equal("Tabulation", Heading(html, 1));
+        Assert.Equal("D1a/S1 BT: Brucella", Heading(html, 2));
+        Assert.Contains("<h3 class=\"govuk-heading-s\">Summary</h3>", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("govuk-caption-l", html, StringComparison.Ordinal);
         // The draft only shows the distribution date in the print header.
         Assert.DoesNotContain("<p class=\"govuk-body\">Date Of Distribution", html, StringComparison.Ordinal);
         Assert.Contains("tabulationtitle-alignright\">Date Of Distribution: 03/05/2026</div>", html, StringComparison.Ordinal);
@@ -334,7 +337,7 @@ public class TabulationReportRenderTests : IClassFixture<WebApplicationFactory<P
         Assert.Equal(3, Regex.Count(comments, "<div class=\"divTestConsultantComments\">"));
         Assert.Contains("<p>Standard text</p>", comments, StringComparison.Ordinal);
         Assert.Contains("<p>Sample <b>comments</b></p>", comments, StringComparison.Ordinal);
-        Assert.Contains("<p class=\"commentsTitle\">Comments provided by Dr A, QAU:</p>", comments, StringComparison.Ordinal);
+        Assert.Contains("<h2 class=\"govuk-heading-m commentsTitle\">Comments provided by Dr A, QAU:</h2>", comments, StringComparison.Ordinal);
         Assert.Contains("<p>Consultant note</p>", comments, StringComparison.Ordinal);
         Assert.Contains("alt=\"UKAS accredited\"", comments, StringComparison.Ordinal);
     }
@@ -382,7 +385,9 @@ public class TabulationReportRenderTests : IClassFixture<WebApplicationFactory<P
         var html = await GetHtmlAsync(PublishedUrl);
 
         Assert.Contains("Issued Tabulation", Title(html), StringComparison.Ordinal);
-        Assert.Equal("FINAL REPORT for D1a/S1 BT: Brucella", Heading(html, 1));
+        Assert.Equal("Issued Tabulation", Heading(html, 1));
+        Assert.Equal("D1a/S1 BT: Brucella", Heading(html, 2));
+        Assert.Contains("<h3 class=\"govuk-heading-s\">Summary</h3>", html, StringComparison.Ordinal);
         Assert.Contains("<p class=\"govuk-body\">Distribution Date: 03/05/2026</p>", html, StringComparison.Ordinal);
         Assert.Equal([(PublishedId, Guid.Empty, Guid.Empty)], _apiClient.RequestedTabulations);
 
@@ -450,12 +455,13 @@ public class TabulationReportRenderTests : IClassFixture<WebApplicationFactory<P
         var html = await GetHtmlAsync($"/Distribution/PublishedTabulations?year=2026&monthId=5&tabulationId={TabulationId}");
 
         Assert.Contains("Issued Tabulations", Title(html), StringComparison.Ordinal);
-        Assert.Equal("D1a/S1 BT: Brucella", Heading(html, 1));
-        Assert.Equal("Summary", Heading(html, 2));
+        Assert.Equal("Issued Tabulations", Heading(html, 1));
+        Assert.Equal("D1a/S1 BT: Brucella", Heading(html, 2));
+        Assert.Equal("Summary", Heading(html, 3));
         Assert.Contains("The table below lists all of the issued versions of this Tabulation.", html, StringComparison.Ordinal);
         Assert.Contains("<p class=\"govuk-body\">There are no issued versions of this Tabulation.</p>", html, StringComparison.Ordinal);
         Assert.DoesNotContain("Date Issued", html, StringComparison.Ordinal);
-        Assert.Matches("<a class=\"govuk-back-link\" href=\"/Distribution/Tabulations\\?year=2026&amp;monthId=5\">Back</a>", html);
+        Assert.DoesNotContain("govuk-back-link", html, StringComparison.Ordinal);
         Assert.Matches("<a class=\"govuk-button govuk-button--secondary\"[^>]*href=\"/Distribution/Tabulations\\?year=2026&amp;monthId=5\">Back</a>", html);
     }
 
@@ -493,7 +499,8 @@ public class TabulationReportRenderTests : IClassFixture<WebApplicationFactory<P
             titles ?? ["Bar chart shows the frequency of assessment scores", "Scheme: Brucella", " ", "Average score: 3.5"],
             "Assessment Score",
             "Frequency",
-            scores ?? [new(1, "1 Fail", 3), new(5, "5 Excellent", 25), new(0, "Not Submitted", 0)]);
+            scores ?? [new(1, "1 Fail", 3), new(5, "5 Excellent", 25), new(0, "Not Submitted", 0)],
+            "D1a/S1: Brucella");
 
     private static string AssessmentUrl(bool issued) => issued
         ? $"/Distribution/PublishedAssessmentResults?year=2026&monthId=5&tabulationId={TabulationId}&publishedTabulationId={PublishedId}&testId={TestId}"
@@ -510,7 +517,7 @@ public class TabulationReportRenderTests : IClassFixture<WebApplicationFactory<P
     }
 
     [Fact]
-    public async Task AssessmentResults_NotSubmitted_ShowsOnlyTheBackButtons()
+    public async Task AssessmentResults_NotSubmitted_ShowsOnlyTheBackButton()
     {
         _apiClient.AssessmentResults = Results(submitted: false);
 
@@ -518,11 +525,12 @@ public class TabulationReportRenderTests : IClassFixture<WebApplicationFactory<P
 
         Assert.Contains("Assessment Results", Title(html), StringComparison.Ordinal);
         Assert.Equal("Assessment Results", Heading(html, 1));
+        Assert.Equal("D1a/S1: Brucella", Heading(html, 2));
         Assert.DoesNotContain("<svg class=\"ptl-assessment-chart\"", html, StringComparison.Ordinal);
         Assert.DoesNotContain("(data table)", html, StringComparison.Ordinal);
         Assert.DoesNotContain("Bar chart shows", html, StringComparison.Ordinal);
         var backs = Regex.Matches(html, "<a class=\"govuk-[^\"]*\"[^>]*href=\"([^\"]+)\">Back</a>").Select(m => WebUtility.HtmlDecode(m.Groups[1].Value)).ToList();
-        Assert.Equal(2, backs.Count);
+        Assert.Single(backs);
         Assert.All(backs, href =>
         {
             var (path, query) = Parse(href);
@@ -539,7 +547,8 @@ public class TabulationReportRenderTests : IClassFixture<WebApplicationFactory<P
 
         var html = await GetHtmlAsync(AssessmentUrl(issued: false));
 
-        Assert.Equal("Bar chart shows the frequency of assessment scores", Heading(html, 2));
+        Assert.Equal("D1a/S1: Brucella", Heading(html, 2));
+        Assert.Equal("Bar chart shows the frequency of assessment scores", Heading(html, 3));
         var list = Regex.Match(html, "<ul class=\"govuk-list\">(.*?)</ul>", RegexOptions.Singleline).Groups[1].Value;
         Assert.Equal(["Scheme: Brucella", "Average score: 3.5"], Regex.Matches(list, "<li>(.*?)</li>").Select(m => m.Groups[1].Value));
 
@@ -581,6 +590,7 @@ public class TabulationReportRenderTests : IClassFixture<WebApplicationFactory<P
 
         Assert.Contains("Issued Assessment Results", Title(html), StringComparison.Ordinal);
         Assert.Equal("Issued Assessment Results", Heading(html, 1));
+        Assert.Equal("D1a/S1: Brucella", Heading(html, 2));
         var (path, query) = Parse(HrefOf(html, "Back</a>"));
         Assert.Equal("/Distribution/PublishedTabulation", path);
         Assert.Equal(("2026", "5", TabulationId.ToString(), PublishedId.ToString()),

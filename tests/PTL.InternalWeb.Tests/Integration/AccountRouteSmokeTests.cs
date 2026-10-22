@@ -1,5 +1,4 @@
 using System.Net;
-using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Mvc.Testing;
 using PTL.InternalWeb.Tests.TestSupport;
 
@@ -10,7 +9,7 @@ namespace PTL.InternalWeb.Tests.Integration;
 // can't be simulated without a live tenant (that's covered at the unit level via
 // EntraOpenIdConnectEventsTests instead) - but the authenticated-session view branches and the
 // sign-out flow are exercised here via the test factory's sign-in shortcut.
-public partial class AccountRouteSmokeTests : IClassFixture<PtlInternalWebTestFactory>
+public class AccountRouteSmokeTests : IClassFixture<PtlInternalWebTestFactory>
 {
     private readonly PtlInternalWebTestFactory _factory;
 
@@ -66,11 +65,10 @@ public partial class AccountRouteSmokeTests : IClassFixture<PtlInternalWebTestFa
         Assert.Contains("You cannot sign in with this account", body);
         Assert.Contains("<!DOCTYPE html>", body);
         Assert.Contains("govuk-frontend", body);
-        // Header/footer/phase-banner render normally - only the "Signed in as/Sign out" panel is
-        // absent, which _Header.cshtml already handles on its own (it's conditional on
-        // User.Identity.IsAuthenticated, which is false here since no session exists yet).
-        Assert.Contains("govuk-phase-banner", body);
-        Assert.Contains("app-service-bar", body);
+        // Header/footer render normally - only the "Signed in as/Sign out" panel is absent, which
+        // _Header.cshtml already handles on its own (it's conditional on User.Identity.IsAuthenticated,
+        // which is false here since no session exists yet).
+        Assert.Contains("govuk-service-navigation", body);
         Assert.DoesNotContain("Sign out", body);
         Assert.DoesNotContain("Signed in as", body);
     }
@@ -100,7 +98,7 @@ public partial class AccountRouteSmokeTests : IClassFixture<PtlInternalWebTestFa
     }
 
     [Fact]
-    public async Task AuthenticatedSession_ShowsSignedInAsAndSignOutRedirectsToEntraEndSession()
+    public async Task AuthenticatedSession_ShowsSignedInAsWithoutSignOut()
     {
         // WebApplicationFactory's CookieContainer-backed client isn't reliably forwarding cookies
         // across requests in this test host - cookies are collected and forwarded manually instead.
@@ -113,19 +111,9 @@ public partial class AccountRouteSmokeTests : IClassFixture<PtlInternalWebTestFa
         var homeResponse = await SendWithCookiesAsync(client, HttpMethod.Get, "/Home/Index", cookies);
         CaptureCookies(homeResponse, cookies);
         var homeBody = await homeResponse.Content.ReadAsStringAsync();
-        Assert.Contains("Signed in as", homeBody);
-        var token = AntiforgeryTokenRegex().Match(homeBody).Groups[1].Value;
-
-        // Entra ID (unlike CIDM) uses the OIDC handler's default redirect-based sign-out, not a
-        // POST-form flow - so the response is a 302 to the end_session_endpoint with id_token_hint
-        // carried as a query parameter, not an HTML form body.
-        var logoutResponse = await SendWithCookiesAsync(client, HttpMethod.Post, "/Account/Logout", cookies,
-            new FormUrlEncodedContent(new Dictionary<string, string> { ["__RequestVerificationToken"] = token }));
-
-        Assert.Equal(HttpStatusCode.Redirect, logoutResponse.StatusCode);
-        var location = logoutResponse.Headers.Location!.ToString();
-        Assert.StartsWith(PtlInternalWebTestFactory.FakeEndSessionEndpoint, location);
-        Assert.Contains($"id_token_hint={PtlInternalWebTestFactory.TestIdToken}", location);
+        Assert.Contains("Signed in as: <strong>test-user</strong>", homeBody);
+        Assert.DoesNotContain("Sign out", homeBody);
+        Assert.DoesNotContain("/Account/Logout", homeBody);
     }
 
     private static void CaptureCookies(HttpResponseMessage response, Dictionary<string, string> cookies)
@@ -153,7 +141,4 @@ public partial class AccountRouteSmokeTests : IClassFixture<PtlInternalWebTestFa
         request.Headers.Add("Cookie", string.Join("; ", cookies.Values));
         return client.SendAsync(request);
     }
-
-    [GeneratedRegex("__RequestVerificationToken[^>]*value=\"([^\"]+)\"")]
-    private static partial Regex AntiforgeryTokenRegex();
 }

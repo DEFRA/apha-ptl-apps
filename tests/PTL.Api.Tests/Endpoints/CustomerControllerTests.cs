@@ -13,7 +13,7 @@ public class CustomerControllerTests
 {
     private static CustomerController CreateController(FakeCustomerRepository repository, FakePendingCustomerUpdateRepository? pendingRepository = null)
     {
-        var controller = new CustomerController(new CustomerService(repository, pendingRepository ?? new FakePendingCustomerUpdateRepository(), NullLogger<CustomerService>.Instance), NullLogger<CustomerController>.Instance);
+        var controller = new CustomerController(new CustomerService(repository, pendingRepository ?? new FakePendingCustomerUpdateRepository(), new PTL.Api.Tests.Notifications.FakeCustomerUpdateNotifier(), NullLogger<CustomerService>.Instance), NullLogger<CustomerController>.Instance);
 
         // ValidationProblem() resolves ProblemDetailsFactory from HttpContext.RequestServices,
         // which a bare controller instance does not have without this wiring.
@@ -132,18 +132,20 @@ public class CustomerControllerTests
     }
 
     [Fact]
-    public async Task SearchCustomers_FiltersAndPagesResults()
+    public async Task SearchCustomers_FiltersByStatusAndPagesResults()
     {
         var controller = CreateController(new FakeCustomerRepository());
         await controller.CreateCustomer(ValidCreateRequest("Alpha Labs"), CancellationToken.None);
         await controller.CreateCustomer(ValidCreateRequest("Beta Labs"), CancellationToken.None);
 
-        var result = await controller.SearchCustomers(new CustomerSearchRequest("Beta", CustomerStatusFilter.Active, 1, 20), CancellationToken.None);
+        var result = await controller.SearchCustomers(new CustomerSearchRequest(CustomerStatusFilter.Active, 2, 1), CancellationToken.None);
 
         var ok = Assert.IsType<OkObjectResult>(result.Result);
         var response = Assert.IsType<CustomerSearchResponse>(ok.Value);
-        Assert.Single(response.Items);
-        Assert.Equal("Beta Labs", response.Items[0].Name);
+        Assert.Equal(2, response.TotalCount);
+        Assert.Equal(2, response.Page);
+        Assert.Equal(1, response.PageSize);
+        Assert.Equal("Beta Labs", Assert.Single(response.Items).Name);
     }
 
     [Fact]
@@ -289,7 +291,7 @@ public class CustomerControllerTests
         var customer = (CustomerResponse)((CreatedAtActionResult)created.Result!).Value!;
         pendingRepository.Seed(ValidPendingUpdate(customer, "New Contact"));
 
-        var result = await controller.ApprovePendingCustomerUpdate(customer.CustomerId, AmendedPendingRequest(customer, "Amended Contact"), CancellationToken.None);
+        var result = await controller.ApprovePendingCustomerUpdate(customer.CustomerId, new PendingCustomerUpdateApproveRequest(AmendedPendingRequest(customer, "Amended Contact")), CancellationToken.None);
 
         Assert.IsType<NoContentResult>(result);
         var updated = await controller.GetCustomer(customer.CustomerId, CancellationToken.None);
@@ -306,7 +308,7 @@ public class CustomerControllerTests
         var customer = (CustomerResponse)((CreatedAtActionResult)created.Result!).Value!;
         pendingRepository.Seed(new PendingCustomerUpdate { PendingCustomerUpdateId = Guid.NewGuid(), CustomerId = customer.CustomerId, ContactName = "New Contact", IsSubmitted = true });
 
-        var result = await controller.ApprovePendingCustomerUpdate(customer.CustomerId, AmendedPendingRequest(customer, string.Empty), CancellationToken.None);
+        var result = await controller.ApprovePendingCustomerUpdate(customer.CustomerId, new PendingCustomerUpdateApproveRequest(AmendedPendingRequest(customer, string.Empty)), CancellationToken.None);
 
         var badRequest = Assert.IsType<ObjectResult>(result, exactMatch: false);
         Assert.Equal(400, badRequest.StatusCode);
@@ -345,7 +347,7 @@ public class CustomerControllerTests
     {
         var controller = CreateController(new FakeCustomerRepository());
 
-        var result = await controller.DeclinePendingCustomerUpdate(Guid.NewGuid(), CancellationToken.None);
+        var result = await controller.DeclinePendingCustomerUpdate(Guid.NewGuid(), request: null, CancellationToken.None);
 
         Assert.IsType<NotFoundResult>(result);
     }
@@ -360,10 +362,43 @@ public class CustomerControllerTests
         var customerId = ((CustomerResponse)((CreatedAtActionResult)created.Result!).Value!).CustomerId;
         pendingRepository.Seed(new PendingCustomerUpdate { PendingCustomerUpdateId = Guid.NewGuid(), CustomerId = customerId, ContactName = "New Contact", IsSubmitted = true });
 
-        var result = await controller.DeclinePendingCustomerUpdate(customerId, CancellationToken.None);
+        var result = await controller.DeclinePendingCustomerUpdate(customerId, new PendingCustomerUpdateDeclineRequest("Not eligible"), CancellationToken.None);
 
         Assert.IsType<NoContentResult>(result);
         var updated = await controller.GetCustomer(customerId, CancellationToken.None);
         Assert.Equal("Alice Example", ((CustomerResponse)((OkObjectResult)updated.Result!).Value!).ContactName);
+    }
+
+    [Fact]
+    public async Task DeclinePendingCustomerUpdate_CommentsTooLong_ReturnsValidationProblemAndKeepsTheUpdatePending()
+    {
+        var repository = new FakeCustomerRepository();
+        var pendingRepository = new FakePendingCustomerUpdateRepository();
+        var controller = CreateController(repository, pendingRepository);
+        var created = await controller.CreateCustomer(ValidCreateRequest(), CancellationToken.None);
+        var customerId = ((CustomerResponse)((CreatedAtActionResult)created.Result!).Value!).CustomerId;
+        pendingRepository.Seed(new PendingCustomerUpdate { PendingCustomerUpdateId = Guid.NewGuid(), CustomerId = customerId, ContactName = "New Contact", IsSubmitted = true });
+
+        var result = await controller.DeclinePendingCustomerUpdate(customerId, new PendingCustomerUpdateDeclineRequest(new string('x', 2001)), CancellationToken.None);
+
+        Assert.Equal(400, Assert.IsType<ObjectResult>(result, exactMatch: false).StatusCode);
+        Assert.NotNull(await pendingRepository.GetByCustomerIdAsync(customerId));
+    }
+
+    [Fact]
+    public async Task ApprovePendingCustomerUpdate_CommentsTooLong_ReturnsValidationProblemAndChangesNothing()
+    {
+        var repository = new FakeCustomerRepository();
+        var pendingRepository = new FakePendingCustomerUpdateRepository();
+        var controller = CreateController(repository, pendingRepository);
+        var created = await controller.CreateCustomer(ValidCreateRequest(), CancellationToken.None);
+        var customer = (CustomerResponse)((CreatedAtActionResult)created.Result!).Value!;
+        pendingRepository.Seed(ValidPendingUpdate(customer, "New Contact"));
+
+        var result = await controller.ApprovePendingCustomerUpdate(customer.CustomerId, new PendingCustomerUpdateApproveRequest(Comments: new string('x', 2001)), CancellationToken.None);
+
+        Assert.Equal(400, Assert.IsType<ObjectResult>(result, exactMatch: false).StatusCode);
+        var unchanged = await controller.GetCustomer(customer.CustomerId, CancellationToken.None);
+        Assert.Equal("Alice Example", ((CustomerResponse)((OkObjectResult)unchanged.Result!).Value!).ContactName);
     }
 }

@@ -1,7 +1,10 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using PTL.ApiClient.Distribution;
 using PTL.Contracts.Distribution;
+using PTL.InternalWeb.Authorization;
+using PTL.InternalWeb.Confirmation;
 using PTL.InternalWeb.Navigation;
 using PTL.SharedUI.Notifications;
 
@@ -22,6 +25,11 @@ namespace PTL.InternalWeb.Features.Distribution;
 // placeholders (ViewStage/InitialiseMonth below) - those workflows (and the exact legacy
 // persisted-save chain behind Initialise) are out of scope and flagged [NEEDS INVESTIGATION] in
 // docs/migration/distribution-migration.md.
+//
+// Authorization follows the legacy folders: the class baseline is the Distributions role (legacy
+// Distributions/ folder - held by anyone with Internal User or Scheduling); Scheduling/ pages and actions
+// additionally need Scheduling, and Internal User/ pages (Preparation, Packaging, Results) need Internal User.
+[Authorize(Policy = PtlPolicies.Distributions)]
 public sealed partial class DistributionController(IDistributionApiClient distributionApiClient) : Controller
 {
     private static readonly string[] MonthOrder =
@@ -64,21 +72,49 @@ public sealed partial class DistributionController(IDistributionApiClient distri
         return View("FeatureNotAvailable", title);
     }
 
-    // Placeholder for "Initialise this Month" - the confirmation text is preserved and the button
-    // is shown exactly where legacy shows it, but the write path (sppSetupMonthlyDistribution's
-    // full persisted-save chain) is unconfirmed - see docs/migration/distribution-migration.md's
-    // "Initialise Month" NEEDS INVESTIGATION items. Do not wire this to a real write until that is
-    // resolved.
+    // Legacy GridView1_RowCommand "Initialise": MonthlyDistribution.CreateMonthlyDistribution(yearID,
+    // monthID) then the dashboard redraws. year is the calendar year of the month's row; a month that
+    // already exists is left exactly as it is, as in legacy, so no message is shown for it.
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public IActionResult InitialiseMonth(int year, int monthId)
+    [Authorize(Policy = PtlPolicies.Scheduling)]
+    public async Task<IActionResult> InitialiseMonth(int year, int monthId, string? confirmation, CancellationToken cancellationToken)
     {
-        return View("FeatureNotAvailable", "Initialise This Month");
+        if (monthId is < 1 or > 12 || year < 1)
+        {
+            return BadRequest();
+        }
+
+        // The dashboard is keyed by financial year (April to March); January to March belong to the year before.
+        var financialYear = monthId < 4 ? year - 1 : year;
+
+        if (!ConfirmationFlow.IsConfirmed(confirmation))
+        {
+            return this.ConfirmationPage(
+                new ConfirmationPageViewModel
+                {
+                    Title = "Initialise this Month",
+                    Message = "Are you sure you wish to initialise this month?",
+                    WarningText = "If you do, you will no longer be able to add schemes to this month (participants can still be added up to a day before the posting date).",
+                    ConfirmText = "Initialise",
+                    CancelUrl = Url.Action(nameof(Index), new { year = financialYear }),
+                },
+                nameof(Index));
+        }
+
+        var result = await distributionApiClient.InitialiseMonthAsync(year, monthId, cancellationToken);
+        if (result is { Initialised: true })
+        {
+            TempData.SetNotification(NotificationType.Success, "Month initialised successfully.");
+        }
+
+        return RedirectToAction(nameof(Index), new { year = financialYear });
     }
 
     // Monthly Distributions (Scheduling) - legacy Scheduling/monthlys.aspx. Reached from the
     // Dashboard's "Scheduling: View" link once a month is initialised.
     [HttpGet]
+    [Authorize(Policy = PtlPolicies.Scheduling)]
     public async Task<IActionResult> Schedule(int year, int monthId, CancellationToken cancellationToken)
     {
         var schedule = await distributionApiClient.GetScheduleAsync(year, monthId, cancellationToken);
@@ -96,6 +132,7 @@ public sealed partial class DistributionController(IDistributionApiClient distri
     // Cancel = discard then leave, no save at all (legacy ButtonCancel_Click -> LeavePage()).
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [Authorize(Policy = PtlPolicies.Scheduling)]
     public async Task<IActionResult> Schedule(int year, int monthId, MonthlyDistributionScheduleViewModel model, string command, CancellationToken cancellationToken)
     {
         if (string.Equals(command, CancelCommand, StringComparison.OrdinalIgnoreCase))
@@ -157,16 +194,31 @@ public sealed partial class DistributionController(IDistributionApiClient distri
     // server-side state beyond this one request.
     // S6967 (ModelState.IsValid not checked) suppressed deliberately: legacy dlMonth_RowCommand
     // runs with CausesValidation=False, so a half-filled form can still be toggled and redisplayed.
+    // The toggle first asks for confirmation; Confirm and Cancel both post the unsaved form back, so a
+    // declined toggle redisplays the page exactly as it was.
     [HttpPost]
     [ValidateAntiForgeryToken]
 #pragma warning disable S6967
-    public IActionResult ToggleCancelled(int year, int monthId, Guid schemeId, MonthlyDistributionScheduleViewModel model)
+    [Authorize(Policy = PtlPolicies.Scheduling)]
+    public IActionResult ToggleCancelled(int year, int monthId, Guid schemeId, MonthlyDistributionScheduleViewModel model, string? confirmation)
 #pragma warning restore S6967
     {
         ModelState.Clear();
         ViewData[BreadcrumbRouteValues.Action] = nameof(Schedule);
         var row = model.Schemes.FirstOrDefault(s => s.MonthlyDistributionSchemeId == schemeId);
-        if (row is not null)
+        if (row is not null && !ConfirmationFlow.IsConfirmed(confirmation) && !ConfirmationFlow.IsCancelled(confirmation))
+        {
+            return this.ConfirmationPage(
+                new ConfirmationPageViewModel
+                {
+                    Title = row.CancelCommenceLinkText,
+                    Caption = row.SchemeHeading,
+                    Message = row.CancelCommenceConfirmText,
+                },
+                nameof(Schedule));
+        }
+
+        if (row is not null && !ConfirmationFlow.IsCancelled(confirmation))
         {
             row.IsCancelled = !row.IsCancelled;
         }
@@ -179,6 +231,7 @@ public sealed partial class DistributionController(IDistributionApiClient distri
     // Sample Preparation - legacy Internal User/PreparationSheet.aspx. Reached from the
     // Dashboard's "Preparation: View" link.
     [HttpGet]
+    [Authorize(Policy = PtlPolicies.InternalUser)]
     public async Task<IActionResult> Preparation(int year, int monthId, CancellationToken cancellationToken)
     {
         var sheet = await distributionApiClient.GetPreparationAsync(year, monthId, cancellationToken);
@@ -191,6 +244,7 @@ public sealed partial class DistributionController(IDistributionApiClient distri
     // Cancel = discard then leave, no save at all (legacy ButtonCancel_Click -> LeavePage()).
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [Authorize(Policy = PtlPolicies.InternalUser)]
     public async Task<IActionResult> Preparation(int year, int monthId, PreparationViewModel model, string command, CancellationToken cancellationToken)
     {
         if (string.Equals(command, CancelCommand, StringComparison.OrdinalIgnoreCase))
@@ -224,6 +278,7 @@ public sealed partial class DistributionController(IDistributionApiClient distri
     // "Results: View" link. Participant View/Edit links open Actual Results / Sample Receipt, which
     // are separate legacy screens outside this feature (ViewStage placeholder).
     [HttpGet]
+    [Authorize(Policy = PtlPolicies.InternalUser)]
     public async Task<IActionResult> ResultsReceipt(int year, int monthId, CancellationToken cancellationToken)
     {
         var receipt = await distributionApiClient.GetResultsReceiptAsync(year, monthId, cancellationToken);
@@ -235,6 +290,7 @@ public sealed partial class DistributionController(IDistributionApiClient distri
     // Cancel = discard then leave, no save at all (legacy ButtonCancel_Click -> LeavePage()).
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [Authorize(Policy = PtlPolicies.InternalUser)]
     public async Task<IActionResult> ResultsReceipt(int year, int monthId, ResultsReceiptViewModel model, string command, CancellationToken cancellationToken)
     {
         if (string.Equals(command, CancelCommand, StringComparison.OrdinalIgnoreCase))
@@ -269,6 +325,7 @@ public sealed partial class DistributionController(IDistributionApiClient distri
     // yet (ViewStage placeholder). The legacy emails are sent by the Windows Email Service, which
     // is out of scope - [EMAIL FUNCTIONALITY DEFERRED].
     [HttpGet]
+    [Authorize(Policy = PtlPolicies.Scheduling)]
     public async Task<IActionResult> Tabulations(int year, int monthId, CancellationToken cancellationToken)
     {
         var page = await distributionApiClient.GetTabulationsAsync(year, monthId, cancellationToken);
@@ -290,6 +347,7 @@ public sealed partial class DistributionController(IDistributionApiClient distri
     // from the Results Receipt screen's per-participant Submission Status "View/Edit" link; year/monthId
     // are carried through purely so Save, Cancel and Back return to the Results Receipt screen.
     [HttpGet]
+    [Authorize(Policy = PtlPolicies.InternalUser)]
     public async Task<IActionResult> SampleReceipt(int year, int monthId, Guid schemeId, Guid participantId, CancellationToken cancellationToken)
     {
         var page = await distributionApiClient.GetSampleReceiptAsync(schemeId, participantId, cancellationToken);
@@ -302,6 +360,7 @@ public sealed partial class DistributionController(IDistributionApiClient distri
     [HttpPost]
     [ValidateAntiForgeryToken]
     [RequestFormLimits(ValueCountLimit = 20000)]
+    [Authorize(Policy = PtlPolicies.InternalUser)]
     public async Task<IActionResult> SampleReceipt(
         int year, int monthId, Guid schemeId, Guid participantId, SampleReceiptViewModel model, string command, CancellationToken cancellationToken)
     {
@@ -362,6 +421,7 @@ public sealed partial class DistributionController(IDistributionApiClient distri
     // screen's per-participant Results "View/Edit" link; year/monthId are carried through purely so
     // Save and Cancel can return to the Results Receipt screen the user came from.
     [HttpGet]
+    [Authorize(Policy = PtlPolicies.InternalUser)]
     public async Task<IActionResult> ActualResults(int year, int monthId, Guid schemeId, Guid participantId, CancellationToken cancellationToken)
     {
         var page = await distributionApiClient.GetActualResultsAsync(schemeId, participantId, cancellationToken);
@@ -376,6 +436,7 @@ public sealed partial class DistributionController(IDistributionApiClient distri
     [HttpPost]
     [ValidateAntiForgeryToken]
     [RequestFormLimits(ValueCountLimit = 20000)]
+    [Authorize(Policy = PtlPolicies.InternalUser)]
     public async Task<IActionResult> ActualResults(
         int year, int monthId, Guid schemeId, Guid participantId, ActualResultsViewModel model, string command, CancellationToken cancellationToken)
     {
@@ -596,6 +657,7 @@ public sealed partial class DistributionController(IDistributionApiClient distri
     // "Packaging: View" link. Print is the browser's own print of this page (legacy window.print()
     // with the Print column choosing which rows appear), so it has no server action.
     [HttpGet]
+    [Authorize(Policy = PtlPolicies.InternalUser)]
     public async Task<IActionResult> Packaging(int year, int monthId, int? mode, int week, CancellationToken cancellationToken)
     {
         var model = await BuildPackagingViewModelAsync(year, monthId, new PackagingViewModel { Mode = mode, Week = week }, cancellationToken);
@@ -608,6 +670,7 @@ public sealed partial class DistributionController(IDistributionApiClient distri
     // Cancel = discard then leave. labels/customs = Print Labels / Print Customs.
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [Authorize(Policy = PtlPolicies.InternalUser)]
     public async Task<IActionResult> Packaging(int year, int monthId, PackagingViewModel model, string command, CancellationToken cancellationToken)
     {
         if (string.Equals(command, CancelCommand, StringComparison.OrdinalIgnoreCase))
@@ -798,6 +861,7 @@ public sealed partial class DistributionController(IDistributionApiClient distri
     // so Save and Cancel can return to the Scheduling screen the user came from (legacy redirects
     // to ~/Scheduling/monthlys.aspx, which restores the month from session).
     [HttpGet]
+    [Authorize(Policy = PtlPolicies.Scheduling)]
     public async Task<IActionResult> SampleNumbers(int year, int monthId, Guid schemeId, CancellationToken cancellationToken)
     {
         var result = await distributionApiClient.GetSampleNumbersAsync(schemeId, cancellationToken);
@@ -830,6 +894,7 @@ public sealed partial class DistributionController(IDistributionApiClient distri
     // to the destination the user originally chose WITHOUT saving.
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [Authorize(Policy = PtlPolicies.Scheduling)]
     public async Task<IActionResult> SampleNumbers(int year, int monthId, Guid schemeId, SampleNumbersViewModel model, string command, CancellationToken cancellationToken)
     {
         if (string.Equals(command, CancelCommand, StringComparison.OrdinalIgnoreCase))
@@ -1015,6 +1080,7 @@ public sealed partial class DistributionController(IDistributionApiClient distri
     // screen's "View Intended Results" link; year/monthId are carried through purely so Save and
     // Cancel can return to the Scheduling screen the user came from.
     [HttpGet]
+    [Authorize(Policy = PtlPolicies.Scheduling)]
     public async Task<IActionResult> IntendedResults(int year, int monthId, Guid schemeId, CancellationToken cancellationToken)
     {
         var page = await distributionApiClient.GetIntendedResultsAsync(schemeId, cancellationToken);
@@ -1036,6 +1102,7 @@ public sealed partial class DistributionController(IDistributionApiClient distri
     // ~/Scheduling/monthlys.aspx for this screen, so there is only one destination.
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [Authorize(Policy = PtlPolicies.Scheduling)]
     public async Task<IActionResult> IntendedResults(int year, int monthId, Guid schemeId, IntendedResultsViewModel model, string command, CancellationToken cancellationToken)
     {
         if (string.Equals(command, CancelCommand, StringComparison.OrdinalIgnoreCase) ||
@@ -1112,6 +1179,7 @@ public sealed partial class DistributionController(IDistributionApiClient distri
     // HasIntendedResults is true (legacy never even offers the "Show Intended Results" option
     // otherwise).
     [HttpGet]
+    [Authorize(Policy = PtlPolicies.InternalUser)]
     public async Task<IActionResult> PrintableResults(int year, int monthId, Guid schemeId, bool showValues, CancellationToken cancellationToken)
     {
         var page = await distributionApiClient.GetIntendedResultsAsync(schemeId, cancellationToken);
@@ -1333,7 +1401,7 @@ public sealed partial class DistributionController(IDistributionApiClient distri
         {
             YearId = year,
             MonthId = monthId,
-            MonthDescription = new DateTime(2000, monthId, 1, 0, 0, 0, DateTimeKind.Utc).ToString("MMM", System.Globalization.CultureInfo.InvariantCulture) + " " + year,
+            MonthDescription = PackagingMonthDescription(year, monthId),
             Schemes = [.. sheet.Schemes.Select(s => new PreparationSchemeRowViewModel
             {
                 MonthlyDistributionSchemeId = s.MonthlyDistributionSchemeId,
@@ -1356,6 +1424,7 @@ public sealed partial class DistributionController(IDistributionApiClient distri
     // Distribution Participants - legacy Scheduling/DistributionParticipantList.aspx. Reached from
     // the Scheduling screen's "View Participants" link.
     [HttpGet]
+    [Authorize(Policy = PtlPolicies.Scheduling)]
     public async Task<IActionResult> Participants(int year, int monthId, Guid schemeId, CancellationToken cancellationToken)
     {
         var data = await distributionApiClient.GetParticipantsAsync(schemeId, cancellationToken);
@@ -1367,6 +1436,7 @@ public sealed partial class DistributionController(IDistributionApiClient distri
     // every other row's posted values are ignored and redisplay uses fresh server data.
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [Authorize(Policy = PtlPolicies.Scheduling)]
     public async Task<IActionResult> ChangeDeadline(
         int year, int monthId, Guid schemeId, Guid participantId, DistributionParticipantsViewModel model, CancellationToken cancellationToken)
     {
@@ -1411,6 +1481,7 @@ public sealed partial class DistributionController(IDistributionApiClient distri
     // participant..." mirrors legacy's client-side checkifchecked() guard, re-enforced server-side.
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [Authorize(Policy = PtlPolicies.Scheduling)]
     public async Task<IActionResult> RepeatDistribution(int year, int monthId, Guid schemeId, DistributionParticipantsViewModel model, CancellationToken cancellationToken)
     {
         ViewData[BreadcrumbRouteValues.Action] = nameof(Participants);

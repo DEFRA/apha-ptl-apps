@@ -49,10 +49,10 @@ internal sealed class StubPendingOrderService : IPendingOrderService
     public Task<bool> UpdateSchemeAsync(Guid pendingContractId, Guid pendingParticipantSchemeId, PendingOrderSchemeEdit edit, CancellationToken cancellationToken = default) =>
         Task.FromResult(false);
 
-    public Task<bool> ApprovePendingOrderAsync(Guid pendingContractId, string purchaseOrderNumber, string approvedBy, CancellationToken cancellationToken = default) =>
+    public Task<bool> ApprovePendingOrderAsync(Guid pendingContractId, string purchaseOrderNumber, string comments = "", CancellationToken cancellationToken = default) =>
         Task.FromResult(false);
 
-    public Task<bool> DeclinePendingOrderAsync(Guid pendingContractId, CancellationToken cancellationToken = default) =>
+    public Task<bool> DeclinePendingOrderAsync(Guid pendingContractId, string comments = "", CancellationToken cancellationToken = default) =>
         Task.FromResult(false);
 }
 

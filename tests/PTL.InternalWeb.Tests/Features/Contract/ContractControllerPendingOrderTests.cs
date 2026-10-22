@@ -126,6 +126,9 @@ public class ContractControllerPendingOrderTests
         Assert.IsType<NotFoundResult>(result);
     }
 
+    private static PTL.InternalWeb.Features.Contract.PendingOrderDecisionForm Form(string? purchaseOrderNumber = "PO-2", string? comments = null) =>
+        new() { PurchaseOrderNumber = purchaseOrderNumber, Comments = comments };
+
     [Fact]
     public async Task ApprovePendingOrder_UnknownOrder_ReturnsNotFound()
     {
@@ -134,24 +137,53 @@ public class ContractControllerPendingOrderTests
             ApprovePendingOrderResult = new PendingOrderDecisionResult(false, true, new Dictionary<string, string[]>())
         });
 
-        var result = await controller.ApprovePendingOrder(Guid.NewGuid(), "PO-2", CancellationToken.None);
+        var result = await controller.ApprovePendingOrder(Guid.NewGuid(), Form(), CancellationToken.None);
 
         Assert.IsType<NotFoundResult>(result);
     }
 
     [Fact]
-    public async Task ApprovePendingOrder_ValidationFailure_RedirectsBackToDetails()
+    public async Task ApprovePendingOrder_ApiValidationFailure_RedisplaysThePageWithTheFieldError()
     {
+        var pendingContractId = Guid.NewGuid();
         var controller = CreateController(new FakeContractApiClient
         {
+            PendingOrder = SampleOrder(pendingContractId),
             ApprovePendingOrderResult = new PendingOrderDecisionResult(false, false, new Dictionary<string, string[]> { ["PurchaseOrderNumber"] = ["Too long."] })
         });
 
-        var result = await controller.ApprovePendingOrder(Guid.NewGuid(), "PO-2", CancellationToken.None);
+        var result = await controller.ApprovePendingOrder(pendingContractId, Form(), CancellationToken.None);
 
-        var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal(nameof(PTL.InternalWeb.Features.Contract.ContractController.PendingOrderDetails), redirect.ActionName);
-        Assert.Equal(NotificationType.Error, controller.TempData.GetNotification()!.Type);
+        var view = Assert.IsType<ViewResult>(result);
+        Assert.Equal(nameof(PTL.InternalWeb.Features.Contract.ContractController.PendingOrderDetails), view.ViewName);
+        var model = Assert.IsType<PTL.InternalWeb.Features.Contract.PendingOrderDetailsViewModel>(view.Model);
+        Assert.Equal("PO-2", model.Form!.PurchaseOrderNumber);
+        Assert.Equal("Too long.", controller.ModelState["PurchaseOrderNumber"]!.Errors[0].ErrorMessage);
+    }
+
+    [Fact]
+    public async Task ApprovePendingOrder_InvalidForm_RedisplaysWithoutCallingTheApi()
+    {
+        var pendingContractId = Guid.NewGuid();
+        var apiClient = new FakeContractApiClient { PendingOrder = SampleOrder(pendingContractId) };
+        var controller = CreateController(apiClient);
+        controller.ModelState.AddModelError("Comments", "The comments field allows maximum 2000 characters");
+
+        var result = await controller.ApprovePendingOrder(pendingContractId, Form(comments: new string('x', 2001)), CancellationToken.None);
+
+        Assert.IsType<ViewResult>(result);
+        Assert.Null(apiClient.LastApproveRequest);
+    }
+
+    [Fact]
+    public async Task ApprovePendingOrder_InvalidFormForAnOrderThatNoLongerExists_ReturnsNotFound()
+    {
+        var controller = CreateController(new FakeContractApiClient { PendingOrder = null });
+        controller.ModelState.AddModelError("Comments", "too long");
+
+        var result = await controller.ApprovePendingOrder(Guid.NewGuid(), Form(), CancellationToken.None);
+
+        Assert.IsType<NotFoundResult>(result);
     }
 
     [Fact]
@@ -160,11 +192,12 @@ public class ContractControllerPendingOrderTests
         var apiClient = new FakeContractApiClient();
         var controller = CreateController(apiClient);
 
-        var result = await controller.ApprovePendingOrder(Guid.NewGuid(), "PO-2", CancellationToken.None);
+        var result = await controller.ApprovePendingOrder(Guid.NewGuid(), Form(comments: "Welcome"), CancellationToken.None);
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
         Assert.Equal(nameof(PTL.InternalWeb.Features.Contract.ContractController.ReviewPendingOrders), redirect.ActionName);
         Assert.Equal("PO-2", apiClient.LastApproveRequest!.PurchaseOrderNumber);
+        Assert.Equal("Welcome", apiClient.LastApproveRequest.Comments);
         var notification = controller.TempData.GetNotification();
         Assert.Equal(NotificationType.Success, notification!.Type);
         Assert.Equal("Order approved successfully.", notification.Message);
@@ -173,24 +206,72 @@ public class ContractControllerPendingOrderTests
     [Fact]
     public async Task DeclinePendingOrder_UnknownOrder_ReturnsNotFound()
     {
-        var controller = CreateController(new FakeContractApiClient { DeclinePendingOrderResult = false });
+        var controller = CreateController(new FakeContractApiClient
+        {
+            DeclinePendingOrderResult = new PendingOrderDecisionResult(false, true, new Dictionary<string, string[]>())
+        });
 
-        var result = await controller.DeclinePendingOrder(Guid.NewGuid(), CancellationToken.None);
+        var result = await controller.DeclinePendingOrder(Guid.NewGuid(), Form(), CancellationToken.None);
 
         Assert.IsType<NotFoundResult>(result);
     }
 
     [Fact]
-    public async Task DeclinePendingOrder_Success_RedirectsToReviewListWithNotification()
+    public async Task DeclinePendingOrder_Success_SendsTheCommentsAndRedirectsToReviewListWithNotification()
     {
-        var controller = CreateController(new FakeContractApiClient { DeclinePendingOrderResult = true });
+        var apiClient = new FakeContractApiClient();
+        var controller = CreateController(apiClient);
 
-        var result = await controller.DeclinePendingOrder(Guid.NewGuid(), CancellationToken.None);
+        var result = await controller.DeclinePendingOrder(Guid.NewGuid(), Form(comments: "Not eligible"), CancellationToken.None);
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
         Assert.Equal(nameof(PTL.InternalWeb.Features.Contract.ContractController.ReviewPendingOrders), redirect.ActionName);
+        Assert.Equal("Not eligible", apiClient.LastDeclineRequest!.Comments);
         var notification = controller.TempData.GetNotification();
         Assert.Equal(NotificationType.Success, notification!.Type);
         Assert.Equal("Order declined successfully.", notification.Message);
+    }
+
+    [Fact]
+    public async Task DeclinePendingOrder_IgnoresAnOverLongPurchaseOrderNumber()
+    {
+        var apiClient = new FakeContractApiClient();
+        var controller = CreateController(apiClient);
+        controller.ModelState.AddModelError("PurchaseOrderNumber", "too long");
+
+        var result = await controller.DeclinePendingOrder(Guid.NewGuid(), Form(), CancellationToken.None);
+
+        Assert.IsType<RedirectToActionResult>(result);
+        Assert.NotNull(apiClient.LastDeclineRequest);
+    }
+
+    [Fact]
+    public async Task DeclinePendingOrder_InvalidComments_RedisplaysWithoutCallingTheApi()
+    {
+        var pendingContractId = Guid.NewGuid();
+        var apiClient = new FakeContractApiClient { PendingOrder = SampleOrder(pendingContractId) };
+        var controller = CreateController(apiClient);
+        controller.ModelState.AddModelError("Comments", "too long");
+
+        var result = await controller.DeclinePendingOrder(pendingContractId, Form(), CancellationToken.None);
+
+        Assert.IsType<ViewResult>(result);
+        Assert.Null(apiClient.LastDeclineRequest);
+    }
+
+    [Fact]
+    public async Task DeclinePendingOrder_ApiValidationFailure_RedisplaysThePage()
+    {
+        var pendingContractId = Guid.NewGuid();
+        var controller = CreateController(new FakeContractApiClient
+        {
+            PendingOrder = SampleOrder(pendingContractId),
+            DeclinePendingOrderResult = new PendingOrderDecisionResult(false, false, new Dictionary<string, string[]> { ["Comments"] = ["Too long."] })
+        });
+
+        var result = await controller.DeclinePendingOrder(pendingContractId, Form(), CancellationToken.None);
+
+        Assert.IsType<ViewResult>(result);
+        Assert.Equal("Too long.", controller.ModelState["Comments"]!.Errors[0].ErrorMessage);
     }
 }

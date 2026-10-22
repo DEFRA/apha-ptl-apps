@@ -54,6 +54,13 @@ public static class ApiClientServiceCollectionExtensions
             .AddHttpMessageHandler<CorrelationIdDelegatingHandler>()
             .AddStandardResilienceHandler();
 
+        services.AddHttpClient<ISearchApiClient, SearchApiClient>(client =>
+        {
+            client.BaseAddress = new Uri(apiBaseUrl);
+        })
+            .AddHttpMessageHandler<CorrelationIdDelegatingHandler>()
+            .AddStandardResilienceHandler();
+
         services.AddHttpClient<IParticipantSchemeApiClient, ParticipantSchemeApiClient>(client =>
         {
             client.BaseAddress = new Uri(apiBaseUrl);
@@ -164,6 +171,24 @@ public static class ApiClientServiceCollectionExtensions
             .AddHttpMessageHandler<ActingUserDelegatingHandler>()
             .AddStandardResilienceHandler();
 
+        services.AddHttpClient<ICategoryItemTypeApiClient, CategoryItemTypeApiClient>(client =>
+        {
+            client.BaseAddress = new Uri(apiBaseUrl);
+        })
+            .AddStandardResilienceHandler();
+
+        services.AddHttpClient<ITestTypeApiClient, TestTypeApiClient>(client =>
+        {
+            client.BaseAddress = new Uri(apiBaseUrl);
+        })
+            .AddStandardResilienceHandler();
+
+        services.AddHttpClient<ICriterionItemTypeApiClient, CriterionItemTypeApiClient>(client =>
+        {
+            client.BaseAddress = new Uri(apiBaseUrl);
+        })
+            .AddStandardResilienceHandler();
+
         services.AddHttpClient<IExternalSiteMessageApiClient, ExternalSiteMessageApiClient>(client =>
         {
             client.BaseAddress = new Uri(apiBaseUrl);
@@ -221,6 +246,8 @@ public static class ApiClientServiceCollectionExtensions
 
         services.AddHealthChecks()
             .AddCheck<ApiConnectivityHealthCheck>("api-connectivity");
+
+        services.AddHostedService<ApiStartupConnectivityCheck>();
 
         return services;
     }

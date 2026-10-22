@@ -41,6 +41,9 @@ coverage/
 appsettings.*.local.json
 appsettings.Development.json
 
+# FortiGate TLS-inspection CA cert - fetched from a GitHub secret at build time, never committed
+build/certs/
+
 # OS files
 .DS_Store
 Thumbs.db

@@ -115,6 +115,7 @@ public class TabulationReportBuilderTests
         var report = Build(source);
 
         Assert.Equal("FINAL REPORT for D1a/S1 BT: Brucella", report.Title);
+        Assert.Equal("D1a/S1 BT: Brucella", report.DistributionHeading);
         Assert.Equal("Summary", report.TabulationName);
         Assert.Equal("Date Of Distribution: 03/05/2026", report.DistributionDateText);
         Assert.False(report.IsPublished);

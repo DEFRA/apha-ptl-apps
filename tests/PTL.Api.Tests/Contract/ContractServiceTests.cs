@@ -8,7 +8,7 @@ namespace PTL.Api.Tests.Contract;
 public class ContractServiceTests
 {
     private static ContractService CreateService(FakeContractRepository repository, FakeParticipantSchemeRepository? participantSchemeRepository = null) =>
-        new(repository, participantSchemeRepository ?? new FakeParticipantSchemeRepository(), NullLogger<ContractService>.Instance);
+        new(repository, participantSchemeRepository ?? new FakeParticipantSchemeRepository(), new PTL.Api.Tests.Contract.FakeContractPostageService(), new PTL.Api.Tests.Contract.FakeAuditActorResolver(), NullLogger<ContractService>.Instance);
 
     private static PTL.Core.Contract.Contract ValidContract(Guid? customerId = null, int? yearId = null) => new()
     {
@@ -288,6 +288,62 @@ public class ContractServiceTests
         var removed = await service.RemoveContractItemAsync(contractId, participantSchemeId);
 
         Assert.False(removed);
+    }
+
+    [Fact]
+    public async Task RemoveContractItemAsync_WithAuditReason_AuditsTheRemovalAsTheActingUser()
+    {
+        var repository = new FakeContractRepository();
+        var contractId = Guid.NewGuid();
+        repository.Seed(new PTL.Core.Contract.Contract { ContractId = contractId, IsReadOnly = false });
+        var participantSchemeRepository = new FakeParticipantSchemeRepository();
+        var participantSchemeId = Guid.NewGuid();
+        participantSchemeRepository.Add(new ParticipantSchemeRecord { ParticipantSchemeId = participantSchemeId, ContractId = contractId });
+        var service = CreateService(repository, participantSchemeRepository);
+
+        var removed = await service.RemoveContractItemAsync(contractId, participantSchemeId, "  Customer left  ");
+
+        Assert.True(removed);
+        Assert.Equal(new ParticipantSchemeAudit("tester", "Customer left"), participantSchemeRepository.LastAudit);
+        Assert.True((await participantSchemeRepository.GetByIdAsync(participantSchemeId))!.IsRemoved);
+    }
+
+    [Fact]
+    public async Task RemoveContractItemAsync_WithoutAuditReason_DoesNotAudit()
+    {
+        var repository = new FakeContractRepository();
+        var contractId = Guid.NewGuid();
+        repository.Seed(new PTL.Core.Contract.Contract { ContractId = contractId, IsReadOnly = false });
+        var participantSchemeRepository = new FakeParticipantSchemeRepository();
+        var participantSchemeId = Guid.NewGuid();
+        participantSchemeRepository.Add(new ParticipantSchemeRecord { ParticipantSchemeId = participantSchemeId, ContractId = contractId });
+        var service = CreateService(repository, participantSchemeRepository);
+
+        await service.RemoveContractItemAsync(contractId, participantSchemeId, "   ");
+
+        Assert.Null(participantSchemeRepository.LastAudit);
+    }
+
+    [Fact]
+    public async Task GetContractItemsAsync_PendingRemovals_AreFlaggedAndLeaveTheTotals()
+    {
+        var contractId = Guid.NewGuid();
+        var kept = new ContractItemLine { ParticipantSchemeId = Guid.NewGuid(), Price = 100m };
+        var pending = new ContractItemLine { ParticipantSchemeId = Guid.NewGuid(), Price = 40m };
+        var stored = new ContractItemLine { ParticipantSchemeId = Guid.NewGuid(), Price = 25m, IsRemoved = true };
+        var nonFeePaying = new ContractItemLine { ParticipantSchemeId = Guid.NewGuid(), Price = 10m, NonFeePaying = true };
+        var items = ValidItems(contractId);
+        items.Schemes = [new ContractItemSchemeGroup { Participants = [kept, pending, stored, nonFeePaying] }];
+        var service = CreateService(new FakeContractRepository { ContractItems = items });
+
+        var result = await service.GetContractItemsAsync(contractId, [pending.ParticipantSchemeId]);
+
+        Assert.True(pending.IsRemoved);
+        Assert.True(pending.IsPendingRemoval);
+        Assert.False(kept.IsRemoved);
+        Assert.False(stored.IsPendingRemoval);
+        // Only the kept, fee paying line is priced: pending, stored-removed and Non Fee Paying lines drop out.
+        Assert.Equal(100m, result!.TotalPriceItems);
     }
 
     [Fact]

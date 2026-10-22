@@ -39,14 +39,14 @@ public class CustomerApiClientTests
         const string json = """{"items":[],"totalCount":0,"page":1,"pageSize":20}""";
         var client = CreateClient(HttpStatusCode.OK, json);
 
-        var result = await client.SearchCustomersAsync(new CustomerSearchRequest("test", CustomerStatusFilter.Active, 1, 20));
+        var result = await client.SearchCustomersAsync(new CustomerSearchRequest(CustomerStatusFilter.Active, 1, 20));
 
         Assert.Empty(result.Items);
         Assert.Equal(0, result.TotalCount);
     }
 
     [Fact]
-    public async Task SearchCustomersAsync_WithNullSearchTerm_ReturnsDeserializedSearchResponse()
+    public async Task SearchCustomersAsync_DefaultRequest_ReturnsDeserializedSearchResponse()
     {
         const string json = """{"items":[],"totalCount":0,"page":1,"pageSize":20}""";
         var client = CreateClient(HttpStatusCode.OK, json);
@@ -54,6 +54,21 @@ public class CustomerApiClientTests
         var result = await client.SearchCustomersAsync(new CustomerSearchRequest());
 
         Assert.Empty(result.Items);
+    }
+
+    [Fact]
+    public async Task SearchCustomersAsync_SendsStatusPageAndPageSizeOnly_WithNoSearchTerm()
+    {
+        var handler = new StubHttpMessageHandler(HttpStatusCode.OK, """{"items":[],"totalCount":0,"page":2,"pageSize":50}""");
+        Uri? requestUri = null;
+        handler.OnRequest = request => requestUri = request.RequestUri;
+        var client = new CustomerApiClient(new HttpClient(handler) { BaseAddress = new Uri("http://localhost") });
+
+        await client.SearchCustomersAsync(new CustomerSearchRequest(CustomerStatusFilter.All, 2, 50));
+
+        Assert.Equal("/api/customers/search", requestUri!.AbsolutePath);
+        Assert.Equal("?status=All&page=2&pageSize=50", requestUri.Query);
+        Assert.DoesNotContain("searchTerm", requestUri.Query, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -117,7 +132,7 @@ public class CustomerApiClientTests
     {
         var client = CreateClient(HttpStatusCode.OK, "null");
 
-        var result = await client.SearchCustomersAsync(new CustomerSearchRequest("test", CustomerStatusFilter.Active, 2, 50));
+        var result = await client.SearchCustomersAsync(new CustomerSearchRequest(CustomerStatusFilter.Active, 2, 50));
 
         Assert.Empty(result.Items);
         Assert.Equal(0, result.TotalCount);
@@ -329,6 +344,73 @@ public class CustomerApiClientTests
         var result = await client.DeclinePendingCustomerUpdateAsync(Guid.NewGuid());
 
         Assert.True(result);
+    }
+
+    private static (CustomerApiClient Client, List<(HttpMethod Method, string Path, string? Body)> Requests) RecordingClient(HttpStatusCode statusCode)
+    {
+        var requests = new List<(HttpMethod, string, string?)>();
+        var handler = new StubHttpMessageHandler(statusCode, null)
+        {
+            OnRequest = r => requests.Add((r.Method, r.RequestUri!.PathAndQuery, r.Content?.ReadAsStringAsync().GetAwaiter().GetResult()))
+        };
+        return (new CustomerApiClient(new HttpClient(handler) { BaseAddress = new Uri("http://localhost") }), requests);
+    }
+
+    [Fact]
+    public async Task ApprovePendingCustomerUpdateAsync_NoAmendmentsAndNoComments_PostsNoBody()
+    {
+        var (client, requests) = RecordingClient(HttpStatusCode.NoContent);
+
+        await client.ApprovePendingCustomerUpdateAsync(Guid.NewGuid());
+
+        Assert.Null(Assert.Single(requests).Body);
+    }
+
+    [Fact]
+    public async Task ApprovePendingCustomerUpdateAsync_CommentsOnly_PostsTheCommentsWithNoEdits()
+    {
+        var (client, requests) = RecordingClient(HttpStatusCode.NoContent);
+
+        await client.ApprovePendingCustomerUpdateAsync(Guid.NewGuid(), comments: "Thanks for the update");
+
+        var body = Assert.Single(requests).Body!;
+        Assert.Contains("\"comments\":\"Thanks for the update\"", body, StringComparison.Ordinal);
+        Assert.Contains("\"edits\":null", body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ApprovePendingCustomerUpdateAsync_AmendmentsAndComments_PostsBoth()
+    {
+        var (client, requests) = RecordingClient(HttpStatusCode.NoContent);
+
+        await client.ApprovePendingCustomerUpdateAsync(Guid.NewGuid(), AmendedRequest(), "Amended");
+
+        var body = Assert.Single(requests).Body!;
+        Assert.Contains("\"comments\":\"Amended\"", body, StringComparison.Ordinal);
+        Assert.Contains("\"edits\":{", body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task DeclinePendingCustomerUpdateAsync_WithComments_PostsTheComments()
+    {
+        var (client, requests) = RecordingClient(HttpStatusCode.NoContent);
+
+        var result = await client.DeclinePendingCustomerUpdateAsync(Guid.NewGuid(), "Not eligible");
+
+        Assert.True(result);
+        var request = Assert.Single(requests);
+        Assert.EndsWith("/pending-update/decline", request.Path, StringComparison.Ordinal);
+        Assert.Contains("\"comments\":\"Not eligible\"", request.Body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task DeclinePendingCustomerUpdateAsync_NoComments_PostsNoBody()
+    {
+        var (client, requests) = RecordingClient(HttpStatusCode.NoContent);
+
+        await client.DeclinePendingCustomerUpdateAsync(Guid.NewGuid());
+
+        Assert.Null(Assert.Single(requests).Body);
     }
 
     private static CustomerSaveRequest MinimalCreateRequest() => new(

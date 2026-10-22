@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 using PTL.ApiClient;
 using PTL.Auth.Entra;
@@ -6,19 +7,20 @@ using PTL.Core.Contract.Document;
 using PTL.InternalWeb.Authorization;
 using PTL.InternalWeb.Features.Account;
 using PTL.InternalWeb.Features.SystemAdministration;
-using PTL.InternalWeb.Features.TestConsultant;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.AddPtlWebFrontEnd();
 builder.AddEntraAuthentication();
 builder.Services.AddScoped<IEntraInternalUserResolver, InternalUserResolver>();
 
-// SystemAdministration: gated on the "Admin" role already resolved into the ResolvedRoles claim
-// at sign-in (InternalUserResolver) - see SystemAdministrationPolicy remarks for why this checks
-// our own database role, not an Entra ID group.
-builder.Services.AddAuthorizationBuilder()
-    .AddPolicy(SystemAdministrationPolicy.Name, policy => policy.RequireAssertion(context => SystemAdministrationPolicy.IsSatisfiedBy(context.User)))
-    .AddPolicy(TestConsultantPolicy.Name, policy => policy.RequireAssertion(context => TestConsultantPolicy.IsSatisfiedBy(context.User)));
+// Roles come from the PTL database (resolved at sign-in by InternalUserResolver), never from Entra ID
+// groups or app roles. Every endpoint requires a signed-in user unless it opts out with [AllowAnonymous].
+builder.Services.AddPtlAuthorization();
+
+// A refused request lands on the standard Access Denied page (which itself answers 403).
+builder.Services.Configure<CookieAuthenticationOptions>(
+    CookieAuthenticationDefaults.AuthenticationScheme,
+    options => options.AccessDeniedPath = "/AccessDenied");
 
 // Logs every refused request ("non-Admin request is refused AND LOGGED") - without this
 // registration ASP.NET Core silently uses its default handler and refusals go unlogged.

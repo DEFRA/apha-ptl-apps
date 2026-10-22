@@ -103,7 +103,8 @@ public static class TabulationReportBuilder
             [.. renderedTests.Select(t => BuildTestTable(source, t, visibleParticipants))],
             source.HasRatings ? BuildRatingsTable(source, usedSamples, visibleParticipants) : null,
             source.Attachments.Select(a => new TabulationAttachmentResponse(a.AttachmentId, a.FileName)).FirstOrDefault(),
-            BuildPrint(source, renderedTests, usedSamples, visibleParticipants));
+            BuildPrint(source, renderedTests, usedSamples, visibleParticipants),
+            $"{source.Distribution} {source.SchemeIdentifier}: {source.SchemeName}");
     }
 
     private static bool IsRendered(TabulationSourceTest test) =>

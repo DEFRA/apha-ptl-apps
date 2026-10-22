@@ -15,4 +15,13 @@ public interface IPendingParticipantUpdateRepository
     // fldIsDeleted=1); used on both Approve and Decline, since neither path reinstates the row.
     // Returns false when the row is still outstanding afterwards.
     Task<bool> MarkDecidedAsync(Guid participantId, Guid pendingParticipantUpdateId, CancellationToken cancellationToken = default);
+
+    // spiUpdatedParticipantDetailsEmail - records one accepted/declined email; it stays unsent until ParticipantUpdateNotifier sends it.
+    Task QueueNotificationAsync(ParticipantUpdateNotification notification, CancellationToken cancellationToken = default);
+
+    // spgaUpdatedParticipantDetailsEmail - every unsent row.
+    Task<IReadOnlyList<ParticipantUpdateEmailEntity>> GetUnsentNotificationsAsync(CancellationToken cancellationToken = default);
+
+    // spuUpdatedParticipantDetailsEmail - stamps fldDateSent.
+    Task MarkNotificationSentAsync(Guid notificationId, DateTime sentAt, CancellationToken cancellationToken = default);
 }

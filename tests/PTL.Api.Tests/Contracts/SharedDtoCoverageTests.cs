@@ -191,17 +191,15 @@ public class SharedDtoCoverageTests
         Assert.Equal("Bob Example", summary.ContactName);
         Assert.True(summary.IsActive);
 
-        var request = new ParticipantSearchRequest(customerId, "lab", IncludeInactive: true, Page: 2, PageSize: 50);
+        var request = new ParticipantSearchRequest(customerId, IncludeInactive: true, Page: 2, PageSize: 50);
 
         Assert.Equal(customerId, request.CustomerId);
-        Assert.Equal("lab", request.SearchTerm);
         Assert.True(request.IncludeInactive);
         Assert.Equal(2, request.Page);
         Assert.Equal(50, request.PageSize);
 
         var defaults = new ParticipantSearchRequest(customerId);
 
-        Assert.Null(defaults.SearchTerm);
         Assert.False(defaults.IncludeInactive);
         Assert.Equal(1, defaults.Page);
         Assert.Equal(20, defaults.PageSize);

@@ -6,6 +6,7 @@ using PTL.Api.Infrastructure;
 using PTL.Common.Correlation;
 using PTL.Common.Health;
 using PTL.Core.AdministrationCharge;
+using PTL.Core.CategoryItemType;
 using PTL.Core.Contract;
 using PTL.Core.Contract.Document;
 using PTL.Core.Contract.Export.Bulk;
@@ -16,6 +17,7 @@ using PTL.Core.Contract.Renew;
 using PTL.Core.Contract.Renewal;
 using PTL.Core.Contract.SampleAddress;
 using PTL.Core.Country;
+using PTL.Core.CriterionItemType;
 using PTL.Core.Customer;
 using PTL.Core.Distribution;
 using PTL.Core.ExternalSiteMessage;
@@ -30,10 +32,12 @@ using PTL.Core.PostagePricingPlan;
 using PTL.Core.Scheme;
 using PTL.Core.SystemMessage;
 using PTL.Core.TestConsultant;
+using PTL.Core.TestType;
 using PTL.Core.User;
 using PTL.Core.Viewer;
 using PTL.Core.WeightedPricingPlan;
 using PTL.Data.AdministrationCharge;
+using PTL.Data.CategoryItemType;
 using PTL.Data.Contract;
 using PTL.Data.Contract.Export;
 using PTL.Data.Contract.ImportPermit;
@@ -42,6 +46,7 @@ using PTL.Data.Contract.Renew;
 using PTL.Data.Contract.Renewal;
 using PTL.Data.Contract.SampleAddress;
 using PTL.Data.Country;
+using PTL.Data.CriterionItemType;
 using PTL.Data.Customer;
 using PTL.Data.Distribution;
 using PTL.Data.ExternalSiteMessage;
@@ -57,6 +62,7 @@ using PTL.Data.Scheme;
 using PTL.Data.Storage;
 using PTL.Data.SystemMessage;
 using PTL.Data.TestConsultant;
+using PTL.Data.TestType;
 using PTL.Data.User;
 using PTL.Data.Viewer;
 using PTL.Data.WeightedPricingPlan;
@@ -102,6 +108,9 @@ builder.Services.AddScoped<ICustomerRepository, CustomerRepository>();
 builder.Services.AddScoped<IPendingCustomerUpdateRepository, PendingCustomerUpdateRepository>();
 builder.Services.AddScoped<ICustomerService, CustomerService>();
 
+builder.Services.AddScoped<PTL.Core.Search.ISearchRepository, PTL.Data.Search.SearchRepository>();
+builder.Services.AddScoped<PTL.Core.Search.ISearchService, PTL.Core.Search.SearchService>();
+
 builder.Services.AddScoped<IGroupAddressRepository, GroupAddressRepository>();
 builder.Services.AddScoped<IGroupAddressService, GroupAddressService>();
 
@@ -126,6 +135,8 @@ builder.Services.AddScoped<IInternalUserService, InternalUserService>();
 
 builder.Services.AddScoped<IContractRepository, ContractRepository>();
 builder.Services.AddScoped<IContractService, ContractService>();
+builder.Services.AddScoped<IContractPostageService, ContractPostageService>();
+builder.Services.AddScoped<PTL.Core.Audit.IAuditActorResolver, PTL.Core.Audit.AuditActorResolver>();
 
 builder.Services.AddScoped<IImportPermitRepository, ImportPermitRepository>();
 builder.Services.AddScoped<IImportPermitService, ImportPermitService>();
@@ -140,6 +151,20 @@ builder.Services.AddScoped<IContractMergeRepository, ContractMergeRepository>();
 builder.Services.AddScoped<IRenewContractsService, RenewContractsService>();
 builder.Services.AddScoped<IPendingOrderRepository, PendingOrderRepository>();
 builder.Services.AddScoped<IPendingOrderService, PendingOrderService>();
+builder.Services.AddScoped<IPendingOrderContractWriter, PendingOrderContractWriter>();
+builder.Services.AddScoped<IPendingOrderDecisionEmails, PendingOrderDecisionEmails>();
+builder.Services.AddScoped<IPendingOrderEmailPersonaliser, PendingOrderEmailPersonaliser>();
+
+// Approve/Decline emails: sent through GOV.UK Notify straight after the decision, retried by the hosted scheduler.
+builder.Services.Configure<OnlineOrderEmailOptions>(builder.Configuration.GetSection(OnlineOrderEmailOptions.SectionName));
+builder.Services.AddSingleton<EmailSendGuard>();
+builder.Services.AddScoped<IPendingOrderNotifier, PendingOrderNotifier>();
+
+// Customer and participant update emails: same pattern - sent through GOV.UK Notify when the update is decided, retried by the scheduler.
+builder.Services.Configure<CustomerUpdateEmailOptions>(builder.Configuration.GetSection(CustomerUpdateEmailOptions.SectionName));
+builder.Services.Configure<ParticipantUpdateEmailOptions>(builder.Configuration.GetSection(ParticipantUpdateEmailOptions.SectionName));
+builder.Services.AddScoped<ICustomerUpdateNotifier, CustomerUpdateNotifier>();
+builder.Services.AddScoped<IParticipantUpdateNotifier, ParticipantUpdateNotifier>();
 
 // Single shared S3 configuration root for every S3-backed feature (export templates, invoice
 // archives) - one bucket, one prefix per feature (docs/migration/invoice-migration.md). Provider
@@ -196,19 +221,19 @@ builder.Services.AddScoped<ITestConsultantTabulationRepository, TestConsultantTa
 builder.Services.AddScoped<ITestConsultantTabulationService, TestConsultantTabulationService>();
 builder.Services.AddScoped<IAmendResultsService, AmendResultsService>();
 builder.Services.AddScoped<ITabulationSendService, TabulationSendService>();
-builder.Services.Configure<AttachmentOptions>(builder.Configuration.GetSection(AttachmentOptions.SectionName));
 builder.Services.AddScoped<IActualResultsService, ActualResultsService>();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddScoped<IDistributionPostedNotifier, DistributionPostedNotifier>();
 
-// Test Consultant and publication emails: sent through GOV.UK Notify, with the scheduler hosted in this process.
+// Test Consultant and publication emails: sent through GOV.UK Notify; the one scheduler for all email jobs is hosted in this process.
+builder.Services.Configure<NotificationSchedulerOptions>(builder.Configuration.GetSection(NotificationSchedulerOptions.SectionName));
 builder.Services.Configure<TabulationEmailOptions>(builder.Configuration.GetSection(TabulationEmailOptions.SectionName));
 builder.Services.Configure<PublicationNotificationOptions>(builder.Configuration.GetSection(PublicationNotificationOptions.SectionName));
 builder.Services.AddSingleton<TabulationEmailGuard>();
 builder.Services.AddSingleton<TabulationEmailContext>();
 builder.Services.AddScoped<ITabulationEmailService, TabulationEmailService>();
 builder.Services.AddScoped<ITabulationPublishedNotifier, TabulationPublishedNotifier>();
-builder.Services.AddHostedService<PTL.Api.BackgroundServices.TabulationEmailBackgroundService>();
+builder.Services.AddHostedService<PTL.Api.BackgroundServices.NotificationBackgroundService>();
 builder.Services.AddScoped<IPackagingService, PackagingService>();
 builder.Services.AddScoped<IPackagingOutputService, PackagingOutputService>();
 builder.Services.AddScoped<ITemplateMergeService, TemplateMergeService>();
@@ -225,6 +250,15 @@ builder.Services.AddScoped<IPostagePricingPlanService, PostagePricingPlanService
 
 builder.Services.AddScoped<ICountryRepository, CountryRepository>();
 builder.Services.AddScoped<ICountryService, CountryService>();
+
+builder.Services.AddScoped<ICategoryItemTypeRepository, CategoryItemTypeRepository>();
+builder.Services.AddScoped<ICategoryItemTypeService, CategoryItemTypeService>();
+
+builder.Services.AddScoped<ITestTypeRepository, TestTypeRepository>();
+builder.Services.AddScoped<ITestTypeService, TestTypeService>();
+
+builder.Services.AddScoped<ICriterionItemTypeRepository, CriterionItemTypeRepository>();
+builder.Services.AddScoped<ICriterionItemTypeService, CriterionItemTypeService>();
 
 builder.Services.AddScoped<IExternalSiteMessageRepository, ExternalSiteMessageRepository>();
 builder.Services.AddScoped<IExternalSiteMessageService, ExternalSiteMessageService>();
@@ -352,6 +386,20 @@ catch (Exception ex)
 {
     logCredentialDiagnosticFailed(app.Logger, ex);
 }
+
+// TEMPORARY DIAGNOSTIC - logs the full Notify API key at the user's explicit request; remove and rotate the key afterwards.
+var logNotifyKeyDiagnostic = LoggerMessage.Define<bool, int, string>(
+    LogLevel.Information,
+    new EventId(3, "NotifyApiKeyDiagnostic"),
+    "GOV.UK Notify API key diagnostic: Configured={Configured} Length={Length} Key={ApiKey}");
+
+var configuredNotifyKey = app.Services.GetRequiredService<IOptions<NotifyOptions>>().Value.ApiKey;
+logNotifyKeyDiagnostic(
+    app.Logger,
+    !string.IsNullOrWhiteSpace(configuredNotifyKey),
+    configuredNotifyKey.Length,
+    configuredNotifyKey,
+    null);
 
 app.UseExceptionHandler();
 

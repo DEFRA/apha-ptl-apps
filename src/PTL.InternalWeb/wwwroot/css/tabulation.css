@@ -66,9 +66,16 @@ table.TabulationTable {
     background-color: #fcfcfc;
 }
 
-.divTestConsultantComments .commentsTitle {
-    font-weight: bold;
-    margin: 0 0 1em;
+/* The comments title is a real heading on screen (GOV.UK heading style); print keeps the legacy bold run-in line. */
+@media print {
+    .divTestConsultantComments .commentsTitle {
+        font-family: inherit;
+        font-size: inherit;
+        line-height: inherit;
+        font-weight: bold;
+        color: black;
+        margin: 0 0 1em;
+    }
 }
 
 .divTestConsultantComments p {
@@ -229,5 +236,63 @@ body:not(.js-enabled) [data-amend-recalculate] {
     .cellVersionDate,
     .cellTabulationSignature {
         width: 50%;
+    }
+}
+
+/* ---- On-screen presentation (GOV.UK typography) ----
+   Everything below is screen-only or scoped to .ptl-tabulation-screen. The tables tabulation-print.js
+   builds sit outside that wrapper and the print rules above/below are untouched, so the printed report
+   keeps its legacy layout. */
+.ptl-tabulation-scroll .TabulationTable {
+    font-family: "GDS Transport", arial, sans-serif;
+    font-size: 1rem;
+    line-height: 1.25;
+    color: var(--govuk-text-colour, #0b0c0c);
+    border: 0;
+}
+
+.ptl-tabulation-scroll .TabulationHeader1,
+.ptl-tabulation-scroll .TabulationHeader2,
+.ptl-tabulation-scroll .TabulationCell {
+    font-size: inherit;
+    border: 1px solid #b1b4b6;
+    padding: 5px 8px;
+}
+
+.ptl-tabulation-scroll .TabulationHeader1,
+.ptl-tabulation-scroll .TabulationHeader2 {
+    font-weight: 700;
+    background-color: #f3f2f1;
+}
+
+.ptl-tabulation-scroll .NilReturn {
+    background-color: #eeeeee;
+}
+
+@media screen {
+    #commentsDiv,
+    .signatureTable,
+    .ptl-tabulation-ukas {
+        font-family: "GDS Transport", arial, sans-serif;
+        color: var(--govuk-text-colour, #0b0c0c);
+    }
+
+    #commentsDiv .divTestConsultantComments {
+        font-size: 1.1875rem;
+        line-height: 1.3158;
+        margin: 0 0 30px;
+        padding: 0 0 0 15px;
+        border: 0;
+        border-left: 5px solid #b1b4b6;
+        background: none;
+    }
+
+    #commentsDiv .divTestConsultantComments p {
+        margin: 0 0 20px;
+    }
+
+    .cellVersionDate,
+    .cellTabulationSignature {
+        font-size: 1rem;
     }
 }

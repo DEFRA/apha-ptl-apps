@@ -15,4 +15,13 @@ public interface IPendingCustomerUpdateRepository
     // fldIsDeleted=1); used on both Approve and Decline, since neither path reinstates the row.
     // Returns false when no matching row was found.
     Task<bool> MarkDecidedAsync(Guid customerId, Guid pendingCustomerUpdateId, CancellationToken cancellationToken = default);
+
+    // spiUpdatedCustomerDetailsEmail - records one accepted/declined email; it stays unsent until CustomerUpdateNotifier sends it.
+    Task QueueNotificationAsync(CustomerUpdateNotification notification, CancellationToken cancellationToken = default);
+
+    // spgaUpdatedCustomerDetailsEmail - every unsent row.
+    Task<IReadOnlyList<CustomerUpdateEmailEntity>> GetUnsentNotificationsAsync(CancellationToken cancellationToken = default);
+
+    // spuUpdatedCustomerDetailsEmail - stamps fldDateSent.
+    Task MarkNotificationSentAsync(Guid notificationId, DateTime sentAt, CancellationToken cancellationToken = default);
 }

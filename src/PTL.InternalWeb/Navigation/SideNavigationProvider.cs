@@ -1,3 +1,5 @@
+using PTL.InternalWeb.Authorization;
+
 namespace PTL.InternalWeb.Navigation;
 
 // Fixed configuration for PTLIMS's left-hand navigation, preserving the legacy left-sidebar menu
@@ -7,7 +9,7 @@ namespace PTL.InternalWeb.Navigation;
 // Legacy behaviour this reproduces: the left nav is context-based, not a permanent full tree.
 // Each page shows only its OWN node's title plus that node's direct children - never the whole
 // menu at once. Navigating to "Manage Contracts" shows the Contracts Administration landing page
-// and its children (Customers, Search, Group Addresses, Exports, Invoice Generation); navigating
+// and its children (Customers, Group Addresses, Exports, Invoice Generation); navigating
 // on to "Customers" replaces that with the Customer children (Create Customer, Review Pending
 // Customer/Participant Updates, Review Pending Orders); navigating to "Create Customer" (a leaf)
 // shows only "Create Customer". See _SideNavigation.cshtml for the rendering logic.
@@ -25,6 +27,7 @@ public static class SideNavigationProvider
     private const string ParticipantControllerName = "Participant";
     private const string ContractControllerName = "Contract";
     private const string GroupAddressControllerName = "GroupAddress";
+    private const string SearchControllerName = "Search";
     private const string ParticipantSchemeControllerName = "ParticipantScheme";
     private const string SystemAdministrationControllerName = "SystemAdministration";
     private const string DistributionControllerName = "Distribution";
@@ -36,14 +39,32 @@ public static class SideNavigationProvider
     private static readonly string[] PublishedTabulationKeys = ["year", "monthId", "tabulationId", "publishedTabulationId"];
 
     // Placeholder for a menu entry whose page hasn't been migrated yet - see class remarks.
-    private static SideNavigationItem Disabled(string text) => new() { Text = text, IsEnabled = false };
+    private static SideNavigationItem Disabled(string text, string? requiredPolicy = null) =>
+        new() { Text = text, IsEnabled = false, RequiredPolicy = requiredPolicy };
 
-    public static IReadOnlyList<SideNavigationItem> Build() =>
+    public static IReadOnlyList<SideNavigationItem> Build()
+    {
+        var tree = BuildTree();
+        InheritPolicies(tree, null);
+        return tree;
+    }
+
+    private static void InheritPolicies(IReadOnlyList<SideNavigationItem> items, string? inherited)
+    {
+        foreach (var item in items)
+        {
+            item.RequiredPolicy ??= inherited;
+            InheritPolicies(item.Children, item.RequiredPolicy);
+        }
+    }
+
+    private static IReadOnlyList<SideNavigationItem> BuildTree() =>
     [
         new SideNavigationItem { Text = "Home", ControllerName = "Home", ActionName = IndexAction },
         new SideNavigationItem
         {
             Text = "System Administration",
+            RequiredPolicy = PtlPolicies.Admin,
             ControllerName = SystemAdministrationControllerName,
             ActionName = SystemAdministrationControllerName,
             Children =
@@ -77,6 +98,7 @@ public static class SideNavigationProvider
         new SideNavigationItem
         {
             Text = "Manage Contracts",
+            RequiredPolicy = PtlPolicies.ContractsAdmin,
             ControllerName = ContractControllerName,
             ActionName = "ManageContracts",
             Children =
@@ -175,10 +197,12 @@ public static class SideNavigationProvider
                                     [
                                         new SideNavigationItem { Text = "Contract Item Details", ControllerName = ParticipantSchemeControllerName, ActionName = DetailsAction, IsHidden = true },
                                         new SideNavigationItem { Text = "Add Contract Item", ControllerName = ParticipantSchemeControllerName, ActionName = CreateAction, IsHidden = true },
-                                        new SideNavigationItem { Text = "Edit Contract Item", ControllerName = ParticipantSchemeControllerName, ActionName = EditAction, IsHidden = true },
-                                        new SideNavigationItem { Text = "Import Permits", ControllerName = ContractControllerName, ActionName = "ImportPermits", IsHidden = true }
+                                        new SideNavigationItem { Text = "Edit Contract Item", ControllerName = ParticipantSchemeControllerName, ActionName = EditAction, IsHidden = true }
                                     ]
                                 },
+
+                                // Hidden: reached from the Contracts list's Import Permit(s) link, not from Contract Items.
+                                new SideNavigationItem { Text = "Import Permit(s)", ControllerName = ContractControllerName, ActionName = "ImportPermits", IsHidden = true },
 
                                 // Hidden: a download action that only renders a page when the
                                 // requested document type has no template (FeatureNotAvailable).
@@ -187,7 +211,7 @@ public static class SideNavigationProvider
                         }
                     ]
                 },
-                Disabled("Search"),
+                new SideNavigationItem { Text = "Search", ControllerName = SearchControllerName, ActionName = IndexAction },
                 new SideNavigationItem
                 {
                     Text = "Group Addresses",
@@ -216,6 +240,7 @@ public static class SideNavigationProvider
                 new SideNavigationItem
                 {
                     Text = "Invoice Generation",
+                    RequiredPolicy = PtlPolicies.InvoiceGeneration,
                     ControllerName = "Invoice",
                     ActionName = IndexAction
                 }
@@ -224,6 +249,7 @@ public static class SideNavigationProvider
         new SideNavigationItem
         {
             Text = "Manage Schemes",
+            RequiredPolicy = PtlPolicies.SchemeAdmin,
             ControllerName = SchemeControllerName,
             ActionName = "ManageSchemes",
             Children =
@@ -261,17 +287,17 @@ public static class SideNavigationProvider
                         new SideNavigationItem { Text = "Printable Scheme", ControllerName = SchemeControllerName, ActionName = "PrintableScheme", IsHidden = true }
                     ]
                 },
-                Disabled("Search"),
-                Disabled("Test Types"),
+                new SideNavigationItem { Text = "Test Types", ControllerName = "SchemeAdmin", ActionName = "TestType" },
                 Disabled("Test Result Items"),
                 Disabled("Test Method Items"),
-                Disabled("Category Items"),
-                Disabled("Criterion Items")
+                new SideNavigationItem { Text = "Category Items", ControllerName = "SchemeAdmin", ActionName = "CategoryItemType" },
+                new SideNavigationItem { Text = "Criterion Items", ControllerName = "SchemeAdmin", ActionName = "CriterionItemType" }
             ]
         },
         new SideNavigationItem
         {
             Text = "Distributions",
+            RequiredPolicy = PtlPolicies.Distributions,
             ControllerName = DistributionControllerName,
             ActionName = IndexAction,
             LinkQueryKeys = YearKey,
@@ -384,6 +410,7 @@ public static class SideNavigationProvider
         new SideNavigationItem
         {
             Text = "Test Consultant",
+            RequiredPolicy = PtlPolicies.TestConsultant,
             ControllerName = TestConsultantControllerName,
             ActionName = IndexAction,
             Children =
@@ -391,8 +418,8 @@ public static class SideNavigationProvider
                 new SideNavigationItem { Text = "Test Consultant Tabulation", ControllerName = TestConsultantControllerName, ActionName = "Tabulation", IsHidden = true }
             ]
         },
-        Disabled("Assessor"),
-        Disabled("Results Sign-Off")
+        Disabled("Assessor", PtlPolicies.Assessor),
+        Disabled("Results Sign-Off", PtlPolicies.ResultsSignOff)
     ];
 
     // Depth-first search for the node matching the current controller/action, regardless of

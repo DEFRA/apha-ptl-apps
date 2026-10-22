@@ -27,6 +27,7 @@ namespace PTL.ExternalWeb.Features.Account
         // reflection even on an override that doesn't redeclare it), so a token-less POST is
         // rejected before reaching this body - either outcome means no sign-in ever happens.
         [HttpPost]
+        [ValidateAntiForgeryToken]
         public override Task<IActionResult> Login(AccountViewModel model)
         {
             if (!ModelState.IsValid)

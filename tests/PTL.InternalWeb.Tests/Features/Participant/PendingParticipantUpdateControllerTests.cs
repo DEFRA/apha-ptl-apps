@@ -34,11 +34,68 @@ public class PendingParticipantUpdateControllerTests
         };
         var controller = CreateController(apiClient);
 
-        var result = await controller.ReviewPendingParticipantUpdates(CancellationToken.None);
+        var result = await controller.ReviewPendingParticipantUpdates(cancellationToken: CancellationToken.None);
 
         var view = Assert.IsType<ViewResult>(result);
         var model = Assert.IsType<PTL.InternalWeb.Features.Participant.PendingParticipantUpdateListViewModel>(view.Model);
         Assert.Single(model.Updates);
+        Assert.Equal(1, model.TotalCount);
+    }
+
+    private static IReadOnlyList<PendingParticipantUpdateSummaryResponse> PendingUpdates(int count) =>
+        [.. Enumerable.Range(1, count).Select(i => new PendingParticipantUpdateSummaryResponse(Guid.NewGuid(), $"{i:D3}", $"Lab {i}"))];
+
+    [Fact]
+    public async Task ReviewPendingParticipantUpdates_PagesTheListAtTwentyRowsLikeLegacy()
+    {
+        var controller = CreateController(new FakeParticipantApiClient { PendingParticipantUpdates = PendingUpdates(45) });
+
+        var first = Assert.IsType<PTL.InternalWeb.Features.Participant.PendingParticipantUpdateListViewModel>(Assert.IsType<ViewResult>(await controller.ReviewPendingParticipantUpdates(cancellationToken: CancellationToken.None)).Model);
+        var third = Assert.IsType<PTL.InternalWeb.Features.Participant.PendingParticipantUpdateListViewModel>(Assert.IsType<ViewResult>(await controller.ReviewPendingParticipantUpdates(page: 3, cancellationToken: CancellationToken.None)).Model);
+
+        Assert.Equal(20, first.Updates.Count);
+        Assert.Equal((1, 20, 45), (first.Page, first.PageSize, first.TotalCount));
+        Assert.Equal("001", first.Updates[0].LabCode);
+        Assert.Equal(5, third.Updates.Count);
+        Assert.Equal("041", third.Updates[0].LabCode);
+    }
+
+    [Theory]
+    [InlineData(0, 1)]
+    [InlineData(-4, 1)]
+    [InlineData(99, 3)]
+    public async Task ReviewPendingParticipantUpdates_PageOutOfRange_IsClampedToTheFirstOrLastPage(int requested, int expected)
+    {
+        var controller = CreateController(new FakeParticipantApiClient { PendingParticipantUpdates = PendingUpdates(45) });
+
+        var model = Assert.IsType<PTL.InternalWeb.Features.Participant.PendingParticipantUpdateListViewModel>(Assert.IsType<ViewResult>(await controller.ReviewPendingParticipantUpdates(page: requested, cancellationToken: CancellationToken.None)).Model);
+
+        Assert.Equal(expected, model.Page);
+    }
+
+    [Theory]
+    [InlineData(10, 10)]
+    [InlineData(50, 50)]
+    [InlineData(7, 20)]
+    public async Task ReviewPendingParticipantUpdates_PageSize_UsesTheSharedSizesElseTheLegacyTwenty(int requested, int expected)
+    {
+        var controller = CreateController(new FakeParticipantApiClient { PendingParticipantUpdates = PendingUpdates(45) });
+
+        var model = Assert.IsType<PTL.InternalWeb.Features.Participant.PendingParticipantUpdateListViewModel>(Assert.IsType<ViewResult>(await controller.ReviewPendingParticipantUpdates(pageSize: requested, cancellationToken: CancellationToken.None)).Model);
+
+        Assert.Equal(expected, model.PageSize);
+        Assert.Equal(Math.Min(expected, 45), model.Updates.Count);
+    }
+
+    [Fact]
+    public async Task ReviewPendingParticipantUpdates_NoUpdates_ReturnsAnEmptyFirstPage()
+    {
+        var controller = CreateController(new FakeParticipantApiClient());
+
+        var model = Assert.IsType<PTL.InternalWeb.Features.Participant.PendingParticipantUpdateListViewModel>(Assert.IsType<ViewResult>(await controller.ReviewPendingParticipantUpdates(cancellationToken: CancellationToken.None)).Model);
+
+        Assert.Empty(model.Updates);
+        Assert.Equal((1, 0), (model.Page, model.TotalCount));
     }
 
     [Fact]
@@ -149,14 +206,15 @@ public class PendingParticipantUpdateControllerTests
     {
         var apiClient = new FakeParticipantApiClient();
         var controller = CreateController(apiClient);
-        var model = new PTL.InternalWeb.Features.Participant.PendingParticipantUpdateFormViewModel { ContactName = "Amended Contact" };
+        var model = new PTL.InternalWeb.Features.Participant.PendingParticipantUpdateFormViewModel { ContactName = "Amended Contact", Comments = "Thanks for the update" };
 
         var result = await controller.EditPendingParticipantUpdate(Guid.NewGuid(), model, CancellationToken.None);
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
         Assert.Equal(nameof(PTL.InternalWeb.Features.Participant.ParticipantController.ReviewPendingParticipantUpdates), redirect.ActionName);
         Assert.Equal("Amended Contact", apiClient.LastApproveRequest!.ContactName);
-        Assert.Equal("Participant update approved successfully.", controller.TempData.GetNotification()!.Message);
+        Assert.Equal("Thanks for the update", apiClient.LastApproveComments);
+        Assert.Equal("Participant details updated successfully.", controller.TempData.GetNotification()!.Message);
     }
 
     [Fact]
@@ -167,7 +225,7 @@ public class PendingParticipantUpdateControllerTests
             ApprovePendingParticipantUpdateResult = new PendingParticipantUpdateDecisionResult(false, true, new Dictionary<string, string[]>())
         });
 
-        var result = await controller.ApprovePendingParticipantUpdate(Guid.NewGuid(), CancellationToken.None);
+        var result = await controller.ApprovePendingParticipantUpdate(Guid.NewGuid(), comments: null, CancellationToken.None);
 
         Assert.IsType<NotFoundResult>(result);
     }
@@ -180,7 +238,7 @@ public class PendingParticipantUpdateControllerTests
             ApprovePendingParticipantUpdateResult = new PendingParticipantUpdateDecisionResult(false, false, new Dictionary<string, string[]> { ["ContactName"] = ["Contact name is required."] })
         });
 
-        var result = await controller.ApprovePendingParticipantUpdate(Guid.NewGuid(), CancellationToken.None);
+        var result = await controller.ApprovePendingParticipantUpdate(Guid.NewGuid(), comments: null, CancellationToken.None);
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
         Assert.Equal(nameof(PTL.InternalWeb.Features.Participant.ParticipantController.EditPendingParticipantUpdate), redirect.ActionName);
@@ -189,15 +247,18 @@ public class PendingParticipantUpdateControllerTests
     [Fact]
     public async Task ApprovePendingParticipantUpdate_Success_RedirectsToReviewListWithSuccessNotification()
     {
-        var controller = CreateController(new FakeParticipantApiClient());
+        var apiClient = new FakeParticipantApiClient();
+        var controller = CreateController(apiClient);
 
-        var result = await controller.ApprovePendingParticipantUpdate(Guid.NewGuid(), CancellationToken.None);
+        var result = await controller.ApprovePendingParticipantUpdate(Guid.NewGuid(), "Thanks for the update", CancellationToken.None);
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
         Assert.Equal(nameof(PTL.InternalWeb.Features.Participant.ParticipantController.ReviewPendingParticipantUpdates), redirect.ActionName);
+        Assert.Null(apiClient.LastApproveRequest);
+        Assert.Equal("Thanks for the update", apiClient.LastApproveComments);
         var notification = controller.TempData.GetNotification();
         Assert.Equal(NotificationType.Success, notification!.Type);
-        Assert.Equal("Participant update approved successfully.", notification.Message);
+        Assert.Equal("Participant details updated successfully.", notification.Message);
     }
 
     [Fact]
@@ -205,7 +266,7 @@ public class PendingParticipantUpdateControllerTests
     {
         var controller = CreateController(new FakeParticipantApiClient { DeclinePendingParticipantUpdateResult = false });
 
-        var result = await controller.DeclinePendingParticipantUpdate(Guid.NewGuid(), CancellationToken.None);
+        var result = await controller.DeclinePendingParticipantUpdate(Guid.NewGuid(), comments: null, CancellationToken.None);
 
         Assert.IsType<NotFoundResult>(result);
     }
@@ -213,14 +274,16 @@ public class PendingParticipantUpdateControllerTests
     [Fact]
     public async Task DeclinePendingParticipantUpdate_Success_RedirectsToReviewListWithSuccessNotification()
     {
-        var controller = CreateController(new FakeParticipantApiClient { DeclinePendingParticipantUpdateResult = true });
+        var apiClient = new FakeParticipantApiClient { DeclinePendingParticipantUpdateResult = true };
+        var controller = CreateController(apiClient);
 
-        var result = await controller.DeclinePendingParticipantUpdate(Guid.NewGuid(), CancellationToken.None);
+        var result = await controller.DeclinePendingParticipantUpdate(Guid.NewGuid(), "Not eligible", CancellationToken.None);
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
         Assert.Equal(nameof(PTL.InternalWeb.Features.Participant.ParticipantController.ReviewPendingParticipantUpdates), redirect.ActionName);
+        Assert.Equal("Not eligible", apiClient.LastDeclineComments);
         var notification = controller.TempData.GetNotification();
         Assert.Equal(NotificationType.Success, notification!.Type);
-        Assert.Equal("Participant update declined successfully.", notification.Message);
+        Assert.Equal("Participant updates declined successfully.", notification.Message);
     }
 }

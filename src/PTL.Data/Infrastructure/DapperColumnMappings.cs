@@ -1,6 +1,7 @@
 using System.Reflection;
 using Dapper;
 using PTL.Core.AdministrationCharge;
+using PTL.Core.CategoryItemType;
 using PTL.Core.Contract;
 using PTL.Core.Contract.Export.Bulk;
 using PTL.Core.Contract.Export.Templates;
@@ -10,6 +11,7 @@ using PTL.Core.Contract.Renew;
 using PTL.Core.Contract.Renewal;
 using PTL.Core.Contract.SampleAddress;
 using PTL.Core.Country;
+using PTL.Core.CriterionItemType;
 using PTL.Core.Customer;
 using PTL.Core.Distribution;
 using PTL.Core.ExternalSiteMessage;
@@ -19,17 +21,21 @@ using PTL.Core.Invoice;
 using PTL.Core.Lookup;
 using PTL.Core.Participant;
 using PTL.Core.Scheme;
+using PTL.Core.TestType;
 using PTL.Core.User;
 using PTL.Core.Viewer;
 using PTL.Core.WeightedPricingPlan;
+using CoreCategoryItemType = PTL.Core.CategoryItemType.CategoryItemType;
 using CoreContract = PTL.Core.Contract.Contract;
 using CoreCountry = PTL.Core.Country.Country;
+using CoreCriterionItemType = PTL.Core.CriterionItemType.CriterionItemType;
 using CoreCustomer = PTL.Core.Customer.Customer;
 using CoreExternalSiteMessage = PTL.Core.ExternalSiteMessage.ExternalSiteMessage;
 using CoreGroupAddress = PTL.Core.GroupAddress.GroupAddress;
 using CoreInternalUser = PTL.Core.InternalUser.InternalUser;
 using CoreParticipant = PTL.Core.Participant.Participant;
 using CoreScheme = PTL.Core.Scheme.Scheme;
+using CoreTestType = PTL.Core.TestType.TestType;
 using CoreUser = PTL.Core.User.User;
 
 namespace PTL.Data.Infrastructure;
@@ -60,6 +66,7 @@ public static partial class DapperColumnMappings
     private const string ColContactName = "fldContactName";
     private const string ColOrganisation = "fldOrganisation";
     private const string ColParticipantId = "fldParticipantId";
+    private const string ColPendingContractId = "fldPendingContractId";
     private const string ColLabCode = "fldLabCode";
     private const string ColIdentifier = "fldIdentifier";
     private const string ColViewerId = "fldViewerId";
@@ -115,6 +122,7 @@ public static partial class DapperColumnMappings
     private const string ColDeadlineDate = "fldDeadlineDate";
     private const string ColDistributionParticipantId = "fldDistributionParticipantId";
     private const string ColTestMethodItemId = "fldTestMethodItemId";
+    private const string ColTestTypeId = "fldTestTypeId";
 
     public static void Register()
     {
@@ -374,6 +382,41 @@ public static partial class DapperColumnMappings
             ["CurrentYearId"] = nameof(SystemSettingsEntity.CurrentYearId),
             ["NextYearId"] = nameof(SystemSettingsEntity.NextYearId),
             ["fldContractStartDate"] = nameof(SystemSettingsEntity.ContractStartDate),
+            ["FinalYearId"] = nameof(SystemSettingsEntity.FinalYearId),
+        });
+
+        Map<CoreCategoryItemType>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldCategoryItemTypeId"] = nameof(CoreCategoryItemType.CategoryItemTypeId),
+            [ColName] = nameof(CoreCategoryItemType.Name),
+            ["fldStartYearId"] = nameof(CoreCategoryItemType.StartYearId),
+            ["fldEndYearId"] = nameof(CoreCategoryItemType.EndYearId),
+            ["fldNoLongerInUse"] = nameof(CoreCategoryItemType.NoLongerInUse),
+            ["ForeignInstances"] = nameof(CoreCategoryItemType.ForeignInstances),
+            ["ForeignInstancesString"] = nameof(CoreCategoryItemType.ForeignInstancesString),
+        });
+
+        Map<CoreCriterionItemType>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldCriterionItemTypeId"] = nameof(CoreCriterionItemType.CriterionItemTypeId),
+            [ColName] = nameof(CoreCriterionItemType.Name),
+            ["fldStartYearId"] = nameof(CoreCriterionItemType.StartYearId),
+            ["fldEndYearId"] = nameof(CoreCriterionItemType.EndYearId),
+            ["fldNoLongerInUse"] = nameof(CoreCriterionItemType.NoLongerInUse),
+            ["ForeignInstances"] = nameof(CoreCriterionItemType.ForeignInstances),
+            ["ForeignInstancesString"] = nameof(CoreCriterionItemType.ForeignInstancesString),
+        });
+
+        Map<CoreTestType>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            [ColTestTypeId] = nameof(CoreTestType.TestTypeId),
+            ["fldSharedId"] = nameof(CoreTestType.SharedId),
+            ["fldTestType"] = nameof(CoreTestType.Name),
+            ["fldStartYearId"] = nameof(CoreTestType.StartYearId),
+            ["fldEndYearId"] = nameof(CoreTestType.EndYearId),
+            ["fldNoLongerInUse"] = nameof(CoreTestType.NoLongerInUse),
+            ["ForeignInstances"] = nameof(CoreTestType.ForeignInstances),
+            ["ForeignInstancesString"] = nameof(CoreTestType.ForeignInstancesString),
         });
 
         // spgContractMerge result set 1 (legacy ContractMergeInfo).
@@ -413,7 +456,7 @@ public static partial class DapperColumnMappings
 
         Map<PendingOrderSummaryEntity>(new(StringComparer.OrdinalIgnoreCase)
         {
-            ["fldPendingContractId"] = nameof(PendingOrderSummaryEntity.PendingContractId),
+            [ColPendingContractId] = nameof(PendingOrderSummaryEntity.PendingContractId),
             [ColCustomerId] = nameof(PendingOrderSummaryEntity.CustomerId),
             [ColYearId] = nameof(PendingOrderSummaryEntity.YearId),
             [ColIsSubmitted] = nameof(PendingOrderSummaryEntity.IsSubmitted),
@@ -423,9 +466,46 @@ public static partial class DapperColumnMappings
             [ColQalNumber] = nameof(PendingOrderSummaryEntity.QalNumber),
         });
 
+        // spgaOnlineContractOrderEmail also returns the customer/QAL/lab-code joins, which are left unmapped on purpose.
+        Map<CustomerUpdateEmailEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldUpdatedCustomerDetailsEmailId"] = nameof(CustomerUpdateEmailEntity.Id),
+            [ColEmail] = nameof(CustomerUpdateEmailEntity.Email),
+            ["fldPendingCustomerDetailsEditId"] = nameof(CustomerUpdateEmailEntity.PendingCustomerUpdateId),
+            ["fldCustomerName"] = nameof(CustomerUpdateEmailEntity.CustomerName),
+            ["fldNotes"] = nameof(CustomerUpdateEmailEntity.Notes),
+            ["fldIsApproved"] = nameof(CustomerUpdateEmailEntity.IsApproved),
+            [ColQalNumber] = nameof(CustomerUpdateEmailEntity.QalNumber),
+            [ColLabCode] = nameof(CustomerUpdateEmailEntity.LabCode),
+        });
+
+        Map<ParticipantUpdateEmailEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldUpdatedParticipantDetailsEmailId"] = nameof(ParticipantUpdateEmailEntity.Id),
+            [ColEmail] = nameof(ParticipantUpdateEmailEntity.Email),
+            [ColLabCode] = nameof(ParticipantUpdateEmailEntity.LabCode),
+            ["fldPendingParticipantDetailsEditId"] = nameof(ParticipantUpdateEmailEntity.PendingParticipantUpdateId),
+            ["fldParticipantName"] = nameof(ParticipantUpdateEmailEntity.ParticipantName),
+            ["fldNotes"] = nameof(ParticipantUpdateEmailEntity.Notes),
+            ["fldIsApproved"] = nameof(ParticipantUpdateEmailEntity.IsApproved),
+            [ColQalNumber] = nameof(ParticipantUpdateEmailEntity.QalNumber),
+        });
+
+        Map<OnlineOrderEmailEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldOnlineContractOrderEmailId"] = nameof(OnlineOrderEmailEntity.Id),
+            [ColEmail] = nameof(OnlineOrderEmailEntity.Email),
+            [ColContractId] = nameof(OnlineOrderEmailEntity.ContractId),
+            [ColPendingContractId] = nameof(OnlineOrderEmailEntity.PendingContractId),
+            ["fldCustomerName"] = nameof(OnlineOrderEmailEntity.CustomerName),
+            [ColYearId] = nameof(OnlineOrderEmailEntity.YearId),
+            ["fldNotes"] = nameof(OnlineOrderEmailEntity.Notes),
+            ["fldIsApproved"] = nameof(OnlineOrderEmailEntity.IsApproved),
+        });
+
         Map<PendingOrderEntity>(new(StringComparer.OrdinalIgnoreCase)
         {
-            ["fldPendingContractId"] = nameof(PendingOrderEntity.PendingContractId),
+            [ColPendingContractId] = nameof(PendingOrderEntity.PendingContractId),
             [ColCustomerId] = nameof(PendingOrderEntity.CustomerId),
             [ColYearId] = nameof(PendingOrderEntity.YearId),
             [ColIsSubmitted] = nameof(PendingOrderEntity.IsSubmitted),
@@ -439,7 +519,7 @@ public static partial class DapperColumnMappings
         Map<PendingOrderSchemeEntity>(new(StringComparer.OrdinalIgnoreCase)
         {
             ["fldPendingParticipantSchemeId"] = nameof(PendingOrderSchemeEntity.PendingParticipantSchemeId),
-            ["fldPendingContractId"] = nameof(PendingOrderSchemeEntity.PendingContractId),
+            [ColPendingContractId] = nameof(PendingOrderSchemeEntity.PendingContractId),
             [ColParticipantId] = nameof(PendingOrderSchemeEntity.ParticipantId),
             ["fldParticipantName"] = nameof(PendingOrderSchemeEntity.ParticipantName),
             [ColSchemeId] = nameof(PendingOrderSchemeEntity.SchemeId),
@@ -829,7 +909,7 @@ public static partial class DapperColumnMappings
         Map<DistributionTestEntity>(new(StringComparer.OrdinalIgnoreCase)
         {
             [ColTestId] = nameof(DistributionTestEntity.TestId),
-            ["fldTestTypeId"] = nameof(DistributionTestEntity.TestTypeId),
+            [ColTestTypeId] = nameof(DistributionTestEntity.TestTypeId),
             ["TestName"] = nameof(DistributionTestEntity.TestName),
             [ColOrder] = nameof(DistributionTestEntity.Order),
         });
@@ -1000,6 +1080,10 @@ public static partial class DapperColumnMappings
 
         RegisterTabulationEmailMappings();
 
+        RegisterMonthSetupMappings();
+
+        RegisterSearchMappings();
+
         RegisterPackagingMappings();
 
         Map<DistributionCategoryItemEntity>(new(StringComparer.OrdinalIgnoreCase)
@@ -1048,7 +1132,7 @@ public static partial class DapperColumnMappings
         Map<SchemeTest>(new(StringComparer.OrdinalIgnoreCase)
         {
             [ColTestId] = nameof(SchemeTest.TestId),
-            ["fldTestTypeId"] = nameof(SchemeTest.TestTypeId),
+            [ColTestTypeId] = nameof(SchemeTest.TestTypeId),
             ["fldTestType"] = nameof(SchemeTest.TestType),
             [ColSchemeId] = nameof(SchemeTest.SchemeId),
             [ColOrder] = nameof(SchemeTest.Order),
@@ -1117,7 +1201,7 @@ public static partial class DapperColumnMappings
 
         Map<SchemeItemTypeEntity>(new(StringComparer.OrdinalIgnoreCase)
         {
-            ["fldTestTypeId"] = nameof(SchemeItemTypeEntity.ItemTypeId),
+            [ColTestTypeId] = nameof(SchemeItemTypeEntity.ItemTypeId),
             ["fldTestType"] = nameof(SchemeItemTypeEntity.Name),
             ["fldTestResultItemTypeId"] = nameof(SchemeItemTypeEntity.ItemTypeId),
             ["fldTestResultItemType"] = nameof(SchemeItemTypeEntity.Name),

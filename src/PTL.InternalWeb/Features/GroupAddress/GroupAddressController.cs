@@ -1,11 +1,15 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using PTL.ApiClient;
 using PTL.Contracts.GroupAddress;
+using PTL.InternalWeb.Authorization;
 using PTL.SharedUI.Notifications;
 
 namespace PTL.InternalWeb.Features.GroupAddress;
 
+// Legacy "Contracts Admin/GroupAddress*" pages - requires the Contracts Admin role.
+[Authorize(Policy = PtlPolicies.ContractsAdmin)]
 public sealed class GroupAddressController(IGroupAddressApiClient groupAddressApiClient, ILookupApiClient lookupApiClient) : Controller
 {
     [HttpGet]

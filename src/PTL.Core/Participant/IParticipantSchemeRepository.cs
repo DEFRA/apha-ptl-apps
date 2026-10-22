@@ -14,4 +14,16 @@ public interface IParticipantSchemeRepository
 
     // Uses spuParticipantScheme; returns false when no row was updated (record does not exist).
     Task<bool> UpdateAsync(ParticipantSchemeRecord record, CancellationToken cancellationToken = default);
+
+    // Legacy ContractItems removal (SetAudit + Delete + Save): the distribution sync, then
+    // spiAuditParticipantScheme, then spuParticipantScheme - in that order, in one transaction.
+    Task<bool> RemoveAsync(ParticipantSchemeRecord record, ParticipantSchemeAudit audit, CancellationToken cancellationToken = default);
+
+    // Uses spgSchemeBySchemeId (fldCanEditXParticipants, or ...Overseas when nonUk) and
+    // spgParticipantSchemeWarning - legacy ParticipantScheme.SchemeId's setter.
+    Task<ParticipantSchemeContext> GetSchemeContextAsync(Guid schemeId, Guid contractId, bool nonUk, CancellationToken cancellationToken = default);
+
+    // Uses spgParticipantSchemeInfoByParticipantIdAndSchemeId - every contract item (any contract,
+    // removed ones included) the participant already has on the scheme.
+    Task<IReadOnlyList<OtherParticipantScheme>> GetByParticipantAndSchemeAsync(Guid participantId, Guid schemeId, CancellationToken cancellationToken = default);
 }

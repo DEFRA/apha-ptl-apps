@@ -1,0 +1,91 @@
+version: 2
+
+# Release labels: build-test-publish-images.yml requires exactly one release:<component>:*
+# label for every component whose paths change, and merging publishes a new version of that
+# component. Dependabot cannot work out which component a change affects, so every component
+# that can be reached gets a patch label. A label for a component that did not change is
+# ignored with a warning, so this never blocks a pull request.
+#
+# Dependabot pull requests receive no repository secrets. Add any secrets the build needs
+# (for example the FortiGate CA certificates and SONAR_TOKEN) under
+# Settings > Secrets and variables > Dependabot, or the container-validation job will fail.
+
+updates:
+  - package-ecosystem: nuget
+    directories:
+      - "/src/*"
+      - "/tests/*"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    labels:
+      - "release:api:patch"
+      - "release:internalweb:patch"
+      - "release:externalweb:patch"
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      nuget-minor-and-patch:
+        update-types:
+          - minor
+          - patch
+
+  - package-ecosystem: github-actions
+    directories:
+      - "/"
+      - "/.github/actions/*"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    labels:
+      - "release:api:patch"
+      - "release:internalweb:patch"
+      - "release:externalweb:patch"
+    commit-message:
+      prefix: "chore(ci)"
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+
+  # Base-image tag bumps only; a new .NET major version is a deliberate, reviewed change.
+  - package-ecosystem: docker
+    directory: "/src/PTL.Api"
+    schedule:
+      interval: weekly
+      day: monday
+    labels:
+      - "release:api:patch"
+    commit-message:
+      prefix: "chore(docker)"
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: docker
+    directory: "/src/PTL.InternalWeb"
+    schedule:
+      interval: weekly
+      day: monday
+    labels:
+      - "release:internalweb:patch"
+    commit-message:
+      prefix: "chore(docker)"
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: docker
+    directory: "/src/PTL.ExternalWeb"
+    schedule:
+      interval: weekly
+      day: monday
+    labels:
+      - "release:externalweb:patch"
+    commit-message:
+      prefix: "chore(docker)"
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]

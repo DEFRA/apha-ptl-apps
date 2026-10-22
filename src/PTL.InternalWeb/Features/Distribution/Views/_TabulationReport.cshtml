@@ -39,11 +39,17 @@
     }
 }
 
-<a class="govuk-back-link noprint" asp-action="@backAction" asp-all-route-data="pageRoute">Back</a>
-
-<div class="noprint">
-    <h1 class="govuk-heading-l">@report.Title</h1>
-    <h2 class="govuk-heading-m">@report.TabulationName</h2>
+<div class="noprint ptl-tabulation-screen">
+    @if (isIssued)
+    {
+         <h1 class="govuk-heading-l">Issued Tabulation</h1>
+    }
+    else
+    {
+        <h1 class="govuk-heading-l">Tabulation</h1>
+    }
+    <h2 class="govuk-heading-m">@report.DistributionHeading</h2>
+    <h3 class="govuk-heading-s">@report.TabulationName</h3>
     @if (isIssued)
     {
         <p class="govuk-body">@report.DistributionDateText</p>
@@ -127,7 +133,7 @@
     @if (!string.IsNullOrEmpty(report.TestConsultantCommentsHtml))
     {
         <div class="divTestConsultantComments">
-            <p class="commentsTitle">@report.TestConsultantCommentsTitle</p>
+            <h2 class="govuk-heading-m commentsTitle">@report.TestConsultantCommentsTitle</h2>
             @Html.Raw(report.TestConsultantCommentsHtml)
         </div>
     }

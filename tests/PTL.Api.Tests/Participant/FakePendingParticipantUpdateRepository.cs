@@ -34,4 +34,43 @@ internal sealed class FakePendingParticipantUpdateRepository : IPendingParticipa
         pending.IsDeleted = true;
         return Task.FromResult(true);
     }
+
+    // Rows of tblUpdatedParticipantDetailsEmail that have no fldDateSent yet.
+    public List<ParticipantUpdateEmailEntity> Unsent { get; } = [];
+    public List<ParticipantUpdateNotification> QueuedNotifications { get; } = [];
+    public Dictionary<Guid, DateTime> MarkedSent { get; } = [];
+    public Exception? GetUnsentFailure { get; set; }
+    public int GetUnsentCalls { get; private set; }
+
+    public Task QueueNotificationAsync(ParticipantUpdateNotification notification, CancellationToken cancellationToken = default)
+    {
+        QueuedNotifications.Add(notification);
+        Unsent.Add(new ParticipantUpdateEmailEntity
+        {
+            Id = Guid.NewGuid(),
+            Email = notification.Email,
+            LabCode = notification.LabCode,
+            PendingParticipantUpdateId = notification.PendingParticipantUpdateId,
+            ParticipantName = notification.ParticipantName,
+            Notes = notification.Notes,
+            IsApproved = notification.IsApproved,
+            QalNumber = "QAL/00001"
+        });
+        return Task.CompletedTask;
+    }
+
+    public Task<IReadOnlyList<ParticipantUpdateEmailEntity>> GetUnsentNotificationsAsync(CancellationToken cancellationToken = default)
+    {
+        GetUnsentCalls++;
+        return GetUnsentFailure is null
+            ? Task.FromResult<IReadOnlyList<ParticipantUpdateEmailEntity>>([.. Unsent])
+            : Task.FromException<IReadOnlyList<ParticipantUpdateEmailEntity>>(GetUnsentFailure);
+    }
+
+    public Task MarkNotificationSentAsync(Guid notificationId, DateTime sentAt, CancellationToken cancellationToken = default)
+    {
+        Unsent.RemoveAll(e => e.Id == notificationId);
+        MarkedSent[notificationId] = sentAt;
+        return Task.CompletedTask;
+    }
 }
