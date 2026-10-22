@@ -382,4 +382,22 @@ public class LookupRepositoryTests
 
         await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => repository.GetSchemeItemTypesAsync((SchemeItemTypeKind)999, 2026));
     }
+
+    [Fact]
+    public async Task GetTestReturnValueTypesAsync_ReturnsMappedReturnValueTypes()
+    {
+        var (repository, connection) = CreateRepository();
+        var returnValueTypeId = Guid.NewGuid();
+        var table = new DataTable();
+        table.Columns.Add("fldTestReturnValueTypeId", typeof(Guid));
+        table.Columns.Add("fldTestReturnValueType", typeof(string));
+        table.Rows.Add(returnValueTypeId, "Numeric");
+        connection.RespondToQuery("EXEC dbo.spgaTestReturnValueType", table);
+
+        var result = await repository.GetTestReturnValueTypesAsync();
+
+        Assert.Single(result);
+        Assert.Equal(returnValueTypeId, result[0].TestReturnValueTypeId);
+        Assert.Equal("Numeric", result[0].Name);
+    }
 }

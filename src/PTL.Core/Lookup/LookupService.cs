@@ -68,6 +68,9 @@ public sealed class LookupService(ILookupRepository lookupRepository) : ILookupS
     public Task<IReadOnlyList<SchemeItemTypeEntity>> GetSchemeItemTypesAsync(SchemeItemTypeKind kind, int yearId, CancellationToken cancellationToken = default) =>
         lookupRepository.GetSchemeItemTypesAsync(kind, yearId, cancellationToken);
 
+    public Task<IReadOnlyList<TestReturnValueTypeEntity>> GetTestReturnValueTypesAsync(CancellationToken cancellationToken = default) =>
+        lookupRepository.GetTestReturnValueTypesAsync(cancellationToken);
+
     public async Task<IReadOnlyList<SchemeCurrencyEntity>> GetSchemeCurrenciesAsync(Guid schemeId, CancellationToken cancellationToken = default)
     {
         var all = await lookupRepository.GetSchemeCurrenciesAsync(cancellationToken);

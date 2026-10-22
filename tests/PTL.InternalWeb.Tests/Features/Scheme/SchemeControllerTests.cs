@@ -243,7 +243,7 @@ public class SchemeControllerTests
     // TestType/CriterionItemType only - a retired item of a different kind (here simulated via the
     // same fake list) is not expected to be dropped from a kind the filter doesn't apply to yet.
     [Fact]
-    public async Task Create_Get_ExcludesNoLongerInUseTestTypesAndCriterionItemsFromAddDropdownButKeepsOtherKindsUnfiltered()
+    public async Task Create_Get_ExcludesNoLongerInUseItemTypesFromAddDropdownsButKeepsCategoryItemsUnfiltered()
     {
         var activeId = Guid.NewGuid();
         var retiredId = Guid.NewGuid();
@@ -265,8 +265,22 @@ public class SchemeControllerTests
         Assert.Contains(model.CriterionItemTypeOptions, o => o.Value == activeId.ToString());
         Assert.DoesNotContain(model.CriterionItemTypeOptions, o => o.Value == retiredId.ToString());
 
-        // Category Item Type dropdown is unaffected by the TestType/CriterionItemType-only fix -
-        // see SchemeController.PopulateTestItemTypeOptionsAsync remarks.
+        // AC: "Given an item is marked No Longer in Use, When a new test is configured, Then the
+        // item is not offered for selection" - story 744590.
+        Assert.Contains(model.ResultItemTypeOptions, o => o.Value == activeId.ToString());
+        Assert.DoesNotContain(model.ResultItemTypeOptions, o => o.Value == retiredId.ToString());
+
+        // AC: "Given a method item is marked No Longer in Use, When an existing scheme referencing
+        // it is opened, Then the item remains visible on that scheme" - story 744591. Covered here
+        // via the mirror-image assertion: the Add dropdown excludes it (this was the final of the
+        // 5 SchemeItemTypeKind values to need the fix), while namesByKind (not exercised by this
+        // dropdown-only test) stays unfiltered by construction - see
+        // SchemeController.PopulateTestItemTypeOptionsAsync remarks.
+        Assert.Contains(model.MethodItemTypeOptions, o => o.Value == activeId.ToString());
+        Assert.DoesNotContain(model.MethodItemTypeOptions, o => o.Value == retiredId.ToString());
+
+        // Category Item Type dropdown is unaffected by the TestType/CriterionItemType/
+        // TestResultItemType-only fix - see SchemeController.PopulateTestItemTypeOptionsAsync remarks.
         Assert.Contains(model.CategoryItemTypeOptions, o => o.Value == retiredId.ToString());
     }
 

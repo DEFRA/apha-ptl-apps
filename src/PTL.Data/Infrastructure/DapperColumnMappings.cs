@@ -35,6 +35,8 @@ using CoreGroupAddress = PTL.Core.GroupAddress.GroupAddress;
 using CoreInternalUser = PTL.Core.InternalUser.InternalUser;
 using CoreParticipant = PTL.Core.Participant.Participant;
 using CoreScheme = PTL.Core.Scheme.Scheme;
+using CoreTestMethodItemType = PTL.Core.TestMethodItemType.TestMethodItemType;
+using CoreTestResultItemType = PTL.Core.TestResultItemType.TestResultItemType;
 using CoreTestType = PTL.Core.TestType.TestType;
 using CoreUser = PTL.Core.User.User;
 
@@ -417,6 +419,34 @@ public static partial class DapperColumnMappings
             ["fldNoLongerInUse"] = nameof(CoreTestType.NoLongerInUse),
             ["ForeignInstances"] = nameof(CoreTestType.ForeignInstances),
             ["ForeignInstancesString"] = nameof(CoreTestType.ForeignInstancesString),
+        });
+
+        Map<CoreTestResultItemType>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldTestResultItemTypeId"] = nameof(CoreTestResultItemType.TestResultItemTypeId),
+            ["fldSharedId"] = nameof(CoreTestResultItemType.SharedId),
+            ["fldTestResultItemType"] = nameof(CoreTestResultItemType.Name),
+            ["fldStartYearId"] = nameof(CoreTestResultItemType.StartYearId),
+            ["fldEndYearId"] = nameof(CoreTestResultItemType.EndYearId),
+            ["fldNoLongerInUse"] = nameof(CoreTestResultItemType.NoLongerInUse),
+            ["fldTestReturnValueTypeId"] = nameof(CoreTestResultItemType.TestReturnValueTypeId),
+            ["fldTestReturnValueType"] = nameof(CoreTestResultItemType.TestReturnValueTypeName),
+            ["ForeignInstances"] = nameof(CoreTestResultItemType.ForeignInstances),
+            ["ForeignInstancesString"] = nameof(CoreTestResultItemType.ForeignInstancesString),
+        });
+
+        Map<CoreTestMethodItemType>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldTestMethodItemTypeId"] = nameof(CoreTestMethodItemType.TestMethodItemTypeId),
+            ["fldSharedId"] = nameof(CoreTestMethodItemType.SharedId),
+            ["fldTestMethodItemType"] = nameof(CoreTestMethodItemType.Name),
+            ["fldStartYearId"] = nameof(CoreTestMethodItemType.StartYearId),
+            ["fldEndYearId"] = nameof(CoreTestMethodItemType.EndYearId),
+            ["fldNoLongerInUse"] = nameof(CoreTestMethodItemType.NoLongerInUse),
+            ["fldTestReturnValueTypeId"] = nameof(CoreTestMethodItemType.TestReturnValueTypeId),
+            ["fldTestReturnValueType"] = nameof(CoreTestMethodItemType.TestReturnValueTypeName),
+            ["ForeignInstances"] = nameof(CoreTestMethodItemType.ForeignInstances),
+            ["ForeignInstancesString"] = nameof(CoreTestMethodItemType.ForeignInstancesString),
         });
 
         // spgContractMerge result set 1 (legacy ContractMergeInfo).
@@ -1307,6 +1337,12 @@ public static partial class DapperColumnMappings
         {
             [ColYearId] = nameof(YearEntity.YearId),
             ["fldYear"] = nameof(YearEntity.Year),
+        });
+
+        Map<TestReturnValueTypeEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldTestReturnValueTypeId"] = nameof(TestReturnValueTypeEntity.TestReturnValueTypeId),
+            ["fldTestReturnValueType"] = nameof(TestReturnValueTypeEntity.Name),
         });
 
         Map<GroupAddressEntity>(new(StringComparer.OrdinalIgnoreCase)

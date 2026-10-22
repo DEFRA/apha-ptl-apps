@@ -68,4 +68,8 @@ public interface ILookupRepository
     // spgCategoryItemTypeByYearId / spgCriterionItemTypeByYearId - only types valid for the
     // scheme's year are offered, matching the Tests tab's year-scoped ObjectDataSources.
     Task<IReadOnlyList<SchemeItemTypeEntity>> GetSchemeItemTypesAsync(SchemeItemTypeKind kind, int yearId, CancellationToken cancellationToken = default);
+
+    // spgaTestReturnValueType - tblTestReturnValueType, every record on file. Backs the Return
+    // Type dropdown on the SchemeAdmin "Test Result Items" screen.
+    Task<IReadOnlyList<TestReturnValueTypeEntity>> GetTestReturnValueTypesAsync(CancellationToken cancellationToken = default);
 }

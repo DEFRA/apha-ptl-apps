@@ -46,6 +46,8 @@ public class ApiClientServiceCollectionExtensionsTests
         Assert.IsType<ExternalUserApiClient>(provider.GetRequiredService<IExternalUserApiClient>());
         Assert.IsType<InternalUserApiClient>(provider.GetRequiredService<IInternalUserApiClient>());
         Assert.IsType<SystemMessageApiClient>(provider.GetRequiredService<ISystemMessageApiClient>());
+        Assert.IsType<TestResultItemTypeApiClient>(provider.GetRequiredService<ITestResultItemTypeApiClient>());
+        Assert.IsType<TestMethodItemTypeApiClient>(provider.GetRequiredService<ITestMethodItemTypeApiClient>());
     }
 
     [Theory]

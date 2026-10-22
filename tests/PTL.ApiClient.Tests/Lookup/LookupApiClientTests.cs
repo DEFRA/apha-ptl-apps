@@ -238,6 +238,18 @@ public class LookupApiClientTests
     }
 
     [Fact]
+    public async Task GetTestReturnValueTypesAsync_ReturnsDeserializedList()
+    {
+        const string json = """[{"testReturnValueTypeId":"88888888-8888-8888-8888-888888888888","name":"Numeric"}]""";
+        var client = CreateClient(HttpStatusCode.OK, json);
+
+        var result = await client.GetTestReturnValueTypesAsync();
+
+        Assert.Single(result);
+        Assert.Equal("Numeric", result[0].Name);
+    }
+
+    [Fact]
     public async Task GetCountriesAsync_NullResponse_ReturnsEmptyList() =>
         Assert.Empty(await CreateClient(HttpStatusCode.OK, "null").GetCountriesAsync());
 
