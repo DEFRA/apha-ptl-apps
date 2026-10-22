@@ -1,3 +1,6 @@
+using System.Security.Claims;
+using PTL.InternalWeb.Authorization;
+
 namespace PTL.InternalWeb.Features.SystemAdministration;
 
 // Resolves the RBAC decision confirmed Oct 2026: internal role membership stays in PT-LIMS's own
@@ -8,4 +11,6 @@ public static class SystemAdministrationPolicy
 {
     public const string Name = "SystemAdministration";
     public const string AdminRoleName = "Admin";
+
+    public static bool IsSatisfiedBy(ClaimsPrincipal user) => InternalRoleClaims.HasRole(user, AdminRoleName);
 }

@@ -1,0 +1,176 @@
+@model PTL.InternalWeb.Features.TestConsultant.TestConsultantTabulationViewModel
+@{
+    var tabulation = Model.Tabulation!;
+    var comments = tabulation.Comments;
+    ViewData["Title"] = "Test Consultant Tabulation";
+
+    var errors = ViewData.ModelState
+        .Where(entry => entry.Value?.Errors.Count > 0)
+        .SelectMany(entry => entry.Value!.Errors.Select(error => (Field: entry.Key, Message: error.ErrorMessage)))
+        .ToList();
+}
+
+@section Styles {
+    <link rel="stylesheet" href="~/css/tabulation.css" asp-append-version="true" />
+}
+
+<a class="govuk-back-link" asp-action="Index">Back</a>
+
+<govuk-error-summary errors="@errors" />
+
+<h1 class="govuk-heading-l">Test Consultant Tabulation</h1>
+<h2 class="govuk-heading-m">@tabulation.Title</h2>
+
+@if (!comments.IsSubmitted)
+{
+    <p class="govuk-body">Please use the box below the Tabulation to record your comments.</p>
+}
+
+<p class="govuk-body">Also provided to assist in your commentary are the full set of results with extra participant information, and additional sample information (if available).</p>
+<p class="govuk-body">To view a subset of the tabulations un-tick several of the check boxes below and press the draw tabulations button.</p>
+
+<form method="post" asp-action="Tabulation" asp-route-monthlyDistributionSchemeId="@Model.MonthlyDistributionSchemeId" novalidate>
+    @* The filter and the comments travel in one form, so drawing the tabulations keeps the comments typed so far. *@
+    <input type="hidden" name="IsFiltered" value="true" />
+    @foreach (var sample in Model.AllSamples)
+    {
+        <input type="hidden" name="AllSamples" value="@sample" />
+    }
+
+    @if (tabulation.HasMethodItems || Model.AllSamples.Count > 0)
+    {
+        <div class="govuk-form-group">
+            <fieldset class="govuk-fieldset">
+                <legend class="govuk-fieldset__legend govuk-fieldset__legend--s">Columns to show</legend>
+                <div class="govuk-checkboxes govuk-checkboxes--small" data-module="govuk-checkboxes">
+                    @if (tabulation.HasMethodItems)
+                    {
+                        <div class="govuk-checkboxes__item">
+                            <input class="govuk-checkboxes__input" id="show-method-items" name="ShowMethodItems" type="checkbox" value="true" checked="@(Model.ShowMethodItems ? "checked" : null)" />
+                            <input name="ShowMethodItems" type="hidden" value="false" />
+                            <label class="govuk-label govuk-checkboxes__label" for="show-method-items">Method Items</label>
+                        </div>
+                    }
+                    @for (var i = 0; i < Model.AllSamples.Count; i++)
+                    {
+                        var sample = Model.AllSamples[i];
+                        <div class="govuk-checkboxes__item">
+                            <input class="govuk-checkboxes__input" id="shown-sample-@i" name="ShownSamples" type="checkbox" value="@sample" checked="@(Model.ShownSamples.Contains(sample) ? "checked" : null)" />
+                            <label class="govuk-label govuk-checkboxes__label" for="shown-sample-@i">@sample</label>
+                        </div>
+                    }
+                </div>
+            </fieldset>
+        </div>
+
+        <button type="submit" name="command" value="draw" class="govuk-button govuk-button--secondary" data-module="govuk-button" formnovalidate>Draw tabulations</button>
+    }
+
+    <div class="govuk-tabs" data-module="govuk-tabs">
+        <h2 class="govuk-tabs__title">Tabulation views</h2>
+        <ul class="govuk-tabs__list">
+            <li class="govuk-tabs__list-item govuk-tabs__list-item--selected"><a class="govuk-tabs__tab" href="#results-tabulation">Results Tabulation</a></li>
+            <li class="govuk-tabs__list-item"><a class="govuk-tabs__tab" href="#full-results-tabulation">Full Results Tabulation</a></li>
+            <li class="govuk-tabs__list-item"><a class="govuk-tabs__tab" href="#additional-sample-information">Additional Sample Information</a></li>
+        </ul>
+
+        <div class="govuk-tabs__panel" id="results-tabulation">
+            <h2 class="govuk-heading-m">Results Tabulation</h2>
+            @foreach (var table in tabulation.ResultsTables)
+            {
+                <partial name="_TabulationTable" model="table" />
+            }
+            @if (tabulation.ResultsRatings is not null)
+            {
+                <partial name="_TabulationTable" model="tabulation.ResultsRatings" />
+            }
+        </div>
+
+        <div class="govuk-tabs__panel govuk-tabs__panel--hidden" id="full-results-tabulation">
+            <h2 class="govuk-heading-m">Full Results Tabulation</h2>
+            @foreach (var table in tabulation.FullTables)
+            {
+                <partial name="_TabulationTable" model="table" />
+            }
+            @if (tabulation.FullRatings is not null)
+            {
+                <partial name="_TabulationTable" model="tabulation.FullRatings" />
+            }
+            @if (tabulation.ParticipantInformation is not null)
+            {
+                <partial name="_TabulationTable" model="tabulation.ParticipantInformation" />
+            }
+        </div>
+
+        <div class="govuk-tabs__panel govuk-tabs__panel--hidden" id="additional-sample-information">
+            <h2 class="govuk-heading-m">Additional Sample Information</h2>
+            @if (tabulation.SampleInformation.Count == 0)
+            {
+                <p class="govuk-body">No additional sample information is available.</p>
+            }
+            @foreach (var sample in tabulation.SampleInformation)
+            {
+                <div class="divTestConsultantSample">@sample.SampleNumber&nbsp;&nbsp;@sample.TabulationDescription</div>
+                <div class="divTestConsultantSampleDetails">@sample.TestConsultantsDescription</div>
+            }
+        </div>
+    </div>
+
+    <button type="submit" name="command" value="export" class="govuk-button govuk-button--secondary" data-module="govuk-button" formnovalidate>Export to Excel</button>
+
+    @if (!string.IsNullOrEmpty(tabulation.StandardTabulationTextHtml))
+    {
+        <div class="divTestConsultantComments">
+            @Html.Raw(tabulation.StandardTabulationTextHtml)
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(tabulation.CommentsHtml))
+    {
+        <div class="divTestConsultantComments">
+            @Html.Raw(tabulation.CommentsHtml)
+        </div>
+    }
+
+    @if (comments.IsSubmitted)
+    {
+        <div class="divTestConsultantComments">
+            <p class="commentsTitle">@comments.Heading</p>
+            @if (comments.HasComments)
+            {
+                @Html.Raw(comments.CommentsHtml)
+            }
+        </div>
+
+        <div class="govuk-button-group">
+            <button type="submit" name="command" value="cancel" class="govuk-button" data-module="govuk-button" formnovalidate>Back</button>
+        </div>
+    }
+    else
+    {
+        <govuk-rich-text asp-for="Comments" label="@comments.Heading" />
+
+        <div class="govuk-button-group">
+            <button type="submit" name="command" value="save" class="govuk-button" data-module="govuk-button">Save</button>
+            <button type="submit" name="command" value="cancel" class="govuk-button govuk-button--secondary" data-module="govuk-button" formnovalidate>Cancel</button>
+        </div>
+
+        <div class="govuk-warning-text">
+            <span class="govuk-warning-text__icon" aria-hidden="true">!</span>
+            <strong class="govuk-warning-text__text">
+                <span class="govuk-visually-hidden">Warning</span>
+                Once your comments are submitted, you will not be able to edit them again.
+            </strong>
+        </div>
+
+        <div class="govuk-button-group">
+            <button type="submit" name="command" value="submit" class="govuk-button" data-module="govuk-button"
+                    onclick="return confirm('Once your comments are submitted, you will not be able to edit them again. Are you sure you wish to submit?');">Save and Submit</button>
+        </div>
+    }
+</form>
+
+@section Scripts {
+    <script src="~/lib/tinymce/tinymce.min.js" asp-append-version="true"></script>
+    <script src="~/js/ptl-rich-text-editor.js" asp-append-version="true"></script>
+}

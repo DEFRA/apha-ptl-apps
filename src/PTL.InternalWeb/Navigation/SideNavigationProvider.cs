@@ -28,6 +28,7 @@ public static class SideNavigationProvider
     private const string ParticipantSchemeControllerName = "ParticipantScheme";
     private const string SystemAdministrationControllerName = "SystemAdministration";
     private const string DistributionControllerName = "Distribution";
+    private const string TestConsultantControllerName = "TestConsultant";
 
     private static readonly string[] YearKey = ["year"];
     private static readonly string[] YearMonthKeys = ["year", "monthId"];
@@ -379,7 +380,17 @@ public static class SideNavigationProvider
                 }
             ]
         },
-        Disabled("Test Consultant"),
+        // Legacy sitemap: "Test Consultant" (MenuTestConsultants.aspx) and its hidden "Test Consultant Tabulation" page.
+        new SideNavigationItem
+        {
+            Text = "Test Consultant",
+            ControllerName = TestConsultantControllerName,
+            ActionName = IndexAction,
+            Children =
+            [
+                new SideNavigationItem { Text = "Test Consultant Tabulation", ControllerName = TestConsultantControllerName, ActionName = "Tabulation", IsHidden = true }
+            ]
+        },
         Disabled("Assessor"),
         Disabled("Results Sign-Off")
     ];

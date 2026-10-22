@@ -76,6 +76,18 @@ public partial class AccountRouteSmokeTests : IClassFixture<PtlInternalWebTestFa
     }
 
     [Fact]
+    public async Task AccessDenied_RendersThePermissionMessage()
+    {
+        var client = _factory.CreateClient();
+
+        var response = await client.GetAsync("/Account/AccessDenied?ReturnUrl=%2FTest%2520Consultant");
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("You do not have permission to view this page", body);
+    }
+
+    [Fact]
     public async Task HomeError_RendersErrorView()
     {
         var client = _factory.CreateClient();

@@ -10,7 +10,7 @@ public interface IUserRepository
     // spiUser
     Task CreateAsync(User user, CancellationToken cancellationToken = default);
 
-    // spiUser + spiSystemAdministrationAudit, in one transaction - if the audit write fails, the
+    // spiUser + spiLog, in one transaction - if the audit write fails, the
     // user row is never persisted either (see ApplyRoleChangesWithAuditAsync remarks).
     Task CreateWithAuditAsync(User user, AuditEntry auditEntry, CancellationToken cancellationToken = default);
 
@@ -18,7 +18,7 @@ public interface IUserRepository
     Task DeleteAsync(Guid userId, CancellationToken cancellationToken = default);
 
     // spdUserRole for each of the user's role assignments, then spdUser, then
-    // spiSystemAdministrationAudit, in one transaction - if the audit write fails, the user and
+    // spiLog, in one transaction - if the audit write fails, the user and
     // their role assignments all remain (see ApplyRoleChangesWithAuditAsync remarks).
     Task DeleteWithAuditAsync(Guid userId, IReadOnlyList<Guid> userRoleIds, AuditEntry auditEntry, CancellationToken cancellationToken = default);
 

@@ -6,6 +6,7 @@ using PTL.Core.Contract.Document;
 using PTL.InternalWeb.Authorization;
 using PTL.InternalWeb.Features.Account;
 using PTL.InternalWeb.Features.SystemAdministration;
+using PTL.InternalWeb.Features.TestConsultant;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.AddPtlWebFrontEnd();
@@ -15,12 +16,9 @@ builder.Services.AddScoped<IEntraInternalUserResolver, InternalUserResolver>();
 // SystemAdministration: gated on the "Admin" role already resolved into the ResolvedRoles claim
 // at sign-in (InternalUserResolver) - see SystemAdministrationPolicy remarks for why this checks
 // our own database role, not an Entra ID group.
-// TEMPORARY (testing phase): any signed-in user passes, so the Admin role is NOT enforced.
-// To restore the Admin-only rule, replace RequireAuthenticatedUser with a RequireAssertion that
-// checks the Admin role in the InternalUserClaimTypes.ResolvedRoles claim
-// (SystemAdministrationPolicy.AdminRoleName).
 builder.Services.AddAuthorizationBuilder()
-    .AddPolicy(SystemAdministrationPolicy.Name, policy => policy.RequireAuthenticatedUser());
+    .AddPolicy(SystemAdministrationPolicy.Name, policy => policy.RequireAssertion(context => SystemAdministrationPolicy.IsSatisfiedBy(context.User)))
+    .AddPolicy(TestConsultantPolicy.Name, policy => policy.RequireAssertion(context => TestConsultantPolicy.IsSatisfiedBy(context.User)));
 
 // Logs every refused request ("non-Admin request is refused AND LOGGED") - without this
 // registration ASP.NET Core silently uses its default handler and refusals go unlogged.

@@ -625,26 +625,31 @@ public class SystemAdministrationController : Controller
     }
 
     // Toggles Active/Inactive - the API stamps/clears InactiveDate accordingly, matching the
-    // story's "Inactive Date is populated" acceptance criterion.
+    // story's "Inactive Date is populated" acceptance criterion. The API refuses to deactivate a
+    // consultant who is still allocated to schemes; that message is shown on the page.
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> ExternalTestConsultantManagementToggleStatus(Guid externalTestConsultantId, bool isInactive, CancellationToken cancellationToken)
     {
-        await externalTestConsultantApiClient.SetStatusAsync(externalTestConsultantId, !isInactive, cancellationToken);
-        return RedirectToAction(nameof(ExternalTestConsultantManagement));
+        var result = await externalTestConsultantApiClient.SetStatusAsync(externalTestConsultantId, !isInactive, cancellationToken);
+        if (result.Success)
+        {
+            return RedirectToAction(nameof(ExternalTestConsultantManagement));
+        }
+
+        return View(nameof(ExternalTestConsultantManagement), await BuildExternalTestConsultantManagementViewModelAsync(
+            editId: null, string.Join(" ", result.FieldErrors.Values.SelectMany(messages => messages)), messageIsError: true, addValues: null, editValues: null, cancellationToken));
     }
 
-    // [NEEDS INVESTIGATION] Generate Login is a stub - see IExternalLoginService remarks. The
-    // confirmation ("Generating a login... Are you sure you wish to proceed?") is a client-side
-    // confirm() on the view's link, matching the story's wording exactly - Cancel simply never
-    // submits the form, so no server-side action runs.
+    // Matches legacy GridViewTC_RowDeleting: refused (with the schemes listed) while the consultant
+    // is allocated to schemes.
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> ExternalTestConsultantManagementGenerateLogin(Guid externalTestConsultantId, CancellationToken cancellationToken)
+    public async Task<IActionResult> ExternalTestConsultantManagementRemove(Guid externalTestConsultantId, CancellationToken cancellationToken)
     {
-        var result = await externalTestConsultantApiClient.GenerateLoginAsync(externalTestConsultantId, cancellationToken);
+        var result = await externalTestConsultantApiClient.DeleteAsync(externalTestConsultantId, cancellationToken);
         return View(nameof(ExternalTestConsultantManagement), await BuildExternalTestConsultantManagementViewModelAsync(
-            editId: null, result.Message ?? (result.Success ? "Login generated successfully." : null), messageIsError: !result.Success, addValues: null, editValues: null, cancellationToken));
+            editId: null, result.Success ? "Test consultant removed successfully." : result.Message, messageIsError: !result.Success, addValues: null, editValues: null, cancellationToken));
     }
 
     private async Task<ExternalTestConsultantManagementViewModel> BuildExternalTestConsultantManagementViewModelAsync(
@@ -667,7 +672,6 @@ public class SystemAdministrationController : Controller
                 Email = editId == c.ExternalTestConsultantId && editValues is not null ? editValues.Email : c.Email,
                 IsInactive = c.IsInactive,
                 InactiveDate = c.InactiveDate,
-                HasLogin = c.HasLogin,
                 IsEditing = editId == c.ExternalTestConsultantId
             })
             .ToList();
@@ -748,19 +752,6 @@ public class SystemAdministrationController : Controller
             editId: null, result.Success ? "Viewer removed successfully." : result.Message, messageIsError: !result.Success, addValues: null, editValues: null, cancellationToken));
     }
 
-    // [NEEDS INVESTIGATION] Generate Login is a stub - see IExternalLoginService remarks. The
-    // confirmation ("Generating a login... Are you sure you wish to proceed?") is a client-side
-    // confirm() on the view's link, matching the story's wording exactly - Cancel simply never
-    // submits the form, so no server-side action runs.
-    [HttpPost]
-    [ValidateAntiForgeryToken]
-    public async Task<IActionResult> ViewerManagementGenerateLogin(Guid viewerId, CancellationToken cancellationToken)
-    {
-        var result = await viewerApiClient.GenerateLoginAsync(viewerId, cancellationToken);
-        return View(nameof(ViewerManagement), await BuildViewerManagementViewModelAsync(
-            editId: null, result.Message ?? (result.Success ? "Login generated successfully." : null), messageIsError: !result.Success, addValues: null, editValues: null, cancellationToken));
-    }
-
     private async Task<ViewerManagementViewModel> BuildViewerManagementViewModelAsync(
         Guid? editId,
         string? message,
@@ -778,7 +769,6 @@ public class SystemAdministrationController : Controller
                 ViewerId = v.ViewerId,
                 Name = editId == v.ViewerId && editValues is not null ? editValues.Name : v.Name,
                 Email = editId == v.ViewerId && editValues is not null ? editValues.Email : v.Email,
-                HasLogin = v.HasLogin,
                 IsEditing = editId == v.ViewerId,
                 IsRemoveBlocked = v.Schemes.Count > 0 || v.Participants.Count > 0,
                 RemoveConfirmMessage = BuildRemoveConfirmMessage(v.Schemes, v.Participants)

@@ -47,5 +47,12 @@ namespace PTL.InternalWeb.Features.Account
         [HttpGet]
         [AllowAnonymous]
         public IActionResult NotPermitted() => View();
+
+        // The cookie scheme's default AccessDeniedPath: reached when a signed-in user is refused by an
+        // authorization policy (for example opening Test Consultant or System Administration without the
+        // required role). The refusal itself is logged by LoggingAuthorizationMiddlewareResultHandler.
+        [HttpGet]
+        [AllowAnonymous]
+        public IActionResult AccessDenied() => View();
     }
 }

@@ -1,5 +1,4 @@
 using PTL.Api.Tests.Audit;
-using PTL.Api.Tests.ExternalUser;
 using PTL.Api.Tests.Participant;
 using PTL.Core.Viewer;
 
@@ -7,8 +6,8 @@ namespace PTL.Api.Tests.Viewer;
 
 public class ViewerServiceTests
 {
-    private static ViewerService CreateService(FakeViewerRepository? repository = null, FakeExternalLoginService? loginService = null) =>
-        new(repository ?? new FakeViewerRepository(), loginService ?? new FakeExternalLoginService(), new FakeActingUserAccessor());
+    private static ViewerService CreateService(FakeViewerRepository? repository = null) =>
+        new(repository ?? new FakeViewerRepository(), new FakeActingUserAccessor());
 
     [Fact]
     public async Task CreateAsync_ValidInput_PersistsAndReturnsViewer()
@@ -142,49 +141,5 @@ public class ViewerServiceTests
 
         Assert.False(success);
         Assert.Single(repository.Viewers);
-    }
-
-    [Fact]
-    public async Task GenerateLoginAsync_Success_SetsSsoId()
-    {
-        var id = Guid.NewGuid();
-        var repository = new FakeViewerRepository();
-        repository.Viewers.Add(new ViewerEntity { ViewerId = id, Name = "Jane Smith", Email = "jane@example.com", SsoId = Guid.Empty });
-        var loginService = new FakeExternalLoginService();
-        var service = CreateService(repository, loginService);
-
-        var (success, message) = await service.GenerateLoginAsync(id);
-
-        Assert.True(success);
-        Assert.Null(message);
-        Assert.Contains(id, loginService.Calls);
-        Assert.NotEqual(Guid.Empty, repository.Viewers.Single().SsoId);
-    }
-
-    [Fact]
-    public async Task GenerateLoginAsync_UnknownViewer_ReturnsFailure()
-    {
-        var service = CreateService();
-
-        var (success, message) = await service.GenerateLoginAsync(Guid.NewGuid());
-
-        Assert.False(success);
-        Assert.Equal("Viewer was not found.", message);
-    }
-
-    [Fact]
-    public async Task GenerateLoginAsync_StubReportsFailure_ReturnsFailureWithoutUpdating()
-    {
-        var id = Guid.NewGuid();
-        var repository = new FakeViewerRepository();
-        repository.Viewers.Add(new ViewerEntity { ViewerId = id });
-        var loginService = new FakeExternalLoginService { Success = false };
-        var service = CreateService(repository, loginService);
-
-        var (success, message) = await service.GenerateLoginAsync(id);
-
-        Assert.False(success);
-        Assert.Equal("The login could not be generated.", message);
-        Assert.Equal(Guid.Empty, repository.Viewers.Single().SsoId);
     }
 }

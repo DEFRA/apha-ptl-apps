@@ -14,7 +14,7 @@ public interface IUserRoleRepository
     Task RemoveAsync(Guid userRoleId, CancellationToken cancellationToken = default);
 
     // Applies every add/remove in roleIdsToAdd/userRoleIdsToRemove plus the audit entry in ONE DB
-    // transaction (spiUserRole/spdUserRole per change, then spiSystemAdministrationAudit) - if the
+    // transaction (spiUserRole/spdUserRole per change, then spiLog) - if the
     // audit write fails, the whole transaction (including every role change) rolls back, so no
     // unaudited role change is ever persisted.
     Task ApplyRoleChangesWithAuditAsync(

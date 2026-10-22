@@ -63,7 +63,7 @@ public class UserRoleRepositoryTests
 
     private const string InsertRoleSql = "EXEC dbo.spiUserRole @UserRoleId, @UserId, @RoleId";
     private const string DeleteRoleSql = "EXEC dbo.spdUserRole @UserRoleId";
-    private const string AuditSql = "EXEC dbo.spiSystemAdministrationAudit @AuditId, @ActingUserId, @Action, @EntityType, @EntityId, @Details";
+    private const string AuditSql = "EXEC dbo.spiLog @LogId, @LogDate, @UserId, @Description";
 
     [Fact]
     public async Task ApplyRoleChangesWithAuditAsync_CommitsAddsRemovesAndAuditInOneTransaction()
@@ -84,7 +84,8 @@ public class UserRoleRepositoryTests
         Assert.Contains(connection.ExecutedCommands, c => c.CommandText == InsertRoleSql);
         Assert.Contains(connection.ExecutedCommands, c => c.CommandText == DeleteRoleSql);
         var auditCommand = Assert.Single(connection.ExecutedCommands, c => c.CommandText == AuditSql);
-        Assert.Equal("SetUserRoles", auditCommand.ParameterValue("@Action"));
+        Assert.Equal(userId.ToString(), auditCommand.ParameterValue("@UserId"));
+        Assert.Equal($"SysAdmin|SetUserRoles|User|{userId}|Added: [Scheme Admin]", auditCommand.ParameterValue("@Description"));
     }
 
     // System Administration business rule: if the audit trail write fails, the change is rolled
