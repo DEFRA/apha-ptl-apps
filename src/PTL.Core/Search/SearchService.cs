@@ -21,6 +21,18 @@ public sealed class SearchService(ISearchRepository searchRepository, ILogger<Se
             new EventId(2, nameof(LogParticipantSearchMessage)),
             "Participant search returned {ResultCount} result(s)");
 
+    private static readonly Action<ILogger, int, Exception?> LogDistributionNumberSearchMessage =
+        LoggerMessage.Define<int>(
+            LogLevel.Information,
+            new EventId(3, nameof(LogDistributionNumberSearchMessage)),
+            "Distribution number search returned {ResultCount} result(s)");
+
+    private static readonly Action<ILogger, int, Exception?> LogSampleNumberSearchMessage =
+        LoggerMessage.Define<int>(
+            LogLevel.Information,
+            new EventId(4, nameof(LogSampleNumberSearchMessage)),
+            "Sample number search returned {ResultCount} result(s)");
+
     public async Task<IReadOnlyList<CustomerSearchRow>> SearchCustomersAsync(CustomerSearchCriteriaRequest criteria, CancellationToken cancellationToken = default)
     {
         var results = await searchRepository.SearchCustomersAsync(
@@ -47,6 +59,26 @@ public sealed class SearchService(ISearchRepository searchRepository, ILogger<Se
             cancellationToken);
 
         LogParticipantSearchMessage(logger, results.Count, null);
+        return results;
+    }
+
+    public async Task<IReadOnlyList<DistributionNumberSearchRow>> SearchByDistributionNumberAsync(DistributionNumberSearchCriteriaRequest criteria, CancellationToken cancellationToken = default)
+    {
+        var results = await searchRepository.SearchByDistributionNumberAsync(
+            new DistributionNumberSearchCriteria(criteria.DistributionNumber ?? string.Empty),
+            cancellationToken);
+
+        LogDistributionNumberSearchMessage(logger, results.Count, null);
+        return results;
+    }
+
+    public async Task<IReadOnlyList<SampleNumberSearchRow>> SearchBySampleNumberAsync(SampleNumberSearchCriteriaRequest criteria, CancellationToken cancellationToken = default)
+    {
+        var results = await searchRepository.SearchBySampleNumberAsync(
+            new SampleNumberSearchCriteria(criteria.SampleNumber ?? string.Empty),
+            cancellationToken);
+
+        LogSampleNumberSearchMessage(logger, results.Count, null);
         return results;
     }
 }

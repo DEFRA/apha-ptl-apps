@@ -308,7 +308,7 @@ public static class SideNavigationProvider
                 // migrated.
                 Disabled("Participant Address Labels"),
                 Disabled("Group Address Labels"),
-                Disabled("Search"),
+                new SideNavigationItem { Text = "Search", ControllerName = DistributionControllerName, ActionName = "Search" },
                 new SideNavigationItem
                 {
                     Text = "Monthly Distributions",

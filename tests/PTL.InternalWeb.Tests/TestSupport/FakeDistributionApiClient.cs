@@ -1,5 +1,6 @@
 using PTL.ApiClient.Distribution;
 using PTL.Contracts.Distribution;
+using PTL.Contracts.Search;
 
 namespace PTL.InternalWeb.Tests.TestSupport;
 
@@ -189,5 +190,24 @@ internal sealed partial class FakeDistributionApiClient : IDistributionApiClient
     {
         PackagingCustomsRequests.Add(request);
         return Task.FromResult(PackagingCustoms);
+    }
+
+    public IReadOnlyList<DistributionNumberSearchResultResponse> DistributionNumberSearchResults { get; set; } = [];
+    public IReadOnlyList<SampleNumberSearchResultResponse> SampleNumberSearchResults { get; set; } = [];
+    public List<DistributionNumberSearchCriteriaRequest> DistributionNumberSearchCalls { get; } = [];
+    public List<SampleNumberSearchCriteriaRequest> SampleNumberSearchCalls { get; } = [];
+
+    public Task<IReadOnlyList<DistributionNumberSearchResultResponse>> SearchByDistributionNumberAsync(
+        DistributionNumberSearchCriteriaRequest criteria, CancellationToken cancellationToken = default)
+    {
+        DistributionNumberSearchCalls.Add(criteria);
+        return Task.FromResult(DistributionNumberSearchResults);
+    }
+
+    public Task<IReadOnlyList<SampleNumberSearchResultResponse>> SearchBySampleNumberAsync(
+        SampleNumberSearchCriteriaRequest criteria, CancellationToken cancellationToken = default)
+    {
+        SampleNumberSearchCalls.Add(criteria);
+        return Task.FromResult(SampleNumberSearchResults);
     }
 }

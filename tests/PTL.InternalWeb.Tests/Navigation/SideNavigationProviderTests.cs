@@ -31,6 +31,17 @@ public class SideNavigationProviderTests
     }
 
     [Fact]
+    public void Build_Distributions_ListsSearchAsAnEnabledLiveNode()
+    {
+        var search = SideNavigationProvider.FindNode(SideNavigationProvider.Build(), "Distribution", "Search");
+
+        Assert.NotNull(search);
+        Assert.Equal("Search", search!.Text);
+        Assert.True(search.IsEnabled);
+        Assert.False(search.IsHidden);
+    }
+
+    [Fact]
     public void FindNode_ExistingNode_ReturnsMatch()
     {
         var tree = SideNavigationProvider.Build();

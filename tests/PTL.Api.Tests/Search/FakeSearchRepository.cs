@@ -32,6 +32,28 @@ internal sealed class FakeSearchRepository : ISearchRepository
         LastCancellationToken = cancellationToken;
         return Failure is null ? Task.FromResult(ParticipantRows) : Task.FromException<IReadOnlyList<ParticipantSearchRow>>(Failure);
     }
+
+    public IReadOnlyList<DistributionNumberSearchRow> DistributionNumberRows { get; set; } = [];
+
+    public IReadOnlyList<SampleNumberSearchRow> SampleNumberRows { get; set; } = [];
+
+    public List<DistributionNumberSearchCriteria> DistributionNumberCalls { get; } = [];
+
+    public List<SampleNumberSearchCriteria> SampleNumberCalls { get; } = [];
+
+    public Task<IReadOnlyList<DistributionNumberSearchRow>> SearchByDistributionNumberAsync(DistributionNumberSearchCriteria criteria, CancellationToken cancellationToken = default)
+    {
+        DistributionNumberCalls.Add(criteria);
+        LastCancellationToken = cancellationToken;
+        return Failure is null ? Task.FromResult(DistributionNumberRows) : Task.FromException<IReadOnlyList<DistributionNumberSearchRow>>(Failure);
+    }
+
+    public Task<IReadOnlyList<SampleNumberSearchRow>> SearchBySampleNumberAsync(SampleNumberSearchCriteria criteria, CancellationToken cancellationToken = default)
+    {
+        SampleNumberCalls.Add(criteria);
+        LastCancellationToken = cancellationToken;
+        return Failure is null ? Task.FromResult(SampleNumberRows) : Task.FromException<IReadOnlyList<SampleNumberSearchRow>>(Failure);
+    }
 }
 
 // Keeps the fully formatted message so tests can assert that search text is never logged.

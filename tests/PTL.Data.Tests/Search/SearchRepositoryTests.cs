@@ -12,6 +12,8 @@ public class SearchRepositoryTests
 
     private const string CustomerSql = "EXEC dbo.spgSearchCustomer @QalNumber, @AccountNumber, @Name, @ContactName, @Organisation, @CountryId";
     private const string ParticipantSql = "EXEC dbo.spgSearchParticipant @LabCode, @LabName, @ContactName";
+    private const string DistributionNumberSql = "EXEC dbo.spgSearchSchemeByDistribution @DistributionNumber";
+    private const string SampleNumberSql = "EXEC dbo.spgSearchSchemeBySampleNumber @SampleNumber";
 
     private static (SearchRepository Repository, FakeDbConnection Connection) CreateRepository()
     {
@@ -41,6 +43,33 @@ public class SearchRepositoryTests
         table.Columns.Add("fldLabName", typeof(string));
         table.Columns.Add("fldContactName", typeof(string));
         table.Columns.Add("fldOldLabCode", typeof(string));
+        return table;
+    }
+
+    private static DataTable DistributionNumberTable()
+    {
+        var table = new DataTable();
+        table.Columns.Add("fldMonthlyDistributionSchemeId", typeof(Guid));
+        table.Columns.Add("fldSchemeId", typeof(Guid));
+        table.Columns.Add("fldSchemeName", typeof(string));
+        table.Columns.Add("fldSchemeIdentifier", typeof(string));
+        table.Columns.Add("fldDistributionNumber", typeof(string));
+        table.Columns.Add("fldMonthId", typeof(int));
+        table.Columns.Add("fldYear", typeof(string));
+        return table;
+    }
+
+    private static DataTable SampleNumberTable()
+    {
+        var table = new DataTable();
+        table.Columns.Add("fldSampleId", typeof(Guid));
+        table.Columns.Add("fldSampleNumber", typeof(string));
+        table.Columns.Add("fldSchemeId", typeof(Guid));
+        table.Columns.Add("fldSchemeName", typeof(string));
+        table.Columns.Add("fldSchemeIdentifier", typeof(string));
+        table.Columns.Add("fldDistributionNumber", typeof(string));
+        table.Columns.Add("fldMonthId", typeof(int));
+        table.Columns.Add("fldYear", typeof(string));
         return table;
     }
 
@@ -229,5 +258,182 @@ public class SearchRepositoryTests
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
             repository.SearchParticipantsAsync(new ParticipantSearchCriteria(string.Empty, string.Empty, string.Empty)));
+    }
+
+    [Fact]
+    public async Task SearchByDistributionNumberAsync_ExecutesTheLegacyProcedureWithTheParameter()
+    {
+        var (repository, connection) = CreateRepository();
+        connection.RespondToQuery(DistributionNumberSql, DistributionNumberTable());
+
+        await repository.SearchByDistributionNumberAsync(new DistributionNumberSearchCriteria("D1a"));
+
+        var command = Assert.Single(connection.ExecutedCommands);
+        Assert.Equal(DistributionNumberSql, command.CommandText);
+        Assert.Equal("D1a", command.ParameterValue("@DistributionNumber"));
+    }
+
+    [Fact]
+    public async Task SearchByDistributionNumberAsync_EmptyCriteria_SendsAnEmptyString()
+    {
+        var (repository, connection) = CreateRepository();
+        connection.RespondToQuery(DistributionNumberSql, DistributionNumberTable());
+
+        await repository.SearchByDistributionNumberAsync(new DistributionNumberSearchCriteria(string.Empty));
+
+        Assert.Equal(string.Empty, Assert.Single(connection.ExecutedCommands).ParameterValue("@DistributionNumber"));
+    }
+
+    [Fact]
+    public async Task SearchByDistributionNumberAsync_MapsEveryColumnAndKeepsTheProcedureOrder()
+    {
+        var (repository, connection) = CreateRepository();
+        var firstSchemeId = Guid.NewGuid();
+        var firstMonthlyId = Guid.NewGuid();
+        var secondSchemeId = Guid.NewGuid();
+        var secondMonthlyId = Guid.NewGuid();
+        var table = DistributionNumberTable();
+        table.Rows.Add(firstMonthlyId, firstSchemeId, "D1a/S1 BT", "D1a", "D1a/00001", 5, "2026");
+        table.Rows.Add(secondMonthlyId, secondSchemeId, "D1a/S2 BT", "D1a", "D1a/00002", 6, "2026");
+        connection.RespondToQuery(DistributionNumberSql, table);
+
+        var results = await repository.SearchByDistributionNumberAsync(new DistributionNumberSearchCriteria(string.Empty));
+
+        Assert.Equal(2, results.Count);
+        Assert.Equal(firstMonthlyId, results[0].MonthlyDistributionSchemeId);
+        Assert.Equal(firstSchemeId, results[0].SchemeId);
+        Assert.Equal("D1a/S1 BT", results[0].SchemeName);
+        Assert.Equal("D1a", results[0].SchemeIdentifier);
+        Assert.Equal("D1a/00001", results[0].DistributionNumber);
+        Assert.Equal(5, results[0].MonthId);
+        Assert.Equal("2026", results[0].Year);
+        Assert.Equal(secondMonthlyId, results[1].MonthlyDistributionSchemeId);
+        Assert.Equal("D1a/00002", results[1].DistributionNumber);
+    }
+
+    [Fact]
+    public async Task SearchByDistributionNumberAsync_NullColumns_AreMappedAsNull()
+    {
+        var (repository, connection) = CreateRepository();
+        var table = DistributionNumberTable();
+        table.Rows.Add(Guid.NewGuid(), Guid.NewGuid(), DBNull.Value, DBNull.Value, DBNull.Value, 5, DBNull.Value);
+        connection.RespondToQuery(DistributionNumberSql, table);
+
+        var row = Assert.Single(await repository.SearchByDistributionNumberAsync(new DistributionNumberSearchCriteria(string.Empty)));
+
+        Assert.Null(row.SchemeName);
+        Assert.Null(row.SchemeIdentifier);
+        Assert.Null(row.DistributionNumber);
+        Assert.Null(row.Year);
+        Assert.Equal(5, row.MonthId);
+    }
+
+    [Fact]
+    public async Task SearchByDistributionNumberAsync_NoRows_ReturnsEmptyList()
+    {
+        var (repository, connection) = CreateRepository();
+        connection.RespondToQuery(DistributionNumberSql, DistributionNumberTable());
+
+        var results = await repository.SearchByDistributionNumberAsync(new DistributionNumberSearchCriteria("none"));
+
+        Assert.Empty(results);
+    }
+
+    [Fact]
+    public async Task SearchByDistributionNumberAsync_DatabaseFailure_Propagates()
+    {
+        var (repository, _) = CreateRepository();
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            repository.SearchByDistributionNumberAsync(new DistributionNumberSearchCriteria(string.Empty)));
+    }
+
+    [Fact]
+    public async Task SearchBySampleNumberAsync_ExecutesTheLegacyProcedureWithTheParameter()
+    {
+        var (repository, connection) = CreateRepository();
+        connection.RespondToQuery(SampleNumberSql, SampleNumberTable());
+
+        await repository.SearchBySampleNumberAsync(new SampleNumberSearchCriteria("S00001"));
+
+        var command = Assert.Single(connection.ExecutedCommands);
+        Assert.Equal(SampleNumberSql, command.CommandText);
+        Assert.Equal("S00001", command.ParameterValue("@SampleNumber"));
+    }
+
+    [Fact]
+    public async Task SearchBySampleNumberAsync_EmptyCriteria_SendsAnEmptyString()
+    {
+        var (repository, connection) = CreateRepository();
+        connection.RespondToQuery(SampleNumberSql, SampleNumberTable());
+
+        await repository.SearchBySampleNumberAsync(new SampleNumberSearchCriteria(string.Empty));
+
+        Assert.Equal(string.Empty, Assert.Single(connection.ExecutedCommands).ParameterValue("@SampleNumber"));
+    }
+
+    [Fact]
+    public async Task SearchBySampleNumberAsync_MapsEveryColumnAndKeepsTheProcedureOrder()
+    {
+        var (repository, connection) = CreateRepository();
+        var firstSampleId = Guid.NewGuid();
+        var firstSchemeId = Guid.NewGuid();
+        var secondSampleId = Guid.NewGuid();
+        var secondSchemeId = Guid.NewGuid();
+        var table = SampleNumberTable();
+        table.Rows.Add(firstSampleId, "S00001", firstSchemeId, "D1a/S1 BT", "D1a", "D1a/00001", 5, "2026");
+        table.Rows.Add(secondSampleId, "S00002", secondSchemeId, "D1a/S2 BT", "D1a", "D1a/00002", 6, "2026");
+        connection.RespondToQuery(SampleNumberSql, table);
+
+        var results = await repository.SearchBySampleNumberAsync(new SampleNumberSearchCriteria(string.Empty));
+
+        Assert.Equal(2, results.Count);
+        Assert.Equal(firstSampleId, results[0].SampleId);
+        Assert.Equal("S00001", results[0].SampleNumber);
+        Assert.Equal(firstSchemeId, results[0].SchemeId);
+        Assert.Equal("D1a/S1 BT", results[0].SchemeName);
+        Assert.Equal("D1a", results[0].SchemeIdentifier);
+        Assert.Equal("D1a/00001", results[0].DistributionNumber);
+        Assert.Equal(5, results[0].MonthId);
+        Assert.Equal("2026", results[0].Year);
+        Assert.Equal(secondSampleId, results[1].SampleId);
+        Assert.Equal("S00002", results[1].SampleNumber);
+    }
+
+    [Fact]
+    public async Task SearchBySampleNumberAsync_NullColumns_AreMappedAsNull()
+    {
+        var (repository, connection) = CreateRepository();
+        var table = SampleNumberTable();
+        table.Rows.Add(Guid.NewGuid(), DBNull.Value, Guid.NewGuid(), DBNull.Value, DBNull.Value, DBNull.Value, 5, DBNull.Value);
+        connection.RespondToQuery(SampleNumberSql, table);
+
+        var row = Assert.Single(await repository.SearchBySampleNumberAsync(new SampleNumberSearchCriteria(string.Empty)));
+
+        Assert.Null(row.SampleNumber);
+        Assert.Null(row.SchemeName);
+        Assert.Null(row.SchemeIdentifier);
+        Assert.Null(row.DistributionNumber);
+        Assert.Null(row.Year);
+    }
+
+    [Fact]
+    public async Task SearchBySampleNumberAsync_NoRows_ReturnsEmptyList()
+    {
+        var (repository, connection) = CreateRepository();
+        connection.RespondToQuery(SampleNumberSql, SampleNumberTable());
+
+        var results = await repository.SearchBySampleNumberAsync(new SampleNumberSearchCriteria("none"));
+
+        Assert.Empty(results);
+    }
+
+    [Fact]
+    public async Task SearchBySampleNumberAsync_DatabaseFailure_Propagates()
+    {
+        var (repository, _) = CreateRepository();
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            repository.SearchBySampleNumberAsync(new SampleNumberSearchCriteria(string.Empty)));
     }
 }

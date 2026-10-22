@@ -238,4 +238,182 @@ public class SearchServiceTests
         Assert.Null(participant.LabName);
         Assert.Null(participant.ContactName);
     }
+
+    [Fact]
+    public async Task SearchByDistributionNumberAsync_NullCriteria_NormalisedToEmptyString()
+    {
+        var (service, repository, _) = CreateService();
+
+        await service.SearchByDistributionNumberAsync(new DistributionNumberSearchCriteriaRequest());
+
+        Assert.Equal(string.Empty, Assert.Single(repository.DistributionNumberCalls).DistributionNumber);
+    }
+
+    [Fact]
+    public async Task SearchByDistributionNumberAsync_BlankDistributionNumber_StillSearchesAndReturnsEverything()
+    {
+        var (service, repository, _) = CreateService();
+        repository.DistributionNumberRows = [new DistributionNumberSearchRow { DistributionNumber = "D1" }, new DistributionNumberSearchRow { DistributionNumber = "D2" }];
+
+        var results = await service.SearchByDistributionNumberAsync(new DistributionNumberSearchCriteriaRequest(string.Empty));
+
+        Assert.Equal(2, results.Count);
+        Assert.Equal(string.Empty, Assert.Single(repository.DistributionNumberCalls).DistributionNumber);
+    }
+
+    [Fact]
+    public async Task SearchByDistributionNumberAsync_ValueIsPassedThroughUnchanged()
+    {
+        var (service, repository, _) = CreateService();
+
+        await service.SearchByDistributionNumberAsync(new DistributionNumberSearchCriteriaRequest(" D1a "));
+
+        Assert.Equal(" D1a ", Assert.Single(repository.DistributionNumberCalls).DistributionNumber);
+    }
+
+    [Fact]
+    public async Task SearchByDistributionNumberAsync_ReturnsRepositoryRowsInRepositoryOrder()
+    {
+        var (service, repository, _) = CreateService();
+        repository.DistributionNumberRows =
+        [
+            new DistributionNumberSearchRow { DistributionNumber = "D2" },
+            new DistributionNumberSearchRow { DistributionNumber = "D1" },
+        ];
+
+        var results = await service.SearchByDistributionNumberAsync(new DistributionNumberSearchCriteriaRequest());
+
+        Assert.Same(repository.DistributionNumberRows, results);
+        Assert.Equal("D2,D1", string.Join(',', results.Select(r => r.DistributionNumber)));
+    }
+
+    [Fact]
+    public async Task SearchByDistributionNumberAsync_NoMatches_ReturnsEmptyList()
+    {
+        var (service, _, _) = CreateService();
+
+        var results = await service.SearchByDistributionNumberAsync(new DistributionNumberSearchCriteriaRequest("nothing"));
+
+        Assert.Empty(results);
+    }
+
+    [Fact]
+    public async Task SearchByDistributionNumberAsync_ForwardsTheCancellationToken()
+    {
+        var (service, repository, _) = CreateService();
+        using var source = new CancellationTokenSource();
+
+        await service.SearchByDistributionNumberAsync(new DistributionNumberSearchCriteriaRequest(), source.Token);
+
+        Assert.Equal(source.Token, repository.LastCancellationToken);
+    }
+
+    [Fact]
+    public async Task SearchByDistributionNumberAsync_RepositoryFailure_Propagates()
+    {
+        var (service, repository, logger) = CreateService();
+        repository.Failure = new InvalidOperationException("database unavailable");
+
+        var failure = await Assert.ThrowsAsync<InvalidOperationException>(() => service.SearchByDistributionNumberAsync(new DistributionNumberSearchCriteriaRequest("D1")));
+
+        Assert.Equal("database unavailable", failure.Message);
+        Assert.Empty(logger.Entries);
+    }
+
+    [Fact]
+    public async Task SearchByDistributionNumberAsync_LogsOnlyTheResultCount_NeverTheSearchText()
+    {
+        var (service, repository, logger) = CreateService();
+        repository.DistributionNumberRows = [new DistributionNumberSearchRow { DistributionNumber = "D-SECRET" }];
+
+        await service.SearchByDistributionNumberAsync(new DistributionNumberSearchCriteriaRequest("D-SECRET"));
+
+        var entry = Assert.Single(logger.Entries);
+        Assert.Equal(LogLevel.Information, entry.Level);
+        Assert.Contains("1", entry.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("D-SECRET", entry.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task SearchBySampleNumberAsync_NullCriteria_NormalisedToEmptyString()
+    {
+        var (service, repository, _) = CreateService();
+
+        await service.SearchBySampleNumberAsync(new SampleNumberSearchCriteriaRequest());
+
+        Assert.Equal(string.Empty, Assert.Single(repository.SampleNumberCalls).SampleNumber);
+    }
+
+    [Fact]
+    public async Task SearchBySampleNumberAsync_ValueIsPassedThroughUnchanged()
+    {
+        var (service, repository, _) = CreateService();
+
+        await service.SearchBySampleNumberAsync(new SampleNumberSearchCriteriaRequest("S100"));
+
+        Assert.Equal("S100", Assert.Single(repository.SampleNumberCalls).SampleNumber);
+    }
+
+    [Fact]
+    public async Task SearchBySampleNumberAsync_ReturnsRepositoryRowsInRepositoryOrder()
+    {
+        var (service, repository, _) = CreateService();
+        repository.SampleNumberRows =
+        [
+            new SampleNumberSearchRow { SampleNumber = "S2" },
+            new SampleNumberSearchRow { SampleNumber = "S1" },
+        ];
+
+        var results = await service.SearchBySampleNumberAsync(new SampleNumberSearchCriteriaRequest());
+
+        Assert.Same(repository.SampleNumberRows, results);
+        Assert.Equal("S2,S1", string.Join(',', results.Select(r => r.SampleNumber)));
+    }
+
+    [Fact]
+    public async Task SearchBySampleNumberAsync_NoMatches_ReturnsEmptyList()
+    {
+        var (service, _, _) = CreateService();
+
+        var results = await service.SearchBySampleNumberAsync(new SampleNumberSearchCriteriaRequest("nothing"));
+
+        Assert.Empty(results);
+    }
+
+    [Fact]
+    public async Task SearchBySampleNumberAsync_ForwardsTheCancellationToken()
+    {
+        var (service, repository, _) = CreateService();
+        using var source = new CancellationTokenSource();
+
+        await service.SearchBySampleNumberAsync(new SampleNumberSearchCriteriaRequest(), source.Token);
+
+        Assert.Equal(source.Token, repository.LastCancellationToken);
+    }
+
+    [Fact]
+    public async Task SearchBySampleNumberAsync_RepositoryFailure_Propagates()
+    {
+        var (service, repository, logger) = CreateService();
+        repository.Failure = new InvalidOperationException("database unavailable");
+
+        var failure = await Assert.ThrowsAsync<InvalidOperationException>(() => service.SearchBySampleNumberAsync(new SampleNumberSearchCriteriaRequest("S1")));
+
+        Assert.Equal("database unavailable", failure.Message);
+        Assert.Empty(logger.Entries);
+    }
+
+    [Fact]
+    public async Task SearchBySampleNumberAsync_LogsOnlyTheResultCount_NeverTheSearchText()
+    {
+        var (service, repository, logger) = CreateService();
+        repository.SampleNumberRows = [new SampleNumberSearchRow { SampleNumber = "S-SECRET" }];
+
+        await service.SearchBySampleNumberAsync(new SampleNumberSearchCriteriaRequest("S-SECRET"));
+
+        var entry = Assert.Single(logger.Entries);
+        Assert.Equal(LogLevel.Information, entry.Level);
+        Assert.Contains("1", entry.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("S-SECRET", entry.Message, StringComparison.Ordinal);
+    }
 }

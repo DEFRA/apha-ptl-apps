@@ -22,6 +22,7 @@ public class AuthorizationRouteTests(PtlInternalWebTestFactory factory) : IClass
     [InlineData("/Contract/ManageContracts")]
     [InlineData("/Scheme/ManageSchemes")]
     [InlineData("/Distribution/Index")]
+    [InlineData("/Distribution/Search")]
     [InlineData("/SystemAdministration/Index")]
     [InlineData("/Invoice/Index")]
     [InlineData("/Home/Index")]
@@ -46,6 +47,7 @@ public class AuthorizationRouteTests(PtlInternalWebTestFactory factory) : IClass
     [InlineData("/Contract/ManageContracts")]
     [InlineData("/Scheme/ManageSchemes")]
     [InlineData("/Distribution/Index")]
+    [InlineData("/Distribution/Search")]
     [InlineData("/SystemAdministration/Index")]
     [InlineData("/Invoice/Index")]
     public async Task SignedInUserWithoutThePtlRole_IsRedirectedToAccessDenied(string url)
@@ -67,6 +69,7 @@ public class AuthorizationRouteTests(PtlInternalWebTestFactory factory) : IClass
     [InlineData("Generate Invoices", "/Invoice/Index")]
     [InlineData("Internal User,Distributions", "/Distribution/Schedule?year=2026&monthId=4")]
     [InlineData("Scheduling,Distributions", "/Distribution/Preparation?year=2026&monthId=4")]
+    [InlineData("Scheme Admin", "/Distribution/Search")]
     public async Task SignedInUserWithADifferentRole_IsRefused_AdminIsNotASuperuser(string roles, string url)
     {
         var client = SignedInClient(roles);
@@ -88,6 +91,23 @@ public class AuthorizationRouteTests(PtlInternalWebTestFactory factory) : IClass
         var response = await client.GetAsync(url);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    // Regression: real model binding validates both tabs' forms on every request, so the Sample
+    // Number tab's required-field error must not appear before Search has ever been clicked. The
+    // message text itself is still present in the input's unobtrusive-validation data attribute
+    // (harmless, inert without a submit), so this checks the actual rendered error markup instead.
+    [Fact]
+    public async Task DistributionSearch_FirstVisit_DoesNotShowTheSampleNumberValidationMessage()
+    {
+        var client = SignedInClient("Distributions");
+
+        var response = await client.GetAsync("/Distribution/Search");
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.DoesNotContain("govuk-error-summary__list", body, StringComparison.Ordinal);
+        Assert.DoesNotContain("SampleNumber_SampleNumber-error", body, StringComparison.Ordinal);
     }
 
     [Fact]
