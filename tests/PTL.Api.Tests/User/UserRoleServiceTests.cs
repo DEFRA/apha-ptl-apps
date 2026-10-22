@@ -135,22 +135,6 @@ public class UserRoleServiceTests
         Assert.Empty(userRoles.Added);
     }
 
-    // System Administration business rule: if the audit trail write fails, the whole change is
-    // rolled back - no unaudited role change is ever persisted.
-    [Fact]
-    public async Task SetUserRolesAsync_AuditWriteFails_RollsBackAndDoesNotPersistRoleChanges()
-    {
-        var userId = Guid.NewGuid();
-        var users = new FakeUserRepository { Users = [new PTL.Core.User.User { UserId = userId, Username = "m100001" }] };
-        var userRoles = new FakeUserRoleRepository { ThrowOnAudit = true };
-        var service = CreateService(users: users, userRoles: userRoles);
-
-        await Assert.ThrowsAsync<InvalidOperationException>(() => service.SetUserRolesAsync(userId, [SchemeAdminRoleId], actingUserId: null));
-
-        Assert.Empty(userRoles.Added);
-        Assert.Empty(userRoles.Removed);
-    }
-
     [Fact]
     public async Task RemoveUserAsync_RevokesAllRolesAndDeletesTheUser_AuditedInOneCall()
     {

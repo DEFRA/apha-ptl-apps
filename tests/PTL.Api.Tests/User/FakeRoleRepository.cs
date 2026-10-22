@@ -1,4 +1,3 @@
-using PTL.Core.Audit;
 using PTL.Core.User;
 
 namespace PTL.Api.Tests.User;
@@ -39,23 +38,12 @@ internal sealed class FakeUserRoleRepository : IUserRoleRepository
         return Task.CompletedTask;
     }
 
-    // When true, simulates the audit write failing - mimics the real transaction's rollback by
-    // throwing BEFORE any add/remove is applied, so a test can assert nothing was persisted.
-    public bool ThrowOnAudit { get; set; }
-    public AuditEntry? LastAuditEntry { get; private set; }
-
-    public Task ApplyRoleChangesWithAuditAsync(
+    public Task ApplyRoleChangesAsync(
         Guid userId,
         IReadOnlyList<Guid> roleIdsToAdd,
         IReadOnlyList<Guid> userRoleIdsToRemove,
-        AuditEntry auditEntry,
         CancellationToken cancellationToken = default)
     {
-        if (ThrowOnAudit)
-        {
-            throw new InvalidOperationException("Simulated audit trail write failure.");
-        }
-
         foreach (var roleId in roleIdsToAdd)
         {
             Added.Add((Guid.NewGuid(), userId, roleId));
@@ -72,7 +60,6 @@ internal sealed class FakeUserRoleRepository : IUserRoleRepository
             }
         }
 
-        LastAuditEntry = auditEntry;
         return Task.CompletedTask;
     }
 }
