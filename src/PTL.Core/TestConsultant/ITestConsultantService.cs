@@ -13,10 +13,12 @@ public interface ITestConsultantService
     Task<TestConsultant?> UpdateAsync(Guid externalTestConsultantId, string name, string department, string email, CancellationToken cancellationToken = default);
 
     // Toggles Active/Inactive. Stamps InactiveDate with now when becoming inactive; clears it
-    // when becoming active. Returns null if externalTestConsultantId doesn't exist.
+    // when becoming active. Returns null if externalTestConsultantId doesn't exist. Throws
+    // ExternalTestConsultantValidationException when deactivating a consultant who is still
+    // allocated to schemes.
     Task<TestConsultant?> SetStatusAsync(Guid externalTestConsultantId, bool isInactive, CancellationToken cancellationToken = default);
 
-    // [NEEDS INVESTIGATION] See IExternalLoginService remarks. Returns (false, message) if the
-    // consultant doesn't exist or the stub reports failure - a legitimate outcome, not an error.
-    Task<(bool Success, string? Message)> GenerateLoginAsync(Guid externalTestConsultantId, CancellationToken cancellationToken = default);
+    // Returns (false, message) when the consultant doesn't exist or is still allocated to schemes -
+    // a legitimate outcome, not an error, matching CountryService.DeleteAsync.
+    Task<(bool Success, string? Message)> DeleteAsync(Guid externalTestConsultantId, CancellationToken cancellationToken = default);
 }

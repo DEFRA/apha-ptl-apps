@@ -1,7 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
 using Microsoft.AspNetCore.Mvc;
-using PTL.Contracts.TestConsultant;
 using PTL.Contracts.Viewer;
 
 namespace PTL.ApiClient;
@@ -12,7 +11,6 @@ public interface IViewerApiClient
     Task<ViewerSaveResult> CreateAsync(ViewerSaveRequest request, CancellationToken cancellationToken = default);
     Task<ViewerSaveResult> UpdateAsync(Guid viewerId, ViewerSaveRequest request, CancellationToken cancellationToken = default);
     Task<ViewerDeleteResponse> DeleteAsync(Guid viewerId, CancellationToken cancellationToken = default);
-    Task<GenerateLoginResponse> GenerateLoginAsync(Guid viewerId, CancellationToken cancellationToken = default);
 }
 
 public sealed class ViewerApiClient(HttpClient httpClient) : IViewerApiClient
@@ -46,14 +44,6 @@ public sealed class ViewerApiClient(HttpClient httpClient) : IViewerApiClient
         response.EnsureSuccessStatusCode();
         var result = await response.Content.ReadFromJsonAsync<ViewerDeleteResponse>(cancellationToken);
         return result ?? new ViewerDeleteResponse(false, "The removal did not return a result.");
-    }
-
-    public async Task<GenerateLoginResponse> GenerateLoginAsync(Guid viewerId, CancellationToken cancellationToken = default)
-    {
-        var response = await httpClient.PostAsync($"/api/viewers/{viewerId}/generate-login", content: null, cancellationToken);
-        response.EnsureSuccessStatusCode();
-        var result = await response.Content.ReadFromJsonAsync<GenerateLoginResponse>(cancellationToken);
-        return result ?? new GenerateLoginResponse(false, "The login could not be generated.");
     }
 
     private static async Task<ViewerSaveResult> ToSaveResultAsync(HttpResponseMessage response, CancellationToken cancellationToken)

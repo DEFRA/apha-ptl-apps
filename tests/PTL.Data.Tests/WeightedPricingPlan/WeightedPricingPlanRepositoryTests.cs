@@ -68,7 +68,7 @@ public class WeightedPricingPlanRepositoryTests
         Assert.Equal(2027, command.ParameterValue("@YearId"));
     }
 
-    private const string AuditSql = "EXEC dbo.spiSystemAdministrationAudit @AuditId, @ActingUserId, @Action, @EntityType, @EntityId, @Details";
+    private const string AuditSql = "EXEC dbo.spiLog @LogId, @LogDate, @UserId, @Description";
 
     [Fact]
     public async Task RenewAsync_WithAudit_CommitsChangeAndAuditInOneTransaction()
@@ -84,7 +84,7 @@ public class WeightedPricingPlanRepositoryTests
         Assert.True(connection.LastTransaction!.Committed);
         Assert.Contains(connection.ExecutedCommands, c => c.CommandText == RenewSql);
         var auditCommand = Assert.Single(connection.ExecutedCommands, c => c.CommandText == AuditSql);
-        Assert.Equal("RenewWeightedPricingPlan", auditCommand.ParameterValue("@Action"));
+        Assert.StartsWith("SysAdmin|RenewWeightedPricingPlan|", (string)auditCommand.ParameterValue("@Description")!);
     }
 
     [Fact]

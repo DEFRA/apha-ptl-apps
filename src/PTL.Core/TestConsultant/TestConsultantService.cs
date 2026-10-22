@@ -2,7 +2,7 @@ using PTL.Core.Audit;
 
 namespace PTL.Core.TestConsultant;
 
-public sealed class TestConsultantService(ITestConsultantRepository repository, IExternalLoginService externalLoginService, IActingUserAccessor actingUser) : ITestConsultantService
+public sealed class TestConsultantService(ITestConsultantRepository repository, IActingUserAccessor actingUser) : ITestConsultantService
 {
     private const string EntityType = "ExternalTestConsultant";
 
@@ -57,6 +57,21 @@ public sealed class TestConsultantService(ITestConsultantRepository repository, 
             return null;
         }
 
+        // Already in the requested state: nothing to change, and re-stamping InactiveDate would
+        // restart the retention clock.
+        if (existing.IsInactive == isInactive)
+        {
+            return existing;
+        }
+
+        // Matches legacy, which stops an allocated consultant being deactivated (legacy only did so
+        // client-side). Reactivating is never blocked.
+        if (isInactive && existing.AllocationCount > 0)
+        {
+            throw new ExternalTestConsultantValidationException(
+                [new ExternalTestConsultantValidationError(string.Empty, InUseMessage(existing, "To change this external test consultant's Active/Inactive status"))]);
+        }
+
         existing.IsInactive = isInactive;
         existing.InactiveDate = isInactive ? DateTime.UtcNow : null;
 
@@ -64,7 +79,7 @@ public sealed class TestConsultantService(ITestConsultantRepository repository, 
         return existing;
     }
 
-    public async Task<(bool Success, string? Message)> GenerateLoginAsync(Guid externalTestConsultantId, CancellationToken cancellationToken = default)
+    public async Task<(bool Success, string? Message)> DeleteAsync(Guid externalTestConsultantId, CancellationToken cancellationToken = default)
     {
         var existing = await FindAsync(externalTestConsultantId, cancellationToken);
         if (existing is null)
@@ -72,16 +87,17 @@ public sealed class TestConsultantService(ITestConsultantRepository repository, 
             return (false, "Test consultant was not found.");
         }
 
-        var success = await externalLoginService.GenerateLoginAsync(existing.ExternalTestConsultantId, existing.Name, existing.Email, cancellationToken);
-        if (!success)
+        if (existing.AllocationCount > 0)
         {
-            return (false, "The login could not be generated.");
+            return (false, InUseMessage(existing, "To delete this external test consultant"));
         }
 
-        existing.SsoId = Guid.NewGuid();
-        await repository.UpdateAsync(existing, Audit("GenerateExternalTestConsultantLogin", existing.ExternalTestConsultantId, $"Name: {existing.Name}"), cancellationToken);
-        return (true, null);
+        var deleted = await repository.DeleteAsync(externalTestConsultantId, Audit("DeleteExternalTestConsultant", externalTestConsultantId, $"Name: {existing.Name}"), cancellationToken);
+        return deleted ? (true, null) : (false, "Test consultant was not found.");
     }
+
+    private static string InUseMessage(TestConsultant consultant, string action) =>
+        $"This external test consultant is being used on: {consultant.AllocationCount} scheme(s). {action} first remove it from the following schemes: {consultant.AllocationString}";
 
     private async Task<TestConsultant?> FindAsync(Guid externalTestConsultantId, CancellationToken cancellationToken)
     {

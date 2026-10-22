@@ -3,7 +3,6 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
 using PTL.Api.Controllers;
 using PTL.Api.Tests.Audit;
-using PTL.Api.Tests.ExternalUser;
 using PTL.Api.Tests.Participant;
 using PTL.Contracts.Viewer;
 using PTL.Core.Viewer;
@@ -12,9 +11,9 @@ namespace PTL.Api.Tests.Endpoints;
 
 public class ViewerControllerTests
 {
-    private static ViewerController CreateController(FakeViewerRepository? repository = null, FakeExternalLoginService? loginService = null)
+    private static ViewerController CreateController(FakeViewerRepository? repository = null)
     {
-        var controller = new ViewerController(new ViewerService(repository ?? new FakeViewerRepository(), loginService ?? new FakeExternalLoginService(), new FakeActingUserAccessor()));
+        var controller = new ViewerController(new ViewerService(repository ?? new FakeViewerRepository(), new FakeActingUserAccessor()));
 
         var services = new ServiceCollection().AddMvc().Services.BuildServiceProvider();
         controller.ControllerContext = new ControllerContext
@@ -38,7 +37,6 @@ public class ViewerControllerTests
         var viewers = Assert.IsAssignableFrom<IReadOnlyList<ViewerResponse>>(ok.Value);
         var viewer = Assert.Single(viewers);
         Assert.Equal("Jane Smith", viewer.Name);
-        Assert.True(viewer.HasLogin);
     }
 
     [Fact]
@@ -99,20 +97,5 @@ public class ViewerControllerTests
         var ok = Assert.IsType<OkObjectResult>(result.Result);
         var response = Assert.IsType<ViewerDeleteResponse>(ok.Value);
         Assert.False(response.Success);
-    }
-
-    [Fact]
-    public async Task GenerateLogin_Success_ReturnsOkWithSuccess()
-    {
-        var id = Guid.NewGuid();
-        var repository = new FakeViewerRepository();
-        repository.Viewers.Add(new ViewerEntity { ViewerId = id, Name = "Jane Smith", Email = "jane@example.com" });
-        var controller = CreateController(repository);
-
-        var result = await controller.GenerateLogin(id, CancellationToken.None);
-
-        var ok = Assert.IsType<OkObjectResult>(result.Result);
-        var response = Assert.IsType<PTL.Contracts.TestConsultant.GenerateLoginResponse>(ok.Value);
-        Assert.True(response.Success);
     }
 }

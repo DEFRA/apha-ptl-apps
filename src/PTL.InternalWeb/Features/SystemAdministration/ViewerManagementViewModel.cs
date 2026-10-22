@@ -23,10 +23,6 @@ public sealed class ViewerRowViewModel
 
     public string Email { get; set; } = string.Empty;
 
-    // A login has already been generated (SsoId is set) - the Generate Login link only ever
-    // shows when this is false, matching the story's Business Rule.
-    public bool HasLogin { get; set; }
-
     // Only one row is ever in edit mode at a time - toggled via the editId query/route value,
     // same convention as CountryManagement/ExternalTestConsultantManagement.
     public bool IsEditing { get; set; }

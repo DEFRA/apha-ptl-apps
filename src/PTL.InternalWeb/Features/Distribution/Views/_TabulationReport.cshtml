@@ -3,7 +3,6 @@
 @{
     var report = Model.Report;
     var isIssued = Model.PublishedTabulationId is not null;
-    var nbsp = new Microsoft.AspNetCore.Html.HtmlString("&nbsp;");
 
     var pageRoute = new Dictionary<string, string>
     {
@@ -28,99 +27,9 @@
         return route;
     }
 
-    string? CellClass(TabulationCellResponse cell)
-    {
-        var kind = cell.Kind switch
-        {
-            "Header1" => "TabulationHeader1",
-            "Header2" => "TabulationHeader2",
-            "Cell" => "TabulationCell",
-            _ => null,
-        };
-        if (!cell.IsNilReturn)
-        {
-            return kind;
-        }
-
-        return kind is null ? "NilReturn" : kind + " NilReturn";
-    }
-
-    object CellText(TabulationCellResponse cell) => string.IsNullOrEmpty(cell.Text) ? nbsp : cell.Text;
-
-    int? Span(int span) => span > 1 ? span : null;
-
-    async Task RenderRow(TabulationGridRowResponse row, bool firstIsRowHeader)
-    {
-        <tr>
-            @for (var c = 0; c < row.Cells.Count; c++)
-            {
-                var cell = row.Cells[c];
-                if (row.IsHeader)
-                {
-                    <th scope="col" class="@CellClass(cell)" colspan="@Span(cell.ColSpan)" rowspan="@Span(cell.RowSpan)">@CellText(cell)</th>
-                }
-                else if (c == 0 && firstIsRowHeader)
-                {
-                    <th scope="row" class="@CellClass(cell)" colspan="@Span(cell.ColSpan)" rowspan="@Span(cell.RowSpan)">@CellText(cell)</th>
-                }
-                else if (cell.Kind is "Header1" or "Header2")
-                {
-                    <th scope="col" class="@CellClass(cell)" colspan="@Span(cell.ColSpan)" rowspan="@Span(cell.RowSpan)">@CellText(cell)</th>
-                }
-                else
-                {
-                    <td class="@CellClass(cell)" colspan="@Span(cell.ColSpan)" rowspan="@Span(cell.RowSpan)">@CellText(cell)</td>
-                }
-            }
-        </tr>
-    }
-
     async Task RenderTable(TabulationTableResponse table)
     {
-        var headerRowCount = table.Rows.TakeWhile(r => r.IsHeader).Count();
-
-        // A row starts with a row header only when column 0 is not still covered by a rowspan above it.
-        var rowHeaderFlags = new List<bool>(table.Rows.Count);
-        var covered = 0;
-        foreach (var row in table.Rows)
-        {
-            if (covered > 0)
-            {
-                rowHeaderFlags.Add(false);
-                covered--;
-                continue;
-            }
-
-            var first = row.Cells.Count > 0 ? row.Cells[0] : null;
-            rowHeaderFlags.Add(!row.IsHeader && first is not null);
-            covered = first is null ? 0 : first.RowSpan - 1;
-        }
-
-        <section class="ptl-table-scroll ptl-tabulation-scroll" aria-label="@table.Caption">
-            <table class="TabulationTable">
-                <caption class="govuk-visually-hidden">@table.Caption</caption>
-                @if (headerRowCount > 0)
-                {
-                    <thead>
-                        @for (var r = 0; r < headerRowCount; r++)
-                        {
-                            <tr>
-                                @foreach (var cell in table.Rows[r].Cells)
-                                {
-                                    <th scope="col" class="@CellClass(cell)" colspan="@Span(cell.ColSpan)" rowspan="@Span(cell.RowSpan)">@CellText(cell)</th>
-                                }
-                            </tr>
-                        }
-                    </thead>
-                }
-                <tbody>
-                    @for (var r = headerRowCount; r < table.Rows.Count; r++)
-                    {
-                        await RenderRow(table.Rows[r], rowHeaderFlags[r]);
-                    }
-                </tbody>
-            </table>
-        </section>
+        <partial name="_TabulationTable" model="table" />
         @if (table.AssessmentTestId is { } testId)
         {
             <p class="govuk-body">

@@ -68,7 +68,7 @@ public class ExternalSiteMessageRepositoryTests
         Assert.Contains(connection.ExecutedCommands, c => c.CommandText == updateSql);
     }
 
-    private const string AuditSql = "EXEC dbo.spiSystemAdministrationAudit @AuditId, @ActingUserId, @Action, @EntityType, @EntityId, @Details";
+    private const string AuditSql = "EXEC dbo.spiLog @LogId, @LogDate, @UserId, @Description";
     private const string UpdateSql = "EXEC dbo.spuMainPageMessage @Message, @ImportantMessage, @SupportEmailAddress";
 
     private static PTL.Core.ExternalSiteMessage.ExternalSiteMessage NewMessage() => new()
@@ -92,7 +92,22 @@ public class ExternalSiteMessageRepositoryTests
         Assert.True(connection.LastTransaction!.Committed);
         Assert.Contains(connection.ExecutedCommands, c => c.CommandText == UpdateSql);
         var auditCommand = Assert.Single(connection.ExecutedCommands, c => c.CommandText == AuditSql);
-        Assert.Equal("UpdateExternalSiteMessage", auditCommand.ParameterValue("@Action"));
+        Assert.StartsWith("SysAdmin|UpdateExternalSiteMessage|", (string)auditCommand.ParameterValue("@Description")!);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_WithAuditAndNoActingUser_LogsUserAsUnknown()
+    {
+        var (repository, connection) = CreateRepository();
+        connection.RespondToNonQuery(UpdateSql, 1);
+        connection.RespondToNonQuery(AuditSql, 1);
+        var audit = new AuditEntry(null, "UpdateExternalSiteMessage", "ExternalSiteMessage", null, null);
+
+        await repository.UpdateAsync(NewMessage(), audit);
+
+        var auditCommand = Assert.Single(connection.ExecutedCommands, c => c.CommandText == AuditSql);
+        Assert.Equal("unknown", auditCommand.ParameterValue("@UserId"));
+        Assert.Equal("SysAdmin|UpdateExternalSiteMessage|ExternalSiteMessage||", auditCommand.ParameterValue("@Description"));
     }
 
     [Fact]

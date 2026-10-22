@@ -13,14 +13,13 @@ public class ExternalTestConsultantApiClientTests
     [Fact]
     public async Task GetAllAsync_Success_ReturnsDeserializedConsultants()
     {
-        const string json = """[{"externalTestConsultantId":"11111111-1111-1111-1111-111111111111","name":"Jane Smith","department":"Science","email":"jane@example.com","isInactive":false,"inactiveDate":null,"hasLogin":true}]""";
+        const string json = """[{"externalTestConsultantId":"11111111-1111-1111-1111-111111111111","name":"Jane Smith","department":"Science","email":"jane@example.com","isInactive":false,"inactiveDate":null}]""";
         var client = CreateClient(HttpStatusCode.OK, json);
 
         var result = await client.GetAllAsync();
 
         var consultant = Assert.Single(result);
         Assert.Equal("Jane Smith", consultant.Name);
-        Assert.True(consultant.HasLogin);
     }
 
     [Fact]
@@ -36,7 +35,7 @@ public class ExternalTestConsultantApiClientTests
     [Fact]
     public async Task CreateAsync_Success_ReturnsSuccessfulResult()
     {
-        const string json = """{"externalTestConsultantId":"11111111-1111-1111-1111-111111111111","name":"Jane Smith","department":"Science","email":"jane@example.com","isInactive":false,"inactiveDate":null,"hasLogin":false}""";
+        const string json = """{"externalTestConsultantId":"11111111-1111-1111-1111-111111111111","name":"Jane Smith","department":"Science","email":"jane@example.com","isInactive":false,"inactiveDate":null}""";
         var client = CreateClient(HttpStatusCode.OK, json);
 
         var result = await client.CreateAsync(new ExternalTestConsultantSaveRequest("Jane Smith", "Science", "jane@example.com"));
@@ -68,44 +67,55 @@ public class ExternalTestConsultantApiClientTests
     }
 
     [Fact]
-    public async Task SetStatusAsync_NotFound_ReturnsNull()
+    public async Task SetStatusAsync_NotFound_ReturnsFailure()
     {
         var client = CreateClient(HttpStatusCode.NotFound, null);
 
         var result = await client.SetStatusAsync(Guid.NewGuid(), true);
 
-        Assert.Null(result);
+        Assert.False(result.Success);
     }
 
     [Fact]
     public async Task SetStatusAsync_Success_ReturnsConsultant()
     {
-        const string json = """{"externalTestConsultantId":"11111111-1111-1111-1111-111111111111","name":"Jane Smith","department":"Science","email":"jane@example.com","isInactive":true,"inactiveDate":"2026-10-08T00:00:00","hasLogin":false}""";
+        const string json = """{"externalTestConsultantId":"11111111-1111-1111-1111-111111111111","name":"Jane Smith","department":"Science","email":"jane@example.com","isInactive":true,"inactiveDate":"2026-10-08T00:00:00"}""";
         var client = CreateClient(HttpStatusCode.OK, json);
 
         var result = await client.SetStatusAsync(Guid.NewGuid(), true);
 
-        Assert.NotNull(result);
-        Assert.True(result.IsInactive);
+        Assert.True(result.Success);
+        Assert.True(result.TestConsultant!.IsInactive);
     }
 
     [Fact]
-    public async Task GenerateLoginAsync_Success_ReturnsSuccess()
+    public async Task SetStatusAsync_RefusedByTheApi_ReturnsTheMessage()
     {
-        const string json = """{"success":true,"message":null}""";
-        var client = CreateClient(HttpStatusCode.OK, json);
+        const string json = """{"title":"One or more validation errors occurred.","status":400,"errors":{"":["This external test consultant is being used on: 1 scheme(s)."]}}""";
+        var client = CreateClient(HttpStatusCode.BadRequest, json);
 
-        var result = await client.GenerateLoginAsync(Guid.NewGuid());
+        var result = await client.SetStatusAsync(Guid.NewGuid(), true);
+
+        Assert.False(result.Success);
+        Assert.Contains("being used on", Assert.Single(result.FieldErrors[string.Empty]));
+    }
+
+    [Fact]
+    public async Task DeleteAsync_Success_ReturnsSuccess()
+    {
+        var client = CreateClient(HttpStatusCode.OK, """{"success":true,"message":null}""");
+
+        var result = await client.DeleteAsync(Guid.NewGuid());
 
         Assert.True(result.Success);
     }
 
     [Fact]
-    public async Task GenerateLoginAsync_NullResponse_ReturnsFailure()
+    public async Task DeleteAsync_NullResponse_ReturnsFailure()
     {
         var client = CreateClient(HttpStatusCode.OK, "null");
 
-        var result = await client.GenerateLoginAsync(Guid.NewGuid());
+        var result = await client.DeleteAsync(Guid.NewGuid());
 
         Assert.False(result.Success);
     }

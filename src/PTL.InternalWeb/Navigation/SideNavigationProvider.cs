@@ -31,6 +31,7 @@ public static class SideNavigationProvider
     private const string ParticipantSchemeControllerName = "ParticipantScheme";
     private const string SystemAdministrationControllerName = "SystemAdministration";
     private const string DistributionControllerName = "Distribution";
+    private const string TestConsultantControllerName = "TestConsultant";
 
     private static readonly string[] YearKey = ["year"];
     private static readonly string[] YearMonthKeys = ["year", "monthId"];
@@ -68,15 +69,15 @@ public static class SideNavigationProvider
             ActionName = IndexAction,
             Children =
             [
-                new SideNavigationItem { Text = "Create User", ControllerName = SystemAdministrationControllerName, ActionName = "CreateUser" },
                 new SideNavigationItem { Text = "Manage Roles", ControllerName = SystemAdministrationControllerName, ActionName = "ManageUserRoles" },
+                new SideNavigationItem { Text = "Create User", ControllerName = SystemAdministrationControllerName, ActionName = "CreateUser" },
                 new SideNavigationItem { Text = "Remove User", ControllerName = SystemAdministrationControllerName, ActionName = "RemoveUser" },
-                new SideNavigationItem { Text = "Internal Test Consultant Department Management", ControllerName = SystemAdministrationControllerName, ActionName = "InternalTestConsultantDepartment" },
-                new SideNavigationItem { Text = "External Test Consultant Management", ControllerName = SystemAdministrationControllerName, ActionName = "ExternalTestConsultantManagement" },
-                new SideNavigationItem { Text = "Viewer Management", ControllerName = SystemAdministrationControllerName, ActionName = "ViewerManagement" },
-                new SideNavigationItem { Text = "Country Management", ControllerName = SystemAdministrationControllerName, ActionName = "CountryManagement" },
+                new SideNavigationItem { Text = "Internal Test Consultant Department", ControllerName = SystemAdministrationControllerName, ActionName = "InternalTestConsultantDepartment" },
+                new SideNavigationItem { Text = "Manage External Test Consultants", ControllerName = SystemAdministrationControllerName, ActionName = "ExternalTestConsultantManagement" },
+                new SideNavigationItem { Text = "Manage Viewers", ControllerName = SystemAdministrationControllerName, ActionName = "ViewerManagement" },
+                new SideNavigationItem { Text = "Manage Countries", ControllerName = SystemAdministrationControllerName, ActionName = "CountryManagement" },
                 new SideNavigationItem { Text = "External Site Management", ControllerName = SystemAdministrationControllerName, ActionName = "ExternalSiteManagement" },
-                new SideNavigationItem { Text = "Administration Charges Management", ControllerName = SystemAdministrationControllerName, ActionName = "AdministrationCharge" },
+                new SideNavigationItem { Text = "Administration Charges", ControllerName = SystemAdministrationControllerName, ActionName = "AdministrationCharge" },
                 new SideNavigationItem
                 {
                     Text = "Weighted Pricing Plan",
@@ -405,7 +406,18 @@ public static class SideNavigationProvider
                 }
             ]
         },
-        Disabled("Test Consultant", PtlPolicies.TestConsultant),
+        // Legacy sitemap: "Test Consultant" (MenuTestConsultants.aspx) and its hidden "Test Consultant Tabulation" page.
+        new SideNavigationItem
+        {
+            Text = "Test Consultant",
+            RequiredPolicy = PtlPolicies.TestConsultant,
+            ControllerName = TestConsultantControllerName,
+            ActionName = IndexAction,
+            Children =
+            [
+                new SideNavigationItem { Text = "Test Consultant Tabulation", ControllerName = TestConsultantControllerName, ActionName = "Tabulation", IsHidden = true }
+            ]
+        },
         Disabled("Assessor", PtlPolicies.Assessor),
         Disabled("Results Sign-Off", PtlPolicies.ResultsSignOff)
     ];

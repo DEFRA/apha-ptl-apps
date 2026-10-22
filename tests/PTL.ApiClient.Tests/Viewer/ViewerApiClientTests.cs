@@ -13,14 +13,13 @@ public class ViewerApiClientTests
     [Fact]
     public async Task GetAllAsync_Success_ReturnsDeserializedViewers()
     {
-        const string json = """[{"viewerId":"11111111-1111-1111-1111-111111111111","name":"Jane Smith","email":"jane@example.com","hasLogin":true,"schemes":[],"participants":[]}]""";
+        const string json = """[{"viewerId":"11111111-1111-1111-1111-111111111111","name":"Jane Smith","email":"jane@example.com","schemes":[],"participants":[]}]""";
         var client = CreateClient(HttpStatusCode.OK, json);
 
         var result = await client.GetAllAsync();
 
         var viewer = Assert.Single(result);
         Assert.Equal("Jane Smith", viewer.Name);
-        Assert.True(viewer.HasLogin);
     }
 
     [Fact]
@@ -36,7 +35,7 @@ public class ViewerApiClientTests
     [Fact]
     public async Task CreateAsync_Success_ReturnsSuccessfulResult()
     {
-        const string json = """{"viewerId":"11111111-1111-1111-1111-111111111111","name":"Jane Smith","email":"jane@example.com","hasLogin":false,"schemes":[],"participants":[]}""";
+        const string json = """{"viewerId":"11111111-1111-1111-1111-111111111111","name":"Jane Smith","email":"jane@example.com","schemes":[],"participants":[]}""";
         var client = CreateClient(HttpStatusCode.OK, json);
 
         var result = await client.CreateAsync(new ViewerSaveRequest("Jane Smith", "jane@example.com"));
@@ -76,26 +75,5 @@ public class ViewerApiClientTests
         var result = await client.DeleteAsync(Guid.NewGuid());
 
         Assert.True(result.Success);
-    }
-
-    [Fact]
-    public async Task GenerateLoginAsync_Success_ReturnsSuccess()
-    {
-        const string json = """{"success":true,"message":null}""";
-        var client = CreateClient(HttpStatusCode.OK, json);
-
-        var result = await client.GenerateLoginAsync(Guid.NewGuid());
-
-        Assert.True(result.Success);
-    }
-
-    [Fact]
-    public async Task GenerateLoginAsync_NullResponse_ReturnsFailure()
-    {
-        var client = CreateClient(HttpStatusCode.OK, "null");
-
-        var result = await client.GenerateLoginAsync(Guid.NewGuid());
-
-        Assert.False(result.Success);
     }
 }

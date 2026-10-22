@@ -12,8 +12,8 @@ public class ViewerAuditTests
     private readonly FakeViewerRepository _repository = new();
     private readonly FakeActingUserAccessor _actingUser = new() { ActingUserId = Guid.NewGuid() };
 
-    private ViewerService CreateService(FakeExternalLoginService? loginService = null) =>
-        new(_repository, loginService ?? new FakeExternalLoginService(), _actingUser);
+    private ViewerService CreateService() =>
+        new(_repository, _actingUser);
 
     private ViewerEntity SeedViewer()
     {
@@ -81,19 +81,6 @@ public class ViewerAuditTests
         Assert.False(success);
         Assert.Single(_repository.Viewers);
         Assert.Null(_repository.LastAuditEntry);
-    }
-
-    [Fact]
-    public async Task GenerateLoginAsync_PassesAuditEntryToRepository()
-    {
-        var viewer = SeedViewer();
-
-        await CreateService().GenerateLoginAsync(viewer.ViewerId);
-
-        var entry = Assert.IsType<AuditEntry>(_repository.LastAuditEntry);
-        Assert.Equal("GenerateViewerLogin", entry.Action);
-        Assert.Equal(viewer.ViewerId.ToString(), entry.EntityId);
-        Assert.Equal(_actingUser.ActingUserId, entry.ActingUserId);
     }
 
     // The SSO link made at external sign-in is system-initiated, not a System Administration change.

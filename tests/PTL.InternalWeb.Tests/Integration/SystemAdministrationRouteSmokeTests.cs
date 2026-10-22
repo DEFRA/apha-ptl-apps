@@ -711,7 +711,7 @@ public partial class SystemAdministrationRouteSmokeTests : IClassFixture<WebAppl
                 services.RemoveAll<IExternalTestConsultantApiClient>();
                 services.AddSingleton<IExternalTestConsultantApiClient>(new FakeExternalTestConsultantApiClient
                 {
-                    TestConsultants = [new ExternalTestConsultantResponse(consultantId, "Jane Smith", "Science", "jane@example.com", false, null, false)]
+                    TestConsultants = [new ExternalTestConsultantResponse(consultantId, "Jane Smith", "Science", "jane@example.com", false, null)]
                 });
             }));
         var client = factory.CreateClient();
@@ -745,7 +745,7 @@ public partial class SystemAdministrationRouteSmokeTests : IClassFixture<WebAppl
                 services.RemoveAll<IViewerApiClient>();
                 services.AddSingleton<IViewerApiClient>(new FakeViewerApiClient
                 {
-                    Viewers = [new ViewerResponse(viewerId, "Jane Smith", "jane@example.com", false, [], [])]
+                    Viewers = [new ViewerResponse(viewerId, "Jane Smith", "jane@example.com", [], [])]
                 });
             }));
         var client = factory.CreateClient();

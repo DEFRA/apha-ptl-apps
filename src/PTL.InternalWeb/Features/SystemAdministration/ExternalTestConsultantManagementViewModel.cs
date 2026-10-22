@@ -29,10 +29,6 @@ public sealed class ExternalTestConsultantRowViewModel
 
     public DateTime? InactiveDate { get; set; }
 
-    // A login has already been generated (SsoId is set) - the Generate Login link only ever
-    // shows when this is false, matching the story's Business Rule.
-    public bool HasLogin { get; set; }
-
     // Only one row is ever in edit mode at a time - toggled via the editId query/route value,
     // same convention as CountryManagement/InternalTestConsultantDepartment.
     public bool IsEditing { get; set; }

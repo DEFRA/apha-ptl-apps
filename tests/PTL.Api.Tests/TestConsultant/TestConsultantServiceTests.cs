@@ -6,8 +6,8 @@ namespace PTL.Api.Tests.TestConsultant;
 
 public class TestConsultantServiceTests
 {
-    private static TestConsultantService CreateService(FakeTestConsultantRepository? repository = null, FakeExternalLoginService? loginService = null) =>
-        new(repository ?? new FakeTestConsultantRepository(), loginService ?? new FakeExternalLoginService(), new FakeActingUserAccessor());
+    private static TestConsultantService CreateService(FakeTestConsultantRepository? repository = null) =>
+        new(repository ?? new FakeTestConsultantRepository(), new FakeActingUserAccessor());
 
     [Fact]
     public async Task CreateAsync_ValidInput_PersistsAndReturnsConsultant()
@@ -112,46 +112,88 @@ public class TestConsultantServiceTests
     }
 
     [Fact]
-    public async Task GenerateLoginAsync_Success_SetsSsoId()
+    public async Task SetStatusAsync_AlreadyInactive_DoesNotRestampOrWrite()
+    {
+        var id = Guid.NewGuid();
+        var stamped = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        var repository = new FakeTestConsultantRepository();
+        repository.Seed(new PTL.Core.TestConsultant.TestConsultant { ExternalTestConsultantId = id, IsInactive = true, InactiveDate = stamped });
+        var service = CreateService(repository);
+
+        var result = await service.SetStatusAsync(id, isInactive: true);
+
+        Assert.Equal(stamped, result!.InactiveDate);
+        Assert.Empty(repository.UpdateCalls);
+    }
+
+    [Fact]
+    public async Task SetStatusAsync_DeactivatingAnAllocatedConsultant_IsRefusedAndWritesNothing()
     {
         var id = Guid.NewGuid();
         var repository = new FakeTestConsultantRepository();
-        repository.Seed(new PTL.Core.TestConsultant.TestConsultant { ExternalTestConsultantId = id, Name = "Jane Smith", Email = "jane@example.com", SsoId = Guid.Empty });
-        var loginService = new FakeExternalLoginService();
-        var service = CreateService(repository, loginService);
+        repository.Seed(new PTL.Core.TestConsultant.TestConsultant { ExternalTestConsultantId = id, AllocationCount = 2, AllocationString = "S1, S2" });
+        var service = CreateService(repository);
 
-        var (success, message) = await service.GenerateLoginAsync(id);
+        var exception = await Assert.ThrowsAsync<ExternalTestConsultantValidationException>(() => service.SetStatusAsync(id, isInactive: true));
+
+        var error = Assert.Single(exception.Errors);
+        Assert.Contains("2 scheme(s)", error.Message);
+        Assert.Contains("S1, S2", error.Message);
+        Assert.Empty(repository.UpdateCalls);
+    }
+
+    [Fact]
+    public async Task SetStatusAsync_ReactivatingAnAllocatedConsultant_IsAllowed()
+    {
+        var id = Guid.NewGuid();
+        var repository = new FakeTestConsultantRepository();
+        repository.Seed(new PTL.Core.TestConsultant.TestConsultant { ExternalTestConsultantId = id, IsInactive = true, InactiveDate = DateTime.UtcNow, AllocationCount = 1 });
+        var service = CreateService(repository);
+
+        var updated = await service.SetStatusAsync(id, isInactive: false);
+
+        Assert.False(updated!.IsInactive);
+    }
+
+    [Fact]
+    public async Task DeleteAsync_UnallocatedConsultant_DeletesIt()
+    {
+        var id = Guid.NewGuid();
+        var repository = new FakeTestConsultantRepository();
+        repository.Seed(new PTL.Core.TestConsultant.TestConsultant { ExternalTestConsultantId = id, Name = "Jane Smith" });
+        var service = CreateService(repository);
+
+        var (success, message) = await service.DeleteAsync(id);
 
         Assert.True(success);
         Assert.Null(message);
-        Assert.Contains(id, loginService.Calls);
-        Assert.NotEqual(Guid.Empty, Assert.Single(repository.UpdateCalls).SsoId);
+        Assert.Contains(id, repository.DeleteCalls);
     }
 
     [Fact]
-    public async Task GenerateLoginAsync_UnknownConsultant_ReturnsFailure()
-    {
-        var service = CreateService();
-
-        var (success, message) = await service.GenerateLoginAsync(Guid.NewGuid());
-
-        Assert.False(success);
-        Assert.Equal("Test consultant was not found.", message);
-    }
-
-    [Fact]
-    public async Task GenerateLoginAsync_StubReportsFailure_ReturnsFailureWithoutUpdating()
+    public async Task DeleteAsync_AllocatedConsultant_IsRefusedAndDeletesNothing()
     {
         var id = Guid.NewGuid();
         var repository = new FakeTestConsultantRepository();
-        repository.Seed(new PTL.Core.TestConsultant.TestConsultant { ExternalTestConsultantId = id });
-        var loginService = new FakeExternalLoginService { Success = false };
-        var service = CreateService(repository, loginService);
+        repository.Seed(new PTL.Core.TestConsultant.TestConsultant { ExternalTestConsultantId = id, AllocationCount = 1, AllocationString = "S1" });
+        var service = CreateService(repository);
 
-        var (success, message) = await service.GenerateLoginAsync(id);
+        var (success, message) = await service.DeleteAsync(id);
 
         Assert.False(success);
-        Assert.Equal("The login could not be generated.", message);
-        Assert.Empty(repository.UpdateCalls);
+        Assert.Contains("1 scheme(s)", message);
+        Assert.Contains("S1", message);
+        Assert.Empty(repository.DeleteCalls);
+    }
+
+    [Fact]
+    public async Task DeleteAsync_UnknownConsultant_ReturnsFailure()
+    {
+        var service = CreateService();
+
+        var (success, message) = await service.DeleteAsync(Guid.NewGuid());
+
+        Assert.False(success);
+        Assert.Equal("Test consultant was not found.", message);
     }
 }
