@@ -93,7 +93,7 @@
         }
         @foreach (var row in Model.Rows)
         {
-            <tr class="govuk-table__row">
+            <tr class="govuk-table__row" id="row-@row.ItemId">
                 @if (row.IsEditing)
                 {
                     <td class="govuk-table__cell">
@@ -139,7 +139,7 @@
                 else
                 {
                     <td class="govuk-table__cell">@row.Name</td>
-                    <td class="govuk-table__cell">@row.TestReturnValueTypeName</td>
+                    <td class="govuk-table__cell" style="overflow-wrap: break-word;">@row.TestReturnValueTypeName</td>
                     <td class="govuk-table__cell">
                         @* Bulk-saved together via #noLongerInUseBulkForm below - matches legacy's
                            page-level Save button. *@
@@ -177,8 +177,8 @@
                         else
                         {
                             <div style="white-space: nowrap;">
-                                <a class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0" data-module="govuk-button" asp-action="@Model.ActionName" asp-route-yearId="@Model.SelectedYearId" asp-route-editId="@row.ItemId" asp-route-page="@Model.Page" asp-route-search="@Model.SearchText">Edit</a>
-                                <a class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0" data-module="govuk-button" asp-action="@Model.ActionName" asp-route-yearId="@Model.SelectedYearId" asp-route-removeConfirmId="@row.ItemId" asp-route-page="@Model.Page" asp-route-search="@Model.SearchText">Remove</a>
+                                <a class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0" data-module="govuk-button" asp-action="@Model.ActionName" asp-route-yearId="@Model.SelectedYearId" asp-route-editId="@row.ItemId" asp-route-page="@Model.Page" asp-route-search="@Model.SearchText" asp-fragment="row-@row.ItemId">Edit</a>
+                                <a class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0" data-module="govuk-button" asp-action="@Model.ActionName" asp-route-yearId="@Model.SelectedYearId" asp-route-removeConfirmId="@row.ItemId" asp-route-page="@Model.Page" asp-route-search="@Model.SearchText" asp-fragment="row-@row.ItemId">Remove</a>
                             </div>
                         }
                         @if (!row.CanEditOrRemove)

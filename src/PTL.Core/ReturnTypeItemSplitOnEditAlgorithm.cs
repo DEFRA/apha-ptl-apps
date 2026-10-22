@@ -34,20 +34,26 @@ public interface ISplitOnEditItem<TSelf> where TSelf : ISplitOnEditItem<TSelf>
 // SonarCloud flagged ~19.6% duplication on each.
 public static class ReturnTypeItemSplitOnEditAlgorithm
 {
+    // Bundles the edited values and year context into one record - ApplyAsync was flagged for
+    // exceeding Sonar's 7-parameter limit (S107) once these were passed individually.
+    public sealed record Request(
+        string NewName,
+        Guid NewTestReturnValueTypeId,
+        string NewTestReturnValueTypeName,
+        bool NewNoLongerInUse,
+        int SelectedYearId,
+        int CurrentYearId,
+        int FinalYearId);
+
     public static async Task<TItem> ApplyAsync<TItem>(
         TItem existing,
-        string newName,
-        Guid newTestReturnValueTypeId,
-        string newTestReturnValueTypeName,
-        bool newNoLongerInUse,
-        int selectedYearId,
-        int currentYearId,
-        int finalYearId,
+        Request request,
         Func<TItem, CancellationToken, Task> createAsync,
         Func<TItem, CancellationToken, Task> updateAsync,
         CancellationToken cancellationToken)
         where TItem : class, ISplitOnEditItem<TItem>
     {
+        var (newName, newTestReturnValueTypeId, newTestReturnValueTypeName, newNoLongerInUse, selectedYearId, currentYearId, finalYearId) = request;
         if (existing.StartYearId == selectedYearId)
         {
             if (selectedYearId == currentYearId)

@@ -10,6 +10,14 @@ html {
   }
 }
 
+/* Smooths the #row-{id} anchor jump used by SchemeAdmin's Edit/Remove links so the post-postback
+   scroll reads as a glide rather than an instant snap - respects users who've opted out of motion. */
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
 .btn:focus, .btn:active:focus, .btn-link.nav-link:focus, .form-control:focus, .form-check-input:focus {
   box-shadow: 0 0 0 0.1rem white, 0 0 0 0.25rem #258cfb;
 }

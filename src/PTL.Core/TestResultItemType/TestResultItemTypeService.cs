@@ -74,13 +74,7 @@ public sealed class TestResultItemTypeService(ITestResultItemTypeRepository repo
         var returnValueTypeName = await ResolveReturnValueTypeNameAsync(testReturnValueTypeId, cancellationToken);
         return await ReturnTypeItemSplitOnEditAlgorithm.ApplyAsync(
             existing,
-            trimmedName,
-            testReturnValueTypeId,
-            returnValueTypeName,
-            noLongerInUse,
-            yearId,
-            settings.CurrentYearId,
-            settings.FinalYearId,
+            new ReturnTypeItemSplitOnEditAlgorithm.Request(trimmedName, testReturnValueTypeId, returnValueTypeName, noLongerInUse, yearId, settings.CurrentYearId, settings.FinalYearId),
             repository.CreateAsync,
             repository.UpdateAsync,
             cancellationToken);
