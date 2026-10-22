@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -92,7 +93,13 @@ public sealed class PtlInternalWebTestFactory : WebApplicationFactory<Program>
 
                     var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
                     var properties = new AuthenticationProperties();
-                    properties.StoreTokens([new AuthenticationToken { Name = "id_token", Value = TestIdToken }]);
+
+                    // Marks the roles as just re-validated so EntraCookieEvents doesn't call the (unavailable) resolver and reject this cookie.
+                    properties.StoreTokens(
+                    [
+                        new AuthenticationToken { Name = "id_token", Value = TestIdToken },
+                        new AuthenticationToken { Name = "ptl_roles_checked_at", Value = DateTimeOffset.UtcNow.ToString("o", CultureInfo.InvariantCulture) }
+                    ]);
                     await context.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(identity), properties);
                     context.Response.StatusCode = StatusCodes.Status204NoContent;
                     return;

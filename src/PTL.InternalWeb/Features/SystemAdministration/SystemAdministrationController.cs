@@ -13,6 +13,7 @@ using PTL.Contracts.User;
 using PTL.Contracts.Viewer;
 using PTL.InternalWeb.Authorization;
 using PTL.InternalWeb.Features.Account;
+using PTL.SharedUI.Notifications;
 
 namespace PTL.InternalWeb.Features.SystemAdministration;
 
@@ -94,7 +95,7 @@ public class SystemAdministrationController : Controller
     // Landing page for the System Administration section (moved from the removed Menu feature) -
     // shows only a heading and a short description, relying on the left nav (SideNavigationProvider)
     // for the actual section contents (Administration Charges, Weighted Pricing Plan, etc.).
-    public IActionResult SystemAdministration() => View();
+    public IActionResult Index() => View();
 
     public async Task<IActionResult> AdministrationCharge(CancellationToken cancellationToken) =>
         View(await BuildAdministrationChargeViewModelAsync(cancellationToken));
@@ -400,13 +401,14 @@ public class SystemAdministrationController : Controller
     }
 
     public async Task<IActionResult> ManageUserRoles(CancellationToken cancellationToken) =>
-        View(await BuildManageUserRolesViewModelAsync(message: null, messageIsError: false, cancellationToken));
+        View(await BuildManageUserRolesViewModelAsync(cancellationToken));
 
     // Whole-grid submit: every user's role set shown on screen is (re)saved, not just the ones
     // actually changed - idempotent for unchanged rows, mirrors the AdministrationCharge screen's
     // save-the-whole-grid convention. Unlike legacy's UserRoles.aspx (every checkbox click is its
     // own immediate save), this only persists on an explicit Save - matches the story's "When I
-    // click Save... Then... persisted" acceptance criteria.
+    // click Save... Then... persisted" acceptance criteria. Redirects back to the System
+    // Administration landing page (matches legacy ButtonSubmit_Click's Response.Redirect).
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> ManageUserRoles(ManageUserRolesViewModel model, CancellationToken cancellationToken)
@@ -423,14 +425,19 @@ public class SystemAdministrationController : Controller
             }
         }
 
-        var message = blockedMessages.Count > 0
-            ? string.Join(" ", blockedMessages)
-            : "Role assignments updated successfully.";
+        if (blockedMessages.Count > 0)
+        {
+            TempData.SetNotification(NotificationType.Error, string.Join(" ", blockedMessages));
+        }
+        else
+        {
+            TempData.SetNotification(NotificationType.Success, "Role assignments updated successfully.");
+        }
 
-        return View(await BuildManageUserRolesViewModelAsync(message, messageIsError: blockedMessages.Count > 0, cancellationToken));
+        return RedirectToAction(nameof(Index));
     }
 
-    private async Task<ManageUserRolesViewModel> BuildManageUserRolesViewModelAsync(string? message, bool messageIsError, CancellationToken cancellationToken)
+    private async Task<ManageUserRolesViewModel> BuildManageUserRolesViewModelAsync(CancellationToken cancellationToken)
     {
         var roles = await roleApiClient.GetRolesAsync(cancellationToken);
         var rows = await userApiClient.GetUserRoleGridAsync(cancellationToken);
@@ -444,9 +451,7 @@ public class SystemAdministrationController : Controller
                 Username = r.Username,
                 FriendlyName = r.FriendlyName,
                 SelectedRoleIds = r.RoleIds.ToList()
-            }).ToList(),
-            Message = message,
-            MessageIsError = messageIsError
+            }).ToList()
         };
     }
 
