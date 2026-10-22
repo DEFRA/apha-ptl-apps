@@ -300,7 +300,7 @@ public static class SideNavigationProvider
             RequiredPolicy = PtlPolicies.Distributions,
             ControllerName = DistributionControllerName,
             ActionName = IndexAction,
-            LinkQueryKeys = YearKey,
+            OptionalLinkQueryKeys = YearKey,
             Children =
             [
                 // Legacy sitemap siblings of MenuDistributions.aspx - not implemented yet (only

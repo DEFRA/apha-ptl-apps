@@ -10,10 +10,6 @@
     <link rel="stylesheet" href="~/css/printable-scheme.css" />
 }
 
-@section BackLink {
-    <a class="govuk-back-link noprint" asp-action="Index" asp-route-year="@Model.YearId">Back</a>
-}
-
 <h1 class="govuk-heading-l">Sample preparation – @Model.MonthDescription</h1>
 
 <form method="post" asp-action="Preparation" asp-route-year="@Model.YearId" asp-route-monthId="@Model.MonthId">
