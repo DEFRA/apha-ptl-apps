@@ -17,4 +17,7 @@ public interface ITestConsultantRepository
     // changes); null is for system-initiated updates such as the SSO link at external sign-in.
     Task<TestConsultant> CreateAsync(TestConsultant testConsultant, AuditEntry? auditEntry = null, CancellationToken cancellationToken = default);
     Task<TestConsultant?> UpdateAsync(TestConsultant testConsultant, AuditEntry? auditEntry = null, CancellationToken cancellationToken = default);
+
+    // spdExtTestConsultant. False when no row was deleted.
+    Task<bool> DeleteAsync(Guid externalTestConsultantId, AuditEntry? auditEntry = null, CancellationToken cancellationToken = default);
 }

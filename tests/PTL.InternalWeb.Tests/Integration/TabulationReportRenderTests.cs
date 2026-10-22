@@ -242,7 +242,7 @@ public class TabulationReportRenderTests : IClassFixture<WebApplicationFactory<P
         var rows = TableRows(table);
         Assert.Equal(6, rows.Count);
         Assert.Equal(
-            "<th scope=\"col\" class=\"TabulationHeader1\" rowspan=\"2\">Clinical</th><th scope=\"col\" class=\"TabulationHeader2\" rowspan=\"2\">Method</th><th scope=\"col\" class=\"TabulationHeader1\" colspan=\"5\">S1</th>",
+            "<th scope=\"col\" class=\"TabulationHeader1\" rowspan=\"2\">Clinical</th><th scope=\"col\" class=\"TabulationHeader2\" rowspan=\"2\">Method</th><th scope=\"colgroup\" class=\"TabulationHeader1\" colspan=\"5\">S1</th>",
             rows[0]);
         Assert.Equal(5, Regex.Count(rows[1], "<th scope=\"col\" class=\"TabulationHeader2\">"));
         Assert.Equal(
@@ -251,7 +251,7 @@ public class TabulationReportRenderTests : IClassFixture<WebApplicationFactory<P
         // Column 0 of the second intended row is still covered by the Intended rowspan.
         Assert.StartsWith("<td class=\"TabulationCell\">ELISA</td>", rows[3], StringComparison.Ordinal);
         Assert.StartsWith("<th scope=\"row\" class=\"TabulationCell\">L001</th>", rows[4], StringComparison.Ordinal);
-        Assert.Contains("<td class=\"TabulationCell NilReturn\">&nbsp;</td>", rows[4], StringComparison.Ordinal);
+        Assert.Contains("<td class=\"TabulationCell NilReturn\"><span class=\"govuk-visually-hidden\">No result</span></td>", rows[4], StringComparison.Ordinal);
         Assert.Contains("<td class=\"TabulationCell\">Good [4/5]</td>", rows[4], StringComparison.Ordinal);
         Assert.Equal(
             "<th scope=\"row\" class=\"TabulationCell\">L002</th><td class=\"TabulationCell NilReturn\">No return</td><td class=\"TabulationCell\" colspan=\"5\">Not Submitted</td>",

@@ -11,9 +11,9 @@ namespace PTL.Api.Tests.Endpoints;
 
 public class ExternalTestConsultantControllerTests
 {
-    private static ExternalTestConsultantController CreateController(FakeTestConsultantRepository? repository = null, FakeExternalLoginService? loginService = null)
+    private static ExternalTestConsultantController CreateController(FakeTestConsultantRepository? repository = null)
     {
-        var controller = new ExternalTestConsultantController(new TestConsultantService(repository ?? new FakeTestConsultantRepository(), loginService ?? new FakeExternalLoginService(), new FakeActingUserAccessor()));
+        var controller = new ExternalTestConsultantController(new TestConsultantService(repository ?? new FakeTestConsultantRepository(), new FakeActingUserAccessor()));
 
         var services = new ServiceCollection().AddMvc().Services.BuildServiceProvider();
         controller.ControllerContext = new ControllerContext
@@ -37,7 +37,6 @@ public class ExternalTestConsultantControllerTests
         var consultants = Assert.IsAssignableFrom<IReadOnlyList<ExternalTestConsultantResponse>>(ok.Value);
         var consultant = Assert.Single(consultants);
         Assert.Equal("Jane Smith", consultant.Name);
-        Assert.True(consultant.HasLogin);
     }
 
     [Fact]
@@ -89,29 +88,44 @@ public class ExternalTestConsultantControllerTests
     }
 
     [Fact]
-    public async Task GenerateLogin_Success_ReturnsOkWithSuccess()
+    public async Task SetStatus_DeactivatingAnAllocatedConsultant_ReturnsValidationProblem()
     {
         var id = Guid.NewGuid();
         var repository = new FakeTestConsultantRepository();
-        repository.Seed(new PTL.Core.TestConsultant.TestConsultant { ExternalTestConsultantId = id, Name = "Jane Smith", Email = "jane@example.com" });
+        repository.Seed(new PTL.Core.TestConsultant.TestConsultant { ExternalTestConsultantId = id, AllocationCount = 1, AllocationString = "S1" });
         var controller = CreateController(repository);
 
-        var result = await controller.GenerateLogin(id, CancellationToken.None);
+        var result = await controller.SetStatus(id, new ExternalTestConsultantStatusRequest(true), CancellationToken.None);
 
-        var ok = Assert.IsType<OkObjectResult>(result.Result);
-        var response = Assert.IsType<GenerateLoginResponse>(ok.Value);
+        Assert.IsType<BadRequestObjectResult>(result.Result);
+        Assert.False(controller.ModelState.IsValid);
+    }
+
+    [Fact]
+    public async Task Delete_ExistingConsultant_ReturnsSuccess()
+    {
+        var id = Guid.NewGuid();
+        var repository = new FakeTestConsultantRepository();
+        repository.Seed(new PTL.Core.TestConsultant.TestConsultant { ExternalTestConsultantId = id });
+        var controller = CreateController(repository);
+
+        var result = await controller.Delete(id, CancellationToken.None);
+
+        var response = Assert.IsType<ExternalTestConsultantDeleteResponse>(Assert.IsType<OkObjectResult>(result.Result).Value);
         Assert.True(response.Success);
     }
 
     [Fact]
-    public async Task GenerateLogin_UnknownConsultant_ReturnsOkWithFailure()
+    public async Task Delete_AllocatedConsultant_ReturnsOkWithFailure()
     {
-        var controller = CreateController();
+        var id = Guid.NewGuid();
+        var repository = new FakeTestConsultantRepository();
+        repository.Seed(new PTL.Core.TestConsultant.TestConsultant { ExternalTestConsultantId = id, AllocationCount = 1, AllocationString = "S1" });
+        var controller = CreateController(repository);
 
-        var result = await controller.GenerateLogin(Guid.NewGuid(), CancellationToken.None);
+        var result = await controller.Delete(id, CancellationToken.None);
 
-        var ok = Assert.IsType<OkObjectResult>(result.Result);
-        var response = Assert.IsType<GenerateLoginResponse>(ok.Value);
+        var response = Assert.IsType<ExternalTestConsultantDeleteResponse>(Assert.IsType<OkObjectResult>(result.Result).Value);
         Assert.False(response.Success);
     }
 }

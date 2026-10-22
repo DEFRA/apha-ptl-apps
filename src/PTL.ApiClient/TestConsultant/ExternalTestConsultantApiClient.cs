@@ -10,8 +10,8 @@ public interface IExternalTestConsultantApiClient
     Task<IReadOnlyList<ExternalTestConsultantResponse>> GetAllAsync(CancellationToken cancellationToken = default);
     Task<ExternalTestConsultantSaveResult> CreateAsync(ExternalTestConsultantSaveRequest request, CancellationToken cancellationToken = default);
     Task<ExternalTestConsultantSaveResult> UpdateAsync(Guid externalTestConsultantId, ExternalTestConsultantSaveRequest request, CancellationToken cancellationToken = default);
-    Task<ExternalTestConsultantResponse?> SetStatusAsync(Guid externalTestConsultantId, bool isInactive, CancellationToken cancellationToken = default);
-    Task<GenerateLoginResponse> GenerateLoginAsync(Guid externalTestConsultantId, CancellationToken cancellationToken = default);
+    Task<ExternalTestConsultantSaveResult> SetStatusAsync(Guid externalTestConsultantId, bool isInactive, CancellationToken cancellationToken = default);
+    Task<ExternalTestConsultantDeleteResponse> DeleteAsync(Guid externalTestConsultantId, CancellationToken cancellationToken = default);
 }
 
 public sealed class ExternalTestConsultantApiClient(HttpClient httpClient) : IExternalTestConsultantApiClient
@@ -39,24 +39,23 @@ public sealed class ExternalTestConsultantApiClient(HttpClient httpClient) : IEx
         return await ToSaveResultAsync(response, cancellationToken);
     }
 
-    public async Task<ExternalTestConsultantResponse?> SetStatusAsync(Guid externalTestConsultantId, bool isInactive, CancellationToken cancellationToken = default)
+    public async Task<ExternalTestConsultantSaveResult> SetStatusAsync(Guid externalTestConsultantId, bool isInactive, CancellationToken cancellationToken = default)
     {
         var response = await httpClient.PutAsJsonAsync($"/api/external-test-consultants/{externalTestConsultantId}/status", new ExternalTestConsultantStatusRequest(isInactive), cancellationToken);
         if (response.StatusCode == HttpStatusCode.NotFound)
         {
-            return null;
+            return new ExternalTestConsultantSaveResult(false, null, new Dictionary<string, string[]> { [string.Empty] = ["Test consultant was not found."] });
         }
 
-        response.EnsureSuccessStatusCode();
-        return await response.Content.ReadFromJsonAsync<ExternalTestConsultantResponse>(cancellationToken);
+        return await ToSaveResultAsync(response, cancellationToken);
     }
 
-    public async Task<GenerateLoginResponse> GenerateLoginAsync(Guid externalTestConsultantId, CancellationToken cancellationToken = default)
+    public async Task<ExternalTestConsultantDeleteResponse> DeleteAsync(Guid externalTestConsultantId, CancellationToken cancellationToken = default)
     {
-        var response = await httpClient.PostAsync($"/api/external-test-consultants/{externalTestConsultantId}/generate-login", content: null, cancellationToken);
+        var response = await httpClient.DeleteAsync($"/api/external-test-consultants/{externalTestConsultantId}", cancellationToken);
         response.EnsureSuccessStatusCode();
-        var result = await response.Content.ReadFromJsonAsync<GenerateLoginResponse>(cancellationToken);
-        return result ?? new GenerateLoginResponse(false, "The login could not be generated.");
+        var result = await response.Content.ReadFromJsonAsync<ExternalTestConsultantDeleteResponse>(cancellationToken);
+        return result ?? new ExternalTestConsultantDeleteResponse(false, "The removal did not return a result.");
     }
 
     private static async Task<ExternalTestConsultantSaveResult> ToSaveResultAsync(HttpResponseMessage response, CancellationToken cancellationToken)

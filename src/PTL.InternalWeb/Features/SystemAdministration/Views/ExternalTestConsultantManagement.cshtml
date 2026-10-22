@@ -1,6 +1,6 @@
 @model PTL.InternalWeb.Features.SystemAdministration.ExternalTestConsultantManagementViewModel
 @{
-    ViewData["Title"] = "External Test Consultant Management";
+    ViewData["Title"] = "Manage External Test Consultants";
 
     var errors = ViewData.ModelState
         .Where(entry => entry.Value?.Errors.Count > 0)
@@ -10,7 +10,7 @@
     var editingRow = Model.Rows.FirstOrDefault(r => r.IsEditing);
 }
 
-<h1 class="govuk-heading-l">External Test Consultant Management</h1>
+<h1 class="govuk-heading-l">Manage External Test Consultants</h1>
 
 @if (Model.Message is not null)
 {
@@ -33,7 +33,6 @@
             <th scope="col" class="govuk-table__header">Name</th>
             <th scope="col" class="govuk-table__header">Department</th>
             <th scope="col" class="govuk-table__header">Email</th>
-            <th scope="col" class="govuk-table__header">External Website Login</th>
             <th scope="col" class="govuk-table__header">Actions</th>
             <th scope="col" class="govuk-table__header">Status</th>
             <th scope="col" class="govuk-table__header">Inactive Date</th>
@@ -43,7 +42,7 @@
         @if (Model.Rows.Count == 0)
         {
             <tr class="govuk-table__row">
-                <td class="govuk-table__cell" colspan="7">There are no External Test Consultants to display.</td>
+                <td class="govuk-table__cell" colspan="6">There are no External Test Consultants to display.</td>
             </tr>
         }
         @foreach (var row in Model.Rows)
@@ -69,7 +68,6 @@
                             <input id="Edit.Email" form="tcEditForm" name="Edit.Email" value="@row.Email" maxlength="50" class="govuk-input" />
                         </div>
                     </td>
-                    <td class="govuk-table__cell">@(row.HasLogin ? "Login generated" : "")</td>
                     <td class="govuk-table__cell">
                         <div class="govuk-button-group govuk-!-margin-bottom-0">
                             <button form="tcEditForm" class="govuk-button govuk-!-margin-bottom-0" data-module="govuk-button" type="submit">Save</button>
@@ -83,12 +81,6 @@
                     <td class="govuk-table__cell">@row.Department</td>
                     <td class="govuk-table__cell">@row.Email</td>
                     <td class="govuk-table__cell">
-                        @if (row.HasLogin)
-                        {
-                            @:Login generated
-                        }
-                    </td>
-                    <td class="govuk-table__cell">
                         <div class="govuk-button-group govuk-!-margin-bottom-0">
                             <a class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0" data-module="govuk-button" asp-action="ExternalTestConsultantManagement" asp-route-editId="@row.ExternalTestConsultantId">Edit</a>
                             <form method="post" asp-action="ExternalTestConsultantManagementToggleStatus" class="govuk-!-display-inline">
@@ -96,6 +88,13 @@
                                 <input type="hidden" name="isInactive" value="@row.IsInactive" />
                                 <button class="govuk-button @(row.IsInactive ? "govuk-button--secondary" : "govuk-button--warning") govuk-!-margin-bottom-0" data-module="govuk-button" type="submit">
                                     @(row.IsInactive ? "Activate" : "Deactivate")
+                                </button>
+                            </form>
+                            <form method="post" asp-action="ExternalTestConsultantManagementRemove" class="govuk-!-display-inline">
+                                <input type="hidden" name="externalTestConsultantId" value="@row.ExternalTestConsultantId" />
+                                <button class="govuk-button govuk-button--warning govuk-!-margin-bottom-0" data-module="govuk-button" type="submit"
+                                        onclick="return confirm('Are you sure you want to remove this test consultant?');">
+                                    Remove
                                 </button>
                             </form>
                         </div>

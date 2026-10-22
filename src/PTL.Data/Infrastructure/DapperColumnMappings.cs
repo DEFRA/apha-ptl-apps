@@ -298,6 +298,8 @@ public static partial class DapperColumnMappings
             ["fldSsoIdExt"] = nameof(PTL.Core.TestConsultant.TestConsultant.SsoIdExt),
             [ColIsInactive] = nameof(PTL.Core.TestConsultant.TestConsultant.IsInactive),
             [ColInactiveDate] = nameof(PTL.Core.TestConsultant.TestConsultant.InactiveDate),
+            ["fldAllocationCount"] = nameof(PTL.Core.TestConsultant.TestConsultant.AllocationCount),
+            ["fldAllocationString"] = nameof(PTL.Core.TestConsultant.TestConsultant.AllocationString),
         });
 
         Map<ParticipantViewerEntity>(new(StringComparer.OrdinalIgnoreCase)

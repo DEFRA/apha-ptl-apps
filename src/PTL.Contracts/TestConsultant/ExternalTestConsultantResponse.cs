@@ -6,5 +6,4 @@ public sealed record ExternalTestConsultantResponse(
     string Department,
     string Email,
     bool IsInactive,
-    DateTime? InactiveDate,
-    bool HasLogin);
+    DateTime? InactiveDate);

@@ -10,6 +10,8 @@ internal sealed class FakeTestConsultantRepository : ITestConsultantRepository
 
     public List<CoreTestConsultant> UpdateCalls { get; } = [];
 
+    public List<Guid> DeleteCalls { get; } = [];
+
     // Audit entry passed to the most recent CreateAsync/UpdateAsync (null when none was supplied).
     public AuditEntry? LastAuditEntry { get; private set; }
 
@@ -47,6 +49,13 @@ internal sealed class FakeTestConsultantRepository : ITestConsultantRepository
 
         _testConsultants[testConsultant.ExternalTestConsultantId] = testConsultant;
         return Task.FromResult<CoreTestConsultant?>(testConsultant);
+    }
+
+    public Task<bool> DeleteAsync(Guid externalTestConsultantId, AuditEntry? auditEntry = null, CancellationToken cancellationToken = default)
+    {
+        DeleteCalls.Add(externalTestConsultantId);
+        LastAuditEntry = auditEntry;
+        return Task.FromResult(_testConsultants.Remove(externalTestConsultantId));
     }
 
     public Task<IReadOnlyList<CoreTestConsultant>> GetAllAsync(CancellationToken cancellationToken = default) =>

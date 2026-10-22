@@ -96,6 +96,21 @@ public class GovUkPageHeaderTagHelperTests
         Assert.Contains("&lt;script&gt;", html, StringComparison.Ordinal);
     }
 
+    // GOV.UK's markup nests the two: a width container (which has side margins) around the service-navigation container.
+    // On one element, the container's own width:100% adds to those margins and the bar overshoots the right-hand edge,
+    // pushing the "Signed in as" content out of line with the rest of the page.
+    [Fact]
+    public async Task ProcessAsync_NestsTheServiceNavigationContainerInsideTheWidthContainer()
+    {
+        var (helper, context, output) = Create("Proficiency Testing - Internal", null, "<nav>Signed in as: Jane</nav>");
+
+        await helper.ProcessAsync(context, output);
+
+        var html = output.Content.GetContent();
+        Assert.DoesNotMatch("class=\"[^\"]*govuk-width-container[^\"]*govuk-service-navigation__container", html);
+        Assert.Matches("<div class=\"govuk-width-container\">\\s*<div class=\"govuk-service-navigation__container\">[\\s\\S]*<nav>Signed in as: Jane</nav>\\s*</div>\\s*</div>\\s*</section>", html);
+    }
+
     [Fact]
     public async Task ProcessAsync_SuppressesOwnTagName()
     {

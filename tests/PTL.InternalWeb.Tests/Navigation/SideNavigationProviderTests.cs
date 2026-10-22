@@ -4,6 +4,29 @@ namespace PTL.InternalWeb.Tests.Navigation;
 
 public class SideNavigationProviderTests
 {
+    // Order and titles are those of the legacy ProficiencyTestingWeb/Web.sitemap "System Administration" node.
+    [Fact]
+    public void Build_SystemAdministration_MatchesTheLegacySiteMapOrderAndTitles()
+    {
+        var systemAdministration = SideNavigationProvider.Build().Single(i => i.Text == "System Administration");
+
+        Assert.Equal(
+            [
+                "Manage Roles",
+                "Create User",
+                "Remove User",
+                "Internal Test Consultant Department",
+                "Manage External Test Consultants",
+                "Manage Viewers",
+                "Manage Countries",
+                "External Site Management",
+                "Administration Charges",
+                "Weighted Pricing Plan",
+                "Postage Pricing Plan",
+            ],
+            systemAdministration.Children.Select(c => c.Text));
+    }
+
     [Fact]
     public void Build_ManageContracts_ListsSearchBetweenCustomersAndGroupAddresses()
     {
@@ -131,14 +154,14 @@ public class SideNavigationProviderTests
     [Theory]
     [InlineData("CreateUserSearch", "Create User")]
     [InlineData("CreateUserConfirm", "Create User")]
-    [InlineData("ViewerManagementAdd", "Viewer Management")]
-    [InlineData("ViewerManagementSave", "Viewer Management")]
-    [InlineData("ViewerManagementRemove", "Viewer Management")]
-    [InlineData("ViewerManagementGenerateLogin", "Viewer Management")]
-    [InlineData("ExternalTestConsultantManagementAdd", "External Test Consultant Management")]
-    [InlineData("ExternalTestConsultantManagementToggleStatus", "External Test Consultant Management")]
-    [InlineData("CountryManagementRemove", "Country Management")]
-    [InlineData("InternalTestConsultantDepartmentToggleStatus", "Internal Test Consultant Department Management")]
+    [InlineData("ViewerManagementAdd", "Manage Viewers")]
+    [InlineData("ViewerManagementSave", "Manage Viewers")]
+    [InlineData("ViewerManagementRemove", "Manage Viewers")]
+    [InlineData("ExternalTestConsultantManagementAdd", "Manage External Test Consultants")]
+    [InlineData("ExternalTestConsultantManagementToggleStatus", "Manage External Test Consultants")]
+    [InlineData("ExternalTestConsultantManagementRemove", "Manage External Test Consultants")]
+    [InlineData("CountryManagementRemove", "Manage Countries")]
+    [InlineData("InternalTestConsultantDepartmentToggleStatus", "Internal Test Consultant Department")]
     [InlineData("PostagePricingPlanRenew", "Postage Pricing Plan")]
     public void FindNode_SubActionWithoutExactMatch_FallsBackToLongestRegisteredPrefix(string actionName, string expectedText)
     {
@@ -171,6 +194,6 @@ public class SideNavigationProviderTests
         var path = SideNavigationProvider.FindPath(tree, "SystemAdministration", "ViewerManagementRemove");
 
         Assert.NotNull(path);
-        Assert.Equal("Viewer Management", path![^1].Text);
+        Assert.Equal("Manage Viewers", path![^1].Text);
     }
 }

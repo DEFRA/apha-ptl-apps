@@ -94,7 +94,7 @@ public class CountryRepositoryTests
         Assert.Contains(connection.ExecutedCommands, c => c.CommandText == deleteSql);
     }
 
-    private const string AuditSql = "EXEC dbo.spiSystemAdministrationAudit @AuditId, @ActingUserId, @Action, @EntityType, @EntityId, @Details";
+    private const string AuditSql = "EXEC dbo.spiLog @LogId, @LogDate, @UserId, @Description";
 
     [Fact]
     public async Task DeleteAsync_WithAudit_CommitsChangeAndAuditInOneTransaction()
@@ -112,7 +112,7 @@ public class CountryRepositoryTests
         Assert.True(connection.LastTransaction!.Committed);
         Assert.Contains(connection.ExecutedCommands, c => c.CommandText == deleteSql);
         var auditCommand = Assert.Single(connection.ExecutedCommands, c => c.CommandText == AuditSql);
-        Assert.Equal("DeleteCountry", auditCommand.ParameterValue("@Action"));
+        Assert.StartsWith("SysAdmin|DeleteCountry|", (string)auditCommand.ParameterValue("@Description")!);
     }
 
     [Fact]

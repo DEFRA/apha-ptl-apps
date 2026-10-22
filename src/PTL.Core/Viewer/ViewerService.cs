@@ -1,12 +1,8 @@
 using PTL.Core.Audit;
-using PTL.Core.TestConsultant;
 
 namespace PTL.Core.Viewer;
 
-// Reuses TestConsultant's IExternalLoginService/StubExternalLoginService as-is - the stub is
-// already generic (id/name/email in, bool out) and the story's Developer Note flags the same
-// CIDM/GOV.UK One Login business decision for Viewers' Generate Login as for Test Consultants'.
-public sealed class ViewerService(IViewerRepository repository, IExternalLoginService externalLoginService, IActingUserAccessor actingUser) : IViewerService
+public sealed class ViewerService(IViewerRepository repository, IActingUserAccessor actingUser) : IViewerService
 {
     private const string EntityType = "Viewer";
 
@@ -70,25 +66,6 @@ public sealed class ViewerService(IViewerRepository repository, IExternalLoginSe
 
         var deleted = await repository.DeleteAsync(viewerId, Audit("DeleteViewer", viewerId, $"Name: {existing.Name}"), cancellationToken);
         return deleted ? (true, null) : (false, "Viewer was not found.");
-    }
-
-    public async Task<(bool Success, string? Message)> GenerateLoginAsync(Guid viewerId, CancellationToken cancellationToken = default)
-    {
-        var existing = await FindAsync(viewerId, cancellationToken);
-        if (existing is null)
-        {
-            return (false, "Viewer was not found.");
-        }
-
-        var success = await externalLoginService.GenerateLoginAsync(existing.ViewerId, existing.Name, existing.Email, cancellationToken);
-        if (!success)
-        {
-            return (false, "The login could not be generated.");
-        }
-
-        existing.SsoId = Guid.NewGuid();
-        await repository.UpdateAsync(existing, Audit("GenerateViewerLogin", existing.ViewerId, $"Name: {existing.Name}"), cancellationToken);
-        return (true, null);
     }
 
     private async Task<ViewerEntity?> FindAsync(Guid viewerId, CancellationToken cancellationToken)

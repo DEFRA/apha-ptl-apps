@@ -1,0 +1,74 @@
+@using System.Globalization
+@model PTL.InternalWeb.Features.TestConsultant.TestConsultantMenuViewModel
+@{
+    ViewData["Title"] = "Test Consultant";
+    var culture = CultureInfo.InvariantCulture;
+}
+
+<h1 class="govuk-heading-l">Test Consultant</h1>
+
+<p class="govuk-body">The table below lists all of the Distributions in each month for which you are a Test Consultant.</p>
+<p class="govuk-body">Clicking the link will allow you to see the results from each participant, and to enter your comments.</p>
+
+@if (Model.Years.Count == 0)
+{
+    <p class="govuk-body">There are no distributions that require comments.</p>
+    return;
+}
+
+<form method="get" asp-action="Index" class="govuk-!-margin-bottom-6">
+    <div class="govuk-form-group">
+        <label class="govuk-label" for="year">Select Year:</label>
+        <select class="govuk-select" id="year" name="year">
+            @foreach (var year in Model.Years)
+            {
+                <option value="@year" selected="@(year == Model.SelectedYear ? "selected" : null)">@year.ToString(culture)</option>
+            }
+        </select>
+    </div>
+    <button type="submit" class="govuk-button govuk-button--secondary" data-module="govuk-button">View</button>
+</form>
+
+@if (Model.Months.Count == 0)
+{
+    <p class="govuk-body">There are no distributions that require comments.</p>
+}
+
+@foreach (var month in Model.Months)
+{
+    <details class="govuk-details">
+        <summary class="govuk-details__summary">
+            <span class="govuk-details__summary-text">@month.Title</span>
+        </summary>
+        <div class="govuk-details__text">
+            <table class="govuk-table">
+                <caption class="govuk-table__caption govuk-visually-hidden">Distributions for @month.Title</caption>
+                <thead class="govuk-table__head">
+                    <tr class="govuk-table__row">
+                        <th scope="col" class="govuk-table__header">Distribution</th>
+                        <th scope="col" class="govuk-table__header">Comment status</th>
+                        <th scope="col" class="govuk-table__header">Results and comments</th>
+                        <th scope="col" class="govuk-table__header">Target date</th>
+                    </tr>
+                </thead>
+                <tbody class="govuk-table__body">
+                    @foreach (var distribution in month.Distributions)
+                    {
+                        <tr class="govuk-table__row">
+                            <td class="govuk-table__cell">@distribution.DistributionTitle</td>
+                            <td class="govuk-table__cell">
+                                <strong class="govuk-tag @(distribution.IsCommentSubmitted ? "govuk-tag--green" : "govuk-tag--yellow")">@distribution.CommentStatus</strong>
+                            </td>
+                            <td class="govuk-table__cell">
+                                <a class="govuk-link" asp-action="Tabulation" asp-route-monthlyDistributionSchemeId="@distribution.MonthlyDistributionSchemeId">
+                                    @(distribution.IsCommentSubmitted ? "View Results / Comments" : "Comments Required")<span class="govuk-visually-hidden"> for @distribution.DistributionTitle</span>
+                                </a>
+                            </td>
+                            <td class="govuk-table__cell">@distribution.TargetDate.ToString("dd/MM/yyyy", culture)</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </details>
+}

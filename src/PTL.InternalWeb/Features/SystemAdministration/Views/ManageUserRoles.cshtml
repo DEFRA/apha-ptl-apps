@@ -1,15 +1,20 @@
 @model PTL.InternalWeb.Features.SystemAdministration.ManageUserRolesViewModel
 @{
-    ViewData["Title"] = "Manage User Roles";
+    ViewData["Title"] = "Manage Roles";
 }
 
-<h1 class="govuk-heading-l">Manage User Roles</h1>
+<h1 class="govuk-heading-l">Manage Roles</h1>
 
 <form method="post" asp-action="ManageUserRoles">
+    @* One column per role, so the grid is wider than the content column: scroll it inside the page (as
+       Preparation and Packaging do) rather than letting it push the whole page wider than the screen. The
+       Username and Name columns stay in view while scrolling so each row is still identifiable. *@
+    <section class="ptl-table-scroll ptl-table-scroll--sticky-first ptl-table-scroll--sticky-second" aria-label="User roles">
     <table class="govuk-table">
         <thead class="govuk-table__head">
             <tr class="govuk-table__row">
-                <th scope="col" class="govuk-table__header">User</th>
+                <th scope="col" class="govuk-table__header">Username</th>
+                <th scope="col" class="govuk-table__header">Name</th>
                 @foreach (var role in Model.Roles)
                 {
                     <th scope="col" class="govuk-table__header">@role.Name</th>
@@ -20,19 +25,20 @@
             @if (Model.Rows.Count == 0)
             {
                 <tr class="govuk-table__row">
-                    <td class="govuk-table__cell" colspan="@(Model.Roles.Count + 1)">There are no users to display.</td>
+                    <td class="govuk-table__cell" colspan="@(Model.Roles.Count + 2)">There are no users to display.</td>
                 </tr>
             }
             @for (var i = 0; i < Model.Rows.Count; i++)
             {
                 var row = Model.Rows[i];
                 <tr class="govuk-table__row">
-                    <td class="govuk-table__cell">
-                        @row.FriendlyName
+                    <th scope="row" class="govuk-table__header">
+                        @row.Username
                         <input type="hidden" name="Rows[@i].UserId" value="@row.UserId" />
                         <input type="hidden" name="Rows[@i].Username" value="@row.Username" />
                         <input type="hidden" name="Rows[@i].FriendlyName" value="@row.FriendlyName" />
-                    </td>
+                    </th>
+                    <td class="govuk-table__cell">@row.FriendlyName</td>
                     @foreach (var role in Model.Roles)
                     {
                         var isChecked = row.SelectedRoleIds.Contains(role.RoleId);
@@ -56,6 +62,7 @@
             }
         </tbody>
     </table>
+    </section>
 
     <div class="govuk-button-group">
         <button class="govuk-button" data-module="govuk-button" type="submit">Save</button>
