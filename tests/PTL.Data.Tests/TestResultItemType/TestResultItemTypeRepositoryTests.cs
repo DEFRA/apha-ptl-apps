@@ -1,7 +1,7 @@
 using System.Data;
 using PTL.Data.Infrastructure;
-using PTL.Data.Tests.Fakes;
 using PTL.Data.TestResultItemType;
+using PTL.Data.Tests.Fakes;
 
 namespace PTL.Data.Tests.TestResultItemType;
 
