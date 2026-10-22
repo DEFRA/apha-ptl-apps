@@ -40,27 +40,28 @@ public sealed class TestResultItemTypeViewModel : IReturnTypeItemListViewModel
 
     public bool MessageIsError { get; set; }
 
-    string IReturnTypeItemListViewModel.PageHeading => "Test Result Items";
-    string IReturnTypeItemListViewModel.PageDescription => "This page defines the Test Result Items (and their Return Types) that will be available for use when setting up next year's Schemes.";
-    string IReturnTypeItemListViewModel.ColumnHeaderLabel => "Test result item name";
-    string IReturnTypeItemListViewModel.EmptyMessage => "There are no Test Result Items to display.";
-    string IReturnTypeItemListViewModel.AddHeading => "Add a Test Result Item";
-    string IReturnTypeItemListViewModel.AddNameLabel => "New test result item name";
-    int IReturnTypeItemListViewModel.EditNameMaxLength => 100;
-    int IReturnTypeItemListViewModel.PageSize => PageSize;
-    string IReturnTypeItemListViewModel.ActionName => "TestResultItemType";
-    string IReturnTypeItemListViewModel.AddActionName => "TestResultItemTypeAdd";
-    string IReturnTypeItemListViewModel.SaveActionName => "TestResultItemTypeSave";
-    string IReturnTypeItemListViewModel.SaveAllNoLongerInUseActionName => "TestResultItemTypeSaveAllNoLongerInUse";
-    string IReturnTypeItemListViewModel.RemoveActionName => "TestResultItemTypeRemove";
-    string IReturnTypeItemListViewModel.EditFormId => "testResultItemTypeEditForm";
-    string IReturnTypeItemListViewModel.EditIdFieldName => "Edit.TestResultItemTypeId";
-    string IReturnTypeItemListViewModel.RemoveIdRouteParamName => "testResultItemTypeId";
-    string IReturnTypeItemListViewModel.PageIdsFieldName => "pageTestResultItemTypeIds";
-    string IReturnTypeItemListViewModel.CheckedIdsFieldName => "checkedTestResultItemTypeIds";
+    string IItemTypeListViewModel.PageHeading => "Test Result Items";
+    string IItemTypeListViewModel.PageDescription => "This page defines the Test Result Items (and their Return Types) that will be available for use when setting up next year's Schemes.";
+    string IItemTypeListViewModel.ColumnHeaderLabel => "Test result item name";
+    string IItemTypeListViewModel.EmptyMessage => "There are no Test Result Items to display.";
+    string IItemTypeListViewModel.AddHeading => "Add a Test Result Item";
+    string IItemTypeListViewModel.AddNameLabel => "New test result item name";
+    int IItemTypeListViewModel.EditNameMaxLength => 100;
+    int IItemTypeListViewModel.PageSize => PageSize;
+    string IItemTypeListViewModel.ActionName => "TestResultItemType";
+    string IItemTypeListViewModel.AddActionName => "TestResultItemTypeAdd";
+    string IItemTypeListViewModel.SaveActionName => "TestResultItemTypeSave";
+    string IItemTypeListViewModel.SaveAllNoLongerInUseActionName => "TestResultItemTypeSaveAllNoLongerInUse";
+    string IItemTypeListViewModel.RemoveActionName => "TestResultItemTypeRemove";
+    string IItemTypeListViewModel.EditFormId => "testResultItemTypeEditForm";
+    string IItemTypeListViewModel.EditIdFieldName => "Edit.TestResultItemTypeId";
+    string IItemTypeListViewModel.RemoveIdRouteParamName => "testResultItemTypeId";
+    string IItemTypeListViewModel.PageIdsFieldName => "pageTestResultItemTypeIds";
+    string IItemTypeListViewModel.CheckedIdsFieldName => "checkedTestResultItemTypeIds";
     IReadOnlyList<IReturnTypeItemRowViewModel> IReturnTypeItemListViewModel.Rows => Rows;
-    string IReturnTypeItemListViewModel.AddName => Add.Name;
-    bool IReturnTypeItemListViewModel.AddNoLongerInUse => Add.NoLongerInUse;
+    IReadOnlyList<IItemTypeRowViewModel> IItemTypeListViewModel.Rows => Rows;
+    string IItemTypeListViewModel.AddName => Add.Name;
+    bool IItemTypeListViewModel.AddNoLongerInUse => Add.NoLongerInUse;
     string? IReturnTypeItemListViewModel.AddTestReturnValueTypeId => Add.TestReturnValueTypeId?.ToString();
 }
 
@@ -90,7 +91,7 @@ public sealed class TestResultItemTypeRowViewModel : IReturnTypeItemRowViewModel
     // Replaces a native confirm() popup with a GOV.UK warning-text + explicit Yes/Cancel step.
     public bool IsConfirmingRemove { get; set; }
 
-    Guid IReturnTypeItemRowViewModel.ItemId => TestResultItemTypeId;
+    Guid IItemTypeRowViewModel.ItemId => TestResultItemTypeId;
 }
 
 // Posted by the single "Add" button at the bottom of the list - matches legacy ButtonAdd_Click.

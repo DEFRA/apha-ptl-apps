@@ -37,15 +37,26 @@ public class TestMethodItemTypeControllerTests
     [Fact]
     public async Task GetByYear_ReturnsMappedItems()
     {
+        var itemId = Guid.NewGuid();
+        var sharedId = Guid.NewGuid();
         var repository = new FakeTestMethodItemTypeRepository();
-        repository.ItemsByYear[CurrentYearId] = [new PTL.Core.TestMethodItemType.TestMethodItemType { TestMethodItemTypeId = Guid.NewGuid(), SharedId = Guid.NewGuid(), Name = "Titration", TestReturnValueTypeId = ReturnTypeId, StartYearId = CurrentYearId, EndYearId = 9999 }];
+        repository.ItemsByYear[CurrentYearId] = [new PTL.Core.TestMethodItemType.TestMethodItemType { TestMethodItemTypeId = itemId, SharedId = sharedId, Name = "Titration", TestReturnValueTypeId = ReturnTypeId, TestReturnValueTypeName = "Numeric", StartYearId = CurrentYearId, EndYearId = 9999, ForeignInstances = 3, ForeignInstancesString = "Scheme C" }];
         var controller = CreateController(repository);
 
         var result = await controller.GetByYear(CurrentYearId, search: null, CancellationToken.None);
 
         var ok = Assert.IsType<OkObjectResult>(result.Result);
-        var items = Assert.IsAssignableFrom<IReadOnlyList<TestMethodItemTypeResponse>>(ok.Value);
-        Assert.Equal("Titration", Assert.Single(items).Name);
+        var response = Assert.Single(Assert.IsAssignableFrom<IReadOnlyList<TestMethodItemTypeResponse>>(ok.Value));
+        Assert.Equal(itemId, response.TestMethodItemTypeId);
+        Assert.Equal(sharedId, response.SharedId);
+        Assert.Equal("Titration", response.Name);
+        Assert.Equal(ReturnTypeId, response.TestReturnValueTypeId);
+        Assert.Equal("Numeric", response.TestReturnValueTypeName);
+        Assert.Equal(CurrentYearId, response.StartYearId);
+        Assert.Equal(9999, response.EndYearId);
+        Assert.False(response.NoLongerInUse);
+        Assert.Equal(3, response.ForeignInstances);
+        Assert.Equal("Scheme C", response.ForeignInstancesString);
     }
 
     [Fact]
@@ -106,6 +117,21 @@ public class TestMethodItemTypeControllerTests
         var result = await controller.Update(Guid.NewGuid(), new TestMethodItemTypeSaveRequest("Titration", ReturnTypeId, false, CurrentYearId), CancellationToken.None);
 
         Assert.IsType<NotFoundResult>(result.Result);
+    }
+
+    [Fact]
+    public async Task Update_ValidRequest_ReturnsOk()
+    {
+        var itemId = Guid.NewGuid();
+        var repository = new FakeTestMethodItemTypeRepository();
+        repository.ItemsByYear[CurrentYearId] = [new PTL.Core.TestMethodItemType.TestMethodItemType { TestMethodItemTypeId = itemId, SharedId = Guid.NewGuid(), Name = "Titration", TestReturnValueTypeId = ReturnTypeId, StartYearId = CurrentYearId, EndYearId = 9999 }];
+        var controller = CreateController(repository);
+
+        var result = await controller.Update(itemId, new TestMethodItemTypeSaveRequest("Titration2", ReturnTypeId, false, CurrentYearId), CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var response = Assert.IsType<TestMethodItemTypeResponse>(ok.Value);
+        Assert.Equal("Titration2", response.Name);
     }
 
     [Fact]

@@ -694,6 +694,23 @@ public class SchemeAdminControllerTests
     }
 
     [Fact]
+    public async Task TestResultItemTypeAdd_ApiReportsFieldError_RedisplaysWithModelStateError()
+    {
+        var apiClient = new FakeTestResultItemTypeApiClient
+        {
+            SaveResult = new TestResultItemTypeSaveResult(false, null, new Dictionary<string, string[]> { ["Name"] = ["Name already in use this year."] })
+        };
+        var controller = CreateController(testResultItemTypeApiClient: apiClient, lookupApiClient: CreateLookupApiClientWithReturnTypes());
+        var model = new TestResultItemTypeAddViewModel { Name = "Weight", TestReturnValueTypeId = ReturnTypeId };
+
+        var result = await controller.TestResultItemTypeAdd(model, CurrentYearId, 1, search: null, CancellationToken.None);
+
+        Assert.IsType<ViewResult>(result);
+        Assert.False(controller.ModelState.IsValid);
+        Assert.True(controller.ModelState.ContainsKey("Add.Name"));
+    }
+
+    [Fact]
     public async Task TestResultItemTypeSave_ValidModel_UpdatesAndRedirects()
     {
         var itemId = Guid.NewGuid();
@@ -727,6 +744,24 @@ public class SchemeAdminControllerTests
     }
 
     [Fact]
+    public async Task TestResultItemTypeSave_ApiReportsFieldError_RedisplaysWithModelStateError()
+    {
+        var itemId = Guid.NewGuid();
+        var apiClient = new FakeTestResultItemTypeApiClient
+        {
+            SaveResult = new TestResultItemTypeSaveResult(false, null, new Dictionary<string, string[]> { ["Name"] = ["Name already in use this year."] })
+        };
+        var controller = CreateController(testResultItemTypeApiClient: apiClient, lookupApiClient: CreateLookupApiClientWithReturnTypes());
+        var model = new TestResultItemTypeEditViewModel { TestResultItemTypeId = itemId, Name = "Weight", TestReturnValueTypeId = ReturnTypeId };
+
+        var result = await controller.TestResultItemTypeSave(model, CurrentYearId, 1, search: null, CancellationToken.None);
+
+        Assert.IsType<ViewResult>(result);
+        Assert.False(controller.ModelState.IsValid);
+        Assert.True(controller.ModelState.ContainsKey("Edit.Name"));
+    }
+
+    [Fact]
     public async Task TestResultItemTypeSaveAllNoLongerInUse_TickedAndUntickedRows_SavesBothCorrectly()
     {
         var tickedId = Guid.NewGuid();
@@ -742,6 +777,28 @@ public class SchemeAdminControllerTests
         Assert.IsType<RedirectToActionResult>(result);
         Assert.True(apiClient.AllNoLongerInUseRequests.Single(r => r.TestResultItemTypeId == tickedId).Request.NoLongerInUse);
         Assert.False(apiClient.AllNoLongerInUseRequests.Single(r => r.TestResultItemTypeId == untickedId).Request.NoLongerInUse);
+    }
+
+    [Fact]
+    public async Task TestResultItemTypeSaveAllNoLongerInUse_ApiThrowsTransientFailure_RedisplaysWithFailureMessage()
+    {
+        var itemId = Guid.NewGuid();
+        var apiClient = new FakeTestResultItemTypeApiClient
+        {
+            Items = [new TestResultItemTypeResponse(itemId, Guid.NewGuid(), "Weight", ReturnTypeId, "Numeric", CurrentYearId, 9999, false, 0, string.Empty)],
+            SetNoLongerInUseException = new HttpRequestException("Connection refused")
+        };
+        var controller = CreateController(testResultItemTypeApiClient: apiClient, lookupApiClient: CreateLookupApiClientWithReturnTypes());
+
+        var result = await controller.TestResultItemTypeSaveAllNoLongerInUse(
+            pageTestResultItemTypeIds: [itemId],
+            checkedTestResultItemTypeIds: [itemId],
+            CurrentYearId, 1, search: null, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<TestResultItemTypeViewModel>(view.Model);
+        Assert.True(model.MessageIsError);
+        Assert.Contains("did not respond", model.Message);
     }
 
     [Fact]
@@ -893,6 +950,23 @@ public class SchemeAdminControllerTests
     }
 
     [Fact]
+    public async Task TestMethodItemTypeAdd_ApiReportsFieldError_RedisplaysWithModelStateError()
+    {
+        var apiClient = new FakeTestMethodItemTypeApiClient
+        {
+            SaveResult = new TestMethodItemTypeSaveResult(false, null, new Dictionary<string, string[]> { ["Name"] = ["Name already in use this year."] })
+        };
+        var controller = CreateController(testMethodItemTypeApiClient: apiClient, lookupApiClient: CreateLookupApiClientWithReturnTypes());
+        var model = new TestMethodItemTypeAddViewModel { Name = "Titration", TestReturnValueTypeId = ReturnTypeId };
+
+        var result = await controller.TestMethodItemTypeAdd(model, CurrentYearId, 1, search: null, CancellationToken.None);
+
+        Assert.IsType<ViewResult>(result);
+        Assert.False(controller.ModelState.IsValid);
+        Assert.True(controller.ModelState.ContainsKey("Add.Name"));
+    }
+
+    [Fact]
     public async Task TestMethodItemTypeSave_ValidModel_UpdatesAndRedirects()
     {
         var itemId = Guid.NewGuid();
@@ -926,6 +1000,24 @@ public class SchemeAdminControllerTests
     }
 
     [Fact]
+    public async Task TestMethodItemTypeSave_ApiReportsFieldError_RedisplaysWithModelStateError()
+    {
+        var itemId = Guid.NewGuid();
+        var apiClient = new FakeTestMethodItemTypeApiClient
+        {
+            SaveResult = new TestMethodItemTypeSaveResult(false, null, new Dictionary<string, string[]> { ["Name"] = ["Name already in use this year."] })
+        };
+        var controller = CreateController(testMethodItemTypeApiClient: apiClient, lookupApiClient: CreateLookupApiClientWithReturnTypes());
+        var model = new TestMethodItemTypeEditViewModel { TestMethodItemTypeId = itemId, Name = "Titration", TestReturnValueTypeId = ReturnTypeId };
+
+        var result = await controller.TestMethodItemTypeSave(model, CurrentYearId, 1, search: null, CancellationToken.None);
+
+        Assert.IsType<ViewResult>(result);
+        Assert.False(controller.ModelState.IsValid);
+        Assert.True(controller.ModelState.ContainsKey("Edit.Name"));
+    }
+
+    [Fact]
     public async Task TestMethodItemTypeSaveAllNoLongerInUse_TickedAndUntickedRows_SavesBothCorrectly()
     {
         var tickedId = Guid.NewGuid();
@@ -941,6 +1033,28 @@ public class SchemeAdminControllerTests
         Assert.IsType<RedirectToActionResult>(result);
         Assert.True(apiClient.AllNoLongerInUseRequests.Single(r => r.TestMethodItemTypeId == tickedId).Request.NoLongerInUse);
         Assert.False(apiClient.AllNoLongerInUseRequests.Single(r => r.TestMethodItemTypeId == untickedId).Request.NoLongerInUse);
+    }
+
+    [Fact]
+    public async Task TestMethodItemTypeSaveAllNoLongerInUse_ApiThrowsTransientFailure_RedisplaysWithFailureMessage()
+    {
+        var itemId = Guid.NewGuid();
+        var apiClient = new FakeTestMethodItemTypeApiClient
+        {
+            Items = [new TestMethodItemTypeResponse(itemId, Guid.NewGuid(), "Titration", ReturnTypeId, "Numeric", CurrentYearId, 9999, false, 0, string.Empty)],
+            SetNoLongerInUseException = new HttpRequestException("Connection refused")
+        };
+        var controller = CreateController(testMethodItemTypeApiClient: apiClient, lookupApiClient: CreateLookupApiClientWithReturnTypes());
+
+        var result = await controller.TestMethodItemTypeSaveAllNoLongerInUse(
+            pageTestMethodItemTypeIds: [itemId],
+            checkedTestMethodItemTypeIds: [itemId],
+            CurrentYearId, 1, search: null, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<TestMethodItemTypeViewModel>(view.Model);
+        Assert.True(model.MessageIsError);
+        Assert.Contains("did not respond", model.Message);
     }
 
     // AC: "Given a method item is in use on a distribution, When removal is attempted, Then the

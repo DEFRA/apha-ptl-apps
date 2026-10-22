@@ -16,6 +16,7 @@ internal sealed class FakeTestResultItemTypeApiClient : ITestResultItemTypeApiCl
     public Guid? LastDeletedTestResultItemTypeId { get; private set; }
     public int? LastDeletedYearId { get; private set; }
     public string? LastSearch { get; private set; }
+    public Exception? SetNoLongerInUseException { get; set; }
 
     public Task<IReadOnlyList<TestResultItemTypeResponse>> GetByYearAsync(int yearId, string? search = null, CancellationToken cancellationToken = default)
     {
@@ -37,6 +38,11 @@ internal sealed class FakeTestResultItemTypeApiClient : ITestResultItemTypeApiCl
 
     public Task<TestResultItemTypeSaveResult> SetNoLongerInUseAsync(Guid testResultItemTypeId, TestResultItemTypeNoLongerInUseRequest request, CancellationToken cancellationToken = default)
     {
+        if (SetNoLongerInUseException is not null)
+        {
+            throw SetNoLongerInUseException;
+        }
+
         AllNoLongerInUseRequests.Add((testResultItemTypeId, request));
         return Task.FromResult(SaveResult);
     }

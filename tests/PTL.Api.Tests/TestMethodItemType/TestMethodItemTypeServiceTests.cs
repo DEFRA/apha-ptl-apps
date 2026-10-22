@@ -214,6 +214,29 @@ public class TestMethodItemTypeServiceTests
     }
 
     [Fact]
+    public async Task UpdateAsync_StartedEarlierYear_EditingNextYear_SplitsFromNextYearToFinalYearAndSoftEndsOriginal()
+    {
+        var itemId = Guid.NewGuid();
+        var sharedId = Guid.NewGuid();
+        var repository = new FakeTestMethodItemTypeRepository();
+        var original = new PTL.Core.TestMethodItemType.TestMethodItemType { TestMethodItemTypeId = itemId, SharedId = sharedId, Name = "Titration", TestReturnValueTypeId = ChemicalReturnTypeId, TestReturnValueTypeName = "Chemical", StartYearId = 2020, EndYearId = FinalYearId, NoLongerInUse = false };
+        repository.ItemsByYear[NextYearId] = [original];
+        var service = CreateService(repository);
+
+        var result = await service.UpdateAsync(itemId, "Titration (renamed)", NumericReturnTypeId, true, NextYearId);
+
+        Assert.NotNull(result);
+        Assert.Equal("Titration (renamed)", result!.Name);
+        Assert.Equal(NumericReturnTypeId, result.TestReturnValueTypeId);
+        Assert.Equal(sharedId, result.SharedId);
+        Assert.Equal(NextYearId, result.StartYearId);
+        Assert.Equal(FinalYearId, result.EndYearId);
+        Assert.Single(repository.Created);
+        Assert.Single(repository.Updated);
+        Assert.Equal(NextYearId - 1, original.EndYearId);
+    }
+
+    [Fact]
     public async Task SetNoLongerInUseAsync_ItemInUse_StillAllowsToggle()
     {
         var itemId = Guid.NewGuid();
@@ -287,6 +310,17 @@ public class TestMethodItemTypeServiceTests
 
         Assert.False(result.Success);
         Assert.Contains("Scheme A", result.Message);
+    }
+
+    [Fact]
+    public async Task DeleteAsync_NotFound_ReturnsFailureResult()
+    {
+        var service = CreateService(new FakeTestMethodItemTypeRepository());
+
+        var result = await service.DeleteAsync(Guid.NewGuid(), CurrentYearId);
+
+        Assert.False(result.Success);
+        Assert.Equal("Test method item was not found.", result.Message);
     }
 
     // AC: "Given a year is selected and the search field is left blank, When Search is selected,

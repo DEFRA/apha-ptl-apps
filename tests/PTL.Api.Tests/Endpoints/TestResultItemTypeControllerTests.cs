@@ -37,15 +37,26 @@ public class TestResultItemTypeControllerTests
     [Fact]
     public async Task GetByYear_ReturnsMappedItems()
     {
+        var itemId = Guid.NewGuid();
+        var sharedId = Guid.NewGuid();
         var repository = new FakeTestResultItemTypeRepository();
-        repository.ItemsByYear[CurrentYearId] = [new PTL.Core.TestResultItemType.TestResultItemType { TestResultItemTypeId = Guid.NewGuid(), SharedId = Guid.NewGuid(), Name = "Weight", TestReturnValueTypeId = ReturnTypeId, StartYearId = CurrentYearId, EndYearId = 9999 }];
+        repository.ItemsByYear[CurrentYearId] = [new PTL.Core.TestResultItemType.TestResultItemType { TestResultItemTypeId = itemId, SharedId = sharedId, Name = "Weight", TestReturnValueTypeId = ReturnTypeId, TestReturnValueTypeName = "Numeric", StartYearId = CurrentYearId, EndYearId = 9999, ForeignInstances = 2, ForeignInstancesString = "Scheme A, Scheme B" }];
         var controller = CreateController(repository);
 
         var result = await controller.GetByYear(CurrentYearId, search: null, CancellationToken.None);
 
         var ok = Assert.IsType<OkObjectResult>(result.Result);
-        var items = Assert.IsAssignableFrom<IReadOnlyList<TestResultItemTypeResponse>>(ok.Value);
-        Assert.Equal("Weight", Assert.Single(items).Name);
+        var response = Assert.Single(Assert.IsAssignableFrom<IReadOnlyList<TestResultItemTypeResponse>>(ok.Value));
+        Assert.Equal(itemId, response.TestResultItemTypeId);
+        Assert.Equal(sharedId, response.SharedId);
+        Assert.Equal("Weight", response.Name);
+        Assert.Equal(ReturnTypeId, response.TestReturnValueTypeId);
+        Assert.Equal("Numeric", response.TestReturnValueTypeName);
+        Assert.Equal(CurrentYearId, response.StartYearId);
+        Assert.Equal(9999, response.EndYearId);
+        Assert.False(response.NoLongerInUse);
+        Assert.Equal(2, response.ForeignInstances);
+        Assert.Equal("Scheme A, Scheme B", response.ForeignInstancesString);
     }
 
     [Fact]
@@ -106,6 +117,21 @@ public class TestResultItemTypeControllerTests
         var result = await controller.Update(Guid.NewGuid(), new TestResultItemTypeSaveRequest("Weight", ReturnTypeId, false, CurrentYearId), CancellationToken.None);
 
         Assert.IsType<NotFoundResult>(result.Result);
+    }
+
+    [Fact]
+    public async Task Update_ValidRequest_ReturnsOk()
+    {
+        var itemId = Guid.NewGuid();
+        var repository = new FakeTestResultItemTypeRepository();
+        repository.ItemsByYear[CurrentYearId] = [new PTL.Core.TestResultItemType.TestResultItemType { TestResultItemTypeId = itemId, SharedId = Guid.NewGuid(), Name = "Weight", TestReturnValueTypeId = ReturnTypeId, StartYearId = CurrentYearId, EndYearId = 9999 }];
+        var controller = CreateController(repository);
+
+        var result = await controller.Update(itemId, new TestResultItemTypeSaveRequest("Weight2", ReturnTypeId, false, CurrentYearId), CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var response = Assert.IsType<TestResultItemTypeResponse>(ok.Value);
+        Assert.Equal("Weight2", response.Name);
     }
 
     [Fact]

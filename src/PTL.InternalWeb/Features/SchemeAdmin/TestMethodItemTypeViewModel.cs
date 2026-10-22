@@ -40,27 +40,28 @@ public sealed class TestMethodItemTypeViewModel : IReturnTypeItemListViewModel
 
     public bool MessageIsError { get; set; }
 
-    string IReturnTypeItemListViewModel.PageHeading => "Test Method Items";
-    string IReturnTypeItemListViewModel.PageDescription => "This page defines the Test Method Items (and their Return Types) that will be available for use when setting up next year's Schemes.";
-    string IReturnTypeItemListViewModel.ColumnHeaderLabel => "Test method item name";
-    string IReturnTypeItemListViewModel.EmptyMessage => "There are no Test Method Items to display.";
-    string IReturnTypeItemListViewModel.AddHeading => "Add a Test Method Item";
-    string IReturnTypeItemListViewModel.AddNameLabel => "New test method item name";
-    int IReturnTypeItemListViewModel.EditNameMaxLength => 100;
-    int IReturnTypeItemListViewModel.PageSize => PageSize;
-    string IReturnTypeItemListViewModel.ActionName => "TestMethodItemType";
-    string IReturnTypeItemListViewModel.AddActionName => "TestMethodItemTypeAdd";
-    string IReturnTypeItemListViewModel.SaveActionName => "TestMethodItemTypeSave";
-    string IReturnTypeItemListViewModel.SaveAllNoLongerInUseActionName => "TestMethodItemTypeSaveAllNoLongerInUse";
-    string IReturnTypeItemListViewModel.RemoveActionName => "TestMethodItemTypeRemove";
-    string IReturnTypeItemListViewModel.EditFormId => "testMethodItemTypeEditForm";
-    string IReturnTypeItemListViewModel.EditIdFieldName => "Edit.TestMethodItemTypeId";
-    string IReturnTypeItemListViewModel.RemoveIdRouteParamName => "testMethodItemTypeId";
-    string IReturnTypeItemListViewModel.PageIdsFieldName => "pageTestMethodItemTypeIds";
-    string IReturnTypeItemListViewModel.CheckedIdsFieldName => "checkedTestMethodItemTypeIds";
+    string IItemTypeListViewModel.PageHeading => "Test Method Items";
+    string IItemTypeListViewModel.PageDescription => "This page defines the Test Method Items (and their Return Types) that will be available for use when setting up next year's Schemes.";
+    string IItemTypeListViewModel.ColumnHeaderLabel => "Test method item name";
+    string IItemTypeListViewModel.EmptyMessage => "There are no Test Method Items to display.";
+    string IItemTypeListViewModel.AddHeading => "Add a Test Method Item";
+    string IItemTypeListViewModel.AddNameLabel => "New test method item name";
+    int IItemTypeListViewModel.EditNameMaxLength => 100;
+    int IItemTypeListViewModel.PageSize => PageSize;
+    string IItemTypeListViewModel.ActionName => "TestMethodItemType";
+    string IItemTypeListViewModel.AddActionName => "TestMethodItemTypeAdd";
+    string IItemTypeListViewModel.SaveActionName => "TestMethodItemTypeSave";
+    string IItemTypeListViewModel.SaveAllNoLongerInUseActionName => "TestMethodItemTypeSaveAllNoLongerInUse";
+    string IItemTypeListViewModel.RemoveActionName => "TestMethodItemTypeRemove";
+    string IItemTypeListViewModel.EditFormId => "testMethodItemTypeEditForm";
+    string IItemTypeListViewModel.EditIdFieldName => "Edit.TestMethodItemTypeId";
+    string IItemTypeListViewModel.RemoveIdRouteParamName => "testMethodItemTypeId";
+    string IItemTypeListViewModel.PageIdsFieldName => "pageTestMethodItemTypeIds";
+    string IItemTypeListViewModel.CheckedIdsFieldName => "checkedTestMethodItemTypeIds";
     IReadOnlyList<IReturnTypeItemRowViewModel> IReturnTypeItemListViewModel.Rows => Rows;
-    string IReturnTypeItemListViewModel.AddName => Add.Name;
-    bool IReturnTypeItemListViewModel.AddNoLongerInUse => Add.NoLongerInUse;
+    IReadOnlyList<IItemTypeRowViewModel> IItemTypeListViewModel.Rows => Rows;
+    string IItemTypeListViewModel.AddName => Add.Name;
+    bool IItemTypeListViewModel.AddNoLongerInUse => Add.NoLongerInUse;
     string? IReturnTypeItemListViewModel.AddTestReturnValueTypeId => Add.TestReturnValueTypeId?.ToString();
 }
 
@@ -90,7 +91,7 @@ public sealed class TestMethodItemTypeRowViewModel : IReturnTypeItemRowViewModel
     // Replaces a native confirm() popup with a GOV.UK warning-text + explicit Yes/Cancel step.
     public bool IsConfirmingRemove { get; set; }
 
-    Guid IReturnTypeItemRowViewModel.ItemId => TestMethodItemTypeId;
+    Guid IItemTypeRowViewModel.ItemId => TestMethodItemTypeId;
 }
 
 // Posted by the single "Add" button at the bottom of the list - matches legacy ButtonAdd_Click.

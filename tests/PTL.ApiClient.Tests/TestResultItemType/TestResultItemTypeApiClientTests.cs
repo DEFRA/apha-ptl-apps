@@ -33,6 +33,16 @@ public class TestResultItemTypeApiClientTests
     }
 
     [Fact]
+    public async Task GetByYearAsync_WithSearch_AppendsSearchQueryString()
+    {
+        var client = CreateClient(HttpStatusCode.OK, "[]");
+
+        var result = await client.GetByYearAsync(2026, "weig ht");
+
+        Assert.Empty(result);
+    }
+
+    [Fact]
     public async Task CreateAsync_Success_ReturnsSuccessfulResult()
     {
         const string json = """{"testResultItemTypeId":"11111111-1111-1111-1111-111111111111","sharedId":"22222222-2222-2222-2222-222222222222","name":"Weight","testReturnValueTypeId":"33333333-3333-3333-3333-333333333333","testReturnValueTypeName":"Numeric","startYearId":2026,"endYearId":9999,"noLongerInUse":false,"foreignInstances":0,"foreignInstancesString":""}""";
@@ -88,6 +98,16 @@ public class TestResultItemTypeApiClientTests
 
         Assert.True(result.Success);
         Assert.True(result.TestResultItemType?.NoLongerInUse);
+    }
+
+    [Fact]
+    public async Task SetNoLongerInUseAsync_NotFound_ReturnsFailure()
+    {
+        var client = CreateClient(HttpStatusCode.NotFound, null);
+
+        var result = await client.SetNoLongerInUseAsync(Guid.NewGuid(), new TestResultItemTypeNoLongerInUseRequest(true, 2026));
+
+        Assert.False(result.Success);
     }
 
     [Fact]

@@ -33,6 +33,16 @@ public class TestMethodItemTypeApiClientTests
     }
 
     [Fact]
+    public async Task GetByYearAsync_WithSearch_AppendsSearchQueryString()
+    {
+        var client = CreateClient(HttpStatusCode.OK, "[]");
+
+        var result = await client.GetByYearAsync(2026, "titr ation");
+
+        Assert.Empty(result);
+    }
+
+    [Fact]
     public async Task CreateAsync_Success_ReturnsSuccessfulResult()
     {
         const string json = """{"testMethodItemTypeId":"11111111-1111-1111-1111-111111111111","sharedId":"22222222-2222-2222-2222-222222222222","name":"Titration","testReturnValueTypeId":"33333333-3333-3333-3333-333333333333","testReturnValueTypeName":"Numeric","startYearId":2026,"endYearId":9999,"noLongerInUse":false,"foreignInstances":0,"foreignInstancesString":""}""";
@@ -88,6 +98,16 @@ public class TestMethodItemTypeApiClientTests
 
         Assert.True(result.Success);
         Assert.True(result.TestMethodItemType?.NoLongerInUse);
+    }
+
+    [Fact]
+    public async Task SetNoLongerInUseAsync_NotFound_ReturnsFailure()
+    {
+        var client = CreateClient(HttpStatusCode.NotFound, null);
+
+        var result = await client.SetNoLongerInUseAsync(Guid.NewGuid(), new TestMethodItemTypeNoLongerInUseRequest(true, 2026));
+
+        Assert.False(result.Success);
     }
 
     [Fact]
