@@ -78,6 +78,33 @@ public partial class TestMethodItemTypeRouteSmokeTests : IClassFixture<WebApplic
         Assert.Contains("value=\"titr\"", body, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task TestMethodItemType_BlankSearch_DoesNotRenderClearSearchLink()
+    {
+        var client = _factory.CreateClient();
+
+        var response = await client.GetAsync("/SchemeAdmin/TestMethodItemType?yearId=" + CurrentYearId);
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.DoesNotContain("Clear search", body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task TestMethodItemType_WithSearch_RendersClearSearchLinkThatReturnsToTheUnfilteredList()
+    {
+        _fakeApiClient.Items = [new TestMethodItemTypeResponse(Guid.NewGuid(), Guid.NewGuid(), "Titration", ReturnTypeId, "Numeric", CurrentYearId, 9999, false, 0, string.Empty)];
+        var client = _factory.CreateClient();
+
+        var searchResponse = await client.GetAsync($"/SchemeAdmin/TestMethodItemType?yearId={CurrentYearId}&search=titr");
+        var searchBody = await searchResponse.Content.ReadAsStringAsync();
+        Assert.Contains($"href=\"/SchemeAdmin/TestMethodItemType?yearId={CurrentYearId}\"", searchBody, StringComparison.Ordinal);
+
+        var clearResponse = await client.GetAsync($"/SchemeAdmin/TestMethodItemType?yearId={CurrentYearId}");
+
+        Assert.Equal(HttpStatusCode.OK, clearResponse.StatusCode);
+        Assert.Null(_fakeApiClient.LastSearch);
+    }
+
     // AC: "Given the administrator creates a Test Method Item with a Return Type, When Save is
     // selected, Then the item is stored and available for assignment to tests."
     [Fact]

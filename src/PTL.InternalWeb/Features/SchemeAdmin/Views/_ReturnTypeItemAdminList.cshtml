@@ -1,0 +1,271 @@
+@model PTL.InternalWeb.Features.SchemeAdmin.IReturnTypeItemListViewModel
+@using PTL.SharedUI.Pagination
+@{
+    // Shared by TestResultItemType.cshtml/TestMethodItemType.cshtml - see
+    // IReturnTypeItemListViewModel.cs remarks. Parallels _ItemTypeAdminList.cshtml (used by
+    // CategoryItemType/TestType/CriterionItemType) but adds a Return Type column/dropdown per row
+    // and a server-side Search-by-name box. Add/Edit inputs are hand-rolled (not asp-for) so this
+    // partial has no compile-time dependency on any one entity's concrete view-model type.
+    var pagination = new PaginationModel
+    {
+        CurrentPage = Model.Page,
+        PageSize = Model.PageSize,
+        TotalRecords = Model.TotalRecords,
+        Action = Model.ActionName,
+        RouteValues = new Dictionary<string, object?> { ["yearId"] = Model.SelectedYearId, ["search"] = Model.SearchText }
+    };
+
+    var errors = ViewData.ModelState
+        .Where(entry => entry.Value?.Errors.Count > 0)
+        .SelectMany(entry => entry.Value!.Errors.Select(error => (Field: entry.Key, Message: error.ErrorMessage)))
+        .ToList();
+
+    string? FirstError(string field) =>
+        ViewData.ModelState.TryGetValue(field, out var entry) && entry.Errors.Count > 0
+            ? entry.Errors[0].ErrorMessage
+            : null;
+
+    var editingRow = Model.Rows.FirstOrDefault(r => r.IsEditing);
+}
+
+<h1 class="govuk-heading-l">@Model.PageHeading</h1>
+
+<p class="govuk-body">@Model.PageDescription</p>
+
+@if (Model.Message is not null)
+{
+    var bannerType = Model.MessageIsError ? "" : "govuk-notification-banner--success";
+    <div class="govuk-notification-banner @bannerType" role="@(Model.MessageIsError ? "alert" : "region")" aria-labelledby="govuk-notification-banner-title" data-module="govuk-notification-banner">
+        <div class="govuk-notification-banner__header">
+            <h2 class="govuk-notification-banner__title" id="govuk-notification-banner-title">@(Model.MessageIsError ? "Important" : "Success")</h2>
+        </div>
+        <div class="govuk-notification-banner__content">
+            <p class="govuk-notification-banner__heading">@Model.Message</p>
+        </div>
+    </div>
+}
+
+<govuk-error-summary errors="@errors" />
+
+@* Year selector and Search box share one form so whichever button is pressed submits both
+   values together - matches legacy's single ViewState-backed page preserving every control's
+   value regardless of which button triggered the postback. Neither control auto-submits on
+   change; View/Search are the only, explicit triggers. *@
+<form method="get" asp-action="@Model.ActionName" class="govuk-!-margin-bottom-6">
+    <div class="govuk-form-group govuk-!-margin-bottom-2">
+        <label class="govuk-label" for="yearId">Select Year to Edit:</label>
+        <select class="govuk-select" id="yearId" name="yearId" asp-items="Model.YearOptions" asp-for="SelectedYearId"></select>
+        <button class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0 govuk-!-margin-left-3" data-module="govuk-button" type="submit">View</button>
+    </div>
+    <div class="govuk-form-group govuk-!-margin-bottom-2">
+        <label class="govuk-label" for="search">Search by name:</label>
+        <input class="govuk-input govuk-input--width-20" id="search" name="search" maxlength="50" value="@Model.SearchText" />
+        <button class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0 govuk-!-margin-left-3" data-module="govuk-button" type="submit">Search</button>
+        @if (!string.IsNullOrWhiteSpace(Model.SearchText))
+        {
+            @* Resets to page 1 since the unfiltered result count differs from the filtered one. *@
+            <a class="govuk-link govuk-!-margin-left-3" asp-action="@Model.ActionName" asp-route-yearId="@Model.SelectedYearId">Clear search</a>
+        }
+    </div>
+</form>
+
+<table class="govuk-table" style="table-layout: fixed; width: 100%;">
+    <colgroup>
+        <col style="width: 30%" />
+        <col style="width: 25%" />
+        <col style="width: 15%" />
+        <col style="width: 30%" />
+    </colgroup>
+    <thead class="govuk-table__head">
+        <tr class="govuk-table__row">
+            <th scope="col" class="govuk-table__header">@Model.ColumnHeaderLabel</th>
+            <th scope="col" class="govuk-table__header">Return type</th>
+            <th scope="col" class="govuk-table__header">No longer in use</th>
+            <th scope="col" class="govuk-table__header">Actions</th>
+        </tr>
+    </thead>
+    <tbody class="govuk-table__body">
+        @if (Model.Rows.Count == 0)
+        {
+            <tr class="govuk-table__row">
+                <td class="govuk-table__cell" colspan="4">@Model.EmptyMessage</td>
+            </tr>
+        }
+        @foreach (var row in Model.Rows)
+        {
+            <tr class="govuk-table__row">
+                @if (row.IsEditing)
+                {
+                    <td class="govuk-table__cell">
+                        <div class="govuk-form-group govuk-!-margin-bottom-0 @(FirstError("Edit.Name") is null ? "" : "govuk-form-group--error")">
+                            <label class="govuk-visually-hidden" for="Edit_Name">@Model.ColumnHeaderLabel</label>
+                            @if (FirstError("Edit.Name") is string nameError)
+                            {
+                                <p class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @nameError</p>
+                            }
+                            <input id="Edit_Name" form="@Model.EditFormId" name="Edit.Name" value="@row.Name" maxlength="@Model.EditNameMaxLength"
+                                   class="govuk-input @(FirstError("Edit.Name") is null ? "" : "govuk-input--error")" />
+                        </div>
+                    </td>
+                    <td class="govuk-table__cell">
+                        <div class="govuk-form-group govuk-!-margin-bottom-0 @(FirstError("Edit.TestReturnValueTypeId") is null ? "" : "govuk-form-group--error")">
+                            <label class="govuk-visually-hidden" for="Edit_TestReturnValueTypeId">Return type</label>
+                            @if (FirstError("Edit.TestReturnValueTypeId") is string returnTypeError)
+                            {
+                                <p class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @returnTypeError</p>
+                            }
+                            <select id="Edit_TestReturnValueTypeId" form="@Model.EditFormId" name="Edit.TestReturnValueTypeId"
+                                    class="govuk-select @(FirstError("Edit.TestReturnValueTypeId") is null ? "" : "govuk-select--error")">
+                                @foreach (var option in Model.ReturnValueTypeOptions)
+                                {
+                                    <option value="@option.Value" selected="@(option.Value == row.TestReturnValueTypeId.ToString())">@option.Text</option>
+                                }
+                            </select>
+                        </div>
+                    </td>
+                    <td class="govuk-table__cell">
+                        <div class="govuk-checkboxes govuk-checkboxes--small" data-module="govuk-checkboxes">
+                            <div class="govuk-checkboxes__item">
+                                <input class="govuk-checkboxes__input" type="checkbox" id="Edit.NoLongerInUse" form="@Model.EditFormId" name="Edit.NoLongerInUse" value="true" checked="@row.NoLongerInUse" />
+                                <label class="govuk-label govuk-checkboxes__label" for="Edit.NoLongerInUse">No longer in use</label>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="govuk-table__cell">
+                        <button form="@Model.EditFormId" class="govuk-button govuk-!-margin-bottom-0" data-module="govuk-button" type="submit">Save</button>
+                        <a class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0" data-module="govuk-button" asp-action="@Model.ActionName" asp-route-yearId="@Model.SelectedYearId" asp-route-page="@Model.Page" asp-route-search="@Model.SearchText">Cancel</a>
+                    </td>
+                }
+                else
+                {
+                    <td class="govuk-table__cell">@row.Name</td>
+                    <td class="govuk-table__cell">@row.TestReturnValueTypeName</td>
+                    <td class="govuk-table__cell">
+                        @* Bulk-saved together via #noLongerInUseBulkForm below - matches legacy's
+                           page-level Save button. *@
+                        <input type="hidden" name="@Model.PageIdsFieldName" value="@row.ItemId" form="noLongerInUseBulkForm" />
+                        <div class="govuk-checkboxes govuk-checkboxes--small govuk-!-margin-bottom-0" data-module="govuk-checkboxes">
+                            <div class="govuk-checkboxes__item">
+                                <input class="govuk-checkboxes__input" type="checkbox" id="NoLongerInUse_@row.ItemId" name="@Model.CheckedIdsFieldName" value="@row.ItemId" checked="@row.NoLongerInUse" form="noLongerInUseBulkForm" />
+                                <label class="govuk-label govuk-checkboxes__label" for="NoLongerInUse_@row.ItemId">
+                                    <span class="govuk-visually-hidden">No longer in use - @row.Name</span>
+                                </label>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="govuk-table__cell">
+                        @if (row.IsConfirmingRemove)
+                        {
+                            <div class="govuk-warning-text govuk-!-margin-bottom-2">
+                                <span class="govuk-warning-text__icon" aria-hidden="true">!</span>
+                                <strong class="govuk-warning-text__text">
+                                    <span class="govuk-visually-hidden">Warning</span>
+                                    Are you sure you want to remove "@row.Name"? This cannot be undone.
+                                </strong>
+                            </div>
+                            <div style="white-space: nowrap;">
+                                <form method="post" asp-action="@Model.RemoveActionName" class="govuk-!-display-inline">
+                                    <input type="hidden" name="@Model.RemoveIdRouteParamName" value="@row.ItemId" />
+                                    <input type="hidden" name="yearId" value="@Model.SelectedYearId" />
+                                    <input type="hidden" name="page" value="@Model.Page" />
+                                    <input type="hidden" name="search" value="@Model.SearchText" />
+                                    <button class="govuk-button govuk-button--warning govuk-!-margin-bottom-0" data-module="govuk-button" type="submit">Yes, remove</button>
+                                </form>
+                                <a class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0" data-module="govuk-button" asp-action="@Model.ActionName" asp-route-yearId="@Model.SelectedYearId" asp-route-page="@Model.Page" asp-route-search="@Model.SearchText">Cancel</a>
+                            </div>
+                        }
+                        else
+                        {
+                            <div style="white-space: nowrap;">
+                                <a class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0" data-module="govuk-button" asp-action="@Model.ActionName" asp-route-yearId="@Model.SelectedYearId" asp-route-editId="@row.ItemId" asp-route-page="@Model.Page" asp-route-search="@Model.SearchText">Edit</a>
+                                <a class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0" data-module="govuk-button" asp-action="@Model.ActionName" asp-route-yearId="@Model.SelectedYearId" asp-route-removeConfirmId="@row.ItemId" asp-route-page="@Model.Page" asp-route-search="@Model.SearchText">Remove</a>
+                            </div>
+                        }
+                        @if (!row.CanEditOrRemove)
+                        {
+                            <details class="govuk-details govuk-!-margin-bottom-0 govuk-!-margin-top-1" data-module="govuk-details">
+                                <summary class="govuk-details__summary">
+                                    <span class="govuk-details__summary-text">Why can't this be edited or removed?</span>
+                                </summary>
+                                <div class="govuk-details__text">
+                                    @(row.ForeignInstances == -1
+                                        ? $"Used on a distribution and on the following Scheme(s): {row.ForeignInstancesString}."
+                                        : $"Used on {row.ForeignInstances} Scheme(s): {row.ForeignInstancesString}.")
+                                </div>
+                            </details>
+                        }
+                    </td>
+                }
+            </tr>
+        }
+    </tbody>
+</table>
+
+<govuk-pagination model="pagination" />
+
+<form id="noLongerInUseBulkForm" method="post" asp-action="@Model.SaveAllNoLongerInUseActionName" class="govuk-!-margin-bottom-6">
+    <input type="hidden" name="yearId" value="@Model.SelectedYearId" />
+    <input type="hidden" name="page" value="@Model.Page" />
+    <input type="hidden" name="search" value="@Model.SearchText" />
+    @if (editingRow is not null)
+    {
+        <p class="govuk-hint govuk-!-margin-bottom-2">Save or cancel the row you're editing above before saving these changes.</p>
+    }
+    <button class="govuk-button" data-module="govuk-button" type="submit" disabled="@(editingRow is not null)">Save changes</button>
+</form>
+
+@if (editingRow is not null)
+{
+    @* Inputs/button for the editing row live in table cells above and bind here via the "form"
+       attribute, since a <form> can't be split across multiple <td> elements. *@
+    <form id="@Model.EditFormId" method="post" asp-action="@Model.SaveActionName" novalidate>
+        <input type="hidden" name="@Model.EditIdFieldName" value="@editingRow.ItemId" />
+        <input type="hidden" name="yearId" value="@Model.SelectedYearId" />
+        <input type="hidden" name="page" value="@Model.Page" />
+        <input type="hidden" name="search" value="@Model.SearchText" />
+    </form>
+}
+
+<hr />
+
+<h2 class="govuk-heading-m">@Model.AddHeading</h2>
+
+<form method="post" asp-action="@Model.AddActionName">
+    <input type="hidden" name="yearId" value="@Model.SelectedYearId" />
+    <input type="hidden" name="page" value="@Model.Page" />
+    <input type="hidden" name="search" value="@Model.SearchText" />
+    <div class="govuk-form-group govuk-!-margin-bottom-4 @(FirstError("Add.Name") is null ? "" : "govuk-form-group--error")">
+        <label class="govuk-label" for="Add_Name">@Model.AddNameLabel</label>
+        @if (FirstError("Add.Name") is string addNameError)
+        {
+            <p class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @addNameError</p>
+        }
+        <input id="Add_Name" name="Add.Name" value="@Model.AddName" class="govuk-input govuk-input--width-20 @(FirstError("Add.Name") is null ? "" : "govuk-input--error")" />
+    </div>
+    <div class="govuk-form-group govuk-!-margin-bottom-4 @(FirstError("Add.TestReturnValueTypeId") is null ? "" : "govuk-form-group--error")">
+        <label class="govuk-label" for="Add_TestReturnValueTypeId">Return type</label>
+        @if (FirstError("Add.TestReturnValueTypeId") is string addReturnTypeError)
+        {
+            <p class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @addReturnTypeError</p>
+        }
+        <select id="Add_TestReturnValueTypeId" name="Add.TestReturnValueTypeId"
+                class="govuk-select @(FirstError("Add.TestReturnValueTypeId") is null ? "" : "govuk-select--error")">
+            <option value="">- Please Select -</option>
+            @foreach (var option in Model.ReturnValueTypeOptions)
+            {
+                <option value="@option.Value" selected="@(option.Value == Model.AddTestReturnValueTypeId)">@option.Text</option>
+            }
+        </select>
+    </div>
+    <div class="govuk-checkboxes govuk-checkboxes--small govuk-!-margin-bottom-4" data-module="govuk-checkboxes">
+        <div class="govuk-checkboxes__item">
+            <input class="govuk-checkboxes__input" type="checkbox" id="Add_NoLongerInUse" name="Add.NoLongerInUse" value="true" checked="@Model.AddNoLongerInUse" />
+            <label class="govuk-label govuk-checkboxes__label" for="Add_NoLongerInUse">No longer in use</label>
+        </div>
+    </div>
+    @if (editingRow is not null)
+    {
+        <p class="govuk-hint govuk-!-margin-bottom-2">Save or cancel the row you're editing above before adding a new item.</p>
+    }
+    <button class="govuk-button" data-module="govuk-button" type="submit" disabled="@(editingRow is not null)">Add</button>
+</form>

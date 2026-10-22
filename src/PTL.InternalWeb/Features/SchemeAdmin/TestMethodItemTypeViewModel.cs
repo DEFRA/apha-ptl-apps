@@ -4,11 +4,11 @@ using Microsoft.AspNetCore.Mvc.Rendering;
 
 namespace PTL.InternalWeb.Features.SchemeAdmin;
 
-// Bespoke (does not implement IItemTypeListViewModel) - identical reasoning to
-// TestResultItemTypeViewModel (Slice 4): extra Return Type column/dropdown on every row plus a
-// server-side search box don't fit the shared _ItemTypeAdminList.cshtml partial's shape. See
-// TestMethodItemType.cshtml.
-public sealed class TestMethodItemTypeViewModel
+// Implements IReturnTypeItemListViewModel so the shared _ReturnTypeItemAdminList.cshtml partial
+// can render this and TestResultItemType from one copy instead of two near-identical ones. Entity-
+// bound HTML field name strings here must match SchemeAdminController exactly - see
+// IReturnTypeItemListViewModel's remarks.
+public sealed class TestMethodItemTypeViewModel : IReturnTypeItemListViewModel
 {
     public int SelectedYearId { get; set; }
 
@@ -39,9 +39,32 @@ public sealed class TestMethodItemTypeViewModel
     public string? Message { get; set; }
 
     public bool MessageIsError { get; set; }
+
+    string IReturnTypeItemListViewModel.PageHeading => "Test Method Items";
+    string IReturnTypeItemListViewModel.PageDescription => "This page defines the Test Method Items (and their Return Types) that will be available for use when setting up next year's Schemes.";
+    string IReturnTypeItemListViewModel.ColumnHeaderLabel => "Test method item name";
+    string IReturnTypeItemListViewModel.EmptyMessage => "There are no Test Method Items to display.";
+    string IReturnTypeItemListViewModel.AddHeading => "Add a Test Method Item";
+    string IReturnTypeItemListViewModel.AddNameLabel => "New test method item name";
+    int IReturnTypeItemListViewModel.EditNameMaxLength => 100;
+    int IReturnTypeItemListViewModel.PageSize => PageSize;
+    string IReturnTypeItemListViewModel.ActionName => "TestMethodItemType";
+    string IReturnTypeItemListViewModel.AddActionName => "TestMethodItemTypeAdd";
+    string IReturnTypeItemListViewModel.SaveActionName => "TestMethodItemTypeSave";
+    string IReturnTypeItemListViewModel.SaveAllNoLongerInUseActionName => "TestMethodItemTypeSaveAllNoLongerInUse";
+    string IReturnTypeItemListViewModel.RemoveActionName => "TestMethodItemTypeRemove";
+    string IReturnTypeItemListViewModel.EditFormId => "testMethodItemTypeEditForm";
+    string IReturnTypeItemListViewModel.EditIdFieldName => "Edit.TestMethodItemTypeId";
+    string IReturnTypeItemListViewModel.RemoveIdRouteParamName => "testMethodItemTypeId";
+    string IReturnTypeItemListViewModel.PageIdsFieldName => "pageTestMethodItemTypeIds";
+    string IReturnTypeItemListViewModel.CheckedIdsFieldName => "checkedTestMethodItemTypeIds";
+    IReadOnlyList<IReturnTypeItemRowViewModel> IReturnTypeItemListViewModel.Rows => Rows;
+    string IReturnTypeItemListViewModel.AddName => Add.Name;
+    bool IReturnTypeItemListViewModel.AddNoLongerInUse => Add.NoLongerInUse;
+    string? IReturnTypeItemListViewModel.AddTestReturnValueTypeId => Add.TestReturnValueTypeId?.ToString();
 }
 
-public sealed class TestMethodItemTypeRowViewModel
+public sealed class TestMethodItemTypeRowViewModel : IReturnTypeItemRowViewModel
 {
     public Guid TestMethodItemTypeId { get; set; }
 
@@ -66,6 +89,8 @@ public sealed class TestMethodItemTypeRowViewModel
 
     // Replaces a native confirm() popup with a GOV.UK warning-text + explicit Yes/Cancel step.
     public bool IsConfirmingRemove { get; set; }
+
+    Guid IReturnTypeItemRowViewModel.ItemId => TestMethodItemTypeId;
 }
 
 // Posted by the single "Add" button at the bottom of the list - matches legacy ButtonAdd_Click.

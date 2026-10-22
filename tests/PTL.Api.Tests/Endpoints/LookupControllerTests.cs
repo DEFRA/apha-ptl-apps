@@ -338,4 +338,20 @@ public class LookupControllerTests
         Assert.Single(itemTypes);
         Assert.Equal(itemTypeId, itemTypes[0].ItemTypeId);
     }
+
+    [Fact]
+    public async Task GetTestReturnValueTypes_ReturnsMappedResponses()
+    {
+        var returnTypeId = Guid.NewGuid();
+        var repository = new FakeLookupRepository { TestReturnValueTypes = [new TestReturnValueTypeEntity { TestReturnValueTypeId = returnTypeId, Name = "Numeric" }] };
+        var controller = CreateController(repository);
+
+        var result = await controller.GetTestReturnValueTypes(CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var returnTypes = Assert.IsType<IReadOnlyList<PTL.Contracts.Lookup.TestReturnValueTypeResponse>>(ok.Value, exactMatch: false);
+        Assert.Single(returnTypes);
+        Assert.Equal(returnTypeId, returnTypes[0].TestReturnValueTypeId);
+        Assert.Equal("Numeric", returnTypes[0].Name);
+    }
 }

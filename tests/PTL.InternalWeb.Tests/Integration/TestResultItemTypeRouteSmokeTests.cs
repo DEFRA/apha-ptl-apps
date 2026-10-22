@@ -80,6 +80,33 @@ public partial class TestResultItemTypeRouteSmokeTests : IClassFixture<WebApplic
         Assert.Contains("value=\"weig\"", body, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task TestResultItemType_BlankSearch_DoesNotRenderClearSearchLink()
+    {
+        var client = _factory.CreateClient();
+
+        var response = await client.GetAsync("/SchemeAdmin/TestResultItemType?yearId=" + CurrentYearId);
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.DoesNotContain("Clear search", body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task TestResultItemType_WithSearch_RendersClearSearchLinkThatReturnsToTheUnfilteredList()
+    {
+        _fakeApiClient.Items = [new TestResultItemTypeResponse(Guid.NewGuid(), Guid.NewGuid(), "Weight", ReturnTypeId, "Numeric", CurrentYearId, 9999, false, 0, string.Empty)];
+        var client = _factory.CreateClient();
+
+        var searchResponse = await client.GetAsync($"/SchemeAdmin/TestResultItemType?yearId={CurrentYearId}&search=weig");
+        var searchBody = await searchResponse.Content.ReadAsStringAsync();
+        Assert.Contains($"href=\"/SchemeAdmin/TestResultItemType?yearId={CurrentYearId}\"", searchBody, StringComparison.Ordinal);
+
+        var clearResponse = await client.GetAsync($"/SchemeAdmin/TestResultItemType?yearId={CurrentYearId}");
+
+        Assert.Equal(HttpStatusCode.OK, clearResponse.StatusCode);
+        Assert.Null(_fakeApiClient.LastSearch);
+    }
+
     // AC: "Given the administrator creates or edits an item, When a Return Type is selected and
     // saved, Then the item is stored with that Return Type."
     [Fact]
