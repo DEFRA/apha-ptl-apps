@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Http;
@@ -8,7 +9,6 @@ using PTL.Auth.Entra.Events;
 using PTL.Auth.Entra.Options;
 using PTL.Auth.Entra.TokenRefresh;
 using PTL.Common.Auth;
-using System.Security.Claims;
 
 namespace PTL.Auth.Entra.Tests.TokenRefresh;
 
@@ -185,6 +185,20 @@ public class EntraCookieEventsTests
 
         Assert.Equal(0, resolver.CallCount);
         Assert.False(context.ShouldRenew);
+    }
+
+    [Fact]
+    public async Task ValidatePrincipal_RoleRevalidationDue_NoResolverRegistered_LeavesPrincipalUnchanged()
+    {
+        var identity = new ClaimsIdentity([new Claim("resolvedRoles", "Admin")]);
+        var principal = new ClaimsPrincipal(identity);
+        var context = CreateContext(principal, new AuthenticationProperties(), resolver: null, out _);
+
+        await CreateEvents(new FakeTokenRefreshService(TokenRefreshResult.Failed)).ValidatePrincipal(context);
+
+        Assert.NotNull(context.Principal);
+        Assert.False(context.ShouldRenew);
+        Assert.Equal("Admin", identity.FindFirst("resolvedRoles")!.Value);
     }
 
     [Fact]

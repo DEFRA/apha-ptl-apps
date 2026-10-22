@@ -50,10 +50,10 @@ public class SystemAdministrationControllerTests
                 ExternalTestConsultant = externalTestConsultantApiClient ?? new FakeExternalTestConsultantApiClient(),
                 Viewer = viewerApiClient ?? new FakeViewerApiClient()
             },
-                NullLogger<SystemAdministrationController>.Instance)
-            {
-                TempData = new TempDataDictionary(new DefaultHttpContext(), new FakeTempDataProvider())
-            };
+            NullLogger<SystemAdministrationController>.Instance)
+        {
+            TempData = new TempDataDictionary(new DefaultHttpContext(), new FakeTempDataProvider())
+        };
 
     [Fact]
     public void Index_ReturnsView()
