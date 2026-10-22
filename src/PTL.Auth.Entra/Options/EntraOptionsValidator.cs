@@ -27,6 +27,11 @@ public sealed class EntraOptionsValidator : IValidateOptions<EntraOptions>
             failures.Add($"{nameof(EntraOptions.RefreshBeforeExpiry)} must be a positive duration.");
         }
 
+        if (options.RoleRevalidationInterval <= TimeSpan.Zero)
+        {
+            failures.Add($"{nameof(EntraOptions.RoleRevalidationInterval)} must be a positive duration.");
+        }
+
         return failures.Count == 0 ? ValidateOptionsResult.Success : ValidateOptionsResult.Fail(failures);
     }
 

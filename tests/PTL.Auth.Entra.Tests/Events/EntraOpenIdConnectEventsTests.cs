@@ -119,6 +119,7 @@ public class EntraOpenIdConnectEventsTests
             new Claim("oid", "22222222-2222-2222-2222-222222222222"),
             new Claim("preferred_username", "jane@example.com"),
             new Claim("onprem_samaccountname", "jane"),
+            new Claim("onprem_domainname", "DEFRA"),
             new Claim("aio", "bulky"),
             new Claim("groups", "g1")
         ]);
@@ -131,7 +132,10 @@ public class EntraOpenIdConnectEventsTests
         Assert.Contains(identity.Claims, c => c.Type == "oid");
         Assert.Contains(identity.Claims, c => c.Type == "preferred_username");
         Assert.Contains(identity.Claims, c => c.Type == "fullName");
-        Assert.DoesNotContain(identity.Claims, c => c.Type == "onprem_samaccountname");
+        // Retained (not just read once here) so EntraCookieEvents can re-invoke
+        // IEntraInternalUserResolver.ResolveAsync against the cookie's principal later.
+        Assert.Contains(identity.Claims, c => c.Type == "onprem_samaccountname");
+        Assert.Contains(identity.Claims, c => c.Type == "onprem_domainname");
         Assert.DoesNotContain(identity.Claims, c => c.Type == "aio");
         Assert.DoesNotContain(identity.Claims, c => c.Type == "groups");
     }

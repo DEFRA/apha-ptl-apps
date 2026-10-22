@@ -66,11 +66,11 @@ public static class SideNavigationProvider
             Text = "System Administration",
             RequiredPolicy = PtlPolicies.Admin,
             ControllerName = SystemAdministrationControllerName,
-            ActionName = SystemAdministrationControllerName,
+            ActionName = IndexAction,
             Children =
             [
                 new SideNavigationItem { Text = "Create User", ControllerName = SystemAdministrationControllerName, ActionName = "CreateUser" },
-                new SideNavigationItem { Text = "Assign Roles to User", ControllerName = SystemAdministrationControllerName, ActionName = "ManageUserRoles" },
+                new SideNavigationItem { Text = "Manage Roles", ControllerName = SystemAdministrationControllerName, ActionName = "ManageUserRoles" },
                 new SideNavigationItem { Text = "Remove User", ControllerName = SystemAdministrationControllerName, ActionName = "RemoveUser" },
                 new SideNavigationItem { Text = "Internal Test Consultant Department Management", ControllerName = SystemAdministrationControllerName, ActionName = "InternalTestConsultantDepartment" },
                 new SideNavigationItem { Text = "External Test Consultant Management", ControllerName = SystemAdministrationControllerName, ActionName = "ExternalTestConsultantManagement" },

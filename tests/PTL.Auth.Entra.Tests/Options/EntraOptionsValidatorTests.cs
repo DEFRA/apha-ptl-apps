@@ -71,6 +71,18 @@ public class EntraOptionsValidatorTests
     }
 
     [Fact]
+    public void Validate_RoleRevalidationIntervalNotPositive_Fails()
+    {
+        var options = ValidOptions();
+        options.RoleRevalidationInterval = TimeSpan.Zero;
+
+        var result = new EntraOptionsValidator().Validate(null, options);
+
+        Assert.True(result.Failed);
+        Assert.Contains(result.Failures!, f => f.Contains(nameof(EntraOptions.RoleRevalidationInterval)));
+    }
+
+    [Fact]
     public void Authority_ComposesFromTenantId()
     {
         var options = ValidOptions();

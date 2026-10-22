@@ -22,7 +22,7 @@ public class AuthorizationRouteTests(PtlInternalWebTestFactory factory) : IClass
     [InlineData("/Contract/ManageContracts")]
     [InlineData("/Scheme/ManageSchemes")]
     [InlineData("/Distribution/Index")]
-    [InlineData("/SystemAdministration/SystemAdministration")]
+    [InlineData("/SystemAdministration/Index")]
     [InlineData("/Invoice/Index")]
     [InlineData("/Home/Index")]
     public async Task AnonymousRequest_IsSentToSignIn_NotToThePage(string url)
@@ -46,7 +46,7 @@ public class AuthorizationRouteTests(PtlInternalWebTestFactory factory) : IClass
     [InlineData("/Contract/ManageContracts")]
     [InlineData("/Scheme/ManageSchemes")]
     [InlineData("/Distribution/Index")]
-    [InlineData("/SystemAdministration/SystemAdministration")]
+    [InlineData("/SystemAdministration/Index")]
     [InlineData("/Invoice/Index")]
     public async Task SignedInUserWithoutThePtlRole_IsRedirectedToAccessDenied(string url)
     {
@@ -59,7 +59,7 @@ public class AuthorizationRouteTests(PtlInternalWebTestFactory factory) : IClass
     }
 
     [Theory]
-    [InlineData("Contracts Admin", "/SystemAdministration/SystemAdministration")]
+    [InlineData("Contracts Admin", "/SystemAdministration/Index")]
     [InlineData("Admin", "/Contract/ManageContracts")]
     [InlineData("Contracts Admin", "/Scheme/ManageSchemes")]
     [InlineData("Scheme Admin", "/Distribution/Index")]
@@ -78,7 +78,7 @@ public class AuthorizationRouteTests(PtlInternalWebTestFactory factory) : IClass
     }
 
     [Theory]
-    [InlineData("Admin", "/SystemAdministration/SystemAdministration")]
+    [InlineData("Admin", "/SystemAdministration/Index")]
     [InlineData("Contracts Admin", "/Contract/ManageContracts")]
     [InlineData("Scheme Admin", "/Scheme/ManageSchemes")]
     public async Task SignedInUserWithThePtlRole_ReachesThePage(string roles, string url)
