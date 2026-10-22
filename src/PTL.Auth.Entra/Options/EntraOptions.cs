@@ -56,6 +56,14 @@ public sealed class EntraOptions
     public TimeSpan RefreshBeforeExpiry { get; set; } = TimeSpan.FromMinutes(5);
 
     /// <summary>
+    /// How long a signed-in user's PTL roles (tblUsers/tlnkUserRoles, resolved via
+    /// <c>IEntraInternalUserResolver</c>) are trusted before the cookie's <c>ResolvedRoles</c>
+    /// claim is re-checked against the database. Keeps a System Administration role change
+    /// effective on the user's next request instead of requiring a fresh sign-in or app restart.
+    /// </summary>
+    public TimeSpan RoleRevalidationInterval { get; set; } = TimeSpan.FromSeconds(30);
+
+    /// <summary>
     /// Composed rather than stored directly, so environments only need to supply <see cref="TenantId"/>.
     /// Uses the v2.0 (Microsoft identity platform) endpoint.
     /// </summary>
