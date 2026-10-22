@@ -74,4 +74,15 @@ public sealed class TestConsultantRepository(IDbConnectionFactory connectionFact
 
             return rowsAffected == 0 ? null : testConsultant;
         }, cancellationToken);
+
+    public Task<bool> DeleteAsync(Guid externalTestConsultantId, AuditEntry? auditEntry = null, CancellationToken cancellationToken = default) =>
+        AuditTrailWriter.ExecuteAsync(connectionFactory, auditEntry, async (connection, transaction) =>
+        {
+            var rowsAffected = await connection.ExecuteAsync(
+                "EXEC dbo.spdExtTestConsultant @ExternalTestConsultantId",
+                new { ExternalTestConsultantId = externalTestConsultantId },
+                transaction);
+
+            return rowsAffected > 0;
+        }, cancellationToken);
 }

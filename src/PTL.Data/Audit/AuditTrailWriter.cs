@@ -7,10 +7,11 @@ namespace PTL.Data.Audit;
 
 // Shared by any repository that must persist a mutation and its audit trail entry atomically in
 // one DB transaction (see IUserRoleRepository.ApplyRoleChangesWithAuditAsync /
-// IUserRepository.CreateWithAuditAsync). No legacy precedent exists for a generic admin audit
-// trail (confirmed gap) - modelled on the one existing transactional-audit precedent in this
-// codebase (InvoiceRepository.MarkInvoicedAndRecordAuditAsync: mutation + audit insert, same
-// transaction, caller commits/rolls back both together).
+// IUserRepository.CreateWithAuditAsync). Legacy never audited System Administration changes, so
+// the entry is written to the legacy generic log table (tblLog, via spiLog) rather than a new
+// table - no schema is added. Modelled on the transactional-audit precedent in this codebase
+// (InvoiceRepository.MarkInvoicedAndRecordAuditAsync: mutation + audit insert, same transaction,
+// caller commits/rolls back both together).
 internal static class AuditTrailWriter
 {
     // Runs a repository write and, when an audit entry is supplied, its audit row in ONE
@@ -46,17 +47,24 @@ internal static class AuditTrailWriter
         }
     }
 
+    private const string DescriptionPrefix = "SysAdmin";
+
+    // Legacy tblLog/spiLog take varchar/text, so the strings are passed as ANSI (an nvarchar
+    // parameter is not implicitly convertible to a text parameter).
     public static Task WriteAsync(IDbConnection connection, IDbTransaction transaction, AuditEntry entry, CancellationToken cancellationToken = default) =>
         connection.ExecuteAsync(
-            "EXEC dbo.spiSystemAdministrationAudit @AuditId, @ActingUserId, @Action, @EntityType, @EntityId, @Details",
+            "EXEC dbo.spiLog @LogId, @LogDate, @UserId, @Description",
             new
             {
-                AuditId = Guid.NewGuid(),
-                entry.ActingUserId,
-                entry.Action,
-                entry.EntityType,
-                entry.EntityId,
-                entry.Details
+                LogId = Guid.NewGuid(),
+                LogDate = DateTime.UtcNow,
+                UserId = new DbString { Value = entry.ActingUserId?.ToString() ?? "unknown", IsAnsi = true, Length = 250 },
+                Description = new DbString { Value = FormatDescription(entry), IsAnsi = true, Length = -1 }
             },
             transaction);
+
+    // tblLog has a single free-text column, so action/entity/id/details are packed into one
+    // pipe-delimited line that is easy to filter on: SysAdmin|Action|EntityType|EntityId|Details
+    private static string FormatDescription(AuditEntry entry) =>
+        string.Join('|', DescriptionPrefix, entry.Action, entry.EntityType, entry.EntityId ?? string.Empty, entry.Details ?? string.Empty);
 }

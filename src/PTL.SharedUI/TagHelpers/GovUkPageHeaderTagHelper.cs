@@ -53,15 +53,17 @@ public class GovUkPageHeaderTagHelper(LinkGenerator linkGenerator, IUrlHelperFac
                     </div>
                 </div>
                 <section aria-label="Service information" class="govuk-service-navigation" data-module="govuk-service-navigation">
-                    <div class="govuk-width-container govuk-service-navigation__container">
-                        <span class="govuk-service-navigation__service-name">
-                            <a href="{encodedHomeUrl}" class="govuk-service-navigation__link govuk-link-image" aria-label="Home">
-                                <img src="{encodedLogoUrl}" alt="APHA" style="{encodedLogoStyle}" />
-                            </a>
-                        </span>
+                    <div class="govuk-width-container">
+                        <div class="govuk-service-navigation__container">
+                            <span class="govuk-service-navigation__service-name">
+                                <a href="{encodedHomeUrl}" class="govuk-service-navigation__link govuk-link-image" aria-label="Home">
+                                    <img src="{encodedLogoUrl}" alt="APHA" style="{encodedLogoStyle}" />
+                                </a>
+                            </span>
             """);
         output.Content.AppendHtml(childContent);
         output.Content.AppendHtml("""
+                        </div>
                     </div>
                 </section>
             </header>

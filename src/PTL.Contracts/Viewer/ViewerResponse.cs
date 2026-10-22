@@ -8,6 +8,5 @@ public sealed record ViewerResponse(
     Guid ViewerId,
     string Name,
     string Email,
-    bool HasLogin,
     IReadOnlyList<ViewerSchemeResponse> Schemes,
     IReadOnlyList<ViewerParticipantResponse> Participants);

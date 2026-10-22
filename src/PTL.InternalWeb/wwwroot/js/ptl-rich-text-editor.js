@@ -62,14 +62,6 @@
                             .replaceAll('&amp;', '&');
                     }
                 });
-
-                // The error summary links to the field id, so focus has to reach the editor.
-                editor.on('init', function () {
-                    var container = editor.getContainer();
-                    if (container) {
-                        container.dataset.editorFor = textarea.id;
-                    }
-                });
             }
         });
     }
@@ -88,6 +80,17 @@
             }
         });
         observer.observe(panel, { attributes: true, attributeFilter: ['class'] });
+    });
+
+    // The error summary links to the field id, but TinyMCE hides that textarea, so the browser cannot focus it.
+    // Move focus into the editor instead (WCAG 2.4.3 / 3.3.1).
+    document.addEventListener('click', function (event) {
+        var link = event.target.closest?.('.govuk-error-summary a[href^="#"]');
+        var editor = link ? tinymce.get(link.getAttribute('href').slice(1)) : null;
+        if (editor) {
+            event.preventDefault();
+            editor.focus();
+        }
     });
 
     // TinyMCE keeps its content in an iframe until asked to write it back.

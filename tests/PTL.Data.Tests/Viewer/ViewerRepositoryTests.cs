@@ -19,7 +19,7 @@ public class ViewerRepositoryTests
     private const string InsertSql = "EXEC dbo.spiViewer @ViewerId, @Name, @Email, @SsoId, @SsoIdExt";
     private const string UpdateSql = "EXEC dbo.spuViewer @ViewerId, @Name, @Email, @SsoId, @SsoIdExt";
     private const string DeleteSql = "EXEC dbo.spdViewer @ViewerId";
-    private const string AuditSql = "EXEC dbo.spiSystemAdministrationAudit @AuditId, @ActingUserId, @Action, @EntityType, @EntityId, @Details";
+    private const string AuditSql = "EXEC dbo.spiLog @LogId, @LogDate, @UserId, @Description";
 
     private static AuditEntry AuditFor(Guid viewerId, string action) =>
         new(Guid.NewGuid(), action, "Viewer", viewerId.ToString(), "Name: Jane");
@@ -38,7 +38,7 @@ public class ViewerRepositoryTests
         Assert.True(connection.LastTransaction!.Committed);
         Assert.Contains(connection.ExecutedCommands, c => c.CommandText == InsertSql);
         var auditCommand = Assert.Single(connection.ExecutedCommands, c => c.CommandText == AuditSql);
-        Assert.Equal("CreateViewer", auditCommand.ParameterValue("@Action"));
+        Assert.StartsWith("SysAdmin|CreateViewer|", (string)auditCommand.ParameterValue("@Description")!);
     }
 
     [Fact]

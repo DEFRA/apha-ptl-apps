@@ -13,6 +13,7 @@ using PTL.InternalWeb.Features.Scheme;
 using PTL.InternalWeb.Features.SchemeAdmin;
 using PTL.InternalWeb.Features.Search;
 using PTL.InternalWeb.Features.SystemAdministration;
+using PTL.InternalWeb.Features.TestConsultant;
 
 namespace PTL.InternalWeb.Tests.Authorization;
 
@@ -50,6 +51,7 @@ public class AuthorizationMatrixTests
         { typeof(InvoiceController), PtlPolicies.InvoiceGeneration },
         { typeof(SchemeController), PtlPolicies.SchemeAdmin },
         { typeof(SchemeAdminController), PtlPolicies.SchemeAdmin },
+        { typeof(TestConsultantController), PtlPolicies.TestConsultant },
     };
 
     private static IEnumerable<MethodInfo> Actions(Type controller) =>

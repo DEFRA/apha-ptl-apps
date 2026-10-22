@@ -3,8 +3,7 @@ using PTL.Core.Audit;
 namespace PTL.Core.Viewer;
 
 // tblViewer - legacy Viewers.ViewerInfo. Originally read-only master data for CIDM external-user
-// resolution only; now also backs the Manage Viewers admin screen (add/edit/remove + the stubbed
-// Generate Login action).
+// resolution only; now also backs the Manage Viewers admin screen (add/edit/remove).
 public sealed class ViewerEntity
 {
     public Guid ViewerId { get; set; }

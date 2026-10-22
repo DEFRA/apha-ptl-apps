@@ -82,7 +82,7 @@ public class UserRepositoryTests
     }
 
     private const string InsertUserSql = "EXEC dbo.spiUser @UserId, @Username, @FriendlyName, @FirstName, @LastName, @Email, @Department, @IsInactive, @InactiveDate";
-    private const string AuditSql = "EXEC dbo.spiSystemAdministrationAudit @AuditId, @ActingUserId, @Action, @EntityType, @EntityId, @Details";
+    private const string AuditSql = "EXEC dbo.spiLog @LogId, @LogDate, @UserId, @Description";
 
     [Fact]
     public async Task CreateWithAuditAsync_CommitsTheInsertAndAuditInOneTransaction()
@@ -101,7 +101,7 @@ public class UserRepositoryTests
         Assert.True(connection.LastTransaction!.Committed);
         Assert.Contains(connection.ExecutedCommands, c => c.CommandText == InsertUserSql);
         var auditCommand = Assert.Single(connection.ExecutedCommands, c => c.CommandText == AuditSql);
-        Assert.Equal("CreateUser", auditCommand.ParameterValue("@Action"));
+        Assert.StartsWith("SysAdmin|CreateUser|", (string)auditCommand.ParameterValue("@Description")!);
     }
 
     // System Administration business rule: if the audit trail write fails, the account creation

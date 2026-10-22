@@ -12,8 +12,8 @@ public class TestConsultantAuditTests
     private readonly FakeTestConsultantRepository _repository = new();
     private readonly FakeActingUserAccessor _actingUser = new() { ActingUserId = Guid.NewGuid() };
 
-    private TestConsultantService CreateService(FakeExternalLoginService? loginService = null) =>
-        new(_repository, loginService ?? new FakeExternalLoginService(), _actingUser);
+    private TestConsultantService CreateService() =>
+        new(_repository, _actingUser);
 
     private Guid SeedConsultant()
     {
@@ -72,26 +72,28 @@ public class TestConsultantAuditTests
     }
 
     [Fact]
-    public async Task GenerateLoginAsync_PassesAuditEntryToRepository()
+    public async Task DeleteAsync_PassesAuditEntryToRepository()
     {
         var id = SeedConsultant();
 
-        await CreateService().GenerateLoginAsync(id);
+        await CreateService().DeleteAsync(id);
 
         var entry = Assert.IsType<PTL.Core.Audit.AuditEntry>(_repository.LastAuditEntry);
-        Assert.Equal("GenerateExternalTestConsultantLogin", entry.Action);
+        Assert.Equal("DeleteExternalTestConsultant", entry.Action);
+        Assert.Equal("ExternalTestConsultant", entry.EntityType);
         Assert.Equal(id.ToString(), entry.EntityId);
         Assert.Equal(_actingUser.ActingUserId, entry.ActingUserId);
     }
 
     [Fact]
-    public async Task GenerateLoginAsync_LoginFails_WritesNothing()
+    public async Task DeleteAsync_BlockedByAllocation_WritesNothing()
     {
         var id = SeedConsultant();
+        _repository.Seed(new CoreTestConsultant { ExternalTestConsultantId = id, AllocationCount = 1 });
 
-        await CreateService(new FakeExternalLoginService { Success = false }).GenerateLoginAsync(id);
+        await CreateService().DeleteAsync(id);
 
-        Assert.Empty(_repository.UpdateCalls);
+        Assert.Empty(_repository.DeleteCalls);
         Assert.Null(_repository.LastAuditEntry);
     }
 

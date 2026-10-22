@@ -6,10 +6,6 @@ namespace PTL.Api.Controllers;
 
 // [NEEDS INVESTIGATION] Not yet protected with authorization: authentication/authorization are
 // out of scope for this phase, same as the other System Administration controllers.
-//
-// Generate Login is a stub - see IExternalLoginService remarks. The story's Developer Note flags
-// this whole function's future as subject to a business decision (CIDM/GOV.UK One Login may
-// replace it with a "Send Invitation" capability instead).
 [ApiController]
 [Route("api/external-test-consultants")]
 public sealed class ExternalTestConsultantController(ITestConsultantService testConsultantService) : ControllerBase
@@ -52,18 +48,24 @@ public sealed class ExternalTestConsultantController(ITestConsultantService test
     [HttpPut("{externalTestConsultantId:guid}/status")]
     public async Task<ActionResult<ExternalTestConsultantResponse>> SetStatus(Guid externalTestConsultantId, [FromBody] ExternalTestConsultantStatusRequest request, CancellationToken cancellationToken)
     {
-        var updated = await testConsultantService.SetStatusAsync(externalTestConsultantId, request.IsInactive, cancellationToken);
-        return updated is null ? NotFound() : Ok(ToResponse(updated));
+        try
+        {
+            var updated = await testConsultantService.SetStatusAsync(externalTestConsultantId, request.IsInactive, cancellationToken);
+            return updated is null ? NotFound() : Ok(ToResponse(updated));
+        }
+        catch (ExternalTestConsultantValidationException ex)
+        {
+            return ToValidationProblem(ex);
+        }
     }
 
-    // Returns 200 OK with Success=false (not 400/404) when generation fails - a legitimate
-    // outcome (not found, or the stub/future integration reports failure), matching
-    // CountryController.DeleteCountry.
-    [HttpPost("{externalTestConsultantId:guid}/generate-login")]
-    public async Task<ActionResult<GenerateLoginResponse>> GenerateLogin(Guid externalTestConsultantId, CancellationToken cancellationToken)
+    // Returns 200 OK with Success=false (not 404/409) when removal is refused - a legitimate
+    // outcome (already gone, or still allocated to schemes), matching ViewerController.Delete.
+    [HttpDelete("{externalTestConsultantId:guid}")]
+    public async Task<ActionResult<ExternalTestConsultantDeleteResponse>> Delete(Guid externalTestConsultantId, CancellationToken cancellationToken)
     {
-        var (success, message) = await testConsultantService.GenerateLoginAsync(externalTestConsultantId, cancellationToken);
-        return Ok(new GenerateLoginResponse(success, message));
+        var result = await testConsultantService.DeleteAsync(externalTestConsultantId, cancellationToken);
+        return Ok(new ExternalTestConsultantDeleteResponse(result.Success, result.Message));
     }
 
     private ActionResult ToValidationProblem(ExternalTestConsultantValidationException ex)
@@ -83,6 +85,5 @@ public sealed class ExternalTestConsultantController(ITestConsultantService test
             testConsultant.Department,
             testConsultant.Email,
             testConsultant.IsInactive,
-            testConsultant.InactiveDate,
-            testConsultant.SsoId != Guid.Empty);
+            testConsultant.InactiveDate);
 }

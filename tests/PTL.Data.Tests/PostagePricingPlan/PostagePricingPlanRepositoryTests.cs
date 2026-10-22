@@ -101,7 +101,7 @@ public class PostagePricingPlanRepositoryTests
         Assert.Equal(2027, command.ParameterValue("@YearId"));
     }
 
-    private const string AuditSql = "EXEC dbo.spiSystemAdministrationAudit @AuditId, @ActingUserId, @Action, @EntityType, @EntityId, @Details";
+    private const string AuditSql = "EXEC dbo.spiLog @LogId, @LogDate, @UserId, @Description";
 
     [Fact]
     public async Task SetPriceAsync_WithAudit_CommitsChangeAndAuditInOneTransaction()
@@ -118,7 +118,7 @@ public class PostagePricingPlanRepositoryTests
         Assert.True(connection.LastTransaction!.Committed);
         Assert.Contains(connection.ExecutedCommands, c => c.CommandText == SetPriceSql);
         var auditCommand = Assert.Single(connection.ExecutedCommands, c => c.CommandText == AuditSql);
-        Assert.Equal("SetPostagePrice", auditCommand.ParameterValue("@Action"));
+        Assert.StartsWith("SysAdmin|SetPostagePrice|", (string)auditCommand.ParameterValue("@Description")!);
     }
 
     [Fact]

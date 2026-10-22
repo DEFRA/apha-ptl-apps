@@ -67,6 +67,7 @@ public class AuthorizationRouteTests(PtlInternalWebTestFactory factory) : IClass
     [InlineData("Scheme Admin", "/Distribution/Index")]
     [InlineData("Contracts Admin", "/Invoice/Index")]
     [InlineData("Generate Invoices", "/Invoice/Index")]
+    [InlineData("Admin", "/Test%20Consultant")]
     [InlineData("Internal User,Distributions", "/Distribution/Schedule?year=2026&monthId=4")]
     [InlineData("Scheduling,Distributions", "/Distribution/Preparation?year=2026&monthId=4")]
     [InlineData("Scheme Admin", "/Distribution/Search")]

@@ -825,6 +825,22 @@ public class SystemAdministrationControllerTests
         Assert.Contains(roleId, row.SelectedRoleIds);
     }
 
+    // spgaRole returns fldOrder DESC; legacy's grid inserted each role at column 2, so it listed them in the reverse order.
+    [Fact]
+    public async Task ManageUserRoles_Get_ListsTheRoleColumnsInTheReverseOfSpgaRoleOrderLikeLegacy()
+    {
+        var roleApiClient = new FakeRoleApiClient
+        {
+            Roles = [new RoleResponse(Guid.NewGuid(), "Override Schemes"), new RoleResponse(Guid.NewGuid(), "Support"), new RoleResponse(Guid.NewGuid(), "Admin")]
+        };
+        var controller = CreateController(userApiClient: new FakeUserApiClient(), roleApiClient: roleApiClient);
+
+        var result = await controller.ManageUserRoles(CancellationToken.None);
+
+        var model = Assert.IsType<ManageUserRolesViewModel>(Assert.IsType<ViewResult>(result).Model);
+        Assert.Equal(["Admin", "Support", "Override Schemes"], model.Roles.Select(r => r.Name));
+    }
+
     [Fact]
     public async Task ManageUserRoles_Post_SavesEachRowAndShowsSuccess()
     {
@@ -1091,7 +1107,7 @@ public class SystemAdministrationControllerTests
         var consultantId = Guid.NewGuid();
         var apiClient = new FakeExternalTestConsultantApiClient
         {
-            TestConsultants = [new ExternalTestConsultantResponse(consultantId, "Jane Smith", "Science", "jane@example.com", false, null, true)]
+            TestConsultants = [new ExternalTestConsultantResponse(consultantId, "Jane Smith", "Science", "jane@example.com", false, null)]
         };
         var controller = CreateController(externalTestConsultantApiClient: apiClient);
 
@@ -1101,7 +1117,6 @@ public class SystemAdministrationControllerTests
         var model = Assert.IsType<ExternalTestConsultantManagementViewModel>(view.Model);
         var row = Assert.Single(model.Rows);
         Assert.Equal("Jane Smith", row.Name);
-        Assert.True(row.HasLogin);
         Assert.False(row.IsEditing);
     }
 
@@ -1156,7 +1171,7 @@ public class SystemAdministrationControllerTests
         var consultantId = Guid.NewGuid();
         var apiClient = new FakeExternalTestConsultantApiClient
         {
-            TestConsultants = [new ExternalTestConsultantResponse(consultantId, "Jane Smith", "Science", "jane@example.com", false, null, false)],
+            TestConsultants = [new ExternalTestConsultantResponse(consultantId, "Jane Smith", "Science", "jane@example.com", false, null)],
             SaveResult = new ExternalTestConsultantSaveResult(false, null, new Dictionary<string, string[]> { ["Email"] = ["Enter an email address"] })
         };
         var controller = CreateController(externalTestConsultantApiClient: apiClient);
@@ -1186,33 +1201,46 @@ public class SystemAdministrationControllerTests
     }
 
     [Fact]
-    public async Task ExternalTestConsultantManagementGenerateLogin_Success_ShowsSuccessMessage()
+    public async Task ExternalTestConsultantManagementToggleStatus_RefusedByTheApi_ShowsTheMessage()
     {
-        var consultantId = Guid.NewGuid();
-        var apiClient = new FakeExternalTestConsultantApiClient { GenerateLoginResult = new GenerateLoginResponse(true, null) };
+        var apiClient = new FakeExternalTestConsultantApiClient
+        {
+            SetStatusResult = new ExternalTestConsultantSaveResult(false, null, new Dictionary<string, string[]> { [string.Empty] = ["This external test consultant is being used on: 1 scheme(s)."] })
+        };
         var controller = CreateController(externalTestConsultantApiClient: apiClient);
 
-        var result = await controller.ExternalTestConsultantManagementGenerateLogin(consultantId, CancellationToken.None);
+        var result = await controller.ExternalTestConsultantManagementToggleStatus(Guid.NewGuid(), isInactive: false, CancellationToken.None);
 
-        var view = Assert.IsType<ViewResult>(result);
-        var model = Assert.IsType<ExternalTestConsultantManagementViewModel>(view.Model);
-        Assert.False(model.MessageIsError);
-        Assert.Contains(consultantId, apiClient.GenerateLoginCalls);
+        var model = Assert.IsType<ExternalTestConsultantManagementViewModel>(Assert.IsType<ViewResult>(result).Model);
+        Assert.True(model.MessageIsError);
+        Assert.Contains("being used on", model.Message);
     }
 
     [Fact]
-    public async Task ExternalTestConsultantManagementGenerateLogin_Failure_ShowsErrorMessage()
+    public async Task ExternalTestConsultantManagementRemove_Success_ShowsSuccessMessage()
     {
         var consultantId = Guid.NewGuid();
-        var apiClient = new FakeExternalTestConsultantApiClient { GenerateLoginResult = new GenerateLoginResponse(false, "The login could not be generated.") };
+        var apiClient = new FakeExternalTestConsultantApiClient();
         var controller = CreateController(externalTestConsultantApiClient: apiClient);
 
-        var result = await controller.ExternalTestConsultantManagementGenerateLogin(consultantId, CancellationToken.None);
+        var result = await controller.ExternalTestConsultantManagementRemove(consultantId, CancellationToken.None);
 
-        var view = Assert.IsType<ViewResult>(result);
-        var model = Assert.IsType<ExternalTestConsultantManagementViewModel>(view.Model);
+        var model = Assert.IsType<ExternalTestConsultantManagementViewModel>(Assert.IsType<ViewResult>(result).Model);
+        Assert.False(model.MessageIsError);
+        Assert.Contains(consultantId, apiClient.DeleteCalls);
+    }
+
+    [Fact]
+    public async Task ExternalTestConsultantManagementRemove_Refused_ShowsTheApiMessage()
+    {
+        var apiClient = new FakeExternalTestConsultantApiClient { DeleteResult = new ExternalTestConsultantDeleteResponse(false, "This external test consultant is being used on: 1 scheme(s).") };
+        var controller = CreateController(externalTestConsultantApiClient: apiClient);
+
+        var result = await controller.ExternalTestConsultantManagementRemove(Guid.NewGuid(), CancellationToken.None);
+
+        var model = Assert.IsType<ExternalTestConsultantManagementViewModel>(Assert.IsType<ViewResult>(result).Model);
         Assert.True(model.MessageIsError);
-        Assert.Equal("The login could not be generated.", model.Message);
+        Assert.Equal("This external test consultant is being used on: 1 scheme(s).", model.Message);
     }
 
     [Fact]
@@ -1221,7 +1249,7 @@ public class SystemAdministrationControllerTests
         var viewerId = Guid.NewGuid();
         var apiClient = new FakeViewerApiClient
         {
-            Viewers = [new ViewerResponse(viewerId, "Jane Smith", "jane@example.com", true, [], [])]
+            Viewers = [new ViewerResponse(viewerId, "Jane Smith", "jane@example.com", [], [])]
         };
         var controller = CreateController(viewerApiClient: apiClient);
 
@@ -1231,7 +1259,6 @@ public class SystemAdministrationControllerTests
         var model = Assert.IsType<ViewerManagementViewModel>(view.Model);
         var row = Assert.Single(model.Rows);
         Assert.Equal("Jane Smith", row.Name);
-        Assert.True(row.HasLogin);
         Assert.False(row.IsEditing);
     }
 
@@ -1243,7 +1270,7 @@ public class SystemAdministrationControllerTests
         {
             Viewers =
             [
-                new ViewerResponse(viewerId, "Jane Smith", "jane@example.com", false,
+                new ViewerResponse(viewerId, "Jane Smith", "jane@example.com",
                     [new ViewerSchemeResponse("SFW1234", "Heavy Metals")],
                     [new ViewerParticipantResponse("LAB001", "Example Lab")])
             ]
@@ -1266,7 +1293,7 @@ public class SystemAdministrationControllerTests
     {
         var apiClient = new FakeViewerApiClient
         {
-            Viewers = [new ViewerResponse(Guid.NewGuid(), "Jane Smith", "jane@example.com", false, [], [])]
+            Viewers = [new ViewerResponse(Guid.NewGuid(), "Jane Smith", "jane@example.com", [], [])]
         };
         var controller = CreateController(viewerApiClient: apiClient);
 
@@ -1329,7 +1356,7 @@ public class SystemAdministrationControllerTests
         var viewerId = Guid.NewGuid();
         var apiClient = new FakeViewerApiClient
         {
-            Viewers = [new ViewerResponse(viewerId, "Jane Smith", "jane@example.com", false, [], [])],
+            Viewers = [new ViewerResponse(viewerId, "Jane Smith", "jane@example.com", [], [])],
             SaveResult = new ViewerSaveResult(false, null, new Dictionary<string, string[]> { ["Email"] = ["Enter an email address"] })
         };
         var controller = CreateController(viewerApiClient: apiClient);
@@ -1356,36 +1383,6 @@ public class SystemAdministrationControllerTests
         var model = Assert.IsType<ViewerManagementViewModel>(view.Model);
         Assert.False(model.MessageIsError);
         Assert.Contains(viewerId, apiClient.DeleteCalls);
-    }
-
-    [Fact]
-    public async Task ViewerManagementGenerateLogin_Success_ShowsSuccessMessage()
-    {
-        var viewerId = Guid.NewGuid();
-        var apiClient = new FakeViewerApiClient { GenerateLoginResult = new GenerateLoginResponse(true, null) };
-        var controller = CreateController(viewerApiClient: apiClient);
-
-        var result = await controller.ViewerManagementGenerateLogin(viewerId, CancellationToken.None);
-
-        var view = Assert.IsType<ViewResult>(result);
-        var model = Assert.IsType<ViewerManagementViewModel>(view.Model);
-        Assert.False(model.MessageIsError);
-        Assert.Contains(viewerId, apiClient.GenerateLoginCalls);
-    }
-
-    [Fact]
-    public async Task ViewerManagementGenerateLogin_Failure_ShowsErrorMessage()
-    {
-        var viewerId = Guid.NewGuid();
-        var apiClient = new FakeViewerApiClient { GenerateLoginResult = new GenerateLoginResponse(false, "The login could not be generated.") };
-        var controller = CreateController(viewerApiClient: apiClient);
-
-        var result = await controller.ViewerManagementGenerateLogin(viewerId, CancellationToken.None);
-
-        var view = Assert.IsType<ViewResult>(result);
-        var model = Assert.IsType<ViewerManagementViewModel>(view.Model);
-        Assert.True(model.MessageIsError);
-        Assert.Equal("The login could not be generated.", model.Message);
     }
 }
 

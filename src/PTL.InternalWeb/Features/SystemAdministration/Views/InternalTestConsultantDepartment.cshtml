@@ -1,11 +1,11 @@
 @model PTL.InternalWeb.Features.SystemAdministration.InternalTestConsultantDepartmentViewModel
 @{
-    ViewData["Title"] = "Internal Test Consultant Department Management";
+    ViewData["Title"] = "Internal Test Consultant Department";
 
     var editingRow = Model.Rows.FirstOrDefault(r => r.IsEditing);
 }
 
-<h1 class="govuk-heading-l">Internal Test Consultant Department Management</h1>
+<h1 class="govuk-heading-l">Internal Test Consultant Department</h1>
 
 @if (Model.Message is not null)
 {

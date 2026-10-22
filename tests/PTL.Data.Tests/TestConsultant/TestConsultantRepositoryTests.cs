@@ -17,7 +17,7 @@ public class TestConsultantRepositoryTests
     private const string GetByEmailSql = "EXEC dbo.spgTestConsultantByEmail @Email";
     private const string InsertSql = "EXEC dbo.spiExtTestConsultant @ExternalTestConsultantId, @Name, @Department, @Email, @SsoId, @IsInactive, @InactiveDate, @SsoIdExt";
     private const string UpdateSql = "EXEC dbo.spuExtTestConsultant @ExternalTestConsultantId, @Name, @Department, @Email, @SsoId, @IsInactive, @InactiveDate, @SsoIdExt";
-    private const string AuditSql = "EXEC dbo.spiSystemAdministrationAudit @AuditId, @ActingUserId, @Action, @EntityType, @EntityId, @Details";
+    private const string AuditSql = "EXEC dbo.spiLog @LogId, @LogDate, @UserId, @Description";
 
     private static AuditEntry AuditFor(CoreTestConsultant testConsultant, string action) =>
         new(Guid.NewGuid(), action, "ExternalTestConsultant", testConsultant.ExternalTestConsultantId.ToString(), "Name: Jane");
@@ -36,7 +36,7 @@ public class TestConsultantRepositoryTests
         Assert.True(connection.LastTransaction!.Committed);
         Assert.Contains(connection.ExecutedCommands, c => c.CommandText == InsertSql);
         var auditCommand = Assert.Single(connection.ExecutedCommands, c => c.CommandText == AuditSql);
-        Assert.Equal("CreateExternalTestConsultant", auditCommand.ParameterValue("@Action"));
+        Assert.StartsWith("SysAdmin|CreateExternalTestConsultant|", (string)auditCommand.ParameterValue("@Description")!);
     }
 
     [Fact]
@@ -221,5 +221,61 @@ public class TestConsultantRepositoryTests
         var consultant = Assert.Single(result);
         Assert.Equal("Jane Smith", consultant.Name);
         Assert.Equal("jane@example.com", consultant.Email);
+    }
+
+    [Fact]
+    public async Task GetAllAsync_MapsTheAllocationColumns()
+    {
+        var (repository, connection) = CreateRepository();
+        var table = TestConsultantTable(Guid.NewGuid());
+        table.Columns.Add("fldAllocationCount", typeof(int));
+        table.Columns.Add("fldAllocationString", typeof(string));
+        table.Rows[0]["fldAllocationCount"] = 2;
+        table.Rows[0]["fldAllocationString"] = "S1, S2";
+        connection.RespondToQuery("EXEC dbo.spgaExtTestConsultants", table);
+
+        var consultant = Assert.Single(await repository.GetAllAsync());
+
+        Assert.Equal((2, "S1, S2"), (consultant.AllocationCount, consultant.AllocationString));
+    }
+
+    private const string DeleteSql = "EXEC dbo.spdExtTestConsultant @ExternalTestConsultantId";
+
+    [Fact]
+    public async Task DeleteAsync_WithAudit_CommitsDeleteAndAuditInOneTransaction()
+    {
+        var (repository, connection) = CreateRepository();
+        var id = Guid.NewGuid();
+        connection.RespondToNonQuery(DeleteSql, 1);
+        connection.RespondToNonQuery(AuditSql, 1);
+
+        var deleted = await repository.DeleteAsync(id, new AuditEntry(Guid.NewGuid(), "DeleteExternalTestConsultant", "ExternalTestConsultant", id.ToString(), "Name: Jane"));
+
+        Assert.True(deleted);
+        Assert.True(connection.LastTransaction!.Committed);
+        var auditCommand = Assert.Single(connection.ExecutedCommands, c => c.CommandText == AuditSql);
+        Assert.StartsWith("SysAdmin|DeleteExternalTestConsultant|", (string)auditCommand.ParameterValue("@Description")!);
+    }
+
+    [Fact]
+    public async Task DeleteAsync_NoRowDeleted_ReturnsFalse()
+    {
+        var (repository, connection) = CreateRepository();
+        connection.RespondToNonQuery(DeleteSql, 0);
+
+        Assert.False(await repository.DeleteAsync(Guid.NewGuid()));
+    }
+
+    [Fact]
+    public async Task DeleteAsync_AuditWriteFails_RollsBackTheTransaction()
+    {
+        var (repository, connection) = CreateRepository();
+        connection.RespondToNonQuery(DeleteSql, 1);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => repository.DeleteAsync(Guid.NewGuid(), new AuditEntry(null, "DeleteExternalTestConsultant", "ExternalTestConsultant", null, null)));
+
+        Assert.True(connection.LastTransaction!.RolledBack);
+        Assert.False(connection.LastTransaction!.Committed);
     }
 }
