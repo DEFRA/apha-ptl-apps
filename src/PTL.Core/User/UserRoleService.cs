@@ -69,7 +69,16 @@ public sealed class UserRoleService(
             return new SetUserRolesResult(true, null);
         }
 
-        await userRoleRepository.ApplyRoleChangesAsync(userId, roleIdsToAdd, userRoleIdsToRemove, cancellationToken);
+        var roleNamesById = roles.ToDictionary(r => r.RoleId, r => r.Name);
+        var addedNames = roleIdsToAdd.Select(id => roleNamesById.GetValueOrDefault(id, id.ToString()));
+        var removedNames = existing.Where(a => userRoleIdsToRemove.Contains(a.UserRoleId)).Select(a => roleNamesById.GetValueOrDefault(a.RoleId, a.RoleId.ToString()));
+        var details = $"Added: [{string.Join(", ", addedNames)}]; Removed: [{string.Join(", ", removedNames)}]";
+
+        var auditEntry = new AuditEntry(actingUserId, "SetUserRoles", UserEntityType, userId.ToString(), details);
+
+        // Audited in one DB transaction - if the audit write fails, every add/remove in this
+        // batch rolls back too, so no unaudited role change is ever persisted.
+        await userRoleRepository.ApplyRoleChangesWithAuditAsync(userId, roleIdsToAdd, userRoleIdsToRemove, auditEntry, cancellationToken);
 
         return new SetUserRolesResult(true, null);
     }

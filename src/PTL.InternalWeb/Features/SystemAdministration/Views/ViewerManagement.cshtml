@@ -1,6 +1,6 @@
 @model PTL.InternalWeb.Features.SystemAdministration.ViewerManagementViewModel
 @{
-    ViewData["Title"] = "Viewer Management";
+    ViewData["Title"] = "Manage Viewers";
 
     var errors = ViewData.ModelState
         .Where(entry => entry.Value?.Errors.Count > 0)
@@ -10,7 +10,7 @@
     var editingRow = Model.Rows.FirstOrDefault(r => r.IsEditing);
 }
 
-<h1 class="govuk-heading-l">Viewer Management</h1>
+<h1 class="govuk-heading-l">Manage Viewers</h1>
 
 @if (Model.Message is not null)
 {

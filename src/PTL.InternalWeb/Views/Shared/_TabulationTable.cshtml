@@ -21,9 +21,15 @@
         return kind is null ? "NilReturn" : kind + " NilReturn";
     }
 
-    object CellText(TabulationCellResponse cell) => string.IsNullOrEmpty(cell.Text) ? nbsp : cell.Text;
+    object CellText(TabulationCellResponse cell) =>
+        string.IsNullOrEmpty(cell.Text)
+            ? cell.IsNilReturn ? new Microsoft.AspNetCore.Html.HtmlString("<span class=\"govuk-visually-hidden\">No result</span>") : nbsp
+            : cell.Text;
 
     int? Span(int span) => span > 1 ? span : null;
+
+    // A heading that spans several columns heads the whole group (as AmendResults does), not just its first column.
+    string HeaderScope(TabulationCellResponse cell) => cell.ColSpan > 1 ? "colgroup" : "col";
 
     async Task RenderRow(TabulationGridRowResponse row, bool firstIsRowHeader)
     {
@@ -33,7 +39,7 @@
                 var cell = row.Cells[c];
                 if (row.IsHeader)
                 {
-                    <th scope="col" class="@CellClass(cell)" colspan="@Span(cell.ColSpan)" rowspan="@Span(cell.RowSpan)">@CellText(cell)</th>
+                    <th scope="@HeaderScope(cell)" class="@CellClass(cell)" colspan="@Span(cell.ColSpan)" rowspan="@Span(cell.RowSpan)">@CellText(cell)</th>
                 }
                 else if (c == 0 && firstIsRowHeader)
                 {
@@ -41,7 +47,7 @@
                 }
                 else if (cell.Kind is "Header1" or "Header2")
                 {
-                    <th scope="col" class="@CellClass(cell)" colspan="@Span(cell.ColSpan)" rowspan="@Span(cell.RowSpan)">@CellText(cell)</th>
+                    <th scope="@HeaderScope(cell)" class="@CellClass(cell)" colspan="@Span(cell.ColSpan)" rowspan="@Span(cell.RowSpan)">@CellText(cell)</th>
                 }
                 else
                 {
@@ -71,7 +77,8 @@
     }
 }
 
-<section class="ptl-table-scroll ptl-tabulation-scroll" aria-label="@table.Caption">
+@* tabindex="0": a read-only table has nothing else to focus, so the scroll region itself must take focus for keyboard users to scroll it (WCAG 2.1.1). *@
+<section class="ptl-table-scroll ptl-tabulation-scroll" aria-label="@table.Caption" tabindex="0">
     <table class="TabulationTable">
         <caption class="govuk-visually-hidden">@table.Caption</caption>
         @if (headerRowCount > 0)
@@ -82,7 +89,7 @@
                     <tr>
                         @foreach (var cell in table.Rows[r].Cells)
                         {
-                            <th scope="col" class="@CellClass(cell)" colspan="@Span(cell.ColSpan)" rowspan="@Span(cell.RowSpan)">@CellText(cell)</th>
+                            <th scope="@HeaderScope(cell)" class="@CellClass(cell)" colspan="@Span(cell.ColSpan)" rowspan="@Span(cell.RowSpan)">@CellText(cell)</th>
                         }
                     </tr>
                 }

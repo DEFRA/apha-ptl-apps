@@ -88,16 +88,6 @@ public class AccountControllerTests
     }
 
     [Fact]
-    public void AccessDenied_ReturnsView()
-    {
-        var controller = new AccountController();
-
-        var result = controller.AccessDenied();
-
-        Assert.IsType<ViewResult>(result);
-    }
-
-    [Fact]
     public void CreateLoginModel_ReturnsViewModelWithGivenReturnUrl()
     {
         // CreateLoginModel is required to satisfy PtlAccountControllerBase's abstract contract, but

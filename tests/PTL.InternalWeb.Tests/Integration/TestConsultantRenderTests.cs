@@ -1,6 +1,5 @@
 using System.Net;
 using System.Text.RegularExpressions;
-using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -12,7 +11,7 @@ using static PTL.InternalWeb.Tests.TestSupport.TestConsultantTestData;
 
 namespace PTL.InternalWeb.Tests.Integration;
 
-// Renders Features/TestConsultant/Views (Index, Tabulation, AccessDenied) - legacy Test Consultant/MenuTestConsultants.aspx and
+// Renders Features/TestConsultant/Views (Index, Tabulation) - legacy Test Consultant/MenuTestConsultants.aspx and
 // Tabulation.aspx - through the real MVC pipeline, with the "Test Consultant" role signed in.
 public class TestConsultantRenderTests : IClassFixture<WebApplicationFactory<Program>>
 {
@@ -32,14 +31,7 @@ public class TestConsultantRenderTests : IClassFixture<WebApplicationFactory<Pro
             {
                 services.RemoveAll<ITestConsultantTabulationApiClient>();
                 services.AddSingleton<ITestConsultantTabulationApiClient>(_apiClient);
-                services.AddAuthentication(TestAuthHandler.SchemeName)
-                    .AddScheme<TestAuthHandlerOptions, TestAuthHandler>(TestAuthHandler.SchemeName, options => options.ResolvedRoles = roles);
-                services.PostConfigure<AuthenticationOptions>(options =>
-                {
-                    options.DefaultAuthenticateScheme = TestAuthHandler.SchemeName;
-                    options.DefaultChallengeScheme = TestAuthHandler.SchemeName;
-                    options.DefaultScheme = TestAuthHandler.SchemeName;
-                });
+                services.Configure<TestAuthHandlerOptions>(TestAuthHandler.SchemeName, options => options.ResolvedRoles = roles);
             }));
 
     private static string MainContent(string html) => Regex.Match(html, "<main.*?</main>", RegexOptions.Singleline).Value;
@@ -153,6 +145,35 @@ public class TestConsultantRenderTests : IClassFixture<WebApplicationFactory<Pro
         Assert.True(HasCommandButton(html, "export", "Export to Excel"));
     }
 
+    // GOV.UK shows a ticked box with ".govuk-checkboxes__input:checked + .govuk-checkboxes__label::after", so the label must
+    // be the very next element after each checkbox - a hidden input between them hides the tick.
+    [Fact]
+    public async Task Tabulation_EveryCheckboxIsImmediatelyFollowedByItsLabel()
+    {
+        _apiClient.Tabulation = new(TestConsultantApiStatus.Ok, Tabulation());
+
+        var html = MainContent(await GetAsync(TabulationUrl));
+
+        var checkboxes = Regex.Matches(html, "<input class=\"govuk-checkboxes__input\"[^>]*>(?<next>\\s*<[a-z]+)");
+        Assert.NotEmpty(checkboxes);
+        Assert.All(checkboxes, match => Assert.Equal("<label", match.Groups["next"].Value.Trim()));
+        // The unticked value still posts: the hidden input follows the label, after the checkbox.
+        Assert.Matches("id=\"show-method-items\"[^>]*/>\\s*<label[^>]*>Method Items</label>\\s*<input name=\"ShowMethodItems\" type=\"hidden\" value=\"false\" />", html);
+    }
+
+    // The shared confirmation page replaced the legacy browser confirm(): an inline handler here would ask twice.
+    [Fact]
+    public async Task Tabulation_SaveAndSubmitHasNoBrowserConfirmDialog()
+    {
+        _apiClient.Tabulation = new(TestConsultantApiStatus.Ok, Tabulation());
+
+        var html = await GetAsync(TabulationUrl);
+
+        Assert.True(HasCommandButton(html, "submit", "Save and Submit"));
+        Assert.DoesNotContain("confirm(", html, StringComparison.Ordinal);
+        Assert.DoesNotMatch("<button[^>]*\\sonclick=", html);
+    }
+
     [Fact]
     public async Task Tabulation_NoMethodItemsAndNoSamples_OffersNoFilter()
     {
@@ -176,7 +197,7 @@ public class TestConsultantRenderTests : IClassFixture<WebApplicationFactory<Pro
         Assert.Contains("data-module=\"ptl-rich-text\"", html, StringComparison.Ordinal);
         Assert.Contains("&lt;p&gt;Draft&lt;/p&gt;", html, StringComparison.Ordinal);
         Assert.True(HasCommandButton(html, "save", "Save"));
-        Assert.True(HasCommandButton(html, "cancel", "Cancel"));
+        Assert.Matches("<a[^>]*govuk-button--secondary[^>]*href=\"/Test%20Consultant\"[^>]*>Cancel</a>", html);
         Assert.True(HasCommandButton(html, "submit", "Save and Submit"));
         Assert.Contains("Once your comments are submitted, you will not be able to edit them again.", html, StringComparison.Ordinal);
     }
@@ -194,7 +215,8 @@ public class TestConsultantRenderTests : IClassFixture<WebApplicationFactory<Pro
         Assert.DoesNotContain("Please use the box below the Tabulation", html, StringComparison.Ordinal);
         Assert.False(HasCommandButton(html, "save", "Save"));
         Assert.False(HasCommandButton(html, "submit", "Save and Submit"));
-        Assert.True(HasCommandButton(html, "cancel", "Back"));
+        Assert.Matches("<a[^>]*govuk-button--secondary[^>]*href=\"/Test%20Consultant\"[^>]*>Back</a>", html);
+        Assert.Contains("<h2 class=\"govuk-heading-m commentsTitle\">Comments provided by A Author:</h2>", html, StringComparison.Ordinal);
         Assert.True(HasCommandButton(html, "export", "Export to Excel"));
     }
 
@@ -208,14 +230,79 @@ public class TestConsultantRenderTests : IClassFixture<WebApplicationFactory<Pro
         Assert.Contains("No comments were submitted before the deadline", html, StringComparison.Ordinal);
     }
 
+    // The refusal is the shared one: the cookie scheme sends a signed-in user to /AccessDenied (the test host's
+    // scheme just answers 403), so the old per-feature "You are not a Test Consultant" page no longer exists.
     [Fact]
-    public async Task Tabulation_NotAllocatedToTheScheme_ShowsAccessDenied()
+    public async Task Tabulation_NotAllocatedToTheScheme_IsForbidden()
     {
         _apiClient.Tabulation = new(TestConsultantApiStatus.Forbidden);
 
-        var html = MainContent(await GetAsync(TabulationUrl, expected: HttpStatusCode.Forbidden));
+        await GetAsync(TabulationUrl, expected: HttpStatusCode.Forbidden);
+    }
 
-        Assert.Contains("You are not a Test Consultant for this distribution.", html, StringComparison.Ordinal);
+    // Distribution's Tabulation page has no back link either: the breadcrumbs already lead back to the menu.
+    [Fact]
+    public async Task Tabulation_HasNoBackLinkBecauseTheBreadcrumbsLeadBack()
+    {
+        _apiClient.Tabulation = new(TestConsultantApiStatus.Ok, Tabulation());
+
+        var html = await GetAsync(TabulationUrl);
+
+        Assert.DoesNotContain("govuk-back-link", html, StringComparison.Ordinal);
+        Assert.Matches("<a class=\"govuk-breadcrumbs__link\" href=\"/Test%20Consultant\">Test Consultant</a>", html);
+    }
+
+    // On-screen GOV.UK typography comes from #commentsDiv, exactly as on Distribution's Tabulation page.
+    [Fact]
+    public async Task Tabulation_TheCommentsBlocksSitInsideTheCommentsDiv()
+    {
+        _apiClient.Tabulation = new(TestConsultantApiStatus.Ok, Tabulation(submitted: true, heading: "Comments:", commentsHtml: "<p>Final words</p>"));
+
+        var html = MainContent(await GetAsync(TabulationUrl));
+
+        var commentsDiv = Regex.Match(html, "<div id=\"commentsDiv\">(?<inner>.*?)</div>\\s*<div class=\"govuk-button-group\">", RegexOptions.Singleline).Groups["inner"].Value;
+        Assert.Contains("<p>Standard text</p>", commentsDiv, StringComparison.Ordinal);
+        Assert.Contains("<p>Scheme comments</p>", commentsDiv, StringComparison.Ordinal);
+        Assert.Contains("<p>Final words</p>", commentsDiv, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Tabulation_EachSamplesInformationIsAHeadingFollowedByItsDetails()
+    {
+        _apiClient.Tabulation = new(TestConsultantApiStatus.Ok, Tabulation());
+
+        var html = MainContent(await GetAsync(TabulationUrl));
+
+        Assert.Matches("<h3 class=\"govuk-heading-s[^\"]*\">26/1 Positive</h3>\\s*<p class=\"govuk-body\">Details of sample one</p>", html);
+        Assert.DoesNotContain("divTestConsultantSample", html, StringComparison.Ordinal);
+    }
+
+    // A read-only table has nothing else to focus, so its scroll region takes focus; a heading over several columns heads
+    // the group; and a blank nil-return cell is announced rather than conveyed only by its grey background.
+    [Fact]
+    public async Task Tabulation_TablesAreKeyboardScrollableWithGroupHeadingsAndAnnouncedNilReturns()
+    {
+        var cells = new[]
+        {
+            new TabulationCellResponse("Brucella", 1, 2, "Header1", false),
+            new TabulationCellResponse("26/1", 2, 1, "Header1", false),
+        };
+        var table = new TabulationTableResponse(
+            "Brucella",
+            [
+                new TabulationGridRowResponse(cells, true),
+                new TabulationGridRowResponse([new("Result", 1, 1, "Header2", false), new("Score", 1, 1, "Header2", false)], true),
+                new TabulationGridRowResponse([new("Lab 001", 1, 1, "Cell", false), new("Positive", 1, 1, "Cell", false), new(string.Empty, 1, 1, "Cell", true)], false),
+            ],
+            null);
+        _apiClient.Tabulation = new(TestConsultantApiStatus.Ok, Tabulation() with { ResultsTables = [table] });
+
+        var html = MainContent(await GetAsync(TabulationUrl));
+
+        Assert.Contains("<section class=\"ptl-table-scroll ptl-tabulation-scroll\" aria-label=\"Brucella\" tabindex=\"0\">", html, StringComparison.Ordinal);
+        Assert.Contains("<th scope=\"colgroup\" class=\"TabulationHeader1\" colspan=\"2\">26/1</th>", html, StringComparison.Ordinal);
+        Assert.Contains("<th scope=\"col\" class=\"TabulationHeader1\" rowspan=\"2\">Brucella</th>", html, StringComparison.Ordinal);
+        Assert.Contains("<td class=\"TabulationCell NilReturn\"><span class=\"govuk-visually-hidden\">No result</span></td>", html, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -229,12 +316,47 @@ public class TestConsultantRenderTests : IClassFixture<WebApplicationFactory<Pro
     {
         _apiClient.Tabulation = new(TestConsultantApiStatus.Ok, Tabulation());
 
-        var response = await PostAsync(("Comments", "<p>New</p>"), ("command", "submit"));
+        var response = await PostAsync(("Comments", "<p>New</p>"), ("command", "submit"), ("confirmation", "confirm"));
 
         Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
         Assert.Equal("/Test%20Consultant", response.Headers.Location!.OriginalString);
         var (schemeId, request) = Assert.Single(_apiClient.Saved);
         Assert.Equal((SchemeId, "<p>New</p>", true), (schemeId, request.Comments, request.Submit));
+    }
+
+    // Save and Save and Submit open the shared confirmation page first; its OK re-posts the comments typed so far.
+    [Theory]
+    [InlineData("save", "Are you sure you wish to save your comments?", false)]
+    [InlineData("submit", "Once your comments are submitted, you will not be able to edit them again. Are you sure you wish to submit?", true)]
+    public async Task Post_SaveOrSubmit_ShowsTheConfirmationPageAndSavesNothing(string command, string question, bool isWarning)
+    {
+        _apiClient.Tabulation = new(TestConsultantApiStatus.Ok, Tabulation());
+
+        var response = await PostAsync(("Comments", "<p>New</p>"), ("command", command));
+        var html = MainContent(await response.Content.ReadAsStringAsync());
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains(question, html, StringComparison.Ordinal);
+        Assert.Equal(isWarning, html.Contains("govuk-warning-text__text", StringComparison.Ordinal));
+        Assert.Contains($"<input type=\"hidden\" name=\"command\" value=\"{command}\" />", html, StringComparison.Ordinal);
+        Assert.Contains("<input type=\"hidden\" name=\"Comments\" value=\"&lt;p&gt;New&lt;/p&gt;\" />", html, StringComparison.Ordinal);
+        Assert.Contains("<input type=\"hidden\" name=\"confirmation\" value=\"confirm\" />", html, StringComparison.Ordinal);
+        Assert.Contains("<input type=\"hidden\" name=\"confirmation\" value=\"cancel\" />", html, StringComparison.Ordinal);
+        Assert.Empty(_apiClient.Saved);
+    }
+
+    [Fact]
+    public async Task Post_ConfirmationCancelled_RedisplaysTheFormWithTheCommentsAndSavesNothing()
+    {
+        _apiClient.Tabulation = new(TestConsultantApiStatus.Ok, Tabulation());
+
+        var response = await PostAsync(("Comments", "<p>Typed so far</p>"), ("command", "save"), ("confirmation", "cancel"));
+        var html = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("&lt;p&gt;Typed so far&lt;/p&gt;", html, StringComparison.Ordinal);
+        Assert.Contains("Test Consultant Tabulation", html, StringComparison.Ordinal);
+        Assert.Empty(_apiClient.Saved);
     }
 
     [Fact]
@@ -278,7 +400,8 @@ public class TestConsultantRenderTests : IClassFixture<WebApplicationFactory<Pro
     [Fact]
     public async Task Menu_WithoutSignIn_RedirectsAwayFromThePage()
     {
-        var client = _rawFactory.WithWebHostBuilder(builder => { }).CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        var client = _rawFactory.WithWebHostBuilder(builder => builder.UseSetting(SignedInUserHostingStartup.UseRealAuthSetting, "true"))
+            .CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
 
         Assert.Equal(HttpStatusCode.Redirect, (await client.GetAsync("/Test%20Consultant")).StatusCode);
     }

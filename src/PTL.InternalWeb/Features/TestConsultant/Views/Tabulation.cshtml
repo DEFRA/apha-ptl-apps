@@ -14,8 +14,6 @@
     <link rel="stylesheet" href="~/css/tabulation.css" asp-append-version="true" />
 }
 
-<a class="govuk-back-link" asp-action="Index">Back</a>
-
 <govuk-error-summary errors="@errors" />
 
 <h1 class="govuk-heading-l">Test Consultant Tabulation</h1>
@@ -47,8 +45,9 @@
                     {
                         <div class="govuk-checkboxes__item">
                             <input class="govuk-checkboxes__input" id="show-method-items" name="ShowMethodItems" type="checkbox" value="true" checked="@(Model.ShowMethodItems ? "checked" : null)" />
-                            <input name="ShowMethodItems" type="hidden" value="false" />
                             <label class="govuk-label govuk-checkboxes__label" for="show-method-items">Method Items</label>
+                            @* After the label, not between: GOV.UK draws the tick with ".input:checked + .label", so nothing may sit between them. *@
+                            <input name="ShowMethodItems" type="hidden" value="false" />
                         </div>
                     }
                     @for (var i = 0; i < Model.AllSamples.Count; i++)
@@ -110,40 +109,46 @@
             }
             @foreach (var sample in tabulation.SampleInformation)
             {
-                <div class="divTestConsultantSample">@sample.SampleNumber&nbsp;&nbsp;@sample.TabulationDescription</div>
-                <div class="divTestConsultantSampleDetails">@sample.TestConsultantsDescription</div>
+                <h3 class="govuk-heading-s govuk-!-margin-bottom-1">@sample.SampleNumber @sample.TabulationDescription</h3>
+                <p class="govuk-body">@sample.TestConsultantsDescription</p>
             }
         </div>
     </div>
 
     <button type="submit" name="command" value="export" class="govuk-button govuk-button--secondary" data-module="govuk-button" formnovalidate>Export to Excel</button>
 
-    @if (!string.IsNullOrEmpty(tabulation.StandardTabulationTextHtml))
-    {
-        <div class="divTestConsultantComments">
-            @Html.Raw(tabulation.StandardTabulationTextHtml)
-        </div>
-    }
+    @* #commentsDiv gives these blocks the on-screen GOV.UK typography, exactly as on Distribution's Tabulation page. *@
+    <div id="commentsDiv">
+        @if (!string.IsNullOrEmpty(tabulation.StandardTabulationTextHtml))
+        {
+            <div class="divTestConsultantComments">
+                @Html.Raw(tabulation.StandardTabulationTextHtml)
+            </div>
+        }
 
-    @if (!string.IsNullOrEmpty(tabulation.CommentsHtml))
-    {
-        <div class="divTestConsultantComments">
-            @Html.Raw(tabulation.CommentsHtml)
-        </div>
-    }
+        @if (!string.IsNullOrEmpty(tabulation.CommentsHtml))
+        {
+            <div class="divTestConsultantComments">
+                @Html.Raw(tabulation.CommentsHtml)
+            </div>
+        }
+
+        @if (comments.IsSubmitted)
+        {
+            <div class="divTestConsultantComments">
+                <h2 class="govuk-heading-m commentsTitle">@comments.Heading</h2>
+                @if (comments.HasComments)
+                {
+                    @Html.Raw(comments.CommentsHtml)
+                }
+            </div>
+        }
+    </div>
 
     @if (comments.IsSubmitted)
     {
-        <div class="divTestConsultantComments">
-            <p class="commentsTitle">@comments.Heading</p>
-            @if (comments.HasComments)
-            {
-                @Html.Raw(comments.CommentsHtml)
-            }
-        </div>
-
         <div class="govuk-button-group">
-            <button type="submit" name="command" value="cancel" class="govuk-button" data-module="govuk-button" formnovalidate>Back</button>
+            <a class="govuk-button govuk-button--secondary" data-module="govuk-button" asp-action="Index">Back</a>
         </div>
     }
     else
@@ -152,7 +157,7 @@
 
         <div class="govuk-button-group">
             <button type="submit" name="command" value="save" class="govuk-button" data-module="govuk-button">Save</button>
-            <button type="submit" name="command" value="cancel" class="govuk-button govuk-button--secondary" data-module="govuk-button" formnovalidate>Cancel</button>
+            <a class="govuk-button govuk-button--secondary" data-module="govuk-button" asp-action="Index">Cancel</a>
         </div>
 
         <div class="govuk-warning-text">
@@ -164,8 +169,7 @@
         </div>
 
         <div class="govuk-button-group">
-            <button type="submit" name="command" value="submit" class="govuk-button" data-module="govuk-button"
-                    onclick="return confirm('Once your comments are submitted, you will not be able to edit them again. Are you sure you wish to submit?');">Save and Submit</button>
+            <button type="submit" name="command" value="submit" class="govuk-button" data-module="govuk-button">Save and Submit</button>
         </div>
     }
 </form>

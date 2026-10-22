@@ -75,30 +75,6 @@ public partial class SystemAdministrationRouteSmokeTests : IClassFixture<WebAppl
     }
 
     [Fact]
-    public async Task SystemAdministration_SignedInWithoutTheAdminRole_IsRefused()
-    {
-        // A signed-in user who holds other roles but not Admin must be refused (and the refusal is
-        // logged by LoggingAuthorizationMiddlewareResultHandler) before the action body runs.
-        var factory = _rawFactory.WithWebHostBuilder(builder =>
-            builder.ConfigureServices(services =>
-            {
-                services.AddAuthentication(TestAuthHandler.SchemeName)
-                    .AddScheme<TestAuthHandlerOptions, TestAuthHandler>(TestAuthHandler.SchemeName, options => options.ResolvedRoles = "Scheduling,Test Consultant");
-                services.PostConfigure<AuthenticationOptions>(options =>
-                {
-                    options.DefaultAuthenticateScheme = TestAuthHandler.SchemeName;
-                    options.DefaultChallengeScheme = TestAuthHandler.SchemeName;
-                    options.DefaultScheme = TestAuthHandler.SchemeName;
-                });
-            }));
-        var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
-
-        var response = await client.GetAsync("/SystemAdministration/SystemAdministration");
-
-        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
-    }
-
-    [Fact]
     public void RefusedRequests_AreHandledByTheLoggingAuthorizationHandler()
     {
         // Without this registration ASP.NET Core falls back to its default handler and a

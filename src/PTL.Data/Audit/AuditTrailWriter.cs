@@ -6,7 +6,8 @@ using PTL.Data.Infrastructure;
 namespace PTL.Data.Audit;
 
 // Shared by any repository that must persist a mutation and its audit trail entry atomically in
-// one DB transaction (see IUserRepository.CreateWithAuditAsync). Legacy never audited System Administration changes, so
+// one DB transaction (see IUserRoleRepository.ApplyRoleChangesWithAuditAsync /
+// IUserRepository.CreateWithAuditAsync). Legacy never audited System Administration changes, so
 // the entry is written to the legacy generic log table (tblLog, via spiLog) rather than a new
 // table - no schema is added. Modelled on the transactional-audit precedent in this codebase
 // (InvoiceRepository.MarkInvoicedAndRecordAuditAsync: mutation + audit insert, same transaction,

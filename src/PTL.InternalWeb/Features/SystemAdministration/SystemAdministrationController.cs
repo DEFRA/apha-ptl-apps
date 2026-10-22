@@ -444,7 +444,9 @@ public class SystemAdministrationController : Controller
 
         return new ManageUserRolesViewModel
         {
-            Roles = roles.Select(r => new RoleColumnViewModel { RoleId = r.RoleId, Name = r.Name }).ToList(),
+            // spgaRole returns the roles by fldOrder DESC. Legacy UserRoles.aspx inserted each one at column 2 as it
+            // looped, so its columns ran the other way (fldOrder ascending): do the same here.
+            Roles = roles.Reverse().Select(r => new RoleColumnViewModel { RoleId = r.RoleId, Name = r.Name }).ToList(),
             Rows = rows.Select(r => new UserRoleRowViewModel
             {
                 UserId = r.UserId,

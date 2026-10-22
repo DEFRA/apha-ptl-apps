@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using PTL.ApiClient;
 using PTL.ApiClient.Distribution;
 using PTL.Contracts.Distribution;
+using PTL.InternalWeb.Confirmation;
 using PTL.InternalWeb.Features.TestConsultant;
 using PTL.InternalWeb.Tests.TestSupport;
 using static PTL.InternalWeb.Tests.TestSupport.TestConsultantTestData;
@@ -38,15 +39,13 @@ public class TestConsultantControllerTests
     }
 
     [Fact]
-    public async Task Index_ApiRefusesTheConsultant_ShowsAccessDenied()
+    public async Task Index_ApiRefusesTheConsultant_IsForbidden()
     {
         _apiClient.DistributionsException = new HttpRequestException("Forbidden", null, HttpStatusCode.Forbidden);
-        var controller = CreateController();
 
-        var result = await controller.Index(null, CancellationToken.None);
+        var result = await CreateController().Index(null, CancellationToken.None);
 
-        Assert.Equal("AccessDenied", Assert.IsType<ViewResult>(result).ViewName);
-        Assert.Equal(StatusCodes.Status403Forbidden, controller.Response.StatusCode);
+        Assert.IsType<ForbidResult>(result);
     }
 
     [Fact]
@@ -85,15 +84,13 @@ public class TestConsultantControllerTests
     }
 
     [Fact]
-    public async Task TabulationGet_NotAllocated_ShowsTheAccessDeniedPage()
+    public async Task TabulationGet_NotAllocated_IsForbidden()
     {
         _apiClient.Tabulation = new(TestConsultantApiStatus.Forbidden);
-        var controller = CreateController();
 
-        var result = await controller.Tabulation(SchemeId, CancellationToken.None);
+        var result = await CreateController().Tabulation(SchemeId, CancellationToken.None);
 
-        Assert.Equal("AccessDenied", Assert.IsType<ViewResult>(result).ViewName);
-        Assert.Equal(StatusCodes.Status403Forbidden, controller.Response.StatusCode);
+        Assert.IsType<ForbidResult>(result);
     }
 
     [Fact]
@@ -104,24 +101,14 @@ public class TestConsultantControllerTests
 
     [Fact]
     public async Task TabulationPost_NullModel_Throws() =>
-        await Assert.ThrowsAsync<ArgumentNullException>(() => CreateController().Tabulation(SchemeId, null!, "save", CancellationToken.None));
-
-    [Fact]
-    public async Task TabulationPost_Cancel_ReturnsToTheMenuWithoutSaving()
-    {
-        var result = await CreateController().Tabulation(SchemeId, Posted(), "CANCEL", CancellationToken.None);
-
-        Assert.Equal("Index", Assert.IsType<RedirectToActionResult>(result).ActionName);
-        Assert.Empty(_apiClient.Saved);
-        Assert.Empty(_apiClient.TabulationFilters);
-    }
+        await Assert.ThrowsAsync<ArgumentNullException>(() => CreateController().Tabulation(SchemeId, null!, "save", null, CancellationToken.None));
 
     [Fact]
     public async Task TabulationPost_Draw_RedrawsWithTheFilterAndKeepsTheTypedComments()
     {
         SeedTabulation();
 
-        var result = await CreateController().Tabulation(SchemeId, Posted(comments: null, filtered: true), "draw", CancellationToken.None);
+        var result = await CreateController().Tabulation(SchemeId, Posted(comments: null, filtered: true), "draw", null, CancellationToken.None);
 
         var model = Assert.IsType<TestConsultantTabulationViewModel>(Assert.IsType<ViewResult>(result).Model);
         var filter = Assert.Single(_apiClient.TabulationFilters);
@@ -138,7 +125,7 @@ public class TestConsultantControllerTests
         var controller = CreateController();
         controller.ModelState.AddModelError("Comments", "Comments required.");
 
-        await controller.Tabulation(SchemeId, Posted(comments: null, filtered: true), "draw", CancellationToken.None);
+        await controller.Tabulation(SchemeId, Posted(comments: null, filtered: true), "draw", null, CancellationToken.None);
 
         Assert.True(controller.ModelState.IsValid);
     }
@@ -149,7 +136,7 @@ public class TestConsultantControllerTests
         _apiClient.Export = new(TestConsultantApiStatus.Ok, new TabulationAttachmentFile([1, 2], "application/x-test", "attachment; filename=\"a.xlsx\""));
         var controller = CreateController();
 
-        var result = await controller.Tabulation(SchemeId, Posted(filtered: true), "export", CancellationToken.None);
+        var result = await controller.Tabulation(SchemeId, Posted(filtered: true), "export", null, CancellationToken.None);
 
         var file = Assert.IsType<FileContentResult>(result);
         Assert.Equal("application/x-test", file.ContentType);
@@ -159,16 +146,16 @@ public class TestConsultantControllerTests
     }
 
     [Theory]
-    [InlineData(TestConsultantApiStatus.Forbidden, "AccessDenied")]
-    [InlineData(TestConsultantApiStatus.NotFound, null)]
-    public async Task TabulationPost_ExportNotAllowed_IsRefused(TestConsultantApiStatus status, string? viewName)
+    [InlineData(TestConsultantApiStatus.Forbidden, true)]
+    [InlineData(TestConsultantApiStatus.NotFound, false)]
+    public async Task TabulationPost_ExportNotAllowed_IsRefused(TestConsultantApiStatus status, bool forbidden)
     {
         _apiClient.Export = new(status);
 
-        var result = await CreateController().Tabulation(SchemeId, Posted(), "export", CancellationToken.None);
+        var result = await CreateController().Tabulation(SchemeId, Posted(), "export", null, CancellationToken.None);
 
-        Assert.Equal(viewName, (result as ViewResult)?.ViewName);
-        Assert.Equal(viewName is null, result is NotFoundResult);
+        Assert.Equal(forbidden, result is ForbidResult);
+        Assert.Equal(!forbidden, result is NotFoundResult);
     }
 
     [Theory]
@@ -177,11 +164,54 @@ public class TestConsultantControllerTests
     [InlineData("SUBMIT", true)]
     public async Task TabulationPost_Save_SendsTheCommentsAndReturnsToTheMenu(string command, bool submit)
     {
-        var result = await CreateController().Tabulation(SchemeId, Posted("<p>Final</p>"), command, CancellationToken.None);
+        var result = await CreateController().Tabulation(SchemeId, Posted("<p>Final</p>"), command, ConfirmationFlow.Confirmed, CancellationToken.None);
 
         Assert.Equal("Index", Assert.IsType<RedirectToActionResult>(result).ActionName);
         var (schemeId, request) = Assert.Single(_apiClient.Saved);
         Assert.Equal((SchemeId, "<p>Final</p>", submit), (schemeId, request.Comments, request.Submit));
+    }
+
+    // Save and Save and Submit first open the shared confirmation page (as Distribution's send for Results Sign-Off);
+    // nothing is saved until it is confirmed.
+    [Fact]
+    public async Task TabulationPost_Save_AsksForConfirmationAndSavesNothing()
+    {
+        var result = await CreateController().Tabulation(SchemeId, Posted("<p>Final</p>"), "save", null, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        Assert.Equal(ConfirmationFlow.ViewName, view.ViewName);
+        var model = Assert.IsType<ConfirmationPageViewModel>(view.Model);
+        Assert.Equal((TestConsultantController.SaveQuestion, false, "OK"), (model.Title, model.IsWarningTitle, model.ConfirmText));
+        Assert.Empty(_apiClient.Saved);
+    }
+
+    [Theory]
+    [InlineData("submit")]
+    [InlineData("SUBMIT")]
+    public async Task TabulationPost_Submit_AsksForConfirmationWithTheLegacyWarningAndSavesNothing(string command)
+    {
+        var result = await CreateController().Tabulation(SchemeId, Posted("<p>Final</p>"), command, null, CancellationToken.None);
+
+        var model = Assert.IsType<ConfirmationPageViewModel>(Assert.IsType<ViewResult>(result).Model);
+        Assert.Equal(TestConsultantController.SubmitQuestion, model.Title);
+        Assert.True(model.IsWarningTitle);
+        Assert.Empty(_apiClient.Saved);
+    }
+
+    // Cancel on the confirmation page posts the form back declined: the page redisplays and keeps what was typed.
+    [Theory]
+    [InlineData("save")]
+    [InlineData("submit")]
+    public async Task TabulationPost_ConfirmationCancelled_RedisplaysTheFormAndSavesNothing(string command)
+    {
+        SeedTabulation();
+
+        var result = await CreateController().Tabulation(SchemeId, Posted("<p>Mine</p>"), command, ConfirmationFlow.Cancelled, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        Assert.Equal("Tabulation", view.ViewName);
+        Assert.Equal("<p>Mine</p>", Assert.IsType<TestConsultantTabulationViewModel>(view.Model).Comments);
+        Assert.Empty(_apiClient.Saved);
     }
 
     [Fact]
@@ -191,9 +221,10 @@ public class TestConsultantControllerTests
         var controller = CreateController();
         controller.ModelState.AddModelError("Comments", "Comments required.");
 
-        var result = await controller.Tabulation(SchemeId, Posted(null), "submit", CancellationToken.None);
+        var result = await controller.Tabulation(SchemeId, Posted(null), "submit", null, CancellationToken.None);
 
-        Assert.IsType<ViewResult>(result);
+        var view = Assert.IsType<ViewResult>(result);
+        Assert.Equal("Tabulation", view.ViewName);
         Assert.Empty(_apiClient.Saved);
         Assert.False(controller.ModelState.IsValid);
     }
@@ -205,7 +236,7 @@ public class TestConsultantControllerTests
         _apiClient.SaveResult = new(TestConsultantApiStatus.Ok, new TestConsultantTabulationSaveResult(false, false, new Dictionary<string, string> { ["Comments"] = "Too long" }));
         var controller = CreateController();
 
-        var result = await controller.Tabulation(SchemeId, Posted(), "save", CancellationToken.None);
+        var result = await controller.Tabulation(SchemeId, Posted(), "save", ConfirmationFlow.Confirmed, CancellationToken.None);
 
         Assert.IsType<ViewResult>(result);
         Assert.Equal("Too long", Assert.Single(controller.ModelState["Comments"]!.Errors).ErrorMessage);
@@ -218,7 +249,7 @@ public class TestConsultantControllerTests
         _apiClient.SaveResult = new(TestConsultantApiStatus.Ok, new TestConsultantTabulationSaveResult(false, true, new Dictionary<string, string>()));
         var controller = CreateController();
 
-        var result = await controller.Tabulation(SchemeId, Posted(), "save", CancellationToken.None);
+        var result = await controller.Tabulation(SchemeId, Posted(), "save", ConfirmationFlow.Confirmed, CancellationToken.None);
 
         var model = Assert.IsType<TestConsultantTabulationViewModel>(Assert.IsType<ViewResult>(result).Model);
         Assert.True(model.Tabulation!.Comments.IsSubmitted);
@@ -226,17 +257,16 @@ public class TestConsultantControllerTests
     }
 
     [Theory]
-    [InlineData(TestConsultantApiStatus.Forbidden, "AccessDenied")]
-    [InlineData(TestConsultantApiStatus.NotFound, null)]
-    public async Task TabulationPost_SaveNotAllowed_IsRefused(TestConsultantApiStatus status, string? viewName)
+    [InlineData(TestConsultantApiStatus.Forbidden, true)]
+    [InlineData(TestConsultantApiStatus.NotFound, false)]
+    public async Task TabulationPost_SaveNotAllowed_IsRefused(TestConsultantApiStatus status, bool forbidden)
     {
         _apiClient.SaveResult = new(status);
-        var controller = CreateController();
 
-        var result = await controller.Tabulation(SchemeId, Posted(), "save", CancellationToken.None);
+        var result = await CreateController().Tabulation(SchemeId, Posted(), "save", ConfirmationFlow.Confirmed, CancellationToken.None);
 
-        Assert.Equal(viewName, (result as ViewResult)?.ViewName);
-        Assert.Equal(viewName is null, result is NotFoundResult);
+        Assert.Equal(forbidden, result is ForbidResult);
+        Assert.Equal(!forbidden, result is NotFoundResult);
     }
 
     [Theory]
@@ -246,8 +276,8 @@ public class TestConsultantControllerTests
     {
         _apiClient.Tabulation = new(status);
 
-        var result = await CreateController().Tabulation(SchemeId, Posted(), "draw", CancellationToken.None);
+        var result = await CreateController().Tabulation(SchemeId, Posted(), "draw", null, CancellationToken.None);
 
-        Assert.True(status == TestConsultantApiStatus.Forbidden ? result is ViewResult { ViewName: "AccessDenied" } : result is NotFoundResult);
+        Assert.True(status == TestConsultantApiStatus.Forbidden ? result is ForbidResult : result is NotFoundResult);
     }
 }
