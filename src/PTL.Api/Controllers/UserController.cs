@@ -11,8 +11,8 @@ namespace PTL.Api.Controllers;
 // go live without the authorization policy decision described in
 // docs/migration/System-Administration-migration.md.
 //
-// The directory-search endpoint is backed by a stub (PTL.Core.User.StubStaffDirectoryService) -
-// see IStaffDirectoryService for why a real Active Directory/Entra ID integration isn't wired up yet.
+// The directory-search endpoint is backed by Microsoft Graph (PTL.Api.Infrastructure.GraphStaffDirectoryService,
+// credentials from the "Graph" configuration section).
 [ApiController]
 [Route("api/users")]
 public sealed class UserController(IUserService userService) : ControllerBase

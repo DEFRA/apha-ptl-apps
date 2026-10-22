@@ -328,8 +328,8 @@ public class SystemAdministrationController : Controller
 
     public IActionResult CreateUser() => View(new CreateUserViewModel());
 
-    // Matches legacy GetADList - searches the staff directory (stubbed - see
-    // IStaffDirectoryService) and shows "No valid search results found" whether nobody matched at
+    // Matches legacy GetADList - searches the staff directory (Microsoft Graph, via PTL.Api) and shows
+    // "No valid search results found" whether nobody matched at
     // all, or everybody who matched already has a PT-LIMS account (both collapse to an empty
     // result set, same as legacy).
     [HttpPost]
