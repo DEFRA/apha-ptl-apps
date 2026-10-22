@@ -1,4 +1,4 @@
-﻿using PTL.InternalWeb.Navigation;
+using PTL.InternalWeb.Navigation;
 
 namespace PTL.InternalWeb.Tests.Navigation;
 

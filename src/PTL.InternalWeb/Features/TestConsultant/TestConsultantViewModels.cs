@@ -57,7 +57,7 @@ public sealed class TestConsultantTabulationViewModel
     public List<string> AllSamples { get; set; } = [];
     public List<string> ShownSamples { get; set; } = [];
     public bool ShowMethodItems { get; set; } = true;
-    public bool IsFiltered { get; set; }
+    public bool? IsFiltered { get; set; }
 
     // Legacy ValidatorCommentsRequired / ValidatorCommentsRegEx.
     [Required(ErrorMessage = "Comments required.")]
@@ -65,7 +65,7 @@ public sealed class TestConsultantTabulationViewModel
     public string? Comments { get; set; }
 
     public TestConsultantTabulationFilter ToFilter() =>
-        IsFiltered
+        IsFiltered == true
             ? new TestConsultantTabulationFilter([.. AllSamples.Except(ShownSamples, StringComparer.Ordinal)], !ShowMethodItems)
             : TestConsultantTabulationFilter.None;
 
@@ -76,7 +76,7 @@ public sealed class TestConsultantTabulationViewModel
 
         MonthlyDistributionSchemeId = monthlyDistributionSchemeId;
         Tabulation = tabulation;
-        ShownSamples = IsFiltered
+        ShownSamples = IsFiltered == true
             ? [.. tabulation.SampleNumbers.Intersect(ShownSamples, StringComparer.Ordinal)]
             : [.. tabulation.SampleNumbers];
         AllSamples = [.. tabulation.SampleNumbers];

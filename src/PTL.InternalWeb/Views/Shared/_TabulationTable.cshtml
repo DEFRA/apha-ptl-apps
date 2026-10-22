@@ -21,10 +21,16 @@
         return kind is null ? "NilReturn" : kind + " NilReturn";
     }
 
-    object CellText(TabulationCellResponse cell) =>
-        string.IsNullOrEmpty(cell.Text)
-            ? cell.IsNilReturn ? new Microsoft.AspNetCore.Html.HtmlString("<span class=\"govuk-visually-hidden\">No result</span>") : nbsp
-            : cell.Text;
+    object CellText(TabulationCellResponse cell)
+    {
+        if (!string.IsNullOrEmpty(cell.Text))
+        {
+            return cell.Text;
+        }
+
+        // An empty nil-return cell is only grey on screen, so say so for assistive technology.
+        return cell.IsNilReturn ? new Microsoft.AspNetCore.Html.HtmlString("<span class=\"govuk-visually-hidden\">No result</span>") : nbsp;
+    }
 
     int? Span(int span) => span > 1 ? span : null;
 
@@ -77,8 +83,7 @@
     }
 }
 
-@* tabindex="0": a read-only table has nothing else to focus, so the scroll region itself must take focus for keyboard users to scroll it (WCAG 2.1.1). *@
-<section class="ptl-table-scroll ptl-tabulation-scroll" aria-label="@table.Caption" tabindex="0">
+<section class="ptl-table-scroll ptl-tabulation-scroll" aria-label="@table.Caption">
     <table class="TabulationTable">
         <caption class="govuk-visually-hidden">@table.Caption</caption>
         @if (headerRowCount > 0)

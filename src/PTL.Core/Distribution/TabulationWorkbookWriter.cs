@@ -65,38 +65,49 @@ public static class TabulationWorkbookWriter
                     column++;
                 }
 
-                var colSpan = Math.Max(1, cell.ColSpan);
-                var rowSpan = Math.Max(1, cell.RowSpan);
-                var text = cell.Text.Replace('\u00a0', ' ').Trim();
-
-                if (!cells.TryGetValue(row, out var rowCells))
-                {
-                    rowCells = [];
-                    cells[row] = rowCells;
-                }
-
-                rowCells[column] = text;
-
-                for (var r = 0; r < rowSpan; r++)
-                {
-                    for (var c = 0; c < colSpan; c++)
-                    {
-                        covered.Add((row + r, column + c));
-                    }
-                }
-
-                if (colSpan > 1 || rowSpan > 1)
-                {
-                    merges.Add($"{ColumnName(column)}{row}:{ColumnName(column + colSpan - 1)}{row + rowSpan - 1}");
-                }
-
-                column += colSpan;
+                column += PlaceCell(cell, row, column, cells, merges, covered);
             }
 
             row++;
         }
 
         return Math.Max(row - 1, covered.Count == 0 ? firstRow : covered.Max(c => c.Row));
+    }
+
+    // Writes one cell, marks the area it spans as taken and records its merge. Returns how many columns it spans.
+    private static int PlaceCell(
+        TabulationCellResponse cell,
+        int row,
+        int column,
+        SortedDictionary<int, SortedDictionary<int, string>> cells,
+        List<string> merges,
+        HashSet<(int Row, int Column)> covered)
+    {
+        var colSpan = Math.Max(1, cell.ColSpan);
+        var rowSpan = Math.Max(1, cell.RowSpan);
+
+        if (!cells.TryGetValue(row, out var rowCells))
+        {
+            rowCells = [];
+            cells[row] = rowCells;
+        }
+
+        rowCells[column] = cell.Text.Replace('\u00a0', ' ').Trim();
+
+        for (var r = 0; r < rowSpan; r++)
+        {
+            for (var c = 0; c < colSpan; c++)
+            {
+                covered.Add((row + r, column + c));
+            }
+        }
+
+        if (colSpan > 1 || rowSpan > 1)
+        {
+            merges.Add($"{ColumnName(column)}{row}:{ColumnName(column + colSpan - 1)}{row + rowSpan - 1}");
+        }
+
+        return colSpan;
     }
 
     private static SheetData BuildSheetData(SortedDictionary<int, SortedDictionary<int, string>> cells)

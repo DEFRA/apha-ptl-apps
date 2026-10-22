@@ -142,9 +142,16 @@ public static class TestConsultantTabulationBuilder
         }
 
         var author = source.TestConsultantCommentsAuthor.Trim();
-        var heading = !hasComments
-            ? "No comments were submitted before the deadline"
-            : author.Length == 0 ? "Comments:" : $"Comments provided by {author}:";
-        return new TestConsultantCommentsStateResponse(true, heading, html, hasComments);
+        return new TestConsultantCommentsStateResponse(true, SubmittedHeading(hasComments, author), html, hasComments);
+    }
+
+    private static string SubmittedHeading(bool hasComments, string author)
+    {
+        if (!hasComments)
+        {
+            return "No comments were submitted before the deadline";
+        }
+
+        return author.Length == 0 ? "Comments:" : $"Comments provided by {author}:";
     }
 }

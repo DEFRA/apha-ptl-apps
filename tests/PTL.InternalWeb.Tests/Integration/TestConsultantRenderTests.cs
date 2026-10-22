@@ -277,10 +277,11 @@ public class TestConsultantRenderTests : IClassFixture<WebApplicationFactory<Pro
         Assert.DoesNotContain("divTestConsultantSample", html, StringComparison.Ordinal);
     }
 
-    // A read-only table has nothing else to focus, so its scroll region takes focus; a heading over several columns heads
-    // the group; and a blank nil-return cell is announced rather than conveyed only by its grey background.
+    // Each table scrolls inside a labelled region (the browser makes a scroller keyboard-focusable itself, so no tabindex
+    // is put on the non-interactive wrapper); a heading over several columns heads the group; and a blank nil-return cell
+    // is announced rather than conveyed only by its grey background.
     [Fact]
-    public async Task Tabulation_TablesAreKeyboardScrollableWithGroupHeadingsAndAnnouncedNilReturns()
+    public async Task Tabulation_TablesScrollInALabelledRegionWithGroupHeadingsAndAnnouncedNilReturns()
     {
         var cells = new[]
         {
@@ -299,7 +300,8 @@ public class TestConsultantRenderTests : IClassFixture<WebApplicationFactory<Pro
 
         var html = MainContent(await GetAsync(TabulationUrl));
 
-        Assert.Contains("<section class=\"ptl-table-scroll ptl-tabulation-scroll\" aria-label=\"Brucella\" tabindex=\"0\">", html, StringComparison.Ordinal);
+        Assert.Contains("<section class=\"ptl-table-scroll ptl-tabulation-scroll\" aria-label=\"Brucella\">", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("tabindex", html, StringComparison.Ordinal);
         Assert.Contains("<th scope=\"colgroup\" class=\"TabulationHeader1\" colspan=\"2\">26/1</th>", html, StringComparison.Ordinal);
         Assert.Contains("<th scope=\"col\" class=\"TabulationHeader1\" rowspan=\"2\">Brucella</th>", html, StringComparison.Ordinal);
         Assert.Contains("<td class=\"TabulationCell NilReturn\"><span class=\"govuk-visually-hidden\">No result</span></td>", html, StringComparison.Ordinal);
