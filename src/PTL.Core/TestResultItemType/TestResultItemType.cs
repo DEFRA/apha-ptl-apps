@@ -1,3 +1,5 @@
+using PTL.Core.ReturnTypeItems;
+
 namespace PTL.Core.TestResultItemType;
 
 // tblTestResultItemType - year-versioned reference list consumed as an "Add Test Result Item"
@@ -7,7 +9,7 @@ namespace PTL.Core.TestResultItemType;
 // conceptual item" across years. Unlike Test Types, each item also carries a required Return Type
 // (tblTestReturnValueType) foreign key - see
 // docs/Parity-Analysis/11-InternalWeb-SchemeItemTypes-Parity-Analysis.md, Slice 4.
-public sealed class TestResultItemType
+public sealed class TestResultItemType : ISplitOnEditItem<TestResultItemType>
 {
     public Guid TestResultItemTypeId { get; set; }
 
@@ -31,4 +33,18 @@ public sealed class TestResultItemType
     public int ForeignInstances { get; set; }
 
     public string ForeignInstancesString { get; set; } = string.Empty;
+
+    public static TestResultItemType CreateSplit(Guid sharedId, string name, Guid testReturnValueTypeId, string testReturnValueTypeName, int startYearId, int endYearId, bool noLongerInUse) =>
+        new()
+        {
+            TestResultItemTypeId = Guid.NewGuid(),
+            SharedId = sharedId,
+            Name = name,
+            TestReturnValueTypeId = testReturnValueTypeId,
+            TestReturnValueTypeName = testReturnValueTypeName,
+            StartYearId = startYearId,
+            EndYearId = endYearId,
+            NoLongerInUse = noLongerInUse
+        };
 }
+

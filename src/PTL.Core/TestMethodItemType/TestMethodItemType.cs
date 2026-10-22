@@ -1,3 +1,5 @@
+using PTL.Core.ReturnTypeItems;
+
 namespace PTL.Core.TestMethodItemType;
 
 // tblTestMethodItemType - year-versioned reference list consumed as an "Add Test Method Item"
@@ -6,7 +8,7 @@ namespace PTL.Core.TestMethodItemType;
 // screen). Identical shape to TestResultItemType (Slice 4): SharedId propagated across
 // split-on-edit rows, a required Return Type (tblTestReturnValueType) foreign key - see
 // docs/Parity-Analysis/11-InternalWeb-SchemeItemTypes-Parity-Analysis.md, Slice 5.
-public sealed class TestMethodItemType
+public sealed class TestMethodItemType : ISplitOnEditItem<TestMethodItemType>
 {
     public Guid TestMethodItemTypeId { get; set; }
 
@@ -30,4 +32,18 @@ public sealed class TestMethodItemType
     public int ForeignInstances { get; set; }
 
     public string ForeignInstancesString { get; set; } = string.Empty;
+
+    public static TestMethodItemType CreateSplit(Guid sharedId, string name, Guid testReturnValueTypeId, string testReturnValueTypeName, int startYearId, int endYearId, bool noLongerInUse) =>
+        new()
+        {
+            TestMethodItemTypeId = Guid.NewGuid(),
+            SharedId = sharedId,
+            Name = name,
+            TestReturnValueTypeId = testReturnValueTypeId,
+            TestReturnValueTypeName = testReturnValueTypeName,
+            StartYearId = startYearId,
+            EndYearId = endYearId,
+            NoLongerInUse = noLongerInUse
+        };
 }
+

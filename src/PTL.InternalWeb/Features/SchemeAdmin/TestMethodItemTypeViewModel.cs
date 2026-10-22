@@ -1,68 +1,35 @@
 using System.ComponentModel.DataAnnotations;
-using System.Text.Json.Serialization;
-using Microsoft.AspNetCore.Mvc.Rendering;
 
 namespace PTL.InternalWeb.Features.SchemeAdmin;
 
-// Implements IReturnTypeItemListViewModel so the shared _ReturnTypeItemAdminList.cshtml partial
-// can render this and TestResultItemType from one copy instead of two near-identical ones. Entity-
-// bound HTML field name strings here must match SchemeAdminController exactly - see
-// IReturnTypeItemListViewModel's remarks.
-public sealed class TestMethodItemTypeViewModel : IReturnTypeItemListViewModel
+// See ReturnTypeItemListViewModelBase's remarks for why the shared rendering/field-name
+// boilerplate lives there rather than here.
+public sealed class TestMethodItemTypeViewModel()
+    : ReturnTypeItemListViewModelBase<TestMethodItemTypeRowViewModel>(new(
+        PageHeading: "Test Method Items",
+        PageDescription: "This page defines the Test Method Items (and their Return Types) that will be available for use when setting up next year's Schemes.",
+        ColumnHeaderLabel: "Test method item name",
+        EmptyMessage: "There are no Test Method Items to display.",
+        AddHeading: "Add a Test Method Item",
+        AddNameLabel: "New test method item name",
+        ActionName: "TestMethodItemType",
+        AddActionName: "TestMethodItemTypeAdd",
+        SaveActionName: "TestMethodItemTypeSave",
+        SaveAllNoLongerInUseActionName: "TestMethodItemTypeSaveAllNoLongerInUse",
+        RemoveActionName: "TestMethodItemTypeRemove",
+        EditFormId: "testMethodItemTypeEditForm",
+        EditIdFieldName: "Edit.TestMethodItemTypeId",
+        RemoveIdRouteParamName: "testMethodItemTypeId",
+        PageIdsFieldName: "pageTestMethodItemTypeIds",
+        CheckedIdsFieldName: "checkedTestMethodItemTypeIds"))
 {
-    public int SelectedYearId { get; set; }
-
-    public IEnumerable<SelectListItem> YearOptions { get; set; } = [];
-
-    // TextboxSearchMethodItemName - matches legacy TestMethodItemTypeList.aspx.vb's
-    // ButtonSearchByMethodItemName_Click (MaxLength 50).
-    public string? SearchText { get; set; }
-
-    public List<TestMethodItemTypeRowViewModel> Rows { get; set; } = [];
-
-    // Matches legacy GridViewTestMethodItemType.PageSize = 15 exactly - see §11.3.1 of the parity
-    // analysis.
-    public const int PageSize = 15;
-
-    public int Page { get; set; } = 1;
-
-    // Count of items for the selected year (after any search filter) before paging is applied -
-    // drives PaginationModel.
-    public int TotalRecords { get; set; }
-
-    public IEnumerable<SelectListItem> ReturnValueTypeOptions { get; set; } = [];
-
     // "Add a new test method item" section at the bottom of the page - matches legacy's
     // TextboxNewName/DropDownNewReturnValueType/NewCheckboxNoLongerInUse/ButtonAdd.
     public TestMethodItemTypeAddViewModel Add { get; set; } = new();
 
-    public string? Message { get; set; }
-
-    public bool MessageIsError { get; set; }
-
-    string IItemTypeListViewModel.PageHeading => "Test Method Items";
-    string IItemTypeListViewModel.PageDescription => "This page defines the Test Method Items (and their Return Types) that will be available for use when setting up next year's Schemes.";
-    string IItemTypeListViewModel.ColumnHeaderLabel => "Test method item name";
-    string IItemTypeListViewModel.EmptyMessage => "There are no Test Method Items to display.";
-    string IItemTypeListViewModel.AddHeading => "Add a Test Method Item";
-    string IItemTypeListViewModel.AddNameLabel => "New test method item name";
-    int IItemTypeListViewModel.EditNameMaxLength => 100;
-    int IItemTypeListViewModel.PageSize => PageSize;
-    string IItemTypeListViewModel.ActionName => "TestMethodItemType";
-    string IItemTypeListViewModel.AddActionName => "TestMethodItemTypeAdd";
-    string IItemTypeListViewModel.SaveActionName => "TestMethodItemTypeSave";
-    string IItemTypeListViewModel.SaveAllNoLongerInUseActionName => "TestMethodItemTypeSaveAllNoLongerInUse";
-    string IItemTypeListViewModel.RemoveActionName => "TestMethodItemTypeRemove";
-    string IItemTypeListViewModel.EditFormId => "testMethodItemTypeEditForm";
-    string IItemTypeListViewModel.EditIdFieldName => "Edit.TestMethodItemTypeId";
-    string IItemTypeListViewModel.RemoveIdRouteParamName => "testMethodItemTypeId";
-    string IItemTypeListViewModel.PageIdsFieldName => "pageTestMethodItemTypeIds";
-    string IItemTypeListViewModel.CheckedIdsFieldName => "checkedTestMethodItemTypeIds";
-    IReadOnlyList<IReturnTypeItemRowViewModel> IReturnTypeItemListViewModel.Rows => Rows;
-    IReadOnlyList<IItemTypeRowViewModel> IItemTypeListViewModel.Rows => Rows;
-    string IItemTypeListViewModel.AddName => Add.Name;
-    bool IItemTypeListViewModel.AddNoLongerInUse => Add.NoLongerInUse;
-    string? IReturnTypeItemListViewModel.AddTestReturnValueTypeId => Add.TestReturnValueTypeId?.ToString();
+    protected override string AddName => Add.Name;
+    protected override bool AddNoLongerInUse => Add.NoLongerInUse;
+    protected override string? AddTestReturnValueTypeIdValue => Add.TestReturnValueTypeId?.ToString();
 }
 
 public sealed class TestMethodItemTypeRowViewModel : IReturnTypeItemRowViewModel
@@ -95,25 +62,17 @@ public sealed class TestMethodItemTypeRowViewModel : IReturnTypeItemRowViewModel
 }
 
 // Posted by the single "Add" button at the bottom of the list - matches legacy ButtonAdd_Click.
-public sealed class TestMethodItemTypeAddViewModel
+public sealed class TestMethodItemTypeAddViewModel : ReturnTypeItemFormFieldsViewModelBase
 {
     [Required(ErrorMessage = "Enter a new test method item name")]
     [StringLength(100, ErrorMessage = "New test method item name must be 100 characters or fewer")]
     public string Name { get; set; } = string.Empty;
-
-    [Required(ErrorMessage = "Select a return type")]
-    public Guid? TestReturnValueTypeId { get; set; }
-
-    // Never JSON-bound here (classic MVC form post) - [JsonRequired] only satisfies the
-    // under-posting analyzer; an unticked checkbox omitting the field still binds to false.
-    [JsonRequired]
-    public bool NoLongerInUse { get; set; }
 }
 
 // Posted by the row-level "Save" link against whichever row is in edit mode - matches legacy
 // GridViewTestMethodItemType_RowUpdating. Bound with an "Edit" prefix so its ModelState errors
 // never bleed into the separate "Add" form on the same page.
-public sealed class TestMethodItemTypeEditViewModel
+public sealed class TestMethodItemTypeEditViewModel : ReturnTypeItemFormFieldsViewModelBase
 {
     [Required]
     public Guid? TestMethodItemTypeId { get; set; }
@@ -121,10 +80,4 @@ public sealed class TestMethodItemTypeEditViewModel
     [Required(ErrorMessage = "Enter a new test method item name")]
     [StringLength(100, ErrorMessage = "New test method item name must be 100 characters or fewer")]
     public string Name { get; set; } = string.Empty;
-
-    [Required(ErrorMessage = "Select a return type")]
-    public Guid? TestReturnValueTypeId { get; set; }
-
-    [JsonRequired]
-    public bool NoLongerInUse { get; set; }
 }
