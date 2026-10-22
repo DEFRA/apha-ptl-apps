@@ -293,6 +293,21 @@ public class EntraCookieEventsTests
         Assert.Equal("Admin", identity.FindFirst("resolvedRoles")!.Value);
     }
 
+    [Fact]
+    public async Task ValidatePrincipal_RoleRevalidationDue_AllowedWithNoClaims_LeavesExistingClaimsUnchanged()
+    {
+        var identity = new ClaimsIdentity([new Claim("resolvedRoles", "Admin")]);
+        var principal = new ClaimsPrincipal(identity);
+        var resolver = new FakeEntraInternalUserResolver(EntraInternalUserResolution.Allow());
+        var context = CreateContext(principal, new AuthenticationProperties(), resolver, out _);
+
+        await CreateEvents(new FakeTokenRefreshService(TokenRefreshResult.Failed)).ValidatePrincipal(context);
+
+        Assert.Equal(1, resolver.CallCount);
+        Assert.False(context.ShouldRenew);
+        Assert.Equal("Admin", identity.FindFirst("resolvedRoles")!.Value);
+    }
+
     private sealed class FakeTimeProvider(DateTimeOffset now) : TimeProvider
     {
         public override DateTimeOffset GetUtcNow() => now;

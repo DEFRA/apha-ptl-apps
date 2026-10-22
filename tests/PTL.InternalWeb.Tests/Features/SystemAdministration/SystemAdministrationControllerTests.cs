@@ -1151,6 +1151,26 @@ public class SystemAdministrationControllerTests
     }
 
     [Fact]
+    public async Task ExternalTestConsultantManagementSave_ApiUpdateFails_RedisplaysRowInEditModeWithPrefixedError()
+    {
+        var consultantId = Guid.NewGuid();
+        var apiClient = new FakeExternalTestConsultantApiClient
+        {
+            TestConsultants = [new ExternalTestConsultantResponse(consultantId, "Jane Smith", "Science", "jane@example.com", false, null, false)],
+            SaveResult = new ExternalTestConsultantSaveResult(false, null, new Dictionary<string, string[]> { ["Email"] = ["Enter an email address"] })
+        };
+        var controller = CreateController(externalTestConsultantApiClient: apiClient);
+        var model = new ExternalTestConsultantEditViewModel { ExternalTestConsultantId = consultantId, Name = "Jane Smith", Department = "Science", Email = string.Empty };
+
+        var result = await controller.ExternalTestConsultantManagementSave(model, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var resultModel = Assert.IsType<ExternalTestConsultantManagementViewModel>(view.Model);
+        Assert.True(resultModel.Rows.Single(r => r.ExternalTestConsultantId == consultantId).IsEditing);
+        Assert.True(controller.ModelState.ContainsKey("Edit.Email"));
+    }
+
+    [Fact]
     public async Task ExternalTestConsultantManagementToggleStatus_FromActive_TogglesToInactive()
     {
         var consultantId = Guid.NewGuid();
@@ -1301,6 +1321,26 @@ public class SystemAdministrationControllerTests
         Assert.IsType<RedirectToActionResult>(result);
         var call = Assert.Single(apiClient.UpdateCalls);
         Assert.Equal(viewerId, call.ViewerId);
+    }
+
+    [Fact]
+    public async Task ViewerManagementSave_ApiUpdateFails_RedisplaysRowInEditModeWithPrefixedError()
+    {
+        var viewerId = Guid.NewGuid();
+        var apiClient = new FakeViewerApiClient
+        {
+            Viewers = [new ViewerResponse(viewerId, "Jane Smith", "jane@example.com", false, [], [])],
+            SaveResult = new ViewerSaveResult(false, null, new Dictionary<string, string[]> { ["Email"] = ["Enter an email address"] })
+        };
+        var controller = CreateController(viewerApiClient: apiClient);
+        var model = new ViewerEditViewModel { ViewerId = viewerId, Name = "Jane Smith", Email = string.Empty };
+
+        var result = await controller.ViewerManagementSave(model, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var resultModel = Assert.IsType<ViewerManagementViewModel>(view.Model);
+        Assert.True(resultModel.Rows.Single(r => r.ViewerId == viewerId).IsEditing);
+        Assert.True(controller.ModelState.ContainsKey("Edit.Email"));
     }
 
     [Fact]
