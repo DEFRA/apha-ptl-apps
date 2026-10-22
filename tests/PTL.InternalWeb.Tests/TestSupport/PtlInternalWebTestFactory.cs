@@ -93,7 +93,7 @@ public sealed class PtlInternalWebTestFactory : WebApplicationFactory<Program>
 
                     var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
                     var properties = new AuthenticationProperties();
-                    
+
                     // Marks the roles as just re-validated so EntraCookieEvents doesn't call the (unavailable) resolver and reject this cookie.
                     properties.StoreTokens(
                     [
