@@ -97,14 +97,15 @@ public class ExportTemplateServiceTests
     [InlineData("template")]
     [InlineData("bad-name.docx")]
     [InlineData(" leading.docx")]
-    public async Task UploadAsync_RejectsAnythingThatIsNotADocOrDocx(string fileName)
+    [InlineData("Legacy.doc")]
+    public async Task UploadAsync_RejectsAnythingThatIsNotADocx(string fileName)
     {
         var (service, repository, _) = CreateService();
 
         var result = await service.UploadAsync(ExportDocumentTypes.Contracts, fileName, [1]);
 
         Assert.False(result.Success);
-        Assert.Equal("The file does not have a .Doc or .Docx extension", result.ErrorMessage);
+        Assert.Equal("The file does not have a .Docx extension", result.ErrorMessage);
         Assert.Empty(repository.Templates);
     }
 
