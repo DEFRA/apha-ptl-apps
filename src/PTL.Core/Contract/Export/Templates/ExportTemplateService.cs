@@ -36,7 +36,11 @@ public sealed partial class ExportTemplateService(
     // Legacy ExportBase error text - reused verbatim.
     private const string FileNotFound = "File not found";
     private const string FileTooLarge = "Maximum file size is 4MB";
-    private const string WrongExtension = "The file does not have a .Doc or .Docx extension";
+    // Legacy accepted .Doc too (Aspose.Words could merge real binary .doc templates); the OpenXML-
+    // based merge engine (TemplateMergeService) can only read .Docx, so a selected .Doc template
+    // would fail every export with "There was a problem with the Mail Merge" - .Doc is no longer
+    // accepted here so that failure state can never be reached via upload.
+    private const string WrongExtension = "The file does not have a .Docx extension";
     private const string DuplicateName = "A file with this name already exists";
     private const string SaveFailed = "File could not be saved";
 
@@ -229,6 +233,6 @@ public sealed partial class ExportTemplateService(
         _ => documentType.Trim('/').ToLowerInvariant()
     };
 
-    [GeneratedRegex(@"^\w[\w\s]*\.(doc|docx)$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    [GeneratedRegex(@"^\w[\w\s]*\.docx$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex TemplateFileNamePattern();
 }

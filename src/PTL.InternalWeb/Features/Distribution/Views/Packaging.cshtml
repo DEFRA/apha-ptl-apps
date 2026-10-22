@@ -165,10 +165,6 @@
     <link rel="stylesheet" href="~/css/printable-scheme.css" />
 }
 
-@section BackLink {
-    <a class="govuk-back-link noprint" asp-action="Index" asp-route-year="@Model.YearId">Back</a>
-}
-
 @if (Model.HasSelectionError)
 {
     <div class="govuk-error-summary noprint" data-module="govuk-error-summary">

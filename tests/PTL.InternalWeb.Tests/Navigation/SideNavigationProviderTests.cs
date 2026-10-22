@@ -54,6 +54,17 @@ public class SideNavigationProviderTests
     }
 
     [Fact]
+    public void Build_Distributions_ListsSearchAsAnEnabledLiveNode()
+    {
+        var search = SideNavigationProvider.FindNode(SideNavigationProvider.Build(), "Distribution", "Search");
+
+        Assert.NotNull(search);
+        Assert.Equal("Search", search!.Text);
+        Assert.True(search.IsEnabled);
+        Assert.False(search.IsHidden);
+    }
+
+    [Fact]
     public void FindNode_ExistingNode_ReturnsMatch()
     {
         var tree = SideNavigationProvider.Build();
@@ -110,6 +121,7 @@ public class SideNavigationProviderTests
     [InlineData("ResultsReceipt", "Results Receipt")]
     [InlineData("ActualResults", "Results")]
     [InlineData("SampleReceipt", "Submission Status")]
+    [InlineData("Search", "Search")]
     public void FindPath_DistributionScreens_ReturnsFullAncestorChain(string actionName, string expectedText)
     {
         var tree = SideNavigationProvider.Build();

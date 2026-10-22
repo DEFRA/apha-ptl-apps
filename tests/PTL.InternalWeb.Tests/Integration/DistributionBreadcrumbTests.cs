@@ -31,9 +31,7 @@ public class DistributionBreadcrumbTests : IClassFixture<WebApplicationFactory<P
 
     private async Task<List<(string Text, string? Href)>> CrumbsAsync(string url)
     {
-        var response = await _factory.CreateClient().GetAsync(url);
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var html = await response.Content.ReadAsStringAsync();
+        var html = await HtmlAsync(url);
 
         var nav = Regex.Match(html, "<nav class=\"govuk-breadcrumbs\".*?</nav>", RegexOptions.Singleline).Value;
         Assert.NotEmpty(nav);
@@ -43,6 +41,13 @@ public class DistributionBreadcrumbTests : IClassFixture<WebApplicationFactory<P
             .Select(inner => (
                 Text: WebUtility.HtmlDecode(Regex.Replace(inner, "<[^>]+>", string.Empty)).Trim(),
                 Href: Regex.Match(inner, "href=\"([^\"]+)\"") is { Success: true } href ? WebUtility.HtmlDecode(href.Groups[1].Value) : null))];
+    }
+
+    private async Task<string> HtmlAsync(string url)
+    {
+        var response = await _factory.CreateClient().GetAsync(url);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        return await response.Content.ReadAsStringAsync();
     }
 
     [Fact]
@@ -106,6 +111,48 @@ public class DistributionBreadcrumbTests : IClassFixture<WebApplicationFactory<P
 
         Assert.Equal(["Home", "Distributions", "Sample Packaging"], crumbs.Select(c => c.Text));
         Assert.Contains("year=2026", crumbs[1].Href, StringComparison.Ordinal);
+    }
+
+    // Search has no year/month context at all (legacy Distributions/Search.aspx), so the
+    // Distributions ancestor crumb must still be a working link, just without a year carried onto
+    // it - the Dashboard defaults its own year when none is supplied.
+    [Fact]
+    public async Task Search_ShowsHomeDistributionsSearch_WithDistributionsStillLinkedButWithNoYear()
+    {
+        var crumbs = await CrumbsAsync("/Distribution/Search");
+
+        Assert.Equal(["Home", "Distributions", "Search"], crumbs.Select(c => c.Text));
+        Assert.NotNull(crumbs[1].Href);
+        Assert.DoesNotContain("year", crumbs[1].Href, StringComparison.Ordinal);
+        Assert.Null(crumbs[2].Href);
+    }
+
+    [Fact]
+    public async Task Preparation_HasNoBackLinkBecauseTheBreadcrumbsLeadBack()
+    {
+        _apiClient.Preparation = new PreparationSheetResponse(Guid.NewGuid(), 2026, 5, []);
+
+        var html = await HtmlAsync("/Distribution/Preparation?year=2026&monthId=5");
+
+        Assert.DoesNotContain("govuk-back-link", html, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Packaging_HasNoBackLinkBecauseTheBreadcrumbsLeadBack()
+    {
+        var html = await HtmlAsync("/Distribution/Packaging?year=2026&monthId=5");
+
+        Assert.DoesNotContain("govuk-back-link", html, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ResultsReceipt_HasNoBackLinkBecauseTheBreadcrumbsLeadBack()
+    {
+        _apiClient.ResultsReceipt = new ResultsReceiptResponse(Guid.NewGuid(), 2026, 5, []);
+
+        var html = await HtmlAsync("/Distribution/ResultsReceipt?year=2026&monthId=5");
+
+        Assert.DoesNotContain("govuk-back-link", html, StringComparison.Ordinal);
     }
 
     [Fact]

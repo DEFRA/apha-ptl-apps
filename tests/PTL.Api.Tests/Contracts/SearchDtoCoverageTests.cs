@@ -76,4 +76,57 @@ public class SearchDtoCoverageTests
         Assert.Equal("Lab One", response.LabName);
         Assert.Equal("Bob", response.ContactName);
     }
+
+    [Fact]
+    public void DistributionNumberSearchCriteriaRequest_ExposesTheProperty_AndDefaultsToNoFilter()
+    {
+        var request = new DistributionNumberSearchCriteriaRequest("D1a");
+
+        Assert.Equal("D1a", request.DistributionNumber);
+        Assert.Null(new DistributionNumberSearchCriteriaRequest().DistributionNumber);
+    }
+
+    [Fact]
+    public void DistributionNumberSearchResultResponse_ExposesEveryProperty()
+    {
+        var monthlyDistributionSchemeId = Guid.NewGuid();
+        var schemeId = Guid.NewGuid();
+
+        var response = new DistributionNumberSearchResultResponse(monthlyDistributionSchemeId, schemeId, "D1a/00001", "D1a/S1 BT", "D1a", "2026", "May");
+
+        Assert.Equal(monthlyDistributionSchemeId, response.MonthlyDistributionSchemeId);
+        Assert.Equal(schemeId, response.SchemeId);
+        Assert.Equal("D1a/00001", response.DistributionNumber);
+        Assert.Equal("D1a/S1 BT", response.SchemeName);
+        Assert.Equal("D1a", response.SchemeIdentifier);
+        Assert.Equal("2026", response.Year);
+        Assert.Equal("May", response.Month);
+    }
+
+    [Fact]
+    public void SampleNumberSearchCriteriaRequest_ExposesTheProperty_AndDefaultsToNoFilter()
+    {
+        var request = new SampleNumberSearchCriteriaRequest("S00001");
+
+        Assert.Equal("S00001", request.SampleNumber);
+        Assert.Null(new SampleNumberSearchCriteriaRequest().SampleNumber);
+    }
+
+    [Fact]
+    public void SampleNumberSearchResultResponse_ExposesEveryProperty()
+    {
+        var sampleId = Guid.NewGuid();
+        var schemeId = Guid.NewGuid();
+
+        var response = new SampleNumberSearchResultResponse(sampleId, schemeId, "S00001", "D1a/S1 BT", "D1a", "D1a/00001", "2026", "May");
+
+        Assert.Equal(sampleId, response.SampleId);
+        Assert.Equal(schemeId, response.SchemeId);
+        Assert.Equal("S00001", response.SampleNumber);
+        Assert.Equal("D1a/S1 BT", response.SchemeName);
+        Assert.Equal("D1a", response.SchemeIdentifier);
+        Assert.Equal("D1a/00001", response.DistributionNumber);
+        Assert.Equal("2026", response.Year);
+        Assert.Equal("May", response.Month);
+    }
 }

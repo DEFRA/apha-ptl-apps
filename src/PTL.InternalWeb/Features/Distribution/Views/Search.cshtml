@@ -1,0 +1,179 @@
+@model PTL.InternalWeb.Features.Distribution.DistributionSearchViewModel
+@using PTL.InternalWeb.Features.Distribution
+@using PTL.SharedUI.Pagination
+@{
+    ViewData["Title"] = "Search";
+
+    var distributionNumberActive = Model.ActiveTab == DistributionSearchTab.DistributionNumber;
+    var sampleNumberActive = Model.ActiveTab == DistributionSearchTab.SampleNumber;
+
+    string? FirstError(string key) =>
+        ViewData.ModelState.TryGetValue(key, out var entry) ? entry.Errors.FirstOrDefault()?.ErrorMessage : null;
+
+    var distributionNumberError = FirstError("DistributionNumber.DistributionNumber");
+    var sampleNumberError = FirstError("SampleNumber.SampleNumber");
+
+    // Same top-to-bottom order as the fields so the summary links follow the page layout.
+    string[] fieldOrder = ["DistributionNumber.DistributionNumber", "SampleNumber.SampleNumber"];
+    var errors = ViewData.ModelState
+        .Where(entry => entry.Value?.Errors.Count > 0)
+        .SelectMany(entry => entry.Value!.Errors.Select(error => (Field: entry.Key, Message: error.ErrorMessage)))
+        .OrderBy(error => Array.IndexOf(fieldOrder, error.Field))
+        .ToList();
+
+    var samplePagination = new PaginationModel
+    {
+        CurrentPage = Model.SampleNumberPage,
+        PageSize = DistributionSearchViewModel.SampleNumberPageSize,
+        TotalRecords = Model.SampleNumberTotalCount,
+        Action = nameof(DistributionController.Search),
+        RouteValues = new Dictionary<string, object?>
+        {
+            ["tab"] = DistributionSearchTab.SampleNumber,
+            ["SampleNumber.SampleNumber"] = Model.SampleNumber.SampleNumber,
+        },
+    };
+}
+
+<govuk-error-summary errors="@errors" />
+
+<h1 class="govuk-heading-l">Search</h1>
+
+<p class="govuk-body">This page can be used to search for Schemes.</p>
+
+@* govuk-tabs works without JavaScript (panels stack, each with its own form). With JavaScript the
+   component selects the tab named by the URL fragment, so each form's action carries its panel id
+   as a fragment and the searched tab is re-selected when the results page loads. *@
+<div class="govuk-tabs" data-module="govuk-tabs">
+    <h2 class="govuk-tabs__title">Contents</h2>
+    <ul class="govuk-tabs__list">
+        <li class="govuk-tabs__list-item @(distributionNumberActive ? "govuk-tabs__list-item--selected" : null)">
+            <a class="govuk-tabs__tab" href="#distribution-number">Distribution Number</a>
+        </li>
+        <li class="govuk-tabs__list-item @(sampleNumberActive ? "govuk-tabs__list-item--selected" : null)">
+            <a class="govuk-tabs__tab" href="#sample-number">Sample Number</a>
+        </li>
+    </ul>
+
+    <div class="govuk-tabs__panel @(distributionNumberActive ? null : "govuk-tabs__panel--hidden")" id="distribution-number">
+        <p class="govuk-body">Use the search box below to identify the required Scheme by Distribution Number.</p>
+
+        <form method="get" asp-action="Search" asp-fragment="distribution-number">
+            <input type="hidden" name="tab" value="DistributionNumber" />
+
+            <div class="govuk-form-group @(distributionNumberError is null ? null : "govuk-form-group--error")">
+                <label class="govuk-label" for="DistributionNumber_DistributionNumber">Distribution Number</label>
+                @if (distributionNumberError is not null)
+                {
+                    <p id="DistributionNumber_DistributionNumber-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @distributionNumberError</p>
+                }
+                <input asp-for="DistributionNumber.DistributionNumber" id="DistributionNumber_DistributionNumber"
+                       class="govuk-input govuk-input--width-10 @(distributionNumberError is null ? null : "govuk-input--error")"
+                       maxlength="50" aria-describedby="@(distributionNumberError is null ? null : "DistributionNumber_DistributionNumber-error")" />
+            </div>
+
+            <button class="govuk-button" data-module="govuk-button" type="submit">Search</button>
+        </form>
+
+        @if (Model.DistributionNumberResults is not null)
+        {
+            <hr class="govuk-section-break govuk-section-break--m govuk-section-break--visible">
+            <h2 class="govuk-heading-m">Search Results:</h2>
+
+            @if (Model.DistributionNumberResults.Count == 0)
+            {
+                <p class="govuk-body">There are no Results to Display</p>
+            }
+            else
+            {
+                <table class="govuk-table">
+                    <caption class="govuk-table__caption govuk-visually-hidden">Distribution Number search results</caption>
+                    <thead class="govuk-table__head">
+                        <tr class="govuk-table__row">
+                            <th scope="col" class="govuk-table__header">Distribution Number</th>
+                            <th scope="col" class="govuk-table__header">Scheme Name</th>
+                            <th scope="col" class="govuk-table__header">Scheme Identifier</th>
+                            <th scope="col" class="govuk-table__header">Year</th>
+                            <th scope="col" class="govuk-table__header">Month</th>
+                        </tr>
+                    </thead>
+                    <tbody class="govuk-table__body">
+                        @foreach (var row in Model.DistributionNumberResults)
+                        {
+                            <tr class="govuk-table__row">
+                                <td class="govuk-table__cell">@row.DistributionNumber</td>
+                                <td class="govuk-table__cell">@row.SchemeName</td>
+                                <td class="govuk-table__cell">@row.SchemeIdentifier</td>
+                                <td class="govuk-table__cell">@row.Year</td>
+                                <td class="govuk-table__cell">@row.Month</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+        }
+    </div>
+
+    <div class="govuk-tabs__panel @(sampleNumberActive ? null : "govuk-tabs__panel--hidden")" id="sample-number">
+        <p class="govuk-body">Use the search box below to identify the required Scheme by Sample Number.</p>
+
+        <form method="get" asp-action="Search" asp-fragment="sample-number">
+            <input type="hidden" name="tab" value="SampleNumber" />
+
+            <div class="govuk-form-group @(sampleNumberError is null ? null : "govuk-form-group--error")">
+                <label class="govuk-label" for="SampleNumber_SampleNumber">Sample Number</label>
+                @if (sampleNumberError is not null)
+                {
+                    <p id="SampleNumber_SampleNumber-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @sampleNumberError</p>
+                }
+                <input asp-for="SampleNumber.SampleNumber" id="SampleNumber_SampleNumber"
+                       class="govuk-input govuk-input--width-10 @(sampleNumberError is null ? null : "govuk-input--error")"
+                       maxlength="50" aria-describedby="@(sampleNumberError is null ? null : "SampleNumber_SampleNumber-error")" />
+            </div>
+
+            <button class="govuk-button" data-module="govuk-button" type="submit">Search</button>
+        </form>
+
+        @if (Model.SampleNumberResults is not null)
+        {
+            <hr class="govuk-section-break govuk-section-break--m govuk-section-break--visible">
+            <h2 class="govuk-heading-m">Search Results:</h2>
+
+            @if (Model.SampleNumberResults.Count == 0)
+            {
+                <p class="govuk-body">There are no Results to Display</p>
+            }
+            else
+            {
+                <table class="govuk-table">
+                    <caption class="govuk-table__caption govuk-visually-hidden">Sample Number search results</caption>
+                    <thead class="govuk-table__head">
+                        <tr class="govuk-table__row">
+                            <th scope="col" class="govuk-table__header">Sample Number</th>
+                            <th scope="col" class="govuk-table__header">Scheme Name</th>
+                            <th scope="col" class="govuk-table__header">Scheme Identifier</th>
+                            <th scope="col" class="govuk-table__header">Distribution Number</th>
+                            <th scope="col" class="govuk-table__header">Year</th>
+                            <th scope="col" class="govuk-table__header">Month</th>
+                        </tr>
+                    </thead>
+                    <tbody class="govuk-table__body">
+                        @foreach (var row in Model.SampleNumberResults)
+                        {
+                            <tr class="govuk-table__row">
+                                <td class="govuk-table__cell">@row.SampleNumber</td>
+                                <td class="govuk-table__cell">@row.SchemeName</td>
+                                <td class="govuk-table__cell">@row.SchemeIdentifier</td>
+                                <td class="govuk-table__cell">@row.DistributionNumber</td>
+                                <td class="govuk-table__cell">@row.Year</td>
+                                <td class="govuk-table__cell">@row.Month</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+
+                <govuk-pagination model="samplePagination" />
+            }
+        }
+    </div>
+</div>

@@ -79,6 +79,18 @@
                     }
                 }
 
+                // Carried onto the link when present, but never disables it when absent - the
+                // target action defaults the value itself (e.g. Distributions/Index's year).
+                foreach (var key in node.OptionalLinkQueryKeys)
+                {
+                    var value = ViewContext.HttpContext.Request.Query[key].FirstOrDefault()
+                        ?? ViewContext.RouteData.Values[key]?.ToString();
+                    if (!string.IsNullOrEmpty(value))
+                    {
+                        routeData[key] = value;
+                    }
+                }
+
                 <li class="govuk-breadcrumbs__list-item">
                     @if (isLast || isUnresolvedLink)
                     {

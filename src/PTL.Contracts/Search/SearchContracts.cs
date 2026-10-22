@@ -32,3 +32,30 @@ public sealed record ParticipantSearchResultResponse(
     string OldLabCode,
     string LabName,
     string ContactName);
+
+// Legacy Distributions/Search.aspx - Distribution Number tab (dbo.spgSearchSchemeByDistribution).
+// An empty/omitted value does not filter - legacy returns every distribution in that case.
+public sealed record DistributionNumberSearchCriteriaRequest(string? DistributionNumber = null);
+
+public sealed record DistributionNumberSearchResultResponse(
+    Guid MonthlyDistributionSchemeId,
+    Guid SchemeId,
+    string DistributionNumber,
+    string SchemeName,
+    string SchemeIdentifier,
+    string Year,
+    string Month);
+
+// Legacy Distributions/Search.aspx - Sample Number tab (dbo.spgSearchSchemeBySampleNumber).
+// Sample Number is mandatory in the UI ("A Sample Number must be supplied."), enforced client-side.
+public sealed record SampleNumberSearchCriteriaRequest(string? SampleNumber = null);
+
+public sealed record SampleNumberSearchResultResponse(
+    Guid SampleId,
+    Guid SchemeId,
+    string SampleNumber,
+    string SchemeName,
+    string SchemeIdentifier,
+    string DistributionNumber,
+    string Year,
+    string Month);

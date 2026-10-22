@@ -30,4 +30,9 @@ public sealed class SideNavigationItem
     // Request values (query string or route) copied onto this node's breadcrumb link - e.g. a
     // Distribution month page needs year and monthId. If any is absent the crumb renders as plain text.
     public IReadOnlyList<string> LinkQueryKeys { get; init; } = [];
+
+    // Like LinkQueryKeys, but for a node whose own action tolerates the value being absent (e.g.
+    // Distributions/Index defaults its year when none is supplied) - carried onto the link when
+    // present, simply omitted rather than disabling the whole link when absent.
+    public IReadOnlyList<string> OptionalLinkQueryKeys { get; init; } = [];
 }

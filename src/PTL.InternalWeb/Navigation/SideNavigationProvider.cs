@@ -211,7 +211,7 @@ public static class SideNavigationProvider
                         }
                     ]
                 },
-                new SideNavigationItem { Text = "Search", ControllerName = SearchControllerName, ActionName = IndexAction },
+                new SideNavigationItem { Text = SearchControllerName, ControllerName = SearchControllerName, ActionName = IndexAction },
                 new SideNavigationItem
                 {
                     Text = "Group Addresses",
@@ -300,7 +300,7 @@ public static class SideNavigationProvider
             RequiredPolicy = PtlPolicies.Distributions,
             ControllerName = DistributionControllerName,
             ActionName = IndexAction,
-            LinkQueryKeys = YearKey,
+            OptionalLinkQueryKeys = YearKey,
             Children =
             [
                 // Legacy sitemap siblings of MenuDistributions.aspx - not implemented yet (only
@@ -309,7 +309,7 @@ public static class SideNavigationProvider
                 // migrated.
                 Disabled("Participant Address Labels"),
                 Disabled("Group Address Labels"),
-                Disabled("Search"),
+                new SideNavigationItem { Text = SearchControllerName, ControllerName = DistributionControllerName, ActionName = SearchControllerName },
                 new SideNavigationItem
                 {
                     Text = "Monthly Distributions",
