@@ -536,6 +536,78 @@ public partial class SystemAdministrationRouteSmokeTests : IClassFixture<WebAppl
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Contains("Jane Smith : m100001", body, StringComparison.Ordinal);
         Assert.Contains("CreateUserConfirm", body, StringComparison.Ordinal);
+        // The confirm form's hidden copy of the search term must not duplicate the search box's id.
+        Assert.Single(System.Text.RegularExpressions.Regex.Matches(body, "id=\"SearchTerm\""));
+        Assert.Contains("id=\"SearchTermForCreate\"", body, StringComparison.Ordinal);
+        Assert.Contains("<option value=\"m100001\">", body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task CreateUserSearch_Post_DirectoryFails_RendersProblemInErrorSummary()
+    {
+        var factory = _factory.WithWebHostBuilder(builder =>
+            builder.ConfigureServices(services =>
+            {
+                services.RemoveAll<IUserApiClient>();
+                services.AddSingleton<IUserApiClient>(new FakeUserApiClient { SearchException = new HttpRequestException("Graph unavailable") });
+            }));
+        var client = factory.CreateClient();
+        var (token, cookie) = await GetAntiforgeryAsync(client, "/SystemAdministration/CreateUser");
+
+        var request = new HttpRequestMessage(HttpMethod.Post, "/SystemAdministration/CreateUserSearch")
+        {
+            Content = new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["__RequestVerificationToken"] = token,
+                ["SearchTerm"] = "jane"
+            })
+        };
+        request.Headers.Add("Cookie", cookie);
+
+        var response = await client.SendAsync(request);
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("govuk-error-summary", body, StringComparison.Ordinal);
+        Assert.Contains("problem searching the staff directory", body, StringComparison.Ordinal);
+        Assert.Contains("<title>Error:", body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task CreateUserConfirm_Post_Success_OffersCreateAnotherAndSetUpRoles()
+    {
+        var factory = _factory.WithWebHostBuilder(builder =>
+            builder.ConfigureServices(services =>
+            {
+                services.RemoveAll<IUserApiClient>();
+                services.AddSingleton<IUserApiClient>(new FakeUserApiClient
+                {
+                    SearchResults = [new StaffDirectoryUserResponse("m100001", "jane@apha.gov.uk", "Jane Smith", "Jane", "Smith")]
+                });
+            }));
+        var client = factory.CreateClient();
+        var (token, cookie) = await GetAntiforgeryAsync(client, "/SystemAdministration/CreateUser");
+
+        var request = new HttpRequestMessage(HttpMethod.Post, "/SystemAdministration/CreateUserConfirm")
+        {
+            Content = new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["__RequestVerificationToken"] = token,
+                ["SearchTerm"] = "jane",
+                ["SelectedCandidate"] = "m100001",
+                ["Department"] = "Science"
+            })
+        };
+        request.Headers.Add("Cookie", cookie);
+
+        var response = await client.SendAsync(request);
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("User added successfully", body, StringComparison.Ordinal);
+        Assert.Contains("Create another user", body, StringComparison.Ordinal);
+        Assert.Contains("/SystemAdministration/ManageUserRoles", body, StringComparison.Ordinal);
+        Assert.Contains("Set up roles", body, StringComparison.Ordinal);
     }
 
     [Fact]

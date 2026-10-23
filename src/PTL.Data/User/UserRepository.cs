@@ -1,4 +1,5 @@
 using Dapper;
+using Microsoft.Data.SqlClient;
 using PTL.Core.Audit;
 using PTL.Core.User;
 using PTL.Data.Audit;
@@ -11,6 +12,10 @@ namespace PTL.Data.User;
 // Dapper-based access path to tblUsers.
 public sealed class UserRepository(IDbConnectionFactory connectionFactory) : IUserRepository
 {
+    // SQL Server error numbers for a unique index / unique constraint violation.
+    private const int DuplicateKeyIndexError = 2601;
+    private const int DuplicateKeyConstraintError = 2627;
+
     public async Task<IReadOnlyList<CoreUser>> GetAllAsync(CancellationToken cancellationToken = default)
     {
         using var connection = connectionFactory.CreateConnection();
@@ -57,6 +62,13 @@ public sealed class UserRepository(IDbConnectionFactory connectionFactory) : IUs
             await AuditTrailWriter.WriteAsync(connection, transaction, auditEntry, cancellationToken);
 
             transaction.Commit();
+        }
+        catch (SqlException ex) when (ex.Number is DuplicateKeyIndexError or DuplicateKeyConstraintError)
+        {
+            // Two admins creating the same account at once both pass the service's duplicate check;
+            // IX_tblUsers_fldUsername (script 0011) makes the second insert fail here instead.
+            transaction.Rollback();
+            throw new UserValidationException([new UserValidationError(string.Empty, UserValidator.DuplicateMessage)], ex);
         }
         catch
         {
