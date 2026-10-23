@@ -419,6 +419,22 @@ span.app-side-navigation__link--disabled {
   padding-right: 10px;
 }
 
+/* Session timeout warning (_SessionTimeoutWarning.cshtml) is deliberately rendered near the end of
+   <body> so its hidden markup never shifts any page's own first-heading/content assertions - this
+   repositions it visually to the centre of the viewport once JS removes the "hidden" attribute,
+   with a dimmed backdrop so it reads as prominent/urgent rather than appearing at the page bottom. */
+.ptl-session-timeout-warning:not([hidden]) {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 1000;
+  width: 90%;
+  max-width: 500px;
+  margin: 0;
+  box-shadow: 0 0 0 100vmax rgba(11, 12, 12, 0.6);
+}
+
 .ptl-pending-order-table .ptl-pending-order-month {
   text-align: center;
   padding-left: 4px;

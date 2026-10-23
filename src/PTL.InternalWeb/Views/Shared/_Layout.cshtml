@@ -1,8 +1,13 @@
 @{
     var currentController = (ViewContext.RouteData.Values["controller"]?.ToString() ?? string.Empty).Trim();
     var currentAction = (ViewContext.RouteData.Values["action"]?.ToString() ?? string.Empty).Trim();
-    var isLoginPage = string.Equals(currentController, "Account", StringComparison.OrdinalIgnoreCase)
-        && string.Equals(currentAction, "Login", StringComparison.OrdinalIgnoreCase);
+    var isAccountController = string.Equals(currentController, "Account", StringComparison.OrdinalIgnoreCase);
+    // Login has no signed-in context to navigate from; SessionExpired is shown precisely because
+    // the session (and any navigation context) has just ended - neither page has a left-nav
+    // section or breadcrumb trail to show.
+    var hidesNavigationChrome = isAccountController
+        && (string.Equals(currentAction, "Login", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(currentAction, "SessionExpired", StringComparison.OrdinalIgnoreCase));
 
     const string serviceName = "Proficiency Testing - Internal";
     var pageTitle = ViewData["Title"]?.ToString();
@@ -42,20 +47,20 @@
     <div class="govuk-width-container app-width-container">
         @* Breadcrumbs and the side navigation sit outside <main> so that the skip link lands on the
            page's own content, and so <main> holds only what is unique to this page. *@
-        @if (!isLoginPage)
+        @if (!hidesNavigationChrome)
         {
             @await Html.PartialAsync("_Breadcrumbs")
         }
 
         <div class="govuk-main-wrapper">
             <div class="govuk-grid-row">
-                @if (!isLoginPage)
+                @if (!hidesNavigationChrome)
                 {
                     <div class="govuk-grid-column-one-quarter">
                         @await Html.PartialAsync("_SideNavigation")
                     </div>
                 }
-                <div class="@(isLoginPage ? "govuk-grid-column-full" : "govuk-grid-column-three-quarters")">
+                <div class="@(hidesNavigationChrome ? "govuk-grid-column-full" : "govuk-grid-column-three-quarters")">
                     @await RenderSectionAsync("BackLink", required: false)
                     <main class="app-main-class" id="main-content">
                         @await Html.PartialAsync("_NotificationBanner")
@@ -66,6 +71,10 @@
         </div>
     </div>
     @await Html.PartialAsync("_Footer", "/docs/QuickReferenceGuide.pdf")
+    @if (User.Identity?.IsAuthenticated == true)
+    {
+        @await Html.PartialAsync("_SessionTimeoutWarning")
+    }
     <script type="module" src="/js/govuk-frontend-6.5.0.min.js"></script>
     <script type="module">
             import {

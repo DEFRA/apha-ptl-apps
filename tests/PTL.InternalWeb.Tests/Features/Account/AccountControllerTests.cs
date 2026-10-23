@@ -1,8 +1,10 @@
 using System.Reflection;
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ViewFeatures;
 using Microsoft.Extensions.DependencyInjection;
 using PTL.Auth.Entra;
 using PTL.InternalWeb.Features.Account;
@@ -119,11 +121,53 @@ public class AccountControllerTests
         Assert.Equal("/Account/SignedOut", signOut.Properties!.RedirectUri);
     }
 
+    [Fact]
+    public void ExtendSession_ReturnsNoContent()
+    {
+        var controller = new AccountController();
+
+        var result = controller.ExtendSession();
+
+        Assert.IsType<NoContentResult>(result);
+    }
+
+    [Fact]
+    public async Task SessionExpired_WhenAuthenticated_SignsOutCookieAndReturnsView()
+    {
+        var httpContext = CreateHttpContextWithFakeAuth(out var authService);
+        httpContext.User = new ClaimsPrincipal(new ClaimsIdentity(CookieAuthenticationDefaults.AuthenticationScheme));
+        var controller = new AccountController
+        {
+            ControllerContext = new ControllerContext { HttpContext = httpContext }
+        };
+
+        var result = await controller.SessionExpired();
+
+        Assert.Contains(CookieAuthenticationDefaults.AuthenticationScheme, authService.SignOutSchemes);
+        Assert.IsType<ViewResult>(result);
+    }
+
+    [Fact]
+    public async Task SessionExpired_WhenAlreadyAnonymous_StillSignsOutDefensivelyAndReturnsView()
+    {
+        var httpContext = CreateHttpContextWithFakeAuth(out var authService);
+        var controller = new AccountController
+        {
+            ControllerContext = new ControllerContext { HttpContext = httpContext }
+        };
+
+        var result = await controller.SessionExpired();
+
+        Assert.Contains(CookieAuthenticationDefaults.AuthenticationScheme, authService.SignOutSchemes);
+        Assert.IsType<ViewResult>(result);
+    }
+
     private static DefaultHttpContext CreateHttpContextWithFakeAuth(out FakeAuthenticationService authService)
     {
         authService = new FakeAuthenticationService();
         var services = new ServiceCollection();
         services.AddSingleton<IAuthenticationService>(authService);
+        services.AddSingleton<ITempDataDictionaryFactory>(new TempDataDictionaryFactory(new FakeTempDataProvider()));
         return new DefaultHttpContext { RequestServices = services.BuildServiceProvider() };
     }
 }
