@@ -4,7 +4,7 @@ namespace PTL.ExternalWeb.Features.Account;
 
 /// <summary>
 /// Single place that reads the roles <see cref="ExternalUserResolver"/> resolved at sign-in -
-/// consumed by both <c>HomeController</c> and <c>_SideNavigation.cshtml</c>, so role-gating logic
+/// consumed by both <c>HomeController</c> and <c>_HeaderMenu.cshtml</c>, so role-gating logic
 /// is not duplicated between the landing page and the navigation menu.
 /// </summary>
 public static class ClaimsPrincipalExtensions

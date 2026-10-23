@@ -1,0 +1,57 @@
+@using PTL.ExternalWeb.Features.Account
+@using PTL.ExternalWeb.Navigation
+@{
+    // Ported from the removed _SideNavigation.cshtml - same NavigationProvider data source, same
+    // per-group/per-child role filtering (a group's own RequiredRole/RequireCanOrderOnline, if
+    // set, gates the whole group; children with their own RequiredRole - e.g. Results'
+    // Viewer/Test Consultant-only items - are then filtered individually), just rendered as a
+    // header dropdown panel instead of a side column.
+    var roles = User.GetResolvedExternalRoles();
+    var canOrderOnline = User.CanOrderOnline();
+    bool IsVisible(NavigationItem item) =>
+        (item.RequiredRole is null || roles.Contains(item.RequiredRole, StringComparer.OrdinalIgnoreCase))
+        && (!item.RequireCanOrderOnline || canOrderOnline);
+
+    var visibleGroups = NavigationProvider.Build()
+        .Where(IsVisible)
+        .Select(group => new { group.Text, Children = group.Children.Where(IsVisible).ToList() })
+        .Where(group => group.Children.Count > 0)
+        .ToList();
+}
+
+<div class="govuk-width-container">
+    <div class="govuk-grid-row app-menu-panel__row">
+        @if (visibleGroups.Count > 0)
+        {
+            @foreach (var group in visibleGroups)
+            {
+                <div class="govuk-grid-column-one-third">
+                    <h2 class="govuk-heading-s app-menu-panel__heading">@group.Text</h2>
+                    <ul class="govuk-list app-menu-panel__list">
+                        @foreach (var item in group.Children)
+                        {
+                            <li>
+                                @if (!item.IsEnabled || item.ControllerName is null)
+                                {
+                                    <span class="govuk-body app-menu-panel__link app-menu-panel__link--disabled" aria-disabled="true">@item.Text</span>
+                                }
+                                else
+                                {
+                                    <a class="govuk-link govuk-link--no-visited-state app-menu-panel__link" asp-controller="@item.ControllerName" asp-action="@item.ActionName" asp-route-title="@item.Text">@item.Text</a>
+                                }
+                            </li>
+                        }
+                    </ul>
+                </div>
+            }
+        }
+        else
+        {
+            <div class="govuk-grid-column-full">
+                <p class="govuk-body">No menu items are available for your account yet.</p>
+            </div>
+        }
+    </div>
+</div>
+    </div>
+</div>

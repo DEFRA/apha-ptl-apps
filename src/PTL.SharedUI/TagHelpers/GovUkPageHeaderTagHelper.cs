@@ -20,6 +20,19 @@ public class GovUkPageHeaderTagHelper(LinkGenerator linkGenerator, IUrlHelperFac
 
     public string? LogoStyle { get; set; }
 
+    // Opt-in only (defaults false) so PTL.InternalWeb's _Header.cshtml, which never sets this,
+    // renders byte-identical markup to before - only PTL.ExternalWeb sets this to true, pairing
+    // the button with a <govuk-menu-panel> the caller renders separately (see that tag helper's
+    // remarks for why the panel isn't produced here too).
+    public bool ShowMenuToggle { get; set; }
+
+    // Optional - shown next to the Menu toggle (visible text, not an icon, per GDS content design
+    // guidance against unlabelled icon-only links) separated by a vertical divider. Both must be
+    // set for anything to render; neither is set by PTL.InternalWeb.
+    public string? HelpLinkText { get; set; }
+
+    public string? HelpLinkHref { get; set; }
+
     [ViewContext]
     [HtmlAttributeNotBound]
     public ViewContext ViewContext { get; set; } = default!;
@@ -41,6 +54,27 @@ public class GovUkPageHeaderTagHelper(LinkGenerator linkGenerator, IUrlHelperFac
         var encodedHomeUrl = WebUtility.HtmlEncode(homeUrl);
         var encodedLogoUrl = WebUtility.HtmlEncode(logoUrl);
 
+        var helpLink = !string.IsNullOrWhiteSpace(HelpLinkText) && !string.IsNullOrWhiteSpace(HelpLinkHref)
+            ? $"""
+                <span class="app-header__divider" aria-hidden="true"></span>
+                <a class="app-header__help-link" href="{WebUtility.HtmlEncode(HelpLinkHref)}" target="_blank" rel="noopener noreferrer">
+                    {WebUtility.HtmlEncode(HelpLinkText)}
+                    <span class="govuk-visually-hidden"> (opens in new tab, PDF)</span>
+                </a>
+            """
+            : "";
+
+        var menuToggle = ShowMenuToggle
+            ? $"""
+                <div class="app-header__actions">
+                    <nav aria-label="Menu" class="app-header__menu">
+                        <button type="button" id="app-menu-toggle" class="govuk-service-navigation__toggle" aria-controls="app-menu-panel" aria-expanded="false" aria-label="Show or hide menu" data-app-menu-toggle>Menu</button>
+                    </nav>
+                    {helpLink}
+                </div>
+            """
+            : "";
+
         output.TagName = null;
         output.TagMode = TagMode.StartTagAndEndTag;
         output.Content.SetHtmlContent($"""
@@ -50,6 +84,7 @@ public class GovUkPageHeaderTagHelper(LinkGenerator linkGenerator, IUrlHelperFac
                         <div class="govuk-header__content">
                             <span class="govuk-header__product-name">{encodedServiceName}</span>
                         </div>
+                        {menuToggle}
                     </div>
                 </div>
                 <section aria-label="Service information" class="govuk-service-navigation" data-module="govuk-service-navigation">

@@ -3,11 +3,10 @@ using PTL.ExternalWeb.Features.Account;
 namespace PTL.ExternalWeb.Navigation;
 
 // Fixed configuration for the external-facing navigation: top-level section names drive the
-// side navigation (_SideNavigation.cshtml - the "header menu" from legacy's top horizontal nav
-// has no literal header-bar equivalent here; it was deliberately moved into this side nav
-// alongside PTL.InternalWeb's existing pattern), and each section's Children drive the Home
-// page's quick-link cards (_QuickLinkCard.cshtml) - a single source of truth for both,
-// reproducing legacy ProficiencyTestingExternalWeb/NavigationBar.ascx's role-gated menu groups
+// header menu panel (_HeaderMenu.cshtml - the "header menu" from legacy's top horizontal nav),
+// and each section's Children drive the Home page's quick-link cards (_QuickLinkCard.cshtml) - a
+// single source of truth for both, reproducing legacy
+// ProficiencyTestingExternalWeb/NavigationBar.ascx's role-gated menu groups
 // (Schemes/Orders/Results) - see docs/Parity-Analysis/01-Module-Migration-Inventory.md
 // "Navigation & Shared Chrome". Results' four children (Enter results/View results/View
 // reports/Enter comments) each carry their own RequiredRole, matching legacy's single "Results"

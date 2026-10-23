@@ -1,7 +1,7 @@
 @using PTL.Common.Auth
 @using PTL.ExternalWeb.Features.Account
 @model (string ServiceName, string? LogoStyle)
-<govuk-page-header service-name="@Model.ServiceName" logo-style="@Model.LogoStyle">
+<govuk-page-header service-name="@Model.ServiceName" logo-style="@Model.LogoStyle" show-menu-toggle="@(User.Identity is not null && User.Identity.IsAuthenticated)" help-link-text="User Manual" help-link-href="/documents/User Manual.pdf">
     @if (User.Identity is not null && User.Identity.IsAuthenticated)
     {
         // CIDM's id_token has no "name" claim without the "profile" scope, so the resolved
@@ -32,3 +32,10 @@
         </nav>
     }
 </govuk-page-header>
+@if (User.Identity is not null && User.Identity.IsAuthenticated)
+{
+    <govuk-menu-panel>
+        <partial name="_HeaderMenu" />
+    </govuk-menu-panel>
+}
+

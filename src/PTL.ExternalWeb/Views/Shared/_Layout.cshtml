@@ -39,13 +39,7 @@
             @await Html.PartialAsync("_Breadcrumbs")
         }
         <div class="govuk-grid-row">
-            @if (!isAccountFlowPage)
-            {
-                <div class="govuk-grid-column-one-quarter">
-                    @await Html.PartialAsync("_SideNavigation")
-                </div>
-            }
-            <div class="@(isAccountFlowPage ? "govuk-grid-column-full" : "govuk-grid-column-three-quarters")">
+            <div class="govuk-grid-column-full">
                 @RenderBody()
             </div>
         </div>
@@ -59,6 +53,7 @@
         } from '/js/govuk-frontend-6.5.0.min.js'
         initAll()
 </script>
+<script src="/js/header-menu.js" defer></script>
 @await RenderSectionAsync("Scripts", required: false)
 </body>
 

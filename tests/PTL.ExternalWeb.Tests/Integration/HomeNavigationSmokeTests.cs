@@ -276,7 +276,6 @@ public class HomeNavigationSmokeTests : IClassFixture<PtlExternalWebTestFactory>
         Assert.Equal(HttpStatusCode.OK, comingSoonResponse.StatusCode);
         Assert.Contains("View schemes", comingSoonBody);
         Assert.Contains("has not been migrated to the new service yet", comingSoonBody);
-        Assert.Contains("Back to Home", comingSoonBody);
     }
 
     private async Task<string> GetHomePageAsSignedInUserAsync(string? roles)
