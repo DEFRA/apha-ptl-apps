@@ -17,7 +17,7 @@ public class DistributionControllerTabulationSendTests
     private static readonly Guid SchemeB = Guid.Parse("aaaaaaaa-0000-0000-0000-0000000000f2");
 
     private static DistributionController CreateController(FakeDistributionApiClient apiClient) =>
-        new(apiClient, new FakeSearchApiClient()) { TempData = new TempDataDictionary(new DefaultHttpContext(), new FakeTempDataProvider()), Url = new FakeUrlHelper() };
+        new(apiClient, new FakeSearchApiClient(), new FakeLookupApiClient()) { TempData = new TempDataDictionary(new DefaultHttpContext(), new FakeTempDataProvider()), Url = new FakeUrlHelper() };
 
     private static TabulationsSchemeResponse Scheme(Guid id) =>
         new(

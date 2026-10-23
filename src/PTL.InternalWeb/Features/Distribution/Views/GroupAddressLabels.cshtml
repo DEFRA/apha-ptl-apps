@@ -1,0 +1,40 @@
+@model PTL.InternalWeb.Features.Distribution.GroupAddressLabelsViewModel
+@{
+    ViewData["Title"] = "Group Address Labels";
+}
+
+<h1 class="govuk-heading-l">Group Address Labels</h1>
+
+<p class="govuk-body">This page can be used to print single Group Address labels.</p>
+
+<hr class="govuk-section-break govuk-section-break--m govuk-section-break--visible">
+
+@if (Model.GroupAddresses.Count == 0)
+{
+    <p class="govuk-body">There are no Results to Display</p>
+}
+else
+{
+    <table class="govuk-table">
+        <caption class="govuk-table__caption govuk-visually-hidden">Group Address Labels</caption>
+        <thead class="govuk-table__head">
+            <tr class="govuk-table__row">
+                <th scope="col" class="govuk-table__header">Identifier</th>
+                <th scope="col" class="govuk-table__header">Address 1</th>
+                <th scope="col" class="govuk-table__header">Print</th>
+            </tr>
+        </thead>
+        <tbody class="govuk-table__body">
+            @foreach (var row in Model.GroupAddresses)
+            {
+                <tr class="govuk-table__row">
+                    <td class="govuk-table__cell">@row.Identifier</td>
+                    <td class="govuk-table__cell">@row.Address1</td>
+                    <td class="govuk-table__cell">
+                        <a class="govuk-link" asp-action="PrintGroupAddressLabel" asp-route-groupAddressId="@row.GroupAddressId">Print<span class="govuk-visually-hidden"> for @row.Identifier</span></a>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}

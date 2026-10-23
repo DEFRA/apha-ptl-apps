@@ -22,7 +22,7 @@ namespace PTL.InternalWeb.Tests.Authorization;
 public class AuthorizationMatrixTests
 {
     private static readonly string[] DistributionsOnly =
-        ["Index", "ViewStage", "Search", "ParticipantAddressLabels", "PrintParticipantAddressLabel"];
+        ["Index", "ViewStage", "Search", "ParticipantAddressLabels", "PrintParticipantAddressLabel", "GroupAddressLabels", "PrintGroupAddressLabel"];
 
     // Legacy Scheduling/ folder pages and the Scheduling-only dashboard actions.
     private static readonly string[] SchedulingActions =
