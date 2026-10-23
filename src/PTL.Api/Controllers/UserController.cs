@@ -11,8 +11,8 @@ namespace PTL.Api.Controllers;
 // go live without the authorization policy decision described in
 // docs/migration/System-Administration-migration.md.
 //
-// The directory-search endpoint is backed by a stub (PTL.Core.User.StubStaffDirectoryService) -
-// see IStaffDirectoryService for why a real Active Directory/Entra ID integration isn't wired up yet.
+// The directory-search endpoint is backed by Microsoft Graph (PTL.Api.Infrastructure.GraphStaffDirectoryService,
+// credentials from the "Graph" configuration section).
 [ApiController]
 [Route("api/users")]
 public sealed class UserController(IUserService userService) : ControllerBase
@@ -25,15 +25,17 @@ public sealed class UserController(IUserService userService) : ControllerBase
     }
 
     [HttpGet("directory-search")]
-    public async Task<ActionResult<IReadOnlyList<StaffDirectoryUserResponse>>> SearchDirectory([FromQuery] string searchTerm, CancellationToken cancellationToken)
+    public async Task<ActionResult<StaffDirectorySearchResponse>> SearchDirectory([FromQuery] string searchTerm, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(searchTerm))
         {
-            return Ok(Array.Empty<StaffDirectoryUserResponse>());
+            return Ok(new StaffDirectorySearchResponse([], false));
         }
 
-        var results = await userService.SearchStaffDirectoryAsync(searchTerm, cancellationToken);
-        return Ok(results.Select(r => new StaffDirectoryUserResponse(r.Username, r.Email, r.FriendlyName, r.FirstName, r.LastName)).ToList());
+        var result = await userService.SearchStaffDirectoryAsync(searchTerm, cancellationToken);
+        return Ok(new StaffDirectorySearchResponse(
+            result.Users.Select(r => new StaffDirectoryUserResponse(r.Username, r.Email, r.FriendlyName, r.FirstName, r.LastName)).ToList(),
+            result.IsTruncated));
     }
 
     [HttpPost]

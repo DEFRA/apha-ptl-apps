@@ -32,7 +32,9 @@ public class UserControllerTests
         var result = await controller.SearchDirectory(string.Empty, CancellationToken.None);
 
         var ok = Assert.IsType<OkObjectResult>(result.Result);
-        Assert.Empty(Assert.IsAssignableFrom<IReadOnlyList<StaffDirectoryUserResponse>>(ok.Value));
+        var response = Assert.IsType<StaffDirectorySearchResponse>(ok.Value);
+        Assert.Empty(response.Users);
+        Assert.False(response.IsTruncated);
         Assert.Null(directory.LastSearchTerm);
     }
 
@@ -41,15 +43,17 @@ public class UserControllerTests
     {
         var directory = new FakeStaffDirectoryService
         {
-            Results = [new StaffDirectoryUser { Username = "m100001", Email = "jane@apha.gov.uk", FriendlyName = "Jane Smith", FirstName = "Jane", LastName = "Smith" }]
+            Results = [new StaffDirectoryUser { Username = "m100001", Email = "jane@apha.gov.uk", FriendlyName = "Jane Smith", FirstName = "Jane", LastName = "Smith" }],
+            IsTruncated = true
         };
         var controller = CreateController(new FakeUserRepository(), directory);
 
         var result = await controller.SearchDirectory("jane", CancellationToken.None);
 
         var ok = Assert.IsType<OkObjectResult>(result.Result);
-        var results = Assert.IsAssignableFrom<IReadOnlyList<StaffDirectoryUserResponse>>(ok.Value);
-        Assert.Equal("m100001", Assert.Single(results).Username);
+        var response = Assert.IsType<StaffDirectorySearchResponse>(ok.Value);
+        Assert.Equal("m100001", Assert.Single(response.Users).Username);
+        Assert.True(response.IsTruncated);
     }
 
     [Fact]

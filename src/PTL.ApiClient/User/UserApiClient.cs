@@ -8,7 +8,7 @@ namespace PTL.ApiClient;
 public interface IUserApiClient
 {
     Task<IReadOnlyList<UserResponse>> GetUsersAsync(CancellationToken cancellationToken = default);
-    Task<IReadOnlyList<StaffDirectoryUserResponse>> SearchStaffDirectoryAsync(string searchTerm, CancellationToken cancellationToken = default);
+    Task<StaffDirectorySearchResponse> SearchStaffDirectoryAsync(string searchTerm, CancellationToken cancellationToken = default);
     Task<CreateUserSaveResult> CreateUserAsync(CreateUserRequest request, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<UserRoleRowResponse>> GetUserRoleGridAsync(CancellationToken cancellationToken = default);
     Task<SetUserRolesResponse> SetUserRolesAsync(Guid userId, SetUserRolesRequest request, CancellationToken cancellationToken = default);
@@ -25,11 +25,11 @@ public sealed class UserApiClient(HttpClient httpClient) : IUserApiClient
         return items ?? [];
     }
 
-    public async Task<IReadOnlyList<StaffDirectoryUserResponse>> SearchStaffDirectoryAsync(string searchTerm, CancellationToken cancellationToken = default)
+    public async Task<StaffDirectorySearchResponse> SearchStaffDirectoryAsync(string searchTerm, CancellationToken cancellationToken = default)
     {
-        var items = await httpClient.GetFromJsonAsync<IReadOnlyList<StaffDirectoryUserResponse>>(
+        var result = await httpClient.GetFromJsonAsync<StaffDirectorySearchResponse>(
             $"/api/users/directory-search?searchTerm={Uri.EscapeDataString(searchTerm)}", cancellationToken);
-        return items ?? [];
+        return result ?? new StaffDirectorySearchResponse([], false);
     }
 
     public async Task<CreateUserSaveResult> CreateUserAsync(CreateUserRequest request, CancellationToken cancellationToken = default)

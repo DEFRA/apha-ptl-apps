@@ -744,7 +744,67 @@ public class SystemAdministrationControllerTests
         var view = Assert.IsType<ViewResult>(result);
         var resultModel = Assert.IsType<CreateUserViewModel>(view.Model);
         Assert.Equal("No valid search results found", resultModel.Message);
-        Assert.True(resultModel.MessageIsError);
+        Assert.True(resultModel.HasSearched);
+        Assert.Empty(resultModel.ResultOptions);
+    }
+
+    [Fact]
+    public async Task CreateUserSearch_TruncatedResults_ShowsRefineYourSearchMessage()
+    {
+        var apiClient = new FakeUserApiClient
+        {
+            SearchResults = [new StaffDirectoryUserResponse("m100001", "jane@apha.gov.uk", "Jane Smith", "Jane", "Smith")],
+            SearchIsTruncated = true
+        };
+        var controller = CreateController(userApiClient: apiClient);
+
+        var result = await controller.CreateUserSearch(new CreateUserViewModel { SearchTerm = "j" }, CancellationToken.None);
+
+        var resultModel = Assert.IsType<CreateUserViewModel>(Assert.IsType<ViewResult>(result).Model);
+        Assert.Single(resultModel.ResultOptions);
+        Assert.Contains("narrow your search", resultModel.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task CreateUserSearch_ResultOptionsPostOnlyTheUsername()
+    {
+        var apiClient = new FakeUserApiClient
+        {
+            SearchResults = [new StaffDirectoryUserResponse("dt2\\jsmith", "jane|x@apha.gov.uk", "Jane | Smith", "Jane", "Smith")]
+        };
+        var controller = CreateController(userApiClient: apiClient);
+
+        var result = await controller.CreateUserSearch(new CreateUserViewModel { SearchTerm = "jane" }, CancellationToken.None);
+
+        var option = Assert.Single(Assert.IsType<CreateUserViewModel>(Assert.IsType<ViewResult>(result).Model).ResultOptions);
+        Assert.Equal("dt2\\jsmith", option.Value);
+    }
+
+    [Fact]
+    public async Task CreateUserSearch_DirectoryFails_ShowsProblemInErrorSummaryInsteadOfThrowing()
+    {
+        var apiClient = new FakeUserApiClient { SearchException = new HttpRequestException("Graph unavailable") };
+        var controller = CreateController(userApiClient: apiClient);
+
+        var result = await controller.CreateUserSearch(new CreateUserViewModel { SearchTerm = "jane" }, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var resultModel = Assert.IsType<CreateUserViewModel>(view.Model);
+        Assert.False(resultModel.HasSearched);
+        var error = Assert.Single(controller.ModelState[string.Empty]!.Errors);
+        Assert.Contains("problem searching the staff directory", error.ErrorMessage, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task CreateUserSearch_RequestTimesOut_ShowsProblemInErrorSummaryInsteadOfThrowing()
+    {
+        var apiClient = new FakeUserApiClient { SearchException = new TaskCanceledException("timeout") };
+        var controller = CreateController(userApiClient: apiClient);
+
+        var result = await controller.CreateUserSearch(new CreateUserViewModel { SearchTerm = "jane" }, CancellationToken.None);
+
+        Assert.IsType<ViewResult>(result);
+        Assert.False(controller.ModelState.IsValid);
     }
 
     [Fact]
@@ -764,12 +824,15 @@ public class SystemAdministrationControllerTests
     [Fact]
     public async Task CreateUserConfirm_ValidSelection_CreatesAndShowsSuccess()
     {
-        var apiClient = new FakeUserApiClient();
+        var apiClient = new FakeUserApiClient
+        {
+            SearchResults = [new StaffDirectoryUserResponse("m100001", "jane@apha.gov.uk", "Jane Smith", "Jane", "Smith")]
+        };
         var controller = CreateController(userApiClient: apiClient);
         var model = new CreateUserViewModel
         {
             SearchTerm = "jane",
-            SelectedCandidate = "m100001|jane@apha.gov.uk|Jane Smith|Jane|Smith",
+            SelectedCandidate = "m100001",
             Department = "Science"
         };
 
@@ -778,12 +841,86 @@ public class SystemAdministrationControllerTests
         var view = Assert.IsType<ViewResult>(result);
         var resultModel = Assert.IsType<CreateUserViewModel>(view.Model);
         Assert.True(resultModel.IsCreated);
+        Assert.Equal("User added successfully", resultModel.Message);
         Assert.Equal("m100001", apiClient.LastCreateRequest?.Username);
         Assert.Equal("Science", apiClient.LastCreateRequest?.Department);
     }
 
+    // The account details come from the directory, never from the posted form.
     [Fact]
-    public async Task CreateUserConfirm_ApiRejectsNoEmail_RedisplaysResultsWithError()
+    public async Task CreateUserConfirm_UsesTheDirectoryDetailsForTheSelectedUsername()
+    {
+        var apiClient = new FakeUserApiClient
+        {
+            SearchResults = [new StaffDirectoryUserResponse("dt2\\jsmith", "jane@apha.gov.uk", "Jane | Smith", "Jane", "Smith")]
+        };
+        var controller = CreateController(userApiClient: apiClient);
+        var model = new CreateUserViewModel { SearchTerm = "jane", SelectedCandidate = "DT2\\JSMITH", Department = "Science" };
+
+        await controller.CreateUserConfirm(model, CancellationToken.None);
+
+        var request = apiClient.LastCreateRequest;
+        Assert.NotNull(request);
+        Assert.Equal("dt2\\jsmith", request.Username);
+        Assert.Equal("jane@apha.gov.uk", request.Email);
+        Assert.Equal("Jane | Smith", request.FriendlyName);
+    }
+
+    [Fact]
+    public async Task CreateUserConfirm_UsernameNotInTheDirectoryResults_DoesNotCreateAndShowsError()
+    {
+        var apiClient = new FakeUserApiClient
+        {
+            SearchResults = [new StaffDirectoryUserResponse("m100001", "jane@apha.gov.uk", "Jane Smith", "Jane", "Smith")]
+        };
+        var controller = CreateController(userApiClient: apiClient);
+        var model = new CreateUserViewModel { SearchTerm = "jane", SelectedCandidate = "m999999", Department = "Science" };
+
+        var result = await controller.CreateUserConfirm(model, CancellationToken.None);
+
+        var resultModel = Assert.IsType<CreateUserViewModel>(Assert.IsType<ViewResult>(result).Model);
+        Assert.Null(apiClient.LastCreateRequest);
+        Assert.False(resultModel.IsCreated);
+        Assert.Contains(controller.ModelState["SelectedCandidate"]!.Errors, e => e.ErrorMessage.Contains("no longer available", StringComparison.Ordinal));
+        Assert.Single(resultModel.ResultOptions);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    public async Task CreateUserConfirm_NoUserSelected_ShowsSelectAUserError(string? selected)
+    {
+        var apiClient = new FakeUserApiClient
+        {
+            SearchResults = [new StaffDirectoryUserResponse("m100001", "jane@apha.gov.uk", "Jane Smith", "Jane", "Smith")]
+        };
+        var controller = CreateController(userApiClient: apiClient);
+        var model = new CreateUserViewModel { SearchTerm = "jane", SelectedCandidate = selected };
+
+        var result = await controller.CreateUserConfirm(model, CancellationToken.None);
+
+        var resultModel = Assert.IsType<CreateUserViewModel>(Assert.IsType<ViewResult>(result).Model);
+        Assert.Null(apiClient.LastCreateRequest);
+        Assert.Equal("Select a user", Assert.Single(controller.ModelState["SelectedCandidate"]!.Errors).ErrorMessage);
+        Assert.True(resultModel.HasSearched);
+    }
+
+    [Fact]
+    public async Task CreateUserConfirm_DirectoryFails_ShowsProblemAndDoesNotCreate()
+    {
+        var apiClient = new FakeUserApiClient { SearchException = new HttpRequestException("Graph unavailable") };
+        var controller = CreateController(userApiClient: apiClient);
+        var model = new CreateUserViewModel { SearchTerm = "jane", SelectedCandidate = "m100001" };
+
+        var result = await controller.CreateUserConfirm(model, CancellationToken.None);
+
+        Assert.IsType<ViewResult>(result);
+        Assert.Null(apiClient.LastCreateRequest);
+        Assert.Contains(controller.ModelState[string.Empty]!.Errors, e => e.ErrorMessage.Contains("problem searching the staff directory", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task CreateUserConfirm_ApiRejectsNoEmail_RedisplaysResultsWithErrorNotLinkedToAMissingField()
     {
         var apiClient = new FakeUserApiClient
         {
@@ -794,7 +931,7 @@ public class SystemAdministrationControllerTests
         var model = new CreateUserViewModel
         {
             SearchTerm = "sam",
-            SelectedCandidate = "m100003||Sam Taylor|Sam|Taylor",
+            SelectedCandidate = "m100003",
             Department = "Science"
         };
 
@@ -802,9 +939,27 @@ public class SystemAdministrationControllerTests
 
         var view = Assert.IsType<ViewResult>(result);
         Assert.False(controller.ModelState.IsValid);
+        Assert.False(controller.ModelState.ContainsKey("Email"));
+        Assert.Contains(controller.ModelState[string.Empty]!.Errors, e => e.ErrorMessage.Contains("no Email Address", StringComparison.Ordinal));
         var resultModel = Assert.IsType<CreateUserViewModel>(view.Model);
         Assert.False(resultModel.IsCreated);
         Assert.True(resultModel.HasSearched);
+    }
+
+    [Fact]
+    public async Task CreateUserConfirm_DepartmentTooLong_KeepsTheDepartmentFieldError()
+    {
+        var apiClient = new FakeUserApiClient
+        {
+            SaveResult = new CreateUserSaveResult(false, null, new Dictionary<string, string[]> { ["Department"] = ["Department must be 50 characters or fewer"] }),
+            SearchResults = [new StaffDirectoryUserResponse("m100001", "jane@apha.gov.uk", "Jane Smith", "Jane", "Smith")]
+        };
+        var controller = CreateController(userApiClient: apiClient);
+        var model = new CreateUserViewModel { SearchTerm = "jane", SelectedCandidate = "m100001", Department = new string('a', 60) };
+
+        await controller.CreateUserConfirm(model, CancellationToken.None);
+
+        Assert.True(controller.ModelState.ContainsKey("Department"));
     }
 
     [Fact]
