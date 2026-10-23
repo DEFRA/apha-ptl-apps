@@ -87,11 +87,13 @@ public class AccountRouteSmokeTests : IClassFixture<PtlInternalWebTestFactory>
         Assert.Contains("Sign in again", body);
         // Account/Login is this app's default route ("{controller=Account}/{action=Login}/{id?}"),
         // so the generated link to it is the root path, same as SignedOut's sign-in link below.
-        Assert.Contains("href=\"/\"", body);        // No navigation context survives a session ending - breadcrumbs/side nav would otherwise
+        Assert.Contains("href=\"/\"", body);
+        // No navigation context survives a session ending - breadcrumbs/side nav would otherwise
         // show a stale/misleading trail (e.g. "Home") on a page reached precisely because the
         // previous page's session/context has just ended.
         Assert.DoesNotContain("govuk-breadcrumbs", body, StringComparison.Ordinal);
-        Assert.DoesNotContain("app-side-navigation", body, StringComparison.Ordinal);    }
+        Assert.DoesNotContain("app-side-navigation", body, StringComparison.Ordinal);
+    }
 
     [Fact]
     public async Task SessionExpired_WhenAuthenticated_SignsOutAndRendersPage()
