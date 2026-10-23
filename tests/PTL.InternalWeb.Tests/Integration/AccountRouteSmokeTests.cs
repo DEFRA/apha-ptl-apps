@@ -74,6 +74,59 @@ public class AccountRouteSmokeTests : IClassFixture<PtlInternalWebTestFactory>
     }
 
     [Fact]
+    public async Task SessionExpired_WhenAnonymous_RendersPageWithSignInLink()
+    {
+        var client = _factory.CreateClient();
+
+        var response = await client.GetAsync("/Account/SessionExpired");
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("Session expired", body);
+        Assert.Contains("govuk-button", body);
+        Assert.Contains("Sign in again", body);
+        // Account/Login is this app's default route ("{controller=Account}/{action=Login}/{id?}"),
+        // so the generated link to it is the root path, same as SignedOut's sign-in link below.
+        Assert.Contains("href=\"/\"", body);        // No navigation context survives a session ending - breadcrumbs/side nav would otherwise
+        // show a stale/misleading trail (e.g. "Home") on a page reached precisely because the
+        // previous page's session/context has just ended.
+        Assert.DoesNotContain("govuk-breadcrumbs", body, StringComparison.Ordinal);
+        Assert.DoesNotContain("app-side-navigation", body, StringComparison.Ordinal);    }
+
+    [Fact]
+    public async Task SessionExpired_WhenAuthenticated_SignsOutAndRendersPage()
+    {
+        var client = _factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        var cookies = new Dictionary<string, string>();
+
+        var signInResponse = await client.GetAsync(PtlInternalWebTestFactory.TestSignInPath);
+        CaptureCookies(signInResponse, cookies);
+
+        var response = await SendWithCookiesAsync(client, HttpMethod.Get, "/Account/SessionExpired", cookies);
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("Session expired", body);
+
+        // The header must NOT still show "Signed in as" on this same response - SignOutAsync only
+        // clears the cookie for FUTURE requests, so HttpContext.User has to be cleared explicitly
+        // for this page's own rendering to reflect the sign-out that just happened.
+        Assert.DoesNotContain("Signed in as", body, StringComparison.Ordinal);
+
+        // SignOutAsync clears the app cookie via a Set-Cookie response - captured here so the
+        // follow-up requests reflect the now-cleared cookie rather than the stale, still-valid one.
+        CaptureCookies(response, cookies);
+        var homeResponse = await SendWithCookiesAsync(client, HttpMethod.Get, "/Home/Index", cookies);
+        Assert.Equal(HttpStatusCode.Redirect, homeResponse.StatusCode);
+        Assert.Contains("/Account/Login", homeResponse.Headers.Location!.ToString(), StringComparison.Ordinal);
+
+        // A second, different protected page too - proves the clearing isn't specific to one route.
+        var distributionResponse = await SendWithCookiesAsync(client, HttpMethod.Get, "/Distribution/Index", cookies);
+        Assert.Equal(HttpStatusCode.Redirect, distributionResponse.StatusCode);
+        Assert.Contains("/Account/Login", distributionResponse.Headers.Location!.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task HomeError_RendersErrorView()
     {
         var client = _factory.CreateClient();
