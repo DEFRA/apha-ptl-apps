@@ -92,6 +92,13 @@ public class SystemAdministrationController : Controller
             LogLevel.Information,
             new EventId(7, nameof(LogCountryRemoveBlockedMessage)),
             "Country {CountryId} could not be removed");
+
+    private static readonly Action<ILogger, Exception?> LogDirectorySearchFailedMessage =
+        LoggerMessage.Define(
+            LogLevel.Warning,
+            new EventId(8, nameof(LogDirectorySearchFailedMessage)),
+            "Staff directory search failed while creating a user");
+
     // Landing page for the System Administration section (moved from the removed Menu feature) -
     // shows only a heading and a short description, relying on the left nav (SideNavigationProvider)
     // for the actual section contents (Administration Charges, Weighted Pricing Plan, etc.).
@@ -329,9 +336,8 @@ public class SystemAdministrationController : Controller
     public IActionResult CreateUser() => View(new CreateUserViewModel());
 
     // Matches legacy GetADList - searches the staff directory (Microsoft Graph, via PTL.Api) and shows
-    // "No valid search results found" whether nobody matched at
-    // all, or everybody who matched already has a PT-LIMS account (both collapse to an empty
-    // result set, same as legacy).
+    // "No valid search results found" whether nobody matched at all, or everybody who matched already
+    // has a PT-LIMS account (both collapse to an empty result set, same as legacy).
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> CreateUserSearch(CreateUserViewModel model, CancellationToken cancellationToken)
@@ -341,64 +347,108 @@ public class SystemAdministrationController : Controller
             return View(nameof(CreateUser), model);
         }
 
-        var results = await userApiClient.SearchStaffDirectoryAsync(model.SearchTerm, cancellationToken);
-        model.HasSearched = true;
-        model.ResultOptions = BuildResultOptions(results);
-
-        if (model.ResultOptions.Count == 0)
+        var search = await TrySearchStaffDirectoryAsync(model.SearchTerm, cancellationToken);
+        if (search is not null)
         {
-            model.Message = "No valid search results found";
-            model.MessageIsError = true;
+            ApplySearchResult(model, search);
         }
 
         return View(nameof(CreateUser), model);
     }
 
-    // Only the candidate matching model.SelectedCandidate is ever created - matches legacy
-    // Button_CreateUser_Click, which only acts on DropDownList_Users.SelectedValue. SearchTerm is
-    // round-tripped via a hidden field so the dropdown can be rebuilt if validation fails.
+    // Only the candidate matching model.SelectedCandidate (a username) is ever created - matches legacy
+    // Button_CreateUser_Click, which only acts on DropDownList_Users.SelectedValue. The posted username is
+    // never trusted on its own: the directory is searched again (SearchTerm is round-tripped via a hidden
+    // field) and the account details come from that fresh result, so a tampered form post cannot create
+    // an arbitrary account - the same protection WebForms event validation gave legacy's dropdown.
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> CreateUserConfirm(CreateUserViewModel model, CancellationToken cancellationToken)
     {
-        if (ModelState.IsValid && !string.IsNullOrEmpty(model.SelectedCandidate))
+        if (string.IsNullOrEmpty(model.SelectedCandidate))
         {
-            var candidate = UnpackCandidate(model.SelectedCandidate);
-            var result = await userApiClient.CreateUserAsync(
-                new CreateUserRequest(candidate.Username, candidate.Email, candidate.FriendlyName, candidate.FirstName, candidate.LastName, model.Department, GetCurrentUserId()),
-                cancellationToken);
+            ModelState.AddModelError(nameof(model.SelectedCandidate), "Select a user");
+        }
 
-            if (result.Success)
+        if (string.IsNullOrWhiteSpace(model.SearchTerm))
+        {
+            return View(nameof(CreateUser), model);
+        }
+
+        var search = await TrySearchStaffDirectoryAsync(model.SearchTerm, cancellationToken);
+        if (search is null)
+        {
+            return View(nameof(CreateUser), model);
+        }
+
+        if (ModelState.IsValid)
+        {
+            var candidate = search.Users.FirstOrDefault(u => string.Equals(u.Username, model.SelectedCandidate, StringComparison.OrdinalIgnoreCase));
+            if (candidate is null)
             {
-                return View(nameof(CreateUser), new CreateUserViewModel { IsCreated = true, Message = "User Added Successfully" });
+                ModelState.AddModelError(nameof(model.SelectedCandidate), "The selected user is no longer available. Search again");
             }
-
-            foreach (var (field, messages) in result.FieldErrors)
+            else
             {
-                foreach (var errorMessage in messages)
+                var result = await userApiClient.CreateUserAsync(
+                    new CreateUserRequest(candidate.Username, candidate.Email, candidate.FriendlyName, candidate.FirstName, candidate.LastName, model.Department, GetCurrentUserId()),
+                    cancellationToken);
+
+                if (result.Success)
                 {
-                    ModelState.AddModelError(field, errorMessage);
+                    return View(nameof(CreateUser), new CreateUserViewModel { IsCreated = true, Message = "User added successfully" });
+                }
+
+                foreach (var (field, messages) in result.FieldErrors)
+                {
+                    // Only Department is a field on this form; the other validated values come from the
+                    // directory, so their errors are shown without a link to a field that is not there.
+                    var key = field == nameof(model.Department) ? field : string.Empty;
+                    foreach (var errorMessage in messages)
+                    {
+                        ModelState.AddModelError(key, errorMessage);
+                    }
                 }
             }
         }
 
-        model.HasSearched = true;
-        var results = await userApiClient.SearchStaffDirectoryAsync(model.SearchTerm, cancellationToken);
-        model.ResultOptions = BuildResultOptions(results);
+        ApplySearchResult(model, search);
         return View(nameof(CreateUser), model);
     }
 
-    private static List<SelectListItem> BuildResultOptions(IReadOnlyList<StaffDirectoryUserResponse> results) =>
-        results.Select(r => new SelectListItem($"{r.FriendlyName} : {r.Username}", PackCandidate(r))).ToList();
-
-    private static string PackCandidate(StaffDirectoryUserResponse candidate) =>
-        string.Join('|', candidate.Username, candidate.Email, candidate.FriendlyName, candidate.FirstName, candidate.LastName);
-
-    private static StaffDirectoryUserResponse UnpackCandidate(string packed)
+    // A directory failure shows a problem message at the top of the page (no field to link to) instead of
+    // the generic error page; legacy showed "An Error has occured whilst Loading the User List".
+    private async Task<StaffDirectorySearchResponse?> TrySearchStaffDirectoryAsync(string searchTerm, CancellationToken cancellationToken)
     {
-        var parts = packed.Split('|');
-        return new StaffDirectoryUserResponse(parts[0], parts[1], parts[2], parts[3], parts[4]);
+        try
+        {
+            return await userApiClient.SearchStaffDirectoryAsync(searchTerm, cancellationToken);
+        }
+        catch (Exception ex) when (ex is HttpRequestException || (ex is OperationCanceledException && !cancellationToken.IsCancellationRequested))
+        {
+            LogDirectorySearchFailedMessage(logger, ex);
+            ModelState.AddModelError(string.Empty, "There was a problem searching the staff directory. Try again, and contact support if it keeps happening");
+            return null;
+        }
     }
+
+    private static void ApplySearchResult(CreateUserViewModel model, StaffDirectorySearchResponse search)
+    {
+        model.HasSearched = true;
+        model.ResultOptions = BuildResultOptions(search.Users);
+
+        if (search.IsTruncated)
+        {
+            model.Message = "Only some of the matching users are shown. Enter more of the name or the employee number to narrow your search";
+        }
+        else if (model.ResultOptions.Count == 0)
+        {
+            model.Message = "No valid search results found";
+        }
+    }
+
+    private static List<SelectListItem> BuildResultOptions(IReadOnlyList<StaffDirectoryUserResponse> results) =>
+        results.Select(r => new SelectListItem($"{r.FriendlyName} : {r.Username}", r.Username)).ToList();
 
     public async Task<IActionResult> ManageUserRoles(CancellationToken cancellationToken) =>
         View(await BuildManageUserRolesViewModelAsync(cancellationToken));

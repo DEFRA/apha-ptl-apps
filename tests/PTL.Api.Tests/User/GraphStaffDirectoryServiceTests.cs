@@ -7,12 +7,13 @@ namespace PTL.Api.Tests.User;
 
 public class GraphStaffDirectoryServiceTests
 {
-    private sealed class RecordingHandler(HttpStatusCode status, string json) : HttpMessageHandler
+    private sealed class RecordingHandler(HttpStatusCode status, params string[] pages) : HttpMessageHandler
     {
         public List<HttpRequestMessage> Requests { get; } = [];
 
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
+            var json = pages[Math.Min(Requests.Count, pages.Length - 1)];
             Requests.Add(request);
             return Task.FromResult(new HttpResponseMessage(status) { Content = new StringContent(json, Encoding.UTF8, "application/json") });
         }
@@ -29,11 +30,24 @@ public class GraphStaffDirectoryServiceTests
         }
     }
 
-    private static (GraphStaffDirectoryService Service, RecordingHandler Handler, Factory Factory) Create(string json = """{"value":[]}""", HttpStatusCode status = HttpStatusCode.OK)
+    private static (GraphStaffDirectoryService Service, RecordingHandler Handler, Factory Factory) Create(string json = """{"value":[]}""", HttpStatusCode status = HttpStatusCode.OK) =>
+        Create(new RecordingHandler(status, json));
+
+    // Serves each page in turn; the last page is repeated if more requests arrive.
+    private static (GraphStaffDirectoryService Service, RecordingHandler Handler, Factory Factory) CreatePaged(params string[] pages) =>
+        Create(new RecordingHandler(HttpStatusCode.OK, pages));
+
+    private static (GraphStaffDirectoryService Service, RecordingHandler Handler, Factory Factory) Create(RecordingHandler handler)
     {
-        var handler = new RecordingHandler(status, json);
         var factory = new Factory(handler);
         return (new GraphStaffDirectoryService(factory), handler, factory);
+    }
+
+    private static string UserPage(int first, int count, string? nextLink = null)
+    {
+        var users = string.Join(",", Enumerable.Range(first, count).Select(i => $$"""{"onPremisesSamAccountName":"u{{i:D3}}","onPremisesDomainName":"dt2","displayName":"U{{i}}"}"""));
+        var next = nextLink is null ? string.Empty : $$""","@odata.nextLink":"{{nextLink}}" """;
+        return $$"""{"value":[{{users}}]{{next}}}""";
     }
 
     private static string DecodedFilter(HttpRequestMessage request) =>
@@ -46,7 +60,8 @@ public class GraphStaffDirectoryServiceTests
 
         var results = await service.SearchAsync("  \\  ");
 
-        Assert.Empty(results);
+        Assert.Empty(results.Users);
+        Assert.False(results.IsTruncated);
         Assert.Empty(handler.Requests);
     }
 
@@ -86,9 +101,10 @@ public class GraphStaffDirectoryServiceTests
         await service.SearchAsync("dt2\\jsmith  Jane");
 
         Assert.Equal(
-            "startsWith(onPremisesSamAccountName,'dt2') or startsWith(givenName,'dt2') or startsWith(surname,'dt2') or startsWith(displayName,'dt2')"
+            "(startsWith(onPremisesSamAccountName,'dt2') or startsWith(givenName,'dt2') or startsWith(surname,'dt2') or startsWith(displayName,'dt2')"
             + " or startsWith(onPremisesSamAccountName,'jsmith') or startsWith(givenName,'jsmith') or startsWith(surname,'jsmith') or startsWith(displayName,'jsmith')"
-            + " or startsWith(onPremisesSamAccountName,'Jane') or startsWith(givenName,'Jane') or startsWith(surname,'Jane') or startsWith(displayName,'Jane')",
+            + " or startsWith(onPremisesSamAccountName,'Jane') or startsWith(givenName,'Jane') or startsWith(surname,'Jane') or startsWith(displayName,'Jane'))"
+            + " and accountEnabled eq true",
             DecodedFilter(Assert.Single(handler.Requests)));
     }
 
@@ -130,7 +146,7 @@ public class GraphStaffDirectoryServiceTests
             ]}
             """);
 
-        var user = Assert.Single(await service.SearchAsync("jane"));
+        var user = Assert.Single((await service.SearchAsync("jane")).Users);
 
         Assert.Equal("dt2\\jsmith", user.Username);
         Assert.Equal("jane@example.test", user.Email);
@@ -146,7 +162,7 @@ public class GraphStaffDirectoryServiceTests
             {"value":[{"onPremisesSamAccountName":"asam","givenName":"Al","surname":"Sam"}]}
             """);
 
-        var user = Assert.Single(await service.SearchAsync("al"));
+        var user = Assert.Single((await service.SearchAsync("al")).Users);
 
         Assert.Equal("asam", user.Username);
         Assert.Equal(string.Empty, user.Email);
@@ -167,16 +183,85 @@ public class GraphStaffDirectoryServiceTests
 
         var results = await service.SearchAsync("e");
 
-        Assert.Equal(["dt2\\abe", "dt2\\zed"], results.Select(r => r.Username));
+        Assert.Equal(["dt2\\abe", "dt2\\zed"], results.Users.Select(r => r.Username));
     }
 
     [Fact]
-    public async Task SearchAsync_ReturnsAtMostFiftyUsers()
+    public async Task SearchAsync_ExcludesDisabledAccountsInTheQueryItselfSoTheyCannotUseUpAPage()
     {
-        var users = string.Join(",", Enumerable.Range(0, 80).Select(i => $$"""{"onPremisesSamAccountName":"u{{i:D3}}","onPremisesDomainName":"dt2","displayName":"U{{i}}"}"""));
-        var (service, _, _) = Create($$"""{"value":[{{users}}]}""");
+        var (service, handler, _) = Create();
 
-        Assert.Equal(50, (await service.SearchAsync("u")).Count);
+        await service.SearchAsync("smith");
+
+        Assert.EndsWith(" and accountEnabled eq true", DecodedFilter(Assert.Single(handler.Requests)), StringComparison.Ordinal);
+    }
+
+    // Legacy returned every match; only a safety cap applies here.
+    [Fact]
+    public async Task SearchAsync_MoreThanFiftyMatches_ReturnsThemAllWithoutTruncation()
+    {
+        var (service, _, _) = CreatePaged(UserPage(0, 80));
+
+        var results = await service.SearchAsync("u");
+
+        Assert.Equal(80, results.Users.Count);
+        Assert.False(results.IsTruncated);
+    }
+
+    [Fact]
+    public async Task SearchAsync_FollowsNextPageLinksAndSendsTheAdvancedQueryHeaderOnEveryPage()
+    {
+        var (service, handler, _) = CreatePaged(
+            UserPage(0, 100, nextLink: "https://graph.example.test/v1.0/users?$skiptoken=page2"),
+            UserPage(100, 30));
+
+        var results = await service.SearchAsync("u");
+
+        Assert.Equal(130, results.Users.Count);
+        Assert.False(results.IsTruncated);
+        Assert.Equal(2, handler.Requests.Count);
+        Assert.Equal("https://graph.example.test/v1.0/users?$skiptoken=page2", handler.Requests[1].RequestUri!.ToString());
+        Assert.All(handler.Requests, r => Assert.Equal("eventual", Assert.Single(r.Headers.GetValues("ConsistencyLevel"))));
+    }
+
+    [Fact]
+    public async Task SearchAsync_MoreMatchesThanTheCap_ReturnsTheFirstOnesSortedAndFlagsTruncation()
+    {
+        var pages = Enumerable.Range(0, 6)
+            .Select(i => UserPage(i * 100, 100, nextLink: "https://graph.example.test/v1.0/users?$skiptoken=next"))
+            .ToArray();
+        var (service, _, _) = CreatePaged(pages);
+
+        var results = await service.SearchAsync("u");
+
+        Assert.Equal(500, results.Users.Count);
+        Assert.True(results.IsTruncated);
+        Assert.Equal("dt2\\u000", results.Users[0].Username);
+    }
+
+    [Fact]
+    public async Task SearchAsync_RunsOutOfPagesWhileStillLinked_FlagsTruncation()
+    {
+        var pages = Enumerable.Range(0, 10)
+            .Select(i => UserPage(i, 1, nextLink: "https://graph.example.test/v1.0/users?$skiptoken=next"))
+            .ToArray();
+        var (service, handler, _) = CreatePaged(pages);
+
+        var results = await service.SearchAsync("u");
+
+        Assert.Equal(10, handler.Requests.Count);
+        Assert.True(results.IsTruncated);
+    }
+
+    // The Graph bearer token is attached to every request from this client.
+    [Fact]
+    public async Task SearchAsync_NextLinkForAnotherHost_IsNotFollowed()
+    {
+        var (service, handler, _) = CreatePaged(UserPage(0, 5, nextLink: "https://evil.example.test/v1.0/users?$skiptoken=x"));
+
+        await Assert.ThrowsAsync<GraphException>(() => service.SearchAsync("u"));
+
+        Assert.Single(handler.Requests);
     }
 
     [Fact]
@@ -184,7 +269,7 @@ public class GraphStaffDirectoryServiceTests
     {
         var (service, _, _) = Create("null");
 
-        Assert.Empty(await service.SearchAsync("jane"));
+        Assert.Empty((await service.SearchAsync("jane")).Users);
     }
 
     [Fact]

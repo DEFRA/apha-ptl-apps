@@ -25,15 +25,17 @@ public sealed class UserController(IUserService userService) : ControllerBase
     }
 
     [HttpGet("directory-search")]
-    public async Task<ActionResult<IReadOnlyList<StaffDirectoryUserResponse>>> SearchDirectory([FromQuery] string searchTerm, CancellationToken cancellationToken)
+    public async Task<ActionResult<StaffDirectorySearchResponse>> SearchDirectory([FromQuery] string searchTerm, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(searchTerm))
         {
-            return Ok(Array.Empty<StaffDirectoryUserResponse>());
+            return Ok(new StaffDirectorySearchResponse([], false));
         }
 
-        var results = await userService.SearchStaffDirectoryAsync(searchTerm, cancellationToken);
-        return Ok(results.Select(r => new StaffDirectoryUserResponse(r.Username, r.Email, r.FriendlyName, r.FirstName, r.LastName)).ToList());
+        var result = await userService.SearchStaffDirectoryAsync(searchTerm, cancellationToken);
+        return Ok(new StaffDirectorySearchResponse(
+            result.Users.Select(r => new StaffDirectoryUserResponse(r.Username, r.Email, r.FriendlyName, r.FirstName, r.LastName)).ToList(),
+            result.IsTruncated));
     }
 
     [HttpPost]

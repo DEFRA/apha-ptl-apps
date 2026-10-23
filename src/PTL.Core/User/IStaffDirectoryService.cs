@@ -6,5 +6,5 @@ namespace PTL.Core.User;
 // (PTL.Api.Infrastructure.GraphStaffDirectoryService), authenticated with the "Graph" app registration.
 public interface IStaffDirectoryService
 {
-    Task<IReadOnlyList<StaffDirectoryUser>> SearchAsync(string searchTerm, CancellationToken cancellationToken = default);
+    Task<StaffDirectorySearchResult> SearchAsync(string searchTerm, CancellationToken cancellationToken = default);
 }
