@@ -34,7 +34,7 @@
     var ONE_MINUTE_REMAINING_SECONDS = 60;
     var THIRTY_SECONDS_REMAINING = 30;
     var TEN_SECONDS_REMAINING = 10;
-    var ANNOUNCE_MILESTONES = [ONE_MINUTE_REMAINING_SECONDS, THIRTY_SECONDS_REMAINING, TEN_SECONDS_REMAINING];
+    var ANNOUNCE_MILESTONES = new Set([ONE_MINUTE_REMAINING_SECONDS, THIRTY_SECONDS_REMAINING, TEN_SECONDS_REMAINING]);
 
     var idleTimer = null;
     var countdownInterval = null;
@@ -79,7 +79,7 @@
     }
 
     function announceMilestone(remainingSeconds) {
-        if (!ANNOUNCE_MILESTONES.includes(remainingSeconds) || announcedMilestones[remainingSeconds]) {
+        if (!ANNOUNCE_MILESTONES.has(remainingSeconds) || announcedMilestones[remainingSeconds]) {
             return;
         }
 

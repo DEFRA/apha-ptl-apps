@@ -10,8 +10,8 @@
     var options = SessionTimeoutOptionsAccessor.Value;
     var warningAfterMs = (long)options.InactivityWarningAfter.TotalMilliseconds;
     var expireAfterMs = (long)options.ExpireAfterWarning.TotalMilliseconds;
-    // A data attribute, not a rendered <input>/<form> - several existing pages assert they render
-    // no form fields at all, which a visible antiforgery <input> would otherwise violate.
+    // Delivered as a data attribute, not a rendered form field - several existing pages assert
+    // they render no form fields at all, which a visible antiforgery field would otherwise violate.
     var antiforgeryToken = Antiforgery.GetAndStoreTokens(Context).RequestToken;
 }
 
