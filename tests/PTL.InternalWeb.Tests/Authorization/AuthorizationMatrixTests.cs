@@ -21,7 +21,8 @@ namespace PTL.InternalWeb.Tests.Authorization;
 // policies the legacy folder rules call for, so a new action cannot ship unclassified.
 public class AuthorizationMatrixTests
 {
-    private static readonly string[] DistributionsOnly = ["Index", "ViewStage", "Search"];
+    private static readonly string[] DistributionsOnly =
+        ["Index", "ViewStage", "Search", "ParticipantAddressLabels", "PrintParticipantAddressLabel"];
 
     // Legacy Scheduling/ folder pages and the Scheduling-only dashboard actions.
     private static readonly string[] SchedulingActions =

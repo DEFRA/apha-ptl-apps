@@ -17,7 +17,7 @@ public class DistributionControllerTabulationReportTests
     private static readonly Guid TestId = Guid.NewGuid();
 
     private static DistributionController CreateController(FakeDistributionApiClient apiClient) =>
-        new(apiClient) { ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() } };
+        new(apiClient, new FakeSearchApiClient()) { ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() } };
 
     internal static TabulationReportResponse Report(bool published = false) =>
         new(

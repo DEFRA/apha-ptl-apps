@@ -67,7 +67,7 @@ public class DistributionControllerAmendResultsTests
         var httpContext = new DefaultHttpContext();
         httpContext.Request.ContentType = "application/x-www-form-urlencoded";
         httpContext.Request.Form = new FormCollection(form.ToDictionary(f => f.Key, f => new StringValues(f.Values)));
-        return new(apiClient)
+        return new(apiClient, new FakeSearchApiClient())
         {
             ControllerContext = new ControllerContext { HttpContext = httpContext },
             TempData = new TempDataDictionary(new DefaultHttpContext(), new FakeTempDataProvider()),

@@ -1,0 +1,101 @@
+@model PTL.InternalWeb.Features.Distribution.ParticipantAddressLabelsViewModel
+@{
+    ViewData["Title"] = "Participant Address Labels";
+
+    // Same top-to-bottom order as the fields so the summary links follow the page layout.
+    string[] fieldOrder = ["Search.LabCode", "Search.LabName", "Search.ContactName"];
+
+    var errors = ViewData.ModelState
+        .Where(entry => entry.Value?.Errors.Count > 0)
+        .SelectMany(entry => entry.Value!.Errors.Select(error => (Field: entry.Key, Message: error.ErrorMessage)))
+        .OrderBy(error => Array.IndexOf(fieldOrder, error.Field))
+        .ToList();
+
+    string? FirstError(string key) =>
+        ViewData.ModelState.TryGetValue(key, out var entry) ? entry.Errors.FirstOrDefault()?.ErrorMessage : null;
+
+    var labCodeError = FirstError("Search.LabCode");
+    var labNameError = FirstError("Search.LabName");
+    var contactNameError = FirstError("Search.ContactName");
+}
+
+<govuk-error-summary errors="@errors" />
+
+<h1 class="govuk-heading-l">Participant Address Labels</h1>
+
+<p class="govuk-body">This page can be used to print single Participant Address labels.</p>
+
+<hr class="govuk-section-break govuk-section-break--m govuk-section-break--visible">
+
+<p class="govuk-body">Use the search criteria below to identify the required Participant by either Lab Code, Lab Name or Contact Name.</p>
+
+<form method="get" asp-action="ParticipantAddressLabels">
+    <input type="hidden" name="searched" value="true" />
+
+    <div class="govuk-form-group @(labCodeError is null ? null : "govuk-form-group--error")">
+        <label class="govuk-label" for="Search_LabCode">Lab Code</label>
+        @if (labCodeError is not null)
+        {
+            <p id="Search_LabCode-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @labCodeError</p>
+        }
+        <input asp-for="Search.LabCode" id="Search_LabCode" class="govuk-input govuk-input--width-10 @(labCodeError is null ? null : "govuk-input--error")" maxlength="8" aria-describedby="@(labCodeError is null ? null : "Search_LabCode-error")" />
+    </div>
+
+    <div class="govuk-form-group @(labNameError is null ? null : "govuk-form-group--error")">
+        <label class="govuk-label" for="Search_LabName">Lab Name</label>
+        @if (labNameError is not null)
+        {
+            <p id="Search_LabName-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @labNameError</p>
+        }
+        <input asp-for="Search.LabName" id="Search_LabName" class="govuk-input @(labNameError is null ? null : "govuk-input--error")" maxlength="50" aria-describedby="@(labNameError is null ? null : "Search_LabName-error")" />
+    </div>
+
+    <div class="govuk-form-group @(contactNameError is null ? null : "govuk-form-group--error")">
+        <label class="govuk-label" for="Search_ContactName">Contact Name</label>
+        @if (contactNameError is not null)
+        {
+            <p id="Search_ContactName-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @contactNameError</p>
+        }
+        <input asp-for="Search.ContactName" id="Search_ContactName" class="govuk-input @(contactNameError is null ? null : "govuk-input--error")" maxlength="50" aria-describedby="@(contactNameError is null ? null : "Search_ContactName-error")" />
+    </div>
+
+    <button class="govuk-button" data-module="govuk-button" type="submit">Search</button>
+</form>
+
+@if (Model.Results is not null)
+{
+    <hr class="govuk-section-break govuk-section-break--m govuk-section-break--visible">
+    <h2 class="govuk-heading-m">Search Results:</h2>
+
+    @if (Model.Results.Count == 0)
+    {
+        <p class="govuk-body">There are no Results to Display</p>
+    }
+    else
+    {
+        <table class="govuk-table">
+            <caption class="govuk-table__caption govuk-visually-hidden">Participant Address Labels search results</caption>
+            <thead class="govuk-table__head">
+                <tr class="govuk-table__row">
+                    <th scope="col" class="govuk-table__header">Lab Code</th>
+                    <th scope="col" class="govuk-table__header">Lab Name</th>
+                    <th scope="col" class="govuk-table__header">Contact Name</th>
+                    <th scope="col" class="govuk-table__header">Print</th>
+                </tr>
+            </thead>
+            <tbody class="govuk-table__body">
+                @foreach (var row in Model.Results)
+                {
+                    <tr class="govuk-table__row">
+                        <td class="govuk-table__cell">@row.LabCode</td>
+                        <td class="govuk-table__cell">@row.LabName</td>
+                        <td class="govuk-table__cell">@row.ContactName</td>
+                        <td class="govuk-table__cell">
+                            <a class="govuk-link" asp-action="PrintParticipantAddressLabel" asp-route-participantId="@row.ParticipantId">Print<span class="govuk-visually-hidden"> for @row.LabCode @row.LabName</span></a>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+}
