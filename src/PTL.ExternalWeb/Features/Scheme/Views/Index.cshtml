@@ -1,0 +1,75 @@
+@model PTL.ExternalWeb.Features.Scheme.SchemeListViewModel
+@{
+    ViewData["Title"] = "View schemes";
+}
+
+<h1 class="govuk-heading-xl">View schemes</h1>
+
+<h2 class="govuk-heading-l">Commercial schemes</h2>
+
+@if (Model.CommercialSchemes.Count == 0)
+{
+    <p class="govuk-body">No commercial schemes are available for the current year.</p>
+}
+else
+{
+    <table class="govuk-table">
+        <thead class="govuk-table__head">
+            <tr class="govuk-table__row">
+                <th scope="col" class="govuk-table__header">Scheme code</th>
+                <th scope="col" class="govuk-table__header">Scheme name</th>
+                <th scope="col" class="govuk-table__header">Year</th>
+                <th scope="col" class="govuk-table__header">Participating</th>
+            </tr>
+        </thead>
+        <tbody class="govuk-table__body">
+            @foreach (var scheme in Model.CommercialSchemes)
+            {
+                <tr class="govuk-table__row">
+                    <td class="govuk-table__cell">@scheme.Identifier</td>
+                    <td class="govuk-table__cell">@scheme.Name</td>
+                    <td class="govuk-table__cell">@scheme.Year</td>
+                    <td class="govuk-table__cell">
+                        @if (scheme.IsParticipating)
+                        {
+                            <strong class="govuk-tag govuk-tag--green">Yes</strong>
+                        }
+                        else
+                        {
+                            <span>No</span>
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+<h2 class="govuk-heading-l">Non-commercial schemes</h2>
+
+@if (Model.NonCommercialSchemes.Count == 0)
+{
+    <p class="govuk-body">You are not currently registered to any non-commercial schemes.</p>
+}
+else
+{
+    <table class="govuk-table">
+        <thead class="govuk-table__head">
+            <tr class="govuk-table__row">
+                <th scope="col" class="govuk-table__header">Scheme code</th>
+                <th scope="col" class="govuk-table__header">Scheme name</th>
+                <th scope="col" class="govuk-table__header">Year</th>
+            </tr>
+        </thead>
+        <tbody class="govuk-table__body">
+            @foreach (var scheme in Model.NonCommercialSchemes)
+            {
+                <tr class="govuk-table__row">
+                    <td class="govuk-table__cell">@scheme.Identifier</td>
+                    <td class="govuk-table__cell">@scheme.Name</td>
+                    <td class="govuk-table__cell">@scheme.Year</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}

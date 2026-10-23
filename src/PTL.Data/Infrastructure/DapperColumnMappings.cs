@@ -768,6 +768,15 @@ public static partial class DapperColumnMappings
             ["fldRecentName"] = nameof(SchemeSummaryEntity.RecentName),
         });
 
+        Map<ParticipantSchemeEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldSchemeId"] = nameof(ParticipantSchemeEntity.SchemeId),
+            ["fldSchemeCode"] = nameof(ParticipantSchemeEntity.Identifier),
+            ["fldSchemeName"] = nameof(ParticipantSchemeEntity.Name),
+            ["fldYear"] = nameof(ParticipantSchemeEntity.Year),
+            ["fldIsParticipating"] = nameof(ParticipantSchemeEntity.IsParticipating),
+        });
+
         Map<SchemeHistoryEntity>(new(StringComparer.OrdinalIgnoreCase)
         {
             ["fldCurrentSchemeId"] = nameof(SchemeHistoryEntity.SchemeId),

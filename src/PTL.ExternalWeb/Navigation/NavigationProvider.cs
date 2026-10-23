@@ -11,10 +11,11 @@ namespace PTL.ExternalWeb.Navigation;
 // "Navigation & Shared Chrome". Results' four children (Enter results/View results/View
 // reports/Enter comments) each carry their own RequiredRole, matching legacy's single "Results"
 // dropdown (NavigationBar.ascx.vb) where Viewer- and Test Consultant-only items sit alongside the
-// Participant ones in one group, rather than being split into separate top-level sections. No
-// screen behind any of these entries has its own migration slice yet, so every one routes to the
-// shared ComingSoonController rather than being a dead/disabled link, matching legacy's
-// always-clickable navigation (docs/Parity-Analysis/08-Migration-Parity-Tracker.md).
+// Participant ones in one group, rather than being split into separate top-level sections. "View
+// schemes" routes to the real SchemeController (first migrated slice); every other entry still has
+// no migration slice yet, so it routes to the shared ComingSoonController rather than being a
+// dead/disabled link, matching legacy's always-clickable navigation
+// (docs/Parity-Analysis/08-Migration-Parity-Tracker.md).
 public static class NavigationProvider
 {
     // Real, clickable link for a menu entry whose own page hasn't been migrated yet. requiredRole
@@ -29,7 +30,16 @@ public static class NavigationProvider
         {
             Text = "Schemes",
             RequiredRole = ExternalRoleNames.Participant,
-            Children = [Stub("View schemes", "List of current proficiency tests available")]
+            Children =
+            [
+                new NavigationItem
+                {
+                    Text = "View schemes",
+                    ControllerName = "Scheme",
+                    ActionName = "Index",
+                    Description = "List of current proficiency tests available"
+                }
+            ]
         },
         new NavigationItem
         {

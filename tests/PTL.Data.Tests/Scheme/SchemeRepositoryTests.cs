@@ -268,6 +268,52 @@ public class SchemeRepositoryTests
     }
 
     [Fact]
+    public async Task GetCommercialSchemesBySsoIdAsync_ReturnsMappedParticipantSchemes()
+    {
+        var (repository, connection) = CreateRepository();
+        var ssoId = Guid.NewGuid();
+        var schemeId = Guid.NewGuid();
+        var table = new DataTable();
+        table.Columns.Add("fldSchemeId", typeof(Guid));
+        table.Columns.Add("fldSchemeCode", typeof(string));
+        table.Columns.Add("fldSchemeName", typeof(string));
+        table.Columns.Add("fldYear", typeof(string));
+        table.Columns.Add("fldIsParticipating", typeof(int));
+        table.Rows.Add(schemeId, "PT1234", "Commercial Scheme", "2025/26", 1);
+        connection.RespondToQuery("EXEC dbo.spgCommercialSchemesBySsoId @SsoId, @CurrentFinancialYear", table);
+
+        var result = await repository.GetCommercialSchemesBySsoIdAsync(ssoId, 2025);
+
+        Assert.Single(result);
+        Assert.Equal(schemeId, result[0].SchemeId);
+        Assert.Equal("PT1234", result[0].Identifier);
+        Assert.Equal("2025/26", result[0].Year);
+        Assert.True(result[0].IsParticipating);
+    }
+
+    [Fact]
+    public async Task GetNonCommercialSchemesBySsoIdAsync_ReturnsMappedParticipantSchemes()
+    {
+        var (repository, connection) = CreateRepository();
+        var ssoId = Guid.NewGuid();
+        var schemeId = Guid.NewGuid();
+        var table = new DataTable();
+        table.Columns.Add("fldSchemeId", typeof(Guid));
+        table.Columns.Add("fldSchemeCode", typeof(string));
+        table.Columns.Add("fldSchemeName", typeof(string));
+        table.Columns.Add("fldYear", typeof(string));
+        table.Columns.Add("fldIsParticipating", typeof(int));
+        table.Rows.Add(schemeId, "PT5678", "Non-Commercial Scheme", "2025/26", 1);
+        connection.RespondToQuery("EXEC dbo.spgNonCommercialSchemesBySsoId @SsoId, @CurrentFinancialYear", table);
+
+        var result = await repository.GetNonCommercialSchemesBySsoIdAsync(ssoId, 2025);
+
+        Assert.Single(result);
+        Assert.Equal(schemeId, result[0].SchemeId);
+        Assert.Equal("Non-Commercial Scheme", result[0].Name);
+    }
+
+    [Fact]
     public async Task CreateAsync_InsertsAndReReadsScheme()
     {
         var (repository, connection) = CreateRepository();

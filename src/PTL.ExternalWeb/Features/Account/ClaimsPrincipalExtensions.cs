@@ -21,4 +21,9 @@ public static class ClaimsPrincipalExtensions
     /// ExternalUserClaimTypes.CanOrderOnline) - gates the Orders section.</summary>
     public static bool CanOrderOnline(this ClaimsPrincipal principal) =>
         principal.HasClaim(claim => claim.Type == ExternalUserClaimTypes.CanOrderOnline);
+
+    /// <summary>The resolved Participant's own id, or null if the Participant role didn't resolve
+    /// (e.g. a Viewer/Test Consultant-only user).</summary>
+    public static Guid? GetParticipantId(this ClaimsPrincipal principal) =>
+        Guid.TryParse(principal.FindFirst(ExternalUserClaimTypes.ParticipantId)?.Value, out var id) ? id : null;
 }

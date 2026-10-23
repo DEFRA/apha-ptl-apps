@@ -9,13 +9,13 @@ public class SchemeServiceTests
 {
     private static readonly Guid TestConsultantTabulationId = Guid.NewGuid();
     private static SchemeService CreateService(FakeSchemeRepository repository) =>
-        new(repository, new FakeLookupRepository(), new PTL.Api.Tests.Participant.FakeViewerRepository(), NullLogger<SchemeService>.Instance);
+        new(repository, new FakeLookupRepository(), new PTL.Api.Tests.Participant.FakeViewerRepository(), new PTL.Api.Tests.Participant.FakeParticipantRepository(), NullLogger<SchemeService>.Instance);
 
     private static SchemeService CreateService(FakeSchemeRepository repository, FakeLookupRepository lookupRepository) =>
-        new(repository, lookupRepository, new PTL.Api.Tests.Participant.FakeViewerRepository(), NullLogger<SchemeService>.Instance);
+        new(repository, lookupRepository, new PTL.Api.Tests.Participant.FakeViewerRepository(), new PTL.Api.Tests.Participant.FakeParticipantRepository(), NullLogger<SchemeService>.Instance);
 
     private static SchemeService CreateService(FakeSchemeRepository repository, FakeLookupRepository lookupRepository, PTL.Api.Tests.Participant.FakeViewerRepository viewerRepository) =>
-        new(repository, lookupRepository, viewerRepository, NullLogger<SchemeService>.Instance);
+        new(repository, lookupRepository, viewerRepository, new PTL.Api.Tests.Participant.FakeParticipantRepository(), NullLogger<SchemeService>.Instance);
 
     private static PTL.Core.Scheme.Scheme ValidScheme(int? yearId = null) => new()
     {
@@ -196,7 +196,7 @@ public class SchemeServiceTests
     public async Task CreateSchemeAsync_WithViewers_LinksEachViewerToTheScheme()
     {
         var viewerRepository = new PTL.Api.Tests.Participant.FakeViewerRepository();
-        var service = new SchemeService(new FakeSchemeRepository(), new FakeLookupRepository(), viewerRepository, NullLogger<SchemeService>.Instance);
+        var service = new SchemeService(new FakeSchemeRepository(), new FakeLookupRepository(), viewerRepository, new PTL.Api.Tests.Participant.FakeParticipantRepository(), NullLogger<SchemeService>.Instance);
         var scheme = ValidScheme();
         var firstViewer = Guid.NewGuid();
         var secondViewer = Guid.NewGuid();
@@ -215,7 +215,7 @@ public class SchemeServiceTests
     {
         var repository = new FakeSchemeRepository();
         var viewerRepository = new PTL.Api.Tests.Participant.FakeViewerRepository();
-        var service = new SchemeService(repository, new FakeLookupRepository(), viewerRepository, NullLogger<SchemeService>.Instance);
+        var service = new SchemeService(repository, new FakeLookupRepository(), viewerRepository, new PTL.Api.Tests.Participant.FakeParticipantRepository(), NullLogger<SchemeService>.Instance);
 
         var keptViewer = Guid.NewGuid();
         var removedViewer = Guid.NewGuid();
@@ -727,5 +727,44 @@ public class SchemeServiceTests
 
         Assert.False(renewed.CanEditApr);
         Assert.True(renewed.DistributionMonthApr);
+    }
+
+    [Fact]
+    public async Task GetSchemesForParticipantAsync_KnownParticipant_PassesTheirSsoIdToBothRepositoryCalls()
+    {
+        var repository = new FakeSchemeRepository
+        {
+            CommercialSchemesBySsoId = [new ParticipantSchemeEntity { SchemeId = Guid.NewGuid(), Identifier = "PT1111", Name = "Commercial", Year = "2025/26", IsParticipating = true }],
+            NonCommercialSchemesBySsoId = [new ParticipantSchemeEntity { SchemeId = Guid.NewGuid(), Identifier = "PT2222", Name = "Non-Commercial", Year = "2025/26", IsParticipating = true }]
+        };
+        var participantRepository = new PTL.Api.Tests.Participant.FakeParticipantRepository();
+        var ssoId = Guid.NewGuid();
+        var participant = await participantRepository.CreateAsync(new PTL.Core.Participant.Participant { SsoId = ssoId });
+        var service = new SchemeService(repository, new FakeLookupRepository(), new PTL.Api.Tests.Participant.FakeViewerRepository(), participantRepository, NullLogger<SchemeService>.Instance);
+
+        var result = await service.GetSchemesForParticipantAsync(participant.ParticipantId);
+
+        Assert.Single(result.CommercialSchemes);
+        Assert.Equal("PT1111", result.CommercialSchemes[0].Identifier);
+        Assert.Single(result.NonCommercialSchemes);
+        Assert.Equal("PT2222", result.NonCommercialSchemes[0].Identifier);
+        Assert.Equal(ssoId, repository.LastCommercialCall!.Value.SsoId);
+        Assert.Equal(ssoId, repository.LastNonCommercialCall!.Value.SsoId);
+    }
+
+    [Fact]
+    public async Task GetSchemesForParticipantAsync_UnknownParticipant_ReturnsEmptyListsWithoutCallingRepository()
+    {
+        var repository = new FakeSchemeRepository
+        {
+            CommercialSchemesBySsoId = [new ParticipantSchemeEntity { SchemeId = Guid.NewGuid(), Identifier = "PT1111", Name = "Commercial", Year = "2025/26", IsParticipating = true }]
+        };
+        var service = CreateService(repository);
+
+        var result = await service.GetSchemesForParticipantAsync(Guid.NewGuid());
+
+        Assert.Empty(result.CommercialSchemes);
+        Assert.Empty(result.NonCommercialSchemes);
+        Assert.Null(repository.LastCommercialCall);
     }
 }

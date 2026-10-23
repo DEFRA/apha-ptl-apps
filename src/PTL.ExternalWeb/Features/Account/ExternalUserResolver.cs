@@ -82,6 +82,11 @@ public sealed partial class ExternalUserResolver(IExternalUserApiClient external
             claims[ExternalUserClaimTypes.CanOrderOnline] = "true";
         }
 
+        if (response.ParticipantId is { } participantId)
+        {
+            claims[ExternalUserClaimTypes.ParticipantId] = participantId.ToString();
+        }
+
         return CidmExternalUserResolution.Allow(claims);
     }
 

@@ -91,6 +91,23 @@ internal sealed class FakeSchemeRepository : ISchemeRepository
         return Task.FromResult(history);
     }
 
+    public IReadOnlyList<ParticipantSchemeEntity> CommercialSchemesBySsoId { get; set; } = [];
+    public IReadOnlyList<ParticipantSchemeEntity> NonCommercialSchemesBySsoId { get; set; } = [];
+    public (Guid SsoId, int CurrentFinancialYear)? LastCommercialCall { get; private set; }
+    public (Guid SsoId, int CurrentFinancialYear)? LastNonCommercialCall { get; private set; }
+
+    public Task<IReadOnlyList<ParticipantSchemeEntity>> GetCommercialSchemesBySsoIdAsync(Guid ssoId, int currentFinancialYear, CancellationToken cancellationToken = default)
+    {
+        LastCommercialCall = (ssoId, currentFinancialYear);
+        return Task.FromResult(CommercialSchemesBySsoId);
+    }
+
+    public Task<IReadOnlyList<ParticipantSchemeEntity>> GetNonCommercialSchemesBySsoIdAsync(Guid ssoId, int currentFinancialYear, CancellationToken cancellationToken = default)
+    {
+        LastNonCommercialCall = (ssoId, currentFinancialYear);
+        return Task.FromResult(NonCommercialSchemesBySsoId);
+    }
+
     public Task<PTL.Core.Scheme.Scheme> CreateAsync(PTL.Core.Scheme.Scheme scheme, CancellationToken cancellationToken = default)
     {
         scheme.SampleNoSequence = 1;

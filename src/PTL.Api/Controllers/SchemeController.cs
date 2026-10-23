@@ -72,6 +72,17 @@ public sealed class SchemeController(ISchemeService schemeService, ILogger<Schem
         return Ok(history.Select(ToHistoryResponse).ToList());
     }
 
+    // GET /api/schemes/participant/{participantId} - legacy ExternalWeb SchemeList.aspx: commercial
+    // + non-commercial schemes for the signed-in participant, current financial year only.
+    [HttpGet("schemes/participant/{participantId:guid}")]
+    public async Task<ActionResult<ParticipantSchemeListResponse>> GetSchemesForParticipant(Guid participantId, CancellationToken cancellationToken)
+    {
+        var result = await schemeService.GetSchemesForParticipantAsync(participantId, cancellationToken);
+        return Ok(new ParticipantSchemeListResponse(
+            result.CommercialSchemes.Select(ToParticipantSchemeResponse).ToList(),
+            result.NonCommercialSchemes.Select(ToParticipantSchemeResponse).ToList()));
+    }
+
     // GET /api/schemes/{schemeId}/renew - legacy Scheme.aspx?SchemeId=..&renewal=true: builds an
     // unsaved draft for the following year, carried by the same SharedId. The draft is then saved
     // through the normal POST /api/schemes - it isn't persisted here.
@@ -345,4 +356,11 @@ public sealed class SchemeController(ISchemeService schemeService, ILogger<Schem
         scheme.YearId,
         scheme.Identifier,
         scheme.Name);
+
+    private static ParticipantSchemeSummaryResponse ToParticipantSchemeResponse(ParticipantSchemeEntity scheme) => new(
+        scheme.SchemeId,
+        scheme.Identifier,
+        scheme.Name,
+        scheme.Year,
+        scheme.IsParticipating);
 }

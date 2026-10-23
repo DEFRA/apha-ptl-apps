@@ -68,6 +68,35 @@ public class SchemeApiClientTests
     }
 
     [Fact]
+    public async Task GetSchemesForParticipantAsync_ReturnsDeserializedLists()
+    {
+        const string json = """
+            {
+                "commercialSchemes":[{"schemeId":"11111111-1111-1111-1111-111111111111","identifier":"PT1111","name":"Commercial","year":"2025/26","isParticipating":true}],
+                "nonCommercialSchemes":[]
+            }
+            """;
+        var client = CreateClient(HttpStatusCode.OK, json);
+
+        var result = await client.GetSchemesForParticipantAsync(Guid.NewGuid());
+
+        Assert.Single(result.CommercialSchemes);
+        Assert.Equal("PT1111", result.CommercialSchemes[0].Identifier);
+        Assert.Empty(result.NonCommercialSchemes);
+    }
+
+    [Fact]
+    public async Task GetSchemesForParticipantAsync_NullResponse_ReturnsEmptyLists()
+    {
+        var client = CreateClient(HttpStatusCode.OK, "null");
+
+        var result = await client.GetSchemesForParticipantAsync(Guid.NewGuid());
+
+        Assert.Empty(result.CommercialSchemes);
+        Assert.Empty(result.NonCommercialSchemes);
+    }
+
+    [Fact]
     public async Task RenewSchemeAsync_NotFound_ReturnsNull()
     {
         var client = CreateClient(HttpStatusCode.NotFound, null);
