@@ -76,6 +76,17 @@ public class SideNavigationProviderTests
     }
 
     [Fact]
+    public void Build_Distributions_ListsGroupAddressLabelsAsAnEnabledLiveNode()
+    {
+        var node = SideNavigationProvider.FindNode(SideNavigationProvider.Build(), "Distribution", "GroupAddressLabels");
+
+        Assert.NotNull(node);
+        Assert.Equal("Group Address Labels", node!.Text);
+        Assert.True(node.IsEnabled);
+        Assert.False(node.IsHidden);
+    }
+
+    [Fact]
     public void FindNode_ExistingNode_ReturnsMatch()
     {
         var tree = SideNavigationProvider.Build();
@@ -134,6 +145,7 @@ public class SideNavigationProviderTests
     [InlineData("SampleReceipt", "Submission Status")]
     [InlineData("Search", "Search")]
     [InlineData("ParticipantAddressLabels", "Participant Address Labels")]
+    [InlineData("GroupAddressLabels", "Group Address Labels")]
     public void FindPath_DistributionScreens_ReturnsFullAncestorChain(string actionName, string expectedText)
     {
         var tree = SideNavigationProvider.Build();

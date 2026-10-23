@@ -3,6 +3,7 @@ using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using PTL.ApiClient;
 using PTL.ApiClient.Distribution;
 using PTL.Contracts.Distribution;
 using PTL.InternalWeb.Tests.TestSupport;
@@ -26,6 +27,8 @@ public class DistributionBreadcrumbTests : IClassFixture<WebApplicationFactory<P
             {
                 services.RemoveAll<IDistributionApiClient>();
                 services.AddSingleton<IDistributionApiClient>(_apiClient);
+                services.RemoveAll<ILookupApiClient>();
+                services.AddSingleton<ILookupApiClient>(new FakeLookupApiClient());
             }));
     }
 
@@ -136,6 +139,20 @@ public class DistributionBreadcrumbTests : IClassFixture<WebApplicationFactory<P
 
         Assert.Contains("<h1 class=\"govuk-heading-l\">Participant Address Labels</h1>", html, StringComparison.Ordinal);
         Assert.Equal(["Home", "Distributions", "Participant Address Labels"], crumbs.Select(c => c.Text));
+        Assert.NotNull(crumbs[1].Href);
+        Assert.Null(crumbs[2].Href);
+    }
+
+    // Same sibling pattern as ParticipantAddressLabels - no year/month context, legacy
+    // Distributions/GroupAddress.aspx, always fetches (no searched flag).
+    [Fact]
+    public async Task GroupAddressLabels_ShowsHomeDistributionsGroupAddressLabels_AndRendersTheHeading()
+    {
+        var html = await HtmlAsync("/Distribution/GroupAddressLabels");
+        var crumbs = await CrumbsAsync("/Distribution/GroupAddressLabels");
+
+        Assert.Contains("<h1 class=\"govuk-heading-l\">Group Address Labels</h1>", html, StringComparison.Ordinal);
+        Assert.Equal(["Home", "Distributions", "Group Address Labels"], crumbs.Select(c => c.Text));
         Assert.NotNull(crumbs[1].Href);
         Assert.Null(crumbs[2].Href);
     }

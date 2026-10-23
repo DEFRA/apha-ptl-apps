@@ -30,7 +30,7 @@ public class DistributionControllerActualResultsTests
     private static readonly Guid MethodDropdown = Guid.Parse("a1000000-0000-0000-0000-000000000002");
 
     private static DistributionController CreateController(FakeDistributionApiClient apiClient) =>
-        new(apiClient, new FakeSearchApiClient())
+        new(apiClient, new FakeSearchApiClient(), new FakeLookupApiClient())
         {
             TempData = new TempDataDictionary(new DefaultHttpContext(), new FakeTempDataProvider()),
         };

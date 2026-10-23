@@ -31,7 +31,7 @@ namespace PTL.InternalWeb.Features.Distribution;
 // Distributions/ folder - held by anyone with Internal User or Scheduling); Scheduling/ pages and actions
 // additionally need Scheduling, and Internal User/ pages (Preparation, Packaging, Results) need Internal User.
 [Authorize(Policy = PtlPolicies.Distributions)]
-public sealed partial class DistributionController(IDistributionApiClient distributionApiClient, ISearchApiClient searchApiClient) : Controller
+public sealed partial class DistributionController(IDistributionApiClient distributionApiClient, ISearchApiClient searchApiClient, ILookupApiClient lookupApiClient) : Controller
 {
     private static readonly string[] MonthOrder =
     [

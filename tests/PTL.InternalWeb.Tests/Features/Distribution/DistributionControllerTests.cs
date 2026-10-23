@@ -14,7 +14,7 @@ namespace PTL.InternalWeb.Tests.Features.Distribution;
 public class DistributionControllerTests
 {
     private static DistributionController CreateController(IDistributionApiClient apiClient) =>
-        new(apiClient, new FakeSearchApiClient())
+        new(apiClient, new FakeSearchApiClient(), new FakeLookupApiClient())
         {
             TempData = new TempDataDictionary(new DefaultHttpContext(), new FakeTempDataProvider())
         };

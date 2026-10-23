@@ -12,7 +12,7 @@ namespace PTL.InternalWeb.Tests.Features.Distribution;
 public class DistributionControllerParticipantAddressLabelsTests
 {
     private static DistributionController CreateController(FakeSearchApiClient searchApiClient) =>
-        new(new FakeDistributionApiClient(), searchApiClient);
+        new(new FakeDistributionApiClient(), searchApiClient, new FakeLookupApiClient());
 
     private static ParticipantAddressLabelsViewModel ModelOf(IActionResult result) =>
         Assert.IsType<ParticipantAddressLabelsViewModel>(Assert.IsType<ViewResult>(result).Model);

@@ -20,7 +20,7 @@ public class DistributionControllerPackagingTests
     private static readonly Guid Dp3 = Guid.Parse("d0000000-0000-0000-0000-0000000000d3");
 
     private static DistributionController CreateController(FakeDistributionApiClient apiClient) =>
-        new(apiClient, new FakeSearchApiClient())
+        new(apiClient, new FakeSearchApiClient(), new FakeLookupApiClient())
         {
             TempData = new TempDataDictionary(new DefaultHttpContext(), new FakeTempDataProvider()),
         };
