@@ -8,18 +8,33 @@
         return;
     }
 
-    var warningAfterMs = parseInt(banner.getAttribute('data-warning-after-ms'), 10);
-    var expireAfterMs = parseInt(banner.getAttribute('data-expire-after-ms'), 10);
-    var extendUrl = banner.getAttribute('data-extend-url');
-    var expiredUrl = banner.getAttribute('data-expired-url');
+    var warningAfterMs = Number.parseInt(banner.dataset.warningAfterMs, 10);
+    var expireAfterMs = Number.parseInt(banner.dataset.expireAfterMs, 10);
+    var extendUrl = toSafeRelativeUrl(banner.dataset.extendUrl);
+    var expiredUrl = toSafeRelativeUrl(banner.dataset.expiredUrl);
     var countdownEl = document.getElementById('session-timeout-countdown');
     var announcementEl = document.getElementById('session-timeout-countdown-announcement');
     var extendButton = document.getElementById('session-timeout-extend');
-    var antiforgeryToken = banner.getAttribute('data-antiforgery-token');
+    var antiforgeryToken = banner.dataset.antiforgeryToken;
+
+    // Only ever a same-origin relative path (never scheme-relative/absolute) is accepted here -
+    // these attributes are server-generated and trustworthy today, but navigating/fetching based on
+    // unvalidated DOM-read text is a DOM-based open-redirect risk if that ever changes (CodeQL
+    // js/xss-through-dom). Returns null for anything else so callers can fail safe.
+    function toSafeRelativeUrl(value) {
+        return typeof value === 'string' && /^\/(?!\/)/.test(value) ? value : null;
+    }
+
+    if (!extendUrl || !expiredUrl) {
+        return;
+    }
 
     // Seconds-remaining points at which the hidden live region re-announces the countdown - not
     // every second, which would be unusably disruptive for screen reader users.
-    var ANNOUNCE_MILESTONES = [60, 30, 10];
+    var ONE_MINUTE_REMAINING_SECONDS = 60;
+    var THIRTY_SECONDS_REMAINING = 30;
+    var TEN_SECONDS_REMAINING = 10;
+    var ANNOUNCE_MILESTONES = [ONE_MINUTE_REMAINING_SECONDS, THIRTY_SECONDS_REMAINING, TEN_SECONDS_REMAINING];
 
     var idleTimer = null;
     var countdownInterval = null;
@@ -64,12 +79,12 @@
     }
 
     function announceMilestone(remainingSeconds) {
-        if (ANNOUNCE_MILESTONES.indexOf(remainingSeconds) === -1 || announcedMilestones[remainingSeconds]) {
+        if (!ANNOUNCE_MILESTONES.includes(remainingSeconds) || announcedMilestones[remainingSeconds]) {
             return;
         }
 
         announcedMilestones[remainingSeconds] = true;
-        announcementEl.textContent = 'You will be signed out in ' + remainingSeconds + ' seconds unless you choose to continue.';
+        announcementEl.textContent = `You will be signed out in ${remainingSeconds} seconds unless you choose to continue.`;
     }
 
     function hideWarning() {
@@ -97,7 +112,7 @@
             method: 'POST',
             credentials: 'same-origin',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: '__RequestVerificationToken=' + encodeURIComponent(antiforgeryToken)
+            body: `__RequestVerificationToken=${encodeURIComponent(antiforgeryToken)}`
         }).then(function (response) {
             if (response.ok) {
                 hideWarning();

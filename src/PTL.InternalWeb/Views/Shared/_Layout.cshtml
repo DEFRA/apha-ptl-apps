@@ -1,6 +1,3 @@
-@using Microsoft.Extensions.Options
-@using PTL.InternalWeb.SessionTimeout
-@inject IOptions<SessionTimeoutOptions> SessionTimeoutOptionsAccessor
 @{
     var currentController = (ViewContext.RouteData.Values["controller"]?.ToString() ?? string.Empty).Trim();
     var currentAction = (ViewContext.RouteData.Values["action"]?.ToString() ?? string.Empty).Trim();
@@ -22,9 +19,6 @@
     {
         title = $"Error: {title}";
     }
-
-    var sessionTimeoutOptions = SessionTimeoutOptionsAccessor.Value;
-    var noScriptSessionRefreshSeconds = (int)(sessionTimeoutOptions.InactivityWarningAfter + sessionTimeoutOptions.ExpireAfterWarning).TotalSeconds;
 }
 <!DOCTYPE html>
 <html lang="en" class="govuk-template app-html-class">
@@ -34,16 +28,6 @@
     <title>@title</title>
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="theme-color" content="blue">
-    @* Without JavaScript no inactivity warning/countdown can be shown at all (progressive-
-       enhancement limitation) - the best available fallback is a hard redirect to the Session
-       Expired page once the full inactivity-plus-warning duration has elapsed. Must live in
-       <head> - meta http-equiv="refresh" is only reliably honoured there, not deep in <body>. *@
-    @if (User.Identity?.IsAuthenticated == true)
-    {
-        <noscript>
-            <meta http-equiv="refresh" content="@noScriptSessionRefreshSeconds; url=@Url.Action("SessionExpired", "Account")">
-        </noscript>
-    }
     <link rel="stylesheet" href="/css/govuk-frontend-6.5.0.min.css">
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
     <link rel="icon" sizes="48x48" href="/assets/images/favicon.ico">
