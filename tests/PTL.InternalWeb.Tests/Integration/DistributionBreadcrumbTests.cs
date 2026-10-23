@@ -127,6 +127,19 @@ public class DistributionBreadcrumbTests : IClassFixture<WebApplicationFactory<P
         Assert.Null(crumbs[2].Href);
     }
 
+    // Same sibling pattern as Search - no year/month context, legacy Distributions/ParticipantAddress.aspx.
+    [Fact]
+    public async Task ParticipantAddressLabels_ShowsHomeDistributionsParticipantAddressLabels_AndRendersTheHeading()
+    {
+        var html = await HtmlAsync("/Distribution/ParticipantAddressLabels");
+        var crumbs = await CrumbsAsync("/Distribution/ParticipantAddressLabels");
+
+        Assert.Contains("<h1 class=\"govuk-heading-l\">Participant Address Labels</h1>", html, StringComparison.Ordinal);
+        Assert.Equal(["Home", "Distributions", "Participant Address Labels"], crumbs.Select(c => c.Text));
+        Assert.NotNull(crumbs[1].Href);
+        Assert.Null(crumbs[2].Href);
+    }
+
     [Fact]
     public async Task Preparation_HasNoBackLinkBecauseTheBreadcrumbsLeadBack()
     {

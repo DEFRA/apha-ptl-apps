@@ -8,7 +8,7 @@ namespace PTL.InternalWeb.Tests.Features.Distribution;
 // Monthly Distributions - Tabulations screen - legacy Scheduling/Tabulations.aspx.
 public class DistributionControllerTabulationsTests
 {
-    private static DistributionController CreateController(FakeDistributionApiClient apiClient) => new(apiClient);
+    private static DistributionController CreateController(FakeDistributionApiClient apiClient) => new(apiClient, new FakeSearchApiClient());
 
     private static TabulationActionResponse Action(string text, bool enabled, string hint, string command) => new(text, enabled, hint, command);
 

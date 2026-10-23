@@ -303,11 +303,10 @@ public static class SideNavigationProvider
             OptionalLinkQueryKeys = YearKey,
             Children =
             [
-                // Legacy sitemap siblings of MenuDistributions.aspx - not implemented yet (only
-                // the dashboard and Monthly Distributions scheduling screen are in scope for this
-                // story), shown disabled so the overall menu shape matches legacy until each is
-                // migrated.
-                Disabled("Participant Address Labels"),
+                // Legacy sitemap siblings of MenuDistributions.aspx - not implemented yet (only the
+                // dashboard, Monthly Distributions scheduling screen, Search and Participant Address
+                // Labels are in scope so far), shown disabled so the overall menu shape matches
+                new SideNavigationItem { Text = "Participant Address Labels", ControllerName = DistributionControllerName, ActionName = "ParticipantAddressLabels" },
                 Disabled("Group Address Labels"),
                 new SideNavigationItem { Text = SearchControllerName, ControllerName = DistributionControllerName, ActionName = SearchControllerName },
                 new SideNavigationItem
