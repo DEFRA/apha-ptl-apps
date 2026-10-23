@@ -383,37 +383,45 @@ public class SystemAdministrationController : Controller
 
         if (ModelState.IsValid)
         {
-            var candidate = search.Users.FirstOrDefault(u => string.Equals(u.Username, model.SelectedCandidate, StringComparison.OrdinalIgnoreCase));
-            if (candidate is null)
+            var created = await TryCreateSelectedUserAsync(model, search, cancellationToken);
+            if (created)
             {
-                ModelState.AddModelError(nameof(model.SelectedCandidate), "The selected user is no longer available. Search again");
-            }
-            else
-            {
-                var result = await userApiClient.CreateUserAsync(
-                    new CreateUserRequest(candidate.Username, candidate.Email, candidate.FriendlyName, candidate.FirstName, candidate.LastName, model.Department, GetCurrentUserId()),
-                    cancellationToken);
-
-                if (result.Success)
-                {
-                    return View(nameof(CreateUser), new CreateUserViewModel { IsCreated = true, Message = "User added successfully" });
-                }
-
-                foreach (var (field, messages) in result.FieldErrors)
-                {
-                    // Only Department is a field on this form; the other validated values come from the
-                    // directory, so their errors are shown without a link to a field that is not there.
-                    var key = field == nameof(model.Department) ? field : string.Empty;
-                    foreach (var errorMessage in messages)
-                    {
-                        ModelState.AddModelError(key, errorMessage);
-                    }
-                }
+                return View(nameof(CreateUser), new CreateUserViewModel { IsCreated = true, Message = "User added successfully" });
             }
         }
 
         ApplySearchResult(model, search);
         return View(nameof(CreateUser), model);
+    }
+
+    // Creates the account for model.SelectedCandidate using the directory's own details for that username.
+    // Returns false (with the reason in ModelState) when the user is not in the search results or the API
+    // rejects the request.
+    private async Task<bool> TryCreateSelectedUserAsync(CreateUserViewModel model, StaffDirectorySearchResponse search, CancellationToken cancellationToken)
+    {
+        var candidate = search.Users.FirstOrDefault(u => string.Equals(u.Username, model.SelectedCandidate, StringComparison.OrdinalIgnoreCase));
+        if (candidate is null)
+        {
+            ModelState.AddModelError(nameof(model.SelectedCandidate), "The selected user is no longer available. Search again");
+            return false;
+        }
+
+        var result = await userApiClient.CreateUserAsync(
+            new CreateUserRequest(candidate.Username, candidate.Email, candidate.FriendlyName, candidate.FirstName, candidate.LastName, model.Department, GetCurrentUserId()),
+            cancellationToken);
+
+        foreach (var (field, messages) in result.FieldErrors)
+        {
+            // Only Department is a field on this form; the other validated values come from the
+            // directory, so their errors are shown without a link to a field that is not there.
+            var key = field == nameof(model.Department) ? field : string.Empty;
+            foreach (var errorMessage in messages)
+            {
+                ModelState.AddModelError(key, errorMessage);
+            }
+        }
+
+        return result.Success;
     }
 
     // A directory failure shows a problem message at the top of the page (no field to link to) instead of

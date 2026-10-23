@@ -37,7 +37,7 @@ public sealed class GraphStaffDirectoryService(IHttpClientFactory httpClientFact
 
         var client = httpClientFactory.CreateClient(GraphServiceCollectionExtensions.GraphHttpClientName);
         var users = new List<StaffDirectoryUser>();
-        string? nextUrl = firstUrl;
+        var nextUrl = firstUrl;
 
         for (var page = 0; page < MaxPages && nextUrl is not null && users.Count <= MaxResults; page++)
         {
