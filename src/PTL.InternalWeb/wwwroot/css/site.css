@@ -183,6 +183,11 @@ body {
   }
 }
 
+/* govuk-error-message sets display:block, which would otherwise override the hidden attribute. */
+.govuk-error-message[hidden] {
+  display: none;
+}
+
 /* A table that gains a column per record (Results Tabulations) outgrows the page once there are a
    few of them. Scroll it horizontally instead of letting it overflow the layout; width:auto lets
    the columns keep their natural size rather than being squeezed by the container. */

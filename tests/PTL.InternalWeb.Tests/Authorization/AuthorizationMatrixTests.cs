@@ -28,7 +28,7 @@ public class AuthorizationMatrixTests
     private static readonly string[] SchedulingActions =
     [
         "InitialiseMonth", "Schedule", "ToggleCancelled", "SampleNumbers", "IntendedResults", "Participants",
-        "ChangeDeadline", "RepeatDistribution", "Tabulations", "Tabulation", "PublishedTabulations", "PublishedTabulation",
+        "ChangeDeadline", "EditDeadline", "RepeatDistribution", "Tabulations", "Tabulation", "PublishedTabulations", "PublishedTabulation",
         "TabulationAssessmentResults", "PublishedAssessmentResults", "TabulationAttachment", "PublishedTabulationAttachment",
         "ViewComments", "ViewCommentsUpload", "ViewCommentsRemoveAttachment", "ViewCommentsAttachment",
         "ViewCommentsStagedAttachment", "AmendResults"

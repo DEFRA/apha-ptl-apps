@@ -594,6 +594,77 @@ public class DistributionControllerTests
         Assert.Equal("The deadline date could not be saved. Please try again later.", notification.Message);
     }
 
+    [Fact]
+    public async Task ChangeDeadline_Post_Failure_KeepsTheEditedRowsChangeFormOpen()
+    {
+        var apiClient = new FakeDistributionApiClient
+        {
+            ChangeDeadlineResult = new ChangeDeadlineResult(false, "Deadline Date required.", null),
+            Participants = ParticipantsResponse(),
+        };
+        var controller = CreateController(apiClient);
+
+        var result = await controller.ChangeDeadline(2026, 4, ParticipantsSchemeId, DistributionParticipantId, PostedParticipantsModel(null, null), CancellationToken.None);
+
+        var model = Assert.IsType<DistributionParticipantsViewModel>(Assert.IsType<ViewResult>(result).Model);
+        Assert.Equal(DistributionParticipantId, model.EditParticipantId);
+    }
+
+    // The Change Deadline Date and Cancel buttons are server round trips, so they work without scripting.
+    [Fact]
+    public async Task EditDeadline_Edit_ReopensThePageWithThatRowsChangeFormAndNothingSaved()
+    {
+        var apiClient = new FakeDistributionApiClient { Participants = ParticipantsResponse() };
+        var controller = CreateController(apiClient);
+        controller.ModelState.AddModelError("Participants[0].NewDeadlineDate", "stale");
+
+        var result = await controller.EditDeadline(2026, 4, ParticipantsSchemeId, DistributionParticipantId, "edit", PostedParticipantsModel(), CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        Assert.Equal(nameof(DistributionController.Participants), view.ViewName);
+        var model = Assert.IsType<DistributionParticipantsViewModel>(view.Model);
+        Assert.Equal(DistributionParticipantId, model.EditParticipantId);
+        Assert.Equal("PT0060: Mastitis bovine", model.SchemeHeading);
+        Assert.True(controller.ModelState.IsValid);
+        Assert.Empty(apiClient.SavedDeadlines);
+    }
+
+    [Theory]
+    [InlineData("cancel")]
+    [InlineData(null)]
+    public async Task EditDeadline_CancelOrNoCommand_ClosesEveryChangeForm(string? command)
+    {
+        var controller = CreateController(new FakeDistributionApiClient { Participants = ParticipantsResponse() });
+
+        var result = await controller.EditDeadline(2026, 4, ParticipantsSchemeId, DistributionParticipantId, command, PostedParticipantsModel(), CancellationToken.None);
+
+        var model = Assert.IsType<DistributionParticipantsViewModel>(Assert.IsType<ViewResult>(result).Model);
+        Assert.Null(model.EditParticipantId);
+    }
+
+    [Fact]
+    public async Task EditDeadline_CarriesTheTickedRepeatSelectionsOver()
+    {
+        var controller = CreateController(new FakeDistributionApiClient { Participants = ParticipantsResponse() });
+        var posted = PostedRepeatModel(selectParticipant: true, selectAdditional: true);
+
+        var result = await controller.EditDeadline(2026, 4, ParticipantsSchemeId, DistributionParticipantId, "edit", posted, CancellationToken.None);
+
+        var model = Assert.IsType<DistributionParticipantsViewModel>(Assert.IsType<ViewResult>(result).Model);
+        Assert.True(Assert.Single(model.Participants).Selected);
+        Assert.True(Assert.Single(model.AdditionalParticipants).Selected);
+    }
+
+    [Fact]
+    public async Task EditDeadline_UnknownScheme_ReturnsNotFound()
+    {
+        var controller = CreateController(new FakeDistributionApiClient());
+
+        var result = await controller.EditDeadline(2026, 4, ParticipantsSchemeId, DistributionParticipantId, "edit", PostedParticipantsModel(), CancellationToken.None);
+
+        Assert.IsType<NotFoundResult>(result);
+    }
+
     private static DistributionParticipantsViewModel PostedRepeatModel(bool selectParticipant = true, bool selectAdditional = false) => new()
     {
         MonthlyDistributionSchemeId = ParticipantsSchemeId,
@@ -637,15 +708,11 @@ public class DistributionControllerTests
         Assert.Contains(saved.Selections, s => s.Id == AdditionalParticipantSchemeId && s.IsAdditional);
     }
 
-    // Legacy client-side checkifchecked() guard, re-enforced server-side.
+    // Legacy client-side checkifchecked() guard, enforced on the server so the message shows without scripting.
     [Fact]
-    public async Task RepeatDistribution_Post_EmptySelection_ShowsApiErrorMessageAndRedisplays()
+    public async Task RepeatDistribution_Post_EmptySelection_AddsTheSelectionErrorAndDoesNotCallTheApi()
     {
-        var apiClient = new FakeDistributionApiClient
-        {
-            RepeatDistributionResult = new RepeatDistributionResult(false, "Please tick at least one participant to be included in the repeat of this distribution."),
-            Participants = ParticipantsResponse(),
-        };
+        var apiClient = new FakeDistributionApiClient { Participants = ParticipantsResponse() };
         var controller = CreateController(apiClient);
         var model = PostedRepeatModel(selectParticipant: false, selectAdditional: false);
 
@@ -653,9 +720,10 @@ public class DistributionControllerTests
 
         var view = Assert.IsType<ViewResult>(result);
         Assert.Equal(nameof(DistributionController.Participants), view.ViewName);
-        var notification = controller.TempData.GetNotification();
-        Assert.Equal(NotificationType.Error, notification!.Type);
-        Assert.Equal("Please tick at least one participant to be included in the repeat of this distribution.", notification.Message);
+        var error = Assert.Single(controller.ModelState[DistributionParticipantsViewModel.RepeatSelectionErrorField]!.Errors);
+        Assert.Equal("Select at least one participant to be included in the repeat of this distribution.", error.ErrorMessage);
+        Assert.Empty(apiClient.SavedRepeatRequests);
+        Assert.Null(controller.TempData.GetNotification());
     }
 
     [Fact]

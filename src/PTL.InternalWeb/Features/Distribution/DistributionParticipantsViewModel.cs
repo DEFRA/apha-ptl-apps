@@ -14,6 +14,11 @@ public sealed class DistributionParticipantsViewModel
     public int MonthId { get; set; }
 #pragma warning restore S6964
 
+    public const string RepeatSelectionRequiredMessage = "Select at least one participant to be included in the repeat of this distribution.";
+
+    // Doubles as the id of the inline message the error summary links to.
+    public const string RepeatSelectionErrorField = "repeatDistributionSelectionError";
+
     public string? SchemeIdentifier { get; set; }
 
     public string? SchemeName { get; set; }
@@ -33,6 +38,9 @@ public sealed class DistributionParticipantsViewModel
     public List<DistributionParticipantRowViewModel> Participants { get; set; } = [];
 
     public List<DistributionAdditionalParticipantRowViewModel> AdditionalParticipants { get; set; } = [];
+
+    // The row whose Change Deadline Date form is open; set by the server so no script is needed to open it.
+    public Guid? EditParticipantId { get; set; }
 
     // Legacy hides btnRepeatDistribution entirely once already a repeat, or when there is nothing
     // to repeat.
