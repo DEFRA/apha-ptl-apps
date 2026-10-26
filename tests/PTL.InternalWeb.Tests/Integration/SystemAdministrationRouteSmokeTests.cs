@@ -191,6 +191,40 @@ public partial class SystemAdministrationRouteSmokeTests : IClassFixture<WebAppl
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 
+    // The year picker must work without scripting, so it submits with a button rather than an onchange script.
+    [Theory]
+    [InlineData("PostagePricingPlan")]
+    [InlineData("WeightedPricingPlan")]
+    public async Task PricingPlan_YearPicker_HasAViewButtonAndNoAutoSubmitScript(string page)
+    {
+        var years = new[] { new YearResponse(2026, "2026/27") };
+        var factory = _factory.WithWebHostBuilder(builder =>
+            builder.ConfigureServices(services =>
+            {
+                services.RemoveAll<IPostagePricingPlanApiClient>();
+                services.AddSingleton<IPostagePricingPlanApiClient>(new FakePostagePricingPlanApiClient
+                {
+                    Years = new PostagePricingPlanYearsResponse(years, false, null, null)
+                });
+                services.RemoveAll<IWeightedPricingPlanApiClient>();
+                services.AddSingleton<IWeightedPricingPlanApiClient>(new FakeWeightedPricingPlanApiClient
+                {
+                    Years = new PTL.Contracts.WeightedPricingPlan.WeightedPricingPlanYearsResponse(years, false, null, null)
+                });
+                services.RemoveAll<ILookupApiClient>();
+                services.AddSingleton<ILookupApiClient>(new FakeLookupApiClient { Years = years });
+            }));
+
+        var response = await factory.CreateClient().GetAsync($"/SystemAdministration/{page}?yearId=2026");
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var form = Regex.Match(body, "<form[^>]*method=\"get\"[^>]*>(?:(?!</form>).)*id=\"yearId\".*?</form>", RegexOptions.Singleline).Value;
+        Assert.NotEmpty(form);
+        Assert.Matches("<button[^>]*type=\"submit\"[^>]*>View</button>", form);
+        Assert.DoesNotContain("onchange", body, StringComparison.Ordinal);
+    }
+
     [Fact]
     public async Task PostagePricingPlan_ReturnsSuccess()
     {

@@ -110,6 +110,81 @@ public partial class ParticipantRouteSmokeTests : IClassFixture<WebApplicationFa
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 
+    private async Task<List<string>> ViewerCheckboxesAsync(bool isActive, Guid assigned, Guid available)
+    {
+        _fakeParticipantClient.ParticipantViewerAssignmentResponse = new ParticipantViewerAssignmentResponse(
+            _customerId, "ALI-001", "Alice Lab", isActive,
+            [new ViewerResponse(available, "Beta Viewer", string.Empty)],
+            [new ViewerResponse(assigned, "Alpha Viewer", string.Empty)]);
+
+        var html = await _factory.CreateClient().GetStringAsync($"/Participant/Viewers?participantId={_participantId}");
+
+        // The transfer lists are only revealed (and only then named) by the script.
+        Assert.Contains("id=\"viewerDualList\" hidden", html, StringComparison.Ordinal);
+        Assert.Matches("<select[^>]*id=\"participantViewers\"(?![^>]*name=)[^>]*>", html);
+        return [.. Regex.Matches(html, "<input[^>]*name=\"viewerIds\"[^>]*>").Select(m => m.Value)];
+    }
+
+    [Fact]
+    public async Task Viewers_RendersEveryViewerAsACheckboxTickedWhenAssignedSoSavingWorksWithoutScript()
+    {
+        var assigned = Guid.NewGuid();
+        var available = Guid.NewGuid();
+
+        var checkboxes = await ViewerCheckboxesAsync(isActive: true, assigned, available);
+
+        Assert.Equal(2, checkboxes.Count);
+        Assert.All(checkboxes, c => Assert.Contains("type=\"checkbox\"", c, StringComparison.Ordinal));
+        Assert.Contains("checked", checkboxes.Single(c => c.Contains($"value=\"{assigned}\"", StringComparison.Ordinal)), StringComparison.Ordinal);
+        Assert.DoesNotContain("checked", checkboxes.Single(c => c.Contains($"value=\"{available}\"", StringComparison.Ordinal)), StringComparison.Ordinal);
+    }
+
+    // Legacy hides Add for an inactive participant, so its viewers can only be kept or removed.
+    [Fact]
+    public async Task Viewers_InactiveParticipant_OffersOnlyItsAssignedViewersAsCheckboxes()
+    {
+        var assigned = Guid.NewGuid();
+
+        var checkboxes = await ViewerCheckboxesAsync(isActive: false, assigned, Guid.NewGuid());
+
+        var only = Assert.Single(checkboxes);
+        Assert.Contains($"value=\"{assigned}\"", only, StringComparison.Ordinal);
+        Assert.Contains("checked", only, StringComparison.Ordinal);
+    }
+
+    // What a browser without scripting sends: only the ticked checkboxes, under the one viewerIds name.
+    [Fact]
+    public async Task Viewers_Post_WithoutScript_SavesExactlyTheTickedViewers()
+    {
+        var kept = Guid.NewGuid();
+        var added = Guid.NewGuid();
+        _fakeParticipantClient.ParticipantViewerAssignmentResponse = new ParticipantViewerAssignmentResponse(
+            _customerId, "ALI-001", "Alice Lab", true,
+            [new ViewerResponse(added, "Beta Viewer", string.Empty)],
+            [new ViewerResponse(kept, "Alpha Viewer", string.Empty)]);
+        var client = _factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        var url = $"/Participant/Viewers?participantId={_participantId}";
+        var (token, cookie) = await GetAntiforgeryAsync(client, url);
+
+        var request = new HttpRequestMessage(HttpMethod.Post, url)
+        {
+            Content = new FormUrlEncodedContent(
+            [
+                new("__RequestVerificationToken", token),
+                new("customerId", _customerId.ToString()),
+                new("viewerIds", kept.ToString()),
+                new("viewerIds", added.ToString())
+            ])
+        };
+        request.Headers.Add("Cookie", cookie);
+
+        var response = await client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        Assert.Equal(_participantId, _fakeParticipantClient.LastUpdateParticipantViewersParticipantId);
+        Assert.Equal([kept, added], _fakeParticipantClient.LastUpdateParticipantViewersViewerIds);
+    }
+
     [Fact]
     public async Task Details_ReturnsSuccess()
     {

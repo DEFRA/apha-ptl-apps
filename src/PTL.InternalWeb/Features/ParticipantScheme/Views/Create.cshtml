@@ -14,7 +14,7 @@
     <input type="hidden" name="customerId" value="@Model.CustomerId" />
     <div class="govuk-form-group">
         <label class="govuk-label" for="participantId">Participant</label>
-        <select class="govuk-select" id="participantId" name="participantId" onchange="this.form.submit()">
+        <select class="govuk-select" id="participantId" name="participantId">
             <option value="">Please select a Participant from the List</option>
             @foreach (var option in Model.ParticipantOptions)
             {
@@ -23,6 +23,7 @@
             }
         </select>
     </div>
+    <button class="govuk-button govuk-button--secondary" data-module="govuk-button" type="submit">Select Participant</button>
 </form>
 
 @if (Model.SchemeId is null)

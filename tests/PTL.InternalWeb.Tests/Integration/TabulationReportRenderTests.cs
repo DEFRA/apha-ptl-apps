@@ -206,6 +206,41 @@ public class TabulationReportRenderTests : IClassFixture<WebApplicationFactory<P
         Assert.DoesNotContain("Select Viewer:", html, StringComparison.Ordinal);
     }
 
+    // Without scripting nothing builds the print layout, so the on-screen tables must be printable by default:
+    // only the headings and filter form are marked noprint, never the tables.
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Report_OnScreenTablesAreNotMarkedNoPrintSoPrintingWorksWithoutScript(bool published)
+    {
+        var report = Report(published: published, participants: [new(Guid.Empty, "All Participants"), new(ParticipantId, "L001")]);
+        _apiClient.TabulationReport = report;
+        _apiClient.PublishedTabulationReport = report;
+
+        var html = await GetHtmlAsync(published ? PublishedUrl : TabulationUrl);
+
+        Assert.Contains("<div class=\"ptl-tabulation-screen\">", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("noprint ptl-tabulation-screen", html, StringComparison.Ordinal);
+        var screen = html[html.IndexOf("<div class=\"ptl-tabulation-screen\">", StringComparison.Ordinal)..html.IndexOf("<div class=\"printonly", StringComparison.Ordinal)];
+        var firstTable = screen.IndexOf("<table class=\"TabulationTable\">", StringComparison.Ordinal);
+        Assert.True(firstTable > 0);
+        Assert.True(screen.IndexOf("<div class=\"noprint\">", StringComparison.Ordinal) < screen.IndexOf("<h1", StringComparison.Ordinal));
+        Assert.DoesNotContain("noprint", screen[firstTable..].Replace("govuk-body noprint", string.Empty, StringComparison.Ordinal), StringComparison.Ordinal);
+        // The filter form stays out of the printout.
+        Assert.True(screen.IndexOf("<div class=\"noprint\">", StringComparison.Ordinal) < screen.IndexOf("<form", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task PrintScript_MarksTheOnScreenTablesNoPrintOnlyOnceItHasBuiltThePrintLayout()
+    {
+        var response = await _factory.CreateClient().GetAsync("/js/tabulation-print.js");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var script = await response.Content.ReadAsStringAsync();
+        Assert.Contains("document.querySelectorAll(\".ptl-tabulation-screen\")", script, StringComparison.Ordinal);
+        Assert.Contains("classList.add(\"noprint\")", script, StringComparison.Ordinal);
+    }
+
     [Fact]
     public async Task Tabulation_ParticipantFilter_RendersGetFormWithSelectedParticipant()
     {
