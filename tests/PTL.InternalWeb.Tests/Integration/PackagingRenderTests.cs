@@ -156,7 +156,7 @@ public partial class PackagingRenderTests : IClassFixture<WebApplicationFactory<
 
     private static void AssertButtons(string html, bool customs)
     {
-        foreach (var (command, text) in new[] { ("select", "View"), ("save", "Save"), ("apply", "Apply"), ("labels", "Print labels") })
+        foreach (var (command, text) in new[] { ("select", "View"), ("save", "Save"), ("labels", "Print labels") })
         {
             Assert.Matches($"<button[^>]*name=\"command\" value=\"{command}\"[^>]*>{text}</button>", html);
         }

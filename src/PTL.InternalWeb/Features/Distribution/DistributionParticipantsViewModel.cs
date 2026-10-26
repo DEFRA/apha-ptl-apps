@@ -89,3 +89,26 @@ public sealed class DistributionAdditionalParticipantRowViewModel
 
     public string? FullName { get; set; }
 }
+
+// What the Change Deadline Date / Cancel round trip reads from the page's form: only the repeat-distribution
+// ticks. Nullable so an absent or malformed value is a binding error rather than a silent default.
+public sealed class ParticipantTicksPostModel
+{
+    public List<ParticipantTickPost> Participants { get; set; } = [];
+
+    public List<AdditionalParticipantTickPost> AdditionalParticipants { get; set; } = [];
+}
+
+public sealed class ParticipantTickPost
+{
+    public Guid? DistributionParticipantId { get; set; }
+
+    public bool? Selected { get; set; }
+}
+
+public sealed class AdditionalParticipantTickPost
+{
+    public Guid? ParticipantSchemeId { get; set; }
+
+    public bool? Selected { get; set; }
+}

@@ -1,4 +1,4 @@
-﻿using System.Net;
+using System.Net;
 using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -271,12 +271,11 @@ public partial class SystemAdministrationRouteSmokeTests : IClassFixture<WebAppl
         Assert.Contains("Dry Ice", body, StringComparison.Ordinal);
         Assert.Contains("postagePriceEditForm", body, StringComparison.Ordinal);
 
-        // Save: primary button (no secondary modifier). Cancel and the other row's Edit are real
-        // buttons (of the GET form postagePriceViewForm) styled like Save, not links. Checked
-        // precisely (not just "govuk-link is absent anywhere") since the shared layout's footer/
-        // phase-banner render their own unrelated govuk-link elements on every page.
-        Assert.Contains("type=\"submit\">Save</button>", body, StringComparison.Ordinal);
-        Assert.DoesNotContain("govuk-button--secondary govuk-!-margin-bottom-0\" data-module=\"govuk-button\" type=\"submit\">Save", body, StringComparison.Ordinal);
+        // Save, Cancel and the other row's Edit are all real secondary buttons (Cancel/Edit of the GET
+        // form postagePriceViewForm), not links. Checked precisely (not just "govuk-link is absent
+        // anywhere") since the shared layout's footer/phase-banner render their own unrelated
+        // govuk-link elements on every page.
+        Assert.Contains("govuk-button--secondary govuk-!-margin-bottom-0\" data-module=\"govuk-button\" type=\"submit\">Save</button>", body, StringComparison.Ordinal);
         Assert.DoesNotContain("govuk-button--secondary govuk-!-margin-bottom-0\" data-module=\"govuk-button\" href=", body, StringComparison.Ordinal);
         Assert.Matches($"<button form=\"postagePriceViewForm\" name=\"editId\" value=\"{otherPostageId}\"[^>]*type=\"submit\">Edit</button>", body);
         Assert.Matches("<button form=\"postagePriceViewForm\"[^>]*type=\"submit\">Cancel</button>", body);

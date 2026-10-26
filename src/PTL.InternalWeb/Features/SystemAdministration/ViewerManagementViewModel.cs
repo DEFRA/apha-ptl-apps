@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 
 namespace PTL.InternalWeb.Features.SystemAdministration;
 
@@ -20,6 +21,8 @@ public sealed class ViewerManagementViewModel
 
     public string? Message { get; set; }
 
+    // Set by the controller only - never taken from the posted form.
+    [BindNever]
     public bool MessageIsError { get; set; }
 
     // Dependency detail lines (assigned schemes/participants) shown under Message.

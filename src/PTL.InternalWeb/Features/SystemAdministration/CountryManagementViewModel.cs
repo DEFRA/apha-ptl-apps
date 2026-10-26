@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.AspNetCore.Mvc.Rendering;
 
 namespace PTL.InternalWeb.Features.SystemAdministration;
@@ -23,6 +24,8 @@ public sealed class CountryManagementViewModel
 
     public string? Message { get; set; }
 
+    // Set by the controller only - never taken from the posted form.
+    [BindNever]
     public bool MessageIsError { get; set; }
 }
 

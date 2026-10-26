@@ -42,11 +42,11 @@ public static class PendingList
     // Keeps the edit-mode row pointing at the same row after the row at removedIndex is removed.
     public static int? EditIndexAfterRemoval(int? editIndex, int removedIndex)
     {
-        if (editIndex is null || editIndex == removedIndex)
+        if (editIndex is not { } index || index == removedIndex)
         {
             return null;
         }
 
-        return editIndex > removedIndex ? editIndex - 1 : editIndex;
+        return index > removedIndex ? index - 1 : index;
     }
 }

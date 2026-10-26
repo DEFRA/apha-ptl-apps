@@ -610,21 +610,43 @@ public class DistributionControllerTests
         Assert.Equal(DistributionParticipantId, model.EditParticipantId);
     }
 
+    private static ParticipantTicksPostModel PostedTicks(bool participant, bool additional) => new()
+    {
+        Participants = [new ParticipantTickPost { DistributionParticipantId = DistributionParticipantId, Selected = participant }],
+        AdditionalParticipants = [new AdditionalParticipantTickPost { ParticipantSchemeId = AdditionalParticipantSchemeId, Selected = additional }],
+    };
+
     // The Change Deadline Date and Cancel buttons are server round trips, so they work without scripting.
     [Fact]
     public async Task EditDeadline_Edit_ReopensThePageWithThatRowsChangeFormAndNothingSaved()
     {
         var apiClient = new FakeDistributionApiClient { Participants = ParticipantsResponse() };
         var controller = CreateController(apiClient);
-        controller.ModelState.AddModelError("Participants[0].NewDeadlineDate", "stale");
 
-        var result = await controller.EditDeadline(2026, 4, ParticipantsSchemeId, DistributionParticipantId, "edit", PostedParticipantsModel(), CancellationToken.None);
+        var result = await controller.EditDeadline(2026, 4, ParticipantsSchemeId, DistributionParticipantId, "edit", PostedTicks(false, false), CancellationToken.None);
 
         var view = Assert.IsType<ViewResult>(result);
         Assert.Equal(nameof(DistributionController.Participants), view.ViewName);
         var model = Assert.IsType<DistributionParticipantsViewModel>(view.Model);
         Assert.Equal(DistributionParticipantId, model.EditParticipantId);
         Assert.Equal("PT0060: Mastitis bovine", model.SchemeHeading);
+        Assert.True(controller.ModelState.IsValid);
+        Assert.Empty(apiClient.SavedDeadlines);
+    }
+
+    [Fact]
+    public async Task EditDeadline_MalformedTicks_AreDroppedAndTheStaleErrorsCleared()
+    {
+        var apiClient = new FakeDistributionApiClient { Participants = ParticipantsResponse() };
+        var controller = CreateController(apiClient);
+        controller.ModelState.AddModelError("Participants[0].Selected", "The value 'x' is not valid.");
+
+        var result = await controller.EditDeadline(2026, 4, ParticipantsSchemeId, DistributionParticipantId, "edit", PostedTicks(true, true), CancellationToken.None);
+
+        var model = Assert.IsType<DistributionParticipantsViewModel>(Assert.IsType<ViewResult>(result).Model);
+        Assert.Equal(DistributionParticipantId, model.EditParticipantId);
+        Assert.False(Assert.Single(model.Participants).Selected);
+        Assert.False(Assert.Single(model.AdditionalParticipants).Selected);
         Assert.True(controller.ModelState.IsValid);
         Assert.Empty(apiClient.SavedDeadlines);
     }
@@ -636,7 +658,7 @@ public class DistributionControllerTests
     {
         var controller = CreateController(new FakeDistributionApiClient { Participants = ParticipantsResponse() });
 
-        var result = await controller.EditDeadline(2026, 4, ParticipantsSchemeId, DistributionParticipantId, command, PostedParticipantsModel(), CancellationToken.None);
+        var result = await controller.EditDeadline(2026, 4, ParticipantsSchemeId, DistributionParticipantId, command, PostedTicks(false, false), CancellationToken.None);
 
         var model = Assert.IsType<DistributionParticipantsViewModel>(Assert.IsType<ViewResult>(result).Model);
         Assert.Null(model.EditParticipantId);
@@ -646,9 +668,8 @@ public class DistributionControllerTests
     public async Task EditDeadline_CarriesTheTickedRepeatSelectionsOver()
     {
         var controller = CreateController(new FakeDistributionApiClient { Participants = ParticipantsResponse() });
-        var posted = PostedRepeatModel(selectParticipant: true, selectAdditional: true);
 
-        var result = await controller.EditDeadline(2026, 4, ParticipantsSchemeId, DistributionParticipantId, "edit", posted, CancellationToken.None);
+        var result = await controller.EditDeadline(2026, 4, ParticipantsSchemeId, DistributionParticipantId, "edit", PostedTicks(true, true), CancellationToken.None);
 
         var model = Assert.IsType<DistributionParticipantsViewModel>(Assert.IsType<ViewResult>(result).Model);
         Assert.True(Assert.Single(model.Participants).Selected);
@@ -656,13 +677,78 @@ public class DistributionControllerTests
     }
 
     [Fact]
+    public async Task EditDeadline_TicksWithoutAnIdOrValue_AreIgnored()
+    {
+        var controller = CreateController(new FakeDistributionApiClient { Participants = ParticipantsResponse() });
+        var posted = new ParticipantTicksPostModel
+        {
+            Participants = [new ParticipantTickPost { DistributionParticipantId = null, Selected = true }, new ParticipantTickPost { DistributionParticipantId = DistributionParticipantId, Selected = null }],
+            AdditionalParticipants = [new AdditionalParticipantTickPost { ParticipantSchemeId = null, Selected = true }],
+        };
+
+        var result = await controller.EditDeadline(2026, 4, ParticipantsSchemeId, DistributionParticipantId, "edit", posted, CancellationToken.None);
+
+        var model = Assert.IsType<DistributionParticipantsViewModel>(Assert.IsType<ViewResult>(result).Model);
+        Assert.False(Assert.Single(model.Participants).Selected);
+        Assert.False(Assert.Single(model.AdditionalParticipants).Selected);
+    }
+
+    [Fact]
     public async Task EditDeadline_UnknownScheme_ReturnsNotFound()
     {
         var controller = CreateController(new FakeDistributionApiClient());
 
-        var result = await controller.EditDeadline(2026, 4, ParticipantsSchemeId, DistributionParticipantId, "edit", PostedParticipantsModel(), CancellationToken.None);
+        var result = await controller.EditDeadline(2026, 4, ParticipantsSchemeId, DistributionParticipantId, "edit", PostedTicks(false, false), CancellationToken.None);
 
         Assert.IsType<NotFoundResult>(result);
+    }
+
+    [Fact]
+    public async Task ChangeDeadline_Post_InvalidModelState_RedisplaysTheRowsChangeFormWithoutCallingTheApi()
+    {
+        var apiClient = new FakeDistributionApiClient { Participants = ParticipantsResponse() };
+        var controller = CreateController(apiClient);
+        controller.ModelState.AddModelError("Participants[0].NewDeadlineDate", "Enter a valid date");
+
+        var result = await controller.ChangeDeadline(2026, 4, ParticipantsSchemeId, DistributionParticipantId, PostedParticipantsModel(), CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        Assert.Equal(nameof(DistributionController.Participants), view.ViewName);
+        Assert.Equal(DistributionParticipantId, Assert.IsType<DistributionParticipantsViewModel>(view.Model).EditParticipantId);
+        Assert.Empty(apiClient.SavedDeadlines);
+        Assert.Null(controller.TempData.GetNotification());
+    }
+
+    [Fact]
+    public async Task ChangeDeadline_Post_OnlyTheReasonRejected_AddsOnlyTheReasonError()
+    {
+        var apiClient = new FakeDistributionApiClient
+        {
+            ChangeDeadlineResult = new ChangeDeadlineResult(false, null, "A reason for changing the deadline date is required."),
+            Participants = ParticipantsResponse(),
+        };
+        var controller = CreateController(apiClient);
+
+        await controller.ChangeDeadline(2026, 4, ParticipantsSchemeId, DistributionParticipantId, PostedParticipantsModel(new DateTime(2026, 5, 1), null), CancellationToken.None);
+
+        Assert.True(controller.ModelState.ContainsKey($"Participants[0].{nameof(DistributionParticipantRowViewModel.NewDeadlineReason)}"));
+        Assert.False(controller.ModelState.ContainsKey($"Participants[0].{nameof(DistributionParticipantRowViewModel.NewDeadlineDate)}"));
+    }
+
+    [Fact]
+    public async Task RepeatDistribution_Post_InvalidModelState_RedisplaysParticipantsWithoutCallingTheApi()
+    {
+        var apiClient = new FakeDistributionApiClient { Participants = ParticipantsResponse() };
+        var controller = CreateController(apiClient);
+        controller.ModelState.AddModelError("Participants[0].Selected", "Invalid");
+
+        var result = await controller.RepeatDistribution(2026, 4, ParticipantsSchemeId, PostedRepeatModel(), CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        Assert.Equal(nameof(DistributionController.Participants), view.ViewName);
+        Assert.IsType<DistributionParticipantsViewModel>(view.Model);
+        Assert.Empty(apiClient.SavedRepeatRequests);
+        Assert.Null(controller.TempData.GetNotification());
     }
 
     private static DistributionParticipantsViewModel PostedRepeatModel(bool selectParticipant = true, bool selectAdditional = false) => new()
@@ -692,6 +778,42 @@ public class DistributionControllerTests
         Assert.Equal("Distribution repeated successfully.", notification.Message);
         var saved = Assert.Single(apiClient.SavedRepeatRequests);
         Assert.Contains(saved.Selections, s => s.Id == DistributionParticipantId && !s.IsAdditional);
+    }
+
+    [Fact]
+    public async Task RepeatDistribution_Post_ApiRejects_ShowsTheApiMessageAndRedisplaysParticipants()
+    {
+        var apiClient = new FakeDistributionApiClient
+        {
+            RepeatDistributionResult = new RepeatDistributionResult(false, "The distribution has already been repeated."),
+            Participants = ParticipantsResponse(),
+        };
+        var controller = CreateController(apiClient);
+
+        var result = await controller.RepeatDistribution(2026, 4, ParticipantsSchemeId, PostedRepeatModel(), CancellationToken.None);
+
+        Assert.Equal(nameof(DistributionController.Participants), Assert.IsType<ViewResult>(result).ViewName);
+        var notification = controller.TempData.GetNotification();
+        Assert.Equal(NotificationType.Error, notification!.Type);
+        Assert.Equal("The distribution has already been repeated.", notification.Message);
+    }
+
+    [Fact]
+    public async Task ChangeDeadline_Post_ParticipantNotInThePostedRows_SendsAnEmptyChange()
+    {
+        var apiClient = new FakeDistributionApiClient
+        {
+            ChangeDeadlineResult = new ChangeDeadlineResult(false, "Deadline Date required.", "A reason for changing the deadline date is required."),
+            Participants = ParticipantsResponse(),
+        };
+        var controller = CreateController(apiClient);
+
+        var result = await controller.ChangeDeadline(2026, 4, ParticipantsSchemeId, Guid.NewGuid(), PostedParticipantsModel(new DateTime(2026, 5, 1), "A reason"), CancellationToken.None);
+
+        Assert.IsType<ViewResult>(result);
+        var saved = Assert.Single(apiClient.SavedDeadlines);
+        Assert.Null(saved.Request.NewDeadlineDate);
+        Assert.Null(saved.Request.Reason);
     }
 
     [Fact]

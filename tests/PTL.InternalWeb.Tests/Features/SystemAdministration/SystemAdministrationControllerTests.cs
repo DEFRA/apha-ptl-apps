@@ -848,6 +848,20 @@ public class SystemAdministrationControllerTests
     }
 
     [Fact]
+    public async Task CreateUserConfirm_BlankSearchTerm_RedisplaysWithoutSearchingOrCreating()
+    {
+        var apiClient = new FakeUserApiClient();
+        var controller = CreateController(userApiClient: apiClient);
+        var model = new CreateUserViewModel { SearchTerm = " ", SelectedCandidate = "m100001" };
+
+        var result = await controller.CreateUserConfirm(model, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        Assert.Equal(nameof(SystemAdministrationController.CreateUser), view.ViewName);
+        Assert.Null(apiClient.LastCreateRequest);
+    }
+
+    [Fact]
     public async Task CreateUserConfirm_DirectoryFails_ShowsProblemAndDoesNotCreate()
     {
         var apiClient = new FakeUserApiClient { SearchException = new HttpRequestException("Graph unavailable") };
@@ -1165,6 +1179,22 @@ public class SystemAdministrationControllerTests
         Assert.Equal("Virology", call.Request.Department);
         Assert.True(call.Request.IsInactive);
         Assert.Equal(inactiveDate, call.Request.InactiveDate);
+    }
+
+    [Fact]
+    public async Task InternalTestConsultantDepartmentSave_InvalidModel_RedisplaysTheRowInEditModeWithoutSaving()
+    {
+        var userId = Guid.NewGuid();
+        var userApiClient = new FakeUserApiClient();
+        var controller = CreateController(userApiClient: userApiClient);
+        controller.ModelState.AddModelError("Edit.Department", "Department is too long");
+        var model = new InternalTestConsultantEditViewModel { UserId = userId, Department = "Virology", IsInactive = false };
+
+        var result = await controller.InternalTestConsultantDepartmentSave(model, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        Assert.Equal(nameof(SystemAdministrationController.InternalTestConsultantDepartment), view.ViewName);
+        Assert.Empty(userApiClient.UpdateTestConsultantCalls);
     }
 
     [Fact]

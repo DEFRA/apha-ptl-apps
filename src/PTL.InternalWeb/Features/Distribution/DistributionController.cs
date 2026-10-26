@@ -1485,9 +1485,16 @@ public sealed partial class DistributionController(IDistributionApiClient distri
     [ValidateAntiForgeryToken]
     [Authorize(Policy = PtlPolicies.Scheduling)]
     public async Task<IActionResult> EditDeadline(
-        int year, int monthId, Guid schemeId, Guid participantId, string? command, DistributionParticipantsViewModel model, CancellationToken cancellationToken)
+        int year, int monthId, Guid schemeId, Guid participantId, string? command, ParticipantTicksPostModel model, CancellationToken cancellationToken)
     {
         ViewData[BreadcrumbRouteValues.Action] = nameof(Participants);
+
+        // Only malformed tick values (a tampered post) can fail here; they are dropped rather than carried over.
+        if (!ModelState.IsValid)
+        {
+            model = new ParticipantTicksPostModel();
+        }
+
         var data = await distributionApiClient.GetParticipantsAsync(schemeId, cancellationToken);
         if (data is null)
         {
@@ -1495,13 +1502,13 @@ public sealed partial class DistributionController(IDistributionApiClient distri
         }
 
         var fresh = ToParticipantsViewModel(year, monthId, data);
-        var ticked = model.Participants.Where(p => p.Selected).Select(p => p.DistributionParticipantId).ToHashSet();
+        var ticked = model.Participants.Where(p => p.Selected == true && p.DistributionParticipantId is not null).Select(p => p.DistributionParticipantId!.Value).ToHashSet();
         foreach (var participant in fresh.Participants)
         {
             participant.Selected = ticked.Contains(participant.DistributionParticipantId);
         }
 
-        var tickedAdditional = model.AdditionalParticipants.Where(p => p.Selected).Select(p => p.ParticipantSchemeId).ToHashSet();
+        var tickedAdditional = model.AdditionalParticipants.Where(p => p.Selected == true && p.ParticipantSchemeId is not null).Select(p => p.ParticipantSchemeId!.Value).ToHashSet();
         foreach (var participant in fresh.AdditionalParticipants)
         {
             participant.Selected = tickedAdditional.Contains(participant.ParticipantSchemeId);
