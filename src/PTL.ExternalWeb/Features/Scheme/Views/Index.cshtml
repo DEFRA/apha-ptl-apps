@@ -1,18 +1,27 @@
 @model PTL.ExternalWeb.Features.Scheme.SchemeListViewModel
+@using PTL.SharedUI.Pagination
 @{
     ViewData["Title"] = "View schemes";
+    var pagination = new PaginationModel
+    {
+        CurrentPage = Model.Page,
+        PageSize = Model.PageSize,
+        TotalRecords = Model.CommercialSchemeTotalCount
+    };
 }
 
 <h1 class="govuk-heading-xl">View schemes</h1>
 
 <h2 class="govuk-heading-l">Commercial schemes</h2>
 
-@if (Model.CommercialSchemes.Count == 0)
+@if (Model.CommercialSchemeTotalCount == 0)
 {
     <p class="govuk-body">No commercial schemes are available for the current year.</p>
 }
 else
 {
+    <govuk-page-size-selector model="pagination" />
+
     <table class="govuk-table">
         <thead class="govuk-table__head">
             <tr class="govuk-table__row">
@@ -43,6 +52,8 @@ else
             }
         </tbody>
     </table>
+
+    <govuk-pagination model="pagination" />
 }
 
 <h2 class="govuk-heading-l">Non-commercial schemes</h2>

@@ -98,4 +98,104 @@ public class SchemeRouteSmokeTests : IClassFixture<PtlExternalWebTestFactory>
         Assert.True(hrefMatch.Success, "Expected to find a real href to SchemeController for the 'View schemes' quick-link card.");
         Assert.DoesNotContain("ComingSoon", hrefMatch.Groups["href"].Value);
     }
+
+    [Fact]
+    public async Task Index_MoreCommercialSchemesThanPageSize_RendersFirstPageAndPaginationNav()
+    {
+        var commercialSchemes = Enumerable.Range(1, 20)
+            .Select(i => new ParticipantSchemeSummaryResponse(Guid.NewGuid(), $"PT{i:D4}", $"Scheme {i}", "2025/26", false))
+            .ToList();
+        var fakeApiClient = new FakeSchemeApiClient
+        {
+            ParticipantSchemes = new ParticipantSchemeListResponse(commercialSchemes, [])
+        };
+
+        var client = _factory.WithWebHostBuilder(builder =>
+            builder.ConfigureServices(services =>
+            {
+                services.RemoveAll<ISchemeApiClient>();
+                services.AddSingleton<ISchemeApiClient>(fakeApiClient);
+            })).CreateClient();
+
+        var cookies = new Dictionary<string, string>();
+        var signInResponse = await client.GetAsync(
+            $"{PtlExternalWebTestFactory.TestSignInPath}?roles={Uri.EscapeDataString("Participant")}&participantId={Guid.NewGuid()}");
+        CookieForwardingHttpClient.CaptureCookies(signInResponse, cookies);
+
+        var response = await CookieForwardingHttpClient.SendWithCookiesAsync(client, HttpMethod.Get, "/Scheme/Index", cookies);
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        // Default page size (15) - first 15 of 20 schemes shown, the last 5 on page 2.
+        Assert.Contains("PT0001", body);
+        Assert.Contains("PT0015", body);
+        Assert.DoesNotContain("PT0016", body);
+        Assert.Contains("govuk-pagination", body);
+        Assert.Contains("Items per page", body);
+    }
+
+    [Fact]
+    public async Task Index_SecondPageRequested_RendersRemainingSchemes()
+    {
+        var commercialSchemes = Enumerable.Range(1, 20)
+            .Select(i => new ParticipantSchemeSummaryResponse(Guid.NewGuid(), $"PT{i:D4}", $"Scheme {i}", "2025/26", false))
+            .ToList();
+        var fakeApiClient = new FakeSchemeApiClient
+        {
+            ParticipantSchemes = new ParticipantSchemeListResponse(commercialSchemes, [])
+        };
+
+        var client = _factory.WithWebHostBuilder(builder =>
+            builder.ConfigureServices(services =>
+            {
+                services.RemoveAll<ISchemeApiClient>();
+                services.AddSingleton<ISchemeApiClient>(fakeApiClient);
+            })).CreateClient();
+
+        var cookies = new Dictionary<string, string>();
+        var signInResponse = await client.GetAsync(
+            $"{PtlExternalWebTestFactory.TestSignInPath}?roles={Uri.EscapeDataString("Participant")}&participantId={Guid.NewGuid()}");
+        CookieForwardingHttpClient.CaptureCookies(signInResponse, cookies);
+
+        var response = await CookieForwardingHttpClient.SendWithCookiesAsync(client, HttpMethod.Get, "/Scheme/Index?page=2", cookies);
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.DoesNotContain("PT0001<", body);
+        Assert.Contains("PT0016", body);
+        Assert.Contains("PT0020", body);
+    }
+
+    [Fact]
+    public async Task Index_PageSizeChanged_RendersRequestedRowCount()
+    {
+        var commercialSchemes = Enumerable.Range(1, 20)
+            .Select(i => new ParticipantSchemeSummaryResponse(Guid.NewGuid(), $"PT{i:D4}", $"Scheme {i}", "2025/26", false))
+            .ToList();
+        var fakeApiClient = new FakeSchemeApiClient
+        {
+            ParticipantSchemes = new ParticipantSchemeListResponse(commercialSchemes, [])
+        };
+
+        var client = _factory.WithWebHostBuilder(builder =>
+            builder.ConfigureServices(services =>
+            {
+                services.RemoveAll<ISchemeApiClient>();
+                services.AddSingleton<ISchemeApiClient>(fakeApiClient);
+            })).CreateClient();
+
+        var cookies = new Dictionary<string, string>();
+        var signInResponse = await client.GetAsync(
+            $"{PtlExternalWebTestFactory.TestSignInPath}?roles={Uri.EscapeDataString("Participant")}&participantId={Guid.NewGuid()}");
+        CookieForwardingHttpClient.CaptureCookies(signInResponse, cookies);
+
+        // All 20 schemes fit on a single page of 25 - no pagination nav should be rendered.
+        var response = await CookieForwardingHttpClient.SendWithCookiesAsync(client, HttpMethod.Get, "/Scheme/Index?pageSize=25", cookies);
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("PT0001", body);
+        Assert.Contains("PT0020", body);
+        Assert.DoesNotContain("govuk-pagination", body);
+    }
 }
