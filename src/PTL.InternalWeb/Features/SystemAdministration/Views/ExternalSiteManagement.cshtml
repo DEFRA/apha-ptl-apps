@@ -26,9 +26,12 @@
 
     <div class="govuk-button-group">
         <button class="govuk-button" data-module="govuk-button" type="submit">Save</button>
-        <a class="govuk-button govuk-button--secondary" data-module="govuk-button" asp-action="ExternalSiteManagement">Cancel</a>
+        <button class="govuk-button govuk-button--secondary" data-module="govuk-button" type="submit" form="external-site-cancel-form">Cancel</button>
     </div>
 </form>
+
+@* Cancel is a button of this separate GET form (via the form attribute); it can't be nested in the POST form above. *@
+<form id="external-site-cancel-form" method="get" asp-action="Index"></form>
 
 @section Scripts {
     <script src="~/lib/tinymce/tinymce.min.js" asp-append-version="true"></script>

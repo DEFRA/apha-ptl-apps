@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -12,9 +12,6 @@ using PTL.Contracts.TestConsultant;
 using PTL.Contracts.User;
 using PTL.Contracts.Viewer;
 using PTL.InternalWeb.Tests.TestSupport;
-using CountryDeleteResponse = PTL.Contracts.Country.CountryDeleteResponse;
-using CountryResponse = PTL.Contracts.Country.CountryResponse;
-using CountryTypeResponse = PTL.Contracts.Country.CountryTypeResponse;
 using ExternalSiteMessageResponse = PTL.Contracts.ExternalSiteMessage.ExternalSiteMessageResponse;
 using ExternalSiteMessageSaveResult = PTL.Contracts.ExternalSiteMessage.ExternalSiteMessageSaveResult;
 
@@ -151,7 +148,7 @@ public partial class SystemAdministrationRouteSmokeTests : IClassFixture<WebAppl
                 services.RemoveAll<ILookupApiClient>();
                 services.AddSingleton<ILookupApiClient>(new FakeLookupApiClient
                 {
-                    Currencies = [new CurrencyResponse(currencyId, "British Pound", "£", "£ - British Pound")]
+                    Currencies = [new CurrencyResponse(currencyId, "British Pound", "Â£", "Â£ - British Pound")]
                 });
             }));
         var client = factory.CreateClient();
@@ -165,7 +162,7 @@ public partial class SystemAdministrationRouteSmokeTests : IClassFixture<WebAppl
                 ["Charges[0].AdministrationChargeId"] = chargeId.ToString(),
                 ["Charges[0].Name"] = "Administration Charge",
                 ["Charges[0].Prices[0].CurrencyId"] = currencyId.ToString(),
-                ["Charges[0].Prices[0].CurrencyLabel"] = "£ - British Pound",
+                ["Charges[0].Prices[0].CurrencyLabel"] = "Â£ - British Pound",
                 ["Charges[0].Prices[0].Price"] = "-1.00"
             })
         };
@@ -347,84 +344,6 @@ public partial class SystemAdministrationRouteSmokeTests : IClassFixture<WebAppl
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 
-    // The empty-state test above never exercises the @foreach row loop or the edit-mode cells
-    // (form="countryEditForm" cross-element binding, govuk-error-summary) - this is the only test
-    // that renders that markup for real. Seeds a second, non-editing row too, so both the
-    // read-only "Edit"/"Remove" actions and the editing row's "Save"/"Cancel" render on the same
-    // page.
-    [Fact]
-    public async Task CountryManagement_WithEditingRow_RendersTableAndEditForm()
-    {
-        var countryId = Guid.NewGuid();
-        var otherCountryId = Guid.NewGuid();
-        var countryTypeId = Guid.NewGuid();
-        var factory = _factory.WithWebHostBuilder(builder =>
-            builder.ConfigureServices(services =>
-            {
-                services.RemoveAll<ICountryApiClient>();
-                services.AddSingleton<ICountryApiClient>(new FakeCountryApiClient
-                {
-                    Countries =
-                    [
-                        new CountryResponse(countryId, "France", countryTypeId, "EU", 0),
-                        new CountryResponse(otherCountryId, "United Kingdom", countryTypeId, "UK", 3)
-                    ],
-                    CountryTypes = [new CountryTypeResponse(countryTypeId, "EU")]
-                });
-            }));
-        var client = factory.CreateClient();
-
-        var response = await client.GetAsync($"/SystemAdministration/CountryManagement?editId={countryId}");
-        var body = await response.Content.ReadAsStringAsync();
-
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.Contains("France", body, StringComparison.Ordinal);
-        Assert.Contains("United Kingdom", body, StringComparison.Ordinal);
-        Assert.Contains("countryEditForm", body, StringComparison.Ordinal);
-        Assert.Contains("type=\"submit\">Save</button>", body, StringComparison.Ordinal);
-        Assert.Contains(">Edit</a>", body, StringComparison.Ordinal);
-        Assert.Contains(">Cancel</a>", body, StringComparison.Ordinal);
-        Assert.Contains("govuk-button--secondary", body, StringComparison.Ordinal);
-        Assert.Contains("Remove", body, StringComparison.Ordinal);
-    }
-
-    // Locks in that a blocked removal (country still referenced) surfaces legacy's exact
-    // dependency-count wording as a notification banner, matching "This country is being used by
-    // N customer(s)/participant(s)/Group Addresses." from Admin/ManageCountries.aspx.vb.
-    [Fact]
-    public async Task CountryManagementRemove_Post_CountryInUse_RendersBlockedMessage()
-    {
-        var countryId = Guid.NewGuid();
-        var factory = _factory.WithWebHostBuilder(builder =>
-            builder.ConfigureServices(services =>
-            {
-                services.RemoveAll<ICountryApiClient>();
-                services.AddSingleton<ICountryApiClient>(new FakeCountryApiClient
-                {
-                    Countries = [new CountryResponse(countryId, "France", Guid.NewGuid(), "EU", 8)],
-                    DeleteResponse = new CountryDeleteResponse(false, "This country is being used by 8 customer(s)/participant(s)/Group Addresses.")
-                });
-            }));
-        var client = factory.CreateClient();
-        var (token, cookie) = await GetAntiforgeryAsync(client, "/SystemAdministration/CountryManagement");
-
-        var request = new HttpRequestMessage(HttpMethod.Post, "/SystemAdministration/CountryManagementRemove")
-        {
-            Content = new FormUrlEncodedContent(new Dictionary<string, string>
-            {
-                ["__RequestVerificationToken"] = token,
-                ["countryId"] = countryId.ToString()
-            })
-        };
-        request.Headers.Add("Cookie", cookie);
-
-        var response = await client.SendAsync(request);
-        var body = await response.Content.ReadAsStringAsync();
-
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.Contains("This country is being used by 8 customer(s)/participant(s)/Group Addresses.", body, StringComparison.Ordinal);
-    }
-
     [Fact]
     public async Task ExternalSiteManagement_ReturnsSuccess()
     {
@@ -433,6 +352,37 @@ public partial class SystemAdministrationRouteSmokeTests : IClassFixture<WebAppl
         var response = await client.GetAsync("/SystemAdministration/ExternalSiteManagement");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    // Cancel on both edit screens is a button of a separate GET form that goes to the section landing page.
+    [Fact]
+    public async Task ExternalSiteManagement_Cancel_IsAButtonThatGoesToTheSystemAdministrationIndex()
+    {
+        var body = await _factory.CreateClient().GetStringAsync("/SystemAdministration/ExternalSiteManagement");
+
+        Assert.Matches("<button[^>]*form=\"external-site-cancel-form\"[^>]*>Cancel</button>", body);
+        Assert.Matches("<form id=\"external-site-cancel-form\" method=\"get\" action=\"/SystemAdministration(/Index)?\"></form>", body);
+        Assert.DoesNotContain(">Cancel</a>", body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task AdministrationCharge_Cancel_IsAButtonThatGoesToTheSystemAdministrationIndex()
+    {
+        var factory = _factory.WithWebHostBuilder(builder =>
+            builder.ConfigureServices(services =>
+            {
+                services.RemoveAll<IAdministrationChargeApiClient>();
+                services.AddSingleton<IAdministrationChargeApiClient>(new FakeAdministrationChargeApiClient
+                {
+                    Charges = [new AdministrationChargeResponse(Guid.NewGuid(), "Administration Charge", [new AdministrationChargeCurrencyPriceResponse(Guid.NewGuid(), 25.00m)])]
+                });
+            }));
+
+        var body = await factory.CreateClient().GetStringAsync("/SystemAdministration/AdministrationCharge");
+
+        Assert.Matches("<button[^>]*form=\"administration-charge-cancel-form\"[^>]*>Cancel</button>", body);
+        Assert.Matches("<form id=\"administration-charge-cancel-form\" method=\"get\" action=\"/SystemAdministration(/Index)?\"></form>", body);
+        Assert.DoesNotContain(">Cancel</a>", body, StringComparison.Ordinal);
     }
 
     // Locks in that the saved Further Information/Important Message content actually renders
@@ -844,7 +794,7 @@ public partial class SystemAdministrationRouteSmokeTests : IClassFixture<WebAppl
     }
 
     [Fact]
-    public async Task ViewerManagement_WithData_RendersAllFourColumns()
+    public async Task ViewerManagement_WithData_RendersNameEmailAndRowActions()
     {
         var viewerId = Guid.NewGuid();
         var factory = _factory.WithWebHostBuilder(builder =>

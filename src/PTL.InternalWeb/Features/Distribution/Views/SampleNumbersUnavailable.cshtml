@@ -9,8 +9,6 @@
     var errors = Model.Errors.Select(message => (Field: string.Empty, Message: message)).ToList();
 }
 
-<a class="govuk-back-link" asp-action="Schedule" asp-route-year="@Model.YearId" asp-route-monthId="@Model.MonthId">Back</a>
-
 <h1 class="govuk-heading-l">Sample Numbers</h1>
 
 <govuk-error-summary errors="@errors" />

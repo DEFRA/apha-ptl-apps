@@ -116,12 +116,12 @@ public partial class PricingPlanRenewConfirmationTests : IClassFixture<WebApplic
     [Theory]
     [InlineData("PostagePricingPlan")]
     [InlineData("WeightedPricingPlan")]
-    public async Task Confirm_RenewsThenReturnsToThePlanWithASuccessBanner(string page)
+    public async Task Confirm_RenewsThenGoesToTheSystemAdministrationIndexWithASuccessBanner(string page)
     {
         var (response, cookie) = await PostRenewAsync(page, confirmation: "confirm");
 
         Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
-        Assert.Equal($"/SystemAdministration/{page}?yearId=2026", response.Headers.Location!.OriginalString);
+        Assert.Equal("/SystemAdministration/Index", response.Headers.Location!.OriginalString);
         Assert.Equal(1, RenewCalls(page));
 
         var next = new HttpRequestMessage(HttpMethod.Get, response.Headers.Location);

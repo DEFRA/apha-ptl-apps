@@ -11,9 +11,15 @@ internal sealed class FakeCountryApiClient : ICountryApiClient
     public IReadOnlyList<CountryTypeResponse> CountryTypes { get; set; } = [];
     public CountrySaveResult SaveResult { get; set; } = new(true, null, new Dictionary<string, string[]>());
     public CountryDeleteResponse DeleteResponse { get; set; } = new(true, null);
-    public CountrySaveRequest? LastCreateRequest { get; private set; }
-    public (Guid CountryId, CountrySaveRequest Request)? LastUpdateRequest { get; private set; }
-    public Guid? LastDeletedCountryId { get; private set; }
+    public List<CountrySaveRequest> CreateRequests { get; } = [];
+    public List<(Guid CountryId, CountrySaveRequest Request)> UpdateRequests { get; } = [];
+    public List<Guid> DeleteCalls { get; } = [];
+
+    // When set, decides the result per request instead of SaveResult.
+    public Func<CountrySaveRequest, CountrySaveResult>? SaveResultFor { get; set; }
+
+    // When set, decides the delete result per country instead of DeleteResponse.
+    public Func<Guid, CountryDeleteResponse>? DeleteResultFor { get; set; }
 
     public Task<IReadOnlyList<CountryResponse>> GetCountriesAsync(CancellationToken cancellationToken = default) =>
         Task.FromResult(Countries);
@@ -23,19 +29,19 @@ internal sealed class FakeCountryApiClient : ICountryApiClient
 
     public Task<CountrySaveResult> CreateCountryAsync(CountrySaveRequest request, CancellationToken cancellationToken = default)
     {
-        LastCreateRequest = request;
-        return Task.FromResult(SaveResult);
+        CreateRequests.Add(request);
+        return Task.FromResult(SaveResultFor?.Invoke(request) ?? SaveResult);
     }
 
     public Task<CountrySaveResult> UpdateCountryAsync(Guid countryId, CountrySaveRequest request, CancellationToken cancellationToken = default)
     {
-        LastUpdateRequest = (countryId, request);
-        return Task.FromResult(SaveResult);
+        UpdateRequests.Add((countryId, request));
+        return Task.FromResult(SaveResultFor?.Invoke(request) ?? SaveResult);
     }
 
     public Task<CountryDeleteResponse> DeleteCountryAsync(Guid countryId, CancellationToken cancellationToken = default)
     {
-        LastDeletedCountryId = countryId;
-        return Task.FromResult(DeleteResponse);
+        DeleteCalls.Add(countryId);
+        return Task.FromResult(DeleteResultFor?.Invoke(countryId) ?? DeleteResponse);
     }
 }
