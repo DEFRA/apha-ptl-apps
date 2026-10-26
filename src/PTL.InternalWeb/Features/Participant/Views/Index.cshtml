@@ -13,18 +13,6 @@
 
 <h1 class="govuk-heading-l">Participants</h1>
 
-<form method="get" asp-action="Index" class="govuk-!-margin-bottom-6">
-    <input type="hidden" name="customerId" value="@Model.CustomerId" />
-    <div class="govuk-form-group">
-        <label class="govuk-label" for="includeInactive">Status</label>
-        <select class="govuk-select" id="includeInactive" name="includeInactive">
-            <option value="false" selected="@(Model.IncludeInactive ? null : "selected")">Active</option>
-            <option value="true" selected="@(Model.IncludeInactive ? "selected" : null)">Inactive</option>
-        </select>
-    </div>
-    <button class="govuk-button" data-module="govuk-button" type="submit">Filter</button>
-</form>
-
 @if (Model.Participants.Count == 0)
 {
     <p class="govuk-body">There are no participants to display.</p>
