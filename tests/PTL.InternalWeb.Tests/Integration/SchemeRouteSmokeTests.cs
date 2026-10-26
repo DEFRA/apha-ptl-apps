@@ -1,8 +1,10 @@
 using System.Net;
+using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using PTL.ApiClient;
+using PTL.Contracts.Participant;
 using PTL.Contracts.Scheme;
 using PTL.InternalWeb.Tests.TestSupport;
 
@@ -242,6 +244,50 @@ public class SchemeRouteSmokeTests : IClassFixture<WebApplicationFactory<Program
         var response = await client.GetAsync($"/Scheme/Edit/{SchemeId}");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Edit_RendersEveryViewerAsACheckboxTickedWhenAssignedSoSavingWorksWithoutScript()
+    {
+        var assigned = Guid.NewGuid();
+        var available = Guid.NewGuid();
+        _fakeApiClient.SchemeResponse = SampleScheme(SchemeId, SharedId) with { ViewerIds = [assigned] };
+        var factory = _factory.WithWebHostBuilder(builder =>
+            builder.ConfigureServices(services =>
+            {
+                services.RemoveAll<ILookupApiClient>();
+                services.AddSingleton<ILookupApiClient>(new FakeLookupApiClient
+                {
+                    Viewers = [new ViewerResponse(assigned, "Alpha Viewer", string.Empty), new ViewerResponse(available, "Beta Viewer", string.Empty)]
+                });
+            }));
+
+        var html = await factory.CreateClient().GetStringAsync($"/Scheme/Edit/{SchemeId}");
+
+        var checkboxes = Regex.Matches(html, "<input[^>]*name=\"ViewerIds\"[^>]*>").Select(m => m.Value).ToList();
+        Assert.Equal(2, checkboxes.Count);
+        Assert.All(checkboxes, c => Assert.Contains("type=\"checkbox\"", c, StringComparison.Ordinal));
+        Assert.Contains("checked", checkboxes.Single(c => c.Contains($"value=\"{assigned}\"", StringComparison.Ordinal)), StringComparison.Ordinal);
+        Assert.DoesNotContain("checked", checkboxes.Single(c => c.Contains($"value=\"{available}\"", StringComparison.Ordinal)), StringComparison.Ordinal);
+        // The transfer lists are only revealed (and only then named) by the script.
+        Assert.Contains("id=\"schemeViewerDualList\" hidden", html, StringComparison.Ordinal);
+        Assert.Matches("<select[^>]*id=\"schemeViewers\"(?![^>]*name=)[^>]*>", html);
+    }
+
+    [Fact]
+    public async Task Edit_TestsTab_EveryAddDropdownIsNamedForItsCommandAndNeedsNoScript()
+    {
+        var test = new SchemeTestResponse(Guid.NewGuid(), Guid.NewGuid(), "Serology", 0, [], [], []);
+        _fakeApiClient.SchemeResponse = SampleScheme(SchemeId, SharedId) with { Tests = [test] };
+
+        var html = await _factory.CreateClient().GetStringAsync($"/Scheme/Edit/{SchemeId}");
+
+        Assert.Matches("<select[^>]*id=\"addTestTypeId\"[^>]*name=\"pick:add-test\"", html);
+        Assert.Matches("<select[^>]*id=\"addResult0\"[^>]*name=\"pick:add-result:0\"", html);
+        Assert.Matches("<select[^>]*id=\"addMethod0\"[^>]*name=\"pick:add-method:0\"", html);
+        Assert.Matches("name=\"testCommand\"\\s+value=\"add-result:0\"", html);
+        Assert.DoesNotContain("selectedItemTypeId", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("data-picker", html, StringComparison.Ordinal);
     }
 
     [Fact]

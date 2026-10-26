@@ -375,7 +375,7 @@ public class SchemeController(ISchemeApiClient schemeApiClient, ILookupApiClient
 
         if (!declined)
         {
-            SchemeTestCommands.TryApply(model, testCommand!, selectedItemTypeId ?? Guid.Empty);
+            SchemeTestCommands.TryApply(model, testCommand!, selectedItemTypeId ?? PickedItemTypeId(testCommand!) ?? Guid.Empty);
         }
 
         ModelState.Clear();
@@ -383,6 +383,14 @@ public class SchemeController(ISchemeApiClient schemeApiClient, ILookupApiClient
         await PopulateFormAsync(model, cancellationToken);
         return true;
     }
+
+    // Each Add dropdown posts as pick:{command}, so the item type needs no script to reach the server.
+    private Guid? PickedItemTypeId(string testCommand) =>
+        HttpContext?.Request is { HasFormContentType: true } request
+        && request.Form.TryGetValue($"pick:{testCommand}", out var picked)
+        && Guid.TryParse(picked.ToString(), out var itemTypeId)
+            ? itemTypeId
+            : null;
 
     // Every GET and every failed POST must repopulate the Details tab's option lists and the
     // currency pricing grid before re-rendering, or the dropdowns come back empty.

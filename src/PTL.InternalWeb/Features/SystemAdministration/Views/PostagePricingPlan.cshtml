@@ -40,8 +40,9 @@
 <form method="get" asp-action="PostagePricingPlan" class="govuk-!-margin-bottom-6">
     <div class="govuk-form-group">
         <label class="govuk-label" for="yearId">Select a financial year:</label>
-        <select class="govuk-select" id="yearId" name="yearId" onchange="this.form.submit()" asp-items="Model.YearOptions" asp-for="SelectedYearId"></select>
+        <select class="govuk-select" id="yearId" name="yearId" asp-items="Model.YearOptions" asp-for="SelectedYearId"></select>
     </div>
+    <button type="submit" class="govuk-button govuk-button--secondary" data-module="govuk-button">View</button>
 </form>
 
 <table class="govuk-table">

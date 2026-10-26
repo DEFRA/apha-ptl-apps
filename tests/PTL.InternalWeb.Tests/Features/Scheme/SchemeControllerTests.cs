@@ -1,5 +1,7 @@
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Primitives;
 using PTL.Contracts.Lookup;
 using PTL.Contracts.Scheme;
 using PTL.InternalWeb.Confirmation;
@@ -639,6 +641,55 @@ public class SchemeControllerTests
         var view = Assert.IsType<ViewResult>(result);
         Assert.Same(model, view.Model);
         Assert.Equal(testTypeId, Assert.Single(model.Tests).TestTypeId);
+    }
+
+    [Fact]
+    public async Task Create_Post_AddTest_ReadsTheItemTypeFromThePickerNamedForTheCommand()
+    {
+        var controller = CreateController(new FakeSchemeApiClient());
+        var testTypeId = Guid.NewGuid();
+        controller.ControllerContext = FormContext(("pick:add-test", testTypeId.ToString()), ("pick:add-category:0", Guid.NewGuid().ToString()));
+        var model = new PTL.InternalWeb.Features.Scheme.SchemeFormViewModel { YearId = 2027 };
+
+        var result = await controller.Create(model, testCommand: "add-test", cancellationToken: CancellationToken.None);
+
+        Assert.IsType<ViewResult>(result);
+        Assert.Equal(testTypeId, Assert.Single(model.Tests).TestTypeId);
+    }
+
+    [Fact]
+    public async Task Edit_Post_AddResult_IgnoresThePickersOfOtherCommands()
+    {
+        var controller = CreateController(new FakeSchemeApiClient());
+        controller.ControllerContext = FormContext(("pick:add-test", Guid.NewGuid().ToString()), ("pick:add-result:0", string.Empty));
+        var model = new PTL.InternalWeb.Features.Scheme.SchemeFormViewModel { YearId = 2027 };
+        model.Tests.Add(new PTL.InternalWeb.Features.Scheme.SchemeTestViewModel { TestTypeId = Guid.NewGuid(), TestType = "Serology" });
+
+        await controller.Edit(Guid.NewGuid(), model, testCommand: "add-result:0", cancellationToken: CancellationToken.None);
+
+        Assert.Empty(model.Tests[0].ResultItems);
+    }
+
+    [Fact]
+    public async Task Create_Post_AddResult_UsesThePickerNamedForThatTestsCommand()
+    {
+        var controller = CreateController(new FakeSchemeApiClient());
+        var itemTypeId = Guid.NewGuid();
+        controller.ControllerContext = FormContext(("pick:add-result:0", itemTypeId.ToString()));
+        var model = new PTL.InternalWeb.Features.Scheme.SchemeFormViewModel { YearId = 2027 };
+        model.Tests.Add(new PTL.InternalWeb.Features.Scheme.SchemeTestViewModel { TestTypeId = Guid.NewGuid(), TestType = "Serology" });
+
+        await controller.Create(model, testCommand: "add-result:0", cancellationToken: CancellationToken.None);
+
+        Assert.Equal(itemTypeId, Assert.Single(model.Tests[0].ResultItems).ItemTypeId);
+    }
+
+    private static ControllerContext FormContext(params (string Key, string Value)[] fields)
+    {
+        var httpContext = new DefaultHttpContext();
+        httpContext.Request.ContentType = "application/x-www-form-urlencoded";
+        httpContext.Request.Form = new FormCollection(fields.ToDictionary(f => f.Key, f => new StringValues(f.Value)));
+        return new ControllerContext { HttpContext = httpContext };
     }
 
     [Fact]

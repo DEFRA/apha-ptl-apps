@@ -1,12 +1,43 @@
 @model PTL.InternalWeb.Features.Participant.ParticipantViewerFormViewModel
 @{
     ViewData["Title"] = "Participant Viewers";
+
+    var checkboxViewers = Model.AssignedViewers.Select(v => (Viewer: v, Assigned: true)).ToList();
+    if (Model.IsActive)
+    {
+        checkboxViewers.AddRange(Model.AvailableViewers.Select(v => (Viewer: v, Assigned: false)));
+    }
+
+    checkboxViewers = [.. checkboxViewers.OrderBy(v => v.Viewer.Name, StringComparer.OrdinalIgnoreCase)];
 }
 
 <h1 class="govuk-heading-l">@Model.LabCode: @Model.LabName</h1>
 
 <form method="post" asp-action="Viewers" asp-route-participantId="@Model.ParticipantId">
     <input type="hidden" name="customerId" value="@Model.CustomerId" />
+
+    @* Works without scripting: every viewer is a checkbox and the ticked ones are the participant's viewers.
+       The script below swaps this for the Add/Remove transfer lists. Inactive participants can only keep
+       or remove viewers, as the Add button is hidden for them. *@
+    <div id="viewerCheckboxes">
+        <div class="govuk-form-group">
+            <fieldset class="govuk-fieldset" aria-describedby="viewerCheckboxesHint">
+                <legend class="govuk-fieldset__legend govuk-fieldset__legend--s">Participant Viewers</legend>
+                <div id="viewerCheckboxesHint" class="govuk-hint">Select the viewers who can see this participant's results.</div>
+                <div class="govuk-checkboxes govuk-checkboxes--small" data-module="govuk-checkboxes">
+                    @foreach (var viewer in checkboxViewers)
+                    {
+                        <div class="govuk-checkboxes__item">
+                            <input class="govuk-checkboxes__input" id="viewer-@viewer.Viewer.ViewerId" name="viewerIds" type="checkbox" value="@viewer.Viewer.ViewerId" checked="@viewer.Assigned" />
+                            <label class="govuk-label govuk-checkboxes__label" for="viewer-@viewer.Viewer.ViewerId">@viewer.Viewer.Name</label>
+                        </div>
+                    }
+                </div>
+            </fieldset>
+        </div>
+    </div>
+
+    <div id="viewerDualList" hidden>
     <div class="govuk-grid-row">
         <div class="govuk-grid-column-one-third">
             <div class="govuk-form-group">
@@ -38,7 +69,7 @@
         <div class="govuk-grid-column-one-third">
             <div class="govuk-form-group">
                 <label class="govuk-label govuk-label--s" for="participantViewers">Participant Viewers</label>
-                <select class="govuk-select ptl-viewer-select" id="participantViewers" name="viewerIds" multiple size="10">
+                <select class="govuk-select ptl-viewer-select" id="participantViewers" multiple size="10">
                     @foreach (var viewer in Model.AssignedViewers)
                     {
                         <option value="@viewer.ViewerId">@viewer.Name</option>
@@ -46,6 +77,7 @@
                 </select>
             </div>
         </div>
+    </div>
     </div>
 
     <div class="govuk-button-group">
@@ -61,6 +93,11 @@
             var selected = document.getElementById('participantViewers');
             var addButton = document.getElementById('btnAddViewer');
             var removeButton = document.getElementById('btnRemoveViewer');
+
+            // Swap the no-script checkboxes for the transfer lists; only one set may post viewerIds.
+            document.getElementById('viewerCheckboxes').remove();
+            document.getElementById('viewerDualList').hidden = false;
+            selected.name = 'viewerIds';
 
             function moveSelected(from, to) {
                 if (!from || !to) {

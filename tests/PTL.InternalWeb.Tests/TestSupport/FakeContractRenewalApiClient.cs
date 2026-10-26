@@ -13,12 +13,17 @@ internal sealed class FakeContractRenewalApiClient : IContractRenewalApiClient
 
     public RenewContractResponse RenewResult { get; set; } = new(true, Guid.NewGuid(), null);
 
+    public RenewContractRequest? LastRenewRequest { get; private set; }
+
     public Task<RenewableContractsResponse> GetRenewableContractsAsync(Guid customerId, CancellationToken cancellationToken = default) =>
         Task.FromResult(ContractsResponse);
 
     public Task<RenewableContractItemsResponse> GetRenewableItemsAsync(Guid customerId, CancellationToken cancellationToken = default) =>
         Task.FromResult(ItemsResponse);
 
-    public Task<RenewContractResponse> RenewContractsAsync(Guid customerId, RenewContractRequest request, CancellationToken cancellationToken = default) =>
-        Task.FromResult(RenewResult);
+    public Task<RenewContractResponse> RenewContractsAsync(Guid customerId, RenewContractRequest request, CancellationToken cancellationToken = default)
+    {
+        LastRenewRequest = request;
+        return Task.FromResult(RenewResult);
+    }
 }

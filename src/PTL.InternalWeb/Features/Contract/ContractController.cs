@@ -20,6 +20,7 @@ public class ContractController(IContractApiClient contractApiClient, ICustomerA
 {
     // Legacy ExportBase.ShowError text, reused verbatim across upload/open/select/delete/export.
     private const string FileNotFound = "File not found";
+    private const string RefreshRenewItemsCommand = "refresh";
 
     // Legacy ContractList.aspx.vb text when no row for the document type has fldSelectedTemplate = 1.
     private const string NoSelectedTemplate = "Template file not found";
@@ -799,10 +800,31 @@ public class ContractController(IContractApiClient contractApiClient, ICustomerA
         List<Guid> selectedContractIds,
         List<Guid> selectedParticipantSchemeIds,
         string? newContractSignatory,
+        List<string>? selectedItemIdentifiers,
+        string? command,
         CancellationToken cancellationToken)
     {
         selectedContractIds ??= [];
         selectedParticipantSchemeIds ??= [];
+
+        // "Update items" (the no-script way to refresh the item list after changing the contract selection).
+        if (string.Equals(command, RefreshRenewItemsCommand, StringComparison.Ordinal))
+        {
+            var refreshed = await BuildRenewContractsModelAsync(customerId, cancellationToken);
+            refreshed.SelectedContractIds = selectedContractIds;
+            refreshed.SelectedItemIdentifiers = selectedItemIdentifiers ?? [];
+            refreshed.SelectedParticipantSchemeIds = SelectedRenewableItemIds(refreshed.Items, refreshed.SelectedItemIdentifiers, selectedContractIds);
+            refreshed.NewContractSignatory = newContractSignatory;
+            return View(refreshed);
+        }
+
+        // The page posts its ticked rows by Identifier; an item is renewed only when its row is ticked, it
+        // has a new scheme and its contract is selected (legacy MergeContractsViewModel).
+        if (selectedItemIdentifiers is { Count: > 0 })
+        {
+            var renewableItems = await contractRenewalApiClient.GetRenewableItemsAsync(customerId, cancellationToken);
+            selectedParticipantSchemeIds = SelectedRenewableItemIds(renewableItems.Items, selectedItemIdentifiers, selectedContractIds);
+        }
 
         var request = new RenewContractRequest(selectedContractIds, selectedParticipantSchemeIds, newContractSignatory);
         var result = await contractRenewalApiClient.RenewContractsAsync(customerId, request, cancellationToken);
@@ -812,6 +834,7 @@ public class ContractController(IContractApiClient contractApiClient, ICustomerA
             var model = await BuildRenewContractsModelAsync(customerId, cancellationToken);
             model.SelectedContractIds = selectedContractIds;
             model.SelectedParticipantSchemeIds = selectedParticipantSchemeIds;
+            model.SelectedItemIdentifiers = selectedItemIdentifiers;
             model.NewContractSignatory = newContractSignatory;
             model.ErrorMessage = result.ErrorMessage;
             return View(model);
@@ -823,6 +846,12 @@ public class ContractController(IContractApiClient contractApiClient, ICustomerA
         ContractSearchState.Clear(HttpContext);
         return RedirectToAction(nameof(Index), new { customerId });
     }
+
+    private static List<Guid> SelectedRenewableItemIds(
+        IEnumerable<RenewableContractItemDto> items, IReadOnlyCollection<string> identifiers, IReadOnlyCollection<Guid> contractIds) =>
+        [.. items
+            .Where(i => i.IsRenewable && identifiers.Contains(i.Identifier, StringComparer.Ordinal) && contractIds.Contains(i.ContractId))
+            .Select(i => i.ParticipantSchemeId)];
 
     private async Task<RenewContractsViewModel> BuildRenewContractsModelAsync(Guid customerId, CancellationToken cancellationToken)
     {
