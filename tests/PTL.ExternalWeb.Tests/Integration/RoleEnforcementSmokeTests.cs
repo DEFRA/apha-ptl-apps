@@ -8,8 +8,8 @@ using PTL.ExternalWeb.Tests.TestSupport;
 namespace PTL.ExternalWeb.Tests.Integration;
 
 // Full-pipeline proof that role checks are enforced at the controller boundary (not just hidden
-// from nav) - Story 744510. Exercises the real [Authorize(Policy=...)]-gated SchemeController and
-// ComingSoonController's dynamic per-link requiredRole check, via the test sign-in mechanism.
+// from nav) - Story 744510. Exercises [Authorize(Policy=...)]-gated controllers via the test
+// sign-in mechanism.
 public class RoleEnforcementSmokeTests : IClassFixture<PtlExternalWebTestFactory>
 {
     private readonly PtlExternalWebTestFactory _factory;
@@ -57,7 +57,7 @@ public class RoleEnforcementSmokeTests : IClassFixture<PtlExternalWebTestFactory
     }
 
     [Fact]
-    public async Task ComingSoon_ParticipantFollowingAViewerOnlyStubLink_IsForbidden()
+    public async Task TabulationIndex_ParticipantSignedIn_IsForbidden()
     {
         var client = _factory.CreateClient();
         var cookies = new Dictionary<string, string>();
@@ -65,16 +65,16 @@ public class RoleEnforcementSmokeTests : IClassFixture<PtlExternalWebTestFactory
             $"{PtlExternalWebTestFactory.TestSignInPath}?roles={Uri.EscapeDataString("Participant")}");
         CookieForwardingHttpClient.CaptureCookies(signInResponse, cookies);
 
-        // "View reports" is Viewer-only (see NavigationProvider) - a Participant guessing this URL
-        // directly, bypassing nav-hiding, must still be refused.
+        // "View reports" (TabulationController) is Viewer-only (see NavigationProvider) - a
+        // Participant guessing this URL directly, bypassing nav-hiding, must still be refused.
         var response = await CookieForwardingHttpClient.SendWithCookiesAsync(
-            client, HttpMethod.Get, "/ComingSoon/Index?title=View+reports&requiredRole=Viewer", cookies);
+            client, HttpMethod.Get, "/Tabulation/Index", cookies);
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
     [Fact]
-    public async Task ComingSoon_ViewerFollowingTheirOwnStubLink_Succeeds()
+    public async Task TabulationIndex_ViewerSignedIn_Succeeds()
     {
         var client = _factory.CreateClient();
         var cookies = new Dictionary<string, string>();
@@ -83,7 +83,7 @@ public class RoleEnforcementSmokeTests : IClassFixture<PtlExternalWebTestFactory
         CookieForwardingHttpClient.CaptureCookies(signInResponse, cookies);
 
         var response = await CookieForwardingHttpClient.SendWithCookiesAsync(
-            client, HttpMethod.Get, "/ComingSoon/Index?title=View+reports&requiredRole=Viewer", cookies);
+            client, HttpMethod.Get, "/Tabulation/Index", cookies);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }

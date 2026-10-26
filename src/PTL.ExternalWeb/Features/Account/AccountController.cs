@@ -58,8 +58,8 @@ namespace PTL.ExternalWeb.Features.Account
         public IActionResult NotPermitted(string? reason) => View(model: reason);
 
         // Where a refused request lands (cookie AccessDeniedPath) - reached when a signed-in user
-        // lacks the role required for the page/link they followed (ComingSoonController, or any
-        // [Authorize(Policy=...)]-gated controller). Anonymous so the page itself can never be
+        // lacks the role required for the page/link they followed, via any
+        // [Authorize(Policy=...)]-gated controller. Anonymous so the page itself can never be
         // refused, and it answers 403 rather than 200 - mirrors PTL.InternalWeb's equivalent.
         [HttpGet("/AccessDenied")]
         [AllowAnonymous]

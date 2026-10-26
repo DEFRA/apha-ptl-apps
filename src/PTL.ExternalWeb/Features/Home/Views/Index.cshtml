@@ -21,9 +21,9 @@
 @* Index requires authentication (the app's default authorization policy), so Model is always
    populated here - no anonymous fallback branch needed. Navigation is the header menu panel
    (_HeaderMenu.cshtml, driven by the same NavigationProvider); each section's sub-items are
-   also shown here as quick-link cards for fast access from Home. No screen behind any of these
-   links has its own migration slice yet, so every one navigates to the shared ComingSoon page
-   instead of being a dead/disabled link, matching legacy's always-clickable navigation. *@
+   also shown here as quick-link cards for fast access from Home. Every link routes to its own
+   feature controller (placeholder or fully migrated), matching legacy's always-clickable
+   navigation - never a dead/disabled link. *@
 
 @* govuk-notification-banner is the GDS equivalent of legacy Home.aspx's "Important" callout -
    the static text/link below is always shown (legacy pt-alert); the admin-authored
@@ -60,7 +60,7 @@
     <div class="app-card-group">
         @foreach (var item in group.Children)
         {
-            var href = Url.Action(item.ActionName, item.ControllerName, new { title = item.Text, requiredRole = item.RequiredRole });
+            var href = Url.Action(item.ActionName, item.ControllerName, new { title = item.Text });
             @await Html.PartialAsync("_QuickLinkCard", (item.Text, item.Description, href ?? "#"))
         }
     </div>
