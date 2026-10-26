@@ -8,4 +8,5 @@ public sealed record ResolveExternalUserResponse(
     string? LabCode,
     Guid? ViewerId,
     Guid? TestConsultantId,
-    bool CanOrderOnline = false);
+    bool CanOrderOnline = false,
+    bool HasInactiveMatch = false);

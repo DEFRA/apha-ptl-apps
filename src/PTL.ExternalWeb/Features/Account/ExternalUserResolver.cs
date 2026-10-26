@@ -60,10 +60,13 @@ public sealed partial class ExternalUserResolver(IExternalUserApiClient external
         }
 
         // No CIDM role resolved to an existing record - nothing in PTL this person is permitted to
-        // use, so deny entirely rather than signing them into an app with no accessible data.
+        // use, so deny entirely rather than signing them into an app with no accessible data. The
+        // "inactive" reason is surfaced distinctly so NotPermitted can show clearer guidance when a
+        // record exists but is marked inactive, rather than the generic "no access at all" message.
         if (response.Roles.Count == 0)
         {
-            return CidmExternalUserResolution.Deny("/Account/NotPermitted");
+            var reason = response.HasInactiveMatch ? "?reason=inactive" : string.Empty;
+            return CidmExternalUserResolution.Deny($"/Account/NotPermitted{reason}");
         }
 
         var claims = new Dictionary<string, string>

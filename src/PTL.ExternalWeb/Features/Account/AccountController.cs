@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using PTL.ApiClient;
 using PTL.Auth.Cidm;
@@ -49,9 +50,23 @@ namespace PTL.ExternalWeb.Features.Account
 
         // Reached via ExternalUserResolver's denial redirect when no CIDM role resolves to an
         // existing record - no local cookie exists at this point, since TokenValidated redirects
-        // here before the OIDC handler ever signs the principal into the cookie scheme.
+        // here before the OIDC handler ever signs the principal into the cookie scheme. reason is
+        // "inactive" when the only matching record was found but excluded for being inactive (see
+        // ExternalUserResolver), so the view can show more specific guidance than the generic case.
         [HttpGet]
         [AllowAnonymous]
-        public IActionResult NotPermitted() => View();
+        public IActionResult NotPermitted(string? reason) => View(model: reason);
+
+        // Where a refused request lands (cookie AccessDeniedPath) - reached when a signed-in user
+        // lacks the role required for the page/link they followed (ComingSoonController, or any
+        // [Authorize(Policy=...)]-gated controller). Anonymous so the page itself can never be
+        // refused, and it answers 403 rather than 200 - mirrors PTL.InternalWeb's equivalent.
+        [HttpGet("/AccessDenied")]
+        [AllowAnonymous]
+        public IActionResult AccessDenied()
+        {
+            Response.StatusCode = StatusCodes.Status403Forbidden;
+            return View();
+        }
     }
 }

@@ -14,7 +14,11 @@ public sealed record ExternalUserResolutionResult(
     Guid? TestConsultantId,
     // Only ever true for a resolved Participant whose linked Customer has CanOrderOnline set -
     // see ExternalUserService.ResolveParticipantAsync.
-    bool CanOrderOnline = false)
+    bool CanOrderOnline = false,
+    // True when a Participant or Test Consultant record was found but excluded solely for being
+    // inactive (Viewer has no inactive concept at all) - lets the caller distinguish "no matching
+    // record exists" from "a matching record exists but is inactive" for sign-in denial messaging.
+    bool HasInactiveMatch = false)
 {
     public bool IsResolved => Roles.Count > 0;
 }

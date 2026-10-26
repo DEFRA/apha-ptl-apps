@@ -18,8 +18,9 @@ namespace PTL.ExternalWeb.Navigation;
 // (docs/Parity-Analysis/08-Migration-Parity-Tracker.md).
 public static class NavigationProvider
 {
-    // Real, clickable link for a menu entry whose own page hasn't been migrated yet. requiredRole
-    // is null when the item inherits visibility purely from its parent section.
+    // Real, clickable link for a menu entry whose own page hasn't been migrated yet. Every leaf
+    // carries its own explicit requiredRole (even when it matches the parent group's) so
+    // ComingSoonController can enforce it per-link via a route value, not just hide it from nav.
     // description ports the matching "*Blurb" resource from legacy's Home.aspx.resx.
     private static NavigationItem Stub(string text, string description, string? requiredRole = null) =>
         new() { Text = text, ControllerName = "ComingSoon", ActionName = "Index", Description = description, RequiredRole = requiredRole };
@@ -48,7 +49,7 @@ public static class NavigationProvider
             // Legacy's PnlOrdersSection.Visible = IsParticipant AndAlso CanOrderOnline (Home.aspx.vb) -
             // being a Participant alone isn't enough; the linked Customer must also be order-eligible.
             RequireCanOrderOnline = true,
-            Children = [Stub("Create order", "Order proficiency tests for the current or next year")]
+            Children = [Stub("Create order", "Order proficiency tests for the current or next year", ExternalRoleNames.Participant)]
         },
         new NavigationItem
         {
@@ -69,8 +70,8 @@ public static class NavigationProvider
             RequiredRole = ExternalRoleNames.Participant,
             Children =
             [
-                Stub("Edit customer details", "Submit an update to your customer details"),
-                Stub("Edit participant details", "Submit an update to participating laboratory details")
+                Stub("Edit customer details", "Submit an update to your customer details", ExternalRoleNames.Participant),
+                Stub("Edit participant details", "Submit an update to participating laboratory details", ExternalRoleNames.Participant)
             ]
         }
     ];

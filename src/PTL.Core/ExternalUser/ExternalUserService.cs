@@ -29,10 +29,12 @@ public sealed class ExternalUserService(
         Guid? viewerId = null;
         Guid? testConsultantId = null;
         var canOrderOnline = false;
+        var hasInactiveMatch = false;
 
         if (HasRole(cidmRoles, ParticipantRoleName))
         {
-            var participant = await ResolveParticipantAsync(ssoIdExt, email, cancellationToken);
+            var (participant, foundButInactive) = await ResolveParticipantAsync(ssoIdExt, email, cancellationToken);
+            hasInactiveMatch |= foundButInactive;
             if (participant is not null)
             {
                 participantId = participant.ParticipantId;
@@ -55,36 +57,45 @@ public sealed class ExternalUserService(
 
         if (HasRole(cidmRoles, TestConsultantRoleName))
         {
-            testConsultantId = await ResolveTestConsultantAsync(ssoIdExt, email, cancellationToken);
+            var (resolvedTestConsultantId, foundButInactive) = await ResolveTestConsultantAsync(ssoIdExt, email, cancellationToken);
+            hasInactiveMatch |= foundButInactive;
+            testConsultantId = resolvedTestConsultantId;
             if (testConsultantId is not null)
             {
                 resolvedRoles.Add(TestConsultantRoleName);
             }
         }
 
-        return new ExternalUserResolutionResult(displayName, resolvedRoles, participantId, labCode, viewerId, testConsultantId, canOrderOnline);
+        return new ExternalUserResolutionResult(displayName, resolvedRoles, participantId, labCode, viewerId, testConsultantId, canOrderOnline, hasInactiveMatch);
     }
 
     private static bool HasRole(IReadOnlyList<string> cidmRoles, string roleName) =>
         cidmRoles.Contains(roleName, StringComparer.OrdinalIgnoreCase);
 
-    private async Task<CoreParticipant?> ResolveParticipantAsync(Guid ssoIdExt, string email, CancellationToken cancellationToken)
+    private async Task<(CoreParticipant? Participant, bool FoundButInactive)> ResolveParticipantAsync(Guid ssoIdExt, string email, CancellationToken cancellationToken)
     {
         var participant = await participantRepository.GetBySsoIdExtAsync(ssoIdExt, cancellationToken);
         if (participant is not null)
         {
-            return participant;
+            // Inactive Participants must not access Participant functionality, even if they were
+            // previously linked (SsoIdExt already set from an earlier sign-in).
+            return participant.IsActive ? (participant, false) : (null, true);
         }
 
         participant = await participantRepository.GetByEmailAsync(email, cancellationToken);
         if (participant is null)
         {
-            return null;
+            return (null, false);
+        }
+
+        if (!participant.IsActive)
+        {
+            return (null, true);
         }
 
         participant.SsoIdExt = ssoIdExt;
         await participantRepository.UpdateAsync(participant, cancellationToken);
-        return participant;
+        return (participant, false);
     }
 
     private async Task<Guid?> ResolveViewerAsync(Guid ssoIdExt, string email, CancellationToken cancellationToken)
@@ -106,24 +117,29 @@ public sealed class ExternalUserService(
         return viewer.ViewerId;
     }
 
-    private async Task<Guid?> ResolveTestConsultantAsync(Guid ssoIdExt, string email, CancellationToken cancellationToken)
+    private async Task<(Guid? TestConsultantId, bool FoundButInactive)> ResolveTestConsultantAsync(Guid ssoIdExt, string email, CancellationToken cancellationToken)
     {
         var testConsultant = await testConsultantRepository.GetBySsoIdExtAsync(ssoIdExt, cancellationToken);
         if (testConsultant is not null)
         {
             // Inactive External Test Consultants must not access Test Consultant functionality,
             // even if they were previously linked (SsoIdExt already set from an earlier sign-in).
-            return testConsultant.IsInactive ? null : testConsultant.ExternalTestConsultantId;
+            return testConsultant.IsInactive ? (null, true) : (testConsultant.ExternalTestConsultantId, false);
         }
 
         testConsultant = await testConsultantRepository.GetByEmailAsync(email, cancellationToken);
-        if (testConsultant is null || testConsultant.IsInactive)
+        if (testConsultant is null)
         {
-            return null;
+            return (null, false);
+        }
+
+        if (testConsultant.IsInactive)
+        {
+            return (null, true);
         }
 
         testConsultant.SsoIdExt = ssoIdExt;
         await testConsultantRepository.UpdateAsync(testConsultant, cancellationToken: cancellationToken);
-        return testConsultant.ExternalTestConsultantId;
+        return (testConsultant.ExternalTestConsultantId, false);
     }
 }

@@ -7,5 +7,15 @@ namespace PTL.ExternalWeb.Features.ComingSoon;
 // while the real screen is still pending its own migration slice.
 public sealed class ComingSoonController : Controller
 {
-    public IActionResult Index(string title) => View(new ComingSoonViewModel(title));
+    // requiredRole is the link's own NavigationItem.RequiredRole, passed as a route value so a
+    // user can't bypass nav-hiding by guessing the URL to another role's stub page.
+    public IActionResult Index(string title, string? requiredRole = null)
+    {
+        if (requiredRole is not null && !User.IsInRole(requiredRole))
+        {
+            return Forbid();
+        }
+
+        return View(new ComingSoonViewModel(title));
+    }
 }

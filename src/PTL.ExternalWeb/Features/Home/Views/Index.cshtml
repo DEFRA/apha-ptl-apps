@@ -60,7 +60,7 @@
     <div class="app-card-group">
         @foreach (var item in group.Children)
         {
-            var href = Url.Action(item.ActionName, item.ControllerName, new { title = item.Text });
+            var href = Url.Action(item.ActionName, item.ControllerName, new { title = item.Text, requiredRole = item.RequiredRole });
             @await Html.PartialAsync("_QuickLinkCard", (item.Text, item.Description, href ?? "#"))
         }
     </div>

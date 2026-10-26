@@ -37,7 +37,7 @@
                                 }
                                 else
                                 {
-                                    <a class="govuk-link govuk-link--no-visited-state app-menu-panel__link" asp-controller="@item.ControllerName" asp-action="@item.ActionName" asp-route-title="@item.Text">@item.Text</a>
+                                    <a class="govuk-link govuk-link--no-visited-state app-menu-panel__link" asp-controller="@item.ControllerName" asp-action="@item.ActionName" asp-route-title="@item.Text" asp-route-requiredRole="@item.RequiredRole">@item.Text</a>
                                 }
                             </li>
                         }
