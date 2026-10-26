@@ -7,9 +7,6 @@
     <link rel="stylesheet" href="~/css/printable-scheme.css" />
 }
 
-@section BackLink {
-    <a class="govuk-back-link noprint" asp-action="Preparation" asp-route-year="@Model.YearId" asp-route-monthId="@Model.MonthId">Back</a>
-}
 
 <h1 class="govuk-heading-l noprint">Printable Results</h1>
 <h2 class="govuk-heading-m noprint">@Model.SchemeHeading</h2>
@@ -22,14 +19,14 @@
         <label class="govuk-label" for="showValues">
             @(Model.HasIntendedResults ? "Select Version to Print: " : "Select Version to Print (Intended Results not yet defined): ")
         </label>
-        <select class="govuk-select" id="showValues" name="showValues" onchange="this.form.submit()">
+        <select class="govuk-select" id="showValues" name="showValues">
             <option value="false" selected="@(!Model.ShowValues ? "selected" : null)">Blank</option>
             @if (Model.HasIntendedResults)
             {
                 <option value="true" selected="@(Model.ShowValues ? "selected" : null)">Show Intended Results</option>
             }
         </select>
-        <noscript><button type="submit" class="govuk-button govuk-button--secondary govuk-!-margin-left-2">View</button></noscript>
+        <button type="submit" class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0 govuk-!-margin-left-3" data-module="govuk-button">View</button>
     </div>
 </form>
 

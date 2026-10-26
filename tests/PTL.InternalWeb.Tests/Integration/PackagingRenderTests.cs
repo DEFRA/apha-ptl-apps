@@ -162,7 +162,9 @@ public partial class PackagingRenderTests : IClassFixture<WebApplicationFactory<
         }
 
         Assert.Matches("<button[^>]*id=\"packaging-print-button\"[^>]*>Print</button>", html);
-        Assert.Matches("<a class=\"govuk-link\" href=\"[^\"]*\">Cancel</a>", html);
+        Assert.Matches("<button type=\"submit\" form=\"packaging-cancel-form\" class=\"govuk-button govuk-button--secondary\"[^>]*>Cancel</button>", html);
+        Assert.Matches("<form id=\"packaging-cancel-form\" method=\"get\" class=\"noprint\" action=\"[^\"]*\"></form>|<form id=\"packaging-cancel-form\" method=\"get\" action=\"[^\"]*\" class=\"noprint\"></form>", html);
+        Assert.DoesNotContain(">Cancel</a>", html, StringComparison.Ordinal);
 
         if (customs)
         {

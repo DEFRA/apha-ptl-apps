@@ -12,6 +12,7 @@ using PTL.Contracts.TestConsultant;
 using PTL.Contracts.User;
 using PTL.Contracts.Viewer;
 using PTL.InternalWeb.Authorization;
+using PTL.InternalWeb.Confirmation;
 using PTL.InternalWeb.Features.Account;
 using PTL.SharedUI.Notifications;
 
@@ -142,23 +143,47 @@ public class SystemAdministrationController : Controller
 
     // yearId is whatever year was selected in the dropdown when Renew was clicked (posted via a
     // hidden field) - matches legacy btnRenew_Click, which rebuilds the same page around the
-    // already-selected Session("YearId") rather than switching to the newly renewed year.
+    // already-selected Session("YearId") rather than switching to the newly renewed year. The
+    // browser confirm() is replaced by the shared two-step confirmation page.
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Renew(int? yearId, CancellationToken cancellationToken)
+    public async Task<IActionResult> Renew(int? yearId, string? confirmation, CancellationToken cancellationToken)
     {
+        if (ConfirmationFlow.IsCancelled(confirmation))
+        {
+            return RedirectToAction(nameof(WeightedPricingPlan), new { yearId });
+        }
+
+        if (!ConfirmationFlow.IsConfirmed(confirmation))
+        {
+            var years = await weightedPricingPlanApiClient.GetYearsAsync(cancellationToken);
+            if (years is { CanRenew: true, NextYearLabel: { } nextYearLabel })
+            {
+                return this.ConfirmationPage(RenewPricingPlanConfirmation("weighted", "Weighted Pricing Plan", nextYearLabel), nameof(WeightedPricingPlan));
+            }
+        }
+
         var result = await weightedPricingPlanApiClient.RenewAsync(cancellationToken);
         if (result.Success)
         {
             LogRenewedMessage(logger, yearId.GetValueOrDefault(), null);
-        }
-        else
-        {
-            LogRenewBlockedMessage(logger, null);
+            TempData.SetNotification(NotificationType.Success, result.Message);
+            return RedirectToAction(nameof(WeightedPricingPlan), new { yearId });
         }
 
-        return View("WeightedPricingPlan", await BuildWeightedPricingPlanViewModelAsync(yearId, result.Message, messageIsError: !result.Success, cancellationToken));
+        LogRenewBlockedMessage(logger, null);
+        return View("WeightedPricingPlan", await BuildWeightedPricingPlanViewModelAsync(yearId, result.Message, messageIsError: true, cancellationToken));
     }
+
+    private static ConfirmationPageViewModel RenewPricingPlanConfirmation(string planName, string caption, string nextYearLabel) =>
+        new()
+        {
+            Title = $"Renew pricing plan for financial year {nextYearLabel}",
+            Caption = caption,
+            Message = $"You are about to renew the {planName} pricing plan for the financial year {nextYearLabel}. The plan for the current financial year will be used to create the plan for {nextYearLabel}.",
+            WarningText = "A pricing plan can only be renewed once for each financial year, and this cannot be undone here.",
+            ConfirmText = "Renew pricing plan",
+        };
 
     public async Task<IActionResult> PostagePricingPlan(int? yearId, Guid? editId, CancellationToken cancellationToken) =>
         View(await BuildPostagePricingPlanViewModelAsync(yearId, editId, message: null, messageIsError: false, editValues: null, cancellationToken));
@@ -198,19 +223,32 @@ public class SystemAdministrationController : Controller
     // already-selected Session("YearId") rather than switching to the newly renewed year.
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> PostagePricingPlanRenew(int? yearId, CancellationToken cancellationToken)
+    public async Task<IActionResult> PostagePricingPlanRenew(int? yearId, string? confirmation, CancellationToken cancellationToken)
     {
+        if (ConfirmationFlow.IsCancelled(confirmation))
+        {
+            return RedirectToAction(nameof(PostagePricingPlan), new { yearId });
+        }
+
+        if (!ConfirmationFlow.IsConfirmed(confirmation))
+        {
+            var years = await postagePricingPlanApiClient.GetYearsAsync(cancellationToken);
+            if (years is { CanRenew: true, NextYearLabel: { } nextYearLabel })
+            {
+                return this.ConfirmationPage(RenewPricingPlanConfirmation("postage", "Postage Pricing Plan", nextYearLabel), nameof(PostagePricingPlan));
+            }
+        }
+
         var result = await postagePricingPlanApiClient.RenewAsync(cancellationToken);
         if (result.Success)
         {
             LogPostageRenewedMessage(logger, yearId.GetValueOrDefault(), null);
-        }
-        else
-        {
-            LogPostageRenewBlockedMessage(logger, null);
+            TempData.SetNotification(NotificationType.Success, result.Message);
+            return RedirectToAction(nameof(PostagePricingPlan), new { yearId });
         }
 
-        return View(nameof(PostagePricingPlan), await BuildPostagePricingPlanViewModelAsync(yearId, editId: null, result.Message, messageIsError: !result.Success, editValues: null, cancellationToken));
+        LogPostageRenewBlockedMessage(logger, null);
+        return View(nameof(PostagePricingPlan), await BuildPostagePricingPlanViewModelAsync(yearId, editId: null, result.Message, messageIsError: true, editValues: null, cancellationToken));
     }
 
     public async Task<IActionResult> CountryManagement(Guid? editId, CancellationToken cancellationToken) =>

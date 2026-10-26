@@ -10,6 +10,7 @@ using PTL.Contracts.TestConsultant;
 using PTL.Contracts.User;
 using PTL.Contracts.Viewer;
 using PTL.Contracts.WeightedPricingPlan;
+using PTL.InternalWeb.Confirmation;
 using PTL.InternalWeb.Features.Account;
 using PTL.InternalWeb.Features.SystemAdministration;
 using PTL.InternalWeb.Tests.TestSupport;
@@ -251,7 +252,7 @@ public class SystemAdministrationControllerTests
         };
         var controller = CreateController(weightedPricingPlanApiClient: apiClient);
 
-        var result = await controller.Renew(2025, CancellationToken.None);
+        var result = await controller.Renew(2025, null, CancellationToken.None);
 
         var view = Assert.IsType<ViewResult>(result);
         var model = Assert.IsType<WeightedPricingPlanViewModel>(view.Model);
@@ -260,21 +261,64 @@ public class SystemAdministrationControllerTests
     }
 
     [Fact]
-    public async Task Renew_Succeeds_RedisplaysWithSuccessMessage()
+    public async Task Renew_NotConfirmed_ShowsTheConfirmationPageForTheNextYearWithoutRenewing()
     {
         var apiClient = new FakeWeightedPricingPlanApiClient
         {
-            Years = new WeightedPricingPlanYearsResponse([new YearResponse(2025, "2025/26")], false, null, null),
+            Years = new WeightedPricingPlanYearsResponse([new YearResponse(2025, "2025/26")], true, 2026, "2026/27")
+        };
+        var controller = CreateController(weightedPricingPlanApiClient: apiClient);
+
+        var result = await controller.Renew(2025, null, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        Assert.Equal(ConfirmationFlow.ViewName, view.ViewName);
+        var page = Assert.IsType<ConfirmationPageViewModel>(view.Model);
+        Assert.Equal("Renew pricing plan for financial year 2026/27", page.Title);
+        Assert.Equal("Weighted Pricing Plan", page.Caption);
+        Assert.Contains("weighted pricing plan for the financial year 2026/27", page.Message, StringComparison.Ordinal);
+        Assert.NotNull(page.WarningText);
+        Assert.Equal("Renew pricing plan", page.ConfirmText);
+        Assert.Null(page.CancelUrl);
+        Assert.Equal(0, apiClient.RenewCallCount);
+    }
+
+    [Fact]
+    public async Task Renew_Cancelled_ReturnsToThePricingPlanForTheSameYearWithoutRenewing()
+    {
+        var apiClient = new FakeWeightedPricingPlanApiClient
+        {
+            Years = new WeightedPricingPlanYearsResponse([new YearResponse(2025, "2025/26")], true, 2026, "2026/27")
+        };
+        var controller = CreateController(weightedPricingPlanApiClient: apiClient);
+
+        var result = await controller.Renew(2025, ConfirmationFlow.Cancelled, CancellationToken.None);
+
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal(nameof(SystemAdministrationController.WeightedPricingPlan), redirect.ActionName);
+        Assert.Equal(2025, redirect.RouteValues!["yearId"]);
+        Assert.Equal(0, apiClient.RenewCallCount);
+        Assert.Null(controller.TempData.GetNotification());
+    }
+
+    [Fact]
+    public async Task Renew_Confirmed_RenewsThenRedirectsToTheSameYearWithASuccessBanner()
+    {
+        var apiClient = new FakeWeightedPricingPlanApiClient
+        {
+            Years = new WeightedPricingPlanYearsResponse([new YearResponse(2025, "2025/26")], true, 2026, "2026/27"),
             RenewResponse = new WeightedPricingPlanRenewResponse(true, "The weighted pricing plan has successfully been renewed for the financial year 2026/27.")
         };
         var controller = CreateController(weightedPricingPlanApiClient: apiClient);
 
-        var result = await controller.Renew(2025, CancellationToken.None);
+        var result = await controller.Renew(2025, ConfirmationFlow.Confirmed, CancellationToken.None);
 
-        var view = Assert.IsType<ViewResult>(result);
-        var model = Assert.IsType<WeightedPricingPlanViewModel>(view.Model);
-        Assert.False(model.MessageIsError);
-        Assert.Contains("2026/27", model.Message);
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal(nameof(SystemAdministrationController.WeightedPricingPlan), redirect.ActionName);
+        Assert.Equal(2025, redirect.RouteValues!["yearId"]);
+        var notification = controller.TempData.GetNotification();
+        Assert.Equal(NotificationType.Success, notification!.Type);
+        Assert.Contains("2026/27", notification.Message, StringComparison.Ordinal);
         Assert.Equal(1, apiClient.RenewCallCount);
     }
 
@@ -463,7 +507,7 @@ public class SystemAdministrationControllerTests
         };
         var controller = CreateController(postagePricingPlanApiClient: apiClient);
 
-        var result = await controller.PostagePricingPlanRenew(2025, CancellationToken.None);
+        var result = await controller.PostagePricingPlanRenew(2025, null, CancellationToken.None);
 
         var view = Assert.IsType<ViewResult>(result);
         var model = Assert.IsType<PostagePricingPlanViewModel>(view.Model);
@@ -472,21 +516,64 @@ public class SystemAdministrationControllerTests
     }
 
     [Fact]
-    public async Task PostagePricingPlanRenew_Succeeds_RedisplaysWithSuccessMessage()
+    public async Task PostagePricingPlanRenew_NotConfirmed_ShowsTheConfirmationPageForTheNextYearWithoutRenewing()
     {
         var apiClient = new FakePostagePricingPlanApiClient
         {
-            Years = new PostagePricingPlanYearsResponse([new YearResponse(2025, "2025/26")], false, null, null),
+            Years = new PostagePricingPlanYearsResponse([new YearResponse(2025, "2025/26")], true, 2026, "2026/27")
+        };
+        var controller = CreateController(postagePricingPlanApiClient: apiClient);
+
+        var result = await controller.PostagePricingPlanRenew(2025, null, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        Assert.Equal(ConfirmationFlow.ViewName, view.ViewName);
+        var page = Assert.IsType<ConfirmationPageViewModel>(view.Model);
+        Assert.Equal("Renew pricing plan for financial year 2026/27", page.Title);
+        Assert.Equal("Postage Pricing Plan", page.Caption);
+        Assert.Contains("postage pricing plan for the financial year 2026/27", page.Message, StringComparison.Ordinal);
+        Assert.NotNull(page.WarningText);
+        Assert.Equal("Renew pricing plan", page.ConfirmText);
+        Assert.Null(page.CancelUrl);
+        Assert.Equal(0, apiClient.RenewCallCount);
+    }
+
+    [Fact]
+    public async Task PostagePricingPlanRenew_Cancelled_ReturnsToThePricingPlanForTheSameYearWithoutRenewing()
+    {
+        var apiClient = new FakePostagePricingPlanApiClient
+        {
+            Years = new PostagePricingPlanYearsResponse([new YearResponse(2025, "2025/26")], true, 2026, "2026/27")
+        };
+        var controller = CreateController(postagePricingPlanApiClient: apiClient);
+
+        var result = await controller.PostagePricingPlanRenew(2025, ConfirmationFlow.Cancelled, CancellationToken.None);
+
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal(nameof(SystemAdministrationController.PostagePricingPlan), redirect.ActionName);
+        Assert.Equal(2025, redirect.RouteValues!["yearId"]);
+        Assert.Equal(0, apiClient.RenewCallCount);
+        Assert.Null(controller.TempData.GetNotification());
+    }
+
+    [Fact]
+    public async Task PostagePricingPlanRenew_Confirmed_RenewsThenRedirectsToTheSameYearWithASuccessBanner()
+    {
+        var apiClient = new FakePostagePricingPlanApiClient
+        {
+            Years = new PostagePricingPlanYearsResponse([new YearResponse(2025, "2025/26")], true, 2026, "2026/27"),
             RenewResponse = new PostagePricingPlanRenewResponse(true, "The postage pricing plan has successfully been renewed for the financial year 2026/27.")
         };
         var controller = CreateController(postagePricingPlanApiClient: apiClient);
 
-        var result = await controller.PostagePricingPlanRenew(2025, CancellationToken.None);
+        var result = await controller.PostagePricingPlanRenew(2025, ConfirmationFlow.Confirmed, CancellationToken.None);
 
-        var view = Assert.IsType<ViewResult>(result);
-        var model = Assert.IsType<PostagePricingPlanViewModel>(view.Model);
-        Assert.False(model.MessageIsError);
-        Assert.Contains("2026/27", model.Message);
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal(nameof(SystemAdministrationController.PostagePricingPlan), redirect.ActionName);
+        Assert.Equal(2025, redirect.RouteValues!["yearId"]);
+        var notification = controller.TempData.GetNotification();
+        Assert.Equal(NotificationType.Success, notification!.Type);
+        Assert.Contains("2026/27", notification.Message, StringComparison.Ordinal);
         Assert.Equal(1, apiClient.RenewCallCount);
     }
 

@@ -41,8 +41,8 @@
     <div class="govuk-form-group">
         <label class="govuk-label" for="yearId">Select a financial year:</label>
         <select class="govuk-select" id="yearId" name="yearId" asp-items="Model.YearOptions" asp-for="SelectedYearId"></select>
+        <button type="submit" class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0 govuk-!-margin-left-3" data-module="govuk-button">View</button>
     </div>
-    <button type="submit" class="govuk-button govuk-button--secondary" data-module="govuk-button">View</button>
 </form>
 
 <table class="govuk-table">
@@ -95,7 +95,7 @@
                     <td class="govuk-table__cell">
                         <div class="govuk-button-group govuk-!-margin-bottom-0">
                             <button form="postagePriceEditForm" class="govuk-button govuk-!-margin-bottom-0" data-module="govuk-button" type="submit">Save</button>
-                            <a class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0" data-module="govuk-button" asp-action="PostagePricingPlan" asp-route-yearId="@Model.SelectedYearId">Cancel</a>
+                            <button form="postagePriceViewForm" class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0" data-module="govuk-button" type="submit">Cancel</button>
                         </div>
                     </td>
                 }
@@ -105,13 +105,18 @@
                     <td class="govuk-table__cell">@row.EUPrice.ToString("N2")</td>
                     <td class="govuk-table__cell">@row.NonEUPrice.ToString("N2")</td>
                     <td class="govuk-table__cell">
-                        <a class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0" data-module="govuk-button" asp-action="PostagePricingPlan" asp-route-yearId="@Model.SelectedYearId" asp-route-editId="@row.PostageId">Edit</a>
+                        <button form="postagePriceViewForm" name="editId" value="@row.PostageId" class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0" data-module="govuk-button" type="submit">Edit</button>
                     </td>
                 }
             </tr>
         }
     </tbody>
 </table>
+
+@* Edit and Cancel are buttons of this GET form (via the form attribute), so entering or leaving edit mode needs no link or script. *@
+<form id="postagePriceViewForm" method="get" asp-action="PostagePricingPlan">
+    <input type="hidden" name="yearId" value="@Model.SelectedYearId" />
+</form>
 
 @if (editingRow is not null)
 {
@@ -127,8 +132,7 @@
 {
     <form method="post" asp-action="PostagePricingPlanRenew" class="govuk-!-margin-top-6">
         <input type="hidden" name="yearId" value="@Model.SelectedYearId" />
-        <button class="govuk-button" data-module="govuk-button" type="submit"
-                onclick="return confirm('Are you sure that you want to renew the pricing plan?');">
+        <button class="govuk-button" data-module="govuk-button" type="submit">
             Renew pricing plan for financial year @Model.NextYearLabel
         </button>
     </form>
