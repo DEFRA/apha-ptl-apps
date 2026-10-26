@@ -10,16 +10,13 @@
         .SelectMany(entry => entry.Value!.Errors.Select(error => (Field: entry.Key, Message: error.ErrorMessage)))
         .ToList();
 
-    // The whole form posts every row's New Date/Reason inputs regardless of which row's panel is
-    // visually open (the `hidden` attribute does not exclude a field from submission), so every
-    // row gets a ModelState entry on any redisplay - ContainsKey alone would wrongly expand every
-    // row. Only a row with an actual validation ERROR should expand.
-    bool RowHasError(int index) =>
-        (ViewData.ModelState.TryGetValue($"{nameof(Model.Participants)}[{index}].{nameof(PTL.InternalWeb.Features.Distribution.DistributionParticipantRowViewModel.NewDeadlineDate)}", out var dateState) && dateState.Errors.Count > 0) ||
-        (ViewData.ModelState.TryGetValue($"{nameof(Model.Participants)}[{index}].{nameof(PTL.InternalWeb.Features.Distribution.DistributionParticipantRowViewModel.NewDeadlineReason)}", out var reasonState) && reasonState.Errors.Count > 0);
+    string ChangeDeadlineUrl(Guid participantId) =>
+        Url.Action("ChangeDeadline", new { year = Model.YearId, monthId = Model.MonthId, schemeId = Model.MonthlyDistributionSchemeId, participantId })!;
+
+    string EditDeadlineUrl(Guid participantId, string command) =>
+        Url.Action("EditDeadline", new { year = Model.YearId, monthId = Model.MonthId, schemeId = Model.MonthlyDistributionSchemeId, participantId, command })!;
 }
 
-<a class="govuk-back-link" asp-action="Schedule" asp-route-year="@Model.YearId" asp-route-monthId="@Model.MonthId">Back</a>
 
 <h1 class="govuk-heading-l">Distribution Participants</h1>
 
@@ -38,6 +35,12 @@
     <input type="hidden" asp-for="YearId" />
     <input type="hidden" asp-for="MonthId" />
     <input type="hidden" asp-for="IsRepeatDistribution" />
+
+    @if (Model.EditParticipantId is { } editingId)
+    {
+        @* Enter in an edit field saves that row; without this the form's first submit button would be used. *@
+        <button type="submit" class="govuk-visually-hidden" tabindex="-1" aria-hidden="true" formaction="@ChangeDeadlineUrl(editingId)">Save</button>
+    }
 
     <h3 class="govuk-heading-m">@Model.DistributionListTitle</h3>
 
@@ -67,7 +70,7 @@
                 @for (var i = 0; i < Model.Participants.Count; i++)
                 {
                     var row = Model.Participants[i];
-                    var expanded = RowHasError(i);
+                    var expanded = row.DistributionParticipantId == Model.EditParticipantId;
                     <tr class="govuk-table__row">
                         <td class="govuk-table__cell" style="vertical-align: middle;">
                             <input type="hidden" asp-for="Participants[i].DistributionParticipantId" />
@@ -100,20 +103,24 @@
                                     <span>@row.DeadlineDate.ToString("dd/MM/yyyy")</span>
                                 }
                             </div>
-                            @* A native details element, so the change form opens without scripting; it stays open after a validation error. *@
-                            <details class="govuk-details govuk-!-margin-top-2 govuk-!-margin-bottom-0 distribution-deadline-edit" id="deadline-@i" open="@expanded">
-                                <summary class="govuk-details__summary">
-                                    <span class="govuk-details__summary-text">Change Deadline Date<span class="govuk-visually-hidden"> for @row.FullName</span></span>
-                                </summary>
-                                <div class="govuk-details__text">
-                                    <govuk-input asp-for="Participants[i].NewDeadlineDate" label="New Date" label-class="govuk-label govuk-visually-hidden" type="date" input-class="govuk-input govuk-input--width-10" />
-                                    <govuk-input asp-for="Participants[i].NewDeadlineReason" label="Reason" label-class="govuk-label govuk-visually-hidden" input-class="govuk-input" />
-                                    <button type="submit" class="govuk-button govuk-button--secondary govuk-!-margin-top-2 govuk-!-margin-bottom-0"
-                                            formaction="@Url.Action("ChangeDeadline", new { year = Model.YearId, monthId = Model.MonthId, schemeId = Model.MonthlyDistributionSchemeId, participantId = row.DistributionParticipantId })">
-                                        Save
-                                    </button>
+                            @* Opening and closing the change form is a server round trip, so it needs no scripting. *@
+                            @if (expanded)
+                            {
+                                <div class="distribution-deadline-edit govuk-!-margin-top-2">
+                                    <govuk-input asp-for="Participants[i].NewDeadlineDate" label="New Date" type="date" input-class="govuk-input govuk-input--width-10" />
+                                    <govuk-input asp-for="Participants[i].NewDeadlineReason" label="Reason" input-class="govuk-input" />
+                                    <div class="govuk-button-group govuk-!-margin-top-2">
+                                        <button type="submit" class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0" formaction="@ChangeDeadlineUrl(row.DistributionParticipantId)">Save</button>
+                                        <button type="submit" formnovalidate class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0" formaction="@EditDeadlineUrl(row.DistributionParticipantId, "cancel")">Cancel</button>
+                                    </div>
                                 </div>
-                            </details>
+                            }
+                            else
+                            {
+                                <button type="submit" formnovalidate class="govuk-button govuk-button--secondary govuk-!-margin-top-2 govuk-!-margin-bottom-0" formaction="@EditDeadlineUrl(row.DistributionParticipantId, "edit")">
+                                    Change Deadline Date<span class="govuk-visually-hidden"> for @row.FullName</span>
+                                </button>
+                            }
                         </td>
                     </tr>
                 }
@@ -172,8 +179,12 @@
 
     @if (Model.ShowRepeatDistributionButton)
     {
-        <p class="govuk-error-message" id="repeatDistributionSelectionError" role="alert" hidden>
-            <span class="govuk-visually-hidden">Error:</span> Select at least one participant to be included in the repeat of this distribution.
+        var repeatError = ViewData.ModelState.TryGetValue(PTL.InternalWeb.Features.Distribution.DistributionParticipantsViewModel.RepeatSelectionErrorField, out var repeatState) && repeatState.Errors.Count > 0
+            ? repeatState.Errors[0].ErrorMessage
+            : null;
+        @* Shown by the server after a post with nothing ticked; the script below shows it earlier when it can. *@
+        <p class="govuk-error-message" id="@PTL.InternalWeb.Features.Distribution.DistributionParticipantsViewModel.RepeatSelectionErrorField" role="alert" hidden="@(repeatError is null)">
+            <span class="govuk-visually-hidden">Error:</span> @(repeatError ?? PTL.InternalWeb.Features.Distribution.DistributionParticipantsViewModel.RepeatSelectionRequiredMessage)
         </p>
     }
     <div class="govuk-button-group">

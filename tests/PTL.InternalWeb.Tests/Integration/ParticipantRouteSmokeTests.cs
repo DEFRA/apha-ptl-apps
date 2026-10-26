@@ -87,6 +87,15 @@ public partial class ParticipantRouteSmokeTests : IClassFixture<WebApplicationFa
     }
 
     [Fact]
+    public async Task Index_HasNoStatusFilter()
+    {
+        var html = await _factory.CreateClient().GetStringAsync($"/Participant/Index?customerId={_customerId}");
+
+        Assert.DoesNotContain("id=\"includeInactive\"", html, StringComparison.Ordinal);
+        Assert.DoesNotContain(">Filter</button>", html, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Index_WithNoResults_RendersEmptyState()
     {
         _fakeParticipantClient.SearchResponse = new ParticipantSearchResponse([], 0, 1, 20);

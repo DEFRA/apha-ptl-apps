@@ -398,8 +398,7 @@
         <div class="ptl-packaging-actions">
             <div class="govuk-button-group">
                 <button type="submit" name="command" value="save" class="govuk-button" data-module="govuk-button">Save</button>
-                <button type="submit" name="command" value="apply" class="govuk-button govuk-button--secondary" data-module="govuk-button">Apply</button>
-                <a class="govuk-link" asp-action="Index">Cancel</a>
+                <button type="submit" form="packaging-cancel-form" class="govuk-button govuk-button--secondary" data-module="govuk-button">Cancel</button>
             </div>
             <div class="govuk-button-group">
                 @if (Model.ShowCustoms)
@@ -412,6 +411,9 @@
         </div>
     </div>
 </form>
+
+@* Cancel is a button of this separate GET form (via the form attribute); it can't be nested in the POST form above. *@
+<form id="packaging-cancel-form" method="get" asp-action="Index" class="noprint"></form>
 
 <script>
     (function () {

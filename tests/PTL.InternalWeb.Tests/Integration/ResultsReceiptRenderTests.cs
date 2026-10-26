@@ -333,6 +333,17 @@ public partial class ResultsReceiptRenderTests : IClassFixture<WebApplicationFac
         Assert.Contains("monthId=5", href, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task Dashboard_YearSelector_IsFollowedByAViewButtonAndDoesNotAutoSubmit()
+    {
+        _apiClient.Years = [new DistributionYearOptionResponse(2026, "2026/27")];
+
+        var html = await _factory.CreateClient().GetStringAsync("/Distribution/Index?year=2026");
+
+        Assert.Matches("</select>\\s*<button type=\"submit\"[^>]*>View</button>", html);
+        Assert.DoesNotContain("this.form.submit()", html, StringComparison.Ordinal);
+    }
+
     private static async Task<HttpResponseMessage> PostAsync(HttpClient client, string command, params (string Name, string Value)[] fields)
     {
         var form = await client.GetAsync($"/Distribution/ResultsReceipt?{BaseQuery}");

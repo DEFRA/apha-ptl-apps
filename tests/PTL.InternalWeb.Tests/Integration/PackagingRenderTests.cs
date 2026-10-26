@@ -156,13 +156,15 @@ public partial class PackagingRenderTests : IClassFixture<WebApplicationFactory<
 
     private static void AssertButtons(string html, bool customs)
     {
-        foreach (var (command, text) in new[] { ("select", "View"), ("save", "Save"), ("apply", "Apply"), ("labels", "Print labels") })
+        foreach (var (command, text) in new[] { ("select", "View"), ("save", "Save"), ("labels", "Print labels") })
         {
             Assert.Matches($"<button[^>]*name=\"command\" value=\"{command}\"[^>]*>{text}</button>", html);
         }
 
         Assert.Matches("<button[^>]*id=\"packaging-print-button\"[^>]*>Print</button>", html);
-        Assert.Matches("<a class=\"govuk-link\" href=\"[^\"]*\">Cancel</a>", html);
+        Assert.Matches("<button type=\"submit\" form=\"packaging-cancel-form\" class=\"govuk-button govuk-button--secondary\"[^>]*>Cancel</button>", html);
+        Assert.Matches("<form id=\"packaging-cancel-form\" method=\"get\" class=\"noprint\" action=\"[^\"]*\"></form>|<form id=\"packaging-cancel-form\" method=\"get\" action=\"[^\"]*\" class=\"noprint\"></form>", html);
+        Assert.DoesNotContain(">Cancel</a>", html, StringComparison.Ordinal);
 
         if (customs)
         {

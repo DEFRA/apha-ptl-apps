@@ -82,12 +82,12 @@ public class ImportPermitsRenderTests : IClassFixture<WebApplicationFactory<Prog
     }
 
     [Fact]
-    public async Task Get_ShowsEditButtonsAndApplySaveCancel_WithoutAnyUpdateImportPermitPost()
+    public async Task Get_ShowsEditButtonsAndSaveCancel_WithoutApplyOrAnyUpdateImportPermitPost()
     {
         var html = MainContent(await _factory.CreateClient().GetStringAsync(Url));
 
         Assert.Contains($"formaction=\"/Contract/ImportPermits/{ContractId}?command=edit&amp;rowId={First}\"", html, StringComparison.Ordinal);
-        Assert.Contains($"?command=apply\"", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("?command=apply\"", html, StringComparison.Ordinal);
         Assert.Contains($"?command=save\"", html, StringComparison.Ordinal);
         Assert.Contains($"?command=cancel\"", html, StringComparison.Ordinal);
         Assert.Contains("name=\"pending[0].ImportPermitReceived\"", html, StringComparison.Ordinal);

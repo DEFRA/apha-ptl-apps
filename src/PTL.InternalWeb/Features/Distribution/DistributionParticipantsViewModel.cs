@@ -14,6 +14,11 @@ public sealed class DistributionParticipantsViewModel
     public int MonthId { get; set; }
 #pragma warning restore S6964
 
+    public const string RepeatSelectionRequiredMessage = "Select at least one participant to be included in the repeat of this distribution.";
+
+    // Doubles as the id of the inline message the error summary links to.
+    public const string RepeatSelectionErrorField = "repeatDistributionSelectionError";
+
     public string? SchemeIdentifier { get; set; }
 
     public string? SchemeName { get; set; }
@@ -33,6 +38,9 @@ public sealed class DistributionParticipantsViewModel
     public List<DistributionParticipantRowViewModel> Participants { get; set; } = [];
 
     public List<DistributionAdditionalParticipantRowViewModel> AdditionalParticipants { get; set; } = [];
+
+    // The row whose Change Deadline Date form is open; set by the server so no script is needed to open it.
+    public Guid? EditParticipantId { get; set; }
 
     // Legacy hides btnRepeatDistribution entirely once already a repeat, or when there is nothing
     // to repeat.
@@ -80,4 +88,27 @@ public sealed class DistributionAdditionalParticipantRowViewModel
 #pragma warning restore S6964
 
     public string? FullName { get; set; }
+}
+
+// What the Change Deadline Date / Cancel round trip reads from the page's form: only the repeat-distribution
+// ticks. Nullable so an absent or malformed value is a binding error rather than a silent default.
+public sealed class ParticipantTicksPostModel
+{
+    public List<ParticipantTickPost> Participants { get; set; } = [];
+
+    public List<AdditionalParticipantTickPost> AdditionalParticipants { get; set; } = [];
+}
+
+public sealed class ParticipantTickPost
+{
+    public Guid? DistributionParticipantId { get; set; }
+
+    public bool? Selected { get; set; }
+}
+
+public sealed class AdditionalParticipantTickPost
+{
+    public Guid? ParticipantSchemeId { get; set; }
+
+    public bool? Selected { get; set; }
 }

@@ -1,41 +1,49 @@
 using System.ComponentModel.DataAnnotations;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 
 namespace PTL.InternalWeb.Features.SystemAdministration;
 
 public sealed class ViewerManagementViewModel
 {
+    // Legacy held this list in ViewState until the page-level Save/Apply wrote it to the database;
+    // here it is round-tripped through the page's form (Rows[i].*) instead.
     public List<ViewerRowViewModel> Rows { get; set; } = [];
 
-    // "Add a viewer" section at the bottom of the page - matches legacy's
+    // Index into Rows of the one row in edit mode (legacy GridView.EditIndex), with the values typed
+    // into it in Edit. Only applied to Rows by the row's own Save (the "update" command).
+    public int? EditIndex { get; set; }
+
+    public ViewerEditViewModel Edit { get; set; } = new();
+
+    // "Add a Viewer" section at the bottom of the page - matches legacy's
     // TextboxNewName/TextboxNewEmail/ButtonAdd.
     public ViewerAddViewModel Add { get; set; } = new();
 
     public string? Message { get; set; }
 
+    // Set by the controller only - never taken from the posted form.
+    [BindNever]
     public bool MessageIsError { get; set; }
+
+    // Dependency detail lines (assigned schemes/participants) shown under Message.
+    public List<string> MessageDetails { get; set; } = [];
 }
 
 public sealed class ViewerRowViewModel
 {
-    public Guid ViewerId { get; set; }
+    // Null for a viewer added on this page that has not been saved yet.
+    public Guid? ViewerId { get; set; }
 
     public string Name { get; set; } = string.Empty;
 
     public string Email { get; set; } = string.Empty;
 
-    // Only one row is ever in edit mode at a time - toggled via the editId query/route value,
-    // same convention as CountryManagement/ExternalTestConsultantManagement.
+    public bool IsNew => ViewerId is null;
+
+    // Removed on this page but not yet deleted: the delete happens with the page-level Save/Apply.
+    public bool IsRemoved { get; set; }
+
     public bool IsEditing { get; set; }
-
-    // True when the viewer still has scheme/participant assignments. ViewerService.DeleteAsync
-    // refuses to remove such a viewer (tlnkViewerScheme/tlnkViewerParticipant FK to tblViewer),
-    // so the view shows RemoveConfirmMessage as an alert instead of a confirm().
-    public bool IsRemoveBlocked { get; set; }
-
-    // Pre-built, JS-string-escaped text for the Remove button. When IsRemoveBlocked it lists the
-    // assignments that must be removed first; otherwise it is a plain "Are you sure...?" confirm.
-    // Built server-side so the JS-escaping only has to be done in one place.
-    public string RemoveConfirmMessage { get; set; } = string.Empty;
 }
 
 public sealed class ViewerAddViewModel
@@ -48,14 +56,11 @@ public sealed class ViewerAddViewModel
     public string Email { get; set; } = string.Empty;
 }
 
-// Posted by the single "Save" button against whichever row is in edit mode - bound with an
-// "Edit" prefix (see Views/ViewerManagement.cshtml) so its ModelState errors never bleed into the
-// separate "Add a viewer" form rendered on the same page, matching CountryManagementEditViewModel.
+// Values typed into the row in edit mode - bound with an "Edit" prefix so its ModelState errors never
+// bleed into the separate "Add a Viewer" form on the same page, matching legacy's two WebForms
+// ValidationGroups ("Edit" vs "New").
 public sealed class ViewerEditViewModel
 {
-    [Required]
-    public Guid? ViewerId { get; set; }
-
     [Required(ErrorMessage = "Enter a name")]
     public string Name { get; set; } = string.Empty;
 

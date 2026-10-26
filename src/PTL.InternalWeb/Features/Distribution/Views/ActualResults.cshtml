@@ -25,8 +25,6 @@
 
 @if (Model.IsAuditStep)
 {
-    <a class="govuk-back-link" asp-action="ActualResults" asp-route-year="@Model.YearId" asp-route-monthId="@Model.MonthId" asp-route-schemeId="@Model.MonthlyDistributionSchemeId" asp-route-participantId="@Model.DistributionParticipantId">Back</a>
-
     <govuk-error-summary errors="@errors" />
 
     <h1 class="govuk-heading-l">Audit Trail</h1>
@@ -86,8 +84,6 @@
 
     return;
 }
-
-<a class="govuk-back-link" asp-action="ResultsReceipt" asp-route-year="@Model.YearId" asp-route-monthId="@Model.MonthId">Back</a>
 
 <govuk-error-summary errors="@errors" />
 
