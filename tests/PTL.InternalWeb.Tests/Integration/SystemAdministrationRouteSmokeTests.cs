@@ -744,8 +744,7 @@ public partial class SystemAdministrationRouteSmokeTests : IClassFixture<WebAppl
         Assert.Contains("Jane Smith", body, StringComparison.Ordinal);
         Assert.Contains("Science", body, StringComparison.Ordinal);
         Assert.Contains("Inactive", body, StringComparison.Ordinal);
-        Assert.Contains("Activate", body, StringComparison.Ordinal);
-        Assert.Contains("You are setting this test consultant to be active. Are you sure?", body, StringComparison.Ordinal);
+        Assert.Contains("8 Oct 2026", body, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -759,7 +758,7 @@ public partial class SystemAdministrationRouteSmokeTests : IClassFixture<WebAppl
     }
 
     [Fact]
-    public async Task ExternalTestConsultantManagement_WithData_RendersAllSevenColumns()
+    public async Task ExternalTestConsultantManagement_WithData_RendersNameDepartmentEmailAndStatus()
     {
         var consultantId = Guid.NewGuid();
         var factory = _factory.WithWebHostBuilder(builder =>

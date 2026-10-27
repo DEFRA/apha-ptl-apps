@@ -148,6 +148,23 @@ public class UserRepositoryTests
     }
 
     [Fact]
+    public async Task GetTestConsultantsAsync_MapsTheAllocationColumns()
+    {
+        var (repository, connection) = CreateRepository();
+        var table = new DataTable();
+        table.Columns.Add("fldUserId", typeof(Guid));
+        table.Columns.Add("fldUsername", typeof(string));
+        table.Columns.Add("fldAllocationCount", typeof(int));
+        table.Columns.Add("fldAllocationString", typeof(string));
+        table.Rows.Add(Guid.NewGuid(), "m100001", 2, "S1, S2");
+        connection.RespondToQuery("EXEC dbo.spgaUserTestConsultant", table);
+
+        var consultant = Assert.Single(await repository.GetTestConsultantsAsync());
+
+        Assert.Equal((2, "S1, S2"), (consultant.AllocationCount, consultant.AllocationString));
+    }
+
+    [Fact]
     public async Task UpdateDepartmentAsync_ExecutesSpuUserDept()
     {
         var (repository, connection) = CreateRepository();

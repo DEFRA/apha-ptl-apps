@@ -94,7 +94,7 @@ public partial class ViewerCountryManagementRenderTests : IClassFixture<WebAppli
             Field($"Rows[{i}].IsRemoved", "false")
         })];
 
-    // Flags row <index> as removed, as the page's hidden Rows[i].IsRemoved input does after a confirmed Remove.
+    // Flags row <index> as removed, as the page's hidden Rows[i].IsRemoved input does after Remove.
     private static List<KeyValuePair<string, string>> WithRemoved(List<KeyValuePair<string, string>> fields, params int[] indices)
     {
         foreach (var i in indices)
@@ -112,10 +112,6 @@ public partial class ViewerCountryManagementRenderTests : IClassFixture<WebAppli
     private static List<KeyValuePair<string, string>> HiddenFields(string html) =>
         [.. HiddenInputPattern().Matches(html).Select(m => Field(WebUtility.HtmlDecode(m.Groups[1].Value), WebUtility.HtmlDecode(m.Groups[2].Value)))];
 
-    // The hidden inputs of the confirmation page's Confirm form (the first form on the page).
-    private static List<KeyValuePair<string, string>> ConfirmFormFields(string html) =>
-        HiddenFields(Regex.Match(html, "<form method=\"post\" action=\"[^\"]*\" novalidate>([\\s\\S]*?)</form>").Groups[1].Value);
-
     private static bool IsRemovedFlag(string html, int row, string expected) =>
         Regex.IsMatch(html, $"<input type=\"hidden\" name=\"Rows\\[{row}\\]\\.IsRemoved\" value=\"{expected}\" />");
 
@@ -127,8 +123,7 @@ public partial class ViewerCountryManagementRenderTests : IClassFixture<WebAppli
         string page,
         string command,
         int? rowIndex,
-        IEnumerable<KeyValuePair<string, string>> fields,
-        string? confirmation = null)
+        IEnumerable<KeyValuePair<string, string>> fields)
     {
         var client = _factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
         var form = await client.GetAsync($"/SystemAdministration/{page}");
@@ -137,10 +132,6 @@ public partial class ViewerCountryManagementRenderTests : IClassFixture<WebAppli
 
         var body = new List<KeyValuePair<string, string>> { Field("__RequestVerificationToken", token) };
         body.AddRange(fields);
-        if (confirmation is not null)
-        {
-            body.Add(Field("confirmation", confirmation));
-        }
 
         var url = $"/SystemAdministration/{page}?command={command}" + (rowIndex is null ? string.Empty : $"&rowIndex={rowIndex}");
         var request = new HttpRequestMessage(HttpMethod.Post, url) { Content = new FormUrlEncodedContent(body) };
@@ -205,12 +196,13 @@ public partial class ViewerCountryManagementRenderTests : IClassFixture<WebAppli
     }
 
     [Fact]
-    public async Task ViewerGet_HasPageLevelSaveApplyAndCancelButtonsAndAnAddButton()
+    public async Task ViewerGet_HasPageLevelSaveAndCancelButtonsAnAddButtonAndNoApply()
     {
         var main = MainContent(await _factory.CreateClient().GetStringAsync("/SystemAdministration/ViewerManagement"));
 
         Assert.Matches(Button("ViewerManagement", "Save", "save", cssClass: "govuk-button\""), main);
-        Assert.Matches(Button("ViewerManagement", "Apply", "apply"), main);
+        Assert.DoesNotContain("command=apply", main, StringComparison.Ordinal);
+        Assert.DoesNotContain(">Apply<", main, StringComparison.Ordinal);
         Assert.Matches(Button("ViewerManagement", "Cancel", "cancel"), main);
         Assert.Matches(Button("ViewerManagement", "Add", "add"), main);
         Assert.Matches("formnovalidate[^>]*formaction=\"/SystemAdministration/ViewerManagement\\?command=cancel\"", main);
@@ -317,37 +309,10 @@ public partial class ViewerCountryManagementRenderTests : IClassFixture<WebAppli
         Assert.Empty(_countries.CreateRequests);
     }
 
-    [Theory]
-    [InlineData("ViewerManagement", "Remove viewer")]
-    [InlineData("CountryManagement", "Remove country")]
-    public async Task Remove_ShowsTheConfirmationPageWithConfirmCancelAndTheCarriedPendingRowsAndDeletesNothing(string page, string heading)
-    {
-        var fields = page == "ViewerManagement" ? ViewerRows((IdAlan, "Alan", "alan@example.com"), (null, "Grace", "grace@example.com")) : CountryRows((IdFrance, "France", TypeEu), (null, "Spain", TypeEu));
-
-        var (response, _) = await PostAsync(page, "remove", 0, fields);
-        var html = await response.Content.ReadAsStringAsync();
-
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.Contains($"<h1 class=\"govuk-heading-l\">{heading}</h1>", html, StringComparison.Ordinal);
-        Assert.Matches($"<button type=\"submit\" class=\"govuk-button govuk-button--warning\" data-module=\"govuk-button\">{heading}</button>", html);
-        Assert.Matches("<button type=\"submit\" form=\"confirmation-cancel\" class=\"govuk-button govuk-button--secondary\"[^>]*>Cancel</button>", html);
-        Assert.Matches($"<form method=\"post\" action=\"/SystemAdministration/{page}\\?command=remove(?:&amp;|&)rowIndex=0\"", html);
-        Assert.Matches("<input type=\"hidden\" name=\"confirmation\" value=\"confirm\" />", html);
-        Assert.Matches("<input type=\"hidden\" name=\"confirmation\" value=\"cancel\" />", html);
-        Assert.Matches(Hidden(page == "ViewerManagement" ? "Rows[0].ViewerId" : "Rows[0].CountryId", page == "ViewerManagement" ? IdAlan.ToString() : IdFrance.ToString()), html);
-        Assert.Matches(Hidden(page == "ViewerManagement" ? "Rows[1].Name" : "Rows[1].Country", page == "ViewerManagement" ? "Grace" : "Spain"), html);
-        Assert.Matches(Hidden("Rows[0].IsRemoved", "false"), html);
-        Assert.Matches(Hidden("Rows[1].IsRemoved", "false"), html);
-        Assert.DoesNotContain("onclick", html, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("confirm(", html, StringComparison.Ordinal);
-        Assert.Empty(_viewers.DeleteCalls);
-        Assert.Empty(_countries.DeleteCalls);
-    }
-
     [Fact]
-    public async Task ViewerRemove_Confirmed_RedisplaysThePageWithTheRowFlaggedRemovedAndNotRenderedWithoutDeletingOrRedirecting()
+    public async Task ViewerRemove_RedisplaysThePageWithTheRowFlaggedRemovedAndNotRenderedWithoutDeletingOrRedirecting()
     {
-        var (response, _) = await PostAsync("ViewerManagement", "remove", 1, SavedViewerRows(), confirmation: "confirm");
+        var (response, _) = await PostAsync("ViewerManagement", "remove", 1, SavedViewerRows());
         var main = MainContent(await response.Content.ReadAsStringAsync());
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -367,9 +332,9 @@ public partial class ViewerCountryManagementRenderTests : IClassFixture<WebAppli
     }
 
     [Fact]
-    public async Task CountryRemove_Confirmed_RedisplaysThePageWithTheRowFlaggedRemovedAndNotRenderedWithoutDeletingOrRedirecting()
+    public async Task CountryRemove_RedisplaysThePageWithTheRowFlaggedRemovedAndNotRenderedWithoutDeletingOrRedirecting()
     {
-        var (response, _) = await PostAsync("CountryManagement", "remove", 0, SavedCountryRows(), confirmation: "confirm");
+        var (response, _) = await PostAsync("CountryManagement", "remove", 0, SavedCountryRows());
         var main = MainContent(await response.Content.ReadAsStringAsync());
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -425,18 +390,11 @@ public partial class ViewerCountryManagementRenderTests : IClassFixture<WebAppli
     }
 
     [Fact]
-    public async Task ViewerFlow_RemoveConfirmRedisplayThenSave_DeletesOnSaveRedirectsToIndexAndShowsTheSuccessBanner()
+    public async Task ViewerFlow_RemoveThenSave_DeletesOnSaveRedirectsToIndexAndShowsTheSuccessBanner()
     {
-        var (confirmPage, _) = await PostAsync("ViewerManagement", "remove", 1, SavedViewerRows());
-        var confirmHtml = await confirmPage.Content.ReadAsStringAsync();
-        Assert.Contains("Remove viewer", confirmHtml, StringComparison.Ordinal);
-        Assert.Empty(_viewers.DeleteCalls);
-
-        var confirmFields = ConfirmFormFields(confirmHtml);
-        Assert.Contains(Field("confirmation", "confirm"), confirmFields);
-        var (redisplay, _) = await PostAsync("ViewerManagement", "remove", 1, confirmFields);
-        var redisplayed = MainContent(await redisplay.Content.ReadAsStringAsync());
-        Assert.Equal(HttpStatusCode.OK, redisplay.StatusCode);
+        var (removed, _) = await PostAsync("ViewerManagement", "remove", 1, SavedViewerRows());
+        var redisplayed = MainContent(await removed.Content.ReadAsStringAsync());
+        Assert.Equal(HttpStatusCode.OK, removed.StatusCode);
         Assert.True(IsRemovedFlag(redisplayed, 1, "true"));
         Assert.Empty(_viewers.DeleteCalls);
 
@@ -454,18 +412,11 @@ public partial class ViewerCountryManagementRenderTests : IClassFixture<WebAppli
     }
 
     [Fact]
-    public async Task CountryFlow_RemoveConfirmRedisplayThenSave_DeletesOnSaveRedirectsToIndexAndShowsTheSuccessBanner()
+    public async Task CountryFlow_RemoveThenSave_DeletesOnSaveRedirectsToIndexAndShowsTheSuccessBanner()
     {
-        var (confirmPage, _) = await PostAsync("CountryManagement", "remove", 0, SavedCountryRows());
-        var confirmHtml = await confirmPage.Content.ReadAsStringAsync();
-        Assert.Contains("Remove country", confirmHtml, StringComparison.Ordinal);
-        Assert.Empty(_countries.DeleteCalls);
-
-        var confirmFields = ConfirmFormFields(confirmHtml);
-        Assert.Contains(Field("confirmation", "confirm"), confirmFields);
-        var (redisplay, _) = await PostAsync("CountryManagement", "remove", 0, confirmFields);
-        var redisplayed = MainContent(await redisplay.Content.ReadAsStringAsync());
-        Assert.Equal(HttpStatusCode.OK, redisplay.StatusCode);
+        var (removed, _) = await PostAsync("CountryManagement", "remove", 0, SavedCountryRows());
+        var redisplayed = MainContent(await removed.Content.ReadAsStringAsync());
+        Assert.Equal(HttpStatusCode.OK, removed.StatusCode);
         Assert.True(IsRemovedFlag(redisplayed, 0, "true"));
         Assert.Empty(_countries.DeleteCalls);
 
@@ -545,39 +496,7 @@ public partial class ViewerCountryManagementRenderTests : IClassFixture<WebAppli
     }
 
     [Fact]
-    public async Task ViewerRemove_Cancelled_RedisplaysThePendingPageUnchangedIncludingUnsavedRows()
-    {
-        var fields = ViewerRows((IdAlan, "Alan (pending change)", "alan@example.com"), (null, "Grace", "grace@example.com"));
-
-        var (response, _) = await PostAsync("ViewerManagement", "remove", 0, fields, confirmation: "cancel");
-        var main = MainContent(await response.Content.ReadAsStringAsync());
-
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.Contains("<h1 class=\"govuk-heading-l\">Manage Viewers</h1>", main, StringComparison.Ordinal);
-        Assert.Matches(Hidden("Rows[0].Name", "Alan (pending change)"), main);
-        Assert.Matches(Hidden("Rows[1].Name", "Grace"), main);
-        Assert.DoesNotContain("confirmation-cancel", main, StringComparison.Ordinal);
-        Assert.Empty(_viewers.DeleteCalls);
-    }
-
-    [Fact]
-    public async Task CountryRemove_Cancelled_RedisplaysThePendingPageUnchangedIncludingUnsavedRows()
-    {
-        var fields = CountryRows((IdFrance, "France (pending change)", TypeEu), (null, "Spain", TypeEu));
-
-        var (response, _) = await PostAsync("CountryManagement", "remove", 0, fields, confirmation: "cancel");
-        var main = MainContent(await response.Content.ReadAsStringAsync());
-
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.Contains("<h1 class=\"govuk-heading-l\">Manage Countries</h1>", main, StringComparison.Ordinal);
-        Assert.Matches(Hidden("Rows[0].Country", "France (pending change)"), main);
-        Assert.Matches(Hidden("Rows[1].Country", "Spain"), main);
-        Assert.DoesNotContain("confirmation-cancel", main, StringComparison.Ordinal);
-        Assert.Empty(_countries.DeleteCalls);
-    }
-
-    [Fact]
-    public async Task ViewerRemove_WhenAssignedToSchemesOrParticipants_ShowsTheBlockedMessageWithDetailsAndNoConfirmationPage()
+    public async Task ViewerRemove_WhenAssignedToSchemesOrParticipants_ShowsTheBlockedMessageWithDetails()
     {
         _viewers.Viewers =
         [
@@ -593,13 +512,12 @@ public partial class ViewerCountryManagementRenderTests : IClassFixture<WebAppli
         Assert.Contains("Scheme SFW1234: Heavy Metals", html, StringComparison.Ordinal);
         Assert.Contains("Participant LAB001: Example Lab", html, StringComparison.Ordinal);
         Assert.Contains("<h1 class=\"govuk-heading-l\">Manage Viewers</h1>", html, StringComparison.Ordinal);
-        Assert.DoesNotContain("confirmation-cancel", html, StringComparison.Ordinal);
         Assert.DoesNotContain("govuk-button--warning", html, StringComparison.Ordinal);
         Assert.Empty(_viewers.DeleteCalls);
     }
 
     [Fact]
-    public async Task CountryRemove_WhenInUse_ShowsTheBlockedMessageAndNoConfirmationPage()
+    public async Task CountryRemove_WhenInUse_ShowsTheBlockedMessage()
     {
         _countries.Countries = [new CountryResponse(IdFrance, "France", TypeEu, "EU", 8), new CountryResponse(IdGermany, "Germany", TypeNonEu, "Non-EU", 0)];
 
@@ -609,7 +527,6 @@ public partial class ViewerCountryManagementRenderTests : IClassFixture<WebAppli
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Contains("This country cannot be removed because it is being used by 8 customer(s)/participant(s)/Group Addresses.", html, StringComparison.Ordinal);
         Assert.Contains("<h1 class=\"govuk-heading-l\">Manage Countries</h1>", html, StringComparison.Ordinal);
-        Assert.DoesNotContain("confirmation-cancel", html, StringComparison.Ordinal);
         Assert.DoesNotContain("govuk-button--warning", html, StringComparison.Ordinal);
         Assert.Empty(_countries.DeleteCalls);
     }

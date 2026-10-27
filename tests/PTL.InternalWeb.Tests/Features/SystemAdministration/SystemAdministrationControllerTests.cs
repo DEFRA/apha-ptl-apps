@@ -69,7 +69,7 @@ public class SystemAdministrationControllerTests
         var eurId = Guid.NewGuid();
         var lookupApiClient = new FakeLookupApiClient
         {
-            Currencies = [new CurrencyResponse(gbpId, "British Pound", "£", "£ - British Pound"), new CurrencyResponse(eurId, "Euro", "€", "€ - Euro")]
+            Currencies = [new CurrencyResponse(gbpId, "British Pound", "Â£", "Â£ - British Pound"), new CurrencyResponse(eurId, "Euro", "â‚¬", "â‚¬ - Euro")]
         };
         var apiClient = new FakeAdministrationChargeApiClient
         {
@@ -102,7 +102,7 @@ public class SystemAdministrationControllerTests
                 {
                     AdministrationChargeId = chargeId,
                     Name = "Administration Charge",
-                    Prices = [new AdministrationChargePriceCellViewModel { CurrencyId = currencyId, CurrencyLabel = "£ - British Pound", Price = 30.00m }]
+                    Prices = [new AdministrationChargePriceCellViewModel { CurrencyId = currencyId, CurrencyLabel = "Â£ - British Pound", Price = 30.00m }]
                 }
             ]
         };
@@ -131,7 +131,7 @@ public class SystemAdministrationControllerTests
                 {
                     AdministrationChargeId = Guid.NewGuid(),
                     Name = "Administration Charge",
-                    Prices = [new AdministrationChargePriceCellViewModel { CurrencyId = Guid.NewGuid(), CurrencyLabel = "£ - British Pound", Price = -1.00m }]
+                    Prices = [new AdministrationChargePriceCellViewModel { CurrencyId = Guid.NewGuid(), CurrencyLabel = "Â£ - British Pound", Price = -1.00m }]
                 }
             ]
         };
@@ -156,7 +156,7 @@ public class SystemAdministrationControllerTests
                 {
                     AdministrationChargeId = Guid.NewGuid(),
                     Name = "Administration Charge",
-                    Prices = [new AdministrationChargePriceCellViewModel { CurrencyId = Guid.NewGuid(), CurrencyLabel = "£ - British Pound", Price = 30.00m }]
+                    Prices = [new AdministrationChargePriceCellViewModel { CurrencyId = Guid.NewGuid(), CurrencyLabel = "Â£ - British Pound", Price = 30.00m }]
                 }
             ]
         };
@@ -1124,250 +1124,4 @@ public class SystemAdministrationControllerTests
 
         Assert.Null(userApiClient.LastRemoveActingUserId);
     }
-
-    [Fact]
-    public async Task InternalTestConsultantDepartment_Get_BuildsRows()
-    {
-        var userId = Guid.NewGuid();
-        var userApiClient = new FakeUserApiClient
-        {
-            TestConsultants = [new UserResponse(userId, "m100001", "Jane Smith", "Jane", "Smith", "jane@apha.gov.uk", "Science", false, null)]
-        };
-        var controller = CreateController(userApiClient: userApiClient);
-
-        var result = await controller.InternalTestConsultantDepartment(editId: null, CancellationToken.None);
-
-        var view = Assert.IsType<ViewResult>(result);
-        var model = Assert.IsType<InternalTestConsultantDepartmentViewModel>(view.Model);
-        var row = Assert.Single(model.Rows);
-        Assert.Equal("Science", row.Department);
-        Assert.False(row.IsInactive);
-        Assert.False(row.IsEditing);
-    }
-
-    [Fact]
-    public async Task InternalTestConsultantDepartment_Get_WithEditId_MarksMatchingRowEditing()
-    {
-        var userId = Guid.NewGuid();
-        var userApiClient = new FakeUserApiClient
-        {
-            TestConsultants = [new UserResponse(userId, "m100001", "Jane Smith", "Jane", "Smith", "jane@apha.gov.uk", "Science", false, null)]
-        };
-        var controller = CreateController(userApiClient: userApiClient);
-
-        var result = await controller.InternalTestConsultantDepartment(userId, CancellationToken.None);
-
-        var view = Assert.IsType<ViewResult>(result);
-        var model = Assert.IsType<InternalTestConsultantDepartmentViewModel>(view.Model);
-        Assert.True(Assert.Single(model.Rows).IsEditing);
-    }
-
-    [Fact]
-    public async Task InternalTestConsultantDepartmentSave_PersistsDepartmentAndRoundTripsStatus()
-    {
-        var userId = Guid.NewGuid();
-        var userApiClient = new FakeUserApiClient();
-        var controller = CreateController(userApiClient: userApiClient);
-        var inactiveDate = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
-        var model = new InternalTestConsultantEditViewModel { UserId = userId, Department = "Virology", IsInactive = true, InactiveDate = inactiveDate };
-
-        var result = await controller.InternalTestConsultantDepartmentSave(model, CancellationToken.None);
-
-        Assert.IsType<RedirectToActionResult>(result);
-        var call = Assert.Single(userApiClient.UpdateTestConsultantCalls);
-        Assert.Equal(userId, call.UserId);
-        Assert.Equal("Virology", call.Request.Department);
-        Assert.True(call.Request.IsInactive);
-        Assert.Equal(inactiveDate, call.Request.InactiveDate);
-    }
-
-    [Fact]
-    public async Task InternalTestConsultantDepartmentSave_InvalidModel_RedisplaysTheRowInEditModeWithoutSaving()
-    {
-        var userId = Guid.NewGuid();
-        var userApiClient = new FakeUserApiClient();
-        var controller = CreateController(userApiClient: userApiClient);
-        controller.ModelState.AddModelError("Edit.Department", "Department is too long");
-        var model = new InternalTestConsultantEditViewModel { UserId = userId, Department = "Virology", IsInactive = false };
-
-        var result = await controller.InternalTestConsultantDepartmentSave(model, CancellationToken.None);
-
-        var view = Assert.IsType<ViewResult>(result);
-        Assert.Equal(nameof(SystemAdministrationController.InternalTestConsultantDepartment), view.ViewName);
-        Assert.Empty(userApiClient.UpdateTestConsultantCalls);
-    }
-
-    [Fact]
-    public async Task InternalTestConsultantDepartmentToggleStatus_FromActive_SetsInactiveAndStampsDate()
-    {
-        var userId = Guid.NewGuid();
-        var userApiClient = new FakeUserApiClient();
-        var controller = CreateController(userApiClient: userApiClient);
-
-        var result = await controller.InternalTestConsultantDepartmentToggleStatus(userId, "Science", isInactive: false, CancellationToken.None);
-
-        Assert.IsType<RedirectToActionResult>(result);
-        var call = Assert.Single(userApiClient.UpdateTestConsultantCalls);
-        Assert.Equal("Science", call.Request.Department);
-        Assert.True(call.Request.IsInactive);
-        Assert.NotNull(call.Request.InactiveDate);
-    }
-
-    [Fact]
-    public async Task InternalTestConsultantDepartmentToggleStatus_FromInactive_SetsActiveAndClearsDate()
-    {
-        var userId = Guid.NewGuid();
-        var userApiClient = new FakeUserApiClient();
-        var controller = CreateController(userApiClient: userApiClient);
-
-        var result = await controller.InternalTestConsultantDepartmentToggleStatus(userId, "Science", isInactive: true, CancellationToken.None);
-
-        Assert.IsType<RedirectToActionResult>(result);
-        var call = Assert.Single(userApiClient.UpdateTestConsultantCalls);
-        Assert.False(call.Request.IsInactive);
-        Assert.Null(call.Request.InactiveDate);
-    }
-
-    [Fact]
-    public async Task ExternalTestConsultantManagement_Get_BuildsRows()
-    {
-        var consultantId = Guid.NewGuid();
-        var apiClient = new FakeExternalTestConsultantApiClient
-        {
-            TestConsultants = [new ExternalTestConsultantResponse(consultantId, "Jane Smith", "Science", "jane@example.com", false, null)]
-        };
-        var controller = CreateController(externalTestConsultantApiClient: apiClient);
-
-        var result = await controller.ExternalTestConsultantManagement(editId: null, CancellationToken.None);
-
-        var view = Assert.IsType<ViewResult>(result);
-        var model = Assert.IsType<ExternalTestConsultantManagementViewModel>(view.Model);
-        var row = Assert.Single(model.Rows);
-        Assert.Equal("Jane Smith", row.Name);
-        Assert.False(row.IsEditing);
-    }
-
-    [Fact]
-    public async Task ExternalTestConsultantManagementAdd_Valid_RedirectsToList()
-    {
-        var apiClient = new FakeExternalTestConsultantApiClient();
-        var controller = CreateController(externalTestConsultantApiClient: apiClient);
-        var model = new ExternalTestConsultantAddViewModel { Name = "Jane Smith", Department = "Science", Email = "jane@example.com" };
-
-        var result = await controller.ExternalTestConsultantManagementAdd(model, CancellationToken.None);
-
-        Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal("Jane Smith", apiClient.LastCreateRequest?.Name);
-    }
-
-    [Fact]
-    public async Task ExternalTestConsultantManagementAdd_ApiRejectsMissingEmail_RedisplaysWithError()
-    {
-        var apiClient = new FakeExternalTestConsultantApiClient
-        {
-            SaveResult = new ExternalTestConsultantSaveResult(false, null, new Dictionary<string, string[]> { ["Email"] = ["Enter an email address"] })
-        };
-        var controller = CreateController(externalTestConsultantApiClient: apiClient);
-        var model = new ExternalTestConsultantAddViewModel { Name = "Jane Smith", Department = "Science", Email = "jane@example.com" };
-
-        var result = await controller.ExternalTestConsultantManagementAdd(model, CancellationToken.None);
-
-        var view = Assert.IsType<ViewResult>(result);
-        Assert.False(controller.ModelState.IsValid);
-        Assert.IsType<ExternalTestConsultantManagementViewModel>(view.Model);
-    }
-
-    [Fact]
-    public async Task ExternalTestConsultantManagementSave_Valid_RedirectsToList()
-    {
-        var consultantId = Guid.NewGuid();
-        var apiClient = new FakeExternalTestConsultantApiClient();
-        var controller = CreateController(externalTestConsultantApiClient: apiClient);
-        var model = new ExternalTestConsultantEditViewModel { ExternalTestConsultantId = consultantId, Name = "Jane Smith", Department = "Science", Email = "jane@example.com" };
-
-        var result = await controller.ExternalTestConsultantManagementSave(model, CancellationToken.None);
-
-        Assert.IsType<RedirectToActionResult>(result);
-        var call = Assert.Single(apiClient.UpdateCalls);
-        Assert.Equal(consultantId, call.ExternalTestConsultantId);
-    }
-
-    [Fact]
-    public async Task ExternalTestConsultantManagementSave_ApiUpdateFails_RedisplaysRowInEditModeWithPrefixedError()
-    {
-        var consultantId = Guid.NewGuid();
-        var apiClient = new FakeExternalTestConsultantApiClient
-        {
-            TestConsultants = [new ExternalTestConsultantResponse(consultantId, "Jane Smith", "Science", "jane@example.com", false, null)],
-            SaveResult = new ExternalTestConsultantSaveResult(false, null, new Dictionary<string, string[]> { ["Email"] = ["Enter an email address"] })
-        };
-        var controller = CreateController(externalTestConsultantApiClient: apiClient);
-        var model = new ExternalTestConsultantEditViewModel { ExternalTestConsultantId = consultantId, Name = "Jane Smith", Department = "Science", Email = string.Empty };
-
-        var result = await controller.ExternalTestConsultantManagementSave(model, CancellationToken.None);
-
-        var view = Assert.IsType<ViewResult>(result);
-        var resultModel = Assert.IsType<ExternalTestConsultantManagementViewModel>(view.Model);
-        Assert.True(resultModel.Rows.Single(r => r.ExternalTestConsultantId == consultantId).IsEditing);
-        Assert.True(controller.ModelState.ContainsKey("Edit.Email"));
-    }
-
-    [Fact]
-    public async Task ExternalTestConsultantManagementToggleStatus_FromActive_TogglesToInactive()
-    {
-        var consultantId = Guid.NewGuid();
-        var apiClient = new FakeExternalTestConsultantApiClient();
-        var controller = CreateController(externalTestConsultantApiClient: apiClient);
-
-        var result = await controller.ExternalTestConsultantManagementToggleStatus(consultantId, isInactive: false, CancellationToken.None);
-
-        Assert.IsType<RedirectToActionResult>(result);
-        var call = Assert.Single(apiClient.SetStatusCalls);
-        Assert.Equal(consultantId, call.ExternalTestConsultantId);
-        Assert.True(call.IsInactive);
-    }
-
-    [Fact]
-    public async Task ExternalTestConsultantManagementToggleStatus_RefusedByTheApi_ShowsTheMessage()
-    {
-        var apiClient = new FakeExternalTestConsultantApiClient
-        {
-            SetStatusResult = new ExternalTestConsultantSaveResult(false, null, new Dictionary<string, string[]> { [string.Empty] = ["This external test consultant is being used on: 1 scheme(s)."] })
-        };
-        var controller = CreateController(externalTestConsultantApiClient: apiClient);
-
-        var result = await controller.ExternalTestConsultantManagementToggleStatus(Guid.NewGuid(), isInactive: false, CancellationToken.None);
-
-        var model = Assert.IsType<ExternalTestConsultantManagementViewModel>(Assert.IsType<ViewResult>(result).Model);
-        Assert.True(model.MessageIsError);
-        Assert.Contains("being used on", model.Message);
-    }
-
-    [Fact]
-    public async Task ExternalTestConsultantManagementRemove_Success_ShowsSuccessMessage()
-    {
-        var consultantId = Guid.NewGuid();
-        var apiClient = new FakeExternalTestConsultantApiClient();
-        var controller = CreateController(externalTestConsultantApiClient: apiClient);
-
-        var result = await controller.ExternalTestConsultantManagementRemove(consultantId, CancellationToken.None);
-
-        var model = Assert.IsType<ExternalTestConsultantManagementViewModel>(Assert.IsType<ViewResult>(result).Model);
-        Assert.False(model.MessageIsError);
-        Assert.Contains(consultantId, apiClient.DeleteCalls);
-    }
-
-    [Fact]
-    public async Task ExternalTestConsultantManagementRemove_Refused_ShowsTheApiMessage()
-    {
-        var apiClient = new FakeExternalTestConsultantApiClient { DeleteResult = new ExternalTestConsultantDeleteResponse(false, "This external test consultant is being used on: 1 scheme(s).") };
-        var controller = CreateController(externalTestConsultantApiClient: apiClient);
-
-        var result = await controller.ExternalTestConsultantManagementRemove(Guid.NewGuid(), CancellationToken.None);
-
-        var model = Assert.IsType<ExternalTestConsultantManagementViewModel>(Assert.IsType<ViewResult>(result).Model);
-        Assert.True(model.MessageIsError);
-        Assert.Equal("This external test consultant is being used on: 1 scheme(s).", model.Message);
-    }
 }
-

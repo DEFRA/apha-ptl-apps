@@ -1,3 +1,5 @@
+@using System.Globalization
+@using PTL.InternalWeb.Features.SystemAdministration
 @model PTL.InternalWeb.Features.SystemAdministration.ExternalTestConsultantManagementViewModel
 @{
     ViewData["Title"] = "Manage External Test Consultants";
@@ -7,17 +9,22 @@
         .SelectMany(entry => entry.Value!.Errors.Select(error => (Field: entry.Key, Message: error.ErrorMessage)))
         .ToList();
 
-    var editingRow = Model.Rows.FirstOrDefault(r => r.IsEditing);
+    string? FirstError(string field) =>
+        ViewData.ModelState.TryGetValue(field, out var entry) && entry.Errors.Count > 0
+            ? entry.Errors[0].ErrorMessage
+            : null;
+
+    string ButtonUrl(string command, int? rowIndex = null) =>
+        Url.Action("ExternalTestConsultantManagement", new { command, rowIndex })!;
 }
 
 <h1 class="govuk-heading-l">Manage External Test Consultants</h1>
 
-@if (Model.Message is not null)
+@if (Model.Message is not null && Model.MessageIsError)
 {
-    var bannerType = Model.MessageIsError ? "" : "govuk-notification-banner--success";
-    <div class="govuk-notification-banner @bannerType" role="@(Model.MessageIsError ? "alert" : "region")" aria-labelledby="govuk-notification-banner-title" data-module="govuk-notification-banner">
+    <div class="govuk-notification-banner" role="alert" aria-labelledby="govuk-notification-banner-title" data-module="govuk-notification-banner">
         <div class="govuk-notification-banner__header">
-            <h2 class="govuk-notification-banner__title" id="govuk-notification-banner-title">@(Model.MessageIsError ? "Important" : "Success")</h2>
+            <h2 class="govuk-notification-banner__title" id="govuk-notification-banner-title">Important</h2>
         </div>
         <div class="govuk-notification-banner__content">
             <p class="govuk-notification-banner__heading">@Model.Message</p>
@@ -27,103 +34,134 @@
 
 <govuk-error-summary errors="@errors" />
 
-<table class="govuk-table">
-    <thead class="govuk-table__head">
-        <tr class="govuk-table__row">
-            <th scope="col" class="govuk-table__header">Name</th>
-            <th scope="col" class="govuk-table__header">Department</th>
-            <th scope="col" class="govuk-table__header">Email</th>
-            <th scope="col" class="govuk-table__header">Actions</th>
-            <th scope="col" class="govuk-table__header">Status</th>
-            <th scope="col" class="govuk-table__header">Inactive Date</th>
-        </tr>
-    </thead>
-    <tbody class="govuk-table__body">
-        @if (Model.Rows.Count == 0)
-        {
+@* One form for the whole page: every button below posts the full pending list (Rows[i].*), so nothing is
+   written until Save/Apply. *@
+<form method="post" asp-action="ExternalTestConsultantManagement">
+    @* First submit button in the form, so Enter in a text box runs "submit" instead of the first row's Edit button. *@
+    <button type="submit" class="govuk-visually-hidden" tabindex="-1" aria-hidden="true" formaction="@ButtonUrl(PendingListCommands.Submit)">Submit</button>
+
+    @if (Model.EditIndex is { } editIndex)
+    {
+        <input type="hidden" name="EditIndex" value="@editIndex" />
+    }
+
+    @* Hidden state for every row (including removed ones) keeps Rows[i] indices contiguous. *@
+    @for (var i = 0; i < Model.Rows.Count; i++)
+    {
+        var hiddenRow = Model.Rows[i];
+        <input type="hidden" name="Rows[@i].ExternalTestConsultantId" value="@(hiddenRow.ExternalTestConsultantId?.ToString() ?? string.Empty)" />
+        <input type="hidden" name="Rows[@i].Name" value="@hiddenRow.Name" />
+        <input type="hidden" name="Rows[@i].Department" value="@hiddenRow.Department" />
+        <input type="hidden" name="Rows[@i].Email" value="@hiddenRow.Email" />
+        <input type="hidden" name="Rows[@i].IsInactive" value="@(hiddenRow.IsInactive ? "true" : "false")" />
+        <input type="hidden" name="Rows[@i].InactiveDate" value="@(hiddenRow.InactiveDate?.ToString("yyyy-MM-dd'T'HH:mm:ss", CultureInfo.InvariantCulture) ?? string.Empty)" />
+        <input type="hidden" name="Rows[@i].IsRemoved" value="@(hiddenRow.IsRemoved ? "true" : "false")" />
+    }
+
+    <table id="Rows" class="govuk-table" tabindex="-1">
+        <thead class="govuk-table__head">
             <tr class="govuk-table__row">
-                <td class="govuk-table__cell" colspan="6">There are no External Test Consultants to display.</td>
+                <th scope="col" class="govuk-table__header">Name</th>
+                <th scope="col" class="govuk-table__header">Department</th>
+                <th scope="col" class="govuk-table__header">Email</th>
+                <th scope="col" class="govuk-table__header">Inactive Date</th>
+                <th scope="col" class="govuk-table__header">Status</th>
+                <th scope="col" class="govuk-table__header">Actions</th>
             </tr>
-        }
-        @foreach (var row in Model.Rows)
-        {
-            <tr class="govuk-table__row">
-                @if (row.IsEditing)
+        </thead>
+        <tbody class="govuk-table__body">
+            @if (Model.Rows.All(r => r.IsRemoved))
+            {
+                <tr class="govuk-table__row">
+                    <td class="govuk-table__cell" colspan="6">There are no External Test Consultants to display.</td>
+                </tr>
+            }
+            @for (var i = 0; i < Model.Rows.Count; i++)
+            {
+                var row = Model.Rows[i];
+                if (row.IsRemoved)
                 {
-                    <td class="govuk-table__cell">
-                        <div class="govuk-form-group govuk-!-margin-bottom-0">
-                            <label class="govuk-visually-hidden" for="Edit.Name">Name</label>
-                            <input id="Edit.Name" form="tcEditForm" name="Edit.Name" value="@row.Name" maxlength="50" class="govuk-input" />
-                        </div>
-                    </td>
-                    <td class="govuk-table__cell">
-                        <div class="govuk-form-group govuk-!-margin-bottom-0">
-                            <label class="govuk-visually-hidden" for="Edit.Department">Department</label>
-                            <input id="Edit.Department" form="tcEditForm" name="Edit.Department" value="@row.Department" maxlength="50" class="govuk-input" />
-                        </div>
-                    </td>
-                    <td class="govuk-table__cell">
-                        <div class="govuk-form-group govuk-!-margin-bottom-0">
-                            <label class="govuk-visually-hidden" for="Edit.Email">Email</label>
-                            <input id="Edit.Email" form="tcEditForm" name="Edit.Email" value="@row.Email" maxlength="50" class="govuk-input" />
-                        </div>
-                    </td>
-                    <td class="govuk-table__cell">
-                        <div class="govuk-button-group govuk-!-margin-bottom-0">
-                            <button form="tcEditForm" class="govuk-button govuk-!-margin-bottom-0" data-module="govuk-button" type="submit">Save</button>
-                            <a class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0" data-module="govuk-button" asp-action="ExternalTestConsultantManagement">Cancel</a>
-                        </div>
-                    </td>
+                    continue;
                 }
-                else
-                {
-                    <td class="govuk-table__cell">@row.Name</td>
-                    <td class="govuk-table__cell">@row.Department</td>
-                    <td class="govuk-table__cell">@row.Email</td>
+                <tr class="govuk-table__row">
+                    @if (row.IsEditing)
+                    {
+                        var nameError = FirstError("Edit.Name");
+                        var emailError = FirstError("Edit.Email");
+
+                        <td class="govuk-table__cell">
+                            <div class="govuk-form-group govuk-!-margin-bottom-0 @(nameError is null ? "" : "govuk-form-group--error")">
+                                <label class="govuk-visually-hidden" for="Edit_Name">Name</label>
+                                @if (nameError is not null)
+                                {
+                                    <p id="Edit_Name-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @nameError</p>
+                                }
+                                <input id="Edit_Name" name="Edit.Name" value="@Model.Edit.Name" maxlength="50"
+                                       class="govuk-input @(nameError is null ? "" : "govuk-input--error")"
+                                       aria-describedby="@(nameError is null ? null : "Edit_Name-error")" />
+                            </div>
+                        </td>
+                        <td class="govuk-table__cell">
+                            <div class="govuk-form-group govuk-!-margin-bottom-0">
+                                <label class="govuk-visually-hidden" for="Edit_Department">Department</label>
+                                <input id="Edit_Department" name="Edit.Department" value="@Model.Edit.Department" maxlength="50" class="govuk-input" />
+                            </div>
+                        </td>
+                        <td class="govuk-table__cell">
+                            <div class="govuk-form-group govuk-!-margin-bottom-0 @(emailError is null ? "" : "govuk-form-group--error")">
+                                <label class="govuk-visually-hidden" for="Edit_Email">Email</label>
+                                @if (emailError is not null)
+                                {
+                                    <p id="Edit_Email-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @emailError</p>
+                                }
+                                <input id="Edit_Email" name="Edit.Email" value="@Model.Edit.Email"
+                                       class="govuk-input @(emailError is null ? "" : "govuk-input--error")"
+                                       aria-describedby="@(emailError is null ? null : "Edit_Email-error")" />
+                            </div>
+                        </td>
+                    }
+                    else
+                    {
+                        <td class="govuk-table__cell">@row.Name</td>
+                        <td class="govuk-table__cell">@row.Department</td>
+                        <td class="govuk-table__cell">@row.Email</td>
+                    }
+                    <td class="govuk-table__cell">@(row.IsInactive && row.InactiveDate is { } inactiveDate ? inactiveDate.ToString("d MMM yyyy", CultureInfo.CurrentCulture) : "")</td>
                     <td class="govuk-table__cell">
-                        <div class="govuk-button-group govuk-!-margin-bottom-0">
-                            <a class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0" data-module="govuk-button" asp-action="ExternalTestConsultantManagement" asp-route-editId="@row.ExternalTestConsultantId">Edit</a>
-                            <form method="post" asp-action="ExternalTestConsultantManagementToggleStatus" class="govuk-!-display-inline">
-                                <input type="hidden" name="externalTestConsultantId" value="@row.ExternalTestConsultantId" />
-                                <input type="hidden" name="isInactive" value="@row.IsInactive" />
-                                <button class="govuk-button @(row.IsInactive ? "govuk-button--secondary" : "govuk-button--warning") govuk-!-margin-bottom-0" data-module="govuk-button" type="submit">
-                                    @(row.IsInactive ? "Activate" : "Deactivate")
-                                </button>
-                            </form>
-                            <form method="post" asp-action="ExternalTestConsultantManagementRemove" class="govuk-!-display-inline">
-                                <input type="hidden" name="externalTestConsultantId" value="@row.ExternalTestConsultantId" />
-                                <button class="govuk-button govuk-button--warning govuk-!-margin-bottom-0" data-module="govuk-button" type="submit"
-                                        onclick="return confirm('Are you sure you want to remove this test consultant?');">
-                                    Remove
-                                </button>
-                            </form>
+                        <button class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0" data-module="govuk-button" type="submit" formnovalidate formaction="@ButtonUrl(PendingListCommands.Toggle, i)">@(row.IsInactive ? "Inactive" : "Active")<span class="govuk-visually-hidden"> - select to make @row.Name @(row.IsInactive ? "active" : "inactive")</span></button>
+                    </td>
+                    <td class="govuk-table__cell">
+                        <div class="govuk-button-group ptl-row-actions govuk-!-margin-bottom-0">
+                            @if (row.IsEditing)
+                            {
+                                <button class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0" data-module="govuk-button" type="submit" formaction="@ButtonUrl(PendingListCommands.Update, i)">Save<span class="govuk-visually-hidden"> test consultant @row.Name</span></button>
+                                <button class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0" data-module="govuk-button" type="submit" formnovalidate formaction="@ButtonUrl(PendingListCommands.CancelEdit, i)">Cancel<span class="govuk-visually-hidden"> editing test consultant @row.Name</span></button>
+                            }
+                            else
+                            {
+                                <button class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0" data-module="govuk-button" type="submit" formnovalidate formaction="@ButtonUrl(PendingListCommands.Edit, i)">Edit<span class="govuk-visually-hidden"> test consultant @row.Name</span></button>
+                                <button class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0" data-module="govuk-button" type="submit" formnovalidate formaction="@ButtonUrl(PendingListCommands.Remove, i)">Remove<span class="govuk-visually-hidden"> test consultant @row.Name</span></button>
+                            }
                         </div>
                     </td>
-                }
-                <td class="govuk-table__cell">@(row.IsInactive ? "Inactive" : "Active")</td>
-                <td class="govuk-table__cell">@(row.InactiveDate is { } inactiveDate ? inactiveDate.ToString("d MMM yyyy") : "")</td>
-            </tr>
-        }
-    </tbody>
-</table>
+                </tr>
+            }
+        </tbody>
+    </table>
 
-@if (editingRow is not null)
-{
-    @* Inputs/button for the editing row live in table cells above and bind here via the "form"
-       attribute, since a <form> can't be split across multiple <td> elements - matches
-       CountryManagement.cshtml. *@
-    <form id="tcEditForm" method="post" asp-action="ExternalTestConsultantManagementSave" novalidate>
-        <input type="hidden" name="Edit.ExternalTestConsultantId" value="@editingRow.ExternalTestConsultantId" />
-    </form>
-}
+    <hr />
 
-<hr />
+    <h2 class="govuk-heading-m">Add a Test Consultant</h2>
 
-<h2 class="govuk-heading-m">Add a Test Consultant</h2>
-
-<form method="post" asp-action="ExternalTestConsultantManagementAdd">
-    <govuk-input asp-for="Add.Name" label="Name" input-class="govuk-input govuk-input--width-20" />
-    <govuk-input asp-for="Add.Department" label="Department" input-class="govuk-input govuk-input--width-20" />
+    <govuk-input asp-for="Add.Name" label="Name" maxlength="50" input-class="govuk-input govuk-input--width-20" />
+    <govuk-input asp-for="Add.Department" label="Department" maxlength="50" input-class="govuk-input govuk-input--width-20" />
     <govuk-input asp-for="Add.Email" label="Email" input-class="govuk-input govuk-input--width-20" />
-    <button class="govuk-button" data-module="govuk-button" type="submit">Add</button>
+    <button class="govuk-button govuk-button--secondary" data-module="govuk-button" type="submit" formaction="@ButtonUrl(PendingListCommands.Add)">Add</button>
+
+    <hr />
+
+    <div class="govuk-button-group">
+        <button class="govuk-button" data-module="govuk-button" type="submit" formaction="@ButtonUrl(PendingListCommands.Save)">Save</button>
+        <button class="govuk-button govuk-button--secondary" data-module="govuk-button" type="submit" formnovalidate formaction="@ButtonUrl(PendingListCommands.Cancel)">Cancel</button>
+    </div>
 </form>
