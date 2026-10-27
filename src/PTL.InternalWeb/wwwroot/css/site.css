@@ -183,6 +183,11 @@ body {
   }
 }
 
+/* govuk-error-message sets display:block, which would otherwise override the hidden attribute. */
+.govuk-error-message[hidden] {
+  display: none;
+}
+
 /* A table that gains a column per record (Results Tabulations) outgrows the page once there are a
    few of them. Scroll it horizontally instead of letting it overflow the layout; width:auto lets
    the columns keep their natural size rather than being squeezed by the container. */
@@ -417,6 +422,22 @@ span.app-side-navigation__link--disabled {
 .ptl-pending-order-table .govuk-table__header,
 .ptl-pending-order-table .govuk-table__cell {
   padding-right: 10px;
+}
+
+/* Session timeout warning (_SessionTimeoutWarning.cshtml) is deliberately rendered near the end of
+   <body> so its hidden markup never shifts any page's own first-heading/content assertions - this
+   repositions it visually to the centre of the viewport once JS removes the "hidden" attribute,
+   with a dimmed backdrop so it reads as prominent/urgent rather than appearing at the page bottom. */
+.ptl-session-timeout-warning:not([hidden]) {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 1000;
+  width: 90%;
+  max-width: 500px;
+  margin: 0;
+  box-shadow: 0 0 0 100vmax rgba(11, 12, 12, 0.6);
 }
 
 .ptl-pending-order-table .ptl-pending-order-month {

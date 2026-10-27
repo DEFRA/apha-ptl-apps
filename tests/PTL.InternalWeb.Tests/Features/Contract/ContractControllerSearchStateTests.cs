@@ -123,7 +123,7 @@ public class ContractControllerSearchStateTests
     {
         var (controller, http, _) = Create(cookieJson: Json(CustomerId, ContractPeriodFilter.Historical));
 
-        var result = await controller.RenewContracts(CustomerId, [Guid.NewGuid()], [Guid.NewGuid()], "Alice Example", CancellationToken.None);
+        var result = await controller.RenewContracts(CustomerId, [Guid.NewGuid()], [Guid.NewGuid()], "Alice Example", null, null, CancellationToken.None);
 
         Assert.IsType<RedirectToActionResult>(result);
         var cookie = SetCookie(http);

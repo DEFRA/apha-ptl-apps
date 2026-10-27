@@ -28,6 +28,9 @@ public sealed class RenewContractsViewModel
 
     public List<Guid> SelectedParticipantSchemeIds { get; set; } = [];
 
+    // Ticked item rows by Identifier, as posted; null until the page has been submitted.
+    public List<string>? SelectedItemIdentifiers { get; set; }
+
     public string? NewContractSignatory { get; set; }
 
     public string? ErrorMessage { get; set; }
@@ -50,6 +53,11 @@ public sealed class RenewContractsViewModel
         row.Items.Any(i => SelectedContractIds.Contains(i.ContractId));
 
     public bool HasNoItems => !ItemRows.Any(IsRowVisible);
+
+    public bool IsRowSelected(RenewContractsItemRow row) =>
+        SelectedItemIdentifiers is { } identifiers
+            ? identifiers.Contains(row.Identifier, StringComparer.Ordinal)
+            : row.Items.Any(i => SelectedParticipantSchemeIds.Contains(i.ParticipantSchemeId));
 }
 
 public sealed record RenewContractsItemRow(

@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
+using PTL.ApiClient;
 using PTL.ApiClient.Distribution;
 using PTL.Contracts.Distribution;
 using PTL.InternalWeb.Authorization;
@@ -30,13 +31,14 @@ namespace PTL.InternalWeb.Features.Distribution;
 // Distributions/ folder - held by anyone with Internal User or Scheduling); Scheduling/ pages and actions
 // additionally need Scheduling, and Internal User/ pages (Preparation, Packaging, Results) need Internal User.
 [Authorize(Policy = PtlPolicies.Distributions)]
-public sealed partial class DistributionController(IDistributionApiClient distributionApiClient) : Controller
+public sealed partial class DistributionController(IDistributionApiClient distributionApiClient, ISearchApiClient searchApiClient, ILookupApiClient lookupApiClient) : Controller
 {
     private static readonly string[] MonthOrder =
     [
         "Scheduling", "Preparation", "Packaging", "Results", "Tabulations", "Actual Results", "Sample Receipt",
     ];
     private const string CancelCommand = "cancel";
+    private const string EditDeadlineCommand = "edit";
     private const string ApplyCommand = "apply";
 
     [HttpGet]
@@ -1443,7 +1445,7 @@ public sealed partial class DistributionController(IDistributionApiClient distri
         ViewData[BreadcrumbRouteValues.Action] = nameof(Participants);
         if (!ModelState.IsValid)
         {
-            return View(nameof(Participants), await RehydrateParticipantsAsync(year, monthId, schemeId, model, cancellationToken));
+            return await RedisplayDeadlineEditAsync(year, monthId, schemeId, participantId, model, cancellationToken);
         }
 
         var row = model.Participants.FirstOrDefault(p => p.DistributionParticipantId == participantId);
@@ -1470,11 +1472,59 @@ public sealed partial class DistributionController(IDistributionApiClient distri
                 }
             }
 
-            return View(nameof(Participants), await RehydrateParticipantsAsync(year, monthId, schemeId, model, cancellationToken));
+            return await RedisplayDeadlineEditAsync(year, monthId, schemeId, participantId, model, cancellationToken);
         }
 
         TempData.SetNotification(NotificationType.Success, "Deadline Date updated successfully.");
         return RedirectToAction(nameof(Participants), new { year, monthId, schemeId });
+    }
+
+    // Change Deadline Date / Cancel buttons: a server round trip opens or closes one row's change form, so
+    // it works without scripting. Nothing is saved; selections already ticked are carried over.
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    [Authorize(Policy = PtlPolicies.Scheduling)]
+    public async Task<IActionResult> EditDeadline(
+        int year, int monthId, Guid schemeId, Guid participantId, string? command, ParticipantTicksPostModel model, CancellationToken cancellationToken)
+    {
+        ViewData[BreadcrumbRouteValues.Action] = nameof(Participants);
+
+        // Only malformed tick values (a tampered post) can fail here; they are dropped rather than carried over.
+        if (!ModelState.IsValid)
+        {
+            model = new ParticipantTicksPostModel();
+        }
+
+        var data = await distributionApiClient.GetParticipantsAsync(schemeId, cancellationToken);
+        if (data is null)
+        {
+            return NotFound();
+        }
+
+        var fresh = ToParticipantsViewModel(year, monthId, data);
+        var ticked = model.Participants.Where(p => p.Selected == true && p.DistributionParticipantId is not null).Select(p => p.DistributionParticipantId!.Value).ToHashSet();
+        foreach (var participant in fresh.Participants)
+        {
+            participant.Selected = ticked.Contains(participant.DistributionParticipantId);
+        }
+
+        var tickedAdditional = model.AdditionalParticipants.Where(p => p.Selected == true && p.ParticipantSchemeId is not null).Select(p => p.ParticipantSchemeId!.Value).ToHashSet();
+        foreach (var participant in fresh.AdditionalParticipants)
+        {
+            participant.Selected = tickedAdditional.Contains(participant.ParticipantSchemeId);
+        }
+
+        fresh.EditParticipantId = string.Equals(command, EditDeadlineCommand, StringComparison.Ordinal) ? participantId : null;
+        ModelState.Clear();
+        return View(nameof(Participants), fresh);
+    }
+
+    private async Task<IActionResult> RedisplayDeadlineEditAsync(
+        int year, int monthId, Guid schemeId, Guid participantId, DistributionParticipantsViewModel posted, CancellationToken cancellationToken)
+    {
+        var model = await RehydrateParticipantsAsync(year, monthId, schemeId, posted, cancellationToken);
+        model.EditParticipantId = participantId;
+        return View(nameof(Participants), model);
     }
 
     // Repeat this Distribution - legacy btnRepeatDistribution_Click. "Please tick at least one
@@ -1493,6 +1543,13 @@ public sealed partial class DistributionController(IDistributionApiClient distri
         var selections = model.Participants.Where(p => p.Selected).Select(p => new ParticipantSelectionRequest(p.DistributionParticipantId, false))
             .Concat(model.AdditionalParticipants.Where(p => p.Selected).Select(p => new ParticipantSelectionRequest(p.ParticipantSchemeId, true)))
             .ToList();
+
+        // Same rule as the page script and the API guard, so the message shows on the page without scripting.
+        if (selections.Count == 0)
+        {
+            ModelState.AddModelError(DistributionParticipantsViewModel.RepeatSelectionErrorField, DistributionParticipantsViewModel.RepeatSelectionRequiredMessage);
+            return View(nameof(Participants), await RehydrateParticipantsAsync(year, monthId, schemeId, model, cancellationToken));
+        }
 
         var result = await distributionApiClient.RepeatDistributionAsync(schemeId, new RepeatDistributionRequest(selections), cancellationToken);
 

@@ -31,7 +31,7 @@ public class DistributionControllerCommentsTests
         new() { TestConsultantComments = Comments(), CommentsSaveResult = save };
 
     private static DistributionController CreateController(FakeDistributionApiClient apiClient) =>
-        new(apiClient)
+        new(apiClient, new FakeSearchApiClient(), new FakeLookupApiClient())
         {
             ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() },
             TempData = new TempDataDictionary(new DefaultHttpContext(), new FakeTempDataProvider()),

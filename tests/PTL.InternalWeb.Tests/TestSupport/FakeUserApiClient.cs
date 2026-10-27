@@ -9,20 +9,26 @@ internal sealed class FakeUserApiClient : IUserApiClient
 {
     public IReadOnlyList<UserResponse> Users { get; set; } = [];
     public IReadOnlyList<StaffDirectoryUserResponse> SearchResults { get; set; } = [];
+    public bool SearchIsTruncated { get; set; }
+    public Exception? SearchException { get; set; }
     public CreateUserSaveResult SaveResult { get; set; } = new(true, null, new Dictionary<string, string[]>());
     public IReadOnlyList<UserRoleRowResponse> UserRoleGrid { get; set; } = [];
     public SetUserRolesResponse SetRolesResult { get; set; } = new(true, null);
     public string? LastSearchTerm { get; private set; }
+    public int SearchCallCount { get; private set; }
     public CreateUserRequest? LastCreateRequest { get; private set; }
     public List<(Guid UserId, SetUserRolesRequest Request)> SetRolesCalls { get; } = [];
 
     public Task<IReadOnlyList<UserResponse>> GetUsersAsync(CancellationToken cancellationToken = default) =>
         Task.FromResult(Users);
 
-    public Task<IReadOnlyList<StaffDirectoryUserResponse>> SearchStaffDirectoryAsync(string searchTerm, CancellationToken cancellationToken = default)
+    public Task<StaffDirectorySearchResponse> SearchStaffDirectoryAsync(string searchTerm, CancellationToken cancellationToken = default)
     {
         LastSearchTerm = searchTerm;
-        return Task.FromResult(SearchResults);
+        SearchCallCount++;
+        return SearchException is null
+            ? Task.FromResult(new StaffDirectorySearchResponse(SearchResults, SearchIsTruncated))
+            : Task.FromException<StaffDirectorySearchResponse>(SearchException);
     }
 
     public Task<CreateUserSaveResult> CreateUserAsync(CreateUserRequest request, CancellationToken cancellationToken = default)

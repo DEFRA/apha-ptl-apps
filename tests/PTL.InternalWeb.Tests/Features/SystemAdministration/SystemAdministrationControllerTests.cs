@@ -8,16 +8,12 @@ using PTL.Contracts.Lookup;
 using PTL.Contracts.PostagePricingPlan;
 using PTL.Contracts.TestConsultant;
 using PTL.Contracts.User;
-using PTL.Contracts.Viewer;
 using PTL.Contracts.WeightedPricingPlan;
+using PTL.InternalWeb.Confirmation;
 using PTL.InternalWeb.Features.Account;
 using PTL.InternalWeb.Features.SystemAdministration;
 using PTL.InternalWeb.Tests.TestSupport;
 using PTL.SharedUI.Notifications;
-using CountryDeleteResponse = PTL.Contracts.Country.CountryDeleteResponse;
-using CountryResponse = PTL.Contracts.Country.CountryResponse;
-using CountrySaveResult = PTL.Contracts.Country.CountrySaveResult;
-using CountryTypeResponse = PTL.Contracts.Country.CountryTypeResponse;
 using ExternalSiteMessageResponse = PTL.Contracts.ExternalSiteMessage.ExternalSiteMessageResponse;
 using ExternalSiteMessageSaveResult = PTL.Contracts.ExternalSiteMessage.ExternalSiteMessageSaveResult;
 
@@ -113,10 +109,13 @@ public class SystemAdministrationControllerTests
 
         var result = await controller.AdministrationCharge(model, CancellationToken.None);
 
-        Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal(nameof(SystemAdministrationController.Index), Assert.IsType<RedirectToActionResult>(result).ActionName);
         var request = Assert.Single(apiClient.SetPriceRequests);
         Assert.Equal(chargeId, request.AdministrationChargeId);
         Assert.Equal(30.00m, request.Price);
+        var notification = controller.TempData.GetNotification();
+        Assert.Equal(NotificationType.Success, notification!.Type);
+        Assert.Equal("Administration charges saved successfully.", notification.Message);
     }
 
     [Fact]
@@ -251,7 +250,7 @@ public class SystemAdministrationControllerTests
         };
         var controller = CreateController(weightedPricingPlanApiClient: apiClient);
 
-        var result = await controller.Renew(2025, CancellationToken.None);
+        var result = await controller.Renew(2025, null, CancellationToken.None);
 
         var view = Assert.IsType<ViewResult>(result);
         var model = Assert.IsType<WeightedPricingPlanViewModel>(view.Model);
@@ -260,21 +259,63 @@ public class SystemAdministrationControllerTests
     }
 
     [Fact]
-    public async Task Renew_Succeeds_RedisplaysWithSuccessMessage()
+    public async Task Renew_NotConfirmed_ShowsTheConfirmationPageForTheNextYearWithoutRenewing()
     {
         var apiClient = new FakeWeightedPricingPlanApiClient
         {
-            Years = new WeightedPricingPlanYearsResponse([new YearResponse(2025, "2025/26")], false, null, null),
+            Years = new WeightedPricingPlanYearsResponse([new YearResponse(2025, "2025/26")], true, 2026, "2026/27")
+        };
+        var controller = CreateController(weightedPricingPlanApiClient: apiClient);
+
+        var result = await controller.Renew(2025, null, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        Assert.Equal(ConfirmationFlow.ViewName, view.ViewName);
+        var page = Assert.IsType<ConfirmationPageViewModel>(view.Model);
+        Assert.Equal("Renew pricing plan for financial year 2026/27", page.Title);
+        Assert.Equal("Weighted Pricing Plan", page.Caption);
+        Assert.Contains("weighted pricing plan for the financial year 2026/27", page.Message, StringComparison.Ordinal);
+        Assert.NotNull(page.WarningText);
+        Assert.Equal("Renew pricing plan", page.ConfirmText);
+        Assert.Null(page.CancelUrl);
+        Assert.Equal(0, apiClient.RenewCallCount);
+    }
+
+    [Fact]
+    public async Task Renew_Cancelled_ReturnsToThePricingPlanForTheSameYearWithoutRenewing()
+    {
+        var apiClient = new FakeWeightedPricingPlanApiClient
+        {
+            Years = new WeightedPricingPlanYearsResponse([new YearResponse(2025, "2025/26")], true, 2026, "2026/27")
+        };
+        var controller = CreateController(weightedPricingPlanApiClient: apiClient);
+
+        var result = await controller.Renew(2025, ConfirmationFlow.Cancelled, CancellationToken.None);
+
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal(nameof(SystemAdministrationController.WeightedPricingPlan), redirect.ActionName);
+        Assert.Equal(2025, redirect.RouteValues!["yearId"]);
+        Assert.Equal(0, apiClient.RenewCallCount);
+        Assert.Null(controller.TempData.GetNotification());
+    }
+
+    [Fact]
+    public async Task Renew_Confirmed_RenewsThenRedirectsToTheSystemAdministrationIndexWithASuccessBanner()
+    {
+        var apiClient = new FakeWeightedPricingPlanApiClient
+        {
+            Years = new WeightedPricingPlanYearsResponse([new YearResponse(2025, "2025/26")], true, 2026, "2026/27"),
             RenewResponse = new WeightedPricingPlanRenewResponse(true, "The weighted pricing plan has successfully been renewed for the financial year 2026/27.")
         };
         var controller = CreateController(weightedPricingPlanApiClient: apiClient);
 
-        var result = await controller.Renew(2025, CancellationToken.None);
+        var result = await controller.Renew(2025, ConfirmationFlow.Confirmed, CancellationToken.None);
 
-        var view = Assert.IsType<ViewResult>(result);
-        var model = Assert.IsType<WeightedPricingPlanViewModel>(view.Model);
-        Assert.False(model.MessageIsError);
-        Assert.Contains("2026/27", model.Message);
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal(nameof(SystemAdministrationController.Index), redirect.ActionName);
+        var notification = controller.TempData.GetNotification();
+        Assert.Equal(NotificationType.Success, notification!.Type);
+        Assert.Contains("2026/27", notification.Message, StringComparison.Ordinal);
         Assert.Equal(1, apiClient.RenewCallCount);
     }
 
@@ -362,7 +403,7 @@ public class SystemAdministrationControllerTests
     }
 
     [Fact]
-    public async Task PostagePricingPlanSave_ValidModel_SavesAndRedirects()
+    public async Task PostagePricingPlanSave_ValidModel_SavesAndRedirectsToTheSystemAdministrationIndexWithASuccessBanner()
     {
         var postageId = Guid.NewGuid();
         var apiClient = new FakePostagePricingPlanApiClient();
@@ -372,8 +413,11 @@ public class SystemAdministrationControllerTests
         var result = await controller.PostagePricingPlanSave(model, CancellationToken.None);
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal(nameof(SystemAdministrationController.PostagePricingPlan), redirect.ActionName);
+        Assert.Equal(nameof(SystemAdministrationController.Index), redirect.ActionName);
         Assert.Equal(postageId, apiClient.LastSetPriceRequest?.PostageId);
+        var notification = controller.TempData.GetNotification();
+        Assert.Equal(NotificationType.Success, notification!.Type);
+        Assert.Equal("Postage pricing plan saved successfully.", notification.Message);
     }
 
     [Fact]
@@ -463,7 +507,7 @@ public class SystemAdministrationControllerTests
         };
         var controller = CreateController(postagePricingPlanApiClient: apiClient);
 
-        var result = await controller.PostagePricingPlanRenew(2025, CancellationToken.None);
+        var result = await controller.PostagePricingPlanRenew(2025, null, CancellationToken.None);
 
         var view = Assert.IsType<ViewResult>(result);
         var model = Assert.IsType<PostagePricingPlanViewModel>(view.Model);
@@ -472,169 +516,64 @@ public class SystemAdministrationControllerTests
     }
 
     [Fact]
-    public async Task PostagePricingPlanRenew_Succeeds_RedisplaysWithSuccessMessage()
+    public async Task PostagePricingPlanRenew_NotConfirmed_ShowsTheConfirmationPageForTheNextYearWithoutRenewing()
     {
         var apiClient = new FakePostagePricingPlanApiClient
         {
-            Years = new PostagePricingPlanYearsResponse([new YearResponse(2025, "2025/26")], false, null, null),
+            Years = new PostagePricingPlanYearsResponse([new YearResponse(2025, "2025/26")], true, 2026, "2026/27")
+        };
+        var controller = CreateController(postagePricingPlanApiClient: apiClient);
+
+        var result = await controller.PostagePricingPlanRenew(2025, null, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        Assert.Equal(ConfirmationFlow.ViewName, view.ViewName);
+        var page = Assert.IsType<ConfirmationPageViewModel>(view.Model);
+        Assert.Equal("Renew pricing plan for financial year 2026/27", page.Title);
+        Assert.Equal("Postage Pricing Plan", page.Caption);
+        Assert.Contains("postage pricing plan for the financial year 2026/27", page.Message, StringComparison.Ordinal);
+        Assert.NotNull(page.WarningText);
+        Assert.Equal("Renew pricing plan", page.ConfirmText);
+        Assert.Null(page.CancelUrl);
+        Assert.Equal(0, apiClient.RenewCallCount);
+    }
+
+    [Fact]
+    public async Task PostagePricingPlanRenew_Cancelled_ReturnsToThePricingPlanForTheSameYearWithoutRenewing()
+    {
+        var apiClient = new FakePostagePricingPlanApiClient
+        {
+            Years = new PostagePricingPlanYearsResponse([new YearResponse(2025, "2025/26")], true, 2026, "2026/27")
+        };
+        var controller = CreateController(postagePricingPlanApiClient: apiClient);
+
+        var result = await controller.PostagePricingPlanRenew(2025, ConfirmationFlow.Cancelled, CancellationToken.None);
+
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal(nameof(SystemAdministrationController.PostagePricingPlan), redirect.ActionName);
+        Assert.Equal(2025, redirect.RouteValues!["yearId"]);
+        Assert.Equal(0, apiClient.RenewCallCount);
+        Assert.Null(controller.TempData.GetNotification());
+    }
+
+    [Fact]
+    public async Task PostagePricingPlanRenew_Confirmed_RenewsThenRedirectsToTheSystemAdministrationIndexWithASuccessBanner()
+    {
+        var apiClient = new FakePostagePricingPlanApiClient
+        {
+            Years = new PostagePricingPlanYearsResponse([new YearResponse(2025, "2025/26")], true, 2026, "2026/27"),
             RenewResponse = new PostagePricingPlanRenewResponse(true, "The postage pricing plan has successfully been renewed for the financial year 2026/27.")
         };
         var controller = CreateController(postagePricingPlanApiClient: apiClient);
 
-        var result = await controller.PostagePricingPlanRenew(2025, CancellationToken.None);
+        var result = await controller.PostagePricingPlanRenew(2025, ConfirmationFlow.Confirmed, CancellationToken.None);
 
-        var view = Assert.IsType<ViewResult>(result);
-        var model = Assert.IsType<PostagePricingPlanViewModel>(view.Model);
-        Assert.False(model.MessageIsError);
-        Assert.Contains("2026/27", model.Message);
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal(nameof(SystemAdministrationController.Index), redirect.ActionName);
+        var notification = controller.TempData.GetNotification();
+        Assert.Equal(NotificationType.Success, notification!.Type);
+        Assert.Contains("2026/27", notification.Message, StringComparison.Ordinal);
         Assert.Equal(1, apiClient.RenewCallCount);
-    }
-
-    [Fact]
-    public async Task CountryManagement_Get_BuildsRowsAndTypeOptions()
-    {
-        var countryId = Guid.NewGuid();
-        var countryTypeId = Guid.NewGuid();
-        var apiClient = new FakeCountryApiClient
-        {
-            Countries = [new CountryResponse(countryId, "France", countryTypeId, "EU", 2)],
-            CountryTypes = [new CountryTypeResponse(countryTypeId, "EU")]
-        };
-        var controller = CreateController(countryApiClient: apiClient);
-
-        var result = await controller.CountryManagement(null, CancellationToken.None);
-
-        var view = Assert.IsType<ViewResult>(result);
-        var model = Assert.IsType<CountryManagementViewModel>(view.Model);
-        var row = Assert.Single(model.Rows);
-        Assert.Equal("France", row.Country);
-        Assert.Equal(2, row.AllocationCount);
-        Assert.False(row.IsEditing);
-        Assert.Single(model.CountryTypeOptions);
-    }
-
-    [Fact]
-    public async Task CountryManagement_Get_WithEditId_MarksMatchingRowAsEditing()
-    {
-        var editingId = Guid.NewGuid();
-        var otherId = Guid.NewGuid();
-        var apiClient = new FakeCountryApiClient
-        {
-            Countries =
-            [
-                new CountryResponse(editingId, "France", Guid.NewGuid(), "EU", 0),
-                new CountryResponse(otherId, "Germany", Guid.NewGuid(), "EU", 0)
-            ]
-        };
-        var controller = CreateController(countryApiClient: apiClient);
-
-        var result = await controller.CountryManagement(editingId, CancellationToken.None);
-
-        var view = Assert.IsType<ViewResult>(result);
-        var model = Assert.IsType<CountryManagementViewModel>(view.Model);
-        Assert.True(model.Rows.Single(r => r.CountryId == editingId).IsEditing);
-        Assert.False(model.Rows.Single(r => r.CountryId == otherId).IsEditing);
-    }
-
-    [Fact]
-    public async Task CountryManagementAdd_ValidModel_CreatesAndRedirects()
-    {
-        var apiClient = new FakeCountryApiClient();
-        var controller = CreateController(countryApiClient: apiClient);
-        var model = new CountryManagementAddViewModel { Country = "France", CountryTypeId = Guid.NewGuid() };
-
-        var result = await controller.CountryManagementAdd(model, CancellationToken.None);
-
-        var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal(nameof(SystemAdministrationController.CountryManagement), redirect.ActionName);
-        Assert.Equal("France", apiClient.LastCreateRequest?.Country);
-    }
-
-    [Fact]
-    public async Task CountryManagementAdd_ApiRejectsDuplicateName_ReturnsViewWithPrefixedError()
-    {
-        var apiClient = new FakeCountryApiClient
-        {
-            SaveResult = new CountrySaveResult(false, null, new Dictionary<string, string[]> { ["Country"] = ["This country already exists. Please try with different name."] })
-        };
-        var controller = CreateController(countryApiClient: apiClient);
-        var model = new CountryManagementAddViewModel { Country = "France", CountryTypeId = Guid.NewGuid() };
-
-        var result = await controller.CountryManagementAdd(model, CancellationToken.None);
-
-        var view = Assert.IsType<ViewResult>(result);
-        Assert.IsType<CountryManagementViewModel>(view.Model);
-        Assert.True(controller.ModelState.ContainsKey("Add.Country"));
-    }
-
-    [Fact]
-    public async Task CountryManagementSave_ValidModel_UpdatesAndRedirects()
-    {
-        var countryId = Guid.NewGuid();
-        var apiClient = new FakeCountryApiClient();
-        var controller = CreateController(countryApiClient: apiClient);
-        var model = new CountryManagementEditViewModel { CountryId = countryId, Country = "French Republic", CountryTypeId = Guid.NewGuid() };
-
-        var result = await controller.CountryManagementSave(model, CancellationToken.None);
-
-        var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal(nameof(SystemAdministrationController.CountryManagement), redirect.ActionName);
-        Assert.Equal(countryId, apiClient.LastUpdateRequest?.CountryId);
-    }
-
-    [Fact]
-    public async Task CountryManagementSave_ApiSaveFails_RedisplaysRowInEditModeWithPrefixedError()
-    {
-        var countryId = Guid.NewGuid();
-        var apiClient = new FakeCountryApiClient
-        {
-            Countries = [new CountryResponse(countryId, "France", Guid.NewGuid(), "EU", 0)],
-            SaveResult = new CountrySaveResult(false, null, new Dictionary<string, string[]> { ["Country"] = ["This country already exists. Please try with different name."] })
-        };
-        var controller = CreateController(countryApiClient: apiClient);
-        var model = new CountryManagementEditViewModel { CountryId = countryId, Country = "Germany", CountryTypeId = Guid.NewGuid() };
-
-        var result = await controller.CountryManagementSave(model, CancellationToken.None);
-
-        var view = Assert.IsType<ViewResult>(result);
-        var resultModel = Assert.IsType<CountryManagementViewModel>(view.Model);
-        Assert.True(resultModel.Rows.Single(r => r.CountryId == countryId).IsEditing);
-        Assert.True(controller.ModelState.ContainsKey("Edit.Country"));
-    }
-
-    [Fact]
-    public async Task CountryManagementRemove_CountryInUse_RedisplaysWithBlockedMessage()
-    {
-        var countryId = Guid.NewGuid();
-        var apiClient = new FakeCountryApiClient
-        {
-            Countries = [new CountryResponse(countryId, "France", Guid.NewGuid(), "EU", 8)],
-            DeleteResponse = new CountryDeleteResponse(false, "This country is being used by 8 customer(s)/participant(s)/Group Addresses.")
-        };
-        var controller = CreateController(countryApiClient: apiClient);
-
-        var result = await controller.CountryManagementRemove(countryId, CancellationToken.None);
-
-        var view = Assert.IsType<ViewResult>(result);
-        var model = Assert.IsType<CountryManagementViewModel>(view.Model);
-        Assert.True(model.MessageIsError);
-        Assert.Equal("This country is being used by 8 customer(s)/participant(s)/Group Addresses.", model.Message);
-        Assert.Equal(countryId, apiClient.LastDeletedCountryId);
-    }
-
-    [Fact]
-    public async Task CountryManagementRemove_NoDependencies_RedisplaysWithSuccessMessage()
-    {
-        var countryId = Guid.NewGuid();
-        var apiClient = new FakeCountryApiClient { DeleteResponse = new CountryDeleteResponse(true, null) };
-        var controller = CreateController(countryApiClient: apiClient);
-
-        var result = await controller.CountryManagementRemove(countryId, CancellationToken.None);
-
-        var view = Assert.IsType<ViewResult>(result);
-        var model = Assert.IsType<CountryManagementViewModel>(view.Model);
-        Assert.False(model.MessageIsError);
-        Assert.Null(model.Message);
     }
 
     [Fact]
@@ -664,8 +603,11 @@ public class SystemAdministrationControllerTests
         var result = await controller.ExternalSiteManagement(model, CancellationToken.None);
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal(nameof(SystemAdministrationController.ExternalSiteManagement), redirect.ActionName);
+        Assert.Equal(nameof(SystemAdministrationController.Index), redirect.ActionName);
         Assert.Equal("vetqas@apha.gov.uk", apiClient.LastSaveRequest?.SupportEmailAddress);
+        var notification = controller.TempData.GetNotification();
+        Assert.Equal(NotificationType.Success, notification!.Type);
+        Assert.Equal("External site management saved successfully.", notification.Message);
     }
 
     [Fact]
@@ -744,7 +686,67 @@ public class SystemAdministrationControllerTests
         var view = Assert.IsType<ViewResult>(result);
         var resultModel = Assert.IsType<CreateUserViewModel>(view.Model);
         Assert.Equal("No valid search results found", resultModel.Message);
-        Assert.True(resultModel.MessageIsError);
+        Assert.True(resultModel.HasSearched);
+        Assert.Empty(resultModel.ResultOptions);
+    }
+
+    [Fact]
+    public async Task CreateUserSearch_TruncatedResults_ShowsRefineYourSearchMessage()
+    {
+        var apiClient = new FakeUserApiClient
+        {
+            SearchResults = [new StaffDirectoryUserResponse("m100001", "jane@apha.gov.uk", "Jane Smith", "Jane", "Smith")],
+            SearchIsTruncated = true
+        };
+        var controller = CreateController(userApiClient: apiClient);
+
+        var result = await controller.CreateUserSearch(new CreateUserViewModel { SearchTerm = "j" }, CancellationToken.None);
+
+        var resultModel = Assert.IsType<CreateUserViewModel>(Assert.IsType<ViewResult>(result).Model);
+        Assert.Single(resultModel.ResultOptions);
+        Assert.Contains("narrow your search", resultModel.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task CreateUserSearch_ResultOptionsPostOnlyTheUsername()
+    {
+        var apiClient = new FakeUserApiClient
+        {
+            SearchResults = [new StaffDirectoryUserResponse("dt2\\jsmith", "jane|x@apha.gov.uk", "Jane | Smith", "Jane", "Smith")]
+        };
+        var controller = CreateController(userApiClient: apiClient);
+
+        var result = await controller.CreateUserSearch(new CreateUserViewModel { SearchTerm = "jane" }, CancellationToken.None);
+
+        var option = Assert.Single(Assert.IsType<CreateUserViewModel>(Assert.IsType<ViewResult>(result).Model).ResultOptions);
+        Assert.Equal("dt2\\jsmith", option.Value);
+    }
+
+    [Fact]
+    public async Task CreateUserSearch_DirectoryFails_ShowsProblemInErrorSummaryInsteadOfThrowing()
+    {
+        var apiClient = new FakeUserApiClient { SearchException = new HttpRequestException("Graph unavailable") };
+        var controller = CreateController(userApiClient: apiClient);
+
+        var result = await controller.CreateUserSearch(new CreateUserViewModel { SearchTerm = "jane" }, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var resultModel = Assert.IsType<CreateUserViewModel>(view.Model);
+        Assert.False(resultModel.HasSearched);
+        var error = Assert.Single(controller.ModelState[string.Empty]!.Errors);
+        Assert.Contains("problem searching the staff directory", error.ErrorMessage, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task CreateUserSearch_RequestTimesOut_ShowsProblemInErrorSummaryInsteadOfThrowing()
+    {
+        var apiClient = new FakeUserApiClient { SearchException = new TaskCanceledException("timeout") };
+        var controller = CreateController(userApiClient: apiClient);
+
+        var result = await controller.CreateUserSearch(new CreateUserViewModel { SearchTerm = "jane" }, CancellationToken.None);
+
+        Assert.IsType<ViewResult>(result);
+        Assert.False(controller.ModelState.IsValid);
     }
 
     [Fact]
@@ -764,12 +766,15 @@ public class SystemAdministrationControllerTests
     [Fact]
     public async Task CreateUserConfirm_ValidSelection_CreatesAndShowsSuccess()
     {
-        var apiClient = new FakeUserApiClient();
+        var apiClient = new FakeUserApiClient
+        {
+            SearchResults = [new StaffDirectoryUserResponse("m100001", "jane@apha.gov.uk", "Jane Smith", "Jane", "Smith")]
+        };
         var controller = CreateController(userApiClient: apiClient);
         var model = new CreateUserViewModel
         {
             SearchTerm = "jane",
-            SelectedCandidate = "m100001|jane@apha.gov.uk|Jane Smith|Jane|Smith",
+            SelectedCandidate = "m100001",
             Department = "Science"
         };
 
@@ -778,12 +783,100 @@ public class SystemAdministrationControllerTests
         var view = Assert.IsType<ViewResult>(result);
         var resultModel = Assert.IsType<CreateUserViewModel>(view.Model);
         Assert.True(resultModel.IsCreated);
+        Assert.Equal("User added successfully", resultModel.Message);
         Assert.Equal("m100001", apiClient.LastCreateRequest?.Username);
         Assert.Equal("Science", apiClient.LastCreateRequest?.Department);
     }
 
+    // The account details come from the directory, never from the posted form.
     [Fact]
-    public async Task CreateUserConfirm_ApiRejectsNoEmail_RedisplaysResultsWithError()
+    public async Task CreateUserConfirm_UsesTheDirectoryDetailsForTheSelectedUsername()
+    {
+        var apiClient = new FakeUserApiClient
+        {
+            SearchResults = [new StaffDirectoryUserResponse("dt2\\jsmith", "jane@apha.gov.uk", "Jane | Smith", "Jane", "Smith")]
+        };
+        var controller = CreateController(userApiClient: apiClient);
+        var model = new CreateUserViewModel { SearchTerm = "jane", SelectedCandidate = "DT2\\JSMITH", Department = "Science" };
+
+        await controller.CreateUserConfirm(model, CancellationToken.None);
+
+        var request = apiClient.LastCreateRequest;
+        Assert.NotNull(request);
+        Assert.Equal("dt2\\jsmith", request.Username);
+        Assert.Equal("jane@apha.gov.uk", request.Email);
+        Assert.Equal("Jane | Smith", request.FriendlyName);
+    }
+
+    [Fact]
+    public async Task CreateUserConfirm_UsernameNotInTheDirectoryResults_DoesNotCreateAndShowsError()
+    {
+        var apiClient = new FakeUserApiClient
+        {
+            SearchResults = [new StaffDirectoryUserResponse("m100001", "jane@apha.gov.uk", "Jane Smith", "Jane", "Smith")]
+        };
+        var controller = CreateController(userApiClient: apiClient);
+        var model = new CreateUserViewModel { SearchTerm = "jane", SelectedCandidate = "m999999", Department = "Science" };
+
+        var result = await controller.CreateUserConfirm(model, CancellationToken.None);
+
+        var resultModel = Assert.IsType<CreateUserViewModel>(Assert.IsType<ViewResult>(result).Model);
+        Assert.Null(apiClient.LastCreateRequest);
+        Assert.False(resultModel.IsCreated);
+        Assert.Contains(controller.ModelState["SelectedCandidate"]!.Errors, e => e.ErrorMessage.Contains("no longer available", StringComparison.Ordinal));
+        Assert.Single(resultModel.ResultOptions);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    public async Task CreateUserConfirm_NoUserSelected_ShowsSelectAUserError(string? selected)
+    {
+        var apiClient = new FakeUserApiClient
+        {
+            SearchResults = [new StaffDirectoryUserResponse("m100001", "jane@apha.gov.uk", "Jane Smith", "Jane", "Smith")]
+        };
+        var controller = CreateController(userApiClient: apiClient);
+        var model = new CreateUserViewModel { SearchTerm = "jane", SelectedCandidate = selected };
+
+        var result = await controller.CreateUserConfirm(model, CancellationToken.None);
+
+        var resultModel = Assert.IsType<CreateUserViewModel>(Assert.IsType<ViewResult>(result).Model);
+        Assert.Null(apiClient.LastCreateRequest);
+        Assert.Equal("Select a user", Assert.Single(controller.ModelState["SelectedCandidate"]!.Errors).ErrorMessage);
+        Assert.True(resultModel.HasSearched);
+    }
+
+    [Fact]
+    public async Task CreateUserConfirm_BlankSearchTerm_RedisplaysWithoutSearchingOrCreating()
+    {
+        var apiClient = new FakeUserApiClient();
+        var controller = CreateController(userApiClient: apiClient);
+        var model = new CreateUserViewModel { SearchTerm = " ", SelectedCandidate = "m100001" };
+
+        var result = await controller.CreateUserConfirm(model, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        Assert.Equal(nameof(SystemAdministrationController.CreateUser), view.ViewName);
+        Assert.Null(apiClient.LastCreateRequest);
+    }
+
+    [Fact]
+    public async Task CreateUserConfirm_DirectoryFails_ShowsProblemAndDoesNotCreate()
+    {
+        var apiClient = new FakeUserApiClient { SearchException = new HttpRequestException("Graph unavailable") };
+        var controller = CreateController(userApiClient: apiClient);
+        var model = new CreateUserViewModel { SearchTerm = "jane", SelectedCandidate = "m100001" };
+
+        var result = await controller.CreateUserConfirm(model, CancellationToken.None);
+
+        Assert.IsType<ViewResult>(result);
+        Assert.Null(apiClient.LastCreateRequest);
+        Assert.Contains(controller.ModelState[string.Empty]!.Errors, e => e.ErrorMessage.Contains("problem searching the staff directory", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task CreateUserConfirm_ApiRejectsNoEmail_RedisplaysResultsWithErrorNotLinkedToAMissingField()
     {
         var apiClient = new FakeUserApiClient
         {
@@ -794,7 +887,7 @@ public class SystemAdministrationControllerTests
         var model = new CreateUserViewModel
         {
             SearchTerm = "sam",
-            SelectedCandidate = "m100003||Sam Taylor|Sam|Taylor",
+            SelectedCandidate = "m100003",
             Department = "Science"
         };
 
@@ -802,9 +895,27 @@ public class SystemAdministrationControllerTests
 
         var view = Assert.IsType<ViewResult>(result);
         Assert.False(controller.ModelState.IsValid);
+        Assert.False(controller.ModelState.ContainsKey("Email"));
+        Assert.Contains(controller.ModelState[string.Empty]!.Errors, e => e.ErrorMessage.Contains("no Email Address", StringComparison.Ordinal));
         var resultModel = Assert.IsType<CreateUserViewModel>(view.Model);
         Assert.False(resultModel.IsCreated);
         Assert.True(resultModel.HasSearched);
+    }
+
+    [Fact]
+    public async Task CreateUserConfirm_DepartmentTooLong_KeepsTheDepartmentFieldError()
+    {
+        var apiClient = new FakeUserApiClient
+        {
+            SaveResult = new CreateUserSaveResult(false, null, new Dictionary<string, string[]> { ["Department"] = ["Department must be 50 characters or fewer"] }),
+            SearchResults = [new StaffDirectoryUserResponse("m100001", "jane@apha.gov.uk", "Jane Smith", "Jane", "Smith")]
+        };
+        var controller = CreateController(userApiClient: apiClient);
+        var model = new CreateUserViewModel { SearchTerm = "jane", SelectedCandidate = "m100001", Department = new string('a', 60) };
+
+        await controller.CreateUserConfirm(model, CancellationToken.None);
+
+        Assert.True(controller.ModelState.ContainsKey("Department"));
     }
 
     [Fact]
@@ -1071,6 +1182,22 @@ public class SystemAdministrationControllerTests
     }
 
     [Fact]
+    public async Task InternalTestConsultantDepartmentSave_InvalidModel_RedisplaysTheRowInEditModeWithoutSaving()
+    {
+        var userId = Guid.NewGuid();
+        var userApiClient = new FakeUserApiClient();
+        var controller = CreateController(userApiClient: userApiClient);
+        controller.ModelState.AddModelError("Edit.Department", "Department is too long");
+        var model = new InternalTestConsultantEditViewModel { UserId = userId, Department = "Virology", IsInactive = false };
+
+        var result = await controller.InternalTestConsultantDepartmentSave(model, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        Assert.Equal(nameof(SystemAdministrationController.InternalTestConsultantDepartment), view.ViewName);
+        Assert.Empty(userApiClient.UpdateTestConsultantCalls);
+    }
+
+    [Fact]
     public async Task InternalTestConsultantDepartmentToggleStatus_FromActive_SetsInactiveAndStampsDate()
     {
         var userId = Guid.NewGuid();
@@ -1241,148 +1368,6 @@ public class SystemAdministrationControllerTests
         var model = Assert.IsType<ExternalTestConsultantManagementViewModel>(Assert.IsType<ViewResult>(result).Model);
         Assert.True(model.MessageIsError);
         Assert.Equal("This external test consultant is being used on: 1 scheme(s).", model.Message);
-    }
-
-    [Fact]
-    public async Task ViewerManagement_Get_BuildsRows()
-    {
-        var viewerId = Guid.NewGuid();
-        var apiClient = new FakeViewerApiClient
-        {
-            Viewers = [new ViewerResponse(viewerId, "Jane Smith", "jane@example.com", [], [])]
-        };
-        var controller = CreateController(viewerApiClient: apiClient);
-
-        var result = await controller.ViewerManagement(editId: null, CancellationToken.None);
-
-        var view = Assert.IsType<ViewResult>(result);
-        var model = Assert.IsType<ViewerManagementViewModel>(view.Model);
-        var row = Assert.Single(model.Rows);
-        Assert.Equal("Jane Smith", row.Name);
-        Assert.False(row.IsEditing);
-    }
-
-    [Fact]
-    public async Task ViewerManagement_Get_WithAssignments_BuildsEnrichedRemoveConfirmMessage()
-    {
-        var viewerId = Guid.NewGuid();
-        var apiClient = new FakeViewerApiClient
-        {
-            Viewers =
-            [
-                new ViewerResponse(viewerId, "Jane Smith", "jane@example.com",
-                    [new ViewerSchemeResponse("SFW1234", "Heavy Metals")],
-                    [new ViewerParticipantResponse("LAB001", "Example Lab")])
-            ]
-        };
-        var controller = CreateController(viewerApiClient: apiClient);
-
-        var result = await controller.ViewerManagement(editId: null, CancellationToken.None);
-
-        var view = Assert.IsType<ViewResult>(result);
-        var model = Assert.IsType<ViewerManagementViewModel>(view.Model);
-        var row = Assert.Single(model.Rows);
-        Assert.Contains("SFW1234: Heavy Metals", row.RemoveConfirmMessage);
-        Assert.Contains("LAB001: Example Lab", row.RemoveConfirmMessage);
-        Assert.Contains("Remove these assignments before removing this viewer.", row.RemoveConfirmMessage);
-        Assert.True(row.IsRemoveBlocked);
-    }
-
-    [Fact]
-    public async Task ViewerManagement_Get_WithoutAssignments_UsesPlainConfirmAndIsNotBlocked()
-    {
-        var apiClient = new FakeViewerApiClient
-        {
-            Viewers = [new ViewerResponse(Guid.NewGuid(), "Jane Smith", "jane@example.com", [], [])]
-        };
-        var controller = CreateController(viewerApiClient: apiClient);
-
-        var result = await controller.ViewerManagement(editId: null, CancellationToken.None);
-
-        var model = Assert.IsType<ViewerManagementViewModel>(Assert.IsType<ViewResult>(result).Model);
-        var row = Assert.Single(model.Rows);
-        Assert.False(row.IsRemoveBlocked);
-        Assert.Equal("Are you sure you want to remove this viewer?", row.RemoveConfirmMessage);
-    }
-
-    [Fact]
-    public async Task ViewerManagementAdd_Valid_RedirectsToList()
-    {
-        var apiClient = new FakeViewerApiClient();
-        var controller = CreateController(viewerApiClient: apiClient);
-        var model = new ViewerAddViewModel { Name = "Jane Smith", Email = "jane@example.com" };
-
-        var result = await controller.ViewerManagementAdd(model, CancellationToken.None);
-
-        Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal("Jane Smith", apiClient.LastCreateRequest?.Name);
-    }
-
-    [Fact]
-    public async Task ViewerManagementAdd_ApiRejectsMissingEmail_RedisplaysWithError()
-    {
-        var apiClient = new FakeViewerApiClient
-        {
-            SaveResult = new ViewerSaveResult(false, null, new Dictionary<string, string[]> { ["Email"] = ["Enter an email address"] })
-        };
-        var controller = CreateController(viewerApiClient: apiClient);
-        var model = new ViewerAddViewModel { Name = "Jane Smith", Email = "jane@example.com" };
-
-        var result = await controller.ViewerManagementAdd(model, CancellationToken.None);
-
-        var view = Assert.IsType<ViewResult>(result);
-        Assert.False(controller.ModelState.IsValid);
-        Assert.IsType<ViewerManagementViewModel>(view.Model);
-    }
-
-    [Fact]
-    public async Task ViewerManagementSave_Valid_RedirectsToList()
-    {
-        var viewerId = Guid.NewGuid();
-        var apiClient = new FakeViewerApiClient();
-        var controller = CreateController(viewerApiClient: apiClient);
-        var model = new ViewerEditViewModel { ViewerId = viewerId, Name = "Jane Smith", Email = "jane@example.com" };
-
-        var result = await controller.ViewerManagementSave(model, CancellationToken.None);
-
-        Assert.IsType<RedirectToActionResult>(result);
-        var call = Assert.Single(apiClient.UpdateCalls);
-        Assert.Equal(viewerId, call.ViewerId);
-    }
-
-    [Fact]
-    public async Task ViewerManagementSave_ApiUpdateFails_RedisplaysRowInEditModeWithPrefixedError()
-    {
-        var viewerId = Guid.NewGuid();
-        var apiClient = new FakeViewerApiClient
-        {
-            Viewers = [new ViewerResponse(viewerId, "Jane Smith", "jane@example.com", [], [])],
-            SaveResult = new ViewerSaveResult(false, null, new Dictionary<string, string[]> { ["Email"] = ["Enter an email address"] })
-        };
-        var controller = CreateController(viewerApiClient: apiClient);
-        var model = new ViewerEditViewModel { ViewerId = viewerId, Name = "Jane Smith", Email = string.Empty };
-
-        var result = await controller.ViewerManagementSave(model, CancellationToken.None);
-
-        var view = Assert.IsType<ViewResult>(result);
-        var resultModel = Assert.IsType<ViewerManagementViewModel>(view.Model);
-        Assert.True(resultModel.Rows.Single(r => r.ViewerId == viewerId).IsEditing);
-        Assert.True(controller.ModelState.ContainsKey("Edit.Email"));
-    }
-
-    [Fact]
-    public async Task ViewerManagementRemove_Success_ShowsSuccessMessage()
-    {
-        var viewerId = Guid.NewGuid();
-        var apiClient = new FakeViewerApiClient { DeleteResult = new ViewerDeleteResponse(true, null) };
-        var controller = CreateController(viewerApiClient: apiClient);
-
-        var result = await controller.ViewerManagementRemove(viewerId, CancellationToken.None);
-
-        var view = Assert.IsType<ViewResult>(result);
-        var model = Assert.IsType<ViewerManagementViewModel>(view.Model);
-        Assert.False(model.MessageIsError);
-        Assert.Contains(viewerId, apiClient.DeleteCalls);
     }
 }
 

@@ -126,7 +126,7 @@ public partial class SampleReceiptRenderTests : IClassFixture<WebApplicationFact
             .ToList();
         Assert.Equal([("save", "Save"), ("cancel", "Cancel")], buttons);
         Assert.Matches("<form[^>]*action=\"/Distribution/SampleReceipt\\?year=2026&amp;monthId=5&amp;schemeId=[^\"]+&amp;participantId=[^\"]+\"", html);
-        Assert.Matches("<a class=\"govuk-back-link\" href=\"/Distribution/ResultsReceipt\\?year=2026&amp;monthId=5\">Back</a>", html);
+        Assert.DoesNotContain("govuk-back-link", html, StringComparison.Ordinal);
     }
 
     [Fact]

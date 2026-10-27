@@ -1,0 +1,48 @@
+@using Microsoft.AspNetCore.Antiforgery
+@using Microsoft.Extensions.Options
+@using PTL.InternalWeb.SessionTimeout
+@inject IOptions<SessionTimeoutOptions> SessionTimeoutOptionsAccessor
+@inject IAntiforgery Antiforgery
+@{
+    // Rendered only for authenticated pages (see _Layout.cshtml) - an anonymous visitor has no
+    // session to warn about. Independent of the 14-day sliding auth cookie/Entra token refresh;
+    // this is purely a client-side UX/security layer on top of them (see SessionTimeoutOptions).
+    var options = SessionTimeoutOptionsAccessor.Value;
+    var warningAfterMs = (long)options.InactivityWarningAfter.TotalMilliseconds;
+    var expireAfterMs = (long)options.ExpireAfterWarning.TotalMilliseconds;
+    // Delivered as a data attribute, not a rendered form field - several existing pages assert
+    // they render no form fields at all, which a visible antiforgery field would otherwise violate.
+    var antiforgeryToken = Antiforgery.GetAndStoreTokens(Context).RequestToken;
+}
+
+<div id="session-timeout-warning"
+     class="govuk-notification-banner ptl-session-timeout-warning"
+     role="alert"
+     aria-labelledby="session-timeout-warning-title"
+     tabindex="-1"
+     data-module="govuk-notification-banner"
+     data-warning-after-ms="@warningAfterMs"
+     data-expire-after-ms="@expireAfterMs"
+     data-extend-url="@Url.Action("ExtendSession", "Account")"
+     data-expired-url="@Url.Action("SessionExpired", "Account")"
+     data-antiforgery-token="@antiforgeryToken"
+     hidden>
+    <div class="govuk-notification-banner__header">
+        <h2 class="govuk-notification-banner__title" id="session-timeout-warning-title">Extend session?</h2>
+    </div>
+    <div class="govuk-notification-banner__content">
+        <p class="govuk-notification-banner__heading">
+            You've been inactive for a while. For your security, you'll be signed out in
+            <span id="session-timeout-countdown">@((int)options.ExpireAfterWarning.TotalSeconds)</span>
+            seconds unless you choose to continue.
+        </p>
+        @* Visually hidden: announces remaining time at a few key milestones only (not every
+           second, which would be disruptive for screen reader users) - see session-timeout.js. *@
+        <span id="session-timeout-countdown-announcement" class="govuk-visually-hidden" aria-live="polite"></span>
+        <button type="button" id="session-timeout-extend" class="govuk-button" data-module="govuk-button">
+            Continue
+        </button>
+    </div>
+</div>
+
+<script src="~/js/session-timeout.js" asp-append-version="true"></script>

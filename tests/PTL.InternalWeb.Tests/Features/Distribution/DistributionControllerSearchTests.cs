@@ -10,7 +10,7 @@ namespace PTL.InternalWeb.Tests.Features.Distribution;
 // unpaged; Sample Number tab is mandatory and paged at DistributionSearchViewModel.SampleNumberPageSize.
 public class DistributionControllerSearchTests
 {
-    private static DistributionController CreateController(IDistributionApiClient apiClient) => new(apiClient);
+    private static DistributionController CreateController(IDistributionApiClient apiClient) => new(apiClient, new FakeSearchApiClient(), new FakeLookupApiClient());
 
     private static DistributionNumberSearchResultResponse DistributionRow(string number) =>
         new(Guid.NewGuid(), Guid.NewGuid(), number, "D1a/S1 BT", "D1a", "2026", "May");

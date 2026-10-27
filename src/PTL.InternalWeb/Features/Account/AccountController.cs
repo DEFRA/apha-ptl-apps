@@ -1,3 +1,6 @@
+using System.Security.Claims;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using PTL.ApiClient;
@@ -43,6 +46,41 @@ namespace PTL.InternalWeb.Features.Account
         [HttpGet]
         [AllowAnonymous]
         public IActionResult SignedOut() => View();
+
+        // Called by session-timeout.js while the "Extend session?" warning is NOT showing, to reset
+        // the client's inactivity timer. Requires no body/response beyond success - reaching this
+        // [Authorize]-by-default action at all (the request pipeline's EntraCookieEvents.ValidatePrincipal
+        // already ran) is itself the proof the session is still genuinely valid; a failed/redirected
+        // fetch response tells the caller to show Session Expired immediately instead of resetting.
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public IActionResult ExtendSession() => NoContent();
+
+        // Reached when the inactivity warning's countdown elapses with no action (or, with
+        // JavaScript disabled, via the partial's <noscript> meta-refresh). Signs out of THIS app's
+        // own cookie only (not a full Entra federated sign-out/redirect) so the message below
+        // reflects reality - the user really is signed out - without navigating away before they've
+        // seen it. Always signed out unconditionally (not gated on IsAuthenticated) so a stale/
+        // partially-valid principal can never slip through. NoStore so a cached copy of this
+        // response (or the browser's back/forward cache) can never mask the sign-out that just
+        // happened. "Sign in again" below re-enters the normal Login challenge; a live Entra SSO
+        // session reauthenticates automatically, otherwise Entra's own sign-in prompt appears.
+        [HttpGet]
+        [AllowAnonymous]
+        [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
+        public async Task<IActionResult> SessionExpired()
+        {
+            await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+
+            // SignOutAsync only clears the cookie for FUTURE requests (via Set-Cookie) - it does not
+            // retroactively update HttpContext.User for this SAME request, which the authentication
+            // middleware already populated before this action ran. Without this, the layout's header
+            // partial (which reads User.Identity.IsAuthenticated) would still show "Signed in as" on
+            // this very page, even though the user has just been signed out.
+            HttpContext.User = new ClaimsPrincipal(new ClaimsIdentity());
+
+            return View();
+        }
 
         // Reached via EntraOpenIdConnectEvents.TokenValidated's denial redirect when no tblUsers row
         // matches - deliberately anonymous (no session is ever created for a denied sign-in). Uses the

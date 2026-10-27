@@ -12,6 +12,7 @@ using PTL.Contracts.TestConsultant;
 using PTL.Contracts.User;
 using PTL.Contracts.Viewer;
 using PTL.InternalWeb.Authorization;
+using PTL.InternalWeb.Confirmation;
 using PTL.InternalWeb.Features.Account;
 using PTL.SharedUI.Notifications;
 
@@ -20,7 +21,7 @@ namespace PTL.InternalWeb.Features.SystemAdministration;
 // Gated behind the "Admin" role (resolved from our own database, not an Entra ID group). PTL.Api itself
 // remains unauthenticated for this phase (tracked separately) - this is the one enforcement point today.
 [Authorize(Policy = PtlPolicies.Admin)]
-public class SystemAdministrationController : Controller
+public partial class SystemAdministrationController : Controller
 {
     private readonly IAdministrationChargeApiClient administrationChargeApiClient;
     private readonly IWeightedPricingPlanApiClient weightedPricingPlanApiClient;
@@ -92,6 +93,13 @@ public class SystemAdministrationController : Controller
             LogLevel.Information,
             new EventId(7, nameof(LogCountryRemoveBlockedMessage)),
             "Country {CountryId} could not be removed");
+
+    private static readonly Action<ILogger, Exception?> LogDirectorySearchFailedMessage =
+        LoggerMessage.Define(
+            LogLevel.Warning,
+            new EventId(8, nameof(LogDirectorySearchFailedMessage)),
+            "Staff directory search failed while creating a user");
+
     // Landing page for the System Administration section (moved from the removed Menu feature) -
     // shows only a heading and a short description, relying on the left nav (SideNavigationProvider)
     // for the actual section contents (Administration Charges, Weighted Pricing Plan, etc.).
@@ -127,7 +135,13 @@ public class SystemAdministrationController : Controller
             }
         }
 
-        return ModelState.IsValid ? RedirectToAction(nameof(AdministrationCharge)) : View(model);
+        if (!ModelState.IsValid)
+        {
+            return View(model);
+        }
+
+        TempData.SetNotification(NotificationType.Success, "Administration charges saved successfully.");
+        return RedirectToAction(nameof(Index));
     }
 
     public async Task<IActionResult> WeightedPricingPlan(int? yearId, CancellationToken cancellationToken) =>
@@ -135,23 +149,47 @@ public class SystemAdministrationController : Controller
 
     // yearId is whatever year was selected in the dropdown when Renew was clicked (posted via a
     // hidden field) - matches legacy btnRenew_Click, which rebuilds the same page around the
-    // already-selected Session("YearId") rather than switching to the newly renewed year.
+    // already-selected Session("YearId") rather than switching to the newly renewed year. The
+    // browser confirm() is replaced by the shared two-step confirmation page.
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Renew(int? yearId, CancellationToken cancellationToken)
+    public async Task<IActionResult> Renew(int? yearId, string? confirmation, CancellationToken cancellationToken)
     {
+        if (ConfirmationFlow.IsCancelled(confirmation))
+        {
+            return RedirectToAction(nameof(WeightedPricingPlan), new { yearId });
+        }
+
+        if (!ConfirmationFlow.IsConfirmed(confirmation))
+        {
+            var years = await weightedPricingPlanApiClient.GetYearsAsync(cancellationToken);
+            if (years is { CanRenew: true, NextYearLabel: { } nextYearLabel })
+            {
+                return this.ConfirmationPage(RenewPricingPlanConfirmation("weighted", "Weighted Pricing Plan", nextYearLabel), nameof(WeightedPricingPlan));
+            }
+        }
+
         var result = await weightedPricingPlanApiClient.RenewAsync(cancellationToken);
         if (result.Success)
         {
             LogRenewedMessage(logger, yearId.GetValueOrDefault(), null);
-        }
-        else
-        {
-            LogRenewBlockedMessage(logger, null);
+            TempData.SetNotification(NotificationType.Success, result.Message);
+            return RedirectToAction(nameof(Index));
         }
 
-        return View("WeightedPricingPlan", await BuildWeightedPricingPlanViewModelAsync(yearId, result.Message, messageIsError: !result.Success, cancellationToken));
+        LogRenewBlockedMessage(logger, null);
+        return View("WeightedPricingPlan", await BuildWeightedPricingPlanViewModelAsync(yearId, result.Message, messageIsError: true, cancellationToken));
     }
+
+    private static ConfirmationPageViewModel RenewPricingPlanConfirmation(string planName, string caption, string nextYearLabel) =>
+        new()
+        {
+            Title = $"Renew pricing plan for financial year {nextYearLabel}",
+            Caption = caption,
+            Message = $"You are about to renew the {planName} pricing plan for the financial year {nextYearLabel}. The plan for the current financial year will be used to create the plan for {nextYearLabel}.",
+            WarningText = "A pricing plan can only be renewed once for each financial year, and this cannot be undone here.",
+            ConfirmText = "Renew pricing plan",
+        };
 
     public async Task<IActionResult> PostagePricingPlan(int? yearId, Guid? editId, CancellationToken cancellationToken) =>
         View(await BuildPostagePricingPlanViewModelAsync(yearId, editId, message: null, messageIsError: false, editValues: null, cancellationToken));
@@ -170,7 +208,8 @@ public class SystemAdministrationController : Controller
 
             if (result.Success)
             {
-                return RedirectToAction(nameof(PostagePricingPlan), new { yearId = model.YearId!.Value });
+                TempData.SetNotification(NotificationType.Success, "Postage pricing plan saved successfully.");
+                return RedirectToAction(nameof(Index));
             }
 
             LogSetPostagePriceFailedMessage(logger, model.PostageId.Value, null);
@@ -191,94 +230,32 @@ public class SystemAdministrationController : Controller
     // already-selected Session("YearId") rather than switching to the newly renewed year.
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> PostagePricingPlanRenew(int? yearId, CancellationToken cancellationToken)
+    public async Task<IActionResult> PostagePricingPlanRenew(int? yearId, string? confirmation, CancellationToken cancellationToken)
     {
+        if (ConfirmationFlow.IsCancelled(confirmation))
+        {
+            return RedirectToAction(nameof(PostagePricingPlan), new { yearId });
+        }
+
+        if (!ConfirmationFlow.IsConfirmed(confirmation))
+        {
+            var years = await postagePricingPlanApiClient.GetYearsAsync(cancellationToken);
+            if (years is { CanRenew: true, NextYearLabel: { } nextYearLabel })
+            {
+                return this.ConfirmationPage(RenewPricingPlanConfirmation("postage", "Postage Pricing Plan", nextYearLabel), nameof(PostagePricingPlan));
+            }
+        }
+
         var result = await postagePricingPlanApiClient.RenewAsync(cancellationToken);
         if (result.Success)
         {
             LogPostageRenewedMessage(logger, yearId.GetValueOrDefault(), null);
-        }
-        else
-        {
-            LogPostageRenewBlockedMessage(logger, null);
+            TempData.SetNotification(NotificationType.Success, result.Message);
+            return RedirectToAction(nameof(Index));
         }
 
-        return View(nameof(PostagePricingPlan), await BuildPostagePricingPlanViewModelAsync(yearId, editId: null, result.Message, messageIsError: !result.Success, editValues: null, cancellationToken));
-    }
-
-    public async Task<IActionResult> CountryManagement(Guid? editId, CancellationToken cancellationToken) =>
-        View(await BuildCountryManagementViewModelAsync(editId, message: null, messageIsError: false, addValues: null, editValues: null, cancellationToken));
-
-    // Matches legacy ButtonAdd_Click - Name and Country Type are required, and the name must not
-    // already exist (CountryValidator/CountryService, surfaced here as a plain ModelState error).
-    [HttpPost]
-    [ValidateAntiForgeryToken]
-    public async Task<IActionResult> CountryManagementAdd([Bind(Prefix = "Add")] CountryManagementAddViewModel model, CancellationToken cancellationToken)
-    {
-        if (ModelState.IsValid)
-        {
-            var result = await countryApiClient.CreateCountryAsync(new CountrySaveRequest(model.Country, model.CountryTypeId!.Value), cancellationToken);
-            if (result.Success)
-            {
-                return RedirectToAction(nameof(CountryManagement));
-            }
-
-            foreach (var (field, messages) in result.FieldErrors)
-            {
-                foreach (var errorMessage in messages)
-                {
-                    ModelState.AddModelError($"Add.{field}", errorMessage);
-                }
-            }
-        }
-
-        return View(nameof(CountryManagement), await BuildCountryManagementViewModelAsync(editId: null, message: null, messageIsError: false, model, editValues: null, cancellationToken));
-    }
-
-    // Only the row matching model.CountryId is ever in edit mode when this posts - matches legacy
-    // GridViewCountry_Updating, which only acts on the row with EditIndex set. Posted field names
-    // use an "Edit" prefix (see Views/CountryManagement.cshtml) so ModelState errors stay scoped
-    // to this row and never bleed into the separate "Add a new country" form on the same page.
-    [HttpPost]
-    [ValidateAntiForgeryToken]
-    public async Task<IActionResult> CountryManagementSave([Bind(Prefix = "Edit")] CountryManagementEditViewModel model, CancellationToken cancellationToken)
-    {
-        if (ModelState.IsValid)
-        {
-            var result = await countryApiClient.UpdateCountryAsync(model.CountryId!.Value, new CountrySaveRequest(model.Country, model.CountryTypeId!.Value), cancellationToken);
-            if (result.Success)
-            {
-                return RedirectToAction(nameof(CountryManagement));
-            }
-
-            foreach (var (field, messages) in result.FieldErrors)
-            {
-                foreach (var errorMessage in messages)
-                {
-                    ModelState.AddModelError($"Edit.{field}", errorMessage);
-                }
-            }
-        }
-
-        return View(nameof(CountryManagement), await BuildCountryManagementViewModelAsync(model.CountryId, message: null, messageIsError: false, addValues: null, model, cancellationToken));
-    }
-
-    // Persists immediately (unlike legacy, which only removed the row from an in-memory
-    // collection until the page-level Save button was clicked) - see issue discussion on
-    // replicating the Postage Pricing Plan "immediate per-action persistence" convention. Blocked
-    // removals (country still referenced by a Customer/Participant/GroupAddress record) surface
-    // legacy's exact warning message as a notification banner rather than a JS alert.
-    [HttpPost]
-    [ValidateAntiForgeryToken]
-    public async Task<IActionResult> CountryManagementRemove(Guid countryId, CancellationToken cancellationToken)
-    {
-        var result = await countryApiClient.DeleteCountryAsync(countryId, cancellationToken);
-        if (!result.Success)
-        {
-            LogCountryRemoveBlockedMessage(logger, countryId, null);
-        }
-
-        return View(nameof(CountryManagement), await BuildCountryManagementViewModelAsync(editId: null, result.Message, messageIsError: !result.Success, addValues: null, editValues: null, cancellationToken));
+        LogPostageRenewBlockedMessage(logger, null);
+        return View(nameof(PostagePricingPlan), await BuildPostagePricingPlanViewModelAsync(yearId, editId: null, result.Message, messageIsError: true, editValues: null, cancellationToken));
     }
 
     public async Task<IActionResult> ExternalSiteManagement(CancellationToken cancellationToken)
@@ -289,9 +266,8 @@ public class SystemAdministrationController : Controller
 
     // Save publishes all three areas together in one request - matches legacy ButtonSave_Click,
     // which writes Message/ImportantMessage/SupportEmailAddress in a single spuMainPageMessage
-    // call. Cancel needs no action method of its own - the view's Cancel link is a plain GET back
-    // to this action, which re-fetches from the API and so discards any unsaved edits, matching
-    // legacy ButtonCancel_Click's "revert to the last saved version" behaviour.
+    // call. Cancel needs no action method of its own - the view's Cancel button is a plain GET to
+    // the System Administration landing page, so unsaved edits are discarded.
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> ExternalSiteManagement(ExternalSiteManagementViewModel model, CancellationToken cancellationToken)
@@ -304,7 +280,8 @@ public class SystemAdministrationController : Controller
 
             if (result.Success)
             {
-                return RedirectToAction(nameof(ExternalSiteManagement));
+                TempData.SetNotification(NotificationType.Success, "External site management saved successfully.");
+                return RedirectToAction(nameof(Index));
             }
 
             foreach (var (field, messages) in result.FieldErrors)
@@ -328,10 +305,9 @@ public class SystemAdministrationController : Controller
 
     public IActionResult CreateUser() => View(new CreateUserViewModel());
 
-    // Matches legacy GetADList - searches the staff directory (stubbed - see
-    // IStaffDirectoryService) and shows "No valid search results found" whether nobody matched at
-    // all, or everybody who matched already has a PT-LIMS account (both collapse to an empty
-    // result set, same as legacy).
+    // Matches legacy GetADList - searches the staff directory (Microsoft Graph, via PTL.Api) and shows
+    // "No valid search results found" whether nobody matched at all, or everybody who matched already
+    // has a PT-LIMS account (both collapse to an empty result set, same as legacy).
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> CreateUserSearch(CreateUserViewModel model, CancellationToken cancellationToken)
@@ -341,64 +317,116 @@ public class SystemAdministrationController : Controller
             return View(nameof(CreateUser), model);
         }
 
-        var results = await userApiClient.SearchStaffDirectoryAsync(model.SearchTerm, cancellationToken);
-        model.HasSearched = true;
-        model.ResultOptions = BuildResultOptions(results);
-
-        if (model.ResultOptions.Count == 0)
+        var search = await TrySearchStaffDirectoryAsync(model.SearchTerm, cancellationToken);
+        if (search is not null)
         {
-            model.Message = "No valid search results found";
-            model.MessageIsError = true;
+            ApplySearchResult(model, search);
         }
 
         return View(nameof(CreateUser), model);
     }
 
-    // Only the candidate matching model.SelectedCandidate is ever created - matches legacy
-    // Button_CreateUser_Click, which only acts on DropDownList_Users.SelectedValue. SearchTerm is
-    // round-tripped via a hidden field so the dropdown can be rebuilt if validation fails.
+    // Only the candidate matching model.SelectedCandidate (a username) is ever created - matches legacy
+    // Button_CreateUser_Click, which only acts on DropDownList_Users.SelectedValue. The posted username is
+    // never trusted on its own: the directory is searched again (SearchTerm is round-tripped via a hidden
+    // field) and the account details come from that fresh result, so a tampered form post cannot create
+    // an arbitrary account - the same protection WebForms event validation gave legacy's dropdown.
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> CreateUserConfirm(CreateUserViewModel model, CancellationToken cancellationToken)
     {
-        if (ModelState.IsValid && !string.IsNullOrEmpty(model.SelectedCandidate))
+        if (string.IsNullOrEmpty(model.SelectedCandidate))
         {
-            var candidate = UnpackCandidate(model.SelectedCandidate);
-            var result = await userApiClient.CreateUserAsync(
-                new CreateUserRequest(candidate.Username, candidate.Email, candidate.FriendlyName, candidate.FirstName, candidate.LastName, model.Department, GetCurrentUserId()),
-                cancellationToken);
+            ModelState.AddModelError(nameof(model.SelectedCandidate), "Select a user");
+        }
 
-            if (result.Success)
-            {
-                return View(nameof(CreateUser), new CreateUserViewModel { IsCreated = true, Message = "User Added Successfully" });
-            }
+        if (string.IsNullOrWhiteSpace(model.SearchTerm))
+        {
+            return View(nameof(CreateUser), model);
+        }
 
-            foreach (var (field, messages) in result.FieldErrors)
+        var search = await TrySearchStaffDirectoryAsync(model.SearchTerm, cancellationToken);
+        if (search is null)
+        {
+            return View(nameof(CreateUser), model);
+        }
+
+        if (ModelState.IsValid)
+        {
+            var created = await TryCreateSelectedUserAsync(model, search, cancellationToken);
+            if (created)
             {
-                foreach (var errorMessage in messages)
-                {
-                    ModelState.AddModelError(field, errorMessage);
-                }
+                return View(nameof(CreateUser), new CreateUserViewModel { IsCreated = true, Message = "User added successfully" });
             }
         }
 
-        model.HasSearched = true;
-        var results = await userApiClient.SearchStaffDirectoryAsync(model.SearchTerm, cancellationToken);
-        model.ResultOptions = BuildResultOptions(results);
+        ApplySearchResult(model, search);
         return View(nameof(CreateUser), model);
     }
 
-    private static List<SelectListItem> BuildResultOptions(IReadOnlyList<StaffDirectoryUserResponse> results) =>
-        results.Select(r => new SelectListItem($"{r.FriendlyName} : {r.Username}", PackCandidate(r))).ToList();
-
-    private static string PackCandidate(StaffDirectoryUserResponse candidate) =>
-        string.Join('|', candidate.Username, candidate.Email, candidate.FriendlyName, candidate.FirstName, candidate.LastName);
-
-    private static StaffDirectoryUserResponse UnpackCandidate(string packed)
+    // Creates the account for model.SelectedCandidate using the directory's own details for that username.
+    // Returns false (with the reason in ModelState) when the user is not in the search results or the API
+    // rejects the request.
+    private async Task<bool> TryCreateSelectedUserAsync(CreateUserViewModel model, StaffDirectorySearchResponse search, CancellationToken cancellationToken)
     {
-        var parts = packed.Split('|');
-        return new StaffDirectoryUserResponse(parts[0], parts[1], parts[2], parts[3], parts[4]);
+        var candidate = search.Users.FirstOrDefault(u => string.Equals(u.Username, model.SelectedCandidate, StringComparison.OrdinalIgnoreCase));
+        if (candidate is null)
+        {
+            ModelState.AddModelError(nameof(model.SelectedCandidate), "The selected user is no longer available. Search again");
+            return false;
+        }
+
+        var result = await userApiClient.CreateUserAsync(
+            new CreateUserRequest(candidate.Username, candidate.Email, candidate.FriendlyName, candidate.FirstName, candidate.LastName, model.Department, GetCurrentUserId()),
+            cancellationToken);
+
+        foreach (var (field, messages) in result.FieldErrors)
+        {
+            // Only Department is a field on this form; the other validated values come from the
+            // directory, so their errors are shown without a link to a field that is not there.
+            var key = field == nameof(model.Department) ? field : string.Empty;
+            foreach (var errorMessage in messages)
+            {
+                ModelState.AddModelError(key, errorMessage);
+            }
+        }
+
+        return result.Success;
     }
+
+    // A directory failure shows a problem message at the top of the page (no field to link to) instead of
+    // the generic error page; legacy showed "An Error has occured whilst Loading the User List".
+    private async Task<StaffDirectorySearchResponse?> TrySearchStaffDirectoryAsync(string searchTerm, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await userApiClient.SearchStaffDirectoryAsync(searchTerm, cancellationToken);
+        }
+        catch (Exception ex) when (ex is HttpRequestException || (ex is OperationCanceledException && !cancellationToken.IsCancellationRequested))
+        {
+            LogDirectorySearchFailedMessage(logger, ex);
+            ModelState.AddModelError(string.Empty, "There was a problem searching the staff directory. Try again, and contact support if it keeps happening");
+            return null;
+        }
+    }
+
+    private static void ApplySearchResult(CreateUserViewModel model, StaffDirectorySearchResponse search)
+    {
+        model.HasSearched = true;
+        model.ResultOptions = BuildResultOptions(search.Users);
+
+        if (search.IsTruncated)
+        {
+            model.Message = "Only some of the matching users are shown. Enter more of the name or the employee number to narrow your search";
+        }
+        else if (model.ResultOptions.Count == 0)
+        {
+            model.Message = "No valid search results found";
+        }
+    }
+
+    private static List<SelectListItem> BuildResultOptions(IReadOnlyList<StaffDirectoryUserResponse> results) =>
+        results.Select(r => new SelectListItem($"{r.FriendlyName} : {r.Username}", r.Username)).ToList();
 
     public async Task<IActionResult> ManageUserRoles(CancellationToken cancellationToken) =>
         View(await BuildManageUserRolesViewModelAsync(cancellationToken));
@@ -692,143 +720,6 @@ public class SystemAdministrationController : Controller
         };
     }
 
-    public async Task<IActionResult> ViewerManagement(Guid? editId, CancellationToken cancellationToken) =>
-        View(await BuildViewerManagementViewModelAsync(editId, message: null, messageIsError: false, addValues: null, editValues: null, cancellationToken));
-
-    // Matches legacy ButtonAdd_Click - Name and Email are both required per the story's Business Rule.
-    [HttpPost]
-    [ValidateAntiForgeryToken]
-    public async Task<IActionResult> ViewerManagementAdd([Bind(Prefix = "Add")] ViewerAddViewModel model, CancellationToken cancellationToken)
-    {
-        if (ModelState.IsValid)
-        {
-            var result = await viewerApiClient.CreateAsync(new ViewerSaveRequest(model.Name, model.Email), cancellationToken);
-            if (result.Success)
-            {
-                return RedirectToAction(nameof(ViewerManagement));
-            }
-
-            foreach (var (field, messages) in result.FieldErrors)
-            {
-                foreach (var errorMessage in messages)
-                {
-                    ModelState.AddModelError($"Add.{field}", errorMessage);
-                }
-            }
-        }
-
-        return View(nameof(ViewerManagement), await BuildViewerManagementViewModelAsync(editId: null, message: null, messageIsError: false, model, editValues: null, cancellationToken));
-    }
-
-    // Only the row matching model.ViewerId is ever in edit mode when this posts - matches
-    // CountryManagementSave/legacy GridViewViewer_Updating.
-    [HttpPost]
-    [ValidateAntiForgeryToken]
-    public async Task<IActionResult> ViewerManagementSave([Bind(Prefix = "Edit")] ViewerEditViewModel model, CancellationToken cancellationToken)
-    {
-        if (ModelState.IsValid)
-        {
-            var result = await viewerApiClient.UpdateAsync(model.ViewerId!.Value, new ViewerSaveRequest(model.Name, model.Email), cancellationToken);
-            if (result.Success)
-            {
-                return RedirectToAction(nameof(ViewerManagement));
-            }
-
-            foreach (var (field, messages) in result.FieldErrors)
-            {
-                foreach (var errorMessage in messages)
-                {
-                    ModelState.AddModelError($"Edit.{field}", errorMessage);
-                }
-            }
-        }
-
-        return View(nameof(ViewerManagement), await BuildViewerManagementViewModelAsync(model.ViewerId, message: null, messageIsError: false, addValues: null, model, cancellationToken));
-    }
-
-    // Removal is blocked server-side by ViewerService.DeleteAsync while the viewer has scheme or
-    // participant assignments (legacy only hit the same rule as an FK error from spdViewer). The
-    // view warns up front via ViewerRowViewModel.IsRemoveBlocked; the service message is the
-    // authoritative fallback.
-    [HttpPost]
-    [ValidateAntiForgeryToken]
-    public async Task<IActionResult> ViewerManagementRemove(Guid viewerId, CancellationToken cancellationToken)
-    {
-        var result = await viewerApiClient.DeleteAsync(viewerId, cancellationToken);
-        return View(nameof(ViewerManagement), await BuildViewerManagementViewModelAsync(
-            editId: null, result.Success ? "Viewer removed successfully." : result.Message, messageIsError: !result.Success, addValues: null, editValues: null, cancellationToken));
-    }
-
-    private async Task<ViewerManagementViewModel> BuildViewerManagementViewModelAsync(
-        Guid? editId,
-        string? message,
-        bool messageIsError,
-        ViewerAddViewModel? addValues,
-        ViewerEditViewModel? editValues,
-        CancellationToken cancellationToken)
-    {
-        var viewers = await viewerApiClient.GetAllAsync(cancellationToken);
-
-        var rows = viewers
-            .OrderBy(v => v.Name, StringComparer.OrdinalIgnoreCase)
-            .Select(v => new ViewerRowViewModel
-            {
-                ViewerId = v.ViewerId,
-                Name = editId == v.ViewerId && editValues is not null ? editValues.Name : v.Name,
-                Email = editId == v.ViewerId && editValues is not null ? editValues.Email : v.Email,
-                IsEditing = editId == v.ViewerId,
-                IsRemoveBlocked = v.Schemes.Count > 0 || v.Participants.Count > 0,
-                RemoveConfirmMessage = BuildRemoveConfirmMessage(v.Schemes, v.Participants)
-            })
-            .ToList();
-
-        return new ViewerManagementViewModel
-        {
-            Rows = rows,
-            Add = addValues ?? new ViewerAddViewModel(),
-            Message = message,
-            MessageIsError = messageIsError
-        };
-    }
-
-    // Lists assignments in legacy GridViewTC_RowDataBound's format (Schemes then Participants,
-    // each as "Identifier/LabCode: Name/LabName"). With assignments the text ends by saying they
-    // must be removed first (shown as an alert, since the service refuses the removal); without
-    // any it is a plain "are you sure" confirm, consistent with this codebase's other Remove
-    // actions (e.g. Remove User).
-    private static string BuildRemoveConfirmMessage(IReadOnlyList<ViewerSchemeResponse> schemes, IReadOnlyList<ViewerParticipantResponse> participants)
-    {
-        var lines = new List<string>();
-
-        if (schemes.Count > 0)
-        {
-            lines.Add("This viewer is assigned to the following schemes:");
-            lines.AddRange(schemes.Select(s => $"{s.Identifier}: {s.Name}"));
-            lines.Add(string.Empty);
-        }
-
-        if (participants.Count > 0)
-        {
-            lines.Add("This viewer is assigned to the following participants:");
-            lines.AddRange(participants.Select(p => $"{p.LabCode}: {p.LabName}"));
-            lines.Add(string.Empty);
-        }
-
-        lines.Add(schemes.Count > 0 || participants.Count > 0
-            ? "Remove these assignments before removing this viewer."
-            : "Are you sure you want to remove this viewer?");
-
-        // JS-escape each line's raw content (not HTML-escape) before joining with the literal
-        // "\n" line-break sequence, since this is embedded inside a single-quoted JS string
-        // literal in an onclick attribute - HTML-encoding alone would not stop an apostrophe in a
-        // scheme/participant name from terminating the string early, and escaping after joining
-        // would double-escape the "\n" separators themselves.
-        return string.Join("\\n", lines.Select(EscapeForJavaScriptString));
-    }
-
-    private static string EscapeForJavaScriptString(string value) =>
-        value.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("'", "\\'", StringComparison.Ordinal);
-
     private async Task<AdministrationChargeListViewModel> BuildAdministrationChargeViewModelAsync(CancellationToken cancellationToken)
     {
         var currencies = await lookupApiClient.GetCurrenciesAsync(cancellationToken);
@@ -975,43 +866,6 @@ public class SystemAdministrationController : Controller
             UKPrice = overlay?.UKPrice ?? plan.UKPrice ?? 0m,
             EUPrice = overlay?.EUPrice ?? plan.EUPrice ?? 0m,
             NonEUPrice = overlay?.NonEUPrice ?? plan.NonEUPrice ?? 0m
-        };
-    }
-
-    private async Task<CountryManagementViewModel> BuildCountryManagementViewModelAsync(
-        Guid? editId,
-        string? message,
-        bool messageIsError,
-        CountryManagementAddViewModel? addValues,
-        CountryManagementEditViewModel? editValues,
-        CancellationToken cancellationToken)
-    {
-        var countries = await countryApiClient.GetCountriesAsync(cancellationToken);
-        var countryTypes = await countryApiClient.GetCountryTypesAsync(cancellationToken);
-
-        var rows = countries
-            .OrderBy(c => c.Country)
-            .Select(c => new CountryManagementRowViewModel
-            {
-                CountryId = c.CountryId,
-                Country = editId == c.CountryId && editValues is not null ? editValues.Country : c.Country,
-                CountryType = c.CountryType,
-                CountryTypeId = editId == c.CountryId && editValues?.CountryTypeId is not null ? editValues.CountryTypeId.Value : c.CountryTypeId,
-                AllocationCount = c.AllocationCount,
-                IsEditing = editId == c.CountryId
-            })
-            .ToList();
-
-        return new CountryManagementViewModel
-        {
-            Rows = rows,
-            CountryTypeOptions = countryTypes
-                .OrderBy(t => t.CountryType)
-                .Select(t => new SelectListItem(t.CountryType, t.CountryTypeId.ToString()))
-                .ToList(),
-            Add = addValues ?? new CountryManagementAddViewModel(),
-            Message = message,
-            MessageIsError = messageIsError
         };
     }
 }

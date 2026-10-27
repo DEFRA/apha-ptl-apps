@@ -26,8 +26,24 @@ public class UserServiceTests
 
         var result = await service.SearchStaffDirectoryAsync("m1");
 
-        var match = Assert.Single(result);
+        var match = Assert.Single(result.Users);
         Assert.Equal("m100002", match.Username);
+        Assert.False(result.IsTruncated);
+    }
+
+    [Fact]
+    public async Task SearchStaffDirectoryAsync_PassesTheTruncatedFlagThrough()
+    {
+        var directory = new FakeStaffDirectoryService
+        {
+            Results = [new StaffDirectoryUser { Username = "m100002" }],
+            IsTruncated = true
+        };
+        var service = CreateService(new FakeUserRepository(), directory);
+
+        var result = await service.SearchStaffDirectoryAsync("m1");
+
+        Assert.True(result.IsTruncated);
     }
 
     [Fact]
@@ -45,7 +61,33 @@ public class UserServiceTests
 
         var result = await service.SearchStaffDirectoryAsync("jane");
 
-        Assert.Empty(result);
+        Assert.Empty(result.Users);
+    }
+
+    [Theory]
+    [InlineData("Username")]
+    [InlineData("Email")]
+    [InlineData("FriendlyName")]
+    [InlineData("FirstName")]
+    [InlineData("LastName")]
+    [InlineData("Department")]
+    public async Task CreateUserAsync_ValueLongerThanTheDatabaseColumn_ThrowsValidationExceptionAndDoesNotPersist(string field)
+    {
+        var tooLong = new string('a', 51);
+        var details = new NewUserDetails(
+            field == "Username" ? tooLong : "m100001",
+            field == "Email" ? tooLong : "jane@apha.gov.uk",
+            field == "FriendlyName" ? tooLong : "Jane Smith",
+            field == "FirstName" ? tooLong : "Jane",
+            field == "LastName" ? tooLong : "Smith",
+            field == "Department" ? tooLong : "Science");
+        var repository = new FakeUserRepository();
+        var service = CreateService(repository);
+
+        var ex = await Assert.ThrowsAsync<UserValidationException>(() => service.CreateUserAsync(details));
+
+        Assert.Contains(ex.Errors, e => e.Field == field);
+        Assert.Empty(repository.Created);
     }
 
     [Fact]

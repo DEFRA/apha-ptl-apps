@@ -24,6 +24,27 @@
 }
 else
 {
+    @* Works without scripting: every viewer is a checkbox and the ticked ones are the scheme's viewers.
+       The script below swaps this for the Add/Remove transfer lists. *@
+    <div id="schemeViewerCheckboxes">
+        <div class="govuk-form-group">
+            <fieldset class="govuk-fieldset" aria-describedby="schemeViewerCheckboxesHint">
+                <legend class="govuk-fieldset__legend govuk-fieldset__legend--s">Scheme Viewers</legend>
+                <div id="schemeViewerCheckboxesHint" class="govuk-hint">Select the viewers who can see this scheme's results.</div>
+                <div class="govuk-checkboxes govuk-checkboxes--small" data-module="govuk-checkboxes">
+                    @foreach (var viewer in Model.ViewerOptions.OrderBy(v => v.Text, StringComparer.OrdinalIgnoreCase))
+                    {
+                        <div class="govuk-checkboxes__item">
+                            <input class="govuk-checkboxes__input" id="scheme-viewer-@viewer.Value" name="ViewerIds" type="checkbox" value="@viewer.Value" checked="@assigned.Contains(Guid.Parse(viewer.Value))" />
+                            <label class="govuk-label govuk-checkboxes__label" for="scheme-viewer-@viewer.Value">@viewer.Text</label>
+                        </div>
+                    }
+                </div>
+            </fieldset>
+        </div>
+    </div>
+
+    <div id="schemeViewerDualList" hidden>
     <div class="govuk-grid-row">
         <div class="govuk-grid-column-one-third">
             <div class="govuk-form-group">
@@ -51,7 +72,7 @@ else
         <div class="govuk-grid-column-one-third">
             <div class="govuk-form-group">
                 <label class="govuk-label govuk-label--s" for="schemeViewers">Scheme Viewers</label>
-                <select class="govuk-select ptl-viewer-select" id="schemeViewers" name="ViewerIds" multiple size="10">
+                <select class="govuk-select ptl-viewer-select" id="schemeViewers" multiple size="10">
                     @foreach (var viewer in assignedViewers)
                     {
                         <option value="@viewer.Value">@viewer.Text</option>
@@ -60,11 +81,17 @@ else
             </div>
         </div>
     </div>
+    </div>
 
     <script>
         (function () {
             var available = document.getElementById('availableViewers');
             var selected = document.getElementById('schemeViewers');
+
+            // Swap the no-script checkboxes for the transfer lists; only one set may post ViewerIds.
+            document.getElementById('schemeViewerCheckboxes').remove();
+            document.getElementById('schemeViewerDualList').hidden = false;
+            selected.name = 'ViewerIds';
 
             function moveSelected(from, to) {
                 Array.from(from.selectedOptions).forEach(function (option) {

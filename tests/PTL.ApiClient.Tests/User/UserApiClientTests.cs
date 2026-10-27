@@ -13,12 +13,13 @@ public class UserApiClientTests
     [Fact]
     public async Task SearchStaffDirectoryAsync_Success_ReturnsDeserializedResults()
     {
-        const string json = """[{"username":"m100001","email":"jane@apha.gov.uk","friendlyName":"Jane Smith","firstName":"Jane","lastName":"Smith"}]""";
+        const string json = """{"users":[{"username":"m100001","email":"jane@apha.gov.uk","friendlyName":"Jane Smith","firstName":"Jane","lastName":"Smith"}],"isTruncated":true}""";
         var client = CreateClient(HttpStatusCode.OK, json);
 
         var result = await client.SearchStaffDirectoryAsync("jane");
 
-        Assert.Equal("m100001", Assert.Single(result).Username);
+        Assert.Equal("m100001", Assert.Single(result.Users).Username);
+        Assert.True(result.IsTruncated);
     }
 
     [Fact]
@@ -28,7 +29,8 @@ public class UserApiClientTests
 
         var result = await client.SearchStaffDirectoryAsync("jane");
 
-        Assert.Empty(result);
+        Assert.Empty(result.Users);
+        Assert.False(result.IsTruncated);
     }
 
     [Fact]
