@@ -1,3 +1,4 @@
+using PTL.Contracts.Distribution;
 using PTL.Core.Distribution;
 
 namespace PTL.Api.Tests.Distribution;
@@ -19,6 +20,92 @@ public class TabulationReportServiceTests
         var source = new TabulationSource { IsPublished = published, TabulationName = fileName };
         source.Attachments.Add(new(AttachmentId, fileName, "application/pdf", [1, 2, 3]));
         return source;
+    }
+
+    // ---- Results Sign-off review (legacy Results Sign-off/Tabulation.aspx draw filter) ----------
+
+    private static TabulationSource ReviewSource(bool withMethodItem = false)
+    {
+        var source = new TabulationSource
+        {
+            TabulationId = TabulationId,
+            AvailableToViewers = true,
+            IntendedResultsOnly = false,
+        };
+        var test = new TabulationSourceTest { TestId = Guid.NewGuid(), Name = "Culture" };
+        test.Samples.Add(new(Guid.NewGuid(), null, "26/2", "Two"));
+        test.Samples.Add(new(Guid.NewGuid(), null, "26/1", "One"));
+        test.ResultItems.Add(new(Guid.NewGuid(), "Isolate"));
+        if (withMethodItem)
+        {
+            test.MethodItems.Add(new(Guid.NewGuid(), "Medium"));
+        }
+
+        source.Tests.Add(test);
+        var viewer = new TabulationSourceViewer { ViewerId = Guid.NewGuid(), Name = "Viewer One" };
+        source.Viewers.Add(viewer);
+        source.Attachments.Add(new(AttachmentId, "support.pdf", "application/pdf", [1]));
+        return source;
+    }
+
+    private static IEnumerable<string> CellTexts(ResultsSignOffReviewResponse review) =>
+        review.Report.Tables.SelectMany(t => t.Rows).SelectMany(r => r.Cells).Select(c => c.Text);
+
+    [Fact]
+    public async Task GetSignOffReviewAsync_Missing_ReturnsNull() =>
+        Assert.Null(await Create().Service.GetSignOffReviewAsync(TabulationId, Guid.Empty, Guid.Empty, TestConsultantTabulationFilter.None));
+
+    [Fact]
+    public async Task GetSignOffReviewAsync_NullFilter_Throws() =>
+        await Assert.ThrowsAsync<ArgumentNullException>(() => Create().Service.GetSignOffReviewAsync(TabulationId, Guid.Empty, Guid.Empty, null!));
+
+    [Fact]
+    public async Task GetSignOffReviewAsync_OffersEverySampleAndMethodItemsWhateverIsHidden()
+    {
+        var (service, repository) = Create();
+        repository.TabulationSources[TabulationId] = ReviewSource(withMethodItem: true);
+
+        var review = await service.GetSignOffReviewAsync(TabulationId, Guid.Empty, Guid.Empty, new TestConsultantTabulationFilter(["26/2"], true));
+
+        Assert.Equal(["26/1", "26/2"], review!.SampleNumbers);
+        Assert.True(review.HasMethodItems);
+    }
+
+    [Fact]
+    public async Task GetSignOffReviewAsync_WithoutAFilter_DrawsEverySample()
+    {
+        var (service, repository) = Create();
+        repository.TabulationSources[TabulationId] = ReviewSource();
+
+        var review = await service.GetSignOffReviewAsync(TabulationId, Guid.Empty, Guid.Empty, TestConsultantTabulationFilter.None);
+
+        Assert.False(review!.HasMethodItems);
+        Assert.Contains("26/1", CellTexts(review));
+        Assert.Contains("26/2", CellTexts(review));
+    }
+
+    [Fact]
+    public async Task GetSignOffReviewAsync_LeavesOutTheHiddenSampleColumns()
+    {
+        var (service, repository) = Create();
+        repository.TabulationSources[TabulationId] = ReviewSource();
+
+        var review = await service.GetSignOffReviewAsync(TabulationId, Guid.Empty, Guid.Empty, new TestConsultantTabulationFilter(["26/2"], false));
+
+        Assert.Contains("26/1", CellTexts(review!));
+        Assert.DoesNotContain("26/2", CellTexts(review!));
+    }
+
+    [Fact]
+    public async Task GetSignOffReviewAsync_KeepsTheAttachmentAndViewerChoiceWhileFiltered()
+    {
+        var (service, repository) = Create();
+        repository.TabulationSources[TabulationId] = ReviewSource();
+
+        var review = await service.GetSignOffReviewAsync(TabulationId, Guid.Empty, Guid.Empty, new TestConsultantTabulationFilter(["26/2"], false));
+
+        Assert.Equal(AttachmentId, review!.Report.Attachment!.AttachmentId);
+        Assert.Equal(["Normal View", "Viewer One"], review.Report.ViewerOptions.Select(o => o.Text));
     }
 
     [Fact]

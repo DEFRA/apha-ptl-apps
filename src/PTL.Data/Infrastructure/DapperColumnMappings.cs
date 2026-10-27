@@ -1302,6 +1302,8 @@ public static partial class DapperColumnMappings
             ["fldDepartment"] = nameof(CoreUser.Department),
             [ColIsInactive] = nameof(CoreUser.IsInactive),
             ["fldInactiveDate"] = nameof(CoreUser.InactiveDate),
+            ["fldAllocationCount"] = nameof(CoreUser.AllocationCount),
+            ["fldAllocationString"] = nameof(CoreUser.AllocationString),
         });
 
         Map<Role>(new(StringComparer.OrdinalIgnoreCase)

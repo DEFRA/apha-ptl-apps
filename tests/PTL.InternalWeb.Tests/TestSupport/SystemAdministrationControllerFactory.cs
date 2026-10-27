@@ -20,7 +20,9 @@ internal static class SystemAdministrationControllerFactory
 
     public static SystemAdministrationController Create(
         FakeCountryApiClient? countryApiClient = null,
-        FakeViewerApiClient? viewerApiClient = null)
+        FakeViewerApiClient? viewerApiClient = null,
+        FakeUserApiClient? userApiClient = null,
+        FakeExternalTestConsultantApiClient? externalTestConsultantApiClient = null)
     {
         var httpContext = new DefaultHttpContext { RequestServices = Services };
 
@@ -32,10 +34,10 @@ internal static class SystemAdministrationControllerFactory
                 PostagePricingPlan = new FakePostagePricingPlanApiClient(),
                 Country = countryApiClient ?? new FakeCountryApiClient(),
                 ExternalSiteMessage = new FakeExternalSiteMessageApiClient(),
-                User = new FakeUserApiClient(),
+                User = userApiClient ?? new FakeUserApiClient(),
                 Role = new FakeRoleApiClient(),
                 Lookup = new FakeLookupApiClient(),
-                ExternalTestConsultant = new FakeExternalTestConsultantApiClient(),
+                ExternalTestConsultant = externalTestConsultantApiClient ?? new FakeExternalTestConsultantApiClient(),
                 Viewer = viewerApiClient ?? new FakeViewerApiClient()
             },
             NullLogger<SystemAdministrationController>.Instance)

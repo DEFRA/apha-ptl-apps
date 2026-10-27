@@ -125,6 +125,23 @@ public class UserControllerTests
     }
 
     [Fact]
+    public async Task GetTestConsultants_ExposesTheSchemeAllocationCountAndNames()
+    {
+        var repository = new FakeUserRepository
+        {
+            TestConsultants = [new PTL.Core.User.User { Username = "m100001", FriendlyName = "Jane Smith", AllocationCount = 2, AllocationString = "Scheme A, Scheme B" }]
+        };
+        var controller = CreateController(repository);
+
+        var result = await controller.GetTestConsultants(CancellationToken.None);
+
+        var users = Assert.IsAssignableFrom<IReadOnlyList<UserResponse>>(Assert.IsType<OkObjectResult>(result.Result).Value);
+        var user = Assert.Single(users);
+        Assert.Equal(2, user.AllocationCount);
+        Assert.Equal("Scheme A, Scheme B", user.AllocationString);
+    }
+
+    [Fact]
     public async Task UpdateTestConsultant_PersistsRequestValues()
     {
         var userId = Guid.NewGuid();
