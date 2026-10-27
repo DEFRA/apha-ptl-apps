@@ -223,6 +223,8 @@ builder.Services.AddScoped<ITabulationsService, TabulationsService>();
 builder.Services.AddScoped<ITabulationReportService, TabulationReportService>();
 builder.Services.AddScoped<ITestConsultantCommentsService, TestConsultantCommentsService>();
 builder.Services.AddScoped<ITestConsultantTabulationRepository, TestConsultantTabulationRepository>();
+builder.Services.AddScoped<IResultsSignOffRepository, ResultsSignOffRepository>();
+builder.Services.AddScoped<IResultsSignOffService, ResultsSignOffService>();
 builder.Services.AddScoped<ITestConsultantTabulationService, TestConsultantTabulationService>();
 builder.Services.AddScoped<IAmendResultsService, AmendResultsService>();
 builder.Services.AddScoped<ITabulationSendService, TabulationSendService>();

@@ -1,0 +1,74 @@
+@using System.Globalization
+@using PTL.InternalWeb.Features.ResultsSignOff
+@model ResultsSignOffQueueViewModel
+@{
+    ViewData["Title"] = "Results Sign-off";
+    var culture = CultureInfo.InvariantCulture;
+}
+
+<h1 class="govuk-heading-l">Results Sign-off</h1>
+
+@if (Model.Months.Count == 0)
+{
+    <p class="govuk-body">There are no Tabulations awaiting Sign-off.</p>
+    return;
+}
+
+<p class="govuk-body">The table below shows each Tabulation on each Distribution that is ready to be signed-off.</p>
+
+@foreach (var month in Model.Months)
+{
+    <h2 class="govuk-heading-m">@month.Title</h2>
+
+    @foreach (var scheme in month.Schemes)
+    {
+        <details class="govuk-details">
+            <summary class="govuk-details__summary">
+                <span class="govuk-details__summary-text">
+                    @scheme.DistributionTitle<span class="govuk-!-font-weight-regular"> (Due Date: @scheme.TargetDate.ToString("dd/MM/yyyy", culture))</span>
+                </span>
+            </summary>
+            <div class="govuk-details__text">
+                <section class="ptl-table-scroll" aria-label="Tabulations for @scheme.DistributionTitle">
+                    <table class="govuk-table">
+                        <caption class="govuk-table__caption govuk-visually-hidden">Tabulations for @scheme.DistributionTitle</caption>
+                        <thead class="govuk-table__head">
+                            <tr class="govuk-table__row">
+                                <th scope="col" class="govuk-table__header">Tabulation Name</th>
+                                <th scope="col" class="govuk-table__header">Test Consultant</th>
+                                <th scope="col" class="govuk-table__header">Assessor</th>
+                                <th scope="col" class="govuk-table__header">Single Participant</th>
+                                <th scope="col" class="govuk-table__header">Availability</th>
+                                <th scope="col" class="govuk-table__header">Status</th>
+                                <th scope="col" class="govuk-table__header">View</th>
+                            </tr>
+                        </thead>
+                        <tbody class="govuk-table__body">
+                            @foreach (var tabulation in scheme.Tabulations)
+                            {
+                                <tr class="govuk-table__row">
+                                    <td class="govuk-table__cell">
+                                        @tabulation.Name
+                                        @if (tabulation.PublishCount > 0)
+                                        {
+                                            <span aria-hidden="true">&nbsp;(@tabulation.PublishCount.ToString(culture))</span>
+                                            <span class="govuk-visually-hidden">This Tabulation has already been published @tabulation.PublishCount.ToString(culture) @(tabulation.PublishCount == 1 ? "time" : "times")</span>
+                                        }
+                                    </td>
+                                    <td class="govuk-table__cell">@scheme.TestConsultants</td>
+                                    <td class="govuk-table__cell">@scheme.Assessors</td>
+                                    <td class="govuk-table__cell">@(tabulation.IsSingleParticipant ? "Yes" : "No")</td>
+                                    <td class="govuk-table__cell">@tabulation.Availability</td>
+                                    <td class="govuk-table__cell"><strong class="govuk-tag govuk-tag--yellow">@tabulation.Status</strong></td>
+                                    <td class="govuk-table__cell">
+                                        <a class="govuk-link" href="@ResultsSignOffQueueViewModel.TabulationUrl(tabulation.TabulationId)">View<span class="govuk-visually-hidden"> @tabulation.Name</span></a>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </section>
+            </div>
+        </details>
+    }
+}

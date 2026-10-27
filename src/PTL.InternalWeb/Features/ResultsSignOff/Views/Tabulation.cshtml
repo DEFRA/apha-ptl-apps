@@ -1,0 +1,145 @@
+@using PTL.Contracts.Distribution
+@model PTL.InternalWeb.Features.ResultsSignOff.ResultsSignOffReviewViewModel
+@{
+    ViewData["Title"] = "Results Sign-Off Tabulation";
+    var report = Model.Report;
+
+    async Task RenderTable(TabulationTableResponse table)
+    {
+        <partial name="_TabulationTable" model="table" />
+        @if (table.AssessmentTestId is { } testId)
+        {
+            <p class="govuk-body">
+                <a class="govuk-link" asp-action="AssessmentResults" asp-route-tabulationId="@Model.TabulationId" asp-route-testId="@testId">View assessment results<span class="govuk-visually-hidden"> for @table.Caption</span></a>
+            </p>
+        }
+    }
+}
+
+@section Styles {
+    <link rel="stylesheet" href="~/css/tabulation.css" asp-append-version="true" />
+}
+
+<div class="ptl-tabulation-screen">
+    <h1 class="govuk-heading-l">Results Sign-Off Tabulation</h1>
+    <h2 class="govuk-heading-m">@report.DistributionHeading</h2>
+    <h3 class="govuk-heading-s">@report.TabulationName</h3>
+
+    @{
+        var draw = Model.Draw;
+    }
+    @if (report.ParticipantOptions.Count > 0 || report.ViewerOptions.Count > 0 || Model.Review.HasMethodItems || draw.AllSamples.Count > 0)
+    {
+        <form method="get" asp-action="Tabulation" class="govuk-!-margin-bottom-6" novalidate>
+            <input type="hidden" name="tabulationId" value="@Model.TabulationId" />
+            <input type="hidden" name="IsFiltered" value="true" />
+            @foreach (var sample in draw.AllSamples)
+            {
+                <input type="hidden" name="AllSamples" value="@sample" />
+            }
+            @if (report.ParticipantOptions.Count > 0)
+            {
+                <div class="govuk-form-group">
+                    <label class="govuk-label" for="participantId">Select Participant:</label>
+                    <select class="govuk-select" id="participantId" name="participantId">
+                        @foreach (var option in report.ParticipantOptions)
+                        {
+                            <option value="@option.Value" selected="@(option.Value == report.SelectedParticipantId ? "selected" : null)">@option.Text</option>
+                        }
+                    </select>
+                </div>
+            }
+            @if (report.ViewerOptions.Count > 0)
+            {
+                <div class="govuk-form-group">
+                    <label class="govuk-label" for="viewerId">Select Viewer:</label>
+                    <select class="govuk-select" id="viewerId" name="viewerId">
+                        @foreach (var option in report.ViewerOptions)
+                        {
+                            <option value="@option.Value" selected="@(option.Value == report.SelectedViewerId ? "selected" : null)">@option.Text</option>
+                        }
+                    </select>
+                </div>
+            }
+            @if (Model.Review.HasMethodItems || draw.AllSamples.Count > 0)
+            {
+                <div class="govuk-form-group">
+                    <fieldset class="govuk-fieldset">
+                        <legend class="govuk-fieldset__legend govuk-fieldset__legend--s">Columns to show</legend>
+                        <div class="govuk-checkboxes govuk-checkboxes--small" data-module="govuk-checkboxes">
+                            @if (Model.Review.HasMethodItems)
+                            {
+                                <div class="govuk-checkboxes__item">
+                                    <input class="govuk-checkboxes__input" id="show-method-items" name="ShowMethodItems" type="checkbox" value="true" checked="@(draw.ShowMethodItems ? "checked" : null)" />
+                                    <label class="govuk-label govuk-checkboxes__label" for="show-method-items">Method Items</label>
+                                    @* After the label, not between: GOV.UK draws the tick with ".input:checked + .label". *@
+                                    <input name="ShowMethodItems" type="hidden" value="false" />
+                                </div>
+                            }
+                            @for (var i = 0; i < draw.AllSamples.Count; i++)
+                            {
+                                var sample = draw.AllSamples[i];
+                                <div class="govuk-checkboxes__item">
+                                    <input class="govuk-checkboxes__input" id="shown-sample-@i" name="ShownSamples" type="checkbox" value="@sample" checked="@(draw.ShownSamples.Contains(sample) ? "checked" : null)" />
+                                    <label class="govuk-label govuk-checkboxes__label" for="shown-sample-@i">@sample</label>
+                                </div>
+                            }
+                        </div>
+                    </fieldset>
+                </div>
+            }
+            <button type="submit" class="govuk-button govuk-button--secondary" data-module="govuk-button">@(Model.Review.HasMethodItems || draw.AllSamples.Count > 0 ? "Draw tabulation" : "View")</button>
+        </form>
+    }
+
+    @foreach (var table in report.Tables)
+    {
+        await RenderTable(table);
+    }
+    @if (report.Ratings is not null)
+    {
+        await RenderTable(report.Ratings);
+    }
+
+    <div id="commentsDiv">
+        @if (!string.IsNullOrEmpty(report.StandardTabulationTextHtml))
+        {
+            <div class="divTestConsultantComments">
+                @Html.Raw(report.StandardTabulationTextHtml)
+            </div>
+        }
+
+        @if (!string.IsNullOrEmpty(report.CommentsHtml))
+        {
+            <div class="divTestConsultantComments">
+                @Html.Raw(report.CommentsHtml)
+            </div>
+        }
+
+        @if (!string.IsNullOrEmpty(report.TestConsultantCommentsHtml))
+        {
+            <div class="divTestConsultantComments">
+                <h2 class="govuk-heading-m commentsTitle">@report.TestConsultantCommentsTitle</h2>
+                @Html.Raw(report.TestConsultantCommentsHtml)
+            </div>
+        }
+    </div>
+
+    @if (report.Attachment is not null)
+    {
+        <p class="govuk-body">
+            <strong>Supporting Document: </strong>
+            <a class="govuk-link" asp-action="Attachment" asp-route-tabulationId="@Model.TabulationId" asp-route-attachmentId="@report.Attachment.AttachmentId">View Supporting Document</a>
+        </p>
+    }
+
+    @* One form holds the whole button group, so Authorise, Reject and Cancel are direct flex children of govuk-button-group and line up. *@
+    <form method="post" asp-action="Authorise" novalidate>
+        <input type="hidden" name="tabulationId" value="@Model.TabulationId" />
+        <div class="govuk-button-group">
+            <button type="submit" class="govuk-button" data-module="govuk-button" asp-action="Authorise">Authorise</button>
+            <button type="submit" class="govuk-button govuk-button--warning" data-module="govuk-button" asp-action="Reject">Reject</button>
+            <a class="govuk-button govuk-button--secondary" role="button" draggable="false" data-module="govuk-button" asp-action="Index">Cancel</a>
+        </div>
+    </form>
+</div>

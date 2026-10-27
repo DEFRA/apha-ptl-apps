@@ -248,6 +248,14 @@ public static class ApiClientServiceCollectionExtensions
             .AddHttpMessageHandler<CorrelationIdDelegatingHandler>()
             .AddStandardResilienceHandler();
 
+        services.AddHttpClient<PTL.ApiClient.Distribution.IResultsSignOffApiClient, PTL.ApiClient.Distribution.ResultsSignOffApiClient>(client =>
+        {
+            client.BaseAddress = new Uri(apiBaseUrl);
+        })
+            .AddHttpMessageHandler<CorrelationIdDelegatingHandler>()
+            .AddHttpMessageHandler<ActingUserDelegatingHandler>()
+            .AddStandardResilienceHandler();
+
         services.AddHttpClient<ITestConsultantTabulationApiClient, TestConsultantTabulationApiClient>(client =>
         {
             client.BaseAddress = new Uri(apiBaseUrl);

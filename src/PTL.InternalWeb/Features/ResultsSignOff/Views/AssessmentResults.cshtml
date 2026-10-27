@@ -1,0 +1,16 @@
+@model PTL.InternalWeb.Features.ResultsSignOff.ResultsSignOffAssessmentViewModel
+@{
+    ViewData["Title"] = "Assessment Results";
+}
+
+@section Styles {
+    <link rel="stylesheet" href="~/css/tabulation.css" asp-append-version="true" />
+}
+
+<h1 class="govuk-heading-l">Assessment Results</h1>
+
+<h2 class="govuk-heading-m">@Model.Results.DistributionHeading</h2>
+
+<partial name="_AssessmentChart" model="Model.Results" />
+
+<a class="govuk-button govuk-button--secondary" role="button" draggable="false" data-module="govuk-button" asp-action="Tabulation" asp-route-tabulationId="@Model.TabulationId">Back</a>

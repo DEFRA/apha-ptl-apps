@@ -26,6 +26,7 @@ internal static partial class TabulationReportRows
         public bool? HasRatings { get; set; }
         public bool? IntendedResultsOnly { get; set; }
         public bool? SingleParticipantTabulation { get; set; }
+        public bool? AvailableToParticipants { get; set; }
         public bool? AvailableToViewers { get; set; }
         public string? StandardTabulationText { get; set; }
     }
@@ -35,6 +36,8 @@ internal static partial class TabulationReportRows
         public Guid TestId { get; set; }
         public string? TestType { get; set; }
         public DateTime? AssessmentSubmitted { get; set; }
+        public Guid? AssessorId { get; set; }
+        public string? AssessorName { get; set; }
     }
 
     public sealed class DraftMethodItem
@@ -69,6 +72,7 @@ internal static partial class TabulationReportRows
 
     public sealed class DraftParticipant
     {
+        public Guid DistributionParticipantId { get; set; }
         public Guid ParticipantId { get; set; }
         public string? LabCode { get; set; }
         public string? NilReturnReason { get; set; }
@@ -103,6 +107,7 @@ internal static partial class TabulationReportRows
         public Guid SampleTestId { get; set; }
         public int? CategoryScore { get; set; }
         public Guid SampleId { get; set; }
+        public Guid TestId { get; set; }
         public DateTime? AssessmentSubmitted { get; set; }
     }
 
@@ -110,6 +115,8 @@ internal static partial class TabulationReportRows
     {
         public Guid ParticipantId { get; set; }
         public Guid CategoryItemId { get; set; }
+        public Guid TestId { get; set; }
+        public Guid CriterionItemId { get; set; }
         public Guid SampleId { get; set; }
         public string? Name { get; set; }
     }
@@ -144,9 +151,14 @@ internal static partial class TabulationReportRows
     {
         public Guid TestId { get; set; }
         public Guid SampleId { get; set; }
+        public Guid SampleReceiptId { get; set; }
+        public Guid SampleTestId { get; set; }
         public Guid ParticipantId { get; set; }
         public int? Score { get; set; }
         public string? AssessmentComment { get; set; }
+        public Guid? AssessorId { get; set; }
+        public string? AssessorName { get; set; }
+        public DateTime? AssessmentDate { get; set; }
         public DateTime? SubmissionDate { get; set; }
         public DateTime? NonSubmissionDate { get; set; }
         public DateTime? NonCapableDate { get; set; }
@@ -159,6 +171,7 @@ internal static partial class TabulationReportRows
         public string? FileName { get; set; }
         public string? ContentType { get; set; }
         public byte[]? FileData { get; set; }
+        public DateTime? UploadDate { get; set; }
     }
 
     public sealed class PublishedHeader
