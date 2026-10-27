@@ -1,7 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using PTL.Contracts.Country;
-using PTL.InternalWeb.Confirmation;
 using PTL.SharedUI.Notifications;
 
 namespace PTL.InternalWeb.Features.SystemAdministration;
@@ -30,7 +29,7 @@ public partial class SystemAdministrationController
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> CountryManagement(CountryManagementViewModel model, string? command, int? rowIndex, string? confirmation, CancellationToken cancellationToken)
+    public async Task<IActionResult> CountryManagement(CountryManagementViewModel model, string? command, int? rowIndex, CancellationToken cancellationToken)
     {
         // Each command validates only the part of the page it acts on (legacy ValidationGroups).
         ModelState.Clear();
@@ -53,7 +52,7 @@ public partial class SystemAdministrationController
 
         if (PendingListCommands.Is(command, PendingListCommands.Remove))
         {
-            return await RemoveCountryAsync(model, rowIndex, confirmation, cancellationToken);
+            return await RemoveCountryAsync(model, rowIndex, cancellationToken);
         }
 
         ApplyCountryRowCommand(model, command, rowIndex);
@@ -210,13 +209,13 @@ public partial class SystemAdministrationController
         }
     }
 
-    // Remove -> confirmation page -> the row is marked removed on the page. Nothing is deleted until Save,
+    // Remove marks the row removed on the page. Nothing is deleted until Save,
     // and the user stays on the page. A country that is still used by customers, participants or group
     // addresses cannot be removed (legacy's AllocationCount rule). Removing a country added on this page
     // (not yet saved) just drops it from the pending list.
-    private async Task<IActionResult> RemoveCountryAsync(CountryManagementViewModel model, int? rowIndex, string? confirmation, CancellationToken cancellationToken)
+    private async Task<IActionResult> RemoveCountryAsync(CountryManagementViewModel model, int? rowIndex, CancellationToken cancellationToken)
     {
-        if (!PendingList.IsRow(model.Rows, rowIndex) || ConfirmationFlow.IsCancelled(confirmation))
+        if (!PendingList.IsRow(model.Rows, rowIndex))
         {
             return await CountryPageAsync(model, cancellationToken);
         }
@@ -238,21 +237,6 @@ public partial class SystemAdministrationController
             model.Message = $"This country cannot be removed because it is being used by {country.AllocationCount} customer(s)/participant(s)/Group Addresses.";
             model.MessageIsError = true;
             return await CountryPageAsync(model, cancellationToken);
-        }
-
-        if (!ConfirmationFlow.IsConfirmed(confirmation))
-        {
-            return this.ConfirmationPage(
-                new ConfirmationPageViewModel
-                {
-                    Title = "Remove country",
-                    Caption = "Manage Countries",
-                    Message = $"You are about to remove the country {row.Country}.",
-                    WarningText = "The country is removed from this list now and deleted when you select Save. Select Cancel on the page to keep it.",
-                    ConfirmText = "Remove country",
-                    IsDestructive = true,
-                },
-                nameof(CountryManagement));
         }
 
         row.IsRemoved = true;

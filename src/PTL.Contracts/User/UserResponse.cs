@@ -1,3 +1,3 @@
 namespace PTL.Contracts.User;
 
-public sealed record UserResponse(Guid UserId, string Username, string FriendlyName, string FirstName, string LastName, string Email, string Department, bool IsInactive = false, DateTime? InactiveDate = null);
+public sealed record UserResponse(Guid UserId, string Username, string FriendlyName, string FirstName, string LastName, string Email, string Department, bool IsInactive = false, DateTime? InactiveDate = null, int AllocationCount = 0, string? AllocationString = null);

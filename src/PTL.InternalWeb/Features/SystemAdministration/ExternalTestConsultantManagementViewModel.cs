@@ -1,23 +1,34 @@
 using System.ComponentModel.DataAnnotations;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 
 namespace PTL.InternalWeb.Features.SystemAdministration;
 
+// Manage External Test Consultants - legacy ManageExternalTCs.aspx. The list is held on the page (round-tripped
+// through the form, where legacy used ViewState) until the page-level Save/Apply writes it.
 public sealed class ExternalTestConsultantManagementViewModel
 {
     public List<ExternalTestConsultantRowViewModel> Rows { get; set; } = [];
 
-    // "Add a new consultant" section at the bottom of the page - matches legacy's
+    // Index into Rows of the one row in edit mode (legacy GridView.EditIndex), with the values typed into it in Edit.
+    public int? EditIndex { get; set; }
+
+    public ExternalTestConsultantEditViewModel Edit { get; set; } = new();
+
+    // "Add a Test Consultant" section at the bottom of the page - matches legacy's
     // TextboxNewName/TextboxNewDepartment/TextboxNewEmail/ButtonAdd.
     public ExternalTestConsultantAddViewModel Add { get; set; } = new();
 
     public string? Message { get; set; }
 
+    // Set by the controller only - never taken from the posted form.
+    [BindNever]
     public bool MessageIsError { get; set; }
 }
 
 public sealed class ExternalTestConsultantRowViewModel
 {
-    public Guid ExternalTestConsultantId { get; set; }
+    // Null for a consultant added on this page that has not been saved yet.
+    public Guid? ExternalTestConsultantId { get; set; }
 
     public string Name { get; set; } = string.Empty;
 
@@ -27,10 +38,14 @@ public sealed class ExternalTestConsultantRowViewModel
 
     public bool IsInactive { get; set; }
 
+    // Display only: the API stamps the real date when the status change is saved.
     public DateTime? InactiveDate { get; set; }
 
-    // Only one row is ever in edit mode at a time - toggled via the editId query/route value,
-    // same convention as CountryManagement/InternalTestConsultantDepartment.
+    public bool IsNew => ExternalTestConsultantId is null;
+
+    // Removed on this page but not yet deleted: the delete happens with the page-level Save/Apply.
+    public bool IsRemoved { get; set; }
+
     public bool IsEditing { get; set; }
 }
 
@@ -46,15 +61,10 @@ public sealed class ExternalTestConsultantAddViewModel
     public string Email { get; set; } = string.Empty;
 }
 
-// Posted by the single "Save" button against whichever row is in edit mode - bound with an
-// "Edit" prefix (see Views/ExternalTestConsultantManagement.cshtml) so its ModelState errors
-// never bleed into the separate "Add a new consultant" form rendered on the same page, matching
-// CountryManagementEditViewModel.
+// Values typed into the row in edit mode - bound with an "Edit" prefix so its ModelState errors never bleed into
+// the separate "Add a Test Consultant" form on the same page, matching legacy's two WebForms ValidationGroups.
 public sealed class ExternalTestConsultantEditViewModel
 {
-    [Required]
-    public Guid? ExternalTestConsultantId { get; set; }
-
     [Required(ErrorMessage = "Enter a name")]
     public string Name { get; set; } = string.Empty;
 

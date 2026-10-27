@@ -76,6 +76,6 @@ public sealed class UserController(IUserService userService) : ControllerBase
     }
 
     private static UserResponse ToResponse(PTL.Core.User.User user) =>
-        new(user.UserId, user.Username, user.FriendlyName, user.FirstName, user.LastName, user.Email, user.Department, user.IsInactive, user.InactiveDate);
+        new(user.UserId, user.Username, user.FriendlyName, user.FirstName, user.LastName, user.Email, user.Department, user.IsInactive, user.InactiveDate, user.AllocationCount, user.AllocationString);
 }
 
