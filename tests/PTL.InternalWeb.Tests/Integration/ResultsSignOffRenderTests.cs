@@ -441,10 +441,10 @@ public class ResultsSignOffRenderTests(WebApplicationFactory<Program> rawFactory
 
     // ---- Reject ---------------------------------------------------------------------------------
 
-    private async Task<HttpResponseMessage> PostRejectAsync(HttpClient client, params (string Name, string Value)[] extra) =>
+    private static async Task<HttpResponseMessage> PostRejectAsync(HttpClient client, params (string Name, string Value)[] extra) =>
         await PostDecisionAsync(client, "Reject", extra);
 
-    private async Task<HttpResponseMessage> PostDecisionAsync(HttpClient client, string action, params (string Name, string Value)[] extra)
+    private static async Task<HttpResponseMessage> PostDecisionAsync(HttpClient client, string action, params (string Name, string Value)[] extra)
     {
         var page = await (await client.GetAsync(ReviewUrl)).Content.ReadAsStringAsync();
         var token = Regex.Match(page, "__RequestVerificationToken[^>]*value=\"([^\"]+)\"").Groups[1].Value;

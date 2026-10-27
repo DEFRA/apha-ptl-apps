@@ -95,6 +95,13 @@ public class TabulationPublishPlannerTests
             plan.Commands.Select(c => c.Procedure));
     }
 
+    private static readonly string[] TabulationParameterNames =
+    [
+        "DistributionTabulationId", "Name", "Signatory", "CreationDate", "DistributionDate", "Distribution", "SchemeIdentifier", "SchemeName", "MonthId", "YearId",
+        "SampleComments", "TestConsultantComments", "TestConsultantCommentsAuthor", "TestConsultantCommentsDept", "IsAccredited", "SchemeVersionDate", "HasRatings",
+        "IntendedResultsOnly", "SingleParticipantTabulation", "AvailableToParticipants", "AvailableToViewers", "RequiresAssessment", "StandardTabulationText",
+    ];
+
     [Fact]
     public void Plan_TabulationRow_CarriesTheLegacyParameters()
     {
@@ -109,12 +116,7 @@ public class TabulationPublishPlannerTests
                 TabulationId, "FINAL REPORT", "Jane Smith", Created, new DateTime(2026, 5, 3), "17208/BA/PT0074", "BT", "Brucella", 6, 2026,
                 "Scheme comments", "Consultant comments", "Dr A", "QAU", true, new DateTime(2025, 4, 1), true, false, true, true, false, true, "Standard text",
             },
-            new[]
-            {
-                "DistributionTabulationId", "Name", "Signatory", "CreationDate", "DistributionDate", "Distribution", "SchemeIdentifier", "SchemeName", "MonthId", "YearId",
-                "SampleComments", "TestConsultantComments", "TestConsultantCommentsAuthor", "TestConsultantCommentsDept", "IsAccredited", "SchemeVersionDate", "HasRatings",
-                "IntendedResultsOnly", "SingleParticipantTabulation", "AvailableToParticipants", "AvailableToViewers", "RequiresAssessment", "StandardTabulationText",
-            }.Select(name => Value(tabulation, name)).ToArray());
+            TabulationParameterNames.Select(name => Value(tabulation, name)).ToArray());
     }
 
     [Fact]
