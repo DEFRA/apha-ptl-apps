@@ -22,6 +22,7 @@ public static class SideNavigationProvider
     private const string CreateAction = "Create";
     private const string EditAction = "Edit";
     private const string DetailsAction = "Details";
+    private const string TabulationAction = "Tabulation";
     private const string SchemeControllerName = "Scheme";
     private const string CustomerControllerName = "Customer";
     private const string ParticipantControllerName = "Participant";
@@ -32,6 +33,7 @@ public static class SideNavigationProvider
     private const string SystemAdministrationControllerName = "SystemAdministration";
     private const string DistributionControllerName = "Distribution";
     private const string TestConsultantControllerName = "TestConsultant";
+    private const string ResultsSignOffControllerName = "ResultsSignOff";
 
     private static readonly string[] YearKey = ["year"];
     private static readonly string[] YearMonthKeys = ["year", "monthId"];
@@ -354,7 +356,7 @@ public static class SideNavigationProvider
                         {
                             Text = "Tabulation",
                             ControllerName = DistributionControllerName,
-                            ActionName = "Tabulation",
+                            ActionName = TabulationAction,
                             IsHidden = true,
                             LinkQueryKeys = TabulationKeys,
                             Children =
@@ -414,11 +416,34 @@ public static class SideNavigationProvider
             ActionName = IndexAction,
             Children =
             [
-                new SideNavigationItem { Text = "Test Consultant Tabulation", ControllerName = TestConsultantControllerName, ActionName = "Tabulation", IsHidden = true }
+                new SideNavigationItem { Text = "Test Consultant Tabulation", ControllerName = TestConsultantControllerName, ActionName = TabulationAction, IsHidden = true }
             ]
         },
         Disabled("Assessor", PtlPolicies.Assessor),
-        Disabled("Results Sign-Off", PtlPolicies.ResultsSignOff)
+        // Legacy sitemap: "Results Sign-off" (SignOff.aspx), its hidden "Results Sign-Off Tabulation" page and that page's hidden
+        // "Assessment Results" page. The Tabulation crumb needs its tabulationId to link back from Assessment Results.
+        new SideNavigationItem
+        {
+            Text = "Results Sign-off",
+            RequiredPolicy = PtlPolicies.ResultsSignOff,
+            ControllerName = ResultsSignOffControllerName,
+            ActionName = IndexAction,
+            Children =
+            [
+                new SideNavigationItem
+                {
+                    Text = "Results Sign-Off Tabulation",
+                    ControllerName = ResultsSignOffControllerName,
+                    ActionName = TabulationAction,
+                    IsHidden = true,
+                    LinkQueryKeys = ["tabulationId"],
+                    Children =
+                    [
+                        new SideNavigationItem { Text = "Assessment Results", ControllerName = ResultsSignOffControllerName, ActionName = "AssessmentResults", IsHidden = true }
+                    ]
+                }
+            ]
+        }
     ];
 
     // Depth-first search for the node matching the current controller/action, regardless of

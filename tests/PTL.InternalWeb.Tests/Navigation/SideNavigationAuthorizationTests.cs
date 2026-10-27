@@ -48,7 +48,7 @@ public class SideNavigationAuthorizationTests
 
     [Fact]
     public async Task TestConsultantAssessorAndSignOffRoles_SeeTheirOwnEntries() =>
-        Assert.Equal(["Home", "Test Consultant", "Assessor", "Results Sign-Off"], await VisibleTopLevelAsync("Test Consultant,Assessor,Results Sign-off"));
+        Assert.Equal(["Home", "Test Consultant", "Assessor", "Results Sign-off"], await VisibleTopLevelAsync("Test Consultant,Assessor,Results Sign-off"));
 
     [Fact]
     public async Task UserWithNoPtlRoles_SeesOnlyHome() =>
@@ -57,7 +57,7 @@ public class SideNavigationAuthorizationTests
     [Fact]
     public async Task AllRoles_SeeEveryTopLevelEntry() =>
         Assert.Equal(
-            ["Home", "System Administration", "Manage Contracts", "Manage Schemes", "Distributions", "Test Consultant", "Assessor", "Results Sign-Off"],
+            ["Home", "System Administration", "Manage Contracts", "Manage Schemes", "Distributions", "Test Consultant", "Assessor", "Results Sign-off"],
             await VisibleTopLevelAsync("Admin,Contracts Admin,Scheme Admin,Internal User,Scheduling,Distributions,Test Consultant,Assessor,Results Sign-off"));
 
     [Theory]
