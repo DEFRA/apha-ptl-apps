@@ -17,6 +17,10 @@ namespace PTL.ExternalWeb.Navigation;
 // turn per docs/Parity-Analysis/08-Migration-Parity-Tracker.md's sequencing.
 public static class NavigationProvider
 {
+    // Every child below routes to its own controller's default action - named once here since
+    // SonarCloud flags the repeated "Index" literal (S1192).
+    private const string IndexAction = "Index";
+
     public static IReadOnlyList<NavigationItem> Build() =>
     [
         new NavigationItem
@@ -29,7 +33,7 @@ public static class NavigationProvider
                 {
                     Text = "View schemes",
                     ControllerName = "Scheme",
-                    ActionName = "Index",
+                    ActionName = IndexAction,
                     Description = "List of current proficiency tests available"
                 }
             ]
@@ -47,7 +51,7 @@ public static class NavigationProvider
                 {
                     Text = "Create order",
                     ControllerName = "Order",
-                    ActionName = "Index",
+                    ActionName = IndexAction,
                     Description = "Order proficiency tests for the current or next year",
                     RequiredRole = ExternalRoleNames.Participant
                 }
@@ -80,7 +84,7 @@ public static class NavigationProvider
                 {
                     Text = "View reports",
                     ControllerName = "Tabulation",
-                    ActionName = "Index",
+                    ActionName = IndexAction,
                     Description = "View completed proficiency test reports, which include all participant results",
                     RequiredRole = ExternalRoleNames.Viewer
                 },
@@ -88,7 +92,7 @@ public static class NavigationProvider
                 {
                     Text = "Enter comments",
                     ControllerName = "Comments",
-                    ActionName = "Index",
+                    ActionName = IndexAction,
                     Description = "Provide or view proficiency test comments",
                     RequiredRole = ExternalRoleNames.TestConsultant
                 }
@@ -104,7 +108,7 @@ public static class NavigationProvider
                 {
                     Text = "Edit customer details",
                     ControllerName = "Customer",
-                    ActionName = "Index",
+                    ActionName = IndexAction,
                     Description = "Submit an update to your customer details",
                     RequiredRole = ExternalRoleNames.Participant
                 },
@@ -112,7 +116,7 @@ public static class NavigationProvider
                 {
                     Text = "Edit participant details",
                     ControllerName = "Participant",
-                    ActionName = "Index",
+                    ActionName = IndexAction,
                     Description = "Submit an update to participating laboratory details",
                     RequiredRole = ExternalRoleNames.Participant
                 }

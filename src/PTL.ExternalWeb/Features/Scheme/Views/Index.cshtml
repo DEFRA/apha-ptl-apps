@@ -46,8 +46,15 @@
         })!;
     }
 
-    static string AriaSort(string currentSortBy, string currentSortDir, string column) =>
-        currentSortBy != column ? "none" : currentSortDir == "asc" ? "ascending" : "descending";
+    static string AriaSort(string currentSortBy, string currentSortDir, string column)
+    {
+        if (currentSortBy != column)
+        {
+            return "none";
+        }
+
+        return currentSortDir == "asc" ? "ascending" : "descending";
+    }
 }
 
 @* GOV.UK ships no sortable-table-header component - this is a hand-rolled, accessible pattern
