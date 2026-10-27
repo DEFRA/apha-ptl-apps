@@ -16,9 +16,11 @@
         }
         @* PTL's Logout action is POST-only with antiforgery protection (unlike CDC's GET-based
            equivalent), so this uses a form+button rather than a plain anchor link. *@
+        @* Sign out is the only action on this page, so it is the primary button (GDS: secondary
+           styling is for a de-emphasised action alongside a primary one, not a sole action). *@
         <form asp-controller="Account" asp-action="Logout" method="post">
             @Html.AntiForgeryToken()
-            <button type="submit" class="govuk-button govuk-button--secondary" data-module="govuk-button">
+            <button type="submit" class="govuk-button" data-module="govuk-button">
                 Sign out
             </button>
         </form>

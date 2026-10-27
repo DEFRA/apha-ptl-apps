@@ -73,4 +73,31 @@ public class BreadcrumbTests : IClassFixture<PtlExternalWebTestFactory>
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Contains("govuk-breadcrumbs__list-item\">Schemes</li>", body);
     }
+
+    [Fact]
+    public async Task NotPermitted_RendersNoBreadcrumbAndAPrimarySignOutButton()
+    {
+        // No sign-in - this page is reached with no local cookie (see AccountController.NotPermitted).
+        var client = _factory.CreateClient();
+
+        var response = await client.GetAsync("/Account/NotPermitted?reason=inactive");
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.DoesNotContain("govuk-breadcrumbs", body);
+        Assert.Contains("Sign out", body);
+        Assert.DoesNotContain("govuk-button--secondary", body);
+    }
+
+    [Fact]
+    public async Task AccessDenied_RendersNoBreadcrumb()
+    {
+        var client = _factory.CreateClient();
+
+        var response = await client.GetAsync("/AccessDenied");
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        Assert.DoesNotContain("govuk-breadcrumbs", body);
+    }
 }

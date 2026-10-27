@@ -14,6 +14,12 @@
   cursor: pointer;
 }
 
+/* Scheme List "enrolment highlighting" (AC3) - legacy's bold-schemes.js reproduced as a server-rendered, accessible row tint rather than client-side jQuery/yellow DOM manipulation */
+.app-table__row--enrolled {
+  background-color: #f3f2f1;
+}
+
+
 .govuk-header__container {
   min-height: 56px;
   display: flex;

@@ -198,4 +198,107 @@ public class SchemeRouteSmokeTests : IClassFixture<PtlExternalWebTestFactory>
         Assert.Contains("PT0020", body);
         Assert.DoesNotContain("govuk-pagination", body);
     }
+
+    [Fact]
+    public async Task Index_CommercialSchemeIsParticipating_RendersBoldHighlightAndAsteriskMarker()
+    {
+        var fakeApiClient = new FakeSchemeApiClient
+        {
+            ParticipantSchemes = new ParticipantSchemeListResponse(
+                [
+                    new ParticipantSchemeSummaryResponse(Guid.NewGuid(), "PT0001", "Enrolled Scheme", "2025/26", true),
+                    new ParticipantSchemeSummaryResponse(Guid.NewGuid(), "PT0002", "Not Enrolled Scheme", "2025/26", false)
+                ],
+                [])
+        };
+
+        var client = _factory.WithWebHostBuilder(builder =>
+            builder.ConfigureServices(services =>
+            {
+                services.RemoveAll<ISchemeApiClient>();
+                services.AddSingleton<ISchemeApiClient>(fakeApiClient);
+            })).CreateClient();
+
+        var cookies = new Dictionary<string, string>();
+        var signInResponse = await client.GetAsync(
+            $"{PtlExternalWebTestFactory.TestSignInPath}?roles={Uri.EscapeDataString("Participant")}&participantId={Guid.NewGuid()}");
+        CookieForwardingHttpClient.CaptureCookies(signInResponse, cookies);
+
+        var response = await CookieForwardingHttpClient.SendWithCookiesAsync(client, HttpMethod.Get, "/Scheme/Index", cookies);
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("app-table__row--enrolled", body);
+        Assert.Contains("govuk-!-font-weight-bold", body);
+        Assert.Contains("You are enrolled in this scheme", body);
+        // The non-enrolled row must not pick up the highlight/bold treatment.
+        var notEnrolledRowIndex = body.IndexOf("Not Enrolled Scheme", StringComparison.Ordinal);
+        var precedingRowStart = body.LastIndexOf("<tr", notEnrolledRowIndex, StringComparison.Ordinal);
+        Assert.DoesNotContain("app-table__row--enrolled", body[precedingRowStart..notEnrolledRowIndex]);
+    }
+
+    [Fact]
+    public async Task Index_CommercialSortByNameDescending_RendersSchemesInDescendingOrder()
+    {
+        var fakeApiClient = new FakeSchemeApiClient
+        {
+            ParticipantSchemes = new ParticipantSchemeListResponse(
+                [
+                    new ParticipantSchemeSummaryResponse(Guid.NewGuid(), "PT0001", "Alpha Scheme", "2025/26", false),
+                    new ParticipantSchemeSummaryResponse(Guid.NewGuid(), "PT0002", "Zeta Scheme", "2025/26", false)
+                ],
+                [])
+        };
+
+        var client = _factory.WithWebHostBuilder(builder =>
+            builder.ConfigureServices(services =>
+            {
+                services.RemoveAll<ISchemeApiClient>();
+                services.AddSingleton<ISchemeApiClient>(fakeApiClient);
+            })).CreateClient();
+
+        var cookies = new Dictionary<string, string>();
+        var signInResponse = await client.GetAsync(
+            $"{PtlExternalWebTestFactory.TestSignInPath}?roles={Uri.EscapeDataString("Participant")}&participantId={Guid.NewGuid()}");
+        CookieForwardingHttpClient.CaptureCookies(signInResponse, cookies);
+
+        var response = await CookieForwardingHttpClient.SendWithCookiesAsync(client, HttpMethod.Get, "/Scheme/Index?sortBy=name&sortDir=desc", cookies);
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.True(body.IndexOf("Zeta Scheme", StringComparison.Ordinal) < body.IndexOf("Alpha Scheme", StringComparison.Ordinal));
+        Assert.Contains("sorted descending", body);
+    }
+
+    [Fact]
+    public async Task Index_NonCommercialSortByYearAscending_RendersSchemesInAscendingOrder()
+    {
+        var fakeApiClient = new FakeSchemeApiClient
+        {
+            ParticipantSchemes = new ParticipantSchemeListResponse(
+                [],
+                [
+                    new ParticipantSchemeSummaryResponse(Guid.NewGuid(), "PT0001", "Later Year Scheme", "2026/27", true),
+                    new ParticipantSchemeSummaryResponse(Guid.NewGuid(), "PT0002", "Earlier Year Scheme", "2024/25", true)
+                ])
+        };
+
+        var client = _factory.WithWebHostBuilder(builder =>
+            builder.ConfigureServices(services =>
+            {
+                services.RemoveAll<ISchemeApiClient>();
+                services.AddSingleton<ISchemeApiClient>(fakeApiClient);
+            })).CreateClient();
+
+        var cookies = new Dictionary<string, string>();
+        var signInResponse = await client.GetAsync(
+            $"{PtlExternalWebTestFactory.TestSignInPath}?roles={Uri.EscapeDataString("Participant")}&participantId={Guid.NewGuid()}");
+        CookieForwardingHttpClient.CaptureCookies(signInResponse, cookies);
+
+        var response = await CookieForwardingHttpClient.SendWithCookiesAsync(client, HttpMethod.Get, "/Scheme/Index?ncSortBy=year&ncSortDir=asc", cookies);
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.True(body.IndexOf("Earlier Year Scheme", StringComparison.Ordinal) < body.IndexOf("Later Year Scheme", StringComparison.Ordinal));
+    }
 }
