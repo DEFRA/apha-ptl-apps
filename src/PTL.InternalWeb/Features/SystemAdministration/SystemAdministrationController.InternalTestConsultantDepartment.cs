@@ -144,12 +144,22 @@ public partial class SystemAdministrationController
                 continue;
             }
 
-            var inactiveDate = row.IsInactive ? (existing.IsInactive ? existing.InactiveDate : DateTime.UtcNow) : null;
+            var inactiveDate = GetInternalTestConsultantInactiveDate(row, existing);
             await userApiClient.UpdateTestConsultantAsync(userId, new UpdateTestConsultantRequest(row.Department, row.IsInactive, inactiveDate), cancellationToken);
         }
 
         TempData.SetNotification(NotificationType.Success, "Internal test consultant departments saved successfully.");
         return RedirectToAction(nameof(Index));
+    }
+
+    private static DateTime? GetInternalTestConsultantInactiveDate(InternalTestConsultantRowViewModel row, UserResponse existing)
+    {
+        if (!row.IsInactive)
+        {
+            return null;
+        }
+
+        return existing.IsInactive ? existing.InactiveDate : DateTime.UtcNow;
     }
 
     private static bool IsInternalTestConsultantChanged(InternalTestConsultantRowViewModel row, UserResponse existing) =>
