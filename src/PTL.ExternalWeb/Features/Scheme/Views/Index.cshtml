@@ -1,4 +1,5 @@
 @model PTL.ExternalWeb.Features.Scheme.SchemeListViewModel
+@using Microsoft.AspNetCore.Html
 @using PTL.SharedUI.Pagination
 @{
     ViewData["Title"] = "View schemes";
@@ -58,20 +59,20 @@
 }
 
 @* GOV.UK ships no sortable-table-header component - this is a hand-rolled, accessible pattern
-   (aria-sort on the th, a visually-hidden direction label alongside the glyph). *@
+   (aria-sort on the th, a visually-hidden direction label alongside the glyph). The <th> itself is
+   written literally in each <tr> below (not behind a helper method) so static HTML analysis can see
+   the table's headers directly - only the repeated indicator fragment is factored out. *@
 @{
-    void SortableHeader(string text, string column, string currentSortBy, string currentSortDir, Func<string, string> urlBuilder)
+    IHtmlContent SortIndicator(string currentSortBy, string currentSortDir, string column)
     {
-        <th scope="col" class="govuk-table__header" aria-sort="@AriaSort(currentSortBy, currentSortDir, column)">
-            <a class="govuk-link" href="@urlBuilder(column)">
-                @text
-                @if (currentSortBy == column)
-                {
-                    <span aria-hidden="true">@(currentSortDir == "asc" ? " ▲" : " ▼")</span>
-                    <span class="govuk-visually-hidden">, sorted @(currentSortDir == "asc" ? "ascending" : "descending")</span>
-                }
-            </a>
-        </th>
+        if (currentSortBy != column)
+        {
+            return HtmlString.Empty;
+        }
+
+        var arrow = currentSortDir == "asc" ? " \u25b2" : " \u25bc";
+        var direction = currentSortDir == "asc" ? "ascending" : "descending";
+        return new HtmlString($"""<span aria-hidden="true">{arrow}</span><span class="govuk-visually-hidden">, sorted {direction}</span>""");
     }
 }
 
@@ -90,9 +91,15 @@ else
     <table class="govuk-table">
         <thead class="govuk-table__head">
             <tr class="govuk-table__row">
-                @{ SortableHeader("Scheme code", "code", Model.SortBy, Model.SortDirection, CommercialSortUrl); }
-                @{ SortableHeader("Scheme name", "name", Model.SortBy, Model.SortDirection, CommercialSortUrl); }
-                @{ SortableHeader("Year", "year", Model.SortBy, Model.SortDirection, CommercialSortUrl); }
+                <th scope="col" class="govuk-table__header" aria-sort="@AriaSort(Model.SortBy, Model.SortDirection, "code")">
+                    <a class="govuk-link" href="@CommercialSortUrl("code")">Scheme code@(SortIndicator(Model.SortBy, Model.SortDirection, "code"))</a>
+                </th>
+                <th scope="col" class="govuk-table__header" aria-sort="@AriaSort(Model.SortBy, Model.SortDirection, "name")">
+                    <a class="govuk-link" href="@CommercialSortUrl("name")">Scheme name@(SortIndicator(Model.SortBy, Model.SortDirection, "name"))</a>
+                </th>
+                <th scope="col" class="govuk-table__header" aria-sort="@AriaSort(Model.SortBy, Model.SortDirection, "year")">
+                    <a class="govuk-link" href="@CommercialSortUrl("year")">Year@(SortIndicator(Model.SortBy, Model.SortDirection, "year"))</a>
+                </th>
                 <th scope="col" class="govuk-table__header">Participating</th>
             </tr>
         </thead>
@@ -145,9 +152,15 @@ else
     <table class="govuk-table">
         <thead class="govuk-table__head">
             <tr class="govuk-table__row">
-                @{ SortableHeader("Scheme code", "code", Model.NonCommercialSortBy, Model.NonCommercialSortDirection, NonCommercialSortUrl); }
-                @{ SortableHeader("Scheme name", "name", Model.NonCommercialSortBy, Model.NonCommercialSortDirection, NonCommercialSortUrl); }
-                @{ SortableHeader("Year", "year", Model.NonCommercialSortBy, Model.NonCommercialSortDirection, NonCommercialSortUrl); }
+                <th scope="col" class="govuk-table__header" aria-sort="@AriaSort(Model.NonCommercialSortBy, Model.NonCommercialSortDirection, "code")">
+                    <a class="govuk-link" href="@NonCommercialSortUrl("code")">Scheme code@(SortIndicator(Model.NonCommercialSortBy, Model.NonCommercialSortDirection, "code"))</a>
+                </th>
+                <th scope="col" class="govuk-table__header" aria-sort="@AriaSort(Model.NonCommercialSortBy, Model.NonCommercialSortDirection, "name")">
+                    <a class="govuk-link" href="@NonCommercialSortUrl("name")">Scheme name@(SortIndicator(Model.NonCommercialSortBy, Model.NonCommercialSortDirection, "name"))</a>
+                </th>
+                <th scope="col" class="govuk-table__header" aria-sort="@AriaSort(Model.NonCommercialSortBy, Model.NonCommercialSortDirection, "year")">
+                    <a class="govuk-link" href="@NonCommercialSortUrl("year")">Year@(SortIndicator(Model.NonCommercialSortBy, Model.NonCommercialSortDirection, "year"))</a>
+                </th>
             </tr>
         </thead>
         <tbody class="govuk-table__body">
