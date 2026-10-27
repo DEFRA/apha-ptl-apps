@@ -24,6 +24,13 @@ public static class TabulationPublishPlanner
 
     private sealed class Builder(TabulationPublishSource source, string signatory, DateTime creationDate, Func<Guid> newId)
     {
+        private const string PublishedTabulationIdName = "PublishedTabulationId";
+        private const string PublishedSampleIdName = "PublishedSampleId";
+        private const string PublishedTestIdName = "PublishedTestId";
+        private const string PublishedParticipantIdName = "PublishedParticipantId";
+        private const string OrderName = "Order";
+        private const string ResultName = "Result";
+
         private readonly List<PublishCommand> _commands = [];
 
         // Draft id -> published id, for every row later rows refer back to (legacy mGuidDictionary).
@@ -63,7 +70,7 @@ public static class TabulationPublishPlanner
 
             Add(
                 "spiPublishedTabulation",
-                ("PublishedTabulationId", _tabulationId),
+                (PublishedTabulationIdName, _tabulationId),
                 ("DistributionTabulationId", h.DistributionTabulationId),
                 ("Name", h.TabulationName),
                 ("Signatory", signatory),
@@ -95,7 +102,7 @@ public static class TabulationPublishPlanner
             {
                 Add(
                     "spiPublishedSample",
-                    ("PublishedSampleId", Register(sample.SampleId)),
+                    (PublishedSampleIdName, Register(sample.SampleId)),
                     ("SampleId", sample.SampleId),
                     ("SampleNumber", sample.SampleNumber),
                     ("TabulationDescription", sample.TabulationDescription));
@@ -107,11 +114,11 @@ public static class TabulationPublishPlanner
                 var testId = Register(test.TestId);
                 Add(
                     "spiPublishedTest",
-                    ("PublishedTestId", testId),
-                    ("PublishedTabulationId", _tabulationId),
+                    (PublishedTestIdName, testId),
+                    (PublishedTabulationIdName, _tabulationId),
                     ("DistributionTestId", test.TestId),
                     ("Name", test.Name),
-                    ("Order", testOrder),
+                    (OrderName, testOrder),
                     ("AssessmentSubmitted", test.AssessmentSubmitted),
                     ("AssessorId", test.AssessorId),
                     ("AssessorName", test.AssessorName));
@@ -121,8 +128,8 @@ public static class TabulationPublishPlanner
                     Add(
                         "spiPublishedSampleTest",
                         ("PublishedSampleTestId", Register(sampleTest.SampleTestId)),
-                        ("PublishedSampleId", PublishedId(sampleTest.SampleId)),
-                        ("PublishedTestId", testId));
+                        (PublishedSampleIdName, PublishedId(sampleTest.SampleId)),
+                        (PublishedTestIdName, testId));
                 }
 
                 SaveOrderedItems("spiPublishedTestResultItem", "PublishedTestResultItemId", "DistributionTestResultItemId", testId, test.ResultItems);
@@ -145,10 +152,10 @@ public static class TabulationPublishPlanner
                 Add(
                     procedure,
                     (publishedIdName, Register(item.Id)),
-                    ("PublishedTestId", testId),
+                    (PublishedTestIdName, testId),
                     (draftIdName, item.Id),
                     ("Name", item.Name),
-                    ("Order", order));
+                    (OrderName, order));
                 order++;
             }
         }
@@ -162,10 +169,10 @@ public static class TabulationPublishPlanner
                 Add(
                     "spiPublishedCategoryItem",
                     ("PublishedCategoryItemId", categoryId),
-                    ("PublishedTestId", testId),
+                    (PublishedTestIdName, testId),
                     ("DistributionCategoryItemId", category.CategoryItemId),
                     ("Name", category.Name),
-                    ("Order", categoryOrder));
+                    (OrderName, categoryOrder));
 
                 var criterionOrder = 1;
                 foreach (var criterion in category.Criteria)
@@ -176,7 +183,7 @@ public static class TabulationPublishPlanner
                         ("PublishedCategoryItemId", categoryId),
                         ("DistributionCriterionItemId", criterion.Id),
                         ("Name", criterion.Name),
-                        ("Order", criterionOrder));
+                        (OrderName, criterionOrder));
                     criterionOrder++;
                 }
 
@@ -191,9 +198,9 @@ public static class TabulationPublishPlanner
                 Add(
                     "spiPublishedIntendedMethodItem",
                     ("PublishedIntendedMethodItemId", newId()),
-                    ("PublishedTabulationId", _tabulationId),
+                    (PublishedTabulationIdName, _tabulationId),
                     ("PublishedTestMethodItemId", PublishedId(method.TestMethodItemId)),
-                    ("Result", method.Result));
+                    (ResultName, method.Result));
             }
 
             foreach (var result in source.IntendedResults)
@@ -201,10 +208,10 @@ public static class TabulationPublishPlanner
                 Add(
                     "spiPublishedIntendedResultItem",
                     ("PublishedIntendedResultItemId", newId()),
-                    ("PublishedTabulationId", _tabulationId),
+                    (PublishedTabulationIdName, _tabulationId),
                     ("PublishedTestResultItemId", PublishedId(result.TestResultItemId)),
-                    ("PublishedSampleId", PublishedId(result.SampleId)),
-                    ("Result", result.Result),
+                    (PublishedSampleIdName, PublishedId(result.SampleId)),
+                    (ResultName, result.Result),
                     ("Result2", result.Result2));
             }
         }
@@ -216,8 +223,8 @@ public static class TabulationPublishPlanner
                 var participantId = Register(participant.DistributionParticipantId);
                 Add(
                     "spiPublishedParticipant",
-                    ("PublishedParticipantId", participantId),
-                    ("PublishedTabulationId", _tabulationId),
+                    (PublishedParticipantIdName, participantId),
+                    (PublishedTabulationIdName, _tabulationId),
                     ("DistributionParticipantId", participant.DistributionParticipantId),
                     ("LabCode", participant.LabCode),
                     ("NilReturnReason", participant.NilReturnReason));
@@ -228,8 +235,8 @@ public static class TabulationPublishPlanner
                     {
                         Add(
                             "spiPublishedSampleRating",
-                            ("PublishedParticipantId", participantId),
-                            ("PublishedSampleId", PublishedId(rating.SampleId)),
+                            (PublishedParticipantIdName, participantId),
+                            (PublishedSampleIdName, PublishedId(rating.SampleId)),
                             ("Rating", rating.Rating));
                     }
                 }
@@ -239,9 +246,9 @@ public static class TabulationPublishPlanner
                     Add(
                         "spiPublishedParticipantMethodItem",
                         ("PublishedParticipantMethodItemId", newId()),
-                        ("PublishedParticipantId", participantId),
+                        (PublishedParticipantIdName, participantId),
                         ("PublishedTestMethodItemId", PublishedId(method.TestMethodItemId)),
-                        ("Result", method.Result));
+                        (ResultName, method.Result));
                 }
 
                 foreach (var result in participant.ResultItemResults)
@@ -249,10 +256,10 @@ public static class TabulationPublishPlanner
                     Add(
                         "spiPublishedParticipantResultItem",
                         ("PublishedParticipantResultItemId", newId()),
-                        ("PublishedParticipantId", participantId),
+                        (PublishedParticipantIdName, participantId),
                         ("PublishedTestResultItemId", PublishedId(result.TestResultItemId)),
-                        ("PublishedSampleId", PublishedId(result.SampleId)),
-                        ("Result", result.Result));
+                        (PublishedSampleIdName, PublishedId(result.SampleId)),
+                        (ResultName, result.Result));
                 }
 
                 if (source.Scheme.RequiresAssessment)
@@ -269,7 +276,7 @@ public static class TabulationPublishPlanner
                 Add(
                     "spiPublishedParticipantSampleTest",
                     ("PublishedParticipantSampleTestId", newId()),
-                    ("PublishedParticipantId", participantId),
+                    (PublishedParticipantIdName, participantId),
                     ("SampleReceiptId", assessment.SampleReceiptId),
                     ("PublishedSampleTestId", PublishedId(assessment.SampleTestId)),
                     ("AssessmentComment", assessment.Comment),
@@ -288,9 +295,9 @@ public static class TabulationPublishPlanner
                 Add(
                     "spiPublishedParticipantCategoryItem",
                     ("PublishedParticipantCategoryItemId", participantCategoryId),
-                    ("PublishedParticipantId", participantId),
+                    (PublishedParticipantIdName, participantId),
                     ("PublishedCategoryItemId", PublishedId(category.CategoryItemId)),
-                    ("PublishedSampleId", PublishedId(category.SampleId)),
+                    (PublishedSampleIdName, PublishedId(category.SampleId)),
                     ("Score", category.Score));
 
                 foreach (var criterionId in category.CriterionItemIds)
@@ -311,7 +318,7 @@ public static class TabulationPublishPlanner
                 Add(
                     "spiPublishedAttachment",
                     ("PublishedAttachmentId", newId()),
-                    ("PublishedTabulationId", _tabulationId),
+                    (PublishedTabulationIdName, _tabulationId),
                     ("AttachmentId", attachment.AttachmentId),
                     ("FileName", attachment.FileName),
                     ("ContentType", attachment.ContentType),

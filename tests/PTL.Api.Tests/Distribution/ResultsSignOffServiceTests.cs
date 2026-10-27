@@ -51,7 +51,9 @@ public class ResultsSignOffServiceTests
 
     private ResultsSignOffService Service => new(_repository, new FixedLocalTime());
 
-    private ResultsSignOffController Controller => new(Service, new TabulationReportService(_distribution), _actingUser);
+    private ResultsSignOffController Controller => new(Service, new TabulationReportService(_distribution));
+
+    private ResultsSignOffDecisionController DecisionController => new(Service, _actingUser);
 
     [Fact]
     public async Task Controller_GetReview_UnknownTabulation_IsNotFound()
@@ -190,7 +192,7 @@ public class ResultsSignOffServiceTests
     {
         _repository.RejectOutcome = outcome;
 
-        var result = await Controller.Reject(Guid.NewGuid(), CancellationToken.None);
+        var result = await DecisionController.Reject(Guid.NewGuid(), CancellationToken.None);
 
         Assert.IsType(expected, result);
     }
@@ -228,7 +230,7 @@ public class ResultsSignOffServiceTests
     {
         _repository.AuthoriseOutcome = outcome;
 
-        var result = await Controller.Authorise(Guid.NewGuid(), CancellationToken.None);
+        var result = await DecisionController.Authorise(Guid.NewGuid(), CancellationToken.None);
 
         Assert.IsType(expected, result);
         if (status is { } code)
@@ -242,7 +244,7 @@ public class ResultsSignOffServiceTests
     {
         var tabulationId = Guid.NewGuid();
 
-        await Controller.Authorise(tabulationId, CancellationToken.None);
+        await DecisionController.Authorise(tabulationId, CancellationToken.None);
 
         var call = Assert.Single(_repository.Authorised);
         Assert.Equal((tabulationId, _actingUser.ActingUserId), (call.TabulationId, call.SignatoryUserId));

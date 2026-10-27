@@ -54,9 +54,8 @@ public sealed partial class ResultsSignOffRepository(IDbConnectionFactory connec
             tabulations = (await results.ReadAsync<Rows.ResultsSignOffTabulation>()).ToList();
         }
 
-        var names = schemes.Count == 0
-            ? new Dictionary<Guid, Rows.ResultsSignOffNames>()
-            : (await connection.QueryAsync<Rows.ResultsSignOffNames>(NamesSql)).ToDictionary(n => n.MonthlyDistributionSchemeId);
+        IEnumerable<Rows.ResultsSignOffNames> nameRows = schemes.Count == 0 ? [] : await connection.QueryAsync<Rows.ResultsSignOffNames>(NamesSql);
+        var names = nameRows.ToDictionary(n => n.MonthlyDistributionSchemeId);
 
         var tabulationsByScheme = tabulations.ToLookup(t => t.MonthlyDistributionSchemeId);
         var schemesByMonth = schemes.ToLookup(s => s.MonthlyDistributionId);

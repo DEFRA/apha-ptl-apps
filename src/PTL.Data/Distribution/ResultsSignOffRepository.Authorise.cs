@@ -123,31 +123,10 @@ public sealed partial class ResultsSignOffRepository
             participantViewers = (await grid.ReadAsync<Rows.PublishRecipient>()).ToList();
         }
 
-        var queued = new HashSet<(string Email, string Name)>();
-        var recipients = new List<(string Email, string Name)>();
-
-        void Add(string? email, string? name)
-        {
-            var recipient = (email ?? string.Empty, name ?? string.Empty);
-            if (queued.Add(recipient))
-            {
-                recipients.Add(recipient);
-            }
-        }
-
-        foreach (var participant in participants)
-        {
-            Add(participant.Email, participant.Name);
-            if (!string.IsNullOrEmpty(participant.Email2))
-            {
-                Add(participant.Email2, participant.Name);
-            }
-        }
-
-        foreach (var viewer in schemeViewers.Concat(participantViewers))
-        {
-            Add(viewer.Email, viewer.Name);
-        }
+        var recipients = participants.SelectMany(Addresses)
+            .Concat(schemeViewers.Concat(participantViewers).Select(v => (v.Email, v.Name)))
+            .Select(r => (Email: r.Email ?? string.Empty, Name: r.Name ?? string.Empty))
+            .Distinct();
 
         foreach (var (email, name) in recipients)
         {
@@ -155,6 +134,16 @@ public sealed partial class ResultsSignOffRepository
                 QueueEmailSql,
                 new { NotificationEmailId = Guid.NewGuid(), PublishedTabulationId = publishedTabulationId, Email = email, Name = name },
                 transaction);
+        }
+    }
+
+    // A participant is notified at the first address and, when there is one, the second.
+    private static IEnumerable<(string? Email, string? Name)> Addresses(Rows.PublishRecipient participant)
+    {
+        yield return (participant.Email, participant.Name);
+        if (!string.IsNullOrEmpty(participant.Email2))
+        {
+            yield return (participant.Email2, participant.Name);
         }
     }
 

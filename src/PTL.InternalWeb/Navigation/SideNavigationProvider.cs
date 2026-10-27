@@ -22,6 +22,7 @@ public static class SideNavigationProvider
     private const string CreateAction = "Create";
     private const string EditAction = "Edit";
     private const string DetailsAction = "Details";
+    private const string TabulationAction = "Tabulation";
     private const string SchemeControllerName = "Scheme";
     private const string CustomerControllerName = "Customer";
     private const string ParticipantControllerName = "Participant";
@@ -355,7 +356,7 @@ public static class SideNavigationProvider
                         {
                             Text = "Tabulation",
                             ControllerName = DistributionControllerName,
-                            ActionName = "Tabulation",
+                            ActionName = TabulationAction,
                             IsHidden = true,
                             LinkQueryKeys = TabulationKeys,
                             Children =
@@ -415,7 +416,7 @@ public static class SideNavigationProvider
             ActionName = IndexAction,
             Children =
             [
-                new SideNavigationItem { Text = "Test Consultant Tabulation", ControllerName = TestConsultantControllerName, ActionName = "Tabulation", IsHidden = true }
+                new SideNavigationItem { Text = "Test Consultant Tabulation", ControllerName = TestConsultantControllerName, ActionName = TabulationAction, IsHidden = true }
             ]
         },
         Disabled("Assessor", PtlPolicies.Assessor),
@@ -433,7 +434,7 @@ public static class SideNavigationProvider
                 {
                     Text = "Results Sign-Off Tabulation",
                     ControllerName = ResultsSignOffControllerName,
-                    ActionName = "Tabulation",
+                    ActionName = TabulationAction,
                     IsHidden = true,
                     LinkQueryKeys = ["tabulationId"],
                     Children =

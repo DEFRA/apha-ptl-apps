@@ -9,7 +9,7 @@ namespace PTL.Api.Controllers;
 // [NEEDS INVESTIGATION] Not yet protected with authorization, like the other API controllers - see UserController's note.
 [ApiController]
 [Route("api/results-sign-off")]
-public sealed class ResultsSignOffController(IResultsSignOffService service, ITabulationReportService tabulationReportService, IActingUserAccessor actingUser) : ControllerBase
+public sealed class ResultsSignOffController(IResultsSignOffService service, ITabulationReportService tabulationReportService) : ControllerBase
 {
     // GET /api/results-sign-off/queue - the tabulations awaiting final approval, grouped by month and scheme.
     [HttpGet("queue")]
@@ -29,7 +29,14 @@ public sealed class ResultsSignOffController(IResultsSignOffService service, ITa
             tabulationId, participantId, viewerId, new TestConsultantTabulationFilter(hiddenSamples ?? [], hideMethodItems), cancellationToken);
         return review is null ? NotFound() : Ok(review);
     }
+}
 
+// Legacy Results Sign-off/Tabulation.aspx BtnAuthorise and BtnReject: the two decisions on a tabulation awaiting sign-off, on the
+// same route as the reads above. Kept apart from them so the controller that reads never changes data.
+[ApiController]
+[Route("api/results-sign-off")]
+public sealed class ResultsSignOffDecisionController(IResultsSignOffService service, IActingUserAccessor actingUser) : ControllerBase
+{
     // POST /api/results-sign-off/tabulations/{id}/reject - 204 when rejected, 404 for an unknown tabulation, 409 when it is
     // no longer awaiting sign-off.
     [HttpPost("tabulations/{tabulationId:guid}/reject")]

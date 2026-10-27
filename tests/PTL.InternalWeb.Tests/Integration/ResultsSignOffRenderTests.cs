@@ -341,7 +341,7 @@ public class ResultsSignOffRenderTests(WebApplicationFactory<Program> rawFactory
         Assert.DoesNotContain("<form", group, StringComparison.Ordinal);
         Assert.Matches("<button[^>]*class=\"govuk-button\"[^>]*formaction=\"/Results%20Sign-off/Authorise\"[^>]*>Authorise</button>", group);
         Assert.Matches("<button[^>]*class=\"govuk-button govuk-button--warning\"[^>]*formaction=\"/Results%20Sign-off/Reject\"[^>]*>Reject</button>", group);
-        Assert.Matches("<a class=\"govuk-button govuk-button--secondary\"[^>]*role=\"button\"[^>]*href=\"/Results%20Sign-off\">Cancel</a>", group);
+        Assert.Matches("<a class=\"govuk-button govuk-button--secondary\"[^>]*href=\"/Results%20Sign-off\">Cancel</a>", group);
         Assert.True(group.IndexOf(">Authorise</button>", StringComparison.Ordinal) < group.IndexOf(">Reject</button>", StringComparison.Ordinal));
         Assert.True(group.IndexOf(">Reject</button>", StringComparison.Ordinal) < group.IndexOf(">Cancel</a>", StringComparison.Ordinal));
     }
