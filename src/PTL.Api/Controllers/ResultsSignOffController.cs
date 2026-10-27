@@ -9,34 +9,13 @@ namespace PTL.Api.Controllers;
 // [NEEDS INVESTIGATION] Not yet protected with authorization, like the other API controllers - see UserController's note.
 [ApiController]
 [Route("api/results-sign-off")]
-public sealed class ResultsSignOffController(IResultsSignOffService service, ITabulationReportService tabulationReportService) : ControllerBase
+public sealed class ResultsSignOffController(IResultsSignOffService service, IActingUserAccessor actingUser) : ControllerBase
 {
     // GET /api/results-sign-off/queue - the tabulations awaiting final approval, grouped by month and scheme.
     [HttpGet("queue")]
     [ProducesResponseType<ResultsSignOffQueueResponse>(StatusCodes.Status200OK)]
     public async Task<ActionResult<ResultsSignOffQueueResponse>> GetQueue(CancellationToken cancellationToken) =>
         Ok(await service.GetQueueAsync(cancellationToken));
-
-    // GET /api/results-sign-off/tabulations/{id} - the draft tabulation for review, without the sample columns listed in
-    // hiddenSamples (and without the method items when hideMethodItems is set). 404 for an unknown tabulation.
-    [HttpGet("tabulations/{tabulationId:guid}")]
-    [ProducesResponseType<ResultsSignOffReviewResponse>(StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<ActionResult<ResultsSignOffReviewResponse>> GetReview(
-        Guid tabulationId, Guid participantId, Guid viewerId, [FromQuery] string[]? hiddenSamples, bool hideMethodItems, CancellationToken cancellationToken)
-    {
-        var review = await tabulationReportService.GetSignOffReviewAsync(
-            tabulationId, participantId, viewerId, new TestConsultantTabulationFilter(hiddenSamples ?? [], hideMethodItems), cancellationToken);
-        return review is null ? NotFound() : Ok(review);
-    }
-}
-
-// Legacy Results Sign-off/Tabulation.aspx BtnAuthorise and BtnReject: the two decisions on a tabulation awaiting sign-off, on the
-// same route as the reads above. Kept apart from them so the controller that reads never changes data.
-[ApiController]
-[Route("api/results-sign-off")]
-public sealed class ResultsSignOffDecisionController(IResultsSignOffService service, IActingUserAccessor actingUser) : ControllerBase
-{
     // POST /api/results-sign-off/tabulations/{id}/reject - 204 when rejected, 404 for an unknown tabulation, 409 when it is
     // no longer awaiting sign-off.
     [HttpPost("tabulations/{tabulationId:guid}/reject")]
@@ -67,4 +46,23 @@ public sealed class ResultsSignOffDecisionController(IResultsSignOffService serv
             ResultsSignOffOutcome.NoSignatory => StatusCode(StatusCodes.Status403Forbidden),
             _ => Conflict(),
         };
+}
+
+// Legacy Results Sign-off/Tabulation.aspx: the draft tabulation under review, on the same route as the queue and decisions.
+[ApiController]
+[Route("api/results-sign-off")]
+public sealed class ResultsSignOffReviewController(ITabulationReportService tabulationReportService) : ControllerBase
+{
+    // GET /api/results-sign-off/tabulations/{id} - the draft tabulation for review, without the sample columns listed in
+    // hiddenSamples (and without the method items when hideMethodItems is set). 404 for an unknown tabulation.
+    [HttpGet("tabulations/{tabulationId:guid}")]
+    [ProducesResponseType<ResultsSignOffReviewResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<ResultsSignOffReviewResponse>> GetReview(
+        Guid tabulationId, Guid participantId, Guid viewerId, [FromQuery] string[]? hiddenSamples, bool hideMethodItems, CancellationToken cancellationToken)
+    {
+        var review = await tabulationReportService.GetSignOffReviewAsync(
+            tabulationId, participantId, viewerId, new TestConsultantTabulationFilter(hiddenSamples ?? [], hideMethodItems), cancellationToken);
+        return review is null ? NotFound() : Ok(review);
+    }
 }

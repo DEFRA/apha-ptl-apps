@@ -51,14 +51,14 @@ public class ResultsSignOffServiceTests
 
     private ResultsSignOffService Service => new(_repository, new FixedLocalTime());
 
-    private ResultsSignOffController Controller => new(Service, new TabulationReportService(_distribution));
+    private ResultsSignOffController Controller => new(Service, _actingUser);
 
-    private ResultsSignOffDecisionController DecisionController => new(Service, _actingUser);
+    private ResultsSignOffReviewController ReviewController => new(new TabulationReportService(_distribution));
 
     [Fact]
     public async Task Controller_GetReview_UnknownTabulation_IsNotFound()
     {
-        var result = await Controller.GetReview(Guid.NewGuid(), Guid.Empty, Guid.Empty, null, false, CancellationToken.None);
+        var result = await ReviewController.GetReview(Guid.NewGuid(), Guid.Empty, Guid.Empty, null, false, CancellationToken.None);
 
         Assert.IsType<NotFoundResult>(result.Result);
     }
@@ -75,7 +75,7 @@ public class ResultsSignOffServiceTests
         source.Tests.Add(test);
         _distribution.TabulationSources[id] = source;
 
-        var result = await Controller.GetReview(id, Guid.Empty, Guid.Empty, ["26/2"], false, CancellationToken.None);
+        var result = await ReviewController.GetReview(id, Guid.Empty, Guid.Empty, ["26/2"], false, CancellationToken.None);
 
         var review = Assert.IsType<ResultsSignOffReviewResponse>(Assert.IsType<OkObjectResult>(result.Result).Value);
         var cells = review.Report.Tables.SelectMany(t => t.Rows).SelectMany(r => r.Cells).Select(c => c.Text).ToList();
@@ -192,7 +192,7 @@ public class ResultsSignOffServiceTests
     {
         _repository.RejectOutcome = outcome;
 
-        var result = await DecisionController.Reject(Guid.NewGuid(), CancellationToken.None);
+        var result = await Controller.Reject(Guid.NewGuid(), CancellationToken.None);
 
         Assert.IsType(expected, result);
     }
@@ -230,7 +230,7 @@ public class ResultsSignOffServiceTests
     {
         _repository.AuthoriseOutcome = outcome;
 
-        var result = await DecisionController.Authorise(Guid.NewGuid(), CancellationToken.None);
+        var result = await Controller.Authorise(Guid.NewGuid(), CancellationToken.None);
 
         Assert.IsType(expected, result);
         if (status is { } code)
@@ -244,7 +244,7 @@ public class ResultsSignOffServiceTests
     {
         var tabulationId = Guid.NewGuid();
 
-        await DecisionController.Authorise(tabulationId, CancellationToken.None);
+        await Controller.Authorise(tabulationId, CancellationToken.None);
 
         var call = Assert.Single(_repository.Authorised);
         Assert.Equal((tabulationId, _actingUser.ActingUserId), (call.TabulationId, call.SignatoryUserId));
