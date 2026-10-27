@@ -168,6 +168,17 @@ public class DistributionBreadcrumbTests : IClassFixture<WebApplicationFactory<P
     }
 
     [Fact]
+    public async Task Preparation_CancelIsASecondaryButtonNotALink()
+    {
+        _apiClient.Preparation = new PreparationSheetResponse(Guid.NewGuid(), 2026, 5, []);
+
+        var html = await HtmlAsync("/Distribution/Preparation?year=2026&monthId=5");
+
+        Assert.Matches("<button[^>]*name=\"command\" value=\"cancel\"[^>]*govuk-button--secondary[^>]*>Cancel</button>", html);
+        Assert.DoesNotContain(">Cancel</a>", html, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Packaging_HasNoBackLinkBecauseTheBreadcrumbsLeadBack()
     {
         var html = await HtmlAsync("/Distribution/Packaging?year=2026&monthId=5");

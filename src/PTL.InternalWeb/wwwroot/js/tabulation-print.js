@@ -216,6 +216,11 @@
         }
 
         container.classList.add("printonly");
+
+        // The on-screen tables print by default (no script); the rebuilt print layout replaces them.
+        document.querySelectorAll(".ptl-tabulation-screen").forEach(function (screen) {
+            screen.classList.add("noprint");
+        });
     }
 
     document.addEventListener("DOMContentLoaded", function () {

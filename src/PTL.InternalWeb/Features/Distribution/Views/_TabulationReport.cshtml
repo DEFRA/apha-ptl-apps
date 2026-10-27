@@ -32,14 +32,16 @@
         <partial name="_TabulationTable" model="table" />
         @if (table.AssessmentTestId is { } testId)
         {
-            <p class="govuk-body">
+            <p class="govuk-body noprint">
                 <a class="govuk-link" asp-action="@(isIssued ? "PublishedAssessmentResults" : "TabulationAssessmentResults")" asp-all-route-data="AssessmentRoute(testId)">View assessment results<span class="govuk-visually-hidden"> for @table.Caption</span></a>
             </p>
         }
     }
 }
 
-<div class="noprint ptl-tabulation-screen">
+@* Without scripting these tables are what gets printed; tabulation-print.js adds noprint to this block once it has built the print layout. *@
+<div class="ptl-tabulation-screen">
+    <div class="noprint">
     @if (isIssued)
     {
          <h1 class="govuk-heading-l">Issued Tabulation</h1>
@@ -92,6 +94,7 @@
             <button type="submit" class="govuk-button govuk-button--secondary" data-module="govuk-button">View</button>
         </form>
     }
+    </div>
 
     @foreach (var table in report.Tables)
     {

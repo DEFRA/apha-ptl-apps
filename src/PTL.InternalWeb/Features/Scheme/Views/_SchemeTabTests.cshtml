@@ -1,6 +1,6 @@
 @model PTL.InternalWeb.Features.Scheme.SchemeFormViewModel
 
-@* The item type chosen in whichever "Add" dropdown was used is posted alongside the command. *@
+@* Each "Add" dropdown is named pick:{command} so the controller reads the one matching the submitted command. *@
 
 
 
@@ -71,7 +71,7 @@
                 @if (!Model.IsViewMode)
                 {
                     <div class="govuk-form-group">
-                        <select class="govuk-select" id="addCategory@(t)" data-item-type-picker>
+                        <select class="govuk-select" id="addCategory@(t)" name="pick:add-category:@t">
                             <option value="">- Please Select -</option>
                             @foreach (var option in Model.CategoryItemTypeOptions)
                             {
@@ -79,7 +79,7 @@
                             }
                         </select>
                         <button type="submit" class="govuk-button govuk-button--secondary govuk-!-margin-left-2" data-module="govuk-button"
-                                name="testCommand" value="add-category:@t" data-picker="addCategory@(t)">Add Category Item</button>
+                                name="testCommand" value="add-category:@t">Add Category Item</button>
                     </div>
                 }
 
@@ -135,7 +135,7 @@
 {
     <div class="govuk-form-group">
         <label class="govuk-label govuk-label--s" for="addTestTypeId">Add New Test</label>
-        <select class="govuk-select govuk-!-width-one-half" id="addTestTypeId" data-item-type-picker>
+        <select class="govuk-select govuk-!-width-one-half" id="addTestTypeId" name="pick:add-test">
             <option value="">- Please Select -</option>
             @foreach (var option in Model.TestTypeOptions)
             {
@@ -143,24 +143,9 @@
             }
         </select>
         <button type="submit" class="govuk-button govuk-button--primary govuk-!-margin-left-2" data-module="govuk-button"
-                name="testCommand" value="add-test" data-picker="addTestTypeId">
+                name="testCommand" value="add-test">
             Add New Test
         </button>
     </div>
-    <input type="hidden" name="selectedItemTypeId" id="selectedItemTypeId" value="" />
-
-    <script>
-        // Each "Add" button carries the id of its own dropdown, whose value is copied into the single
-        // selectedItemTypeId field the controller reads.
-        (function () {
-            var hidden = document.getElementById('selectedItemTypeId');
-            document.querySelectorAll('button[data-picker]').forEach(function (button) {
-                button.addEventListener('click', function () {
-                    var picker = document.getElementById(button.dataset.picker);
-                    hidden.value = picker ? picker.value : '';
-                });
-            });
-        })();
-    </script>
 }
 

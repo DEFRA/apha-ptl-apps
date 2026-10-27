@@ -167,6 +167,11 @@ body:not(.js-enabled) [data-amend-recalculate] {
         display: block;
     }
 
+    /* Without scripting the on-screen tables are printed, so their scroll region must not clip them. */
+    .ptl-tabulation-scroll {
+        overflow: visible;
+    }
+
     /* The printed page is the report only - matches legacy's master-chrome suppression. */
     .govuk-skip-link,
     .govuk-template__header,

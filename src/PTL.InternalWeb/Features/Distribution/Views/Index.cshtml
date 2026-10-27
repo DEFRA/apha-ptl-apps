@@ -16,13 +16,13 @@
 <form method="get" asp-action="Index" class="govuk-!-margin-bottom-6">
     <div class="govuk-form-group">
         <label class="govuk-label" for="year">Year</label>
-        <select class="govuk-select" id="year" name="year" onchange="this.form.submit()">
+        <select class="govuk-select" id="year" name="year">
             @foreach (var option in Model.YearOptions)
             {
                 <option value="@option.Value" selected="@(option.Selected ? "selected" : null)">@option.Text</option>
             }
         </select>
-        <noscript><button type="submit" class="govuk-button govuk-button--secondary govuk-!-margin-left-2">View</button></noscript>
+        <button type="submit" class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0 govuk-!-margin-left-3" data-module="govuk-button">View</button>
     </div>
 </form>
 

@@ -267,7 +267,7 @@ public partial class SampleNumbersRenderTests : IClassFixture<WebApplicationFact
         // The sample table is replaced, not merely annotated.
         Assert.DoesNotContain("govuk-tabs", html, StringComparison.Ordinal);
 
-        Assert.Contains("<a class=\"govuk-back-link\" href=\"/Distribution/Schedule?year=2026&amp;monthId=4\">Back</a>", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("govuk-back-link", html, StringComparison.Ordinal);
 
         // Navigation, so a plain link rather than an anchor wearing role="button".
         Assert.Contains("<a class=\"govuk-link\" href=\"/Distribution/Schedule?year=2026&amp;monthId=4\">Return to Monthly Distributions</a>", html, StringComparison.Ordinal);

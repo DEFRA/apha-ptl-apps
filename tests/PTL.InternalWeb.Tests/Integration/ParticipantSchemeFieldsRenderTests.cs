@@ -187,4 +187,16 @@ public class ParticipantSchemeFieldsRenderTests : IClassFixture<WebApplicationFa
         Assert.Contains("data-is-new=\"true\"", select, StringComparison.Ordinal);
         Assert.Contains("Full scheme pricing", select, StringComparison.Ordinal);
     }
+
+    // Without scripting the participant choice must still be submittable, so it has a button rather than an auto-submit.
+    [Fact]
+    public async Task Create_ParticipantPicker_HasASubmitButtonAndNoAutoSubmitScript()
+    {
+        var html = await MainContentAsync($"/ParticipantScheme/Create?contractId={ContractId}&customerId={CustomerId}");
+
+        var form = Regex.Match(html, "<form[^>]*method=\"get\".*?</form>", RegexOptions.Singleline).Value;
+        Assert.Contains("id=\"participantId\"", form, StringComparison.Ordinal);
+        Assert.Matches("<button[^>]*type=\"submit\"[^>]*>Select Participant</button>", form);
+        Assert.DoesNotContain("onchange", html, StringComparison.Ordinal);
+    }
 }
