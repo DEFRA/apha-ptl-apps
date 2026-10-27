@@ -9,6 +9,7 @@ using PTL.InternalWeb.Features.GroupAddress;
 using PTL.InternalWeb.Features.Invoice;
 using PTL.InternalWeb.Features.Participant;
 using PTL.InternalWeb.Features.ParticipantScheme;
+using PTL.InternalWeb.Features.ResultsSignOff;
 using PTL.InternalWeb.Features.Scheme;
 using PTL.InternalWeb.Features.SchemeAdmin;
 using PTL.InternalWeb.Features.Search;
@@ -53,6 +54,7 @@ public class AuthorizationMatrixTests
         { typeof(SchemeController), PtlPolicies.SchemeAdmin },
         { typeof(SchemeAdminController), PtlPolicies.SchemeAdmin },
         { typeof(TestConsultantController), PtlPolicies.TestConsultant },
+        { typeof(ResultsSignOffController), PtlPolicies.ResultsSignOff },
     };
 
     private static IEnumerable<MethodInfo> Actions(Type controller) =>

@@ -46,6 +46,7 @@ public static class TestConsultantTabulationBuilder
 
     // A copy of the source without the columns the Test Consultant un-ticked. Legacy kept a test's table when all
     // its samples were hidden; here a test with no sample left is not drawn, as on the Tabulation page.
+    // Everything else is carried over, so Results Sign-off can draw the whole report from the filtered copy.
     internal static TabulationSource Filter(TabulationSource source, TestConsultantTabulationFilter filter)
     {
         if (filter.HiddenSamples.Count == 0 && !filter.HideMethodItems)
@@ -58,6 +59,7 @@ public static class TestConsultantTabulationBuilder
         {
             TabulationId = source.TabulationId,
             DistributionTabulationId = source.DistributionTabulationId,
+            IsPublished = source.IsPublished,
             Distribution = source.Distribution,
             SchemeIdentifier = source.SchemeIdentifier,
             SchemeName = source.SchemeName,
@@ -68,8 +70,15 @@ public static class TestConsultantTabulationBuilder
             TestConsultantCommentsAuthor = source.TestConsultantCommentsAuthor,
             TestConsultantCommentsDept = source.TestConsultantCommentsDept,
             DistributionDate = source.DistributionDate,
+            ShowUkasLogo = source.ShowUkasLogo,
+            SchemeVersionDate = source.SchemeVersionDate,
             HasRatings = source.HasRatings,
+            IntendedResultsOnly = source.IntendedResultsOnly,
+            SingleParticipantTabulation = source.SingleParticipantTabulation,
+            AvailableToViewers = source.AvailableToViewers,
             StandardTabulationText = source.StandardTabulationText,
+            Signatory = source.Signatory,
+            CreationDate = source.CreationDate,
         };
 
         foreach (var test in source.Tests)
@@ -87,6 +96,8 @@ public static class TestConsultantTabulationBuilder
         }
 
         filtered.Participants.AddRange(source.Participants);
+        filtered.Viewers.AddRange(source.Viewers);
+        filtered.Attachments.AddRange(source.Attachments);
         foreach (var (itemId, result) in source.IntendedMethodResults)
         {
             filtered.IntendedMethodResults[itemId] = result;

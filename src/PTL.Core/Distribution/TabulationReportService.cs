@@ -11,6 +11,9 @@ public interface ITabulationReportService
 
     Task<TabulationReportResponse?> GetPublishedTabulationAsync(Guid publishedTabulationId, Guid participantId, Guid viewerId, CancellationToken cancellationToken = default);
 
+    // Results Sign-off's draft tabulation, drawn without the columns the filter leaves out (legacy HiddenColumnBlocks).
+    Task<ResultsSignOffReviewResponse?> GetSignOffReviewAsync(Guid tabulationId, Guid participantId, Guid viewerId, TestConsultantTabulationFilter filter, CancellationToken cancellationToken = default);
+
     Task<PublishedTabulationsResponse?> GetPublishedTabulationsAsync(Guid tabulationId, CancellationToken cancellationToken = default);
 
     Task<AssessmentResultsResponse?> GetAssessmentResultsAsync(Guid testId, Guid tabulationId, bool isPublished, CancellationToken cancellationToken = default);
@@ -31,6 +34,22 @@ public sealed class TabulationReportService(IDistributionRepository distribution
     {
         var source = await distributionRepository.GetPublishedTabulationSourceAsync(publishedTabulationId, cancellationToken);
         return source is null ? null : TabulationReportBuilder.Build(source, participantId, viewerId);
+    }
+
+    public async Task<ResultsSignOffReviewResponse?> GetSignOffReviewAsync(Guid tabulationId, Guid participantId, Guid viewerId, TestConsultantTabulationFilter filter, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(filter);
+
+        var source = await distributionRepository.GetTabulationSourceAsync(tabulationId, cancellationToken);
+        if (source is null)
+        {
+            return null;
+        }
+
+        return new ResultsSignOffReviewResponse(
+            TabulationReportBuilder.Build(TestConsultantTabulationBuilder.Filter(source, filter), participantId, viewerId),
+            TestConsultantTabulationBuilder.HasMethodItems(source),
+            TestConsultantTabulationBuilder.SampleNumbers(source));
     }
 
     public async Task<PublishedTabulationsResponse?> GetPublishedTabulationsAsync(Guid tabulationId, CancellationToken cancellationToken = default)
