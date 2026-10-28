@@ -24,6 +24,17 @@ internal sealed class FakePendingParticipantUpdateRepository : IPendingParticipa
     public Task<PendingParticipantUpdate?> GetByParticipantIdAsync(Guid participantId, CancellationToken cancellationToken = default) =>
         Task.FromResult(_byParticipantId.TryGetValue(participantId, out var pending) && pending.IsSubmitted && !pending.IsDeleted ? pending : null);
 
+    public Task UpsertAsync(PendingParticipantUpdate update, CancellationToken cancellationToken = default)
+    {
+        if (update.PendingParticipantUpdateId == Guid.Empty)
+        {
+            update.PendingParticipantUpdateId = Guid.NewGuid();
+        }
+
+        _byParticipantId[update.ParticipantId] = update;
+        return Task.CompletedTask;
+    }
+
     public Task<bool> MarkDecidedAsync(Guid participantId, Guid pendingParticipantUpdateId, CancellationToken cancellationToken = default)
     {
         if (!_byParticipantId.TryGetValue(participantId, out var pending) || pending.PendingParticipantUpdateId != pendingParticipantUpdateId)

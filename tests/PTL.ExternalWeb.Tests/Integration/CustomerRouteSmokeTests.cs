@@ -76,8 +76,8 @@ public partial class CustomerRouteSmokeTests : IClassFixture<PtlExternalWebTestF
         // Copy-to-invoice checkbox (AC5) and its script are present.
         Assert.Contains("id=\"CopyDetails\"", body);
         Assert.Contains("copy-customer-details-to-invoice.js", body);
-        // Cancel (AC8).
-        Assert.Contains("Cancel", body);
+        // Cancel (AC8) leaves the page for Home, like legacy's LeavePage().
+        Assert.Matches("<a[^>]*href=\"/(Home(/Index)?)?\"[^>]*>\\s*Cancel", body);
     }
 
     [Fact]
@@ -161,7 +161,15 @@ public partial class CustomerRouteSmokeTests : IClassFixture<PtlExternalWebTestF
         CookieForwardingHttpClient.CaptureCookies(getResponse, cookies);
         var token = AntiforgeryTokenRegex().Match(await getResponse.Content.ReadAsStringAsync()).Groups[1].Value;
 
-        var form = new Dictionary<string, string> { ["__RequestVerificationToken"] = token };
+        // ContactName/Organisation posted as empty strings (not omitted) - matches what a browser
+        // actually sends when a participant clears a text input, which is what previously also
+        // triggered ASP.NET Core's own implicit "The X field is required" alongside our message.
+        var form = new Dictionary<string, string>
+        {
+            ["__RequestVerificationToken"] = token,
+            ["ContactName"] = "",
+            ["Organisation"] = ""
+        };
 
         var postResponse = await CookieForwardingHttpClient.SendWithCookiesAsync(
             client, HttpMethod.Post, "/Customer/Index", cookies, new FormUrlEncodedContent(form));
@@ -170,6 +178,9 @@ public partial class CustomerRouteSmokeTests : IClassFixture<PtlExternalWebTestF
         Assert.Equal(HttpStatusCode.OK, postResponse.StatusCode);
         Assert.Contains("Enter Contact Name", body);
         Assert.Contains("Enter Organisation Name", body);
+        // Guards against ASP.NET Core's implicit non-nullable-reference-type [Required] check
+        // duplicating the Core-layer validator's own message for the same field.
+        Assert.DoesNotContain("field is required", body);
         // Remains on the Edit Customer/Invoice Details page (not redirected away).
         Assert.Contains("Edit customer/invoice details", body);
     }

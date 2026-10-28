@@ -126,6 +126,7 @@ builder.Services.AddScoped<IParticipantViewerRepository, ParticipantViewerReposi
 builder.Services.AddScoped<IViewerRepository, ViewerRepository>();
 builder.Services.AddScoped<IViewerService, ViewerService>();
 builder.Services.AddScoped<IParticipantService, ParticipantService>();
+builder.Services.AddScoped<IParticipantDetailsEditService, ParticipantDetailsEditService>();
 builder.Services.AddScoped<IParticipantSchemeRepository, ParticipantSchemeRepository>();
 builder.Services.AddScoped<IParticipantSchemeService, ParticipantSchemeService>();
 
