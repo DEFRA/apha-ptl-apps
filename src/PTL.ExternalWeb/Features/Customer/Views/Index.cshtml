@@ -26,14 +26,14 @@
 
 @if (Model.HasOutstandingUpdate)
 {
-    <div class="govuk-notification-banner" role="region" aria-labelledby="pending-update-title" data-module="govuk-notification-banner">
+    <section class="govuk-notification-banner" aria-labelledby="pending-update-title" data-module="govuk-notification-banner">
         <div class="govuk-notification-banner__header">
             <h3 class="govuk-notification-banner__title" id="pending-update-title">Updated details submitted</h3>
         </div>
         <div class="govuk-notification-banner__content">
             <p class="govuk-notification-banner__heading">Changes have already been submitted. Please wait for those changes to be approved or rejected before submitting further changes.</p>
         </div>
-    </div>
+    </section>
 }
 
 <govuk-error-summary errors="@errors" />

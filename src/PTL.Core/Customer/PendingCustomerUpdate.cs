@@ -4,7 +4,7 @@ namespace PTL.Core.Customer;
 // Customer record awaiting admin approval/decline (legacy PendingCustomerUpdate.vb /
 // spgPendingCustomerDetailsEditByCustomerID). Only IsSubmitted=1, IsDeleted=0 rows are "live"
 // pending updates - see IPendingCustomerUpdateRepository.
-public class PendingCustomerUpdate
+public class PendingCustomerUpdate : IPendingContactDetails
 {
     public Guid PendingCustomerUpdateId { get; set; }
     public Guid CustomerId { get; set; }
