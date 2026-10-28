@@ -11,6 +11,11 @@ public interface IPendingCustomerUpdateRepository
     // update for a customer, or null if there is none.
     Task<PendingCustomerUpdate?> GetByCustomerIdAsync(Guid customerId, CancellationToken cancellationToken = default);
 
+    // spiPendingCustomerDetailsEdit (update.PendingCustomerUpdateId == Guid.Empty) or
+    // spuPendingCustomerDetailsEditByCustomerID (otherwise) - legacy PendingCustomerUpdate.Save's
+    // insert-or-update split. Mutates update.PendingCustomerUpdateId with the new id on insert.
+    Task UpsertAsync(PendingCustomerUpdate update, CancellationToken cancellationToken = default);
+
     // spdPendingCustomerDetailsEditByCustomerID - soft-deletes the pending record (sets
     // fldIsDeleted=1); used on both Approve and Decline, since neither path reinstates the row.
     // Returns false when no matching row was found.

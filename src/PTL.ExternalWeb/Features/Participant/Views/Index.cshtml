@@ -1,0 +1,64 @@
+@model PTL.ExternalWeb.Features.Participant.ParticipantDetailsEditViewModel
+@{
+    ViewData["Title"] = "Edit participant details";
+
+    // Fixed field order matching the visual layout, so error summary links appear top-to-bottom
+    // in reading order rather than ModelState's validation-execution order.
+    string[] fieldOrder =
+    [
+        "ContactName", "Organisation", "Address1", "Address2", "Address3", "Address4", "Address5",
+        "CountryId", "Telephone", "Email", "Email2"
+    ];
+
+    var errors = ViewData.ModelState
+        .Where(entry => entry.Value?.Errors.Count > 0)
+        .SelectMany(entry => entry.Value!.Errors.Select(error => (Field: entry.Key, Message: error.ErrorMessage)))
+        .OrderBy(error => Array.IndexOf(fieldOrder, error.Field) is var idx && idx == -1 ? -1 : idx)
+        .ToList();
+}
+
+<partial name="_MyAccountNav" />
+
+<h2 class="govuk-heading-l">Edit participant details</h2>
+
+@if (Model.HasOutstandingUpdate)
+{
+    <section class="govuk-notification-banner" aria-labelledby="pending-update-title" data-module="govuk-notification-banner">
+        <div class="govuk-notification-banner__header">
+            <h3 class="govuk-notification-banner__title" id="pending-update-title">Updated details submitted</h3>
+        </div>
+        <div class="govuk-notification-banner__content">
+            <p class="govuk-notification-banner__heading">Changes have already been submitted. Please wait for those changes to be approved or rejected before submitting further changes.</p>
+        </div>
+    </section>
+}
+
+<govuk-error-summary errors="@errors" />
+
+<form asp-action="Index" method="post">
+    @Html.AntiForgeryToken()
+
+    <div class="govuk-form-group">
+        <p class="govuk-label govuk-label--s govuk-!-margin-bottom-0">Lab Code</p>
+        <p class="govuk-body">@Model.LabCode</p>
+    </div>
+
+    <p class="govuk-body">Details of your laboratory participating in proficiency testing.</p>
+
+    <govuk-input asp-for="ContactName" label="Contact Name" disabled="@Model.HasOutstandingUpdate" />
+    <govuk-input asp-for="Organisation" label="Organisation name" disabled="@Model.HasOutstandingUpdate" />
+    <govuk-input asp-for="Address1" label="Address line 1" disabled="@Model.HasOutstandingUpdate" />
+    <govuk-input asp-for="Address2" label="Address line 2" disabled="@Model.HasOutstandingUpdate" />
+    <govuk-input asp-for="Address3" label="Address line 3 (optional)" disabled="@Model.HasOutstandingUpdate" />
+    <govuk-input asp-for="Address4" label="Address line 4 (optional)" disabled="@Model.HasOutstandingUpdate" />
+    <govuk-input asp-for="Address5" label="Address line 5 (optional)" disabled="@Model.HasOutstandingUpdate" />
+    <govuk-select asp-for="CountryId" label="Country" asp-items="Model.CountryOptions" disabled="@Model.HasOutstandingUpdate" />
+    <govuk-input asp-for="Telephone" label="Telephone" disabled="@Model.HasOutstandingUpdate" />
+    <govuk-input asp-for="Email" label="Email (Primary)" disabled="@Model.HasOutstandingUpdate" />
+    <govuk-input asp-for="Email2" label="Email (Secondary) (optional)" disabled="@Model.HasOutstandingUpdate" />
+
+    <div class="govuk-button-group govuk-!-margin-top-6">
+        <button type="submit" class="govuk-button" data-module="govuk-button" disabled="@Model.HasOutstandingUpdate">Update details</button>
+        <a class="govuk-button govuk-button--secondary" data-module="govuk-button" asp-controller="Home" asp-action="Index">Cancel</a>
+    </div>
+</form>

@@ -107,6 +107,18 @@ public static class ApiClientServiceCollectionExtensions
         })
             .AddStandardResilienceHandler();
 
+        services.AddHttpClient<ICustomerDetailsEditApiClient, CustomerDetailsEditApiClient>(client =>
+        {
+            client.BaseAddress = new Uri(apiBaseUrl);
+        })
+            .AddStandardResilienceHandler();
+
+        services.AddHttpClient<IParticipantDetailsEditApiClient, ParticipantDetailsEditApiClient>(client =>
+        {
+            client.BaseAddress = new Uri(apiBaseUrl);
+        })
+            .AddStandardResilienceHandler();
+
         services.AddHttpClient<ILookupApiClient, LookupApiClient>(client =>
         {
             client.BaseAddress = new Uri(apiBaseUrl);

@@ -112,6 +112,7 @@ builder.Services.AddScoped<PTL.Core.Audit.IActingUserAccessor, HttpActingUserAcc
 builder.Services.AddScoped<ICustomerRepository, CustomerRepository>();
 builder.Services.AddScoped<IPendingCustomerUpdateRepository, PendingCustomerUpdateRepository>();
 builder.Services.AddScoped<ICustomerService, CustomerService>();
+builder.Services.AddScoped<ICustomerDetailsEditService, CustomerDetailsEditService>();
 
 builder.Services.AddScoped<PTL.Core.Search.ISearchRepository, PTL.Data.Search.SearchRepository>();
 builder.Services.AddScoped<PTL.Core.Search.ISearchService, PTL.Core.Search.SearchService>();
@@ -125,6 +126,7 @@ builder.Services.AddScoped<IParticipantViewerRepository, ParticipantViewerReposi
 builder.Services.AddScoped<IViewerRepository, ViewerRepository>();
 builder.Services.AddScoped<IViewerService, ViewerService>();
 builder.Services.AddScoped<IParticipantService, ParticipantService>();
+builder.Services.AddScoped<IParticipantDetailsEditService, ParticipantDetailsEditService>();
 builder.Services.AddScoped<IParticipantSchemeRepository, ParticipantSchemeRepository>();
 builder.Services.AddScoped<IParticipantSchemeService, ParticipantSchemeService>();
 

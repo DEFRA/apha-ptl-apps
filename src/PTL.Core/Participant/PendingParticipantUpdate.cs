@@ -4,7 +4,7 @@ namespace PTL.Core.Participant;
 // their own record awaiting admin approval/decline (legacy PendingParticipantUpdate.vb /
 // spgPendingParticipantDetailsEditByParticipantID). Only IsSubmitted=1, IsDeleted=0 rows are
 // "live" pending updates - see IPendingParticipantUpdateRepository.
-public class PendingParticipantUpdate
+public class PendingParticipantUpdate : IPendingContactDetails
 {
     public Guid PendingParticipantUpdateId { get; set; }
     public Guid ParticipantId { get; set; }

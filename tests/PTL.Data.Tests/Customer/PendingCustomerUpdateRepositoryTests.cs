@@ -15,6 +15,8 @@ public class PendingCustomerUpdateRepositoryTests
     private const string GetSummariesSql = "EXEC dbo.spgaPendingCustomerDetailsEditInfo";
     private const string GetByCustomerIdSql = "EXEC dbo.spgPendingCustomerDetailsEditByCustomerID @CustomerId, @IsSubmitted";
     private const string MarkDecidedSql = "EXEC dbo.spdPendingCustomerDetailsEditByCustomerID @CustomerId, @PendingCustomerDetailsEditId";
+    private const string InsertSql = "EXEC dbo.spiPendingCustomerDetailsEdit @PendingCustomerDetailsEditId = @PendingCustomerUpdateId, @CustomerId = @CustomerId, @ContactName = @ContactName, @Organisation = @Organisation, @Address1 = @Address1, @Address2 = @Address2, @Address3 = @Address3, @Address4 = @Address4, @Address5 = @Address5, @Fax = @Fax, @Email = @Email, @Telephone = @Telephone, @Telephone2 = @Telephone2, @InvoiceName = @InvoiceName, @InvoiceOrganisation = @InvoiceOrganisation, @InvoiceAddress1 = @InvoiceAddress1, @InvoiceAddress2 = @InvoiceAddress2, @InvoiceAddress3 = @InvoiceAddress3, @InvoiceAddress4 = @InvoiceAddress4, @InvoiceAddress5 = @InvoiceAddress5, @InvoiceTelephone = @InvoiceTelephone, @InvoiceTelephone2 = @InvoiceTelephone2, @InvoiceFax = @InvoiceFax, @InvoiceEmail = @InvoiceEmail, @CountryId = @CountryId, @InvoiceCountryId = @InvoiceCountryId, @IsDeleted = @IsDeleted, @IsSubmitted = @IsSubmitted";
+    private const string UpdateSql = "EXEC dbo.spuPendingCustomerDetailsEditByCustomerID @CustomerId = @CustomerId, @PendingCustomerDetailsEditId = @PendingCustomerUpdateId, @ContactName = @ContactName, @Organisation = @Organisation, @Address1 = @Address1, @Address2 = @Address2, @Address3 = @Address3, @Address4 = @Address4, @Address5 = @Address5, @Fax = @Fax, @Email = @Email, @Telephone = @Telephone, @Telephone2 = @Telephone2, @InvoiceName = @InvoiceName, @InvoiceOrganisation = @InvoiceOrganisation, @InvoiceAddress1 = @InvoiceAddress1, @InvoiceAddress2 = @InvoiceAddress2, @InvoiceAddress3 = @InvoiceAddress3, @InvoiceAddress4 = @InvoiceAddress4, @InvoiceAddress5 = @InvoiceAddress5, @InvoiceTelephone = @InvoiceTelephone, @InvoiceTelephone2 = @InvoiceTelephone2, @InvoiceFax = @InvoiceFax, @InvoiceEmail = @InvoiceEmail, @CountryId = @CountryId, @InvoiceCountryId = @InvoiceCountryId, @IsDeleted = @IsDeleted, @IsSubmitted = @IsSubmitted";
 
     private static (PendingCustomerUpdateRepository Repository, FakeDbConnection Connection) CreateRepository()
     {
@@ -185,5 +187,41 @@ public class PendingCustomerUpdateRepositoryTests
         Assert.Equal(markSql, command.CommandText);
         Assert.Equal(id, (Guid?)command.ParameterValue("Id"));
         Assert.Equal(sentAt, (DateTime?)command.ParameterValue("SentAt"));
+    }
+
+    [Fact]
+    public async Task UpsertAsync_NewPendingUpdate_CallsInsertProcedureAndAssignsAnId()
+    {
+        var (repository, connection) = CreateRepository();
+        connection.RespondToNonQuery(InsertSql, -1);
+        var customerId = Guid.NewGuid();
+        var update = new PendingCustomerUpdate { CustomerId = customerId, ContactName = "Jane Doe" };
+
+        await repository.UpsertAsync(update);
+
+        Assert.NotEqual(Guid.Empty, update.PendingCustomerUpdateId);
+        var command = Assert.Single(connection.ExecutedCommands);
+        Assert.Equal(InsertSql, command.CommandText);
+        Assert.Equal(customerId, (Guid?)command.ParameterValue("CustomerId"));
+        Assert.Equal("Jane Doe", (string?)command.ParameterValue("ContactName"));
+        Assert.Equal(update.PendingCustomerUpdateId, (Guid?)command.ParameterValue("PendingCustomerUpdateId"));
+    }
+
+    [Fact]
+    public async Task UpsertAsync_ExistingPendingUpdateId_CallsUpdateProcedure()
+    {
+        var (repository, connection) = CreateRepository();
+        connection.RespondToNonQuery(UpdateSql, -1);
+        var customerId = Guid.NewGuid();
+        var pendingId = Guid.NewGuid();
+        var update = new PendingCustomerUpdate { PendingCustomerUpdateId = pendingId, CustomerId = customerId, ContactName = "Updated Name" };
+
+        await repository.UpsertAsync(update);
+
+        Assert.Equal(pendingId, update.PendingCustomerUpdateId);
+        var command = Assert.Single(connection.ExecutedCommands);
+        Assert.Equal(UpdateSql, command.CommandText);
+        Assert.Equal(pendingId, (Guid?)command.ParameterValue("PendingCustomerUpdateId"));
+        Assert.Equal("Updated Name", (string?)command.ParameterValue("ContactName"));
     }
 }

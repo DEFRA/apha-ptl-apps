@@ -1,0 +1,94 @@
+@model PTL.ExternalWeb.Features.Customer.CustomerDetailsEditViewModel
+@{
+    ViewData["Title"] = "Edit customer/invoice details";
+
+    // Fixed field order matching the visual layout, so error summary links appear top-to-bottom
+    // in reading order rather than ModelState's validation-execution order.
+    string[] fieldOrder =
+    [
+        "ContactName", "Organisation", "Address1", "Address2", "Address3", "Address4", "Address5",
+        "CountryId", "Telephone", "Telephone2", "Email",
+        "InvoiceName", "InvoiceOrganisation", "InvoiceAddress1", "InvoiceAddress2", "InvoiceAddress3",
+        "InvoiceAddress4", "InvoiceAddress5", "InvoiceCountryId", "InvoiceTelephone", "InvoiceTelephone2",
+        "InvoiceEmail"
+    ];
+
+    var errors = ViewData.ModelState
+        .Where(entry => entry.Value?.Errors.Count > 0)
+        .SelectMany(entry => entry.Value!.Errors.Select(error => (Field: entry.Key, Message: error.ErrorMessage)))
+        .OrderBy(error => Array.IndexOf(fieldOrder, error.Field) is var idx && idx == -1 ? -1 : idx)
+        .ToList();
+}
+
+<partial name="_MyAccountNav" />
+
+<h2 class="govuk-heading-l">Edit customer/invoice details</h2>
+
+@if (Model.HasOutstandingUpdate)
+{
+    <section class="govuk-notification-banner" aria-labelledby="pending-update-title" data-module="govuk-notification-banner">
+        <div class="govuk-notification-banner__header">
+            <h3 class="govuk-notification-banner__title" id="pending-update-title">Updated details submitted</h3>
+        </div>
+        <div class="govuk-notification-banner__content">
+            <p class="govuk-notification-banner__heading">Changes have already been submitted. Please wait for those changes to be approved or rejected before submitting further changes.</p>
+        </div>
+    </section>
+}
+
+<govuk-error-summary errors="@errors" />
+
+<form asp-action="Index" method="post">
+    @Html.AntiForgeryToken()
+
+    <div class="govuk-form-group">
+        <p class="govuk-label govuk-label--s govuk-!-margin-bottom-0">QAL Number</p>
+        <p class="govuk-body">@Model.QalNumber</p>
+    </div>
+
+    <h3 class="govuk-heading-m">Customer Details</h3>
+    <p class="govuk-body">Please provide details of your laboratory participating in proficiency testing.</p>
+
+    <govuk-input asp-for="ContactName" label="Contact Name" disabled="@Model.HasOutstandingUpdate" />
+    <govuk-input asp-for="Organisation" label="Organisation name" disabled="@Model.HasOutstandingUpdate" />
+    <govuk-input asp-for="Address1" label="Address line 1" disabled="@Model.HasOutstandingUpdate" />
+    <govuk-input asp-for="Address2" label="Address line 2" disabled="@Model.HasOutstandingUpdate" />
+    <govuk-input asp-for="Address3" label="Address line 3 (optional)" disabled="@Model.HasOutstandingUpdate" />
+    <govuk-input asp-for="Address4" label="Address line 4 (optional)" disabled="@Model.HasOutstandingUpdate" />
+    <govuk-input asp-for="Address5" label="Address line 5 (optional)" disabled="@Model.HasOutstandingUpdate" />
+    <govuk-select asp-for="CountryId" label="Country" asp-items="Model.CountryOptions" disabled="@Model.HasOutstandingUpdate" />
+    <govuk-input asp-for="Telephone" label="Telephone" disabled="@Model.HasOutstandingUpdate" />
+    <govuk-input asp-for="Telephone2" label="Telephone 2 (optional)" disabled="@Model.HasOutstandingUpdate" />
+    <govuk-input asp-for="Email" label="Email" disabled="@Model.HasOutstandingUpdate" />
+
+    <h3 class="govuk-heading-m govuk-!-margin-top-6">Invoice Details</h3>
+    <p class="govuk-body">These details will be used to charge and invoice your purchases.</p>
+
+    <div class="govuk-checkboxes govuk-checkboxes--small govuk-!-margin-bottom-4" data-module="govuk-checkboxes">
+        <div class="govuk-checkboxes__item">
+            <input class="govuk-checkboxes__input" id="CopyDetails" type="checkbox" disabled="@Model.HasOutstandingUpdate" />
+            <label class="govuk-label govuk-checkboxes__label" for="CopyDetails">Invoice Details are the same as customer details</label>
+        </div>
+    </div>
+
+    <govuk-input asp-for="InvoiceName" label="Invoice contact name (optional)" disabled="@Model.HasOutstandingUpdate" />
+    <govuk-input asp-for="InvoiceOrganisation" label="Invoice organisation name" disabled="@Model.HasOutstandingUpdate" />
+    <govuk-input asp-for="InvoiceAddress1" label="Invoice address line 1" disabled="@Model.HasOutstandingUpdate" />
+    <govuk-input asp-for="InvoiceAddress2" label="Invoice address line 2" disabled="@Model.HasOutstandingUpdate" />
+    <govuk-input asp-for="InvoiceAddress3" label="Invoice address line 3 (optional)" disabled="@Model.HasOutstandingUpdate" />
+    <govuk-input asp-for="InvoiceAddress4" label="Invoice address line 4 (optional)" disabled="@Model.HasOutstandingUpdate" />
+    <govuk-input asp-for="InvoiceAddress5" label="Invoice address line 5 (optional)" disabled="@Model.HasOutstandingUpdate" />
+    <govuk-select asp-for="InvoiceCountryId" label="Invoice country" asp-items="Model.InvoiceCountryOptions" disabled="@Model.HasOutstandingUpdate" />
+    <govuk-input asp-for="InvoiceTelephone" label="Invoice telephone (optional)" disabled="@Model.HasOutstandingUpdate" />
+    <govuk-input asp-for="InvoiceTelephone2" label="Invoice telephone 2 (optional)" disabled="@Model.HasOutstandingUpdate" />
+    <govuk-input asp-for="InvoiceEmail" label="Invoice email (optional)" disabled="@Model.HasOutstandingUpdate" />
+
+    <div class="govuk-button-group govuk-!-margin-top-6">
+        <button type="submit" class="govuk-button" data-module="govuk-button" disabled="@Model.HasOutstandingUpdate">Update details</button>
+        <a class="govuk-button govuk-button--secondary" data-module="govuk-button" asp-controller="Home" asp-action="Index">Cancel</a>
+    </div>
+</form>
+
+@section Scripts {
+    <script src="~/js/copy-customer-details-to-invoice.js" defer></script>
+}
