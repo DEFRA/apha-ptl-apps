@@ -1,0 +1,70 @@
+@using System.Globalization
+@model PTL.InternalWeb.Features.Assessor.AssessorMenuViewModel
+@{
+    ViewData["Title"] = "Assessor";
+    var culture = CultureInfo.InvariantCulture;
+}
+
+<h1 class="govuk-heading-l">Assessor</h1>
+
+@if (Model.Years.Count == 0)
+{
+    <p class="govuk-body">There are no Distributions requiring assessment.</p>
+    return;
+}
+
+<p class="govuk-body">The table below lists all of the Distributions in each month for which you are an assessor.</p>
+<p class="govuk-body">Clicking the link will allow you to see the samples associated with each test.</p>
+
+<form method="get" asp-action="Index" class="govuk-!-margin-bottom-6">
+    <div class="govuk-form-group">
+        <label class="govuk-label" for="year">Select Year:</label>
+        <select class="govuk-select" id="year" name="year">
+            @foreach (var year in Model.Years)
+            {
+                <option value="@year" selected="@(year == Model.SelectedYear ? "selected" : null)">@year.ToString(culture)</option>
+            }
+        </select>
+    </div>
+    <button type="submit" class="govuk-button govuk-button--secondary" data-module="govuk-button">View</button>
+</form>
+
+@if (Model.Months.Count == 0)
+{
+    <p class="govuk-body">There are no distributions that require assessment.</p>
+}
+
+@foreach (var month in Model.Months)
+{
+    <details class="govuk-details" open>
+        <summary class="govuk-details__summary">
+            <span class="govuk-details__summary-text">@month.Title</span>
+        </summary>
+        <div class="govuk-details__text">
+            @foreach (var distribution in month.Distributions)
+            {
+                <h2 class="govuk-heading-s">@distribution.DistributionTitle</h2>
+                <table class="govuk-table">
+                    <caption class="govuk-table__caption govuk-visually-hidden">Tests for @distribution.DistributionTitle</caption>
+                    <thead class="govuk-table__head">
+                        <tr class="govuk-table__row">
+                            <th scope="col" class="govuk-table__header">Test</th>
+                            <th scope="col" class="govuk-table__header">View</th>
+                        </tr>
+                    </thead>
+                    <tbody class="govuk-table__body">
+                        @foreach (var test in distribution.Tests)
+                        {
+                            <tr class="govuk-table__row">
+                                <td class="govuk-table__cell">@test.TestType@(test.IsAssessmentSubmitted ? " (Assessment Submitted)" : null)</td>
+                                <td class="govuk-table__cell">
+                                    <a class="govuk-link" asp-action="AssessmentItemList" asp-route-testId="@test.TestId" asp-route-year="@Model.SelectedYear">View<span class="govuk-visually-hidden"> @test.TestType for @distribution.DistributionTitle</span></a>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+        </div>
+    </details>
+}

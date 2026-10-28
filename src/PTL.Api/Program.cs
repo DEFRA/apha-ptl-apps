@@ -225,6 +225,8 @@ builder.Services.AddScoped<ITestConsultantCommentsService, TestConsultantComment
 builder.Services.AddScoped<ITestConsultantTabulationRepository, TestConsultantTabulationRepository>();
 builder.Services.AddScoped<IResultsSignOffRepository, ResultsSignOffRepository>();
 builder.Services.AddScoped<IResultsSignOffService, ResultsSignOffService>();
+builder.Services.AddScoped<IAssessorRepository, AssessorRepository>();
+builder.Services.AddScoped<IAssessorService, AssessorService>();
 builder.Services.AddScoped<ITestConsultantTabulationService, TestConsultantTabulationService>();
 builder.Services.AddScoped<IAmendResultsService, AmendResultsService>();
 builder.Services.AddScoped<ITabulationSendService, TabulationSendService>();

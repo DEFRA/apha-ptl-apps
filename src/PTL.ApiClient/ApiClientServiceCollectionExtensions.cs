@@ -264,6 +264,14 @@ public static class ApiClientServiceCollectionExtensions
             .AddHttpMessageHandler<ActingUserDelegatingHandler>()
             .AddStandardResilienceHandler();
 
+        services.AddHttpClient<PTL.ApiClient.Distribution.IAssessorApiClient, PTL.ApiClient.Distribution.AssessorApiClient>(client =>
+        {
+            client.BaseAddress = new Uri(apiBaseUrl);
+        })
+            .AddHttpMessageHandler<CorrelationIdDelegatingHandler>()
+            .AddHttpMessageHandler<ActingUserDelegatingHandler>()
+            .AddStandardResilienceHandler();
+
         services.AddHealthChecks()
             .AddCheck<ApiConnectivityHealthCheck>("api-connectivity");
 

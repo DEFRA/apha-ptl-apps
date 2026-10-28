@@ -1,0 +1,77 @@
+@using PTL.InternalWeb.Features.Assessor
+@model AssessorItemListViewModel
+@{
+    ViewData["Title"] = "Assessment Items";
+    var list = Model.List;
+}
+
+<span class="govuk-caption-l">@list.YearMonthTitle</span>
+<h1 class="govuk-heading-l">Assessment Items</h1>
+<h2 class="govuk-heading-m">@list.DistributionTitle</h2>
+<h3 class="govuk-heading-s">@list.TestName</h3>
+
+@if (list.Samples.Count == 0)
+{
+    <p class="govuk-body">No samples have been submitted for assessment.</p>
+}
+
+@foreach (var sample in list.Samples)
+{
+    <h4 class="govuk-heading-s">Sample number: @sample.SampleNumber</h4>
+
+    @if (sample.Items.Count == 0)
+    {
+        <p class="govuk-body">There are no samples for this test</p>
+        continue;
+    }
+
+    <table class="govuk-table">
+        <caption class="govuk-table__caption govuk-visually-hidden">Assessment items for sample @sample.SampleNumber</caption>
+        <thead class="govuk-table__head">
+            <tr class="govuk-table__row">
+                <th scope="col" class="govuk-table__header">Labcode</th>
+                <th scope="col" class="govuk-table__header">Assessment Entered</th>
+                <th scope="col" class="govuk-table__header">View/Edit</th>
+            </tr>
+        </thead>
+        <tbody class="govuk-table__body">
+            @foreach (var item in sample.Items)
+            {
+                <tr class="govuk-table__row">
+                    <td class="govuk-table__cell">@item.LabCode</td>
+                    <td class="govuk-table__cell">@(item.HasAssessment ? "Yes" : "No")</td>
+                    <td class="govuk-table__cell">
+                        <a class="govuk-link" href="@AssessorItemListViewModel.EntryUrl(item, list.TestId, Model.Year)">View/Edit<span class="govuk-visually-hidden"> for Labcode @item.LabCode, sample @sample.SampleNumber</span></a>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@if (Model.SubmittedMessage is { } submitted)
+{
+    <div class="govuk-inset-text">@submitted</div>
+}
+
+@if (list.IsAssessmentSubmitted)
+{
+    <div class="govuk-button-group">
+        <a class="govuk-button govuk-button--secondary" data-module="govuk-button" asp-action="Index" asp-route-year="@Model.Year">Back</a>
+    </div>
+}
+else
+{
+    @* One form holds the whole button group, so Submit and Back are direct children of govuk-button-group and line up. *@
+    <form method="post" asp-action="Submit" novalidate>
+        <input type="hidden" name="testId" value="@list.TestId" />
+        @if (Model.Year is not null)
+        {
+            <input type="hidden" name="year" value="@Model.Year" />
+        }
+        <div class="govuk-button-group">
+            <button type="submit" class="govuk-button" data-module="govuk-button">Submit</button>
+            <a class="govuk-button govuk-button--secondary" data-module="govuk-button" asp-action="Index" asp-route-year="@Model.Year">Back</a>
+        </div>
+    </form>
+}

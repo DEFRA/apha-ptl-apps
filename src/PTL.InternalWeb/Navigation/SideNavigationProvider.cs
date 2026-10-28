@@ -34,6 +34,7 @@ public static class SideNavigationProvider
     private const string DistributionControllerName = "Distribution";
     private const string TestConsultantControllerName = "TestConsultant";
     private const string ResultsSignOffControllerName = "ResultsSignOff";
+    private const string AssessorControllerName = "Assessor";
 
     private static readonly string[] YearKey = ["year"];
     private static readonly string[] YearMonthKeys = ["year", "monthId"];
@@ -419,7 +420,30 @@ public static class SideNavigationProvider
                 new SideNavigationItem { Text = "Test Consultant Tabulation", ControllerName = TestConsultantControllerName, ActionName = TabulationAction, IsHidden = true }
             ]
         },
-        Disabled("Assessor", PtlPolicies.Assessor),
+        new SideNavigationItem
+        {
+            Text = "Assessor",
+            RequiredPolicy = PtlPolicies.Assessor,
+            ControllerName = AssessorControllerName,
+            ActionName = IndexAction,
+            Children =
+            [
+                // Legacy sitemap: "Assessor" (MenuAssessor.aspx), its hidden "Assessment Items" page (AssessmentItemList.aspx) and that
+                // page's hidden "Assessment Entry" page. The Assessment Items crumb needs the test (and year) to link back from the entry.
+                new SideNavigationItem
+                {
+                    Text = "Assessment Items",
+                    ControllerName = AssessorControllerName,
+                    ActionName = "AssessmentItemList",
+                    IsHidden = true,
+                    LinkQueryKeys = ["testId", "year"],
+                    Children =
+                    [
+                        new SideNavigationItem { Text = "Assessment Entry", ControllerName = AssessorControllerName, ActionName = "AssessmentEntry", IsHidden = true }
+                    ]
+                }
+            ]
+        },
         // Legacy sitemap: "Results Sign-off" (SignOff.aspx), its hidden "Results Sign-Off Tabulation" page and that page's hidden
         // "Assessment Results" page. The Tabulation crumb needs its tabulationId to link back from Assessment Results.
         new SideNavigationItem

@@ -1,0 +1,97 @@
+@using PTL.InternalWeb.Features.Assessor
+@model AssessorEntryViewModel
+@{
+    ViewData["Title"] = "Assessment Entry";
+    var entry = Model.Entry!;
+    var readOnly = entry.IsAssessmentSubmitted;
+    var itemsUrl = Url.Action("AssessmentItemList", new { testId = entry.TestId, year = Model.Year });
+
+    var errors = ViewData.ModelState
+        .Where(state => state.Value?.Errors.Count > 0)
+        .SelectMany(state => state.Value!.Errors.Select(error => (Field: state.Key, Message: error.ErrorMessage)))
+        .ToList();
+}
+
+<govuk-error-summary errors="@errors" />
+
+<span class="govuk-caption-l">@entry.YearMonthTitle</span>
+<h1 class="govuk-heading-l">Assessment Entry</h1>
+<h2 class="govuk-heading-m">@entry.DistributionTitle</h2>
+<h3 class="govuk-heading-s">Labcode: @entry.LabCode, Sample number: @entry.SampleNumber</h3>
+<h3 class="govuk-heading-s">@entry.TestName</h3>
+
+@if (entry.ResultItems.Count > 0)
+{
+    <table class="govuk-table">
+        <caption class="govuk-table__caption govuk-visually-hidden">Results of Labcode @entry.LabCode for sample @entry.SampleNumber</caption>
+        <thead class="govuk-table__head">
+            <tr class="govuk-table__row">
+                <th scope="col" class="govuk-table__header">Test result item name</th>
+                <th scope="col" class="govuk-table__header">Result</th>
+            </tr>
+        </thead>
+        <tbody class="govuk-table__body">
+            @foreach (var item in entry.ResultItems)
+            {
+                <tr class="govuk-table__row">
+                    <td class="govuk-table__cell">@item.Name</td>
+                    <td class="govuk-table__cell">@item.Result</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+<form method="post" asp-action="AssessmentEntry" novalidate>
+    <input type="hidden" asp-for="SampleTestId" />
+    <input type="hidden" asp-for="ParticipantId" />
+    @if (Model.Year is not null)
+    {
+        <input type="hidden" asp-for="Year" />
+    }
+
+    @for (var i = 0; i < entry.Categories.Count; i++)
+    {
+        var category = entry.Categories[i];
+        var ticked = Model.Categories[i].CriterionItemIds;
+
+        <input type="hidden" asp-for="Categories[i].CategoryItemId" />
+        <fieldset class="govuk-fieldset govuk-!-margin-bottom-6">
+            <legend class="govuk-fieldset__legend govuk-fieldset__legend--m">
+                <h3 class="govuk-fieldset__heading">@category.Name</h3>
+            </legend>
+
+            @if (category.Criteria.Count > 0)
+            {
+                <div class="govuk-form-group">
+                    <div class="govuk-checkboxes govuk-checkboxes--small" data-module="govuk-checkboxes">
+                        @for (var j = 0; j < category.Criteria.Count; j++)
+                        {
+                            var criterion = category.Criteria[j];
+                            <div class="govuk-checkboxes__item">
+                                <input class="govuk-checkboxes__input" id="category-@i-criterion-@j" name="Categories[@i].CriterionItemIds" type="checkbox" value="@criterion.CriterionItemId"
+                                       checked="@(ticked.Contains(criterion.CriterionItemId) ? "checked" : null)" disabled="@(readOnly ? "disabled" : null)" />
+                                <label class="govuk-label govuk-checkboxes__label" for="category-@i-criterion-@j">@criterion.Name</label>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+
+            <govuk-select asp-for="Categories[i].Score" label="Score:" asp-items="AssessorEntryViewModel.CategoryScoreOptions" option-label="Please select..." disabled="@readOnly" />
+        </fieldset>
+    }
+
+    <govuk-textarea asp-for="Comment" label="Assessment comment:" rows="5" disabled="@readOnly" />
+
+    <govuk-select asp-for="OverallScore" label="Overall Score:" asp-items="AssessorEntryViewModel.OverallScoreOptions" option-label="Please select..." disabled="@readOnly" />
+
+    <div class="govuk-button-group">
+        @if (!readOnly)
+        {
+            <button type="submit" name="command" value="@AssessorEntryViewModel.SaveCommand" class="govuk-button" data-module="govuk-button">Save</button>
+            <button type="submit" name="command" value="@AssessorEntryViewModel.ApplyCommand" class="govuk-button govuk-button--secondary" data-module="govuk-button">Apply</button>
+        }
+        <a class="govuk-button govuk-button--secondary" data-module="govuk-button" href="@itemsUrl">@(readOnly ? "Back" : "Cancel")</a>
+    </div>
+</form>

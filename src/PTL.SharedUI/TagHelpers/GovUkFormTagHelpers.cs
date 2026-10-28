@@ -171,6 +171,8 @@ public class GovUkTextareaTagHelper(IHtmlGenerator generator) : TagHelper
     [HtmlAttributeName("maxlength")]
     public int MaxLength { get; set; }
 
+    public bool Disabled { get; set; }
+
     [ViewContext]
     [HtmlAttributeNotBound]
     public ViewContext ViewContext { get; set; } = default!;
@@ -192,6 +194,10 @@ public class GovUkTextareaTagHelper(IHtmlGenerator generator) : TagHelper
         if (MaxLength > 0)
         {
             htmlAttributes["maxlength"] = MaxLength;
+        }
+        if (Disabled)
+        {
+            htmlAttributes["disabled"] = "disabled";
         }
 
         var textarea = generator.GenerateTextArea(ViewContext, For.ModelExplorer, field, rows: Rows, columns: 0, htmlAttributes);
