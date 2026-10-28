@@ -10,6 +10,9 @@
     var options = SessionTimeoutOptionsAccessor.Value;
     var warningAfterMs = (long)options.InactivityWarningAfter.TotalMilliseconds;
     var expireAfterMs = (long)options.ExpireAfterWarning.TotalMilliseconds;
+    // The same mm:ss format session-timeout.js renders on every tick.
+    var expireAfterSeconds = (int)options.ExpireAfterWarning.TotalSeconds;
+    var initialCountdown = $"{expireAfterSeconds / 60:D2}:{expireAfterSeconds % 60:D2}";
     // Delivered as a data attribute, not a rendered form field - several existing pages assert
     // they render no form fields at all, which a visible antiforgery field would otherwise violate.
     var antiforgeryToken = Antiforgery.GetAndStoreTokens(Context).RequestToken;
@@ -33,8 +36,9 @@
     <div class="govuk-notification-banner__content">
         <p class="govuk-notification-banner__heading">
             You've been inactive for a while. For your security, you'll be signed out in
-            <span id="session-timeout-countdown">@((int)options.ExpireAfterWarning.TotalSeconds)</span>
-            seconds unless you choose to continue.
+            <span id="session-timeout-countdown">@initialCountdown</span>
+            <span class="govuk-visually-hidden">(minutes and seconds)</span>
+            unless you choose to continue.
         </p>
         @* Visually hidden: announces remaining time at a few key milestones only (not every
            second, which would be disruptive for screen reader users) - see session-timeout.js. *@

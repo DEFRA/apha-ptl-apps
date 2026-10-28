@@ -52,4 +52,13 @@ public class LayoutStructureTests : IClassFixture<WebApplicationFactory<Program>
 
         Assert.Contains("<title>Home - Proficiency Testing - Internal</title>", html, StringComparison.Ordinal);
     }
+
+    // The configured two-minute ExpireAfterWarning, shown the way session-timeout.js counts it down.
+    [Fact]
+    public async Task SessionTimeoutWarning_ShowsTheCountdownAsMinutesAndSeconds()
+    {
+        var html = await GetHomePageAsync();
+
+        Assert.Contains("<span id=\"session-timeout-countdown\">02:00</span>", html, StringComparison.Ordinal);
+    }
 }
