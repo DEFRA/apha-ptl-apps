@@ -1,8 +1,8 @@
+using Microsoft.AspNetCore.Mvc;
 using PTL.Api.Controllers;
 using PTL.Api.Tests.Participant;
 using PTL.Contracts.Participant;
 using PTL.Core.Participant;
-using Microsoft.AspNetCore.Mvc;
 
 namespace PTL.Api.Tests.Endpoints;
 
