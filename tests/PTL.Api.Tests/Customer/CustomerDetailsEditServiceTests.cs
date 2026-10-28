@@ -130,4 +130,40 @@ public class CustomerDetailsEditServiceTests
         Assert.False(stored.IsDeleted);
         Assert.Equal("Jane Doe", stored.ContactName);
     }
+
+    [Fact]
+    public async Task SubmitAsync_FaxFieldsNotOnEditForm_CarriesOverLiveCustomerValues()
+    {
+        var (service, participants, customers, pendingUpdates) = CreateService();
+        var customerId = Guid.NewGuid();
+        await customers.CreateAsync(new PTL.Core.Customer.Customer
+        {
+            CustomerId = customerId,
+            Fax = "01234 111111",
+            InvoiceFax = "01234 222222"
+        });
+        var participant = await participants.CreateAsync(new CoreParticipant { CustomerId = customerId });
+
+        var proposed = new PendingCustomerUpdate
+        {
+            ContactName = "Jane Doe",
+            Organisation = "Test Lab",
+            Address1 = "1 Test Street",
+            Address2 = "Testville",
+            CountryId = Guid.NewGuid(),
+            Telephone = "01234 567890",
+            Email = "jane@example.com",
+            InvoiceOrganisation = "Test Lab Invoicing",
+            InvoiceAddress1 = "1 Test Street",
+            InvoiceAddress2 = "Testville",
+            InvoiceCountryId = Guid.NewGuid()
+        };
+
+        await service.SubmitAsync(participant.ParticipantId, proposed);
+
+        var stored = await pendingUpdates.GetByCustomerIdAsync(customerId);
+        Assert.NotNull(stored);
+        Assert.Equal("01234 111111", stored!.Fax);
+        Assert.Equal("01234 222222", stored.InvoiceFax);
+    }
 }

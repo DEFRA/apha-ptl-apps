@@ -74,6 +74,13 @@ public sealed class CustomerDetailsEditService(
             throw new PendingCustomerUpdateAlreadySubmittedException();
         }
 
+        // Fax/InvoiceFax aren't on the edit form (legacy parity) - carry the live values across so the
+        // admin review screen's diff doesn't flag them as changed (legacy ConvertCustomerToPendingCustomerUpdate).
+        var customer = await customerRepository.GetByIdAsync(participant.CustomerId, cancellationToken)
+            ?? throw new InvalidOperationException($"Customer {participant.CustomerId} not found.");
+        proposed.Fax = customer.Fax;
+        proposed.InvoiceFax = customer.InvoiceFax;
+
         var validation = PendingCustomerUpdateValidator.Validate(proposed);
         if (!validation.IsValid)
         {
