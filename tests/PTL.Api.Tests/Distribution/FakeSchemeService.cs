@@ -21,6 +21,9 @@ internal sealed class FakeSchemeService : ISchemeService
     public Task<IReadOnlyList<SchemeHistoryEntity>> GetSchemeFamilyHistoryAsync(Guid sharedId, CancellationToken cancellationToken = default) =>
         throw new NotSupportedException();
 
+    public Task<ParticipantSchemeListResult> GetSchemesForParticipantAsync(Guid participantId, CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException();
+
     public Task<CoreScheme?> RenewSchemeAsync(Guid schemeId, CancellationToken cancellationToken = default) =>
         throw new NotSupportedException();
 

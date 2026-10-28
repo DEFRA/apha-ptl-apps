@@ -9,7 +9,7 @@
         (item.RequiredRole is null || roles.Contains(item.RequiredRole, StringComparer.OrdinalIgnoreCase))
         && (!item.RequireCanOrderOnline || canOrderOnline);
 
-    // See _SideNavigation.cshtml for why groups and children are each filtered independently
+    // See _HeaderMenu.cshtml for why groups and children are each filtered independently
     // (Results has no group-level role - only its children do).
     var visibleSections = NavigationProvider.Build()
         .Where(IsVisible)
@@ -19,11 +19,11 @@
 }
 
 @* Index requires authentication (the app's default authorization policy), so Model is always
-   populated here - no anonymous fallback branch needed. Navigation is the side nav
-   (_SideNavigation.cshtml, driven by the same NavigationProvider); each section's sub-items are
-   also shown here as quick-link cards for fast access from Home. No screen behind any of these
-   links has its own migration slice yet, so every one navigates to the shared ComingSoon page
-   instead of being a dead/disabled link, matching legacy's always-clickable navigation. *@
+   populated here - no anonymous fallback branch needed. Navigation is the header menu panel
+   (_HeaderMenu.cshtml, driven by the same NavigationProvider); each section's sub-items are
+   also shown here as quick-link cards for fast access from Home. Every link routes to its own
+   feature controller (placeholder or fully migrated), matching legacy's always-clickable
+   navigation - never a dead/disabled link. *@
 
 @* govuk-notification-banner is the GDS equivalent of legacy Home.aspx's "Important" callout -
    the static text/link below is always shown (legacy pt-alert); the admin-authored

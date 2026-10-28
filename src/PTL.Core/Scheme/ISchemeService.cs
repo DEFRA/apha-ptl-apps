@@ -2,6 +2,10 @@ namespace PTL.Core.Scheme;
 
 public sealed record SchemeSearchResult(IReadOnlyList<SchemeSummaryEntity> Items, int TotalCount);
 
+public sealed record ParticipantSchemeListResult(
+    IReadOnlyList<ParticipantSchemeEntity> CommercialSchemes,
+    IReadOnlyList<ParticipantSchemeEntity> NonCommercialSchemes);
+
 public interface ISchemeService
 {
     Task<Scheme?> GetSchemeAsync(Guid schemeId, CancellationToken cancellationToken = default);
@@ -16,6 +20,12 @@ public interface ISchemeService
     Task<SchemeSearchResult> GetSchemeFamiliesAsync(int page, int pageSize, string? searchTerm, CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<SchemeHistoryEntity>> GetSchemeFamilyHistoryAsync(Guid sharedId, CancellationToken cancellationToken = default);
+
+    // Legacy ExternalWeb SchemeList.aspx: commercial + non-commercial schemes for the participant,
+    // keyed by the participant's legacy SsoId and the current financial year - reuses the existing
+    // spgCommercialSchemesBySsoId/spgNonCommercialSchemesBySsoId procedures exactly as legacy calls
+    // them (same April-cutoff year math), rather than introducing new participant-keyed procedures.
+    Task<ParticipantSchemeListResult> GetSchemesForParticipantAsync(Guid participantId, CancellationToken cancellationToken = default);
 
     // Legacy Scheme.RenewScheme: builds an unsaved draft for schemeId's year + 1, carried by the
     // same SharedId so it joins the existing family rather than starting a new one. Returns null

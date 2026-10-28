@@ -203,6 +203,48 @@ public class ExternalUserServiceTests
         Assert.Null(result.TestConsultantId);
     }
 
+    // Story 744510 "Inactive User Validation": an inactive Participant must be denied access,
+    // even if previously linked via SsoIdExt - mirrors the existing Test Consultant business rule.
+    [Fact]
+    public async Task ResolveAsync_InactiveParticipant_MatchedBySsoIdExt_OmitsRoleAndFlagsHasInactiveMatch()
+    {
+        var ssoIdExt = Guid.NewGuid();
+        var participantRepository = new FakeParticipantRepository();
+        await participantRepository.CreateAsync(new CoreParticipant { ParticipantId = Guid.NewGuid(), SsoIdExt = ssoIdExt, CustomerId = Guid.NewGuid(), IsActive = false });
+        var service = CreateService(participantRepository: participantRepository);
+
+        var result = await service.ResolveAsync(ssoIdExt, "participant@example.com", "Jane Doe", ["Participant"]);
+
+        Assert.Empty(result.Roles);
+        Assert.Null(result.ParticipantId);
+        Assert.True(result.HasInactiveMatch);
+    }
+
+    [Fact]
+    public async Task ResolveAsync_InactiveParticipant_MatchedByEmail_OmitsRoleAndFlagsHasInactiveMatch()
+    {
+        const string email = "participant@example.com";
+        var participantRepository = new FakeParticipantRepository();
+        await participantRepository.CreateAsync(new CoreParticipant { ParticipantId = Guid.NewGuid(), Email = email, CustomerId = Guid.NewGuid(), IsActive = false });
+        var service = CreateService(participantRepository: participantRepository);
+
+        var result = await service.ResolveAsync(Guid.NewGuid(), email, "Jane Doe", ["Participant"]);
+
+        Assert.Empty(result.Roles);
+        Assert.Null(result.ParticipantId);
+        Assert.True(result.HasInactiveMatch);
+    }
+
+    [Fact]
+    public async Task ResolveAsync_NoMatchAtAll_HasInactiveMatchIsFalse()
+    {
+        var service = CreateService();
+
+        var result = await service.ResolveAsync(Guid.NewGuid(), "unknown@example.com", "Jane Doe", ["Participant", "Test Consultant"]);
+
+        Assert.False(result.HasInactiveMatch);
+    }
+
     // System Administration business rule: an Inactive External Test Consultant must be denied
     // access to Test Consultant functionality, even if previously linked via SsoIdExt.
     [Fact]

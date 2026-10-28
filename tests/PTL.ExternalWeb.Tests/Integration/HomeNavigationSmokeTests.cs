@@ -70,7 +70,7 @@ public class HomeNavigationSmokeTests : IClassFixture<PtlExternalWebTestFactory>
         // rather than relying on construction alone.
         var body = await GetHomePageAsSignedInUserAsync(roles: "Participant");
 
-        var hrefs = Regex.Matches(body, "href=\"(?<href>[^\"]*ComingSoon[^\"]*title=Enter(%20|\\+)results[^\"]*)\"")
+        var hrefs = Regex.Matches(body, "href=\"(?<href>[^\"]*Distribution/Current[^\"]*title=Enter(%20|\\+)results[^\"]*)\"")
             .Select(match => match.Groups["href"].Value)
             .ToList();
 
@@ -252,7 +252,7 @@ public class HomeNavigationSmokeTests : IClassFixture<PtlExternalWebTestFactory>
     }
 
     [Fact]
-    public async Task QuickLinkCard_IsRealLinkThatNavigatesToComingSoonPage_NotDisabledPlaceholder()
+    public async Task QuickLinkCard_IsRealLinkThatNavigatesToItsOwnFeatureController_NotDisabledPlaceholder()
     {
         var client = _factory.CreateClient();
         var cookies = new Dictionary<string, string>();
@@ -266,17 +266,19 @@ public class HomeNavigationSmokeTests : IClassFixture<PtlExternalWebTestFactory>
         Assert.DoesNotContain("aria-disabled", homeBody);
         Assert.DoesNotContain("Cannot start yet", homeBody);
 
-        var hrefMatch = Regex.Match(homeBody, "href=\"(?<href>[^\"]*ComingSoon[^\"]*title=View(%20|\\+)schemes[^\"]*)\"");
-        Assert.True(hrefMatch.Success, "Expected to find a real href to ComingSoon for the 'View schemes' quick-link card.");
+        // "View schemes" and "Enter results" are both real migrated controllers now (Scheme,
+        // Distribution) - use "Enter results" to prove not-yet-fully-migrated quick-link cards
+        // still route to their own real, authorized controller rather than a disabled link.
+        var hrefMatch = Regex.Match(homeBody, "href=\"(?<href>[^\"]*Distribution/Current[^\"]*title=Enter(%20|\\+)results[^\"]*)\"");
+        Assert.True(hrefMatch.Success, "Expected to find a real href to DistributionController for the 'Enter results' quick-link card.");
 
-        var comingSoonResponse = await CookieForwardingHttpClient.SendWithCookiesAsync(
+        var distributionResponse = await CookieForwardingHttpClient.SendWithCookiesAsync(
             client, HttpMethod.Get, hrefMatch.Groups["href"].Value, cookies);
-        var comingSoonBody = await comingSoonResponse.Content.ReadAsStringAsync();
+        var distributionBody = await distributionResponse.Content.ReadAsStringAsync();
 
-        Assert.Equal(HttpStatusCode.OK, comingSoonResponse.StatusCode);
-        Assert.Contains("View schemes", comingSoonBody);
-        Assert.Contains("has not been migrated to the new service yet", comingSoonBody);
-        Assert.Contains("Back to Home", comingSoonBody);
+        Assert.Equal(HttpStatusCode.OK, distributionResponse.StatusCode);
+        Assert.Contains("Enter results", distributionBody);
+        Assert.Contains("has not been migrated to the new service yet", distributionBody);
     }
 
     private async Task<string> GetHomePageAsSignedInUserAsync(string? roles)

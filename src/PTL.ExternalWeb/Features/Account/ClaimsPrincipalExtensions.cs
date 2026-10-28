@@ -4,7 +4,7 @@ namespace PTL.ExternalWeb.Features.Account;
 
 /// <summary>
 /// Single place that reads the roles <see cref="ExternalUserResolver"/> resolved at sign-in -
-/// consumed by both <c>HomeController</c> and <c>_SideNavigation.cshtml</c>, so role-gating logic
+/// consumed by both <c>HomeController</c> and <c>_HeaderMenu.cshtml</c>, so role-gating logic
 /// is not duplicated between the landing page and the navigation menu.
 /// </summary>
 public static class ClaimsPrincipalExtensions
@@ -21,4 +21,9 @@ public static class ClaimsPrincipalExtensions
     /// ExternalUserClaimTypes.CanOrderOnline) - gates the Orders section.</summary>
     public static bool CanOrderOnline(this ClaimsPrincipal principal) =>
         principal.HasClaim(claim => claim.Type == ExternalUserClaimTypes.CanOrderOnline);
+
+    /// <summary>The resolved Participant's own id, or null if the Participant role didn't resolve
+    /// (e.g. a Viewer/Test Consultant-only user).</summary>
+    public static Guid? GetParticipantId(this ClaimsPrincipal principal) =>
+        Guid.TryParse(principal.FindFirst(ExternalUserClaimTypes.ParticipantId)?.Value, out var id) ? id : null;
 }

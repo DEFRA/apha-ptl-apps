@@ -28,6 +28,9 @@ internal sealed class FakeSchemeApiClient : ISchemeApiClient
     public Task<IReadOnlyList<SchemeHistoryResponse>> GetSchemeHistoryAsync(Guid sharedId, CancellationToken cancellationToken = default) =>
         Task.FromResult(HistoryResponse);
 
+    public Task<ParticipantSchemeListResponse> GetSchemesForParticipantAsync(Guid participantId, CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException();
+
     public Task<SchemeResponse?> RenewSchemeAsync(Guid schemeId, CancellationToken cancellationToken = default) =>
         Task.FromResult(RenewResponse);
 

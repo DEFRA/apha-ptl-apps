@@ -11,6 +11,7 @@ public interface ISchemeApiClient
     Task<SchemeSearchResponse> GetSchemesForYearAsync(SchemeSearchRequest request, CancellationToken cancellationToken = default);
     Task<SchemeSearchResponse> GetSchemeFamiliesAsync(int page, int pageSize, string? searchTerm = null, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<SchemeHistoryResponse>> GetSchemeHistoryAsync(Guid sharedId, CancellationToken cancellationToken = default);
+    Task<ParticipantSchemeListResponse> GetSchemesForParticipantAsync(Guid participantId, CancellationToken cancellationToken = default);
     Task<SchemeResponse?> RenewSchemeAsync(Guid schemeId, CancellationToken cancellationToken = default);
     Task<SchemeSaveResult> CreateSchemeAsync(SchemeRequest request, CancellationToken cancellationToken = default);
     Task<SchemeSaveResult> UpdateSchemeAsync(Guid schemeId, SchemeRequest request, CancellationToken cancellationToken = default);
@@ -50,6 +51,12 @@ public sealed class SchemeApiClient(HttpClient httpClient) : ISchemeApiClient
     {
         var result = await httpClient.GetFromJsonAsync<List<SchemeHistoryResponse>>($"/api/schemes/families/{sharedId}/history", cancellationToken);
         return result ?? [];
+    }
+
+    public async Task<ParticipantSchemeListResponse> GetSchemesForParticipantAsync(Guid participantId, CancellationToken cancellationToken = default)
+    {
+        var result = await httpClient.GetFromJsonAsync<ParticipantSchemeListResponse>($"/api/schemes/participant/{participantId}", cancellationToken);
+        return result ?? new ParticipantSchemeListResponse([], []);
     }
 
     public async Task<SchemeResponse?> RenewSchemeAsync(Guid schemeId, CancellationToken cancellationToken = default)

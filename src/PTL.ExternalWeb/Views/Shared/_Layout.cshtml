@@ -26,9 +26,15 @@
 @{
     var currentController = (ViewContext.RouteData.Values["controller"]?.ToString() ?? string.Empty).Trim();
     var currentAction = (ViewContext.RouteData.Values["action"]?.ToString() ?? string.Empty).Trim();
+    // NotPermitted/AccessDenied are terminal "you cannot use this service" pages reached via a
+    // diversion, not normal in-service navigation - their breadcrumb trail is actively misleading:
+    // NotPermitted has no local cookie yet, so "Home" just re-triggers the CIDM challenge and loops
+    // back here, and the "Account" segment has nowhere to link to (AccountController has no Index).
     var isAccountFlowPage = string.Equals(currentController, "Account", StringComparison.OrdinalIgnoreCase)
         && (string.Equals(currentAction, "Login", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(currentAction, "SignedOut", StringComparison.OrdinalIgnoreCase));
+            || string.Equals(currentAction, "SignedOut", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(currentAction, "NotPermitted", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(currentAction, "AccessDenied", StringComparison.OrdinalIgnoreCase));
 }
 
 @await Html.PartialAsync("_Header", ("Proficiency Testing - External", "height:80px; width:auto;"))
@@ -39,13 +45,7 @@
             @await Html.PartialAsync("_Breadcrumbs")
         }
         <div class="govuk-grid-row">
-            @if (!isAccountFlowPage)
-            {
-                <div class="govuk-grid-column-one-quarter">
-                    @await Html.PartialAsync("_SideNavigation")
-                </div>
-            }
-            <div class="@(isAccountFlowPage ? "govuk-grid-column-full" : "govuk-grid-column-three-quarters")">
+            <div class="govuk-grid-column-full">
                 @RenderBody()
             </div>
         </div>
@@ -59,6 +59,7 @@
         } from '/js/govuk-frontend-6.5.0.min.js'
         initAll()
 </script>
+<script src="/js/header-menu.js" defer></script>
 @await RenderSectionAsync("Scripts", required: false)
 </body>
 

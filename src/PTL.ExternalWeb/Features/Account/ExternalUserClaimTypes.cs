@@ -21,4 +21,9 @@ public static class ExternalUserClaimTypes
     /// <summary>Present (value "true") only when the resolved Participant's Customer has
     /// CanOrderOnline set - gates the Orders section (NavigationProvider).</summary>
     public const string CanOrderOnline = "canOrderOnline";
+
+    /// <summary>The resolved Participant's own id, only present when the Participant role
+    /// resolved - lets participant-scoped features (e.g. Scheme List) query by id directly
+    /// without re-resolving the user against PTL.Api.</summary>
+    public const string ParticipantId = "participantId";
 }

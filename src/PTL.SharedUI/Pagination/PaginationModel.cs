@@ -30,5 +30,7 @@ public sealed class PaginationModel
 
     public const int DefaultPageSize = 25;
 
-    public static IReadOnlyList<int> AvailablePageSizes { get; } = [10, 20, 25, 50, 100];
+    // 15 added for PTL.ExternalWeb's Scheme List (legacy GridView page size) alongside InternalWeb's
+    // existing choices - purely additive, no existing screen's selected size is removed.
+    public static IReadOnlyList<int> AvailablePageSizes { get; } = [10, 15, 20, 25, 50, 100];
 }

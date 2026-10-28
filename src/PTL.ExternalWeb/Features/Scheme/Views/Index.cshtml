@@ -1,0 +1,177 @@
+@model PTL.ExternalWeb.Features.Scheme.SchemeListViewModel
+@using Microsoft.AspNetCore.Html
+@using PTL.SharedUI.Pagination
+@{
+    ViewData["Title"] = "View schemes";
+    var pagination = new PaginationModel
+    {
+        CurrentPage = Model.Page,
+        PageSize = Model.PageSize,
+        TotalRecords = Model.CommercialSchemeTotalCount,
+        RouteValues = new Dictionary<string, object?>
+        {
+            ["sortBy"] = Model.SortBy,
+            ["sortDir"] = Model.SortDirection,
+            ["ncSortBy"] = Model.NonCommercialSortBy,
+            ["ncSortDir"] = Model.NonCommercialSortDirection
+        }
+    };
+
+    // Sorting is applied in-memory by the controller (AC5) - these helpers just build the
+    // toggle-direction links for each sortable column header, preserving every other query value.
+    string CommercialSortUrl(string column)
+    {
+        var dir = Model.SortBy == column && Model.SortDirection == "asc" ? "desc" : "asc";
+        return Url.Action("Index", new
+        {
+            page = 1,
+            pageSize = Model.PageSize,
+            sortBy = column,
+            sortDir = dir,
+            ncSortBy = Model.NonCommercialSortBy,
+            ncSortDir = Model.NonCommercialSortDirection
+        })!;
+    }
+
+    string NonCommercialSortUrl(string column)
+    {
+        var dir = Model.NonCommercialSortBy == column && Model.NonCommercialSortDirection == "asc" ? "desc" : "asc";
+        return Url.Action("Index", new
+        {
+            page = Model.Page,
+            pageSize = Model.PageSize,
+            sortBy = Model.SortBy,
+            sortDir = Model.SortDirection,
+            ncSortBy = column,
+            ncSortDir = dir
+        })!;
+    }
+
+    static string AriaSort(string currentSortBy, string currentSortDir, string column)
+    {
+        if (currentSortBy != column)
+        {
+            return "none";
+        }
+
+        return currentSortDir == "asc" ? "ascending" : "descending";
+    }
+}
+
+@* GOV.UK ships no sortable-table-header component - this is a hand-rolled, accessible pattern
+   (aria-sort on the th, a visually-hidden direction label alongside the glyph). The <th> itself is
+   written literally in each <tr> below (not behind a helper method) so static HTML analysis can see
+   the table's headers directly - only the repeated indicator fragment is factored out. *@
+@{
+    IHtmlContent SortIndicator(string currentSortBy, string currentSortDir, string column)
+    {
+        if (currentSortBy != column)
+        {
+            return HtmlString.Empty;
+        }
+
+        var arrow = currentSortDir == "asc" ? " \u25b2" : " \u25bc";
+        var direction = currentSortDir == "asc" ? "ascending" : "descending";
+        return new HtmlString($"""<span aria-hidden="true">{arrow}</span><span class="govuk-visually-hidden">, sorted {direction}</span>""");
+    }
+}
+
+<h1 class="govuk-heading-xl">View schemes</h1>
+
+<h2 class="govuk-heading-l">Commercial schemes</h2>
+
+@if (Model.CommercialSchemeTotalCount == 0)
+{
+    <partial name="_SchemeEmptyState" model="@("No commercial schemes are available for the current year.")" />
+}
+else
+{
+    <govuk-page-size-selector model="pagination" />
+
+    <table class="govuk-table">
+        <thead class="govuk-table__head">
+            <tr class="govuk-table__row">
+                <th scope="col" class="govuk-table__header" aria-sort="@AriaSort(Model.SortBy, Model.SortDirection, "code")">
+                    <a class="govuk-link" href="@CommercialSortUrl("code")">Scheme code@(SortIndicator(Model.SortBy, Model.SortDirection, "code"))</a>
+                </th>
+                <th scope="col" class="govuk-table__header" aria-sort="@AriaSort(Model.SortBy, Model.SortDirection, "name")">
+                    <a class="govuk-link" href="@CommercialSortUrl("name")">Scheme name@(SortIndicator(Model.SortBy, Model.SortDirection, "name"))</a>
+                </th>
+                <th scope="col" class="govuk-table__header" aria-sort="@AriaSort(Model.SortBy, Model.SortDirection, "year")">
+                    <a class="govuk-link" href="@CommercialSortUrl("year")">Year@(SortIndicator(Model.SortBy, Model.SortDirection, "year"))</a>
+                </th>
+                <th scope="col" class="govuk-table__header">Participating</th>
+            </tr>
+        </thead>
+        <tbody class="govuk-table__body">
+            @foreach (var scheme in Model.CommercialSchemes)
+            {
+                var rowClass = scheme.IsParticipating ? "govuk-table__row app-table__row--enrolled" : "govuk-table__row";
+                var cellClass = scheme.IsParticipating ? "govuk-table__cell govuk-!-font-weight-bold" : "govuk-table__cell";
+                <tr class="@rowClass">
+                    <td class="@cellClass">
+                        @scheme.Identifier
+                        @if (scheme.IsParticipating)
+                        {
+                            <span aria-hidden="true"> *</span>
+                        }
+                    </td>
+                    <td class="@cellClass">@scheme.Name</td>
+                    <td class="govuk-table__cell">@scheme.Year</td>
+                    <td class="govuk-table__cell">
+                        @if (scheme.IsParticipating)
+                        {
+                            <strong class="govuk-tag govuk-tag--green">Yes</strong>
+                        }
+                        else
+                        {
+                            <span>No</span>
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+
+    @if (Model.CommercialSchemes.Any(scheme => scheme.IsParticipating))
+    {
+        <p class="govuk-body-s govuk-hint">* You are enrolled in this scheme</p>
+    }
+
+    <govuk-pagination model="pagination" />
+}
+
+<h2 class="govuk-heading-l">Non-commercial schemes</h2>
+
+@if (Model.NonCommercialSchemes.Count == 0)
+{
+    <partial name="_SchemeEmptyState" model="@("You are not currently registered to any non-commercial schemes.")" />
+}
+else
+{
+    <table class="govuk-table">
+        <thead class="govuk-table__head">
+            <tr class="govuk-table__row">
+                <th scope="col" class="govuk-table__header" aria-sort="@AriaSort(Model.NonCommercialSortBy, Model.NonCommercialSortDirection, "code")">
+                    <a class="govuk-link" href="@NonCommercialSortUrl("code")">Scheme code@(SortIndicator(Model.NonCommercialSortBy, Model.NonCommercialSortDirection, "code"))</a>
+                </th>
+                <th scope="col" class="govuk-table__header" aria-sort="@AriaSort(Model.NonCommercialSortBy, Model.NonCommercialSortDirection, "name")">
+                    <a class="govuk-link" href="@NonCommercialSortUrl("name")">Scheme name@(SortIndicator(Model.NonCommercialSortBy, Model.NonCommercialSortDirection, "name"))</a>
+                </th>
+                <th scope="col" class="govuk-table__header" aria-sort="@AriaSort(Model.NonCommercialSortBy, Model.NonCommercialSortDirection, "year")">
+                    <a class="govuk-link" href="@NonCommercialSortUrl("year")">Year@(SortIndicator(Model.NonCommercialSortBy, Model.NonCommercialSortDirection, "year"))</a>
+                </th>
+            </tr>
+        </thead>
+        <tbody class="govuk-table__body">
+            @foreach (var scheme in Model.NonCommercialSchemes)
+            {
+                <tr class="govuk-table__row">
+                    <td class="govuk-table__cell">@scheme.Identifier</td>
+                    <td class="govuk-table__cell">@scheme.Name</td>
+                    <td class="govuk-table__cell">@scheme.Year</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}

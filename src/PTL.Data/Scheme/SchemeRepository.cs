@@ -120,6 +120,24 @@ public sealed class SchemeRepository(IDbConnectionFactory connectionFactory) : I
             new { SharedId = sharedId })).ToList();
     }
 
+    public async Task<IReadOnlyList<ParticipantSchemeEntity>> GetCommercialSchemesBySsoIdAsync(Guid ssoId, int currentFinancialYear, CancellationToken cancellationToken = default)
+    {
+        using var connection = connectionFactory.CreateConnection();
+
+        return (await connection.QueryAsync<ParticipantSchemeEntity>(
+            "EXEC dbo.spgCommercialSchemesBySsoId @SsoId, @CurrentFinancialYear",
+            new { SsoId = ssoId, CurrentFinancialYear = currentFinancialYear })).ToList();
+    }
+
+    public async Task<IReadOnlyList<ParticipantSchemeEntity>> GetNonCommercialSchemesBySsoIdAsync(Guid ssoId, int currentFinancialYear, CancellationToken cancellationToken = default)
+    {
+        using var connection = connectionFactory.CreateConnection();
+
+        return (await connection.QueryAsync<ParticipantSchemeEntity>(
+            "EXEC dbo.spgNonCommercialSchemesBySsoId @SsoId, @CurrentFinancialYear",
+            new { SsoId = ssoId, CurrentFinancialYear = currentFinancialYear })).ToList();
+    }
+
     public async Task<CoreScheme> CreateAsync(CoreScheme scheme, CancellationToken cancellationToken = default)
     {
         using var connection = connectionFactory.CreateConnection();
