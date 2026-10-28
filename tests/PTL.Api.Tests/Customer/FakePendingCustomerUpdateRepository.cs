@@ -23,6 +23,17 @@ internal sealed class FakePendingCustomerUpdateRepository : IPendingCustomerUpda
     public Task<PendingCustomerUpdate?> GetByCustomerIdAsync(Guid customerId, CancellationToken cancellationToken = default) =>
         Task.FromResult(_byCustomerId.TryGetValue(customerId, out var pending) && pending.IsSubmitted && !pending.IsDeleted ? pending : null);
 
+    public Task UpsertAsync(PendingCustomerUpdate update, CancellationToken cancellationToken = default)
+    {
+        if (update.PendingCustomerUpdateId == Guid.Empty)
+        {
+            update.PendingCustomerUpdateId = Guid.NewGuid();
+        }
+
+        _byCustomerId[update.CustomerId] = update;
+        return Task.CompletedTask;
+    }
+
     public Task<bool> MarkDecidedAsync(Guid customerId, Guid pendingCustomerUpdateId, CancellationToken cancellationToken = default)
     {
         if (!_byCustomerId.TryGetValue(customerId, out var pending) || pending.PendingCustomerUpdateId != pendingCustomerUpdateId)

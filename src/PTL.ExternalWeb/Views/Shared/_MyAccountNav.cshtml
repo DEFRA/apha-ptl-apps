@@ -1,0 +1,33 @@
+@{
+    // Legacy ProfileNav.ascx - rendered atop both Edit Customer/Invoice Details and Edit
+    // Participant Details, marking whichever page is current as plain (non-link) text.
+    var controller = (ViewContext.RouteData.Values["controller"]?.ToString() ?? string.Empty).Trim();
+}
+
+<h1 class="govuk-heading-xl">My account</h1>
+
+<nav aria-label="My account">
+    <p class="govuk-body-s govuk-!-margin-bottom-2">Contents</p>
+    <ul class="govuk-list">
+        <li>
+            @if (string.Equals(controller, "Participant", StringComparison.OrdinalIgnoreCase))
+            {
+                <span aria-current="page">Edit participant details</span>
+            }
+            else
+            {
+                <a class="govuk-link" asp-controller="Participant" asp-action="Index">Edit participant details</a>
+            }
+        </li>
+        <li>
+            @if (string.Equals(controller, "Customer", StringComparison.OrdinalIgnoreCase))
+            {
+                <span aria-current="page">Edit customer/invoice details</span>
+            }
+            else
+            {
+                <a class="govuk-link" asp-controller="Customer" asp-action="Index">Edit customer/invoice details</a>
+            }
+        </li>
+    </ul>
+</nav>

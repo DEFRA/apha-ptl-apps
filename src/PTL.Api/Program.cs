@@ -112,6 +112,7 @@ builder.Services.AddScoped<PTL.Core.Audit.IActingUserAccessor, HttpActingUserAcc
 builder.Services.AddScoped<ICustomerRepository, CustomerRepository>();
 builder.Services.AddScoped<IPendingCustomerUpdateRepository, PendingCustomerUpdateRepository>();
 builder.Services.AddScoped<ICustomerService, CustomerService>();
+builder.Services.AddScoped<ICustomerDetailsEditService, CustomerDetailsEditService>();
 
 builder.Services.AddScoped<PTL.Core.Search.ISearchRepository, PTL.Data.Search.SearchRepository>();
 builder.Services.AddScoped<PTL.Core.Search.ISearchService, PTL.Core.Search.SearchService>();
