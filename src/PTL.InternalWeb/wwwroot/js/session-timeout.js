@@ -74,8 +74,15 @@
             return;
         }
 
-        countdownEl.textContent = String(remainingSeconds);
+        countdownEl.textContent = formatCountdown(remainingSeconds);
         announceMilestone(remainingSeconds);
+    }
+
+    // Zero-padded mm:ss (02:00, 01:59 ...); _SessionTimeoutWarning.cshtml renders the first value the same way.
+    function formatCountdown(totalSeconds) {
+        var minutes = Math.floor(totalSeconds / 60);
+        var seconds = totalSeconds % 60;
+        return String(minutes).padStart(2, '0') + ':' + String(seconds).padStart(2, '0');
     }
 
     function announceMilestone(remainingSeconds) {
