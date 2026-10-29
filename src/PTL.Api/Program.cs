@@ -162,12 +162,11 @@ builder.Services.AddScoped<IPendingOrderContractWriter, PendingOrderContractWrit
 builder.Services.AddScoped<IPendingOrderDecisionEmails, PendingOrderDecisionEmails>();
 builder.Services.AddScoped<IPendingOrderEmailPersonaliser, PendingOrderEmailPersonaliser>();
 
-// Approve/Decline emails: sent through GOV.UK Notify straight after the decision, retried by the hosted scheduler.
+// Approve/Decline emails: sent through GOV.UK Notify straight after the decision; a failed send is not retried.
 builder.Services.Configure<OnlineOrderEmailOptions>(builder.Configuration.GetSection(OnlineOrderEmailOptions.SectionName));
-builder.Services.AddSingleton<EmailSendGuard>();
 builder.Services.AddScoped<IPendingOrderNotifier, PendingOrderNotifier>();
 
-// Customer and participant update emails: same pattern - sent through GOV.UK Notify when the update is decided, retried by the scheduler.
+// Customer and participant update emails: same pattern - sent through GOV.UK Notify when the update is decided, not retried.
 builder.Services.Configure<CustomerUpdateEmailOptions>(builder.Configuration.GetSection(CustomerUpdateEmailOptions.SectionName));
 builder.Services.Configure<ParticipantUpdateEmailOptions>(builder.Configuration.GetSection(ParticipantUpdateEmailOptions.SectionName));
 builder.Services.AddScoped<ICustomerUpdateNotifier, CustomerUpdateNotifier>();

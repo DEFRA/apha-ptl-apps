@@ -21,7 +21,7 @@ public interface IPendingOrderService
     Task<bool> UpdateSchemeAsync(Guid pendingContractId, Guid pendingParticipantSchemeId, PendingOrderSchemeEdit edit, CancellationToken cancellationToken = default);
 
     // Creates the contract and its participant schemes, soft-deletes the pending order, then sends the
-    // approval emails (a failed send never undoes the approval; the scheduler retries it). Throws PendingOrderValidationException for an over-long purchase order number/comments.
+    // approval emails (a failed send never undoes the approval and is not retried). Throws PendingOrderValidationException for an over-long purchase order number/comments.
     Task<bool> ApprovePendingOrderAsync(Guid pendingContractId, string purchaseOrderNumber, string comments = "", CancellationToken cancellationToken = default);
 
     // Deletes every pending scheme line, soft-deletes the pending order, then sends the decline emails.

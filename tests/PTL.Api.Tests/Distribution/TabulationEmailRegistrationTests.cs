@@ -59,15 +59,6 @@ public class TabulationEmailRegistrationTests : IClassFixture<WebApplicationFact
     }
 
     [Fact]
-    public void EmailSendGuard_IsOneSingletonSharedByEveryScope()
-    {
-        var root = _factory.Services.GetRequiredService<EmailSendGuard>();
-        using var scope = _factory.Services.CreateScope();
-
-        Assert.Same(root, scope.ServiceProvider.GetRequiredService<EmailSendGuard>());
-    }
-
-    [Fact]
     public void TabulationEmailService_ResolvesFromTheRealContainer()
     {
         using var scope = _factory.Services.CreateScope();
