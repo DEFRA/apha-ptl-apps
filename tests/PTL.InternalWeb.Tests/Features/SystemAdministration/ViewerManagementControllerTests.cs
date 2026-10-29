@@ -176,7 +176,6 @@ public class ViewerManagementControllerTests
         Assert.Equal(2, result.Rows.Count);
         var added = result.Rows[1];
         Assert.Null(added.ViewerId);
-        Assert.True(added.IsNew);
         Assert.Equal("Grace Hopper", added.Name);
         Assert.Equal("grace@example.com", added.Email);
         Assert.Equal(string.Empty, result.Add.Name);

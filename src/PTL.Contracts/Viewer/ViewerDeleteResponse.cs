@@ -1,6 +1,5 @@
 namespace PTL.Contracts.Viewer;
 
-// Always Success=true unless the viewer id no longer exists - spdViewer is an unconditional
-// delete (no allocation block server-side); the confirmation listing assigned schemes/
-// participants is a client-side-only courtesy, matching legacy ManageViewers.aspx.
+// Success is false (with Message populated) when the viewer no longer exists or is still assigned to
+// schemes/participants - ViewerService.DeleteAsync blocks that, as legacy ManageViewers.aspx intended.
 public sealed record ViewerDeleteResponse(bool Success, string? Message);

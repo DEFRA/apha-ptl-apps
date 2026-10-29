@@ -3,7 +3,7 @@ using System.Text.Json.Serialization;
 using PTL.Common.Graph;
 using PTL.Core.User;
 
-namespace PTL.Api.Infrastructure;
+namespace PTL.InternalWeb.Infrastructure;
 
 /// <summary>
 /// Staff directory search backed by Microsoft Graph (replaces legacy UserCreate.aspx's LDAP DirectorySearcher).
