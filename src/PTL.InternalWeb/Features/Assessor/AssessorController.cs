@@ -55,7 +55,12 @@ public sealed class AssessorController(IAssessorApiClient apiClient) : Controlle
     {
         ArgumentNullException.ThrowIfNull(model);
 
-        var loaded = await apiClient.GetEntryAsync(model.SampleTestId, model.ParticipantId, cancellationToken);
+        if (model.SampleTestId is not { } sampleTestId || model.ParticipantId is not { } participantId)
+        {
+            return NotFound();
+        }
+
+        var loaded = await apiClient.GetEntryAsync(sampleTestId, participantId, cancellationToken);
         if (loaded.Value is not { } entry || !loaded.IsOk)
         {
             return NotOk(loaded.Status);
@@ -72,13 +77,13 @@ public sealed class AssessorController(IAssessorApiClient apiClient) : Controlle
             return View(model);
         }
 
-        var saved = await apiClient.SaveEntryAsync(model.SampleTestId, model.ParticipantId, model.ToRequest(), cancellationToken);
+        var saved = await apiClient.SaveEntryAsync(sampleTestId, participantId, model.ToRequest(), cancellationToken);
         switch (saved.Status)
         {
             case AssessorSaveStatus.Saved:
                 TempData.SetNotification(NotificationType.Success, SavedNotification);
                 return command == AssessorEntryViewModel.ApplyCommand
-                    ? RedirectToAction(nameof(AssessmentEntry), new { sampleTestId = model.SampleTestId, participantId = model.ParticipantId, testId = entry.TestId, year = model.Year })
+                    ? RedirectToAction(nameof(AssessmentEntry), new { sampleTestId, participantId, testId = entry.TestId, year = model.Year })
                     : RedirectToAction(nameof(AssessmentItemList), new { testId = entry.TestId, year = model.Year });
             case AssessorSaveStatus.Invalid:
                 foreach (var error in saved.Errors)

@@ -83,41 +83,49 @@ public static class AssessorEntryPlanner
 
         foreach (var category in current.Categories)
         {
-            if (!requested.TryGetValue(category.CategoryItemId, out var request))
+            if (requested.TryGetValue(category.CategoryItemId, out var request) && PlanCategory(category, request, save) is { } planned)
             {
-                continue;
+                commands.AddRange(planned.Commands);
+                changes.Add(planned.Change);
             }
+        }
 
-            var known = category.Criteria.Select(c => c.CriterionItemId).ToHashSet();
-            if (request.CriterionItemIds.Any(id => !known.Contains(id)))
-            {
-                throw new InvalidOperationException($"A criterion is not part of the category {category.CategoryItemId}.");
-            }
+        return (commands, changes.Count == 0 ? null : string.Join("; ", changes));
+    }
 
-            var ticked = request.CriterionItemIds.ToHashSet();
-            var isNew = category.ActualScore is null;
-            var added = category.Criteria.Where(c => ticked.Contains(c.CriterionItemId) && (isNew || !c.IsSelected)).ToList();
-            var removed = isNew ? [] : category.Criteria.Where(c => c.IsSelected && !ticked.Contains(c.CriterionItemId)).ToList();
-            var scoreChanged = isNew || category.ActualScore != request.Score;
-            if (!scoreChanged && added.Count == 0 && removed.Count == 0)
-            {
-                continue;
-            }
+    // Null when the category's score and criteria are as saved.
+    private static (List<AssessorCommand> Commands, string Change)? PlanCategory(AssessorCategoryEntity category, AssessorCategorySave request, AssessorEntrySave save)
+    {
+        var known = category.Criteria.Select(c => c.CriterionItemId).ToHashSet();
+        if (request.CriterionItemIds.Any(id => !known.Contains(id)))
+        {
+            throw new InvalidOperationException($"A criterion is not part of the category {category.CategoryItemId}.");
+        }
 
-            commands.Add(new AssessorCommand(
+        var ticked = request.CriterionItemIds.ToHashSet();
+        var isNew = category.ActualScore is null;
+        var added = category.Criteria.Where(c => ticked.Contains(c.CriterionItemId) && (isNew || !c.IsSelected)).ToList();
+        var removed = isNew ? [] : category.Criteria.Where(c => c.IsSelected && !ticked.Contains(c.CriterionItemId)).ToList();
+        var scoreChanged = isNew || category.ActualScore != request.Score;
+        if (!scoreChanged && added.Count == 0 && removed.Count == 0)
+        {
+            return null;
+        }
+
+        List<AssessorCommand> commands =
+        [
+            new(
                 isNew ? "spiActualCategoryItemResult" : "spuActualCategoryItemResult",
                 [
                     new("ActualResultsId", save.ParticipantId),
                     new("CategoryItemId", category.CategoryItemId),
                     new("SampleTestId", save.SampleTestId),
                     new("CategoryScore", request.Score),
-                ]));
-            commands.AddRange(added.Select(c => Criterion("spiActualCriterionItemResult", save, c)));
-            commands.AddRange(removed.Select(c => Criterion("spdActualCriterionItemResult", save, c)));
-            changes.Add(Describe(category, request.Score, scoreChanged, added, removed));
-        }
-
-        return (commands, changes.Count == 0 ? null : string.Join("; ", changes));
+                ]),
+        ];
+        commands.AddRange(added.Select(c => Criterion("spiActualCriterionItemResult", save, c)));
+        commands.AddRange(removed.Select(c => Criterion("spdActualCriterionItemResult", save, c)));
+        return (commands, Describe(category, request.Score, scoreChanged, added, removed));
     }
 
     private static AssessorCommand Criterion(string procedure, AssessorEntrySave save, AssessorCriterionEntity criterion) =>

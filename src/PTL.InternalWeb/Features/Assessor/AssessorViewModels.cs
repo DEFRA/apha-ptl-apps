@@ -79,8 +79,11 @@ public sealed class AssessorEntryViewModel
     [BindNever]
     public AssessorEntryResponse? Entry { get; set; }
 
-    public Guid SampleTestId { get; set; }
-    public Guid ParticipantId { get; set; }
+    [Required]
+    public Guid? SampleTestId { get; set; }
+
+    [Required]
+    public Guid? ParticipantId { get; set; }
 
     // The year the menu was showing, so Cancel and Back return to it.
     public int? Year { get; set; }

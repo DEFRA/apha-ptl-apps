@@ -254,6 +254,27 @@ public class AssessorControllerTests
         Assert.Empty(_apiClient.Saved);
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task AssessmentEntry_Post_MissingAnId_IsNotFoundWithoutCallingTheApi(bool missingSampleTest)
+    {
+        _apiClient.Entry = new(AssessorApiStatus.Ok, Entry());
+        var model = Posted();
+        if (missingSampleTest)
+        {
+            model.SampleTestId = null;
+        }
+        else
+        {
+            model.ParticipantId = null;
+        }
+
+        Assert.IsType<NotFoundResult>(await Controller.AssessmentEntry(model, "save", CancellationToken.None));
+        Assert.Empty(_apiClient.RequestedEntries);
+        Assert.Empty(_apiClient.Saved);
+    }
+
     [Fact]
     public async Task AssessmentEntry_Post_ATestAlreadySubmitted_ReturnsToTheItemsWithAnErrorAndSavesNothing()
     {
