@@ -438,4 +438,235 @@ public class ResultsSignOffRepositoryTests
         Assert.False(connection.LastTransaction.Committed);
         Assert.DoesNotContain(connection.ExecutedCommands, c => c.CommandText == SetStateSql);
     }
+
+    private static readonly Guid FullTestId = Guid.Parse("66666666-0000-0000-0000-000000000001");
+    private static readonly Guid FullSampleId = Guid.Parse("66666666-0000-0000-0000-000000000002");
+    private static readonly Guid FullSampleTestId = Guid.Parse("66666666-0000-0000-0000-000000000003");
+    private static readonly Guid FullMethodId = Guid.Parse("66666666-0000-0000-0000-000000000004");
+    private static readonly Guid FullResultId = Guid.Parse("66666666-0000-0000-0000-000000000005");
+    private static readonly Guid FullCategoryId = Guid.Parse("66666666-0000-0000-0000-000000000006");
+    private static readonly Guid FullCriterionId = Guid.Parse("66666666-0000-0000-0000-000000000007");
+    private static readonly Guid FullDistributionParticipantId = Guid.Parse("66666666-0000-0000-0000-000000000008");
+    private static readonly Guid FullParticipantId = Guid.Parse("66666666-0000-0000-0000-000000000009");
+    private static readonly Guid FullReceiptId = Guid.Parse("66666666-0000-0000-0000-00000000000a");
+    private static readonly Guid FullAssessorId = Guid.Parse("66666666-0000-0000-0000-00000000000b");
+    private static readonly Guid FullAttachmentId = Guid.Parse("66666666-0000-0000-0000-00000000000c");
+
+    // Every draft result set filled in, so the whole read-and-map path from spgDistributionTabulation to the publish plan runs.
+    private static DataSet FullDraft()
+    {
+        var assessed = new DateTime(2026, 9, 1);
+        return Sets(
+            Rows(
+                Table(("fldDistributionTabulationId", typeof(Guid)), ("fldMonthlyDistributionSchemeId", typeof(Guid)), ("fldTabulationName", typeof(string)),
+                    ("fldSchemeName", typeof(string)), ("fldSchemeIdentifier", typeof(string)), ("fldRequiresAssessment", typeof(bool)),
+                    ("fldDistributionReference", typeof(string)), ("fldDistributionReferenceSuffix", typeof(string)), ("fldScheduleCode", typeof(string)),
+                    ("fldComments", typeof(string)), ("fldTestConsultantComments", typeof(string)), ("fldTestConsultantCommentsAuthor", typeof(string)),
+                    ("fldTestConsultantCommentsDept", typeof(string)), ("fldDistributionDate", typeof(DateTime)), ("fldSchemeVersionDate", typeof(DateTime)),
+                    ("fldHasRatings", typeof(bool)), ("fldIntendedResultsOnly", typeof(bool)), ("fldSingleParticipantTabulation", typeof(bool)),
+                    ("fldAvailableToParticipants", typeof(bool)), ("fldAvailableToViewers", typeof(bool)), ("fldStandardTabulationText", typeof(string))),
+                [TabulationA1, SchemeA, "FINAL REPORT", "Brucella", "PT0001", true, "17001", "/BA", "PT0001", "Sample comments", "TC comments", "Dr TC", "APHA",
+                    assessed, assessed, true, false, true, true, false, "Standard text"]),
+            Rows(
+                Table(("fldTestId", typeof(Guid)), ("fldTestType", typeof(string)), ("fldAssessmentSubmitted", typeof(DateTime)), ("fldAssessorId", typeof(Guid)), ("fldAssessorName", typeof(string))),
+                [FullTestId, "Serology", assessed, FullAssessorId, "Ann Assessor"]),
+            Rows(Table(("fldTestId", typeof(Guid)), ("fldTestMethodItemId", typeof(Guid)), ("fldTestMethodItemType", typeof(string))), [FullTestId, FullMethodId, "ELISA"]),
+            Rows(Table(("fldTestId", typeof(Guid)), ("fldTestResultItemId", typeof(Guid)), ("fldTestResultItemType", typeof(string))), [FullTestId, FullResultId, "Titre"]),
+            Rows(Table(("fldCategoryItemId", typeof(Guid)), ("fldTestId", typeof(Guid)), ("fldName", typeof(string))), [FullCategoryId, FullTestId, "Accuracy"]),
+            Rows(
+                Table(("fldTestId", typeof(Guid)), ("fldCategoryItemId", typeof(Guid)), ("fldCriterionItemId", typeof(Guid)), ("fldName", typeof(string))),
+                [FullTestId, FullCategoryId, FullCriterionId, "Within range"]),
+            Rows(
+                Table(("fldTestId", typeof(Guid)), ("fldSampleId", typeof(Guid)), ("fldSampleNumber", typeof(string)), ("fldTabulationDescription", typeof(string)), ("fldSampleTestId", typeof(Guid))),
+                [FullTestId, FullSampleId, "S1", "Serum", FullSampleTestId]),
+            Rows(
+                Table(("fldDistributionParticipantId", typeof(Guid)), ("fldParticipantId", typeof(Guid)), ("fldLabCode", typeof(string)), ("fldNilReturnReason", typeof(string))),
+                [FullDistributionParticipantId, FullParticipantId, "L001", "None"]),
+            Rows(Table(("fldSampleId", typeof(Guid)), ("fldParticipantId", typeof(Guid)), ("fldRating", typeof(string))), [FullSampleId, FullParticipantId, "Good"]),
+            Rows(
+                Table(("fldParticipantId", typeof(Guid)), ("fldTestMethodItemId", typeof(Guid)), ("fldAmendedResult", typeof(string))),
+                [FullParticipantId, FullMethodId, "Positive"]),
+            Rows(
+                Table(("fldSampleId", typeof(Guid)), ("fldParticipantId", typeof(Guid)), ("fldTestResultItemId", typeof(Guid)), ("fldAmendedResult", typeof(string))),
+                [FullSampleId, FullParticipantId, FullResultId, "1:64"]),
+            Rows(
+                Table(("fldParticipantId", typeof(Guid)), ("fldCategoryItemId", typeof(Guid)), ("fldSampleTestId", typeof(Guid)), ("fldCategoryScore", typeof(int)),
+                    ("fldSampleId", typeof(Guid)), ("fldTestId", typeof(Guid)), ("fldAssessmentSubmitted", typeof(DateTime))),
+                [FullParticipantId, FullCategoryId, FullSampleTestId, 3, FullSampleId, FullTestId, assessed]),
+            Rows(
+                Table(("fldParticipantId", typeof(Guid)), ("fldCategoryItemId", typeof(Guid)), ("fldTestId", typeof(Guid)), ("fldCriterionItemId", typeof(Guid)),
+                    ("fldSampleId", typeof(Guid)), ("fldName", typeof(string))),
+                [FullParticipantId, FullCategoryId, FullTestId, FullCriterionId, FullSampleId, "Within range"]),
+            Rows(Table(("fldTestMethodItemId", typeof(Guid)), ("fldIntendedResult", typeof(string))), [FullMethodId, "Positive"]),
+            Rows(
+                Table(("fldSampleId", typeof(Guid)), ("fldTestResultItemId", typeof(Guid)), ("fldIntendedResult", typeof(string)), ("fldIntendedResult2", typeof(string))),
+                [FullSampleId, FullResultId, "1:32", "1:64"]),
+            Empty(),
+            Empty(),
+            Rows(
+                Table(("fldTestId", typeof(Guid)), ("fldSampleId", typeof(Guid)), ("fldSampleReceiptId", typeof(Guid)), ("fldSampleTestId", typeof(Guid)), ("fldParticipantId", typeof(Guid)),
+                    ("fldScore", typeof(int)), ("fldAssessmentComment", typeof(string)), ("fldAssessorId", typeof(Guid)), ("fldAssessorName", typeof(string)),
+                    ("fldAssessmentDate", typeof(DateTime)), ("fldSubmissionDate", typeof(DateTime)), ("fldNonSubmissionDate", typeof(DateTime)),
+                    ("fldNonCapableDate", typeof(DateTime)), ("fldAssessmentSubmitted", typeof(DateTime))),
+                [FullTestId, FullSampleId, FullReceiptId, FullSampleTestId, FullParticipantId, 4, "Fine", FullAssessorId, "Ann Assessor", assessed, assessed, assessed, assessed, assessed]),
+            Rows(
+                Table(("fldMonthlyDistributionAttachmentId", typeof(Guid)), ("fldFileName", typeof(string)), ("fldContentType", typeof(string)),
+                    ("fldFileData", typeof(byte[])), ("fldUploadDate", typeof(DateTime))),
+                [FullAttachmentId, "report.pdf", "application/pdf", new byte[] { 1, 2, 3 }, assessed]));
+    }
+
+    [Fact]
+    public async Task AuthoriseAsync_FullDraft_PublishesEveryRowTheDraftHolds()
+    {
+        var (repository, connection) = AwaitingWithSignatory();
+        connection.DefaultNonQueryResult = 1;
+        connection.RespondToQuery(DraftSql, FullDraft());
+        connection.RespondToQuery(
+            SchemeSql,
+            Rows(Table(("fldMonthId", typeof(int)), ("fldYearId", typeof(int)), ("fldIsAccredited", typeof(bool)), ("fldRequiresAssessment", typeof(bool))), [6, 2026, true, true]));
+        connection.RespondToQuery(
+            IntendedResultsSql,
+            Sets(Empty(), Rows(Table(("fldSampleId", typeof(Guid)), ("fldSampleNumber", typeof(string)), ("fldTabulationDescription", typeof(string))), [FullSampleId, "S1", "Serum"])));
+
+        var result = await repository.AuthoriseAsync(TabulationA1, Signatory, Created);
+
+        Assert.Equal(ResultsSignOffOutcome.Done, result.Outcome);
+        FakeDbCommand Published(string procedure) =>
+            Assert.Single(connection.ExecutedCommands, c => c.CommandText.StartsWith($"EXEC dbo.{procedure} ", StringComparison.Ordinal));
+
+        var header = Published("spiPublishedTabulation");
+        Assert.Equal(
+            ("FINAL REPORT", "17001/BA/PT0001", "PT0001", "Brucella", "Sample comments", "TC comments", "Dr TC", "APHA", true, true, "Standard text"),
+            ((string)header.ParameterValue("Name")!, (string)header.ParameterValue("Distribution")!, (string)header.ParameterValue("SchemeIdentifier")!, (string)header.ParameterValue("SchemeName")!,
+                (string)header.ParameterValue("SampleComments")!, (string)header.ParameterValue("TestConsultantComments")!, (string)header.ParameterValue("TestConsultantCommentsAuthor")!,
+                (string)header.ParameterValue("TestConsultantCommentsDept")!, header.ParameterValue("HasRatings")!, header.ParameterValue("RequiresAssessment")!, (string)header.ParameterValue("StandardTabulationText")!));
+
+        var sample = Published("spiPublishedSample");
+        Assert.Equal(("S1", "Serum"), ((string)sample.ParameterValue("SampleNumber")!, (string)sample.ParameterValue("TabulationDescription")!));
+
+        var test = Published("spiPublishedTest");
+        Assert.Equal(("Serology", "Ann Assessor", FullAssessorId), ((string)test.ParameterValue("Name")!, (string)test.ParameterValue("AssessorName")!, test.ParameterValue("AssessorId")!));
+        Assert.Equal(sample.ParameterValue("PublishedSampleId"), Published("spiPublishedSampleTest").ParameterValue("PublishedSampleId"));
+        Assert.Equal("Titre", Published("spiPublishedTestResultItem").ParameterValue("Name"));
+        Assert.Equal("ELISA", Published("spiPublishedTestMethodItem").ParameterValue("Name"));
+        Assert.Equal("Accuracy", Published("spiPublishedCategoryItem").ParameterValue("Name"));
+        Assert.Equal("Within range", Published("spiPublishedCriterionItem").ParameterValue("Name"));
+
+        Assert.Equal("Positive", Published("spiPublishedIntendedMethodItem").ParameterValue("Result"));
+        var intended = Published("spiPublishedIntendedResultItem");
+        Assert.Equal(("1:32", "1:64"), ((string)intended.ParameterValue("Result")!, (string)intended.ParameterValue("Result2")!));
+
+        var participant = Published("spiPublishedParticipant");
+        Assert.Equal(("L001", "None"), ((string)participant.ParameterValue("LabCode")!, (string)participant.ParameterValue("NilReturnReason")!));
+        Assert.Equal("Good", Published("spiPublishedSampleRating").ParameterValue("Rating"));
+        Assert.Equal("Positive", Published("spiPublishedParticipantMethodItem").ParameterValue("Result"));
+        Assert.Equal("1:64", Published("spiPublishedParticipantResultItem").ParameterValue("Result"));
+
+        var assessment = Published("spiPublishedParticipantSampleTest");
+        Assert.Equal((FullReceiptId, "Fine", 4, "Ann Assessor"), (assessment.ParameterValue("SampleReceiptId")!, (string)assessment.ParameterValue("AssessmentComment")!, assessment.ParameterValue("AssessmentScore")!, (string)assessment.ParameterValue("AssessorName")!));
+        Assert.Equal(3, Published("spiPublishedParticipantCategoryItem").ParameterValue("Score"));
+        Assert.NotNull(Published("spiPublishedParticipantCriterionItem").ParameterValue("PublishedCriterionItemId"));
+
+        var attachment = Published("spiPublishedAttachment");
+        Assert.Equal(("report.pdf", "application/pdf", FullAttachmentId), ((string)attachment.ParameterValue("FileName")!, (string)attachment.ParameterValue("ContentType")!, attachment.ParameterValue("AttachmentId")!));
+        Assert.Equal(new byte[] { 1, 2, 3 }, (byte[])attachment.ParameterValue("FileData")!);
+
+        Assert.True(connection.LastTransaction!.Committed);
+    }
+
+    [Fact]
+    public async Task AuthoriseAsync_DraftWithNullColumns_PublishesEmptyValuesInsteadOfNulls()
+    {
+        var (repository, connection) = AwaitingWithSignatory();
+        connection.DefaultNonQueryResult = 1;
+        var noValue = DBNull.Value;
+        connection.RespondToQuery(DraftSql, Sets(
+            Rows(
+                Table(("fldDistributionTabulationId", typeof(Guid)), ("fldMonthlyDistributionSchemeId", typeof(Guid)), ("fldTabulationName", typeof(string)), ("fldRequiresAssessment", typeof(bool))),
+                [TabulationA1, SchemeA, noValue, noValue]),
+            Rows(
+                Table(("fldTestId", typeof(Guid)), ("fldTestType", typeof(string)), ("fldAssessorId", typeof(Guid)), ("fldAssessorName", typeof(string))),
+                [FullTestId, noValue, noValue, noValue]),
+            Rows(Table(("fldTestId", typeof(Guid)), ("fldTestMethodItemId", typeof(Guid)), ("fldTestMethodItemType", typeof(string))), [FullTestId, FullMethodId, noValue]),
+            Rows(Table(("fldTestId", typeof(Guid)), ("fldTestResultItemId", typeof(Guid)), ("fldTestResultItemType", typeof(string))), [FullTestId, FullResultId, noValue]),
+            Rows(Table(("fldCategoryItemId", typeof(Guid)), ("fldTestId", typeof(Guid)), ("fldName", typeof(string))), [FullCategoryId, FullTestId, noValue]),
+            Rows(
+                Table(("fldTestId", typeof(Guid)), ("fldCategoryItemId", typeof(Guid)), ("fldCriterionItemId", typeof(Guid)), ("fldName", typeof(string))),
+                [FullTestId, FullCategoryId, FullCriterionId, noValue]),
+            Rows(
+                Table(("fldTestId", typeof(Guid)), ("fldSampleId", typeof(Guid)), ("fldSampleNumber", typeof(string)), ("fldTabulationDescription", typeof(string)), ("fldSampleTestId", typeof(Guid))),
+                [FullTestId, FullSampleId, noValue, noValue, FullSampleTestId]),
+            Rows(
+                Table(("fldDistributionParticipantId", typeof(Guid)), ("fldParticipantId", typeof(Guid)), ("fldLabCode", typeof(string)), ("fldNilReturnReason", typeof(string))),
+                [FullDistributionParticipantId, FullParticipantId, noValue, noValue]),
+            Rows(Table(("fldSampleId", typeof(Guid)), ("fldParticipantId", typeof(Guid)), ("fldRating", typeof(string))), [FullSampleId, FullParticipantId, noValue]),
+            Rows(Table(("fldParticipantId", typeof(Guid)), ("fldTestMethodItemId", typeof(Guid)), ("fldAmendedResult", typeof(string))), [FullParticipantId, FullMethodId, noValue]),
+            Rows(
+                Table(("fldSampleId", typeof(Guid)), ("fldParticipantId", typeof(Guid)), ("fldTestResultItemId", typeof(Guid)), ("fldAmendedResult", typeof(string))),
+                [FullSampleId, FullParticipantId, FullResultId, noValue]),
+            Rows(
+                Table(("fldParticipantId", typeof(Guid)), ("fldCategoryItemId", typeof(Guid)), ("fldSampleTestId", typeof(Guid)), ("fldCategoryScore", typeof(int)),
+                    ("fldSampleId", typeof(Guid)), ("fldTestId", typeof(Guid))),
+                [FullParticipantId, FullCategoryId, FullSampleTestId, noValue, FullSampleId, FullTestId]),
+            Rows(
+                Table(("fldParticipantId", typeof(Guid)), ("fldCategoryItemId", typeof(Guid)), ("fldTestId", typeof(Guid)), ("fldCriterionItemId", typeof(Guid)),
+                    ("fldSampleId", typeof(Guid)), ("fldName", typeof(string))),
+                [FullParticipantId, FullCategoryId, FullTestId, FullCriterionId, FullSampleId, noValue]),
+            Rows(Table(("fldTestMethodItemId", typeof(Guid)), ("fldIntendedResult", typeof(string))), [FullMethodId, noValue]),
+            Rows(
+                Table(("fldSampleId", typeof(Guid)), ("fldTestResultItemId", typeof(Guid)), ("fldIntendedResult", typeof(string)), ("fldIntendedResult2", typeof(string))),
+                [FullSampleId, FullResultId, noValue, noValue]),
+            Empty(),
+            Empty(),
+            Rows(
+                Table(("fldTestId", typeof(Guid)), ("fldSampleId", typeof(Guid)), ("fldSampleReceiptId", typeof(Guid)), ("fldSampleTestId", typeof(Guid)), ("fldParticipantId", typeof(Guid)),
+                    ("fldScore", typeof(int)), ("fldAssessmentComment", typeof(string)), ("fldAssessorId", typeof(Guid)), ("fldAssessorName", typeof(string))),
+                [FullTestId, FullSampleId, FullReceiptId, FullSampleTestId, FullParticipantId, noValue, noValue, noValue, noValue]),
+            Rows(
+                Table(("fldMonthlyDistributionAttachmentId", typeof(Guid)), ("fldFileName", typeof(string)), ("fldContentType", typeof(string)), ("fldFileData", typeof(byte[]))),
+                [FullAttachmentId, noValue, noValue, noValue])));
+        connection.RespondToQuery(SchemeSql, Rows(Table(("fldMonthId", typeof(int)), ("fldYearId", typeof(int)), ("fldIsAccredited", typeof(bool)), ("fldRequiresAssessment", typeof(bool))), [noValue, noValue, noValue, noValue]));
+        connection.RespondToQuery(
+            IntendedResultsSql,
+            Sets(Empty(), Rows(Table(("fldSampleId", typeof(Guid)), ("fldSampleNumber", typeof(string)), ("fldTabulationDescription", typeof(string))), [FullSampleId, noValue, noValue])));
+
+        var result = await repository.AuthoriseAsync(TabulationA1, Signatory, Created);
+
+        Assert.Equal(ResultsSignOffOutcome.Done, result.Outcome);
+        var header = Assert.Single(connection.ExecutedCommands, c => c.CommandText.StartsWith("EXEC dbo.spiPublishedTabulation ", StringComparison.Ordinal));
+        Assert.Equal((string.Empty, 0, 0, false), ((string)header.ParameterValue("Name")!, header.ParameterValue("MonthId")!, header.ParameterValue("YearId")!, header.ParameterValue("IsAccredited")!));
+        var sample = Assert.Single(connection.ExecutedCommands, c => c.CommandText.StartsWith("EXEC dbo.spiPublishedSample ", StringComparison.Ordinal));
+        Assert.Equal((string.Empty, string.Empty), ((string)sample.ParameterValue("SampleNumber")!, (string)sample.ParameterValue("TabulationDescription")!));
+        Assert.Equal(string.Empty, Assert.Single(connection.ExecutedCommands, c => c.CommandText.StartsWith("EXEC dbo.spiPublishedTest ", StringComparison.Ordinal)).ParameterValue("Name"));
+        Assert.Equal(string.Empty, Assert.Single(connection.ExecutedCommands, c => c.CommandText.StartsWith("EXEC dbo.spiPublishedParticipant ", StringComparison.Ordinal)).ParameterValue("LabCode"));
+        Assert.True(connection.LastTransaction!.Committed);
+    }
+
+    [Fact]
+    public async Task AuthoriseAsync_SchemeRowMissing_PublishesWithZeroMonthAndYear()
+    {
+        var (repository, connection) = AwaitingWithSignatory();
+        connection.RespondToQuery(SchemeSql, Rows(Table(("fldMonthId", typeof(int)), ("fldYearId", typeof(int)), ("fldIsAccredited", typeof(bool)), ("fldRequiresAssessment", typeof(bool)))));
+
+        var result = await repository.AuthoriseAsync(TabulationA1, Signatory, Created);
+
+        Assert.Equal(ResultsSignOffOutcome.Done, result.Outcome);
+        var published = Assert.Single(connection.ExecutedCommands, c => c.CommandText == PublishTabulationSql);
+        Assert.Equal((0, 0), (published.ParameterValue("MonthId"), published.ParameterValue("YearId")));
+    }
+
+    [Fact]
+    public async Task AuthoriseAsync_RecipientsWithNoAddress_AreQueuedWithEmptyValues()
+    {
+        var (repository, connection) = AwaitingWithSignatory();
+        connection.RespondToQuery(RecipientsSql, Sets(
+            Recipients([DBNull.Value, string.Empty, DBNull.Value]),
+            Recipients([DBNull.Value, DBNull.Value, DBNull.Value]),
+            Recipients()));
+
+        await repository.AuthoriseAsync(TabulationA1, Signatory, Created);
+
+        var email = Assert.Single(connection.ExecutedCommands, c => c.CommandText == QueueEmailSql);
+        Assert.Equal((string.Empty, string.Empty), (email.ParameterValue("Email"), email.ParameterValue("Name")));
+    }
 }

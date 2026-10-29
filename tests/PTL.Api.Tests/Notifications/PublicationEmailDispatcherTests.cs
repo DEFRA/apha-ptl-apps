@@ -131,6 +131,26 @@ public class PublicationEmailDispatcherTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_TheQueueIsCompleted_SendsWhatWasQueuedThenEndsWithoutBeingCancelled()
+    {
+        using var h = new Harness();
+        h.Dispatcher.Dispatch(Published1);
+
+        // Nothing in production completes the queue, so the test closes it to show the worker ends normally rather than only on shutdown.
+        var queue = (Channel<Guid>)typeof(PublicationEmailDispatcher)
+            .GetField("queue", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
+            .GetValue(h.Dispatcher)!;
+        queue.Writer.Complete();
+
+        await h.Dispatcher.StartAsync(CancellationToken.None);
+        await h.Dispatcher.ExecuteTask!.WaitAsync(Timeout);
+
+        Assert.Equal([Published1], h.Calls.Started.Select(s => s.PublishedTabulationId));
+        Assert.True(h.Dispatcher.ExecuteTask.IsCompletedSuccessfully);
+        Assert.Empty(h.Logger.Entries);
+    }
+
+    [Fact]
     public async Task Dispatch_BeforeTheWorkerHasStarted_IsSentOnceItHasAndInTheOrderGiven()
     {
         using var h = new Harness();

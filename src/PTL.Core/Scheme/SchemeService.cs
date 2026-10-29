@@ -408,22 +408,13 @@ public sealed class SchemeService(
         // Detection runs on what will actually be written, so it follows the derived-field rules above.
         AssignMissingIds(updatedFields);
         var plan = SchemeAuditDetector.Detect(existing, updatedFields);
-        SchemeAuditWrite? audit = null;
-        if (!plan.IsEmpty)
+        if (!plan.IsEmpty && string.IsNullOrWhiteSpace(auditWhy))
         {
-            if (string.IsNullOrWhiteSpace(auditWhy))
-            {
-                LogAuditReasonRequiredMessage(logger, schemeId, null);
-                return new SchemeUpdateResult(SchemeUpdateStatus.AuditReasonRequired, null, $"Scheme {updatedFields.Identifier}: {updatedFields.Name}");
-            }
-
-            if (auditWhy.Length > AuditWhyLength)
-            {
-                throw new SchemeValidationException([new SchemeValidationError("AuditWhy", AuditWhyTooLongMessage)]);
-            }
-
-            audit = new SchemeAuditWrite(auditWho.Length > AuditWhoLength ? auditWho[..AuditWhoLength] : auditWho, auditWhy, plan);
+            LogAuditReasonRequiredMessage(logger, schemeId, null);
+            return new SchemeUpdateResult(SchemeUpdateStatus.AuditReasonRequired, null, $"Scheme {updatedFields.Identifier}: {updatedFields.Name}");
         }
+
+        var audit = BuildAudit(plan, auditWho, auditWhy);
 
         var updated = await schemeRepository.UpdateAsync(updatedFields, audit, cancellationToken);
         if (updated is null)
@@ -435,6 +426,22 @@ public sealed class SchemeService(
         updated.ViewerIds = updatedFields.ViewerIds;
         LogUpdatedSchemeMessage(logger, schemeId, null);
         return new SchemeUpdateResult(SchemeUpdateStatus.Updated, updated);
+    }
+
+    // Null when nothing audited changed. The caller has already refused a blank reason for a plan that has changes.
+    private static SchemeAuditWrite? BuildAudit(SchemeAuditPlan plan, string auditWho, string? auditWhy)
+    {
+        if (plan.IsEmpty)
+        {
+            return null;
+        }
+
+        if (auditWhy!.Length > AuditWhyLength)
+        {
+            throw new SchemeValidationException([new SchemeValidationError("AuditWhy", AuditWhyTooLongMessage)]);
+        }
+
+        return new SchemeAuditWrite(auditWho.Length > AuditWhoLength ? auditWho[..AuditWhoLength] : auditWho, auditWhy, plan);
     }
 
     // The repository would give an empty id a new one at save time; the audit rows need that id first.

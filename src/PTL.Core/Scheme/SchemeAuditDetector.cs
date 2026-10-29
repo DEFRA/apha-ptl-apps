@@ -142,25 +142,21 @@ public static class SchemeAuditDetector
         }
 
         var keptTabulations = updated.Tabulations.Select(t => t.TabulationId).ToHashSet();
-        foreach (var removed in storedTabulations.Values.Where(t => !keptTabulations.Contains(t.TabulationId)))
-        {
-            tabulations.Add(new SchemeTabulationAudit(removed.TabulationId, SchemeAuditOperation.Delete, removed.Name, false, removed.IntendedResultsOnly, false));
-        }
+        tabulations.AddRange(storedTabulations.Values
+            .Where(t => !keptTabulations.Contains(t.TabulationId))
+            .Select(removed => new SchemeTabulationAudit(removed.TabulationId, SchemeAuditOperation.Delete, removed.Name, false, removed.IntendedResultsOnly, false)));
     }
 
     private static void CompareLinks(Guid tabulationId, IList<Guid> postedItemIds, IList<SchemeTabulationItemLink> storedLinks, List<SchemeTabulationLinkAudit> sink)
     {
         var posted = postedItemIds.ToHashSet();
-
-        foreach (var link in storedLinks.Where(l => !posted.Contains(l.ItemId)))
-        {
-            sink.Add(new SchemeTabulationLinkAudit(link.LinkId, SchemeAuditOperation.Delete, tabulationId, link.ItemId));
-        }
-
         var alreadyLinked = storedLinks.Select(l => l.ItemId).ToHashSet();
-        foreach (var itemId in posted.Where(id => !alreadyLinked.Contains(id)))
-        {
-            sink.Add(new SchemeTabulationLinkAudit(Guid.NewGuid(), SchemeAuditOperation.Insert, tabulationId, itemId));
-        }
+
+        sink.AddRange(storedLinks
+            .Where(l => !posted.Contains(l.ItemId))
+            .Select(link => new SchemeTabulationLinkAudit(link.LinkId, SchemeAuditOperation.Delete, tabulationId, link.ItemId)));
+        sink.AddRange(posted
+            .Where(id => !alreadyLinked.Contains(id))
+            .Select(itemId => new SchemeTabulationLinkAudit(Guid.NewGuid(), SchemeAuditOperation.Insert, tabulationId, itemId)));
     }
 }

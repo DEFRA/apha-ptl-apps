@@ -474,6 +474,18 @@ public class SchemeControllerTests
     }
 
     [Fact]
+    public async Task UpdateScheme_PrincipalWithoutAnIdentity_AuditsAsGuest()
+    {
+        var service = new FakeSchemeService { UpdateResult = new SchemeUpdateResult(SchemeUpdateStatus.NotFound) };
+        var controller = ControllerOver(service);
+        controller.ControllerContext.HttpContext.User = new ClaimsPrincipal();
+
+        await controller.UpdateScheme(Guid.NewGuid(), ValidCreateRequest(), CancellationToken.None);
+
+        Assert.Equal("Guest", service.LastUpdate!.Value.AuditWho);
+    }
+
+    [Fact]
     public async Task UpdateScheme_NoHttpContext_AuditsAsGuest()
     {
         var service = new FakeSchemeService { UpdateResult = new SchemeUpdateResult(SchemeUpdateStatus.NotFound) };

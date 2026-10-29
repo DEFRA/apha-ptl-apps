@@ -349,7 +349,7 @@ public class SchemeController(ISchemeApiClient schemeApiClient, ILookupApiClient
     }
 
     private bool OnlyAuditWhyHasErrors() =>
-        ModelState.Where(entry => entry.Value?.Errors.Count > 0).All(entry => entry.Key == nameof(SchemeFormViewModel.AuditWhy));
+        ModelState.Where(entry => entry.Value!.Errors.Count > 0).All(entry => entry.Key == nameof(SchemeFormViewModel.AuditWhy));
 
     // Legacy Audit.aspx Cancel returned to the Scheme List without saving, which is also where Edit's Cancel goes.
     private ViewResult AuditReasonView(string? auditObjectName, string? auditWhy) =>

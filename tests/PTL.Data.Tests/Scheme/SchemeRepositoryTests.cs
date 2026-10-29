@@ -946,6 +946,235 @@ public class SchemeRepositoryTests
         Assert.All(connection.ExecutedCommands, c => Assert.Null(c.EnlistedTransaction));
     }
 
+    [Fact]
+    public async Task GetAllSummariesAsync_ReturnsEverySchemeFamily()
+    {
+        var (repository, connection) = CreateRepository();
+        var table = new DataTable();
+        table.Columns.Add("fldSharedId", typeof(Guid));
+        table.Columns.Add("fldYearId", typeof(int));
+        table.Columns.Add("fldRecentSchemeId", typeof(Guid));
+        table.Columns.Add("fldRecentIdentifier", typeof(string));
+        table.Columns.Add("fldRecentName", typeof(string));
+        table.Rows.Add(Guid.NewGuid(), 2026, Guid.NewGuid(), "PT0001", "First");
+        table.Rows.Add(Guid.NewGuid(), 2027, Guid.NewGuid(), "PT0002", "Second");
+        connection.RespondToQuery("EXEC dbo.spgaSchemeInfo", table);
+
+        var result = await repository.GetAllSummariesAsync();
+
+        Assert.Equal(["PT0001", "PT0002"], result.Select(s => s.RecentIdentifier));
+    }
+
+    [Fact]
+    public async Task UpdateAsync_ExistingTree_UpdatesStoredItemsInsertsNewOnesAndRenumbersEveryList()
+    {
+        var stored = StoredTreeWithEveryLevel();
+        var newMethodId = Guid.NewGuid();
+        var newResultId = Guid.NewGuid();
+        var newCategoryId = Guid.NewGuid();
+        var newCriterionId = Guid.NewGuid();
+        var criterionUnderNewCategoryId = Guid.NewGuid();
+        var scheme = new CoreScheme
+        {
+            SchemeId = stored.SchemeId,
+            YearId = 2026,
+            Name = "Test Scheme",
+            Tests =
+            [
+                new SchemeTest
+                {
+                    TestId = stored.TestId,
+                    TestTypeId = Guid.NewGuid(),
+                    MethodItems =
+                    [
+                        new SchemeTestMethodItem { TestMethodItemId = newMethodId, TestMethodItemTypeId = Guid.NewGuid() },
+                        new SchemeTestMethodItem { TestMethodItemId = stored.MethodItemId, TestMethodItemTypeId = Guid.NewGuid() },
+                    ],
+                    ResultItems =
+                    [
+                        new SchemeTestResultItem { TestResultItemId = stored.ResultItemId, TestResultItemTypeId = Guid.NewGuid() },
+                        new SchemeTestResultItem { TestResultItemId = newResultId, TestResultItemTypeId = Guid.NewGuid() },
+                    ],
+                    Categories =
+                    [
+                        new SchemeCategoryItem
+                        {
+                            CategoryItemId = stored.CategoryId,
+                            Criteria =
+                            [
+                                new SchemeCriterionItem { CriterionItemId = stored.CriterionId },
+                                new SchemeCriterionItem { CriterionItemId = newCriterionId, CriterionItemTypeId = Guid.NewGuid() },
+                            ],
+                        },
+                        new SchemeCategoryItem
+                        {
+                            CategoryItemId = newCategoryId,
+                            CategoryItemTypeId = Guid.NewGuid(),
+                            Criteria = [new SchemeCriterionItem { CriterionItemId = criterionUnderNewCategoryId, CriterionItemTypeId = Guid.NewGuid() }],
+                        },
+                    ],
+                },
+            ],
+        };
+
+        var (connection, _) = await RunUpdateAsync(scheme, null, stored.Data);
+
+        var writes = Writes(connection).ToList();
+        FakeDbCommand Single(string procedure, string idParameter, Guid id) =>
+            Assert.Single(writes, c => c.CommandText.StartsWith($"EXEC dbo.{procedure} ", StringComparison.Ordinal) && Equals(c.ParameterValue(idParameter), id));
+
+        Assert.Equal(1, Single("spuTest", "@TestId", stored.TestId).ParameterValue("@Order"));
+
+        Assert.Equal(1, Single("spiTestMethodItem", "@TestMethodItemId", newMethodId).ParameterValue("@Order"));
+        Assert.Equal(2, Single("spuTestMethodItem", "@TestMethodItemId", stored.MethodItemId).ParameterValue("@Order"));
+        Assert.Equal(1, Single("spuTestResultItem", "@TestResultItemId", stored.ResultItemId).ParameterValue("@Order"));
+        Assert.Equal(2, Single("spiTestResultItem", "@TestResultItemId", newResultId).ParameterValue("@Order"));
+
+        Assert.Equal(1, Single("spuCategoryItem", "@CategoryItemId", stored.CategoryId).ParameterValue("@Order"));
+        var insertedCategory = Single("spiCategoryItem", "@CategoryItemId", newCategoryId);
+        Assert.Equal(2, insertedCategory.ParameterValue("@Order"));
+        Assert.Equal(stored.TestId, insertedCategory.ParameterValue("@TestId"));
+
+        Assert.Equal(1, Single("spuCriterionItem", "@CriterionItemId", stored.CriterionId).ParameterValue("@Order"));
+        var insertedCriterion = Single("spiCriterionItem", "@CriterionItemId", newCriterionId);
+        Assert.Equal(2, insertedCriterion.ParameterValue("@Order"));
+        Assert.Equal(stored.CategoryId, insertedCriterion.ParameterValue("@CategoryItemId"));
+        var criterionUnderNewCategory = Single("spiCriterionItem", "@CriterionItemId", criterionUnderNewCategoryId);
+        Assert.Equal(1, criterionUnderNewCategory.ParameterValue("@Order"));
+        Assert.Equal(newCategoryId, criterionUnderNewCategory.ParameterValue("@CategoryItemId"));
+
+        Assert.DoesNotContain(writes, c => c.CommandText.StartsWith("EXEC dbo.spd", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task UpdateAsync_StagedItemsWithoutIds_AreGivenIdsAndInsertedUnderThem()
+    {
+        var schemeId = Guid.NewGuid();
+        var scheme = new CoreScheme
+        {
+            SchemeId = schemeId,
+            YearId = 2026,
+            Name = "Test Scheme",
+            Tests =
+            [
+                new SchemeTest
+                {
+                    TestTypeId = Guid.NewGuid(),
+                    ResultItems = [new SchemeTestResultItem { TestResultItemTypeId = Guid.NewGuid() }],
+                    MethodItems = [new SchemeTestMethodItem { TestMethodItemTypeId = Guid.NewGuid() }],
+                    Categories =
+                    [
+                        new SchemeCategoryItem
+                        {
+                            CategoryItemTypeId = Guid.NewGuid(),
+                            Criteria = [new SchemeCriterionItem { CriterionItemTypeId = Guid.NewGuid() }],
+                        },
+                    ],
+                },
+            ],
+            Tabulations = [new SchemeTabulation { Name = "Published" }],
+        };
+
+        var (connection, _) = await RunUpdateAsync(scheme, null);
+
+        var test = scheme.Tests[0];
+        var category = test.Categories[0];
+        Assert.NotEqual(Guid.Empty, test.TestId);
+        Assert.NotEqual(Guid.Empty, test.ResultItems[0].TestResultItemId);
+        Assert.NotEqual(Guid.Empty, test.MethodItems[0].TestMethodItemId);
+        Assert.NotEqual(Guid.Empty, category.CategoryItemId);
+        Assert.NotEqual(Guid.Empty, category.Criteria[0].CriterionItemId);
+        Assert.NotEqual(Guid.Empty, scheme.Tabulations[0].TabulationId);
+
+        var writes = Writes(connection).ToList();
+        Assert.Equal(test.TestId, Assert.Single(writes, c => c.CommandText.StartsWith("EXEC dbo.spiTest ", StringComparison.Ordinal)).ParameterValue("@TestId"));
+        Assert.Equal(test.ResultItems[0].TestResultItemId, Assert.Single(writes, c => c.CommandText.StartsWith("EXEC dbo.spiTestResultItem ", StringComparison.Ordinal)).ParameterValue("@TestResultItemId"));
+        Assert.Equal(test.MethodItems[0].TestMethodItemId, Assert.Single(writes, c => c.CommandText.StartsWith("EXEC dbo.spiTestMethodItem ", StringComparison.Ordinal)).ParameterValue("@TestMethodItemId"));
+        Assert.Equal(category.CategoryItemId, Assert.Single(writes, c => c.CommandText.StartsWith("EXEC dbo.spiCategoryItem ", StringComparison.Ordinal)).ParameterValue("@CategoryItemId"));
+        Assert.Equal(category.Criteria[0].CriterionItemId, Assert.Single(writes, c => c.CommandText.StartsWith("EXEC dbo.spiCriterionItem ", StringComparison.Ordinal)).ParameterValue("@CriterionItemId"));
+        Assert.Equal(scheme.Tabulations[0].TabulationId, Assert.Single(writes, c => c.CommandText == InsertTabulationSql).ParameterValue("@TabulationId"));
+    }
+
+    [Fact]
+    public async Task UpdateAsync_ItemsRemovedFromAKeptTest_AreDeletedAndTheTestIsKept()
+    {
+        var stored = StoredTreeWithEveryLevel();
+        var scheme = new CoreScheme
+        {
+            SchemeId = stored.SchemeId,
+            YearId = 2026,
+            Name = "Test Scheme",
+            Tests = [new SchemeTest { TestId = stored.TestId, TestTypeId = Guid.NewGuid() }],
+        };
+
+        var (connection, _) = await RunUpdateAsync(scheme, null, stored.Data);
+
+        var writes = Writes(connection).ToList();
+        FakeDbCommand Deleted(string procedure, string idParameter, Guid id) =>
+            Assert.Single(writes, c => c.CommandText.StartsWith($"EXEC dbo.{procedure} ", StringComparison.Ordinal) && Equals(c.ParameterValue(idParameter), id));
+
+        Deleted("spdCriterionItem", "@CriterionItemId", stored.CriterionId);
+        Deleted("spdCategoryItem", "@CategoryItemId", stored.CategoryId);
+        Deleted("spdTestResultItem", "@TestResultItemId", stored.ResultItemId);
+        Deleted("spdTestMethodItem", "@TestMethodItemId", stored.MethodItemId);
+        Assert.DoesNotContain(writes, c => c.CommandText.StartsWith("EXEC dbo.spdTest ", StringComparison.Ordinal));
+        Assert.Contains(writes, c => c.CommandText.StartsWith("EXEC dbo.spuTest ", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task CreateAsync_NothingStoredAndNotReReadable_StillWritesTheStagedTreeThenThrows()
+    {
+        var (repository, connection) = CreateRepository();
+        connection.DefaultNonQueryResult = 1;
+        var notFound = SchemeTable(Guid.Empty);
+        notFound.Rows.Clear();
+        connection.RespondToQuery(GetByIdSql, notFound);
+        var scheme = new CoreScheme
+        {
+            SchemeId = Guid.NewGuid(),
+            YearId = 2026,
+            Name = "Test Scheme",
+            Tests = [new SchemeTest { TestId = Guid.NewGuid(), TestTypeId = Guid.NewGuid() }],
+            Tabulations = [new SchemeTabulation { TabulationId = Guid.NewGuid(), Name = "Published" }],
+        };
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => repository.CreateAsync(scheme));
+
+        Assert.Contains(connection.ExecutedCommands, c => c.CommandText == InsertTestSql);
+        Assert.Contains(connection.ExecutedCommands, c => c.CommandText == InsertTabulationSql);
+    }
+
+    private sealed record StoredTree(DataSet Data, Guid SchemeId, Guid TestId, Guid MethodItemId, Guid ResultItemId, Guid CategoryId, Guid CriterionId);
+
+    // One stored test holding a method item, a result item and a category with one criterion.
+    private static StoredTree StoredTreeWithEveryLevel()
+    {
+        var schemeId = Guid.NewGuid();
+        var testId = Guid.NewGuid();
+        var categoryId = Guid.NewGuid();
+        var methodItems = ItemTable("fldTestMethodItemId", "fldTestMethodItemTypeId", "fldTestMethodItemType", testId, "ELISA");
+        var resultItems = ItemTable("fldTestResultItemId", "fldTestResultItemTypeId", "fldTestResultItemType", testId, "Titre");
+        var criteria = CriterionTable(categoryId);
+
+        var data = new DataSet();
+        data.Tables.Add(SchemeTable(schemeId));
+        data.Tables.Add(EmptyPriceTable());
+        data.Tables.Add(TestTable(testId, schemeId));
+        data.Tables.Add(methodItems);
+        data.Tables.Add(resultItems);
+        data.Tables.Add(CategoryTable(categoryId, testId));
+        data.Tables.Add(criteria);
+
+        return new StoredTree(
+            data,
+            schemeId,
+            testId,
+            (Guid)methodItems.Rows[0]["fldTestMethodItemId"],
+            (Guid)resultItems.Rows[0]["fldTestResultItemId"],
+            categoryId,
+            (Guid)criteria.Rows[0]["fldCriterionItemId"]);
+    }
+
     private static SchemeAuditPlan EmptyPlan => new([], [], [], [], [], [], [], []);
 
     private static SchemeAuditWrite Audit(SchemeAuditPlan plan) => new(AuditWho, AuditWhy, plan);
