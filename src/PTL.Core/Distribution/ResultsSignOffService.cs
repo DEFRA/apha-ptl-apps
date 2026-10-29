@@ -13,8 +13,8 @@ public interface IResultsSignOffRepository
 
     // Legacy BtnAuthorise: copies the draft tabulation into the published tables, queues the "Tabulation Published" emails and
     // marks it authorised - all in one transaction, and only while it is still awaiting sign-off. creationDate is when it is
-    // published; signatoryUserId names the user who signs it.
-    Task<ResultsSignOffOutcome> AuthoriseAsync(Guid tabulationId, Guid? signatoryUserId, DateTime creationDate, CancellationToken cancellationToken = default);
+    // published; signatoryUserId names the user who signs it. A tabulation that was authorised also returns what was published.
+    Task<AuthoriseResult> AuthoriseAsync(Guid tabulationId, Guid? signatoryUserId, DateTime creationDate, CancellationToken cancellationToken = default);
 }
 
 public interface IResultsSignOffService
@@ -38,6 +38,9 @@ public enum ResultsSignOffOutcome
     NoSignatory,
 }
 
+// PublishedTabulationId is the published tabulation whose emails were queued; it is set only when the outcome is Done.
+public sealed record AuthoriseResult(ResultsSignOffOutcome Outcome, Guid? PublishedTabulationId = null);
+
 // tblDistributionTabulation.fldPublishState - legacy SignOff.Tabulation.PublishStatus.
 public static class ResultsSignOffState
 {
@@ -47,7 +50,7 @@ public static class ResultsSignOffState
 }
 
 // Legacy Results Sign-off/SignOff.aspx.vb BuildTable: the wording and the grouping come from there.
-public sealed class ResultsSignOffService(IResultsSignOffRepository repository, TimeProvider timeProvider) : IResultsSignOffService
+public sealed class ResultsSignOffService(IResultsSignOffRepository repository, IPublicationEmailDispatcher emailDispatcher, TimeProvider timeProvider) : IResultsSignOffService
 {
     public const string AwaitingStatus = "Awaiting Sign-off";
 
@@ -55,8 +58,16 @@ public sealed class ResultsSignOffService(IResultsSignOffRepository repository, 
         repository.RejectAsync(tabulationId, cancellationToken);
 
     // Legacy stamped the publication with DateTime.Now (local time).
-    public Task<ResultsSignOffOutcome> AuthoriseAsync(Guid tabulationId, Guid? signatoryUserId, CancellationToken cancellationToken = default) =>
-        repository.AuthoriseAsync(tabulationId, signatoryUserId, timeProvider.GetLocalNow().DateTime, cancellationToken);
+    public async Task<ResultsSignOffOutcome> AuthoriseAsync(Guid tabulationId, Guid? signatoryUserId, CancellationToken cancellationToken = default)
+    {
+        var result = await repository.AuthoriseAsync(tabulationId, signatoryUserId, timeProvider.GetLocalNow().DateTime, cancellationToken);
+        if (result.PublishedTabulationId is { } publishedTabulationId)
+        {
+            emailDispatcher.Dispatch(publishedTabulationId);
+        }
+
+        return result.Outcome;
+    }
 
     public async Task<ResultsSignOffQueueResponse> GetQueueAsync(CancellationToken cancellationToken = default)
     {

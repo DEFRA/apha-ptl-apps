@@ -134,6 +134,65 @@ public class SchemeFormViewModelTests
         Assert.DoesNotContain(errors, e => e.MemberNames.Contains(nameof(model.SampleOrigin)));
     }
 
+    private const string ReasonRequiredMessage = "The reason for these changes must be specified";
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("A reason")]
+    public void Validate_NotOnTheAuditStep_NeverAsksForAReason(string? reason)
+    {
+        var model = new PTL.InternalWeb.Features.Scheme.SchemeFormViewModel { DistributionMonthApr = true, IsAuditStep = false, AuditWhy = reason };
+
+        var errors = Validate(model);
+
+        Assert.DoesNotContain(errors, e => e.MemberNames.Contains(nameof(model.AuditWhy)));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("\t\r\n")]
+    public void Validate_OnTheAuditStepWithoutAReason_RequiresOne(string? reason)
+    {
+        var model = new PTL.InternalWeb.Features.Scheme.SchemeFormViewModel { DistributionMonthApr = true, IsAuditStep = true, AuditWhy = reason };
+
+        var errors = Validate(model);
+
+        var error = Assert.Single(errors, e => e.MemberNames.Contains(nameof(model.AuditWhy)));
+        Assert.Equal(ReasonRequiredMessage, error.ErrorMessage);
+    }
+
+    [Fact]
+    public void Validate_OnTheAuditStepWithAReason_AcceptsIt()
+    {
+        var model = new PTL.InternalWeb.Features.Scheme.SchemeFormViewModel { DistributionMonthApr = true, IsAuditStep = true, AuditWhy = "Corrected the order" };
+
+        var errors = Validate(model);
+
+        Assert.DoesNotContain(errors, e => e.MemberNames.Contains(nameof(model.AuditWhy)));
+    }
+
+    [Theory]
+    [InlineData(2000, true)]
+    [InlineData(2001, false)]
+    public void AuditWhy_IsLimitedToTwoThousandCharacters(int length, bool valid)
+    {
+        var model = new PTL.InternalWeb.Features.Scheme.SchemeFormViewModel { AuditWhy = new string('x', length) };
+        var results = new List<ValidationResult>();
+
+        var isValid = Validator.TryValidateProperty(
+            model.AuditWhy, new ValidationContext(model) { MemberName = nameof(model.AuditWhy) }, results);
+
+        Assert.Equal(valid, isValid);
+        if (!valid)
+        {
+            Assert.Equal("Input can not exceed 2000 characters", Assert.Single(results).ErrorMessage);
+        }
+    }
+
     [Fact]
     public void CheckboxId_ReplacesIndexerAndPropertyPunctuationWithUnderscores()
     {

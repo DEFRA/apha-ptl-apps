@@ -161,12 +161,11 @@ builder.Services.AddScoped<IPendingOrderContractWriter, PendingOrderContractWrit
 builder.Services.AddScoped<IPendingOrderDecisionEmails, PendingOrderDecisionEmails>();
 builder.Services.AddScoped<IPendingOrderEmailPersonaliser, PendingOrderEmailPersonaliser>();
 
-// Approve/Decline emails: sent through GOV.UK Notify straight after the decision, retried by the hosted scheduler.
+// Approve/Decline emails: sent through GOV.UK Notify straight after the decision; a failed send is not retried.
 builder.Services.Configure<OnlineOrderEmailOptions>(builder.Configuration.GetSection(OnlineOrderEmailOptions.SectionName));
-builder.Services.AddSingleton<EmailSendGuard>();
 builder.Services.AddScoped<IPendingOrderNotifier, PendingOrderNotifier>();
 
-// Customer and participant update emails: same pattern - sent through GOV.UK Notify when the update is decided, retried by the scheduler.
+// Customer and participant update emails: same pattern - sent through GOV.UK Notify when the update is decided, not retried.
 builder.Services.Configure<CustomerUpdateEmailOptions>(builder.Configuration.GetSection(CustomerUpdateEmailOptions.SectionName));
 builder.Services.Configure<ParticipantUpdateEmailOptions>(builder.Configuration.GetSection(ParticipantUpdateEmailOptions.SectionName));
 builder.Services.AddScoped<ICustomerUpdateNotifier, CustomerUpdateNotifier>();
@@ -235,7 +234,8 @@ builder.Services.AddScoped<IActualResultsService, ActualResultsService>();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddScoped<IDistributionPostedNotifier, DistributionPostedNotifier>();
 
-// Test Consultant and publication emails: sent through GOV.UK Notify; the one scheduler for all email jobs is hosted in this process.
+// Test Consultant and publication emails: sent through GOV.UK Notify. The scheduler hosted in this process runs the Test Consultant
+// jobs; the publication emails are sent by their own hosted worker as soon as Authorise has committed.
 builder.Services.Configure<NotificationSchedulerOptions>(builder.Configuration.GetSection(NotificationSchedulerOptions.SectionName));
 builder.Services.Configure<TabulationEmailOptions>(builder.Configuration.GetSection(TabulationEmailOptions.SectionName));
 builder.Services.Configure<PublicationNotificationOptions>(builder.Configuration.GetSection(PublicationNotificationOptions.SectionName));
@@ -243,6 +243,9 @@ builder.Services.AddSingleton<TabulationEmailGuard>();
 builder.Services.AddSingleton<TabulationEmailContext>();
 builder.Services.AddScoped<ITabulationEmailService, TabulationEmailService>();
 builder.Services.AddScoped<ITabulationPublishedNotifier, TabulationPublishedNotifier>();
+builder.Services.AddSingleton<PTL.Api.BackgroundServices.PublicationEmailDispatcher>();
+builder.Services.AddSingleton<IPublicationEmailDispatcher>(sp => sp.GetRequiredService<PTL.Api.BackgroundServices.PublicationEmailDispatcher>());
+builder.Services.AddHostedService(sp => sp.GetRequiredService<PTL.Api.BackgroundServices.PublicationEmailDispatcher>());
 builder.Services.AddHostedService<PTL.Api.BackgroundServices.NotificationBackgroundService>();
 builder.Services.AddScoped<IPackagingService, PackagingService>();
 builder.Services.AddScoped<IPackagingOutputService, PackagingOutputService>();

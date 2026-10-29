@@ -92,6 +92,7 @@ public static class ApiClientServiceCollectionExtensions
         {
             client.BaseAddress = new Uri(apiBaseUrl);
         })
+            .AddHttpMessageHandler<ActingUserDelegatingHandler>()
             .AddStandardResilienceHandler();
 
         services.AddHttpClient<IGroupAddressApiClient, GroupAddressApiClient>(client =>
@@ -105,6 +106,7 @@ public static class ApiClientServiceCollectionExtensions
         {
             client.BaseAddress = new Uri(apiBaseUrl);
         })
+            .AddHttpMessageHandler<ActingUserDelegatingHandler>()
             .AddStandardResilienceHandler();
 
         services.AddHttpClient<ICustomerDetailsEditApiClient, CustomerDetailsEditApiClient>(client =>
@@ -237,6 +239,7 @@ public static class ApiClientServiceCollectionExtensions
         {
             client.BaseAddress = new Uri(apiBaseUrl);
         })
+            .AddHttpMessageHandler<ActingUserDelegatingHandler>()
             .AddStandardResilienceHandler();
 
         services.AddHttpClient<IExternalTestConsultantApiClient, ExternalTestConsultantApiClient>(client =>
@@ -258,6 +261,7 @@ public static class ApiClientServiceCollectionExtensions
             client.BaseAddress = new Uri(apiBaseUrl);
         })
             .AddHttpMessageHandler<CorrelationIdDelegatingHandler>()
+            .AddHttpMessageHandler<ActingUserDelegatingHandler>()
             .AddStandardResilienceHandler();
 
         services.AddHttpClient<PTL.ApiClient.Distribution.IResultsSignOffApiClient, PTL.ApiClient.Distribution.ResultsSignOffApiClient>(client =>

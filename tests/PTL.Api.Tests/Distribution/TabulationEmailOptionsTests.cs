@@ -18,10 +18,10 @@ public class TabulationEmailOptionsTests
     }
 
     [Fact]
-    public void PublicationNotificationOptions_Defaults_AreDisabled()
+    public void PublicationNotificationOptions_Defaults_AreEnabled()
     {
         Assert.Equal("PublicationNotifications", PublicationNotificationOptions.SectionName);
-        Assert.False(new PublicationNotificationOptions().Enabled);
+        Assert.True(new PublicationNotificationOptions().Enabled);
     }
 
     [Fact]

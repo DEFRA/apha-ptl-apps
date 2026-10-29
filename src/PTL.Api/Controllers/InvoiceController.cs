@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using PTL.Contracts.Invoice;
+using PTL.Core.Audit;
 using PTL.Core.Invoice;
 using PTL.Core.Lookup;
 
@@ -11,7 +12,7 @@ namespace PTL.Api.Controllers;
 // ContractController.
 [ApiController]
 [Route("api/invoices")]
-public sealed class InvoiceController(IInvoiceService invoiceService, ILookupService lookupService, IOptions<InvoiceNotificationOptions> notificationOptions) : ControllerBase
+public sealed class InvoiceController(IInvoiceService invoiceService, ILookupService lookupService, IOptions<InvoiceNotificationOptions> notificationOptions, IAuditActorResolver auditActor) : ControllerBase
 {
     [HttpGet("pending")]
     public async Task<ActionResult<PendingInvoiceSummaryResponse>> GetPending(CancellationToken cancellationToken)
@@ -32,7 +33,7 @@ public sealed class InvoiceController(IInvoiceService invoiceService, ILookupSer
     [HttpPost("generate")]
     public async Task<ActionResult<InvoiceGenerationResponse>> Generate(CancellationToken cancellationToken)
     {
-        var generatedBy = User?.Identity?.Name ?? "Guest";
+        var generatedBy = await auditActor.GetAuditNameAsync(cancellationToken);
         var outcome = await invoiceService.GenerateInvoicesAsync(generatedBy, cancellationToken);
 
         return Ok(new InvoiceGenerationResponse(outcome.Success, outcome.ContractCount, outcome.CsvStorageKey, outcome.ErrorMessage));

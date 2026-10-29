@@ -1,4 +1,3 @@
-using System.Security.Claims;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
@@ -14,7 +13,8 @@ public class DistributionControllerTests
         FakeDistributionRepository repository,
         FakeSchemeService? schemeService = null,
         IPackagingService? packagingService = null,
-        IPackagingOutputService? packagingOutputService = null) =>
+        IPackagingOutputService? packagingOutputService = null,
+        string auditUser = "Guest") =>
         new(
             new DistributionService(repository),
             new SampleNumbersService(repository, schemeService ?? new FakeSchemeService()),
@@ -26,6 +26,7 @@ public class DistributionControllerTests
             new ActualResultsService(repository, TimeProvider.System),
             packagingService ?? new FakePackagingService(),
             packagingOutputService ?? new FakePackagingOutputService(),
+            new PTL.Api.Tests.Contract.FakeAuditActorResolver(auditUser),
             Microsoft.Extensions.Logging.Abstractions.NullLogger<DistributionController>.Instance);
 
     // ValidationProblem() resolves ProblemDetailsFactory from HttpContext.RequestServices,
@@ -327,19 +328,12 @@ public class DistributionControllerTests
         Assert.Empty(repository.SavedSampleNumbers);
     }
 
-    // AuditWho is never accepted from the body - it is taken from the authenticated identity.
+    // AuditWho is never accepted from the body - it is resolved from the acting user.
     [Fact]
-    public async Task SaveSampleNumbers_AuditWho_ComesFromTheAuthenticatedIdentity()
+    public async Task SaveSampleNumbers_AuditWho_ComesFromTheActingUser()
     {
         var repository = SampleNumbersRepository();
-        var controller = CreateController(repository);
-        controller.ControllerContext = new ControllerContext
-        {
-            HttpContext = new DefaultHttpContext
-            {
-                User = new ClaimsPrincipal(new ClaimsIdentity([new Claim(ClaimTypes.Name, "APHA\\jbloggs")], "TestAuth")),
-            }
-        };
+        var controller = CreateController(repository, auditUser: "APHA\\jbloggs");
 
         var request = new SampleNumbersSaveRequest("New comments",
         [
@@ -361,31 +355,10 @@ public class DistributionControllerTests
     }
 
     [Fact]
-    public async Task SaveSampleNumbers_UnauthenticatedCaller_RecordsGuestAsAuditWho()
+    public async Task SaveSampleNumbers_UnresolvedActingUser_RecordsGuestAsAuditWho()
     {
         var repository = SampleNumbersRepository();
         var controller = CreateController(repository);
-        controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
-
-        var request = new SampleNumbersSaveRequest("New comments",
-        [
-            new SampleNumberRowRequest(SampleNumbersSampleId, "S1", "Internal 1", string.Empty, "Tabulation", string.Empty, []),
-        ], AuditWhy: "Corrected the tabulation description");
-
-        await controller.SaveSampleNumbers(SampleNumbersSchemeId, request, CancellationToken.None);
-
-        Assert.Equal("Guest", Assert.Single(repository.SavedSampleNumbers).AuditWho);
-    }
-
-    [Fact]
-    public async Task SaveSampleNumbers_PrincipalWithNoIdentity_RecordsGuestAsAuditWho()
-    {
-        var repository = SampleNumbersRepository();
-        var controller = CreateController(repository);
-        controller.ControllerContext = new ControllerContext
-        {
-            HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal() }
-        };
 
         var request = new SampleNumbersSaveRequest("New comments",
         [
@@ -569,19 +542,12 @@ public class DistributionControllerTests
         Assert.Empty(repository.SavedIntendedResults);
     }
 
-    // AuditWho is never accepted from the body - it is taken from the authenticated identity.
+    // AuditWho is never accepted from the body - it is resolved from the acting user.
     [Fact]
-    public async Task SaveIntendedResults_AuditWho_ComesFromTheAuthenticatedIdentity()
+    public async Task SaveIntendedResults_AuditWho_ComesFromTheActingUser()
     {
         var repository = IntendedResultsRepository();
-        var controller = CreateController(repository);
-        controller.ControllerContext = new ControllerContext
-        {
-            HttpContext = new DefaultHttpContext
-            {
-                User = new ClaimsPrincipal(new ClaimsIdentity([new Claim(ClaimTypes.Name, "APHA\\jbloggs")], "TestAuth")),
-            }
-        };
+        var controller = CreateController(repository, auditUser: "APHA\\jbloggs");
 
         var request = new IntendedResultsSaveRequest(
         [
@@ -598,11 +564,10 @@ public class DistributionControllerTests
     }
 
     [Fact]
-    public async Task SaveIntendedResults_UnauthenticatedCaller_RecordsGuestAsAuditWho()
+    public async Task SaveIntendedResults_UnresolvedActingUser_RecordsGuestAsAuditWho()
     {
         var repository = IntendedResultsRepository();
         var controller = CreateController(repository);
-        controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
 
         var request = new IntendedResultsSaveRequest(
         [

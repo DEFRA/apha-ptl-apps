@@ -1,4 +1,3 @@
-using System.Security.Claims;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
@@ -20,15 +19,8 @@ public class DistributionControllerCommentsTests
 
     private TestConsultantCommentsService Service => new(_repository, _store, Options.Create(new AttachmentOptions()), Clock());
 
-    private DistributionController CreateController(string? userName = null)
-    {
-        var httpContext = new DefaultHttpContext();
-        if (userName is not null)
-        {
-            httpContext.User = new ClaimsPrincipal(new ClaimsIdentity([new Claim(ClaimTypes.Name, userName)], "Test"));
-        }
-
-        return new(
+    private DistributionController CreateController(string? userName = null) =>
+        new(
             new DistributionService(_repository),
             new SampleNumbersService(_repository, new FakeSchemeService()),
             new IntendedResultsService(_repository),
@@ -39,11 +31,11 @@ public class DistributionControllerCommentsTests
             new ActualResultsService(_repository, TimeProvider.System),
             new FakePackagingService(),
             new FakePackagingOutputService(),
+            new PTL.Api.Tests.Contract.FakeAuditActorResolver(userName ?? "Guest"),
             Microsoft.Extensions.Logging.Abstractions.NullLogger<DistributionController>.Instance)
         {
-            ControllerContext = new ControllerContext { HttpContext = httpContext },
+            ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() },
         };
-    }
 
     private void Seed(string contentType = "application/pdf")
     {

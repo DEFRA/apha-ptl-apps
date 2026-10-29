@@ -7,13 +7,12 @@ using PTL.Api.Tests.Scheme;
 using PTL.Core.Contract;
 using PTL.Core.Contract.PendingOrder;
 using PTL.Core.Lookup;
-using PTL.Core.Notifications;
 using CoreScheme = PTL.Core.Scheme.Scheme;
 
 namespace PTL.Api.Tests.Contract;
 
-// Legacy email.vb ProcessOnlineContractOrderEmails: each unsent tblOnlineContractOrderEmail row is sent through
-// GOV.UK Notify and marked sent only afterwards, so a failed send stays unsent for the next run.
+// Legacy email.vb ProcessOnlineContractOrderEmails: each unsent tblOnlineContractOrderEmail row of a decided order is sent
+// through GOV.UK Notify and marked sent only afterwards, so a failed send stays unsent.
 public class PendingOrderNotifierTests
 {
     private const string ApprovedTemplate = OnlineOrderEmailTemplates.ApprovedId;
@@ -27,14 +26,13 @@ public class PendingOrderNotifierTests
         public FakePendingOrderRepository PendingOrders { get; } = new();
         public FakeContractRepository Contracts { get; } = new();
         public RecordingNotifyClient Notify { get; } = new();
-        public EmailSendGuard Guard { get; } = new();
         public MessageCapturingLogger<PendingOrderNotifier> Logger { get; } = new();
         public PendingOrderNotifier Notifier { get; private set; } = null!;
         public Guid PendingContractId { get; } = Guid.NewGuid();
         public Guid ContractId { get; } = Guid.NewGuid();
         public string QalNumber { get; private set; } = string.Empty;
 
-        public static async Task<Harness> CreateAsync(bool enabled = true, INotifyClient? client = null)
+        public static async Task<Harness> CreateAsync(bool enabled = true)
         {
             var h = new Harness();
 
@@ -89,8 +87,7 @@ public class PendingOrderNotifierTests
             h.Notifier = new PendingOrderNotifier(
                 h.PendingOrders,
                 new PendingOrderEmailPersonaliser(h.PendingOrders, h.Contracts, schemes, customers, participants, lookups),
-                client ?? h.Notify,
-                h.Guard,
+                h.Notify,
                 Options.Create(new OnlineOrderEmailOptions { Enabled = enabled }),
                 new SettableTimeProvider(Now),
                 h.Logger);
@@ -116,15 +113,18 @@ public class PendingOrderNotifierTests
         }
     }
 
+    private static string RunSummary(Harness h) =>
+        Assert.Single(h.Logger.At(LogLevel.Information), e => e.Message.StartsWith("Online contract order email run complete", StringComparison.Ordinal)).Message;
+
     [Fact]
-    public async Task SendUnsentAsync_Approved_SendsTheApprovedTemplateWithTheLegacyTokensAndMarksItSent()
+    public async Task SendForOrderAsync_Approved_SendsTheApprovedTemplateWithTheLegacyTokensAndMarksItSent()
     {
         var h = await Harness.CreateAsync();
         var row = h.Queue("customer@example.com");
 
-        var summary = await h.Notifier.SendUnsentAsync();
+        await h.Notifier.SendForOrderAsync(h.PendingContractId);
 
-        Assert.Equal(new OnlineOrderEmailRunSummary(1, 1, 0, 0), summary);
+        Assert.Equal("Online contract order email run complete. Unsent=1 Sent=1 Skipped=0 Failed=0", RunSummary(h));
         var sent = Assert.Single(h.Notify.Sent);
         Assert.Equal(ApprovedTemplate, sent.TemplateId);
         Assert.Equal("customer@example.com", sent.Email);
@@ -140,12 +140,12 @@ public class PendingOrderNotifierTests
     }
 
     [Fact]
-    public async Task SendUnsentAsync_Declined_SendsTheDeclinedTemplateWithTheFirstActiveLabCodeAndNoSchemeList()
+    public async Task SendForOrderAsync_Declined_SendsTheDeclinedTemplateWithTheFirstActiveLabCodeAndNoSchemeList()
     {
         var h = await Harness.CreateAsync();
         h.Queue("customer@example.com", isApproved: false, notes: "Not eligible");
 
-        await h.Notifier.SendUnsentAsync();
+        await h.Notifier.SendForOrderAsync(h.PendingContractId);
 
         var sent = Assert.Single(h.Notify.Sent);
         Assert.Equal(DeclinedTemplate, sent.TemplateId);
@@ -157,100 +157,93 @@ public class PendingOrderNotifierTests
     }
 
     [Fact]
-    public async Task SendUnsentAsync_UnknownYear_UsesTheLegacyPlaceholder()
+    public async Task SendForOrderAsync_UnknownYear_UsesTheLegacyPlaceholder()
     {
         var h = await Harness.CreateAsync();
         h.Queue("customer@example.com").YearId = 1999;
 
-        await h.Notifier.SendUnsentAsync();
+        await h.Notifier.SendForOrderAsync(h.PendingContractId);
 
         Assert.Equal("####", Assert.Single(h.Notify.Sent).Personalisation!["ContractYear"]);
     }
 
     [Fact]
-    public async Task SendUnsentAsync_ContractWithNoItems_SendsAnEmptySchemeList()
+    public async Task SendForOrderAsync_ContractWithNoItems_SendsAnEmptySchemeList()
     {
         var h = await Harness.CreateAsync();
         h.Contracts.ContractItems = null;
         h.Queue("customer@example.com");
 
-        await h.Notifier.SendUnsentAsync();
+        await h.Notifier.SendForOrderAsync(h.PendingContractId);
 
         Assert.Equal(string.Empty, Assert.Single(h.Notify.Sent).Personalisation!["ApprovedSchemeOrders"]);
     }
 
     [Fact]
-    public async Task SendUnsentAsync_Disabled_SendsNothingAndLeavesTheRowsUnsent()
+    public async Task SendForOrderAsync_Disabled_SendsNothingAndLeavesTheRowsUnsent()
     {
         var h = await Harness.CreateAsync(enabled: false);
         h.Queue("customer@example.com");
 
-        var summary = await h.Notifier.SendUnsentAsync();
+        await h.Notifier.SendForOrderAsync(h.PendingContractId);
 
-        Assert.Same(OnlineOrderEmailRunSummary.Empty, summary);
         Assert.Equal(0, h.PendingOrders.GetUnsentCalls);
         Assert.Empty(h.Notify.Sent);
         Assert.Single(h.PendingOrders.Unsent);
     }
 
     [Fact]
-    public async Task SendUnsentAsync_NoRows_DoesNothing()
+    public async Task SendForOrderAsync_NoRows_DoesNothing()
     {
         var h = await Harness.CreateAsync();
 
-        Assert.Same(OnlineOrderEmailRunSummary.Empty, await h.Notifier.SendUnsentAsync());
+        await h.Notifier.SendForOrderAsync(h.PendingContractId);
+
         Assert.Empty(h.Notify.Sent);
+        Assert.Empty(h.Logger.Entries);
     }
 
     [Theory]
     [InlineData(null)]
     [InlineData("")]
     [InlineData("  ")]
-    public async Task SendUnsentAsync_BlankAddress_StaysUnsentAndWarnsOnlyOncePerDay(string? address)
+    public async Task SendForOrderAsync_BlankAddress_StaysUnsentAndWarns(string? address)
     {
         var h = await Harness.CreateAsync();
         h.Queue(address);
 
-        var first = await h.Notifier.SendUnsentAsync();
-        await h.Notifier.SendUnsentAsync();
+        await h.Notifier.SendForOrderAsync(h.PendingContractId);
 
-        Assert.Equal(new OnlineOrderEmailRunSummary(1, 0, 1, 0), first);
+        Assert.Equal("Online contract order email run complete. Unsent=1 Sent=0 Skipped=1 Failed=0", RunSummary(h));
         Assert.Empty(h.Notify.Sent);
         Assert.Single(h.PendingOrders.Unsent);
         Assert.Single(h.Logger.At(LogLevel.Warning));
     }
 
     [Fact]
-    public async Task SendUnsentAsync_NotifyFailure_StaysUnsentAndTheNextRunSendsItExactlyOnce()
+    public async Task SendForOrderAsync_NotifyFailure_StaysUnsentAndTheOtherRowsStillGo()
     {
         var h = await Harness.CreateAsync();
         h.Queue("bad@example.com");
         h.Queue("good@example.com");
         h.Notify.FailFor = address => address == "bad@example.com" ? new InvalidOperationException("Notify is down") : null;
 
-        var first = await h.Notifier.SendUnsentAsync();
+        await h.Notifier.SendForOrderAsync(h.PendingContractId);
 
-        Assert.Equal(new OnlineOrderEmailRunSummary(2, 1, 0, 1), first);
+        Assert.Equal("Online contract order email run complete. Unsent=2 Sent=1 Skipped=0 Failed=1", RunSummary(h));
         Assert.Equal("good@example.com", Assert.Single(h.Notify.Sent).Email);
         Assert.Equal("bad@example.com", Assert.Single(h.PendingOrders.Unsent).Email);
-
-        h.Notify.FailFor = null;
-        var second = await h.Notifier.SendUnsentAsync();
-
-        Assert.Equal(new OnlineOrderEmailRunSummary(1, 1, 0, 0), second);
-        Assert.Equal(["good@example.com", "bad@example.com"], h.Notify.Sent.Select(s => s.Email));
-        Assert.Empty(h.PendingOrders.Unsent);
+        Assert.Single(h.Logger.At(LogLevel.Error));
     }
 
     [Fact]
-    public async Task SendUnsentAsync_RepeatedFailure_LogsOncePerDayWithoutTheAddressOrNotes()
+    public async Task SendForOrderAsync_Failure_LogsWithoutTheAddressOrNotes()
     {
         var h = await Harness.CreateAsync();
         h.Queue("bad@example.com", notes: "private comment");
         h.Notify.FailFor = _ => new InvalidOperationException("Notify is down");
 
-        await h.Notifier.SendUnsentAsync();
-        await h.Notifier.SendUnsentAsync();
+        await h.Notifier.SendForOrderAsync(h.PendingContractId);
 
         Assert.Single(h.Logger.At(LogLevel.Error));
         h.Logger.AssertNoneContain("bad@example.com", "private comment", "@");
@@ -285,29 +278,15 @@ public class PendingOrderNotifierTests
     }
 
     [Fact]
-    public async Task SendForOrderAsync_Cancelled_Propagates()
+    public async Task SendForOrderAsync_CancelledWhileSending_PropagatesAndLeavesTheRowUnsent()
     {
         var h = await Harness.CreateAsync();
         h.Queue("customer@example.com");
-        using var cts = new CancellationTokenSource();
-        await cts.CancelAsync();
+        h.Notify.FailFor = _ => new OperationCanceledException();
 
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => h.Notifier.SendForOrderAsync(h.PendingContractId, cts.Token));
-    }
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => h.Notifier.SendForOrderAsync(h.PendingContractId));
 
-    [Fact]
-    public async Task ImmediateSendAndScheduler_RunningTogether_SendEachRowOnce()
-    {
-        var slow = new SlowNotifyClient();
-        var h = await Harness.CreateAsync(client: slow);
-        h.Queue("a@example.com");
-        h.Queue("b@example.com");
-        h.Queue("c@example.com");
-
-        await Task.WhenAll(h.Notifier.SendForOrderAsync(h.PendingContractId), h.Notifier.SendUnsentAsync());
-
-        Assert.Equal(3, slow.Sent.Count);
-        Assert.Equal(3, slow.Sent.Select(s => s.Email).Distinct().Count());
-        Assert.Empty(h.PendingOrders.Unsent);
+        Assert.Single(h.PendingOrders.Unsent);
+        Assert.Empty(h.Logger.At(LogLevel.Error));
     }
 }

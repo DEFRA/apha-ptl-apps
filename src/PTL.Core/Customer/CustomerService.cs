@@ -201,8 +201,8 @@ public sealed class CustomerService(
         }
     }
 
-    // Legacy EmailUpdateNotifications: one row for the customer's email, which is then sent at once (retried by the
-    // scheduler if that fails). A blank address is skipped rather than queued.
+    // Legacy EmailUpdateNotifications: one row for the customer's email, which is then sent at once (a failed send is
+    // not retried). A blank address is skipped rather than queued.
     private async Task NotifyAsync(Customer customer, Guid pendingCustomerUpdateId, string comments, bool isApproved, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(customer.Email))

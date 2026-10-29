@@ -20,7 +20,7 @@ public sealed class PendingOrderDecisionEmails(
 
     // Legacy EmailOrderNotifications: the customer, the customer's first active participant and that
     // participant's second address each get a row in tblOnlineContractOrderEmail, which is then sent at
-    // once (retried by the scheduler if that fails). Blank addresses are skipped rather than queued.
+    // once (a failed send is not retried). Blank addresses are skipped rather than queued.
     public async Task QueueAndSendAsync(PendingOrderEntity order, Guid contractId, string comments, bool isApproved, CancellationToken cancellationToken = default)
     {
         var customer = await customerRepository.GetByIdAsync(order.CustomerId, cancellationToken);

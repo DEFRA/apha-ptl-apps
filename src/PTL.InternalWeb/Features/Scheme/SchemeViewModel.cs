@@ -345,6 +345,19 @@ public sealed class SchemeFormViewModel : IValidatableObject
     // Posted by the "Add New Tabulation" control; not part of the saved scheme.
     public string? NewTabulationName { get; set; }
 
+    // Legacy Audit.aspx: set only by the audit reason page's own form, which re-posts the whole edit
+    // with them. AuditObjectName is its "Scheme PT1234: Name" heading, carried so the page can be shown
+    // again after an error without asking the API.
+#pragma warning disable S6964
+    public bool IsAuditStep { get; set; }
+#pragma warning restore S6964
+
+    public string? AuditObjectName { get; set; }
+
+    [StringLength(2000, ErrorMessage = "Input can not exceed 2000 characters")]
+    [Display(Name = "Reason for these changes")]
+    public string? AuditWhy { get; set; }
+
     // Year-scoped "Add" dropdown options for the Tests tab.
     public IEnumerable<SelectListItem> TestTypeOptions { get; set; } = [];
     public IEnumerable<SelectListItem> ResultItemTypeOptions { get; set; } = [];
@@ -373,6 +386,12 @@ public sealed class SchemeFormViewModel : IValidatableObject
 
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
     {
+        // Legacy Audit.aspx ValidatorAuditWhyRequired - only in force once the audit reason page is showing.
+        if (IsAuditStep && string.IsNullOrWhiteSpace(AuditWhy))
+        {
+            yield return new ValidationResult("The reason for these changes must be specified", [nameof(AuditWhy)]);
+        }
+
         // [Required] only sees the markup, so an editor left with an empty paragraph would pass.
         // Legacy measured the visible text instead (TBEdit's TextPlain property).
         if (!string.IsNullOrWhiteSpace(Instructions) && !PTL.Core.Scheme.SchemeInstructions.HasContent(Instructions))

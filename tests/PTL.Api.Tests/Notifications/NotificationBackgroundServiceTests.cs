@@ -3,16 +3,12 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using PTL.Api.BackgroundServices;
 using PTL.Api.Tests.Distribution;
-using PTL.Core.Contract.PendingOrder;
-using PTL.Core.Customer;
 using PTL.Core.Distribution;
 using PTL.Core.Notifications;
-using PTL.Core.Participant;
 
 namespace PTL.Api.Tests.Notifications;
 
-// The one hosted scheduler: each run resolves the three email jobs from a fresh scope; a failing job never stops the
-// host or the other jobs.
+// The hosted scheduler: each run resolves the Test Consultant job from a fresh scope; a failing job never stops the host.
 public class NotificationBackgroundServiceTests
 {
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(10);
@@ -29,10 +25,6 @@ public class NotificationBackgroundServiceTests
         public List<string> Order { get; } = [];
         public List<(string Job, Guid Scope, CancellationToken Token)> Invocations { get; } = [];
         public Exception? EmailFailure { get; set; }
-        public Exception? PublicationFailure { get; set; }
-        public Exception? OnlineOrderFailure { get; set; }
-        public Exception? CustomerUpdateFailure { get; set; }
-        public Exception? ParticipantUpdateFailure { get; set; }
         public Func<CancellationToken, Task>? EmailBehaviour { get; set; }
         public TaskCompletionSource FirstEmailRun { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public TaskCompletionSource ThreeEmailRuns { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -83,52 +75,6 @@ public class NotificationBackgroundServiceTests
         }
     }
 
-    private sealed class PublicationJob(Calls calls, ScopeProbe probe) : ITabulationPublishedNotifier
-    {
-        public Task<PublicationNotificationRunSummary> SendUnsentAsync(CancellationToken cancellationToken = default)
-        {
-            calls.Record("publication", probe.Id, cancellationToken);
-            return calls.PublicationFailure is null
-                ? Task.FromResult(PublicationNotificationRunSummary.Empty)
-                : Task.FromException<PublicationNotificationRunSummary>(calls.PublicationFailure);
-        }
-    }
-
-    private sealed class OnlineOrderJob(Calls calls, ScopeProbe probe) : IPendingOrderNotifier
-    {
-        public Task SendForOrderAsync(Guid pendingContractId, CancellationToken cancellationToken = default) => Task.CompletedTask;
-
-        public Task<OnlineOrderEmailRunSummary> SendUnsentAsync(CancellationToken cancellationToken = default)
-        {
-            calls.Record("onlineOrder", probe.Id, cancellationToken);
-            return calls.OnlineOrderFailure is null
-                ? Task.FromResult(OnlineOrderEmailRunSummary.Empty)
-                : Task.FromException<OnlineOrderEmailRunSummary>(calls.OnlineOrderFailure);
-        }
-    }
-
-    private sealed class CustomerUpdateJob(Calls calls, ScopeProbe probe) : ICustomerUpdateNotifier
-    {
-        public Task SendForUpdateAsync(Guid pendingCustomerUpdateId, CancellationToken cancellationToken = default) => Task.CompletedTask;
-
-        public Task SendUnsentAsync(CancellationToken cancellationToken = default)
-        {
-            calls.Record("customerUpdate", probe.Id, cancellationToken);
-            return calls.CustomerUpdateFailure is null ? Task.CompletedTask : Task.FromException(calls.CustomerUpdateFailure);
-        }
-    }
-
-    private sealed class ParticipantUpdateJob(Calls calls, ScopeProbe probe) : IParticipantUpdateNotifier
-    {
-        public Task SendForUpdateAsync(Guid pendingParticipantUpdateId, CancellationToken cancellationToken = default) => Task.CompletedTask;
-
-        public Task SendUnsentAsync(CancellationToken cancellationToken = default)
-        {
-            calls.Record("participantUpdate", probe.Id, cancellationToken);
-            return calls.ParticipantUpdateFailure is null ? Task.CompletedTask : Task.FromException(calls.ParticipantUpdateFailure);
-        }
-    }
-
     private sealed class Harness : IDisposable
     {
         private readonly ServiceProvider _provider;
@@ -139,10 +85,6 @@ public class NotificationBackgroundServiceTests
 
         public Harness(
             bool emailsEnabled = true,
-            bool publicationsEnabled = true,
-            bool onlineOrdersEnabled = true,
-            bool customerUpdatesEnabled = true,
-            bool participantUpdatesEnabled = true,
             TimeSpan? startupDelay = null,
             TimeSpan? pollInterval = null)
         {
@@ -150,10 +92,6 @@ public class NotificationBackgroundServiceTests
             services.AddSingleton(Calls);
             services.AddScoped<ScopeProbe>();
             services.AddScoped<ITabulationEmailService, EmailJob>();
-            services.AddScoped<ITabulationPublishedNotifier, PublicationJob>();
-            services.AddScoped<IPendingOrderNotifier, OnlineOrderJob>();
-            services.AddScoped<ICustomerUpdateNotifier, CustomerUpdateJob>();
-            services.AddScoped<IParticipantUpdateNotifier, ParticipantUpdateJob>();
             _provider = services.BuildServiceProvider();
 
             Service = new NotificationBackgroundService(
@@ -164,10 +102,6 @@ public class NotificationBackgroundServiceTests
                     PollInterval = pollInterval ?? TimeSpan.FromMilliseconds(10),
                 }),
                 Options.Create(new TabulationEmailOptions { Enabled = emailsEnabled }),
-                Options.Create(new PublicationNotificationOptions { Enabled = publicationsEnabled }),
-                Options.Create(new OnlineOrderEmailOptions { Enabled = onlineOrdersEnabled }),
-                Options.Create(new CustomerUpdateEmailOptions { Enabled = customerUpdatesEnabled }),
-                Options.Create(new ParticipantUpdateEmailOptions { Enabled = participantUpdatesEnabled }),
                 TimeProvider.System,
                 Logger);
         }
@@ -178,8 +112,6 @@ public class NotificationBackgroundServiceTests
             _provider.Dispose();
         }
     }
-
-    private static readonly string[] AllJobsInOrder = ["email", "publication", "onlineOrder", "customerUpdate", "participantUpdate"];
 
     [Fact]
     public void NotificationSchedulerOptions_Defaults_AreFiveMinutesAfterAThirtySecondDelay()
@@ -194,14 +126,14 @@ public class NotificationBackgroundServiceTests
     // ---- RunOnceAsync ----
 
     [Fact]
-    public async Task RunOnceAsync_RunsAllFiveJobsInOneScopeWithTheToken()
+    public async Task RunOnceAsync_RunsTheTestConsultantJobInOneScopeWithTheToken()
     {
         using var h = new Harness();
         using var cts = new CancellationTokenSource();
 
         await h.Service.RunOnceAsync(cts.Token);
 
-        Assert.Equal(AllJobsInOrder, h.Calls.Order);
+        Assert.Equal(["email"], h.Calls.Order);
         Assert.Single(h.Calls.Invocations.Select(i => i.Scope).Distinct());
         Assert.All(h.Calls.Invocations, i => Assert.Equal(cts.Token, i.Token));
         Assert.Empty(h.Logger.Entries);
@@ -218,57 +150,30 @@ public class NotificationBackgroundServiceTests
         Assert.Equal(2, h.Calls.Invocations.Select(i => i.Scope).Distinct().Count());
     }
 
-    [Theory]
-    [InlineData("email", "TestConsultantEmails")]
-    [InlineData("publication", "PublicationNotifications")]
-    [InlineData("onlineOrder", "OnlineOrderEmails")]
-    [InlineData("customerUpdate", "CustomerUpdateEmails")]
-    [InlineData("participantUpdate", "ParticipantUpdateEmails")]
-    public async Task RunOnceAsync_OneJobThrows_LogsItByNameAndStillRunsTheOthers(string failing, string jobName)
+    [Fact]
+    public async Task RunOnceAsync_JobThrows_LogsItByNameAndDoesNotThrow()
     {
         using var h = new Harness();
         var failure = new InvalidOperationException("down");
-        switch (failing)
-        {
-            case "email": h.Calls.EmailFailure = failure; break;
-            case "publication": h.Calls.PublicationFailure = failure; break;
-            case "onlineOrder": h.Calls.OnlineOrderFailure = failure; break;
-            case "customerUpdate": h.Calls.CustomerUpdateFailure = failure; break;
-            default: h.Calls.ParticipantUpdateFailure = failure; break;
-        }
+        h.Calls.EmailFailure = failure;
 
         await h.Service.RunOnceAsync(CancellationToken.None);
 
-        Assert.Equal(AllJobsInOrder, h.Calls.Order);
+        Assert.Equal(["email"], h.Calls.Order);
         var error = Assert.Single(h.Logger.At(LogLevel.Error));
         Assert.Same(failure, error.Exception);
-        Assert.Contains(error.State, kv => kv.Key == "Job" && Equals(kv.Value, jobName));
+        Assert.Contains(error.State, kv => kv.Key == "Job" && Equals(kv.Value, "TestConsultantEmails"));
     }
 
     [Fact]
-    public async Task RunOnceAsync_AllJobsThrow_LogsEach()
-    {
-        using var h = new Harness();
-        h.Calls.EmailFailure = new InvalidOperationException("one");
-        h.Calls.PublicationFailure = new InvalidOperationException("two");
-        h.Calls.OnlineOrderFailure = new InvalidOperationException("three");
-        h.Calls.CustomerUpdateFailure = new InvalidOperationException("four");
-        h.Calls.ParticipantUpdateFailure = new InvalidOperationException("five");
-
-        await h.Service.RunOnceAsync(CancellationToken.None);
-
-        Assert.Equal(5, h.Logger.At(LogLevel.Error).Count());
-    }
-
-    [Fact]
-    public async Task RunOnceAsync_JobTimesOutWithoutShutdown_IsLoggedAndTheOthersStillRun()
+    public async Task RunOnceAsync_JobTimesOutWithoutShutdown_IsLogged()
     {
         using var h = new Harness();
         h.Calls.EmailFailure = new TaskCanceledException("http timeout");
 
         await h.Service.RunOnceAsync(CancellationToken.None);
 
-        Assert.Equal(AllJobsInOrder, h.Calls.Order);
+        Assert.Equal(["email"], h.Calls.Order);
         Assert.Single(h.Logger.At(LogLevel.Error));
     }
 
@@ -292,9 +197,9 @@ public class NotificationBackgroundServiceTests
     // ---- ExecuteAsync ----
 
     [Fact]
-    public async Task ExecuteAsync_EveryJobDisabled_ReturnsImmediatelyWithoutRunningJobs()
+    public async Task ExecuteAsync_Disabled_ReturnsImmediatelyWithoutRunningTheJob()
     {
-        using var h = new Harness(emailsEnabled: false, publicationsEnabled: false, onlineOrdersEnabled: false, customerUpdatesEnabled: false, participantUpdatesEnabled: false, startupDelay: TimeSpan.Zero);
+        using var h = new Harness(emailsEnabled: false, startupDelay: TimeSpan.Zero);
 
         await h.Service.StartAsync(CancellationToken.None);
         await h.Service.ExecuteTask!.WaitAsync(Timeout);
@@ -306,23 +211,16 @@ public class NotificationBackgroundServiceTests
         Assert.Contains("disabled", log.Message, StringComparison.Ordinal);
     }
 
-    [Theory]
-    [InlineData(true, false, false, false, false)]
-    [InlineData(false, true, false, false, false)]
-    [InlineData(false, false, true, false, false)]
-    [InlineData(false, false, false, true, false)]
-    [InlineData(false, false, false, false, true)]
-    [InlineData(true, true, true, true, true)]
-    public async Task ExecuteAsync_AnyJobEnabled_RunsTheJobsRepeatedlyAfterTheStartupDelay(bool emails, bool publications, bool onlineOrders, bool customerUpdates, bool participantUpdates)
+    [Fact]
+    public async Task ExecuteAsync_Enabled_RunsTheJobRepeatedlyAfterTheStartupDelay()
     {
-        using var h = new Harness(emailsEnabled: emails, publicationsEnabled: publications, onlineOrdersEnabled: onlineOrders, customerUpdatesEnabled: customerUpdates, participantUpdatesEnabled: participantUpdates);
+        using var h = new Harness();
 
         await h.Service.StartAsync(CancellationToken.None);
         await h.Calls.ThreeEmailRuns.Task.WaitAsync(Timeout);
         await h.Service.StopAsync(CancellationToken.None);
 
         Assert.True(h.Calls.EmailRuns >= 3);
-        Assert.Equal(AllJobsInOrder, h.Calls.Order.Take(5));
         Assert.Empty(h.Logger.At(LogLevel.Error));
         var started = Assert.Single(h.Logger.Entries, e => e.Message.StartsWith("Notification scheduler started", StringComparison.Ordinal));
         Assert.Contains(started.State, kv => kv.Key == "PollInterval" && Equals(kv.Value, TimeSpan.FromMilliseconds(10)));
@@ -363,20 +261,16 @@ public class NotificationBackgroundServiceTests
     }
 
     [Fact]
-    public async Task ExecuteAsync_FailingJobs_DoNotStopThePollingLoop()
+    public async Task ExecuteAsync_FailingJob_DoesNotStopThePollingLoop()
     {
         using var h = new Harness();
         h.Calls.EmailFailure = new InvalidOperationException("database down");
-        h.Calls.PublicationFailure = new InvalidOperationException("notify down");
-        h.Calls.OnlineOrderFailure = new InvalidOperationException("notify down");
-        h.Calls.CustomerUpdateFailure = new InvalidOperationException("notify down");
-        h.Calls.ParticipantUpdateFailure = new InvalidOperationException("notify down");
 
         await h.Service.StartAsync(CancellationToken.None);
         await h.Calls.ThreeEmailRuns.Task.WaitAsync(Timeout);
         await h.Service.StopAsync(CancellationToken.None);
 
-        Assert.True(h.Logger.At(LogLevel.Error).Count() >= 15);
+        Assert.True(h.Logger.At(LogLevel.Error).Count() >= 3);
         Assert.True(h.Service.ExecuteTask!.IsCompletedSuccessfully);
     }
 

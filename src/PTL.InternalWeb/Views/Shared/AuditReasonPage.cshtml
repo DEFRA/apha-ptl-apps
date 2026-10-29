@@ -1,0 +1,41 @@
+@model PTL.InternalWeb.AuditReason.AuditReasonPageViewModel
+@using PTL.InternalWeb.AuditReason
+@{
+    ViewData["Title"] = $"Audit Trail - {Model.AuditObjectName}";
+
+    // Same error list shape as the other audit steps; the layout adds the "Error:" title prefix.
+    var errors = ViewData.ModelState
+        .Where(entry => entry.Value?.Errors.Count > 0)
+        .SelectMany(entry => entry.Value!.Errors.Select(error => (Field: entry.Key, Message: error.ErrorMessage)))
+        .ToList();
+}
+
+<govuk-error-summary errors="@errors" />
+
+<h1 class="govuk-heading-l">Audit Trail</h1>
+
+<p class="govuk-body">Changes have been made to the following object:</p>
+
+<h2 class="govuk-heading-m">@Model.AuditObjectName</h2>
+
+<hr class="govuk-section-break govuk-section-break--visible govuk-section-break--m">
+
+<form method="post" action="@Model.PostUrl" novalidate>
+    @Html.AntiForgeryToken()
+    @* The original edit has no server-side state, so every field rides along hidden. Razor encodes names and values. *@
+    @foreach (var field in Model.Fields)
+    {
+        <input type="hidden" name="@field.Key" value="@field.Value" />
+    }
+    <input type="hidden" name="@AuditReasonFlow.IsAuditStepField" value="true" />
+    <input type="hidden" name="@AuditReasonFlow.AuditObjectNameField" value="@Model.AuditObjectName" />
+
+    <govuk-textarea asp-for="AuditWhy" label="Before these modifications can be saved, you must enter your reasons for making these changes below: " rows="5" maxlength="2000" />
+
+    <hr class="govuk-section-break govuk-section-break--visible govuk-section-break--m">
+
+    <div class="govuk-button-group">
+        <button type="submit" class="govuk-button" data-module="govuk-button">Save</button>
+        <a class="govuk-button govuk-button--secondary" data-module="govuk-button" href="@Model.CancelUrl">Cancel</a>
+    </div>
+</form>

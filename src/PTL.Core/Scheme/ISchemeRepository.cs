@@ -37,6 +37,7 @@ public interface ISchemeRepository
     // (computed by the fetch procedure) are populated.
     Task<Scheme> CreateAsync(Scheme scheme, CancellationToken cancellationToken = default);
 
-    // Uses spuScheme; returns null when no row was updated (scheme does not exist).
-    Task<Scheme?> UpdateAsync(Scheme scheme, CancellationToken cancellationToken = default);
+    // Uses spuScheme; returns null when no row was updated (scheme does not exist). The update, and the
+    // spiAudit* rows when audit is given, are written in one transaction.
+    Task<Scheme?> UpdateAsync(Scheme scheme, SchemeAuditWrite? audit = null, CancellationToken cancellationToken = default);
 }
