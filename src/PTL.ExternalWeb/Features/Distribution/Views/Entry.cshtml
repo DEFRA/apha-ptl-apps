@@ -1,0 +1,157 @@
+@model PTL.ExternalWeb.Features.Distribution.DistributionResultsEntryViewModel
+@{
+    ViewData["Title"] = $"Results entry - {Model.Heading}";
+
+    const string saveFailedMessage = "Save Failed: No results can be saved after the deadline date.";
+
+    var errors = ViewData.ModelState
+        .Where(entry => entry.Value?.Errors.Count > 0)
+        .SelectMany(entry => entry.Value!.Errors.Select(error => (Field: entry.Key, Message: error.ErrorMessage)))
+        .ToList();
+
+    if (Model.SaveFailed)
+    {
+        errors.Insert(0, (Field: string.Empty, Message: saveFailedMessage));
+        if (ViewData.ModelState.IsValid)
+        {
+            ViewData["Title"] = $"Error: {ViewData["Title"]}";
+        }
+    }
+}
+
+<govuk-error-summary errors="@errors" />
+
+<h1 class="govuk-heading-l">Results entry</h1>
+<h2 class="govuk-heading-m">@Model.Heading</h2>
+
+<p class="govuk-body">Enter or amend your results below. Input format guidance is shown against each field.</p>
+
+<form method="post" asp-action="Entry" asp-route-schemeId="@Model.MonthlyDistributionSchemeId" asp-route-participantId="@Model.DistributionParticipantId">
+    @Html.AntiForgeryToken()
+    <input type="hidden" asp-for="MonthlyDistributionSchemeId" />
+    <input type="hidden" asp-for="DistributionParticipantId" />
+
+    @for (var t = 0; t < Model.Tests.Count; t++)
+    {
+        var test = Model.Tests[t];
+
+        <input type="hidden" asp-for="Tests[t].TestId" />
+
+        <h2 class="govuk-heading-m">@test.TestName</h2>
+
+        <div class="govuk-!-margin-bottom-6" style="overflow-x: auto;">
+            <table class="govuk-table">
+                <caption class="govuk-table__caption govuk-visually-hidden">Results for @test.TestName</caption>
+                <thead class="govuk-table__head">
+                    <tr class="govuk-table__row">
+                        <th scope="col" class="govuk-table__header">Sample</th>
+                        @for (var r = 0; r < test.ResultItems.Count; r++)
+                        {
+                            var resultItem = test.ResultItems[r];
+                            <input type="hidden" asp-for="Tests[t].ResultItems[r].TestResultItemId" />
+                            <th scope="col" class="govuk-table__header">@resultItem.Name</th>
+                        }
+                    </tr>
+                </thead>
+                <tbody class="govuk-table__body">
+                    @for (var s = 0; s < test.Samples.Count; s++)
+                    {
+                        var sample = test.Samples[s];
+                        <tr class="govuk-table__row">
+                            <th scope="row" class="govuk-table__header">
+                                <input type="hidden" asp-for="Tests[t].Samples[s].SampleId" />
+                                @sample.SampleNumber
+                            </th>
+
+                            @for (var r = 0; r < test.ResultItems.Count; r++)
+                            {
+                                var resultItem = test.ResultItems[r];
+                                var valueIndex = test.ValueIndexFor(s, resultItem.TestResultItemId);
+
+                                <td class="govuk-table__cell">
+                                    @if (valueIndex == -1)
+                                    {
+                                        <span class="govuk-visually-hidden">No result item for this sample</span>
+                                    }
+                                    else
+                                    {
+                                        <input type="hidden" asp-for="Tests[t].Samples[s].Values[valueIndex].SampleResultItemId" />
+                                        <input type="hidden" asp-for="Tests[t].Samples[s].Values[valueIndex].TestResultItemId" />
+
+                                        @if (resultItem.IsDropdown)
+                                        {
+                                            <div class="govuk-form-group">
+                                                <label class="govuk-label govuk-visually-hidden" asp-for="Tests[t].Samples[s].Values[valueIndex].Result">@resultItem.Name</label>
+                                                <select class="govuk-select" asp-for="Tests[t].Samples[s].Values[valueIndex].Result">
+                                                    <option value=""></option>
+                                                    @foreach (var option in resultItem.DropdownOptions)
+                                                    {
+                                                        <option value="@option">@option</option>
+                                                    }
+                                                </select>
+                                                <div class="govuk-hint">@resultItem.InputFormatMessage</div>
+                                                <span asp-validation-for="Tests[t].Samples[s].Values[valueIndex].Result" class="govuk-error-message"></span>
+                                            </div>
+                                        }
+                                        else
+                                        {
+                                            <div class="govuk-form-group">
+                                                <label class="govuk-label govuk-visually-hidden" asp-for="Tests[t].Samples[s].Values[valueIndex].Result">@resultItem.Name</label>
+                                                <input class="govuk-input govuk-input--width-10" asp-for="Tests[t].Samples[s].Values[valueIndex].Result" />
+                                                <div class="govuk-hint">@resultItem.InputFormatMessage</div>
+                                                <span asp-validation-for="Tests[t].Samples[s].Values[valueIndex].Result" class="govuk-error-message"></span>
+                                            </div>
+                                        }
+                                    }
+                                </td>
+                            }
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        @if (test.MethodItems.Count > 0)
+        {
+            <h3 class="govuk-heading-s">Method details</h3>
+
+            @for (var m = 0; m < test.MethodItems.Count; m++)
+            {
+                var methodItem = test.MethodItems[m];
+                <input type="hidden" asp-for="Tests[t].MethodItems[m].TestMethodItemId" />
+
+                @if (methodItem.IsDropdown)
+                {
+                    <div class="govuk-form-group">
+                        <label class="govuk-label" asp-for="Tests[t].MethodItems[m].Result">@methodItem.Name</label>
+                        <select class="govuk-select" asp-for="Tests[t].MethodItems[m].Result">
+                            <option value=""></option>
+                            @foreach (var option in methodItem.DropdownOptions)
+                            {
+                                <option value="@option">@option</option>
+                            }
+                        </select>
+                        <div class="govuk-hint">@methodItem.InputFormatMessage</div>
+                        <span asp-validation-for="Tests[t].MethodItems[m].Result" class="govuk-error-message"></span>
+                    </div>
+                }
+                else
+                {
+                    <div class="govuk-form-group">
+                        <label class="govuk-label" asp-for="Tests[t].MethodItems[m].Result">@methodItem.Name</label>
+                        <input class="govuk-input govuk-input--width-10" asp-for="Tests[t].MethodItems[m].Result" />
+                        <div class="govuk-hint">@methodItem.InputFormatMessage</div>
+                        <span asp-validation-for="Tests[t].MethodItems[m].Result" class="govuk-error-message"></span>
+                    </div>
+                }
+            }
+        }
+
+        <hr class="govuk-section-break govuk-section-break--m govuk-section-break--visible" />
+    }
+
+    <div class="govuk-button-group">
+        <button type="submit" name="command" value="save" class="govuk-button" data-module="govuk-button">Save</button>
+        <button type="submit" name="command" value="cancel" class="govuk-button govuk-button--secondary" data-module="govuk-button" formnovalidate>Cancel</button>
+    </div>
+</form>

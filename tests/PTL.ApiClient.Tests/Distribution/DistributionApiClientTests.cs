@@ -35,6 +35,32 @@ public class DistributionApiClientTests
     }
 
     [Fact]
+    public async Task GetCurrentDistributionsAsync_ReturnsDeserializedRows()
+    {
+        const string json = """
+            [{"monthlyDistributionSchemeId":"11111111-1111-1111-1111-111111111111","distributionParticipantId":"22222222-2222-2222-2222-222222222222","distributionReference":"D26-01A/BA","schemeCode":"PT001","schemeName":"Bacteriology","distributionDate":"2026-04-03T00:00:00","deadlineDate":"2026-04-30T00:00:00","hasResults":true,"submitted":false}]
+            """;
+        var client = CreateClient(HttpStatusCode.OK, json);
+
+        var result = await client.GetCurrentDistributionsAsync(Guid.NewGuid());
+
+        var row = Assert.Single(result);
+        Assert.Equal("PT001", row.SchemeCode);
+        Assert.True(row.HasResults);
+        Assert.False(row.Submitted);
+    }
+
+    [Fact]
+    public async Task GetCurrentDistributionsAsync_NullResponse_ReturnsEmptyList()
+    {
+        var client = CreateClient(HttpStatusCode.OK, "null");
+
+        var result = await client.GetCurrentDistributionsAsync(Guid.NewGuid());
+
+        Assert.Empty(result);
+    }
+
+    [Fact]
     public async Task InitialiseMonthAsync_PostsToTheMonthAndReturnsTheResult()
     {
         var handler = new StubHttpMessageHandler(HttpStatusCode.OK, """{"initialised":true}""");

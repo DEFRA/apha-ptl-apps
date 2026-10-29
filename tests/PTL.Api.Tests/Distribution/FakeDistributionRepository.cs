@@ -90,6 +90,8 @@ internal sealed partial class FakeDistributionRepository : IDistributionReposito
 
     public Dictionary<Guid, DistributionParticipantsData> ParticipantsByScheme { get; } = [];
 
+    public Dictionary<Guid, List<CurrentDistributionData>> CurrentDistributionsByParticipant { get; } = [];
+
     public List<DistributionParticipantEntity> UpdatedParticipantDeadlines { get; } = [];
 
     public List<(MonthlyDistributionSchemeEntity NewScheme, IReadOnlyList<DistributionParticipantEntity> NewParticipants)> RepeatedDistributions { get; } = [];
@@ -97,6 +99,9 @@ internal sealed partial class FakeDistributionRepository : IDistributionReposito
     public Task<DistributionParticipantsData?> GetDistributionParticipantsAsync(
         Guid monthlyDistributionSchemeId, CancellationToken cancellationToken = default) =>
         Task.FromResult(ParticipantsByScheme.GetValueOrDefault(monthlyDistributionSchemeId));
+
+    public Task<IReadOnlyList<CurrentDistributionData>> GetCurrentDistributionsAsync(Guid participantId, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<CurrentDistributionData>>(CurrentDistributionsByParticipant.GetValueOrDefault(participantId) ?? []);
 
     public Task UpdateParticipantDeadlineAsync(DistributionParticipantEntity participant, CancellationToken cancellationToken = default)
     {

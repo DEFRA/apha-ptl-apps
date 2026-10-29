@@ -217,6 +217,7 @@ builder.Services.AddScoped<IDistributionRepository, DistributionRepository>();
 builder.Services.AddScoped<IDistributionService, DistributionService>();
 builder.Services.AddScoped<ISampleNumbersService, SampleNumbersService>();
 builder.Services.AddScoped<IIntendedResultsService, IntendedResultsService>();
+builder.Services.AddScoped<ICurrentDistributionsService, CurrentDistributionsService>();
 builder.Services.AddScoped<IDistributionParticipantsService, DistributionParticipantsService>();
 builder.Services.AddScoped<IPreparationService, PreparationService>();
 builder.Services.AddScoped<IResultsReceiptService, ResultsReceiptService>();

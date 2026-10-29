@@ -1,0 +1,48 @@
+@model PTL.ExternalWeb.Features.Distribution.CurrentDistributionsViewModel
+@{
+    ViewData["Title"] = "Current distributions";
+}
+
+<h1 class="govuk-heading-l">Current distributions</h1>
+
+@if (Model.Distributions.Count == 0)
+{
+    <div class="govuk-inset-text">There are no current distributions to display.</div>
+    return;
+}
+
+<p class="govuk-body">Select View to enter or amend results for a current distribution.</p>
+
+<table class="govuk-table">
+    <thead class="govuk-table__head">
+        <tr class="govuk-table__row">
+            <th scope="col" class="govuk-table__header">Distribution reference</th>
+            <th scope="col" class="govuk-table__header">Scheme code</th>
+            <th scope="col" class="govuk-table__header">Scheme name</th>
+            <th scope="col" class="govuk-table__header">Distribution date</th>
+            <th scope="col" class="govuk-table__header">Deadline date</th>
+            <th scope="col" class="govuk-table__header">Results entered</th>
+            <th scope="col" class="govuk-table__header">Results</th>
+        </tr>
+    </thead>
+    <tbody class="govuk-table__body">
+        @foreach (var distribution in Model.Distributions)
+        {
+            <tr class="govuk-table__row">
+                <td class="govuk-table__cell">@distribution.DistributionReference</td>
+                <td class="govuk-table__cell">@distribution.SchemeCode</td>
+                <td class="govuk-table__cell">@distribution.SchemeName</td>
+                <td class="govuk-table__cell">@distribution.DistributionDate.ToString("dddd d MMMM yyyy")</td>
+                <td class="govuk-table__cell">@distribution.DeadlineDate.ToString("dddd d MMMM yyyy")</td>
+                <td class="govuk-table__cell">@(distribution.ResultsEntered ? "Yes" : "No")</td>
+                <td class="govuk-table__cell">
+                    <a class="govuk-link"
+                       asp-action="Entry"
+                       asp-route-schemeId="@distribution.MonthlyDistributionSchemeId"
+                       asp-route-participantId="@distribution.DistributionParticipantId"
+                       aria-label="View results entry for @distribution.DistributionReference">View</a>
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
