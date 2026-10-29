@@ -212,7 +212,7 @@ public class AssessorApiClientTests
     [Fact]
     public async Task SaveEntryAsync_BadRequest_CarriesTheFieldsAtFault()
     {
-        var (client, _) = Create(HttpStatusCode.BadRequest, """{"errors":[{"key":"OverallScore","message":"An overall score is required"},{"key":"Categories[0].Score","message":"A category score is required"}]}""");
+        var (client, _) = Create(HttpStatusCode.BadRequest, """{"errors":{"OverallScore":["An overall score is required"],"Categories[0].Score":["A category score is required"]}}""");
 
         var result = await client.SaveEntryAsync(SampleTestId, ParticipantId, SaveRequest());
 

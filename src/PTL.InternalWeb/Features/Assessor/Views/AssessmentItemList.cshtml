@@ -38,7 +38,7 @@
             @foreach (var item in sample.Items)
             {
                 <tr class="govuk-table__row">
-                    <td class="govuk-table__cell">@item.LabCode</td>
+                    <th scope="row" class="govuk-table__header govuk-!-font-weight-regular">@item.LabCode</th>
                     <td class="govuk-table__cell">@(item.HasAssessment ? "Yes" : "No")</td>
                     <td class="govuk-table__cell">
                         <a class="govuk-link" href="@AssessorItemListViewModel.EntryUrl(item, list.TestId, Model.Year)">View/Edit<span class="govuk-visually-hidden"> for Labcode @item.LabCode, sample @sample.SampleNumber</span></a>

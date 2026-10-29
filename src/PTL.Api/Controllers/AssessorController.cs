@@ -98,7 +98,7 @@ public sealed class AssessorController(IAssessorService service, IActingUserAcce
     // has been submitted.
     [HttpPut("entries/{sampleTestId:guid}/{participantId:guid}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
-    [ProducesResponseType<AssessorValidationResponse>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
@@ -113,10 +113,21 @@ public sealed class AssessorController(IAssessorService service, IActingUserAcce
         return result.Outcome switch
         {
             AssessorSaveOutcome.Saved => NoContent(),
-            AssessorSaveOutcome.Invalid => BadRequest(new AssessorValidationResponse([.. result.Errors.Select(e => new AssessorValidationErrorResponse(e.Key, e.Message))])),
+            AssessorSaveOutcome.Invalid => ToValidationProblem(result.Errors),
             AssessorSaveOutcome.Forbidden => StatusCode(StatusCodes.Status403Forbidden),
             AssessorSaveOutcome.Submitted => Conflict(),
             _ => NotFound(),
         };
+    }
+
+    // Each key names the field in the form ("Comment", "OverallScore", "Categories[0].Score").
+    private ActionResult ToValidationProblem(IEnumerable<AssessorValidationError> errors)
+    {
+        foreach (var error in errors)
+        {
+            ModelState.AddModelError(error.Key, error.Message);
+        }
+
+        return ValidationProblem(ModelState);
     }
 }

@@ -463,3 +463,8 @@ span.app-side-navigation__link--disabled {
 .ptl-break-word {
   overflow-wrap: anywhere;
 }
+
+/* Free text keeps the line breaks it was typed with. */
+.ptl-preserve-lines {
+  white-space: pre-line;
+}

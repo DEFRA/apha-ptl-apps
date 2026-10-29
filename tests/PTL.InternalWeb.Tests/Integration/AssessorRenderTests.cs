@@ -108,28 +108,29 @@ public class AssessorRenderTests(WebApplicationFactory<Program> rawFactory) : IC
     }
 
     [Fact]
-    public async Task Menu_EachMonthStartsOpenAndListsItsDistributionsAndTests()
+    public async Task Menu_EachMonthStartsCollapsedAndListsItsDistributionsAndTests()
     {
         Menu();
 
         var html = await GetAsync("/Assessor");
 
-        Assert.Contains("<details class=\"govuk-details\" open>", html, StringComparison.Ordinal);
+        Assert.Contains("<details class=\"govuk-details\">", html, StringComparison.Ordinal);
+        Assert.DoesNotContain(" open", Regex.Match(html, "<details[^>]*>").Value, StringComparison.Ordinal);
         Assert.Contains("<span class=\"govuk-details__summary-text\">February 2021</span>", html, StringComparison.Ordinal);
         Assert.Contains("<h2 class=\"govuk-heading-s\">14468/A/HI: PT0166 Cellular Pathology Technique (CPT)</h2>", html, StringComparison.Ordinal);
-        Assert.Contains(">Giemsa</td>", html, StringComparison.Ordinal);
-        Assert.Contains(">E-cadherin</td>", html, StringComparison.Ordinal);
+        Assert.Contains("Giemsa", html, StringComparison.Ordinal);
+        Assert.Contains("E-cadherin", html, StringComparison.Ordinal);
     }
 
     [Fact]
-    public async Task Menu_ASubmittedTestIsMarkedInLegacyWords()
+    public async Task Menu_ASubmittedTestIsMarkedWithAGreenTag()
     {
         Menu(submitted: true);
 
         var html = await GetAsync("/Assessor");
 
-        Assert.Contains(">Giemsa (Assessment Submitted)</td>", html, StringComparison.Ordinal);
-        Assert.Contains(">E-cadherin</td>", html, StringComparison.Ordinal);
+        Assert.Matches("Giemsa\\s*<strong class=\"govuk-tag govuk-tag--green\">Assessment Submitted</strong>", html);
+        Assert.Equal(1, Regex.Count(html, "Assessment Submitted</strong>"));
     }
 
     [Fact]
@@ -205,8 +206,8 @@ public class AssessorRenderTests(WebApplicationFactory<Program> rawFactory) : IC
         Assert.Contains("<h4 class=\"govuk-heading-s\">Sample number: 21/7140</h4>", html, StringComparison.Ordinal);
         var headers = Regex.Matches(html, "<th scope=\"col\" class=\"govuk-table__header\">(?<text>[^<]*)</th>").Select(m => m.Groups["text"].Value);
         Assert.Equal(["Labcode", "Assessment Entered", "View/Edit"], headers);
-        Assert.Contains(">1126</td>", html, StringComparison.Ordinal);
-        Assert.Contains(">1385</td>", html, StringComparison.Ordinal);
+        Assert.Contains("<th scope=\"row\" class=\"govuk-table__header govuk-!-font-weight-regular\">1126</th>", html, StringComparison.Ordinal);
+        Assert.Contains("<th scope=\"row\" class=\"govuk-table__header govuk-!-font-weight-regular\">1385</th>", html, StringComparison.Ordinal);
         Assert.DoesNotContain(ParticipantId.ToString(), Regex.Replace(html, "href=\"[^\"]*\"", string.Empty), StringComparison.OrdinalIgnoreCase);
     }
 
@@ -463,8 +464,8 @@ public class AssessorRenderTests(WebApplicationFactory<Program> rawFactory) : IC
         Assert.Contains("<span class=\"govuk-caption-l\">February 2021</span>", html, StringComparison.Ordinal);
         Assert.Contains("<h1 class=\"govuk-heading-l\">Assessment Entry</h1>", html, StringComparison.Ordinal);
         Assert.Contains("<h2 class=\"govuk-heading-m\">14468/A/HI: PT0166 Cellular Pathology Technique (CPT)</h2>", html, StringComparison.Ordinal);
-        Assert.Contains("<h3 class=\"govuk-heading-s\">Labcode: 1126, Sample number: 21/7140</h3>", html, StringComparison.Ordinal);
-        Assert.Contains("<h3 class=\"govuk-heading-s\">Alcian blue / PAS</h3>", html, StringComparison.Ordinal);
+        var rows = Regex.Matches(html, "<dt class=\"govuk-summary-list__key\">(?<key>[^<]*)</dt><dd class=\"govuk-summary-list__value\">(?<value>[^<]*)</dd>").Select(m => (m.Groups["key"].Value, m.Groups["value"].Value));
+        Assert.Equal([("Labcode", "1126"), ("Sample number", "21/7140"), ("Test", "Alcian blue / PAS")], rows);
         Assert.Equal([(SampleTestId, ParticipantId)], _apiClient.RequestedEntries);
     }
 
@@ -477,7 +478,7 @@ public class AssessorRenderTests(WebApplicationFactory<Program> rawFactory) : IC
 
         var headers = Regex.Matches(html, "<th scope=\"col\" class=\"govuk-table__header\">(?<text>[^<]*)</th>").Select(m => m.Groups["text"].Value);
         Assert.Equal(["Test result item name", "Result"], headers);
-        Assert.Contains(">Isolate</td>", html, StringComparison.Ordinal);
+        Assert.Contains(">Isolate</th>", html, StringComparison.Ordinal);
         Assert.Contains(">Positive</td>", html, StringComparison.Ordinal);
     }
 
@@ -568,18 +569,29 @@ public class AssessorRenderTests(WebApplicationFactory<Program> rawFactory) : IC
         Assert.DoesNotContain("name=\"command\"", html, StringComparison.Ordinal);
         Assert.DoesNotContain(">Cancel</a>", html, StringComparison.Ordinal);
         Assert.Matches($"<a class=\"govuk-button govuk-button--secondary\"[^>]*href=\"/Assessor/AssessmentItemList\\?testId={TestId}&amp;year=2021\">Back</a>", html);
-        Assert.Matches("<textarea[^>]*disabled=\"disabled\"", html);
-        Assert.Matches("<select[^>]*disabled=\"disabled\"[^>]*id=\"OverallScore\"", html);
-        Assert.Matches("<select[^>]*disabled=\"disabled\"[^>]*id=\"Categories_0__Score\"", html);
-        Assert.Equal(1, Regex.Count(html, "type=\"checkbox\"[^>]*\\s+checked=\"checked\"\\s+disabled=\"disabled\""));
+        Assert.Contains("Assessment has been submitted for this test, so it can no longer be changed.", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("<form", MainContent(html), StringComparison.Ordinal);
+        Assert.DoesNotContain("<input", MainContent(html), StringComparison.Ordinal);
+        Assert.DoesNotContain("<select", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("<textarea", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("disabled", html, StringComparison.Ordinal);
+        Assert.Contains("Score: 2", html, StringComparison.Ordinal);
+        Assert.Contains("Score: Not entered", html, StringComparison.Ordinal);
+        Assert.Contains("<li>Shape</li>", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("<li>Colour</li>", html, StringComparison.Ordinal);
+        Assert.Contains("<span class=\"ptl-preserve-lines\">Good work</span>", html, StringComparison.Ordinal);
+        Assert.Contains("3 - Pass", html, StringComparison.Ordinal);
     }
 
     [Fact]
-    public async Task Entry_NotSubmitted_LeavesEveryControlEnabled()
+    public async Task Entry_NotSubmitted_ShowsTheCommentLimitAndLeavesEveryControlEnabled()
     {
         Entry();
 
-        Assert.DoesNotContain("disabled=\"disabled\"", await GetAsync(EntryUrl), StringComparison.Ordinal);
+        var html = await GetAsync(EntryUrl);
+
+        Assert.DoesNotContain("disabled=\"disabled\"", html, StringComparison.Ordinal);
+        Assert.Matches("<textarea[^>]*maxlength=\"2000\"", html);
     }
 
     [Fact]
@@ -619,10 +631,11 @@ public class AssessorRenderTests(WebApplicationFactory<Program> rawFactory) : IC
 
     // ---- Save and Apply -------------------------------------------------------------------------
 
-    private static async Task<HttpResponseMessage> PostEntryAsync(HttpClient client, string command, string? comment = "Fine work", string overall = "4", string morphologyScore = "3", string stainingScore = "5")
+    private static async Task<HttpResponseMessage> PostEntryAsync(HttpClient client, string command, string? comment = "Fine work", string overall = "4", string morphologyScore = "3", string stainingScore = "5", Action? beforePost = null)
     {
         var page = await (await client.GetAsync(EntryUrl)).Content.ReadAsStringAsync();
         var token = Regex.Match(page, "__RequestVerificationToken[^>]*value=\"([^\"]+)\"").Groups[1].Value;
+        beforePost?.Invoke();
 
         List<KeyValuePair<string, string>> fields =
         [
@@ -733,11 +746,11 @@ public class AssessorRenderTests(WebApplicationFactory<Program> rawFactory) : IC
     [Fact]
     public async Task Save_ATestSubmittedMeanwhile_ReturnsToTheItemsWithAnErrorAndSavesNothing()
     {
-        Entry(submitted: true);
+        Entry();
         Items(submitted: true);
         var client = Factory("Assessor").CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = true });
 
-        var html = MainContent(await (await PostEntryAsync(client, "save")).Content.ReadAsStringAsync());
+        var html = MainContent(await (await PostEntryAsync(client, "save", beforePost: () => Entry(submitted: true))).Content.ReadAsStringAsync());
 
         Assert.Contains("Assessment has already been submitted for this test, so it can no longer be changed.", html, StringComparison.Ordinal);
         Assert.Empty(_apiClient.Saved);

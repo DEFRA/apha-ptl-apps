@@ -36,7 +36,7 @@
 
 @foreach (var month in Model.Months)
 {
-    <details class="govuk-details" open>
+    <details class="govuk-details">
         <summary class="govuk-details__summary">
             <span class="govuk-details__summary-text">@month.Title</span>
         </summary>
@@ -56,7 +56,13 @@
                         @foreach (var test in distribution.Tests)
                         {
                             <tr class="govuk-table__row">
-                                <td class="govuk-table__cell">@test.TestType@(test.IsAssessmentSubmitted ? " (Assessment Submitted)" : null)</td>
+                                <td class="govuk-table__cell">
+                                    @test.TestType
+                                    @if (test.IsAssessmentSubmitted)
+                                    {
+                                        <strong class="govuk-tag govuk-tag--green">Assessment Submitted</strong>
+                                    }
+                                </td>
                                 <td class="govuk-table__cell">
                                     <a class="govuk-link" asp-action="AssessmentItemList" asp-route-testId="@test.TestId" asp-route-year="@Model.SelectedYear">View<span class="govuk-visually-hidden"> @test.TestType for @distribution.DistributionTitle</span></a>
                                 </td>

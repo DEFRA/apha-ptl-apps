@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using Microsoft.AspNetCore.Mvc;
 using PTL.Contracts.Distribution;
 
 namespace PTL.ApiClient.Distribution;
@@ -33,7 +34,10 @@ public enum AssessorSaveStatus
     Invalid,
 }
 
-public sealed record AssessorSaveApiResult(AssessorSaveStatus Status, IReadOnlyList<AssessorValidationErrorResponse> Errors)
+// Key names the field in the form ("Comment", "OverallScore", "Categories[0].Score").
+public sealed record AssessorFieldError(string Key, string Message);
+
+public sealed record AssessorSaveApiResult(AssessorSaveStatus Status, IReadOnlyList<AssessorFieldError> Errors)
 {
     public static AssessorSaveApiResult Of(AssessorSaveStatus status) => new(status, []);
 }
@@ -89,8 +93,10 @@ public sealed class AssessorApiClient(HttpClient httpClient) : IAssessorApiClien
             case HttpStatusCode.Conflict:
                 return AssessorSaveApiResult.Of(AssessorSaveStatus.Submitted);
             case HttpStatusCode.BadRequest:
-                var failure = await response.Content.ReadFromJsonAsync<AssessorValidationResponse>(cancellationToken);
-                return new AssessorSaveApiResult(AssessorSaveStatus.Invalid, failure?.Errors ?? []);
+                var problem = await response.Content.ReadFromJsonAsync<ValidationProblemDetails>(cancellationToken);
+                return new AssessorSaveApiResult(
+                    AssessorSaveStatus.Invalid,
+                    [.. (problem?.Errors ?? new Dictionary<string, string[]>()).SelectMany(field => field.Value.Select(message => new AssessorFieldError(field.Key, message)))]);
             default:
                 response.EnsureSuccessStatusCode();
                 return AssessorSaveApiResult.Of(AssessorSaveStatus.Saved);

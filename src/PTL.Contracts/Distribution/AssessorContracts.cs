@@ -78,8 +78,3 @@ public sealed record AssessorEntrySaveRequest(
     IReadOnlyList<AssessorCategorySaveRequest> Categories);
 
 public sealed record AssessorCategorySaveRequest(Guid CategoryItemId, int Score, IReadOnlyList<Guid> CriterionItemIds);
-
-// Returned with 400 when a save is refused. Key names the field in the form ("Comment", "OverallScore", "Categories[0].Score").
-public sealed record AssessorValidationResponse(IReadOnlyList<AssessorValidationErrorResponse> Errors);
-
-public sealed record AssessorValidationErrorResponse(string Key, string Message);

@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Infrastructure;
+using Microsoft.Extensions.DependencyInjection;
 using PTL.Api.Controllers;
 using PTL.Api.Tests.Audit;
 using PTL.Contracts.Distribution;
@@ -109,7 +110,11 @@ public class AssessorServiceTests
 
     private AssessorService Service => new(_repository, new FixedLocalTime());
 
-    private AssessorController Controller => new(Service, _actingUser);
+    // ValidationProblem() resolves ProblemDetailsFactory from HttpContext.RequestServices, which a bare controller does not have.
+    private AssessorController Controller => new(Service, _actingUser)
+    {
+        ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext { RequestServices = new ServiceCollection().AddMvc().Services.BuildServiceProvider() } },
+    };
 
     private static AssessorMonthEntity Month(int yearId, int monthId, DateTime? submitted = null)
     {
@@ -827,8 +832,11 @@ public class AssessorServiceTests
 
         var result = await Controller.SaveEntry(SampleTestId, ParticipantId, Request(overall: 0), CancellationToken.None);
 
-        var body = Assert.IsType<AssessorValidationResponse>(Assert.IsType<BadRequestObjectResult>(result).Value);
-        Assert.Equal(("OverallScore", "An overall score is required"), (Assert.Single(body.Errors).Key, body.Errors[0].Message));
+        var body = Assert.IsType<ValidationProblemDetails>(Assert.IsType<ObjectResult>(result, exactMatch: false).Value);
+        Assert.Equal(StatusCodes.Status400BadRequest, Assert.IsAssignableFrom<IStatusCodeActionResult>(result).StatusCode);
+        var error = Assert.Single(body.Errors);
+        Assert.Equal("OverallScore", error.Key);
+        Assert.Equal(["An overall score is required"], error.Value);
     }
 
     [Theory]
