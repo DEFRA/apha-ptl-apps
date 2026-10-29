@@ -4,10 +4,13 @@ using Microsoft.Extensions.Options;
 using PTL.ApiClient;
 using PTL.Auth.Entra;
 using PTL.Auth.Entra.Events;
+using PTL.Common.Graph;
 using PTL.Core.Contract.Document;
+using PTL.Core.User;
 using PTL.InternalWeb.Authorization;
 using PTL.InternalWeb.Features.Account;
 using PTL.InternalWeb.Features.SystemAdministration;
+using PTL.InternalWeb.Infrastructure;
 using PTL.InternalWeb.SessionTimeout;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -38,6 +41,11 @@ builder.Services.AddSingleton<IAuthorizationMiddlewareResultHandler, LoggingAuth
 // Mail merge runs in-process in this app; the template bytes come from S3 via PTL.Api's
 // export-template endpoints, so nothing here touches the file system.
 builder.Services.AddScoped<ITemplateMergeService, TemplateMergeService>();
+
+// The Create User staff search calls Microsoft Graph from here, so the Graph app registration's secrets
+// (the "Graph" configuration section) are held by this app only - PTL.Api no longer has them.
+builder.Services.AddGraphClient(builder.Configuration);
+builder.Services.AddScoped<IStaffDirectoryService, GraphStaffDirectoryService>();
 
 // Bundled so SystemAdministrationController's constructor takes one parameter instead of 8 - see
 // SystemAdministrationApiClients remarks.

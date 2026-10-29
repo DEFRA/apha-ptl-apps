@@ -5,12 +5,14 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using PTL.ApiClient;
+using PTL.Common.Graph;
 using PTL.Contracts.AdministrationCharge;
 using PTL.Contracts.Lookup;
 using PTL.Contracts.PostagePricingPlan;
 using PTL.Contracts.TestConsultant;
 using PTL.Contracts.User;
 using PTL.Contracts.Viewer;
+using PTL.Core.User;
 using PTL.InternalWeb.Tests.TestSupport;
 using ExternalSiteMessageResponse = PTL.Contracts.ExternalSiteMessage.ExternalSiteMessageResponse;
 using ExternalSiteMessageSaveResult = PTL.Contracts.ExternalSiteMessage.ExternalSiteMessageSaveResult;
@@ -54,6 +56,8 @@ public partial class SystemAdministrationRouteSmokeTests : IClassFixture<WebAppl
                 services.AddSingleton<IExternalTestConsultantApiClient>(new FakeExternalTestConsultantApiClient());
                 services.RemoveAll<IViewerApiClient>();
                 services.AddSingleton<IViewerApiClient>(new FakeViewerApiClient());
+                services.RemoveAll<IStaffDirectoryService>();
+                services.AddSingleton<IStaffDirectoryService>(new FakeStaffDirectoryService());
             }));
     }
 
@@ -468,7 +472,9 @@ public partial class SystemAdministrationRouteSmokeTests : IClassFixture<WebAppl
             builder.ConfigureServices(services =>
             {
                 services.RemoveAll<IUserApiClient>();
-                services.AddSingleton<IUserApiClient>(new FakeUserApiClient { SearchResults = [] });
+                services.AddSingleton<IUserApiClient>(new FakeUserApiClient());
+                services.RemoveAll<IStaffDirectoryService>();
+                services.AddSingleton<IStaffDirectoryService>(new FakeStaffDirectoryService { Results = [] });
             }));
         var client = factory.CreateClient();
         var (token, cookie) = await GetAntiforgeryAsync(client, "/SystemAdministration/CreateUser");
@@ -496,10 +502,10 @@ public partial class SystemAdministrationRouteSmokeTests : IClassFixture<WebAppl
         var factory = _factory.WithWebHostBuilder(builder =>
             builder.ConfigureServices(services =>
             {
-                services.RemoveAll<IUserApiClient>();
-                services.AddSingleton<IUserApiClient>(new FakeUserApiClient
+                services.RemoveAll<IStaffDirectoryService>();
+                services.AddSingleton<IStaffDirectoryService>(new FakeStaffDirectoryService
                 {
-                    SearchResults = [new StaffDirectoryUserResponse("m100001", "jane@apha.gov.uk", "Jane Smith", "Jane", "Smith")]
+                    Results = [new StaffDirectoryUser { Username = "m100001", Email = "jane@apha.gov.uk", FriendlyName = "Jane Smith", FirstName = "Jane", LastName = "Smith" }]
                 });
             }));
         var client = factory.CreateClient();
@@ -533,8 +539,8 @@ public partial class SystemAdministrationRouteSmokeTests : IClassFixture<WebAppl
         var factory = _factory.WithWebHostBuilder(builder =>
             builder.ConfigureServices(services =>
             {
-                services.RemoveAll<IUserApiClient>();
-                services.AddSingleton<IUserApiClient>(new FakeUserApiClient { SearchException = new HttpRequestException("Graph unavailable") });
+                services.RemoveAll<IStaffDirectoryService>();
+                services.AddSingleton<IStaffDirectoryService>(new FakeStaffDirectoryService { Exception = new GraphException("Microsoft Graph user search failed with HTTP 503.") });
             }));
         var client = factory.CreateClient();
         var (token, cookie) = await GetAntiforgeryAsync(client, "/SystemAdministration/CreateUser");
@@ -564,10 +570,10 @@ public partial class SystemAdministrationRouteSmokeTests : IClassFixture<WebAppl
         var factory = _factory.WithWebHostBuilder(builder =>
             builder.ConfigureServices(services =>
             {
-                services.RemoveAll<IUserApiClient>();
-                services.AddSingleton<IUserApiClient>(new FakeUserApiClient
+                services.RemoveAll<IStaffDirectoryService>();
+                services.AddSingleton<IStaffDirectoryService>(new FakeStaffDirectoryService
                 {
-                    SearchResults = [new StaffDirectoryUserResponse("m100001", "jane@apha.gov.uk", "Jane Smith", "Jane", "Smith")]
+                    Results = [new StaffDirectoryUser { Username = "m100001", Email = "jane@apha.gov.uk", FriendlyName = "Jane Smith", FirstName = "Jane", LastName = "Smith" }]
                 });
             }));
         var client = factory.CreateClient();

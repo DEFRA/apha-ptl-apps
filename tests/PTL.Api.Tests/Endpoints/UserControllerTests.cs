@@ -10,9 +10,9 @@ namespace PTL.Api.Tests.Endpoints;
 
 public class UserControllerTests
 {
-    private static UserController CreateController(FakeUserRepository repository, FakeStaffDirectoryService? directory = null)
+    private static UserController CreateController(FakeUserRepository repository)
     {
-        var controller = new UserController(new UserService(repository, directory ?? new FakeStaffDirectoryService(), new PTL.Api.Tests.Audit.FakeActingUserAccessor()));
+        var controller = new UserController(new UserService(repository, new PTL.Api.Tests.Audit.FakeActingUserAccessor()));
 
         var services = new ServiceCollection().AddMvc().Services.BuildServiceProvider();
         controller.ControllerContext = new ControllerContext
@@ -21,39 +21,6 @@ public class UserControllerTests
         };
 
         return controller;
-    }
-
-    [Fact]
-    public async Task SearchDirectory_BlankTerm_ReturnsEmptyWithoutCallingDirectory()
-    {
-        var directory = new FakeStaffDirectoryService { Results = [new StaffDirectoryUser { Username = "m1" }] };
-        var controller = CreateController(new FakeUserRepository(), directory);
-
-        var result = await controller.SearchDirectory(string.Empty, CancellationToken.None);
-
-        var ok = Assert.IsType<OkObjectResult>(result.Result);
-        var response = Assert.IsType<StaffDirectorySearchResponse>(ok.Value);
-        Assert.Empty(response.Users);
-        Assert.False(response.IsTruncated);
-        Assert.Null(directory.LastSearchTerm);
-    }
-
-    [Fact]
-    public async Task SearchDirectory_ReturnsMappedResults()
-    {
-        var directory = new FakeStaffDirectoryService
-        {
-            Results = [new StaffDirectoryUser { Username = "m100001", Email = "jane@apha.gov.uk", FriendlyName = "Jane Smith", FirstName = "Jane", LastName = "Smith" }],
-            IsTruncated = true
-        };
-        var controller = CreateController(new FakeUserRepository(), directory);
-
-        var result = await controller.SearchDirectory("jane", CancellationToken.None);
-
-        var ok = Assert.IsType<OkObjectResult>(result.Result);
-        var response = Assert.IsType<StaffDirectorySearchResponse>(ok.Value);
-        Assert.Equal("m100001", Assert.Single(response.Users).Username);
-        Assert.True(response.IsTruncated);
     }
 
     [Fact]

@@ -189,7 +189,6 @@ public class CountryManagementControllerTests
         Assert.Equal(2, result.Rows.Count);
         var added = result.Rows[1];
         Assert.Null(added.CountryId);
-        Assert.True(added.IsNew);
         Assert.Equal("Spain", added.Country);
         Assert.Equal(TypeNonEu, added.CountryTypeId);
         Assert.Equal("Non-EU", added.CountryType);

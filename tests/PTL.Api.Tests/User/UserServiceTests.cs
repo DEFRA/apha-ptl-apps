@@ -4,65 +4,8 @@ namespace PTL.Api.Tests.User;
 
 public class UserServiceTests
 {
-    private static UserService CreateService(FakeUserRepository repository, FakeStaffDirectoryService? directory = null, PTL.Api.Tests.Audit.FakeActingUserAccessor? actingUser = null) =>
-        new(repository, directory ?? new FakeStaffDirectoryService(), actingUser ?? new PTL.Api.Tests.Audit.FakeActingUserAccessor());
-
-    [Fact]
-    public async Task SearchStaffDirectoryAsync_FiltersOutCandidatesWithExistingAccounts()
-    {
-        var repository = new FakeUserRepository
-        {
-            Users = [new PTL.Core.User.User { Username = "m100001", Email = "jane@apha.gov.uk" }]
-        };
-        var directory = new FakeStaffDirectoryService
-        {
-            Results =
-            [
-                new StaffDirectoryUser { Username = "m100001", Email = "jane@apha.gov.uk", FriendlyName = "Jane Smith" },
-                new StaffDirectoryUser { Username = "m100002", Email = "john@apha.gov.uk", FriendlyName = "John Doe" }
-            ]
-        };
-        var service = CreateService(repository, directory);
-
-        var result = await service.SearchStaffDirectoryAsync("m1");
-
-        var match = Assert.Single(result.Users);
-        Assert.Equal("m100002", match.Username);
-        Assert.False(result.IsTruncated);
-    }
-
-    [Fact]
-    public async Task SearchStaffDirectoryAsync_PassesTheTruncatedFlagThrough()
-    {
-        var directory = new FakeStaffDirectoryService
-        {
-            Results = [new StaffDirectoryUser { Username = "m100002" }],
-            IsTruncated = true
-        };
-        var service = CreateService(new FakeUserRepository(), directory);
-
-        var result = await service.SearchStaffDirectoryAsync("m1");
-
-        Assert.True(result.IsTruncated);
-    }
-
-    [Fact]
-    public async Task SearchStaffDirectoryAsync_AllCandidatesAlreadyHaveAccounts_ReturnsEmpty()
-    {
-        var repository = new FakeUserRepository
-        {
-            Users = [new PTL.Core.User.User { Username = "m100001" }]
-        };
-        var directory = new FakeStaffDirectoryService
-        {
-            Results = [new StaffDirectoryUser { Username = "m100001", FriendlyName = "Jane Smith" }]
-        };
-        var service = CreateService(repository, directory);
-
-        var result = await service.SearchStaffDirectoryAsync("jane");
-
-        Assert.Empty(result.Users);
-    }
+    private static UserService CreateService(FakeUserRepository repository, PTL.Api.Tests.Audit.FakeActingUserAccessor? actingUser = null) =>
+        new(repository, actingUser ?? new PTL.Api.Tests.Audit.FakeActingUserAccessor());
 
     [Theory]
     [InlineData("Username")]

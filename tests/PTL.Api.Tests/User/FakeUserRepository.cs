@@ -79,15 +79,3 @@ internal sealed class FakeUserRepository : IUserRepository
     }
 }
 
-internal sealed class FakeStaffDirectoryService : IStaffDirectoryService
-{
-    public IReadOnlyList<StaffDirectoryUser> Results { get; set; } = [];
-    public bool IsTruncated { get; set; }
-    public string? LastSearchTerm { get; private set; }
-
-    public Task<StaffDirectorySearchResult> SearchAsync(string searchTerm, CancellationToken cancellationToken = default)
-    {
-        LastSearchTerm = searchTerm;
-        return Task.FromResult(new StaffDirectorySearchResult(Results, IsTruncated));
-    }
-}

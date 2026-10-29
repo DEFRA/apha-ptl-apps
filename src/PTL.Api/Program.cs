@@ -4,7 +4,6 @@ using Microsoft.OpenApi;
 using PTL.Api.Features.Health;
 using PTL.Api.Infrastructure;
 using PTL.Common.Correlation;
-using PTL.Common.Graph;
 using PTL.Common.Health;
 using PTL.Core.AdministrationCharge;
 using PTL.Core.CategoryItemType;
@@ -281,8 +280,6 @@ builder.Services.AddScoped<IExternalSiteMessageRepository, ExternalSiteMessageRe
 builder.Services.AddScoped<IExternalSiteMessageService, ExternalSiteMessageService>();
 
 builder.Services.AddScoped<IUserRepository, UserRepository>();
-builder.Services.AddGraphClient(builder.Configuration);
-builder.Services.AddScoped<IStaffDirectoryService, GraphStaffDirectoryService>();
 builder.Services.AddScoped<IUserService, UserService>();
 
 builder.Services.AddScoped<IRoleRepository, RoleRepository>();
