@@ -19,7 +19,7 @@ public sealed class ResultsSignOffController(IResultsSignOffApiClient apiClient,
     public const string RejectMessage = "Rejected Tabulations are returned for amendments and restart the tabulation cycle.";
     public const string RejectedNotification = "The Tabulation has been rejected.";
     public const string AuthoriseQuestion = "Are you sure you wish to Authorise this Tabulation?";
-    public const string AuthoriseMessage = "Authorising publishes the Tabulation and queues its Tabulation Published notification emails.";
+    public const string AuthoriseMessage = "Authorising publishes the Tabulation and sends its Tabulation Published notification emails.";
     public const string AuthorisedNotification = "The Tabulation has been authorised and published.";
     public const string NoLongerAwaitingNotification = "This Tabulation is no longer awaiting Sign-off.";
     public const string NoSignatoryNotification = "The Tabulation could not be authorised because you are not signed in as a PT-LIMS user.";

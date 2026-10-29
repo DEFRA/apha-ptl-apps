@@ -312,9 +312,9 @@ public class ResultsSignOffRepositoryTests
             Recipients(["viewer@example.org", DBNull.Value, "Viewer"], ["same@example.org", DBNull.Value, "Lab Two"]),
             Recipients(["viewer@example.org", DBNull.Value, "Viewer"], ["other@example.org", DBNull.Value, "Other"])));
 
-        var outcome = await repository.AuthoriseAsync(TabulationA1, Signatory, Created);
+        var result = await repository.AuthoriseAsync(TabulationA1, Signatory, Created);
 
-        Assert.Equal(ResultsSignOffOutcome.Done, outcome);
+        Assert.Equal(ResultsSignOffOutcome.Done, result.Outcome);
         var published = Assert.Single(connection.ExecutedCommands, c => c.CommandText == PublishTabulationSql);
         Assert.Equal(("Jane Smith", Created, TabulationA1, 6, 2026), (published.ParameterValue("Signatory"), published.ParameterValue("CreationDate"), published.ParameterValue("DistributionTabulationId"), published.ParameterValue("MonthId"), published.ParameterValue("YearId")));
 
@@ -324,6 +324,9 @@ public class ResultsSignOffRepositoryTests
             [("p@example.org", "Lab One"), ("p2@example.org", "Lab One"), ("same@example.org", "Lab Two"), ("viewer@example.org", "Viewer"), ("other@example.org", "Other")],
             emails.Select(e => ((string)e.ParameterValue("Email")!, (string)e.ParameterValue("Name")!)));
         Assert.All(emails, e => Assert.Equal(published.ParameterValue("PublishedTabulationId"), e.ParameterValue("PublishedTabulationId")));
+
+        // The caller sends the emails of what was published, so it is told which publication that was.
+        Assert.Equal(published.ParameterValue("PublishedTabulationId"), result.PublishedTabulationId);
 
         var update = Assert.Single(connection.ExecutedCommands, c => c.CommandText == SetStateSql);
         Assert.Equal((TabulationA1, 1), (update.ParameterValue("DistributionTabulationId"), update.ParameterValue("PublishState")));
@@ -361,7 +364,7 @@ public class ResultsSignOffRepositoryTests
         var (repository, connection) = CreateRepository();
         connection.RespondToScalar(StateSql, (object?)null);
 
-        Assert.Equal(ResultsSignOffOutcome.NotFound, await repository.AuthoriseAsync(TabulationA1, Signatory, Created));
+        Assert.Equal(new AuthoriseResult(ResultsSignOffOutcome.NotFound), await repository.AuthoriseAsync(TabulationA1, Signatory, Created));
 
         Assert.True(connection.LastTransaction!.RolledBack);
         Assert.False(connection.LastTransaction.Committed);
@@ -375,7 +378,7 @@ public class ResultsSignOffRepositoryTests
         var (repository, connection) = CreateRepository();
         connection.RespondToScalar(StateSql, state);
 
-        Assert.Equal(ResultsSignOffOutcome.NotAwaiting, await repository.AuthoriseAsync(TabulationA1, Signatory, Created));
+        Assert.Equal(new AuthoriseResult(ResultsSignOffOutcome.NotAwaiting), await repository.AuthoriseAsync(TabulationA1, Signatory, Created));
 
         Assert.Equal(StateSql, Assert.Single(connection.ExecutedCommands).CommandText);
         Assert.True(connection.LastTransaction!.RolledBack);
@@ -387,7 +390,7 @@ public class ResultsSignOffRepositoryTests
         var (repository, connection) = CreateRepository();
         connection.RespondToScalar(StateSql, 0);
 
-        Assert.Equal(ResultsSignOffOutcome.NoSignatory, await repository.AuthoriseAsync(TabulationA1, null, Created));
+        Assert.Equal(new AuthoriseResult(ResultsSignOffOutcome.NoSignatory), await repository.AuthoriseAsync(TabulationA1, null, Created));
 
         Assert.Equal(StateSql, Assert.Single(connection.ExecutedCommands).CommandText);
         Assert.True(connection.LastTransaction!.RolledBack);
@@ -400,7 +403,7 @@ public class ResultsSignOffRepositoryTests
         connection.RespondToScalar(StateSql, 0);
         connection.RespondToQuery(SignatorySql, Signatories());
 
-        Assert.Equal(ResultsSignOffOutcome.NoSignatory, await repository.AuthoriseAsync(TabulationA1, Signatory, Created));
+        Assert.Equal(new AuthoriseResult(ResultsSignOffOutcome.NoSignatory), await repository.AuthoriseAsync(TabulationA1, Signatory, Created));
 
         Assert.DoesNotContain(connection.ExecutedCommands, c => c.CommandText == DraftSql);
         Assert.True(connection.LastTransaction!.RolledBack);
@@ -412,7 +415,7 @@ public class ResultsSignOffRepositoryTests
         var (repository, connection) = AwaitingWithSignatory();
         connection.RespondToQuery(DraftSql, Draft(Table(("fldDistributionTabulationId", typeof(Guid)), ("fldMonthlyDistributionSchemeId", typeof(Guid)))));
 
-        Assert.Equal(ResultsSignOffOutcome.NotFound, await repository.AuthoriseAsync(TabulationA1, Signatory, Created));
+        Assert.Equal(new AuthoriseResult(ResultsSignOffOutcome.NotFound), await repository.AuthoriseAsync(TabulationA1, Signatory, Created));
 
         Assert.DoesNotContain(connection.ExecutedCommands, c => c.CommandText == PublishTabulationSql);
         Assert.True(connection.LastTransaction!.RolledBack);

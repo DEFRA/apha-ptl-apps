@@ -12,7 +12,7 @@ using PTL.Core.Participant;
 
 namespace PTL.Api.Tests.Distribution;
 
-// Program.cs registers the email services and the one hosted scheduler.
+// Program.cs registers the email services, the one hosted scheduler and the publication email worker.
 public class TabulationEmailRegistrationTests : IClassFixture<WebApplicationFactory<Program>>
 {
     private readonly WebApplicationFactory<Program> _factory;
@@ -26,7 +26,7 @@ public class TabulationEmailRegistrationTests : IClassFixture<WebApplicationFact
         Environment.SetEnvironmentVariable("Database__TrustServerCertificate", "true");
         Environment.SetEnvironmentVariable("HealthCheck__ReadinessKey", "local-dev-readiness-key");
 
-        // All three flags off: the hosted scheduler returns at once, so no test run ever reaches a real database.
+        // Every email flag off: the hosted scheduler returns at once and the publication worker sends nothing, so no test run ever reaches a real database.
         _factory = factory.WithWebHostBuilder(builder =>
             builder.ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(new Dictionary<string, string?>
             {
@@ -81,6 +81,24 @@ public class TabulationEmailRegistrationTests : IClassFixture<WebApplicationFact
         using var scope = _factory.Services.CreateScope();
 
         Assert.IsType<TabulationPublishedNotifier>(scope.ServiceProvider.GetRequiredService<ITabulationPublishedNotifier>());
+    }
+
+    [Fact]
+    public void PublicationEmailDispatcher_IsOneSingletonRegisteredAsTheWorkerAndAsTheDispatcher()
+    {
+        var dispatcher = _factory.Services.GetRequiredService<IPublicationEmailDispatcher>();
+        using var scope = _factory.Services.CreateScope();
+
+        Assert.Same(dispatcher, scope.ServiceProvider.GetRequiredService<IPublicationEmailDispatcher>());
+        Assert.Same(dispatcher, Assert.Single(_factory.Services.GetServices<IHostedService>().OfType<PublicationEmailDispatcher>()));
+    }
+
+    [Fact]
+    public void ResultsSignOffService_ResolvesWithTheEmailDispatcher()
+    {
+        using var scope = _factory.Services.CreateScope();
+
+        Assert.IsType<ResultsSignOffService>(scope.ServiceProvider.GetRequiredService<IResultsSignOffService>());
     }
 
     [Fact]
