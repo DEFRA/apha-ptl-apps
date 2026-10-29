@@ -1,6 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
 using PTL.Contracts.Viewer;
-using PTL.InternalWeb.Confirmation;
 using PTL.SharedUI.Notifications;
 
 namespace PTL.InternalWeb.Features.SystemAdministration;
@@ -30,7 +29,7 @@ public partial class SystemAdministrationController
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> ViewerManagement(ViewerManagementViewModel model, string? command, int? rowIndex, string? confirmation, CancellationToken cancellationToken)
+    public async Task<IActionResult> ViewerManagement(ViewerManagementViewModel model, string? command, int? rowIndex, CancellationToken cancellationToken)
     {
         // Each command validates only the part of the page it acts on (legacy ValidationGroups).
         ModelState.Clear();
@@ -53,7 +52,7 @@ public partial class SystemAdministrationController
 
         if (PendingListCommands.Is(command, PendingListCommands.Remove))
         {
-            return await RemoveViewerAsync(model, rowIndex, confirmation, cancellationToken);
+            return await RemoveViewerAsync(model, rowIndex, cancellationToken);
         }
 
         ApplyViewerRowCommand(model, command, rowIndex);
@@ -183,13 +182,13 @@ public partial class SystemAdministrationController
         }
     }
 
-    // Remove -> confirmation page -> the row is marked removed on the page. Nothing is deleted until
+    // Remove marks the row removed on the page. Nothing is deleted until
     // Save/Apply, and the user stays on the page. A viewer that is still assigned to schemes or
     // participants cannot be removed; the assignments are listed instead. Removing a viewer added on this
     // page (not yet saved) just drops it from the pending list.
-    private async Task<IActionResult> RemoveViewerAsync(ViewerManagementViewModel model, int? rowIndex, string? confirmation, CancellationToken cancellationToken)
+    private async Task<IActionResult> RemoveViewerAsync(ViewerManagementViewModel model, int? rowIndex, CancellationToken cancellationToken)
     {
-        if (!PendingList.IsRow(model.Rows, rowIndex) || ConfirmationFlow.IsCancelled(confirmation))
+        if (!PendingList.IsRow(model.Rows, rowIndex))
         {
             return ViewerPage(model);
         }
@@ -216,21 +215,6 @@ public partial class SystemAdministrationController
                 .. viewer.Participants.Select(p => $"Participant {p.LabCode}: {p.LabName}")
             ];
             return ViewerPage(model);
-        }
-
-        if (!ConfirmationFlow.IsConfirmed(confirmation))
-        {
-            return this.ConfirmationPage(
-                new ConfirmationPageViewModel
-                {
-                    Title = "Remove viewer",
-                    Caption = "Manage Viewers",
-                    Message = $"You are about to remove the viewer {row.Name} ({row.Email}).",
-                    WarningText = "The viewer is removed from this list now and deleted when you select Save or Apply. Select Cancel on the page to keep it.",
-                    ConfirmText = "Remove viewer",
-                    IsDestructive = true,
-                },
-                nameof(ViewerManagement));
         }
 
         row.IsRemoved = true;

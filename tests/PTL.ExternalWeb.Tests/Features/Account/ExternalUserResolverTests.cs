@@ -50,6 +50,21 @@ public class ExternalUserResolverTests
     }
 
     [Fact]
+    public async Task ResolveAsync_ZeroRolesResolvedWithInactiveMatch_DeniesWithInactiveReason()
+    {
+        var principal = CreatePrincipal(
+            new Claim(CidmClaimTypes.ContactId, Guid.NewGuid().ToString()),
+            new Claim(ClaimTypes.Email, "user@example.com"));
+        var apiClient = new FakeExternalUserApiClient(new ResolveExternalUserResponse("Jane Doe", [], null, null, null, null, HasInactiveMatch: true));
+        var resolver = new ExternalUserResolver(apiClient, NullLogger<ExternalUserResolver>.Instance);
+
+        var result = await resolver.ResolveAsync(principal, CancellationToken.None);
+
+        Assert.False(result.IsAllowed);
+        Assert.Equal("/Account/NotPermitted?reason=inactive", result.DenialRedirectPath);
+    }
+
+    [Fact]
     public async Task ResolveAsync_RolesResolved_AllowsAndAddsDisplayNameAndRolesClaims()
     {
         var ssoIdExt = Guid.NewGuid();

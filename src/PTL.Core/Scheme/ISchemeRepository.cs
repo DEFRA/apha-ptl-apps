@@ -24,6 +24,15 @@ public interface ISchemeRepository
     // Uses spgSchemeInfoBySharedId (family history, newest year first).
     Task<IReadOnlyList<SchemeHistoryEntity>> GetHistoryAsync(Guid sharedId, CancellationToken cancellationToken = default);
 
+    // Reuses the existing legacy spgCommercialSchemesBySsoId (@SsoId, @CurrentFinancialYear) exactly
+    // as-is - SchemeList.aspx's "Commercial Schemes" grid (PtWebServicesBusinessObjects.SchemeListCollection,
+    // ListType=0). No new procedure required.
+    Task<IReadOnlyList<ParticipantSchemeEntity>> GetCommercialSchemesBySsoIdAsync(Guid ssoId, int currentFinancialYear, CancellationToken cancellationToken = default);
+
+    // Reuses the existing legacy spgNonCommercialSchemesBySsoId (@SsoId, @CurrentFinancialYear) exactly
+    // as-is - SchemeList.aspx's "Non-Commercial Schemes" grid (ListType=1). No new procedure required.
+    Task<IReadOnlyList<ParticipantSchemeEntity>> GetNonCommercialSchemesBySsoIdAsync(Guid ssoId, int currentFinancialYear, CancellationToken cancellationToken = default);
+
     // Uses spiScheme; the returned Scheme is re-read via GetByIdAsync so SampleNoSequence/IsReadOnly
     // (computed by the fetch procedure) are populated.
     Task<Scheme> CreateAsync(Scheme scheme, CancellationToken cancellationToken = default);

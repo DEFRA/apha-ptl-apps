@@ -11,6 +11,11 @@ public interface IPendingParticipantUpdateRepository
     // pending update for a participant, or null if there is none.
     Task<PendingParticipantUpdate?> GetByParticipantIdAsync(Guid participantId, CancellationToken cancellationToken = default);
 
+    // spiPendingParticipantDetailsEdit (insert, assigns a new id when update.PendingParticipantUpdateId
+    // is empty) / spuPendingParticipantDetailsEditByParticipantID (update) - participant's own
+    // self-service submission (legacy EditParticipantDetails.aspx's ButtonUpdateDetails_Click).
+    Task UpsertAsync(PendingParticipantUpdate update, CancellationToken cancellationToken = default);
+
     // spdPendingParticipantDetailsEditByParticipantID - soft-deletes the pending record (sets
     // fldIsDeleted=1); used on both Approve and Decline, since neither path reinstates the row.
     // Returns false when the row is still outstanding afterwards.

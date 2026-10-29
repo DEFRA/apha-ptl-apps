@@ -70,6 +70,16 @@ body {
   white-space: nowrap;
 }
 
+/* Row action buttons (Edit/Remove) stay side by side in a table cell instead of wrapping or stacking. */
+.ptl-row-actions {
+  flex-direction: row;
+  flex-wrap: nowrap;
+}
+
+.ptl-row-actions .govuk-button {
+  width: auto;
+}
+
 /* Inactive contracts render struck-through, matching legacy ContractList.aspx.vb
    GridViewCurrentContracts_RowDataBound's manual cell.Style.Add("text-decoration", "line-through"). */
 .ptl-inactive-row td {

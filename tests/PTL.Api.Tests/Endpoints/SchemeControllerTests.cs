@@ -14,7 +14,7 @@ public class SchemeControllerTests
     private static readonly Guid TestConsultantTabulationId = Guid.NewGuid();
     private static SchemeController CreateController(FakeSchemeRepository repository)
     {
-        var controller = new SchemeController(new SchemeService(repository, new PTL.Api.Tests.Lookup.FakeLookupRepository(), new PTL.Api.Tests.Participant.FakeViewerRepository(), NullLogger<SchemeService>.Instance), NullLogger<SchemeController>.Instance);
+        var controller = new SchemeController(new SchemeService(repository, new PTL.Api.Tests.Lookup.FakeLookupRepository(), new PTL.Api.Tests.Participant.FakeViewerRepository(), new PTL.Api.Tests.Participant.FakeParticipantRepository(), NullLogger<SchemeService>.Instance), NullLogger<SchemeController>.Instance);
 
         // ValidationProblem() resolves ProblemDetailsFactory from HttpContext.RequestServices,
         // which a bare controller instance does not have without this wiring.
@@ -339,5 +339,41 @@ public class SchemeControllerTests
         var ok = Assert.IsType<OkObjectResult>(result.Result);
         var history = Assert.IsType<IReadOnlyList<SchemeHistoryResponse>>(ok.Value, exactMatch: false);
         Assert.Single(history);
+    }
+
+    [Fact]
+    public async Task GetSchemesForParticipant_KnownParticipant_ReturnsMappedCommercialAndNonCommercialSchemes()
+    {
+        var schemeRepository = new FakeSchemeRepository
+        {
+            CommercialSchemesBySsoId = [new ParticipantSchemeEntity { SchemeId = Guid.NewGuid(), Identifier = "PT1111", Name = "Commercial", Year = "2025/26", IsParticipating = true }],
+            NonCommercialSchemesBySsoId = [new ParticipantSchemeEntity { SchemeId = Guid.NewGuid(), Identifier = "PT2222", Name = "Non-Commercial", Year = "2025/26", IsParticipating = true }]
+        };
+        var participantRepository = new PTL.Api.Tests.Participant.FakeParticipantRepository();
+        var participant = await participantRepository.CreateAsync(new PTL.Core.Participant.Participant { SsoId = Guid.NewGuid() });
+        var service = new SchemeService(schemeRepository, new PTL.Api.Tests.Lookup.FakeLookupRepository(), new PTL.Api.Tests.Participant.FakeViewerRepository(), participantRepository, NullLogger<SchemeService>.Instance);
+        var controller = new SchemeController(service, NullLogger<SchemeController>.Instance);
+
+        var result = await controller.GetSchemesForParticipant(participant.ParticipantId, CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var response = Assert.IsType<ParticipantSchemeListResponse>(ok.Value);
+        Assert.Single(response.CommercialSchemes);
+        Assert.Equal("PT1111", response.CommercialSchemes[0].Identifier);
+        Assert.Single(response.NonCommercialSchemes);
+        Assert.Equal("PT2222", response.NonCommercialSchemes[0].Identifier);
+    }
+
+    [Fact]
+    public async Task GetSchemesForParticipant_UnknownParticipant_ReturnsOkWithEmptyLists()
+    {
+        var controller = CreateController(new FakeSchemeRepository());
+
+        var result = await controller.GetSchemesForParticipant(Guid.NewGuid(), CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var response = Assert.IsType<ParticipantSchemeListResponse>(ok.Value);
+        Assert.Empty(response.CommercialSchemes);
+        Assert.Empty(response.NonCommercialSchemes);
     }
 }

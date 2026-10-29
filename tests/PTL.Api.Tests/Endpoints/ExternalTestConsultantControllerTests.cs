@@ -40,6 +40,37 @@ public class ExternalTestConsultantControllerTests
     }
 
     [Fact]
+    public async Task GetAll_ExposesTheSchemeAllocationCountAndNames()
+    {
+        var id = Guid.NewGuid();
+        var inactiveDate = new DateTime(2026, 10, 8, 0, 0, 0, DateTimeKind.Utc);
+        var repository = new FakeTestConsultantRepository();
+        repository.Seed(new PTL.Core.TestConsultant.TestConsultant
+        {
+            ExternalTestConsultantId = id,
+            Name = "Jane Smith",
+            Department = "Science",
+            Email = "jane@example.com",
+            IsInactive = true,
+            InactiveDate = inactiveDate,
+            AllocationCount = 2,
+            AllocationString = "Scheme A, Scheme B"
+        });
+        var controller = CreateController(repository);
+
+        var result = await controller.GetAll(CancellationToken.None);
+
+        var consultants = Assert.IsAssignableFrom<IReadOnlyList<ExternalTestConsultantResponse>>(Assert.IsType<OkObjectResult>(result.Result).Value);
+        var consultant = Assert.Single(consultants);
+        Assert.Equal(id, consultant.ExternalTestConsultantId);
+        Assert.Equal(("Jane Smith", "Science", "jane@example.com"), (consultant.Name, consultant.Department, consultant.Email));
+        Assert.True(consultant.IsInactive);
+        Assert.Equal(inactiveDate, consultant.InactiveDate);
+        Assert.Equal(2, consultant.AllocationCount);
+        Assert.Equal("Scheme A, Scheme B", consultant.AllocationString);
+    }
+
+    [Fact]
     public async Task Create_Valid_ReturnsOk()
     {
         var controller = CreateController();

@@ -22,7 +22,7 @@ public class GovUkPageHeaderTagHelperTests
     }
 
     private static (GovUkPageHeaderTagHelper Helper, TagHelperContext Context, TagHelperOutput Output) Create(
-        string serviceName, string? logoStyle, string childContentHtml)
+        string serviceName, string? logoStyle, string childContentHtml, bool showMenuToggle = false, string? helpLinkText = null, string? helpLinkHref = null)
     {
         var services = new ServiceCollection();
         services.AddLogging();
@@ -45,6 +45,9 @@ public class GovUkPageHeaderTagHelperTests
         {
             ServiceName = serviceName,
             LogoStyle = logoStyle,
+            ShowMenuToggle = showMenuToggle,
+            HelpLinkText = helpLinkText,
+            HelpLinkHref = helpLinkHref,
             ViewContext = viewContext
         };
 
@@ -119,5 +122,56 @@ public class GovUkPageHeaderTagHelperTests
         await helper.ProcessAsync(context, output);
 
         Assert.Null(output.TagName);
+    }
+
+    // Proves PTL.InternalWeb (which never sets ShowMenuToggle) gets no toggle markup at all.
+    [Fact]
+    public async Task ProcessAsync_ShowMenuToggleDefaultsFalse_NoToggleButtonRendered()
+    {
+        var (helper, context, output) = Create("Proficiency Testing - Internal", null, string.Empty);
+
+        await helper.ProcessAsync(context, output);
+
+        var html = output.Content.GetContent();
+        Assert.DoesNotContain("app-menu-toggle", html, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ProcessAsync_ShowMenuToggleTrue_RendersAccessibleToggleButtonBeforeChildContent()
+    {
+        var (helper, context, output) = Create("Proficiency Testing - External", null, "<nav>Signed in as: Jane</nav>", showMenuToggle: true);
+
+        await helper.ProcessAsync(context, output);
+
+        var html = output.Content.GetContent();
+        Assert.Contains("id=\"app-menu-toggle\"", html, StringComparison.Ordinal);
+        Assert.Contains("aria-controls=\"app-menu-panel\"", html, StringComparison.Ordinal);
+        Assert.Contains("aria-expanded=\"false\"", html, StringComparison.Ordinal);
+        Assert.True(html.IndexOf("app-menu-toggle", StringComparison.Ordinal) < html.IndexOf("Signed in as: Jane", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task ProcessAsync_HelpLinkTextAndHrefSet_RendersVisibleLinkAfterToggle()
+    {
+        var (helper, context, output) = Create("Proficiency Testing - External", null, string.Empty, showMenuToggle: true, helpLinkText: "User Manual", helpLinkHref: "/documents/User Manual.pdf");
+
+        await helper.ProcessAsync(context, output);
+
+        var html = output.Content.GetContent();
+        Assert.Contains("app-header__help-link", html, StringComparison.Ordinal);
+        Assert.Contains("href=\"/documents/User Manual.pdf\"", html, StringComparison.Ordinal);
+        Assert.Contains("User Manual", html, StringComparison.Ordinal);
+        Assert.True(html.IndexOf("app-menu-toggle", StringComparison.Ordinal) < html.IndexOf("app-header__help-link", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task ProcessAsync_HelpLinkNotSet_NoHelpLinkRendered()
+    {
+        var (helper, context, output) = Create("Proficiency Testing - External", null, string.Empty, showMenuToggle: true);
+
+        await helper.ProcessAsync(context, output);
+
+        var html = output.Content.GetContent();
+        Assert.DoesNotContain("app-header__help-link", html, StringComparison.Ordinal);
     }
 }

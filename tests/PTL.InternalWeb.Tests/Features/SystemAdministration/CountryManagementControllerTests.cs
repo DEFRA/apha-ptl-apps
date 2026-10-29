@@ -1,6 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
 using PTL.Contracts.Country;
-using PTL.InternalWeb.Confirmation;
 using PTL.InternalWeb.Features.SystemAdministration;
 using PTL.InternalWeb.Navigation;
 using PTL.InternalWeb.Tests.TestSupport;
@@ -9,7 +8,7 @@ using PTL.SharedUI.Notifications;
 namespace PTL.InternalWeb.Tests.Features.SystemAdministration;
 
 // Manage Countries (legacy ManageCountries.aspx): row edit/update/cancel/add only change the pending list; page Save
-// writes it then leaves; Cancel discards it; Remove goes through the confirmation page and is blocked while in use.
+// writes it then leaves; Cancel discards it; Remove marks the row removed and is blocked while in use.
 public class CountryManagementControllerTests
 {
     private const string Duplicate = "This country already exists. Please try with different name.";
@@ -83,7 +82,7 @@ public class CountryManagementControllerTests
         var (controller, api) = Arrange();
         var model = Page(Row(IdFrance, "France", TypeEu), Row(IdGermany, "Germany", TypeNonEu));
 
-        var result = PageModel(await controller.CountryManagement(model, PendingListCommands.Edit, 1, null, CancellationToken.None));
+        var result = PageModel(await controller.CountryManagement(model, PendingListCommands.Edit, 1, CancellationToken.None));
 
         Assert.Equal(1, result.EditIndex);
         Assert.Equal("Germany", result.Edit.Country);
@@ -103,7 +102,7 @@ public class CountryManagementControllerTests
         var (controller, _) = Arrange();
         var model = Page(Row(IdFrance, "France", TypeEu), Row(IdGermany, "Germany", TypeNonEu));
 
-        var result = PageModel(await controller.CountryManagement(model, PendingListCommands.Edit, rowIndex, null, CancellationToken.None));
+        var result = PageModel(await controller.CountryManagement(model, PendingListCommands.Edit, rowIndex, CancellationToken.None));
 
         Assert.Null(result.EditIndex);
         Assert.All(result.Rows, r => Assert.False(r.IsEditing));
@@ -116,7 +115,7 @@ public class CountryManagementControllerTests
         var model = Page(Row(IdFrance, "France", TypeEu));
         model.EditIndex = 7;
 
-        var result = PageModel(await controller.CountryManagement(model, command: null, rowIndex: null, confirmation: null, CancellationToken.None));
+        var result = PageModel(await controller.CountryManagement(model, command: null, rowIndex: null, CancellationToken.None));
 
         Assert.Null(result.EditIndex);
     }
@@ -129,7 +128,7 @@ public class CountryManagementControllerTests
         model.EditIndex = 0;
         model.Edit = new CountryManagementEditViewModel { Country = "  French Republic ", CountryTypeId = TypeNonEu };
 
-        var result = PageModel(await controller.CountryManagement(model, PendingListCommands.Update, 0, null, CancellationToken.None));
+        var result = PageModel(await controller.CountryManagement(model, PendingListCommands.Update, 0, CancellationToken.None));
 
         var row = Assert.Single(result.Rows);
         Assert.Equal("French Republic", row.Country);
@@ -151,7 +150,7 @@ public class CountryManagementControllerTests
         model.EditIndex = 0;
         model.Edit = new CountryManagementEditViewModel { Country = string.Empty, CountryTypeId = null };
 
-        var result = PageModel(await controller.CountryManagement(model, PendingListCommands.Update, 0, null, CancellationToken.None));
+        var result = PageModel(await controller.CountryManagement(model, PendingListCommands.Update, 0, CancellationToken.None));
 
         Assert.Equal(0, result.EditIndex);
         Assert.True(result.Rows[0].IsEditing);
@@ -170,7 +169,7 @@ public class CountryManagementControllerTests
         model.EditIndex = 1;
         model.Edit = new CountryManagementEditViewModel { Country = "typed but abandoned", CountryTypeId = TypeNonEu };
 
-        var result = PageModel(await controller.CountryManagement(model, PendingListCommands.CancelEdit, 1, null, CancellationToken.None));
+        var result = PageModel(await controller.CountryManagement(model, PendingListCommands.CancelEdit, 1, CancellationToken.None));
 
         Assert.Null(result.EditIndex);
         Assert.Equal(["France (pending change)", "Spain"], result.Rows.Select(r => r.Country));
@@ -185,7 +184,7 @@ public class CountryManagementControllerTests
         var model = Page(Row(IdFrance, "France", TypeEu));
         model.Add = new CountryManagementAddViewModel { Country = " Spain ", CountryTypeId = TypeNonEu };
 
-        var result = PageModel(await controller.CountryManagement(model, PendingListCommands.Add, null, null, CancellationToken.None));
+        var result = PageModel(await controller.CountryManagement(model, PendingListCommands.Add, null, CancellationToken.None));
 
         Assert.Equal(2, result.Rows.Count);
         var added = result.Rows[1];
@@ -206,7 +205,7 @@ public class CountryManagementControllerTests
         var (controller, api) = Arrange();
         var model = Page(Row(IdFrance, "France", TypeEu));
 
-        var result = PageModel(await controller.CountryManagement(model, PendingListCommands.Add, null, null, CancellationToken.None));
+        var result = PageModel(await controller.CountryManagement(model, PendingListCommands.Add, null, CancellationToken.None));
 
         Assert.Single(result.Rows);
         Assert.Equal("Enter a country name", controller.ModelState["Add.Country"]!.Errors[0].ErrorMessage);
@@ -221,7 +220,7 @@ public class CountryManagementControllerTests
         var model = Page();
         model.Add = new CountryManagementAddViewModel { Country = new string('x', 51), CountryTypeId = TypeEu };
 
-        var result = PageModel(await controller.CountryManagement(model, PendingListCommands.Add, null, null, CancellationToken.None));
+        var result = PageModel(await controller.CountryManagement(model, PendingListCommands.Add, null, CancellationToken.None));
 
         Assert.Empty(result.Rows);
         Assert.Equal("Country name must be 50 characters or fewer", controller.ModelState["Add.Country"]!.Errors[0].ErrorMessage);
@@ -237,7 +236,7 @@ public class CountryManagementControllerTests
         var model = Page(Row(IdFrance, "France", TypeEu));
         model.Add = new CountryManagementAddViewModel { Country = name, CountryTypeId = TypeNonEu };
 
-        var result = PageModel(await controller.CountryManagement(model, PendingListCommands.Add, null, null, CancellationToken.None));
+        var result = PageModel(await controller.CountryManagement(model, PendingListCommands.Add, null, CancellationToken.None));
 
         Assert.Single(result.Rows);
         Assert.Equal(Duplicate, controller.ModelState["Add.Country"]!.Errors[0].ErrorMessage);
@@ -251,7 +250,7 @@ public class CountryManagementControllerTests
         var model = Page(Row(null, "Spain", TypeEu));
         model.Add = new CountryManagementAddViewModel { Country = "spain", CountryTypeId = TypeEu };
 
-        var result = PageModel(await controller.CountryManagement(model, PendingListCommands.Add, null, null, CancellationToken.None));
+        var result = PageModel(await controller.CountryManagement(model, PendingListCommands.Add, null, CancellationToken.None));
 
         Assert.Single(result.Rows);
         Assert.Equal(Duplicate, controller.ModelState["Add.Country"]!.Errors[0].ErrorMessage);
@@ -264,7 +263,7 @@ public class CountryManagementControllerTests
         var model = Page(Row(IdFrance, "France", TypeEu));
         model.Add = new CountryManagementAddViewModel { Country = "Spain", CountryTypeId = TypeEu };
 
-        var result = PageModel(await controller.CountryManagement(model, PendingListCommands.Submit, null, null, CancellationToken.None));
+        var result = PageModel(await controller.CountryManagement(model, PendingListCommands.Submit, null, CancellationToken.None));
 
         Assert.Equal(["France", "Spain"], result.Rows.Select(r => r.Country));
     }
@@ -278,7 +277,7 @@ public class CountryManagementControllerTests
         model.Edit = new CountryManagementEditViewModel { Country = "Federal Germany", CountryTypeId = TypeEu };
         model.Add = new CountryManagementAddViewModel { Country = "Ignored", CountryTypeId = TypeEu };
 
-        var result = PageModel(await controller.CountryManagement(model, PendingListCommands.Submit, null, null, CancellationToken.None));
+        var result = PageModel(await controller.CountryManagement(model, PendingListCommands.Submit, null, CancellationToken.None));
 
         Assert.Equal(["France", "Federal Germany"], result.Rows.Select(r => r.Country));
         Assert.Null(result.EditIndex);
@@ -294,7 +293,7 @@ public class CountryManagementControllerTests
             Row(IdGermany, "Germany", TypeEu),
             Row(null, "Spain", TypeEu));
 
-        var result = await controller.CountryManagement(model, PendingListCommands.Save, null, null, CancellationToken.None);
+        var result = await controller.CountryManagement(model, PendingListCommands.Save, null, CancellationToken.None);
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
         Assert.Equal(nameof(SystemAdministrationController.Index), redirect.ActionName);
@@ -314,7 +313,7 @@ public class CountryManagementControllerTests
         var (controller, api) = Arrange(Persisted(IdFrance, "France", TypeEu));
         var model = Page(Row(IdFrance, "French Republic", TypeEu));
 
-        await controller.CountryManagement(model, PendingListCommands.Save, null, null, CancellationToken.None);
+        await controller.CountryManagement(model, PendingListCommands.Save, null, CancellationToken.None);
 
         Assert.Equal("French Republic", Assert.Single(api.UpdateRequests).Request.Country);
     }
@@ -325,7 +324,7 @@ public class CountryManagementControllerTests
         var (controller, api) = Arrange(Persisted(IdFrance, "France", TypeEu));
         var model = Page(Row(IdFrance, "France", TypeEu));
 
-        var result = await controller.CountryManagement(model, PendingListCommands.Save, null, null, CancellationToken.None);
+        var result = await controller.CountryManagement(model, PendingListCommands.Save, null, CancellationToken.None);
 
         Assert.IsType<RedirectToActionResult>(result);
         AssertNothingWritten(api);
@@ -338,7 +337,7 @@ public class CountryManagementControllerTests
         var (controller, api) = Arrange();
         var model = Page(Row(IdFrance, "France", TypeEu));
 
-        await controller.CountryManagement(model, PendingListCommands.Save, null, null, CancellationToken.None);
+        await controller.CountryManagement(model, PendingListCommands.Save, null, CancellationToken.None);
 
         Assert.Equal(IdFrance, Assert.Single(api.UpdateRequests).CountryId);
     }
@@ -354,7 +353,7 @@ public class CountryManagementControllerTests
         var model = Page(Row(IdFrance, "France", TypeEu), Row(null, "Bad", TypeEu), Row(null, "Spain", TypeEu));
         model.EditIndex = 1;
 
-        var result = await controller.CountryManagement(model, PendingListCommands.Save, null, null, CancellationToken.None);
+        var result = await controller.CountryManagement(model, PendingListCommands.Save, null, CancellationToken.None);
 
         var page = PageModel(result);
         Assert.Equal(["France", "Bad", "Spain"], page.Rows.Select(r => r.Country));
@@ -372,7 +371,7 @@ public class CountryManagementControllerTests
         var (controller, api) = Arrange();
         var model = Page(Row(null, "Spain", TypeEu), Row(IdFrance, "Changed", TypeEu));
 
-        var result = await controller.CountryManagement(model, PendingListCommands.Cancel, null, null, CancellationToken.None);
+        var result = await controller.CountryManagement(model, PendingListCommands.Cancel, null, CancellationToken.None);
 
         Assert.Equal(nameof(SystemAdministrationController.Index), Assert.IsType<RedirectToActionResult>(result).ActionName);
         AssertNothingWritten(api);
@@ -388,25 +387,10 @@ public class CountryManagementControllerTests
         var (controller, api) = Arrange(Persisted(IdFrance, "France", TypeEu));
         var model = Page(Row(IdFrance, "France", TypeEu));
 
-        var result = PageModel(await controller.CountryManagement(model, PendingListCommands.Remove, rowIndex, null, CancellationToken.None));
+        var result = PageModel(await controller.CountryManagement(model, PendingListCommands.Remove, rowIndex, CancellationToken.None));
 
         Assert.Single(result.Rows);
         AssertNothingWritten(api);
-    }
-
-    [Fact]
-    public async Task Remove_WhenTheConfirmationWasCancelled_RedisplaysThePendingPageUnchanged()
-    {
-        var (controller, api) = Arrange(Persisted(IdFrance, "France", TypeEu));
-        var model = Page(Row(IdFrance, "France (pending change)", TypeEu), Row(null, "Spain", TypeEu));
-
-        var result = PageModel(await controller.CountryManagement(model, PendingListCommands.Remove, 0, ConfirmationFlow.Cancelled, CancellationToken.None));
-
-        Assert.Equal(["France (pending change)", "Spain"], result.Rows.Select(r => r.Country));
-        Assert.All(result.Rows, r => Assert.False(r.IsRemoved));
-        Assert.Null(result.Message);
-        AssertNothingWritten(api);
-        Assert.Null(controller.TempData.GetNotification());
     }
 
     [Fact]
@@ -417,7 +401,7 @@ public class CountryManagementControllerTests
         model.EditIndex = 1;
         model.Edit = new CountryManagementEditViewModel { Country = "Federal Germany", CountryTypeId = TypeEu };
 
-        var result = PageModel(await controller.CountryManagement(model, PendingListCommands.Remove, 0, null, CancellationToken.None));
+        var result = PageModel(await controller.CountryManagement(model, PendingListCommands.Remove, 0, CancellationToken.None));
 
         var remaining = Assert.Single(result.Rows);
         Assert.Equal("Germany", remaining.Country);
@@ -434,19 +418,19 @@ public class CountryManagementControllerTests
         var model = Page(Row(IdGermany, "Germany", TypeNonEu), Row(null, "Spain", TypeEu));
         model.EditIndex = 1;
 
-        var result = PageModel(await controller.CountryManagement(model, PendingListCommands.Remove, 1, null, CancellationToken.None));
+        var result = PageModel(await controller.CountryManagement(model, PendingListCommands.Remove, 1, CancellationToken.None));
 
         Assert.Single(result.Rows);
         Assert.Null(result.EditIndex);
     }
 
     [Fact]
-    public async Task Remove_WhenInUse_IsBlockedWithTheLegacyDependencyMessageAndNoConfirmationPage()
+    public async Task Remove_WhenInUse_IsBlockedWithTheLegacyDependencyMessage()
     {
         var (controller, api) = Arrange(Persisted(IdFrance, "France", TypeEu, allocations: 8));
         var model = Page(Row(IdFrance, "France", TypeEu));
 
-        var result = PageModel(await controller.CountryManagement(model, PendingListCommands.Remove, 0, ConfirmationFlow.Confirmed, CancellationToken.None));
+        var result = PageModel(await controller.CountryManagement(model, PendingListCommands.Remove, 0, CancellationToken.None));
 
         Assert.True(result.MessageIsError);
         Assert.Equal("This country cannot be removed because it is being used by 8 customer(s)/participant(s)/Group Addresses.", result.Message);
@@ -457,46 +441,12 @@ public class CountryManagementControllerTests
     }
 
     [Fact]
-    public async Task Remove_WhenNotYetConfirmed_ShowsTheDestructiveConfirmationPageAndDeletesNothing()
-    {
-        var (controller, api) = Arrange(Persisted(IdFrance, "France", TypeEu));
-        var model = Page(Row(IdFrance, "France", TypeEu));
-
-        var result = await controller.CountryManagement(model, PendingListCommands.Remove, 0, null, CancellationToken.None);
-
-        var view = Assert.IsType<ViewResult>(result);
-        Assert.Equal(ConfirmationFlow.ViewName, view.ViewName);
-        Assert.Equal("ConfirmationPage", view.ViewName);
-        var page = Assert.IsType<ConfirmationPageViewModel>(view.Model);
-        Assert.Equal("Remove country", page.Title);
-        Assert.Equal("Manage Countries", page.Caption);
-        Assert.Contains("the country France", page.Message, StringComparison.Ordinal);
-        Assert.Equal("Remove country", page.ConfirmText);
-        Assert.True(page.IsDestructive);
-        Assert.Null(page.CancelUrl);
-        AssertNothingWritten(api);
-        Assert.Null(controller.TempData.GetNotification());
-        Assert.Equal(nameof(SystemAdministrationController.CountryManagement), controller.ViewData[BreadcrumbRouteValues.Action]);
-    }
-
-    [Fact]
-    public async Task Remove_OfACountryTheApiNoLongerReturns_StillOffersTheConfirmationPage()
-    {
-        var (controller, _) = Arrange();
-        var model = Page(Row(IdFrance, "France", TypeEu));
-
-        var result = await controller.CountryManagement(model, PendingListCommands.Remove, 0, null, CancellationToken.None);
-
-        Assert.Equal(ConfirmationFlow.ViewName, Assert.IsType<ViewResult>(result).ViewName);
-    }
-
-    [Fact]
-    public async Task Remove_WhenConfirmed_MarksTheRowRemovedOnTheRedisplayedPageWithoutDeletingNotifyingOrRedirecting()
+    public async Task Remove_MarksTheRowRemovedOnTheRedisplayedPageWithoutDeletingNotifyingOrRedirecting()
     {
         var (controller, api) = Arrange(Persisted(IdFrance, "France", TypeEu), Persisted(IdGermany, "Germany", TypeNonEu));
         var model = Page(Row(IdFrance, "France", TypeEu), Row(IdGermany, "Germany", TypeNonEu));
 
-        var result = await controller.CountryManagement(model, PendingListCommands.Remove, 0, ConfirmationFlow.Confirmed, CancellationToken.None);
+        var result = await controller.CountryManagement(model, PendingListCommands.Remove, 0, CancellationToken.None);
 
         Assert.IsNotType<RedirectToActionResult>(result);
         var page = PageModel(result);
@@ -510,25 +460,25 @@ public class CountryManagementControllerTests
     }
 
     [Fact]
-    public async Task Remove_WhenConfirmed_ForACountryTheApiNoLongerReturns_StillMarksItRemoved()
+    public async Task Remove_ForACountryTheApiNoLongerReturns_StillMarksItRemoved()
     {
         var (controller, api) = Arrange();
         var model = Page(Row(IdFrance, "France", TypeEu));
 
-        var page = PageModel(await controller.CountryManagement(model, PendingListCommands.Remove, 0, ConfirmationFlow.Confirmed, CancellationToken.None));
+        var page = PageModel(await controller.CountryManagement(model, PendingListCommands.Remove, 0, CancellationToken.None));
 
         Assert.True(Assert.Single(page.Rows).IsRemoved);
         AssertNothingWritten(api);
     }
 
     [Fact]
-    public async Task Remove_WhenConfirmed_ForTheRowInEditMode_LeavesEditMode()
+    public async Task Remove_ForTheRowInEditMode_LeavesEditMode()
     {
         var (controller, _) = Arrange(Persisted(IdFrance, "France", TypeEu), Persisted(IdGermany, "Germany", TypeNonEu));
         var model = Page(Row(IdFrance, "France", TypeEu), Row(IdGermany, "Germany", TypeNonEu));
         model.EditIndex = 1;
 
-        var page = PageModel(await controller.CountryManagement(model, PendingListCommands.Remove, 1, ConfirmationFlow.Confirmed, CancellationToken.None));
+        var page = PageModel(await controller.CountryManagement(model, PendingListCommands.Remove, 1, CancellationToken.None));
 
         Assert.True(page.Rows[1].IsRemoved);
         Assert.Null(page.EditIndex);
@@ -536,41 +486,17 @@ public class CountryManagementControllerTests
     }
 
     [Fact]
-    public async Task Remove_WhenConfirmed_ForADifferentRowThanTheOneInEditMode_KeepsEditMode()
+    public async Task Remove_ForADifferentRowThanTheOneInEditMode_KeepsEditMode()
     {
         var (controller, _) = Arrange(Persisted(IdFrance, "France", TypeEu), Persisted(IdGermany, "Germany", TypeNonEu));
         var model = Page(Row(IdFrance, "France", TypeEu), Row(IdGermany, "Germany", TypeNonEu));
         model.EditIndex = 1;
 
-        var page = PageModel(await controller.CountryManagement(model, PendingListCommands.Remove, 0, ConfirmationFlow.Confirmed, CancellationToken.None));
+        var page = PageModel(await controller.CountryManagement(model, PendingListCommands.Remove, 0, CancellationToken.None));
 
         Assert.True(page.Rows[0].IsRemoved);
         Assert.Equal(1, page.EditIndex);
         Assert.True(page.Rows[1].IsEditing);
-    }
-
-    [Fact]
-    public async Task Remove_NeverCallsTheDeleteApi_AtAnyStageOfTheConfirmationFlow()
-    {
-        var (controller, api) = Arrange(Persisted(IdFrance, "France", TypeEu));
-
-        foreach (var confirmation in new string?[] { null, ConfirmationFlow.Cancelled, ConfirmationFlow.Confirmed })
-        {
-            await controller.CountryManagement(Page(Row(IdFrance, "France", TypeEu)), PendingListCommands.Remove, 0, confirmation, CancellationToken.None);
-        }
-
-        Assert.Empty(api.DeleteCalls);
-    }
-
-    [Fact]
-    public async Task Remove_WhenNotConfirmed_DoesNotMarkTheRowRemoved()
-    {
-        var (controller, _) = Arrange(Persisted(IdFrance, "France", TypeEu));
-        var model = Page(Row(IdFrance, "France", TypeEu));
-
-        await controller.CountryManagement(model, PendingListCommands.Remove, 0, null, CancellationToken.None);
-
-        Assert.False(model.Rows[0].IsRemoved);
     }
 
     [Fact]
@@ -581,7 +507,7 @@ public class CountryManagementControllerTests
         model.Rows[0].IsRemoved = true;
         model.Add = new CountryManagementAddViewModel { Country = "france", CountryTypeId = TypeNonEu };
 
-        var page = PageModel(await controller.CountryManagement(model, PendingListCommands.Add, null, null, CancellationToken.None));
+        var page = PageModel(await controller.CountryManagement(model, PendingListCommands.Add, null, CancellationToken.None));
 
         Assert.Equal(["France", "france"], page.Rows.Select(r => r.Country));
         Assert.True(page.Rows[0].IsRemoved);
@@ -597,7 +523,7 @@ public class CountryManagementControllerTests
         model.Rows[0].IsRemoved = true;
         model.Add = new CountryManagementAddViewModel { Country = "France", CountryTypeId = TypeEu };
 
-        var page = PageModel(await controller.CountryManagement(model, PendingListCommands.Add, null, null, CancellationToken.None));
+        var page = PageModel(await controller.CountryManagement(model, PendingListCommands.Add, null, CancellationToken.None));
 
         Assert.Equal(2, page.Rows.Count);
         Assert.Equal(Duplicate, controller.ModelState["Add.Country"]!.Errors[0].ErrorMessage);
@@ -611,7 +537,7 @@ public class CountryManagementControllerTests
         model.Rows[0].IsRemoved = true;
         model.EditIndex = 1;
 
-        var result = await controller.CountryManagement(model, PendingListCommands.Save, null, null, CancellationToken.None);
+        var result = await controller.CountryManagement(model, PendingListCommands.Save, null, CancellationToken.None);
 
         Assert.Equal(nameof(SystemAdministrationController.Index), Assert.IsType<RedirectToActionResult>(result).ActionName);
         Assert.Equal([IdFrance], api.DeleteCalls);
@@ -631,7 +557,7 @@ public class CountryManagementControllerTests
         var model = Page(Row(IdFrance, "France renamed", TypeEu), Row(IdGermany, "Germany", TypeEu), Row(null, "Spain", TypeEu));
         model.Rows[0].IsRemoved = true;
 
-        await controller.CountryManagement(model, PendingListCommands.Save, null, null, CancellationToken.None);
+        await controller.CountryManagement(model, PendingListCommands.Save, null, CancellationToken.None);
 
         Assert.Equal([IdFrance], api.DeleteCalls);
         Assert.Equal(IdGermany, Assert.Single(api.UpdateRequests).CountryId);
@@ -645,7 +571,7 @@ public class CountryManagementControllerTests
         var model = Page(Row(null, "Spain", TypeEu));
         model.Rows[0].IsRemoved = true;
 
-        var result = await controller.CountryManagement(model, PendingListCommands.Save, null, null, CancellationToken.None);
+        var result = await controller.CountryManagement(model, PendingListCommands.Save, null, CancellationToken.None);
 
         Assert.IsType<RedirectToActionResult>(result);
         Assert.Empty(model.Rows);
@@ -661,7 +587,7 @@ public class CountryManagementControllerTests
         model.Rows[0].IsRemoved = true;
         model.Rows[1].IsRemoved = true;
 
-        var result = await controller.CountryManagement(model, PendingListCommands.Save, null, null, CancellationToken.None);
+        var result = await controller.CountryManagement(model, PendingListCommands.Save, null, CancellationToken.None);
 
         var page = PageModel(result);
         Assert.Equal([IdFrance, IdGermany], api.DeleteCalls);
@@ -681,7 +607,7 @@ public class CountryManagementControllerTests
         var model = Page(Row(IdFrance, "France", TypeEu));
         model.Rows[0].IsRemoved = true;
 
-        var page = PageModel(await controller.CountryManagement(model, PendingListCommands.Save, null, null, CancellationToken.None));
+        var page = PageModel(await controller.CountryManagement(model, PendingListCommands.Save, null, CancellationToken.None));
 
         Assert.True(Assert.Single(page.Rows).IsRemoved);
         Assert.Equal("France: The country could not be removed.", Assert.Single(controller.ModelState["Rows"]!.Errors).ErrorMessage);
@@ -696,7 +622,7 @@ public class CountryManagementControllerTests
         var model = Page(Row(IdFrance, "France", TypeEu), Row(null, "Spain", TypeEu));
         model.Rows[0].IsRemoved = true;
 
-        var page = PageModel(await controller.CountryManagement(model, PendingListCommands.Save, null, null, CancellationToken.None));
+        var page = PageModel(await controller.CountryManagement(model, PendingListCommands.Save, null, CancellationToken.None));
 
         Assert.Equal([IdFrance], api.DeleteCalls);
         Assert.Equal(["Spain"], page.Rows.Select(r => r.Country));
@@ -711,7 +637,7 @@ public class CountryManagementControllerTests
         var model = Page(Row(IdFrance, "France", TypeEu));
         model.Rows[0].IsRemoved = true;
 
-        var result = await controller.CountryManagement(model, PendingListCommands.Cancel, null, null, CancellationToken.None);
+        var result = await controller.CountryManagement(model, PendingListCommands.Cancel, null, CancellationToken.None);
 
         Assert.Equal(nameof(SystemAdministrationController.Index), Assert.IsType<RedirectToActionResult>(result).ActionName);
         AssertNothingWritten(api);
@@ -732,7 +658,7 @@ public class CountryManagementControllerTests
         var model = Page(Row(IdFrance, "France", TypeEu), Row(IdGermany, "Germany", TypeNonEu));
         model.Rows[0].IsRemoved = true;
 
-        var result = await controller.CountryManagement(model, command, 1, null, CancellationToken.None);
+        var result = await controller.CountryManagement(model, command, 1, CancellationToken.None);
 
         Assert.IsNotType<RedirectToActionResult>(result);
         Assert.True(model.Rows[0].IsRemoved);
@@ -748,7 +674,7 @@ public class CountryManagementControllerTests
         model.Rows[0].IsRemoved = true;
         model.EditIndex = 0;
 
-        var page = PageModel(await controller.CountryManagement(model, command: null, rowIndex: null, confirmation: null, CancellationToken.None));
+        var page = PageModel(await controller.CountryManagement(model, command: null, rowIndex: null, CancellationToken.None));
 
         Assert.Null(page.EditIndex);
         Assert.All(page.Rows, r => Assert.False(r.IsEditing));
@@ -760,7 +686,7 @@ public class CountryManagementControllerTests
         var (controller, api) = Arrange();
         var model = Page(Row(IdFrance, "France", TypeEu));
 
-        var result = PageModel(await controller.CountryManagement(model, "something-else", 0, null, CancellationToken.None));
+        var result = PageModel(await controller.CountryManagement(model, "something-else", 0, CancellationToken.None));
 
         Assert.Single(result.Rows);
         AssertNothingWritten(api);
@@ -772,7 +698,7 @@ public class CountryManagementControllerTests
         var (controller, api) = Arrange();
         var model = Page(Row(null, "Spain", TypeEu));
 
-        var result = PageModel(await controller.CountryManagement(model, PendingListCommands.Apply, null, null, CancellationToken.None));
+        var result = PageModel(await controller.CountryManagement(model, PendingListCommands.Apply, null, CancellationToken.None));
 
         Assert.Single(result.Rows);
         AssertNothingWritten(api);

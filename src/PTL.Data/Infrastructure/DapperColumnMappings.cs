@@ -768,6 +768,15 @@ public static partial class DapperColumnMappings
             ["fldRecentName"] = nameof(SchemeSummaryEntity.RecentName),
         });
 
+        Map<ParticipantSchemeEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldSchemeId"] = nameof(ParticipantSchemeEntity.SchemeId),
+            ["fldSchemeCode"] = nameof(ParticipantSchemeEntity.Identifier),
+            ["fldSchemeName"] = nameof(ParticipantSchemeEntity.Name),
+            ["fldYear"] = nameof(ParticipantSchemeEntity.Year),
+            ["fldIsParticipating"] = nameof(ParticipantSchemeEntity.IsParticipating),
+        });
+
         Map<SchemeHistoryEntity>(new(StringComparer.OrdinalIgnoreCase)
         {
             ["fldCurrentSchemeId"] = nameof(SchemeHistoryEntity.SchemeId),
@@ -1293,6 +1302,8 @@ public static partial class DapperColumnMappings
             ["fldDepartment"] = nameof(CoreUser.Department),
             [ColIsInactive] = nameof(CoreUser.IsInactive),
             ["fldInactiveDate"] = nameof(CoreUser.InactiveDate),
+            ["fldAllocationCount"] = nameof(CoreUser.AllocationCount),
+            ["fldAllocationString"] = nameof(CoreUser.AllocationString),
         });
 
         Map<Role>(new(StringComparer.OrdinalIgnoreCase)

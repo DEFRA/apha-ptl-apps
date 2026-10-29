@@ -85,5 +85,7 @@ public sealed class ExternalTestConsultantController(ITestConsultantService test
             testConsultant.Department,
             testConsultant.Email,
             testConsultant.IsInactive,
-            testConsultant.InactiveDate);
+            testConsultant.InactiveDate,
+            testConsultant.AllocationCount,
+            testConsultant.AllocationString);
 }

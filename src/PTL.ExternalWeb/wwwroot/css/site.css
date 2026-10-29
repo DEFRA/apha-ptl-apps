@@ -14,10 +14,36 @@
   cursor: pointer;
 }
 
+/* Scheme List "enrolment highlighting" (AC3) - legacy's bold-schemes.js reproduced as a server-rendered, accessible row tint rather than client-side jQuery/yellow DOM manipulation */
+.app-table__row--enrolled {
+  background-color: #f3f2f1;
+}
+
+
 .govuk-header__container {
   min-height: 56px;
   display: flex;
   align-items: center;
+}
+
+/* Sits in the dark govuk-header bar next to the product name, not the light
+   govuk-service-navigation section - pushed to the right edge via margin-left: auto. */
+.app-header__actions {
+  display: flex;
+  align-items: center;
+  margin-left: auto;
+}
+
+.app-header__divider {
+  display: inline-block;
+  width: 1px;
+  height: 30px;
+  margin: 0 15px;
+  background-color: rgba(255, 255, 255, 0.5);
+}
+
+.app-header__help-link {
+  color: #ffffff;
 }
 
 .govuk-service-navigation__service-name img {
@@ -47,18 +73,26 @@
   white-space: nowrap;
 }
 
-.app-side-navigation__title {
-  font-weight: 700;
-  margin-top: 1rem;
+.app-header__menu .govuk-service-navigation__toggle {
+  color: #ffffff;
 }
 
-.app-side-navigation__list {
-  margin-bottom: 1.5rem;
+.app-header__menu-panel {
+  --govuk-text-colour: #0b0c0c;
+  background-color: #ffffff;
+  border-bottom: 1px solid #b1b4b6;
+  padding: 20px 0;
 }
 
-.app-side-navigation__link--disabled {
+.app-header__menu-panel .govuk-grid-column-one-third + .govuk-grid-column-one-third {
+  border-left: 1px solid #b1b4b6;
+}
+
+.app-menu-panel__link--disabled {
   color: #505a5f;
 }
+
+
 
 /* Quick-link tiles on Home - structure follows the DfE Frontend Card component
    (github.com/DFE-Digital/dfe-frontend, packages/components/card), recoloured with

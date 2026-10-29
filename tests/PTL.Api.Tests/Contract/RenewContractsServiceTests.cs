@@ -462,6 +462,12 @@ public sealed class RenewContractsServiceTests
         public Task<IReadOnlyList<SchemeHistoryEntity>> GetHistoryAsync(Guid sharedId, CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<SchemeHistoryEntity>>(_schemes.Values.Where(s => s.SharedId == sharedId).OrderByDescending(s => s.YearId).Select(s => new SchemeHistoryEntity { SchemeId = s.SchemeId, SharedId = s.SharedId, YearId = s.YearId, Identifier = s.Identifier, Name = s.Name }).ToList());
 
+        public Task<IReadOnlyList<ParticipantSchemeEntity>> GetCommercialSchemesBySsoIdAsync(Guid ssoId, int currentFinancialYear, CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<ParticipantSchemeEntity>>([]);
+
+        public Task<IReadOnlyList<ParticipantSchemeEntity>> GetNonCommercialSchemesBySsoIdAsync(Guid ssoId, int currentFinancialYear, CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<ParticipantSchemeEntity>>([]);
+
         public Task<CoreScheme> CreateAsync(CoreScheme scheme, CancellationToken cancellationToken = default)
         {
             _schemes[scheme.SchemeId] = scheme;
@@ -508,6 +514,12 @@ public sealed class RenewContractsServiceTests
 
         public Task<IReadOnlyList<SchemeHistoryEntity>> GetHistoryAsync(Guid sharedId, CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<SchemeHistoryEntity>>([]);
+
+        public Task<IReadOnlyList<ParticipantSchemeEntity>> GetCommercialSchemesBySsoIdAsync(Guid ssoId, int currentFinancialYear, CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<ParticipantSchemeEntity>>([]);
+
+        public Task<IReadOnlyList<ParticipantSchemeEntity>> GetNonCommercialSchemesBySsoIdAsync(Guid ssoId, int currentFinancialYear, CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<ParticipantSchemeEntity>>([]);
 
         public Task<CoreScheme> CreateAsync(CoreScheme scheme, CancellationToken cancellationToken = default) => Task.FromResult(scheme);
 

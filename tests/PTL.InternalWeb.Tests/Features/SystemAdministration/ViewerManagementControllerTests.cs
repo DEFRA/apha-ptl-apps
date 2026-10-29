@@ -1,6 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
 using PTL.Contracts.Viewer;
-using PTL.InternalWeb.Confirmation;
 using PTL.InternalWeb.Features.SystemAdministration;
 using PTL.InternalWeb.Navigation;
 using PTL.InternalWeb.Tests.TestSupport;
@@ -9,7 +8,7 @@ using PTL.SharedUI.Notifications;
 namespace PTL.InternalWeb.Tests.Features.SystemAdministration;
 
 // Manage Viewers (legacy ManageViewers.aspx): row edit/update/cancel/add only change the pending list; page Save/Apply
-// writes it; Cancel discards it; Remove goes through the confirmation page and is blocked while the viewer is in use.
+// writes it; Cancel discards it; Remove marks the row removed and is blocked while the viewer is in use.
 public class ViewerManagementControllerTests
 {
     private static readonly Guid IdA = Guid.Parse("aaaaaaaa-0000-0000-0000-000000000001");
@@ -71,7 +70,7 @@ public class ViewerManagementControllerTests
         var (controller, api) = Arrange();
         var model = Page(Row(IdA, "Alan", "alan@example.com"), Row(IdB, "Zoe", "zoe@example.com"));
 
-        var result = PageModel(await controller.ViewerManagement(model, PendingListCommands.Edit, 1, null, CancellationToken.None));
+        var result = PageModel(await controller.ViewerManagement(model, PendingListCommands.Edit, 1, CancellationToken.None));
 
         Assert.Equal(1, result.EditIndex);
         Assert.Equal("Zoe", result.Edit.Name);
@@ -91,7 +90,7 @@ public class ViewerManagementControllerTests
         var (controller, _) = Arrange();
         var model = Page(Row(IdA, "Alan", "alan@example.com"), Row(IdB, "Zoe", "zoe@example.com"));
 
-        var result = PageModel(await controller.ViewerManagement(model, PendingListCommands.Edit, rowIndex, null, CancellationToken.None));
+        var result = PageModel(await controller.ViewerManagement(model, PendingListCommands.Edit, rowIndex, CancellationToken.None));
 
         Assert.Null(result.EditIndex);
         Assert.All(result.Rows, r => Assert.False(r.IsEditing));
@@ -104,7 +103,7 @@ public class ViewerManagementControllerTests
         var model = Page(Row(IdA, "Alan", "alan@example.com"));
         model.EditIndex = 7;
 
-        var result = PageModel(await controller.ViewerManagement(model, command: null, rowIndex: null, confirmation: null, CancellationToken.None));
+        var result = PageModel(await controller.ViewerManagement(model, command: null, rowIndex: null, CancellationToken.None));
 
         Assert.Null(result.EditIndex);
     }
@@ -117,7 +116,7 @@ public class ViewerManagementControllerTests
         model.EditIndex = 0;
         model.Edit = new ViewerEditViewModel { Name = "  Alan Turing ", Email = " alan.turing@example.com " };
 
-        var result = PageModel(await controller.ViewerManagement(model, PendingListCommands.Update, 0, null, CancellationToken.None));
+        var result = PageModel(await controller.ViewerManagement(model, PendingListCommands.Update, 0, CancellationToken.None));
 
         var row = Assert.Single(result.Rows);
         Assert.Equal("Alan Turing", row.Name);
@@ -138,7 +137,7 @@ public class ViewerManagementControllerTests
         model.EditIndex = 0;
         model.Edit = new ViewerEditViewModel { Name = string.Empty, Email = "not-an-email" };
 
-        var result = PageModel(await controller.ViewerManagement(model, PendingListCommands.Update, 0, null, CancellationToken.None));
+        var result = PageModel(await controller.ViewerManagement(model, PendingListCommands.Update, 0, CancellationToken.None));
 
         Assert.Equal(0, result.EditIndex);
         Assert.True(result.Rows[0].IsEditing);
@@ -157,7 +156,7 @@ public class ViewerManagementControllerTests
         model.EditIndex = 1;
         model.Edit = new ViewerEditViewModel { Name = "typed but abandoned", Email = "x@example.com" };
 
-        var result = PageModel(await controller.ViewerManagement(model, PendingListCommands.CancelEdit, 1, null, CancellationToken.None));
+        var result = PageModel(await controller.ViewerManagement(model, PendingListCommands.CancelEdit, 1, CancellationToken.None));
 
         Assert.Null(result.EditIndex);
         Assert.Equal(["Alan (pending change)", "New Viewer"], result.Rows.Select(r => r.Name));
@@ -172,7 +171,7 @@ public class ViewerManagementControllerTests
         var model = Page(Row(IdA, "Alan", "alan@example.com"));
         model.Add = new ViewerAddViewModel { Name = " Grace Hopper ", Email = " grace@example.com " };
 
-        var result = PageModel(await controller.ViewerManagement(model, PendingListCommands.Add, null, null, CancellationToken.None));
+        var result = PageModel(await controller.ViewerManagement(model, PendingListCommands.Add, null, CancellationToken.None));
 
         Assert.Equal(2, result.Rows.Count);
         var added = result.Rows[1];
@@ -196,7 +195,7 @@ public class ViewerManagementControllerTests
         var model = Page(Row(IdA, "Alan", "alan@example.com"));
         model.Add = new ViewerAddViewModel { Name = name, Email = email };
 
-        var result = PageModel(await controller.ViewerManagement(model, PendingListCommands.Add, null, null, CancellationToken.None));
+        var result = PageModel(await controller.ViewerManagement(model, PendingListCommands.Add, null, CancellationToken.None));
 
         Assert.Single(result.Rows);
         Assert.Equal(message, controller.ModelState[key]!.Errors[0].ErrorMessage);
@@ -210,7 +209,7 @@ public class ViewerManagementControllerTests
         var model = Page(Row(IdA, "Alan", "alan@example.com"));
         model.Add = new ViewerAddViewModel { Name = "Grace", Email = "grace@example.com" };
 
-        var result = PageModel(await controller.ViewerManagement(model, PendingListCommands.Submit, null, null, CancellationToken.None));
+        var result = PageModel(await controller.ViewerManagement(model, PendingListCommands.Submit, null, CancellationToken.None));
 
         Assert.Equal(["Alan", "Grace"], result.Rows.Select(r => r.Name));
     }
@@ -224,7 +223,7 @@ public class ViewerManagementControllerTests
         model.Edit = new ViewerEditViewModel { Name = "Zoe Q", Email = "zoeq@example.com" };
         model.Add = new ViewerAddViewModel { Name = "Ignored", Email = "ignored@example.com" };
 
-        var result = PageModel(await controller.ViewerManagement(model, PendingListCommands.Submit, null, null, CancellationToken.None));
+        var result = PageModel(await controller.ViewerManagement(model, PendingListCommands.Submit, null, CancellationToken.None));
 
         Assert.Equal(["Alan", "Zoe Q"], result.Rows.Select(r => r.Name));
         Assert.Null(result.EditIndex);
@@ -240,7 +239,7 @@ public class ViewerManagementControllerTests
             Row(IdB, "Zoe", "zoe.new@example.com"),
             Row(null, "Grace", "grace@example.com"));
 
-        var result = await controller.ViewerManagement(model, PendingListCommands.Save, null, null, CancellationToken.None);
+        var result = await controller.ViewerManagement(model, PendingListCommands.Save, null, CancellationToken.None);
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
         Assert.Equal(nameof(SystemAdministrationController.Index), redirect.ActionName);
@@ -260,7 +259,7 @@ public class ViewerManagementControllerTests
         var (controller, api) = Arrange(Persisted(IdA, "Alan", "alan@example.com"));
         var model = Page(Row(IdA, "Alan", "alan@example.com"));
 
-        var result = await controller.ViewerManagement(model, PendingListCommands.Save, null, null, CancellationToken.None);
+        var result = await controller.ViewerManagement(model, PendingListCommands.Save, null, CancellationToken.None);
 
         Assert.IsType<RedirectToActionResult>(result);
         AssertNothingWritten(api);
@@ -273,7 +272,7 @@ public class ViewerManagementControllerTests
         var (controller, api) = Arrange();
         var model = Page(Row(IdA, "Alan", "alan@example.com"));
 
-        await controller.ViewerManagement(model, PendingListCommands.Save, null, null, CancellationToken.None);
+        await controller.ViewerManagement(model, PendingListCommands.Save, null, CancellationToken.None);
 
         Assert.Equal(IdA, Assert.Single(api.UpdateCalls).ViewerId);
     }
@@ -289,7 +288,7 @@ public class ViewerManagementControllerTests
         var model = Page(Row(IdA, "Alan", "alan@example.com"), Row(null, "Bad", "bad@example.com"), Row(null, "Grace", "grace@example.com"));
         model.EditIndex = 1;
 
-        var result = await controller.ViewerManagement(model, PendingListCommands.Save, null, null, CancellationToken.None);
+        var result = await controller.ViewerManagement(model, PendingListCommands.Save, null, CancellationToken.None);
 
         var page = PageModel(result);
         Assert.Equal(["Alan", "Bad", "Grace"], page.Rows.Select(r => r.Name));
@@ -310,7 +309,7 @@ public class ViewerManagementControllerTests
         var model = Page(Row(null, "Grace", "grace@example.com"));
         model.EditIndex = 0;
 
-        var result = await controller.ViewerManagement(model, PendingListCommands.Apply, null, null, CancellationToken.None);
+        var result = await controller.ViewerManagement(model, PendingListCommands.Apply, null, CancellationToken.None);
 
         var page = PageModel(result);
         Assert.Null(page.EditIndex);
@@ -329,7 +328,7 @@ public class ViewerManagementControllerTests
         api.SaveResult = new ViewerSaveResult(false, null, new Dictionary<string, string[]> { ["Email"] = ["Enter an email address"] });
         var model = Page(Row(null, "Grace", "grace@example.com"));
 
-        var result = await controller.ViewerManagement(model, PendingListCommands.Apply, null, null, CancellationToken.None);
+        var result = await controller.ViewerManagement(model, PendingListCommands.Apply, null, CancellationToken.None);
 
         PageModel(result);
         Assert.Equal("Grace: Enter an email address", controller.ModelState["Rows"]!.Errors[0].ErrorMessage);
@@ -342,7 +341,7 @@ public class ViewerManagementControllerTests
         var (controller, api) = Arrange();
         var model = Page(Row(null, "Grace", "grace@example.com"), Row(IdA, "Changed", "changed@example.com"));
 
-        var result = await controller.ViewerManagement(model, PendingListCommands.Cancel, null, null, CancellationToken.None);
+        var result = await controller.ViewerManagement(model, PendingListCommands.Cancel, null, CancellationToken.None);
 
         Assert.Equal(nameof(SystemAdministrationController.Index), Assert.IsType<RedirectToActionResult>(result).ActionName);
         AssertNothingWritten(api);
@@ -358,25 +357,10 @@ public class ViewerManagementControllerTests
         var (controller, api) = Arrange(Persisted(IdA, "Alan", "alan@example.com"));
         var model = Page(Row(IdA, "Alan", "alan@example.com"));
 
-        var result = PageModel(await controller.ViewerManagement(model, PendingListCommands.Remove, rowIndex, null, CancellationToken.None));
+        var result = PageModel(await controller.ViewerManagement(model, PendingListCommands.Remove, rowIndex, CancellationToken.None));
 
         Assert.Single(result.Rows);
         AssertNothingWritten(api);
-    }
-
-    [Fact]
-    public async Task Remove_WhenTheConfirmationWasCancelled_RedisplaysThePendingPageUnchanged()
-    {
-        var (controller, api) = Arrange(Persisted(IdA, "Alan", "alan@example.com"));
-        var model = Page(Row(IdA, "Alan (pending change)", "alan@example.com"), Row(null, "Grace", "grace@example.com"));
-
-        var result = PageModel(await controller.ViewerManagement(model, PendingListCommands.Remove, 0, ConfirmationFlow.Cancelled, CancellationToken.None));
-
-        Assert.Equal(["Alan (pending change)", "Grace"], result.Rows.Select(r => r.Name));
-        Assert.All(result.Rows, r => Assert.False(r.IsRemoved));
-        Assert.Null(result.Message);
-        AssertNothingWritten(api);
-        Assert.Null(controller.TempData.GetNotification());
     }
 
     [Fact]
@@ -387,7 +371,7 @@ public class ViewerManagementControllerTests
         model.EditIndex = 1;
         model.Edit = new ViewerEditViewModel { Name = "Zoe Q", Email = "zoeq@example.com" };
 
-        var result = PageModel(await controller.ViewerManagement(model, PendingListCommands.Remove, 0, null, CancellationToken.None));
+        var result = PageModel(await controller.ViewerManagement(model, PendingListCommands.Remove, 0, CancellationToken.None));
 
         var remaining = Assert.Single(result.Rows);
         Assert.Equal("Zoe", remaining.Name);
@@ -404,14 +388,14 @@ public class ViewerManagementControllerTests
         var model = Page(Row(IdB, "Zoe", "zoe@example.com"), Row(null, "Grace", "grace@example.com"));
         model.EditIndex = 1;
 
-        var result = PageModel(await controller.ViewerManagement(model, PendingListCommands.Remove, 1, null, CancellationToken.None));
+        var result = PageModel(await controller.ViewerManagement(model, PendingListCommands.Remove, 1, CancellationToken.None));
 
         Assert.Single(result.Rows);
         Assert.Null(result.EditIndex);
     }
 
     [Fact]
-    public async Task Remove_WhenAssignedToSchemesAndParticipants_IsBlockedWithTheAssignmentsListedAndNoConfirmationPage()
+    public async Task Remove_WhenAssignedToSchemesAndParticipants_IsBlockedWithTheAssignmentsListed()
     {
         var (controller, api) = Arrange(new ViewerResponse(
             IdA, "Alan", "alan@example.com",
@@ -419,7 +403,7 @@ public class ViewerManagementControllerTests
             [new ViewerParticipantResponse("LAB001", "Example Lab")]));
         var model = Page(Row(IdA, "Alan", "alan@example.com"));
 
-        var result = PageModel(await controller.ViewerManagement(model, PendingListCommands.Remove, 0, ConfirmationFlow.Confirmed, CancellationToken.None));
+        var result = PageModel(await controller.ViewerManagement(model, PendingListCommands.Remove, 0, CancellationToken.None));
 
         Assert.True(result.MessageIsError);
         Assert.Contains("cannot be removed", result.Message, StringComparison.Ordinal);
@@ -441,7 +425,7 @@ public class ViewerManagementControllerTests
             hasParticipant ? [new ViewerParticipantResponse("LAB001", "Example Lab")] : []));
         var model = Page(Row(IdA, "Alan", "alan@example.com"));
 
-        var result = PageModel(await controller.ViewerManagement(model, PendingListCommands.Remove, 0, null, CancellationToken.None));
+        var result = PageModel(await controller.ViewerManagement(model, PendingListCommands.Remove, 0, CancellationToken.None));
 
         Assert.True(result.MessageIsError);
         Assert.Single(result.MessageDetails);
@@ -449,46 +433,12 @@ public class ViewerManagementControllerTests
     }
 
     [Fact]
-    public async Task Remove_WhenNotYetConfirmed_ShowsTheDestructiveConfirmationPageAndDeletesNothing()
-    {
-        var (controller, api) = Arrange(Persisted(IdA, "Alan", "alan@example.com"));
-        var model = Page(Row(IdA, "Alan", "alan@example.com"));
-
-        var result = await controller.ViewerManagement(model, PendingListCommands.Remove, 0, null, CancellationToken.None);
-
-        var view = Assert.IsType<ViewResult>(result);
-        Assert.Equal(ConfirmationFlow.ViewName, view.ViewName);
-        Assert.Equal("ConfirmationPage", view.ViewName);
-        var page = Assert.IsType<ConfirmationPageViewModel>(view.Model);
-        Assert.Equal("Remove viewer", page.Title);
-        Assert.Equal("Manage Viewers", page.Caption);
-        Assert.Contains("Alan (alan@example.com)", page.Message, StringComparison.Ordinal);
-        Assert.Equal("Remove viewer", page.ConfirmText);
-        Assert.True(page.IsDestructive);
-        Assert.Null(page.CancelUrl);
-        AssertNothingWritten(api);
-        Assert.Null(controller.TempData.GetNotification());
-        Assert.Equal(nameof(SystemAdministrationController.ViewerManagement), controller.ViewData[BreadcrumbRouteValues.Action]);
-    }
-
-    [Fact]
-    public async Task Remove_OfAViewerTheApiNoLongerReturns_StillOffersTheConfirmationPage()
-    {
-        var (controller, _) = Arrange();
-        var model = Page(Row(IdA, "Alan", "alan@example.com"));
-
-        var result = await controller.ViewerManagement(model, PendingListCommands.Remove, 0, null, CancellationToken.None);
-
-        Assert.Equal(ConfirmationFlow.ViewName, Assert.IsType<ViewResult>(result).ViewName);
-    }
-
-    [Fact]
-    public async Task Remove_WhenConfirmed_MarksTheRowRemovedOnTheRedisplayedPageWithoutDeletingNotifyingOrRedirecting()
+    public async Task Remove_MarksTheRowRemovedOnTheRedisplayedPageWithoutDeletingNotifyingOrRedirecting()
     {
         var (controller, api) = Arrange(Persisted(IdA, "Alan", "alan@example.com"), Persisted(IdB, "Zoe", "zoe@example.com"));
         var model = Page(Row(IdA, "Alan", "alan@example.com"), Row(IdB, "Zoe", "zoe@example.com"));
 
-        var result = await controller.ViewerManagement(model, PendingListCommands.Remove, 0, ConfirmationFlow.Confirmed, CancellationToken.None);
+        var result = await controller.ViewerManagement(model, PendingListCommands.Remove, 0, CancellationToken.None);
 
         Assert.IsNotType<RedirectToActionResult>(result);
         var page = PageModel(result);
@@ -502,25 +452,25 @@ public class ViewerManagementControllerTests
     }
 
     [Fact]
-    public async Task Remove_WhenConfirmed_ForAViewerTheApiNoLongerReturns_StillMarksItRemoved()
+    public async Task Remove_ForAViewerTheApiNoLongerReturns_StillMarksItRemoved()
     {
         var (controller, api) = Arrange();
         var model = Page(Row(IdA, "Alan", "alan@example.com"));
 
-        var page = PageModel(await controller.ViewerManagement(model, PendingListCommands.Remove, 0, ConfirmationFlow.Confirmed, CancellationToken.None));
+        var page = PageModel(await controller.ViewerManagement(model, PendingListCommands.Remove, 0, CancellationToken.None));
 
         Assert.True(Assert.Single(page.Rows).IsRemoved);
         AssertNothingWritten(api);
     }
 
     [Fact]
-    public async Task Remove_WhenConfirmed_ForTheRowInEditMode_LeavesEditMode()
+    public async Task Remove_ForTheRowInEditMode_LeavesEditMode()
     {
         var (controller, _) = Arrange(Persisted(IdA, "Alan", "alan@example.com"), Persisted(IdB, "Zoe", "zoe@example.com"));
         var model = Page(Row(IdA, "Alan", "alan@example.com"), Row(IdB, "Zoe", "zoe@example.com"));
         model.EditIndex = 1;
 
-        var page = PageModel(await controller.ViewerManagement(model, PendingListCommands.Remove, 1, ConfirmationFlow.Confirmed, CancellationToken.None));
+        var page = PageModel(await controller.ViewerManagement(model, PendingListCommands.Remove, 1, CancellationToken.None));
 
         Assert.True(page.Rows[1].IsRemoved);
         Assert.Null(page.EditIndex);
@@ -528,41 +478,17 @@ public class ViewerManagementControllerTests
     }
 
     [Fact]
-    public async Task Remove_WhenConfirmed_ForADifferentRowThanTheOneInEditMode_KeepsEditMode()
+    public async Task Remove_ForADifferentRowThanTheOneInEditMode_KeepsEditMode()
     {
         var (controller, _) = Arrange(Persisted(IdA, "Alan", "alan@example.com"), Persisted(IdB, "Zoe", "zoe@example.com"));
         var model = Page(Row(IdA, "Alan", "alan@example.com"), Row(IdB, "Zoe", "zoe@example.com"));
         model.EditIndex = 1;
 
-        var page = PageModel(await controller.ViewerManagement(model, PendingListCommands.Remove, 0, ConfirmationFlow.Confirmed, CancellationToken.None));
+        var page = PageModel(await controller.ViewerManagement(model, PendingListCommands.Remove, 0, CancellationToken.None));
 
         Assert.True(page.Rows[0].IsRemoved);
         Assert.Equal(1, page.EditIndex);
         Assert.True(page.Rows[1].IsEditing);
-    }
-
-    [Fact]
-    public async Task Remove_NeverCallsTheDeleteApi_AtAnyStageOfTheConfirmationFlow()
-    {
-        var (controller, api) = Arrange(Persisted(IdA, "Alan", "alan@example.com"));
-
-        foreach (var confirmation in new string?[] { null, ConfirmationFlow.Cancelled, ConfirmationFlow.Confirmed })
-        {
-            await controller.ViewerManagement(Page(Row(IdA, "Alan", "alan@example.com")), PendingListCommands.Remove, 0, confirmation, CancellationToken.None);
-        }
-
-        Assert.Empty(api.DeleteCalls);
-    }
-
-    [Fact]
-    public async Task Remove_WhenNotConfirmed_DoesNotMarkTheRowRemoved()
-    {
-        var (controller, _) = Arrange(Persisted(IdA, "Alan", "alan@example.com"));
-        var model = Page(Row(IdA, "Alan", "alan@example.com"));
-
-        await controller.ViewerManagement(model, PendingListCommands.Remove, 0, null, CancellationToken.None);
-
-        Assert.False(model.Rows[0].IsRemoved);
     }
 
     [Fact]
@@ -573,7 +499,7 @@ public class ViewerManagementControllerTests
         model.Rows[0].IsRemoved = true;
         model.EditIndex = 1;
 
-        var result = await controller.ViewerManagement(model, PendingListCommands.Save, null, null, CancellationToken.None);
+        var result = await controller.ViewerManagement(model, PendingListCommands.Save, null, CancellationToken.None);
 
         Assert.Equal(nameof(SystemAdministrationController.Index), Assert.IsType<RedirectToActionResult>(result).ActionName);
         Assert.Equal([IdA], api.DeleteCalls);
@@ -593,7 +519,7 @@ public class ViewerManagementControllerTests
         var model = Page(Row(IdA, "Alan renamed", "alan@example.com"), Row(IdB, "Zoe", "zoe.new@example.com"), Row(null, "Grace", "grace@example.com"));
         model.Rows[0].IsRemoved = true;
 
-        await controller.ViewerManagement(model, PendingListCommands.Save, null, null, CancellationToken.None);
+        await controller.ViewerManagement(model, PendingListCommands.Save, null, CancellationToken.None);
 
         Assert.Equal([IdA], api.DeleteCalls);
         Assert.Equal(IdB, Assert.Single(api.UpdateCalls).ViewerId);
@@ -607,7 +533,7 @@ public class ViewerManagementControllerTests
         var model = Page(Row(null, "Grace", "grace@example.com"));
         model.Rows[0].IsRemoved = true;
 
-        var result = await controller.ViewerManagement(model, PendingListCommands.Save, null, null, CancellationToken.None);
+        var result = await controller.ViewerManagement(model, PendingListCommands.Save, null, CancellationToken.None);
 
         Assert.IsType<RedirectToActionResult>(result);
         Assert.Empty(model.Rows);
@@ -623,7 +549,7 @@ public class ViewerManagementControllerTests
         model.Rows[0].IsRemoved = true;
         model.Rows[1].IsRemoved = true;
 
-        var result = await controller.ViewerManagement(model, PendingListCommands.Save, null, null, CancellationToken.None);
+        var result = await controller.ViewerManagement(model, PendingListCommands.Save, null, CancellationToken.None);
 
         var page = PageModel(result);
         Assert.Equal([IdA, IdB], api.DeleteCalls);
@@ -643,7 +569,7 @@ public class ViewerManagementControllerTests
         var model = Page(Row(IdA, "Alan", "alan@example.com"));
         model.Rows[0].IsRemoved = true;
 
-        var page = PageModel(await controller.ViewerManagement(model, PendingListCommands.Save, null, null, CancellationToken.None));
+        var page = PageModel(await controller.ViewerManagement(model, PendingListCommands.Save, null, CancellationToken.None));
 
         Assert.True(Assert.Single(page.Rows).IsRemoved);
         Assert.Equal("Alan: The viewer could not be removed.", Assert.Single(controller.ModelState["Rows"]!.Errors).ErrorMessage);
@@ -658,7 +584,7 @@ public class ViewerManagementControllerTests
         var model = Page(Row(IdA, "Alan", "alan@example.com"), Row(null, "Grace", "grace@example.com"));
         model.Rows[0].IsRemoved = true;
 
-        var page = PageModel(await controller.ViewerManagement(model, PendingListCommands.Save, null, null, CancellationToken.None));
+        var page = PageModel(await controller.ViewerManagement(model, PendingListCommands.Save, null, CancellationToken.None));
 
         Assert.Equal([IdA], api.DeleteCalls);
         Assert.Equal(["Grace"], page.Rows.Select(r => r.Name));
@@ -673,7 +599,7 @@ public class ViewerManagementControllerTests
         var model = Page(Row(IdA, "Alan", "alan@example.com"), Row(IdB, "Zoe", "zoe@example.com"));
         model.Rows[1].IsRemoved = true;
 
-        var result = await controller.ViewerManagement(model, PendingListCommands.Apply, null, null, CancellationToken.None);
+        var result = await controller.ViewerManagement(model, PendingListCommands.Apply, null, CancellationToken.None);
 
         var page = PageModel(result);
         Assert.Equal([IdB], api.DeleteCalls);
@@ -689,7 +615,7 @@ public class ViewerManagementControllerTests
         var model = Page(Row(IdA, "Alan", "alan@example.com"));
         model.Rows[0].IsRemoved = true;
 
-        var page = PageModel(await controller.ViewerManagement(model, PendingListCommands.Apply, null, null, CancellationToken.None));
+        var page = PageModel(await controller.ViewerManagement(model, PendingListCommands.Apply, null, CancellationToken.None));
 
         Assert.True(Assert.Single(page.Rows).IsRemoved);
         Assert.Equal("Alan: Alan is still assigned.", Assert.Single(controller.ModelState["Rows"]!.Errors).ErrorMessage);
@@ -703,7 +629,7 @@ public class ViewerManagementControllerTests
         var model = Page(Row(IdA, "Alan", "alan@example.com"));
         model.Rows[0].IsRemoved = true;
 
-        var result = await controller.ViewerManagement(model, PendingListCommands.Cancel, null, null, CancellationToken.None);
+        var result = await controller.ViewerManagement(model, PendingListCommands.Cancel, null, CancellationToken.None);
 
         Assert.Equal(nameof(SystemAdministrationController.Index), Assert.IsType<RedirectToActionResult>(result).ActionName);
         AssertNothingWritten(api);
@@ -723,7 +649,7 @@ public class ViewerManagementControllerTests
         var model = Page(Row(IdA, "Alan", "alan@example.com"), Row(IdB, "Zoe", "zoe@example.com"));
         model.Rows[0].IsRemoved = true;
 
-        var result = await controller.ViewerManagement(model, command, 1, null, CancellationToken.None);
+        var result = await controller.ViewerManagement(model, command, 1, CancellationToken.None);
 
         Assert.IsNotType<RedirectToActionResult>(result);
         Assert.True(model.Rows[0].IsRemoved);
@@ -739,7 +665,7 @@ public class ViewerManagementControllerTests
         model.Rows[0].IsRemoved = true;
         model.EditIndex = 0;
 
-        var page = PageModel(await controller.ViewerManagement(model, command: null, rowIndex: null, confirmation: null, CancellationToken.None));
+        var page = PageModel(await controller.ViewerManagement(model, command: null, rowIndex: null, CancellationToken.None));
 
         Assert.Null(page.EditIndex);
         Assert.All(page.Rows, r => Assert.False(r.IsEditing));
@@ -753,7 +679,7 @@ public class ViewerManagementControllerTests
         model.Rows[0].IsRemoved = true;
         model.Add = new ViewerAddViewModel { Name = "Grace", Email = "grace@example.com" };
 
-        var page = PageModel(await controller.ViewerManagement(model, PendingListCommands.Add, null, null, CancellationToken.None));
+        var page = PageModel(await controller.ViewerManagement(model, PendingListCommands.Add, null, CancellationToken.None));
 
         Assert.Equal(["Alan", "Grace"], page.Rows.Select(r => r.Name));
         Assert.True(page.Rows[0].IsRemoved);
@@ -766,7 +692,7 @@ public class ViewerManagementControllerTests
         var (controller, api) = Arrange();
         var model = Page(Row(IdA, "Alan", "alan@example.com"));
 
-        var result = PageModel(await controller.ViewerManagement(model, "something-else", 0, null, CancellationToken.None));
+        var result = PageModel(await controller.ViewerManagement(model, "something-else", 0, CancellationToken.None));
 
         Assert.Single(result.Rows);
         AssertNothingWritten(api);
@@ -778,7 +704,7 @@ public class ViewerManagementControllerTests
         var (controller, _) = Arrange();
         var model = Page(Row(IdA, "Alan", "alan@example.com"));
 
-        var result = PageModel(await controller.ViewerManagement(model, "EDIT", 0, null, CancellationToken.None));
+        var result = PageModel(await controller.ViewerManagement(model, "EDIT", 0, CancellationToken.None));
 
         Assert.Equal(0, result.EditIndex);
     }

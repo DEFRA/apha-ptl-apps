@@ -26,6 +26,26 @@ public sealed class PendingParticipantUpdateRepository(IDbConnectionFactory conn
             new { ParticipantId = participantId, IsSubmitted = true });
     }
 
+    public async Task UpsertAsync(PendingParticipantUpdate update, CancellationToken cancellationToken = default)
+    {
+        using var connection = connectionFactory.CreateConnection();
+
+        if (update.PendingParticipantUpdateId == Guid.Empty)
+        {
+            update.PendingParticipantUpdateId = Guid.NewGuid();
+
+            await connection.ExecuteAsync(
+                "EXEC dbo.spiPendingParticipantDetailsEdit @PendingParticipantDetailsEditId = @PendingParticipantUpdateId, @ParticipantId = @ParticipantId, @CustomerId = @CustomerId, @LabCode = @LabCode, @ContactName = @ContactName, @Organisation = @Organisation, @Address1 = @Address1, @Address2 = @Address2, @Address3 = @Address3, @Address4 = @Address4, @Address5 = @Address5, @Fax = @Fax, @Email = @Email, @Email2 = @Email2, @Telephone = @Telephone, @CountryId = @CountryId, @IsDeleted = @IsDeleted, @IsSubmitted = @IsSubmitted",
+                update);
+
+            return;
+        }
+
+        await connection.ExecuteAsync(
+            "EXEC dbo.spuPendingParticipantDetailsEditByParticipantID @CustomerId = @CustomerId, @ParticipantId = @ParticipantId, @PendingParticipantDetailsEditId = @PendingParticipantUpdateId, @ContactName = @ContactName, @Organisation = @Organisation, @Address1 = @Address1, @Address2 = @Address2, @Address3 = @Address3, @Address4 = @Address4, @Address5 = @Address5, @Telephone = @Telephone, @Fax = @Fax, @Email = @Email, @Email2 = @Email2, @CountryId = @CountryId, @IsSubmitted = @IsSubmitted, @IsDeleted = @IsDeleted",
+            update);
+    }
+
     public async Task<bool> MarkDecidedAsync(Guid participantId, Guid pendingParticipantUpdateId, CancellationToken cancellationToken = default)
     {
         using var connection = connectionFactory.CreateConnection();

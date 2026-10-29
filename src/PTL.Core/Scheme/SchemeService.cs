@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using PTL.Core.Lookup;
+using PTL.Core.Participant;
 using PTL.Core.Viewer;
 
 namespace PTL.Core.Scheme;
@@ -8,6 +9,7 @@ public sealed class SchemeService(
     ISchemeRepository schemeRepository,
     ILookupRepository lookupRepository,
     IViewerRepository viewerRepository,
+    IParticipantRepository participantRepository,
     ILogger<SchemeService> logger) : ISchemeService
 {
     private static readonly Action<ILogger, int, string?, int, int, Exception?> LogSchemeSearchMessage =
@@ -66,6 +68,23 @@ public sealed class SchemeService(
         var links = await viewerRepository.GetSchemeViewersAsync(schemeId, cancellationToken);
         scheme.ViewerIds = links.Select(link => link.ViewerId).ToList();
         return scheme;
+    }
+
+    public async Task<ParticipantSchemeListResult> GetSchemesForParticipantAsync(Guid participantId, CancellationToken cancellationToken = default)
+    {
+        var participant = await participantRepository.GetByIdAsync(participantId, cancellationToken);
+        if (participant is null)
+        {
+            return new ParticipantSchemeListResult([], []);
+        }
+
+        // Matches legacy SchemeListCollection.Criteria's financial-year math exactly (April cutoff).
+        var now = DateTime.Now;
+        var currentFinancialYear = now.Month < 4 ? now.Year - 1 : now.Year;
+
+        var commercial = await schemeRepository.GetCommercialSchemesBySsoIdAsync(participant.SsoId, currentFinancialYear, cancellationToken);
+        var nonCommercial = await schemeRepository.GetNonCommercialSchemesBySsoIdAsync(participant.SsoId, currentFinancialYear, cancellationToken);
+        return new ParticipantSchemeListResult(commercial, nonCommercial);
     }
 
     public async Task<SchemeSearchResult> SearchSchemesAsync(int yearId, string? searchTerm, int page, int pageSize, CancellationToken cancellationToken = default)

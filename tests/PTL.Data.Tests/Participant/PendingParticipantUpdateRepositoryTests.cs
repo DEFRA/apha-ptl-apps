@@ -15,6 +15,8 @@ public class PendingParticipantUpdateRepositoryTests
     private const string GetSummariesSql = "EXEC dbo.spgaPendingParticipantDetailsEditInfo";
     private const string GetByParticipantIdSql = "EXEC dbo.spgPendingParticipantDetailsEditByParticipantID @ParticipantId, @IsSubmitted";
     private const string MarkDecidedSql = "EXEC dbo.spdPendingParticipantDetailsEditByParticipantID @ParticipantId, @PendingParticipantDetailsEditId";
+    private const string InsertSql = "EXEC dbo.spiPendingParticipantDetailsEdit @PendingParticipantDetailsEditId = @PendingParticipantUpdateId, @ParticipantId = @ParticipantId, @CustomerId = @CustomerId, @LabCode = @LabCode, @ContactName = @ContactName, @Organisation = @Organisation, @Address1 = @Address1, @Address2 = @Address2, @Address3 = @Address3, @Address4 = @Address4, @Address5 = @Address5, @Fax = @Fax, @Email = @Email, @Email2 = @Email2, @Telephone = @Telephone, @CountryId = @CountryId, @IsDeleted = @IsDeleted, @IsSubmitted = @IsSubmitted";
+    private const string UpdateSql = "EXEC dbo.spuPendingParticipantDetailsEditByParticipantID @CustomerId = @CustomerId, @ParticipantId = @ParticipantId, @PendingParticipantDetailsEditId = @PendingParticipantUpdateId, @ContactName = @ContactName, @Organisation = @Organisation, @Address1 = @Address1, @Address2 = @Address2, @Address3 = @Address3, @Address4 = @Address4, @Address5 = @Address5, @Telephone = @Telephone, @Fax = @Fax, @Email = @Email, @Email2 = @Email2, @CountryId = @CountryId, @IsSubmitted = @IsSubmitted, @IsDeleted = @IsDeleted";
 
     private static (PendingParticipantUpdateRepository Repository, FakeDbConnection Connection) CreateRepository()
     {
@@ -113,6 +115,51 @@ public class PendingParticipantUpdateRepositoryTests
         var result = await repository.MarkDecidedAsync(participantId, Guid.NewGuid());
 
         Assert.False(result);
+    }
+
+    [Fact]
+    public async Task UpsertAsync_NewPendingUpdate_CallsInsertProcedureAndAssignsAnId()
+    {
+        var (repository, connection) = CreateRepository();
+        connection.RespondToNonQuery(InsertSql, -1);
+        var update = new PendingParticipantUpdate
+        {
+            ParticipantId = Guid.NewGuid(),
+            CustomerId = Guid.NewGuid(),
+            LabCode = "001",
+            ContactName = "Jane Doe"
+        };
+
+        await repository.UpsertAsync(update);
+
+        Assert.NotEqual(Guid.Empty, update.PendingParticipantUpdateId);
+        var command = Assert.Single(connection.ExecutedCommands);
+        Assert.Equal(InsertSql, command.CommandText);
+        Assert.Equal(update.PendingParticipantUpdateId, (Guid?)command.ParameterValue("PendingParticipantUpdateId"));
+        Assert.Equal(update.ParticipantId, (Guid?)command.ParameterValue("ParticipantId"));
+        Assert.Equal("Jane Doe", (string?)command.ParameterValue("ContactName"));
+    }
+
+    [Fact]
+    public async Task UpsertAsync_ExistingPendingUpdateId_CallsUpdateProcedure()
+    {
+        var (repository, connection) = CreateRepository();
+        connection.RespondToNonQuery(UpdateSql, -1);
+        var pendingId = Guid.NewGuid();
+        var update = new PendingParticipantUpdate
+        {
+            PendingParticipantUpdateId = pendingId,
+            ParticipantId = Guid.NewGuid(),
+            CustomerId = Guid.NewGuid(),
+            ContactName = "Jane Doe"
+        };
+
+        await repository.UpsertAsync(update);
+
+        Assert.Equal(pendingId, update.PendingParticipantUpdateId);
+        var command = Assert.Single(connection.ExecutedCommands);
+        Assert.Equal(UpdateSql, command.CommandText);
+        Assert.Equal(pendingId, (Guid?)command.ParameterValue("PendingParticipantUpdateId"));
     }
 
     [Fact]

@@ -4,7 +4,7 @@ namespace PTL.SharedUI.Tests.Pagination;
 
 public class PaginationModelTests
 {
-    private static readonly int[] ExpectedAvailablePageSizes = [10, 20, 25, 50, 100];
+    private static readonly int[] ExpectedAvailablePageSizes = [10, 15, 20, 25, 50, 100];
 
     [Fact]
     public void TotalPages_PageSizeZeroOrLess_ReturnsOne()

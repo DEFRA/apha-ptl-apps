@@ -1,4 +1,5 @@
 @using System.Text.RegularExpressions
+@using PTL.ExternalWeb.Navigation
 @{
     var controller = (ViewContext.RouteData.Values["controller"]?.ToString() ?? string.Empty).Trim();
     var action = (ViewContext.RouteData.Values["action"]?.ToString() ?? string.Empty).Trim();
@@ -13,11 +14,24 @@
         return Regex.Replace(value, "([a-z])([A-Z])", "$1 $2", RegexOptions.None, TimeSpan.FromMilliseconds(100));
     }
 
+    // GOV.UK guidance: breadcrumbs end at the parent section, not the current page itself
+    // (design-system.service.gov.uk/components/breadcrumbs - "Removed guidance that advised
+    // including the current page's name in the Breadcrumbs"). Match the route against
+    // NavigationProvider's groups so the parent section is the actual nav section text (e.g.
+    // "Results"), not a raw controller/action class name (e.g. "Distribution > Current" for the
+    // Enter results page, "Distribution > Previous" for View results - both belong to "Results").
+    var parentSection = NavigationProvider.Build()
+        .FirstOrDefault(group => group.Children.Any(child =>
+            string.Equals(child.ControllerName, controller, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(child.ActionName, action, StringComparison.OrdinalIgnoreCase)))
+        ?.Text;
+
     var hasController =
+        parentSection is null &&
         !string.IsNullOrWhiteSpace(controller) &&
         !string.Equals(controller, "Home", StringComparison.OrdinalIgnoreCase);
 
-    var hasAction = !string.IsNullOrWhiteSpace(action) && !string.Equals(action, "Index", StringComparison.OrdinalIgnoreCase);
+    var hasAction = parentSection is null && !string.IsNullOrWhiteSpace(action) && !string.Equals(action, "Index", StringComparison.OrdinalIgnoreCase);
 }
 
 <nav class="govuk-breadcrumbs" aria-label="Breadcrumb">
@@ -25,6 +39,11 @@
         <li class="govuk-breadcrumbs__list-item">
             <a class="govuk-breadcrumbs__link" asp-controller="Home" asp-action="Index">Home</a>
         </li>
+
+        @if (parentSection is not null)
+        {
+            <li class="govuk-breadcrumbs__list-item">@parentSection</li>
+        }
 
         @if (hasController)
         {
