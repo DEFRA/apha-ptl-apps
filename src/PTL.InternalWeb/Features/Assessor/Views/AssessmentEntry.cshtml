@@ -1,0 +1,133 @@
+@using PTL.Core.Distribution
+@using PTL.InternalWeb.Features.Assessor
+@model AssessorEntryViewModel
+@{
+    ViewData["Title"] = "Assessment Entry";
+    var entry = Model.Entry!;
+    var readOnly = entry.IsAssessmentSubmitted;
+    var itemsUrl = Url.Action("AssessmentItemList", new { testId = entry.TestId, year = Model.Year });
+
+    var errors = ViewData.ModelState
+        .Where(state => state.Value?.Errors.Count > 0)
+        .SelectMany(state => state.Value!.Errors.Select(error => (Field: state.Key, Message: error.ErrorMessage)))
+        .ToList();
+}
+
+<govuk-error-summary errors="@errors" />
+
+<span class="govuk-caption-l">@entry.YearMonthTitle</span>
+<h1 class="govuk-heading-l">Assessment Entry</h1>
+<h2 class="govuk-heading-m">@entry.DistributionTitle</h2>
+
+<dl class="govuk-summary-list">
+    <govuk-summary-row label="Labcode">@entry.LabCode</govuk-summary-row>
+    <govuk-summary-row label="Sample number">@entry.SampleNumber</govuk-summary-row>
+    <govuk-summary-row label="Test">@entry.TestName</govuk-summary-row>
+</dl>
+
+@if (entry.ResultItems.Count > 0)
+{
+    <table class="govuk-table">
+        <caption class="govuk-table__caption govuk-visually-hidden">Results of Labcode @entry.LabCode for sample @entry.SampleNumber</caption>
+        <thead class="govuk-table__head">
+            <tr class="govuk-table__row">
+                <th scope="col" class="govuk-table__header">Test result item name</th>
+                <th scope="col" class="govuk-table__header">Result</th>
+            </tr>
+        </thead>
+        <tbody class="govuk-table__body">
+            @foreach (var item in entry.ResultItems)
+            {
+                <tr class="govuk-table__row">
+                    <th scope="row" class="govuk-table__header govuk-!-font-weight-regular">@item.Name</th>
+                    <td class="govuk-table__cell">@item.Result</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@if (readOnly)
+{
+    var overallScore = AssessorEntryViewModel.OverallScoreOptions.FirstOrDefault(o => o.Value == entry.OverallScore.ToString(System.Globalization.CultureInfo.InvariantCulture))?.Text;
+
+    <div class="govuk-inset-text">Assessment has been submitted for this test, so it can no longer be changed.</div>
+
+    <h2 class="govuk-heading-m">Assessment</h2>
+    <dl class="govuk-summary-list">
+        @foreach (var category in entry.Categories)
+        {
+            <govuk-summary-row label="@category.Name">
+                <p class="govuk-body">Score: @(category.Score == 0 ? "Not entered" : category.Score.ToString(System.Globalization.CultureInfo.InvariantCulture))</p>
+                @if (category.Criteria.Any(c => c.IsSelected))
+                {
+                    <ul class="govuk-list govuk-list--bullet">
+                        @foreach (var criterion in category.Criteria.Where(c => c.IsSelected))
+                        {
+                            <li>@criterion.Name</li>
+                        }
+                    </ul>
+                }
+            </govuk-summary-row>
+        }
+        <govuk-summary-row label="Assessment comment"><span class="ptl-preserve-lines">@entry.Comment</span></govuk-summary-row>
+        <govuk-summary-row label="Overall Score">@(overallScore ?? "Not entered")</govuk-summary-row>
+    </dl>
+
+    <div class="govuk-button-group">
+        <a class="govuk-button govuk-button--secondary" data-module="govuk-button" href="@itemsUrl">Back</a>
+    </div>
+
+    return;
+}
+
+<form method="post" asp-action="AssessmentEntry" novalidate>
+    <input type="hidden" asp-for="SampleTestId" />
+    <input type="hidden" asp-for="ParticipantId" />
+    @if (Model.Year is not null)
+    {
+        <input type="hidden" asp-for="Year" />
+    }
+
+    @for (var i = 0; i < entry.Categories.Count; i++)
+    {
+        var category = entry.Categories[i];
+        var ticked = Model.Categories[i].CriterionItemIds;
+
+        <input type="hidden" asp-for="Categories[i].CategoryItemId" />
+        <fieldset class="govuk-fieldset govuk-!-margin-bottom-6">
+            <legend class="govuk-fieldset__legend govuk-fieldset__legend--m">
+                <h3 class="govuk-fieldset__heading">@category.Name</h3>
+            </legend>
+
+            @if (category.Criteria.Count > 0)
+            {
+                <div class="govuk-form-group">
+                    <div class="govuk-checkboxes govuk-checkboxes--small" data-module="govuk-checkboxes">
+                        @for (var j = 0; j < category.Criteria.Count; j++)
+                        {
+                            var criterion = category.Criteria[j];
+                            <div class="govuk-checkboxes__item">
+                                <input class="govuk-checkboxes__input" id="category-@i-criterion-@j" name="Categories[@i].CriterionItemIds" type="checkbox" value="@criterion.CriterionItemId"
+                                       checked="@(ticked.Contains(criterion.CriterionItemId) ? "checked" : null)" />
+                                <label class="govuk-label govuk-checkboxes__label" for="category-@i-criterion-@j">@criterion.Name</label>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+
+            <govuk-select asp-for="Categories[i].Score" label="Score:" asp-items="AssessorEntryViewModel.CategoryScoreOptions" option-label="Please select..." />
+        </fieldset>
+    }
+
+    <govuk-textarea asp-for="Comment" label="Assessment comment:" rows="5" maxlength="@AssessorService.MaxCommentLength" />
+
+    <govuk-select asp-for="OverallScore" label="Overall Score:" asp-items="AssessorEntryViewModel.OverallScoreOptions" option-label="Please select..." />
+
+    <div class="govuk-button-group">
+        <button type="submit" name="command" value="@AssessorEntryViewModel.SaveCommand" class="govuk-button" data-module="govuk-button">Save</button>
+        <button type="submit" name="command" value="@AssessorEntryViewModel.ApplyCommand" class="govuk-button govuk-button--secondary" data-module="govuk-button">Apply</button>
+        <a class="govuk-button govuk-button--secondary" data-module="govuk-button" href="@itemsUrl">Cancel</a>
+    </div>
+</form>

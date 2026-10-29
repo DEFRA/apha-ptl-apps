@@ -2,6 +2,7 @@ using System.Reflection;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using PTL.InternalWeb.Authorization;
+using PTL.InternalWeb.Features.Assessor;
 using PTL.InternalWeb.Features.Contract;
 using PTL.InternalWeb.Features.Customer;
 using PTL.InternalWeb.Features.Distribution;
@@ -55,6 +56,7 @@ public class AuthorizationMatrixTests
         { typeof(SchemeAdminController), PtlPolicies.SchemeAdmin },
         { typeof(TestConsultantController), PtlPolicies.TestConsultant },
         { typeof(ResultsSignOffController), PtlPolicies.ResultsSignOff },
+        { typeof(AssessorController), PtlPolicies.Assessor },
     };
 
     private static IEnumerable<MethodInfo> Actions(Type controller) =>

@@ -38,8 +38,6 @@ public sealed class ViewerRowViewModel
 
     public string Email { get; set; } = string.Empty;
 
-    public bool IsNew => ViewerId is null;
-
     // Removed on this page but not yet deleted: the delete happens with the page-level Save/Apply.
     public bool IsRemoved { get; set; }
 

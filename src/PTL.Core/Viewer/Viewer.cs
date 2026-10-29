@@ -57,8 +57,8 @@ public interface IViewerRepository
     Task<ViewerEntity> CreateAsync(ViewerEntity viewer, AuditEntry? auditEntry = null, CancellationToken cancellationToken = default);
     Task<ViewerEntity?> UpdateAsync(ViewerEntity viewer, AuditEntry? auditEntry = null, CancellationToken cancellationToken = default);
 
-    // spdViewer - unconditional delete, no allocation block (matches legacy; see
-    // ViewerDeleteResponse remarks). Returns false if the viewer no longer exists.
+    // spdViewer - unconditional at this level; ViewerService.DeleteAsync blocks viewers that still have
+    // assignments first. Returns false if the viewer no longer exists.
     Task<bool> DeleteAsync(Guid viewerId, AuditEntry? auditEntry = null, CancellationToken cancellationToken = default);
 
     // spgaViewers result set 2 - the tlnkViewerScheme links for one scheme.

@@ -41,8 +41,6 @@ public sealed class CountryManagementRowViewModel
     // Display name for CountryTypeId, resolved server-side (not posted back).
     public string CountryType { get; set; } = string.Empty;
 
-    public bool IsNew => CountryId is null;
-
     // Removed on this page but not yet deleted: the delete happens with the page-level Save.
     public bool IsRemoved { get; set; }
 

@@ -2,7 +2,9 @@ using System.Globalization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
+using Polly;
 using PTL.ApiClient;
+using PTL.Common.Graph;
 using PTL.Contracts.AdministrationCharge;
 using PTL.Contracts.Country;
 using PTL.Contracts.ExternalSiteMessage;
@@ -11,6 +13,7 @@ using PTL.Contracts.PostagePricingPlan;
 using PTL.Contracts.TestConsultant;
 using PTL.Contracts.User;
 using PTL.Contracts.Viewer;
+using PTL.Core.User;
 using PTL.InternalWeb.Authorization;
 using PTL.InternalWeb.Confirmation;
 using PTL.InternalWeb.Features.Account;
@@ -33,11 +36,12 @@ public partial class SystemAdministrationController : Controller
     private readonly ILookupApiClient lookupApiClient;
     private readonly IExternalTestConsultantApiClient externalTestConsultantApiClient;
     private readonly IViewerApiClient viewerApiClient;
+    private readonly IStaffDirectoryService staffDirectoryService;
     private readonly ILogger<SystemAdministrationController> logger;
 
-    // Takes the bundled SystemAdministrationApiClients rather than 8 separate parameters, to stay
+    // Takes the bundled SystemAdministrationApiClients rather than one parameter per client, to stay
     // under the analyzer's constructor-parameter-count threshold - see that type's remarks.
-    public SystemAdministrationController(SystemAdministrationApiClients apiClients, ILogger<SystemAdministrationController> logger)
+    public SystemAdministrationController(SystemAdministrationApiClients apiClients, IStaffDirectoryService staffDirectoryService, ILogger<SystemAdministrationController> logger)
     {
         administrationChargeApiClient = apiClients.AdministrationCharge;
         weightedPricingPlanApiClient = apiClients.WeightedPricingPlan;
@@ -49,6 +53,7 @@ public partial class SystemAdministrationController : Controller
         lookupApiClient = apiClients.Lookup;
         externalTestConsultantApiClient = apiClients.ExternalTestConsultant;
         viewerApiClient = apiClients.Viewer;
+        this.staffDirectoryService = staffDirectoryService;
         this.logger = logger;
     }
 
@@ -305,7 +310,7 @@ public partial class SystemAdministrationController : Controller
 
     public IActionResult CreateUser() => View(new CreateUserViewModel());
 
-    // Matches legacy GetADList - searches the staff directory (Microsoft Graph, via PTL.Api) and shows
+    // Matches legacy GetADList - searches the staff directory (Microsoft Graph, called from this app) and shows
     // "No valid search results found" whether nobody matched at all, or everybody who matched already
     // has a PT-LIMS account (both collapse to an empty result set, same as legacy).
     [HttpPost]
@@ -394,15 +399,28 @@ public partial class SystemAdministrationController : Controller
         return result.Success;
     }
 
+    // The directory is searched from this app (Microsoft Graph, credentials held here), then anyone who already
+    // has a PT-LIMS account is dropped - legacy GetADList's mUserList.ContainsByName check, and what makes a
+    // search where every match already has an account collapse to an empty result set.
     // A directory failure shows a problem message at the top of the page (no field to link to) instead of
     // the generic error page; legacy showed "An Error has occured whilst Loading the User List".
     private async Task<StaffDirectorySearchResponse?> TrySearchStaffDirectoryAsync(string searchTerm, CancellationToken cancellationToken)
     {
         try
         {
-            return await userApiClient.SearchStaffDirectoryAsync(searchTerm, cancellationToken);
+            var candidates = await staffDirectoryService.SearchAsync(searchTerm, cancellationToken);
+            var existingUsernames = (await userApiClient.GetUsersAsync(cancellationToken))
+                .Select(u => u.Username)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            return new StaffDirectorySearchResponse(
+                [.. candidates.Users
+                    .Where(c => !existingUsernames.Contains(c.Username))
+                    .Select(c => new StaffDirectoryUserResponse(c.Username, c.Email, c.FriendlyName, c.FirstName, c.LastName))],
+                candidates.IsTruncated);
         }
-        catch (Exception ex) when (ex is HttpRequestException || (ex is OperationCanceledException && !cancellationToken.IsCancellationRequested))
+        catch (Exception ex) when (ex is HttpRequestException or GraphException or ExecutionRejectedException
+            || (ex is OperationCanceledException && !cancellationToken.IsCancellationRequested))
         {
             LogDirectorySearchFailedMessage(logger, ex);
             ModelState.AddModelError(string.Empty, "There was a problem searching the staff directory. Try again, and contact support if it keeps happening");

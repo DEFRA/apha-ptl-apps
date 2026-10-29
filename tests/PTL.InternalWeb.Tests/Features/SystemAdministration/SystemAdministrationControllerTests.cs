@@ -3,12 +3,15 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ViewFeatures;
 using Microsoft.Extensions.Logging.Abstractions;
+using Polly.Timeout;
+using PTL.Common.Graph;
 using PTL.Contracts.AdministrationCharge;
 using PTL.Contracts.Lookup;
 using PTL.Contracts.PostagePricingPlan;
 using PTL.Contracts.TestConsultant;
 using PTL.Contracts.User;
 using PTL.Contracts.WeightedPricingPlan;
+using PTL.Core.User;
 using PTL.InternalWeb.Confirmation;
 using PTL.InternalWeb.Features.Account;
 using PTL.InternalWeb.Features.SystemAdministration;
@@ -31,7 +34,8 @@ public class SystemAdministrationControllerTests
         FakeRoleApiClient? roleApiClient = null,
         FakeLookupApiClient? lookupApiClient = null,
         FakeExternalTestConsultantApiClient? externalTestConsultantApiClient = null,
-        FakeViewerApiClient? viewerApiClient = null) =>
+        FakeViewerApiClient? viewerApiClient = null,
+        FakeStaffDirectoryService? staffDirectoryService = null) =>
         new(
             new SystemAdministrationApiClients
             {
@@ -46,6 +50,7 @@ public class SystemAdministrationControllerTests
                 ExternalTestConsultant = externalTestConsultantApiClient ?? new FakeExternalTestConsultantApiClient(),
                 Viewer = viewerApiClient ?? new FakeViewerApiClient()
             },
+            staffDirectoryService ?? new FakeStaffDirectoryService(),
             NullLogger<SystemAdministrationController>.Instance)
         {
             TempData = new TempDataDictionary(new DefaultHttpContext(), new FakeTempDataProvider())
@@ -657,11 +662,11 @@ public class SystemAdministrationControllerTests
     [Fact]
     public async Task CreateUserSearch_ResultsFound_PopulatesOptions()
     {
-        var apiClient = new FakeUserApiClient
+        var directory = new FakeStaffDirectoryService
         {
-            SearchResults = [new StaffDirectoryUserResponse("m100001", "jane@apha.gov.uk", "Jane Smith", "Jane", "Smith")]
+            Results = [new StaffDirectoryUser { Username = "m100001", Email = "jane@apha.gov.uk", FriendlyName = "Jane Smith", FirstName = "Jane", LastName = "Smith" }]
         };
-        var controller = CreateController(userApiClient: apiClient);
+        var controller = CreateController(staffDirectoryService: directory);
         var model = new CreateUserViewModel { SearchTerm = "jane" };
 
         var result = await controller.CreateUserSearch(model, CancellationToken.None);
@@ -671,14 +676,13 @@ public class SystemAdministrationControllerTests
         Assert.True(resultModel.HasSearched);
         Assert.Single(resultModel.ResultOptions);
         Assert.Null(resultModel.Message);
-        Assert.Equal("jane", apiClient.LastSearchTerm);
+        Assert.Equal("jane", directory.LastSearchTerm);
     }
 
     [Fact]
     public async Task CreateUserSearch_NoResults_ShowsNoValidResultsMessage()
     {
-        var apiClient = new FakeUserApiClient { SearchResults = [] };
-        var controller = CreateController(userApiClient: apiClient);
+        var controller = CreateController(staffDirectoryService: new FakeStaffDirectoryService());
         var model = new CreateUserViewModel { SearchTerm = "nobody" };
 
         var result = await controller.CreateUserSearch(model, CancellationToken.None);
@@ -690,15 +694,50 @@ public class SystemAdministrationControllerTests
         Assert.Empty(resultModel.ResultOptions);
     }
 
+    // Legacy GetADList: a person who already has a PT-LIMS account is not offered.
+    [Fact]
+    public async Task CreateUserSearch_LeavesOutPeopleWhoAlreadyHaveAnAccount()
+    {
+        var directory = new FakeStaffDirectoryService
+        {
+            Results =
+            [
+                new StaffDirectoryUser { Username = "dt2\\jsmith", FriendlyName = "Jane Smith" },
+                new StaffDirectoryUser { Username = "dt2\\jdoe", FriendlyName = "John Doe" },
+            ]
+        };
+        var userApiClient = new FakeUserApiClient { Users = [new UserResponse(Guid.NewGuid(), "DT2\\JSMITH", "Jane Smith", "Jane", "Smith", "jane@apha.gov.uk", "Science", false, null, 0, string.Empty)] };
+        var controller = CreateController(userApiClient: userApiClient, staffDirectoryService: directory);
+
+        var result = await controller.CreateUserSearch(new CreateUserViewModel { SearchTerm = "j" }, CancellationToken.None);
+
+        var option = Assert.Single(Assert.IsType<CreateUserViewModel>(Assert.IsType<ViewResult>(result).Model).ResultOptions);
+        Assert.Equal("dt2\\jdoe", option.Value);
+    }
+
+    [Fact]
+    public async Task CreateUserSearch_EveryMatchAlreadyHasAnAccount_ShowsNoValidResultsMessage()
+    {
+        var directory = new FakeStaffDirectoryService { Results = [new StaffDirectoryUser { Username = "m100001", FriendlyName = "Jane Smith" }] };
+        var userApiClient = new FakeUserApiClient { Users = [new UserResponse(Guid.NewGuid(), "m100001", "Jane Smith", "Jane", "Smith", "jane@apha.gov.uk", "Science", false, null, 0, string.Empty)] };
+        var controller = CreateController(userApiClient: userApiClient, staffDirectoryService: directory);
+
+        var result = await controller.CreateUserSearch(new CreateUserViewModel { SearchTerm = "jane" }, CancellationToken.None);
+
+        var resultModel = Assert.IsType<CreateUserViewModel>(Assert.IsType<ViewResult>(result).Model);
+        Assert.Equal("No valid search results found", resultModel.Message);
+        Assert.Empty(resultModel.ResultOptions);
+    }
+
     [Fact]
     public async Task CreateUserSearch_TruncatedResults_ShowsRefineYourSearchMessage()
     {
-        var apiClient = new FakeUserApiClient
+        var directory = new FakeStaffDirectoryService
         {
-            SearchResults = [new StaffDirectoryUserResponse("m100001", "jane@apha.gov.uk", "Jane Smith", "Jane", "Smith")],
-            SearchIsTruncated = true
+            Results = [new StaffDirectoryUser { Username = "m100001", Email = "jane@apha.gov.uk", FriendlyName = "Jane Smith", FirstName = "Jane", LastName = "Smith" }],
+            IsTruncated = true
         };
-        var controller = CreateController(userApiClient: apiClient);
+        var controller = CreateController(staffDirectoryService: directory);
 
         var result = await controller.CreateUserSearch(new CreateUserViewModel { SearchTerm = "j" }, CancellationToken.None);
 
@@ -710,11 +749,11 @@ public class SystemAdministrationControllerTests
     [Fact]
     public async Task CreateUserSearch_ResultOptionsPostOnlyTheUsername()
     {
-        var apiClient = new FakeUserApiClient
+        var directory = new FakeStaffDirectoryService
         {
-            SearchResults = [new StaffDirectoryUserResponse("dt2\\jsmith", "jane|x@apha.gov.uk", "Jane | Smith", "Jane", "Smith")]
+            Results = [new StaffDirectoryUser { Username = "dt2\\jsmith", Email = "jane|x@apha.gov.uk", FriendlyName = "Jane | Smith", FirstName = "Jane", LastName = "Smith" }]
         };
-        var controller = CreateController(userApiClient: apiClient);
+        var controller = CreateController(staffDirectoryService: directory);
 
         var result = await controller.CreateUserSearch(new CreateUserViewModel { SearchTerm = "jane" }, CancellationToken.None);
 
@@ -722,11 +761,18 @@ public class SystemAdministrationControllerTests
         Assert.Equal("dt2\\jsmith", option.Value);
     }
 
-    [Fact]
-    public async Task CreateUserSearch_DirectoryFails_ShowsProblemInErrorSummaryInsteadOfThrowing()
+    public static TheoryData<Exception> DirectoryFailures => new()
     {
-        var apiClient = new FakeUserApiClient { SearchException = new HttpRequestException("Graph unavailable") };
-        var controller = CreateController(userApiClient: apiClient);
+        new HttpRequestException("PTL.Api unavailable"),
+        new GraphException("Microsoft Graph user search failed with HTTP 503."),
+        new TimeoutRejectedException("Graph timed out"),
+    };
+
+    [Theory]
+    [MemberData(nameof(DirectoryFailures))]
+    public async Task CreateUserSearch_DirectoryFails_ShowsProblemInErrorSummaryInsteadOfThrowing(Exception failure)
+    {
+        var controller = CreateController(staffDirectoryService: new FakeStaffDirectoryService { Exception = failure });
 
         var result = await controller.CreateUserSearch(new CreateUserViewModel { SearchTerm = "jane" }, CancellationToken.None);
 
@@ -740,8 +786,7 @@ public class SystemAdministrationControllerTests
     [Fact]
     public async Task CreateUserSearch_RequestTimesOut_ShowsProblemInErrorSummaryInsteadOfThrowing()
     {
-        var apiClient = new FakeUserApiClient { SearchException = new TaskCanceledException("timeout") };
-        var controller = CreateController(userApiClient: apiClient);
+        var controller = CreateController(staffDirectoryService: new FakeStaffDirectoryService { Exception = new TaskCanceledException("timeout") });
 
         var result = await controller.CreateUserSearch(new CreateUserViewModel { SearchTerm = "jane" }, CancellationToken.None);
 
@@ -750,27 +795,28 @@ public class SystemAdministrationControllerTests
     }
 
     [Fact]
-    public async Task CreateUserSearch_MissingSearchTerm_ReturnsViewWithoutCallingApi()
+    public async Task CreateUserSearch_MissingSearchTerm_ReturnsViewWithoutSearching()
     {
-        var apiClient = new FakeUserApiClient();
-        var controller = CreateController(userApiClient: apiClient);
+        var directory = new FakeStaffDirectoryService();
+        var controller = CreateController(staffDirectoryService: directory);
         controller.ModelState.AddModelError("SearchTerm", "Enter an Employee Number, Forename or Surname");
         var model = new CreateUserViewModel { SearchTerm = string.Empty };
 
         var result = await controller.CreateUserSearch(model, CancellationToken.None);
 
         Assert.IsType<ViewResult>(result);
-        Assert.Null(apiClient.LastSearchTerm);
+        Assert.Null(directory.LastSearchTerm);
     }
 
     [Fact]
     public async Task CreateUserConfirm_ValidSelection_CreatesAndShowsSuccess()
     {
-        var apiClient = new FakeUserApiClient
+        var directory = new FakeStaffDirectoryService
         {
-            SearchResults = [new StaffDirectoryUserResponse("m100001", "jane@apha.gov.uk", "Jane Smith", "Jane", "Smith")]
+            Results = [new StaffDirectoryUser { Username = "m100001", Email = "jane@apha.gov.uk", FriendlyName = "Jane Smith", FirstName = "Jane", LastName = "Smith" }]
         };
-        var controller = CreateController(userApiClient: apiClient);
+        var apiClient = new FakeUserApiClient();
+        var controller = CreateController(userApiClient: apiClient, staffDirectoryService: directory);
         var model = new CreateUserViewModel
         {
             SearchTerm = "jane",
@@ -792,11 +838,12 @@ public class SystemAdministrationControllerTests
     [Fact]
     public async Task CreateUserConfirm_UsesTheDirectoryDetailsForTheSelectedUsername()
     {
-        var apiClient = new FakeUserApiClient
+        var directory = new FakeStaffDirectoryService
         {
-            SearchResults = [new StaffDirectoryUserResponse("dt2\\jsmith", "jane@apha.gov.uk", "Jane | Smith", "Jane", "Smith")]
+            Results = [new StaffDirectoryUser { Username = "dt2\\jsmith", Email = "jane@apha.gov.uk", FriendlyName = "Jane | Smith", FirstName = "Jane", LastName = "Smith" }]
         };
-        var controller = CreateController(userApiClient: apiClient);
+        var apiClient = new FakeUserApiClient();
+        var controller = CreateController(userApiClient: apiClient, staffDirectoryService: directory);
         var model = new CreateUserViewModel { SearchTerm = "jane", SelectedCandidate = "DT2\\JSMITH", Department = "Science" };
 
         await controller.CreateUserConfirm(model, CancellationToken.None);
@@ -811,11 +858,12 @@ public class SystemAdministrationControllerTests
     [Fact]
     public async Task CreateUserConfirm_UsernameNotInTheDirectoryResults_DoesNotCreateAndShowsError()
     {
-        var apiClient = new FakeUserApiClient
+        var directory = new FakeStaffDirectoryService
         {
-            SearchResults = [new StaffDirectoryUserResponse("m100001", "jane@apha.gov.uk", "Jane Smith", "Jane", "Smith")]
+            Results = [new StaffDirectoryUser { Username = "m100001", Email = "jane@apha.gov.uk", FriendlyName = "Jane Smith", FirstName = "Jane", LastName = "Smith" }]
         };
-        var controller = CreateController(userApiClient: apiClient);
+        var apiClient = new FakeUserApiClient();
+        var controller = CreateController(userApiClient: apiClient, staffDirectoryService: directory);
         var model = new CreateUserViewModel { SearchTerm = "jane", SelectedCandidate = "m999999", Department = "Science" };
 
         var result = await controller.CreateUserConfirm(model, CancellationToken.None);
@@ -832,11 +880,12 @@ public class SystemAdministrationControllerTests
     [InlineData("")]
     public async Task CreateUserConfirm_NoUserSelected_ShowsSelectAUserError(string? selected)
     {
-        var apiClient = new FakeUserApiClient
+        var directory = new FakeStaffDirectoryService
         {
-            SearchResults = [new StaffDirectoryUserResponse("m100001", "jane@apha.gov.uk", "Jane Smith", "Jane", "Smith")]
+            Results = [new StaffDirectoryUser { Username = "m100001", Email = "jane@apha.gov.uk", FriendlyName = "Jane Smith", FirstName = "Jane", LastName = "Smith" }]
         };
-        var controller = CreateController(userApiClient: apiClient);
+        var apiClient = new FakeUserApiClient();
+        var controller = CreateController(userApiClient: apiClient, staffDirectoryService: directory);
         var model = new CreateUserViewModel { SearchTerm = "jane", SelectedCandidate = selected };
 
         var result = await controller.CreateUserConfirm(model, CancellationToken.None);
@@ -850,8 +899,9 @@ public class SystemAdministrationControllerTests
     [Fact]
     public async Task CreateUserConfirm_BlankSearchTerm_RedisplaysWithoutSearchingOrCreating()
     {
+        var directory = new FakeStaffDirectoryService();
         var apiClient = new FakeUserApiClient();
-        var controller = CreateController(userApiClient: apiClient);
+        var controller = CreateController(userApiClient: apiClient, staffDirectoryService: directory);
         var model = new CreateUserViewModel { SearchTerm = " ", SelectedCandidate = "m100001" };
 
         var result = await controller.CreateUserConfirm(model, CancellationToken.None);
@@ -859,13 +909,14 @@ public class SystemAdministrationControllerTests
         var view = Assert.IsType<ViewResult>(result);
         Assert.Equal(nameof(SystemAdministrationController.CreateUser), view.ViewName);
         Assert.Null(apiClient.LastCreateRequest);
+        Assert.Equal(0, directory.SearchCallCount);
     }
 
     [Fact]
     public async Task CreateUserConfirm_DirectoryFails_ShowsProblemAndDoesNotCreate()
     {
-        var apiClient = new FakeUserApiClient { SearchException = new HttpRequestException("Graph unavailable") };
-        var controller = CreateController(userApiClient: apiClient);
+        var apiClient = new FakeUserApiClient();
+        var controller = CreateController(userApiClient: apiClient, staffDirectoryService: new FakeStaffDirectoryService { Exception = new GraphException("Microsoft Graph user search failed with HTTP 503.") });
         var model = new CreateUserViewModel { SearchTerm = "jane", SelectedCandidate = "m100001" };
 
         var result = await controller.CreateUserConfirm(model, CancellationToken.None);
@@ -880,10 +931,10 @@ public class SystemAdministrationControllerTests
     {
         var apiClient = new FakeUserApiClient
         {
-            SaveResult = new CreateUserSaveResult(false, null, new Dictionary<string, string[]> { ["Email"] = ["The selected User has no Email Address stored in Active Directory and cannot be added."] }),
-            SearchResults = [new StaffDirectoryUserResponse("m100003", string.Empty, "Sam Taylor", "Sam", "Taylor")]
+            SaveResult = new CreateUserSaveResult(false, null, new Dictionary<string, string[]> { ["Email"] = ["The selected User has no Email Address stored in Active Directory and cannot be added."] })
         };
-        var controller = CreateController(userApiClient: apiClient);
+        var directory = new FakeStaffDirectoryService { Results = [new StaffDirectoryUser { Username = "m100003", Email = string.Empty, FriendlyName = "Sam Taylor", FirstName = "Sam", LastName = "Taylor" }] };
+        var controller = CreateController(userApiClient: apiClient, staffDirectoryService: directory);
         var model = new CreateUserViewModel
         {
             SearchTerm = "sam",
@@ -907,10 +958,10 @@ public class SystemAdministrationControllerTests
     {
         var apiClient = new FakeUserApiClient
         {
-            SaveResult = new CreateUserSaveResult(false, null, new Dictionary<string, string[]> { ["Department"] = ["Department must be 50 characters or fewer"] }),
-            SearchResults = [new StaffDirectoryUserResponse("m100001", "jane@apha.gov.uk", "Jane Smith", "Jane", "Smith")]
+            SaveResult = new CreateUserSaveResult(false, null, new Dictionary<string, string[]> { ["Department"] = ["Department must be 50 characters or fewer"] })
         };
-        var controller = CreateController(userApiClient: apiClient);
+        var directory = new FakeStaffDirectoryService { Results = [new StaffDirectoryUser { Username = "m100001", Email = "jane@apha.gov.uk", FriendlyName = "Jane Smith", FirstName = "Jane", LastName = "Smith" }] };
+        var controller = CreateController(userApiClient: apiClient, staffDirectoryService: directory);
         var model = new CreateUserViewModel { SearchTerm = "jane", SelectedCandidate = "m100001", Department = new string('a', 60) };
 
         await controller.CreateUserConfirm(model, CancellationToken.None);
