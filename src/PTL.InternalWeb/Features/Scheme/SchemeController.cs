@@ -7,6 +7,7 @@ using PTL.ApiClient;
 using PTL.Contracts.Lookup;
 using PTL.Contracts.Scheme;
 using PTL.Core.Scheme;
+using PTL.InternalWeb.AuditReason;
 using PTL.InternalWeb.Authorization;
 using PTL.InternalWeb.Confirmation;
 using PTL.SharedUI.Notifications;
@@ -208,7 +209,7 @@ public class SchemeController(ISchemeApiClient schemeApiClient, ILookupApiClient
 
         LogCreatedSchemeMessage(logger, result.Scheme.SchemeId, null);
         TempData.SetNotification(NotificationType.Success, "Scheme created successfully.");
-        return RedirectToAction(nameof(Details), new { id = result.Scheme.SchemeId });
+        return RedirectToAction(nameof(Index));
     }
 
     [HttpGet]
@@ -307,16 +308,36 @@ public class SchemeController(ISchemeApiClient schemeApiClient, ILookupApiClient
         ValidatePriceText(model);
         if (!ModelState.IsValid)
         {
+            // Only the reason is wrong on the audit step: stay there rather than redisplay the whole form.
+            if (model.IsAuditStep && OnlyAuditWhyHasErrors())
+            {
+                return AuditReasonView(model.AuditObjectName, model.AuditWhy);
+            }
+
+            model.IsAuditStep = false;
             model.Instructions = SchemeInstructions.Sanitise(model.Instructions);
             await PopulateFormAsync(model, cancellationToken);
             return View(model);
         }
 
         var result = await schemeApiClient.UpdateSchemeAsync(id, ToRequest(model), cancellationToken);
+
+        // Legacy diverted a save that changes an audited Test or Tabulation through Audit.aspx for a reason.
+        if (result.AuditReasonRequired)
+        {
+            return AuditReasonView(result.AuditObjectName, null);
+        }
+
         if (!result.Success)
         {
             LogUpdateFailedMessage(logger, id, null);
             AddErrors(result.FieldErrors);
+            if (model.IsAuditStep && OnlyAuditWhyHasErrors())
+            {
+                return AuditReasonView(model.AuditObjectName, model.AuditWhy);
+            }
+
+            model.IsAuditStep = false;
             model.Instructions = SchemeInstructions.Sanitise(model.Instructions);
             await PopulateFormAsync(model, cancellationToken);
             return View(model);
@@ -324,8 +345,20 @@ public class SchemeController(ISchemeApiClient schemeApiClient, ILookupApiClient
 
         LogUpdatedSchemeMessage(logger, id, null);
         TempData.SetNotification(NotificationType.Success, "Scheme updated successfully.");
-        return RedirectToAction(nameof(Details), new { id });
+        return RedirectToAction(nameof(Index));
     }
+
+    private bool OnlyAuditWhyHasErrors() =>
+        ModelState.Where(entry => entry.Value?.Errors.Count > 0).All(entry => entry.Key == nameof(SchemeFormViewModel.AuditWhy));
+
+    // Legacy Audit.aspx Cancel returned to the Scheme List without saving, which is also where Edit's Cancel goes.
+    private ViewResult AuditReasonView(string? auditObjectName, string? auditWhy) =>
+        this.AuditReasonPage(new AuditReasonPageViewModel
+        {
+            AuditObjectName = auditObjectName ?? string.Empty,
+            AuditWhy = auditWhy,
+            CancelUrl = Url.Action(nameof(Index)) ?? string.Empty,
+        });
 
     // Removing a Test or Category asks first; Confirm and Cancel both post the unsaved form back, so a
     // declined removal redisplays the form exactly as it was.
@@ -671,7 +704,8 @@ public class SchemeController(ISchemeApiClient schemeApiClient, ILookupApiClient
                 t.ResultItemIds,
                 t.MethodItemIds))
             .ToList(),
-        model.SharedId);
+        model.SharedId,
+        model.AuditWhy);
 
     private static SchemeFormViewModel ToFormViewModel(SchemeResponse scheme) => new()
     {

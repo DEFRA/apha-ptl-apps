@@ -113,13 +113,23 @@ public sealed class SchemeController(ISchemeService schemeService, ILogger<Schem
         }
     }
 
+    // 428 + SchemeAuditRequiredResponse (nothing saved) when the edit changes an audited Test or
+    // Tabulation and request.AuditWhy is blank - the caller collects the reason and resubmits.
     [HttpPut("schemes/{schemeId:guid}")]
+    [ProducesResponseType<SchemeResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<SchemeAuditRequiredResponse>(StatusCodes.Status428PreconditionRequired)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<SchemeResponse>> UpdateScheme(Guid schemeId, [FromBody] SchemeRequest request, CancellationToken cancellationToken)
     {
         try
         {
-            var updated = await schemeService.UpdateSchemeAsync(schemeId, ToEntity(schemeId, request), cancellationToken);
-            return updated is null ? NotFound() : Ok(ToResponse(updated));
+            var result = await schemeService.UpdateSchemeAsync(schemeId, ToEntity(schemeId, request), User?.Identity?.Name ?? "Guest", request.AuditWhy, cancellationToken);
+            return result.Status switch
+            {
+                SchemeUpdateStatus.Updated => Ok(ToResponse(result.Scheme!)),
+                SchemeUpdateStatus.AuditReasonRequired => StatusCode(StatusCodes.Status428PreconditionRequired, new SchemeAuditRequiredResponse(result.AuditObjectName)),
+                _ => NotFound(),
+            };
         }
         catch (SchemeValidationException ex)
         {

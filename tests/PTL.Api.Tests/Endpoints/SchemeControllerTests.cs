@@ -1,8 +1,10 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using PTL.Api.Controllers;
+using PTL.Api.Tests.Distribution;
 using PTL.Api.Tests.Scheme;
 using PTL.Contracts.Scheme;
 using PTL.Core.Scheme;
@@ -12,6 +14,7 @@ namespace PTL.Api.Tests.Endpoints;
 public class SchemeControllerTests
 {
     private static readonly Guid TestConsultantTabulationId = Guid.NewGuid();
+    private static readonly Guid PublishedTabulationId = Guid.NewGuid();
     private static SchemeController CreateController(FakeSchemeRepository repository)
     {
         var controller = new SchemeController(new SchemeService(repository, new PTL.Api.Tests.Lookup.FakeLookupRepository(), new PTL.Api.Tests.Participant.FakeViewerRepository(), new PTL.Api.Tests.Participant.FakeParticipantRepository(), NullLogger<SchemeService>.Instance), NullLogger<SchemeController>.Instance);
@@ -87,7 +90,7 @@ public class SchemeControllerTests
         Tabulations:
         [
             new SchemeTabulationRequest(TestConsultantTabulationId, "Test Consultant", false, false, false, true, true, [], []),
-            new SchemeTabulationRequest(Guid.NewGuid(), "Published", false, false, false, true, true, [], [])
+            new SchemeTabulationRequest(PublishedTabulationId, "Published", false, false, false, true, true, [], [])
         ]);
 
     private static SchemeRequest ToUpdateRequest(SchemeRequest request) => request;
@@ -375,5 +378,133 @@ public class SchemeControllerTests
         var response = Assert.IsType<ParticipantSchemeListResponse>(ok.Value);
         Assert.Empty(response.CommercialSchemes);
         Assert.Empty(response.NonCommercialSchemes);
+    }
+
+    private static SchemeController ControllerOver(FakeSchemeService service, string? signedInAs = null)
+    {
+        var context = new DefaultHttpContext { RequestServices = new ServiceCollection().AddMvc().Services.BuildServiceProvider() };
+        if (signedInAs is not null)
+        {
+            context.User = new ClaimsPrincipal(new ClaimsIdentity([new Claim(ClaimTypes.Name, signedInAs)], "Test"));
+        }
+
+        return new SchemeController(service, NullLogger<SchemeController>.Instance) { ControllerContext = new ControllerContext { HttpContext = context } };
+    }
+
+    [Fact]
+    public async Task UpdateScheme_Updated_ReturnsOkWithTheSavedScheme()
+    {
+        var schemeId = Guid.NewGuid();
+        var service = new FakeSchemeService { UpdateResult = new SchemeUpdateResult(SchemeUpdateStatus.Updated, new PTL.Core.Scheme.Scheme { SchemeId = schemeId, Name = "Saved" }) };
+        var controller = ControllerOver(service);
+
+        var result = await controller.UpdateScheme(schemeId, ValidCreateRequest(), CancellationToken.None);
+
+        var response = Assert.IsType<SchemeResponse>(Assert.IsType<OkObjectResult>(result.Result).Value);
+        Assert.Equal(schemeId, response.SchemeId);
+        Assert.Equal("Saved", response.Name);
+    }
+
+    [Fact]
+    public async Task UpdateScheme_AuditReasonRequired_Returns428WithTheAuditObjectName()
+    {
+        var service = new FakeSchemeService { UpdateResult = new SchemeUpdateResult(SchemeUpdateStatus.AuditReasonRequired, null, "Scheme PT1234: Test Scheme") };
+        var controller = ControllerOver(service);
+
+        var result = await controller.UpdateScheme(Guid.NewGuid(), ValidCreateRequest(), CancellationToken.None);
+
+        var objectResult = Assert.IsType<ObjectResult>(result.Result);
+        Assert.Equal(StatusCodes.Status428PreconditionRequired, objectResult.StatusCode);
+        Assert.Equal(new SchemeAuditRequiredResponse("Scheme PT1234: Test Scheme"), objectResult.Value);
+    }
+
+    [Fact]
+    public async Task UpdateScheme_ServiceReportsNotFound_Returns404()
+    {
+        var service = new FakeSchemeService { UpdateResult = new SchemeUpdateResult(SchemeUpdateStatus.NotFound) };
+        var controller = ControllerOver(service);
+
+        var result = await controller.UpdateScheme(Guid.NewGuid(), ValidCreateRequest(), CancellationToken.None);
+
+        Assert.IsType<NotFoundResult>(result.Result);
+    }
+
+    [Fact]
+    public async Task UpdateScheme_ServiceThrowsAValidationError_ReturnsValidationProblemKeyedByField()
+    {
+        var service = new FakeSchemeService
+        {
+            UpdateException = new SchemeValidationException([new SchemeValidationError("AuditWhy", SchemeService.AuditWhyTooLongMessage)]),
+        };
+        var controller = ControllerOver(service);
+
+        var result = await controller.UpdateScheme(Guid.NewGuid(), ValidCreateRequest() with { AuditWhy = new string('x', 2001) }, CancellationToken.None);
+
+        var badRequest = Assert.IsType<BadRequestObjectResult>(result.Result);
+        var problem = Assert.IsType<ValidationProblemDetails>(badRequest.Value);
+        Assert.Equal(SchemeService.AuditWhyTooLongMessage, Assert.Single(problem.Errors["AuditWhy"]));
+    }
+
+    [Fact]
+    public async Task UpdateScheme_PassesTheRouteIdTheSignedInNameAndTheReasonToTheService()
+    {
+        var schemeId = Guid.NewGuid();
+        var service = new FakeSchemeService { UpdateResult = new SchemeUpdateResult(SchemeUpdateStatus.NotFound) };
+        var controller = ControllerOver(service, signedInAs: @"DEFRA\jsmith");
+
+        await controller.UpdateScheme(schemeId, ValidCreateRequest() with { AuditWhy = "Corrected the order" }, CancellationToken.None);
+
+        var update = service.LastUpdate!.Value;
+        Assert.Equal(schemeId, update.SchemeId);
+        Assert.Equal(schemeId, update.Scheme.SchemeId);
+        Assert.Equal(@"DEFRA\jsmith", update.AuditWho);
+        Assert.Equal("Corrected the order", update.AuditWhy);
+    }
+
+    [Fact]
+    public async Task UpdateScheme_NobodySignedIn_AuditsAsGuest()
+    {
+        var service = new FakeSchemeService { UpdateResult = new SchemeUpdateResult(SchemeUpdateStatus.NotFound) };
+        var controller = ControllerOver(service);
+
+        await controller.UpdateScheme(Guid.NewGuid(), ValidCreateRequest(), CancellationToken.None);
+
+        Assert.Equal("Guest", service.LastUpdate!.Value.AuditWho);
+        Assert.Null(service.LastUpdate.Value.AuditWhy);
+    }
+
+    [Fact]
+    public async Task UpdateScheme_NoHttpContext_AuditsAsGuest()
+    {
+        var service = new FakeSchemeService { UpdateResult = new SchemeUpdateResult(SchemeUpdateStatus.NotFound) };
+        var controller = new SchemeController(service, NullLogger<SchemeController>.Instance);
+
+        await controller.UpdateScheme(Guid.NewGuid(), ValidCreateRequest(), CancellationToken.None);
+
+        Assert.Equal("Guest", service.LastUpdate!.Value.AuditWho);
+    }
+
+    [Fact]
+    public async Task UpdateScheme_AuditableEdit_Returns428UntilAReasonIsSentThenSavesWithItsAudit()
+    {
+        var repository = new FakeSchemeRepository();
+        var controller = CreateController(repository);
+        var created = await controller.CreateScheme(ValidCreateRequest(), CancellationToken.None);
+        var schemeId = ((SchemeResponse)((CreatedAtActionResult)created.Result!).Value!).SchemeId;
+        var withNewTest = ValidCreateRequest() with { Tests = [new SchemeTestRequest(Guid.NewGuid(), Guid.NewGuid(), [], [], [])] };
+
+        var asked = await controller.UpdateScheme(schemeId, withNewTest, CancellationToken.None);
+
+        var objectResult = Assert.IsType<ObjectResult>(asked.Result);
+        Assert.Equal(StatusCodes.Status428PreconditionRequired, objectResult.StatusCode);
+        Assert.Equal("Scheme PT1234: Test Scheme", Assert.IsType<SchemeAuditRequiredResponse>(objectResult.Value).AuditObjectName);
+        Assert.Empty(repository.AuditWrites);
+
+        var saved = await controller.UpdateScheme(schemeId, withNewTest with { AuditWhy = "Added a test" }, CancellationToken.None);
+
+        Assert.IsType<OkObjectResult>(saved.Result);
+        Assert.Equal("Added a test", repository.LastAudit!.AuditWhy);
+        Assert.Equal("Guest", repository.LastAudit.AuditWho);
+        Assert.Single(repository.LastAudit.Plan.Tests);
     }
 }

@@ -271,6 +271,14 @@ public class SharedDtoCoverageTests
         Assert.False(schemeSaveResult.Success);
         Assert.Null(schemeSaveResult.Scheme);
         Assert.Same(fieldErrors, schemeSaveResult.FieldErrors);
+        Assert.False(schemeSaveResult.AuditReasonRequired);
+        Assert.Equal(string.Empty, schemeSaveResult.AuditObjectName);
+
+        var auditRequiredResult = new SchemeSaveResult(false, null, fieldErrors, AuditReasonRequired: true, AuditObjectName: "Scheme PT1234: Test Scheme");
+
+        Assert.True(auditRequiredResult.AuditReasonRequired);
+        Assert.Equal("Scheme PT1234: Test Scheme", auditRequiredResult.AuditObjectName);
+        Assert.Equal("Scheme PT1234: Test Scheme", new SchemeAuditRequiredResponse("Scheme PT1234: Test Scheme").AuditObjectName);
 
         var price = new AdministrationChargeCurrencyPriceResponse(Guid.NewGuid(), 12.5m);
         var chargeSaveResult = new AdministrationChargeSaveResult(true, price, new Dictionary<string, string[]>());

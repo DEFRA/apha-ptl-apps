@@ -43,6 +43,14 @@ public class SchemeServiceTests
         ]
     };
 
+    // An update that leaves the stored Tabulations alone, so it needs no audit reason.
+    private static PTL.Core.Scheme.Scheme ValidUpdate(PTL.Core.Scheme.Scheme stored)
+    {
+        var update = ValidScheme(stored.YearId);
+        update.Tabulations = [.. stored.Tabulations.Select(t => new SchemeTabulation { TabulationId = t.TabulationId, Name = t.Name })];
+        return update;
+    }
+
     [Fact]
     public async Task CreateSchemeAsync_MonthAlreadyDistributed_IgnoresItAndFlagsItLocked()
     {
@@ -227,9 +235,9 @@ public class SchemeServiceTests
 
         var keptLinkId = (await viewerRepository.GetSchemeViewersAsync(created.SchemeId)).Single(l => l.ViewerId == keptViewer).ViewerSchemeId;
 
-        var update = ValidScheme();
+        var update = ValidUpdate(created);
         update.ViewerIds = [keptViewer, addedViewer];
-        await service.UpdateSchemeAsync(created.SchemeId, update);
+        await service.UpdateSchemeAsync(created.SchemeId, update, "tester", null);
 
         var links = await viewerRepository.GetSchemeViewersAsync(created.SchemeId);
         Assert.Equal(2, links.Count);
@@ -262,26 +270,28 @@ public class SchemeServiceTests
     }
 
     [Fact]
-    public async Task UpdateSchemeAsync_UnknownScheme_ReturnsNull()
+    public async Task UpdateSchemeAsync_UnknownScheme_ReturnsNotFound()
     {
         var service = CreateService(new FakeSchemeRepository());
 
-        var result = await service.UpdateSchemeAsync(Guid.NewGuid(), ValidScheme());
+        var result = await service.UpdateSchemeAsync(Guid.NewGuid(), ValidScheme(), "tester", null);
 
-        Assert.Null(result);
+        Assert.Equal(SchemeUpdateStatus.NotFound, result.Status);
+        Assert.Null(result.Scheme);
     }
 
     [Fact]
-    public async Task UpdateSchemeAsync_RepositoryUpdateReturnsNull_ReturnsNull()
+    public async Task UpdateSchemeAsync_RepositoryUpdateReturnsNull_ReturnsNotFound()
     {
         var repository = new FakeSchemeRepository();
         var service = CreateService(repository);
         var created = await service.CreateSchemeAsync(ValidScheme());
         repository.ForceUpdateReturnsNull = true;
 
-        var result = await service.UpdateSchemeAsync(created.SchemeId, ValidScheme(created.YearId));
+        var result = await service.UpdateSchemeAsync(created.SchemeId, ValidUpdate(created), "tester", null);
 
-        Assert.Null(result);
+        Assert.Equal(SchemeUpdateStatus.NotFound, result.Status);
+        Assert.Null(result.Scheme);
     }
 
     [Fact]
@@ -297,15 +307,16 @@ public class SchemeServiceTests
 
         // RequiresAssessment is forced back to the stored value, so the update is still validated
         // as an assessment scheme and must carry its assessors.
-        var updatedFields = ValidScheme(created.YearId);
+        var updatedFields = ValidUpdate(created);
         updatedFields.RequiresAssessment = false;
         updatedFields.Assessor1 = scheme.Assessor1;
         updatedFields.Assessor2 = scheme.Assessor2;
         updatedFields.Name = "Updated Name";
-        var updated = await service.UpdateSchemeAsync(created.SchemeId, updatedFields);
+        var result = await service.UpdateSchemeAsync(created.SchemeId, updatedFields, "tester", null);
 
-        Assert.NotNull(updated);
-        Assert.Equal(created.SharedId, updated!.SharedId);
+        Assert.Equal(SchemeUpdateStatus.Updated, result.Status);
+        var updated = result.Scheme!;
+        Assert.Equal(created.SharedId, updated.SharedId);
         Assert.True(updated.RequiresAssessment);
         Assert.Equal("Updated Name", updated.Name);
     }
@@ -317,7 +328,7 @@ public class SchemeServiceTests
         var service = CreateService(repository);
         var created = await service.CreateSchemeAsync(ValidScheme(yearId: DateTime.UtcNow.Year - 1));
 
-        await Assert.ThrowsAsync<SchemeValidationException>(() => service.UpdateSchemeAsync(created.SchemeId, ValidScheme(created.YearId)));
+        await Assert.ThrowsAsync<SchemeValidationException>(() => service.UpdateSchemeAsync(created.SchemeId, ValidScheme(created.YearId), "tester", null));
     }
 
     [Fact]

@@ -12,6 +12,11 @@ internal sealed class FakeSchemeRepository : ISchemeRepository
     // update call - SchemeService must treat a null UpdateAsync result as "not found", not throw.
     public bool ForceUpdateReturnsNull { get; set; }
 
+    // One entry per UpdateAsync call, null when the service passed no audit.
+    public List<SchemeAuditWrite?> AuditWrites { get; } = [];
+
+    public SchemeAuditWrite? LastAudit => AuditWrites.Count == 0 ? null : AuditWrites[^1];
+
     public Task<PTL.Core.Scheme.Scheme?> GetByIdAsync(Guid schemeId, CancellationToken cancellationToken = default) =>
         Task.FromResult(_schemes.TryGetValue(schemeId, out var scheme) ? Clone(scheme) : null);
 
@@ -116,8 +121,9 @@ internal sealed class FakeSchemeRepository : ISchemeRepository
         return Task.FromResult(Clone(scheme));
     }
 
-    public Task<PTL.Core.Scheme.Scheme?> UpdateAsync(PTL.Core.Scheme.Scheme scheme, CancellationToken cancellationToken = default)
+    public Task<PTL.Core.Scheme.Scheme?> UpdateAsync(PTL.Core.Scheme.Scheme scheme, SchemeAuditWrite? audit = null, CancellationToken cancellationToken = default)
     {
+        AuditWrites.Add(audit);
         if (ForceUpdateReturnsNull || !_schemes.TryGetValue(scheme.SchemeId, out var existing))
         {
             return Task.FromResult<PTL.Core.Scheme.Scheme?>(null);

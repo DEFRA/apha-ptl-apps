@@ -72,6 +72,9 @@ public sealed record SchemeRequest(
     IReadOnlyList<SchemeTabulationRequest>? Tabulations = null,
     // Set only by a Renew draft's Create post, to keep the new scheme in its existing family
     // instead of starting a new one. Null/omitted on every other Create request.
-    Guid? SharedId = null);
+    Guid? SharedId = null,
+    // The reason legacy Audit.aspx captures. Only read on update, and only needed when the edit changes
+    // an audited Test or Tabulation (see SchemeAuditDetector).
+    string? AuditWhy = null);
 
 public sealed record SchemeCurrencyPriceRequest(Guid SchemeCurrencyId, Guid CurrencyId, decimal Price);
