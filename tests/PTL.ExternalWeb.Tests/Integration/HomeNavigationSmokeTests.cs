@@ -59,7 +59,8 @@ public class HomeNavigationSmokeTests : IClassFixture<PtlExternalWebTestFactory>
         var body = await homeResponse.Content.ReadAsStringAsync();
 
         Assert.Contains("Orders", body);
-        Assert.Contains("Create order", body);
+        Assert.Contains("Create order for current year", body);
+        Assert.Contains("Create order for next year", body);
     }
 
     [Fact]

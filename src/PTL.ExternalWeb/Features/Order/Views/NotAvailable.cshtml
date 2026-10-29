@@ -1,0 +1,20 @@
+@model string
+@{
+    var yearName = Model == PTL.ExternalWeb.Features.Order.OrderController.CurrentYearSlug ? "current" : "next";
+    ViewData["Title"] = $"You cannot create an order for the {yearName} year";
+    ViewData["BreadcrumbParent"] = "Orders";
+}
+
+<div class="govuk-grid-row">
+    <div class="govuk-grid-column-two-thirds">
+        <h1 class="govuk-heading-l">You cannot create an order for the @yearName year</h1>
+        <p class="govuk-body">This can happen if:</p>
+        <ul class="govuk-list govuk-list--bullet">
+            <li>an order for that year has already been submitted</li>
+            <li>online ordering is not available for your organisation</li>
+            <li>more than one participant is active for your organisation</li>
+        </ul>
+        <p class="govuk-body">Contact APHA if you believe this is incorrect.</p>
+        <a class="govuk-button" asp-controller="Home" asp-action="Index" role="button" draggable="false" data-module="govuk-button">Back to home</a>
+    </div>
+</div>

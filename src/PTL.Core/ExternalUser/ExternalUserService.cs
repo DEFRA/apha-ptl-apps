@@ -1,3 +1,4 @@
+using PTL.Core.Contract.CreateOrder;
 using PTL.Core.Customer;
 using PTL.Core.Participant;
 using PTL.Core.TestConsultant;
@@ -42,7 +43,7 @@ public sealed class ExternalUserService(
                 resolvedRoles.Add(ParticipantRoleName);
 
                 var customer = await customerRepository.GetByIdAsync(participant.CustomerId, cancellationToken);
-                canOrderOnline = customer?.CanOrderOnline ?? false;
+                canOrderOnline = await OnlineOrderingEligibility.CanOrderOnlineAsync(participantRepository, participant, customer, cancellationToken);
             }
         }
 

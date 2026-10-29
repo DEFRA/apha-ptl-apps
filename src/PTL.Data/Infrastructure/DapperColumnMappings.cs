@@ -1123,6 +1123,8 @@ public static partial class DapperColumnMappings
 
         RegisterSearchMappings();
 
+        RegisterCreateOrderMappings();
+
         RegisterPackagingMappings();
 
         Map<DistributionCategoryItemEntity>(new(StringComparer.OrdinalIgnoreCase)

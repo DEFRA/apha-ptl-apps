@@ -9,6 +9,7 @@ using PTL.Common.Health;
 using PTL.Core.AdministrationCharge;
 using PTL.Core.CategoryItemType;
 using PTL.Core.Contract;
+using PTL.Core.Contract.CreateOrder;
 using PTL.Core.Contract.Document;
 using PTL.Core.Contract.Export.Bulk;
 using PTL.Core.Contract.Export.Templates;
@@ -42,6 +43,7 @@ using PTL.Core.WeightedPricingPlan;
 using PTL.Data.AdministrationCharge;
 using PTL.Data.CategoryItemType;
 using PTL.Data.Contract;
+using PTL.Data.Contract.CreateOrder;
 using PTL.Data.Contract.Export;
 using PTL.Data.Contract.ImportPermit;
 using PTL.Data.Contract.PendingOrder;
@@ -161,6 +163,11 @@ builder.Services.AddScoped<IPendingOrderService, PendingOrderService>();
 builder.Services.AddScoped<IPendingOrderContractWriter, PendingOrderContractWriter>();
 builder.Services.AddScoped<IPendingOrderDecisionEmails, PendingOrderDecisionEmails>();
 builder.Services.AddScoped<IPendingOrderEmailPersonaliser, PendingOrderEmailPersonaliser>();
+
+// Participant-facing Create Order (legacy PendingContractOrder.aspx stage 1).
+builder.Services.AddScoped<ICreateOrderRepository, CreateOrderRepository>();
+builder.Services.AddScoped<ICreateOrderService, CreateOrderService>();
+builder.Services.Configure<CreateOrderOptions>(builder.Configuration.GetSection(CreateOrderOptions.SectionName));
 
 // Approve/Decline emails: sent through GOV.UK Notify straight after the decision, retried by the hosted scheduler.
 builder.Services.Configure<OnlineOrderEmailOptions>(builder.Configuration.GetSection(OnlineOrderEmailOptions.SectionName));
