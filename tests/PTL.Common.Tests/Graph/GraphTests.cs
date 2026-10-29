@@ -252,4 +252,27 @@ public class GraphServiceCollectionExtensionsTests
         using var provider = services.BuildServiceProvider();
         Assert.False(provider.GetRequiredService<IOptions<GraphOptions>>().Value.IsConfigured);
     }
+
+    [Fact]
+    public void AddGraphClient_WithoutGraphCredentials_ReusesEntraCredentials()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Entra:TenantId"] = "t",
+                ["Entra:ClientId"] = "c",
+                ["Entra:ClientSecret"] = "s"
+            })
+            .Build();
+        var services = new ServiceCollection();
+
+        services.AddGraphClient(configuration);
+
+        using var provider = services.BuildServiceProvider();
+        var options = provider.GetRequiredService<IOptions<GraphOptions>>().Value;
+        Assert.True(options.IsConfigured);
+        Assert.Equal("t", options.TenantId);
+        Assert.Equal("c", options.ClientId);
+        Assert.Equal("s", options.ClientSecret);
+    }
 }
