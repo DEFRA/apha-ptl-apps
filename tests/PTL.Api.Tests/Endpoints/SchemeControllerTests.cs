@@ -1,9 +1,9 @@
-using System.Security.Claims;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using PTL.Api.Controllers;
+using PTL.Api.Tests.Contract;
 using PTL.Api.Tests.Distribution;
 using PTL.Api.Tests.Scheme;
 using PTL.Contracts.Scheme;
@@ -17,7 +17,7 @@ public class SchemeControllerTests
     private static readonly Guid PublishedTabulationId = Guid.NewGuid();
     private static SchemeController CreateController(FakeSchemeRepository repository)
     {
-        var controller = new SchemeController(new SchemeService(repository, new PTL.Api.Tests.Lookup.FakeLookupRepository(), new PTL.Api.Tests.Participant.FakeViewerRepository(), new PTL.Api.Tests.Participant.FakeParticipantRepository(), NullLogger<SchemeService>.Instance), NullLogger<SchemeController>.Instance);
+        var controller = new SchemeController(new SchemeService(repository, new PTL.Api.Tests.Lookup.FakeLookupRepository(), new PTL.Api.Tests.Participant.FakeViewerRepository(), new PTL.Api.Tests.Participant.FakeParticipantRepository(), NullLogger<SchemeService>.Instance), new FakeAuditActorResolver(), NullLogger<SchemeController>.Instance);
 
         // ValidationProblem() resolves ProblemDetailsFactory from HttpContext.RequestServices,
         // which a bare controller instance does not have without this wiring.
@@ -355,7 +355,7 @@ public class SchemeControllerTests
         var participantRepository = new PTL.Api.Tests.Participant.FakeParticipantRepository();
         var participant = await participantRepository.CreateAsync(new PTL.Core.Participant.Participant { SsoId = Guid.NewGuid() });
         var service = new SchemeService(schemeRepository, new PTL.Api.Tests.Lookup.FakeLookupRepository(), new PTL.Api.Tests.Participant.FakeViewerRepository(), participantRepository, NullLogger<SchemeService>.Instance);
-        var controller = new SchemeController(service, NullLogger<SchemeController>.Instance);
+        var controller = new SchemeController(service, new FakeAuditActorResolver(), NullLogger<SchemeController>.Instance);
 
         var result = await controller.GetSchemesForParticipant(participant.ParticipantId, CancellationToken.None);
 
@@ -380,15 +380,11 @@ public class SchemeControllerTests
         Assert.Empty(response.NonCommercialSchemes);
     }
 
-    private static SchemeController ControllerOver(FakeSchemeService service, string? signedInAs = null)
+    private static SchemeController ControllerOver(FakeSchemeService service, string auditName = "tester")
     {
         var context = new DefaultHttpContext { RequestServices = new ServiceCollection().AddMvc().Services.BuildServiceProvider() };
-        if (signedInAs is not null)
-        {
-            context.User = new ClaimsPrincipal(new ClaimsIdentity([new Claim(ClaimTypes.Name, signedInAs)], "Test"));
-        }
 
-        return new SchemeController(service, NullLogger<SchemeController>.Instance) { ControllerContext = new ControllerContext { HttpContext = context } };
+        return new SchemeController(service, new FakeAuditActorResolver(auditName), NullLogger<SchemeController>.Instance) { ControllerContext = new ControllerContext { HttpContext = context } };
     }
 
     [Fact]
@@ -446,54 +442,30 @@ public class SchemeControllerTests
     }
 
     [Fact]
-    public async Task UpdateScheme_PassesTheRouteIdTheSignedInNameAndTheReasonToTheService()
+    public async Task UpdateScheme_PassesTheRouteIdTheResolvedAuditNameAndTheReasonToTheService()
     {
         var schemeId = Guid.NewGuid();
         var service = new FakeSchemeService { UpdateResult = new SchemeUpdateResult(SchemeUpdateStatus.NotFound) };
-        var controller = ControllerOver(service, signedInAs: @"DEFRA\jsmith");
+        var controller = ControllerOver(service, auditName: "jsmith");
 
         await controller.UpdateScheme(schemeId, ValidCreateRequest() with { AuditWhy = "Corrected the order" }, CancellationToken.None);
 
         var update = service.LastUpdate!.Value;
         Assert.Equal(schemeId, update.SchemeId);
         Assert.Equal(schemeId, update.Scheme.SchemeId);
-        Assert.Equal(@"DEFRA\jsmith", update.AuditWho);
+        Assert.Equal("jsmith", update.AuditWho);
         Assert.Equal("Corrected the order", update.AuditWhy);
     }
 
     [Fact]
-    public async Task UpdateScheme_NobodySignedIn_AuditsAsGuest()
+    public async Task UpdateScheme_NoReasonSent_PassesNullToTheService()
     {
         var service = new FakeSchemeService { UpdateResult = new SchemeUpdateResult(SchemeUpdateStatus.NotFound) };
         var controller = ControllerOver(service);
 
         await controller.UpdateScheme(Guid.NewGuid(), ValidCreateRequest(), CancellationToken.None);
 
-        Assert.Equal("Guest", service.LastUpdate!.Value.AuditWho);
-        Assert.Null(service.LastUpdate.Value.AuditWhy);
-    }
-
-    [Fact]
-    public async Task UpdateScheme_PrincipalWithoutAnIdentity_AuditsAsGuest()
-    {
-        var service = new FakeSchemeService { UpdateResult = new SchemeUpdateResult(SchemeUpdateStatus.NotFound) };
-        var controller = ControllerOver(service);
-        controller.ControllerContext.HttpContext.User = new ClaimsPrincipal();
-
-        await controller.UpdateScheme(Guid.NewGuid(), ValidCreateRequest(), CancellationToken.None);
-
-        Assert.Equal("Guest", service.LastUpdate!.Value.AuditWho);
-    }
-
-    [Fact]
-    public async Task UpdateScheme_NoHttpContext_AuditsAsGuest()
-    {
-        var service = new FakeSchemeService { UpdateResult = new SchemeUpdateResult(SchemeUpdateStatus.NotFound) };
-        var controller = new SchemeController(service, NullLogger<SchemeController>.Instance);
-
-        await controller.UpdateScheme(Guid.NewGuid(), ValidCreateRequest(), CancellationToken.None);
-
-        Assert.Equal("Guest", service.LastUpdate!.Value.AuditWho);
+        Assert.Null(service.LastUpdate!.Value.AuditWhy);
     }
 
     [Fact]
@@ -516,7 +488,7 @@ public class SchemeControllerTests
 
         Assert.IsType<OkObjectResult>(saved.Result);
         Assert.Equal("Added a test", repository.LastAudit!.AuditWhy);
-        Assert.Equal("Guest", repository.LastAudit.AuditWho);
+        Assert.Equal("tester", repository.LastAudit.AuditWho);
         Assert.Single(repository.LastAudit.Plan.Tests);
     }
 }

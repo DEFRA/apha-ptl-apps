@@ -449,32 +449,37 @@ public sealed class SchemeService(
     {
         foreach (var test in scheme.Tests)
         {
-            test.TestId = test.TestId == Guid.Empty ? Guid.NewGuid() : test.TestId;
-
-            foreach (var item in test.ResultItems.Where(i => i.TestResultItemId == Guid.Empty))
-            {
-                item.TestResultItemId = Guid.NewGuid();
-            }
-
-            foreach (var item in test.MethodItems.Where(i => i.TestMethodItemId == Guid.Empty))
-            {
-                item.TestMethodItemId = Guid.NewGuid();
-            }
-
-            foreach (var category in test.Categories)
-            {
-                category.CategoryItemId = category.CategoryItemId == Guid.Empty ? Guid.NewGuid() : category.CategoryItemId;
-
-                foreach (var criterion in category.Criteria.Where(c => c.CriterionItemId == Guid.Empty))
-                {
-                    criterion.CriterionItemId = Guid.NewGuid();
-                }
-            }
+            AssignMissingIds(test);
         }
 
         foreach (var tabulation in scheme.Tabulations.Where(t => t.TabulationId == Guid.Empty))
         {
             tabulation.TabulationId = Guid.NewGuid();
+        }
+    }
+
+    private static void AssignMissingIds(SchemeTest test)
+    {
+        test.TestId = test.TestId == Guid.Empty ? Guid.NewGuid() : test.TestId;
+
+        foreach (var item in test.ResultItems.Where(i => i.TestResultItemId == Guid.Empty))
+        {
+            item.TestResultItemId = Guid.NewGuid();
+        }
+
+        foreach (var item in test.MethodItems.Where(i => i.TestMethodItemId == Guid.Empty))
+        {
+            item.TestMethodItemId = Guid.NewGuid();
+        }
+
+        foreach (var category in test.Categories)
+        {
+            category.CategoryItemId = category.CategoryItemId == Guid.Empty ? Guid.NewGuid() : category.CategoryItemId;
+
+            foreach (var criterion in category.Criteria.Where(c => c.CriterionItemId == Guid.Empty))
+            {
+                criterion.CriterionItemId = Guid.NewGuid();
+            }
         }
     }
 

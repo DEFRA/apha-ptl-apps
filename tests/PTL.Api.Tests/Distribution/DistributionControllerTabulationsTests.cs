@@ -22,6 +22,7 @@ public class DistributionControllerTabulationsTests
             new ActualResultsService(repository, TimeProvider.System),
             new FakePackagingService(),
             new FakePackagingOutputService(),
+            new PTL.Api.Tests.Contract.FakeAuditActorResolver("Guest"),
             Microsoft.Extensions.Logging.Abstractions.NullLogger<DistributionController>.Instance);
 
     private static FakeDistributionRepository Seeded(params TabulationsSchemeEntity[] schemes)

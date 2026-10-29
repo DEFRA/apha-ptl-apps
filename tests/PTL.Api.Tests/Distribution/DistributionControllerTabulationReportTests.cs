@@ -32,6 +32,7 @@ public class DistributionControllerTabulationReportTests
             new ActualResultsService(_repository, TimeProvider.System),
             new FakePackagingService(),
             new FakePackagingOutputService(),
+            new PTL.Api.Tests.Contract.FakeAuditActorResolver("Guest"),
             Microsoft.Extensions.Logging.Abstractions.NullLogger<DistributionController>.Instance)
         {
             ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() },

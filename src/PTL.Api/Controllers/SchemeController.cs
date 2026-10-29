@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.Extensions.Logging;
 using PTL.Contracts.Scheme;
+using PTL.Core.Audit;
 using PTL.Core.Scheme;
 
 namespace PTL.Api.Controllers;
@@ -13,7 +14,7 @@ namespace PTL.Api.Controllers;
 // inconsistent authorization enforcement that must not be carried forward mechanically).
 [ApiController]
 [Route("api")]
-public sealed class SchemeController(ISchemeService schemeService, ILogger<SchemeController> logger) : ControllerBase
+public sealed class SchemeController(ISchemeService schemeService, IAuditActorResolver auditActor, ILogger<SchemeController> logger) : ControllerBase
 {
     private static readonly Action<ILogger, Guid, Exception?> LogSchemeNotFoundMessage =
         LoggerMessage.Define<Guid>(
@@ -123,7 +124,8 @@ public sealed class SchemeController(ISchemeService schemeService, ILogger<Schem
     {
         try
         {
-            var result = await schemeService.UpdateSchemeAsync(schemeId, ToEntity(schemeId, request), User?.Identity?.Name ?? "Guest", request.AuditWhy, cancellationToken);
+            var auditWho = await auditActor.GetAuditNameAsync(cancellationToken);
+            var result = await schemeService.UpdateSchemeAsync(schemeId, ToEntity(schemeId, request), auditWho, request.AuditWhy, cancellationToken);
             return result.Status switch
             {
                 SchemeUpdateStatus.Updated => Ok(ToResponse(result.Scheme!)),
