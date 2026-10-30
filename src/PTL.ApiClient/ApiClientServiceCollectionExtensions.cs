@@ -92,6 +92,7 @@ public static class ApiClientServiceCollectionExtensions
         {
             client.BaseAddress = new Uri(apiBaseUrl);
         })
+            .AddHttpMessageHandler<ActingUserDelegatingHandler>()
             .AddStandardResilienceHandler();
 
         services.AddHttpClient<IGroupAddressApiClient, GroupAddressApiClient>(client =>
@@ -105,6 +106,7 @@ public static class ApiClientServiceCollectionExtensions
         {
             client.BaseAddress = new Uri(apiBaseUrl);
         })
+            .AddHttpMessageHandler<ActingUserDelegatingHandler>()
             .AddStandardResilienceHandler();
 
         services.AddHttpClient<ICustomerDetailsEditApiClient, CustomerDetailsEditApiClient>(client =>
@@ -243,6 +245,7 @@ public static class ApiClientServiceCollectionExtensions
         {
             client.BaseAddress = new Uri(apiBaseUrl);
         })
+            .AddHttpMessageHandler<ActingUserDelegatingHandler>()
             .AddStandardResilienceHandler();
 
         services.AddHttpClient<IExternalTestConsultantApiClient, ExternalTestConsultantApiClient>(client =>
@@ -264,6 +267,7 @@ public static class ApiClientServiceCollectionExtensions
             client.BaseAddress = new Uri(apiBaseUrl);
         })
             .AddHttpMessageHandler<CorrelationIdDelegatingHandler>()
+            .AddHttpMessageHandler<ActingUserDelegatingHandler>()
             .AddStandardResilienceHandler();
 
         services.AddHttpClient<PTL.ApiClient.Distribution.IResultsSignOffApiClient, PTL.ApiClient.Distribution.ResultsSignOffApiClient>(client =>
@@ -275,6 +279,14 @@ public static class ApiClientServiceCollectionExtensions
             .AddStandardResilienceHandler();
 
         services.AddHttpClient<ITestConsultantTabulationApiClient, TestConsultantTabulationApiClient>(client =>
+        {
+            client.BaseAddress = new Uri(apiBaseUrl);
+        })
+            .AddHttpMessageHandler<CorrelationIdDelegatingHandler>()
+            .AddHttpMessageHandler<ActingUserDelegatingHandler>()
+            .AddStandardResilienceHandler();
+
+        services.AddHttpClient<PTL.ApiClient.Distribution.IAssessorApiClient, PTL.ApiClient.Distribution.AssessorApiClient>(client =>
         {
             client.BaseAddress = new Uri(apiBaseUrl);
         })

@@ -1,5 +1,3 @@
-using System.Security.Claims;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using PTL.Api.Controllers;
 using PTL.Contracts.Distribution;
@@ -26,18 +24,8 @@ public class DistributionControllerActualResultsTests
             new ParticipantDistributionHistoryService(repository, new PTL.Api.Tests.Participant.FakeParticipantRepository(), new ActualResultsService(repository, TimeProvider.System)),
             new FakePackagingService(),
             new FakePackagingOutputService(),
+            new PTL.Api.Tests.Contract.FakeAuditActorResolver(userName ?? "Guest"),
             Microsoft.Extensions.Logging.Abstractions.NullLogger<DistributionController>.Instance);
-
-        if (userName is not null)
-        {
-            controller.ControllerContext = new ControllerContext
-            {
-                HttpContext = new DefaultHttpContext
-                {
-                    User = new ClaimsPrincipal(new ClaimsIdentity([new Claim(ClaimTypes.Name, userName)], "test")),
-                },
-            };
-        }
 
         return controller;
     }

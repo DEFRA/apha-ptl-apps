@@ -21,6 +21,9 @@ internal sealed class FakeDbConnection : DbConnection
     // Set by a test wanting to assert MarkInvoicedAndRecordAuditAsync's transaction was committed.
     public FakeDbTransaction? LastTransaction { get; private set; }
 
+    // Rows affected for any non-query command with no exact response configured; unset, such a command throws.
+    public int? DefaultNonQueryResult { get; set; }
+
     [System.Diagnostics.CodeAnalysis.AllowNull]
     public override string ConnectionString { get; set; } = string.Empty;
     public override string Database => "FakeDatabase";
@@ -68,7 +71,7 @@ internal sealed class FakeDbConnection : DbConnection
     internal int ResolveNonQueryResult(FakeDbCommand command) =>
         _nonQueryResults.TryGetValue(command.CommandText, out var factory)
             ? factory(command)
-            : throw new InvalidOperationException($"No non-query result configured for command text: '{command.CommandText}'.");
+            : DefaultNonQueryResult ?? throw new InvalidOperationException($"No non-query result configured for command text: '{command.CommandText}'.");
 
     internal object? ResolveScalarResult(FakeDbCommand command) =>
         _scalarResults.TryGetValue(command.CommandText, out var factory)

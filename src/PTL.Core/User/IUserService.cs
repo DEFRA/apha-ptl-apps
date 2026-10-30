@@ -4,11 +4,6 @@ public interface IUserService
 {
     Task<IReadOnlyList<User>> GetAllAsync(CancellationToken cancellationToken = default);
 
-    // Filters out any candidate already linked to a PT-LIMS account - matches legacy
-    // GetADList's mUserList.ContainsByName(fullname) check, and is what makes a search where
-    // every match already has an account collapse to an empty result set.
-    Task<StaffDirectorySearchResult> SearchStaffDirectoryAsync(string searchTerm, CancellationToken cancellationToken = default);
-
     // Throws UserValidationException when business rules are violated (no email, over-long values, duplicate account).
     Task<User> CreateUserAsync(NewUserDetails details, Guid? actingUserId = null, CancellationToken cancellationToken = default);
 

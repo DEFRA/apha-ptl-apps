@@ -17,7 +17,18 @@ public static class GraphServiceCollectionExtensions
     /// </summary>
     public static IHttpClientBuilder AddGraphClient(this IServiceCollection services, IConfiguration configuration)
     {
-        services.AddOptions<GraphOptions>().Bind(configuration.GetSection(GraphOptions.SectionName));
+        services.AddOptions<GraphOptions>()
+            .Bind(configuration.GetSection(GraphOptions.SectionName))
+            .PostConfigure(options =>
+            {
+                // Graph credentials are sourced from the same host's Entra settings unless explicit Graph values are supplied.
+                options.TenantId = Resolve(options.TenantId, configuration["Entra:TenantId"]);
+                options.ClientId = Resolve(options.ClientId, configuration["Entra:ClientId"]);
+                options.ClientSecret = Resolve(options.ClientSecret, configuration["Entra:ClientSecret"]);
+
+                static string Resolve(string current, string? fallback) =>
+                    !string.IsNullOrWhiteSpace(current) ? current : fallback ?? string.Empty;
+            });
         services.TryAddSingleton(TimeProvider.System);
 
         services.AddHttpClient(GraphTokenProvider.HttpClientName).AddStandardResilienceHandler();

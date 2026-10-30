@@ -2,24 +2,12 @@ using PTL.Core.Audit;
 
 namespace PTL.Core.User;
 
-public sealed class UserService(IUserRepository userRepository, IStaffDirectoryService staffDirectoryService, IActingUserAccessor actingUser) : IUserService
+public sealed class UserService(IUserRepository userRepository, IActingUserAccessor actingUser) : IUserService
 {
     private const string UserEntityType = "User";
 
     public Task<IReadOnlyList<User>> GetAllAsync(CancellationToken cancellationToken = default) =>
         userRepository.GetAllAsync(cancellationToken);
-
-    public async Task<StaffDirectorySearchResult> SearchStaffDirectoryAsync(string searchTerm, CancellationToken cancellationToken = default)
-    {
-        var candidates = await staffDirectoryService.SearchAsync(searchTerm, cancellationToken);
-        var existingUsernames = (await userRepository.GetAllAsync(cancellationToken))
-            .Select(u => u.Username)
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
-
-        return new StaffDirectorySearchResult(
-            candidates.Users.Where(c => !existingUsernames.Contains(c.Username)).ToList(),
-            candidates.IsTruncated);
-    }
 
     public async Task<User> CreateUserAsync(NewUserDetails details, Guid? actingUserId = null, CancellationToken cancellationToken = default)
     {

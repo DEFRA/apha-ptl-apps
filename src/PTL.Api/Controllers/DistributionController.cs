@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
 using PTL.Contracts.Distribution;
+using PTL.Core.Audit;
 using PTL.Core.Distribution;
 
 namespace PTL.Api.Controllers;
@@ -23,6 +24,7 @@ public sealed partial class DistributionController(
     IParticipantDistributionHistoryService participantDistributionHistoryService,
     IPackagingService packagingService,
     IPackagingOutputService packagingOutputService,
+    IAuditActorResolver auditActor,
     ILogger<DistributionController> logger) : ControllerBase
 {
     private static readonly Action<ILogger, Guid, Exception?> LogStructureCreationFailedMessage =
@@ -221,7 +223,7 @@ public sealed partial class DistributionController(
         var update = new ActualResultsUpdate(
             [.. request.SampleValues.Select(v => new ActualResultsSampleValueUpdate(v.SampleResultItemId, v.Result))],
             [.. request.MethodItems.Select(m => new ActualResultsMethodItemUpdate(m.TestMethodItemId, m.Result))],
-            User?.Identity?.Name ?? "Guest",
+            await AuditWhoAsync(cancellationToken),
             request.AuditWhy ?? string.Empty);
 
         var outcome = await actualResultsService.SaveActualResultsAsync(distributionParticipantId, monthlyDistributionSchemeId, update, cancellationToken);
@@ -396,7 +398,7 @@ public sealed partial class DistributionController(
                 s.TabulationDescription,
                 s.TestConsultantsDescription,
                 [.. s.Allocations.Select(a => new SampleAllocationUpdate(a.SampleTestId, a.IsApplicable))]))],
-            User?.Identity?.Name ?? "Guest",
+            await AuditWhoAsync(cancellationToken),
             request.AuditWhy ?? string.Empty);
 
         var outcome = await sampleNumbersService.SaveSampleNumbersAsync(monthlyDistributionSchemeId, update, cancellationToken);
@@ -444,7 +446,7 @@ public sealed partial class DistributionController(
                     s.IsApplicable,
                     [.. s.Values.Select(v => new IntendedResultsSampleResultValueUpdate(v.SampleResultItemId, v.IntendedResult, v.IntendedResult2))]))]))],
             request.RequiresAuditReason,
-            User?.Identity?.Name ?? "Guest",
+            await AuditWhoAsync(cancellationToken),
             request.AuditWhy ?? string.Empty);
 
         var outcome = await intendedResultsService.SaveIntendedResultsAsync(monthlyDistributionSchemeId, update, cancellationToken);

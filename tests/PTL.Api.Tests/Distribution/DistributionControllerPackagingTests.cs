@@ -35,6 +35,7 @@ public class DistributionControllerPackagingTests
                 new ParticipantDistributionHistoryService(repository, new PTL.Api.Tests.Participant.FakeParticipantRepository(), new ActualResultsService(repository, TimeProvider.System)),
                 Packaging,
                 Output,
+                new PTL.Api.Tests.Contract.FakeAuditActorResolver("Guest"),
                 Microsoft.Extensions.Logging.Abstractions.NullLogger<DistributionController>.Instance)
             {
                 ControllerContext = new ControllerContext

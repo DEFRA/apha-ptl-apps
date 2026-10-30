@@ -22,7 +22,8 @@ internal static class SystemAdministrationControllerFactory
         FakeCountryApiClient? countryApiClient = null,
         FakeViewerApiClient? viewerApiClient = null,
         FakeUserApiClient? userApiClient = null,
-        FakeExternalTestConsultantApiClient? externalTestConsultantApiClient = null)
+        FakeExternalTestConsultantApiClient? externalTestConsultantApiClient = null,
+        FakeStaffDirectoryService? staffDirectoryService = null)
     {
         var httpContext = new DefaultHttpContext { RequestServices = Services };
 
@@ -40,6 +41,7 @@ internal static class SystemAdministrationControllerFactory
                 ExternalTestConsultant = externalTestConsultantApiClient ?? new FakeExternalTestConsultantApiClient(),
                 Viewer = viewerApiClient ?? new FakeViewerApiClient()
             },
+            staffDirectoryService ?? new FakeStaffDirectoryService(),
             NullLogger<SystemAdministrationController>.Instance)
         {
             ControllerContext = new ControllerContext { HttpContext = httpContext, RouteData = new RouteData() },

@@ -52,6 +52,10 @@ internal static class AuditTrailWriter
     // Legacy tblLog/spiLog take varchar/text, so the strings are passed as ANSI (an nvarchar
     // parameter is not implicitly convertible to a text parameter).
     public static Task WriteAsync(IDbConnection connection, IDbTransaction transaction, AuditEntry entry, CancellationToken cancellationToken = default) =>
+        WriteAsync(connection, transaction, entry, DescriptionPrefix, cancellationToken);
+
+    // The prefix names the area the entry comes from ("SysAdmin" for System Administration).
+    public static Task WriteAsync(IDbConnection connection, IDbTransaction transaction, AuditEntry entry, string descriptionPrefix, CancellationToken cancellationToken = default) =>
         connection.ExecuteAsync(
             "EXEC dbo.spiLog @LogId, @LogDate, @UserId, @Description",
             new
@@ -59,12 +63,12 @@ internal static class AuditTrailWriter
                 LogId = Guid.NewGuid(),
                 LogDate = DateTime.UtcNow,
                 UserId = new DbString { Value = entry.ActingUserId?.ToString() ?? "unknown", IsAnsi = true, Length = 250 },
-                Description = new DbString { Value = FormatDescription(entry), IsAnsi = true, Length = -1 }
+                Description = new DbString { Value = FormatDescription(descriptionPrefix, entry), IsAnsi = true, Length = -1 }
             },
             transaction);
 
     // tblLog has a single free-text column, so action/entity/id/details are packed into one
     // pipe-delimited line that is easy to filter on: SysAdmin|Action|EntityType|EntityId|Details
-    private static string FormatDescription(AuditEntry entry) =>
-        string.Join('|', DescriptionPrefix, entry.Action, entry.EntityType, entry.EntityId ?? string.Empty, entry.Details ?? string.Empty);
+    private static string FormatDescription(string descriptionPrefix, AuditEntry entry) =>
+        string.Join('|', descriptionPrefix, entry.Action, entry.EntityType, entry.EntityId ?? string.Empty, entry.Details ?? string.Empty);
 }

@@ -1,11 +1,16 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Routing;
+using Microsoft.AspNetCore.Mvc.ViewFeatures;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Primitives;
 using PTL.Contracts.Lookup;
 using PTL.Contracts.Scheme;
+using PTL.InternalWeb.AuditReason;
 using PTL.InternalWeb.Confirmation;
 using PTL.InternalWeb.Tests.TestSupport;
+using PTL.SharedUI.Notifications;
+using SchemeFormViewModel = PTL.InternalWeb.Features.Scheme.SchemeFormViewModel;
 
 namespace PTL.InternalWeb.Tests.Features.Scheme;
 
@@ -456,7 +461,7 @@ public class SchemeControllerTests
     }
 
     [Fact]
-    public async Task Create_Post_Success_RedirectsToDetails()
+    public async Task Create_Post_Success_RedirectsToIndex()
     {
         var schemeId = Guid.NewGuid();
         var apiClient = new FakeSchemeApiClient
@@ -469,8 +474,8 @@ public class SchemeControllerTests
         var result = await controller.Create(model, cancellationToken: CancellationToken.None);
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal("Details", redirect.ActionName);
-        Assert.Equal(schemeId, redirect.RouteValues!["id"]);
+        Assert.Equal("Index", redirect.ActionName);
+        Assert.Null(redirect.RouteValues);
     }
 
     [Fact]
@@ -497,7 +502,7 @@ public class SchemeControllerTests
     }
 
     [Fact]
-    public async Task Edit_Post_Success_RedirectsToDetails()
+    public async Task Edit_Post_Success_RedirectsToIndex()
     {
         var schemeId = Guid.NewGuid();
         var apiClient = new FakeSchemeApiClient
@@ -510,8 +515,8 @@ public class SchemeControllerTests
         var result = await controller.Edit(schemeId, model, cancellationToken: CancellationToken.None);
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal("Details", redirect.ActionName);
-        Assert.Equal(schemeId, redirect.RouteValues!["id"]);
+        Assert.Equal("Index", redirect.ActionName);
+        Assert.Null(redirect.RouteValues);
     }
 
     [Fact]
@@ -949,5 +954,281 @@ public class SchemeControllerTests
         Assert.Equal(schemeCurrencyId, price.SchemeCurrencyId);
         Assert.Equal(42m, price.Price);
         Assert.Equal("British Pound", price.CurrencyName);
+    }
+
+    private const string ReasonRequiredMessage = "The reason for these changes must be specified";
+    private const string ReasonTooLongMessage = "Input can not exceed 2000 characters";
+    private const string AuditObjectName = "Scheme PT1234: Test Scheme";
+
+    private static SchemeFormViewModel AuditModel(bool isAuditStep, string? auditWhy = null) => new()
+    {
+        YearId = 2027,
+        Identifier = "PT1234",
+        Name = "Test Scheme",
+        IsAuditStep = isAuditStep,
+        AuditObjectName = isAuditStep ? AuditObjectName : null,
+        AuditWhy = auditWhy,
+    };
+
+    private static SchemeSaveResult AuditRequired() =>
+        new(false, null, new Dictionary<string, string[]>(), AuditReasonRequired: true, AuditObjectName: AuditObjectName);
+
+    private static PTL.InternalWeb.Features.Scheme.SchemeController PostingController(FakeSchemeApiClient apiClient, params (string Key, string Value)[] fields)
+    {
+        var controller = CreateController(apiClient);
+        var context = FormContext(fields);
+        context.HttpContext.Request.PathBase = "/internal";
+        context.HttpContext.Request.Path = "/Scheme/Edit/1";
+        controller.ControllerContext = context;
+        controller.Url = new FakeUrlHelper();
+        controller.TempData = new TempDataDictionary(context.HttpContext, new FakeTempDataProvider());
+        return controller;
+    }
+
+    [Fact]
+    public async Task Edit_Post_ApiRequiresAnAuditReason_ShowsTheAuditPageAndSavesNothing()
+    {
+        var apiClient = new FakeSchemeApiClient { SaveResult = AuditRequired() };
+        var controller = PostingController(
+            apiClient,
+            ("__RequestVerificationToken", "token"),
+            ("IsAuditStep", "false"),
+            ("AuditObjectName", string.Empty),
+            ("AuditWhy", string.Empty),
+            ("Name", "Test Scheme"),
+            ("Tests[0].TestId", "abc"));
+        var schemeId = Guid.NewGuid();
+
+        var result = await controller.Edit(schemeId, AuditModel(isAuditStep: false), cancellationToken: CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        Assert.Equal(AuditReasonFlow.ViewName, view.ViewName);
+        var page = Assert.IsType<AuditReasonPageViewModel>(view.Model);
+        Assert.Equal(AuditObjectName, page.AuditObjectName);
+        Assert.Null(page.AuditWhy);
+        Assert.Equal(controller.Url.Action(nameof(PTL.InternalWeb.Features.Scheme.SchemeController.Index)), page.CancelUrl);
+        Assert.NotEqual(string.Empty, page.CancelUrl);
+        Assert.Equal("/internal/Scheme/Edit/1", page.PostUrl);
+        Assert.Equal([new("Name", "Test Scheme"), new("Tests[0].TestId", "abc")], page.Fields);
+        Assert.Null(apiClient.LastUpdateRequest!.AuditWhy);
+        Assert.Null(controller.TempData.GetNotification());
+    }
+
+    [Fact]
+    public async Task Edit_Post_AuditStepWithAReason_SendsItToTheApiAndRedirectsToIndexWithANotification()
+    {
+        var schemeId = Guid.NewGuid();
+        var apiClient = new FakeSchemeApiClient
+        {
+            SaveResult = new SchemeSaveResult(true, SampleScheme(schemeId, Guid.NewGuid()), new Dictionary<string, string[]>())
+        };
+        var controller = PostingController(apiClient);
+
+        var result = await controller.Edit(schemeId, AuditModel(isAuditStep: true, auditWhy: "Reordered the tests"), cancellationToken: CancellationToken.None);
+
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal("Index", redirect.ActionName);
+        Assert.Null(redirect.RouteValues);
+        Assert.Equal("Reordered the tests", apiClient.LastUpdateRequest!.AuditWhy);
+        var notification = controller.TempData.GetNotification();
+        Assert.Equal(NotificationType.Success, notification!.Type);
+        Assert.Equal("Scheme updated successfully.", notification.Message);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData(null)]
+    public async Task Edit_Post_AuditStepWithoutAReason_ShowsTheAuditPageAgainWithoutCallingTheApi(string? reason)
+    {
+        var apiClient = new FakeSchemeApiClient();
+        var controller = PostingController(apiClient);
+        controller.ModelState.AddModelError(nameof(SchemeFormViewModel.AuditWhy), ReasonRequiredMessage);
+
+        var result = await controller.Edit(Guid.NewGuid(), AuditModel(isAuditStep: true, auditWhy: reason), cancellationToken: CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        Assert.Equal(AuditReasonFlow.ViewName, view.ViewName);
+        var page = Assert.IsType<AuditReasonPageViewModel>(view.Model);
+        Assert.Equal(AuditObjectName, page.AuditObjectName);
+        Assert.Equal(reason, page.AuditWhy);
+        Assert.Equal(ReasonRequiredMessage, Assert.Single(controller.ModelState[nameof(SchemeFormViewModel.AuditWhy)]!.Errors).ErrorMessage);
+        Assert.Null(apiClient.LastUpdateRequest);
+    }
+
+    [Fact]
+    public async Task Edit_Post_AuditStepWithNoObjectNameAndOnlyAReasonError_ShowsTheAuditPageWithAnEmptyObjectName()
+    {
+        var controller = PostingController(new FakeSchemeApiClient());
+        controller.ModelState.AddModelError(nameof(SchemeFormViewModel.AuditWhy), ReasonRequiredMessage);
+        var model = AuditModel(isAuditStep: true);
+        model.AuditObjectName = null;
+
+        var result = await controller.Edit(Guid.NewGuid(), model, cancellationToken: CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        Assert.Equal(AuditReasonFlow.ViewName, view.ViewName);
+        Assert.Equal(string.Empty, Assert.IsType<AuditReasonPageViewModel>(view.Model).AuditObjectName);
+    }
+
+    [Fact]
+    public async Task Edit_Post_AuditPageWhenNoIndexUrlCanBeBuilt_HasAnEmptyCancelUrl()
+    {
+        var apiClient = new FakeSchemeApiClient { SaveResult = AuditRequired() };
+        var controller = PostingController(apiClient);
+        controller.Url = new NullActionUrlHelper();
+
+        var result = await controller.Edit(Guid.NewGuid(), AuditModel(isAuditStep: false), cancellationToken: CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        Assert.Equal(string.Empty, Assert.IsType<AuditReasonPageViewModel>(view.Model).CancelUrl);
+    }
+
+    private sealed class NullActionUrlHelper : IUrlHelper
+    {
+        public ActionContext ActionContext { get; } = new();
+
+        public string? Action(UrlActionContext actionContext) => null;
+
+        public string? Content(string? contentPath) => contentPath;
+
+        public bool IsLocalUrl(string? url) => false;
+
+        public string? Link(string? routeName, object? values) => null;
+
+        public string? RouteUrl(UrlRouteContext routeContext) => null;
+    }
+
+    [Fact]
+    public async Task Edit_Post_AuditStepReasonTooLongForTheModel_ShowsTheAuditPageAgain()
+    {
+        var controller = PostingController(new FakeSchemeApiClient());
+        controller.ModelState.AddModelError(nameof(SchemeFormViewModel.AuditWhy), ReasonTooLongMessage);
+
+        var result = await controller.Edit(Guid.NewGuid(), AuditModel(isAuditStep: true, auditWhy: new string('x', 2001)), cancellationToken: CancellationToken.None);
+
+        Assert.Equal(AuditReasonFlow.ViewName, Assert.IsType<ViewResult>(result).ViewName);
+    }
+
+    [Fact]
+    public async Task Edit_Post_AuditStepWhereTheApiRejectsOnlyTheReason_ShowsTheAuditPageAgain()
+    {
+        var apiClient = new FakeSchemeApiClient
+        {
+            SaveResult = new SchemeSaveResult(false, null, new Dictionary<string, string[]> { ["AuditWhy"] = [ReasonTooLongMessage] })
+        };
+        var controller = PostingController(apiClient);
+        var model = AuditModel(isAuditStep: true, auditWhy: "kept reason");
+
+        var result = await controller.Edit(Guid.NewGuid(), model, cancellationToken: CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        Assert.Equal(AuditReasonFlow.ViewName, view.ViewName);
+        var page = Assert.IsType<AuditReasonPageViewModel>(view.Model);
+        Assert.Equal("kept reason", page.AuditWhy);
+        Assert.Equal(AuditObjectName, page.AuditObjectName);
+        Assert.Equal(ReasonTooLongMessage, Assert.Single(controller.ModelState[nameof(SchemeFormViewModel.AuditWhy)]!.Errors).ErrorMessage);
+        Assert.True(model.IsAuditStep);
+    }
+
+    [Fact]
+    public async Task Edit_Post_AuditStepWithAnotherInvalidField_ReturnsTheEditFormAndLeavesTheAuditStep()
+    {
+        var controller = PostingController(new FakeSchemeApiClient());
+        controller.ModelState.AddModelError(nameof(SchemeFormViewModel.AuditWhy), ReasonRequiredMessage);
+        controller.ModelState.AddModelError(nameof(SchemeFormViewModel.Identifier), "Enter an identifier");
+        var model = AuditModel(isAuditStep: true);
+
+        var result = await controller.Edit(Guid.NewGuid(), model, cancellationToken: CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        Assert.Null(view.ViewName);
+        Assert.Same(model, view.Model);
+        Assert.False(model.IsAuditStep);
+        Assert.Equal(ReasonRequiredMessage, Assert.Single(controller.ModelState[nameof(SchemeFormViewModel.AuditWhy)]!.Errors).ErrorMessage);
+        Assert.Equal("Enter an identifier", Assert.Single(controller.ModelState[nameof(SchemeFormViewModel.Identifier)]!.Errors).ErrorMessage);
+    }
+
+    [Theory]
+    [InlineData("Identifier")]
+    [InlineData("")]
+    public async Task Edit_Post_AuditStepWhereTheApiRejectsAnotherField_ReturnsTheEditForm(string otherKey)
+    {
+        var apiClient = new FakeSchemeApiClient
+        {
+            SaveResult = new SchemeSaveResult(false, null, new Dictionary<string, string[]>
+            {
+                ["AuditWhy"] = [ReasonTooLongMessage],
+                [otherKey] = ["Rejected"],
+            })
+        };
+        var controller = PostingController(apiClient);
+        var model = AuditModel(isAuditStep: true, auditWhy: "reason");
+
+        var result = await controller.Edit(Guid.NewGuid(), model, cancellationToken: CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        Assert.Null(view.ViewName);
+        Assert.Same(model, view.Model);
+        Assert.False(model.IsAuditStep);
+    }
+
+    [Fact]
+    public async Task Edit_Post_ReasonErrorOutsideTheAuditStep_ReturnsTheEditForm()
+    {
+        var controller = PostingController(new FakeSchemeApiClient());
+        controller.ModelState.AddModelError(nameof(SchemeFormViewModel.AuditWhy), ReasonTooLongMessage);
+        var model = AuditModel(isAuditStep: false, auditWhy: "x");
+
+        var result = await controller.Edit(Guid.NewGuid(), model, cancellationToken: CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        Assert.Null(view.ViewName);
+        Assert.Same(model, view.Model);
+    }
+
+    [Fact]
+    public async Task Edit_Post_ApiRejectsTheReasonOutsideTheAuditStep_ReturnsTheEditForm()
+    {
+        var apiClient = new FakeSchemeApiClient
+        {
+            SaveResult = new SchemeSaveResult(false, null, new Dictionary<string, string[]> { ["AuditWhy"] = [ReasonTooLongMessage] })
+        };
+        var controller = PostingController(apiClient);
+
+        var result = await controller.Edit(Guid.NewGuid(), AuditModel(isAuditStep: false), cancellationToken: CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        Assert.Null(view.ViewName);
+    }
+
+    [Fact]
+    public async Task Create_Post_NeverShowsTheAuditPageAndSendsNoReason()
+    {
+        var apiClient = new FakeSchemeApiClient { SaveResult = AuditRequired() };
+        var controller = PostingController(apiClient);
+        var model = AuditModel(isAuditStep: false);
+
+        var result = await controller.Create(model, cancellationToken: CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        Assert.Null(view.ViewName);
+        Assert.Same(model, view.Model);
+        Assert.Null(apiClient.LastCreateRequest!.AuditWhy);
+    }
+
+    [Fact]
+    public async Task Create_Post_Success_SendsNoReason()
+    {
+        var apiClient = new FakeSchemeApiClient
+        {
+            SaveResult = new SchemeSaveResult(true, SampleScheme(Guid.NewGuid(), Guid.NewGuid()), new Dictionary<string, string[]>())
+        };
+        var controller = PostingController(apiClient);
+
+        var result = await controller.Create(AuditModel(isAuditStep: false), cancellationToken: CancellationToken.None);
+
+        Assert.IsType<RedirectToActionResult>(result);
+        Assert.Null(apiClient.LastCreateRequest!.AuditWhy);
     }
 }

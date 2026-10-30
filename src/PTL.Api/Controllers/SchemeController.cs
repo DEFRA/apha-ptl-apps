@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.Extensions.Logging;
 using PTL.Contracts.Scheme;
+using PTL.Core.Audit;
 using PTL.Core.Scheme;
 
 namespace PTL.Api.Controllers;
@@ -13,7 +14,7 @@ namespace PTL.Api.Controllers;
 // inconsistent authorization enforcement that must not be carried forward mechanically).
 [ApiController]
 [Route("api")]
-public sealed class SchemeController(ISchemeService schemeService, ILogger<SchemeController> logger) : ControllerBase
+public sealed class SchemeController(ISchemeService schemeService, IAuditActorResolver auditActor, ILogger<SchemeController> logger) : ControllerBase
 {
     private static readonly Action<ILogger, Guid, Exception?> LogSchemeNotFoundMessage =
         LoggerMessage.Define<Guid>(
@@ -113,13 +114,24 @@ public sealed class SchemeController(ISchemeService schemeService, ILogger<Schem
         }
     }
 
+    // 428 + SchemeAuditRequiredResponse (nothing saved) when the edit changes an audited Test or
+    // Tabulation and request.AuditWhy is blank - the caller collects the reason and resubmits.
     [HttpPut("schemes/{schemeId:guid}")]
+    [ProducesResponseType<SchemeResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<SchemeAuditRequiredResponse>(StatusCodes.Status428PreconditionRequired)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<SchemeResponse>> UpdateScheme(Guid schemeId, [FromBody] SchemeRequest request, CancellationToken cancellationToken)
     {
         try
         {
-            var updated = await schemeService.UpdateSchemeAsync(schemeId, ToEntity(schemeId, request), cancellationToken);
-            return updated is null ? NotFound() : Ok(ToResponse(updated));
+            var auditWho = await auditActor.GetAuditNameAsync(cancellationToken);
+            var result = await schemeService.UpdateSchemeAsync(schemeId, ToEntity(schemeId, request), auditWho, request.AuditWhy, cancellationToken);
+            return result.Status switch
+            {
+                SchemeUpdateStatus.Updated => Ok(ToResponse(result.Scheme!)),
+                SchemeUpdateStatus.AuditReasonRequired => StatusCode(StatusCodes.Status428PreconditionRequired, new SchemeAuditRequiredResponse(result.AuditObjectName)),
+                _ => NotFound(),
+            };
         }
         catch (SchemeValidationException ex)
         {

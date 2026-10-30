@@ -13,9 +13,6 @@ namespace PTL.InternalWeb.Navigation;
 // on to "Customers" replaces that with the Customer children (Create Customer, Review Pending
 // Customer/Participant Updates, Review Pending Orders); navigating to "Create Customer" (a leaf)
 // shows only "Create Customer". See _SideNavigation.cshtml for the rendering logic.
-//
-// No new pages are created for disabled entries - they exist only so the overall menu shape
-// matches the legacy application until each area is migrated (docs/prompts/05-feature-implementation.md).
 public static class SideNavigationProvider
 {
     private const string IndexAction = "Index";
@@ -34,15 +31,12 @@ public static class SideNavigationProvider
     private const string DistributionControllerName = "Distribution";
     private const string TestConsultantControllerName = "TestConsultant";
     private const string ResultsSignOffControllerName = "ResultsSignOff";
+    private const string AssessorControllerName = "Assessor";
 
     private static readonly string[] YearKey = ["year"];
     private static readonly string[] YearMonthKeys = ["year", "monthId"];
     private static readonly string[] TabulationKeys = ["year", "monthId", "tabulationId"];
     private static readonly string[] PublishedTabulationKeys = ["year", "monthId", "tabulationId", "publishedTabulationId"];
-
-    // Placeholder for a menu entry whose page hasn't been migrated yet - see class remarks.
-    private static SideNavigationItem Disabled(string text, string? requiredPolicy = null) =>
-        new() { Text = text, IsEnabled = false, RequiredPolicy = requiredPolicy };
 
     public static IReadOnlyList<SideNavigationItem> Build()
     {
@@ -419,7 +413,30 @@ public static class SideNavigationProvider
                 new SideNavigationItem { Text = "Test Consultant Tabulation", ControllerName = TestConsultantControllerName, ActionName = TabulationAction, IsHidden = true }
             ]
         },
-        Disabled("Assessor", PtlPolicies.Assessor),
+        new SideNavigationItem
+        {
+            Text = "Assessor",
+            RequiredPolicy = PtlPolicies.Assessor,
+            ControllerName = AssessorControllerName,
+            ActionName = IndexAction,
+            Children =
+            [
+                // Legacy sitemap: "Assessor" (MenuAssessor.aspx), its hidden "Assessment Items" page (AssessmentItemList.aspx) and that
+                // page's hidden "Assessment Entry" page. The Assessment Items crumb needs the test (and year) to link back from the entry.
+                new SideNavigationItem
+                {
+                    Text = "Assessment Items",
+                    ControllerName = AssessorControllerName,
+                    ActionName = "AssessmentItemList",
+                    IsHidden = true,
+                    LinkQueryKeys = ["testId", "year"],
+                    Children =
+                    [
+                        new SideNavigationItem { Text = "Assessment Entry", ControllerName = AssessorControllerName, ActionName = "AssessmentEntry", IsHidden = true }
+                    ]
+                }
+            ]
+        },
         // Legacy sitemap: "Results Sign-off" (SignOff.aspx), its hidden "Results Sign-Off Tabulation" page and that page's hidden
         // "Assessment Results" page. The Tabulation crumb needs its tabulationId to link back from Assessment Results.
         new SideNavigationItem

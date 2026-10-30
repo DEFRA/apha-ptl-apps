@@ -195,6 +195,7 @@ public class InitialiseMonthTests
             new ParticipantDistributionHistoryService(repository, new PTL.Api.Tests.Participant.FakeParticipantRepository(), new ActualResultsService(repository, TimeProvider.System)),
             new FakePackagingService(),
             new FakePackagingOutputService(),
+            new PTL.Api.Tests.Contract.FakeAuditActorResolver("Guest"),
             Microsoft.Extensions.Logging.Abstractions.NullLogger<PTL.Api.Controllers.DistributionController>.Instance);
 
         var result = await controller.InitialiseMonth(2026, 5, CancellationToken.None);
@@ -223,6 +224,7 @@ public class InitialiseMonthTests
             new ParticipantDistributionHistoryService(repository, new PTL.Api.Tests.Participant.FakeParticipantRepository(), new ActualResultsService(repository, TimeProvider.System)),
             new FakePackagingService(),
             new FakePackagingOutputService(),
+            new PTL.Api.Tests.Contract.FakeAuditActorResolver("Guest"),
             Microsoft.Extensions.Logging.Abstractions.NullLogger<PTL.Api.Controllers.DistributionController>.Instance);
 
         var result = await controller.InitialiseMonth(year, month, CancellationToken.None);

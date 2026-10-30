@@ -11,29 +11,6 @@ public class UserApiClientTests
         new(new HttpClient(new StubHttpMessageHandler(statusCode, jsonContent)) { BaseAddress = new Uri("http://localhost") });
 
     [Fact]
-    public async Task SearchStaffDirectoryAsync_Success_ReturnsDeserializedResults()
-    {
-        const string json = """{"users":[{"username":"m100001","email":"jane@apha.gov.uk","friendlyName":"Jane Smith","firstName":"Jane","lastName":"Smith"}],"isTruncated":true}""";
-        var client = CreateClient(HttpStatusCode.OK, json);
-
-        var result = await client.SearchStaffDirectoryAsync("jane");
-
-        Assert.Equal("m100001", Assert.Single(result.Users).Username);
-        Assert.True(result.IsTruncated);
-    }
-
-    [Fact]
-    public async Task SearchStaffDirectoryAsync_NullResponse_ReturnsEmpty()
-    {
-        var client = CreateClient(HttpStatusCode.OK, "null");
-
-        var result = await client.SearchStaffDirectoryAsync("jane");
-
-        Assert.Empty(result.Users);
-        Assert.False(result.IsTruncated);
-    }
-
-    [Fact]
     public async Task CreateUserAsync_Success_ReturnsSuccessfulResult()
     {
         const string json = """{"userId":"11111111-1111-1111-1111-111111111111","username":"m100001","friendlyName":"Jane Smith","firstName":"Jane","lastName":"Smith","email":"jane@apha.gov.uk","department":"Science"}""";

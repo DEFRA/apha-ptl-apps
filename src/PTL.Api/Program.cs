@@ -4,7 +4,6 @@ using Microsoft.OpenApi;
 using PTL.Api.Features.Health;
 using PTL.Api.Infrastructure;
 using PTL.Common.Correlation;
-using PTL.Common.Graph;
 using PTL.Common.Health;
 using PTL.Core.AdministrationCharge;
 using PTL.Core.CategoryItemType;
@@ -169,12 +168,11 @@ builder.Services.AddScoped<ICreateOrderRepository, CreateOrderRepository>();
 builder.Services.AddScoped<ICreateOrderService, CreateOrderService>();
 builder.Services.Configure<CreateOrderOptions>(builder.Configuration.GetSection(CreateOrderOptions.SectionName));
 
-// Approve/Decline emails: sent through GOV.UK Notify straight after the decision, retried by the hosted scheduler.
+// Approve/Decline emails: sent through GOV.UK Notify straight after the decision; a failed send is not retried.
 builder.Services.Configure<OnlineOrderEmailOptions>(builder.Configuration.GetSection(OnlineOrderEmailOptions.SectionName));
-builder.Services.AddSingleton<EmailSendGuard>();
 builder.Services.AddScoped<IPendingOrderNotifier, PendingOrderNotifier>();
 
-// Customer and participant update emails: same pattern - sent through GOV.UK Notify when the update is decided, retried by the scheduler.
+// Customer and participant update emails: same pattern - sent through GOV.UK Notify when the update is decided, not retried.
 builder.Services.Configure<CustomerUpdateEmailOptions>(builder.Configuration.GetSection(CustomerUpdateEmailOptions.SectionName));
 builder.Services.Configure<ParticipantUpdateEmailOptions>(builder.Configuration.GetSection(ParticipantUpdateEmailOptions.SectionName));
 builder.Services.AddScoped<ICustomerUpdateNotifier, CustomerUpdateNotifier>();
@@ -234,6 +232,8 @@ builder.Services.AddScoped<ITestConsultantCommentsService, TestConsultantComment
 builder.Services.AddScoped<ITestConsultantTabulationRepository, TestConsultantTabulationRepository>();
 builder.Services.AddScoped<IResultsSignOffRepository, ResultsSignOffRepository>();
 builder.Services.AddScoped<IResultsSignOffService, ResultsSignOffService>();
+builder.Services.AddScoped<IAssessorRepository, AssessorRepository>();
+builder.Services.AddScoped<IAssessorService, AssessorService>();
 builder.Services.AddScoped<ITestConsultantTabulationService, TestConsultantTabulationService>();
 builder.Services.AddScoped<IAmendResultsService, AmendResultsService>();
 builder.Services.AddScoped<ITabulationSendService, TabulationSendService>();
@@ -243,7 +243,8 @@ builder.Services.AddScoped<IParticipantTabulationService, ParticipantTabulationS
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddScoped<IDistributionPostedNotifier, DistributionPostedNotifier>();
 
-// Test Consultant and publication emails: sent through GOV.UK Notify; the one scheduler for all email jobs is hosted in this process.
+// Test Consultant and publication emails: sent through GOV.UK Notify. The scheduler hosted in this process runs the Test Consultant
+// jobs; the publication emails are sent by their own hosted worker as soon as Authorise has committed.
 builder.Services.Configure<NotificationSchedulerOptions>(builder.Configuration.GetSection(NotificationSchedulerOptions.SectionName));
 builder.Services.Configure<TabulationEmailOptions>(builder.Configuration.GetSection(TabulationEmailOptions.SectionName));
 builder.Services.Configure<PublicationNotificationOptions>(builder.Configuration.GetSection(PublicationNotificationOptions.SectionName));
@@ -251,6 +252,9 @@ builder.Services.AddSingleton<TabulationEmailGuard>();
 builder.Services.AddSingleton<TabulationEmailContext>();
 builder.Services.AddScoped<ITabulationEmailService, TabulationEmailService>();
 builder.Services.AddScoped<ITabulationPublishedNotifier, TabulationPublishedNotifier>();
+builder.Services.AddSingleton<PTL.Api.BackgroundServices.PublicationEmailDispatcher>();
+builder.Services.AddSingleton<IPublicationEmailDispatcher>(sp => sp.GetRequiredService<PTL.Api.BackgroundServices.PublicationEmailDispatcher>());
+builder.Services.AddHostedService(sp => sp.GetRequiredService<PTL.Api.BackgroundServices.PublicationEmailDispatcher>());
 builder.Services.AddHostedService<PTL.Api.BackgroundServices.NotificationBackgroundService>();
 builder.Services.AddScoped<IPackagingService, PackagingService>();
 builder.Services.AddScoped<IPackagingOutputService, PackagingOutputService>();
@@ -288,8 +292,6 @@ builder.Services.AddScoped<IExternalSiteMessageRepository, ExternalSiteMessageRe
 builder.Services.AddScoped<IExternalSiteMessageService, ExternalSiteMessageService>();
 
 builder.Services.AddScoped<IUserRepository, UserRepository>();
-builder.Services.AddGraphClient(builder.Configuration);
-builder.Services.AddScoped<IStaffDirectoryService, GraphStaffDirectoryService>();
 builder.Services.AddScoped<IUserService, UserService>();
 
 builder.Services.AddScoped<IRoleRepository, RoleRepository>();

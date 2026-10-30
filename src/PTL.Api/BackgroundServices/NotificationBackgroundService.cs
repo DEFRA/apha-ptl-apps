@@ -1,33 +1,21 @@
 using Microsoft.Extensions.Options;
-using PTL.Core.Contract.PendingOrder;
-using PTL.Core.Customer;
 using PTL.Core.Distribution;
 using PTL.Core.Notifications;
-using PTL.Core.Participant;
 
 namespace PTL.Api.BackgroundServices;
 
-// The one scheduler for every email job, hosted in PTL.Api (single instance): after the start-up delay it runs each job
-// on every poll - the Test Consultant emails, the publication notifications, and the online contract order, customer
-// update and participant update emails that failed to send when the decision was made. Each job checks its own Enabled switch.
+// The scheduler for the time-based Test Consultant emails, hosted in PTL.Api (single instance): after the start-up delay it runs
+// the job on every poll. Every other email is sent when its decision is saved and is not retried.
 public sealed partial class NotificationBackgroundService(
     IServiceScopeFactory scopeFactory,
     IOptions<NotificationSchedulerOptions> schedulerOptions,
     IOptions<TabulationEmailOptions> tabulationOptions,
-    IOptions<PublicationNotificationOptions> publicationOptions,
-    IOptions<OnlineOrderEmailOptions> onlineOrderOptions,
-    IOptions<CustomerUpdateEmailOptions> customerUpdateOptions,
-    IOptions<ParticipantUpdateEmailOptions> participantUpdateOptions,
     TimeProvider timeProvider,
     ILogger<NotificationBackgroundService> logger) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        if (!tabulationOptions.Value.Enabled
-            && !publicationOptions.Value.Enabled
-            && !onlineOrderOptions.Value.Enabled
-            && !customerUpdateOptions.Value.Enabled
-            && !participantUpdateOptions.Value.Enabled)
+        if (!tabulationOptions.Value.Enabled)
         {
             LogDisabled(logger);
             return;
@@ -54,7 +42,7 @@ public sealed partial class NotificationBackgroundService(
         }
     }
 
-    // One scheduler execution. A failing job is logged and never stops the host or the other jobs, so the next run retries it.
+    // One scheduler execution. A failing job is logged and never stops the host, so the next run retries it.
     public async Task RunOnceAsync(CancellationToken cancellationToken)
     {
         using var scope = scopeFactory.CreateScope();
@@ -62,26 +50,6 @@ public sealed partial class NotificationBackgroundService(
         await RunJobAsync(
             "TestConsultantEmails",
             () => scope.ServiceProvider.GetRequiredService<ITabulationEmailService>().ProcessScheduledEmailsAsync(cancellationToken),
-            cancellationToken);
-
-        await RunJobAsync(
-            "PublicationNotifications",
-            () => scope.ServiceProvider.GetRequiredService<ITabulationPublishedNotifier>().SendUnsentAsync(cancellationToken),
-            cancellationToken);
-
-        await RunJobAsync(
-            "OnlineOrderEmails",
-            () => scope.ServiceProvider.GetRequiredService<IPendingOrderNotifier>().SendUnsentAsync(cancellationToken),
-            cancellationToken);
-
-        await RunJobAsync(
-            "CustomerUpdateEmails",
-            () => scope.ServiceProvider.GetRequiredService<ICustomerUpdateNotifier>().SendUnsentAsync(cancellationToken),
-            cancellationToken);
-
-        await RunJobAsync(
-            "ParticipantUpdateEmails",
-            () => scope.ServiceProvider.GetRequiredService<IParticipantUpdateNotifier>().SendUnsentAsync(cancellationToken),
             cancellationToken);
     }
 
@@ -97,7 +65,7 @@ public sealed partial class NotificationBackgroundService(
         }
     }
 
-    [LoggerMessage(EventId = 41, Level = LogLevel.Information, Message = "Notification scheduler is disabled (every email job is disabled).")]
+    [LoggerMessage(EventId = 41, Level = LogLevel.Information, Message = "Notification scheduler is disabled (the Test Consultant email job is disabled).")]
     private static partial void LogDisabled(ILogger logger);
 
     [LoggerMessage(EventId = 42, Level = LogLevel.Information, Message = "Notification scheduler started. StartupDelay={StartupDelay} PollInterval={PollInterval}")]

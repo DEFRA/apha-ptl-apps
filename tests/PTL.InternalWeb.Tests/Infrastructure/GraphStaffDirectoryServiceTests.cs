@@ -1,9 +1,9 @@
 using System.Net;
 using System.Text;
-using PTL.Api.Infrastructure;
 using PTL.Common.Graph;
+using PTL.InternalWeb.Infrastructure;
 
-namespace PTL.Api.Tests.User;
+namespace PTL.InternalWeb.Tests.Infrastructure;
 
 public class GraphStaffDirectoryServiceTests
 {

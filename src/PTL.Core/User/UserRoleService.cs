@@ -2,13 +2,10 @@ using PTL.Core.Audit;
 
 namespace PTL.Core.User;
 
-// The current user is resolved by PTL.InternalWeb (from the signed-in Entra claims) and passed in
-// explicitly as actingUserId on every call that needs it, rather than resolved here via an
-// injected "current user" service - see ICurrentUserProvider's removal: PTL.Api has no identity
-// context of its own (no authentication is validated at this layer yet), so an ambient
-// "who is calling" service here would either stay permanently stubbed or have to trust a
-// self-reported value anyway. Threading it explicitly from the one layer that actually knows it
-// keeps that trust boundary visible at every call site instead of hiding it behind a DI service.
+// The acting user is resolved by PTL.InternalWeb (from the signed-in Entra claims) and passed in
+// explicitly as actingUserId, not read from IActingUserAccessor like the other services. The
+// self-removal and self-Admin-removal guards compare against it, and PTL.Api does not yet validate
+// who the caller is, so it is a self-reported value.
 public sealed class UserRoleService(
     IUserRepository userRepository,
     IRoleRepository roleRepository,
