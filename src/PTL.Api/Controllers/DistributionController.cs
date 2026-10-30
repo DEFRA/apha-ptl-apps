@@ -20,6 +20,7 @@ public sealed partial class DistributionController(
     IResultsReceiptService resultsReceiptService,
     ITabulationsService tabulationsService,
     IActualResultsService actualResultsService,
+    IParticipantDistributionHistoryService participantDistributionHistoryService,
     IPackagingService packagingService,
     IPackagingOutputService packagingOutputService,
     ILogger<DistributionController> logger) : ControllerBase
@@ -46,6 +47,16 @@ public sealed partial class DistributionController(
     {
         var years = await distributionService.GetYearOptionsAsync(cancellationToken);
         return Ok(years.Select(y => new DistributionYearOptionResponse(y.YearId, y.Label)).ToList());
+    }
+
+    // GET /api/distributions/participants/{participantId}/history - the ExternalWeb Previous
+    // Distributions screen, legacy PastDistributionCollection.FetchPastDistributionCollection.
+    [HttpGet("participants/{participantId:guid}/history")]
+    public async Task<ActionResult<ParticipantPastDistributionListResponse>> GetParticipantDistributionHistory(
+        Guid participantId, CancellationToken cancellationToken)
+    {
+        var history = await participantDistributionHistoryService.GetParticipantDistributionHistoryAsync(participantId, cancellationToken);
+        return Ok(new ParticipantPastDistributionListResponse([.. history.Select(ToResponse)]));
     }
 
     // GET /api/distributions/months/{yearId}/{monthId}/schedule - the Monthly Distributions
@@ -185,6 +196,18 @@ public sealed partial class DistributionController(
         Guid monthlyDistributionSchemeId, Guid distributionParticipantId, CancellationToken cancellationToken)
     {
         var page = await actualResultsService.GetActualResultsAsync(distributionParticipantId, monthlyDistributionSchemeId, cancellationToken);
+        return page is null ? NotFound() : Ok(ToResponse(page));
+    }
+
+    // GET /api/distributions/schemes/{monthlyDistributionSchemeId}/participant-results?participantId=... -
+    // ExternalWeb's read-only View Results screen (legacy ResultsView.aspx). Resolves the
+    // participant's own DistributionParticipantId server-side, so a participant can never request
+    // someone else's results by supplying a different id.
+    [HttpGet("schemes/{monthlyDistributionSchemeId:guid}/participant-results")]
+    public async Task<ActionResult<ActualResultsResponse>> GetActualResultsForParticipant(
+        Guid monthlyDistributionSchemeId, [FromQuery] Guid participantId, CancellationToken cancellationToken)
+    {
+        var page = await participantDistributionHistoryService.GetActualResultsForParticipantAsync(participantId, monthlyDistributionSchemeId, cancellationToken);
         return page is null ? NotFound() : Ok(ToResponse(page));
     }
 
@@ -667,4 +690,14 @@ public sealed partial class DistributionController(
             month.PackagingCompletePercentage,
             month.ResultsCompletePercentage,
             month.TabulationsCompletePercentage);
+
+    private static ParticipantPastDistributionResponse ToResponse(ParticipantPastDistributionEntity distribution) =>
+        new(
+            distribution.MonthlyDistributionSchemeId,
+            distribution.DistributionReference,
+            distribution.SchemeCode,
+            distribution.SchemeNameOnly,
+            distribution.DistributionDate,
+            distribution.YearId,
+            distribution.MonthId);
 }

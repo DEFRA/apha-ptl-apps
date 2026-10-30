@@ -13,8 +13,21 @@ internal sealed partial class FakeDistributionRepository : IDistributionReposito
 
     public List<MonthlyDistributionSchemeEntity> UpdatedSchemes { get; } = [];
 
+    public Guid? ResolvedDistributionParticipantId { get; set; }
+
+    public Task<Guid?> ResolveDistributionParticipantIdAsync(
+        Guid ssoId, Guid monthlyDistributionSchemeId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(ResolvedDistributionParticipantId);
+
+    public Dictionary<Guid, List<ParticipantPastDistributionEntity>> ParticipantHistoryBySsoId { get; } = [];
+
     public Task<IReadOnlyList<DistributionMonthSummaryEntity>> GetMonthlyDistributionSummariesAsync(CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<DistributionMonthSummaryEntity>>(Summaries);
+
+    public Task<IReadOnlyList<ParticipantPastDistributionEntity>> GetParticipantDistributionHistoryAsync(
+        Guid ssoId, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<ParticipantPastDistributionEntity>>(
+            ParticipantHistoryBySsoId.TryGetValue(ssoId, out var history) ? history : []);
 
     public Task<IReadOnlyList<DistributionMonthYearEntity>> GetDistributionYearsAsync(CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<DistributionMonthYearEntity>>(Years);

@@ -1,0 +1,136 @@
+@model PTL.ExternalWeb.Features.Distribution.DistributionPreviousListViewModel
+@using System.Globalization
+@using PTL.SharedUI.Pagination
+@{
+    ViewData["Title"] = "Previous Distributions";
+    var pagination = new PaginationModel
+    {
+        CurrentPage = Model.Page,
+        PageSize = Model.PageSize,
+        TotalRecords = Model.TotalCount,
+        RouteValues = new Dictionary<string, object?>
+        {
+            ["year"] = Model.Year,
+            ["month"] = Model.Month,
+            ["distributionReference"] = Model.DistributionReference,
+            ["schemeCode"] = Model.SchemeCode,
+            ["schemeName"] = Model.SchemeName,
+            ["sortBy"] = Model.SortBy,
+            ["sortDir"] = Model.SortDirection,
+        }
+    };
+
+    string SortUrl(string column)
+    {
+        var dir = Model.SortBy == column && Model.SortDirection == "asc" ? "desc" : "asc";
+        return Url.Action("Previous", new
+        {
+            page = 1,
+            pageSize = Model.PageSize,
+            sortBy = column,
+            sortDir = dir,
+            year = Model.Year,
+            month = Model.Month,
+            distributionReference = Model.DistributionReference,
+            schemeCode = Model.SchemeCode,
+            schemeName = Model.SchemeName,
+        })!;
+    }
+
+    static string AriaSort(string currentSortBy, string currentSortDir, string column) =>
+        currentSortBy != column ? "none" : currentSortDir == "asc" ? "ascending" : "descending";
+}
+
+<h1 class="govuk-heading-l">Previous Distributions</h1>
+
+<p class="govuk-body">View the results you have previously submitted for a distribution.</p>
+
+<form method="get" asp-action="Previous" class="govuk-!-margin-bottom-6">
+    <div class="govuk-grid-row">
+        <div class="govuk-grid-column-one-half">
+            <div class="govuk-form-group">
+                <label class="govuk-label" for="year">Year</label>
+                <input class="govuk-input govuk-input--width-5" type="number" id="year" name="year" value="@Model.Year" />
+            </div>
+
+            <div class="govuk-form-group">
+                <label class="govuk-label" for="month">Month</label>
+                <select class="govuk-select" id="month" name="month">
+                    <option value="">All</option>
+                    @for (var monthId = 1; monthId <= 12; monthId++)
+                    {
+                        <option value="@monthId" selected="@(Model.Month == monthId)">@CultureInfo.InvariantCulture.DateTimeFormat.GetMonthName(monthId)</option>
+                    }
+                </select>
+            </div>
+
+            <div class="govuk-form-group">
+                <label class="govuk-label" for="distributionReference">Distribution Reference</label>
+                <input class="govuk-input" id="distributionReference" name="distributionReference" value="@Model.DistributionReference" />
+            </div>
+
+            <div class="govuk-form-group">
+                <label class="govuk-label" for="schemeCode">Scheme Code</label>
+                <input class="govuk-input" id="schemeCode" name="schemeCode" value="@Model.SchemeCode" />
+            </div>
+
+            <div class="govuk-form-group">
+                <label class="govuk-label" for="schemeName">Scheme Name</label>
+                <input class="govuk-input" id="schemeName" name="schemeName" value="@Model.SchemeName" />
+            </div>
+        </div>
+    </div>
+
+    <div class="govuk-button-group">
+        <button class="govuk-button" data-module="govuk-button" type="submit">Search</button>
+        <a class="govuk-button govuk-button--secondary" data-module="govuk-button" asp-action="Previous">Show All</a>
+    </div>
+</form>
+
+@if (Model.Distributions.Count == 0)
+{
+    <p class="govuk-body">@(Model.IsFiltered ? "No results found for the selected search criteria." : "There are no distributions to display.")</p>
+}
+else
+{
+    <govuk-page-size-selector model="pagination" />
+
+    <table class="govuk-table">
+        <thead class="govuk-table__head">
+            <tr class="govuk-table__row">
+                <th scope="col" class="govuk-table__header" aria-sort="@AriaSort(Model.SortBy, Model.SortDirection, "reference")">
+                    <a class="govuk-link" href="@SortUrl("reference")">Distribution Reference</a>
+                </th>
+                <th scope="col" class="govuk-table__header" aria-sort="@AriaSort(Model.SortBy, Model.SortDirection, "schemeCode")">
+                    <a class="govuk-link" href="@SortUrl("schemeCode")">Scheme Code</a>
+                </th>
+                <th scope="col" class="govuk-table__header" aria-sort="@AriaSort(Model.SortBy, Model.SortDirection, "schemeName")">
+                    <a class="govuk-link" href="@SortUrl("schemeName")">Scheme Name</a>
+                </th>
+                <th scope="col" class="govuk-table__header" aria-sort="@AriaSort(Model.SortBy, Model.SortDirection, "distributionDate")">
+                    <a class="govuk-link" href="@SortUrl("distributionDate")">Distribution Date</a>
+                </th>
+                <th scope="col" class="govuk-table__header">Results</th>
+            </tr>
+        </thead>
+        <tbody class="govuk-table__body">
+            @foreach (var distribution in Model.Distributions)
+            {
+                <tr class="govuk-table__row">
+                    <td class="govuk-table__cell">@distribution.DistributionReference</td>
+                    <td class="govuk-table__cell">@distribution.SchemeCode</td>
+                    <td class="govuk-table__cell">@distribution.SchemeName</td>
+                    <td class="govuk-table__cell">@distribution.DistributionDate.ToString("d MMMM yyyy", CultureInfo.InvariantCulture)</td>
+                    <td class="govuk-table__cell">
+                        <a class="govuk-link"
+                           asp-action="Results"
+                           asp-route-monthlyDistributionSchemeId="@distribution.MonthlyDistributionSchemeId"
+                           aria-label="View results for @distribution.DistributionReference">View</a>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+
+    <govuk-pagination model="pagination" />
+}

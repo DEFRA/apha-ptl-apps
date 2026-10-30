@@ -844,6 +844,23 @@ public static partial class DapperColumnMappings
             [ColMonthId] = nameof(DistributionMonthYearEntity.MonthId),
         });
 
+        // spgPastDistributionsBySsoId - SchemeCode/SchemeNameOnly are computed from SchemeName, not
+        // separate result columns, so they are deliberately not mapped here.
+        Map<ParticipantPastDistributionEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            [ColMonthlyDistributionSchemeId] = nameof(ParticipantPastDistributionEntity.MonthlyDistributionSchemeId),
+            [ColDistributionReference] = nameof(ParticipantPastDistributionEntity.DistributionReference),
+            [ColSchemeName] = nameof(ParticipantPastDistributionEntity.SchemeName),
+            [ColDistributionDate] = nameof(ParticipantPastDistributionEntity.DistributionDate),
+            [ColYearId] = nameof(ParticipantPastDistributionEntity.YearId),
+            [ColMonthId] = nameof(ParticipantPastDistributionEntity.MonthId),
+        });
+
+        Map<PTL.Data.Distribution.ResultsEntryHeaderEntity>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fldActualResultsId"] = nameof(PTL.Data.Distribution.ResultsEntryHeaderEntity.ActualResultsId),
+        });
+
         Map<PTL.Data.Distribution.MonthlyDistributionHeaderEntity>(new(StringComparer.OrdinalIgnoreCase)
         {
             [ColMonthlyDistributionId] = nameof(PTL.Data.Distribution.MonthlyDistributionHeaderEntity.MonthlyDistributionId),

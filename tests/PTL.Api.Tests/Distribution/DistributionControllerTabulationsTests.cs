@@ -20,6 +20,7 @@ public class DistributionControllerTabulationsTests
             new ResultsReceiptService(repository, TimeProvider.System),
             new TabulationsService(repository, Clock()),
             new ActualResultsService(repository, TimeProvider.System),
+            new ParticipantDistributionHistoryService(repository, new PTL.Api.Tests.Participant.FakeParticipantRepository(), new ActualResultsService(repository, TimeProvider.System)),
             new FakePackagingService(),
             new FakePackagingOutputService(),
             Microsoft.Extensions.Logging.Abstractions.NullLogger<DistributionController>.Instance);

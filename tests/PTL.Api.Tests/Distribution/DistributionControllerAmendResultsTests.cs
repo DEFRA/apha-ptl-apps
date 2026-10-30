@@ -33,6 +33,7 @@ public class DistributionControllerAmendResultsTests
             new ResultsReceiptService(_repository, TimeProvider.System),
             new TabulationsService(_repository, Clock()),
             new ActualResultsService(_repository, TimeProvider.System),
+            new ParticipantDistributionHistoryService(_repository, new PTL.Api.Tests.Participant.FakeParticipantRepository(), new ActualResultsService(_repository, TimeProvider.System)),
             new FakePackagingService(),
             new FakePackagingOutputService(),
             Microsoft.Extensions.Logging.Abstractions.NullLogger<DistributionController>.Instance)
