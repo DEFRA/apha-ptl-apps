@@ -1,7 +1,9 @@
 using Microsoft.AspNetCore.Mvc;
 using PTL.Api.Controllers;
+using PTL.Api.Tests.Participant;
 using PTL.Contracts.Distribution;
 using PTL.Core.Distribution;
+using ParticipantEntity = PTL.Core.Participant.Participant;
 
 namespace PTL.Api.Tests.Distribution;
 
@@ -10,7 +12,8 @@ public class DistributionControllerActualResultsTests
 {
     private readonly ActualResultsScenario _s = new();
 
-    private static DistributionController CreateController(FakeDistributionRepository repository, string? userName = null)
+    private static DistributionController CreateController(
+        FakeDistributionRepository repository, string? userName = null, FakeParticipantRepository? participantRepository = null)
     {
         var controller = new DistributionController(
             new DistributionService(repository),
@@ -21,7 +24,7 @@ public class DistributionControllerActualResultsTests
             new ResultsReceiptService(repository, TimeProvider.System),
             new TabulationsService(repository, TimeProvider.System),
             new ActualResultsService(repository, new LocalClock(new DateTime(2026, 6, 15, 12, 0, 0))),
-            new ParticipantDistributionHistoryService(repository, new PTL.Api.Tests.Participant.FakeParticipantRepository(), new ActualResultsService(repository, TimeProvider.System)),
+            new ParticipantDistributionHistoryService(repository, participantRepository ?? new FakeParticipantRepository(), new ActualResultsService(repository, TimeProvider.System)),
             new FakePackagingService(),
             new FakePackagingOutputService(),
             new PTL.Api.Tests.Contract.FakeAuditActorResolver(userName ?? "Guest"),
@@ -94,6 +97,73 @@ public class DistributionControllerActualResultsTests
         var result = await CreateController(repository).GetActualResults(_s.SchemeId, _s.ParticipantId, CancellationToken.None);
 
         Assert.True(Assert.IsType<ActualResultsResponse>(Assert.IsType<OkObjectResult>(result.Result).Value).IsNew);
+    }
+
+    // GET schemes/{mdsId}/participant-results?participantId=... - ExternalWeb's own-results-only lookup.
+    [Fact]
+    public async Task GetActualResultsForParticipant_UnknownParticipant_ReturnsNotFound()
+    {
+        var repository = _s.Seed(_s.FullyStored());
+
+        var result = await CreateController(repository).GetActualResultsForParticipant(
+            _s.SchemeId, Guid.NewGuid(), CancellationToken.None);
+
+        Assert.IsType<NotFoundResult>(result.Result);
+    }
+
+    [Fact]
+    public async Task GetActualResultsForParticipant_ResolvesOwnDistributionParticipantIdAndReturnsTheMappedPage()
+    {
+        var repository = _s.Seed(_s.FullyStored());
+        repository.ResolvedDistributionParticipantId = _s.ParticipantId;
+        var participantId = Guid.NewGuid();
+        var participantRepository = new FakeParticipantRepository();
+        await participantRepository.CreateAsync(new ParticipantEntity { ParticipantId = participantId, SsoId = Guid.NewGuid() });
+
+        var result = await CreateController(repository, participantRepository: participantRepository)
+            .GetActualResultsForParticipant(_s.SchemeId, participantId, CancellationToken.None);
+
+        var response = Assert.IsType<ActualResultsResponse>(Assert.IsType<OkObjectResult>(result.Result).Value);
+        Assert.Equal((_s.ParticipantId, _s.SchemeId), (response.DistributionParticipantId, response.MonthlyDistributionSchemeId));
+    }
+
+    // GET participants/{participantId}/history - ExternalWeb's Previous Distributions screen.
+    [Fact]
+    public async Task GetParticipantDistributionHistory_UnknownParticipant_ReturnsEmptyList()
+    {
+        var result = await CreateController(new FakeDistributionRepository())
+            .GetParticipantDistributionHistory(Guid.NewGuid(), CancellationToken.None);
+
+        var response = Assert.IsType<ParticipantPastDistributionListResponse>(Assert.IsType<OkObjectResult>(result.Result).Value);
+        Assert.Empty(response.Distributions);
+    }
+
+    [Fact]
+    public async Task GetParticipantDistributionHistory_ResolvesOwnSsoIdAndReturnsTheMappedHistory()
+    {
+        var participantId = Guid.NewGuid();
+        var ssoId = Guid.NewGuid();
+        var participantRepository = new FakeParticipantRepository();
+        await participantRepository.CreateAsync(new ParticipantEntity { ParticipantId = participantId, SsoId = ssoId });
+        var repository = new FakeDistributionRepository();
+        repository.ParticipantHistoryBySsoId[ssoId] =
+        [
+            new ParticipantPastDistributionEntity
+            {
+                MonthlyDistributionSchemeId = Guid.NewGuid(),
+                DistributionReference = "D1a/00001/1",
+                SchemeName = "PT1234: Test Scheme",
+                DistributionDate = new DateTime(2026, 1, 15),
+                YearId = 2025,
+                MonthId = 1,
+            }
+        ];
+
+        var result = await CreateController(repository, participantRepository: participantRepository)
+            .GetParticipantDistributionHistory(participantId, CancellationToken.None);
+
+        var response = Assert.IsType<ParticipantPastDistributionListResponse>(Assert.IsType<OkObjectResult>(result.Result).Value);
+        Assert.Equal("D1a/00001/1", Assert.Single(response.Distributions).DistributionReference);
     }
 
     [Fact]

@@ -96,4 +96,51 @@ public class GovUkTabulationTableTagHelperTests
         Assert.Contains("&lt;script&gt;", html, StringComparison.Ordinal);
         Assert.Contains("&lt;b&gt;bold&lt;/b&gt;", html, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void Process_RowHeaderWithRowSpan_SubsequentCoveredRowsHaveNoRowHeaderCell()
+    {
+        // Row 0's first cell spans down into row 1, so row 1 must not also render a row-header cell.
+        var table = new TabulationTableResponse(
+            "Culture",
+            [
+                new TabulationGridRowResponse([Cell("S001", rowSpan: 2), Cell("Positive")], IsHeader: false),
+                new TabulationGridRowResponse([Cell("Negative")], IsHeader: false),
+            ],
+            AssessmentTestId: null);
+
+        var html = Render(table);
+
+        Assert.Contains("""<th scope="row" class="TabulationCell" rowspan="2">S001</th>""", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("""scope="row" class="TabulationCell">Negative""", html, StringComparison.Ordinal);
+        Assert.Contains("""<td class="TabulationCell">Negative</td>""", html, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Process_NonFirstCellWithHeaderKindInDataRow_RendersAsThNotTd()
+    {
+        var table = new TabulationTableResponse(
+            "Culture",
+            [new TabulationGridRowResponse([Cell("S001"), Cell("Growth", kind: "Header2")], IsHeader: false)],
+            AssessmentTestId: null);
+
+        var html = Render(table);
+
+        Assert.Contains("""<th scope="col" class="TabulationHeader2">Growth</th>""", html, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("Header2", """<th scope="col" class="TabulationHeader2">Value</th>""")]
+    [InlineData("Unrecognised", """<th scope="col">Value</th>""")]
+    public void Process_CellKind_MapsToExpectedClass(string kind, string expectedMarkup)
+    {
+        var table = new TabulationTableResponse(
+            "Culture",
+            [new TabulationGridRowResponse([Cell("Value", kind: kind)], IsHeader: true)],
+            AssessmentTestId: null);
+
+        var html = Render(table);
+
+        Assert.Contains(expectedMarkup, html, StringComparison.Ordinal);
+    }
 }

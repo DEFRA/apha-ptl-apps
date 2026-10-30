@@ -1,6 +1,5 @@
 @model PTL.ExternalWeb.Features.Tabulation.TabulationListViewModel
 @using System.Globalization
-@using Microsoft.AspNetCore.Html
 @using PTL.SharedUI.Pagination
 @{
     ViewData["Title"] = "View Reports";
@@ -37,24 +36,6 @@
             schemeName = Model.SchemeName,
         })!;
     }
-
-    static string AriaSort(string currentSortBy, string currentSortDir, string column) =>
-        currentSortBy != column ? "none" : currentSortDir == "asc" ? "ascending" : "descending";
-
-    // GOV.UK ships no sortable-table-header component - matches the hand-rolled pattern already
-    // used by Features/Scheme/Views/Index.cshtml (aria-sort on the th, a visible glyph plus a
-    // visually-hidden direction label alongside the column link).
-    IHtmlContent SortIndicator(string column)
-    {
-        if (Model.SortBy != column)
-        {
-            return HtmlString.Empty;
-        }
-
-        var arrow = Model.SortDirection == "asc" ? " \u25b2" : " \u25bc";
-        var direction = Model.SortDirection == "asc" ? "ascending" : "descending";
-        return new HtmlString($"""<span aria-hidden="true">{arrow}</span><span class="govuk-visually-hidden">, sorted {direction}</span>""");
-    }
 }
 
 <h1 class="govuk-heading-l">View Reports</h1>
@@ -75,38 +56,11 @@
                 </select>
             </div>
 
-            <div class="govuk-form-group">
-                <label class="govuk-label" for="month">Month</label>
-                <select class="govuk-select" id="month" name="month">
-                    <option value="">All</option>
-                    @for (var monthId = 1; monthId <= 12; monthId++)
-                    {
-                        <option value="@monthId" selected="@(Model.Month == monthId)">@CultureInfo.InvariantCulture.DateTimeFormat.GetMonthName(monthId)</option>
-                    }
-                </select>
-            </div>
-
-            <div class="govuk-form-group">
-                <label class="govuk-label" for="distributionReference">Distribution Reference</label>
-                <input class="govuk-input" id="distributionReference" name="distributionReference" value="@Model.DistributionReference" />
-            </div>
-
-            <div class="govuk-form-group">
-                <label class="govuk-label" for="schemeCode">Scheme Code</label>
-                <input class="govuk-input" id="schemeCode" name="schemeCode" value="@Model.SchemeCode" />
-            </div>
-
-            <div class="govuk-form-group">
-                <label class="govuk-label" for="schemeName">Scheme Name</label>
-                <input class="govuk-input" id="schemeName" name="schemeName" value="@Model.SchemeName" />
-            </div>
+            <partial name="_DistributionReferenceSchemeSearchFields" model="@(new PTL.ExternalWeb.ViewSupport.DistributionReferenceSchemeSearchFields(Model.Month, Model.DistributionReference, Model.SchemeCode, Model.SchemeName))" />
         </div>
     </div>
 
-    <div class="govuk-button-group">
-        <button class="govuk-button" data-module="govuk-button" type="submit">Search</button>
-        <a class="govuk-button govuk-button--secondary" data-module="govuk-button" asp-action="Index">Show All</a>
-    </div>
+    <partial name="_SearchFormButtonGroup" model="@("Index")" />
 </form>
 
 @if (Model.Tabulations.Count == 0)
@@ -121,19 +75,19 @@ else
         <thead class="govuk-table__head">
             <tr class="govuk-table__row">
                 <th scope="col" class="govuk-table__header" aria-sort="@AriaSort(Model.SortBy, Model.SortDirection, "reference")">
-                    <a class="govuk-link" href="@SortUrl("reference")">Distribution Reference@(SortIndicator("reference"))</a>
+                    <a class="govuk-link" href="@SortUrl("reference")">Distribution Reference@(SortIndicator(Model.SortBy, Model.SortDirection, "reference"))</a>
                 </th>
                 <th scope="col" class="govuk-table__header" aria-sort="@AriaSort(Model.SortBy, Model.SortDirection, "schemeCode")">
-                    <a class="govuk-link" href="@SortUrl("schemeCode")">Scheme Code@(SortIndicator("schemeCode"))</a>
+                    <a class="govuk-link" href="@SortUrl("schemeCode")">Scheme Code@(SortIndicator(Model.SortBy, Model.SortDirection, "schemeCode"))</a>
                 </th>
                 <th scope="col" class="govuk-table__header" aria-sort="@AriaSort(Model.SortBy, Model.SortDirection, "schemeName")">
-                    <a class="govuk-link" href="@SortUrl("schemeName")">Scheme Name@(SortIndicator("schemeName"))</a>
+                    <a class="govuk-link" href="@SortUrl("schemeName")">Scheme Name@(SortIndicator(Model.SortBy, Model.SortDirection, "schemeName"))</a>
                 </th>
                 <th scope="col" class="govuk-table__header" aria-sort="@AriaSort(Model.SortBy, Model.SortDirection, "tabulationName")">
-                    <a class="govuk-link" href="@SortUrl("tabulationName")">Report Name@(SortIndicator("tabulationName"))</a>
+                    <a class="govuk-link" href="@SortUrl("tabulationName")">Report Name@(SortIndicator(Model.SortBy, Model.SortDirection, "tabulationName"))</a>
                 </th>
                 <th scope="col" class="govuk-table__header" aria-sort="@AriaSort(Model.SortBy, Model.SortDirection, "distributionDate")">
-                    <a class="govuk-link" href="@SortUrl("distributionDate")">Distribution Date@(SortIndicator("distributionDate"))</a>
+                    <a class="govuk-link" href="@SortUrl("distributionDate")">Distribution Date@(SortIndicator(Model.SortBy, Model.SortDirection, "distributionDate"))</a>
                 </th>
                 <th scope="col" class="govuk-table__header">Report</th>
             </tr>

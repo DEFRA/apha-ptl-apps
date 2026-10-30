@@ -19,12 +19,7 @@ public class ParticipantPastDistributionEntity
     public int YearId { get; set; }
     public int MonthId { get; set; }
 
-    public string SchemeCode => SplitSchemeName()[0];
+    public string SchemeCode => SchemeNameSplitter.Split(SchemeName).Code;
 
-    public string SchemeNameOnly => SplitSchemeName()[1];
-
-    private string[] SplitSchemeName() =>
-        !string.IsNullOrEmpty(SchemeName) && SchemeName.Contains(':')
-            ? [SchemeName[..SchemeName.IndexOf(':')].Trim(), SchemeName[(SchemeName.IndexOf(':') + 1)..].Trim()]
-            : [SchemeName, SchemeName];
+    public string SchemeNameOnly => SchemeNameSplitter.Split(SchemeName).NameOnly;
 }

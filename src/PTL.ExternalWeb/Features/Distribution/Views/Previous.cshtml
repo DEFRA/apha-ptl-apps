@@ -36,9 +36,6 @@
             schemeName = Model.SchemeName,
         })!;
     }
-
-    static string AriaSort(string currentSortBy, string currentSortDir, string column) =>
-        currentSortBy != column ? "none" : currentSortDir == "asc" ? "ascending" : "descending";
 }
 
 <h1 class="govuk-heading-l">Previous Distributions</h1>
@@ -53,38 +50,11 @@
                 <input class="govuk-input govuk-input--width-5" type="number" id="year" name="year" value="@Model.Year" />
             </div>
 
-            <div class="govuk-form-group">
-                <label class="govuk-label" for="month">Month</label>
-                <select class="govuk-select" id="month" name="month">
-                    <option value="">All</option>
-                    @for (var monthId = 1; monthId <= 12; monthId++)
-                    {
-                        <option value="@monthId" selected="@(Model.Month == monthId)">@CultureInfo.InvariantCulture.DateTimeFormat.GetMonthName(monthId)</option>
-                    }
-                </select>
-            </div>
-
-            <div class="govuk-form-group">
-                <label class="govuk-label" for="distributionReference">Distribution Reference</label>
-                <input class="govuk-input" id="distributionReference" name="distributionReference" value="@Model.DistributionReference" />
-            </div>
-
-            <div class="govuk-form-group">
-                <label class="govuk-label" for="schemeCode">Scheme Code</label>
-                <input class="govuk-input" id="schemeCode" name="schemeCode" value="@Model.SchemeCode" />
-            </div>
-
-            <div class="govuk-form-group">
-                <label class="govuk-label" for="schemeName">Scheme Name</label>
-                <input class="govuk-input" id="schemeName" name="schemeName" value="@Model.SchemeName" />
-            </div>
+            <partial name="_DistributionReferenceSchemeSearchFields" model="@(new PTL.ExternalWeb.ViewSupport.DistributionReferenceSchemeSearchFields(Model.Month, Model.DistributionReference, Model.SchemeCode, Model.SchemeName))" />
         </div>
     </div>
 
-    <div class="govuk-button-group">
-        <button class="govuk-button" data-module="govuk-button" type="submit">Search</button>
-        <a class="govuk-button govuk-button--secondary" data-module="govuk-button" asp-action="Previous">Show All</a>
-    </div>
+    <partial name="_SearchFormButtonGroup" model="@("Previous")" />
 </form>
 
 @if (Model.Distributions.Count == 0)
