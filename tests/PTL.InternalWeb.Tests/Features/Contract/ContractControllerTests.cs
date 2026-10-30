@@ -1,3 +1,4 @@
+using System.Globalization;
 using DocumentFormat.OpenXml.Packaging;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -1081,6 +1082,103 @@ public class ContractControllerTests
         var view = Assert.IsType<ViewResult>(result);
         Assert.Same(model, view.Model);
         Assert.False(controller.ModelState.IsValid);
+    }
+
+    // The form field is "Discount rate (%)" but everything past the controller holds a fraction
+    // (0.10 = 10%), so entering 1.00 must be sent as 0.01, not 1.00 (which displays as 100%).
+    [Theory]
+    [InlineData("1.00", "0.01")]
+    [InlineData("12.5", "0.125")]
+    [InlineData("100", "1")]
+    [InlineData("0", "0")]
+    public async Task Edit_Post_SendsEnteredPercentageDiscountRateAsFraction(string entered, string expected)
+    {
+        var apiClient = new FakeContractApiClient
+        {
+            SaveResult = new ContractSaveResult(true, SampleContract(Guid.NewGuid(), Guid.NewGuid()), new Dictionary<string, string[]>())
+        };
+        var controller = CreateController(apiClient);
+        var model = new PTL.InternalWeb.Features.Contract.ContractFormViewModel
+        {
+            YearId = 2027,
+            UTNumber = "UT3/306",
+            CustomerId = Guid.NewGuid(),
+            DiscountRate = decimal.Parse(entered, CultureInfo.InvariantCulture)
+        };
+
+        await controller.Edit(Guid.NewGuid(), model, CancellationToken.None);
+
+        Assert.Equal(decimal.Parse(expected, CultureInfo.InvariantCulture), apiClient.LastUpdateRequest!.DiscountRate);
+    }
+
+    [Fact]
+    public async Task Create_Post_SendsEnteredPercentageDiscountRateAsFraction()
+    {
+        var apiClient = new FakeContractApiClient
+        {
+            SaveResult = new ContractSaveResult(true, SampleContract(Guid.NewGuid(), Guid.NewGuid()), new Dictionary<string, string[]>())
+        };
+        var controller = CreateController(apiClient);
+        var model = new PTL.InternalWeb.Features.Contract.ContractFormViewModel { YearId = 2027, UTNumber = "UT3/306", DiscountRate = 1.00m };
+
+        await controller.Create(Guid.NewGuid(), model, CancellationToken.None);
+
+        Assert.Equal(0.01m, apiClient.LastCreateRequest!.DiscountRate);
+    }
+
+    [Fact]
+    public async Task Edit_Post_BlankDiscountRate_SendsZero()
+    {
+        var apiClient = new FakeContractApiClient
+        {
+            SaveResult = new ContractSaveResult(true, SampleContract(Guid.NewGuid(), Guid.NewGuid()), new Dictionary<string, string[]>())
+        };
+        var controller = CreateController(apiClient);
+        var model = new PTL.InternalWeb.Features.Contract.ContractFormViewModel { YearId = 2027, UTNumber = "UT3/306", CustomerId = Guid.NewGuid(), DiscountRate = null };
+
+        await controller.Edit(Guid.NewGuid(), model, CancellationToken.None);
+
+        Assert.Equal(0m, apiClient.LastUpdateRequest!.DiscountRate);
+    }
+
+    // The reverse of the conversion above: the stored fraction is shown to the user as a percentage.
+    [Theory]
+    [InlineData("0.1000", "10")]
+    [InlineData("0.0125", "1.25")]
+    [InlineData("1.0000", "100")]
+    [InlineData("0", "0")]
+    public async Task Edit_Get_ShowsStoredFractionDiscountRateAsPercentage(string stored, string expected)
+    {
+        var contractId = Guid.NewGuid();
+        var contract = SampleContract(contractId, Guid.NewGuid()) with { DiscountRate = decimal.Parse(stored, CultureInfo.InvariantCulture) };
+        var controller = CreateController(new FakeContractApiClient { ContractResponse = contract });
+
+        var result = await controller.Edit(contractId, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<PTL.InternalWeb.Features.Contract.ContractFormViewModel>(view.Model);
+        Assert.Equal(decimal.Parse(expected, CultureInfo.InvariantCulture), model.DiscountRate);
+    }
+
+    // Saving an untouched Edit form must not change the stored rate.
+    [Fact]
+    public async Task Edit_RoundTrip_LeavesStoredDiscountRateUnchanged()
+    {
+        var contractId = Guid.NewGuid();
+        var customerId = Guid.NewGuid();
+        var contract = SampleContract(contractId, customerId) with { DiscountRate = 0.0125m };
+        var apiClient = new FakeContractApiClient
+        {
+            ContractResponse = contract,
+            SaveResult = new ContractSaveResult(true, contract, new Dictionary<string, string[]>())
+        };
+        var controller = CreateController(apiClient);
+
+        var edit = await controller.Edit(contractId, CancellationToken.None);
+        var model = Assert.IsType<PTL.InternalWeb.Features.Contract.ContractFormViewModel>(Assert.IsType<ViewResult>(edit).Model);
+        await controller.Edit(contractId, model, CancellationToken.None);
+
+        Assert.Equal(0.0125m, apiClient.LastUpdateRequest!.DiscountRate);
     }
 
     private static Microsoft.AspNetCore.Mvc.ViewFeatures.TempDataDictionary CreateTempData() =>
