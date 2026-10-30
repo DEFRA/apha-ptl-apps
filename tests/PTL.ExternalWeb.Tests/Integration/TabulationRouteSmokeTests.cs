@@ -270,6 +270,94 @@ public class TabulationRouteSmokeTests : IClassFixture<PtlExternalWebTestFactory
     }
 
     [Fact]
+    public async Task AssessmentResults_ApiResolvesNothingForThisUser_RendersNotFound()
+    {
+        var apiClient = new FakeDistributionApiClient { AssessmentResults = null };
+        var client = CreateClient(apiClient);
+        var cookies = await SignInAsync(client, "Participant,Viewer", participantId: Guid.NewGuid());
+
+        var response = await CookieForwardingHttpClient.SendWithCookiesAsync(
+            client, HttpMethod.Get, $"/Tabulation/AssessmentResults?publishedTabulationId={Guid.NewGuid()}&testId={Guid.NewGuid()}", cookies);
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Theory]
+    [InlineData("reference", "D1a/00001", "D1a/00002")]
+    [InlineData("schemeName", "Brucella", "TB")]
+    [InlineData("tabulationName", "Summary A", "Summary B")]
+    public async Task Index_SortedByEachColumn_OrdersTabulationsByThatColumn(string sortBy, string firstValue, string secondValue)
+    {
+        var apiClient = new FakeDistributionApiClient
+        {
+            Tabulations = new PublishedTabulationSummaryListResponse(
+            [
+                Summary(Guid.NewGuid(), "D1a/00002", "TB", "TB", "Summary B", new DateTime(2026, 5, 1), 2026, 5),
+                Summary(Guid.NewGuid(), "D1a/00001", "BT", "Brucella", "Summary A", new DateTime(2026, 4, 1), 2026, 4),
+            ])
+        };
+        var client = CreateClient(apiClient);
+        var cookies = await SignInAsync(client, "Participant,Viewer", participantId: Guid.NewGuid());
+
+        var response = await CookieForwardingHttpClient.SendWithCookiesAsync(
+            client, HttpMethod.Get, $"/Tabulation/Index?sortBy={sortBy}&sortDir=asc", cookies);
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.True(body.IndexOf(firstValue, StringComparison.Ordinal) < body.IndexOf(secondValue, StringComparison.Ordinal),
+            $"Expected '{firstValue}' to appear before '{secondValue}' when sorted ascending by {sortBy}.");
+    }
+
+    [Fact]
+    public async Task Index_InvalidSortAndPageSizeValues_FallBackToDefaults()
+    {
+        var apiClient = new FakeDistributionApiClient
+        {
+            Tabulations = new PublishedTabulationSummaryListResponse(
+                [Summary(Guid.NewGuid(), "D1a/00001", "BT", "Brucella", "Summary", new DateTime(2026, 5, 1), 2026, 5)])
+        };
+        var client = CreateClient(apiClient);
+        var cookies = await SignInAsync(client, "Participant,Viewer", participantId: Guid.NewGuid());
+
+        var response = await CookieForwardingHttpClient.SendWithCookiesAsync(
+            client, HttpMethod.Get, "/Tabulation/Index?sortBy=notAColumn&sortDir=sideways&pageSize=999", cookies);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Attachment_ApiResolvesTheFile_ReturnsItWithContentDisposition()
+    {
+        var apiClient = new FakeDistributionApiClient
+        {
+            Attachment = new TabulationAttachmentFile([1, 2, 3], "application/pdf", "attachment; filename=report.pdf")
+        };
+        var client = CreateClient(apiClient);
+        var cookies = await SignInAsync(client, "Participant,Viewer", participantId: Guid.NewGuid());
+
+        var response = await CookieForwardingHttpClient.SendWithCookiesAsync(
+            client, HttpMethod.Get, $"/Tabulation/Attachment?publishedTabulationId={Guid.NewGuid()}&attachmentId={Guid.NewGuid()}", cookies);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("application/pdf", response.Content.Headers.ContentType?.ToString());
+        Assert.Equal("attachment; filename=report.pdf", response.Content.Headers.ContentDisposition?.ToString());
+        Assert.Equal(new byte[] { 1, 2, 3 }, await response.Content.ReadAsByteArrayAsync());
+    }
+
+    [Fact]
+    public async Task Attachment_ApiResolvesNothingForThisUser_RendersNotFound()
+    {
+        var apiClient = new FakeDistributionApiClient { Attachment = null };
+        var client = CreateClient(apiClient);
+        var cookies = await SignInAsync(client, "Participant,Viewer", participantId: Guid.NewGuid());
+
+        var response = await CookieForwardingHttpClient.SendWithCookiesAsync(
+            client, HttpMethod.Get, $"/Tabulation/Attachment?publishedTabulationId={Guid.NewGuid()}&attachmentId={Guid.NewGuid()}", cookies);
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
     public async Task Index_UnresolvedUser_IsForbidden()
     {
         var client = CreateClient(new FakeDistributionApiClient());
