@@ -37,6 +37,13 @@ public sealed class CidmOptions
     public string MetadataAddress => $"{Address.TrimEnd('/')}/{Policy}/.well-known/openid-configuration";
 
     /// <summary>
+    /// The user-facing CIDM self-service portal, where an external user manages their own account
+    /// (not part of the OIDC flow). Composed from <see cref="Address"/>'s scheme/host, dropping its
+    /// idphub/policy path, since the portal lives at the bare origin rather than under /idphub/b2c.
+    /// </summary>
+    public string AccountPortalUrl => $"{new Uri(Address).GetLeftPart(UriPartial.Authority)}/management";
+
+    /// <summary>
     /// The client_id must also be sent as a scope entry (per the CIDM guide) to request an access token, in
     /// addition to the standard scopes.
     /// </summary>

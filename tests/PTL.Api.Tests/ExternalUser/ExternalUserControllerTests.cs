@@ -69,7 +69,7 @@ public class ExternalUserControllerTests
 
         var okResult = Assert.IsType<OkObjectResult>(response.Result);
         var body = Assert.IsType<ResolveExternalUserResponse>(okResult.Value);
-        Assert.Equal(["Participant"], body.Roles);
+        Assert.Equal(["Participant", "Viewer"], body.Roles);
         Assert.Equal(participant.ParticipantId, body.ParticipantId);
     }
 

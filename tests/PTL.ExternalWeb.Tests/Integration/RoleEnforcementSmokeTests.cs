@@ -67,14 +67,13 @@ public class RoleEnforcementSmokeTests : IClassFixture<PtlExternalWebTestFactory
                 services.AddSingleton<IDistributionApiClient>(new FakeDistributionApiClient());
             })).CreateClient();
         var cookies = new Dictionary<string, string>();
+        // Real Participant accounts are always also granted the Viewer role by ExternalUserService
+        // (docs/Parity-Analysis/11-External-Role-Card-and-Menu-Visibility.md - legacy Generate
+        // Login did the same) - "Participant,Viewer" is what CIDM resolution would actually produce.
         var signInResponse = await client.GetAsync(
-            $"{PtlExternalWebTestFactory.TestSignInPath}?roles={Uri.EscapeDataString("Participant")}&participantId={Guid.NewGuid()}");
+            $"{PtlExternalWebTestFactory.TestSignInPath}?roles={Uri.EscapeDataString("Participant,Viewer")}&participantId={Guid.NewGuid()}");
         CookieForwardingHttpClient.CaptureCookies(signInResponse, cookies);
 
-        // "View reports" (TabulationController) is visible to Participant, Viewer and Test
-        // Consultant (docs/Parity-Analysis/11-External-Role-Card-and-Menu-Visibility.md: every
-        // Participant/Test Consultant account is always also given the Viewer SSO role at Generate
-        // Login) - a bare Participant must be let in, not just a Viewer.
         var response = await CookieForwardingHttpClient.SendWithCookiesAsync(
             client, HttpMethod.Get, "/Tabulation/Index", cookies);
 
@@ -99,6 +98,25 @@ public class RoleEnforcementSmokeTests : IClassFixture<PtlExternalWebTestFactory
             client, HttpMethod.Get, "/Tabulation/Index", cookies);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task TabulationIndex_ParticipantWithoutViewerRole_IsForbidden()
+    {
+        // TabulationController is gated on IsViewer alone, exactly like legacy - this would only
+        // happen if ExternalUserService somehow failed to grant the Viewer role it always grants
+        // to a resolved Participant (see its own comments), but proves the controller-level check
+        // hasn't silently grown its own multi-role logic.
+        var client = _factory.CreateClient();
+        var cookies = new Dictionary<string, string>();
+        var signInResponse = await client.GetAsync(
+            $"{PtlExternalWebTestFactory.TestSignInPath}?roles={Uri.EscapeDataString("Participant")}&participantId={Guid.NewGuid()}");
+        CookieForwardingHttpClient.CaptureCookies(signInResponse, cookies);
+
+        var response = await CookieForwardingHttpClient.SendWithCookiesAsync(
+            client, HttpMethod.Get, "/Tabulation/Index", cookies);
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
     [Fact]

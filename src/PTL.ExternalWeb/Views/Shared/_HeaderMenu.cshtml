@@ -8,11 +8,8 @@
     // header dropdown panel instead of a side column.
     var roles = User.GetResolvedExternalRoles();
     var canOrderOnline = User.CanOrderOnline();
-    // RequiredRole may be a single role or a comma-separated "any of" list (e.g. the Reports item,
-    // visible to Participant, Viewer or Test Consultant).
     bool IsVisible(NavigationItem item) =>
-        (item.RequiredRole is null
-            || item.RequiredRole.Split(',').Any(r => roles.Contains(r, StringComparer.OrdinalIgnoreCase)))
+        (item.RequiredRole is null || roles.Contains(item.RequiredRole, StringComparer.OrdinalIgnoreCase))
         && (!item.RequireCanOrderOnline || canOrderOnline);
 
     var visibleGroups = NavigationProvider.Build()

@@ -9,10 +9,12 @@ using PTL.SharedUI.Pagination;
 namespace PTL.ExternalWeb.Features.Tabulation;
 
 // Legacy Tabulations.aspx/TabulationView.aspx/AssessmentResults.aspx (tracker rows 15-16) - "View
-// Reports". Visible to Participant, Viewer and Test Consultant; every lookup is scoped to the
-// caller's own access by PTL.Api's "for-user" tabulation endpoints (ParticipantTabulationService),
-// never by trusting a bare id from the URL - see that service's own comments for why.
-[Authorize(Policy = ExternalPolicies.ViewReports)]
+// Reports". Gated on IsViewer alone, exactly like legacy (ExternalUserService now grants the
+// Viewer role to every resolved Participant/Test Consultant too - see its own comments - so this
+// single-role check already covers all three legacy-visible roles). Every lookup is further scoped
+// to the caller's own access by PTL.Api's "for-user" tabulation endpoints
+// (ParticipantTabulationService), never by trusting a bare id from the URL.
+[Authorize(Policy = ExternalPolicies.Viewer)]
 public sealed class TabulationController(IDistributionApiClient distributionApiClient) : Controller
 {
     private const int DefaultPageSize = 15;

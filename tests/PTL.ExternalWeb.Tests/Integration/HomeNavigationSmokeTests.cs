@@ -19,7 +19,9 @@ public class HomeNavigationSmokeTests : IClassFixture<PtlExternalWebTestFactory>
     [Fact]
     public async Task ParticipantOnly_SeesResultsSchemesOrdersAndAccountSections_NotReportsOrCommentsItems()
     {
-        var body = await GetHomePageAsSignedInUserAsync(roles: "Participant");
+        // ExternalUserService always grants Viewer alongside Participant (see its own comments) -
+        // "Participant,Viewer" is what CIDM resolution actually produces for a Participant account.
+        var body = await GetHomePageAsSignedInUserAsync(roles: "Participant,Viewer");
 
         Assert.Contains("Results", body);
         Assert.Contains("Enter results", body);
@@ -101,7 +103,8 @@ public class HomeNavigationSmokeTests : IClassFixture<PtlExternalWebTestFactory>
     [Fact]
     public async Task TestConsultantOnly_SeesEnterCommentsAndViewReports_NotParticipantOrViewerOnlyItems()
     {
-        var body = await GetHomePageAsSignedInUserAsync(roles: "Test Consultant");
+        // ExternalUserService always grants Viewer alongside Test Consultant (see its own comments).
+        var body = await GetHomePageAsSignedInUserAsync(roles: "Test Consultant,Viewer");
 
         Assert.Contains("Results", body);
         Assert.Contains("Enter comments", body);
@@ -240,6 +243,18 @@ public class HomeNavigationSmokeTests : IClassFixture<PtlExternalWebTestFactory>
         Assert.Contains($"Signed in as: <strong>{longName}</strong>", body);
         Assert.Contains("Lab Number: <strong>LAB001</strong>", body);
         Assert.Contains("Sign out", body);
+    }
+
+    [Fact]
+    public async Task SignedInUser_SeesCidmAccountLinkToTheSelfServicePortal()
+    {
+        // CidmOptions.AccountPortalUrl drops the idphub/b2c path from the configured Address
+        // (test config: https://cidm.test/idphub/b2c) - the portal lives at the bare origin.
+        var body = await GetHomePageAsSignedInUserAsync(roles: "Participant");
+
+        Assert.Contains(
+            """<a class="govuk-service-navigation__link" href="https://cidm.test/management" target="_blank" rel="noopener noreferrer">CIDM account</a>""",
+            body, StringComparison.Ordinal);
     }
 
     [Fact]

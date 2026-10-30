@@ -44,6 +44,12 @@ public sealed class ExternalUserService(
 
                 var customer = await customerRepository.GetByIdAsync(participant.CustomerId, cancellationToken);
                 canOrderOnline = await OnlineOrderingEligibility.CanOrderOnlineAsync(participantRepository, participant, customer, cancellationToken);
+
+                // Legacy's Generate Login always granted a Participant account both the
+                // Participant and Viewer SSO roles - "View reports" only ever checked IsViewer, so
+                // every Participant could see it without CIDM separately sending "Viewer". There is
+                // no real Viewer record backing this (ViewerId stays null); it's a role grant only.
+                AddRoleIfMissing(resolvedRoles, ViewerRoleName);
             }
         }
 
@@ -52,7 +58,7 @@ public sealed class ExternalUserService(
             viewerId = await ResolveViewerAsync(ssoIdExt, email, cancellationToken);
             if (viewerId is not null)
             {
-                resolvedRoles.Add(ViewerRoleName);
+                AddRoleIfMissing(resolvedRoles, ViewerRoleName);
             }
         }
 
@@ -64,10 +70,22 @@ public sealed class ExternalUserService(
             if (testConsultantId is not null)
             {
                 resolvedRoles.Add(TestConsultantRoleName);
+
+                // Same reasoning as Participant above - an external Test Consultant account was
+                // always also granted the Viewer SSO role at Generate Login.
+                AddRoleIfMissing(resolvedRoles, ViewerRoleName);
             }
         }
 
         return new ExternalUserResolutionResult(displayName, resolvedRoles, participantId, labCode, viewerId, testConsultantId, canOrderOnline, hasInactiveMatch);
+    }
+
+    private static void AddRoleIfMissing(List<string> resolvedRoles, string roleName)
+    {
+        if (!resolvedRoles.Contains(roleName, StringComparer.OrdinalIgnoreCase))
+        {
+            resolvedRoles.Add(roleName);
+        }
     }
 
     private static bool HasRole(IReadOnlyList<string> cidmRoles, string roleName) =>

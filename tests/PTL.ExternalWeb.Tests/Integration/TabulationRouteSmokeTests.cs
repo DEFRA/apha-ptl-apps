@@ -89,7 +89,7 @@ public class TabulationRouteSmokeTests : IClassFixture<PtlExternalWebTestFactory
                 [Summary(tabulationId, "D1a/00001", "BT", "Brucella", "Summary", new DateTime(2026, 5, 1), 2026, 5)])
         };
         var client = CreateClient(apiClient);
-        var cookies = await SignInAsync(client, "Participant", participantId: Guid.NewGuid());
+        var cookies = await SignInAsync(client, "Participant,Viewer", participantId: Guid.NewGuid());
 
         var response = await CookieForwardingHttpClient.SendWithCookiesAsync(client, HttpMethod.Get, "/Tabulation/Index", cookies);
         var body = await response.Content.ReadAsStringAsync();
@@ -120,7 +120,7 @@ public class TabulationRouteSmokeTests : IClassFixture<PtlExternalWebTestFactory
         var tabulationId = Guid.NewGuid();
         var apiClient = new FakeDistributionApiClient { PublishedTabulation = Report(tabulationId) };
         var client = CreateClient(apiClient);
-        var cookies = await SignInAsync(client, "Participant", participantId: Guid.NewGuid());
+        var cookies = await SignInAsync(client, "Participant,Viewer", participantId: Guid.NewGuid());
 
         var response = await CookieForwardingHttpClient.SendWithCookiesAsync(
             client, HttpMethod.Get, $"/Tabulation/Report?publishedTabulationId={tabulationId}", cookies);
@@ -144,7 +144,7 @@ public class TabulationRouteSmokeTests : IClassFixture<PtlExternalWebTestFactory
         // tampered id that belongs to someone else's scheme also resolves to nothing.
         var apiClient = new FakeDistributionApiClient { PublishedTabulation = null };
         var client = CreateClient(apiClient);
-        var cookies = await SignInAsync(client, "Participant", participantId: Guid.NewGuid());
+        var cookies = await SignInAsync(client, "Participant,Viewer", participantId: Guid.NewGuid());
 
         var response = await CookieForwardingHttpClient.SendWithCookiesAsync(
             client, HttpMethod.Get, $"/Tabulation/Report?publishedTabulationId={Guid.NewGuid()}", cookies);
@@ -168,7 +168,7 @@ public class TabulationRouteSmokeTests : IClassFixture<PtlExternalWebTestFactory
                 DistributionHeading: "D1a/S1 BT: Brucella")
         };
         var client = CreateClient(apiClient);
-        var cookies = await SignInAsync(client, "Participant", participantId: Guid.NewGuid());
+        var cookies = await SignInAsync(client, "Participant,Viewer", participantId: Guid.NewGuid());
 
         var response = await CookieForwardingHttpClient.SendWithCookiesAsync(
             client, HttpMethod.Get, $"/Tabulation/AssessmentResults?publishedTabulationId={tabulationId}&testId={testId}", cookies);
