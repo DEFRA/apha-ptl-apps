@@ -83,7 +83,7 @@ table.TabulationTable {
 
 .ptl-tabulation-ukas {
     margin: 1em 0;
-    text-align: center;
+    text-align: left;
 }
 
 .signatureTable {
@@ -100,12 +100,12 @@ table.TabulationTable {
 
 .cellTabulationSignature {
     flex: 1;
-    text-align: right;
+    text-align: left;
     font-size: smaller;
 }
 
 .cellTabulationSignature2 {
-    text-align: right;
+    text-align: left;
 }
 
 @media print {
