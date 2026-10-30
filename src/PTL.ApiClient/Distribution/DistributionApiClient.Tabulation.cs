@@ -24,6 +24,34 @@ public sealed partial class DistributionApiClient
     public async Task<TabulationAttachmentFile?> GetTabulationAttachmentAsync(Guid tabulationId, bool isPublished, Guid attachmentId, CancellationToken cancellationToken = default) =>
         await GetAttachmentFileAsync($"/api/distributions/{TabulationSegment(isPublished)}/{tabulationId}/attachments/{attachmentId}", cancellationToken);
 
+    public Task<PublishedTabulationSummaryListResponse> GetTabulationsForUserAsync(
+        Guid? participantId, Guid? viewerId, Guid? testConsultantId, CancellationToken cancellationToken = default) =>
+        GetAsync<PublishedTabulationSummaryListResponse>(
+            $"/api/distributions/tabulations/for-user?participantId={participantId}&viewerId={viewerId}&testConsultantId={testConsultantId}", cancellationToken);
+
+    public Task<TabulationReportResponse?> GetPublishedTabulationForUserAsync(
+        Guid publishedTabulationId, Guid? participantId, Guid? viewerId, Guid? testConsultantId, CancellationToken cancellationToken = default) =>
+        GetOrNullAsync<TabulationReportResponse>(
+            $"/api/distributions/published-tabulations/{publishedTabulationId}/for-user?participantId={participantId}&viewerId={viewerId}&testConsultantId={testConsultantId}", cancellationToken);
+
+    public Task<AssessmentResultsResponse?> GetAssessmentResultsForUserAsync(
+        Guid publishedTabulationId, Guid testId, Guid? participantId, Guid? viewerId, Guid? testConsultantId, CancellationToken cancellationToken = default) =>
+        GetOrNullAsync<AssessmentResultsResponse>(
+            $"/api/distributions/published-tabulations/{publishedTabulationId}/tests/{testId}/assessment-results/for-user?participantId={participantId}&viewerId={viewerId}&testConsultantId={testConsultantId}", cancellationToken);
+
+    public async Task<TabulationAttachmentFile?> GetPublishedTabulationAttachmentForUserAsync(
+        Guid publishedTabulationId, Guid attachmentId, Guid? participantId, Guid? viewerId, Guid? testConsultantId, CancellationToken cancellationToken = default) =>
+        await GetAttachmentFileAsync(
+            $"/api/distributions/published-tabulations/{publishedTabulationId}/attachments/{attachmentId}/for-user?participantId={participantId}&viewerId={viewerId}&testConsultantId={testConsultantId}", cancellationToken);
+
+    private async Task<T> GetAsync<T>(string url, CancellationToken cancellationToken)
+        where T : class
+    {
+        var response = await httpClient.GetAsync(new Uri(url, UriKind.Relative), cancellationToken);
+        response.EnsureSuccessStatusCode();
+        return (await response.Content.ReadFromJsonAsync<T>(cancellationToken))!;
+    }
+
     private async Task<TabulationAttachmentFile?> GetAttachmentFileAsync(string url, CancellationToken cancellationToken)
     {
         var response = await httpClient.GetAsync(new Uri(url, UriKind.Relative), cancellationToken);

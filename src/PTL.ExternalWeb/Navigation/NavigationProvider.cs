@@ -49,10 +49,18 @@ public static class NavigationProvider
             [
                 new NavigationItem
                 {
-                    Text = "Create order",
+                    Text = "Create order for current year",
                     ControllerName = "Order",
-                    ActionName = IndexAction,
-                    Description = "Order proficiency tests for the current or next year",
+                    ActionName = "CurrentYear",
+                    Description = "Order proficiency tests for the current year",
+                    RequiredRole = ExternalRoleNames.Participant
+                },
+                new NavigationItem
+                {
+                    Text = "Create order for next year",
+                    ControllerName = "Order",
+                    ActionName = "NextYear",
+                    Description = "Order proficiency tests for the next year",
                     RequiredRole = ExternalRoleNames.Participant
                 }
             ]

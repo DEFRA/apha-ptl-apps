@@ -1,0 +1,41 @@
+@model PTL.ExternalWeb.Features.Tabulation.AssessmentResultsPageViewModel
+@{
+    var results = Model.Results;
+    ViewData["Title"] = "Assessment Results";
+}
+
+<h1 class="govuk-heading-l">Assessment Results</h1>
+<h2 class="govuk-heading-m">@results.DistributionHeading</h2>
+
+@if (!results.IsAssessmentSubmitted)
+{
+    <p class="govuk-body">Assessment results have not yet been submitted for this test.</p>
+}
+else
+{
+    @foreach (var title in results.Titles)
+    {
+        <p class="govuk-body">@title</p>
+    }
+
+    <table class="govuk-table">
+        <caption class="govuk-table__caption govuk-visually-hidden">Assessment results</caption>
+        <thead class="govuk-table__head">
+            <tr class="govuk-table__row">
+                <th scope="col" class="govuk-table__header">@results.XAxisTitle</th>
+                <th scope="col" class="govuk-table__header govuk-table__header--numeric">@results.YAxisTitle</th>
+            </tr>
+        </thead>
+        <tbody class="govuk-table__body">
+            @foreach (var score in results.Scores)
+            {
+                <tr class="govuk-table__row">
+                    <td class="govuk-table__cell">@score.Label</td>
+                    <td class="govuk-table__cell govuk-table__cell--numeric">@score.Frequency</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+<a class="govuk-button govuk-button--secondary" asp-action="Report" asp-route-publishedTabulationId="@Model.PublishedTabulationId">Back</a>

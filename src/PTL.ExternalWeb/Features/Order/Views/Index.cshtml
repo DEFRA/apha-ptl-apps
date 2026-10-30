@@ -1,0 +1,49 @@
+@model PTL.ExternalWeb.Features.Order.CreateOrderViewModel
+@{
+    ViewData["Title"] = "Create new order";
+}
+
+<h1 class="govuk-heading-xl">Create new order</h1>
+
+<dl class="govuk-summary-list govuk-summary-list--no-border">
+    <div class="govuk-summary-list__row">
+        <dt class="govuk-summary-list__key">Contract year</dt>
+        <dd class="govuk-summary-list__value">@Model.Order.Year</dd>
+    </div>
+    <div class="govuk-summary-list__row">
+        <dt class="govuk-summary-list__key">QAL number</dt>
+        <dd class="govuk-summary-list__value">@Model.Order.QalNumber</dd>
+    </div>
+    <div class="govuk-summary-list__row">
+        <dt class="govuk-summary-list__key">Lab code</dt>
+        <dd class="govuk-summary-list__value">@Model.Order.LabCode</dd>
+    </div>
+</dl>
+
+<p class="govuk-body">
+    Select the schemes you want to order and the distribution months for each. Prices update as you make changes.
+</p>
+
+@* The draft order is saved on every change, so the page body is swapped in place by create-order.js - no
+   page refresh. The antiforgery token sits outside the swapped body so it survives each update. *@
+<div id="create-order"
+     data-change-url="@Url.Action("Change", "Order")"
+     data-year="@Model.YearSlug"
+     data-search="@Model.Search">
+    @Html.AntiForgeryToken()
+    <div id="create-order-error" class="govuk-error-summary" tabindex="-1" hidden>
+        <div role="alert">
+            <h2 class="govuk-error-summary__title">There is a problem</h2>
+            <div class="govuk-error-summary__body">
+                <p class="govuk-body">Your change could not be saved. Refresh the page and try again.</p>
+            </div>
+        </div>
+    </div>
+    <div id="create-order-body">
+        <partial name="_OrderBody" model="Model" />
+    </div>
+</div>
+
+@section Scripts {
+    <script src="~/js/create-order.js" defer></script>
+}

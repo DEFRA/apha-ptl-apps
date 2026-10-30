@@ -20,7 +20,9 @@
     // NavigationProvider's groups so the parent section is the actual nav section text (e.g.
     // "Results"), not a raw controller/action class name (e.g. "Distribution > Current" for the
     // Enter results page, "Distribution > Previous" for View results - both belong to "Results").
-    var parentSection = NavigationProvider.Build()
+    // Pages that are not themselves a nav child (e.g. a confirmation step reached from one) name their parent
+    // section via ViewData["BreadcrumbParent"].
+    var parentSection = ViewData["BreadcrumbParent"] as string ?? NavigationProvider.Build()
         .FirstOrDefault(group => group.Children.Any(child =>
             string.Equals(child.ControllerName, controller, StringComparison.OrdinalIgnoreCase) &&
             string.Equals(child.ActionName, action, StringComparison.OrdinalIgnoreCase)))

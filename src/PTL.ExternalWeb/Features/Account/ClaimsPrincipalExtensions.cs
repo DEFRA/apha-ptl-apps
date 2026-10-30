@@ -26,4 +26,13 @@ public static class ClaimsPrincipalExtensions
     /// (e.g. a Viewer/Test Consultant-only user).</summary>
     public static Guid? GetParticipantId(this ClaimsPrincipal principal) =>
         Guid.TryParse(principal.FindFirst(ExternalUserClaimTypes.ParticipantId)?.Value, out var id) ? id : null;
+
+    /// <summary>The resolved Viewer's own id, or null if the Viewer role didn't resolve (a
+    /// Participant-only user with no Viewer record).</summary>
+    public static Guid? GetViewerId(this ClaimsPrincipal principal) =>
+        Guid.TryParse(principal.FindFirst(ExternalUserClaimTypes.ViewerId)?.Value, out var id) ? id : null;
+
+    /// <summary>The resolved Test Consultant's own id, or null if the Test Consultant role didn't resolve.</summary>
+    public static Guid? GetTestConsultantId(this ClaimsPrincipal principal) =>
+        Guid.TryParse(principal.FindFirst(ExternalUserClaimTypes.TestConsultantId)?.Value, out var id) ? id : null;
 }

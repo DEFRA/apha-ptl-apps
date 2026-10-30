@@ -28,6 +28,14 @@ internal sealed partial class FakeDistributionApiClient : IDistributionApiClient
         return Task.FromResult(SaveResult);
     }
 
+    public Task<ParticipantPastDistributionListResponse> GetParticipantDistributionHistoryAsync(
+        Guid participantId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(new ParticipantPastDistributionListResponse([]));
+
+    public Task<ActualResultsResponse?> GetActualResultsForParticipantAsync(
+        Guid monthlyDistributionSchemeId, Guid participantId, CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException();
+
     public SampleNumbersResponse? SampleNumbers { get; set; }
     public IReadOnlyList<string> SampleNumbersErrors { get; set; } = [];
     public InitialiseMonthResult? InitialiseMonthResult { get; set; }

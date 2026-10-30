@@ -34,7 +34,7 @@ public class PendingOrderEntity
 
 // Row shape returned by spgPendingParticipantSchemeByPendingContractId. fldPrice comes from the
 // SQL function fnGetPendingParticipantSchemePrice, so scheme pricing needs no C# equivalent.
-public class PendingOrderSchemeEntity
+public class PendingOrderSchemeEntity : IDistributionMonthFlags
 {
     public Guid PendingParticipantSchemeId { get; set; }
     public Guid PendingContractId { get; set; }

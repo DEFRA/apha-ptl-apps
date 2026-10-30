@@ -1,0 +1,9 @@
+@model string
+
+@* Shared by Distribution/Previous.cshtml and Tabulation/Index.cshtml - see
+   docs/Code-Duplication-Playbook.md. Model is the current controller action name, so "Show All"
+   re-submits the form's own action with no query values. *@
+<div class="govuk-button-group">
+    <button class="govuk-button" data-module="govuk-button" type="submit">Search</button>
+    <a class="govuk-button govuk-button--secondary" data-module="govuk-button" asp-action="@Model">Show All</a>
+</div>

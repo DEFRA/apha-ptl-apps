@@ -118,4 +118,18 @@ public sealed class CidmOpenIdConnectEvents : OidcProviderEvents<ICidmExternalUs
             context.ProtocolMessage.PostLogoutRedirectUri,
             context.ProtocolMessage.State));
     }
+
+    public override Task SignedOutCallbackRedirect(RemoteSignOutContext context)
+    {
+        // HandleSignOutCallbackAsync only redirects if Properties.RedirectUri is set here - CIDM's
+        // end-session policy does not always echo the protected state back on its redirect to
+        // SignedOutCallbackPath, which otherwise leaves this blank and renders an empty page.
+        if (string.IsNullOrEmpty(context.Properties?.RedirectUri))
+        {
+            context.Properties ??= new AuthenticationProperties();
+            context.Properties.RedirectUri = "/Account/SignedOut";
+        }
+
+        return Task.CompletedTask;
+    }
 }

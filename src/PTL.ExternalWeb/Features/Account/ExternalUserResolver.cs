@@ -90,6 +90,16 @@ public sealed partial class ExternalUserResolver(IExternalUserApiClient external
             claims[ExternalUserClaimTypes.ParticipantId] = participantId.ToString();
         }
 
+        if (response.ViewerId is { } viewerId)
+        {
+            claims[ExternalUserClaimTypes.ViewerId] = viewerId.ToString();
+        }
+
+        if (response.TestConsultantId is { } testConsultantId)
+        {
+            claims[ExternalUserClaimTypes.TestConsultantId] = testConsultantId.ToString();
+        }
+
         return CidmExternalUserResolution.Allow(claims);
     }
 
