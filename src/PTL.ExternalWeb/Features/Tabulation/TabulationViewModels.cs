@@ -16,7 +16,8 @@ public sealed record TabulationListViewModel(
     int? Month,
     string? DistributionReference,
     string? SchemeCode,
-    string? SchemeName)
+    string? SchemeName,
+    IReadOnlyList<int> AvailableYears)
 {
     public bool IsFiltered =>
         Year is not null || Month is not null

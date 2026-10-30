@@ -66,40 +66,18 @@ table.TabulationTable {
     box-shadow: inset 0 0 0 2px #0b0c0c;
 }
 
-.divTestConsultantComments {
-    border-top: 1px solid black;
-    border-bottom: 1px solid black;
-    border-left: 1px dotted black;
-    border-right: 1px dotted black;
-    font-size: 80%;
-    padding: 4px;
-    margin-top: 1em;
-    background-color: #fcfcfc;
-}
-
-.divTestConsultantComments p {
-    margin-top: 0;
-}
-
 .ptl-tabulation-ukas {
     margin: 1em 0;
     text-align: left;
 }
 
-.signatureTable {
-    display: flex;
-    width: 100%;
-    margin-bottom: 1em;
-}
-
 .cellVersionDate {
     text-align: left;
     font-size: smaller;
-    width: 15%;
+    margin-bottom: 1em;
 }
 
 .cellTabulationSignature {
-    flex: 1;
     text-align: left;
     font-size: smaller;
 }
@@ -143,16 +121,10 @@ table.TabulationTable {
 
     .cellTabulationSignature2,
     .cellTabulationSignature,
-    .cellVersionDate,
-    .divTestConsultantComments {
+    .cellVersionDate {
         font-size: 8.5pt;
         color: black;
         font-weight: normal;
-    }
-
-    .cellVersionDate,
-    .cellTabulationSignature {
-        width: 50%;
     }
 }
 
@@ -185,24 +157,11 @@ table.TabulationTable {
 
 @media screen {
     #commentsDiv,
-    .signatureTable,
+    .cellVersionDate,
+    .cellTabulationSignature,
     .ptl-tabulation-ukas {
         font-family: "GDS Transport", arial, sans-serif;
         color: var(--govuk-text-colour, #0b0c0c);
-    }
-
-    #commentsDiv .divTestConsultantComments {
-        font-size: 1.1875rem;
-        line-height: 1.3158;
-        margin: 0 0 30px;
-        padding: 0 0 0 15px;
-        border: 0;
-        border-left: 5px solid #b1b4b6;
-        background: none;
-    }
-
-    #commentsDiv .divTestConsultantComments p {
-        margin: 0 0 20px;
     }
 
     .cellVersionDate,

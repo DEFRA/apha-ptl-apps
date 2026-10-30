@@ -47,12 +47,20 @@ public sealed class TabulationController(IDistributionApiClient distributionApiC
 
         var list = await distributionApiClient.GetTabulationsForUserAsync(participantId, viewerId, testConsultantId, cancellationToken);
 
+        // Legacy Tabulations.aspx.vb's PopulateDropdowns builds the Year dropdown from both
+        // YearId and DistributionDate.Year across the user's own full (unfiltered) tabulation list.
+        var availableYears = list.Tabulations
+            .SelectMany(t => new[] { t.YearId, t.DistributionDate.Year })
+            .Distinct()
+            .OrderBy(y => y)
+            .ToList();
+
         var filtered = Filter(list.Tabulations, year, month, distributionReference, schemeCode, schemeName);
         var sorted = Sort(filtered, sortBy, sortDir);
         var paged = sorted.Skip((page - 1) * pageSize).Take(pageSize).ToList();
 
         return View(new TabulationListViewModel(
-            paged, sorted.Count, page, pageSize, sortBy, sortDir, year, month, distributionReference, schemeCode, schemeName));
+            paged, sorted.Count, page, pageSize, sortBy, sortDir, year, month, distributionReference, schemeCode, schemeName, availableYears));
     }
 
     // Legacy TabulationView.aspx - read only, no participant/viewer switcher (unlike InternalWeb's

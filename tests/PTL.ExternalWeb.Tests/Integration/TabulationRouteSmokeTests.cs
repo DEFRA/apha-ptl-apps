@@ -23,19 +23,21 @@ public class TabulationRouteSmokeTests : IClassFixture<PtlExternalWebTestFactory
         DateTime date, int yearId, int monthId) =>
         new(tabulationId, reference, schemeCode, schemeName, tabulationName, date, yearId, monthId);
 
-    private static TabulationReportResponse Report(Guid tabulationId, Guid? assessmentTestId = null) => new(
+    private static TabulationReportResponse Report(
+        Guid tabulationId, Guid? assessmentTestId = null, bool showUkasLogo = false, TabulationSignatoryResponse? signatory = null,
+        string standardTabulationTextHtml = "") => new(
         tabulationId,
         IsPublished: true,
         DistributionTabulationId: tabulationId,
         Title: "FINAL REPORT for D1a/S1 BT: Brucella",
         TabulationName: "Summary",
         DistributionDateText: "Date Of Distribution: 01/05/2026",
-        StandardTabulationTextHtml: "",
+        StandardTabulationTextHtml: standardTabulationTextHtml,
         CommentsHtml: "",
         TestConsultantCommentsHtml: "",
         TestConsultantCommentsTitle: "Comments :",
-        ShowUkasLogo: false,
-        Signatory: null,
+        ShowUkasLogo: showUkasLogo,
+        Signatory: signatory,
         ParticipantOptions: [],
         SelectedParticipantId: Guid.Empty,
         ViewerOptions: [],
@@ -115,6 +117,45 @@ public class TabulationRouteSmokeTests : IClassFixture<PtlExternalWebTestFactory
     }
 
     [Fact]
+    public async Task Index_SortedByColumn_RendersVisibleSortIndicatorNotJustAriaSort()
+    {
+        var apiClient = new FakeDistributionApiClient
+        {
+            Tabulations = new PublishedTabulationSummaryListResponse(
+                [Summary(Guid.NewGuid(), "D1a/00001", "BT", "Brucella", "Summary", new DateTime(2026, 5, 1), 2026, 5)])
+        };
+        var client = CreateClient(apiClient);
+        var cookies = await SignInAsync(client, "Participant,Viewer", participantId: Guid.NewGuid());
+
+        var response = await CookieForwardingHttpClient.SendWithCookiesAsync(
+            client, HttpMethod.Get, "/Tabulation/Index?sortBy=schemeCode&sortDir=asc", cookies);
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("""Scheme Code<span aria-hidden="true"> ▲</span><span class="govuk-visually-hidden">, sorted ascending</span>""", body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Index_RendersYearAsADropdownOfAvailableYearsNotFreeText()
+    {
+        var apiClient = new FakeDistributionApiClient
+        {
+            Tabulations = new PublishedTabulationSummaryListResponse(
+                [Summary(Guid.NewGuid(), "D1a/00001", "BT", "Brucella", "Summary", new DateTime(2026, 5, 1), 2026, 5)])
+        };
+        var client = CreateClient(apiClient);
+        var cookies = await SignInAsync(client, "Participant,Viewer", participantId: Guid.NewGuid());
+
+        var response = await CookieForwardingHttpClient.SendWithCookiesAsync(client, HttpMethod.Get, "/Tabulation/Index?year=2026", cookies);
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("""<select class="govuk-select" id="year" name="year">""", body, StringComparison.Ordinal);
+        Assert.Contains("""<option value="2026" selected="selected">2026</option>""", body, StringComparison.Ordinal);
+        Assert.DoesNotContain("type=\"number\" id=\"year\"", body, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Report_ApiResolvesTheTabulation_RendersTheTable()
     {
         var tabulationId = Guid.NewGuid();
@@ -134,6 +175,54 @@ public class TabulationRouteSmokeTests : IClassFixture<PtlExternalWebTestFactory
         // user's own, unlike InternalWeb's staff-facing equivalent.
         var main = Regex.Match(body, "<main.*?</main>", RegexOptions.Singleline).Value;
         Assert.DoesNotContain("<select", main, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Report_WithSignatoryAndUkasLogo_RendersVersionAboveTheLogo()
+    {
+        // Legacy TabulationView.aspx's tabulation-footer stacks tabulation-version-info ->
+        // tabulation-certification-logo -> tabulation-signature-address in that order (not the
+        // version paired beside the address in a two-column row).
+        var tabulationId = Guid.NewGuid();
+        var signatory = new TabulationSignatoryResponse("Version 3, dated 01/05/2026", "Dr Jane Smith", ["Addr line 1"], "Issued 01/05/2026");
+        var apiClient = new FakeDistributionApiClient { PublishedTabulation = Report(tabulationId, showUkasLogo: true, signatory: signatory) };
+        var client = CreateClient(apiClient);
+        var cookies = await SignInAsync(client, "Participant,Viewer", participantId: Guid.NewGuid());
+
+        var response = await CookieForwardingHttpClient.SendWithCookiesAsync(
+            client, HttpMethod.Get, $"/Tabulation/Report?publishedTabulationId={tabulationId}", cookies);
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var versionIndex = body.IndexOf("Version 3, dated 01/05/2026", StringComparison.Ordinal);
+        var logoIndex = body.IndexOf("ukas.png", StringComparison.Ordinal);
+        Assert.True(versionIndex >= 0 && logoIndex >= 0 && versionIndex < logoIndex,
+            "Expected the Version text to appear before the UKAS logo image in the rendered page.");
+    }
+
+    [Fact]
+    public async Task Report_WithStandardTabulationText_RendersAsPlainGovUkBodyNotABoxedComment()
+    {
+        // ExternalWeb's own legacy TabulationView.aspx never boxes Standard Tabulation Text,
+        // Sample Comments or Test Consultant Comments (unlike InternalWeb's staff-facing
+        // Tabulation.aspx, whose divTestConsultantComments class renders a bordered card) - this
+        // app's markup must not carry that InternalWeb-only styling over.
+        var tabulationId = Guid.NewGuid();
+        var apiClient = new FakeDistributionApiClient
+        {
+            PublishedTabulation = Report(tabulationId, standardTabulationTextHtml: "<p>Store samples at -20C.</p>")
+        };
+        var client = CreateClient(apiClient);
+        var cookies = await SignInAsync(client, "Participant,Viewer", participantId: Guid.NewGuid());
+
+        var response = await CookieForwardingHttpClient.SendWithCookiesAsync(
+            client, HttpMethod.Get, $"/Tabulation/Report?publishedTabulationId={tabulationId}", cookies);
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("""<div class="govuk-body">""", body, StringComparison.Ordinal);
+        Assert.Contains("Store samples at -20C.", body, StringComparison.Ordinal);
+        Assert.DoesNotContain("divTestConsultantComments", body, StringComparison.Ordinal);
     }
 
     [Fact]

@@ -1,5 +1,6 @@
 @model PTL.ExternalWeb.Features.Tabulation.TabulationListViewModel
 @using System.Globalization
+@using Microsoft.AspNetCore.Html
 @using PTL.SharedUI.Pagination
 @{
     ViewData["Title"] = "View Reports";
@@ -39,6 +40,21 @@
 
     static string AriaSort(string currentSortBy, string currentSortDir, string column) =>
         currentSortBy != column ? "none" : currentSortDir == "asc" ? "ascending" : "descending";
+
+    // GOV.UK ships no sortable-table-header component - matches the hand-rolled pattern already
+    // used by Features/Scheme/Views/Index.cshtml (aria-sort on the th, a visible glyph plus a
+    // visually-hidden direction label alongside the column link).
+    IHtmlContent SortIndicator(string column)
+    {
+        if (Model.SortBy != column)
+        {
+            return HtmlString.Empty;
+        }
+
+        var arrow = Model.SortDirection == "asc" ? " \u25b2" : " \u25bc";
+        var direction = Model.SortDirection == "asc" ? "ascending" : "descending";
+        return new HtmlString($"""<span aria-hidden="true">{arrow}</span><span class="govuk-visually-hidden">, sorted {direction}</span>""");
+    }
 }
 
 <h1 class="govuk-heading-l">View Reports</h1>
@@ -50,7 +66,13 @@
         <div class="govuk-grid-column-one-half">
             <div class="govuk-form-group">
                 <label class="govuk-label" for="year">Year</label>
-                <input class="govuk-input govuk-input--width-5" type="number" id="year" name="year" value="@Model.Year" />
+                <select class="govuk-select" id="year" name="year">
+                    <option value="">All</option>
+                    @foreach (var availableYear in Model.AvailableYears)
+                    {
+                        <option value="@availableYear" selected="@(Model.Year == availableYear)">@availableYear</option>
+                    }
+                </select>
             </div>
 
             <div class="govuk-form-group">
@@ -99,19 +121,19 @@ else
         <thead class="govuk-table__head">
             <tr class="govuk-table__row">
                 <th scope="col" class="govuk-table__header" aria-sort="@AriaSort(Model.SortBy, Model.SortDirection, "reference")">
-                    <a class="govuk-link" href="@SortUrl("reference")">Distribution Reference</a>
+                    <a class="govuk-link" href="@SortUrl("reference")">Distribution Reference@(SortIndicator("reference"))</a>
                 </th>
                 <th scope="col" class="govuk-table__header" aria-sort="@AriaSort(Model.SortBy, Model.SortDirection, "schemeCode")">
-                    <a class="govuk-link" href="@SortUrl("schemeCode")">Scheme Code</a>
+                    <a class="govuk-link" href="@SortUrl("schemeCode")">Scheme Code@(SortIndicator("schemeCode"))</a>
                 </th>
                 <th scope="col" class="govuk-table__header" aria-sort="@AriaSort(Model.SortBy, Model.SortDirection, "schemeName")">
-                    <a class="govuk-link" href="@SortUrl("schemeName")">Scheme Name</a>
+                    <a class="govuk-link" href="@SortUrl("schemeName")">Scheme Name@(SortIndicator("schemeName"))</a>
                 </th>
                 <th scope="col" class="govuk-table__header" aria-sort="@AriaSort(Model.SortBy, Model.SortDirection, "tabulationName")">
-                    <a class="govuk-link" href="@SortUrl("tabulationName")">Report Name</a>
+                    <a class="govuk-link" href="@SortUrl("tabulationName")">Report Name@(SortIndicator("tabulationName"))</a>
                 </th>
                 <th scope="col" class="govuk-table__header" aria-sort="@AriaSort(Model.SortBy, Model.SortDirection, "distributionDate")">
-                    <a class="govuk-link" href="@SortUrl("distributionDate")">Distribution Date</a>
+                    <a class="govuk-link" href="@SortUrl("distributionDate")">Distribution Date@(SortIndicator("distributionDate"))</a>
                 </th>
                 <th scope="col" class="govuk-table__header">Report</th>
             </tr>
