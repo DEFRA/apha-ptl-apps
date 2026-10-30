@@ -44,10 +44,12 @@ public sealed class ParticipantSchemeFormViewModel
 
     public int? SchemeOptionsPage { get; set; } = 1;
 
+    public int SchemeOptionsPageSize { get; set; } = PaginationModel.DefaultPageSize;
+
     public PaginationModel SchemePagination => new()
     {
         CurrentPage = SchemeOptionsPage.GetValueOrDefault(1),
-        PageSize = PaginationModel.DefaultPageSize,
+        PageSize = SchemeOptionsPageSize,
         TotalRecords = SchemeOptionsTotalCount.GetValueOrDefault(),
         Action = "Create",
         RouteValues = new Dictionary<string, object?> { ["contractId"] = ContractId, ["customerId"] = CustomerId, ["participantId"] = ParticipantId, ["schemeSearchTerm"] = SchemeSearchTerm }

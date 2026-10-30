@@ -45,6 +45,8 @@ public class ParticipantSchemeFieldsRenderTests : IClassFixture<WebApplicationFa
         var schemes = new FakeSchemeApiClient
         {
             SchemeResponse = ParticipantSchemeControllerTests.SampleScheme(SchemeId, yearId, jan: true, feb: true),
+            SearchResponse = new SchemeSearchResponse(
+                [new SchemeSummaryResponse(Guid.NewGuid(), yearId, Guid.NewGuid(), "S1", "Salmonella", null, null, null, null, null, null)], 120, 1, 25),
         };
 
         void ConfigureFakes(IServiceCollection services)
@@ -73,14 +75,16 @@ public class ParticipantSchemeFieldsRenderTests : IClassFixture<WebApplicationFa
             }));
     }
 
-    private async Task<string> MainContentAsync(string url, bool asOverrideUser = false)
+    private async Task<string> PageAsync(string url, bool asOverrideUser = false)
     {
         var response = await (asOverrideUser ? _overrideUserFactory : _factory).CreateClient().GetAsync(url);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var html = await response.Content.ReadAsStringAsync();
-        return Regex.Match(html, "<main.*?</main>", RegexOptions.Singleline).Value;
+        return await response.Content.ReadAsStringAsync();
     }
+
+    private async Task<string> MainContentAsync(string url, bool asOverrideUser = false) =>
+        Regex.Match(await PageAsync(url, asOverrideUser), "<main.*?</main>", RegexOptions.Singleline).Value;
 
     private static string InputTag(string html, string id) => Regex.Match(html, $"<input[^>]*id=\"{id}\"[^>]*>").Value;
 
@@ -188,15 +192,27 @@ public class ParticipantSchemeFieldsRenderTests : IClassFixture<WebApplicationFa
         Assert.Contains("Full scheme pricing", select, StringComparison.Ordinal);
     }
 
-    // Without scripting the participant choice must still be submittable, so it has a button rather than an auto-submit.
+    // The page size and page controls submit page and pageSize; the Create action must bind them rather than ignore them.
     [Fact]
-    public async Task Create_ParticipantPicker_HasASubmitButtonAndNoAutoSubmitScript()
+    public async Task Create_SchemeList_BindsThePageAndPageSizeTheSharedControlsSubmit()
     {
-        var html = await MainContentAsync($"/ParticipantScheme/Create?contractId={ContractId}&customerId={CustomerId}");
+        var html = await MainContentAsync($"/ParticipantScheme/Create?contractId={ContractId}&customerId={CustomerId}&page=2&pageSize=50");
 
-        var form = Regex.Match(html, "<form[^>]*method=\"get\".*?</form>", RegexOptions.Singleline).Value;
+        Assert.Contains("<option value=\"50\" selected>50</option>", html, StringComparison.Ordinal);
+        Assert.Contains("aria-label=\"Page 2\" aria-current=\"page\"", html, StringComparison.Ordinal);
+    }
+
+    // Choosing a participant applies it at once; the button only exists inside noscript so the page still works without scripting.
+    [Fact]
+    public async Task Create_ParticipantPicker_SubmitsOnChangeAndOnlyOffersAButtonWithoutScripting()
+    {
+        var page = await PageAsync($"/ParticipantScheme/Create?contractId={ContractId}&customerId={CustomerId}");
+
+        var main = Regex.Match(page, "<main.*?</main>", RegexOptions.Singleline).Value;
+        var form = Regex.Match(main, "<form[^>]*method=\"get\".*?</form>", RegexOptions.Singleline).Value;
         Assert.Contains("id=\"participantId\"", form, StringComparison.Ordinal);
-        Assert.Matches("<button[^>]*type=\"submit\"[^>]*>Select Participant</button>", form);
-        Assert.DoesNotContain("onchange", html, StringComparison.Ordinal);
+        Assert.Matches("(?s)<noscript>.*?<button[^>]*type=\"submit\"[^>]*>Select Participant</button>.*?</noscript>", form);
+        Assert.DoesNotContain("Select Participant", Regex.Replace(form, "(?s)<noscript>.*?</noscript>", string.Empty), StringComparison.Ordinal);
+        Assert.Matches("(?s)getElementById\\('participantId'\\)\\.addEventListener\\('change'.*?this\\.form\\.submit\\(\\)", page);
     }
 }

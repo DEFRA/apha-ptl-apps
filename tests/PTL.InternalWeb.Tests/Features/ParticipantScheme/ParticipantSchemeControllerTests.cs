@@ -563,6 +563,41 @@ public class ParticipantSchemeControllerTests
         Assert.Equal("sal", pagination.RouteValues["schemeSearchTerm"]);
     }
 
+    [Fact]
+    public async Task Create_Get_PassesThePageAndPageSizeToTheSchemeSearch()
+    {
+        var contractId = Guid.NewGuid();
+        var customerId = Guid.NewGuid();
+        var contractApiClient = new FakeContractApiClient { ContractResponse = SampleContract(contractId, customerId) with { YearId = DateTime.UtcNow.Year } };
+        var schemeApiClient = new FakeSchemeApiClient { SearchResponse = new SchemeSearchResponse([], 120, 2, 50) };
+        var controller = CreateController(contractApiClient: contractApiClient, schemeApiClient: schemeApiClient);
+
+        var result = await controller.Create(contractId, customerId, page: 2, pageSize: 50);
+
+        var model = Assert.IsType<ParticipantSchemeFormViewModel>(Assert.IsType<ViewResult>(result).Model);
+        Assert.Equal((2, 50), (schemeApiClient.LastSearchRequest!.Page, schemeApiClient.LastSearchRequest.PageSize));
+        Assert.Equal((2, 50), (model.SchemePagination.CurrentPage, model.SchemePagination.PageSize));
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(7)]
+    [InlineData(1000)]
+    public async Task Create_Get_UnsupportedPageSize_FallsBackToTheDefault(int pageSize)
+    {
+        var contractId = Guid.NewGuid();
+        var customerId = Guid.NewGuid();
+        var contractApiClient = new FakeContractApiClient { ContractResponse = SampleContract(contractId, customerId) with { YearId = DateTime.UtcNow.Year } };
+        var schemeApiClient = new FakeSchemeApiClient();
+        var controller = CreateController(contractApiClient: contractApiClient, schemeApiClient: schemeApiClient);
+
+        var result = await controller.Create(contractId, customerId, pageSize: pageSize);
+
+        var model = Assert.IsType<ParticipantSchemeFormViewModel>(Assert.IsType<ViewResult>(result).Model);
+        Assert.Equal(25, schemeApiClient.LastSearchRequest!.PageSize);
+        Assert.Equal(25, model.SchemePagination.PageSize);
+    }
+
     private static SchemeMonthEditabilityResponse MonthsDefined(bool jan = true, bool feb = true) =>
         new(jan, feb, true, true, true, true, true, true, true, true, true, true);
 
