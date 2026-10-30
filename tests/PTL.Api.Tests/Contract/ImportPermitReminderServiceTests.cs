@@ -49,21 +49,16 @@ public class ImportPermitReminderServiceTests
         public FakeRepository Repository { get; } = new();
         public RecordingNotifyClient Notify { get; } = new();
         public MessageCapturingLogger<ImportPermitReminderService> Logger { get; } = new();
-        public ImportPermitReminderOptions Options { get; } = new();
         public SettableTimeProvider Clock { get; } = new(new DateTimeOffset(2026, 10, 30, 9, 0, 0, TimeSpan.Zero));
         public ImportPermitReminderService Service { get; }
 
-        public Harness(Action<ImportPermitReminderOptions>? configure = null)
-        {
-            configure?.Invoke(Options);
+        public Harness() =>
             Service = new ImportPermitReminderService(
                 Repository,
                 Notify,
                 new ImportPermitReminderGuard(),
                 Clock,
-                Microsoft.Extensions.Options.Options.Create(Options),
                 Logger);
-        }
 
         public void Due(int offset, IEnumerable<ImportPermitCustomerEntity>? customers = null, IEnumerable<ImportPermitParticipantEntity>? participants = null) =>
             Repository.ByOffset[offset] = new ImportPermitReminderData(
@@ -116,41 +111,13 @@ public class ImportPermitReminderServiceTests
     // ---- Offsets ----
 
     [Fact]
-    public async Task ProcessRemindersAsync_QueriesTheThreeConfiguredOffsetsInOrder()
+    public async Task ProcessRemindersAsync_QueriesTwentyEightFourteenAndSevenDaysInOrder()
     {
         var h = new Harness();
 
         await h.Service.ProcessRemindersAsync();
 
         Assert.Equal([28, 14, 7], h.Repository.Queried);
-    }
-
-    [Fact]
-    public async Task ProcessRemindersAsync_UsesTheConfiguredOffsets()
-    {
-        var h = new Harness(o =>
-        {
-            o.FirstReminderDays = 30;
-            o.SecondReminderDays = 20;
-            o.ThirdReminderDays = 10;
-        });
-
-        await h.Service.ProcessRemindersAsync();
-
-        Assert.Equal([30, 20, 10], h.Repository.Queried);
-    }
-
-    [Fact]
-    public async Task ProcessRemindersAsync_Disabled_DoesNothing()
-    {
-        var h = new Harness(o => o.Enabled = false);
-        h.Due(28, [CustomerRow()], [ParticipantRow()]);
-
-        var summary = await h.Service.ProcessRemindersAsync();
-
-        Assert.Empty(h.Repository.Queried);
-        Assert.Empty(h.Notify.Sent);
-        Assert.Equal(ImportPermitReminderRunSummary.Empty, summary);
     }
 
     [Fact]
@@ -510,15 +477,5 @@ public class ImportPermitReminderServiceTests
         await h.Service.ProcessRemindersAsync();
 
         Assert.Empty(h.Notify.Sent);
-    }
-
-    [Fact]
-    public void Options_DefaultToTwentyEightFourteenAndSevenDays()
-    {
-        var options = new ImportPermitReminderOptions();
-
-        Assert.Equal("ImportPermitReminders", ImportPermitReminderOptions.SectionName);
-        Assert.True(options.Enabled);
-        Assert.Equal([28, 14, 7], options.Offsets);
     }
 }

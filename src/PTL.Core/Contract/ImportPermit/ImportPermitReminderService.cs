@@ -1,7 +1,6 @@
 using System.Globalization;
 using System.Text;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using PTL.Core.Notifications;
 
 namespace PTL.Core.Contract.ImportPermit;
@@ -23,19 +22,12 @@ public sealed partial class ImportPermitReminderService(
     INotifyClient notifyClient,
     ImportPermitReminderGuard guard,
     TimeProvider timeProvider,
-    IOptions<ImportPermitReminderOptions> options,
     ILogger<ImportPermitReminderService> logger) : IImportPermitReminderService
 {
     public async Task<ImportPermitReminderRunSummary> ProcessRemindersAsync(CancellationToken cancellationToken = default)
     {
-        if (!options.Value.Enabled)
-        {
-            LogDisabled(logger);
-            return ImportPermitReminderRunSummary.Empty;
-        }
-
         var total = ImportPermitReminderRunSummary.Empty;
-        foreach (var offset in options.Value.Offsets)
+        foreach (var offset in ImportPermitReminderSchedule.Offsets)
         {
             var summary = await ProcessOffsetAsync(offset, cancellationToken);
             total = new ImportPermitReminderRunSummary(
@@ -233,9 +225,6 @@ public sealed partial class ImportPermitReminderService(
         };
 
     private bool FirstLogToday(string key) => guard.FirstLogToday(key, DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime));
-
-    [LoggerMessage(EventId = 101, Level = LogLevel.Information, Message = "Import permit reminders are disabled.")]
-    private static partial void LogDisabled(ILogger logger);
 
     [LoggerMessage(EventId = 102, Level = LogLevel.Information,
         Message = "Import permit customer reminder sent. QalNumber={QalNumber} ReminderType={ReminderType} Participants={Participants}")]

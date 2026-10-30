@@ -248,7 +248,6 @@ builder.Services.AddSingleton<IPublicationEmailDispatcher>(sp => sp.GetRequiredS
 builder.Services.AddHostedService(sp => sp.GetRequiredService<PTL.Api.BackgroundServices.PublicationEmailDispatcher>());
 
 // Import permit reminders: the scheduler runs this on every poll, like the legacy service did on every timer tick.
-builder.Services.Configure<ImportPermitReminderOptions>(builder.Configuration.GetSection(ImportPermitReminderOptions.SectionName));
 builder.Services.AddSingleton<ImportPermitReminderGuard>();
 builder.Services.AddScoped<IImportPermitReminderRepository, ImportPermitReminderRepository>();
 builder.Services.AddScoped<IImportPermitReminderService, ImportPermitReminderService>();

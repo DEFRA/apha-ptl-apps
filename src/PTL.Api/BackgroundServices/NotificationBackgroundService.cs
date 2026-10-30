@@ -12,18 +12,11 @@ public sealed partial class NotificationBackgroundService(
     IServiceScopeFactory scopeFactory,
     IOptions<NotificationSchedulerOptions> schedulerOptions,
     IOptions<TabulationEmailOptions> tabulationOptions,
-    IOptions<ImportPermitReminderOptions> importPermitOptions,
     TimeProvider timeProvider,
     ILogger<NotificationBackgroundService> logger) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        if (!tabulationOptions.Value.Enabled && !importPermitOptions.Value.Enabled)
-        {
-            LogDisabled(logger);
-            return;
-        }
-
         var settings = schedulerOptions.Value;
         var pollInterval = settings.PollInterval > TimeSpan.Zero ? settings.PollInterval : new NotificationSchedulerOptions().PollInterval;
         LogStarted(logger, settings.StartupDelay, pollInterval);
@@ -59,13 +52,10 @@ public sealed partial class NotificationBackgroundService(
         }
 
         // Legacy ran the import permit job last, after the Test Consultant job, on the same tick.
-        if (importPermitOptions.Value.Enabled)
-        {
-            await RunJobAsync(
-                "ImportPermitReminders",
-                () => scope.ServiceProvider.GetRequiredService<IImportPermitReminderService>().ProcessRemindersAsync(cancellationToken),
-                cancellationToken);
-        }
+        await RunJobAsync(
+            "ImportPermitReminders",
+            () => scope.ServiceProvider.GetRequiredService<IImportPermitReminderService>().ProcessRemindersAsync(cancellationToken),
+            cancellationToken);
     }
 
     private async Task RunJobAsync(string job, Func<Task> run, CancellationToken cancellationToken)
@@ -79,9 +69,6 @@ public sealed partial class NotificationBackgroundService(
             LogJobFailed(logger, job, ex);
         }
     }
-
-    [LoggerMessage(EventId = 41, Level = LogLevel.Information, Message = "Notification scheduler is disabled (every scheduled email job is disabled).")]
-    private static partial void LogDisabled(ILogger logger);
 
     [LoggerMessage(EventId = 42, Level = LogLevel.Information, Message = "Notification scheduler started. StartupDelay={StartupDelay} PollInterval={PollInterval}")]
     private static partial void LogStarted(ILogger logger, TimeSpan startupDelay, TimeSpan pollInterval);
