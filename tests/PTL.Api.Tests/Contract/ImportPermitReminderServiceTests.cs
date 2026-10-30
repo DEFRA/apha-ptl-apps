@@ -331,6 +331,25 @@ public class ImportPermitReminderServiceTests
         Assert.Equal(1, summary.ParticipantEmailsSent);
     }
 
+    // The permit and date columns are the procedure's own inputs (an expired permit is still due a reminder); the service
+    // reminds every row it is given and applies none of those rules a second time.
+    [Fact]
+    public async Task ProcessRemindersAsync_RemindsEveryRowTheProcedureReturns_WhateverItsPermitAndDateColumnsHold()
+    {
+        var h = new Harness();
+        var expiredPermit = ParticipantRow();
+        expiredPermit.ImportPermitReceived = true;
+        expiredPermit.ImportPermitExpiry = new DateTime(2026, 11, 1);
+        expiredPermit.DistributionDate = new DateTime(2026, 11, 20);
+        expiredPermit.OverseasPostingDate = new DateTime(2026, 11, 27);
+        h.Due(28, [], [expiredPermit]);
+
+        var summary = await h.Service.ProcessRemindersAsync();
+
+        Assert.Equal(ImportPermitReminderTemplates.ParticipantId, Assert.Single(h.Notify.Sent).TemplateId);
+        Assert.Equal(1, summary.ParticipantEmailsSent);
+    }
+
     // ---- Repeated polls: the job runs on every scheduler poll, so the same problem is logged once a day ----
 
     [Fact]
