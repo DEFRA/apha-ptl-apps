@@ -112,7 +112,7 @@ public sealed partial class ImportPermitReminderService(
 
     // Every participant on every distribution this customer has due at this offset - one grouped email
     // rather than one per distribution.
-    private static IReadOnlyList<ImportPermitParticipantEntity> ParticipantsDueFor(ImportPermitReminderData data, Guid customerId)
+    private static List<ImportPermitParticipantEntity> ParticipantsDueFor(ImportPermitReminderData data, Guid customerId)
     {
         var distributions = data.Customers
             .Where(c => c.CustomerId == customerId)
@@ -126,7 +126,7 @@ public sealed partial class ImportPermitReminderService(
     // False when the send failed: the customer stays unreminded and the failure is logged once a day.
     private async Task<bool> TrySendCustomerReminderAsync(
         ImportPermitCustomerEntity customer,
-        IReadOnlyList<ImportPermitParticipantEntity> participants,
+        List<ImportPermitParticipantEntity> participants,
         int offset,
         CancellationToken cancellationToken)
     {
