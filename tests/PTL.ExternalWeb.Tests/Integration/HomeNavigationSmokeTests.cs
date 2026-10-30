@@ -29,9 +29,10 @@ public class HomeNavigationSmokeTests : IClassFixture<PtlExternalWebTestFactory>
         // Orders also requires CanOrderOnline (see ParticipantWithoutCanOrderOnline_* /
         // ParticipantWithCanOrderOnline_* below) - a bare Participant role isn't enough.
         Assert.DoesNotContain("Orders", body);
-        // View reports/Enter comments are Results' Viewer/Test Consultant-only children (see
-        // NavigationProvider) - not visible to a Participant-only user.
-        Assert.DoesNotContain("View reports", body);
+        // View reports is visible to Participant too (docs/Parity-Analysis/11-External-Role-Card-
+        // and-Menu-Visibility.md - every Participant account is always also given the Viewer SSO
+        // role at Generate Login), but Enter comments stays Test-Consultant-only.
+        Assert.Contains("View reports", body);
         Assert.DoesNotContain("Enter comments", body);
     }
 
@@ -98,15 +99,17 @@ public class HomeNavigationSmokeTests : IClassFixture<PtlExternalWebTestFactory>
     }
 
     [Fact]
-    public async Task TestConsultantOnly_SeesOnlyEnterCommentsWithinResults_NotParticipantOrViewerItems()
+    public async Task TestConsultantOnly_SeesEnterCommentsAndViewReports_NotParticipantOrViewerOnlyItems()
     {
         var body = await GetHomePageAsSignedInUserAsync(roles: "Test Consultant");
 
         Assert.Contains("Results", body);
         Assert.Contains("Enter comments", body);
+        // Test Consultants are always also given the Viewer SSO role at Generate Login (docs/
+        // Parity-Analysis/11-External-Role-Card-and-Menu-Visibility.md), so they see View reports too.
+        Assert.Contains("View reports", body);
         Assert.DoesNotContain("Enter results", body);
         Assert.DoesNotContain("View results", body);
-        Assert.DoesNotContain("View reports", body);
         Assert.DoesNotContain("Schemes", body);
         Assert.DoesNotContain("My account", body);
     }

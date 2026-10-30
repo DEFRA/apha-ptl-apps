@@ -119,6 +119,18 @@ public sealed class PtlExternalWebTestFactory : WebApplicationFactory<Program>
                         claims.Add(new Claim(ExternalUserClaimTypes.ParticipantId, participantId));
                     }
 
+                    var viewerId = context.Request.Query["viewerId"].FirstOrDefault();
+                    if (!string.IsNullOrEmpty(viewerId))
+                    {
+                        claims.Add(new Claim(ExternalUserClaimTypes.ViewerId, viewerId));
+                    }
+
+                    var testConsultantId = context.Request.Query["testConsultantId"].FirstOrDefault();
+                    if (!string.IsNullOrEmpty(testConsultantId))
+                    {
+                        claims.Add(new Claim(ExternalUserClaimTypes.TestConsultantId, testConsultantId));
+                    }
+
                     var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
                     var properties = new AuthenticationProperties();
                     properties.StoreTokens([new AuthenticationToken { Name = "id_token", Value = TestIdToken }]);

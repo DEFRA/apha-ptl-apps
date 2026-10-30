@@ -239,6 +239,7 @@ builder.Services.AddScoped<IAmendResultsService, AmendResultsService>();
 builder.Services.AddScoped<ITabulationSendService, TabulationSendService>();
 builder.Services.AddScoped<IActualResultsService, ActualResultsService>();
 builder.Services.AddScoped<IParticipantDistributionHistoryService, ParticipantDistributionHistoryService>();
+builder.Services.AddScoped<IParticipantTabulationService, ParticipantTabulationService>();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddScoped<IDistributionPostedNotifier, DistributionPostedNotifier>();
 

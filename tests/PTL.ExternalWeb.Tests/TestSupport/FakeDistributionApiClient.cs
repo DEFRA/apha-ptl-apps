@@ -4,13 +4,22 @@ using PTL.Contracts.Search;
 
 namespace PTL.ExternalWeb.Tests.TestSupport;
 
-// Only GetParticipantDistributionHistoryAsync and GetActualResultsAsync are exercised by
-// ExternalWeb's View Results screens; the rest of IDistributionApiClient is InternalWeb-only.
+// GetParticipantDistributionHistoryAsync/GetActualResultsForParticipantAsync (View Results) and the
+// *ForUserAsync tabulation methods (View Reports) are exercised by ExternalWeb; the rest of
+// IDistributionApiClient is InternalWeb-only.
 internal sealed class FakeDistributionApiClient : IDistributionApiClient
 {
     public ParticipantPastDistributionListResponse ParticipantHistory { get; set; } = new([]);
 
     public ActualResultsResponse? ActualResults { get; set; }
+
+    public PublishedTabulationSummaryListResponse Tabulations { get; set; } = new([]);
+
+    public TabulationReportResponse? PublishedTabulation { get; set; }
+
+    public AssessmentResultsResponse? AssessmentResults { get; set; }
+
+    public TabulationAttachmentFile? Attachment { get; set; }
 
     public Task<ParticipantPastDistributionListResponse> GetParticipantDistributionHistoryAsync(
         Guid participantId, CancellationToken cancellationToken = default) =>
@@ -123,6 +132,22 @@ internal sealed class FakeDistributionApiClient : IDistributionApiClient
 
     public Task<TabulationAttachmentFile?> GetTabulationAttachmentAsync(Guid tabulationId, bool isPublished, Guid attachmentId, CancellationToken cancellationToken = default) =>
         throw new NotSupportedException();
+
+    public Task<PublishedTabulationSummaryListResponse> GetTabulationsForUserAsync(
+        Guid? participantId, Guid? viewerId, Guid? testConsultantId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Tabulations);
+
+    public Task<TabulationReportResponse?> GetPublishedTabulationForUserAsync(
+        Guid publishedTabulationId, Guid? participantId, Guid? viewerId, Guid? testConsultantId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(PublishedTabulation);
+
+    public Task<AssessmentResultsResponse?> GetAssessmentResultsForUserAsync(
+        Guid publishedTabulationId, Guid testId, Guid? participantId, Guid? viewerId, Guid? testConsultantId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(AssessmentResults);
+
+    public Task<TabulationAttachmentFile?> GetPublishedTabulationAttachmentForUserAsync(
+        Guid publishedTabulationId, Guid attachmentId, Guid? participantId, Guid? viewerId, Guid? testConsultantId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Attachment);
 
     public Task<TabulationsResponse?> PreviewTabulationsAsync(int yearId, int monthId, IReadOnlyList<TabulationStagedSendRequest> staged, CancellationToken cancellationToken = default) =>
         throw new NotSupportedException();

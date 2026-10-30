@@ -94,7 +94,10 @@ public static class NavigationProvider
                     ControllerName = "Tabulation",
                     ActionName = IndexAction,
                     Description = "View completed proficiency test reports, which include all participant results",
-                    RequiredRole = ExternalRoleNames.Viewer
+                    // Comma-separated "any of" - visible to Participant, Viewer or Test Consultant
+                    // (legacy Tabulations.aspx is reachable by all three; see IsVisible in
+                    // _HeaderMenu.cshtml/Home/Index.cshtml).
+                    RequiredRole = $"{ExternalRoleNames.Participant},{ExternalRoleNames.Viewer},{ExternalRoleNames.TestConsultant}"
                 },
                 new NavigationItem
                 {
