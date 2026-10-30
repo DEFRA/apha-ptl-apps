@@ -1,0 +1,63 @@
+@using PTL.ExternalWeb.Features.Order
+@model CreateOrderReviewViewModel
+@{
+    ViewData["Title"] = "Pending order";
+    ViewData["BreadcrumbParent"] = "Orders";
+}
+
+<h1 class="govuk-heading-xl">Pending order</h1>
+
+<div class="govuk-inset-text">
+    This is a summary of the order you have selected for @Model.Order.Year. Entering a purchase order number, accepting the
+    terms and conditions and submitting the order are not yet available online.
+</div>
+
+<table class="govuk-table">
+    <caption class="govuk-table__caption govuk-table__caption--m">Schemes in your order</caption>
+    <thead class="govuk-table__head">
+        <tr class="govuk-table__row">
+            <th scope="col" class="govuk-table__header">Scheme code</th>
+            <th scope="col" class="govuk-table__header">Scheme name</th>
+            <th scope="col" class="govuk-table__header govuk-table__header--numeric">Annual price</th>
+            <th scope="col" class="govuk-table__header">Distribution months</th>
+            <th scope="col" class="govuk-table__header">Import permit required</th>
+            <th scope="col" class="govuk-table__header govuk-table__header--numeric">Postage</th>
+            <th scope="col" class="govuk-table__header govuk-table__header--numeric">Scheme price</th>
+            <th scope="col" class="govuk-table__header govuk-table__header--numeric">Total</th>
+        </tr>
+    </thead>
+    <tbody class="govuk-table__body">
+        @foreach (var scheme in Model.Schemes)
+        {
+            <tr class="govuk-table__row">
+                <td class="govuk-table__cell">@scheme.Identifier</td>
+                <td class="govuk-table__cell">@scheme.Name</td>
+                <td class="govuk-table__cell govuk-table__cell--numeric">@Model.FormatMoney(scheme.AnnualPrice)</td>
+                <td class="govuk-table__cell">@string.Join(", ", scheme.Months.Where(m => m.Selected && !m.AlreadyParticipating).Select(m => m.Label))</td>
+                <td class="govuk-table__cell">@(scheme.ImportPermitRequired ? "Yes" : "No")</td>
+                <td class="govuk-table__cell govuk-table__cell--numeric">@Model.FormatMoney(scheme.PostagePrice)</td>
+                <td class="govuk-table__cell govuk-table__cell--numeric">@Model.FormatMoney(scheme.SchemePrice)</td>
+                <td class="govuk-table__cell govuk-table__cell--numeric">@Model.FormatMoney(scheme.TotalPrice)</td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+<dl class="govuk-summary-list govuk-summary-list--no-border">
+    <div class="govuk-summary-list__row">
+        <dt class="govuk-summary-list__key">Scheme price</dt>
+        <dd class="govuk-summary-list__value">@Model.FormatMoney(Model.Order.SchemeTotal)</dd>
+    </div>
+    <div class="govuk-summary-list__row">
+        <dt class="govuk-summary-list__key">Combined postage (courier or bio-freeze)</dt>
+        <dd class="govuk-summary-list__value">@Model.FormatMoney(Model.Order.PostageTotal)</dd>
+    </div>
+    <div class="govuk-summary-list__row">
+        <dt class="govuk-summary-list__key">Total amount</dt>
+        <dd class="govuk-summary-list__value"><strong>@Model.FormatMoney(Model.Order.OrderTotal)</strong></dd>
+    </div>
+</dl>
+
+<div class="govuk-button-group">
+    <a class="govuk-button govuk-button--secondary" asp-controller="Order" asp-action="@Model.BackAction" draggable="false" data-module="govuk-button">Back</a>
+</div>

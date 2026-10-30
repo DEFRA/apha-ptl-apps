@@ -1,5 +1,8 @@
 @using PTL.Common.Auth
 @using PTL.ExternalWeb.Features.Account
+@using PTL.Auth.Cidm.Options
+@using Microsoft.Extensions.Options
+@inject IOptions<CidmOptions> CidmOptionsAccessor
 @model (string ServiceName, string? LogoStyle)
 <govuk-page-header service-name="@Model.ServiceName" logo-style="@Model.LogoStyle" show-menu-toggle="@(User.Identity is not null && User.Identity.IsAuthenticated)" help-link-text="User Manual" help-link-href="/documents/User Manual.pdf">
     @if (User.Identity is not null && User.Identity.IsAuthenticated)
@@ -22,6 +25,9 @@
                         Signed in as: <strong>@friendlyName</strong>
                     </li>
                 }
+                <li class="govuk-service-navigation__item">
+                    <a class="govuk-service-navigation__link" href="@CidmOptionsAccessor.Value.AccountPortalUrl" target="_blank" rel="noopener noreferrer">CIDM account</a>
+                </li>
                 <li class="govuk-service-navigation__item">
                     <form asp-controller="Account" asp-action="Logout" method="post" class="app-signout-form">
                         @Html.AntiForgeryToken()
