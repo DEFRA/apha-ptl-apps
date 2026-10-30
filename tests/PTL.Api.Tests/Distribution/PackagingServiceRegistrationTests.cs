@@ -43,6 +43,6 @@ public class PackagingServiceRegistrationTests(WebApplicationFactory<Program> fa
 
         var external = scope.ServiceProvider.GetRequiredService<IOptions<PTL.Core.Configuration.ExternalOptions>>().Value;
 
-        Assert.Equal("http://localhost:5215", external.AppUrl);
+        Assert.Equal("http://localhost:5215/", external.AppUrl);
     }
 }
