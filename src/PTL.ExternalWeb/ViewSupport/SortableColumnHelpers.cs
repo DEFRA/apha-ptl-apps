@@ -8,8 +8,15 @@ namespace PTL.ExternalWeb.ViewSupport;
 // instead of a fourth copy.
 public static class SortableColumnHelpers
 {
-    public static string AriaSort(string currentSortBy, string currentSortDir, string column) =>
-        currentSortBy != column ? "none" : currentSortDir == "asc" ? "ascending" : "descending";
+    public static string AriaSort(string currentSortBy, string currentSortDir, string column)
+    {
+        if (currentSortBy != column)
+        {
+            return "none";
+        }
+
+        return currentSortDir == "asc" ? "ascending" : "descending";
+    }
 
     public static IHtmlContent SortIndicator(string currentSortBy, string currentSortDir, string column)
     {

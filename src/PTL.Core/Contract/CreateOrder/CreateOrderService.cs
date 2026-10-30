@@ -332,55 +332,80 @@ public sealed class CreateOrderService(
         var line = state.Lines.FirstOrDefault(l => l.SchemeId == schemeId);
         if (line is null)
         {
-            // Legacy creates the line on the first click, pre-ticking every editable month.
-            if (field != SelectField || !isChecked)
-            {
-                return false;
-            }
-
-            var context = state.Context;
-            await createOrderRepository.InsertSchemeAsync(
-                NewLine(state.Order.PendingContractId, context.Participant.ParticipantId, scheme, held),
-                context.Customer.PaymentNonUK,
-                cancellationToken);
-            return true;
+            return await InsertFirstLineAsync(state, scheme, held, field, isChecked, cancellationToken);
         }
 
-        if (field == SelectField)
-        {
-            line.IsSelected = isChecked;
-        }
-        else if (!line.IsSelected)
+        if (!ApplyToLine(line, scheme, held, field, isChecked))
         {
             return false;
         }
-        else if (field == ImportPermitField)
-        {
-            if (!Enumerable.Range(1, 12).Any(m => IsMonthEditable(scheme, held, m)))
-            {
-                return false;
-            }
-
-            line.ImportExportLicenceRequired = isChecked;
-        }
-        else
-        {
-            var month = Array.IndexOf(MonthFields, field) + 1;
-            if (!IsMonthEditable(scheme, held, month))
-            {
-                return false;
-            }
-
-            line.SetMonth(month, isChecked);
-
-            // Legacy SetImportExportChecked: an import permit only stays required while an editable month is ticked.
-            if (line.ImportExportLicenceRequired)
-            {
-                line.ImportExportLicenceRequired = Enumerable.Range(1, 12).Any(m => IsMonthEditable(scheme, held, m) && line.GetMonth(m));
-            }
-        }
 
         await pendingOrderRepository.UpdateSchemeAsync(line, line.DataConsentDeclarationGiven, cancellationToken);
+        return true;
+    }
+
+    // Legacy creates the line on the first click, pre-ticking every editable month.
+    private async Task<bool> InsertFirstLineAsync(
+        OrderState state, AvailableSchemeEntity scheme, ParticipatingSchemeEntity? held, string field, bool isChecked, CancellationToken cancellationToken)
+    {
+        if (field != SelectField || !isChecked)
+        {
+            return false;
+        }
+
+        var context = state.Context;
+        await createOrderRepository.InsertSchemeAsync(
+            NewLine(state.Order.PendingContractId, context.Participant.ParticipantId, scheme, held),
+            context.Customer.PaymentNonUK,
+            cancellationToken);
+        return true;
+    }
+
+    private static bool ApplyToLine(PendingOrderSchemeEntity line, AvailableSchemeEntity scheme, ParticipatingSchemeEntity? held, string field, bool isChecked)
+    {
+        if (field == SelectField)
+        {
+            line.IsSelected = isChecked;
+            return true;
+        }
+
+        if (!line.IsSelected)
+        {
+            return false;
+        }
+
+        return field == ImportPermitField
+            ? ApplyImportPermit(line, scheme, held, isChecked)
+            : ApplyMonth(line, scheme, held, field, isChecked);
+    }
+
+    private static bool ApplyImportPermit(PendingOrderSchemeEntity line, AvailableSchemeEntity scheme, ParticipatingSchemeEntity? held, bool isChecked)
+    {
+        if (!Enumerable.Range(1, 12).Any(m => IsMonthEditable(scheme, held, m)))
+        {
+            return false;
+        }
+
+        line.ImportExportLicenceRequired = isChecked;
+        return true;
+    }
+
+    private static bool ApplyMonth(PendingOrderSchemeEntity line, AvailableSchemeEntity scheme, ParticipatingSchemeEntity? held, string field, bool isChecked)
+    {
+        var month = Array.IndexOf(MonthFields, field) + 1;
+        if (!IsMonthEditable(scheme, held, month))
+        {
+            return false;
+        }
+
+        line.SetMonth(month, isChecked);
+
+        // Legacy SetImportExportChecked: an import permit only stays required while an editable month is ticked.
+        if (line.ImportExportLicenceRequired)
+        {
+            line.ImportExportLicenceRequired = Enumerable.Range(1, 12).Any(m => IsMonthEditable(scheme, held, m) && line.GetMonth(m));
+        }
+
         return true;
     }
 

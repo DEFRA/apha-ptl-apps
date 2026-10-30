@@ -71,5 +71,5 @@ public class GovUkReadOnlyResultsTablesTagHelper : TagHelper
             ? """<span class="govuk-visually-hidden">No result entered</span>"""
             : Encode(value);
 
-    private static string Encode(string? value) => WebUtility.HtmlEncode(value);
+    private static string Encode(string? value) => WebUtility.HtmlEncode(value) ?? string.Empty;
 }

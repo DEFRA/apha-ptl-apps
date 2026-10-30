@@ -394,7 +394,8 @@ public class ExternalUserServiceTests
 
     [Fact]
     public async Task ResolveAsync_RoleNameCasingDiffersFromCidm_StillMatches()
-    {        var ssoIdExt = Guid.NewGuid();
+    {
+        var ssoIdExt = Guid.NewGuid();
         var viewerRepository = new FakeViewerRepository();
         var viewer = await viewerRepository.CreateAsync(new ViewerEntity { ViewerId = Guid.NewGuid(), SsoIdExt = ssoIdExt, Name = "Viewer One" });
         var service = CreateService(viewerRepository: viewerRepository);

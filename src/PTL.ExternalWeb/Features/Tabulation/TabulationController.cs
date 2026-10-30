@@ -4,6 +4,7 @@ using PTL.ApiClient.Distribution;
 using PTL.Contracts.Distribution;
 using PTL.ExternalWeb.Authorization;
 using PTL.ExternalWeb.Features.Account;
+using PTL.ExternalWeb.ViewSupport;
 using PTL.SharedUI.Pagination;
 
 namespace PTL.ExternalWeb.Features.Tabulation;
@@ -17,8 +18,6 @@ namespace PTL.ExternalWeb.Features.Tabulation;
 [Authorize(Policy = ExternalPolicies.Viewer)]
 public sealed class TabulationController(IDistributionApiClient distributionApiClient) : Controller
 {
-    private const int DefaultPageSize = 15;
-
     private static readonly string[] ValidSortColumns = ["reference", "schemeCode", "schemeName", "tabulationName", "distributionDate"];
     private static readonly string[] ValidSortDirections = ["asc", "desc"];
 
@@ -26,22 +25,12 @@ public sealed class TabulationController(IDistributionApiClient distributionApiC
     // "contains" (Scheme Name matches when every typed word is contained), mirroring
     // DistributionController.Previous's DistributionsPast.ExecuteSearch pattern. Default sort is
     // DistributionDate descending.
-    public async Task<IActionResult> Index(
-        int? year,
-        int? month,
-        string? distributionReference,
-        string? schemeCode,
-        string? schemeName,
-        int page = 1,
-        int pageSize = DefaultPageSize,
-        string sortBy = "distributionDate",
-        string sortDir = "desc",
-        CancellationToken cancellationToken = default)
+    public async Task<IActionResult> Index([FromQuery] ReferenceSchemeListQuery query, CancellationToken cancellationToken = default)
     {
-        sortBy = ValidSortColumns.Contains(sortBy) ? sortBy : "distributionDate";
-        sortDir = ValidSortDirections.Contains(sortDir) ? sortDir : "desc";
-        page = Math.Max(page, 1);
-        pageSize = PaginationModel.AvailablePageSizes.Contains(pageSize) ? pageSize : DefaultPageSize;
+        var sortBy = ValidSortColumns.Contains(query.SortBy) ? query.SortBy : "distributionDate";
+        var sortDir = ValidSortDirections.Contains(query.SortDir) ? query.SortDir : "desc";
+        var page = Math.Max(query.Page, 1);
+        var pageSize = PaginationModel.AvailablePageSizes.Contains(query.PageSize) ? query.PageSize : ReferenceSchemeListQuery.DefaultPageSize;
 
         var (participantId, viewerId, testConsultantId) = CallerIds();
 
@@ -55,12 +44,12 @@ public sealed class TabulationController(IDistributionApiClient distributionApiC
             .OrderBy(y => y)
             .ToList();
 
-        var filtered = Filter(list.Tabulations, year, month, distributionReference, schemeCode, schemeName);
+        var filtered = Filter(list.Tabulations, query.Year, query.Month, query.DistributionReference, query.SchemeCode, query.SchemeName);
         var sorted = Sort(filtered, sortBy, sortDir);
         var paged = sorted.Skip((page - 1) * pageSize).Take(pageSize).ToList();
 
         return View(new TabulationListViewModel(
-            paged, sorted.Count, page, pageSize, sortBy, sortDir, year, month, distributionReference, schemeCode, schemeName, availableYears));
+            paged, sorted.Count, page, pageSize, sortBy, sortDir, query.Year, query.Month, query.DistributionReference, query.SchemeCode, query.SchemeName, availableYears));
     }
 
     // Legacy TabulationView.aspx - read only, no participant/viewer switcher (unlike InternalWeb's
@@ -126,7 +115,7 @@ public sealed class TabulationController(IDistributionApiClient distributionApiC
         IOrderedEnumerable<PublishedTabulationSummaryResponse> Order<TKey>(Func<PublishedTabulationSummaryResponse, TKey> keySelector) =>
             sortDir == "desc" ? tabulations.OrderByDescending(keySelector) : tabulations.OrderBy(keySelector);
 
-        IOrderedEnumerable<PublishedTabulationSummaryResponse> ordered = sortBy switch
+        var ordered = sortBy switch
         {
             "reference" => Order(t => t.DistributionReference),
             "schemeCode" => Order(t => t.SchemeCode),

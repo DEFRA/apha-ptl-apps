@@ -76,6 +76,6 @@ else
     <input type="hidden" name="year" value="@Model.YearSlug" />
     <button type="submit" class="govuk-button" data-module="govuk-button"
             disabled="@(!order.CanProceed)" aria-disabled="@(order.CanProceed ? "false" : "true")">Next</button>
-    <a class="govuk-button govuk-button--secondary" asp-controller="Order" asp-action="ConfirmClear" asp-route-year="@Model.YearSlug" role="button" draggable="false" data-module="govuk-button">Clear form</a>
+    <a class="govuk-button govuk-button--secondary" asp-controller="Order" asp-action="ConfirmClear" asp-route-year="@Model.YearSlug" draggable="false" data-module="govuk-button">Clear form</a>
     <a class="govuk-link govuk-link--no-visited-state" asp-controller="Home" asp-action="Index">Cancel</a>
 </form>

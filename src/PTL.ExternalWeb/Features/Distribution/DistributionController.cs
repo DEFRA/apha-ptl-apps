@@ -4,6 +4,7 @@ using PTL.ApiClient.Distribution;
 using PTL.Contracts.Distribution;
 using PTL.ExternalWeb.Authorization;
 using PTL.ExternalWeb.Features.Account;
+using PTL.ExternalWeb.ViewSupport;
 using PTL.SharedUI.Pagination;
 
 namespace PTL.ExternalWeb.Features.Distribution;
@@ -14,8 +15,6 @@ namespace PTL.ExternalWeb.Features.Distribution;
 [Authorize(Policy = ExternalPolicies.Participant)]
 public sealed class DistributionController(IDistributionApiClient distributionApiClient) : Controller
 {
-    private const int DefaultPageSize = 15;
-
     private static readonly string[] ValidSortColumns = ["reference", "schemeCode", "schemeName", "distributionDate"];
     private static readonly string[] ValidSortDirections = ["asc", "desc"];
 
@@ -24,37 +23,27 @@ public sealed class DistributionController(IDistributionApiClient distributionAp
     // Legacy DistributionsPrevious.aspx - Year/Month dropdowns are exact matches, the 3 text
     // criteria are "contains" (Scheme Name matches when every typed word is contained), mirroring
     // DistributionsPast.ExecuteSearch. Default sort is DistributionDate descending.
-    public async Task<IActionResult> Previous(
-        int? year,
-        int? month,
-        string? distributionReference,
-        string? schemeCode,
-        string? schemeName,
-        int page = 1,
-        int pageSize = DefaultPageSize,
-        string sortBy = "distributionDate",
-        string sortDir = "desc",
-        CancellationToken cancellationToken = default)
+    public async Task<IActionResult> Previous([FromQuery] ReferenceSchemeListQuery query, CancellationToken cancellationToken = default)
     {
-        sortBy = ValidSortColumns.Contains(sortBy) ? sortBy : "distributionDate";
-        sortDir = ValidSortDirections.Contains(sortDir) ? sortDir : "desc";
-        page = Math.Max(page, 1);
-        pageSize = PaginationModel.AvailablePageSizes.Contains(pageSize) ? pageSize : DefaultPageSize;
+        var sortBy = ValidSortColumns.Contains(query.SortBy) ? query.SortBy : "distributionDate";
+        var sortDir = ValidSortDirections.Contains(query.SortDir) ? query.SortDir : "desc";
+        var page = Math.Max(query.Page, 1);
+        var pageSize = PaginationModel.AvailablePageSizes.Contains(query.PageSize) ? query.PageSize : ReferenceSchemeListQuery.DefaultPageSize;
 
         var participantId = User.GetParticipantId();
         if (participantId is null)
         {
-            return View(new DistributionPreviousListViewModel([], 0, page, pageSize, sortBy, sortDir, year, month, distributionReference, schemeCode, schemeName));
+            return View(new DistributionPreviousListViewModel([], 0, page, pageSize, sortBy, sortDir, query.Year, query.Month, query.DistributionReference, query.SchemeCode, query.SchemeName));
         }
 
         var history = await distributionApiClient.GetParticipantDistributionHistoryAsync(participantId.Value, cancellationToken);
 
-        var filtered = Filter(history.Distributions, year, month, distributionReference, schemeCode, schemeName);
+        var filtered = Filter(history.Distributions, query.Year, query.Month, query.DistributionReference, query.SchemeCode, query.SchemeName);
         var sorted = Sort(filtered, sortBy, sortDir);
         var paged = sorted.Skip((page - 1) * pageSize).Take(pageSize).ToList();
 
         return View(new DistributionPreviousListViewModel(
-            paged, sorted.Count, page, pageSize, sortBy, sortDir, year, month, distributionReference, schemeCode, schemeName));
+            paged, sorted.Count, page, pageSize, sortBy, sortDir, query.Year, query.Month, query.DistributionReference, query.SchemeCode, query.SchemeName));
     }
 
     // Legacy ResultsView.aspx - read-only, no Save/Submit/Edit/Delete. Reuses the same
@@ -98,7 +87,7 @@ public sealed class DistributionController(IDistributionApiClient distributionAp
         IOrderedEnumerable<ParticipantPastDistributionResponse> Order<TKey>(Func<ParticipantPastDistributionResponse, TKey> keySelector) =>
             sortDir == "desc" ? distributions.OrderByDescending(keySelector) : distributions.OrderBy(keySelector);
 
-        IOrderedEnumerable<ParticipantPastDistributionResponse> ordered = sortBy switch
+        var ordered = sortBy switch
         {
             "reference" => Order(d => d.DistributionReference),
             "schemeCode" => Order(d => d.SchemeCode),

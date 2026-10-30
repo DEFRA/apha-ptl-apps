@@ -209,6 +209,25 @@ public partial class OrderRouteSmokeTests : IClassFixture<PtlExternalWebTestFact
     }
 
     [Fact]
+    public async Task Change_Post_WithoutSchemeIdOrChecked_IsRejectedAsUnderPosted()
+    {
+        var api = new FakeCreateOrderApiClient();
+        var client = CreateClient(api);
+        var cookies = await SignInAsync(client);
+        var token = await GetAntiforgeryTokenAsync(client, cookies, "/Order/CurrentYear");
+
+        var response = await CookieForwardingHttpClient.SendWithCookiesAsync(client, HttpMethod.Post, "/Order/Change", cookies, new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["__RequestVerificationToken"] = token,
+            ["year"] = "current",
+            ["field"] = "select"
+        }));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Null(api.LastChange);
+    }
+
+    [Fact]
     public async Task Change_Post_WithoutAntiforgeryToken_IsRejected()
     {
         var api = new FakeCreateOrderApiClient();

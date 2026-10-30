@@ -1,4 +1,5 @@
 using System.Globalization;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 using PTL.Contracts.CreateOrder;
 
 namespace PTL.ExternalWeb.Features.Order;
@@ -56,10 +57,12 @@ public sealed class CreateOrderChangeModel
 {
     public string? Year { get; set; }
 
+    [BindRequired]
     public Guid SchemeId { get; set; }
 
     public string? Field { get; set; }
 
+    [BindRequired]
     public bool Checked { get; set; }
 
     public string? Search { get; set; }

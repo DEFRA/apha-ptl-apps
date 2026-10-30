@@ -37,7 +37,7 @@ public sealed class OrderController(ICreateOrderApiClient createOrderApiClient) 
     {
         var year = NormaliseYear(model.Year);
         var field = model.Field?.Trim().ToLowerInvariant();
-        if (year is null || field is null || (field != "select" && field != "importexport" && !MonthFields.Contains(field)))
+        if (!ModelState.IsValid || year is null || field is null || (field != "select" && field != "importexport" && !MonthFields.Contains(field)))
         {
             return BadRequest();
         }
