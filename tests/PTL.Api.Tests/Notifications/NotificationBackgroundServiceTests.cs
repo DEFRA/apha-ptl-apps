@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using PTL.Api.BackgroundServices;
 using PTL.Api.Tests.Distribution;
+using PTL.Core.Contract.ImportPermit;
 using PTL.Core.Distribution;
 using PTL.Core.Notifications;
 
@@ -25,6 +26,7 @@ public class NotificationBackgroundServiceTests
         public List<string> Order { get; } = [];
         public List<(string Job, Guid Scope, CancellationToken Token)> Invocations { get; } = [];
         public Exception? EmailFailure { get; set; }
+        public Exception? ImportPermitFailure { get; set; }
         public Func<CancellationToken, Task>? EmailBehaviour { get; set; }
         public TaskCompletionSource FirstEmailRun { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public TaskCompletionSource ThreeEmailRuns { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -75,6 +77,17 @@ public class NotificationBackgroundServiceTests
         }
     }
 
+    private sealed class ImportPermitJob(Calls calls, ScopeProbe probe) : IImportPermitReminderService
+    {
+        public Task<ImportPermitReminderRunSummary> ProcessRemindersAsync(CancellationToken cancellationToken = default)
+        {
+            calls.Record("importPermit", probe.Id, cancellationToken);
+            return calls.ImportPermitFailure is null
+                ? Task.FromResult(ImportPermitReminderRunSummary.Empty)
+                : throw calls.ImportPermitFailure;
+        }
+    }
+
     private sealed class Harness : IDisposable
     {
         private readonly ServiceProvider _provider;
@@ -85,6 +98,7 @@ public class NotificationBackgroundServiceTests
 
         public Harness(
             bool emailsEnabled = true,
+            bool importPermitEnabled = false,
             TimeSpan? startupDelay = null,
             TimeSpan? pollInterval = null)
         {
@@ -92,6 +106,7 @@ public class NotificationBackgroundServiceTests
             services.AddSingleton(Calls);
             services.AddScoped<ScopeProbe>();
             services.AddScoped<ITabulationEmailService, EmailJob>();
+            services.AddScoped<IImportPermitReminderService, ImportPermitJob>();
             _provider = services.BuildServiceProvider();
 
             Service = new NotificationBackgroundService(
@@ -102,6 +117,7 @@ public class NotificationBackgroundServiceTests
                     PollInterval = pollInterval ?? TimeSpan.FromMilliseconds(10),
                 }),
                 Options.Create(new TabulationEmailOptions { Enabled = emailsEnabled }),
+                Options.Create(new ImportPermitReminderOptions { Enabled = importPermitEnabled }),
                 TimeProvider.System,
                 Logger);
         }
@@ -209,6 +225,80 @@ public class NotificationBackgroundServiceTests
         var log = Assert.Single(h.Logger.Entries);
         Assert.Equal(LogLevel.Information, log.Level);
         Assert.Contains("disabled", log.Message, StringComparison.Ordinal);
+    }
+
+    // ---- Import permit reminders ----
+
+    [Fact]
+    public async Task RunOnceAsync_ImportPermitEnabled_RunsAfterTheTestConsultantJob()
+    {
+        using var h = new Harness(importPermitEnabled: true);
+        using var cts = new CancellationTokenSource();
+
+        await h.Service.RunOnceAsync(cts.Token);
+
+        Assert.Equal(["email", "importPermit"], h.Calls.Order);
+        Assert.Single(h.Calls.Invocations.Select(i => i.Scope).Distinct());
+        Assert.All(h.Calls.Invocations, i => Assert.Equal(cts.Token, i.Token));
+    }
+
+    [Fact]
+    public async Task RunOnceAsync_ImportPermitRunsOnEveryPollAlongsideTheEmailJob()
+    {
+        using var h = new Harness(importPermitEnabled: true);
+
+        await h.Service.RunOnceAsync(CancellationToken.None);
+        await h.Service.RunOnceAsync(CancellationToken.None);
+
+        Assert.Equal(["email", "importPermit", "email", "importPermit"], h.Calls.Order);
+    }
+
+    [Fact]
+    public async Task RunOnceAsync_ImportPermitDisabled_IsNotRun()
+    {
+        using var h = new Harness(importPermitEnabled: false);
+
+        await h.Service.RunOnceAsync(CancellationToken.None);
+
+        Assert.Equal(["email"], h.Calls.Order);
+    }
+
+    [Fact]
+    public async Task RunOnceAsync_ImportPermitThrows_LogsItByNameAndRetriesOnTheNextPoll()
+    {
+        using var h = new Harness(importPermitEnabled: true);
+        var failure = new InvalidOperationException("sp failed");
+        h.Calls.ImportPermitFailure = failure;
+
+        await h.Service.RunOnceAsync(CancellationToken.None);
+        await h.Service.RunOnceAsync(CancellationToken.None);
+
+        Assert.Equal(2, h.Calls.Order.Count(o => o == "importPermit"));
+        var errors = h.Logger.At(LogLevel.Error).ToList();
+        Assert.Equal(2, errors.Count);
+        Assert.All(errors, e => Assert.Same(failure, e.Exception));
+        Assert.All(errors, e => Assert.Contains(e.State, kv => kv.Key == "Job" && Equals(kv.Value, "ImportPermitReminders")));
+    }
+
+    [Fact]
+    public async Task RunOnceAsync_OnlyImportPermitEnabled_RunsThatJobAlone()
+    {
+        using var h = new Harness(emailsEnabled: false, importPermitEnabled: true);
+
+        await h.Service.RunOnceAsync(CancellationToken.None);
+
+        Assert.Equal(["importPermit"], h.Calls.Order);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_OnlyImportPermitEnabled_StartsTheScheduler()
+    {
+        using var h = new Harness(emailsEnabled: false, importPermitEnabled: true);
+
+        await h.Service.StartAsync(CancellationToken.None);
+        await h.Service.StopAsync(CancellationToken.None);
+
+        Assert.DoesNotContain(h.Logger.Entries, e => e.Message.Contains("disabled", StringComparison.Ordinal));
     }
 
     [Fact]

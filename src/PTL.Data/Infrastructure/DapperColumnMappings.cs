@@ -1119,6 +1119,8 @@ public static partial class DapperColumnMappings
 
         RegisterTabulationEmailMappings();
 
+        RegisterImportPermitReminderMappings();
+
         RegisterMonthSetupMappings();
 
         RegisterSearchMappings();

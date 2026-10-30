@@ -1,21 +1,24 @@
 using Microsoft.Extensions.Options;
+using PTL.Core.Contract.ImportPermit;
 using PTL.Core.Distribution;
 using PTL.Core.Notifications;
 
 namespace PTL.Api.BackgroundServices;
 
-// The scheduler for the time-based Test Consultant emails, hosted in PTL.Api (single instance): after the start-up delay it runs
-// the job on every poll. Every other email is sent when its decision is saved and is not retried.
+// The scheduler for the time-based emails, hosted in PTL.Api (single instance): after the start-up delay it runs the Test Consultant
+// and Import Permit reminder jobs on every poll, as the legacy service ran every job on every timer tick. Every other email is sent
+// when its decision is saved and is not retried.
 public sealed partial class NotificationBackgroundService(
     IServiceScopeFactory scopeFactory,
     IOptions<NotificationSchedulerOptions> schedulerOptions,
     IOptions<TabulationEmailOptions> tabulationOptions,
+    IOptions<ImportPermitReminderOptions> importPermitOptions,
     TimeProvider timeProvider,
     ILogger<NotificationBackgroundService> logger) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        if (!tabulationOptions.Value.Enabled)
+        if (!tabulationOptions.Value.Enabled && !importPermitOptions.Value.Enabled)
         {
             LogDisabled(logger);
             return;
@@ -47,10 +50,22 @@ public sealed partial class NotificationBackgroundService(
     {
         using var scope = scopeFactory.CreateScope();
 
-        await RunJobAsync(
-            "TestConsultantEmails",
-            () => scope.ServiceProvider.GetRequiredService<ITabulationEmailService>().ProcessScheduledEmailsAsync(cancellationToken),
-            cancellationToken);
+        if (tabulationOptions.Value.Enabled)
+        {
+            await RunJobAsync(
+                "TestConsultantEmails",
+                () => scope.ServiceProvider.GetRequiredService<ITabulationEmailService>().ProcessScheduledEmailsAsync(cancellationToken),
+                cancellationToken);
+        }
+
+        // Legacy ran the import permit job last, after the Test Consultant job, on the same tick.
+        if (importPermitOptions.Value.Enabled)
+        {
+            await RunJobAsync(
+                "ImportPermitReminders",
+                () => scope.ServiceProvider.GetRequiredService<IImportPermitReminderService>().ProcessRemindersAsync(cancellationToken),
+                cancellationToken);
+        }
     }
 
     private async Task RunJobAsync(string job, Func<Task> run, CancellationToken cancellationToken)
@@ -65,7 +80,7 @@ public sealed partial class NotificationBackgroundService(
         }
     }
 
-    [LoggerMessage(EventId = 41, Level = LogLevel.Information, Message = "Notification scheduler is disabled (the Test Consultant email job is disabled).")]
+    [LoggerMessage(EventId = 41, Level = LogLevel.Information, Message = "Notification scheduler is disabled (every scheduled email job is disabled).")]
     private static partial void LogDisabled(ILogger logger);
 
     [LoggerMessage(EventId = 42, Level = LogLevel.Information, Message = "Notification scheduler started. StartupDelay={StartupDelay} PollInterval={PollInterval}")]
