@@ -548,7 +548,7 @@ public class ParticipantSchemeControllerTests
         };
         var controller = CreateController(contractApiClient: contractApiClient, schemeApiClient: schemeApiClient);
 
-        var result = await controller.Create(contractId, customerId, schemeSearchTerm: "sal");
+        var result = await controller.Create(contractId, customerId, schemeList: new SchemeListQuery(SchemeSearchTerm: "sal"));
 
         var view = Assert.IsType<ViewResult>(result);
         var model = Assert.IsType<ParticipantSchemeFormViewModel>(view.Model);
@@ -572,7 +572,7 @@ public class ParticipantSchemeControllerTests
         var schemeApiClient = new FakeSchemeApiClient { SearchResponse = new SchemeSearchResponse([], 120, 2, 50) };
         var controller = CreateController(contractApiClient: contractApiClient, schemeApiClient: schemeApiClient);
 
-        var result = await controller.Create(contractId, customerId, page: 2, pageSize: 50);
+        var result = await controller.Create(contractId, customerId, schemeList: new SchemeListQuery(Page: 2, PageSize: 50));
 
         var model = Assert.IsType<ParticipantSchemeFormViewModel>(Assert.IsType<ViewResult>(result).Model);
         Assert.Equal((2, 50), (schemeApiClient.LastSearchRequest!.Page, schemeApiClient.LastSearchRequest.PageSize));
@@ -580,10 +580,11 @@ public class ParticipantSchemeControllerTests
     }
 
     [Theory]
+    [InlineData(null)]
     [InlineData(0)]
     [InlineData(7)]
     [InlineData(1000)]
-    public async Task Create_Get_UnsupportedPageSize_FallsBackToTheDefault(int pageSize)
+    public async Task Create_Get_MissingOrUnsupportedPageSize_FallsBackToTheDefault(int? pageSize)
     {
         var contractId = Guid.NewGuid();
         var customerId = Guid.NewGuid();
@@ -591,7 +592,7 @@ public class ParticipantSchemeControllerTests
         var schemeApiClient = new FakeSchemeApiClient();
         var controller = CreateController(contractApiClient: contractApiClient, schemeApiClient: schemeApiClient);
 
-        var result = await controller.Create(contractId, customerId, pageSize: pageSize);
+        var result = await controller.Create(contractId, customerId, schemeList: new SchemeListQuery(PageSize: pageSize));
 
         var model = Assert.IsType<ParticipantSchemeFormViewModel>(Assert.IsType<ViewResult>(result).Model);
         Assert.Equal(25, schemeApiClient.LastSearchRequest!.PageSize);

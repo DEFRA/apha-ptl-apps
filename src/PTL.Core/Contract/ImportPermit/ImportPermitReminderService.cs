@@ -90,53 +90,77 @@ public sealed partial class ImportPermitReminderService(
                 continue;
             }
 
-            // Every distribution this customer has due at this offset, then every participant on each of
-            // them - one grouped email rather than one per distribution.
-            var distributions = data.Customers
-                .Where(c => c.CustomerId == customer.CustomerId)
-                .Select(c => c.MonthlyDistributionSchemeId)
-                .ToHashSet();
-            var participants = data.Participants
-                .Where(p => p.CustomerId == customer.CustomerId && distributions.Contains(p.MonthlyDistributionSchemeId))
-                .ToList();
+            var participants = ParticipantsDueFor(data, customer.CustomerId);
             if (participants.Count == 0)
             {
                 continue;
             }
 
             due++;
-            try
-            {
-                await notifyClient.SendEmailAsync(
-                    ImportPermitReminderTemplates.CustomerId,
-                    customer.CustomerEmail,
-                    new Dictionary<string, string> { ["participant_list"] = BuildParticipantList(participants) },
-                    $"{customer.CustomerId}:{offset}",
-                    cancellationToken);
-                sent++;
-                LogCustomerSent(logger, customer.QalNumber, offset, participants.Count);
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException)
+            if (!await TrySendCustomerReminderAsync(customer, participants, offset, cancellationToken))
             {
                 failed++;
-                if (FirstLogToday($"customer-send-failed:{customer.CustomerId}"))
-                {
-                    LogCustomerSendFailed(logger, customer.QalNumber, offset, ex);
-                }
-
                 continue;
             }
 
-            // Legacy marks every row of this customer, so each contract/distribution gets its own ledger row.
-            foreach (var row in data.Customers.Where(c => c.CustomerId == customer.CustomerId && !c.ReminderSent))
-            {
-                row.ReminderSent = true;
-                await repository.MarkReminderSentAsync(
-                    row.ContractId, row.CustomerId, row.MonthlyDistributionSchemeId, participantId: null, offset, CancellationToken.None);
-            }
+            sent++;
+            await MarkCustomerRemindersSentAsync(data, customer.CustomerId, offset);
         }
 
         return (due, sent, skipped, failed);
+    }
+
+    // Every participant on every distribution this customer has due at this offset - one grouped email
+    // rather than one per distribution.
+    private static IReadOnlyList<ImportPermitParticipantEntity> ParticipantsDueFor(ImportPermitReminderData data, Guid customerId)
+    {
+        var distributions = data.Customers
+            .Where(c => c.CustomerId == customerId)
+            .Select(c => c.MonthlyDistributionSchemeId)
+            .ToHashSet();
+        return data.Participants
+            .Where(p => p.CustomerId == customerId && distributions.Contains(p.MonthlyDistributionSchemeId))
+            .ToList();
+    }
+
+    // False when the send failed: the customer stays unreminded and the failure is logged once a day.
+    private async Task<bool> TrySendCustomerReminderAsync(
+        ImportPermitCustomerEntity customer,
+        IReadOnlyList<ImportPermitParticipantEntity> participants,
+        int offset,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await notifyClient.SendEmailAsync(
+                ImportPermitReminderTemplates.CustomerId,
+                customer.CustomerEmail,
+                new Dictionary<string, string> { ["participant_list"] = BuildParticipantList(participants) },
+                $"{customer.CustomerId}:{offset}",
+                cancellationToken);
+            LogCustomerSent(logger, customer.QalNumber, offset, participants.Count);
+            return true;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            if (FirstLogToday($"customer-send-failed:{customer.CustomerId}"))
+            {
+                LogCustomerSendFailed(logger, customer.QalNumber, offset, ex);
+            }
+
+            return false;
+        }
+    }
+
+    // Legacy marks every row of this customer, so each contract/distribution gets its own ledger row.
+    private async Task MarkCustomerRemindersSentAsync(ImportPermitReminderData data, Guid customerId, int offset)
+    {
+        foreach (var row in data.Customers.Where(c => c.CustomerId == customerId && !c.ReminderSent))
+        {
+            row.ReminderSent = true;
+            await repository.MarkReminderSentAsync(
+                row.ContractId, row.CustomerId, row.MonthlyDistributionSchemeId, participantId: null, offset, CancellationToken.None);
+        }
     }
 
     // One email per participant, independent of whether their customer was reminded.

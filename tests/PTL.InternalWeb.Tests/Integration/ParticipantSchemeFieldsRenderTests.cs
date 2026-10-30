@@ -192,12 +192,13 @@ public class ParticipantSchemeFieldsRenderTests : IClassFixture<WebApplicationFa
         Assert.Contains("Full scheme pricing", select, StringComparison.Ordinal);
     }
 
-    // The page size and page controls submit page and pageSize; the Create action must bind them rather than ignore them.
+    // The search box and the page controls submit schemeSearchTerm, page and pageSize; the Create action must bind them rather than ignore them.
     [Fact]
-    public async Task Create_SchemeList_BindsThePageAndPageSizeTheSharedControlsSubmit()
+    public async Task Create_SchemeList_BindsTheSearchAndPagingValuesItsControlsSubmit()
     {
-        var html = await MainContentAsync($"/ParticipantScheme/Create?contractId={ContractId}&customerId={CustomerId}&page=2&pageSize=50");
+        var html = await MainContentAsync($"/ParticipantScheme/Create?contractId={ContractId}&customerId={CustomerId}&schemeSearchTerm=sal&page=2&pageSize=50");
 
+        Assert.Contains("name=\"schemeSearchTerm\" type=\"text\" value=\"sal\"", html, StringComparison.Ordinal);
         Assert.Contains("<option value=\"50\" selected>50</option>", html, StringComparison.Ordinal);
         Assert.Contains("aria-label=\"Page 2\" aria-current=\"page\"", html, StringComparison.Ordinal);
     }

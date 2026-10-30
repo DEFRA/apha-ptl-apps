@@ -97,16 +97,13 @@ public class ParticipantSchemeController(
         ViewData[BreadcrumbRouteValues.ContractId] = contractId;
     }
 
-    // page and pageSize are the names govuk-pagination and govuk-page-size-selector submit.
     [HttpGet]
     public async Task<IActionResult> Create(
         Guid contractId,
         Guid customerId,
         Guid? participantId = null,
         Guid? schemeId = null,
-        string? schemeSearchTerm = null,
-        int page = 1,
-        int pageSize = PTL.SharedUI.Pagination.PaginationModel.DefaultPageSize,
+        [FromQuery] SchemeListQuery? schemeList = null,
         CancellationToken cancellationToken = default)
     {
         var contract = await contractApiClient.GetContractAsync(contractId, cancellationToken);
@@ -115,6 +112,7 @@ public class ParticipantSchemeController(
             return NotFound();
         }
 
+        schemeList ??= new SchemeListQuery();
         var model = new ParticipantSchemeFormViewModel
         {
             ContractId = contractId,
@@ -122,10 +120,10 @@ public class ParticipantSchemeController(
             YearId = contract.YearId,
             ParticipantId = participantId,
             SchemeId = schemeId,
-            SchemeSearchTerm = schemeSearchTerm,
-            SchemeOptionsPage = page,
-            SchemeOptionsPageSize = PTL.SharedUI.Pagination.PaginationModel.AvailablePageSizes.Contains(pageSize)
-                ? pageSize
+            SchemeSearchTerm = schemeList.SchemeSearchTerm,
+            SchemeOptionsPage = schemeList.Page,
+            SchemeOptionsPageSize = PTL.SharedUI.Pagination.PaginationModel.AvailablePageSizes.Contains(schemeList.PageSize.GetValueOrDefault())
+                ? schemeList.PageSize
                 : PTL.SharedUI.Pagination.PaginationModel.DefaultPageSize,
             IsReadOnly = contract.IsReadOnly
         };
@@ -354,7 +352,11 @@ public class ParticipantSchemeController(
             return;
         }
 
-        var request = new SchemeSearchRequest(model.YearId.GetValueOrDefault(), model.SchemeSearchTerm, model.SchemeOptionsPage.GetValueOrDefault(1), model.SchemeOptionsPageSize);
+        var request = new SchemeSearchRequest(
+            model.YearId.GetValueOrDefault(),
+            model.SchemeSearchTerm,
+            model.SchemeOptionsPage.GetValueOrDefault(1),
+            model.SchemeOptionsPageSize.GetValueOrDefault(PTL.SharedUI.Pagination.PaginationModel.DefaultPageSize));
         var result = await schemeApiClient.GetSchemesForYearAsync(request, cancellationToken);
         model.SchemeOptions = result.Items;
         model.SchemeOptionsTotalCount = result.TotalCount;
