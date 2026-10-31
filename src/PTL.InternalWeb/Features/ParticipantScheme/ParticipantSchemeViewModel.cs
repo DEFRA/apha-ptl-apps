@@ -11,6 +11,11 @@ namespace PTL.InternalWeb.Features.ParticipantScheme;
 // here is the item's own removed/closed-year state, driving the page title and the Edit button only.
 public sealed record ParticipantSchemeDetailsViewModel(ParticipantSchemeFormViewModel Fields, bool IsReadOnly);
 
+// The scheme list's query string on Create. Bundled into one object so the action stays under Sonar's
+// 7-parameter limit (S107); page and pageSize are the names govuk-pagination and
+// govuk-page-size-selector submit.
+public sealed record SchemeListQuery(string? SchemeSearchTerm = null, int? Page = null, int? PageSize = null);
+
 // Shared by Create.cshtml and Edit.cshtml. Participant/Scheme selection only happens on Create -
 // legacy hides DropDownParticipant/GridViewSchemes once mParticipantScheme.IsNew is false, so Edit
 // only ever shows ParticipantDisplayName/SchemeDisplayName as plain text, never the pickers.
@@ -44,10 +49,12 @@ public sealed class ParticipantSchemeFormViewModel
 
     public int? SchemeOptionsPage { get; set; } = 1;
 
+    public int? SchemeOptionsPageSize { get; set; } = PaginationModel.DefaultPageSize;
+
     public PaginationModel SchemePagination => new()
     {
         CurrentPage = SchemeOptionsPage.GetValueOrDefault(1),
-        PageSize = PaginationModel.DefaultPageSize,
+        PageSize = SchemeOptionsPageSize.GetValueOrDefault(PaginationModel.DefaultPageSize),
         TotalRecords = SchemeOptionsTotalCount.GetValueOrDefault(),
         Action = "Create",
         RouteValues = new Dictionary<string, object?> { ["contractId"] = ContractId, ["customerId"] = CustomerId, ["participantId"] = ParticipantId, ["schemeSearchTerm"] = SchemeSearchTerm }

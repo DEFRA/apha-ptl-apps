@@ -255,6 +255,12 @@ builder.Services.AddScoped<ITabulationPublishedNotifier, TabulationPublishedNoti
 builder.Services.AddSingleton<PTL.Api.BackgroundServices.PublicationEmailDispatcher>();
 builder.Services.AddSingleton<IPublicationEmailDispatcher>(sp => sp.GetRequiredService<PTL.Api.BackgroundServices.PublicationEmailDispatcher>());
 builder.Services.AddHostedService(sp => sp.GetRequiredService<PTL.Api.BackgroundServices.PublicationEmailDispatcher>());
+
+// Import permit reminders: the scheduler runs this on every poll, like the legacy service did on every timer tick.
+builder.Services.AddSingleton<ImportPermitReminderGuard>();
+builder.Services.AddScoped<IImportPermitReminderRepository, ImportPermitReminderRepository>();
+builder.Services.AddScoped<IImportPermitReminderService, ImportPermitReminderService>();
+
 builder.Services.AddHostedService<PTL.Api.BackgroundServices.NotificationBackgroundService>();
 builder.Services.AddScoped<IPackagingService, PackagingService>();
 builder.Services.AddScoped<IPackagingOutputService, PackagingOutputService>();
@@ -413,20 +419,6 @@ catch (Exception ex)
 {
     logCredentialDiagnosticFailed(app.Logger, ex);
 }
-
-// TEMPORARY DIAGNOSTIC - logs the full Notify API key at the user's explicit request; remove and rotate the key afterwards.
-var logNotifyKeyDiagnostic = LoggerMessage.Define<bool, int, string>(
-    LogLevel.Information,
-    new EventId(3, "NotifyApiKeyDiagnostic"),
-    "GOV.UK Notify API key diagnostic: Configured={Configured} Length={Length} Key={ApiKey}");
-
-var configuredNotifyKey = app.Services.GetRequiredService<IOptions<NotifyOptions>>().Value.ApiKey;
-logNotifyKeyDiagnostic(
-    app.Logger,
-    !string.IsNullOrWhiteSpace(configuredNotifyKey),
-    configuredNotifyKey.Length,
-    configuredNotifyKey,
-    null);
 
 app.UseExceptionHandler();
 
