@@ -76,6 +76,10 @@ public partial class ParticipantRouteSmokeTests : IClassFixture<WebApplicationFa
             Guid.NewGuid(), "01234 567890", "01234 567891", "alice@example.com", "alice2@example.com",
             "Notes", isActive, isActive ? null : DateTime.UtcNow, false, null);
 
+    private static PendingParticipantUpdateResponse SamplePendingUpdate(Guid participantId, Guid customerId) => new(
+        participantId, customerId, "ALI-001", "New Contact", "New Organisation", "New Address 1", string.Empty,
+        string.Empty, string.Empty, string.Empty, Guid.NewGuid(), "09876 543210", string.Empty, "new@example.com", string.Empty);
+
     [Fact]
     public async Task Index_ReturnsSuccess()
     {
@@ -270,12 +274,26 @@ public partial class ParticipantRouteSmokeTests : IClassFixture<WebApplicationFa
         var client = _factory.CreateClient();
 
         var response = await client.GetAsync($"/Participant/Edit/{_participantId}?customerId={_customerId}");
-        var body = await response.Content.ReadAsStringAsync();
+        var crumbs = BreadcrumbHtml.Crumbs(await response.Content.ReadAsStringAsync());
 
-        Assert.Contains("Manage Contracts", body);
-        Assert.Contains("Customers", body);
-        Assert.Contains("Participants", body);
-        Assert.Contains("Edit Participant", body);
+        Assert.Equal(["Home", "Manage Contracts", "Customers", "Participants", "Participant Details", "Edit Participant"], crumbs.Select(c => c.Text));
+        Assert.Equal($"/Participant/Details/{_participantId}", crumbs.Single(c => c.Text == "Participant Details").Href);
+        Assert.Null(crumbs[^1].Href);
+    }
+
+    [Fact]
+    public async Task EditPendingParticipantUpdate_RendersFullBreadcrumbTrail()
+    {
+        _fakeParticipantClient.PendingParticipantUpdateComparison = new PendingParticipantUpdateComparisonResponse(
+            SampleParticipant(_participantId, _customerId), SamplePendingUpdate(_participantId, _customerId));
+        var client = _factory.CreateClient();
+
+        var response = await client.GetAsync($"/Participant/EditPendingParticipantUpdate?participantId={_participantId}");
+        var crumbs = BreadcrumbHtml.Crumbs(await response.Content.ReadAsStringAsync());
+
+        Assert.Equal(["Home", "Manage Contracts", "Customers", "Review Pending Participant Updates", "Pending Participant Update Details", "Edit Pending Participant Update"], crumbs.Select(c => c.Text));
+        Assert.Equal($"/Participant/PendingParticipantUpdateDetails?participantId={_participantId}", crumbs.Single(c => c.Text == "Pending Participant Update Details").Href);
+        Assert.Null(crumbs[^1].Href);
     }
 
     [Fact]
@@ -324,6 +342,34 @@ public partial class ParticipantRouteSmokeTests : IClassFixture<WebApplicationFa
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Contains("govuk-form-group--error", body);
+    }
+
+    // Only the Details crumb is asserted: the re-render does not republish every ancestor id, so other crumbs may already be plain text.
+    [Fact]
+    public async Task Edit_Post_InvalidModel_KeepsTheDetailsBreadcrumbLinked()
+    {
+        var client = _factory.CreateClient();
+        var (token, cookie) = await GetAntiforgeryAsync(client, $"/Participant/Edit/{_participantId}?customerId={_customerId}");
+
+        var request = new HttpRequestMessage(HttpMethod.Post, $"/Participant/Edit/{_participantId}?customerId={_customerId}")
+        {
+            Content = new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["__RequestVerificationToken"] = token,
+                ["IsActive"] = "true",
+            })
+        };
+        request.Headers.Add("Cookie", cookie);
+
+        var response = await client.SendAsync(request);
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("govuk-form-group--error", body);
+        var crumbs = BreadcrumbHtml.Crumbs(body);
+        Assert.Equal($"/Participant/Details/{_participantId}", crumbs.Single(c => c.Text == "Participant Details").Href);
+        Assert.Equal("Edit Participant", crumbs[^1].Text);
+        Assert.Null(crumbs[^1].Href);
     }
 
     private static async Task<(string Token, string Cookie)> GetAntiforgeryAsync(HttpClient client, string url)

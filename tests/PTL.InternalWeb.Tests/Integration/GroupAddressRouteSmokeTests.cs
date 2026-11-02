@@ -160,4 +160,17 @@ public class GroupAddressRouteSmokeTests : IClassFixture<WebApplicationFactory<P
         Assert.Contains("Group Addresses", body);
         Assert.Contains("Group Address Details", body);
     }
+
+    [Fact]
+    public async Task Edit_RendersFullBreadcrumbTrail()
+    {
+        var client = _factory.CreateClient();
+
+        var response = await client.GetAsync($"/GroupAddress/Edit/{_groupAddressId}");
+        var crumbs = BreadcrumbHtml.Crumbs(await response.Content.ReadAsStringAsync());
+
+        Assert.Equal(["Home", "Manage Contracts", "Group Addresses", "Group Address Details", "Edit Group Address"], crumbs.Select(c => c.Text));
+        Assert.Equal($"/GroupAddress/Details/{_groupAddressId}", crumbs.Single(c => c.Text == "Group Address Details").Href);
+        Assert.Null(crumbs[^1].Href);
+    }
 }

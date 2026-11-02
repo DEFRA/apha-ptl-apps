@@ -296,10 +296,11 @@ public class SchemeRouteSmokeTests : IClassFixture<WebApplicationFactory<Program
         var client = _factory.CreateClient();
 
         var response = await client.GetAsync($"/Scheme/Edit/{SchemeId}");
-        var body = await response.Content.ReadAsStringAsync();
+        var crumbs = BreadcrumbHtml.Crumbs(await response.Content.ReadAsStringAsync());
 
-        Assert.Contains("Manage Schemes", body);
-        Assert.Contains("Edit Scheme", body);
+        Assert.Equal(["Home", "Manage Schemes", "Schemes", "Scheme Details", "Edit Scheme"], crumbs.Select(c => c.Text));
+        Assert.Equal($"/Scheme/Details/{SchemeId}", crumbs.Single(c => c.Text == "Scheme Details").Href);
+        Assert.Null(crumbs[^1].Href);
     }
 
     [Fact]
