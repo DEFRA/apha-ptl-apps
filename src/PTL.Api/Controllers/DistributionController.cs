@@ -278,7 +278,8 @@ public sealed partial class DistributionController(
 
     // PUT /api/distributions/months/{yearId}/{monthId}/packaging - legacy ButtonSave_Click /
     // ButtonApply_Click, which save every packaging sheet the user touched (the save-vs-stay
-    // distinction is owned by InternalWeb).
+    // distinction is owned by InternalWeb). The Distribution Posted emails of newly posted rows are
+    // handed to the background worker once the save has committed.
     [HttpPut("months/{yearId:int}/{monthId:int}/packaging")]
     public async Task<ActionResult<PackagingSaveResult>> SavePackaging(
         int yearId, int monthId, [FromBody] PackagingSaveRequest request, CancellationToken cancellationToken)
@@ -295,7 +296,7 @@ public sealed partial class DistributionController(
         }
 
         var outcome = await packagingService.SavePackagingAsync(yearId, monthId, updates, cancellationToken);
-        return outcome.Success ? Ok(new PackagingSaveResult(true, outcome.EmailFailures ?? [])) : NotFound();
+        return outcome.Success ? Ok(new PackagingSaveResult(true)) : NotFound();
     }
 
     // POST /api/distributions/months/{yearId}/{monthId}/packaging/labels - legacy Print Labels,

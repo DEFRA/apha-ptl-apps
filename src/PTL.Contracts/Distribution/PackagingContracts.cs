@@ -47,6 +47,8 @@ public sealed record PackagingStageUpdateRequest(int Mode, int Week, Guid Distri
 
 public sealed record PackagingSaveRequest(IReadOnlyList<PackagingStageUpdateRequest> Updates);
 
+// EmailFailures is no longer filled in: the Distribution Posted emails are sent by a background worker after the save, so a failed send
+// is logged there and cannot be reported to the caller.
 public sealed record PackagingSaveResult(bool Success, IReadOnlyList<string>? EmailFailures = null);
 
 // The rows ticked in the Print column (PackagingBlockResponse.PrintKey).

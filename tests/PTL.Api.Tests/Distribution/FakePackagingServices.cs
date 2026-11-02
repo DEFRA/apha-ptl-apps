@@ -61,13 +61,11 @@ internal sealed class FakePostedNotifier : IDistributionPostedNotifier
 {
     public List<IReadOnlyList<PostedParticipant>> BuildRequests { get; } = [];
 
-    public List<IReadOnlyList<DistributionPostedEmailEntity>> Dispatched { get; } = [];
+    // Batches handed to SendAsync; PackagingService must never send inline, so tests expect this to stay empty.
+    public List<IReadOnlyList<DistributionPostedEmailEntity>> SendRequests { get; } = [];
 
     // Emails BuildEmailsAsync hands back for whatever was posted.
     public List<DistributionPostedEmailEntity> EmailsToReturn { get; } = [];
-
-    // Emails DispatchAsync reports as not sent.
-    public List<DistributionPostedEmailEntity> FailedEmails { get; } = [];
 
     // Mirrors the real notifier's contract (nothing posted -> nothing to send) unless told otherwise.
     public bool ReturnEmailsEvenWhenNothingPosted { get; set; }
@@ -80,12 +78,21 @@ internal sealed class FakePostedNotifier : IDistributionPostedNotifier
             posted.Count == 0 && !ReturnEmailsEvenWhenNothingPosted ? [] : [.. EmailsToReturn]);
     }
 
-    public Task<IReadOnlyList<DistributionPostedEmailEntity>> DispatchAsync(
+    public Task<DistributionPostedRunSummary> SendAsync(
         IReadOnlyList<DistributionPostedEmailEntity> emails, CancellationToken cancellationToken = default)
     {
-        Dispatched.Add(emails);
-        return Task.FromResult<IReadOnlyList<DistributionPostedEmailEntity>>([.. FailedEmails]);
+        SendRequests.Add(emails);
+        return Task.FromResult(new DistributionPostedRunSummary(emails.Count, emails.Count, 0, 0));
     }
+}
+
+// Records each hand-off to the background sender and how many packaging commits had reached the repository by then.
+internal sealed class FakePostedEmailDispatcher(FakeDistributionRepository repository) : IDistributionPostedEmailDispatcher
+{
+    public List<(IReadOnlyList<DistributionPostedEmailEntity> Emails, int CommitsBefore)> Dispatched { get; } = [];
+
+    public void Dispatch(IReadOnlyList<DistributionPostedEmailEntity> emails) =>
+        Dispatched.Add((emails, repository.PackagingUpdates.Count));
 }
 
 internal sealed class FixedTimeProvider(DateTimeOffset now) : TimeProvider
@@ -191,6 +198,9 @@ internal sealed class RecordingNotifyClient : INotifyClient
 {
     public List<(string TemplateId, string Email, IReadOnlyDictionary<string, string>? Personalisation, string? Reference)> Sent { get; } = [];
 
+    // The token of every call, successful or not.
+    public List<CancellationToken> Tokens { get; } = [];
+
     public Func<string, Exception?>? FailFor { get; set; }
 
     public Task SendEmailAsync(
@@ -200,6 +210,7 @@ internal sealed class RecordingNotifyClient : INotifyClient
         string? reference = null,
         CancellationToken cancellationToken = default)
     {
+        Tokens.Add(cancellationToken);
         if (FailFor?.Invoke(emailAddress) is { } failure)
         {
             throw failure;
