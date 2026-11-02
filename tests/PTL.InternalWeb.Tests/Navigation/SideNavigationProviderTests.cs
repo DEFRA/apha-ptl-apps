@@ -45,6 +45,22 @@ public class SideNavigationProviderTests
         Assert.False(search.IsHidden);
     }
 
+    // Plural display text matches the Scheme list page heading; the route stays on the singular Scheme controller.
+    [Fact]
+    public void Build_ManageSchemes_ListsSchemesFirstAndKeepsItsRouteAndChildrenUnchanged()
+    {
+        var manageSchemes = SideNavigationProvider.Build().Single(i => i.Text == "Manage Schemes");
+
+        var schemes = manageSchemes.Children[0];
+
+        Assert.Equal("Schemes", schemes.Text);
+        Assert.Equal("Scheme", schemes.ControllerName);
+        Assert.Equal("Index", schemes.ActionName);
+        Assert.Equal(
+            ["Create Scheme for Current Year", "Create Scheme for Next Year", "Printable Schemes"],
+            schemes.Children.Where(c => !c.IsHidden).Select(c => c.Text));
+    }
+
     [Fact]
     public void Build_ReturnsNonEmptyTree()
     {
