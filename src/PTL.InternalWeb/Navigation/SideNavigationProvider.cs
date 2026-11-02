@@ -114,8 +114,19 @@ public static class SideNavigationProvider
                             ActionName = "ReviewPendingCustomerUpdates",
                             Children =
                             [
-                                new SideNavigationItem { Text = "Pending Customer Update Details", ControllerName = CustomerControllerName, ActionName = "PendingCustomerUpdateDetails", IsHidden = true },
-                                new SideNavigationItem { Text = "Edit Pending Customer Update", ControllerName = CustomerControllerName, ActionName = "EditPendingCustomerUpdate", IsHidden = true }
+                                new SideNavigationItem
+                                {
+                                    Text = "Pending Customer Update Details",
+                                    ControllerName = CustomerControllerName,
+                                    ActionName = "PendingCustomerUpdateDetails",
+                                    IsHidden = true,
+                                    LinkRouteParameter = BreadcrumbRouteValues.CustomerIdKey,
+                                    LinkRouteValueKey = BreadcrumbRouteValues.CustomerIdKey,
+                                    Children =
+                                    [
+                                        new SideNavigationItem { Text = "Edit Pending Customer Update", ControllerName = CustomerControllerName, ActionName = "EditPendingCustomerUpdate", IsHidden = true }
+                                    ]
+                                }
                             ]
                         },
                         new SideNavigationItem
@@ -125,8 +136,19 @@ public static class SideNavigationProvider
                             ActionName = "ReviewPendingParticipantUpdates",
                             Children =
                             [
-                                new SideNavigationItem { Text = "Pending Participant Update Details", ControllerName = ParticipantControllerName, ActionName = "PendingParticipantUpdateDetails", IsHidden = true },
-                                new SideNavigationItem { Text = "Edit Pending Participant Update", ControllerName = ParticipantControllerName, ActionName = "EditPendingParticipantUpdate", IsHidden = true }
+                                new SideNavigationItem
+                                {
+                                    Text = "Pending Participant Update Details",
+                                    ControllerName = ParticipantControllerName,
+                                    ActionName = "PendingParticipantUpdateDetails",
+                                    IsHidden = true,
+                                    LinkRouteParameter = BreadcrumbRouteValues.ParticipantIdKey,
+                                    LinkRouteValueKey = BreadcrumbRouteValues.ParticipantIdKey,
+                                    Children =
+                                    [
+                                        new SideNavigationItem { Text = "Edit Pending Participant Update", ControllerName = ParticipantControllerName, ActionName = "EditPendingParticipantUpdate", IsHidden = true }
+                                    ]
+                                }
                             ]
                         },
                         new SideNavigationItem
@@ -140,10 +162,20 @@ public static class SideNavigationProvider
                             ]
                         },
 
-                        // Hidden: not a menu entry, but present so Details/Edit pages resolve a full
-                        // breadcrumb trail instead of a plain controller/action crumb.
-                        new SideNavigationItem { Text = "Customer Details", ControllerName = CustomerControllerName, ActionName = DetailsAction, IsHidden = true },
-                        new SideNavigationItem { Text = "Edit Customer", ControllerName = CustomerControllerName, ActionName = EditAction, IsHidden = true },
+                        // Hidden: not a menu entry; gives Details/Edit pages a full breadcrumb trail, with Edit nested under Details.
+                        new SideNavigationItem
+                        {
+                            Text = "Customer Details",
+                            ControllerName = CustomerControllerName,
+                            ActionName = DetailsAction,
+                            IsHidden = true,
+                            LinkRouteParameter = "id",
+                            LinkRouteValueKey = BreadcrumbRouteValues.IdKey,
+                            Children =
+                            [
+                                new SideNavigationItem { Text = "Edit Customer", ControllerName = CustomerControllerName, ActionName = EditAction, IsHidden = true }
+                            ]
+                        },
 
                         // Hidden: only reached from within a specific customer (Customer Details'
                         // "View participants"/"View contracts" links), never listed here - matches
@@ -159,8 +191,19 @@ public static class SideNavigationProvider
                             Children =
                             [
                                 new SideNavigationItem { Text = "Create Participant", ControllerName = ParticipantControllerName, ActionName = CreateAction },
-                                new SideNavigationItem { Text = "Participant Details", ControllerName = ParticipantControllerName, ActionName = DetailsAction, IsHidden = true },
-                                new SideNavigationItem { Text = "Edit Participant", ControllerName = ParticipantControllerName, ActionName = EditAction, IsHidden = true },
+                                new SideNavigationItem
+                                {
+                                    Text = "Participant Details",
+                                    ControllerName = ParticipantControllerName,
+                                    ActionName = DetailsAction,
+                                    IsHidden = true,
+                                    LinkRouteParameter = "id",
+                                    LinkRouteValueKey = BreadcrumbRouteValues.IdKey,
+                                    Children =
+                                    [
+                                        new SideNavigationItem { Text = "Edit Participant", ControllerName = ParticipantControllerName, ActionName = EditAction, IsHidden = true }
+                                    ]
+                                },
                                 new SideNavigationItem { Text = "Participant Viewers", ControllerName = ParticipantControllerName, ActionName = "Viewers", IsHidden = true }
                             ]
                         },
@@ -176,8 +219,19 @@ public static class SideNavigationProvider
                             [
                                 new SideNavigationItem { Text = "Create Contract", ControllerName = ContractControllerName, ActionName = CreateAction },
                                 new SideNavigationItem { Text = "Renew Contracts", ControllerName = ContractControllerName, ActionName = "RenewContracts" },
-                                new SideNavigationItem { Text = "Contract Details", ControllerName = ContractControllerName, ActionName = DetailsAction, IsHidden = true },
-                                new SideNavigationItem { Text = "Edit Contract", ControllerName = ContractControllerName, ActionName = EditAction, IsHidden = true },
+                                new SideNavigationItem
+                                {
+                                    Text = "Contract Details",
+                                    ControllerName = ContractControllerName,
+                                    ActionName = DetailsAction,
+                                    IsHidden = true,
+                                    LinkRouteParameter = "id",
+                                    LinkRouteValueKey = BreadcrumbRouteValues.IdKey,
+                                    Children =
+                                    [
+                                        new SideNavigationItem { Text = "Edit Contract", ControllerName = ContractControllerName, ActionName = EditAction, IsHidden = true }
+                                    ]
+                                },
 
                                 // Hidden: reached from the Contracts list and from Contract Details.
                                 // Its own children all return here via their Back/Cancel buttons.
@@ -191,9 +245,20 @@ public static class SideNavigationProvider
                                     LinkRouteValueKey = BreadcrumbRouteValues.ContractIdKey,
                                     Children =
                                     [
-                                        new SideNavigationItem { Text = "Contract Item Details", ControllerName = ParticipantSchemeControllerName, ActionName = DetailsAction, IsHidden = true },
-                                        new SideNavigationItem { Text = "Add Contract Item", ControllerName = ParticipantSchemeControllerName, ActionName = CreateAction, IsHidden = true },
-                                        new SideNavigationItem { Text = "Edit Contract Item", ControllerName = ParticipantSchemeControllerName, ActionName = EditAction, IsHidden = true }
+                                        new SideNavigationItem
+                                        {
+                                            Text = "Contract Item Details",
+                                            ControllerName = ParticipantSchemeControllerName,
+                                            ActionName = DetailsAction,
+                                            IsHidden = true,
+                                            LinkRouteParameter = "id",
+                                            LinkRouteValueKey = BreadcrumbRouteValues.IdKey,
+                                            Children =
+                                            [
+                                                new SideNavigationItem { Text = "Edit Contract Item", ControllerName = ParticipantSchemeControllerName, ActionName = EditAction, IsHidden = true }
+                                            ]
+                                        },
+                                        new SideNavigationItem { Text = "Add Contract Item", ControllerName = ParticipantSchemeControllerName, ActionName = CreateAction, IsHidden = true }
                                     ]
                                 },
 
@@ -216,8 +281,19 @@ public static class SideNavigationProvider
                     Children =
                     [
                         new SideNavigationItem { Text = "Create Group Address", ControllerName = GroupAddressControllerName, ActionName = CreateAction },
-                        new SideNavigationItem { Text = "Group Address Details", ControllerName = GroupAddressControllerName, ActionName = DetailsAction, IsHidden = true },
-                        new SideNavigationItem { Text = "Edit Group Address", ControllerName = GroupAddressControllerName, ActionName = EditAction, IsHidden = true }
+                        new SideNavigationItem
+                        {
+                            Text = "Group Address Details",
+                            ControllerName = GroupAddressControllerName,
+                            ActionName = DetailsAction,
+                            IsHidden = true,
+                            LinkRouteParameter = "id",
+                            LinkRouteValueKey = BreadcrumbRouteValues.IdKey,
+                            Children =
+                            [
+                                new SideNavigationItem { Text = "Edit Group Address", ControllerName = GroupAddressControllerName, ActionName = EditAction, IsHidden = true }
+                            ]
+                        }
                     ]
                 },
                 new SideNavigationItem
@@ -264,10 +340,20 @@ public static class SideNavigationProvider
                         new SideNavigationItem { Text = "Printable Schemes", ControllerName = SchemeControllerName, ActionName = "PrintableSchemes" },
 
 
-                        // Hidden: not menu entries, but present so Details/Edit pages resolve a full
-                        // breadcrumb trail instead of a plain controller/action crumb.
-                        new SideNavigationItem { Text = "Scheme Details", ControllerName = SchemeControllerName, ActionName = DetailsAction, IsHidden = true },
-                        new SideNavigationItem { Text = "Edit Scheme", ControllerName = SchemeControllerName, ActionName = EditAction, IsHidden = true },
+                        // Hidden: not menu entries; gives Details/Edit pages a full breadcrumb trail, with Edit nested under Details.
+                        new SideNavigationItem
+                        {
+                            Text = "Scheme Details",
+                            ControllerName = SchemeControllerName,
+                            ActionName = DetailsAction,
+                            IsHidden = true,
+                            LinkRouteParameter = "id",
+                            LinkRouteValueKey = BreadcrumbRouteValues.IdKey,
+                            Children =
+                            [
+                                new SideNavigationItem { Text = "Edit Scheme", ControllerName = SchemeControllerName, ActionName = EditAction, IsHidden = true }
+                            ]
+                        },
 
                         // Hidden: Renew reuses the Create view/action but needs its own breadcrumb
                         // leaf - Home > Manage Schemes > Schemes > Scheme - Renew - rather than
