@@ -1,6 +1,6 @@
 namespace PTL.Core.Contract.PendingOrder;
 
-// Replaces the legacy Windows service's SendOnlineContractOrderEmail switch; its timer is now NotificationSchedulerOptions.
+// Replaces the legacy Windows service's SendOnlineContractOrderEmail switch.
 public sealed class OnlineOrderEmailOptions
 {
     public const string SectionName = "OnlineOrderEmails";

@@ -4,20 +4,22 @@ using PTL.ApiClient.Distribution;
 using PTL.Contracts.Distribution;
 using PTL.ExternalWeb.Authorization;
 using PTL.ExternalWeb.Features.Account;
+using PTL.ExternalWeb.ViewSupport;
 using PTL.SharedUI.Notifications;
+using PTL.SharedUI.Pagination;
 
 namespace PTL.ExternalWeb.Features.Distribution;
 
 // Legacy DistributionsCurrent.aspx/ResultsEntry.aspx and DistributionsPrevious.aspx.
 [Authorize(Policy = ExternalPolicies.Participant)]
-public sealed class DistributionController : Controller
+public sealed class DistributionController(IDistributionApiClient distributionApiClient) : Controller
 {
     private const string CancelCommand = "cancel";
     private const string ExternalAuditReason = "External participant results updated.";
+    private static readonly string[] ValidSortColumns = ["reference", "schemeCode", "schemeName", "distributionDate"];
+    private static readonly string[] ValidSortDirections = ["asc", "desc"];
 
-    public async Task<IActionResult> Current(
-        [FromServices] IDistributionApiClient distributionApiClient,
-        CancellationToken cancellationToken)
+    public async Task<IActionResult> Current(CancellationToken cancellationToken)
     {
         var participantId = User.GetParticipantId();
         if (participantId is null)
@@ -50,7 +52,6 @@ public sealed class DistributionController : Controller
     public async Task<IActionResult> Entry(
         Guid schemeId,
         Guid participantId,
-        [FromServices] IDistributionApiClient distributionApiClient,
         CancellationToken cancellationToken)
     {
         var page = await distributionApiClient.GetActualResultsAsync(schemeId, participantId, cancellationToken);
@@ -63,7 +64,6 @@ public sealed class DistributionController : Controller
     public async Task<IActionResult> Entry(
         DistributionResultsEntryViewModel model,
         string? command,
-        [FromServices] IDistributionApiClient distributionApiClient,
         CancellationToken cancellationToken)
     {
         if (string.Equals(command, CancelCommand, StringComparison.OrdinalIgnoreCase))
@@ -106,7 +106,46 @@ public sealed class DistributionController : Controller
         return RedirectToAction(nameof(Current));
     }
 
-    public IActionResult Previous() => View("_ComingSoonBody", "View results");
+    // Legacy DistributionsPrevious.aspx - Year/Month dropdowns are exact matches, the 3 text
+    // criteria are "contains" (Scheme Name matches when every typed word is contained), mirroring
+    // DistributionsPast.ExecuteSearch. Default sort is DistributionDate descending.
+    public async Task<IActionResult> Previous([FromQuery] ReferenceSchemeListQuery query, CancellationToken cancellationToken = default)
+    {
+        var sortBy = ValidSortColumns.Contains(query.SortBy) ? query.SortBy : "distributionDate";
+        var sortDir = ValidSortDirections.Contains(query.SortDir) ? query.SortDir : "desc";
+        var page = Math.Max(query.Page, 1);
+        var pageSize = PaginationModel.AvailablePageSizes.Contains(query.PageSize) ? query.PageSize : ReferenceSchemeListQuery.DefaultPageSize;
+
+        var participantId = User.GetParticipantId();
+        if (participantId is null)
+        {
+            return View(new DistributionPreviousListViewModel([], 0, page, pageSize, sortBy, sortDir, query.Year, query.Month, query.DistributionReference, query.SchemeCode, query.SchemeName));
+        }
+
+        var history = await distributionApiClient.GetParticipantDistributionHistoryAsync(participantId.Value, cancellationToken);
+
+        var filtered = Filter(history.Distributions, query.Year, query.Month, query.DistributionReference, query.SchemeCode, query.SchemeName);
+        var sorted = Sort(filtered, sortBy, sortDir);
+        var paged = sorted.Skip((page - 1) * pageSize).Take(pageSize).ToList();
+
+        return View(new DistributionPreviousListViewModel(
+            paged, sorted.Count, page, pageSize, sortBy, sortDir, query.Year, query.Month, query.DistributionReference, query.SchemeCode, query.SchemeName));
+    }
+
+    // Legacy ResultsView.aspx - read-only, no Save/Submit/Edit/Delete. Reuses the same
+    // actual-results data as InternalWeb's Actual Results screen, resolved against the signed-in
+    // participant server-side.
+    public async Task<IActionResult> Results(Guid monthlyDistributionSchemeId, CancellationToken cancellationToken)
+    {
+        var participantId = User.GetParticipantId();
+        if (participantId is null)
+        {
+            return NotFound();
+        }
+
+        var page = await distributionApiClient.GetActualResultsForParticipantAsync(monthlyDistributionSchemeId, participantId.Value, cancellationToken);
+        return page is null ? NotFound() : View(page);
+    }
 
     private static async Task<DistributionResultsEntryViewModel> RehydrateResultsEntryAsync(
         IDistributionApiClient distributionApiClient,
@@ -267,4 +306,38 @@ public sealed class DistributionController : Controller
             })
         ],
     };
+
+    private static List<ParticipantPastDistributionResponse> Filter(
+        IReadOnlyList<ParticipantPastDistributionResponse> distributions,
+        int? year, int? month, string? distributionReference, string? schemeCode, string? schemeName) =>
+        [.. distributions.Where(d =>
+            (year is null or 0 || d.YearId == year)
+            && (month is null or 0 || d.MonthId == month)
+            && Contains(d.DistributionReference, distributionReference)
+            && Contains(d.SchemeCode, schemeCode)
+            && ContainsAllWords(d.SchemeName, schemeName))];
+
+    private static bool Contains(string value, string? term) =>
+        string.IsNullOrWhiteSpace(term) || value.Contains(term, StringComparison.OrdinalIgnoreCase);
+
+    private static bool ContainsAllWords(string value, string? term) =>
+        string.IsNullOrWhiteSpace(term)
+        || term.Split(' ', StringSplitOptions.RemoveEmptyEntries).All(word => value.Contains(word, StringComparison.OrdinalIgnoreCase));
+
+    private static List<ParticipantPastDistributionResponse> Sort(
+        IReadOnlyList<ParticipantPastDistributionResponse> distributions, string sortBy, string sortDir)
+    {
+        IOrderedEnumerable<ParticipantPastDistributionResponse> Order<TKey>(Func<ParticipantPastDistributionResponse, TKey> keySelector) =>
+            sortDir == "desc" ? distributions.OrderByDescending(keySelector) : distributions.OrderBy(keySelector);
+
+        var ordered = sortBy switch
+        {
+            "reference" => Order(d => d.DistributionReference),
+            "schemeCode" => Order(d => d.SchemeCode),
+            "schemeName" => Order(d => d.SchemeName),
+            _ => Order(d => d.DistributionDate),
+        };
+
+        return [.. ordered];
+    }
 }

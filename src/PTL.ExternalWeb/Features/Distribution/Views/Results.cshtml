@@ -1,0 +1,14 @@
+@model PTL.Contracts.Distribution.ActualResultsResponse
+@{
+    ViewData["Title"] = $"Results - {Model.Heading}";
+}
+
+<h1 class="govuk-heading-l">Results</h1>
+
+<h2 class="govuk-heading-m">@Model.Heading</h2>
+
+<p class="govuk-body">These are the results you previously submitted for this distribution, shown read-only.</p>
+
+<govuk-readonly-results-tables tests="Model.Tests" />
+
+<a class="govuk-button govuk-button--secondary" data-module="govuk-button" asp-action="Previous">Back</a>

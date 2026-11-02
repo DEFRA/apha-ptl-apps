@@ -156,3 +156,36 @@
   position: absolute;
   inset: 0;
 }
+/* Create New Order (legacy PendingContractOrder.aspx): month strip under each selected scheme row */
+.app-order-row--selected {
+  background-color: #f3f2f1;
+}
+
+.app-order-table .govuk-checkboxes__item {
+  margin-bottom: 0;
+}
+
+.app-month-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px 20px;
+}
+
+.app-month .govuk-checkboxes__item {
+  float: none;
+}
+
+.app-month--unavailable {
+  color: #505a5f;
+  padding-left: 40px;
+}
+
+/* GOV.UK component rules that set display (e.g. error summary/message) otherwise win over the hidden attribute. */
+#create-order [hidden] {
+  display: none;
+}
+
+.app-table-scroll {
+  overflow-x: auto;
+}

@@ -1,4 +1,3 @@
-using System.Security.Claims;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using PTL.Api.Controllers;
@@ -16,15 +15,8 @@ public class DistributionControllerAmendResultsTests
 
     private AmendResultsService Service => new(_repository);
 
-    private DistributionController CreateController(string? userName = null)
-    {
-        var httpContext = new DefaultHttpContext();
-        if (userName is not null)
-        {
-            httpContext.User = new ClaimsPrincipal(new ClaimsIdentity([new Claim(ClaimTypes.Name, userName)], "Test"));
-        }
-
-        return new(
+    private DistributionController CreateController(string? userName = null) =>
+        new(
             new DistributionService(_repository),
             new SampleNumbersService(_repository, new FakeSchemeService()),
             new IntendedResultsService(_repository),
@@ -33,13 +25,14 @@ public class DistributionControllerAmendResultsTests
             new ResultsReceiptService(_repository, TimeProvider.System),
             new TabulationsService(_repository, Clock()),
             new ActualResultsService(_repository, TimeProvider.System),
+            new ParticipantDistributionHistoryService(_repository, new PTL.Api.Tests.Participant.FakeParticipantRepository(), new ActualResultsService(_repository, TimeProvider.System)),
             new FakePackagingService(),
             new FakePackagingOutputService(),
+            new PTL.Api.Tests.Contract.FakeAuditActorResolver(userName ?? "Guest"),
             Microsoft.Extensions.Logging.Abstractions.NullLogger<DistributionController>.Instance)
         {
-            ControllerContext = new ControllerContext { HttpContext = httpContext },
+            ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() },
         };
-    }
 
     private void Seed()
     {

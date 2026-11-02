@@ -7,7 +7,15 @@
     var canOrderOnline = User.CanOrderOnline();
     bool IsVisible(NavigationItem item) =>
         (item.RequiredRole is null || roles.Contains(item.RequiredRole, StringComparer.OrdinalIgnoreCase))
-        && (!item.RequireCanOrderOnline || canOrderOnline);
+        && (!item.RequireCanOrderOnline || canOrderOnline)
+        && !IsSubmittedOrderCard(item);
+
+    // An Orders card disappears once an order for its year has been submitted (the header menu stays claim-based;
+    // the order page itself explains why the year is unavailable).
+    bool IsSubmittedOrderCard(NavigationItem item) =>
+        item.ControllerName == "Order"
+        && ((item.ActionName == "CurrentYear" && !Model.CanCreateCurrentYearOrder)
+            || (item.ActionName == "NextYear" && !Model.CanCreateNextYearOrder));
 
     // See _HeaderMenu.cshtml for why groups and children are each filtered independently
     // (Results has no group-level role - only its children do).

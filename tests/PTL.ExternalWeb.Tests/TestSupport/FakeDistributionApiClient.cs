@@ -108,6 +108,14 @@ internal sealed partial class FakeDistributionApiClient : IDistributionApiClient
         return Task.FromResult(PreparationSaveResult);
     }
 
+    public ParticipantPastDistributionListResponse ParticipantHistory { get; set; } = new([]);
+
+    public PublishedTabulationSummaryListResponse Tabulations { get; set; } = new([]);
+
+    public TabulationReportResponse? PublishedTabulation { get; set; }
+
+    public TabulationAttachmentFile? Attachment { get; set; }
+
     public ResultsReceiptResponse? ResultsReceipt { get; set; }
     public ResultsReceiptSaveResult? ResultsReceiptSaveResult { get; set; }
     public List<ResultsReceiptSaveRequest> SavedResultsReceiptRequests { get; } = [];
@@ -115,14 +123,12 @@ internal sealed partial class FakeDistributionApiClient : IDistributionApiClient
     public Task<ResultsReceiptResponse?> GetResultsReceiptAsync(int yearId, int monthId, CancellationToken cancellationToken = default) =>
         Task.FromResult(ResultsReceipt);
 
-    public TabulationsResponse? Tabulations { get; set; }
-
     public List<(int YearId, int MonthId)> TabulationRequests { get; } = [];
 
     public Task<TabulationsResponse?> GetTabulationsAsync(int yearId, int monthId, CancellationToken cancellationToken = default)
     {
         TabulationRequests.Add((yearId, monthId));
-        return Task.FromResult(Tabulations);
+        return Task.FromResult(TabulationsPreview);
     }
 
     public Task<ResultsReceiptSaveResult?> SaveResultsReceiptAsync(
@@ -154,6 +160,30 @@ internal sealed partial class FakeDistributionApiClient : IDistributionApiClient
     public Task<ActualResultsResponse?> GetActualResultsAsync(
         Guid monthlyDistributionSchemeId, Guid distributionParticipantId, CancellationToken cancellationToken = default) =>
         Task.FromResult(ActualResults);
+
+    public Task<ParticipantPastDistributionListResponse> GetParticipantDistributionHistoryAsync(
+        Guid participantId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(ParticipantHistory);
+
+    public Task<ActualResultsResponse?> GetActualResultsForParticipantAsync(
+        Guid monthlyDistributionSchemeId, Guid participantId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(ActualResults);
+
+    public Task<PublishedTabulationSummaryListResponse> GetTabulationsForUserAsync(
+        Guid? participantId, Guid? viewerId, Guid? testConsultantId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Tabulations);
+
+    public Task<TabulationReportResponse?> GetPublishedTabulationForUserAsync(
+        Guid publishedTabulationId, Guid? participantId, Guid? viewerId, Guid? testConsultantId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(PublishedTabulation);
+
+    public Task<AssessmentResultsResponse?> GetAssessmentResultsForUserAsync(
+        Guid publishedTabulationId, Guid testId, Guid? participantId, Guid? viewerId, Guid? testConsultantId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(AssessmentResults);
+
+    public Task<TabulationAttachmentFile?> GetPublishedTabulationAttachmentForUserAsync(
+        Guid publishedTabulationId, Guid attachmentId, Guid? participantId, Guid? viewerId, Guid? testConsultantId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Attachment);
 
     public Task<ActualResultsSaveResult?> SaveActualResultsAsync(
         Guid monthlyDistributionSchemeId, Guid distributionParticipantId, ActualResultsSaveRequest request, CancellationToken cancellationToken = default)

@@ -8,6 +8,7 @@ using PTL.Common.Health;
 using PTL.Core.AdministrationCharge;
 using PTL.Core.CategoryItemType;
 using PTL.Core.Contract;
+using PTL.Core.Contract.CreateOrder;
 using PTL.Core.Contract.Document;
 using PTL.Core.Contract.Export.Bulk;
 using PTL.Core.Contract.Export.Templates;
@@ -41,6 +42,7 @@ using PTL.Core.WeightedPricingPlan;
 using PTL.Data.AdministrationCharge;
 using PTL.Data.CategoryItemType;
 using PTL.Data.Contract;
+using PTL.Data.Contract.CreateOrder;
 using PTL.Data.Contract.Export;
 using PTL.Data.Contract.ImportPermit;
 using PTL.Data.Contract.PendingOrder;
@@ -161,12 +163,16 @@ builder.Services.AddScoped<IPendingOrderContractWriter, PendingOrderContractWrit
 builder.Services.AddScoped<IPendingOrderDecisionEmails, PendingOrderDecisionEmails>();
 builder.Services.AddScoped<IPendingOrderEmailPersonaliser, PendingOrderEmailPersonaliser>();
 
-// Approve/Decline emails: sent through GOV.UK Notify straight after the decision, retried by the hosted scheduler.
+// Participant-facing Create Order (legacy PendingContractOrder.aspx stage 1).
+builder.Services.AddScoped<ICreateOrderRepository, CreateOrderRepository>();
+builder.Services.AddScoped<ICreateOrderService, CreateOrderService>();
+builder.Services.Configure<CreateOrderOptions>(builder.Configuration.GetSection(CreateOrderOptions.SectionName));
+
+// Approve/Decline emails: sent through GOV.UK Notify straight after the decision; a failed send is not retried.
 builder.Services.Configure<OnlineOrderEmailOptions>(builder.Configuration.GetSection(OnlineOrderEmailOptions.SectionName));
-builder.Services.AddSingleton<EmailSendGuard>();
 builder.Services.AddScoped<IPendingOrderNotifier, PendingOrderNotifier>();
 
-// Customer and participant update emails: same pattern - sent through GOV.UK Notify when the update is decided, retried by the scheduler.
+// Customer and participant update emails: same pattern - sent through GOV.UK Notify when the update is decided, not retried.
 builder.Services.Configure<CustomerUpdateEmailOptions>(builder.Configuration.GetSection(CustomerUpdateEmailOptions.SectionName));
 builder.Services.Configure<ParticipantUpdateEmailOptions>(builder.Configuration.GetSection(ParticipantUpdateEmailOptions.SectionName));
 builder.Services.AddScoped<ICustomerUpdateNotifier, CustomerUpdateNotifier>();
@@ -233,10 +239,13 @@ builder.Services.AddScoped<ITestConsultantTabulationService, TestConsultantTabul
 builder.Services.AddScoped<IAmendResultsService, AmendResultsService>();
 builder.Services.AddScoped<ITabulationSendService, TabulationSendService>();
 builder.Services.AddScoped<IActualResultsService, ActualResultsService>();
+builder.Services.AddScoped<IParticipantDistributionHistoryService, ParticipantDistributionHistoryService>();
+builder.Services.AddScoped<IParticipantTabulationService, ParticipantTabulationService>();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddScoped<IDistributionPostedNotifier, DistributionPostedNotifier>();
 
-// Test Consultant and publication emails: sent through GOV.UK Notify; the one scheduler for all email jobs is hosted in this process.
+// Test Consultant and publication emails: sent through GOV.UK Notify. The scheduler hosted in this process runs the Test Consultant
+// jobs; the publication emails are sent by their own hosted worker as soon as Authorise has committed.
 builder.Services.Configure<NotificationSchedulerOptions>(builder.Configuration.GetSection(NotificationSchedulerOptions.SectionName));
 builder.Services.Configure<TabulationEmailOptions>(builder.Configuration.GetSection(TabulationEmailOptions.SectionName));
 builder.Services.Configure<PublicationNotificationOptions>(builder.Configuration.GetSection(PublicationNotificationOptions.SectionName));
@@ -244,6 +253,15 @@ builder.Services.AddSingleton<TabulationEmailGuard>();
 builder.Services.AddSingleton<TabulationEmailContext>();
 builder.Services.AddScoped<ITabulationEmailService, TabulationEmailService>();
 builder.Services.AddScoped<ITabulationPublishedNotifier, TabulationPublishedNotifier>();
+builder.Services.AddSingleton<PTL.Api.BackgroundServices.PublicationEmailDispatcher>();
+builder.Services.AddSingleton<IPublicationEmailDispatcher>(sp => sp.GetRequiredService<PTL.Api.BackgroundServices.PublicationEmailDispatcher>());
+builder.Services.AddHostedService(sp => sp.GetRequiredService<PTL.Api.BackgroundServices.PublicationEmailDispatcher>());
+
+// Import permit reminders: the scheduler runs this on every poll, like the legacy service did on every timer tick.
+builder.Services.AddSingleton<ImportPermitReminderGuard>();
+builder.Services.AddScoped<IImportPermitReminderRepository, ImportPermitReminderRepository>();
+builder.Services.AddScoped<IImportPermitReminderService, ImportPermitReminderService>();
+
 builder.Services.AddHostedService<PTL.Api.BackgroundServices.NotificationBackgroundService>();
 builder.Services.AddScoped<IPackagingService, PackagingService>();
 builder.Services.AddScoped<IPackagingOutputService, PackagingOutputService>();
@@ -402,20 +420,6 @@ catch (Exception ex)
 {
     logCredentialDiagnosticFailed(app.Logger, ex);
 }
-
-// TEMPORARY DIAGNOSTIC - logs the full Notify API key at the user's explicit request; remove and rotate the key afterwards.
-var logNotifyKeyDiagnostic = LoggerMessage.Define<bool, int, string>(
-    LogLevel.Information,
-    new EventId(3, "NotifyApiKeyDiagnostic"),
-    "GOV.UK Notify API key diagnostic: Configured={Configured} Length={Length} Key={ApiKey}");
-
-var configuredNotifyKey = app.Services.GetRequiredService<IOptions<NotifyOptions>>().Value.ApiKey;
-logNotifyKeyDiagnostic(
-    app.Logger,
-    !string.IsNullOrWhiteSpace(configuredNotifyKey),
-    configuredNotifyKey.Length,
-    configuredNotifyKey,
-    null);
 
 app.UseExceptionHandler();
 

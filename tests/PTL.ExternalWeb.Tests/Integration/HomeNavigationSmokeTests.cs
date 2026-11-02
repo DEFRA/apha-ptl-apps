@@ -19,7 +19,9 @@ public class HomeNavigationSmokeTests : IClassFixture<PtlExternalWebTestFactory>
     [Fact]
     public async Task ParticipantOnly_SeesResultsSchemesOrdersAndAccountSections_NotReportsOrCommentsItems()
     {
-        var body = await GetHomePageAsSignedInUserAsync(roles: "Participant");
+        // ExternalUserService always grants Viewer alongside Participant (see its own comments) -
+        // "Participant,Viewer" is what CIDM resolution actually produces for a Participant account.
+        var body = await GetHomePageAsSignedInUserAsync(roles: "Participant,Viewer");
 
         Assert.Contains("Results", body);
         Assert.Contains("Enter results", body);
@@ -29,9 +31,10 @@ public class HomeNavigationSmokeTests : IClassFixture<PtlExternalWebTestFactory>
         // Orders also requires CanOrderOnline (see ParticipantWithoutCanOrderOnline_* /
         // ParticipantWithCanOrderOnline_* below) - a bare Participant role isn't enough.
         Assert.DoesNotContain("Orders", body);
-        // View reports/Enter comments are Results' Viewer/Test Consultant-only children (see
-        // NavigationProvider) - not visible to a Participant-only user.
-        Assert.DoesNotContain("View reports", body);
+        // View reports is visible to Participant too (docs/Parity-Analysis/11-External-Role-Card-
+        // and-Menu-Visibility.md - every Participant account is always also given the Viewer SSO
+        // role at Generate Login), but Enter comments stays Test-Consultant-only.
+        Assert.Contains("View reports", body);
         Assert.DoesNotContain("Enter comments", body);
     }
 
@@ -59,7 +62,8 @@ public class HomeNavigationSmokeTests : IClassFixture<PtlExternalWebTestFactory>
         var body = await homeResponse.Content.ReadAsStringAsync();
 
         Assert.Contains("Orders", body);
-        Assert.Contains("Create order", body);
+        Assert.Contains("Create order for current year", body);
+        Assert.Contains("Create order for next year", body);
     }
 
     [Fact]
@@ -97,15 +101,18 @@ public class HomeNavigationSmokeTests : IClassFixture<PtlExternalWebTestFactory>
     }
 
     [Fact]
-    public async Task TestConsultantOnly_SeesOnlyEnterCommentsWithinResults_NotParticipantOrViewerItems()
+    public async Task TestConsultantOnly_SeesEnterCommentsAndViewReports_NotParticipantOrViewerOnlyItems()
     {
-        var body = await GetHomePageAsSignedInUserAsync(roles: "Test Consultant");
+        // ExternalUserService always grants Viewer alongside Test Consultant (see its own comments).
+        var body = await GetHomePageAsSignedInUserAsync(roles: "Test Consultant,Viewer");
 
         Assert.Contains("Results", body);
         Assert.Contains("Enter comments", body);
+        // Test Consultants are always also given the Viewer SSO role at Generate Login (docs/
+        // Parity-Analysis/11-External-Role-Card-and-Menu-Visibility.md), so they see View reports too.
+        Assert.Contains("View reports", body);
         Assert.DoesNotContain("Enter results", body);
         Assert.DoesNotContain("View results", body);
-        Assert.DoesNotContain("View reports", body);
         Assert.DoesNotContain("Schemes", body);
         Assert.DoesNotContain("My account", body);
     }
@@ -236,6 +243,18 @@ public class HomeNavigationSmokeTests : IClassFixture<PtlExternalWebTestFactory>
         Assert.Contains($"Signed in as: <strong>{longName}</strong>", body);
         Assert.Contains("Lab Number: <strong>LAB001</strong>", body);
         Assert.Contains("Sign out", body);
+    }
+
+    [Fact]
+    public async Task SignedInUser_SeesCidmAccountLinkToTheSelfServicePortal()
+    {
+        // CidmOptions.AccountPortalUrl drops the idphub/b2c path from the configured Address
+        // (test config: https://cidm.test/idphub/b2c) - the portal lives at the bare origin.
+        var body = await GetHomePageAsSignedInUserAsync(roles: "Participant");
+
+        Assert.Contains(
+            """<a class="govuk-service-navigation__link" href="https://cidm.test/management" target="_blank" rel="noopener noreferrer">CIDM account</a>""",
+            body, StringComparison.Ordinal);
     }
 
     [Fact]

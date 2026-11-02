@@ -1126,6 +1126,10 @@ public class ContractController(IContractApiClient contractApiClient, ICustomerA
         model.CurrencySymbol = currencies.FirstOrDefault(c => c.CurrencyId == customer.CurrencyId)?.Symbol ?? string.Empty;
     }
 
+    // Legacy Contract.aspx.vb shows DiscountRate * 100 and saves Decimal.Parse(text) / 100: the form
+    // works in percent, while the API, database and every other screen hold a fraction (0.10 = 10%).
+    private const decimal PercentFactor = 100m;
+
     private static ContractRequest ToRequest(ContractFormViewModel model) => new(
         model.YearId.GetValueOrDefault(),
         model.UTNumber ?? string.Empty,
@@ -1133,7 +1137,7 @@ public class ContractController(IContractApiClient contractApiClient, ICustomerA
         model.ContractSignatory ?? string.Empty,
         model.ActionsRequired ?? string.Empty,
         model.RenewalInformation ?? string.Empty,
-        model.DiscountRate.GetValueOrDefault(),
+        model.DiscountRate.GetValueOrDefault() / PercentFactor,
         model.AdministrationCharge.GetValueOrDefault(),
         model.NumberCourier.GetValueOrDefault(),
         model.CourierPrice.GetValueOrDefault(),
@@ -1167,7 +1171,8 @@ public class ContractController(IContractApiClient contractApiClient, ICustomerA
         ContractSignatory = contract.ContractSignatory,
         ActionsRequired = contract.ActionsRequired,
         RenewalInformation = contract.RenewalInformation,
-        DiscountRate = contract.DiscountRate,
+        // Rounded to 2dp like legacy's ToString("N2"); lossless for the decimal(18,4) fraction.
+        DiscountRate = decimal.Round(contract.DiscountRate * PercentFactor, 2),
         AdministrationCharge = contract.AdministrationCharge,
         NumberCourier = contract.NumberCourier,
         CourierPrice = contract.CourierPrice,

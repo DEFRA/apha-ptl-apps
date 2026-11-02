@@ -26,4 +26,15 @@ public static class ExternalUserClaimTypes
     /// resolved - lets participant-scoped features (e.g. Scheme List) query by id directly
     /// without re-resolving the user against PTL.Api.</summary>
     public const string ParticipantId = "participantId";
+
+    /// <summary>The resolved Viewer's own id, only present when the Viewer role resolved (this
+    /// also covers Test Consultants, who are always also resolved as a Viewer - see
+    /// docs/Parity-Analysis/11-External-Role-Card-and-Menu-Visibility.md) - lets viewer-scoped
+    /// features (e.g. View Reports) query by id directly without re-resolving the user.</summary>
+    public const string ViewerId = "viewerId";
+
+    /// <summary>The resolved Test Consultant's own id, only present when the Test Consultant role
+    /// resolved - Test Consultants are resolved separately from Viewers (own tblExternalTestConsultant
+    /// row, own SsoId), so View Reports needs this in addition to ViewerId.</summary>
+    public const string TestConsultantId = "testConsultantId";
 }

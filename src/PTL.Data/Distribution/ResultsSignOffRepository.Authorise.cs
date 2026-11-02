@@ -18,7 +18,7 @@ public sealed partial class ResultsSignOffRepository
 
     private const string SignatorySql = "SELECT fldFirstName, fldLastName, fldUsername FROM tblUsers WHERE fldUserId = @UserId";
 
-    public async Task<ResultsSignOffOutcome> AuthoriseAsync(Guid tabulationId, Guid? signatoryUserId, DateTime creationDate, CancellationToken cancellationToken = default)
+    public async Task<AuthoriseResult> AuthoriseAsync(Guid tabulationId, Guid? signatoryUserId, DateTime creationDate, CancellationToken cancellationToken = default)
     {
         using var connection = connectionFactory.CreateConnection();
         connection.Open();
@@ -26,8 +26,8 @@ public sealed partial class ResultsSignOffRepository
 
         try
         {
-            var outcome = await AuthoriseAsync(connection, transaction, tabulationId, signatoryUserId, creationDate);
-            if (outcome == ResultsSignOffOutcome.Done)
+            var result = await AuthoriseAsync(connection, transaction, tabulationId, signatoryUserId, creationDate);
+            if (result.Outcome == ResultsSignOffOutcome.Done)
             {
                 transaction.Commit();
             }
@@ -36,7 +36,7 @@ public sealed partial class ResultsSignOffRepository
                 transaction.Rollback();
             }
 
-            return outcome;
+            return result;
         }
         catch
         {
@@ -45,29 +45,29 @@ public sealed partial class ResultsSignOffRepository
         }
     }
 
-    private static async Task<ResultsSignOffOutcome> AuthoriseAsync(IDbConnection connection, IDbTransaction transaction, Guid tabulationId, Guid? signatoryUserId, DateTime creationDate)
+    private static async Task<AuthoriseResult> AuthoriseAsync(IDbConnection connection, IDbTransaction transaction, Guid tabulationId, Guid? signatoryUserId, DateTime creationDate)
     {
         var state = await connection.ExecuteScalarAsync<int?>(StateSql, new { DistributionTabulationId = tabulationId }, transaction);
         if (state is null)
         {
-            return ResultsSignOffOutcome.NotFound;
+            return new AuthoriseResult(ResultsSignOffOutcome.NotFound);
         }
 
         if (state != ResultsSignOffState.AwaitingSignOff)
         {
-            return ResultsSignOffOutcome.NotAwaiting;
+            return new AuthoriseResult(ResultsSignOffOutcome.NotAwaiting);
         }
 
         var signatory = await GetSignatoryAsync(connection, transaction, signatoryUserId);
         if (signatory is null)
         {
-            return ResultsSignOffOutcome.NoSignatory;
+            return new AuthoriseResult(ResultsSignOffOutcome.NoSignatory);
         }
 
         var source = await ReadPublishSourceAsync(connection, transaction, tabulationId);
         if (source is null)
         {
-            return ResultsSignOffOutcome.NotFound;
+            return new AuthoriseResult(ResultsSignOffOutcome.NotFound);
         }
 
         var plan = TabulationPublishPlanner.Plan(source, signatory, creationDate);
@@ -89,7 +89,7 @@ public sealed partial class ResultsSignOffRepository
             SetStateSql,
             new { DistributionTabulationId = tabulationId, PublishState = ResultsSignOffState.Authorized },
             transaction);
-        return ResultsSignOffOutcome.Done;
+        return new AuthoriseResult(ResultsSignOffOutcome.Done, plan.PublishedTabulationId);
     }
 
     // Legacy signed with the user's first and last name, or with the account name when the user list had no match.

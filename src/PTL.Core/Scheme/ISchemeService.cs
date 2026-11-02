@@ -35,7 +35,9 @@ public interface ISchemeService
     // Throws SchemeValidationException when business rules are violated.
     Task<Scheme> CreateSchemeAsync(Scheme scheme, CancellationToken cancellationToken = default);
 
-    // Returns null when schemeId does not exist. Throws SchemeValidationException when business
-    // rules are violated, including when the existing scheme IsReadOnly (closed year).
-    Task<Scheme?> UpdateSchemeAsync(Guid schemeId, Scheme updatedFields, CancellationToken cancellationToken = default);
+    // NotFound when schemeId does not exist. AuditReasonRequired (nothing saved) when the edit changes
+    // an audited Test or Tabulation and auditWhy is blank - legacy diverted that save through Audit.aspx.
+    // Throws SchemeValidationException when business rules are violated, including when the existing
+    // scheme IsReadOnly (closed year).
+    Task<SchemeUpdateResult> UpdateSchemeAsync(Guid schemeId, Scheme updatedFields, string auditWho, string? auditWhy, CancellationToken cancellationToken = default);
 }

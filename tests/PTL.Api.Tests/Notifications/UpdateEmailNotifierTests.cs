@@ -4,13 +4,12 @@ using PTL.Api.Tests.Customer;
 using PTL.Api.Tests.Distribution;
 using PTL.Api.Tests.Participant;
 using PTL.Core.Customer;
-using PTL.Core.Notifications;
 using PTL.Core.Participant;
 
 namespace PTL.Api.Tests.Notifications;
 
-// Legacy email.vb ProcessUpdateCustomerDetailsEmails / ProcessUpdateParticipantDetailsEmails: each unsent row is sent
-// through GOV.UK Notify and marked sent only afterwards, so a failed send stays unsent for the next run.
+// Legacy email.vb ProcessUpdateCustomerDetailsEmails / ProcessUpdateParticipantDetailsEmails: each unsent row of a decided
+// update is sent through GOV.UK Notify and marked sent only afterwards, so a failed send stays unsent.
 public class UpdateEmailNotifierTests
 {
     private const string CustomerAccepted = CustomerUpdateEmailTemplates.AcceptedId;
@@ -24,16 +23,14 @@ public class UpdateEmailNotifierTests
     {
         public FakePendingCustomerUpdateRepository Repository { get; } = new();
         public RecordingNotifyClient Notify { get; } = new();
-        public EmailSendGuard Guard { get; } = new();
         public MessageCapturingLogger<CustomerUpdateNotifier> Logger { get; } = new();
         public CustomerUpdateNotifier Notifier { get; }
         public Guid PendingId { get; } = Guid.NewGuid();
 
-        public CustomerHarness(bool enabled = true, PTL.Core.Notifications.INotifyClient? client = null) =>
+        public CustomerHarness(bool enabled = true) =>
             Notifier = new CustomerUpdateNotifier(
                 Repository,
-                client ?? Notify,
-                Guard,
+                Notify,
                 Options.Create(new CustomerUpdateEmailOptions { Enabled = enabled }),
                 new SettableTimeProvider(Now),
                 Logger);
@@ -60,7 +57,6 @@ public class UpdateEmailNotifierTests
     {
         public FakePendingParticipantUpdateRepository Repository { get; } = new();
         public RecordingNotifyClient Notify { get; } = new();
-        public EmailSendGuard Guard { get; } = new();
         public MessageCapturingLogger<ParticipantUpdateNotifier> Logger { get; } = new();
         public ParticipantUpdateNotifier Notifier { get; }
         public Guid PendingId { get; } = Guid.NewGuid();
@@ -69,7 +65,6 @@ public class UpdateEmailNotifierTests
             Notifier = new ParticipantUpdateNotifier(
                 Repository,
                 Notify,
-                Guard,
                 Options.Create(new ParticipantUpdateEmailOptions { Enabled = enabled }),
                 new SettableTimeProvider(Now),
                 Logger);
@@ -100,7 +95,7 @@ public class UpdateEmailNotifierTests
         var h = new CustomerHarness();
         var row = h.Queue("customer@example.com");
 
-        await h.Notifier.SendUnsentAsync();
+        await h.Notifier.SendForUpdateAsync(h.PendingId);
 
         var sent = Assert.Single(h.Notify.Sent);
         Assert.Equal(CustomerAccepted, sent.TemplateId);
@@ -120,7 +115,7 @@ public class UpdateEmailNotifierTests
         var h = new CustomerHarness();
         h.Queue("customer@example.com", isApproved: false, notes: "Not eligible");
 
-        await h.Notifier.SendUnsentAsync();
+        await h.Notifier.SendForUpdateAsync(h.PendingId);
 
         var sent = Assert.Single(h.Notify.Sent);
         Assert.Equal(CustomerDeclined, sent.TemplateId);
@@ -136,7 +131,7 @@ public class UpdateEmailNotifierTests
         row.QalNumber = null;
         row.LabCode = null;
 
-        await h.Notifier.SendUnsentAsync();
+        await h.Notifier.SendForUpdateAsync(h.PendingId);
 
         var sent = Assert.Single(h.Notify.Sent);
         Assert.Equal(string.Empty, sent.Personalisation!["CustomerName"]);
@@ -149,7 +144,7 @@ public class UpdateEmailNotifierTests
         var h = new CustomerHarness(enabled: false);
         h.Queue("customer@example.com");
 
-        await h.Notifier.SendUnsentAsync();
+        await h.Notifier.SendForUpdateAsync(h.PendingId);
 
         Assert.Equal(0, h.Repository.GetUnsentCalls);
         Assert.Empty(h.Notify.Sent);
@@ -161,7 +156,7 @@ public class UpdateEmailNotifierTests
     {
         var h = new CustomerHarness();
 
-        await h.Notifier.SendUnsentAsync();
+        await h.Notifier.SendForUpdateAsync(h.PendingId);
 
         Assert.Empty(h.Notify.Sent);
         Assert.Empty(h.Logger.Entries);
@@ -171,13 +166,12 @@ public class UpdateEmailNotifierTests
     [InlineData(null)]
     [InlineData("")]
     [InlineData("  ")]
-    public async Task Customer_BlankAddress_StaysUnsentAndWarnsOnlyOncePerDay(string? address)
+    public async Task Customer_BlankAddress_StaysUnsentAndWarns(string? address)
     {
         var h = new CustomerHarness();
         h.Queue(address);
 
-        await h.Notifier.SendUnsentAsync();
-        await h.Notifier.SendUnsentAsync();
+        await h.Notifier.SendForUpdateAsync(h.PendingId);
 
         Assert.Empty(h.Notify.Sent);
         Assert.Single(h.Repository.Unsent);
@@ -185,34 +179,28 @@ public class UpdateEmailNotifierTests
     }
 
     [Fact]
-    public async Task Customer_NotifyFailure_StaysUnsentAndTheNextRunSendsItExactlyOnce()
+    public async Task Customer_NotifyFailure_StaysUnsentAndTheOtherRowsStillGo()
     {
         var h = new CustomerHarness();
         h.Queue("bad@example.com");
         h.Queue("good@example.com");
         h.Notify.FailFor = address => address == "bad@example.com" ? new InvalidOperationException("Notify is down") : null;
 
-        await h.Notifier.SendUnsentAsync();
+        await h.Notifier.SendForUpdateAsync(h.PendingId);
 
         Assert.Equal("good@example.com", Assert.Single(h.Notify.Sent).Email);
         Assert.Equal("bad@example.com", Assert.Single(h.Repository.Unsent).Email);
-
-        h.Notify.FailFor = null;
-        await h.Notifier.SendUnsentAsync();
-
-        Assert.Equal(["good@example.com", "bad@example.com"], h.Notify.Sent.Select(s => s.Email));
-        Assert.Empty(h.Repository.Unsent);
+        Assert.Single(h.Logger.At(LogLevel.Error));
     }
 
     [Fact]
-    public async Task Customer_RepeatedFailure_LogsOncePerDayWithoutTheAddressOrNotes()
+    public async Task Customer_Failure_LogsWithoutTheAddressOrNotes()
     {
         var h = new CustomerHarness();
         h.Queue("bad@example.com", notes: "private comment");
         h.Notify.FailFor = _ => new InvalidOperationException("Notify is down");
 
-        await h.Notifier.SendUnsentAsync();
-        await h.Notifier.SendUnsentAsync();
+        await h.Notifier.SendForUpdateAsync(h.PendingId);
 
         Assert.Single(h.Logger.At(LogLevel.Error));
         h.Logger.AssertNoneContain("bad@example.com", "private comment", "@");
@@ -247,29 +235,16 @@ public class UpdateEmailNotifierTests
     }
 
     [Fact]
-    public async Task Customer_SendForUpdate_Cancelled_Propagates()
+    public async Task Customer_SendForUpdate_CancelledWhileSending_PropagatesAndLeavesTheRowUnsent()
     {
         var h = new CustomerHarness();
         h.Queue("customer@example.com");
-        using var cts = new CancellationTokenSource();
-        await cts.CancelAsync();
+        h.Notify.FailFor = _ => new OperationCanceledException();
 
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => h.Notifier.SendForUpdateAsync(h.PendingId, cts.Token));
-    }
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => h.Notifier.SendForUpdateAsync(h.PendingId));
 
-    [Fact]
-    public async Task Customer_ImmediateSendAndScheduler_RunningTogether_SendEachRowOnce()
-    {
-        var slow = new SlowNotifyClient();
-        var h = new CustomerHarness(client: slow);
-        h.Queue("a@example.com");
-        h.Queue("b@example.com");
-
-        await Task.WhenAll(h.Notifier.SendForUpdateAsync(h.PendingId), h.Notifier.SendUnsentAsync());
-
-        Assert.Equal(2, slow.Sent.Count);
-        Assert.Equal(2, slow.Sent.Select(s => s.Email).Distinct().Count());
-        Assert.Empty(h.Repository.Unsent);
+        Assert.Single(h.Repository.Unsent);
+        Assert.Empty(h.Logger.At(LogLevel.Error));
     }
 
     // ---- Participant ----
@@ -280,7 +255,7 @@ public class UpdateEmailNotifierTests
         var h = new ParticipantHarness();
         var row = h.Queue("lab@example.com");
 
-        await h.Notifier.SendUnsentAsync();
+        await h.Notifier.SendForUpdateAsync(h.PendingId);
 
         var sent = Assert.Single(h.Notify.Sent);
         Assert.Equal(ParticipantAccepted, sent.TemplateId);
@@ -300,7 +275,7 @@ public class UpdateEmailNotifierTests
         var h = new ParticipantHarness();
         h.Queue("lab@example.com", isApproved: false, notes: "Not eligible");
 
-        await h.Notifier.SendUnsentAsync();
+        await h.Notifier.SendForUpdateAsync(h.PendingId);
 
         var sent = Assert.Single(h.Notify.Sent);
         Assert.Equal(ParticipantDeclined, sent.TemplateId);
@@ -314,7 +289,7 @@ public class UpdateEmailNotifierTests
         var h = new ParticipantHarness();
         h.Queue("lab@example.com").QalNumber = null;
 
-        await h.Notifier.SendUnsentAsync();
+        await h.Notifier.SendForUpdateAsync(h.PendingId);
 
         Assert.Equal(string.Empty, Assert.Single(h.Notify.Sent).Personalisation!["CustomerName"]);
     }
@@ -325,7 +300,7 @@ public class UpdateEmailNotifierTests
         var h = new ParticipantHarness(enabled: false);
         h.Queue("lab@example.com");
 
-        await h.Notifier.SendUnsentAsync();
+        await h.Notifier.SendForUpdateAsync(h.PendingId);
 
         Assert.Equal(0, h.Repository.GetUnsentCalls);
         Assert.Empty(h.Notify.Sent);
@@ -337,21 +312,20 @@ public class UpdateEmailNotifierTests
     {
         var h = new ParticipantHarness();
 
-        await h.Notifier.SendUnsentAsync();
+        await h.Notifier.SendForUpdateAsync(h.PendingId);
 
         Assert.Empty(h.Notify.Sent);
         Assert.Empty(h.Logger.Entries);
     }
 
     [Fact]
-    public async Task Participant_BlankAddress_StaysUnsentAndWarnsOnlyOncePerDay()
+    public async Task Participant_BlankAddress_StaysUnsentAndWarns()
     {
         var h = new ParticipantHarness();
         h.Queue(" ");
         h.Queue("", isApproved: false);
 
-        await h.Notifier.SendUnsentAsync();
-        await h.Notifier.SendUnsentAsync();
+        await h.Notifier.SendForUpdateAsync(h.PendingId);
 
         Assert.Empty(h.Notify.Sent);
         Assert.Equal(2, h.Repository.Unsent.Count);
@@ -359,26 +333,19 @@ public class UpdateEmailNotifierTests
     }
 
     [Fact]
-    public async Task Participant_NotifyFailure_StaysUnsentAndTheNextRunSendsItExactlyOnce()
+    public async Task Participant_NotifyFailure_StaysUnsentAndTheOtherRowsStillGo()
     {
         var h = new ParticipantHarness();
         h.Queue("bad@example.com");
         h.Queue("good@example.com");
         h.Notify.FailFor = address => address == "bad@example.com" ? new InvalidOperationException("Notify is down") : null;
 
-        await h.Notifier.SendUnsentAsync();
-        await h.Notifier.SendUnsentAsync();
+        await h.Notifier.SendForUpdateAsync(h.PendingId);
 
         Assert.Equal("good@example.com", Assert.Single(h.Notify.Sent).Email);
         Assert.Equal("bad@example.com", Assert.Single(h.Repository.Unsent).Email);
         Assert.Single(h.Logger.At(LogLevel.Error));
         h.Logger.AssertNoneContain("bad@example.com", "@");
-
-        h.Notify.FailFor = null;
-        await h.Notifier.SendUnsentAsync();
-
-        Assert.Empty(h.Repository.Unsent);
-        Assert.Equal(2, h.Notify.Sent.Count);
     }
 
     [Fact]
@@ -402,13 +369,15 @@ public class UpdateEmailNotifierTests
     }
 
     [Fact]
-    public async Task Participant_SendForUpdate_Cancelled_Propagates()
+    public async Task Participant_SendForUpdate_CancelledWhileSending_PropagatesAndLeavesTheRowUnsent()
     {
         var h = new ParticipantHarness();
         h.Queue("lab@example.com");
-        using var cts = new CancellationTokenSource();
-        await cts.CancelAsync();
+        h.Notify.FailFor = _ => new OperationCanceledException();
 
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => h.Notifier.SendForUpdateAsync(h.PendingId, cts.Token));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => h.Notifier.SendForUpdateAsync(h.PendingId));
+
+        Assert.Single(h.Repository.Unsent);
+        Assert.Empty(h.Logger.At(LogLevel.Error));
     }
 }

@@ -12,7 +12,8 @@ public class InvoiceControllerTests
     private static InvoiceController CreateController(
         FakeInvoiceRepository repository,
         FakeLookupServiceForInvoice? lookupService = null,
-        string? recipients = null)
+        string? recipients = null,
+        string auditUser = "Guest")
     {
         var service = new InvoiceService(
             repository,
@@ -23,7 +24,11 @@ public class InvoiceControllerTests
             Options.Create(new InternalOptions()),
             Microsoft.Extensions.Logging.Abstractions.NullLogger<InvoiceService>.Instance);
 
-        return new InvoiceController(service, lookupService ?? new FakeLookupServiceForInvoice(), Options.Create(new InvoiceNotificationOptions { Recipients = recipients ?? "ops@example.com" }));
+        return new InvoiceController(
+            service,
+            lookupService ?? new FakeLookupServiceForInvoice(),
+            Options.Create(new InvoiceNotificationOptions { Recipients = recipients ?? "ops@example.com" }),
+            new PTL.Api.Tests.Contract.FakeAuditActorResolver(auditUser));
     }
 
     [Fact]
@@ -93,22 +98,14 @@ public class InvoiceControllerTests
     }
 
     [Fact]
-    public async Task Generate_AuthenticatedUser_PassesUserNameAsGeneratedBy()
+    public async Task Generate_ActingUser_PassesUserNameAsGeneratedBy()
     {
         var repository = new FakeInvoiceRepository();
         var contractId = Guid.NewGuid();
         repository.PendingData = new InvoicePendingData(
             [new InvoiceContractEntity { ContractId = contractId }],
             [new InvoiceContractItemEntity { ContractId = contractId }]);
-        var controller = CreateController(repository);
-        var identity = new System.Security.Claims.ClaimsIdentity([new System.Security.Claims.Claim(System.Security.Claims.ClaimTypes.Name, "alice")], "Test");
-        controller.ControllerContext = new Microsoft.AspNetCore.Mvc.ControllerContext
-        {
-            HttpContext = new Microsoft.AspNetCore.Http.DefaultHttpContext
-            {
-                User = new System.Security.Claims.ClaimsPrincipal(identity)
-            }
-        };
+        var controller = CreateController(repository, auditUser: "alice");
 
         var result = await controller.Generate(CancellationToken.None);
 
@@ -160,7 +157,7 @@ public class InvoiceControllerTests
             Microsoft.Extensions.Logging.Abstractions.NullLogger<InvoiceService>.Instance);
         var generationId = Guid.NewGuid();
         await storage.SaveAsync($"invoices/{generationId}/PT_Invoices_2026-01-01.csv", [1, 2, 3], "text/csv");
-        var controller = new InvoiceController(service, new FakeLookupServiceForInvoice(), Options.Create(new InvoiceNotificationOptions()));
+        var controller = new InvoiceController(service, new FakeLookupServiceForInvoice(), Options.Create(new InvoiceNotificationOptions()), new PTL.Api.Tests.Contract.FakeAuditActorResolver());
 
         var result = await controller.DownloadCsv(generationId, CancellationToken.None);
 

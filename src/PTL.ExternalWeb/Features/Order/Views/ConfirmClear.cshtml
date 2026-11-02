@@ -1,0 +1,21 @@
+@model PTL.ExternalWeb.Features.Order.CreateOrderConfirmClearViewModel
+@{
+    ViewData["Title"] = "Clear the order form";
+    ViewData["BreadcrumbParent"] = "Orders";
+    var backAction = Model.YearSlug == PTL.ExternalWeb.Features.Order.OrderController.CurrentYearSlug ? "CurrentYear" : "NextYear";
+}
+
+<div class="govuk-grid-row">
+    <div class="govuk-grid-column-two-thirds">
+        <h1 class="govuk-heading-l">Are you sure you want to clear the form?</h1>
+        <p class="govuk-body">This removes every scheme and distribution month you have selected for this order.</p>
+        <form method="post" asp-controller="Order" asp-action="Clear">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="year" value="@Model.YearSlug" />
+            <div class="govuk-button-group">
+                <button type="submit" class="govuk-button govuk-button--warning" data-module="govuk-button">Yes, clear the form</button>
+                <a class="govuk-link" asp-controller="Order" asp-action="@backAction">No, go back to the order</a>
+            </div>
+        </form>
+    </div>
+</div>

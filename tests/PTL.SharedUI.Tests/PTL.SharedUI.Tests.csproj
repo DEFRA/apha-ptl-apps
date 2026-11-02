@@ -5,6 +5,10 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
+    <!-- PTL.Contracts (referenced for GovUkReadOnlyResultsTablesTagHelper's Actual Results DTOs) is
+         measured by its own consuming projects (PTL.Api.Tests, PTL.ApiClient.Tests) - without this
+         filter its large, mostly record-only surface dilutes this project's coverage percentage. -->
+    <Include>[PTL.SharedUI]*</Include>
   </PropertyGroup>
 
   <ItemGroup>

@@ -13,8 +13,6 @@ internal sealed class FakeCustomerUpdateNotifier : ICustomerUpdateNotifier
         SentForUpdates.Add(pendingCustomerUpdateId);
         return Task.CompletedTask;
     }
-
-    public Task SendUnsentAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
 }
 
 internal sealed class FakeParticipantUpdateNotifier : IParticipantUpdateNotifier
@@ -26,6 +24,4 @@ internal sealed class FakeParticipantUpdateNotifier : IParticipantUpdateNotifier
         SentForUpdates.Add(pendingParticipantUpdateId);
         return Task.CompletedTask;
     }
-
-    public Task SendUnsentAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
 }

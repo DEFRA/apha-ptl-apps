@@ -15,12 +15,16 @@ internal sealed class FakeSchemeApiClient : ISchemeApiClient
     public SchemeResponse? RenewResponse { get; set; }
     public SchemeRequest? LastCreateRequest { get; private set; }
     public SchemeRequest? LastUpdateRequest { get; private set; }
+    public SchemeSearchRequest? LastSearchRequest { get; private set; }
 
     public Task<SchemeResponse?> GetSchemeAsync(Guid schemeId, CancellationToken cancellationToken = default) =>
         Task.FromResult(SchemeResponse);
 
-    public Task<SchemeSearchResponse> GetSchemesForYearAsync(SchemeSearchRequest request, CancellationToken cancellationToken = default) =>
-        Task.FromResult(SearchResponse);
+    public Task<SchemeSearchResponse> GetSchemesForYearAsync(SchemeSearchRequest request, CancellationToken cancellationToken = default)
+    {
+        LastSearchRequest = request;
+        return Task.FromResult(SearchResponse);
+    }
 
     public Task<SchemeSearchResponse> GetSchemeFamiliesAsync(int page, int pageSize, string? searchTerm = null, CancellationToken cancellationToken = default) =>
         Task.FromResult(SearchResponse);

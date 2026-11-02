@@ -1,0 +1,116 @@
+@model PTL.ExternalWeb.Features.Tabulation.TabulationListViewModel
+@using System.Globalization
+@using PTL.SharedUI.Pagination
+@{
+    ViewData["Title"] = "View Reports";
+    var pagination = new PaginationModel
+    {
+        CurrentPage = Model.Page,
+        PageSize = Model.PageSize,
+        TotalRecords = Model.TotalCount,
+        RouteValues = new Dictionary<string, object?>
+        {
+            ["year"] = Model.Year,
+            ["month"] = Model.Month,
+            ["distributionReference"] = Model.DistributionReference,
+            ["schemeCode"] = Model.SchemeCode,
+            ["schemeName"] = Model.SchemeName,
+            ["sortBy"] = Model.SortBy,
+            ["sortDir"] = Model.SortDirection,
+        }
+    };
+
+    string SortUrl(string column)
+    {
+        var dir = Model.SortBy == column && Model.SortDirection == "asc" ? "desc" : "asc";
+        return Url.Action("Index", new
+        {
+            page = 1,
+            pageSize = Model.PageSize,
+            sortBy = column,
+            sortDir = dir,
+            year = Model.Year,
+            month = Model.Month,
+            distributionReference = Model.DistributionReference,
+            schemeCode = Model.SchemeCode,
+            schemeName = Model.SchemeName,
+        })!;
+    }
+}
+
+<h1 class="govuk-heading-l">View Reports</h1>
+
+<p class="govuk-body">View published proficiency test reports (tabulations) for the schemes you are linked to.</p>
+
+<form method="get" asp-action="Index" class="govuk-!-margin-bottom-6">
+    <div class="govuk-grid-row">
+        <div class="govuk-grid-column-one-half">
+            <div class="govuk-form-group">
+                <label class="govuk-label" for="year">Year</label>
+                <select class="govuk-select" id="year" name="year">
+                    <option value="">All</option>
+                    @foreach (var availableYear in Model.AvailableYears)
+                    {
+                        <option value="@availableYear" selected="@(Model.Year == availableYear)">@availableYear</option>
+                    }
+                </select>
+            </div>
+
+            <partial name="_DistributionReferenceSchemeSearchFields" model="@(new PTL.ExternalWeb.ViewSupport.DistributionReferenceSchemeSearchFields(Model.Month, Model.DistributionReference, Model.SchemeCode, Model.SchemeName))" />
+        </div>
+    </div>
+
+    <partial name="_SearchFormButtonGroup" model="@("Index")" />
+</form>
+
+@if (Model.Tabulations.Count == 0)
+{
+    <p class="govuk-body">@(Model.IsFiltered ? "No reports found for the selected search criteria." : "There are no reports to display.")</p>
+}
+else
+{
+    <govuk-page-size-selector model="pagination" />
+
+    <table class="govuk-table">
+        <thead class="govuk-table__head">
+            <tr class="govuk-table__row">
+                <th scope="col" class="govuk-table__header" aria-sort="@AriaSort(Model.SortBy, Model.SortDirection, "reference")">
+                    <a class="govuk-link" href="@SortUrl("reference")">Distribution Reference@(SortIndicator(Model.SortBy, Model.SortDirection, "reference"))</a>
+                </th>
+                <th scope="col" class="govuk-table__header" aria-sort="@AriaSort(Model.SortBy, Model.SortDirection, "schemeCode")">
+                    <a class="govuk-link" href="@SortUrl("schemeCode")">Scheme Code@(SortIndicator(Model.SortBy, Model.SortDirection, "schemeCode"))</a>
+                </th>
+                <th scope="col" class="govuk-table__header" aria-sort="@AriaSort(Model.SortBy, Model.SortDirection, "schemeName")">
+                    <a class="govuk-link" href="@SortUrl("schemeName")">Scheme Name@(SortIndicator(Model.SortBy, Model.SortDirection, "schemeName"))</a>
+                </th>
+                <th scope="col" class="govuk-table__header" aria-sort="@AriaSort(Model.SortBy, Model.SortDirection, "tabulationName")">
+                    <a class="govuk-link" href="@SortUrl("tabulationName")">Report Name@(SortIndicator(Model.SortBy, Model.SortDirection, "tabulationName"))</a>
+                </th>
+                <th scope="col" class="govuk-table__header" aria-sort="@AriaSort(Model.SortBy, Model.SortDirection, "distributionDate")">
+                    <a class="govuk-link" href="@SortUrl("distributionDate")">Distribution Date@(SortIndicator(Model.SortBy, Model.SortDirection, "distributionDate"))</a>
+                </th>
+                <th scope="col" class="govuk-table__header">Report</th>
+            </tr>
+        </thead>
+        <tbody class="govuk-table__body">
+            @foreach (var tabulation in Model.Tabulations)
+            {
+                <tr class="govuk-table__row">
+                    <td class="govuk-table__cell">@tabulation.DistributionReference</td>
+                    <td class="govuk-table__cell">@tabulation.SchemeCode</td>
+                    <td class="govuk-table__cell">@tabulation.SchemeName</td>
+                    <td class="govuk-table__cell">@tabulation.TabulationName</td>
+                    <td class="govuk-table__cell">@tabulation.DistributionDate.ToString("d MMMM yyyy", CultureInfo.InvariantCulture)</td>
+                    <td class="govuk-table__cell">
+                        <a class="govuk-link"
+                           asp-action="Report"
+                           asp-route-publishedTabulationId="@tabulation.TabulationId"
+                           aria-label="View report for @tabulation.DistributionReference">View</a>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+
+    <govuk-pagination model="pagination" />
+}

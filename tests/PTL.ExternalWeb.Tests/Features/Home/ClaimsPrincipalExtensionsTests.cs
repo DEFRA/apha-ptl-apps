@@ -46,6 +46,23 @@ public class ClaimsPrincipalExtensionsTests
         Assert.Equal(expected, principal.HasResolvedExternalRole(roleToCheck));
     }
 
+    [Fact]
+    public void CanOrderOnline_ClaimPresent_ReturnsTrue()
+    {
+        var principal = new ClaimsPrincipal(new ClaimsIdentity(
+            [new Claim(ExternalUserClaimTypes.CanOrderOnline, "true")], "TestAuth"));
+
+        Assert.True(principal.CanOrderOnline());
+    }
+
+    [Fact]
+    public void CanOrderOnline_ClaimMissing_ReturnsFalse()
+    {
+        var principal = CreatePrincipal(resolvedRoles: null);
+
+        Assert.False(principal.CanOrderOnline());
+    }
+
     private static ClaimsPrincipal CreatePrincipal(string? resolvedRoles)
     {
         var claims = new List<Claim>();

@@ -1,6 +1,6 @@
 namespace PTL.Core.Notifications;
 
-// Timing shared by every email job the NotificationBackgroundService runs; each job keeps its own Enabled switch.
+// Timing of the jobs the NotificationBackgroundService runs (today the Test Consultant emails); each job keeps its own Enabled switch.
 public sealed class NotificationSchedulerOptions
 {
     public const string SectionName = "NotificationScheduler";

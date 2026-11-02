@@ -23,7 +23,7 @@ public sealed record ParticipantUpdateNotification(
     string Notes,
     bool IsApproved);
 
-// Replaces the legacy Windows service's SendParticipantUpdateEmails switch; its timer is now NotificationSchedulerOptions.
+// Replaces the legacy Windows service's SendParticipantUpdateEmails switch.
 public sealed class ParticipantUpdateEmailOptions
 {
     public const string SectionName = "ParticipantUpdateEmails";

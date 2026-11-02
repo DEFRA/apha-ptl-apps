@@ -1,0 +1,91 @@
+@model PTL.ExternalWeb.Features.Tabulation.TabulationReportPageViewModel
+@{
+    var report = Model.Report;
+    ViewData["Title"] = report.TabulationName;
+}
+
+<h1 class="govuk-heading-l">Report</h1>
+<h2 class="govuk-heading-m">@report.DistributionHeading</h2>
+<h3 class="govuk-heading-s">@report.TabulationName</h3>
+<p class="govuk-body">@report.DistributionDateText</p>
+
+@foreach (var table in report.Tables)
+{
+    <govuk-tabulation-table table="table" />
+    @if (table.AssessmentTestId is { } testId)
+    {
+        <p class="govuk-body">
+            <a class="govuk-link" asp-action="AssessmentResults" asp-route-publishedTabulationId="@report.TabulationId" asp-route-testId="@testId">
+                View assessment results<span class="govuk-visually-hidden"> for @table.Caption</span>
+            </a>
+        </p>
+    }
+}
+
+@if (report.Ratings is not null)
+{
+    <govuk-tabulation-table table="report.Ratings" />
+}
+
+<div id="commentsDiv">
+    @if (!string.IsNullOrEmpty(report.StandardTabulationTextHtml))
+    {
+        <div class="govuk-body">
+            @Html.Raw(report.StandardTabulationTextHtml)
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(report.CommentsHtml))
+    {
+        <div class="govuk-body">
+            @Html.Raw(report.CommentsHtml)
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(report.TestConsultantCommentsHtml))
+    {
+        <div class="govuk-body">
+            <h2 class="govuk-heading-m">@report.TestConsultantCommentsTitle</h2>
+            @Html.Raw(report.TestConsultantCommentsHtml)
+        </div>
+    }
+
+    @if (report.Attachment is not null)
+    {
+        <p class="govuk-body">
+            <strong>Supporting Document: </strong>
+            <a class="govuk-link" asp-action="Attachment" asp-route-publishedTabulationId="@report.TabulationId" asp-route-attachmentId="@report.Attachment.AttachmentId">View Supporting Document</a>
+        </p>
+    }
+
+    @if (report.Signatory is { } versionSignatory)
+    {
+        <div class="cellVersionDate">@versionSignatory.VersionText</div>
+    }
+
+    @if (report.ShowUkasLogo)
+    {
+        <div class="ptl-tabulation-ukas">
+            <img src="~/images/ukas.png" alt="UKAS accredited" width="60" />
+            <div>0004</div>
+        </div>
+    }
+
+    @if (report.Signatory is { } signatory)
+    {
+        <div class="cellTabulationSignature">
+            <div>@signatory.Signatory</div>
+            @foreach (var line in signatory.AddressLines)
+            {
+                <div class="cellTabulationSignature2">@line</div>
+            }
+            <div class="cellTabulationSignature2">@signatory.IssuedText</div>
+        </div>
+    }
+</div>
+
+<div class="govuk-button-group govuk-!-margin-top-6">
+    <a class="govuk-button govuk-button--secondary" asp-action="Index">Back</a>
+    @* PDF export is a separate Reporting workstream deliverable - placeholder link only until then. *@
+    <a class="govuk-button govuk-button--secondary" asp-action="GeneratePdf" asp-route-publishedTabulationId="@report.TabulationId">Generate PDF</a>
+</div>

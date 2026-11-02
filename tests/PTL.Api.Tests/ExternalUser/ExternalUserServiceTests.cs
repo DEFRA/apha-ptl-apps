@@ -47,10 +47,27 @@ public class ExternalUserServiceTests
 
         var result = await service.ResolveAsync(ssoIdExt, "participant@example.com", "Jane Doe", ["Participant"]);
 
-        Assert.Equal(["Participant"], result.Roles);
+        Assert.Equal(["Participant", "Viewer"], result.Roles);
         Assert.Equal(participant.ParticipantId, result.ParticipantId);
         Assert.Equal("LAB001", result.LabCode);
         Assert.False(result.CanOrderOnline);
+    }
+
+    // Legacy Generate Login always granted a Participant account both the Participant and Viewer
+    // SSO roles - "View reports" only ever checked IsViewer, so CIDM doesn't need to separately
+    // send "Viewer" for a Participant to see it. There's no real Viewer record behind this grant.
+    [Fact]
+    public async Task ResolveAsync_ParticipantRole_CidmDidNotSendViewer_StillGrantsViewerRoleButNoViewerId()
+    {
+        var ssoIdExt = Guid.NewGuid();
+        var participantRepository = new FakeParticipantRepository();
+        await participantRepository.CreateAsync(new CoreParticipant { ParticipantId = Guid.NewGuid(), SsoIdExt = ssoIdExt, CustomerId = Guid.NewGuid(), LabCode = "LAB001" });
+        var service = CreateService(participantRepository: participantRepository);
+
+        var result = await service.ResolveAsync(ssoIdExt, "participant@example.com", "Jane Doe", ["Participant"]);
+
+        Assert.Contains("Viewer", result.Roles);
+        Assert.Null(result.ViewerId);
     }
 
     [Fact]
@@ -88,6 +105,53 @@ public class ExternalUserServiceTests
     }
 
     [Fact]
+    public async Task ResolveAsync_ParticipantRole_AnotherActiveParticipantOnCustomer_ReturnsCanOrderOnlineFalse()
+    {
+        var ssoIdExt = Guid.NewGuid();
+        var customerId = Guid.NewGuid();
+        var participantRepository = new FakeParticipantRepository();
+        await participantRepository.CreateAsync(new CoreParticipant { ParticipantId = Guid.NewGuid(), SsoIdExt = ssoIdExt, CustomerId = customerId, LabCode = "LAB001" });
+        await participantRepository.CreateAsync(new CoreParticipant { ParticipantId = Guid.NewGuid(), CustomerId = customerId, LabCode = "LAB002" });
+        var customerRepository = new FakeCustomerRepository();
+        await customerRepository.CreateAsync(new PTL.Core.Customer.Customer { CustomerId = customerId, CanOrderOnline = true });
+        var service = CreateService(participantRepository: participantRepository, customerRepository: customerRepository);
+
+        var result = await service.ResolveAsync(ssoIdExt, "participant@example.com", "Jane Doe", ["Participant"]);
+
+        Assert.False(result.CanOrderOnline);
+    }
+
+    [Fact]
+    public async Task ResolveAsync_ParticipantRole_OtherParticipantOnCustomerIsInactive_ReturnsCanOrderOnlineTrue()
+    {
+        var ssoIdExt = Guid.NewGuid();
+        var customerId = Guid.NewGuid();
+        var participantRepository = new FakeParticipantRepository();
+        await participantRepository.CreateAsync(new CoreParticipant { ParticipantId = Guid.NewGuid(), SsoIdExt = ssoIdExt, CustomerId = customerId, LabCode = "LAB001" });
+        await participantRepository.CreateAsync(new CoreParticipant { ParticipantId = Guid.NewGuid(), CustomerId = customerId, LabCode = "LAB002", IsActive = false });
+        var customerRepository = new FakeCustomerRepository();
+        await customerRepository.CreateAsync(new PTL.Core.Customer.Customer { CustomerId = customerId, CanOrderOnline = true });
+        var service = CreateService(participantRepository: participantRepository, customerRepository: customerRepository);
+
+        var result = await service.ResolveAsync(ssoIdExt, "participant@example.com", "Jane Doe", ["Participant"]);
+
+        Assert.True(result.CanOrderOnline);
+    }
+
+    [Fact]
+    public async Task ResolveAsync_ParticipantRole_CustomerMissing_ReturnsCanOrderOnlineFalse()
+    {
+        var ssoIdExt = Guid.NewGuid();
+        var participantRepository = new FakeParticipantRepository();
+        await participantRepository.CreateAsync(new CoreParticipant { ParticipantId = Guid.NewGuid(), SsoIdExt = ssoIdExt, CustomerId = Guid.NewGuid(), LabCode = "LAB001" });
+        var service = CreateService(participantRepository: participantRepository);
+
+        var result = await service.ResolveAsync(ssoIdExt, "participant@example.com", "Jane Doe", ["Participant"]);
+
+        Assert.False(result.CanOrderOnline);
+    }
+
+    [Fact]
     public async Task ResolveAsync_ParticipantRole_NoSsoIdExtMatch_FallsBackToEmailAndBackfillsSsoIdExt()
     {
         var participantId = Guid.NewGuid();
@@ -100,7 +164,7 @@ public class ExternalUserServiceTests
 
         var result = await service.ResolveAsync(ssoIdExt, email, "Jane Doe", ["Participant"]);
 
-        Assert.Equal(["Participant"], result.Roles);
+        Assert.Equal(["Participant", "Viewer"], result.Roles);
         Assert.Equal(participantId, result.ParticipantId);
         var backfilled = await participantRepository.GetByIdAsync(participantId);
         Assert.Equal(ssoIdExt, backfilled!.SsoIdExt);
@@ -170,9 +234,25 @@ public class ExternalUserServiceTests
 
         var result = await service.ResolveAsync(ssoIdExt, "consultant@example.com", "Jane Doe", ["Test Consultant"]);
 
-        Assert.Equal(["Test Consultant"], result.Roles);
+        Assert.Equal(["Test Consultant", "Viewer"], result.Roles);
         Assert.Equal(testConsultantId, result.TestConsultantId);
         Assert.Empty(testConsultantRepository.UpdateCalls);
+    }
+
+    // Same reasoning as Participant above - an external Test Consultant account was always also
+    // granted the Viewer SSO role at Generate Login, with no real Viewer record behind it.
+    [Fact]
+    public async Task ResolveAsync_TestConsultantRole_CidmDidNotSendViewer_StillGrantsViewerRoleButNoViewerId()
+    {
+        var ssoIdExt = Guid.NewGuid();
+        var testConsultantRepository = new FakeTestConsultantRepository();
+        testConsultantRepository.Seed(new CoreTestConsultant { ExternalTestConsultantId = Guid.NewGuid(), SsoIdExt = ssoIdExt, Name = "Test Consultant One" });
+        var service = CreateService(testConsultantRepository: testConsultantRepository);
+
+        var result = await service.ResolveAsync(ssoIdExt, "consultant@example.com", "Jane Doe", ["Test Consultant"]);
+
+        Assert.Contains("Viewer", result.Roles);
+        Assert.Null(result.ViewerId);
     }
 
     [Fact]
@@ -187,7 +267,7 @@ public class ExternalUserServiceTests
 
         var result = await service.ResolveAsync(ssoIdExt, email, "Jane Doe", ["Test Consultant"]);
 
-        Assert.Equal(["Test Consultant"], result.Roles);
+        Assert.Equal(["Test Consultant", "Viewer"], result.Roles);
         Assert.Equal(testConsultantId, result.TestConsultantId);
         Assert.Contains(testConsultantRepository.UpdateCalls, call => call.ExternalTestConsultantId == testConsultantId && call.SsoIdExt == ssoIdExt);
     }
@@ -292,6 +372,24 @@ public class ExternalUserServiceTests
         Assert.Equal(viewer.ViewerId, result.ViewerId);
         Assert.Null(result.ParticipantId);
         Assert.Null(result.TestConsultantId);
+    }
+
+    // CIDM sending "Viewer" in addition to a Participant/Test Consultant role that is also always
+    // granted Viewer must not produce a duplicate "Viewer" entry in Roles.
+    [Fact]
+    public async Task ResolveAsync_ParticipantAndCidmViewerBothResolve_DoesNotDuplicateViewerRole()
+    {
+        var ssoIdExt = Guid.NewGuid();
+        var participantRepository = new FakeParticipantRepository();
+        await participantRepository.CreateAsync(new CoreParticipant { ParticipantId = Guid.NewGuid(), SsoIdExt = ssoIdExt, CustomerId = Guid.NewGuid(), LabCode = "LAB001" });
+        var viewerRepository = new FakeViewerRepository();
+        var viewer = await viewerRepository.CreateAsync(new ViewerEntity { ViewerId = Guid.NewGuid(), SsoIdExt = ssoIdExt, Name = "Viewer One" });
+        var service = CreateService(participantRepository, viewerRepository);
+
+        var result = await service.ResolveAsync(ssoIdExt, "participant@example.com", "Jane Doe", ["Participant", "Viewer"]);
+
+        Assert.Equal(["Participant", "Viewer"], result.Roles);
+        Assert.Equal(viewer.ViewerId, result.ViewerId);
     }
 
     [Fact]

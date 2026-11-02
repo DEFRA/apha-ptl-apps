@@ -235,7 +235,7 @@ public sealed class ParticipantService(
     }
 
     // Legacy EmailUpdateNotifications: one row for the participant's primary email and one for the secondary when it is
-    // set, which are then sent at once (retried by the scheduler if that fails). Blank addresses are skipped rather than queued.
+    // set, which are then sent at once (a failed send is not retried). Blank addresses are skipped rather than queued.
     private async Task NotifyAsync(Participant participant, Guid pendingParticipantUpdateId, string comments, bool isApproved, CancellationToken cancellationToken)
     {
         var labCode = Truncate(participant.LabCode, LabCodeMaxLength);

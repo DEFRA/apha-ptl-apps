@@ -1,0 +1,31 @@
+@using System.Globalization
+@model PTL.ExternalWeb.ViewSupport.DistributionReferenceSchemeSearchFields
+
+@* Shared by Distribution/Previous.cshtml and Tabulation/Index.cshtml - see
+   docs/Code-Duplication-Playbook.md. Caller wraps this in its own govuk-grid-row/column divs
+   alongside its own Year field (free text vs dropdown differs per caller). *@
+<div class="govuk-form-group">
+    <label class="govuk-label" for="month">Month</label>
+    <select class="govuk-select" id="month" name="month">
+        <option value="">All</option>
+        @for (var monthId = 1; monthId <= 12; monthId++)
+        {
+            <option value="@monthId" selected="@(Model.Month == monthId)">@CultureInfo.InvariantCulture.DateTimeFormat.GetMonthName(monthId)</option>
+        }
+    </select>
+</div>
+
+<div class="govuk-form-group">
+    <label class="govuk-label" for="distributionReference">Distribution Reference</label>
+    <input class="govuk-input" id="distributionReference" name="distributionReference" value="@Model.DistributionReference" />
+</div>
+
+<div class="govuk-form-group">
+    <label class="govuk-label" for="schemeCode">Scheme Code</label>
+    <input class="govuk-input" id="schemeCode" name="schemeCode" value="@Model.SchemeCode" />
+</div>
+
+<div class="govuk-form-group">
+    <label class="govuk-label" for="schemeName">Scheme Name</label>
+    <input class="govuk-input" id="schemeName" name="schemeName" value="@Model.SchemeName" />
+</div>

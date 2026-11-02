@@ -27,7 +27,7 @@ public sealed partial class DistributionController
         [FromServices] ITestConsultantCommentsService commentsService,
         CancellationToken cancellationToken)
     {
-        var result = await commentsService.SaveAsync(monthlyDistributionSchemeId, request, AuditWho(), cancellationToken);
+        var result = await commentsService.SaveAsync(monthlyDistributionSchemeId, request, await AuditWhoAsync(cancellationToken), cancellationToken);
         return result is null ? NotFound() : Ok(result);
     }
 
@@ -80,5 +80,6 @@ public sealed partial class DistributionController
         return attachment is null ? NotFound() : AttachmentFile(attachment);
     }
 
-    private string AuditWho() => User?.Identity?.Name ?? "Guest";
+    // The signed-in internal user's login name, forwarded by InternalWeb; "Guest" when none was.
+    private Task<string> AuditWhoAsync(CancellationToken cancellationToken) => auditActor.GetAuditNameAsync(cancellationToken);
 }

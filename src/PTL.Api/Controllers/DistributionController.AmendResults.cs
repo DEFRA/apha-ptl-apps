@@ -26,7 +26,8 @@ public sealed partial class DistributionController
         [FromServices] IAmendResultsService amendResultsService,
         CancellationToken cancellationToken)
     {
-        var result = await amendResultsService.SaveAsync(monthlyDistributionSchemeId, request, AuditWho(), cancellationToken);
+        var auditWho = await AuditWhoAsync(cancellationToken);
+        var result = await amendResultsService.SaveAsync(monthlyDistributionSchemeId, request, auditWho, cancellationToken);
         return result is null ? NotFound() : Ok(result);
     }
 }

@@ -4,28 +4,19 @@ using PTL.Core.Notifications;
 
 namespace PTL.Core.Contract.PendingOrder;
 
-// Online contract order emails - legacy email.vb ProcessOnlineContractOrderEmails. The unsent rows of
-// tblOnlineContractOrderEmail are the record of what still has to go out: each is sent through GOV.UK Notify and
-// marked sent only afterwards, so a failed send stays unsent for the next scheduled run.
+// Online contract order emails - legacy email.vb ProcessOnlineContractOrderEmails. The rows of tblOnlineContractOrderEmail
+// queued by a decision are the record of what still has to go out: each is sent through GOV.UK Notify and marked sent only
+// afterwards, so a failed send stays unsent. There is no retry.
 public interface IPendingOrderNotifier
 {
-    // Sends one decided order's emails straight after the decision was saved. Never throws: whatever fails stays unsent for the scheduler.
+    // Sends one decided order's emails straight after the decision was saved. Never throws: whatever fails stays unsent.
     Task SendForOrderAsync(Guid pendingContractId, CancellationToken cancellationToken = default);
-
-    // The scheduled retry - every unsent row.
-    Task<OnlineOrderEmailRunSummary> SendUnsentAsync(CancellationToken cancellationToken = default);
-}
-
-public sealed record OnlineOrderEmailRunSummary(int Unsent, int Sent, int Skipped, int Failed)
-{
-    public static readonly OnlineOrderEmailRunSummary Empty = new(0, 0, 0, 0);
 }
 
 public sealed partial class PendingOrderNotifier(
     IPendingOrderRepository pendingOrderRepository,
     IPendingOrderEmailPersonaliser personaliser,
     INotifyClient notifyClient,
-    EmailSendGuard guard,
     IOptions<OnlineOrderEmailOptions> options,
     TimeProvider timeProvider,
     ILogger<PendingOrderNotifier> logger) : IPendingOrderNotifier
@@ -42,58 +33,39 @@ public sealed partial class PendingOrderNotifier(
         }
     }
 
-    public Task<OnlineOrderEmailRunSummary> SendUnsentAsync(CancellationToken cancellationToken = default) =>
-        SendAsync(null, cancellationToken);
-
-    private async Task<OnlineOrderEmailRunSummary> SendAsync(Guid? pendingContractId, CancellationToken cancellationToken)
+    private async Task SendAsync(Guid pendingContractId, CancellationToken cancellationToken)
     {
-        var settings = options.Value;
-        if (!settings.Enabled)
+        if (!options.Value.Enabled)
         {
-            return OnlineOrderEmailRunSummary.Empty;
+            return;
         }
 
-        await guard.Lock.WaitAsync(cancellationToken);
-        try
+        var unsent = (await pendingOrderRepository.GetUnsentNotificationsAsync(cancellationToken))
+            .Where(e => e.PendingContractId == pendingContractId)
+            .ToList();
+        if (unsent.Count == 0)
         {
-            var unsent = (await pendingOrderRepository.GetUnsentNotificationsAsync(cancellationToken))
-                .Where(e => pendingContractId is null || e.PendingContractId == pendingContractId)
-                .ToList();
-            if (unsent.Count == 0)
-            {
-                return OnlineOrderEmailRunSummary.Empty;
-            }
-
-            var now = timeProvider.GetUtcNow().UtcDateTime;
-            var outcomes = new List<EmailSendOutcome>(unsent.Count);
-            foreach (var email in unsent)
-            {
-                outcomes.Add(await SendOneAsync(email, now, cancellationToken));
-            }
-
-            var summary = new OnlineOrderEmailRunSummary(
-                unsent.Count,
-                outcomes.Count(o => o == EmailSendOutcome.Sent),
-                outcomes.Count(o => o == EmailSendOutcome.Skipped),
-                outcomes.Count(o => o == EmailSendOutcome.Failed));
-            LogRunSummary(logger, summary.Unsent, summary.Sent, summary.Skipped, summary.Failed);
-            return summary;
+            return;
         }
-        finally
+
+        var now = timeProvider.GetUtcNow().UtcDateTime;
+        var outcomes = new List<EmailSendOutcome>(unsent.Count);
+        foreach (var email in unsent)
         {
-            guard.Lock.Release();
+            outcomes.Add(await SendOneAsync(email, now, cancellationToken));
         }
+
+        var sent = outcomes.Count(o => o == EmailSendOutcome.Sent);
+        var skipped = outcomes.Count(o => o == EmailSendOutcome.Skipped);
+        var failed = outcomes.Count(o => o == EmailSendOutcome.Failed);
+        LogRunSummary(logger, unsent.Count, sent, skipped, failed);
     }
 
     private async Task<EmailSendOutcome> SendOneAsync(OnlineOrderEmailEntity email, DateTime now, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(email.Email))
         {
-            if (guard.FirstWarningToday(email.Id, now.Date))
-            {
-                LogSkipped(logger, email.Id, email.PendingContractId, "no email address");
-            }
-
+            LogSkipped(logger, email.Id, email.PendingContractId, "no email address");
             return EmailSendOutcome.Skipped;
         }
 
@@ -109,11 +81,7 @@ public sealed partial class PendingOrderNotifier(
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            if (guard.FirstWarningToday(email.Id, now.Date))
-            {
-                LogSendFailed(logger, email.Id, email.PendingContractId, status, templateId, ex);
-            }
-
+            LogSendFailed(logger, email.Id, email.PendingContractId, status, templateId, ex);
             return EmailSendOutcome.Failed;
         }
     }
@@ -123,7 +91,7 @@ public sealed partial class PendingOrderNotifier(
     private static partial void LogSent(ILogger logger, Guid notificationId, Guid pendingContractId, string status, string templateId);
 
     [LoggerMessage(EventId = 62, Level = LogLevel.Error,
-        Message = "Online contract order email could not be sent; it stays unsent and the scheduler will retry. NotificationId={NotificationId} PendingContractId={PendingContractId} Status={Status} TemplateId={TemplateId}")]
+        Message = "Online contract order email could not be sent; it stays unsent. NotificationId={NotificationId} PendingContractId={PendingContractId} Status={Status} TemplateId={TemplateId}")]
     private static partial void LogSendFailed(ILogger logger, Guid notificationId, Guid pendingContractId, string status, string templateId, Exception exception);
 
     [LoggerMessage(EventId = 63, Level = LogLevel.Warning,
@@ -135,6 +103,6 @@ public sealed partial class PendingOrderNotifier(
     private static partial void LogRunSummary(ILogger logger, int unsent, int sent, int skipped, int failed);
 
     [LoggerMessage(EventId = 65, Level = LogLevel.Error,
-        Message = "Online contract order emails could not be sent after the decision was saved; the scheduler will retry. PendingContractId={PendingContractId}")]
+        Message = "Online contract order emails could not be sent after the decision was saved; the unsent ones stay unsent. PendingContractId={PendingContractId}")]
     private static partial void LogImmediateSendFailed(ILogger logger, Guid pendingContractId, Exception exception);
 }

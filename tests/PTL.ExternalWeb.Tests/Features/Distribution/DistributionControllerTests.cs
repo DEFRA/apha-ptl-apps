@@ -5,6 +5,8 @@ using PTL.ExternalWeb.Tests.TestSupport;
 
 namespace PTL.ExternalWeb.Tests.Features.Distribution;
 
+// Previous/Results behaviour is covered end-to-end by Integration/DistributionPreviousAndResultsRouteSmokeTests.cs
+// (they need a real HTTP pipeline for User.GetParticipantId() and the rendered Razor views).
 public class DistributionControllerTests
 {
     [Fact]
@@ -28,10 +30,10 @@ public class DistributionControllerTests
             ]
         };
 
-        var controller = new DistributionController();
+        var controller = new DistributionController(apiClient);
         AuthenticatedParticipant.Attach(controller, participantId);
 
-        var result = await controller.Current(apiClient, CancellationToken.None);
+        var result = await controller.Current(CancellationToken.None);
 
         var view = Assert.IsType<ViewResult>(result);
         var model = Assert.IsType<CurrentDistributionsViewModel>(view.Model);
@@ -53,7 +55,7 @@ public class DistributionControllerTests
             ActualResultsSaveResult = new ActualResultsSaveResult(true, new Dictionary<Guid, string>())
         };
 
-        var controller = new DistributionController();
+        var controller = new DistributionController(apiClient);
         AuthenticatedParticipant.Attach(controller, participantId);
 
         var model = new DistributionResultsEntryViewModel
@@ -81,7 +83,7 @@ public class DistributionControllerTests
             ]
         };
 
-        var result = await controller.Entry(model, "save", apiClient, CancellationToken.None);
+        var result = await controller.Entry(model, "save", CancellationToken.None);
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
         Assert.Equal(nameof(DistributionController.Current), redirect.ActionName);
@@ -98,17 +100,5 @@ public class DistributionControllerTests
         };
 
         Assert.Equal("Input must be of format: dd/MM/yyyy", item.InputFormatMessage);
-    }
-
-    [Fact]
-    public void Previous_ReturnsComingSoonViewForViewResults()
-    {
-        var controller = new DistributionController();
-
-        var result = controller.Previous();
-
-        var viewResult = Assert.IsType<ViewResult>(result);
-        Assert.Equal("_ComingSoonBody", viewResult.ViewName);
-        Assert.Equal("View results", viewResult.Model);
     }
 }

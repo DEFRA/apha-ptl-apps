@@ -157,6 +157,22 @@ public class ContractRouteSmokeTests : IClassFixture<WebApplicationFactory<Progr
         Assert.Contains("Edit Contract", body);
     }
 
+    // "Discount rate (%)" is stored as a fraction (0.0125 = 1.25%), so the Edit textbox must render the
+    // percentage, and Details (which formats the fraction as a percentage) must agree with it.
+    [Fact]
+    public async Task Edit_RendersStoredFractionDiscountRateAsPercentage()
+    {
+        _fakeApiClient.ContractResponse = SampleContract(ContractId, CustomerId) with { DiscountRate = 0.0125m };
+        var client = _factory.CreateClient();
+
+        var response = await client.GetAsync($"/Contract/Edit/{ContractId}");
+        var body = await response.Content.ReadAsStringAsync();
+
+        var input = System.Text.RegularExpressions.Regex.Match(body, "<input[^>]*id=\"DiscountRate\"[^>]*>", System.Text.RegularExpressions.RegexOptions.None, TimeSpan.FromSeconds(5));
+        Assert.True(input.Success, "The Discount rate input was not rendered.");
+        Assert.Contains($"value=\"{1.25m}\"", input.Value, StringComparison.Ordinal);
+    }
+
     [Fact]
     public async Task Index_NoResults_RendersEmptyState()
     {

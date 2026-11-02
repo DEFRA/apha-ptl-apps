@@ -322,6 +322,50 @@ public class CidmOpenIdConnectEventsTests
     }
 
     [Fact]
+    public void SignedOutCallbackRedirect_NoRedirectUriEchoedBack_DefaultsToSignedOutPage()
+    {
+        // CIDM's end-session policy does not always echo the protected state back on its redirect
+        // to SignedOutCallbackPath, which otherwise leaves RedirectUri blank and renders an empty page.
+        var context = new RemoteSignOutContext(
+            new DefaultHttpContext(), CreateScheme(), new OpenIdConnectOptions(), new OpenIdConnectMessage())
+        {
+            Properties = new AuthenticationProperties()
+        };
+
+        CreateEvents().SignedOutCallbackRedirect(context);
+
+        Assert.Equal("/Account/SignedOut", context.Properties!.RedirectUri);
+    }
+
+    [Fact]
+    public void SignedOutCallbackRedirect_NoPropertiesAtAll_CreatesThemAndDefaultsToSignedOutPage()
+    {
+        var context = new RemoteSignOutContext(
+            new DefaultHttpContext(), CreateScheme(), new OpenIdConnectOptions(), new OpenIdConnectMessage())
+        {
+            Properties = null
+        };
+
+        CreateEvents().SignedOutCallbackRedirect(context);
+
+        Assert.Equal("/Account/SignedOut", context.Properties!.RedirectUri);
+    }
+
+    [Fact]
+    public void SignedOutCallbackRedirect_RedirectUriAlreadyPresent_LeavesItUnchanged()
+    {
+        var context = new RemoteSignOutContext(
+            new DefaultHttpContext(), CreateScheme(), new OpenIdConnectOptions(), new OpenIdConnectMessage())
+        {
+            Properties = new AuthenticationProperties { RedirectUri = "/Home/Index" }
+        };
+
+        CreateEvents().SignedOutCallbackRedirect(context);
+
+        Assert.Equal("/Home/Index", context.Properties!.RedirectUri);
+    }
+
+    [Fact]
     public async Task TokenValidated_NoResolverRegistered_LeavesPrincipalUnchanged()
     {
         var identity = new ClaimsIdentity([new Claim(ClaimTypes.Name, "test-user")]);

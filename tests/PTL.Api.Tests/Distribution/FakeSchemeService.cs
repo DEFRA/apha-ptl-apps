@@ -9,6 +9,13 @@ internal sealed class FakeSchemeService : ISchemeService
 {
     public Dictionary<Guid, CoreScheme> Schemes { get; } = [];
 
+    // Scripted outcome of UpdateSchemeAsync; unset, it throws like the other unused members.
+    public SchemeUpdateResult? UpdateResult { get; set; }
+
+    public Exception? UpdateException { get; set; }
+
+    public (Guid SchemeId, CoreScheme Scheme, string AuditWho, string? AuditWhy)? LastUpdate { get; private set; }
+
     public Task<CoreScheme?> GetSchemeAsync(Guid schemeId, CancellationToken cancellationToken = default) =>
         Task.FromResult(Schemes.GetValueOrDefault(schemeId));
 
@@ -30,6 +37,14 @@ internal sealed class FakeSchemeService : ISchemeService
     public Task<CoreScheme> CreateSchemeAsync(CoreScheme scheme, CancellationToken cancellationToken = default) =>
         throw new NotSupportedException();
 
-    public Task<CoreScheme?> UpdateSchemeAsync(Guid schemeId, CoreScheme updatedFields, CancellationToken cancellationToken = default) =>
-        throw new NotSupportedException();
+    public Task<SchemeUpdateResult> UpdateSchemeAsync(Guid schemeId, CoreScheme updatedFields, string auditWho, string? auditWhy, CancellationToken cancellationToken = default)
+    {
+        LastUpdate = (schemeId, updatedFields, auditWho, auditWhy);
+        if (UpdateException is not null)
+        {
+            throw UpdateException;
+        }
+
+        return UpdateResult is null ? throw new NotSupportedException() : Task.FromResult(UpdateResult);
+    }
 }
