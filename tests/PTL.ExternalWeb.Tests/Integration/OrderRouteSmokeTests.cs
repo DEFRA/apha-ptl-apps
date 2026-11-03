@@ -338,16 +338,24 @@ public partial class OrderRouteSmokeTests : IClassFixture<PtlExternalWebTestFact
     }
 
     [Fact]
-    public async Task OrderPages_BreadcrumbsNameTheOrdersSection()
+    public async Task OrderPages_BreadcrumbsFollowLegacy_HomeThenCreateNewOrderThenStage()
     {
-        var client = CreateClient(new FakeCreateOrderApiClient());
+        var api = new FakeCreateOrderApiClient { GetResult = new(CreateOrderApiStatus.Ok, FakeCreateOrderApiClient.SampleOrder(selected: true)) };
+        var client = CreateClient(api);
         var cookies = await SignInAsync(client);
 
         var yearPage = await GetAsync(client, cookies, "/Order/CurrentYear");
+        var reviewPage = await GetAsync(client, cookies, "/Order/Review?year=next");
         var confirmPage = await GetAsync(client, cookies, "/Order/ConfirmClear?year=current");
 
-        Assert.Contains(">Orders</li>", yearPage);
-        Assert.Contains(">Orders</li>", confirmPage);
+        Assert.Contains("aria-current=\"page\">Create new order</li>", yearPage);
+        Assert.DoesNotContain(">Orders</li>", yearPage);
+
+        Assert.Contains("href=\"/Order/NextYear\">Create new order</a>", reviewPage);
+        Assert.Contains("aria-current=\"page\">Pending order</li>", reviewPage);
+
+        Assert.Contains("href=\"/Order/CurrentYear\">Create new order</a>", confirmPage);
+        Assert.Contains("aria-current=\"page\">Clear the order form</li>", confirmPage);
     }
 
     private const string AntiforgeryTokenPattern = "__RequestVerificationToken[^>]*value=\"[^\"]+\"";

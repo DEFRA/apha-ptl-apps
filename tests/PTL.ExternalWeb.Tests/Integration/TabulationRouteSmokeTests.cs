@@ -178,6 +178,51 @@ public class TabulationRouteSmokeTests : IClassFixture<PtlExternalWebTestFactory
     }
 
     [Fact]
+    public async Task Report_Breadcrumb_ShowsReportsLinkThenViewReportsAsPlainCurrentPage()
+    {
+        var tabulationId = Guid.NewGuid();
+        var apiClient = new FakeDistributionApiClient { PublishedTabulation = Report(tabulationId) };
+        var client = CreateClient(apiClient);
+        var cookies = await SignInAsync(client, "Participant,Viewer", participantId: Guid.NewGuid());
+
+        var response = await CookieForwardingHttpClient.SendWithCookiesAsync(
+            client, HttpMethod.Get, $"/Tabulation/Report?publishedTabulationId={tabulationId}", cookies);
+        var body = await response.Content.ReadAsStringAsync();
+
+        var breadcrumbs = Regex.Match(body, "<nav class=\"govuk-breadcrumbs\".*?</nav>", RegexOptions.Singleline).Value;
+        Assert.Matches("<a class=\"govuk-breadcrumbs__link\" href=\"/Tabulation(/Index)?\">Reports</a>", breadcrumbs);
+        Assert.Contains("<li class=\"govuk-breadcrumbs__list-item\" aria-current=\"page\">View reports</li>", breadcrumbs, StringComparison.Ordinal);
+        Assert.DoesNotContain(">Results</", breadcrumbs, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task AssessmentResults_Breadcrumb_LinksBackThroughReportsAndTheReportWithItsId()
+    {
+        var tabulationId = Guid.NewGuid();
+        var apiClient = new FakeDistributionApiClient
+        {
+            AssessmentResults = new AssessmentResultsResponse(
+                IsAssessmentSubmitted: true,
+                Titles: ["Assessment results for Culture test"],
+                XAxisTitle: "Score",
+                YAxisTitle: "Number of participants",
+                Scores: [new AssessmentScoreFrequencyResponse(2, "Satisfactory", 5)],
+                DistributionHeading: "D1a/S1 BT: Brucella")
+        };
+        var client = CreateClient(apiClient);
+        var cookies = await SignInAsync(client, "Participant,Viewer", participantId: Guid.NewGuid());
+
+        var response = await CookieForwardingHttpClient.SendWithCookiesAsync(
+            client, HttpMethod.Get, $"/Tabulation/AssessmentResults?publishedTabulationId={tabulationId}&testId={Guid.NewGuid()}", cookies);
+        var body = await response.Content.ReadAsStringAsync();
+
+        var breadcrumbs = Regex.Match(body, "<nav class=\"govuk-breadcrumbs\".*?</nav>", RegexOptions.Singleline).Value;
+        Assert.Matches("<a class=\"govuk-breadcrumbs__link\" href=\"/Tabulation(/Index)?\">Reports</a>", breadcrumbs);
+        Assert.Contains($"href=\"/Tabulation/Report?publishedTabulationId={tabulationId}\">View reports</a>", breadcrumbs, StringComparison.Ordinal);
+        Assert.Contains("<li class=\"govuk-breadcrumbs__list-item\" aria-current=\"page\">Assessment results</li>", breadcrumbs, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Report_WithSignatoryAndUkasLogo_RendersVersionAboveTheLogo()
     {
         // Legacy TabulationView.aspx's tabulation-footer stacks tabulation-version-info ->
@@ -306,6 +351,28 @@ public class TabulationRouteSmokeTests : IClassFixture<PtlExternalWebTestFactory
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.True(body.IndexOf(firstValue, StringComparison.Ordinal) < body.IndexOf(secondValue, StringComparison.Ordinal),
             $"Expected '{firstValue}' to appear before '{secondValue}' when sorted ascending by {sortBy}.");
+    }
+
+    [Fact]
+    public async Task Index_NoSortRequested_OrdersByReferenceAscendingWithNoSortIndicator()
+    {
+        var apiClient = new FakeDistributionApiClient
+        {
+            Tabulations = new PublishedTabulationSummaryListResponse(
+            [
+                Summary(Guid.NewGuid(), "D1a/00002", "TB", "TB", "Summary B", new DateTime(2026, 5, 1), 2026, 5),
+                Summary(Guid.NewGuid(), "D1a/00001", "BT", "Brucella", "Summary A", new DateTime(2026, 4, 1), 2026, 4),
+            ])
+        };
+        var client = CreateClient(apiClient);
+        var cookies = await SignInAsync(client, "Participant,Viewer", participantId: Guid.NewGuid());
+
+        var response = await CookieForwardingHttpClient.SendWithCookiesAsync(client, HttpMethod.Get, "/Tabulation/Index", cookies);
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.True(body.IndexOf("D1a/00001", StringComparison.Ordinal) < body.IndexOf("D1a/00002", StringComparison.Ordinal));
+        Assert.DoesNotContain("govuk-visually-hidden\">, sorted", body, StringComparison.Ordinal);
     }
 
     [Fact]

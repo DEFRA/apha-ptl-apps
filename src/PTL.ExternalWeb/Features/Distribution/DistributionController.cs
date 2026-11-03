@@ -111,8 +111,8 @@ public sealed class DistributionController(IDistributionApiClient distributionAp
     // DistributionsPast.ExecuteSearch. Default sort is DistributionDate descending.
     public async Task<IActionResult> Previous([FromQuery] ReferenceSchemeListQuery query, CancellationToken cancellationToken = default)
     {
-        var sortBy = ValidSortColumns.Contains(query.SortBy) ? query.SortBy : "distributionDate";
-        var sortDir = ValidSortDirections.Contains(query.SortDir) ? query.SortDir : "desc";
+        var sortBy = query.SortBy is not null && ValidSortColumns.Contains(query.SortBy) ? query.SortBy : "distributionDate";
+        var sortDir = query.SortDir is not null && ValidSortDirections.Contains(query.SortDir) ? query.SortDir : "desc";
         var page = Math.Max(query.Page, 1);
         var pageSize = PaginationModel.AvailablePageSizes.Contains(query.PageSize) ? query.PageSize : ReferenceSchemeListQuery.DefaultPageSize;
 

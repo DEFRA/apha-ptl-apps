@@ -20,6 +20,10 @@ public static class NavigationProvider
     // Every child below routes to its own controller's default action - named once here since
     // SonarCloud flags the repeated "Index" literal (S1192).
     private const string IndexAction = "Index";
+    private const string ReportsText = "Reports";
+    private const string ViewReportsText = "View reports";
+    private const string MyAccountText = "My account";
+    private const string CreateNewOrderText = "Create new order";
 
     public static IReadOnlyList<NavigationItem> Build() =>
     [
@@ -90,7 +94,7 @@ public static class NavigationProvider
                 },
                 new NavigationItem
                 {
-                    Text = "View reports",
+                    Text = ViewReportsText,
                     ControllerName = "Tabulation",
                     ActionName = IndexAction,
                     Description = "View completed proficiency test reports, which include all participant results",
@@ -108,7 +112,7 @@ public static class NavigationProvider
         },
         new NavigationItem
         {
-            Text = "My account",
+            Text = MyAccountText,
             RequiredRole = ExternalRoleNames.Participant,
             Children =
             [
@@ -131,4 +135,53 @@ public static class NavigationProvider
             ]
         }
     ];
+
+    // Legacy Web.sitemap titles (rendered by SiteMapPath as Home > ancestors > current page, current
+    // page not a link) for pages whose breadcrumb differs from their nav group. Keyed controller/action.
+    private static readonly Dictionary<string, BreadcrumbCrumb[]> Trails = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["Distribution/Current"] = [new("Current distributions")],
+        ["Distribution/Entry"] = [new("Current distributions", "Distribution", "Current"), new("Results entry")],
+        ["Distribution/Previous"] = [new("Previous distributions")],
+        ["Distribution/Results"] = [new("Previous distributions", "Distribution", "Previous"), new("View results")],
+        ["Tabulation/Index"] = [new(ReportsText)],
+        ["Tabulation/Report"] = [new(ReportsText, "Tabulation", IndexAction), new(ViewReportsText)],
+        ["Tabulation/AssessmentResults"] =
+        [
+            new(ReportsText, "Tabulation", IndexAction),
+            new(ViewReportsText, "Tabulation", "Report", "publishedTabulationId"),
+            new("Assessment results")
+        ],
+        ["Scheme/Index"] = [new("View schemes")],
+        ["Customer/Index"] = [new(MyAccountText)],
+        ["Participant/Index"] = [new(MyAccountText)],
+        ["Order/CurrentYear"] = [new(CreateNewOrderText)],
+        ["Order/NextYear"] = [new(CreateNewOrderText)]
+    };
+
+    // Legacy PendingContractOrder.aspx showed Home > Create new order (link back to that year's order) >
+    // stage title once past the start view; the year comes from the request's year slug.
+    private static readonly Dictionary<string, string> OrderStageTitles = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["Order/Review"] = "Pending order",
+        ["Order/ConfirmClear"] = "Clear the order form"
+    };
+
+    public static IReadOnlyList<BreadcrumbCrumb>? BreadcrumbTrail(string controller, string action, string? year = null)
+    {
+        var key = $"{controller}/{action}";
+        if (OrderStageTitles.TryGetValue(key, out var stageTitle))
+        {
+            var yearAction = string.Equals(year, Features.Order.OrderController.NextYearSlug, StringComparison.OrdinalIgnoreCase)
+                ? "NextYear"
+                : "CurrentYear";
+            return [new(CreateNewOrderText, "Order", yearAction), new(stageTitle)];
+        }
+
+        return Trails.TryGetValue(key, out var trail) ? trail : null;
+    }
 }
+
+/// <summary>One breadcrumb step. Controller/Action null means plain text; RouteKey names a query value
+/// (e.g. an id) the link needs from the current request.</summary>
+public sealed record BreadcrumbCrumb(string Text, string? Controller = null, string? Action = null, string? RouteKey = null);

@@ -199,6 +199,80 @@ public class DistributionPreviousAndResultsRouteSmokeTests : IClassFixture<PtlEx
     }
 
     [Fact]
+    public async Task Results_Breadcrumb_ShowsResultsSectionLinkThenCurrentPageAsPlainText()
+    {
+        var monthlyDistributionSchemeId = Guid.NewGuid();
+        var apiClient = new FakeDistributionApiClient
+        {
+            ActualResults = new ActualResultsResponse(
+                Guid.NewGuid(),
+                monthlyDistributionSchemeId,
+                "D1a/00001 Test Scheme",
+                "D1a/00001 Test Scheme",
+                new DateTime(2026, 1, 1),
+                false,
+                [])
+        };
+        var client = CreateClient(apiClient);
+        var cookies = await SignInAsync(client);
+
+        var response = await CookieForwardingHttpClient.SendWithCookiesAsync(
+            client, HttpMethod.Get, $"/Distribution/Results?monthlyDistributionSchemeId={monthlyDistributionSchemeId}", cookies);
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var breadcrumbs = Regex.Match(body, "<nav class=\"govuk-breadcrumbs\".*?</nav>", RegexOptions.Singleline).Value;
+        Assert.Contains("<a class=\"govuk-breadcrumbs__link\" href=\"/Distribution/Previous\">Previous distributions</a>", breadcrumbs, StringComparison.Ordinal);
+        Assert.Contains("<li class=\"govuk-breadcrumbs__list-item\" aria-current=\"page\">View results</li>", breadcrumbs, StringComparison.Ordinal);
+        Assert.DoesNotContain(">Results</", breadcrumbs, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Entry_Breadcrumb_ResultsLinksToCurrentDistributionsAndCurrentPageIsPlainText()
+    {
+        var monthlyDistributionSchemeId = Guid.NewGuid();
+        var participantId = Guid.NewGuid();
+        var apiClient = new FakeDistributionApiClient
+        {
+            ActualResults = new ActualResultsResponse(
+                participantId,
+                monthlyDistributionSchemeId,
+                "D1a/00001 Test Scheme",
+                "D1a/00001 Test Scheme",
+                new DateTime(2026, 1, 1),
+                false,
+                [])
+        };
+        var client = CreateClient(apiClient);
+        var cookies = await SignInAsync(client);
+
+        var response = await CookieForwardingHttpClient.SendWithCookiesAsync(
+            client, HttpMethod.Get, $"/Distribution/Entry?schemeId={monthlyDistributionSchemeId}&participantId={participantId}", cookies);
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var breadcrumbs = Regex.Match(body, "<nav class=\"govuk-breadcrumbs\".*?</nav>", RegexOptions.Singleline).Value;
+        Assert.Contains("<a class=\"govuk-breadcrumbs__link\" href=\"/Distribution/Current\">Current distributions</a>", breadcrumbs, StringComparison.Ordinal);
+        Assert.Contains("<li class=\"govuk-breadcrumbs__list-item\" aria-current=\"page\">Results entry</li>", breadcrumbs, StringComparison.Ordinal);
+        Assert.DoesNotContain(">Results</", breadcrumbs, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Previous_Breadcrumb_ShowsPreviousDistributionsAsPlainCurrentPage()
+    {
+        var client = CreateClient(new FakeDistributionApiClient());
+        var cookies = await SignInAsync(client);
+
+        var response = await CookieForwardingHttpClient.SendWithCookiesAsync(client, HttpMethod.Get, "/Distribution/Previous", cookies);
+        var body = await response.Content.ReadAsStringAsync();
+
+        var breadcrumbs = Regex.Match(body, "<nav class=\"govuk-breadcrumbs\".*?</nav>", RegexOptions.Singleline).Value;
+        Assert.Contains("<li class=\"govuk-breadcrumbs__list-item\" aria-current=\"page\">Previous distributions</li>", breadcrumbs, StringComparison.Ordinal);
+        Assert.DoesNotContain(">Results</", breadcrumbs, StringComparison.Ordinal);
+        Assert.DoesNotContain("View results", breadcrumbs, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Results_ApiResolvesNoResultsForThisParticipant_RendersNotFound()
     {
         // Covers both "no results exist for this distribution" and the Access Restrictions AC: the

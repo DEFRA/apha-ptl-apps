@@ -12,6 +12,8 @@
   padding: 0;
   font: inherit;
   cursor: pointer;
+  /* A button never matches govuk-frontend's :link/:visited colour rules, so set the link colour explicitly. */
+  color: var(--govuk-link-colour, #1a65a6);
 }
 
 /* Scheme List "enrolment highlighting" (AC3) - legacy's bold-schemes.js reproduced as a server-rendered, accessible row tint rather than client-side jQuery/yellow DOM manipulation */

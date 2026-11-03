@@ -23,12 +23,13 @@ public sealed class TabulationController(IDistributionApiClient distributionApiC
 
     // Legacy Tabulations.aspx - Year/Month dropdowns are exact matches, the 3 text criteria are
     // "contains" (Scheme Name matches when every typed word is contained), mirroring
-    // DistributionController.Previous's DistributionsPast.ExecuteSearch pattern. Default sort is
-    // DistributionDate descending.
+    // DistributionController.Previous's DistributionsPast.ExecuteSearch pattern. Legacy has no
+    // default grid sort: rows come in spgTabulations order (Distribution Reference ascending) with
+    // no column marked as sorted, so SortBy stays empty until the user picks a column.
     public async Task<IActionResult> Index([FromQuery] ReferenceSchemeListQuery query, CancellationToken cancellationToken = default)
     {
-        var sortBy = ValidSortColumns.Contains(query.SortBy) ? query.SortBy : "distributionDate";
-        var sortDir = ValidSortDirections.Contains(query.SortDir) ? query.SortDir : "desc";
+        var sortBy = query.SortBy is not null && ValidSortColumns.Contains(query.SortBy) ? query.SortBy : string.Empty;
+        var sortDir = sortBy.Length > 0 && query.SortDir is not null && ValidSortDirections.Contains(query.SortDir) ? query.SortDir : "asc";
         var page = Math.Max(query.Page, 1);
         var pageSize = PaginationModel.AvailablePageSizes.Contains(query.PageSize) ? query.PageSize : ReferenceSchemeListQuery.DefaultPageSize;
 
@@ -117,11 +118,11 @@ public sealed class TabulationController(IDistributionApiClient distributionApiC
 
         var ordered = sortBy switch
         {
-            "reference" => Order(t => t.DistributionReference),
             "schemeCode" => Order(t => t.SchemeCode),
             "schemeName" => Order(t => t.SchemeName),
             "tabulationName" => Order(t => t.TabulationName),
-            _ => Order(t => t.DistributionDate),
+            "distributionDate" => Order(t => t.DistributionDate),
+            _ => Order(t => t.DistributionReference),
         };
 
         return [.. ordered];
