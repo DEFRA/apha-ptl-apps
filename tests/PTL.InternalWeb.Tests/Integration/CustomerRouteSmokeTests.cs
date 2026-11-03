@@ -54,6 +54,11 @@ public partial class CustomerRouteSmokeTests : IClassFixture<WebApplicationFacto
         string.Empty, Guid.NewGuid(), string.Empty, string.Empty, string.Empty, string.Empty, isActive, false,
         isActive ? null : DateTime.UtcNow, isActive ? null : Guid.NewGuid());
 
+    private static PendingCustomerUpdateResponse SamplePendingUpdate(Guid customerId) => new(
+        customerId, "New Contact", "New Organisation", "New Address 1", string.Empty, string.Empty, string.Empty, string.Empty,
+        Guid.NewGuid(), string.Empty, string.Empty, string.Empty, "new@example.com", string.Empty, string.Empty, string.Empty,
+        string.Empty, string.Empty, string.Empty, string.Empty, Guid.NewGuid(), string.Empty, string.Empty, string.Empty, string.Empty);
+
     [Theory]
     [InlineData("/Customer/Index")]
     [InlineData("/Customer/Create")]
@@ -117,10 +122,25 @@ public partial class CustomerRouteSmokeTests : IClassFixture<WebApplicationFacto
         var client = _factory.CreateClient();
 
         var response = await client.GetAsync($"/Customer/Edit/{CustomerId}");
-        var body = await response.Content.ReadAsStringAsync();
+        var crumbs = BreadcrumbHtml.Crumbs(await response.Content.ReadAsStringAsync());
 
-        Assert.Contains("Manage Contracts", body);
-        Assert.Contains("Edit Customer", body);
+        Assert.Equal(["Home", "Manage Contracts", "Customers", "Customer Details", "Edit Customer"], crumbs.Select(c => c.Text));
+        Assert.Equal($"/Customer/Details/{CustomerId}", crumbs.Single(c => c.Text == "Customer Details").Href);
+        Assert.Null(crumbs[^1].Href);
+    }
+
+    [Fact]
+    public async Task EditPendingCustomerUpdate_RendersFullBreadcrumbTrail()
+    {
+        _fakeApiClient.PendingCustomerUpdateComparison = new PendingCustomerUpdateComparisonResponse(SampleCustomer(CustomerId), SamplePendingUpdate(CustomerId));
+        var client = _factory.CreateClient();
+
+        var response = await client.GetAsync($"/Customer/EditPendingCustomerUpdate?customerId={CustomerId}");
+        var crumbs = BreadcrumbHtml.Crumbs(await response.Content.ReadAsStringAsync());
+
+        Assert.Equal(["Home", "Manage Contracts", "Customers", "Review Pending Customer Updates", "Pending Customer Update Details", "Edit Pending Customer Update"], crumbs.Select(c => c.Text));
+        Assert.Equal($"/Customer/PendingCustomerUpdateDetails?customerId={CustomerId}", crumbs.Single(c => c.Text == "Pending Customer Update Details").Href);
+        Assert.Null(crumbs[^1].Href);
     }
 
     [Fact]
@@ -227,6 +247,34 @@ public partial class CustomerRouteSmokeTests : IClassFixture<WebApplicationFacto
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Contains("govuk-form-group--error", body);
+    }
+
+    // Only the Details crumb is asserted: the re-render does not republish every ancestor id, so other crumbs may already be plain text.
+    [Fact]
+    public async Task Edit_Post_InvalidModel_KeepsTheDetailsBreadcrumbLinked()
+    {
+        var client = _factory.CreateClient();
+        var (token, cookie) = await GetAntiforgeryAsync(client, $"/Customer/Edit/{CustomerId}");
+
+        var request = new HttpRequestMessage(HttpMethod.Post, $"/Customer/Edit/{CustomerId}")
+        {
+            Content = new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["__RequestVerificationToken"] = token,
+                ["IsActive"] = "true"
+            })
+        };
+        request.Headers.Add("Cookie", cookie);
+
+        var response = await client.SendAsync(request);
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("govuk-form-group--error", body);
+        var crumbs = BreadcrumbHtml.Crumbs(body);
+        Assert.Equal($"/Customer/Details/{CustomerId}", crumbs.Single(c => c.Text == "Customer Details").Href);
+        Assert.Equal("Edit Customer", crumbs[^1].Text);
+        Assert.Null(crumbs[^1].Href);
     }
 
     private static async Task<(string Token, string Cookie)> GetAntiforgeryAsync(HttpClient client, string url)

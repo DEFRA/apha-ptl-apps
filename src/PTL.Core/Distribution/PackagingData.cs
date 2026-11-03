@@ -204,8 +204,7 @@ public sealed record PackagingStageUpdate(
     bool Packed,
     bool Posted);
 
-// EmailFailures lists the Distribution Posted emails GOV.UK Notify did not accept; the Save itself still committed.
-public sealed record PackagingSaveOutcome(bool Success, IReadOnlyList<string>? EmailFailures = null);
+public sealed record PackagingSaveOutcome(bool Success);
 
 public sealed record PackagingLabel(IReadOnlyList<string> Lines);
 

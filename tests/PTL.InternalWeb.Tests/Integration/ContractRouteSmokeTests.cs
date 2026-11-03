@@ -149,12 +149,11 @@ public class ContractRouteSmokeTests : IClassFixture<WebApplicationFactory<Progr
         var client = _factory.CreateClient();
 
         var response = await client.GetAsync($"/Contract/Edit/{ContractId}");
-        var body = await response.Content.ReadAsStringAsync();
+        var crumbs = BreadcrumbHtml.Crumbs(await response.Content.ReadAsStringAsync());
 
-        Assert.Contains("Manage Contracts", body);
-        Assert.Contains("Customers", body);
-        Assert.Contains("Contracts", body);
-        Assert.Contains("Edit Contract", body);
+        Assert.Equal(["Home", "Manage Contracts", "Customers", "Contracts", "Contract Details", "Edit Contract"], crumbs.Select(c => c.Text));
+        Assert.Equal($"/Contract/Details/{ContractId}", crumbs.Single(c => c.Text == "Contract Details").Href);
+        Assert.Null(crumbs[^1].Href);
     }
 
     // "Discount rate (%)" is stored as a fraction (0.0125 = 1.25%), so the Edit textbox must render the

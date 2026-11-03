@@ -17,4 +17,8 @@ public static class BreadcrumbRouteValues
     // Ambient value names a SideNavigationItem can reference via LinkRouteValueKey.
     public const string CustomerIdKey = "customerId";
     public const string ContractIdKey = "contractId";
+
+    // A Details crumb links with its own Edit page's request values (route id, query participantId), never ViewData.
+    public const string IdKey = "id";
+    public const string ParticipantIdKey = "participantId";
 }

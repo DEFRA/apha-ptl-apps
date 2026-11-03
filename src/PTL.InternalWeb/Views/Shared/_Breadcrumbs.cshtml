@@ -7,6 +7,7 @@
     // Ancestor links such as Contracts and Contract Items are parameterised routes. Take the id
     // from the current request where present, otherwise from whatever the page published (see
     // BreadcrumbRouteValues) - /Contract/Details/{id} knows the contract but carries no customerId.
+    // A Details crumb takes its own id / participantId from the request only (no ViewData fallback).
     var ambient = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase)
     {
         [BreadcrumbRouteValues.CustomerIdKey] =
@@ -16,7 +17,13 @@
         [BreadcrumbRouteValues.ContractIdKey] =
             ViewContext.HttpContext.Request.Query[BreadcrumbRouteValues.ContractIdKey].FirstOrDefault()
             ?? ViewContext.RouteData.Values[BreadcrumbRouteValues.ContractIdKey]?.ToString()
-            ?? ViewData[BreadcrumbRouteValues.ContractId]?.ToString()
+            ?? ViewData[BreadcrumbRouteValues.ContractId]?.ToString(),
+        [BreadcrumbRouteValues.IdKey] =
+            ViewContext.HttpContext.Request.Query[BreadcrumbRouteValues.IdKey].FirstOrDefault()
+            ?? ViewContext.RouteData.Values[BreadcrumbRouteValues.IdKey]?.ToString(),
+        [BreadcrumbRouteValues.ParticipantIdKey] =
+            ViewContext.HttpContext.Request.Query[BreadcrumbRouteValues.ParticipantIdKey].FirstOrDefault()
+            ?? ViewContext.RouteData.Values[BreadcrumbRouteValues.ParticipantIdKey]?.ToString()
     };
 
     static string ToDisplay(string value)
