@@ -100,7 +100,7 @@ else
                     <td class="govuk-table__cell">@tabulation.SchemeCode</td>
                     <td class="govuk-table__cell">@tabulation.SchemeName</td>
                     <td class="govuk-table__cell">@tabulation.TabulationName</td>
-                    <td class="govuk-table__cell">@tabulation.DistributionDate.ToString("d MMMM yyyy", CultureInfo.InvariantCulture)</td>
+                    <td class="govuk-table__cell">@tabulation.DistributionDate.ToString("dddd d MMMM yyyy", CultureInfo.InvariantCulture)</td>
                     <td class="govuk-table__cell">
                         <a class="govuk-link"
                            asp-action="Report"

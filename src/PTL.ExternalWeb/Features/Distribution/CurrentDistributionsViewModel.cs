@@ -3,6 +3,16 @@ namespace PTL.ExternalWeb.Features.Distribution;
 public sealed class CurrentDistributionsViewModel
 {
     public IReadOnlyList<CurrentDistributionRowViewModel> Distributions { get; init; } = [];
+
+    public int TotalCount { get; init; }
+
+    public int Page { get; init; } = 1;
+
+    public int PageSize { get; init; } = 15;
+
+    public string SortBy { get; init; } = string.Empty;
+
+    public string SortDirection { get; init; } = "asc";
 }
 
 public sealed class CurrentDistributionRowViewModel
@@ -17,5 +27,6 @@ public sealed class CurrentDistributionRowViewModel
     public required bool HasResults { get; init; }
     public required bool Submitted { get; init; }
 
-    public bool ResultsEntered => Submitted || HasResults;
+    // Legacy DistributionsCurrent.GetStatus: Submitted, else In Progress when any result exists, else No.
+    public string Status => Submitted ? "Submitted" : HasResults ? "In Progress" : "No";
 }

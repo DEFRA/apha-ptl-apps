@@ -924,6 +924,15 @@ public sealed partial class DistributionRepository(IDbConnectionFactory connecti
             actualResultsParameters,
             transaction);
 
+        // Legacy external Save/Submit stamps tblActualResults.fldSubmitted through this procedure.
+        if (write.Submitted is { } submitted)
+        {
+            await connection.ExecuteAsync(
+                "EXEC dbo.spuEditResultsEntryResult @ActualResultId = @ActualResultsId, @LastEditDate = @LastEditDate, @Submitted = @Submitted",
+                new { ActualResultsId = write.DistributionParticipantId, write.LastEditDate, Submitted = submitted },
+                transaction);
+        }
+
         // The audit procedures record the row's CURRENT (pre-update) value, so they must run
         // immediately BEFORE the matching spu* call.
         foreach (var item in write.MethodItems)

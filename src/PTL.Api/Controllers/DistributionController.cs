@@ -224,7 +224,8 @@ public sealed partial class DistributionController(
             [.. request.SampleValues.Select(v => new ActualResultsSampleValueUpdate(v.SampleResultItemId, v.Result))],
             [.. request.MethodItems.Select(m => new ActualResultsMethodItemUpdate(m.TestMethodItemId, m.Result))],
             await AuditWhoAsync(cancellationToken),
-            request.AuditWhy ?? string.Empty);
+            request.AuditWhy ?? string.Empty,
+            request.Submitted);
 
         var outcome = await actualResultsService.SaveActualResultsAsync(distributionParticipantId, monthlyDistributionSchemeId, update, cancellationToken);
 

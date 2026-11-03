@@ -156,6 +156,8 @@ internal sealed partial class FakeDistributionApiClient : IDistributionApiClient
     public ActualResultsResponse? ActualResults { get; set; }
     public ActualResultsSaveResult? ActualResultsSaveResult { get; set; }
     public List<ActualResultsSaveRequest> SavedActualResultsRequests { get; } = [];
+    public List<Guid> SavedActualResultsParticipantIds { get; } = [];
+    public List<Guid> RequestedOwnResultsParticipantIds { get; } = [];
 
     public Task<ActualResultsResponse?> GetActualResultsAsync(
         Guid monthlyDistributionSchemeId, Guid distributionParticipantId, CancellationToken cancellationToken = default) =>
@@ -166,8 +168,11 @@ internal sealed partial class FakeDistributionApiClient : IDistributionApiClient
         Task.FromResult(ParticipantHistory);
 
     public Task<ActualResultsResponse?> GetActualResultsForParticipantAsync(
-        Guid monthlyDistributionSchemeId, Guid participantId, CancellationToken cancellationToken = default) =>
-        Task.FromResult(ActualResults);
+        Guid monthlyDistributionSchemeId, Guid participantId, CancellationToken cancellationToken = default)
+    {
+        RequestedOwnResultsParticipantIds.Add(participantId);
+        return Task.FromResult(ActualResults);
+    }
 
     public Task<PublishedTabulationSummaryListResponse> GetTabulationsForUserAsync(
         Guid? participantId, Guid? viewerId, Guid? testConsultantId, CancellationToken cancellationToken = default) =>
@@ -189,6 +194,7 @@ internal sealed partial class FakeDistributionApiClient : IDistributionApiClient
         Guid monthlyDistributionSchemeId, Guid distributionParticipantId, ActualResultsSaveRequest request, CancellationToken cancellationToken = default)
     {
         SavedActualResultsRequests.Add(request);
+        SavedActualResultsParticipantIds.Add(distributionParticipantId);
         return Task.FromResult(ActualResultsSaveResult);
     }
 

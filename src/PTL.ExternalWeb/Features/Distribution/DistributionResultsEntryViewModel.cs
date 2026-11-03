@@ -44,7 +44,9 @@ public sealed class DistributionResultsEntryResultItemViewModel
     public IReadOnlyList<string> DropdownOptions =>
         IsDropdown ? FormatString.Split('|', StringSplitOptions.RemoveEmptyEntries) : [];
 
-    public string InputFormatMessage => $"Input must be of format: {DistributionResultsEntryFormatMessages.For(ReturnValueType)}";
+    public string InputFormatMessage => $"Input must be of format: {RequiredFormat}";
+
+    public string RequiredFormat => DistributionResultsEntryFormatMessages.For(ReturnValueType);
 }
 
 public sealed class DistributionResultsEntryMethodItemViewModel
@@ -64,7 +66,9 @@ public sealed class DistributionResultsEntryMethodItemViewModel
     public IReadOnlyList<string> DropdownOptions =>
         IsDropdown ? FormatString.Split('|', StringSplitOptions.RemoveEmptyEntries) : [];
 
-    public string InputFormatMessage => $"Input must be of format: {DistributionResultsEntryFormatMessages.For(ReturnValueType)}";
+    public string InputFormatMessage => $"Input must be of format: {RequiredFormat}";
+
+    public string RequiredFormat => DistributionResultsEntryFormatMessages.For(ReturnValueType);
 }
 
 internal static class DistributionResultsEntryFormatMessages

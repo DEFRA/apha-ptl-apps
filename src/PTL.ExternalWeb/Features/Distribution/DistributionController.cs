@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using PTL.ApiClient.Distribution;
@@ -15,46 +16,69 @@ namespace PTL.ExternalWeb.Features.Distribution;
 public sealed class DistributionController(IDistributionApiClient distributionApiClient) : Controller
 {
     private const string CancelCommand = "cancel";
+    private const string SubmitCommand = "submit";
     private const string ExternalAuditReason = "External participant results updated.";
     private static readonly string[] ValidSortColumns = ["reference", "schemeCode", "schemeName", "distributionDate"];
     private static readonly string[] ValidSortDirections = ["asc", "desc"];
+    private static readonly string[] ValidCurrentSortColumns = [.. ValidSortColumns, "deadlineDate", "status"];
 
-    public async Task<IActionResult> Current(CancellationToken cancellationToken)
+    // Legacy DistributionsCurrent has no default sort: rows keep the stored-procedure order until a column is chosen.
+    // Legacy pages the grid at 15 rows by default.
+    public async Task<IActionResult> Current(
+        string? sortBy = null,
+        string? sortDir = null,
+        int page = 1,
+        int pageSize = ReferenceSchemeListQuery.DefaultPageSize,
+        CancellationToken cancellationToken = default)
     {
+        page = Math.Max(page, 1);
+        pageSize = PaginationModel.AvailablePageSizes.Contains(pageSize) ? pageSize : ReferenceSchemeListQuery.DefaultPageSize;
+
         var participantId = User.GetParticipantId();
         if (participantId is null)
         {
-            return View(new CurrentDistributionsViewModel());
+            return View(new CurrentDistributionsViewModel { Page = page, PageSize = pageSize });
         }
 
         var distributions = await distributionApiClient.GetCurrentDistributionsAsync(participantId.Value, cancellationToken);
 
+        var rows = distributions
+            .Select(d => new CurrentDistributionRowViewModel
+            {
+                MonthlyDistributionSchemeId = d.MonthlyDistributionSchemeId,
+                DistributionParticipantId = d.DistributionParticipantId,
+                DistributionReference = d.DistributionReference,
+                SchemeCode = d.SchemeCode,
+                SchemeName = d.SchemeName,
+                DistributionDate = d.DistributionDate,
+                DeadlineDate = d.DeadlineDate,
+                HasResults = d.HasResults,
+                Submitted = d.Submitted,
+            })
+            .ToList();
+
+        var column = sortBy is not null && ValidCurrentSortColumns.Contains(sortBy) ? sortBy : string.Empty;
+        var direction = sortDir is not null && ValidSortDirections.Contains(sortDir) ? sortDir : "asc";
+
+        var sorted = column.Length == 0 ? rows : SortCurrent(rows, column, direction);
+
         return View(new CurrentDistributionsViewModel
         {
-            Distributions = distributions
-                .Select(d => new CurrentDistributionRowViewModel
-                {
-                    MonthlyDistributionSchemeId = d.MonthlyDistributionSchemeId,
-                    DistributionParticipantId = d.DistributionParticipantId,
-                    DistributionReference = d.DistributionReference,
-                    SchemeCode = d.SchemeCode,
-                    SchemeName = d.SchemeName,
-                    DistributionDate = d.DistributionDate,
-                    DeadlineDate = d.DeadlineDate,
-                    HasResults = d.HasResults,
-                    Submitted = d.Submitted,
-                })
-                .ToList(),
+            Distributions = [.. sorted.Skip((page - 1) * pageSize).Take(pageSize)],
+            TotalCount = sorted.Count,
+            Page = page,
+            PageSize = pageSize,
+            SortBy = column,
+            SortDirection = direction,
         });
     }
 
+    // The participant comes from the signed-in user, never from the URL or form, so one participant
+    // cannot open or overwrite another's results (same rule as Results).
     [HttpGet]
-    public async Task<IActionResult> Entry(
-        Guid schemeId,
-        Guid participantId,
-        CancellationToken cancellationToken)
+    public async Task<IActionResult> Entry(Guid schemeId, CancellationToken cancellationToken)
     {
-        var page = await distributionApiClient.GetActualResultsAsync(schemeId, participantId, cancellationToken);
+        var page = await GetOwnResultsAsync(schemeId, cancellationToken);
         return page is null ? RedirectToAction(nameof(Current)) : View(ToResultsEntryViewModel(page));
     }
 
@@ -71,16 +95,42 @@ public sealed class DistributionController(IDistributionApiClient distributionAp
             return RedirectToAction(nameof(Current));
         }
 
+        var own = await GetOwnResultsAsync(model.MonthlyDistributionSchemeId, cancellationToken);
+        if (own is null)
+        {
+            return RedirectToAction(nameof(Current));
+        }
+
+        model.DistributionParticipantId = own.DistributionParticipantId;
+
+        // Legacy raises the deadline rule on its own, ahead of any format errors.
+        if (own.IsReadOnly)
+        {
+            var late = await RehydrateResultsEntryAsync(distributionApiClient, model, cancellationToken);
+            late.SaveFailed = true;
+            return View(late);
+        }
+
         if (!ModelState.IsValid)
         {
             return View(model);
+        }
+
+        // Legacy's participant rule rejects a drop-down value that is not one of its options; the shared save endpoint does not.
+        var unlisted = UnlistedDropdownValues(own, model);
+        if (unlisted.Count > 0)
+        {
+            var invalidOptions = await RehydrateResultsEntryAsync(distributionApiClient, model, cancellationToken);
+            ApplyResultsEntryFieldErrors(invalidOptions, unlisted);
+            return View(invalidOptions);
         }
 
         var request = new ActualResultsSaveRequest(
             [.. model.Tests.SelectMany(t => t.Samples).SelectMany(s => s.Values)
                 .Select(v => new ActualResultsSampleValueRequest(v.SampleResultItemId, v.Result ?? string.Empty))],
             [.. model.Tests.SelectMany(t => t.MethodItems).Select(m => new ActualResultsMethodItemRequest(m.TestMethodItemId, m.Result ?? string.Empty))],
-            ExternalAuditReason);
+            ExternalAuditReason,
+            string.Equals(command, SubmitCommand, StringComparison.OrdinalIgnoreCase));
 
         var result = await distributionApiClient.SaveActualResultsAsync(
             model.MonthlyDistributionSchemeId,
@@ -102,7 +152,7 @@ public sealed class DistributionController(IDistributionApiClient distributionAp
             return View(invalid);
         }
 
-        TempData.SetNotification(NotificationType.Success, "Results saved successfully.");
+        TempData.SetNotification(NotificationType.Success, request.Submitted == true ? "Results submitted successfully." : "Results saved successfully.");
         return RedirectToAction(nameof(Current));
     }
 
@@ -147,6 +197,14 @@ public sealed class DistributionController(IDistributionApiClient distributionAp
         return page is null ? NotFound() : View(page);
     }
 
+    private async Task<ActualResultsResponse?> GetOwnResultsAsync(Guid monthlyDistributionSchemeId, CancellationToken cancellationToken)
+    {
+        var participantId = User.GetParticipantId();
+        return participantId is null
+            ? null
+            : await distributionApiClient.GetActualResultsForParticipantAsync(monthlyDistributionSchemeId, participantId.Value, cancellationToken);
+    }
+
     private static async Task<DistributionResultsEntryViewModel> RehydrateResultsEntryAsync(
         IDistributionApiClient distributionApiClient,
         DistributionResultsEntryViewModel posted,
@@ -187,21 +245,56 @@ public sealed class DistributionController(IDistributionApiClient distributionAp
         return model;
     }
 
+    private static Dictionary<Guid, string> UnlistedDropdownValues(ActualResultsResponse own, DistributionResultsEntryViewModel posted)
+    {
+        var resultItems = own.Tests.SelectMany(t => t.ResultItems).DistinctBy(i => i.TestResultItemId).ToDictionary(i => i.TestResultItemId);
+        var itemOfSampleValue = own.Tests.SelectMany(t => t.Samples).SelectMany(s => s.Values)
+            .DistinctBy(v => v.SampleResultItemId).ToDictionary(v => v.SampleResultItemId, v => v.TestResultItemId);
+        var methodItems = own.Tests.SelectMany(t => t.MethodItems).DistinctBy(m => m.TestMethodItemId).ToDictionary(m => m.TestMethodItemId);
+
+        var errors = new Dictionary<Guid, string>();
+
+        foreach (var value in posted.Tests.SelectMany(t => t.Samples).SelectMany(s => s.Values))
+        {
+            if (itemOfSampleValue.TryGetValue(value.SampleResultItemId, out var itemId)
+                && resultItems.TryGetValue(itemId, out var item)
+                && IsUnlistedOption(item.FormatString, value.Result))
+            {
+                errors[value.SampleResultItemId] = $"{item.Name} must be one of the listed options";
+            }
+        }
+
+        foreach (var method in posted.Tests.SelectMany(t => t.MethodItems))
+        {
+            if (methodItems.TryGetValue(method.TestMethodItemId, out var item) && IsUnlistedOption(item.FormatString, method.Result))
+            {
+                errors[method.TestMethodItemId] = $"{item.Name} must be one of the listed options";
+            }
+        }
+
+        return errors;
+    }
+
+    private static bool IsUnlistedOption(string formatString, string? value) =>
+        !string.IsNullOrEmpty(value)
+        && !formatString.StartsWith('^')
+        && !formatString.Split('|').Contains(value, StringComparer.Ordinal);
+
     private void ApplyResultsEntryFieldErrors(
         DistributionResultsEntryViewModel model,
         IReadOnlyDictionary<Guid, string> fieldErrorsByItemId)
     {
         foreach (var (itemId, message) in fieldErrorsByItemId)
         {
-            if (TryFindMethodField(model, itemId, out var methodPath))
+            if (TryFindMethodField(model, itemId, out var methodPath, out var methodName))
             {
-                ModelState.AddModelError(methodPath, message);
+                ModelState.AddModelError(methodPath, LegacyFormatMessage(methodName, message));
                 continue;
             }
 
-            if (TryFindSampleField(model, itemId, out var samplePath))
+            if (TryFindSampleField(model, itemId, out var samplePath, out var itemName))
             {
-                ModelState.AddModelError(samplePath, message);
+                ModelState.AddModelError(samplePath, LegacyFormatMessage(itemName, message));
                 continue;
             }
 
@@ -209,10 +302,20 @@ public sealed class DistributionController(IDistributionApiClient distributionAp
         }
     }
 
+    // Legacy ResultsEntry names the item: "{Item} must be in format {format}".
+    private static string LegacyFormatMessage(string itemName, string apiMessage)
+    {
+        const string prefix = "Input must be of format:";
+        return apiMessage.StartsWith(prefix, StringComparison.Ordinal)
+            ? $"{itemName} must be in format {apiMessage[prefix.Length..].Trim()}"
+            : apiMessage;
+    }
+
     private static bool TryFindMethodField(
         DistributionResultsEntryViewModel model,
         Guid itemId,
-        out string? path)
+        [NotNullWhen(true)] out string? path,
+        [NotNullWhen(true)] out string? name)
     {
         for (var t = 0; t < model.Tests.Count; t++)
         {
@@ -221,19 +324,22 @@ public sealed class DistributionController(IDistributionApiClient distributionAp
                 if (model.Tests[t].MethodItems[m].TestMethodItemId == itemId)
                 {
                     path = $"Tests[{t}].MethodItems[{m}].Result";
+                    name = model.Tests[t].MethodItems[m].Name;
                     return true;
                 }
             }
         }
 
         path = null;
+        name = null;
         return false;
     }
 
     private static bool TryFindSampleField(
         DistributionResultsEntryViewModel model,
         Guid itemId,
-        out string? path)
+        [NotNullWhen(true)] out string? path,
+        [NotNullWhen(true)] out string? name)
     {
         for (var t = 0; t < model.Tests.Count; t++)
         {
@@ -244,6 +350,8 @@ public sealed class DistributionController(IDistributionApiClient distributionAp
                     if (model.Tests[t].Samples[s].Values[v].SampleResultItemId == itemId)
                     {
                         path = $"Tests[{t}].Samples[{s}].Values[{v}].Result";
+                        var testResultItemId = model.Tests[t].Samples[s].Values[v].TestResultItemId;
+                        name = model.Tests[t].ResultItems.FirstOrDefault(r => r.TestResultItemId == testResultItemId)?.Name ?? string.Empty;
                         return true;
                     }
                 }
@@ -251,6 +359,7 @@ public sealed class DistributionController(IDistributionApiClient distributionAp
         }
 
         path = null;
+        name = null;
         return false;
     }
 
@@ -323,6 +432,25 @@ public sealed class DistributionController(IDistributionApiClient distributionAp
     private static bool ContainsAllWords(string value, string? term) =>
         string.IsNullOrWhiteSpace(term)
         || term.Split(' ', StringSplitOptions.RemoveEmptyEntries).All(word => value.Contains(word, StringComparison.OrdinalIgnoreCase));
+
+    private static List<CurrentDistributionRowViewModel> SortCurrent(
+        IReadOnlyList<CurrentDistributionRowViewModel> rows, string sortBy, string sortDir)
+    {
+        IOrderedEnumerable<CurrentDistributionRowViewModel> Order<TKey>(Func<CurrentDistributionRowViewModel, TKey> keySelector) =>
+            sortDir == "desc" ? rows.OrderByDescending(keySelector) : rows.OrderBy(keySelector);
+
+        var ordered = sortBy switch
+        {
+            "reference" => Order(d => d.DistributionReference),
+            "schemeCode" => Order(d => d.SchemeCode),
+            "schemeName" => Order(d => d.SchemeName),
+            "deadlineDate" => Order(d => d.DeadlineDate),
+            "status" => Order(d => d.HasResults),
+            _ => Order(d => d.DistributionDate),
+        };
+
+        return [.. ordered];
+    }
 
     private static List<ParticipantPastDistributionResponse> Sort(
         IReadOnlyList<ParticipantPastDistributionResponse> distributions, string sortBy, string sortDir)

@@ -47,4 +47,5 @@ public sealed record ActualResultsWrite(
     IReadOnlyList<Guid> RatingSampleIds,
     Guid? DefaultRatingId,
     string AuditWho,
-    string AuditWhy);
+    string AuditWhy,
+    bool? Submitted = null);

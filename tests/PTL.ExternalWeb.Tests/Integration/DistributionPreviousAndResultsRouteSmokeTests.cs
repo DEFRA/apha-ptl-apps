@@ -258,6 +258,179 @@ public class DistributionPreviousAndResultsRouteSmokeTests : IClassFixture<PtlEx
     }
 
     [Fact]
+    public async Task Entry_RendersSubmitSaveAndCancel_AndDoesNotPostATrustedParticipantId()
+    {
+        var schemeId = Guid.NewGuid();
+        var apiClient = new FakeDistributionApiClient
+        {
+            ActualResults = new ActualResultsResponse(
+                Guid.NewGuid(), schemeId, "D1a/00001 Test Scheme", "D1a/00001 Test Scheme", new DateTime(2026, 1, 1), false, [])
+        };
+        var client = CreateClient(apiClient);
+        var cookies = await SignInAsync(client);
+
+        var response = await CookieForwardingHttpClient.SendWithCookiesAsync(
+            client, HttpMethod.Get, $"/Distribution/Entry?schemeId={schemeId}", cookies);
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var main = Regex.Match(body, "<main.*?</main>", RegexOptions.Singleline).Value;
+        Assert.Matches("<button[^>]*value=\"submit\"[^>]*class=\"govuk-button\"[^>]*>Submit</button>", main);
+        Assert.Matches("<button[^>]*value=\"save\"[^>]*govuk-button--secondary[^>]*>Save</button>", main);
+        Assert.Matches("<button[^>]*value=\"cancel\"[^>]*>Cancel</button>", main);
+        Assert.DoesNotContain("DistributionParticipantId", main, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Entry_RendersLegacyIntroAndOneTablePerSampleWithRequiredFormatOnlyForTextInputs()
+    {
+        var schemeId = Guid.NewGuid();
+        var textItem = Guid.NewGuid();
+        var dropdownItem = Guid.NewGuid();
+        var apiClient = new FakeDistributionApiClient
+        {
+            ActualResults = new ActualResultsResponse(
+                Guid.NewGuid(), schemeId, "D1a/00001 Test Scheme", "D1a/00001 Test Scheme", new DateTime(2026, 1, 1), false,
+                [new ActualResultsTestResponse(
+                    Guid.NewGuid(),
+                    "ELISA",
+                    [
+                        new ActualResultsResultItemResponse(textItem, "PI Values", "^.*$", "X(15)"),
+                        new ActualResultsResultItemResponse(dropdownItem, "Result", "Positive|Negative", "Text"),
+                    ],
+                    [new ActualResultsMethodItemResponse(Guid.NewGuid(), "Kit", "^.*$", "X(10)", "")],
+                    [
+                        new ActualResultsSampleRowResponse(Guid.NewGuid(), "26/7001",
+                            [new ActualResultsSampleValueResponse(Guid.NewGuid(), textItem, ""), new ActualResultsSampleValueResponse(Guid.NewGuid(), dropdownItem, "")]),
+                        new ActualResultsSampleRowResponse(Guid.NewGuid(), "26/7002",
+                            [new ActualResultsSampleValueResponse(Guid.NewGuid(), textItem, ""), new ActualResultsSampleValueResponse(Guid.NewGuid(), dropdownItem, "")]),
+                    ])])
+        };
+        var client = CreateClient(apiClient);
+        var cookies = await SignInAsync(client);
+
+        var response = await CookieForwardingHttpClient.SendWithCookiesAsync(
+            client, HttpMethod.Get, $"/Distribution/Entry?schemeId={schemeId}", cookies);
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var main = Regex.Match(body, "<main.*?</main>", RegexOptions.Singleline).Value;
+        Assert.Contains("Enter the Test Results below. Tests are divided into Result Items which are tested for each Sample, and Method Items which apply to the Test itself.", main, StringComparison.Ordinal);
+        Assert.Contains("Results can be saved at any time up until the deadline date provided that all the inputs are valid.", main, StringComparison.Ordinal);
+        Assert.Contains(">Sample 26/7001</th>", main, StringComparison.Ordinal);
+        Assert.Contains(">Sample 26/7002</th>", main, StringComparison.Ordinal);
+        Assert.Equal(3, Regex.Matches(main, ">Required format</th>").Count);
+        Assert.Equal(2, Regex.Matches(main, "<option[^>]*value=\"\"[^>]*>- Please Select -</option>").Count);
+        Assert.Equal(3, Regex.Matches(main, "maxlength=\"8000\"").Count);
+        Assert.Equal(3, Regex.Matches(main, "<td class=\"govuk-table__cell\">X\\((15|10)\\)</td>").Count);
+        Assert.DoesNotContain("Input must be of format", main, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Current_RendersLegacyStatusTextAndSortableHeaders()
+    {
+        var apiClient = new FakeDistributionApiClient
+        {
+            CurrentDistributions =
+            [
+                new CurrentDistributionResponse(Guid.NewGuid(), Guid.NewGuid(), "D1a/00001", "PT1", "Scheme", new DateTime(2026, 1, 5), new DateTime(2026, 1, 30), HasResults: false, Submitted: false),
+                new CurrentDistributionResponse(Guid.NewGuid(), Guid.NewGuid(), "D1a/00002", "PT2", "Scheme", new DateTime(2026, 1, 6), new DateTime(2026, 1, 31), HasResults: true, Submitted: false),
+                new CurrentDistributionResponse(Guid.NewGuid(), Guid.NewGuid(), "D1a/00003", "PT3", "Scheme", new DateTime(2026, 1, 7), new DateTime(2026, 2, 1), HasResults: true, Submitted: true),
+            ]
+        };
+        var client = CreateClient(apiClient);
+        var cookies = await SignInAsync(client);
+
+        var response = await CookieForwardingHttpClient.SendWithCookiesAsync(
+            client, HttpMethod.Get, "/Distribution/Current?sortBy=reference&sortDir=desc", cookies);
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("In Progress</td>", body, StringComparison.Ordinal);
+        Assert.Contains("Submitted</td>", body, StringComparison.Ordinal);
+        Assert.Contains("No</td>", body, StringComparison.Ordinal);
+        Assert.Contains("aria-sort=\"descending\"", body, StringComparison.Ordinal);
+        Assert.Contains("sortBy=status", body, StringComparison.Ordinal);
+        Assert.Contains("sortBy=deadlineDate", body, StringComparison.Ordinal);
+        Assert.True(body.IndexOf("D1a/00003", StringComparison.Ordinal) < body.IndexOf("D1a/00001", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Previous_RendersTheDistributionDateInTheLegacyDayNameFormat()
+    {
+        var apiClient = new FakeDistributionApiClient
+        {
+            ParticipantHistory = new ParticipantPastDistributionListResponse(
+                [Distribution("D1a/00001", "PT1234", "Test Scheme", new DateTime(2026, 1, 15), 2025, 1)])
+        };
+        var client = CreateClient(apiClient);
+        var cookies = await SignInAsync(client);
+
+        var response = await CookieForwardingHttpClient.SendWithCookiesAsync(client, HttpMethod.Get, "/Distribution/Previous", cookies);
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Contains("Thursday 15 January 2026", body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Current_MoreThanFifteenDistributions_ShowsFifteenWithPaginationLinksToCurrent()
+    {
+        var apiClient = new FakeDistributionApiClient
+        {
+            CurrentDistributions = [.. Enumerable.Range(1, 20).Select(i => new CurrentDistributionResponse(
+                Guid.NewGuid(), Guid.NewGuid(), $"D1a/{i:D5}", "PT1", "Scheme", new DateTime(2026, 1, 5), new DateTime(2026, 1, 30), HasResults: false, Submitted: false))]
+        };
+        var client = CreateClient(apiClient);
+        var cookies = await SignInAsync(client);
+
+        var response = await CookieForwardingHttpClient.SendWithCookiesAsync(client, HttpMethod.Get, "/Distribution/Current", cookies);
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(15, Regex.Matches(body, "aria-label=\"View results entry for ").Count);
+        Assert.Contains("govuk-pagination", body, StringComparison.Ordinal);
+        Assert.Contains("href=\"/Distribution/Current?", body, StringComparison.Ordinal);
+        Assert.Contains("page=2", body, StringComparison.Ordinal);
+        Assert.Contains("name=\"pageSize\"", body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Current_FifteenOrFewerDistributions_RendersNoPaginationNav()
+    {
+        var apiClient = new FakeDistributionApiClient
+        {
+            CurrentDistributions =
+            [
+                new CurrentDistributionResponse(Guid.NewGuid(), Guid.NewGuid(), "D1a/00001", "PT1", "Scheme", new DateTime(2026, 1, 5), new DateTime(2026, 1, 30), HasResults: false, Submitted: false),
+            ]
+        };
+        var client = CreateClient(apiClient);
+        var cookies = await SignInAsync(client);
+
+        var response = await CookieForwardingHttpClient.SendWithCookiesAsync(client, HttpMethod.Get, "/Distribution/Current", cookies);
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.DoesNotContain("<nav class=\"govuk-pagination\"", body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Previous_MoreDistributionsThanPageSize_PaginationLinksPointAtPrevious()
+    {
+        var distributions = Enumerable.Range(1, 20)
+            .Select(i => Distribution($"D1a/{i:D5}", "PT1234", $"Scheme {i}", new DateTime(2026, 1, 1).AddDays(i), 2025, 1))
+            .ToList();
+        var apiClient = new FakeDistributionApiClient { ParticipantHistory = new ParticipantPastDistributionListResponse(distributions) };
+        var client = CreateClient(apiClient);
+        var cookies = await SignInAsync(client);
+
+        var response = await CookieForwardingHttpClient.SendWithCookiesAsync(client, HttpMethod.Get, "/Distribution/Previous", cookies);
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Contains("href=\"/Distribution/Previous?", body, StringComparison.Ordinal);
+        Assert.Contains("page=2", body, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Previous_Breadcrumb_ShowsPreviousDistributionsAsPlainCurrentPage()
     {
         var client = CreateClient(new FakeDistributionApiClient());
