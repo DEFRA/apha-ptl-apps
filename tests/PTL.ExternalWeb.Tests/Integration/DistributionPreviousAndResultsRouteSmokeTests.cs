@@ -319,10 +319,10 @@ public class DistributionPreviousAndResultsRouteSmokeTests : IClassFixture<PtlEx
         Assert.Contains("Results can be saved at any time up until the deadline date provided that all the inputs are valid.", main, StringComparison.Ordinal);
         Assert.Contains(">Sample 26/7001</th>", main, StringComparison.Ordinal);
         Assert.Contains(">Sample 26/7002</th>", main, StringComparison.Ordinal);
-        Assert.Equal(3, Regex.Matches(main, ">Required format</th>").Count);
-        Assert.Equal(2, Regex.Matches(main, "<option[^>]*value=\"\"[^>]*>- Please Select -</option>").Count);
-        Assert.Equal(3, Regex.Matches(main, "maxlength=\"8000\"").Count);
-        Assert.Equal(3, Regex.Matches(main, "<td class=\"govuk-table__cell\">X\\((15|10)\\)</td>").Count);
+        Assert.Equal(3, Regex.Count(main, ">Required format</th>"));
+        Assert.Equal(2, Regex.Count(main, "<option[^>]*value=\"\"[^>]*>- Please Select -</option>"));
+        Assert.Equal(3, Regex.Count(main, "maxlength=\"8000\""));
+        Assert.Equal(3, Regex.Count(main, "<td class=\"govuk-table__cell\">X\\((15|10)\\)</td>"));
         Assert.DoesNotContain("Input must be of format", main, StringComparison.Ordinal);
     }
 
@@ -387,7 +387,7 @@ public class DistributionPreviousAndResultsRouteSmokeTests : IClassFixture<PtlEx
         var body = await response.Content.ReadAsStringAsync();
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.Equal(15, Regex.Matches(body, "aria-label=\"View results entry for ").Count);
+        Assert.Equal(15, Regex.Count(body, "aria-label=\"View results entry for "));
         Assert.Contains("govuk-pagination", body, StringComparison.Ordinal);
         Assert.Contains("href=\"/Distribution/Current?", body, StringComparison.Ordinal);
         Assert.Contains("page=2", body, StringComparison.Ordinal);

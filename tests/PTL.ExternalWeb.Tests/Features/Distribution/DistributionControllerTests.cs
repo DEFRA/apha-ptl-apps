@@ -9,6 +9,8 @@ namespace PTL.ExternalWeb.Tests.Features.Distribution;
 // (they need a real HTTP pipeline for User.GetParticipantId() and the rendered Razor views).
 public class DistributionControllerTests
 {
+    private static readonly string[] UnsortedReferences = ["B", "A", "C"];
+
     [Fact]
     public async Task Current_ReturnsMappedCurrentDistributions()
     {
@@ -75,7 +77,7 @@ public class DistributionControllerTests
     {
         var apiClient = new FakeDistributionApiClient
         {
-            CurrentDistributions = [.. new[] { "B", "A", "C" }.Select(reference => new CurrentDistributionResponse(
+            CurrentDistributions = [.. UnsortedReferences.Select(reference => new CurrentDistributionResponse(
                 Guid.NewGuid(), Guid.NewGuid(), reference, "PT001", "Bacteriology",
                 new DateTime(2026, 4, 3), new DateTime(2026, 4, 30), HasResults: false, Submitted: false))]
         };
