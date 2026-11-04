@@ -11,6 +11,7 @@ public interface IUserApiClient
     Task<CreateUserSaveResult> CreateUserAsync(CreateUserRequest request, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<UserRoleRowResponse>> GetUserRoleGridAsync(CancellationToken cancellationToken = default);
     Task<SetUserRolesResponse> SetUserRolesAsync(Guid userId, SetUserRolesRequest request, CancellationToken cancellationToken = default);
+    Task<SetUserRolesBatchResponse> SetUserRolesBatchAsync(SetUserRolesBatchRequest request, CancellationToken cancellationToken = default);
     Task<UserRemoveResponse> RemoveUserAsync(Guid userId, Guid? actingUserId, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<UserResponse>> GetTestConsultantsAsync(CancellationToken cancellationToken = default);
     Task UpdateTestConsultantAsync(Guid userId, UpdateTestConsultantRequest request, CancellationToken cancellationToken = default);
@@ -53,6 +54,16 @@ public sealed class UserApiClient(HttpClient httpClient) : IUserApiClient
         response.EnsureSuccessStatusCode();
         var result = await response.Content.ReadFromJsonAsync<SetUserRolesResponse>(cancellationToken);
         return result ?? new SetUserRolesResponse(false, "The role change could not be saved.");
+    }
+
+    // Saves every row of the Manage User Roles grid in a single HTTP round trip - replaces the
+    // previous one-PUT-per-user loop, which caused intermittent gateway timeouts on larger grids.
+    public async Task<SetUserRolesBatchResponse> SetUserRolesBatchAsync(SetUserRolesBatchRequest request, CancellationToken cancellationToken = default)
+    {
+        var response = await httpClient.PutAsJsonAsync("/api/users/roles", request, cancellationToken);
+        response.EnsureSuccessStatusCode();
+        var result = await response.Content.ReadFromJsonAsync<SetUserRolesBatchResponse>(cancellationToken);
+        return result ?? new SetUserRolesBatchResponse(request.Items.Select(i => new SetUserRolesItemResult(i.UserId, false, "The role change could not be saved.")).ToList());
     }
 
     public async Task<UserRemoveResponse> RemoveUserAsync(Guid userId, Guid? actingUserId, CancellationToken cancellationToken = default)

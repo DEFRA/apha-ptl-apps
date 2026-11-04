@@ -28,6 +28,18 @@ public sealed class UserRoleController(IUserRoleService userRoleService) : Contr
         return Ok(new SetUserRolesResponse(result.Success, result.Message));
     }
 
+    // Saves every row shown on the Manage User Roles grid in a single request/transaction,
+    // instead of one PUT per user - avoids the intermittent gateway timeouts that the per-row
+    // loop caused on larger grids (each row re-queried all users/roles and opened its own
+    // transaction).
+    [HttpPut("roles")]
+    public async Task<ActionResult<SetUserRolesBatchResponse>> SetUserRolesBatch([FromBody] SetUserRolesBatchRequest request, CancellationToken cancellationToken)
+    {
+        var rows = request.Items.Select(i => (i.UserId, (IReadOnlyList<Guid>)i.RoleIds)).ToList();
+        var results = await userRoleService.SetUserRolesBatchAsync(rows, request.ActingUserId, cancellationToken);
+        return Ok(new SetUserRolesBatchResponse(results.Select(r => new PTL.Contracts.User.SetUserRolesItemResult(r.UserId, r.Success, r.Message)).ToList()));
+    }
+
     // Returns 200 OK with Success=false (not 400) when removal is blocked by a business rule
     // (e.g. removing your own account) - matches CountryController.DeleteCountry. actingUserId is
     // the signed-in admin performing the removal (resolved by PTL.InternalWeb from Entra claims).

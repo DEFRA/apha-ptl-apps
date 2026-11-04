@@ -21,6 +21,21 @@ internal sealed class FakeUserRoleService : IUserRoleService
         return Task.FromResult(SetResult);
     }
 
+    public SetUserRolesItemResult? BatchResultOverride { get; set; }
+    public List<(IReadOnlyList<(Guid UserId, IReadOnlyList<Guid> RoleIds)> Rows, Guid? ActingUserId)> SetBatchCalls { get; } = [];
+
+    public Task<IReadOnlyList<SetUserRolesItemResult>> SetUserRolesBatchAsync(
+        IReadOnlyList<(Guid UserId, IReadOnlyList<Guid> RoleIds)> rows,
+        Guid? actingUserId,
+        CancellationToken cancellationToken = default)
+    {
+        SetBatchCalls.Add((rows, actingUserId));
+        var results = rows.Select(r => BatchResultOverride is { } overrideResult
+            ? overrideResult with { UserId = r.UserId }
+            : new SetUserRolesItemResult(r.UserId, SetResult.Success, SetResult.Message)).ToList();
+        return Task.FromResult<IReadOnlyList<SetUserRolesItemResult>>(results);
+    }
+
     public UserRemoveResult RemoveResult { get; set; } = new(true, null);
     public List<Guid> RemoveCalls { get; } = [];
 

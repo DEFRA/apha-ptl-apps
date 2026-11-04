@@ -23,4 +23,20 @@ public interface IUserRoleRepository
         IReadOnlyList<Guid> userRoleIdsToRemove,
         AuditEntry auditEntry,
         CancellationToken cancellationToken = default);
+
+    // Same as ApplyRoleChangesWithAuditAsync but applies every user's add/remove set plus every
+    // user's audit entry in ONE connection/transaction, instead of opening a new connection and
+    // transaction per user - used by the Manage User Roles "save the whole grid" action so saving
+    // many users is a single DB round trip rather than N, avoiding the gateway timeouts that the
+    // per-user loop caused on larger grids.
+    Task ApplyBatchRoleChangesWithAuditAsync(
+        IReadOnlyList<UserRoleChangeSet> changeSets,
+        CancellationToken cancellationToken = default);
 }
+
+// One user's add/remove role diff plus its audit entry, applied as part of a batch save.
+public sealed record UserRoleChangeSet(
+    Guid UserId,
+    IReadOnlyList<Guid> RoleIdsToAdd,
+    IReadOnlyList<Guid> UserRoleIdsToRemove,
+    AuditEntry AuditEntry);
