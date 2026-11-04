@@ -28,5 +28,16 @@ public sealed class CurrentDistributionRowViewModel
     public required bool Submitted { get; init; }
 
     // Legacy DistributionsCurrent.GetStatus: Submitted, else In Progress when any result exists, else No.
-    public string Status => Submitted ? "Submitted" : HasResults ? "In Progress" : "No";
+    public string Status
+    {
+        get
+        {
+            if (Submitted)
+            {
+                return "Submitted";
+            }
+
+            return HasResults ? "In Progress" : "No";
+        }
+    }
 }

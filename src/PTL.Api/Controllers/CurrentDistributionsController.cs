@@ -5,13 +5,14 @@ using PTL.Core.Distribution;
 namespace PTL.Api.Controllers;
 
 // External Enter Results current distributions list (legacy ExternalWeb/DistributionsCurrent.aspx).
-public sealed partial class DistributionController
+[ApiController]
+[Route("api/distributions/participants")]
+public sealed class CurrentDistributionsController(ICurrentDistributionsService currentDistributionsService) : ControllerBase
 {
-    [HttpGet("participants/{participantId:guid}/current")]
+    [HttpGet("{participantId:guid}/current")]
     [ProducesResponseType<IReadOnlyList<CurrentDistributionResponse>>(StatusCodes.Status200OK)]
     public async Task<ActionResult<IReadOnlyList<CurrentDistributionResponse>>> GetCurrentDistributions(
         Guid participantId,
-        [FromServices] ICurrentDistributionsService currentDistributionsService,
         CancellationToken cancellationToken)
     {
         var distributions = await currentDistributionsService.GetCurrentDistributionsAsync(participantId, cancellationToken);

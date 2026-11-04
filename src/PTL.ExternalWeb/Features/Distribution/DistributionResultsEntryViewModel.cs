@@ -2,13 +2,10 @@ namespace PTL.ExternalWeb.Features.Distribution;
 
 public sealed class DistributionResultsEntryViewModel
 {
-    public Guid MonthlyDistributionSchemeId { get; set; }
-
-    public Guid DistributionParticipantId { get; set; }
+    // Nullable so a post that omits it is detected instead of silently binding to Guid.Empty.
+    public Guid? MonthlyDistributionSchemeId { get; set; }
 
     public string Heading { get; set; } = string.Empty;
-
-    public bool SaveFailed { get; set; }
 
     public List<DistributionResultsEntryTestViewModel> Tests { get; set; } = [];
 }

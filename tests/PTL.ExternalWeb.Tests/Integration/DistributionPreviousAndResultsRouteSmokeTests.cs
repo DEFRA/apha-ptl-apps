@@ -30,13 +30,13 @@ public class DistributionPreviousAndResultsRouteSmokeTests : IClassFixture<PtlEx
             yearId,
             monthId);
 
-    private HttpClient CreateClient(FakeDistributionApiClient apiClient) =>
+    private HttpClient CreateClient(FakeDistributionApiClient apiClient, bool allowAutoRedirect = true) =>
         _factory.WithWebHostBuilder(builder =>
             builder.ConfigureServices(services =>
             {
                 services.RemoveAll<IDistributionApiClient>();
                 services.AddSingleton<IDistributionApiClient>(apiClient);
-            })).CreateClient();
+            })).CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = allowAutoRedirect });
 
     private static async Task<Dictionary<string, string>> SignInAsync(HttpClient client, string roles = "Participant")
     {
@@ -428,6 +428,198 @@ public class DistributionPreviousAndResultsRouteSmokeTests : IClassFixture<PtlEx
 
         Assert.Contains("href=\"/Distribution/Previous?", body, StringComparison.Ordinal);
         Assert.Contains("page=2", body, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("schemeCode", "D1a/00002", "D1a/00001")]
+    [InlineData("schemeName", "D1a/00002", "D1a/00001")]
+    public async Task Previous_SortsByTheSchemeColumns(string sortBy, string firstReference, string secondReference)
+    {
+        var apiClient = new FakeDistributionApiClient
+        {
+            ParticipantHistory = new ParticipantPastDistributionListResponse(
+            [
+                Distribution("D1a/00001", "PT9", "Zulu", new DateTime(2026, 1, 1), 2025, 1),
+                Distribution("D1a/00002", "PT1", "Alpha", new DateTime(2026, 2, 1), 2025, 2),
+            ])
+        };
+        var client = CreateClient(apiClient);
+        var cookies = await SignInAsync(client);
+
+        var response = await CookieForwardingHttpClient.SendWithCookiesAsync(
+            client, HttpMethod.Get, $"/Distribution/Previous?sortBy={sortBy}&sortDir=asc", cookies);
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.True(body.IndexOf(firstReference, StringComparison.Ordinal) < body.IndexOf(secondReference, StringComparison.Ordinal));
+    }
+
+    private sealed record EntryFixture(
+        Guid SchemeId, Guid OwnDistributionParticipantId, Guid TestId, Guid ResultItemId, Guid SampleId, Guid SampleValueId, ActualResultsResponse Own);
+
+    private static EntryFixture NewEntryFixture(bool isReadOnly = false)
+    {
+        var schemeId = Guid.NewGuid();
+        var ownId = Guid.NewGuid();
+        var testId = Guid.NewGuid();
+        var resultItemId = Guid.NewGuid();
+        var sampleId = Guid.NewGuid();
+        var sampleValueId = Guid.NewGuid();
+        var own = new ActualResultsResponse(
+            ownId, schemeId, "D1a/00001 Test Scheme", "D1a/00001 Test Scheme", new DateTime(2026, 1, 1), false,
+            [new ActualResultsTestResponse(
+                testId,
+                "ELISA",
+                [new ActualResultsResultItemResponse(resultItemId, "PI Values", "^[A-Z]+$", "X(15)")],
+                [],
+                [new ActualResultsSampleRowResponse(sampleId, "26/7001", [new ActualResultsSampleValueResponse(sampleValueId, resultItemId, "")])])],
+            isReadOnly);
+        return new EntryFixture(schemeId, ownId, testId, resultItemId, sampleId, sampleValueId, own);
+    }
+
+    private static Dictionary<string, string> EntryForm(string token, EntryFixture f, string result, string command = "save") => new()
+    {
+        ["__RequestVerificationToken"] = token,
+        ["MonthlyDistributionSchemeId"] = f.SchemeId.ToString(),
+        ["Tests[0].TestId"] = f.TestId.ToString(),
+        ["Tests[0].ResultItems[0].TestResultItemId"] = f.ResultItemId.ToString(),
+        ["Tests[0].Samples[0].SampleId"] = f.SampleId.ToString(),
+        ["Tests[0].Samples[0].Values[0].SampleResultItemId"] = f.SampleValueId.ToString(),
+        ["Tests[0].Samples[0].Values[0].TestResultItemId"] = f.ResultItemId.ToString(),
+        ["Tests[0].Samples[0].Values[0].Result"] = result,
+        ["command"] = command,
+    };
+
+    private static async Task<(string Token, string Body)> GetEntryTokenAsync(HttpClient client, Dictionary<string, string> cookies, Guid schemeId)
+    {
+        var response = await CookieForwardingHttpClient.SendWithCookiesAsync(client, HttpMethod.Get, $"/Distribution/Entry?schemeId={schemeId}", cookies);
+        var body = await response.Content.ReadAsStringAsync();
+        return (Regex.Match(body, "__RequestVerificationToken[^>]*value=\"([^\"]+)\"").Groups[1].Value, body);
+    }
+
+    [Fact]
+    public async Task Entry_Post_RealForm_BindsTheNestedValuesAndSavesAgainstTheOwnRecord()
+    {
+        var f = NewEntryFixture();
+        var apiClient = new FakeDistributionApiClient
+        {
+            ActualResults = f.Own,
+            ActualResultsSaveResult = new ActualResultsSaveResult(true, new Dictionary<Guid, string>())
+        };
+        var client = CreateClient(apiClient, allowAutoRedirect: false);
+        var cookies = await SignInAsync(client);
+        var (token, formBody) = await GetEntryTokenAsync(client, cookies, f.SchemeId);
+
+        // The hand-built field names below must be the ones the real form posts.
+        Assert.Contains("name=\"Tests[0].Samples[0].Values[0].Result\"", formBody, StringComparison.Ordinal);
+        Assert.Contains("name=\"MonthlyDistributionSchemeId\"", formBody, StringComparison.Ordinal);
+        Assert.DoesNotContain("DistributionParticipantId", formBody, StringComparison.Ordinal);
+
+        var response = await CookieForwardingHttpClient.SendWithCookiesAsync(
+            client, HttpMethod.Post, "/Distribution/Entry", cookies, new FormUrlEncodedContent(EntryForm(token, f, "POSITIVE")));
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        Assert.EndsWith("/Distribution/Current", response.Headers.Location!.ToString());
+        var saved = Assert.Single(apiClient.SavedActualResultsRequests);
+        var value = Assert.Single(saved.SampleValues);
+        Assert.Equal((f.SampleValueId, "POSITIVE"), (value.SampleResultItemId, value.Result));
+        Assert.Equal(f.OwnDistributionParticipantId, Assert.Single(apiClient.SavedActualResultsParticipantIds));
+        Assert.False(saved.Submitted);
+    }
+
+    [Fact]
+    public async Task Entry_Post_SubmitButton_SendsTheSubmittedFlag()
+    {
+        var f = NewEntryFixture();
+        var apiClient = new FakeDistributionApiClient
+        {
+            ActualResults = f.Own,
+            ActualResultsSaveResult = new ActualResultsSaveResult(true, new Dictionary<Guid, string>())
+        };
+        var client = CreateClient(apiClient, allowAutoRedirect: false);
+        var cookies = await SignInAsync(client);
+        var (token, _) = await GetEntryTokenAsync(client, cookies, f.SchemeId);
+
+        await CookieForwardingHttpClient.SendWithCookiesAsync(
+            client, HttpMethod.Post, "/Distribution/Entry", cookies, new FormUrlEncodedContent(EntryForm(token, f, "POSITIVE", command: "submit")));
+
+        Assert.True(Assert.Single(apiClient.SavedActualResultsRequests).Submitted);
+    }
+
+    [Fact]
+    public async Task Entry_Post_WithoutTheSchemeId_ReturnsToCurrentAndSavesNothing()
+    {
+        var f = NewEntryFixture();
+        var apiClient = new FakeDistributionApiClient { ActualResults = f.Own };
+        var client = CreateClient(apiClient, allowAutoRedirect: false);
+        var cookies = await SignInAsync(client);
+        var (token, _) = await GetEntryTokenAsync(client, cookies, f.SchemeId);
+        var form = EntryForm(token, f, "POSITIVE");
+        form.Remove("MonthlyDistributionSchemeId");
+
+        var response = await CookieForwardingHttpClient.SendWithCookiesAsync(
+            client, HttpMethod.Post, "/Distribution/Entry", cookies, new FormUrlEncodedContent(form));
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        Assert.EndsWith("/Distribution/Current", response.Headers.Location!.ToString());
+        Assert.Empty(apiClient.SavedActualResultsRequests);
+    }
+
+    [Fact]
+    public async Task Entry_Post_PastTheDeadline_RendersTheSaveFailedMessageAndSavesNothing()
+    {
+        var f = NewEntryFixture(isReadOnly: true);
+        var apiClient = new FakeDistributionApiClient { ActualResults = f.Own };
+        var client = CreateClient(apiClient, allowAutoRedirect: false);
+        var cookies = await SignInAsync(client);
+        var (token, _) = await GetEntryTokenAsync(client, cookies, f.SchemeId);
+
+        var response = await CookieForwardingHttpClient.SendWithCookiesAsync(
+            client, HttpMethod.Post, "/Distribution/Entry", cookies, new FormUrlEncodedContent(EntryForm(token, f, "POSITIVE")));
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("Save Failed: No results can be saved after the deadline date.", body, StringComparison.Ordinal);
+        Assert.Contains("value=\"POSITIVE\"", body, StringComparison.Ordinal);
+        Assert.Empty(apiClient.SavedActualResultsRequests);
+    }
+
+    [Fact]
+    public async Task Entry_Post_ApiReportsAFormatError_RendersItInLegacyWordingOnTheForm()
+    {
+        var f = NewEntryFixture();
+        var apiClient = new FakeDistributionApiClient
+        {
+            ActualResults = f.Own,
+            ActualResultsSaveResult = new ActualResultsSaveResult(false, new Dictionary<Guid, string> { [f.SampleValueId] = "Input must be of format: X(15)" })
+        };
+        var client = CreateClient(apiClient, allowAutoRedirect: false);
+        var cookies = await SignInAsync(client);
+        var (token, _) = await GetEntryTokenAsync(client, cookies, f.SchemeId);
+
+        var response = await CookieForwardingHttpClient.SendWithCookiesAsync(
+            client, HttpMethod.Post, "/Distribution/Entry", cookies, new FormUrlEncodedContent(EntryForm(token, f, "bad value")));
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("PI Values must be in format X(15)", body, StringComparison.Ordinal);
+        Assert.Contains("value=\"bad value\"", body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Entry_Post_WithoutAntiforgeryToken_IsRejected()
+    {
+        var f = NewEntryFixture();
+        var apiClient = new FakeDistributionApiClient { ActualResults = f.Own };
+        var client = CreateClient(apiClient, allowAutoRedirect: false);
+        var cookies = await SignInAsync(client);
+        var form = EntryForm("", f, "POSITIVE");
+        form.Remove("__RequestVerificationToken");
+
+        var response = await CookieForwardingHttpClient.SendWithCookiesAsync(
+            client, HttpMethod.Post, "/Distribution/Entry", cookies, new FormUrlEncodedContent(form));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Empty(apiClient.SavedActualResultsRequests);
     }
 
     [Fact]

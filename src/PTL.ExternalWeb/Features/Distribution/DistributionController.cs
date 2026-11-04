@@ -17,6 +17,7 @@ public sealed class DistributionController(IDistributionApiClient distributionAp
 {
     private const string CancelCommand = "cancel";
     private const string SubmitCommand = "submit";
+    private const string SaveFailedKey = "SaveFailed";
     private const string ExternalAuditReason = "External participant results updated.";
     private static readonly string[] ValidSortColumns = ["reference", "schemeCode", "schemeName", "distributionDate"];
     private static readonly string[] ValidSortDirections = ["asc", "desc"];
@@ -95,20 +96,19 @@ public sealed class DistributionController(IDistributionApiClient distributionAp
             return RedirectToAction(nameof(Current));
         }
 
-        var own = await GetOwnResultsAsync(model.MonthlyDistributionSchemeId, cancellationToken);
+        var own = model.MonthlyDistributionSchemeId is { } schemeId
+            ? await GetOwnResultsAsync(schemeId, cancellationToken)
+            : null;
         if (own is null)
         {
             return RedirectToAction(nameof(Current));
         }
 
-        model.DistributionParticipantId = own.DistributionParticipantId;
-
         // Legacy raises the deadline rule on its own, ahead of any format errors.
         if (own.IsReadOnly)
         {
-            var late = await RehydrateResultsEntryAsync(distributionApiClient, model, cancellationToken);
-            late.SaveFailed = true;
-            return View(late);
+            ViewData[SaveFailedKey] = true;
+            return View(RehydrateResultsEntry(model, own));
         }
 
         if (!ModelState.IsValid)
@@ -120,7 +120,7 @@ public sealed class DistributionController(IDistributionApiClient distributionAp
         var unlisted = UnlistedDropdownValues(own, model);
         if (unlisted.Count > 0)
         {
-            var invalidOptions = await RehydrateResultsEntryAsync(distributionApiClient, model, cancellationToken);
+            var invalidOptions = RehydrateResultsEntry(model, own);
             ApplyResultsEntryFieldErrors(invalidOptions, unlisted);
             return View(invalidOptions);
         }
@@ -133,21 +133,21 @@ public sealed class DistributionController(IDistributionApiClient distributionAp
             string.Equals(command, SubmitCommand, StringComparison.OrdinalIgnoreCase));
 
         var result = await distributionApiClient.SaveActualResultsAsync(
-            model.MonthlyDistributionSchemeId,
-            model.DistributionParticipantId,
+            own.MonthlyDistributionSchemeId,
+            own.DistributionParticipantId,
             request,
             cancellationToken);
 
         if (result is null)
         {
             TempData.SetNotification(NotificationType.Error, "Results could not be saved. Please try again later.");
-            return View(await RehydrateResultsEntryAsync(distributionApiClient, model, cancellationToken));
+            return View(RehydrateResultsEntry(model, own));
         }
 
         if (!result.Success)
         {
-            var invalid = await RehydrateResultsEntryAsync(distributionApiClient, model, cancellationToken);
-            invalid.SaveFailed = result.DeadlinePassed;
+            var invalid = RehydrateResultsEntry(model, own);
+            ViewData[SaveFailedKey] = result.DeadlinePassed;
             ApplyResultsEntryFieldErrors(invalid, result.FieldErrorsByItemId);
             return View(invalid);
         }
@@ -205,17 +205,8 @@ public sealed class DistributionController(IDistributionApiClient distributionAp
             : await distributionApiClient.GetActualResultsForParticipantAsync(monthlyDistributionSchemeId, participantId.Value, cancellationToken);
     }
 
-    private static async Task<DistributionResultsEntryViewModel> RehydrateResultsEntryAsync(
-        IDistributionApiClient distributionApiClient,
-        DistributionResultsEntryViewModel posted,
-        CancellationToken cancellationToken)
+    private static DistributionResultsEntryViewModel RehydrateResultsEntry(DistributionResultsEntryViewModel posted, ActualResultsResponse page)
     {
-        var page = await distributionApiClient.GetActualResultsAsync(posted.MonthlyDistributionSchemeId, posted.DistributionParticipantId, cancellationToken);
-        if (page is null)
-        {
-            return posted;
-        }
-
         var model = ToResultsEntryViewModel(page);
 
         var postedSampleValues = posted.Tests.SelectMany(t => t.Samples).SelectMany(s => s.Values)
@@ -366,7 +357,6 @@ public sealed class DistributionController(IDistributionApiClient distributionAp
     private static DistributionResultsEntryViewModel ToResultsEntryViewModel(ActualResultsResponse page) => new()
     {
         MonthlyDistributionSchemeId = page.MonthlyDistributionSchemeId,
-        DistributionParticipantId = page.DistributionParticipantId,
         Heading = page.Heading,
         Tests =
         [

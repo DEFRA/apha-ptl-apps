@@ -52,12 +52,14 @@ public class DistributionControllerTests
     public async Task GetCurrentDistributions_ReturnsMappedRows()
     {
         var participantId = Guid.NewGuid();
+        var schemeId = Guid.NewGuid();
+        var distributionParticipantId = Guid.NewGuid();
         var repository = new FakeDistributionRepository();
         repository.CurrentDistributionsByParticipant[participantId] =
         [
             new CurrentDistributionData(
-                Guid.NewGuid(),
-                Guid.NewGuid(),
+                schemeId,
+                distributionParticipantId,
                 "D26-01A/BA",
                 "PT001",
                 "Bacteriology",
@@ -67,14 +69,16 @@ public class DistributionControllerTests
                 Submitted: false)
         ];
 
-        var controller = CreateController(repository);
+        var controller = new CurrentDistributionsController(new CurrentDistributionsService(repository));
 
-        var result = await controller.GetCurrentDistributions(participantId, new CurrentDistributionsService(repository), CancellationToken.None);
+        var result = await controller.GetCurrentDistributions(participantId, CancellationToken.None);
 
         var ok = Assert.IsType<OkObjectResult>(result.Result);
         var rows = Assert.IsAssignableFrom<IReadOnlyList<CurrentDistributionResponse>>(ok.Value);
         var row = Assert.Single(rows);
-        Assert.Equal("PT001", row.SchemeCode);
+        Assert.Equal((schemeId, distributionParticipantId, "D26-01A/BA", "PT001", "Bacteriology"),
+            (row.MonthlyDistributionSchemeId, row.DistributionParticipantId, row.DistributionReference, row.SchemeCode, row.SchemeName));
+        Assert.Equal((new DateTime(2026, 4, 3), new DateTime(2026, 4, 30)), (row.DistributionDate, row.DeadlineDate));
         Assert.True(row.HasResults);
         Assert.False(row.Submitted);
     }

@@ -20,6 +20,8 @@ public static class NavigationProvider
     // Every child below routes to its own controller's default action - named once here since
     // SonarCloud flags the repeated "Index" literal (S1192).
     private const string IndexAction = "Index";
+    private const string DistributionControllerName = "Distribution";
+    private const string TabulationControllerName = "Tabulation";
     private const string ReportsText = "Reports";
     private const string ViewReportsText = "View reports";
     private const string MyAccountText = "My account";
@@ -79,7 +81,7 @@ public static class NavigationProvider
                 new NavigationItem
                 {
                     Text = "Enter results",
-                    ControllerName = "Distribution",
+                    ControllerName = DistributionControllerName,
                     ActionName = "Current",
                     Description = "Submit results for a current distribution",
                     RequiredRole = ExternalRoleNames.Participant
@@ -87,7 +89,7 @@ public static class NavigationProvider
                 new NavigationItem
                 {
                     Text = "View results",
-                    ControllerName = "Distribution",
+                    ControllerName = DistributionControllerName,
                     ActionName = "Previous",
                     Description = "View your results from a previous proficiency test",
                     RequiredRole = ExternalRoleNames.Participant
@@ -95,7 +97,7 @@ public static class NavigationProvider
                 new NavigationItem
                 {
                     Text = ViewReportsText,
-                    ControllerName = "Tabulation",
+                    ControllerName = TabulationControllerName,
                     ActionName = IndexAction,
                     Description = "View completed proficiency test reports, which include all participant results",
                     RequiredRole = ExternalRoleNames.Viewer
@@ -141,15 +143,15 @@ public static class NavigationProvider
     private static readonly Dictionary<string, BreadcrumbCrumb[]> Trails = new(StringComparer.OrdinalIgnoreCase)
     {
         ["Distribution/Current"] = [new("Current distributions")],
-        ["Distribution/Entry"] = [new("Current distributions", "Distribution", "Current"), new("Results entry")],
+        ["Distribution/Entry"] = [new("Current distributions", DistributionControllerName, "Current"), new("Results entry")],
         ["Distribution/Previous"] = [new("Previous distributions")],
-        ["Distribution/Results"] = [new("Previous distributions", "Distribution", "Previous"), new("View results")],
+        ["Distribution/Results"] = [new("Previous distributions", DistributionControllerName, "Previous"), new("View results")],
         ["Tabulation/Index"] = [new(ReportsText)],
-        ["Tabulation/Report"] = [new(ReportsText, "Tabulation", IndexAction), new(ViewReportsText)],
+        ["Tabulation/Report"] = [new(ReportsText, TabulationControllerName, IndexAction), new(ViewReportsText)],
         ["Tabulation/AssessmentResults"] =
         [
-            new(ReportsText, "Tabulation", IndexAction),
-            new(ViewReportsText, "Tabulation", "Report", "publishedTabulationId"),
+            new(ReportsText, TabulationControllerName, IndexAction),
+            new(ViewReportsText, TabulationControllerName, "Report", "publishedTabulationId"),
             new("Assessment results")
         ],
         ["Scheme/Index"] = [new("View schemes")],

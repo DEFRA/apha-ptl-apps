@@ -110,10 +110,9 @@ public class DistributionControllerTests
         Assert.Equal(["NONE", "WITH"], model.Distributions.Select(d => d.DistributionReference));
     }
 
-    private static DistributionResultsEntryViewModel EntryModel(Guid schemeId, Guid postedDistributionParticipantId) => new()
+    private static DistributionResultsEntryViewModel EntryModel(Guid schemeId) => new()
     {
         MonthlyDistributionSchemeId = schemeId,
-        DistributionParticipantId = postedDistributionParticipantId,
         Heading = "D26-01A/BA PT001: Bacteriology",
         Tests =
         [
@@ -153,7 +152,7 @@ public class DistributionControllerTests
         var controller = new DistributionController(apiClient);
         AuthenticatedParticipant.Attach(controller, participantId);
 
-        var result = await controller.Entry(EntryModel(schemeId, participantId), "save", CancellationToken.None);
+        var result = await controller.Entry(EntryModel(schemeId), "save", CancellationToken.None);
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
         Assert.Equal(nameof(DistributionController.Current), redirect.ActionName);
@@ -173,18 +172,17 @@ public class DistributionControllerTests
         var controller = new DistributionController(apiClient);
         AuthenticatedParticipant.Attach(controller, Guid.NewGuid());
 
-        await controller.Entry(EntryModel(schemeId, Guid.NewGuid()), "submit", CancellationToken.None);
+        await controller.Entry(EntryModel(schemeId), "submit", CancellationToken.None);
 
         Assert.True(Assert.Single(apiClient.SavedActualResultsRequests).Submitted);
     }
 
     [Fact]
-    public async Task Entry_Post_SavesAgainstTheSignedInParticipantsOwnRecord_NotThePostedId()
+    public async Task Entry_Post_SavesAgainstTheSignedInParticipantsOwnRecord()
     {
         var schemeId = Guid.NewGuid();
         var signedInParticipantId = Guid.NewGuid();
         var ownDistributionParticipantId = Guid.NewGuid();
-        var someoneElsesDistributionParticipantId = Guid.NewGuid();
         var apiClient = new FakeDistributionApiClient
         {
             ActualResults = OwnResults(schemeId, ownDistributionParticipantId),
@@ -193,7 +191,7 @@ public class DistributionControllerTests
         var controller = new DistributionController(apiClient);
         AuthenticatedParticipant.Attach(controller, signedInParticipantId);
 
-        await controller.Entry(EntryModel(schemeId, someoneElsesDistributionParticipantId), "save", CancellationToken.None);
+        await controller.Entry(EntryModel(schemeId), "save", CancellationToken.None);
 
         Assert.Equal(signedInParticipantId, Assert.Single(apiClient.RequestedOwnResultsParticipantIds));
         Assert.Equal(ownDistributionParticipantId, Assert.Single(apiClient.SavedActualResultsParticipantIds));
@@ -206,7 +204,7 @@ public class DistributionControllerTests
         var controller = new DistributionController(apiClient);
         AuthenticatedParticipant.Attach(controller, Guid.NewGuid());
 
-        var result = await controller.Entry(EntryModel(Guid.NewGuid(), Guid.NewGuid()), "save", CancellationToken.None);
+        var result = await controller.Entry(EntryModel(Guid.NewGuid()), "save", CancellationToken.None);
 
         Assert.Equal(nameof(DistributionController.Current), Assert.IsType<RedirectToActionResult>(result).ActionName);
         Assert.Empty(apiClient.SavedActualResultsRequests);
@@ -278,8 +276,8 @@ public class DistributionControllerTests
 
         var result = await controller.Entry(PostedDropdowns(f, "Rubbish", "Rubbish"), "save", CancellationToken.None);
 
-        var model = Assert.IsType<DistributionResultsEntryViewModel>(Assert.IsType<ViewResult>(result).Model);
-        Assert.True(model.SaveFailed);
+        var view = Assert.IsType<ViewResult>(result);
+        Assert.Equal(true, view.ViewData["SaveFailed"]);
         Assert.Empty(apiClient.SavedActualResultsRequests);
         Assert.True(controller.ModelState.IsValid);
     }
@@ -322,6 +320,116 @@ public class DistributionControllerTests
     }
 
     [Fact]
+    public async Task Entry_Post_Cancel_ReturnsToCurrentWithoutLookingUpOrSavingAnything()
+    {
+        var apiClient = new FakeDistributionApiClient { ActualResults = OwnResults(Guid.NewGuid(), Guid.NewGuid()) };
+        var controller = new DistributionController(apiClient);
+        AuthenticatedParticipant.Attach(controller, Guid.NewGuid());
+
+        var result = await controller.Entry(EntryModel(Guid.NewGuid()), "cancel", CancellationToken.None);
+
+        Assert.Equal(nameof(DistributionController.Current), Assert.IsType<RedirectToActionResult>(result).ActionName);
+        Assert.Empty(apiClient.RequestedOwnResultsParticipantIds);
+        Assert.Empty(apiClient.SavedActualResultsRequests);
+    }
+
+    [Fact]
+    public async Task Entry_Post_InvalidModelState_ShowsThePostedEntryAndSavesNothing()
+    {
+        var schemeId = Guid.NewGuid();
+        var apiClient = new FakeDistributionApiClient { ActualResults = OwnResults(schemeId, Guid.NewGuid()) };
+        var controller = new DistributionController(apiClient);
+        AuthenticatedParticipant.Attach(controller, Guid.NewGuid());
+        controller.ModelState.AddModelError("Tests[0].MethodItems[0].Result", "Bad");
+        var posted = EntryModel(schemeId);
+
+        var result = await controller.Entry(posted, "save", CancellationToken.None);
+
+        Assert.Same(posted, Assert.IsType<ViewResult>(result).Model);
+        Assert.Empty(apiClient.SavedActualResultsRequests);
+    }
+
+    [Fact]
+    public async Task Entry_Post_SaveEndpointReturnsNothing_ShowsTheEntryAgain()
+    {
+        var schemeId = Guid.NewGuid();
+        var apiClient = new FakeDistributionApiClient { ActualResults = OwnResults(schemeId, Guid.NewGuid()), ActualResultsSaveResult = null };
+        var controller = new DistributionController(apiClient);
+        AuthenticatedParticipant.Attach(controller, Guid.NewGuid());
+
+        var result = await controller.Entry(EntryModel(schemeId), "save", CancellationToken.None);
+
+        Assert.IsType<DistributionResultsEntryViewModel>(Assert.IsType<ViewResult>(result).Model);
+        Assert.Single(apiClient.SavedActualResultsRequests);
+    }
+
+    [Fact]
+    public async Task Entry_Post_NoSchemeIdPosted_ReturnsToCurrentWithoutLookingUpOrSavingAnything()
+    {
+        var apiClient = new FakeDistributionApiClient { ActualResults = OwnResults(Guid.NewGuid(), Guid.NewGuid()) };
+        var controller = new DistributionController(apiClient);
+        AuthenticatedParticipant.Attach(controller, Guid.NewGuid());
+        var posted = EntryModel(Guid.NewGuid());
+        posted.MonthlyDistributionSchemeId = null;
+
+        var result = await controller.Entry(posted, "save", CancellationToken.None);
+
+        Assert.Equal(nameof(DistributionController.Current), Assert.IsType<RedirectToActionResult>(result).ActionName);
+        Assert.Empty(apiClient.RequestedOwnResultsParticipantIds);
+        Assert.Empty(apiClient.SavedActualResultsRequests);
+    }
+
+    [Fact]
+    public async Task Results_NoSignedInParticipant_IsNotFound()
+    {
+        var controller = new DistributionController(new FakeDistributionApiClient())
+        {
+            ControllerContext = new ControllerContext { HttpContext = new Microsoft.AspNetCore.Http.DefaultHttpContext() }
+        };
+
+        Assert.IsType<NotFoundResult>(await controller.Results(Guid.NewGuid(), CancellationToken.None));
+    }
+
+    [Theory]
+    [InlineData("schemeCode", "asc", "B,A,C")]
+    [InlineData("schemeCode", "desc", "C,A,B")]
+    [InlineData("schemeName", "asc", "A,C,B")]
+    [InlineData("deadlineDate", "asc", "C,B,A")]
+    [InlineData("distributionDate", "asc", "A,C,B")]
+    public async Task Current_SortsByEachColumn(string sortBy, string sortDir, string expectedOrder)
+    {
+        CurrentDistributionResponse Row(string reference, string code, string name, int distributionDay, int deadlineDay) => new(
+            Guid.NewGuid(), Guid.NewGuid(), reference, code, name,
+            new DateTime(2026, 4, distributionDay), new DateTime(2026, 5, deadlineDay), HasResults: false, Submitted: false);
+
+        var apiClient = new FakeDistributionApiClient
+        {
+            CurrentDistributions = [Row("A", "PT2", "Alpha", 1, 30), Row("B", "PT1", "Charlie", 9, 20), Row("C", "PT3", "Bravo", 5, 10)]
+        };
+        var controller = new DistributionController(apiClient);
+        AuthenticatedParticipant.Attach(controller, Guid.NewGuid());
+
+        var result = await controller.Current(sortBy, sortDir);
+
+        var model = Assert.IsType<CurrentDistributionsViewModel>(Assert.IsType<ViewResult>(result).Model);
+        Assert.Equal(expectedOrder, string.Join(",", model.Distributions.Select(d => d.DistributionReference)));
+    }
+
+    [Fact]
+    public void ResultsEntryMethodItemViewModel_DropdownAndFormatProperties()
+    {
+        var dropdown = new DistributionResultsEntryMethodItemViewModel { FormatString = "A|B", ReturnValueType = "Text" };
+        var date = new DistributionResultsEntryMethodItemViewModel { FormatString = "^.*$", ReturnValueType = "Date of testing" };
+
+        Assert.True(dropdown.IsDropdown);
+        Assert.Equal(["A", "B"], dropdown.DropdownOptions);
+        Assert.Equal("Input must be of format: Text", dropdown.InputFormatMessage);
+        Assert.False(date.IsDropdown);
+        Assert.Empty(date.DropdownOptions);
+        Assert.Equal("dd/MM/yyyy", date.RequiredFormat);
+    }
+
+    [Fact]
     public async Task Entry_Post_DeadlinePassed_ShowsTheEntryAgainWithSaveFailedAndDoesNotReturnToCurrent()
     {
         var schemeId = Guid.NewGuid();
@@ -333,10 +441,9 @@ public class DistributionControllerTests
         var controller = new DistributionController(apiClient);
         AuthenticatedParticipant.Attach(controller, Guid.NewGuid());
 
-        var result = await controller.Entry(EntryModel(schemeId, Guid.NewGuid()), "save", CancellationToken.None);
+        var result = await controller.Entry(EntryModel(schemeId), "save", CancellationToken.None);
 
-        var model = Assert.IsType<DistributionResultsEntryViewModel>(Assert.IsType<ViewResult>(result).Model);
-        Assert.True(model.SaveFailed);
+        Assert.Equal(true, Assert.IsType<ViewResult>(result).ViewData["SaveFailed"]);
     }
 
     [Fact]
@@ -368,7 +475,7 @@ public class DistributionControllerTests
         var controller = new DistributionController(apiClient);
         AuthenticatedParticipant.Attach(controller, Guid.NewGuid());
 
-        await controller.Entry(EntryModel(schemeId, Guid.NewGuid()), "save", CancellationToken.None);
+        await controller.Entry(EntryModel(schemeId), "save", CancellationToken.None);
 
         string Message(string key) => Assert.Single(controller.ModelState[key]!.Errors).ErrorMessage;
         Assert.Equal("PI Values must be in format X(15)", Message("Tests[0].Samples[0].Values[0].Result"));

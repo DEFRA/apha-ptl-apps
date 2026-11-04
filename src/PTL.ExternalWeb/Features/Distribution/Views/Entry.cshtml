@@ -9,7 +9,9 @@
         .SelectMany(entry => entry.Value!.Errors.Select(error => (Field: entry.Key, Message: error.ErrorMessage)))
         .ToList();
 
-    if (Model.SaveFailed)
+    var saveFailed = ViewData["SaveFailed"] is true;
+
+    if (saveFailed)
     {
         errors.Insert(0, (Field: string.Empty, Message: saveFailedMessage));
         if (ViewData.ModelState.IsValid)

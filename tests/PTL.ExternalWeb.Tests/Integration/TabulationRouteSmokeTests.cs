@@ -103,6 +103,29 @@ public class TabulationRouteSmokeTests : IClassFixture<PtlExternalWebTestFactory
         Assert.Contains($"/Tabulation/Report?publishedTabulationId={tabulationId}", body);
     }
 
+    [Theory]
+    [InlineData("tabulationName")]
+    [InlineData("distributionDate")]
+    public async Task Index_SortedAcrossYears_OrdersByTheChosenColumn(string sortBy)
+    {
+        var apiClient = new FakeDistributionApiClient
+        {
+            Tabulations = new PublishedTabulationSummaryListResponse(
+            [
+                Summary(Guid.NewGuid(), "D1a/00001", "BT", "Brucella", "Zebra report", new DateTime(2026, 5, 1), 2026, 5),
+                Summary(Guid.NewGuid(), "D1a/00002", "BT", "Brucella", "Apple report", new DateTime(2025, 5, 1), 2025, 5),
+            ])
+        };
+        var client = CreateClient(apiClient);
+        var cookies = await SignInAsync(client, "Participant,Viewer", participantId: Guid.NewGuid());
+
+        var response = await CookieForwardingHttpClient.SendWithCookiesAsync(
+            client, HttpMethod.Get, $"/Tabulation/Index?sortBy={sortBy}&sortDir=asc", cookies);
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.True(body.IndexOf("Apple report", StringComparison.Ordinal) < body.IndexOf("Zebra report", StringComparison.Ordinal));
+    }
+
     [Fact]
     public async Task Index_NoTabulations_RendersEmptyStateMessage()
     {
