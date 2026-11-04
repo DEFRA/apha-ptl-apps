@@ -679,6 +679,38 @@ public partial class SystemAdministrationRouteSmokeTests : IClassFixture<WebAppl
     }
 
     [Fact]
+    public async Task ManageUserRoles_Post_UserWithNoRolesAndNoChange_IsNotSent()
+    {
+        var userId = Guid.NewGuid();
+        var userApiClient = new FakeUserApiClient();
+        var factory = _factory.WithWebHostBuilder(builder =>
+            builder.ConfigureServices(services =>
+            {
+                services.RemoveAll<IUserApiClient>();
+                services.AddSingleton<IUserApiClient>(userApiClient);
+            }));
+        var client = factory.CreateClient();
+        var (token, cookie) = await GetAntiforgeryAsync(client, "/SystemAdministration/ManageUserRoles");
+
+        var request = new HttpRequestMessage(HttpMethod.Post, "/SystemAdministration/ManageUserRoles")
+        {
+            Content = new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["__RequestVerificationToken"] = token,
+                ["Rows[0].UserId"] = userId.ToString(),
+                ["Rows[0].FriendlyName"] = "Jane Smith",
+                ["Rows[0].OriginalRoleIds"] = string.Empty
+            })
+        };
+        request.Headers.Add("Cookie", cookie);
+
+        var response = await client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Empty(userApiClient.SetRolesCalls);
+    }
+
+    [Fact]
     public async Task RemoveUser_ReturnsSuccess()
     {
         var client = _factory.CreateClient();

@@ -280,7 +280,7 @@ public partial class SystemAdministrationController : Controller
         if (ModelState.IsValid)
         {
             var result = await externalSiteMessageApiClient.UpdateExternalSiteMessageAsync(
-                new ExternalSiteMessageSaveRequest(model.Message, model.ImportantMessage, model.SupportEmailAddress),
+                new ExternalSiteMessageSaveRequest(model.Message ?? string.Empty, model.ImportantMessage ?? string.Empty, model.SupportEmailAddress),
                 cancellationToken);
 
             if (result.Success)
@@ -449,11 +449,10 @@ public partial class SystemAdministrationController : Controller
     public async Task<IActionResult> ManageUserRoles(CancellationToken cancellationToken) =>
         View(await BuildManageUserRolesViewModelAsync(cancellationToken));
 
-    // Whole-grid submit: every user's role set shown on screen is (re)saved, not just the ones
-    // actually changed - idempotent for unchanged rows, mirrors the AdministrationCharge screen's
-    // save-the-whole-grid convention. Unlike legacy's UserRoles.aspx (every checkbox click is its
-    // own immediate save), this only persists on an explicit Save - matches the story's "When I
-    // click Save... Then... persisted" acceptance criteria. Redirects back to the System
+    // Whole-grid submit, but only rows whose checkboxes differ from what the page loaded are sent to
+    // the API - one call per user for every row made the save time out. Unlike legacy's UserRoles.aspx
+    // (every checkbox click is its own immediate save), this only persists on an explicit Save - matches
+    // the story's "When I click Save... Then... persisted" acceptance criteria. Redirects back to the System
     // Administration landing page (matches legacy ButtonSubmit_Click's Response.Redirect).
     [HttpPost]
     [ValidateAntiForgeryToken]
@@ -462,7 +461,7 @@ public partial class SystemAdministrationController : Controller
         var actingUserId = GetCurrentUserId();
         var blockedMessages = new List<string>();
 
-        foreach (var row in model.Rows)
+        foreach (var row in model.Rows.Where(r => !r.IsUnchanged()))
         {
             var result = await userApiClient.SetUserRolesAsync(row.UserId, new SetUserRolesRequest(row.SelectedRoleIds, actingUserId), cancellationToken);
             if (!result.Success && result.Message is not null)
@@ -490,6 +489,7 @@ public partial class SystemAdministrationController : Controller
 
         return new ManageUserRolesViewModel
         {
+            CurrentUserId = GetCurrentUserId(),
             // spgaRole returns the roles by fldOrder DESC. Legacy UserRoles.aspx inserted each one at column 2 as it
             // looped, so its columns ran the other way (fldOrder ascending): do the same here.
             Roles = roles.Reverse().Select(r => new RoleColumnViewModel { RoleId = r.RoleId, Name = r.Name }).ToList(),
@@ -498,7 +498,8 @@ public partial class SystemAdministrationController : Controller
                 UserId = r.UserId,
                 Username = r.Username,
                 FriendlyName = r.FriendlyName,
-                SelectedRoleIds = r.RoleIds.ToList()
+                SelectedRoleIds = r.RoleIds.ToList(),
+                OriginalRoleIds = string.Join(',', r.RoleIds)
             }).ToList()
         };
     }

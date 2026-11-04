@@ -5,6 +5,11 @@
 
 <h1 class="govuk-heading-l">Manage Roles</h1>
 
+@if (Model.Rows.Any(row => Model.Roles.Any(role => Model.IsOwnAdminRole(row, role))))
+{
+    <p class="govuk-hint" id="own-admin-hint">You cannot change your own Admin access, so that box is unavailable.</p>
+}
+
 <form method="post" asp-action="ManageUserRoles">
     @* One column per role, so the grid is wider than the content column: scroll it inside the page (as
        Preparation and Packaging do) rather than letting it push the whole page wider than the screen. The
@@ -37,23 +42,31 @@
                         <input type="hidden" name="Rows[@i].UserId" value="@row.UserId" />
                         <input type="hidden" name="Rows[@i].Username" value="@row.Username" />
                         <input type="hidden" name="Rows[@i].FriendlyName" value="@row.FriendlyName" />
+                        <input type="hidden" name="Rows[@i].OriginalRoleIds" value="@row.OriginalRoleIds" />
                     </th>
                     <td class="govuk-table__cell">@row.FriendlyName</td>
                     @foreach (var role in Model.Roles)
                     {
                         var isChecked = row.SelectedRoleIds.Contains(role.RoleId);
+                        var isLocked = Model.IsOwnAdminRole(row, role);
                         <td class="govuk-table__cell">
                             <div class="govuk-checkboxes govuk-checkboxes--small govuk-!-margin-bottom-0" data-module="govuk-checkboxes">
                                 <div class="govuk-checkboxes__item">
                                     <input class="govuk-checkboxes__input" type="checkbox"
                                            id="Rows_@(i)__@(role.RoleId)" name="Rows[@i].SelectedRoleIds" value="@role.RoleId"
-                                           checked="@(isChecked ? "checked" : null)" />
+                                           checked="@(isChecked ? "checked" : null)" disabled="@isLocked"
+                                           aria-describedby="@(isLocked ? "own-admin-hint" : null)" />
                                     <!-- The visible checkbox box is a pseudo-element on the LABEL itself (govuk-checkboxes__label:before) -
                                          govuk-visually-hidden must go on a nested span around the text only, never on the label, or the
                                          box disappears along with the text. -->
                                     <label class="govuk-label govuk-checkboxes__label" for="Rows_@(i)__@(role.RoleId)">
                                         <span class="govuk-visually-hidden">@role.Name for @row.FriendlyName</span>
                                     </label>
+                                    @if (isLocked && isChecked)
+                                    {
+                                        @* A disabled box posts nothing, so the role is sent from here instead. *@
+                                        <input type="hidden" name="Rows[@i].SelectedRoleIds" value="@role.RoleId" />
+                                    }
                                 </div>
                             </div>
                         </td>

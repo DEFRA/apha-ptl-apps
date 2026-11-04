@@ -40,6 +40,70 @@ public class ManageUserRolesRenderTests(WebApplicationFactory<Program> factory) 
     }
 
     [Fact]
+    public async Task Grid_PostsEachUsersLoadedRolesAsOneHiddenField()
+    {
+        var html = await GetAsync();
+
+        Assert.Matches($"name=\"Rows\\[0\\]\\.OriginalRoleIds\" value=\"{Support.RoleId}\"", html);
+    }
+
+    private async Task<string> GetSignedInAsAsync(Guid signedInUserId)
+    {
+        var rows = new[]
+        {
+            new UserRoleRowResponse(signedInUserId, "dt2\\me", "Me Myself", [Admin.RoleId, Support.RoleId]),
+            new UserRoleRowResponse(Guid.NewGuid(), "dt2\\other", "Other Person", [Admin.RoleId, Support.RoleId]),
+        };
+        var client = factory.WithWebHostBuilder(builder => builder.ConfigureServices(services =>
+        {
+            services.Configure<TestAuthHandlerOptions>(TestAuthHandler.SchemeName, options => options.UserId = signedInUserId);
+            services.RemoveAll<IUserApiClient>();
+            services.AddSingleton<IUserApiClient>(new FakeUserApiClient { UserRoleGrid = rows });
+            services.RemoveAll<IRoleApiClient>();
+            services.AddSingleton<IRoleApiClient>(new FakeRoleApiClient { Roles = [Support, Admin] });
+        })).CreateClient();
+
+        return await client.GetStringAsync("/SystemAdministration/ManageUserRoles");
+    }
+
+    private static string Box(string html, int row, RoleResponse role) =>
+        Regex.Match(html, $"<input[^>]*id=\"Rows_{row}__{role.RoleId}\"[^>]*>").Value;
+
+    // Legacy PreventAdminUncheck greyed out the Admin box on the signed-in user's own row only.
+    [Fact]
+    public async Task OwnAdminBox_IsDisabledExplainedAndStillPosted()
+    {
+        var html = await GetSignedInAsAsync(Guid.NewGuid());
+
+        var own = Box(html, 0, Admin);
+        Assert.Contains("disabled=\"disabled\"", own, StringComparison.Ordinal);
+        Assert.Contains("checked=\"checked\"", own, StringComparison.Ordinal);
+        Assert.Contains("aria-describedby=\"own-admin-hint\"", own, StringComparison.Ordinal);
+        Assert.Contains("You cannot change your own Admin access", html, StringComparison.Ordinal);
+        Assert.Single(Regex.Matches(html, $"<input type=\"hidden\" name=\"Rows\\[0\\]\\.SelectedRoleIds\" value=\"{Admin.RoleId}\" />"));
+    }
+
+    [Fact]
+    public async Task EverythingElse_StaysEditable()
+    {
+        var html = await GetSignedInAsAsync(Guid.NewGuid());
+
+        Assert.DoesNotContain("disabled", Box(html, 0, Support), StringComparison.Ordinal);
+        Assert.DoesNotContain("disabled", Box(html, 1, Admin), StringComparison.Ordinal);
+        Assert.DoesNotContain("disabled", Box(html, 1, Support), StringComparison.Ordinal);
+        Assert.Single(Regex.Matches(html, "<input type=\"hidden\" name=\"Rows\\[\\d\\]\\.SelectedRoleIds\""));
+    }
+
+    [Fact]
+    public async Task WhenTheSignedInUserIsNotInTheGrid_NoBoxIsDisabledAndNoHintShows()
+    {
+        var html = await GetAsync();
+
+        Assert.DoesNotContain("own-admin-hint", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("disabled=\"disabled\"", html, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Grid_ShowsUsernameThenNameThenOneColumnPerRole()
     {
         var html = await GetAsync();
