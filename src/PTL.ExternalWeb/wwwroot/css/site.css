@@ -191,3 +191,16 @@
 .app-table-scroll {
   overflow-x: auto;
 }
+
+/* Read-only results tables: fixed 65/35 columns as legacy (pt-results__table-readonly-column1/2) so values line up. */
+.app-results-table {
+  table-layout: fixed;
+}
+
+.app-results-table .govuk-table__header:first-child {
+  width: 65%;
+}
+
+.app-results-table .govuk-table__cell {
+  overflow-wrap: anywhere;
+}

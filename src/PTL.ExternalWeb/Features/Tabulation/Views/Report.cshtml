@@ -15,7 +15,7 @@
     @if (table.AssessmentTestId is { } testId)
     {
         <p class="govuk-body">
-            <a class="govuk-link" asp-action="AssessmentResults" asp-route-publishedTabulationId="@report.TabulationId" asp-route-testId="@testId">
+            <a class="govuk-link" asp-action="AssessmentResults" asp-route-publishedTabulationId="@report.TabulationId" asp-route-testId="@testId" asp-route-returnUrl="@Model.ReturnUrl">
                 View assessment results<span class="govuk-visually-hidden"> for @table.Caption</span>
             </a>
         </p>
@@ -85,7 +85,7 @@
 </div>
 
 <div class="govuk-button-group govuk-!-margin-top-6">
-    <a class="govuk-button govuk-button--secondary" asp-action="Index">Back</a>
+    <a class="govuk-button govuk-button--secondary" href="@(Model.ReturnUrl ?? Url.Action("Index"))">Back</a>
     @* PDF export is a separate Reporting workstream deliverable - placeholder link only until then. *@
     <a class="govuk-button govuk-button--secondary" asp-action="GeneratePdf" asp-route-publishedTabulationId="@report.TabulationId">Generate PDF</a>
 </div>

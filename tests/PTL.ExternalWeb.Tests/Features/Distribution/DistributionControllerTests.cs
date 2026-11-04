@@ -389,7 +389,7 @@ public class DistributionControllerTests
             ControllerContext = new ControllerContext { HttpContext = new Microsoft.AspNetCore.Http.DefaultHttpContext() }
         };
 
-        Assert.IsType<NotFoundResult>(await controller.Results(Guid.NewGuid(), CancellationToken.None));
+        Assert.IsType<NotFoundResult>(await controller.Results(Guid.NewGuid(), null, CancellationToken.None));
     }
 
     [Theory]

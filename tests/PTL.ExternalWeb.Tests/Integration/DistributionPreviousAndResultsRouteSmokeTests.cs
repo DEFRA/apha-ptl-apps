@@ -121,6 +121,147 @@ public class DistributionPreviousAndResultsRouteSmokeTests : IClassFixture<PtlEx
     }
 
     [Fact]
+    public async Task Previous_RendersLegacyTitleIntroAndYearDropdownOfHistoryYears()
+    {
+        var apiClient = new FakeDistributionApiClient
+        {
+            ParticipantHistory = new ParticipantPastDistributionListResponse(
+            [
+                Distribution("D1a/00001", "PT1234", "Scheme A", new DateTime(2026, 1, 15), 2025, 1),
+                Distribution("D1a/00002", "PT5678", "Scheme B", new DateTime(2025, 6, 15), 2025, 6),
+            ])
+        };
+        var client = CreateClient(apiClient);
+        var cookies = await SignInAsync(client);
+
+        var response = await CookieForwardingHttpClient.SendWithCookiesAsync(client, HttpMethod.Get, "/Distribution/Previous?year=2026", cookies);
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Contains(">Previous distributions</h1>", body, StringComparison.Ordinal);
+        Assert.Contains("Please select the month and year of the distribution, the distribution reference number or the scheme name of the distribution you wish to view.", body, StringComparison.Ordinal);
+        var year = Regex.Match(body, "<select[^>]*id=\"year\".*?</select>", RegexOptions.Singleline).Value;
+        Assert.DoesNotContain("type=\"number\"", body, StringComparison.Ordinal);
+        List<string> expectedOptions = ["All", "2025", "2026"];
+        Assert.Equal(expectedOptions, Regex.Matches(year, "<option[^>]*>([^<]*)</option>").Select(m => m.Groups[1].Value).ToList());
+        Assert.Matches("<option[^>]*value=\"2026\"[^>]*selected", year);
+    }
+
+    [Fact]
+    public async Task Previous_YearFilter_MatchesYearIdOrDistributionCalendarYear()
+    {
+        var apiClient = new FakeDistributionApiClient
+        {
+            ParticipantHistory = new ParticipantPastDistributionListResponse(
+            [
+                Distribution("D1a/00001", "PT1234", "Scheme A", new DateTime(2026, 1, 15), 2025, 1),
+                Distribution("D1a/00002", "PT5678", "Scheme B", new DateTime(2024, 6, 15), 2024, 6),
+            ])
+        };
+        var client = CreateClient(apiClient);
+        var cookies = await SignInAsync(client);
+
+        var byCalendarYear = await (await CookieForwardingHttpClient.SendWithCookiesAsync(client, HttpMethod.Get, "/Distribution/Previous?year=2026", cookies)).Content.ReadAsStringAsync();
+        var byYearId = await (await CookieForwardingHttpClient.SendWithCookiesAsync(client, HttpMethod.Get, "/Distribution/Previous?year=2025", cookies)).Content.ReadAsStringAsync();
+
+        Assert.Contains("D1a/00001", byCalendarYear, StringComparison.Ordinal);
+        Assert.DoesNotContain("D1a/00002", byCalendarYear, StringComparison.Ordinal);
+        Assert.Contains("D1a/00001", byYearId, StringComparison.Ordinal);
+        Assert.DoesNotContain("D1a/00002", byYearId, StringComparison.Ordinal);
+    }
+
+    private const string PreviousUrlWithFilters = "/Distribution/Previous?year=2026&month=1&sortBy=schemeCode&sortDir=desc&pageSize=25";
+
+    [Fact]
+    public async Task Previous_ViewLink_CarriesTheCurrentListUrlAsReturnUrl()
+    {
+        var apiClient = new FakeDistributionApiClient
+        {
+            ParticipantHistory = new ParticipantPastDistributionListResponse(
+                [Distribution("D1a/00001", "PT1234", "Test Scheme", new DateTime(2026, 1, 15), 2025, 1)])
+        };
+        var client = CreateClient(apiClient);
+        var cookies = await SignInAsync(client);
+
+        var response = await CookieForwardingHttpClient.SendWithCookiesAsync(client, HttpMethod.Get, PreviousUrlWithFilters, cookies);
+        var body = (await response.Content.ReadAsStringAsync()).Replace("&amp;", "&", StringComparison.Ordinal);
+
+        Assert.Contains($"returnUrl={Uri.EscapeDataString(PreviousUrlWithFilters)}", body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Results_WithReturnUrl_BackReturnsToTheFilteredList()
+    {
+        var monthlyDistributionSchemeId = Guid.NewGuid();
+        var apiClient = new FakeDistributionApiClient
+        {
+            ActualResults = new ActualResultsResponse(
+                Guid.NewGuid(), monthlyDistributionSchemeId, "D1a/00001 Test Scheme", "D1a/00001 Test Scheme", new DateTime(2026, 1, 1), false, [])
+        };
+        var client = CreateClient(apiClient);
+        var cookies = await SignInAsync(client);
+
+        var response = await CookieForwardingHttpClient.SendWithCookiesAsync(
+            client,
+            HttpMethod.Get,
+            $"/Distribution/Results?monthlyDistributionSchemeId={monthlyDistributionSchemeId}&returnUrl={Uri.EscapeDataString(PreviousUrlWithFilters)}",
+            cookies);
+        var main = Regex.Match(await response.Content.ReadAsStringAsync(), "<main.*?</main>", RegexOptions.Singleline).Value.Replace("&amp;", "&", StringComparison.Ordinal);
+
+        Assert.Contains($"href=\"{PreviousUrlWithFilters}\">Back</a>", main, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("https://evil.example/Distribution/Previous")]
+    [InlineData("//evil.example/Distribution/Previous")]
+    [InlineData("javascript:alert(1)")]
+    [InlineData("/Tabulation/Index")]
+    public async Task Results_WithUnsafeReturnUrl_IgnoresItAndBacksToThePlainList(string returnUrl)
+    {
+        var monthlyDistributionSchemeId = Guid.NewGuid();
+        var apiClient = new FakeDistributionApiClient
+        {
+            ActualResults = new ActualResultsResponse(
+                Guid.NewGuid(), monthlyDistributionSchemeId, "D1a/00001 Test Scheme", "D1a/00001 Test Scheme", new DateTime(2026, 1, 1), false, [])
+        };
+        var client = CreateClient(apiClient);
+        var cookies = await SignInAsync(client);
+
+        var response = await CookieForwardingHttpClient.SendWithCookiesAsync(
+            client,
+            HttpMethod.Get,
+            $"/Distribution/Results?monthlyDistributionSchemeId={monthlyDistributionSchemeId}&returnUrl={Uri.EscapeDataString(returnUrl)}",
+            cookies);
+        var main = Regex.Match(await response.Content.ReadAsStringAsync(), "<main.*?</main>", RegexOptions.Singleline).Value;
+
+        Assert.Matches("<a[^>]*href=\"/Distribution/Previous\"[^>]*>Back</a>", main);
+        Assert.DoesNotContain("evil.example", main, StringComparison.Ordinal);
+        Assert.DoesNotContain("javascript:", main, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Results_WithReturnUrl_BreadcrumbPreviousDistributionsLinksToTheFilteredList()
+    {
+        var monthlyDistributionSchemeId = Guid.NewGuid();
+        var apiClient = new FakeDistributionApiClient
+        {
+            ActualResults = new ActualResultsResponse(
+                Guid.NewGuid(), monthlyDistributionSchemeId, "D1a/00001 Test Scheme", "D1a/00001 Test Scheme", new DateTime(2026, 1, 1), false, [])
+        };
+        var client = CreateClient(apiClient);
+        var cookies = await SignInAsync(client);
+
+        var response = await CookieForwardingHttpClient.SendWithCookiesAsync(
+            client,
+            HttpMethod.Get,
+            $"/Distribution/Results?monthlyDistributionSchemeId={monthlyDistributionSchemeId}&returnUrl={Uri.EscapeDataString(PreviousUrlWithFilters)}",
+            cookies);
+        var breadcrumbs = Regex.Match(await response.Content.ReadAsStringAsync(), "<nav class=\"govuk-breadcrumbs\".*?</nav>", RegexOptions.Singleline).Value
+            .Replace("&amp;", "&", StringComparison.Ordinal);
+
+        Assert.Contains($"<a class=\"govuk-breadcrumbs__link\" href=\"{PreviousUrlWithFilters}\">Previous distributions</a>", breadcrumbs, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Previous_ColumnHeaderSort_TogglesDirection()
     {
         var apiClient = new FakeDistributionApiClient
@@ -196,6 +337,12 @@ public class DistributionPreviousAndResultsRouteSmokeTests : IClassFixture<PtlEx
         Assert.DoesNotContain("<select", main, StringComparison.Ordinal);
         Assert.DoesNotContain("<button", main, StringComparison.Ordinal);
         Assert.Matches("<a[^>]*href=\"/Distribution/Previous\"[^>]*>Back</a>", main);
+
+        // Legacy ResultsView: intro text, then one table per sample and a separate method items section.
+        Assert.Contains("The tables below show the results that were entered for this distribution.", main, StringComparison.Ordinal);
+        Assert.Contains(">Sample S001 results for Culture test</caption>", main, StringComparison.Ordinal);
+        Assert.Matches("<th scope=\"row\"[^>]*>Growth</th><td class=\"govuk-table__cell\">", main);
+        Assert.Contains("This test has no method items.", main, StringComparison.Ordinal);
     }
 
     [Fact]

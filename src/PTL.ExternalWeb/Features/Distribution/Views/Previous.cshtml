@@ -1,5 +1,6 @@
 @model PTL.ExternalWeb.Features.Distribution.DistributionPreviousListViewModel
 @using System.Globalization
+@using Microsoft.AspNetCore.Http.Extensions
 @using PTL.SharedUI.Pagination
 @{
     ViewData["Title"] = "Previous distributions";
@@ -41,14 +42,20 @@
 
 <h1 class="govuk-heading-l">Previous distributions</h1>
 
-<p class="govuk-body">View the results you have previously submitted for a distribution.</p>
+<p class="govuk-body">Please select the month and year of the distribution, the distribution reference number or the scheme name of the distribution you wish to view.</p>
 
 <form method="get" asp-action="Previous" class="govuk-!-margin-bottom-6">
     <div class="govuk-grid-row">
         <div class="govuk-grid-column-one-half">
             <div class="govuk-form-group">
                 <label class="govuk-label" for="year">Year</label>
-                <input class="govuk-input govuk-input--width-5" type="number" id="year" name="year" value="@Model.Year" />
+                <select class="govuk-select" id="year" name="year">
+                    <option value="">All</option>
+                    @foreach (var year in Model.Years)
+                    {
+                        <option value="@year" selected="@(Model.Year == year)">@year</option>
+                    }
+                </select>
             </div>
 
             <partial name="_DistributionReferenceSchemeSearchFields" model="@(new PTL.ExternalWeb.ViewSupport.DistributionReferenceSchemeSearchFields(Model.Month, Model.DistributionReference, Model.SchemeCode, Model.SchemeName))" />
@@ -70,16 +77,16 @@ else
         <thead class="govuk-table__head">
             <tr class="govuk-table__row">
                 <th scope="col" class="govuk-table__header" aria-sort="@AriaSort(Model.SortBy, Model.SortDirection, "reference")">
-                    <a class="govuk-link" href="@SortUrl("reference")">Distribution Reference@(SortIndicator(Model.SortBy, Model.SortDirection, "reference"))</a>
+                    <a class="govuk-link" href="@SortUrl("reference")">Distribution reference@(SortIndicator(Model.SortBy, Model.SortDirection, "reference"))</a>
                 </th>
                 <th scope="col" class="govuk-table__header" aria-sort="@AriaSort(Model.SortBy, Model.SortDirection, "schemeCode")">
-                    <a class="govuk-link" href="@SortUrl("schemeCode")">Scheme Code@(SortIndicator(Model.SortBy, Model.SortDirection, "schemeCode"))</a>
+                    <a class="govuk-link" href="@SortUrl("schemeCode")">Scheme code@(SortIndicator(Model.SortBy, Model.SortDirection, "schemeCode"))</a>
                 </th>
                 <th scope="col" class="govuk-table__header" aria-sort="@AriaSort(Model.SortBy, Model.SortDirection, "schemeName")">
-                    <a class="govuk-link" href="@SortUrl("schemeName")">Scheme Name@(SortIndicator(Model.SortBy, Model.SortDirection, "schemeName"))</a>
+                    <a class="govuk-link" href="@SortUrl("schemeName")">Scheme name@(SortIndicator(Model.SortBy, Model.SortDirection, "schemeName"))</a>
                 </th>
                 <th scope="col" class="govuk-table__header" aria-sort="@AriaSort(Model.SortBy, Model.SortDirection, "distributionDate")">
-                    <a class="govuk-link" href="@SortUrl("distributionDate")">Distribution Date@(SortIndicator(Model.SortBy, Model.SortDirection, "distributionDate"))</a>
+                    <a class="govuk-link" href="@SortUrl("distributionDate")">Distribution date@(SortIndicator(Model.SortBy, Model.SortDirection, "distributionDate"))</a>
                 </th>
                 <th scope="col" class="govuk-table__header">Results</th>
             </tr>
@@ -96,6 +103,7 @@ else
                         <a class="govuk-link"
                            asp-action="Results"
                            asp-route-monthlyDistributionSchemeId="@distribution.MonthlyDistributionSchemeId"
+                           asp-route-returnUrl="@Context.Request.GetEncodedPathAndQuery()"
                            aria-label="View results for @distribution.DistributionReference">View</a>
                     </td>
                 </tr>
