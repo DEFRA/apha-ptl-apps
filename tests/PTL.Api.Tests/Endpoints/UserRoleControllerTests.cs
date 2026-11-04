@@ -71,6 +71,35 @@ public class UserRoleControllerTests
     }
 
     [Fact]
+    public async Task SetUserRolesBatch_TooManyItems_ReturnsValidationProblemWithoutCallingService()
+    {
+        var userRoleService = new FakeUserRoleService();
+        var controller = CreateController(userRoleService);
+        var items = Enumerable.Range(0, 2_001).Select(_ => new SetUserRolesBatchItem(Guid.NewGuid(), [])).ToList();
+
+        var result = await controller.SetUserRolesBatch(new SetUserRolesBatchRequest(items), CancellationToken.None);
+
+        var badRequest = Assert.IsType<BadRequestObjectResult>(result.Result);
+        Assert.IsType<ValidationProblemDetails>(badRequest.Value);
+        Assert.Empty(userRoleService.SetBatchCalls);
+    }
+
+    [Fact]
+    public async Task SetUserRolesBatch_TooManyRoleIdsInOneRow_ReturnsValidationProblemWithoutCallingService()
+    {
+        var userRoleService = new FakeUserRoleService();
+        var controller = CreateController(userRoleService);
+        var roleIds = Enumerable.Range(0, 501).Select(_ => Guid.NewGuid()).ToList();
+        var items = new List<SetUserRolesBatchItem> { new(Guid.NewGuid(), roleIds) };
+
+        var result = await controller.SetUserRolesBatch(new SetUserRolesBatchRequest(items), CancellationToken.None);
+
+        var badRequest = Assert.IsType<BadRequestObjectResult>(result.Result);
+        Assert.IsType<ValidationProblemDetails>(badRequest.Value);
+        Assert.Empty(userRoleService.SetBatchCalls);
+    }
+
+    [Fact]
     public async Task RemoveUser_Blocked_ReturnsOkWithFailureMessage()
     {
         var userId = Guid.NewGuid();

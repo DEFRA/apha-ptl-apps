@@ -6,6 +6,11 @@ namespace PTL.InternalWeb.Tests.TestSupport;
 
 internal sealed partial class FakeDistributionApiClient : IDistributionApiClient
 {
+    public IReadOnlyList<CurrentDistributionResponse> CurrentDistributions { get; set; } = [];
+
+    public Task<IReadOnlyList<CurrentDistributionResponse>> GetCurrentDistributionsAsync(Guid participantId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(CurrentDistributions);
+
     public IReadOnlyList<DistributionDashboardMonthResponse> Months { get; set; } = [];
     public IReadOnlyList<DistributionYearOptionResponse> Years { get; set; } = [];
     public MonthlyDistributionResponse? Schedule { get; set; }

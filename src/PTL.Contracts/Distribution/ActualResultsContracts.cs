@@ -30,7 +30,8 @@ public sealed record ActualResultsSampleValueResponse(Guid SampleResultItemId, G
 public sealed record ActualResultsSaveRequest(
     IReadOnlyList<ActualResultsSampleValueRequest> SampleValues,
     IReadOnlyList<ActualResultsMethodItemRequest> MethodItems,
-    string? AuditWhy = null);
+    string? AuditWhy = null,
+    bool? Submitted = null);
 
 public sealed record ActualResultsSampleValueRequest(Guid SampleResultItemId, string Result);
 

@@ -12,6 +12,7 @@ namespace PTL.Data.Tests.Fakes;
 internal sealed class FakeDbConnection : DbConnection
 {
     private readonly Dictionary<string, Func<FakeDbCommand, DbDataReader>> _readerFactories = new(StringComparer.OrdinalIgnoreCase);
+    private readonly List<(string Fragment, Func<FakeDbCommand, DbDataReader> Factory)> _fragmentReaders = [];
     private readonly Dictionary<string, Func<FakeDbCommand, int>> _nonQueryResults = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, Func<FakeDbCommand, object?>> _scalarResults = new(StringComparer.OrdinalIgnoreCase);
     private ConnectionState _state = ConnectionState.Closed;
@@ -35,6 +36,11 @@ internal sealed class FakeDbConnection : DbConnection
     // against this exact "EXEC dbo.spXxx ..." command text should return.
     public void RespondToQuery(string commandText, DataTable table) =>
         _readerFactories[commandText] = _ => table.CreateDataReader();
+
+    // For an inline multi-line SELECT whose full text is not worth copying into a test: matches any
+    // command containing the fragment, after the exact-text responses have been tried.
+    public void RespondToQueryContaining(string fragment, DataTable table) =>
+        _fragmentReaders.Add((fragment, _ => table.CreateDataReader()));
 
     // Configures a multi-result-set reader (one table per result set, in order) for a
     // QueryMultipleAsync call against this exact command text - DataSet.CreateDataReader() yields
@@ -63,10 +69,18 @@ internal sealed class FakeDbConnection : DbConnection
         _scalarResults[commandText] = _ => values[Math.Min(callCount++, values.Length - 1)];
     }
 
-    internal DbDataReader ResolveReader(FakeDbCommand command) =>
-        _readerFactories.TryGetValue(command.CommandText, out var factory)
-            ? factory(command)
+    internal DbDataReader ResolveReader(FakeDbCommand command)
+    {
+        if (_readerFactories.TryGetValue(command.CommandText, out var factory))
+        {
+            return factory(command);
+        }
+
+        var byFragment = _fragmentReaders.FirstOrDefault(r => command.CommandText.Contains(r.Fragment, StringComparison.OrdinalIgnoreCase));
+        return byFragment.Factory is not null
+            ? byFragment.Factory(command)
             : throw new InvalidOperationException($"No reader configured for command text: '{command.CommandText}'.");
+    }
 
     internal int ResolveNonQueryResult(FakeDbCommand command) =>
         _nonQueryResults.TryGetValue(command.CommandText, out var factory)

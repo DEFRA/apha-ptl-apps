@@ -49,6 +49,41 @@ public class DistributionControllerTests
     }
 
     [Fact]
+    public async Task GetCurrentDistributions_ReturnsMappedRows()
+    {
+        var participantId = Guid.NewGuid();
+        var schemeId = Guid.NewGuid();
+        var distributionParticipantId = Guid.NewGuid();
+        var repository = new FakeDistributionRepository();
+        repository.CurrentDistributionsByParticipant[participantId] =
+        [
+            new CurrentDistributionData(
+                schemeId,
+                distributionParticipantId,
+                "D26-01A/BA",
+                "PT001",
+                "Bacteriology",
+                new DateTime(2026, 4, 3),
+                new DateTime(2026, 4, 30),
+                HasResults: true,
+                Submitted: false)
+        ];
+
+        var controller = new CurrentDistributionsController(new CurrentDistributionsService(repository));
+
+        var result = await controller.GetCurrentDistributions(participantId, CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var rows = Assert.IsAssignableFrom<IReadOnlyList<CurrentDistributionResponse>>(ok.Value);
+        var row = Assert.Single(rows);
+        Assert.Equal((schemeId, distributionParticipantId, "D26-01A/BA", "PT001", "Bacteriology"),
+            (row.MonthlyDistributionSchemeId, row.DistributionParticipantId, row.DistributionReference, row.SchemeCode, row.SchemeName));
+        Assert.Equal((new DateTime(2026, 4, 3), new DateTime(2026, 4, 30)), (row.DistributionDate, row.DeadlineDate));
+        Assert.True(row.HasResults);
+        Assert.False(row.Submitted);
+    }
+
+    [Fact]
     public async Task GetDashboard_ReturnsTwelveMonthsWithMonthDescription()
     {
         var repository = new FakeDistributionRepository();

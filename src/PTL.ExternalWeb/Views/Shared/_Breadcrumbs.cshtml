@@ -1,4 +1,5 @@
 @using System.Text.RegularExpressions
+@using Microsoft.AspNetCore.Routing
 @using PTL.ExternalWeb.Navigation
 @{
     var controller = (ViewContext.RouteData.Values["controller"]?.ToString() ?? string.Empty).Trim();
@@ -28,12 +29,20 @@
             string.Equals(child.ActionName, action, StringComparison.OrdinalIgnoreCase)))
         ?.Text;
 
+    // Pages in the legacy Web.sitemap follow its SiteMapPath: Home > ancestors (links) > current page
+    // (plain text, aria-current) - there is no "Results" section level in legacy's trail. A page that
+    // names its own ViewData["BreadcrumbParent"] (e.g. the order "not available" page) opts out.
+    var query = ViewContext.HttpContext.Request.Query;
+    var trail = ViewData["BreadcrumbParent"] is null
+        ? NavigationProvider.BreadcrumbTrail(controller, action, query["year"].FirstOrDefault())
+        : null;
+
     var hasController =
-        parentSection is null &&
+        parentSection is null && trail is null &&
         !string.IsNullOrWhiteSpace(controller) &&
         !string.Equals(controller, "Home", StringComparison.OrdinalIgnoreCase);
 
-    var hasAction = parentSection is null && !string.IsNullOrWhiteSpace(action) && !string.Equals(action, "Index", StringComparison.OrdinalIgnoreCase);
+    var hasAction = parentSection is null && trail is null && !string.IsNullOrWhiteSpace(action) && !string.Equals(action, "Index", StringComparison.OrdinalIgnoreCase);
 }
 
 <nav class="govuk-breadcrumbs" aria-label="Breadcrumb">
@@ -42,7 +51,37 @@
             <a class="govuk-breadcrumbs__link" asp-controller="Home" asp-action="Index">Home</a>
         </li>
 
-        @if (parentSection is not null)
+        @if (trail is not null)
+        {
+            for (var i = 0; i < trail.Count; i++)
+            {
+                var crumb = trail[i];
+                var routeValue = crumb.RouteKey is null ? null : query[crumb.RouteKey].FirstOrDefault();
+
+                if (i == trail.Count - 1)
+                {
+                    <li class="govuk-breadcrumbs__list-item" aria-current="page">@crumb.Text</li>
+                }
+                else if (crumb.RouteKey is null || !string.IsNullOrEmpty(routeValue))
+                {
+                    var values = new RouteValueDictionary();
+                    if (crumb.RouteKey is not null)
+                    {
+                        values[crumb.RouteKey] = routeValue;
+                    }
+
+                    <li class="govuk-breadcrumbs__list-item">
+                        <a class="govuk-breadcrumbs__link" href="@Url.Action(crumb.Action, crumb.Controller, values)">@crumb.Text</a>
+                    </li>
+                }
+                else
+                {
+                    @* An ancestor needing an id the request does not carry would link to an error page, so it stays text. *@
+                    <li class="govuk-breadcrumbs__list-item">@crumb.Text</li>
+                }
+            }
+        }
+        else if (parentSection is not null)
         {
             <li class="govuk-breadcrumbs__list-item">@parentSection</li>
         }

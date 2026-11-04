@@ -59,6 +59,9 @@ public class DistributionRepositoryActualResultsTests
     private const string InsertSampleRatingSql =
         "EXEC dbo.spiSampleRating @SampleId = @SampleId, @ParticipantId = @ParticipantId, @RatingId = @RatingId";
 
+    private const string UpdateSubmittedSql =
+        "EXEC dbo.spuEditResultsEntryResult @ActualResultId = @ActualResultsId, @LastEditDate = @LastEditDate, @Submitted = @Submitted";
+
     private static (DistributionRepository Repository, FakeDbConnection Connection) CreateRepository()
     {
         var connection = new FakeDbConnection();
@@ -70,7 +73,7 @@ public class DistributionRepositoryActualResultsTests
         foreach (var sql in new[]
         {
             InsertActualResultsSql, UpdateActualResultsSql, InsertMethodItemSql, AuditMethodItemSql, UpdateMethodItemSql,
-            InsertSampleItemSql, AuditSampleItemSql, UpdateSampleItemSql, InsertSampleRatingSql,
+            InsertSampleItemSql, AuditSampleItemSql, UpdateSampleItemSql, InsertSampleRatingSql, UpdateSubmittedSql,
         })
         {
             connection.RespondToNonQuery(sql, 1);
@@ -336,6 +339,21 @@ public class DistributionRepositoryActualResultsTests
             ParticipantId, IsNew: false, First, Last, [], [], [], null, "tester", "why"));
 
         Assert.Equal([UpdateActualResultsSql], connection.ExecutedCommands.Select(c => c.CommandText));
+        Assert.True(connection.LastTransaction!.Committed);
+    }
+
+    [Fact]
+    public async Task SaveActualResultsAsync_WithASubmittedChoice_StampsItAfterTheHeaderInTheSameTransaction()
+    {
+        var (repository, connection) = CreateRepository();
+        RespondToAllWrites(connection);
+
+        await repository.SaveActualResultsAsync(new ActualResultsWrite(
+            ParticipantId, IsNew: false, First, Last, [], [], [], null, "tester", "why", Submitted: true));
+
+        Assert.Equal([UpdateActualResultsSql, UpdateSubmittedSql], connection.ExecutedCommands.Select(c => c.CommandText));
+        var submitted = connection.ExecutedCommands[1];
+        Assert.Equal((ParticipantId, Last, true), (submitted.ParameterValue("ActualResultsId"), submitted.ParameterValue("LastEditDate"), submitted.ParameterValue("Submitted")));
         Assert.True(connection.LastTransaction!.Committed);
     }
 
