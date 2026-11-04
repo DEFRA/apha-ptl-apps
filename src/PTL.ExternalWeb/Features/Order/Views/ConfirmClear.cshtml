@@ -1,7 +1,6 @@
 @model PTL.ExternalWeb.Features.Order.CreateOrderConfirmClearViewModel
 @{
     ViewData["Title"] = "Clear the order form";
-    ViewData["BreadcrumbParent"] = "Orders";
     var backAction = Model.YearSlug == PTL.ExternalWeb.Features.Order.OrderController.CurrentYearSlug ? "CurrentYear" : "NextYear";
 }
 

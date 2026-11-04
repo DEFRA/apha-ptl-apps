@@ -296,8 +296,8 @@ public class HomeNavigationSmokeTests : IClassFixture<PtlExternalWebTestFactory>
         var distributionBody = await distributionResponse.Content.ReadAsStringAsync();
 
         Assert.Equal(HttpStatusCode.OK, distributionResponse.StatusCode);
-        Assert.Contains("Enter results", distributionBody);
-        Assert.Contains("has not been migrated to the new service yet", distributionBody);
+        Assert.Contains("Current distributions", distributionBody);
+        Assert.DoesNotContain("has not been migrated to the new service yet", distributionBody);
     }
 
     private async Task<string> GetHomePageAsSignedInUserAsync(string? roles)

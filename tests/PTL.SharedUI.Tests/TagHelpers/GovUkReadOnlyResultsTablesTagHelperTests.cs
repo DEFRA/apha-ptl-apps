@@ -32,7 +32,7 @@ public class GovUkReadOnlyResultsTablesTagHelperTests
     {
         var html = Render([SampleTest()]);
 
-        Assert.Contains(">Culture test</h2>", html, StringComparison.Ordinal);
+        Assert.Contains(">Culture test</h3>", html, StringComparison.Ordinal);
         Assert.Contains("<caption class=\"govuk-table__caption govuk-visually-hidden\">Actual Results for Culture test</caption>", html, StringComparison.Ordinal);
         Assert.Contains(">Growth</th>", html, StringComparison.Ordinal);
     }
@@ -44,7 +44,17 @@ public class GovUkReadOnlyResultsTablesTagHelperTests
 
         var html = Render([test]);
 
-        Assert.Contains("""<span class="govuk-visually-hidden">No result entered</span>""", html, StringComparison.Ordinal);
+        Assert.Contains("""<span aria-hidden="true">-</span><span class="govuk-visually-hidden">No result entered</span>""", html, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Process_WideTable_UsesScrollClassNotInlineStyleAndTestHeadingIsH3()
+    {
+        var html = Render([SampleTest()]);
+
+        Assert.Contains("app-table-scroll", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("style=", html, StringComparison.Ordinal);
+        Assert.Contains("<h3 class=\"govuk-heading-s\">Culture test</h3>", html, StringComparison.Ordinal);
     }
 
     [Fact]

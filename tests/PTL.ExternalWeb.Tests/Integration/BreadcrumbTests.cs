@@ -29,9 +29,7 @@ public class BreadcrumbTests : IClassFixture<PtlExternalWebTestFactory>
         var body = await response.Content.ReadAsStringAsync();
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.Contains("govuk-breadcrumbs__list-item\">Results</li>", body);
-        Assert.DoesNotContain("Distribution</a>", body);
-        Assert.DoesNotContain("Current</a>", body);
+        Assert.Contains("govuk-breadcrumbs__list-item\" aria-current=\"page\">Current distributions</li>", body);
     }
 
     [Fact]
@@ -47,9 +45,7 @@ public class BreadcrumbTests : IClassFixture<PtlExternalWebTestFactory>
         var body = await response.Content.ReadAsStringAsync();
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.Contains("govuk-breadcrumbs__list-item\">Results</li>", body);
-        Assert.DoesNotContain("Distribution</a>", body);
-        Assert.DoesNotContain("Previous</a>", body);
+        Assert.Contains("govuk-breadcrumbs__list-item\" aria-current=\"page\">Previous distributions</li>", body);
     }
 
     [Fact]
@@ -71,7 +67,7 @@ public class BreadcrumbTests : IClassFixture<PtlExternalWebTestFactory>
         var body = await response.Content.ReadAsStringAsync();
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.Contains("govuk-breadcrumbs__list-item\">Schemes</li>", body);
+        Assert.Contains("govuk-breadcrumbs__list-item\" aria-current=\"page\">View schemes</li>", body);
     }
 
     [Fact]

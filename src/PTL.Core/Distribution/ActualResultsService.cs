@@ -66,7 +66,7 @@ public sealed class ActualResultsService(IDistributionRepository distributionRep
         var methodItems = ResolveWrites(state.Structure.TestMethodItems.Select(m => m.TestMethodItemId), state.MethodResults, postedMethods);
         var sampleItems = ResolveWrites(state.Structure.SampleResultItems.Select(s => s.SampleResultItemId), state.SampleResults, postedSamples);
 
-        var dirty = isNew || methodItems.Count > 0 || sampleItems.Count > 0;
+        var dirty = isNew || methodItems.Count > 0 || sampleItems.Count > 0 || update.Submitted is not null;
         if (!dirty)
         {
             return ActualResultsSaveOutcome.Of(ActualResultsSaveStatus.NothingToSave);
@@ -103,7 +103,8 @@ public sealed class ActualResultsService(IDistributionRepository distributionRep
                 ratingSampleIds,
                 defaultRatingId,
                 update.AuditWho,
-                isNew ? string.Empty : update.AuditWhy),
+                isNew ? string.Empty : update.AuditWhy,
+                update.Submitted),
             cancellationToken);
 
         return ActualResultsSaveOutcome.Of(ActualResultsSaveStatus.Saved);

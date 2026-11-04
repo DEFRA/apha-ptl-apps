@@ -20,7 +20,8 @@ public sealed class ReferenceSchemeListQuery
 
     public int PageSize { get; init; } = DefaultPageSize;
 
-    public string SortBy { get; init; } = "distributionDate";
+    // Null when absent so each controller applies its own legacy default sort.
+    public string? SortBy { get; init; }
 
-    public string SortDir { get; init; } = "desc";
+    public string? SortDir { get; init; }
 }

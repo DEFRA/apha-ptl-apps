@@ -1,10 +1,10 @@
 @model PTL.ExternalWeb.Features.Tabulation.AssessmentResultsPageViewModel
 @{
     var results = Model.Results;
-    ViewData["Title"] = "Assessment Results";
+    ViewData["Title"] = "Assessment results";
 }
 
-<h1 class="govuk-heading-l">Assessment Results</h1>
+<h1 class="govuk-heading-l">Assessment results</h1>
 <h2 class="govuk-heading-m">@results.DistributionHeading</h2>
 
 @if (!results.IsAssessmentSubmitted)

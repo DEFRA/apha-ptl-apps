@@ -2,12 +2,13 @@
 @using System.Globalization
 @using PTL.SharedUI.Pagination
 @{
-    ViewData["Title"] = "Previous Distributions";
+    ViewData["Title"] = "Previous distributions";
     var pagination = new PaginationModel
     {
         CurrentPage = Model.Page,
         PageSize = Model.PageSize,
         TotalRecords = Model.TotalCount,
+        Action = "Previous",
         RouteValues = new Dictionary<string, object?>
         {
             ["year"] = Model.Year,
@@ -38,7 +39,7 @@
     }
 }
 
-<h1 class="govuk-heading-l">Previous Distributions</h1>
+<h1 class="govuk-heading-l">Previous distributions</h1>
 
 <p class="govuk-body">View the results you have previously submitted for a distribution.</p>
 
@@ -69,16 +70,16 @@ else
         <thead class="govuk-table__head">
             <tr class="govuk-table__row">
                 <th scope="col" class="govuk-table__header" aria-sort="@AriaSort(Model.SortBy, Model.SortDirection, "reference")">
-                    <a class="govuk-link" href="@SortUrl("reference")">Distribution Reference</a>
+                    <a class="govuk-link" href="@SortUrl("reference")">Distribution Reference@(SortIndicator(Model.SortBy, Model.SortDirection, "reference"))</a>
                 </th>
                 <th scope="col" class="govuk-table__header" aria-sort="@AriaSort(Model.SortBy, Model.SortDirection, "schemeCode")">
-                    <a class="govuk-link" href="@SortUrl("schemeCode")">Scheme Code</a>
+                    <a class="govuk-link" href="@SortUrl("schemeCode")">Scheme Code@(SortIndicator(Model.SortBy, Model.SortDirection, "schemeCode"))</a>
                 </th>
                 <th scope="col" class="govuk-table__header" aria-sort="@AriaSort(Model.SortBy, Model.SortDirection, "schemeName")">
-                    <a class="govuk-link" href="@SortUrl("schemeName")">Scheme Name</a>
+                    <a class="govuk-link" href="@SortUrl("schemeName")">Scheme Name@(SortIndicator(Model.SortBy, Model.SortDirection, "schemeName"))</a>
                 </th>
                 <th scope="col" class="govuk-table__header" aria-sort="@AriaSort(Model.SortBy, Model.SortDirection, "distributionDate")">
-                    <a class="govuk-link" href="@SortUrl("distributionDate")">Distribution Date</a>
+                    <a class="govuk-link" href="@SortUrl("distributionDate")">Distribution Date@(SortIndicator(Model.SortBy, Model.SortDirection, "distributionDate"))</a>
                 </th>
                 <th scope="col" class="govuk-table__header">Results</th>
             </tr>
@@ -90,7 +91,7 @@ else
                     <td class="govuk-table__cell">@distribution.DistributionReference</td>
                     <td class="govuk-table__cell">@distribution.SchemeCode</td>
                     <td class="govuk-table__cell">@distribution.SchemeName</td>
-                    <td class="govuk-table__cell">@distribution.DistributionDate.ToString("d MMMM yyyy", CultureInfo.InvariantCulture)</td>
+                    <td class="govuk-table__cell">@distribution.DistributionDate.ToString("dddd d MMMM yyyy", CultureInfo.InvariantCulture)</td>
                     <td class="govuk-table__cell">
                         <a class="govuk-link"
                            asp-action="Results"

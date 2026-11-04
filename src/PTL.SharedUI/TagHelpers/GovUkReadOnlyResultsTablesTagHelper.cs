@@ -23,9 +23,9 @@ public class GovUkReadOnlyResultsTablesTagHelper : TagHelper
 
         foreach (var test in Tests)
         {
-            output.Content.AppendHtml($"""<h2 class="govuk-heading-m">{Encode(test.TestName)}</h2>""");
+            output.Content.AppendHtml($"""<h3 class="govuk-heading-s">{Encode(test.TestName)}</h3>""");
             output.Content.AppendHtml($"""
-                <div class="govuk-!-margin-bottom-6" style="overflow-x: auto;">
+                <div class="govuk-!-margin-bottom-6 app-table-scroll">
                     <table class="govuk-table">
                         <caption class="govuk-table__caption govuk-visually-hidden">Actual Results for {Encode(test.TestName)}</caption>
                         <thead class="govuk-table__head">
@@ -68,7 +68,7 @@ public class GovUkReadOnlyResultsTablesTagHelper : TagHelper
 
     private static string ValueOrHiddenPlaceholder(string? value) =>
         string.IsNullOrEmpty(value)
-            ? """<span class="govuk-visually-hidden">No result entered</span>"""
+            ? """<span aria-hidden="true">-</span><span class="govuk-visually-hidden">No result entered</span>"""
             : Encode(value);
 
     private static string Encode(string? value) => WebUtility.HtmlEncode(value) ?? string.Empty;

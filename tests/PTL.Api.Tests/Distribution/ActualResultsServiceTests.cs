@@ -355,6 +355,17 @@ public class ActualResultsServiceTests
     }
 
     [Fact]
+    public async Task Save_SubmittedChoiceOnAnUntouchedExistingSet_IsSavedAndCarriedToTheWrite()
+    {
+        var repository = _s.Seed(_s.FullyStored());
+
+        var outcome = await SaveAsync(repository, new ActualResultsUpdate([], [], "tester", "external save", Submitted: true));
+
+        Assert.Equal(ActualResultsSaveStatus.Saved, outcome.Status);
+        Assert.True(Assert.Single(repository.SavedActualResults).Submitted);
+    }
+
+    [Fact]
     public async Task Save_NewSetUntouched_IsAlwaysDirtyAndRecordsBlankResults()
     {
         var repository = _s.Seed(ActualResultsScenario.Untouched());
