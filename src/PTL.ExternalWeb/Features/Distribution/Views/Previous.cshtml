@@ -38,6 +38,8 @@
             schemeName = Model.SchemeName,
         })!;
     }
+
+    var sortHeaders = new SortableHeaderContext(Model.SortBy, Model.SortDirection, SortUrl);
 }
 
 <h1 class="govuk-heading-l">Previous distributions</h1>
@@ -76,18 +78,8 @@ else
     <table class="govuk-table">
         <thead class="govuk-table__head">
             <tr class="govuk-table__row">
-                <th scope="col" class="govuk-table__header" aria-sort="@AriaSort(Model.SortBy, Model.SortDirection, "reference")">
-                    <a class="govuk-link" href="@SortUrl("reference")">Distribution reference@(SortIndicator(Model.SortBy, Model.SortDirection, "reference"))</a>
-                </th>
-                <th scope="col" class="govuk-table__header" aria-sort="@AriaSort(Model.SortBy, Model.SortDirection, "schemeCode")">
-                    <a class="govuk-link" href="@SortUrl("schemeCode")">Scheme code@(SortIndicator(Model.SortBy, Model.SortDirection, "schemeCode"))</a>
-                </th>
-                <th scope="col" class="govuk-table__header" aria-sort="@AriaSort(Model.SortBy, Model.SortDirection, "schemeName")">
-                    <a class="govuk-link" href="@SortUrl("schemeName")">Scheme name@(SortIndicator(Model.SortBy, Model.SortDirection, "schemeName"))</a>
-                </th>
-                <th scope="col" class="govuk-table__header" aria-sort="@AriaSort(Model.SortBy, Model.SortDirection, "distributionDate")">
-                    <a class="govuk-link" href="@SortUrl("distributionDate")">Distribution date@(SortIndicator(Model.SortBy, Model.SortDirection, "distributionDate"))</a>
-                </th>
+                <partial name="_DistributionReferenceSchemeHeaders" model="sortHeaders" />
+                <partial name="_SortableHeader" model="@(sortHeaders.Header("Distribution date", "distributionDate"))" />
                 <th scope="col" class="govuk-table__header">Results</th>
             </tr>
         </thead>

@@ -46,7 +46,7 @@ public class DistributionControllerTests
 
     [Theory]
     [InlineData(false, false, "No")]
-    [InlineData(true, false, "In Progress")]
+    [InlineData(true, false, "In progress")]
     [InlineData(true, true, "Submitted")]
     [InlineData(false, true, "Submitted")]
     public void CurrentRow_Status_FollowsLegacyGetStatus(bool hasResults, bool submitted, string expected)

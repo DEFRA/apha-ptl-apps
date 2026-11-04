@@ -21,6 +21,11 @@
   background-color: #f3f2f1;
 }
 
+/* Keep multi-word status tags (e.g. "In Progress") on one line in table cells */
+.govuk-table__cell .govuk-tag {
+  white-space: nowrap;
+}
+
 
 .govuk-header__container {
   min-height: 56px;
@@ -202,5 +207,27 @@
 }
 
 .app-results-table .govuk-table__cell {
+  overflow-wrap: anywhere;
+}
+
+/* Editable results entry: fixed 30/50/20 columns as legacy (pt-results__table-column1/2/3) so every Value column lines up across tables. */
+.app-results-entry-table {
+  table-layout: fixed;
+  min-width: 36rem;
+}
+
+.app-results-entry-table .govuk-table__header:nth-child(1) {
+  width: 30%;
+}
+
+.app-results-entry-table .govuk-table__header:nth-child(2) {
+  width: 50%;
+}
+
+.app-results-entry-table .govuk-table__header:nth-child(3) {
+  width: 20%;
+}
+
+.app-results-entry-table .govuk-table__cell {
   overflow-wrap: anywhere;
 }

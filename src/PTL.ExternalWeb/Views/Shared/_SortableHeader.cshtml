@@ -1,0 +1,6 @@
+@model PTL.ExternalWeb.ViewSupport.SortableHeader
+
+@* One sortable column header - see docs/Code-Duplication-Playbook.md. *@
+<th scope="col" class="govuk-table__header" aria-sort="@AriaSort(Model.SortBy, Model.SortDirection, Model.Column)">
+    <a class="govuk-link" href="@Model.Url">@Model.Label@(SortIndicator(Model.SortBy, Model.SortDirection, Model.Column))</a>
+</th>
