@@ -23,7 +23,9 @@
             }
         </select>
     </div>
-    <button class="govuk-button govuk-button--secondary" data-module="govuk-button" type="submit">Select Participant</button>
+    <noscript>
+        <button class="govuk-button govuk-button--secondary" data-module="govuk-button" type="submit">Select Participant</button>
+    </noscript>
 </form>
 
 @if (Model.SchemeId is null)
@@ -86,4 +88,13 @@ else
             <a class="govuk-button govuk-button--secondary" data-module="govuk-button" asp-controller="Contract" asp-action="ContractItems" asp-route-id="@Model.ContractId">Cancel</a>
         </div>
     </form>
+}
+
+@section Scripts {
+    @* Choosing a participant applies it at once; the button inside noscript keeps the page usable without scripting. *@
+    <script>
+        document.getElementById('participantId').addEventListener('change', function () {
+            this.form.submit();
+        });
+    </script>
 }

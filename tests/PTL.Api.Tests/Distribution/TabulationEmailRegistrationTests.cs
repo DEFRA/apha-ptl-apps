@@ -12,7 +12,7 @@ using PTL.Core.Participant;
 
 namespace PTL.Api.Tests.Distribution;
 
-// Program.cs registers the email services and the one hosted scheduler.
+// Program.cs registers the email services, the one hosted scheduler and the publication and Distribution Posted email workers.
 public class TabulationEmailRegistrationTests : IClassFixture<WebApplicationFactory<Program>>
 {
     private readonly WebApplicationFactory<Program> _factory;
@@ -26,12 +26,13 @@ public class TabulationEmailRegistrationTests : IClassFixture<WebApplicationFact
         Environment.SetEnvironmentVariable("Database__TrustServerCertificate", "true");
         Environment.SetEnvironmentVariable("HealthCheck__ReadinessKey", "local-dev-readiness-key");
 
-        // All three flags off: the hosted scheduler returns at once, so no test run ever reaches a real database.
+        // Every email flag off: the hosted scheduler returns at once and the email workers send nothing, so no test run ever reaches a real database.
         _factory = factory.WithWebHostBuilder(builder =>
             builder.ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["TabulationEmails:Enabled"] = "false",
                 ["PublicationNotifications:Enabled"] = "false",
+                ["DistributionPostedEmails:Enabled"] = "false",
                 ["OnlineOrderEmails:Enabled"] = "false",
                 ["CustomerUpdateEmails:Enabled"] = "false",
                 ["ParticipantUpdateEmails:Enabled"] = "false",
@@ -59,15 +60,6 @@ public class TabulationEmailRegistrationTests : IClassFixture<WebApplicationFact
     }
 
     [Fact]
-    public void EmailSendGuard_IsOneSingletonSharedByEveryScope()
-    {
-        var root = _factory.Services.GetRequiredService<EmailSendGuard>();
-        using var scope = _factory.Services.CreateScope();
-
-        Assert.Same(root, scope.ServiceProvider.GetRequiredService<EmailSendGuard>());
-    }
-
-    [Fact]
     public void TabulationEmailService_ResolvesFromTheRealContainer()
     {
         using var scope = _factory.Services.CreateScope();
@@ -81,6 +73,44 @@ public class TabulationEmailRegistrationTests : IClassFixture<WebApplicationFact
         using var scope = _factory.Services.CreateScope();
 
         Assert.IsType<TabulationPublishedNotifier>(scope.ServiceProvider.GetRequiredService<ITabulationPublishedNotifier>());
+    }
+
+    [Fact]
+    public void PublicationEmailDispatcher_IsOneSingletonRegisteredAsTheWorkerAndAsTheDispatcher()
+    {
+        var dispatcher = _factory.Services.GetRequiredService<IPublicationEmailDispatcher>();
+        using var scope = _factory.Services.CreateScope();
+
+        Assert.Same(dispatcher, scope.ServiceProvider.GetRequiredService<IPublicationEmailDispatcher>());
+        Assert.Same(dispatcher, Assert.Single(_factory.Services.GetServices<IHostedService>().OfType<PublicationEmailDispatcher>()));
+    }
+
+    [Fact]
+    public void ResultsSignOffService_ResolvesWithTheEmailDispatcher()
+    {
+        using var scope = _factory.Services.CreateScope();
+
+        Assert.IsType<ResultsSignOffService>(scope.ServiceProvider.GetRequiredService<IResultsSignOffService>());
+    }
+
+    [Fact]
+    public void DistributionPostedEmailDispatcher_IsOneSingletonRegisteredAsTheWorkerAndAsTheDispatcher()
+    {
+        var dispatcher = _factory.Services.GetRequiredService<IDistributionPostedEmailDispatcher>();
+        using var scope = _factory.Services.CreateScope();
+
+        Assert.Same(dispatcher, scope.ServiceProvider.GetRequiredService<IDistributionPostedEmailDispatcher>());
+        Assert.Same(dispatcher, _factory.Services.GetRequiredService<DistributionPostedEmailDispatcher>());
+        Assert.Same(dispatcher, Assert.Single(_factory.Services.GetServices<IHostedService>().OfType<DistributionPostedEmailDispatcher>()));
+    }
+
+    [Fact]
+    public void PackagingServiceAndDistributionPostedNotifier_ResolveFromTheRealContainerWithTheDispatcher()
+    {
+        using var scope = _factory.Services.CreateScope();
+
+        Assert.IsType<PackagingService>(scope.ServiceProvider.GetRequiredService<IPackagingService>());
+        Assert.IsType<DistributionPostedNotifier>(scope.ServiceProvider.GetRequiredService<IDistributionPostedNotifier>());
     }
 
     [Fact]
@@ -115,6 +145,7 @@ public class TabulationEmailRegistrationTests : IClassFixture<WebApplicationFact
     {
         Assert.False(_factory.Services.GetRequiredService<IOptions<TabulationEmailOptions>>().Value.Enabled);
         Assert.False(_factory.Services.GetRequiredService<IOptions<PublicationNotificationOptions>>().Value.Enabled);
+        Assert.False(_factory.Services.GetRequiredService<IOptions<DistributionPostedEmailOptions>>().Value.Enabled);
         Assert.False(_factory.Services.GetRequiredService<IOptions<OnlineOrderEmailOptions>>().Value.Enabled);
         Assert.False(_factory.Services.GetRequiredService<IOptions<CustomerUpdateEmailOptions>>().Value.Enabled);
         Assert.False(_factory.Services.GetRequiredService<IOptions<ParticipantUpdateEmailOptions>>().Value.Enabled);

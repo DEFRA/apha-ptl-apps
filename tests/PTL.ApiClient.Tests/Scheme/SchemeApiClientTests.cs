@@ -198,6 +198,59 @@ public class SchemeApiClientTests
 
         Assert.True(result.Success);
         Assert.NotNull(result.Scheme);
+        Assert.False(result.AuditReasonRequired);
+    }
+
+    [Fact]
+    public async Task UpdateSchemeAsync_PreconditionRequired_ReturnsAuditReasonRequiredWithTheObjectName()
+    {
+        var client = CreateClient(HttpStatusCode.PreconditionRequired, "{\"auditObjectName\":\"Scheme PT1234: Test Scheme\"}");
+
+        var result = await client.UpdateSchemeAsync(Guid.NewGuid(), MinimalUpdateRequest());
+
+        Assert.False(result.Success);
+        Assert.True(result.AuditReasonRequired);
+        Assert.Equal("Scheme PT1234: Test Scheme", result.AuditObjectName);
+        Assert.Null(result.Scheme);
+        Assert.Empty(result.FieldErrors);
+    }
+
+    [Fact]
+    public async Task UpdateSchemeAsync_PreconditionRequiredWithNullBody_ReturnsAuditReasonRequiredWithAnEmptyName()
+    {
+        var client = CreateClient(HttpStatusCode.PreconditionRequired, "null");
+
+        var result = await client.UpdateSchemeAsync(Guid.NewGuid(), MinimalUpdateRequest());
+
+        Assert.True(result.AuditReasonRequired);
+        Assert.Equal(string.Empty, result.AuditObjectName);
+    }
+
+    [Fact]
+    public async Task UpdateSchemeAsync_BadRequest_ReturnsFieldErrorsWithoutAuditFlag()
+    {
+        var client = CreateClient(HttpStatusCode.BadRequest, "{\"errors\":{\"AuditWhy\":[\"Input can not exceed 2000 characters\"]}}");
+
+        var result = await client.UpdateSchemeAsync(Guid.NewGuid(), MinimalUpdateRequest());
+
+        Assert.False(result.Success);
+        Assert.False(result.AuditReasonRequired);
+        Assert.Equal("Input can not exceed 2000 characters", Assert.Single(result.FieldErrors["AuditWhy"]));
+    }
+
+    [Fact]
+    public async Task UpdateSchemeAsync_SerialisesTheAuditReasonIntoTheRequestBody()
+    {
+        string? body = null;
+        var handler = new StubHttpMessageHandler(HttpStatusCode.OK, FullSchemeJson())
+        {
+            OnRequest = request => body = request.Content!.ReadAsStringAsync().GetAwaiter().GetResult(),
+        };
+        var client = new SchemeApiClient(new HttpClient(handler) { BaseAddress = new Uri("http://localhost") });
+
+        await client.UpdateSchemeAsync(Guid.NewGuid(), MinimalUpdateRequest() with { AuditWhy = "Corrected the order" });
+
+        Assert.Contains("\"auditWhy\":\"Corrected the order\"", body, StringComparison.Ordinal);
     }
 
     private static string FullSchemeJson() => """

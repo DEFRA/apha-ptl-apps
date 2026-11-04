@@ -22,8 +22,10 @@ public class DistributionControllerSampleReceiptTests
             new ResultsReceiptService(repository, TimeProvider.System),
             new TabulationsService(repository, TimeProvider.System),
             new ActualResultsService(repository, TimeProvider.System),
+            new ParticipantDistributionHistoryService(repository, new PTL.Api.Tests.Participant.FakeParticipantRepository(), new ActualResultsService(repository, TimeProvider.System)),
             new FakePackagingService(),
             new FakePackagingOutputService(),
+            new PTL.Api.Tests.Contract.FakeAuditActorResolver("Guest"),
             Microsoft.Extensions.Logging.Abstractions.NullLogger<DistributionController>.Instance);
 
     private static FakeDistributionRepository Seeded(DateTime? readyForAssessor = null)

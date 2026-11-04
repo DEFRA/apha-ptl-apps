@@ -9,13 +9,17 @@ namespace PTL.Api.Tests.Distribution;
 // Results Sign-off queue - legacy Results Sign-off/SignOff.aspx. The wording (title, availability) is legacy's.
 public class ResultsSignOffServiceTests
 {
-    private sealed class FakeRepository : IResultsSignOffRepository
+    private sealed class FakeRepository(List<string> events) : IResultsSignOffRepository
     {
         public List<ResultsSignOffMonthEntity> Months { get; } = [];
 
         public ResultsSignOffOutcome RejectOutcome { get; set; } = ResultsSignOffOutcome.Done;
 
         public ResultsSignOffOutcome AuthoriseOutcome { get; set; } = ResultsSignOffOutcome.Done;
+
+        public Exception? AuthoriseFailure { get; set; }
+
+        public Guid PublishedTabulationId { get; } = Guid.NewGuid();
 
         public List<Guid> Rejected { get; } = [];
 
@@ -24,16 +28,33 @@ public class ResultsSignOffServiceTests
         public Task<IReadOnlyList<ResultsSignOffMonthEntity>> GetQueueAsync(CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<ResultsSignOffMonthEntity>>(Months);
 
-        public Task<ResultsSignOffOutcome> AuthoriseAsync(Guid tabulationId, Guid? signatoryUserId, DateTime creationDate, CancellationToken cancellationToken = default)
+        public Task<AuthoriseResult> AuthoriseAsync(Guid tabulationId, Guid? signatoryUserId, DateTime creationDate, CancellationToken cancellationToken = default)
         {
             Authorised.Add((tabulationId, signatoryUserId, creationDate));
-            return Task.FromResult(AuthoriseOutcome);
+            if (AuthoriseFailure is not null)
+            {
+                return Task.FromException<AuthoriseResult>(AuthoriseFailure);
+            }
+
+            events.Add("publish");
+            return Task.FromResult(new AuthoriseResult(AuthoriseOutcome, AuthoriseOutcome == ResultsSignOffOutcome.Done ? PublishedTabulationId : null));
         }
 
         public Task<ResultsSignOffOutcome> RejectAsync(Guid tabulationId, CancellationToken cancellationToken = default)
         {
             Rejected.Add(tabulationId);
             return Task.FromResult(RejectOutcome);
+        }
+    }
+
+    private sealed class FakeDispatcher(List<string> events) : IPublicationEmailDispatcher
+    {
+        public List<Guid> Dispatched { get; } = [];
+
+        public void Dispatch(Guid publishedTabulationId)
+        {
+            events.Add("dispatch");
+            Dispatched.Add(publishedTabulationId);
         }
     }
 
@@ -45,11 +66,19 @@ public class ResultsSignOffServiceTests
         public override TimeZoneInfo LocalTimeZone => TimeZoneInfo.CreateCustomTimeZone("Test", TimeSpan.FromHours(2), "Test", "Test");
     }
 
-    private readonly FakeRepository _repository = new();
+    private readonly List<string> _events = [];
+    private readonly FakeRepository _repository;
+    private readonly FakeDispatcher _dispatcher;
     private readonly FakeDistributionRepository _distribution = new();
     private readonly FakeActingUserAccessor _actingUser = new() { ActingUserId = Guid.NewGuid() };
 
-    private ResultsSignOffService Service => new(_repository, new FixedLocalTime());
+    public ResultsSignOffServiceTests()
+    {
+        _repository = new FakeRepository(_events);
+        _dispatcher = new FakeDispatcher(_events);
+    }
+
+    private ResultsSignOffService Service => new(_repository, _dispatcher, new FixedLocalTime());
 
     private ResultsSignOffController Controller => new(Service, _actingUser);
 
@@ -219,6 +248,40 @@ public class ResultsSignOffServiceTests
 
         // Legacy stamped DateTime.Now, so the published CreationDate is local time, not UTC.
         Assert.Equal((tabulationId, (Guid?)signatory, new DateTime(2026, 10, 26, 13, 30, 0)), Assert.Single(_repository.Authorised));
+    }
+
+    [Fact]
+    public async Task AuthoriseAsync_Done_HandsThePublishedTabulationToTheEmailDispatcherOnceThePublishIsDone()
+    {
+        await Service.AuthoriseAsync(Guid.NewGuid(), Guid.NewGuid());
+
+        Assert.Equal([_repository.PublishedTabulationId], _dispatcher.Dispatched);
+        Assert.Equal(["publish", "dispatch"], _events);
+    }
+
+    [Theory]
+    [InlineData(ResultsSignOffOutcome.NotFound)]
+    [InlineData(ResultsSignOffOutcome.NotAwaiting)]
+    [InlineData(ResultsSignOffOutcome.NoSignatory)]
+    public async Task AuthoriseAsync_NothingPublished_SendsNoEmails(ResultsSignOffOutcome outcome)
+    {
+        _repository.AuthoriseOutcome = outcome;
+
+        await Service.AuthoriseAsync(Guid.NewGuid(), Guid.NewGuid());
+
+        Assert.Empty(_dispatcher.Dispatched);
+    }
+
+    [Fact]
+    public async Task AuthoriseAsync_PublishFails_SendsNoEmailsAndThrows()
+    {
+        var failure = new InvalidOperationException("database down");
+        _repository.AuthoriseFailure = failure;
+
+        var thrown = await Assert.ThrowsAsync<InvalidOperationException>(() => Service.AuthoriseAsync(Guid.NewGuid(), Guid.NewGuid()));
+
+        Assert.Same(failure, thrown);
+        Assert.Empty(_dispatcher.Dispatched);
     }
 
     [Theory]

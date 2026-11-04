@@ -1,10 +1,23 @@
 @model PTL.InternalWeb.Features.Distribution.ActualResultsViewModel
+@using PTL.Contracts.Distribution
+@using PTL.InternalWeb.Features.Distribution
 @{
     // Legacy diverts to a separate Audit.aspx page; here it is a second step of the same view -
     // same pattern as Features/Distribution/Views/IntendedResults.cshtml.
     ViewData["Title"] = Model.IsAuditStep
         ? $"Audit Trail - {Model.Heading}"
         : $"Results - {Model.Heading}";
+
+    // The read-only tables tag helper is shared with ExternalWeb's View Results screen (see
+    // docs/Code-Duplication-Playbook.md) and renders off the API's own contract shape rather than
+    // this page's form-bound view model.
+    static IReadOnlyList<ActualResultsTestResponse> ToContractsTests(List<ActualResultsTestViewModel> tests) =>
+        [.. tests.Select(t => new ActualResultsTestResponse(
+            t.TestId,
+            t.TestName ?? string.Empty,
+            [.. t.ResultItems.Select(r => new ActualResultsResultItemResponse(r.TestResultItemId, r.Name ?? string.Empty, r.FormatString ?? string.Empty, r.ReturnValueType ?? string.Empty))],
+            [.. t.MethodItems.Select(m => new ActualResultsMethodItemResponse(m.TestMethodItemId, m.Name ?? string.Empty, m.FormatString ?? string.Empty, m.ReturnValueType ?? string.Empty, m.Result ?? string.Empty))],
+            [.. t.Samples.Select(s => new ActualResultsSampleRowResponse(s.SampleId, s.SampleNumber ?? string.Empty, [.. s.Values.Select(v => new ActualResultsSampleValueResponse(v.SampleResultItemId, v.TestResultItemId, v.Result ?? string.Empty))]))]))];
 
     const string saveFailedMessage = "Save Failed: No results can be saved after the deadline date.";
 
@@ -97,63 +110,7 @@
 {
     <div class="govuk-inset-text">The deadline date for these results has passed. The results are shown read-only and no results can be saved after the deadline date.</div>
 
-    @foreach (var test in Model.Tests)
-    {
-        <h2 class="govuk-heading-m">@test.TestName</h2>
-
-        <div class="govuk-!-margin-bottom-6" style="overflow-x: auto;">
-            <table class="govuk-table">
-                <caption class="govuk-table__caption govuk-visually-hidden">Actual Results for @test.TestName</caption>
-                <thead class="govuk-table__head">
-                    <tr class="govuk-table__row">
-                        <th scope="col" class="govuk-table__header">Sample</th>
-                        @foreach (var resultItem in test.ResultItems)
-                        {
-                            <th scope="col" class="govuk-table__header">@resultItem.Name</th>
-                        }
-                    </tr>
-                </thead>
-                <tbody class="govuk-table__body">
-                    @foreach (var sample in test.Samples)
-                    {
-                        <tr class="govuk-table__row">
-                            <th scope="row" class="govuk-table__header">@sample.SampleNumber</th>
-                            @foreach (var resultItem in test.ResultItems)
-                            {
-                                var value = sample.Values.FirstOrDefault(v => v.TestResultItemId == resultItem.TestResultItemId)?.Result;
-                                <td class="govuk-table__cell">
-                                    @if (string.IsNullOrEmpty(value))
-                                    {
-                                        <span class="govuk-visually-hidden">No result entered</span>
-                                    }
-                                    else
-                                    {
-                                        @value
-                                    }
-                                </td>
-                            }
-                        </tr>
-                    }
-                    @foreach (var methodItem in test.MethodItems)
-                    {
-                        <tr class="govuk-table__row">
-                            <th scope="row" class="govuk-table__header">@methodItem.Name:</th>
-                            <td class="govuk-table__cell" colspan="@(Math.Max(test.ResultItems.Count, 1))">
-                                @if (string.IsNullOrEmpty(methodItem.Result))
-                                {
-                                    <span class="govuk-visually-hidden">No result entered</span>
-                                }
-                                else
-                                {
-                                    @methodItem.Result
-                                }
-                            </td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
-        </div>
-    }
+    <govuk-readonly-results-tables tests="ToContractsTests(Model.Tests)" />
 
     <a class="govuk-button govuk-button--secondary" asp-action="ResultsReceipt" asp-route-year="@Model.YearId" asp-route-monthId="@Model.MonthId">Back</a>
 

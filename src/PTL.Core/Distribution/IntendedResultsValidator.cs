@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.RegularExpressions;
 
 namespace PTL.Core.Distribution;
@@ -18,7 +19,18 @@ public static class IntendedResultsValidator
 
     public static string? ValidateValue(string? formatString, string? returnValueType, string? value)
     {
-        if (string.IsNullOrEmpty(value) || !IsRegexFormat(formatString))
+        if (string.IsNullOrEmpty(value))
+        {
+            return null;
+        }
+
+        if (returnValueType?.Contains("date", StringComparison.OrdinalIgnoreCase) == true
+            && !DateTime.TryParseExact(value, "dd/MM/yyyy", CultureInfo.InvariantCulture, DateTimeStyles.None, out _))
+        {
+            return "Input must be of format: dd/MM/yyyy";
+        }
+
+        if (!IsRegexFormat(formatString))
         {
             return null;
         }

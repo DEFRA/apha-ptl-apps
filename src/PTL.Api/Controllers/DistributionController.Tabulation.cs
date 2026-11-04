@@ -89,6 +89,71 @@ public sealed partial class DistributionController
         return results is null ? NotFound() : Ok(results);
     }
 
+    // ExternalWeb Tabulations.aspx / TabulationView.aspx / AssessmentResults.aspx - every endpoint
+    // below is scoped to the caller's own Participant/Viewer/Test Consultant access (re-checked
+    // against spgTabulations - see ParticipantTabulationService), unlike the unscoped
+    // tabulations/published-tabulations endpoints above, which InternalWeb staff use with no such
+    // restriction.
+    [HttpGet("tabulations/for-user")]
+    [ProducesResponseType<PublishedTabulationSummaryListResponse>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<PublishedTabulationSummaryListResponse>> GetTabulationsForUser(
+        [FromQuery] Guid? participantId,
+        [FromQuery] Guid? viewerId,
+        [FromQuery] Guid? testConsultantId,
+        [FromServices] IParticipantTabulationService participantTabulationService,
+        CancellationToken cancellationToken)
+    {
+        var tabulations = await participantTabulationService.GetTabulationsForUserAsync(participantId, viewerId, testConsultantId, cancellationToken);
+        return Ok(tabulations);
+    }
+
+    [HttpGet("published-tabulations/{publishedTabulationId:guid}/for-user")]
+    [ProducesResponseType<TabulationReportResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<TabulationReportResponse>> GetPublishedTabulationForUser(
+        Guid publishedTabulationId,
+        [FromQuery] Guid? participantId,
+        [FromQuery] Guid? viewerId,
+        [FromQuery] Guid? testConsultantId,
+        [FromServices] IParticipantTabulationService participantTabulationService,
+        CancellationToken cancellationToken)
+    {
+        var report = await participantTabulationService.GetPublishedTabulationForUserAsync(publishedTabulationId, participantId, viewerId, testConsultantId, cancellationToken);
+        return report is null ? NotFound() : Ok(report);
+    }
+
+    [HttpGet("published-tabulations/{publishedTabulationId:guid}/tests/{testId:guid}/assessment-results/for-user")]
+    [ProducesResponseType<AssessmentResultsResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<AssessmentResultsResponse>> GetAssessmentResultsForUser(
+        Guid publishedTabulationId,
+        Guid testId,
+        [FromQuery] Guid? participantId,
+        [FromQuery] Guid? viewerId,
+        [FromQuery] Guid? testConsultantId,
+        [FromServices] IParticipantTabulationService participantTabulationService,
+        CancellationToken cancellationToken)
+    {
+        var results = await participantTabulationService.GetAssessmentResultsForUserAsync(publishedTabulationId, testId, participantId, viewerId, testConsultantId, cancellationToken);
+        return results is null ? NotFound() : Ok(results);
+    }
+
+    [HttpGet("published-tabulations/{publishedTabulationId:guid}/attachments/{attachmentId:guid}/for-user")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetPublishedTabulationAttachmentForUser(
+        Guid publishedTabulationId,
+        Guid attachmentId,
+        [FromQuery] Guid? participantId,
+        [FromQuery] Guid? viewerId,
+        [FromQuery] Guid? testConsultantId,
+        [FromServices] IParticipantTabulationService participantTabulationService,
+        CancellationToken cancellationToken)
+    {
+        var attachment = await participantTabulationService.GetAttachmentForUserAsync(publishedTabulationId, attachmentId, participantId, viewerId, testConsultantId, cancellationToken);
+        return attachment is null ? NotFound() : AttachmentFile(attachment);
+    }
+
     private async Task<IActionResult> Attachment(
         ITabulationReportService tabulationReportService, Guid tabulationId, bool isPublished, Guid attachmentId, CancellationToken cancellationToken)
     {

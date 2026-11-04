@@ -141,33 +141,57 @@ public sealed class SchemeRepository(IDbConnectionFactory connectionFactory) : I
     public async Task<CoreScheme> CreateAsync(CoreScheme scheme, CancellationToken cancellationToken = default)
     {
         using var connection = connectionFactory.CreateConnection();
+        var db = new Db(connection, null);
 
-        await connection.ExecuteAsync(InsertSql, BuildParameters(scheme));
-        await SavePricesAsync(connection, scheme);
-        await SaveChildCollectionsAsync(connection, scheme, cancellationToken);
+        await db.ExecuteAsync(InsertSql, BuildParameters(scheme));
+        await SavePricesAsync(db, scheme);
+        await SaveChildCollectionsAsync(db, scheme, await GetByIdAsync(scheme.SchemeId, cancellationToken), null);
         var created = await GetByIdAsync(scheme.SchemeId, cancellationToken);
         return created ?? throw new InvalidOperationException($"Scheme {scheme.SchemeId} was inserted but could not be re-read.");
     }
 
-    public async Task<CoreScheme?> UpdateAsync(CoreScheme scheme, CancellationToken cancellationToken = default)
+    // Legacy Scheme.DataPortal_Update ran in a TransactionScope, so the audit rows and every child write
+    // commit together or not at all. What is already stored is read first, on its own connection: the
+    // transaction holds locks on the rows it is about to change.
+    public async Task<CoreScheme?> UpdateAsync(CoreScheme scheme, SchemeAuditWrite? audit = null, CancellationToken cancellationToken = default)
     {
-        using var connection = connectionFactory.CreateConnection();
+        var existing = await GetByIdAsync(scheme.SchemeId, cancellationToken);
 
-        var rowsAffected = await connection.ExecuteAsync(UpdateSql, BuildParameters(scheme));
+        using var connection = connectionFactory.CreateConnection();
+        connection.Open();
+        using var transaction = connection.BeginTransaction();
+        var db = new Db(connection, transaction);
+
+        var rowsAffected = await db.ExecuteAsync(UpdateSql, BuildParameters(scheme));
         if (rowsAffected == 0)
         {
             return null;
         }
 
-        await SavePricesAsync(connection, scheme);
-        await SaveChildCollectionsAsync(connection, scheme, cancellationToken);
+        // The spiAudit* procedures copy the stored (old) values, so they run before the writes below.
+        if (audit is not null)
+        {
+            await WriteAuditAsync(db, audit);
+        }
+
+        await SavePricesAsync(db, scheme);
+        await SaveChildCollectionsAsync(db, scheme, existing, audit);
+        transaction.Commit();
+
         return await GetByIdAsync(scheme.SchemeId, cancellationToken);
+    }
+
+    // One connection and, for an update, the transaction every write below joins.
+    private readonly record struct Db(IDbConnection Connection, IDbTransaction? Transaction)
+    {
+        public Task<int> ExecuteAsync(string sql, object? parameters = null) =>
+            Connection.ExecuteAsync(sql, parameters, Transaction);
     }
 
     // Legacy SchemeCurrencyCollection.Update: insert rows that have no id yet, update the rest.
     // There is no spdSchemeCurrency, so a currency link is never deleted. Arguments are bound by
     // name - a positional EXEC would silently depend on the procedure's declaration order.
-    private static async Task SavePricesAsync(IDbConnection connection, CoreScheme scheme)
+    private static async Task SavePricesAsync(Db db, CoreScheme scheme)
     {
         foreach (var price in scheme.Prices)
         {
@@ -181,7 +205,7 @@ public sealed class SchemeRepository(IDbConnectionFactory connectionFactory) : I
                 ? "EXEC dbo.spiSchemeCurrency @SchemeCurrencyId = @SchemeCurrencyId, @SchemeId = @SchemeId, @CurrencyId = @CurrencyId, @Price = @Price"
                 : "EXEC dbo.spuSchemeCurrency @SchemeCurrencyId = @SchemeCurrencyId, @SchemeId = @SchemeId, @CurrencyId = @CurrencyId, @Price = @Price";
 
-            await connection.ExecuteAsync(sql, new
+            await db.ExecuteAsync(sql, new
             {
                 price.SchemeCurrencyId,
                 scheme.SchemeId,
@@ -194,19 +218,18 @@ public sealed class SchemeRepository(IDbConnectionFactory connectionFactory) : I
     // The Tests and Results Tabulations tabs are staged in the form and written as a unit, in
     // legacy's order: Tests.UpdateNotDelete, then Tabulations.Update, then Tests.UpdateDeleteOnly.
     // Deleting tests last matters because tabulation link rows reference their items.
-    private async Task SaveChildCollectionsAsync(IDbConnection connection, CoreScheme scheme, CancellationToken cancellationToken)
+    private static async Task SaveChildCollectionsAsync(Db db, CoreScheme scheme, CoreScheme? existing, SchemeAuditWrite? audit)
     {
-        var existing = await GetByIdAsync(scheme.SchemeId, cancellationToken);
         var existingTests = existing?.Tests ?? [];
 
-        await SaveTestsAsync(connection, scheme, existingTests);
-        await SaveTabulationsAsync(connection, scheme, existing?.Tabulations ?? []);
-        await DeleteRemovedAsync(connection, scheme, existingTests);
+        await SaveTestsAsync(db, scheme, existingTests);
+        await SaveTabulationsAsync(db, scheme, existing?.Tabulations ?? [], audit);
+        await DeleteRemovedAsync(db, scheme, existingTests);
     }
 
     // Ids are generated client-side when an item is staged (legacy does the same), so a row is
     // new when it is not already present rather than when its id is empty.
-    private static async Task SaveTestsAsync(IDbConnection connection, CoreScheme scheme, IList<SchemeTest> existingTests)
+    private static async Task SaveTestsAsync(Db db, CoreScheme scheme, IList<SchemeTest> existingTests)
     {
         var existingTestIds = existingTests.Select(t => t.TestId).ToHashSet();
         var existingResultItemIds = existingTests.SelectMany(t => t.ResultItems).Select(i => i.TestResultItemId).ToHashSet();
@@ -224,19 +247,19 @@ public sealed class SchemeRepository(IDbConnectionFactory connectionFactory) : I
                 test.TestId = Guid.NewGuid();
             }
 
-            await UpsertAsync(connection, !existingTestIds.Contains(test.TestId),
+            await UpsertAsync(db, !existingTestIds.Contains(test.TestId),
                 "EXEC dbo.spiTest @TestId = @TestId, @TestTypeId = @TestTypeId, @SchemeId = @SchemeId, @Order = @Order",
                 "EXEC dbo.spuTest @TestId = @TestId, @TestTypeId = @TestTypeId, @SchemeId = @SchemeId, @Order = @Order",
                 () => new { test.TestId, test.TestTypeId, test.SchemeId, test.Order });
 
-            await SaveTestChildrenAsync(connection, test, existingResultItemIds, existingMethodItemIds, existingCategoryIds, existingCriterionIds);
+            await SaveTestChildrenAsync(db, test, existingResultItemIds, existingMethodItemIds, existingCategoryIds, existingCriterionIds);
         }
     }
 
     // Legacy TabulationCollection.Update: upsert each tabulation, reconcile its item links by
     // insert/delete (neither link table has an update procedure), then delete tabulations that
     // are no longer present.
-    private static async Task SaveTabulationsAsync(IDbConnection connection, CoreScheme scheme, IList<SchemeTabulation> existingTabulations)
+    private static async Task SaveTabulationsAsync(Db db, CoreScheme scheme, IList<SchemeTabulation> existingTabulations, SchemeAuditWrite? audit)
     {
         foreach (var tabulation in scheme.Tabulations)
         {
@@ -247,7 +270,7 @@ public sealed class SchemeRepository(IDbConnectionFactory connectionFactory) : I
             }
 
             var isNew = existingTabulations.All(t => t.TabulationId != tabulation.TabulationId);
-            await UpsertAsync(connection, isNew,
+            await UpsertAsync(db, isNew,
                 "EXEC dbo.spiTabulation @TabulationId = @TabulationId, @SchemeId = @SchemeId, @Name = @Name, @IntendedResultsOnly = @IntendedResultsOnly, @SingleParticipantTabulation = @SingleParticipantTabulation, @ShowRatings = @ShowRatings, @AvailableToParticipants = @AvailableToParticipants, @AvailableToViewers = @AvailableToViewers",
                 "EXEC dbo.spuTabulation @TabulationId = @TabulationId, @SchemeId = @SchemeId, @Name = @Name, @IntendedResultsOnly = @IntendedResultsOnly, @SingleParticipantTabulation = @SingleParticipantTabulation, @ShowRatings = @ShowRatings, @AvailableToParticipants = @AvailableToParticipants, @AvailableToViewers = @AvailableToViewers",
                 () => new
@@ -263,10 +286,10 @@ public sealed class SchemeRepository(IDbConnectionFactory connectionFactory) : I
                 });
 
             var existingLinks = existingTabulations.FirstOrDefault(t => t.TabulationId == tabulation.TabulationId);
-            await SyncItemLinksAsync(connection, tabulation.TabulationId, tabulation.ResultItemIds, existingLinks?.ResultItemLinks ?? [],
+            await SyncItemLinksAsync(db, tabulation.TabulationId, tabulation.ResultItemIds, existingLinks?.ResultItemLinks ?? [], audit?.Plan.ResultLinks,
                 "EXEC dbo.spdTabulationTestResultItem @TabulationTestResultItemId = @LinkId",
                 "EXEC dbo.spiTabulationTestResultItem @TabulationTestResultItemId = @LinkId, @TabulationId = @TabulationId, @TestResultItemId = @ItemId");
-            await SyncItemLinksAsync(connection, tabulation.TabulationId, tabulation.MethodItemIds, existingLinks?.MethodItemLinks ?? [],
+            await SyncItemLinksAsync(db, tabulation.TabulationId, tabulation.MethodItemIds, existingLinks?.MethodItemLinks ?? [], audit?.Plan.MethodLinks,
                 "EXEC dbo.spdTabulationTestMethodItem @TabulationTestMethodItemId = @LinkId",
                 "EXEC dbo.spiTabulationTestMethodItem @TabulationTestMethodItemId = @LinkId, @TabulationId = @TabulationId, @TestMethodItemId = @ItemId");
         }
@@ -275,7 +298,7 @@ public sealed class SchemeRepository(IDbConnectionFactory connectionFactory) : I
         foreach (var removed in existingTabulations.Where(t => !keptTabulations.Contains(t.TabulationId)))
         {
             // spdTabulation cascades to both link tables.
-            await connection.ExecuteAsync("EXEC dbo.spdTabulation @TabulationId", new { removed.TabulationId });
+            await db.ExecuteAsync("EXEC dbo.spdTabulation @TabulationId", new { removed.TabulationId });
         }
     }
 
@@ -283,10 +306,11 @@ public sealed class SchemeRepository(IDbConnectionFactory connectionFactory) : I
     // The delete and insert SQL are complete literal command texts supplied by the caller - this
     // method only chooses between them and binds parameters, so there is no dynamically built SQL.
     private static async Task SyncItemLinksAsync(
-        IDbConnection connection,
+        Db db,
         Guid tabulationId,
         IList<Guid> requestedItemIds,
         IList<SchemeTabulationItemLink> existingLinks,
+        IReadOnlyList<SchemeTabulationLinkAudit>? plannedLinks,
         string deleteSql,
         string insertSql)
     {
@@ -294,30 +318,32 @@ public sealed class SchemeRepository(IDbConnectionFactory connectionFactory) : I
 
         foreach (var link in existingLinks.Where(l => !requested.Contains(l.ItemId)))
         {
-            await connection.ExecuteAsync(deleteSql, new { link.LinkId });
+            await db.ExecuteAsync(deleteSql, new { link.LinkId });
         }
 
         var alreadyLinked = existingLinks.Select(l => l.ItemId).ToHashSet();
         foreach (var itemId in requested.Where(id => !alreadyLinked.Contains(id)))
         {
-            await connection.ExecuteAsync(insertSql, new { LinkId = Guid.NewGuid(), TabulationId = tabulationId, ItemId = itemId });
+            // An audited save already wrote this link's audit row under the id chosen when it was planned.
+            var linkId = plannedLinks?.FirstOrDefault(l => l.Operation == SchemeAuditOperation.Insert && l.TabulationId == tabulationId && l.ItemId == itemId)?.LinkId ?? Guid.NewGuid();
+            await db.ExecuteAsync(insertSql, new { LinkId = linkId, TabulationId = tabulationId, ItemId = itemId });
         }
     }
 
     private static async Task SaveTestChildrenAsync(
-        IDbConnection connection,
+        Db db,
         SchemeTest test,
         HashSet<Guid> existingResultItemIds,
         HashSet<Guid> existingMethodItemIds,
         HashSet<Guid> existingCategoryIds,
         HashSet<Guid> existingCriterionIds)
     {
-        await SaveResultItemsAsync(connection, test, existingResultItemIds);
-        await SaveMethodItemsAsync(connection, test, existingMethodItemIds);
-        await SaveCategoriesAsync(connection, test, existingCategoryIds, existingCriterionIds);
+        await SaveResultItemsAsync(db, test, existingResultItemIds);
+        await SaveMethodItemsAsync(db, test, existingMethodItemIds);
+        await SaveCategoriesAsync(db, test, existingCategoryIds, existingCriterionIds);
     }
 
-    private static async Task SaveResultItemsAsync(IDbConnection connection, SchemeTest test, HashSet<Guid> existingResultItemIds)
+    private static async Task SaveResultItemsAsync(Db db, SchemeTest test, HashSet<Guid> existingResultItemIds)
     {
         for (var i = 0; i < test.ResultItems.Count; i++)
         {
@@ -329,14 +355,14 @@ public sealed class SchemeRepository(IDbConnectionFactory connectionFactory) : I
                 item.TestResultItemId = Guid.NewGuid();
             }
 
-            await UpsertAsync(connection, !existingResultItemIds.Contains(item.TestResultItemId),
+            await UpsertAsync(db, !existingResultItemIds.Contains(item.TestResultItemId),
                 "EXEC dbo.spiTestResultItem @TestResultItemId = @TestResultItemId, @TestResultItemTypeId = @TestResultItemTypeId, @TestId = @TestId, @Order = @Order",
                 "EXEC dbo.spuTestResultItem @TestResultItemId = @TestResultItemId, @TestResultItemTypeId = @TestResultItemTypeId, @TestId = @TestId, @Order = @Order",
                 () => new { item.TestResultItemId, item.TestResultItemTypeId, item.TestId, item.Order });
         }
     }
 
-    private static async Task SaveMethodItemsAsync(IDbConnection connection, SchemeTest test, HashSet<Guid> existingMethodItemIds)
+    private static async Task SaveMethodItemsAsync(Db db, SchemeTest test, HashSet<Guid> existingMethodItemIds)
     {
         for (var i = 0; i < test.MethodItems.Count; i++)
         {
@@ -348,7 +374,7 @@ public sealed class SchemeRepository(IDbConnectionFactory connectionFactory) : I
                 item.TestMethodItemId = Guid.NewGuid();
             }
 
-            await UpsertAsync(connection, !existingMethodItemIds.Contains(item.TestMethodItemId),
+            await UpsertAsync(db, !existingMethodItemIds.Contains(item.TestMethodItemId),
                 "EXEC dbo.spiTestMethodItem @TestMethodItemId = @TestMethodItemId, @TestMethodItemTypeId = @TestMethodItemTypeId, @TestId = @TestId, @Order = @Order",
                 "EXEC dbo.spuTestMethodItem @TestMethodItemId = @TestMethodItemId, @TestMethodItemTypeId = @TestMethodItemTypeId, @TestId = @TestId, @Order = @Order",
                 () => new { item.TestMethodItemId, item.TestMethodItemTypeId, item.TestId, item.Order });
@@ -358,7 +384,7 @@ public sealed class SchemeRepository(IDbConnectionFactory connectionFactory) : I
     // spuCategoryItem / spuCriterionItem only take the id and the order - the type and parent are
     // fixed at insert time.
     private static async Task SaveCategoriesAsync(
-        IDbConnection connection,
+        Db db,
         SchemeTest test,
         HashSet<Guid> existingCategoryIds,
         HashSet<Guid> existingCriterionIds)
@@ -375,22 +401,22 @@ public sealed class SchemeRepository(IDbConnectionFactory connectionFactory) : I
 
             if (!existingCategoryIds.Contains(category.CategoryItemId))
             {
-                await connection.ExecuteAsync(
+                await db.ExecuteAsync(
                     "EXEC dbo.spiCategoryItem @CategoryItemId = @CategoryItemId, @CategoryItemTypeId = @CategoryItemTypeId, @TestId = @TestId, @Order = @Order",
                     new { category.CategoryItemId, category.CategoryItemTypeId, category.TestId, category.Order });
             }
             else
             {
-                await connection.ExecuteAsync(
+                await db.ExecuteAsync(
                     "EXEC dbo.spuCategoryItem @CategoryItemId = @CategoryItemId, @Order = @Order",
                     new { category.CategoryItemId, category.Order });
             }
 
-            await SaveCriteriaAsync(connection, category, existingCriterionIds);
+            await SaveCriteriaAsync(db, category, existingCriterionIds);
         }
     }
 
-    private static async Task SaveCriteriaAsync(IDbConnection connection, SchemeCategoryItem category, HashSet<Guid> existingCriterionIds)
+    private static async Task SaveCriteriaAsync(Db db, SchemeCategoryItem category, HashSet<Guid> existingCriterionIds)
     {
         for (var j = 0; j < category.Criteria.Count; j++)
         {
@@ -404,13 +430,13 @@ public sealed class SchemeRepository(IDbConnectionFactory connectionFactory) : I
 
             if (!existingCriterionIds.Contains(criterion.CriterionItemId))
             {
-                await connection.ExecuteAsync(
+                await db.ExecuteAsync(
                     "EXEC dbo.spiCriterionItem @CriterionItemId = @CriterionItemId, @CriterionItemTypeId = @CriterionItemTypeId, @CategoryItemId = @CategoryItemId, @Order = @Order",
                     new { criterion.CriterionItemId, criterion.CriterionItemTypeId, criterion.CategoryItemId, criterion.Order });
             }
             else
             {
-                await connection.ExecuteAsync(
+                await db.ExecuteAsync(
                     "EXEC dbo.spuCriterionItem @CriterionItemId = @CriterionItemId, @Order = @Order",
                     new { criterion.CriterionItemId, criterion.Order });
             }
@@ -419,10 +445,10 @@ public sealed class SchemeRepository(IDbConnectionFactory connectionFactory) : I
 
     // The insert and update SQL are complete literal command texts supplied by the caller - this
     // method only chooses between them, so there is no dynamically built SQL to flag.
-    private static async Task UpsertAsync(IDbConnection connection, bool isNew, string insertSql, string updateSql, Func<object> parameters) =>
-        await connection.ExecuteAsync(isNew ? insertSql : updateSql, parameters());
+    private static async Task UpsertAsync(Db db, bool isNew, string insertSql, string updateSql, Func<object> parameters) =>
+        await db.ExecuteAsync(isNew ? insertSql : updateSql, parameters());
 
-    private static async Task DeleteRemovedAsync(IDbConnection connection, CoreScheme scheme, IList<SchemeTest> existingTests)
+    private static async Task DeleteRemovedAsync(Db db, CoreScheme scheme, IList<SchemeTest> existingTests)
     {
         var keptTests = scheme.Tests.Select(t => t.TestId).ToHashSet();
         var keptResultItems = scheme.Tests.SelectMany(t => t.ResultItems).Select(i => i.TestResultItemId).ToHashSet();
@@ -434,30 +460,125 @@ public sealed class SchemeRepository(IDbConnectionFactory connectionFactory) : I
         {
             foreach (var criterion in test.Categories.SelectMany(c => c.Criteria).Where(c => !keptCriteria.Contains(c.CriterionItemId)))
             {
-                await connection.ExecuteAsync("EXEC dbo.spdCriterionItem @CriterionItemId", new { criterion.CriterionItemId });
+                await db.ExecuteAsync("EXEC dbo.spdCriterionItem @CriterionItemId", new { criterion.CriterionItemId });
             }
 
             foreach (var category in test.Categories.Where(c => !keptCategories.Contains(c.CategoryItemId)))
             {
-                await connection.ExecuteAsync("EXEC dbo.spdCategoryItem @CategoryItemId", new { category.CategoryItemId });
+                await db.ExecuteAsync("EXEC dbo.spdCategoryItem @CategoryItemId", new { category.CategoryItemId });
             }
 
             foreach (var item in test.ResultItems.Where(i => !keptResultItems.Contains(i.TestResultItemId)))
             {
-                await connection.ExecuteAsync("EXEC dbo.spdTestResultItem @TestResultItemId", new { item.TestResultItemId });
+                await db.ExecuteAsync("EXEC dbo.spdTestResultItem @TestResultItemId", new { item.TestResultItemId });
             }
 
             foreach (var item in test.MethodItems.Where(i => !keptMethodItems.Contains(i.TestMethodItemId)))
             {
-                await connection.ExecuteAsync("EXEC dbo.spdTestMethodItem @TestMethodItemId", new { item.TestMethodItemId });
+                await db.ExecuteAsync("EXEC dbo.spdTestMethodItem @TestMethodItemId", new { item.TestMethodItemId });
             }
 
             if (!keptTests.Contains(test.TestId))
             {
-                await connection.ExecuteAsync("EXEC dbo.spdTest @TestId", new { test.TestId });
+                await db.ExecuteAsync("EXEC dbo.spdTest @TestId", new { test.TestId });
             }
         }
     }
+
+    // Every spiAudit* procedure copies the row's stored (old) values, so these run before any write.
+    // Parameters are bound by name; the names are the procedures' own (see ProficiencyTestingDatabase).
+    private static async Task WriteAuditAsync(Db db, SchemeAuditWrite audit)
+    {
+        var plan = audit.Plan;
+
+        foreach (var test in plan.Tests)
+        {
+            await db.ExecuteAsync(
+                "EXEC dbo.spiAuditTest @TestId = @Id, @AuditWho = @AuditWho, @AuditWhy = @AuditWhy, @TestTypeId = @TypeId, @TestTypeIdUpdate = @TypeChanged, @Order = @Order, @OrderUpdate = @OrderChanged, @IsDeleted = @IsDeleted",
+                ItemAuditArguments(test, audit));
+        }
+
+        foreach (var item in plan.TestMethodItems)
+        {
+            await db.ExecuteAsync(
+                "EXEC dbo.spiAuditTestMethodItem @TestMethodItemId = @Id, @AuditWho = @AuditWho, @AuditWhy = @AuditWhy, @TestMethodItemTypeId = @TypeId, @TestMethodItemTypeIdUpdate = @TypeChanged, @Order = @Order, @OrderUpdate = @OrderChanged, @IsDeleted = @IsDeleted",
+                ItemAuditArguments(item, audit));
+        }
+
+        foreach (var item in plan.TestResultItems)
+        {
+            await db.ExecuteAsync(
+                "EXEC dbo.spiAuditTestResultItem @TestResultItemId = @Id, @AuditWho = @AuditWho, @AuditWhy = @AuditWhy, @TestResultItemTypeId = @TypeId, @TestResultItemTypeIdUpdate = @TypeChanged, @Order = @Order, @OrderUpdate = @OrderChanged, @IsDeleted = @IsDeleted",
+                ItemAuditArguments(item, audit));
+        }
+
+        foreach (var category in plan.CategoryItems)
+        {
+            await db.ExecuteAsync(
+                "EXEC dbo.spiAuditCategoryItem @CategoryItemId = @Id, @AuditWho = @AuditWho, @AuditWhy = @AuditWhy, @Order = @Order, @OrderUpdate = @OrderChanged, @CategoryItemTypeId = @TypeId, @IsDeleted = @IsDeleted",
+                ItemAuditArguments(category, audit));
+        }
+
+        foreach (var criterion in plan.CriterionItems)
+        {
+            await db.ExecuteAsync(
+                "EXEC dbo.spiAuditCriterionItem @CriterionItemId = @Id, @AuditWho = @AuditWho, @AuditWhy = @AuditWhy, @Order = @Order, @OrderUpdate = @OrderChanged, @CriterionItemTypeId = @TypeId, @IsDeleted = @IsDeleted",
+                ItemAuditArguments(criterion, audit));
+        }
+
+        foreach (var tabulation in plan.Tabulations)
+        {
+            await db.ExecuteAsync(
+                "EXEC dbo.spiAuditTabulation @TabulationId = @Id, @AuditWho = @AuditWho, @AuditWhy = @AuditWhy, @Name = @Name, @NameUpdate = @NameChanged, @IntendedResultsOnly = @IntendedResultsOnly, @IntendedResultsOnlyUpdate = @IntendedResultsOnlyChanged, @IsDeleted = @IsDeleted",
+                new
+                {
+                    tabulation.Id,
+                    audit.AuditWho,
+                    audit.AuditWhy,
+                    tabulation.Name,
+                    tabulation.NameChanged,
+                    tabulation.IntendedResultsOnly,
+                    tabulation.IntendedResultsOnlyChanged,
+                    IsDeleted = tabulation.Operation == SchemeAuditOperation.Delete,
+                });
+        }
+
+        foreach (var link in plan.MethodLinks)
+        {
+            await db.ExecuteAsync(
+                "EXEC dbo.spiAuditTabulationTestMethodItem @TabulationTestMethodItemId = @LinkId, @AuditWho = @AuditWho, @AuditWhy = @AuditWhy, @TabulationId = @TabulationId, @TabulationIdUpdate = 0, @TestMethodItemId = @ItemId, @TestMethodItemIdUpdate = 0, @IsDeleted = @IsDeleted",
+                LinkAuditArguments(link, audit));
+        }
+
+        foreach (var link in plan.ResultLinks)
+        {
+            await db.ExecuteAsync(
+                "EXEC dbo.spiAuditTabulationTestResultItem @TabulationTestResultItemId = @LinkId, @AuditWho = @AuditWho, @AuditWhy = @AuditWhy, @TabulationId = @TabulationId, @TabulationIdUpdate = 0, @TestResultItemId = @ItemId, @TestResultItemIdUpdate = 0, @IsDeleted = @IsDeleted",
+                LinkAuditArguments(link, audit));
+        }
+    }
+
+    private static object ItemAuditArguments(SchemeItemAudit item, SchemeAuditWrite audit) => new
+    {
+        item.Id,
+        audit.AuditWho,
+        audit.AuditWhy,
+        item.TypeId,
+        item.TypeChanged,
+        item.Order,
+        item.OrderChanged,
+        IsDeleted = item.Operation == SchemeAuditOperation.Delete,
+    };
+
+    private static object LinkAuditArguments(SchemeTabulationLinkAudit link, SchemeAuditWrite audit) => new
+    {
+        link.LinkId,
+        audit.AuditWho,
+        audit.AuditWhy,
+        link.TabulationId,
+        link.ItemId,
+        IsDeleted = link.Operation == SchemeAuditOperation.Delete,
+    };
 
     private const string InsertSql =
         "EXEC dbo.spiScheme @SchemeId, @SharedId, @YearId, @Identifier, @Name, @ScheduleId, @ScheduleCodeId, @StartDate, @DistributionMonthJan, @DistributionMonthFeb, @DistributionMonthMar, @DistributionMonthApr, @DistributionMonthMay, @DistributionMonthJun, @DistributionMonthJul, @DistributionMonthAug, @DistributionMonthSep, @DistributionMonthOct, @DistributionMonthNov, @DistributionMonthDec, @DistributionAsAvailable, @WeekNumber, @DayOfWeekId, @Deadline, @Pilot, @Accredited, @ComerciallyAvailable, @LimitedSampleAvailability, @NoVLALabs, @CombinedPackaging, @SampleOrigin, @Subcontractor, @NumberOfSamples, @SamplePackingInstructions, @TestConsultant1, @TestConsultant2, @TestConsultant3, @CommentsRequired, @DateOfReceipt, @StorageConditions, @ConditionOnReceipt, @Instructions, @TestConsultantTabulationId, @UseExternalReference, @LastModified, @StoreRatings, @Assessor1, @Assessor2, @Assessor3, @Assessor4, @RequiresAssessment, @StandardTabulationText, @Postage, @CustomsDocumentDescription, @CustomsDocumentVolume, @DataConsentDeclarationActive, @DataConsentDeclarationText";

@@ -548,7 +548,7 @@ public class ParticipantSchemeControllerTests
         };
         var controller = CreateController(contractApiClient: contractApiClient, schemeApiClient: schemeApiClient);
 
-        var result = await controller.Create(contractId, customerId, schemeSearchTerm: "sal");
+        var result = await controller.Create(contractId, customerId, schemeList: new SchemeListQuery(SchemeSearchTerm: "sal"));
 
         var view = Assert.IsType<ViewResult>(result);
         var model = Assert.IsType<ParticipantSchemeFormViewModel>(view.Model);
@@ -561,6 +561,42 @@ public class ParticipantSchemeControllerTests
         Assert.Equal("Create", pagination.Action);
         Assert.Equal(contractId, pagination.RouteValues["contractId"]);
         Assert.Equal("sal", pagination.RouteValues["schemeSearchTerm"]);
+    }
+
+    [Fact]
+    public async Task Create_Get_PassesThePageAndPageSizeToTheSchemeSearch()
+    {
+        var contractId = Guid.NewGuid();
+        var customerId = Guid.NewGuid();
+        var contractApiClient = new FakeContractApiClient { ContractResponse = SampleContract(contractId, customerId) with { YearId = DateTime.UtcNow.Year } };
+        var schemeApiClient = new FakeSchemeApiClient { SearchResponse = new SchemeSearchResponse([], 120, 2, 50) };
+        var controller = CreateController(contractApiClient: contractApiClient, schemeApiClient: schemeApiClient);
+
+        var result = await controller.Create(contractId, customerId, schemeList: new SchemeListQuery(Page: 2, PageSize: 50));
+
+        var model = Assert.IsType<ParticipantSchemeFormViewModel>(Assert.IsType<ViewResult>(result).Model);
+        Assert.Equal((2, 50), (schemeApiClient.LastSearchRequest!.Page, schemeApiClient.LastSearchRequest.PageSize));
+        Assert.Equal((2, 50), (model.SchemePagination.CurrentPage, model.SchemePagination.PageSize));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData(0)]
+    [InlineData(7)]
+    [InlineData(1000)]
+    public async Task Create_Get_MissingOrUnsupportedPageSize_FallsBackToTheDefault(int? pageSize)
+    {
+        var contractId = Guid.NewGuid();
+        var customerId = Guid.NewGuid();
+        var contractApiClient = new FakeContractApiClient { ContractResponse = SampleContract(contractId, customerId) with { YearId = DateTime.UtcNow.Year } };
+        var schemeApiClient = new FakeSchemeApiClient();
+        var controller = CreateController(contractApiClient: contractApiClient, schemeApiClient: schemeApiClient);
+
+        var result = await controller.Create(contractId, customerId, schemeList: new SchemeListQuery(PageSize: pageSize));
+
+        var model = Assert.IsType<ParticipantSchemeFormViewModel>(Assert.IsType<ViewResult>(result).Model);
+        Assert.Equal(25, schemeApiClient.LastSearchRequest!.PageSize);
+        Assert.Equal(25, model.SchemePagination.PageSize);
     }
 
     private static SchemeMonthEditabilityResponse MonthsDefined(bool jan = true, bool feb = true) =>

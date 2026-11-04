@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
 using PTL.Contracts.Distribution;
+using PTL.Core.Audit;
 using PTL.Core.Distribution;
 
 namespace PTL.Api.Controllers;
@@ -20,8 +21,10 @@ public sealed partial class DistributionController(
     IResultsReceiptService resultsReceiptService,
     ITabulationsService tabulationsService,
     IActualResultsService actualResultsService,
+    IParticipantDistributionHistoryService participantDistributionHistoryService,
     IPackagingService packagingService,
     IPackagingOutputService packagingOutputService,
+    IAuditActorResolver auditActor,
     ILogger<DistributionController> logger) : ControllerBase
 {
     private static readonly Action<ILogger, Guid, Exception?> LogStructureCreationFailedMessage =
@@ -46,6 +49,16 @@ public sealed partial class DistributionController(
     {
         var years = await distributionService.GetYearOptionsAsync(cancellationToken);
         return Ok(years.Select(y => new DistributionYearOptionResponse(y.YearId, y.Label)).ToList());
+    }
+
+    // GET /api/distributions/participants/{participantId}/history - the ExternalWeb Previous
+    // Distributions screen, legacy PastDistributionCollection.FetchPastDistributionCollection.
+    [HttpGet("participants/{participantId:guid}/history")]
+    public async Task<ActionResult<ParticipantPastDistributionListResponse>> GetParticipantDistributionHistory(
+        Guid participantId, CancellationToken cancellationToken)
+    {
+        var history = await participantDistributionHistoryService.GetParticipantDistributionHistoryAsync(participantId, cancellationToken);
+        return Ok(new ParticipantPastDistributionListResponse([.. history.Select(ToResponse)]));
     }
 
     // GET /api/distributions/months/{yearId}/{monthId}/schedule - the Monthly Distributions
@@ -188,6 +201,18 @@ public sealed partial class DistributionController(
         return page is null ? NotFound() : Ok(ToResponse(page));
     }
 
+    // GET /api/distributions/schemes/{monthlyDistributionSchemeId}/participant-results?participantId=... -
+    // ExternalWeb's read-only View Results screen (legacy ResultsView.aspx). Resolves the
+    // participant's own DistributionParticipantId server-side, so a participant can never request
+    // someone else's results by supplying a different id.
+    [HttpGet("schemes/{monthlyDistributionSchemeId:guid}/participant-results")]
+    public async Task<ActionResult<ActualResultsResponse>> GetActualResultsForParticipant(
+        Guid monthlyDistributionSchemeId, [FromQuery] Guid participantId, CancellationToken cancellationToken)
+    {
+        var page = await participantDistributionHistoryService.GetActualResultsForParticipantAsync(participantId, monthlyDistributionSchemeId, cancellationToken);
+        return page is null ? NotFound() : Ok(ToResponse(page));
+    }
+
     // PUT /api/distributions/schemes/{monthlyDistributionSchemeId}/participants/{distributionParticipantId}/actual-results -
     // legacy ActualResults.aspx ButtonSave_Click / ButtonApply_Click -> ActualResultsSet.Save() (the
     // save-vs-stay distinction is owned by InternalWeb).
@@ -198,8 +223,9 @@ public sealed partial class DistributionController(
         var update = new ActualResultsUpdate(
             [.. request.SampleValues.Select(v => new ActualResultsSampleValueUpdate(v.SampleResultItemId, v.Result))],
             [.. request.MethodItems.Select(m => new ActualResultsMethodItemUpdate(m.TestMethodItemId, m.Result))],
-            User?.Identity?.Name ?? "Guest",
-            request.AuditWhy ?? string.Empty);
+            await AuditWhoAsync(cancellationToken),
+            request.AuditWhy ?? string.Empty,
+            request.Submitted);
 
         var outcome = await actualResultsService.SaveActualResultsAsync(distributionParticipantId, monthlyDistributionSchemeId, update, cancellationToken);
 
@@ -253,7 +279,8 @@ public sealed partial class DistributionController(
 
     // PUT /api/distributions/months/{yearId}/{monthId}/packaging - legacy ButtonSave_Click /
     // ButtonApply_Click, which save every packaging sheet the user touched (the save-vs-stay
-    // distinction is owned by InternalWeb).
+    // distinction is owned by InternalWeb). The Distribution Posted emails of newly posted rows are
+    // handed to the background worker once the save has committed.
     [HttpPut("months/{yearId:int}/{monthId:int}/packaging")]
     public async Task<ActionResult<PackagingSaveResult>> SavePackaging(
         int yearId, int monthId, [FromBody] PackagingSaveRequest request, CancellationToken cancellationToken)
@@ -270,7 +297,7 @@ public sealed partial class DistributionController(
         }
 
         var outcome = await packagingService.SavePackagingAsync(yearId, monthId, updates, cancellationToken);
-        return outcome.Success ? Ok(new PackagingSaveResult(true, outcome.EmailFailures ?? [])) : NotFound();
+        return outcome.Success ? Ok(new PackagingSaveResult(true)) : NotFound();
     }
 
     // POST /api/distributions/months/{yearId}/{monthId}/packaging/labels - legacy Print Labels,
@@ -373,7 +400,7 @@ public sealed partial class DistributionController(
                 s.TabulationDescription,
                 s.TestConsultantsDescription,
                 [.. s.Allocations.Select(a => new SampleAllocationUpdate(a.SampleTestId, a.IsApplicable))]))],
-            User?.Identity?.Name ?? "Guest",
+            await AuditWhoAsync(cancellationToken),
             request.AuditWhy ?? string.Empty);
 
         var outcome = await sampleNumbersService.SaveSampleNumbersAsync(monthlyDistributionSchemeId, update, cancellationToken);
@@ -421,7 +448,7 @@ public sealed partial class DistributionController(
                     s.IsApplicable,
                     [.. s.Values.Select(v => new IntendedResultsSampleResultValueUpdate(v.SampleResultItemId, v.IntendedResult, v.IntendedResult2))]))]))],
             request.RequiresAuditReason,
-            User?.Identity?.Name ?? "Guest",
+            await AuditWhoAsync(cancellationToken),
             request.AuditWhy ?? string.Empty);
 
         var outcome = await intendedResultsService.SaveIntendedResultsAsync(monthlyDistributionSchemeId, update, cancellationToken);
@@ -667,4 +694,14 @@ public sealed partial class DistributionController(
             month.PackagingCompletePercentage,
             month.ResultsCompletePercentage,
             month.TabulationsCompletePercentage);
+
+    private static ParticipantPastDistributionResponse ToResponse(ParticipantPastDistributionEntity distribution) =>
+        new(
+            distribution.MonthlyDistributionSchemeId,
+            distribution.DistributionReference,
+            distribution.SchemeCode,
+            distribution.SchemeNameOnly,
+            distribution.DistributionDate,
+            distribution.YearId,
+            distribution.MonthId);
 }

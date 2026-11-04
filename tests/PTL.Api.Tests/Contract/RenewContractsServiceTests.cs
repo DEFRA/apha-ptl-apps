@@ -474,7 +474,7 @@ public sealed class RenewContractsServiceTests
             return Task.FromResult(scheme);
         }
 
-        public Task<CoreScheme?> UpdateAsync(CoreScheme scheme, CancellationToken cancellationToken = default)
+        public Task<CoreScheme?> UpdateAsync(CoreScheme scheme, SchemeAuditWrite? audit = null, CancellationToken cancellationToken = default)
         {
             _schemes[scheme.SchemeId] = scheme;
             return Task.FromResult<CoreScheme?>(scheme);
@@ -523,7 +523,7 @@ public sealed class RenewContractsServiceTests
 
         public Task<CoreScheme> CreateAsync(CoreScheme scheme, CancellationToken cancellationToken = default) => Task.FromResult(scheme);
 
-        public Task<CoreScheme?> UpdateAsync(CoreScheme scheme, CancellationToken cancellationToken = default) => Task.FromResult<CoreScheme?>(scheme);
+        public Task<CoreScheme?> UpdateAsync(CoreScheme scheme, SchemeAuditWrite? audit = null, CancellationToken cancellationToken = default) => Task.FromResult<CoreScheme?>(scheme);
     }
 
     private sealed class TestLookupRepository(SystemSettingsEntity settings, IReadOnlyList<YearEntity> weightedPricingYears) : ILookupRepository

@@ -54,6 +54,17 @@ public sealed class SchemeService(
             new EventId(7, nameof(LogRenewedSchemeMessage)),
             "Built renewal draft from scheme {OldSchemeId} for family {SharedId}, year {YearId}");
 
+    private static readonly Action<ILogger, Guid, Exception?> LogAuditReasonRequiredMessage =
+        LoggerMessage.Define<Guid>(
+            LogLevel.Information,
+            new EventId(8, nameof(LogAuditReasonRequiredMessage)),
+            "Update of scheme {SchemeId} changes audited Tests or Tabulations and needs an audit reason");
+
+    // tblAudit*.fldAuditWho is varchar(50) and fldAuditWhy is varchar(2000).
+    private const int AuditWhoLength = 50;
+    private const int AuditWhyLength = 2000;
+    public const string AuditWhyTooLongMessage = "Input can not exceed 2000 characters";
+
     public Task<Scheme?> GetSchemeAsync(Guid schemeId, CancellationToken cancellationToken = default) =>
         LoadWithViewersAsync(schemeId, cancellationToken);
 
@@ -368,13 +379,13 @@ public sealed class SchemeService(
         return created;
     }
 
-    public async Task<Scheme?> UpdateSchemeAsync(Guid schemeId, Scheme updatedFields, CancellationToken cancellationToken = default)
+    public async Task<SchemeUpdateResult> UpdateSchemeAsync(Guid schemeId, Scheme updatedFields, string auditWho, string? auditWhy, CancellationToken cancellationToken = default)
     {
         var existing = await schemeRepository.GetByIdAsync(schemeId, cancellationToken);
         if (existing is null)
         {
             LogUpdateUnknownSchemeMessage(logger, schemeId, null);
-            return null;
+            return new SchemeUpdateResult(SchemeUpdateStatus.NotFound);
         }
 
         if (existing.IsReadOnly)
@@ -394,16 +405,82 @@ public sealed class SchemeService(
 
         await ValidateAsync(updatedFields, existing, cancellationToken);
 
-        var updated = await schemeRepository.UpdateAsync(updatedFields, cancellationToken);
+        // Detection runs on what will actually be written, so it follows the derived-field rules above.
+        AssignMissingIds(updatedFields);
+        var plan = SchemeAuditDetector.Detect(existing, updatedFields);
+        if (!plan.IsEmpty && string.IsNullOrWhiteSpace(auditWhy))
+        {
+            LogAuditReasonRequiredMessage(logger, schemeId, null);
+            return new SchemeUpdateResult(SchemeUpdateStatus.AuditReasonRequired, null, $"Scheme {updatedFields.Identifier}: {updatedFields.Name}");
+        }
+
+        var audit = BuildAudit(plan, auditWho, auditWhy);
+
+        var updated = await schemeRepository.UpdateAsync(updatedFields, audit, cancellationToken);
         if (updated is null)
         {
-            return null;
+            return new SchemeUpdateResult(SchemeUpdateStatus.NotFound);
         }
 
         await SyncViewersAsync(schemeId, updatedFields.ViewerIds, cancellationToken);
         updated.ViewerIds = updatedFields.ViewerIds;
         LogUpdatedSchemeMessage(logger, schemeId, null);
-        return updated;
+        return new SchemeUpdateResult(SchemeUpdateStatus.Updated, updated);
+    }
+
+    // Null when nothing audited changed. The caller has already refused a blank reason for a plan that has changes.
+    private static SchemeAuditWrite? BuildAudit(SchemeAuditPlan plan, string auditWho, string? auditWhy)
+    {
+        if (plan.IsEmpty)
+        {
+            return null;
+        }
+
+        if (auditWhy!.Length > AuditWhyLength)
+        {
+            throw new SchemeValidationException([new SchemeValidationError("AuditWhy", AuditWhyTooLongMessage)]);
+        }
+
+        return new SchemeAuditWrite(auditWho.Length > AuditWhoLength ? auditWho[..AuditWhoLength] : auditWho, auditWhy, plan);
+    }
+
+    // The repository would give an empty id a new one at save time; the audit rows need that id first.
+    private static void AssignMissingIds(Scheme scheme)
+    {
+        foreach (var test in scheme.Tests)
+        {
+            AssignMissingIds(test);
+        }
+
+        foreach (var tabulation in scheme.Tabulations.Where(t => t.TabulationId == Guid.Empty))
+        {
+            tabulation.TabulationId = Guid.NewGuid();
+        }
+    }
+
+    private static void AssignMissingIds(SchemeTest test)
+    {
+        test.TestId = test.TestId == Guid.Empty ? Guid.NewGuid() : test.TestId;
+
+        foreach (var item in test.ResultItems.Where(i => i.TestResultItemId == Guid.Empty))
+        {
+            item.TestResultItemId = Guid.NewGuid();
+        }
+
+        foreach (var item in test.MethodItems.Where(i => i.TestMethodItemId == Guid.Empty))
+        {
+            item.TestMethodItemId = Guid.NewGuid();
+        }
+
+        foreach (var category in test.Categories)
+        {
+            category.CategoryItemId = category.CategoryItemId == Guid.Empty ? Guid.NewGuid() : category.CategoryItemId;
+
+            foreach (var criterion in category.Criteria.Where(c => c.CriterionItemId == Guid.Empty))
+            {
+                criterion.CriterionItemId = Guid.NewGuid();
+            }
+        }
     }
 
     // Legacy ViewerSchemeCollection.Update: delete the links that were removed, insert the ones

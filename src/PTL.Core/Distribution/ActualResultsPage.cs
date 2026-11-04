@@ -29,12 +29,14 @@ public sealed record ActualResultsSampleRow(Guid SampleId, string SampleNumber, 
 
 public sealed record ActualResultsSampleValue(Guid SampleResultItemId, Guid TestResultItemId, string Result);
 
-// The posted form - only the controls legacy rendered (applicable samples) are present.
+// The posted form - only the controls legacy rendered (applicable samples) are present. Submitted is
+// the external participant's Submit (true) / Save (false) choice; null (InternalWeb) leaves it untouched.
 public sealed record ActualResultsUpdate(
     IReadOnlyList<ActualResultsSampleValueUpdate> SampleValues,
     IReadOnlyList<ActualResultsMethodItemUpdate> MethodItems,
     string AuditWho,
-    string AuditWhy);
+    string AuditWhy,
+    bool? Submitted = null);
 
 public sealed record ActualResultsSampleValueUpdate(Guid SampleResultItemId, string Result);
 

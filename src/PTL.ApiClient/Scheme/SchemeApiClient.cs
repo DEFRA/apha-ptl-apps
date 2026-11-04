@@ -85,6 +85,12 @@ public sealed class SchemeApiClient(HttpClient httpClient) : ISchemeApiClient
             return new SchemeSaveResult(false, null, new Dictionary<string, string[]> { [string.Empty] = ["Scheme was not found."] });
         }
 
+        if (response.StatusCode == HttpStatusCode.PreconditionRequired)
+        {
+            var required = await response.Content.ReadFromJsonAsync<SchemeAuditRequiredResponse>(cancellationToken);
+            return new SchemeSaveResult(false, null, new Dictionary<string, string[]>(), AuditReasonRequired: true, AuditObjectName: required?.AuditObjectName ?? string.Empty);
+        }
+
         return await ToSaveResultAsync(response, cancellationToken);
     }
 

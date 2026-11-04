@@ -523,7 +523,7 @@ public class ResultsSignOffRenderTests(WebApplicationFactory<Program> rawFactory
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Contains("Are you sure you wish to Authorise this Tabulation?", html, StringComparison.Ordinal);
-        Assert.Contains("Authorising publishes the Tabulation and queues its Tabulation Published notification emails.", html, StringComparison.Ordinal);
+        Assert.Contains("Authorising publishes the Tabulation and sends its Tabulation Published notification emails.", html, StringComparison.Ordinal);
         Assert.DoesNotContain("govuk-button--warning", html, StringComparison.Ordinal);
         Assert.Contains($"href=\"/Results%20Sign-off/Tabulation?tabulationId={TabulationId}\"", html, StringComparison.Ordinal);
         Assert.Empty(_apiClient.Authorised);

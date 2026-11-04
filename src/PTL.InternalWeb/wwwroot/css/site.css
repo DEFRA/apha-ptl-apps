@@ -478,3 +478,8 @@ span.app-side-navigation__link--disabled {
 .ptl-preserve-lines {
   white-space: pre-line;
 }
+
+/* Wide read-only results tables scroll inside their container instead of widening the page. */
+.app-table-scroll {
+  overflow-x: auto;
+}

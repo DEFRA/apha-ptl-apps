@@ -6,8 +6,8 @@ using static PTL.Api.Tests.Distribution.TabulationEmailTestData;
 
 namespace PTL.Api.Tests.Distribution;
 
-// Legacy email.vb ProcessNotificationEmails: each unsent tblNotificationEmail row is sent through GOV.UK Notify
-// and marked sent only afterwards, so a failed send stays unsent for the next run.
+// Legacy email.vb ProcessNotificationEmails: each unsent tblNotificationEmail row of the tabulation just published is sent
+// through GOV.UK Notify and marked sent only afterwards, so a failed send stays unsent.
 public class TabulationPublishedNotifierTests
 {
     private const string PublishedTemplateId = "396b4c10-e36c-462e-9629-ea9d1950ef3e";
@@ -22,7 +22,6 @@ public class TabulationPublishedNotifierTests
     {
         public FakeDistributionRepository Repository { get; } = new();
         public RecordingNotifyClient Notify { get; } = new();
-        public TabulationEmailGuard Guard { get; } = new();
         public MessageCapturingLogger<TabulationPublishedNotifier> Logger { get; } = new();
         public SettableTimeProvider Clock { get; }
         public TabulationPublishedNotifier Notifier { get; }
@@ -33,7 +32,6 @@ public class TabulationPublishedNotifierTests
             Notifier = new TabulationPublishedNotifier(
                 Repository,
                 Notify,
-                Guard,
                 Options.Create(new PublicationNotificationOptions { Enabled = enabled }),
                 new TabulationEmailContext(
                     Clock,
@@ -58,12 +56,12 @@ public class TabulationPublishedNotifierTests
         };
 
     [Fact]
-    public async Task SendUnsentAsync_Disabled_ReturnsEmptyWithoutReadingTheRepository()
+    public async Task SendForPublishedTabulationAsync_Disabled_ReturnsEmptyWithoutReadingTheRepository()
     {
         var h = new Harness(enabled: false);
         h.Repository.UnsentNotifications.Add(Row(Notification1, Published1, "lab1@example.test"));
 
-        var summary = await h.Notifier.SendUnsentAsync();
+        var summary = await h.Notifier.SendForPublishedTabulationAsync(Published1);
 
         Assert.Same(PublicationNotificationRunSummary.Empty, summary);
         Assert.Equal(0, h.Repository.UnsentLoads);
@@ -72,11 +70,11 @@ public class TabulationPublishedNotifierTests
     }
 
     [Fact]
-    public async Task SendUnsentAsync_NothingUnsent_ReturnsEmptyCounts()
+    public async Task SendForPublishedTabulationAsync_NothingUnsent_ReturnsEmptyCounts()
     {
         var h = new Harness();
 
-        var summary = await h.Notifier.SendUnsentAsync();
+        var summary = await h.Notifier.SendForPublishedTabulationAsync(Published1);
 
         Assert.Equal(PublicationNotificationRunSummary.Empty, summary);
         Assert.Equal(1, h.Repository.UnsentLoads);
@@ -84,13 +82,13 @@ public class TabulationPublishedNotifierTests
     }
 
     [Fact]
-    public async Task SendUnsentAsync_UnsentRows_SendsTheTemplateWithTheLegacyPlaceholdersThenMarksEachSent()
+    public async Task SendForPublishedTabulationAsync_UnsentRows_SendsTheTemplateWithTheLegacyPlaceholdersThenMarksEachSent()
     {
         var h = new Harness(externalUrl: "https://external.example.test/ptl/external/");
         h.Repository.UnsentNotifications.AddRange(
         [
             Row(Notification1, Published1, "lab1@example.test", "Lab One"),
-            Row(Notification2, Published2, "lab2@example.test", "Lab Two"),
+            Row(Notification2, Published1, "lab2@example.test", "Lab Two"),
         ]);
         var sentBeforeEachSend = new List<int>();
         h.Notify.FailFor = _ =>
@@ -99,7 +97,7 @@ public class TabulationPublishedNotifierTests
             return null;
         };
 
-        var summary = await h.Notifier.SendUnsentAsync();
+        var summary = await h.Notifier.SendForPublishedTabulationAsync(Published1);
 
         Assert.Equal(new PublicationNotificationRunSummary(2, 2, 0, 0), summary);
         Assert.Equal([0, 1], sentBeforeEachSend);
@@ -116,13 +114,30 @@ public class TabulationPublishedNotifierTests
             ("PublishedTabulationId", Published1.ToString()),
             ("DateTimeNow", "12/05/2026"));
         Assert.Equal("Lab Two", h.Notify.Sent[1].Personalisation!["DisplayName"]);
-        Assert.Equal(Published2.ToString(), h.Notify.Sent[1].Personalisation!["PublishedTabulationId"]);
         Assert.Equal([Notification1, Notification2], h.Repository.NotificationsSent.Select(s => s.Id));
         Assert.All(h.Repository.NotificationsSent, s => Assert.Equal(NowUtc.UtcDateTime, s.DateSent));
         var summaryLog = Assert.Single(h.Logger.At(LogLevel.Information), e => e.Message.StartsWith("Publication notification run complete", StringComparison.Ordinal));
-        Assert.Equal("Publication notification run complete. Unsent=2 Sent=2 Skipped=0 Failed=0", summaryLog.Message);
+        Assert.Equal($"Publication notification run complete. PublishedTabulationId={Published1} Unsent=2 Sent=2 Skipped=0 Failed=0", summaryLog.Message);
         h.AssertNoAddressesLogged();
-        Assert.Equal(1, h.Guard.Lock.CurrentCount);
+    }
+
+    [Fact]
+    public async Task SendForPublishedTabulationAsync_RowsOfOtherTabulations_AreLeftUnsent()
+    {
+        var h = new Harness();
+        h.Repository.UnsentNotifications.AddRange(
+        [
+            Row(Notification1, Published1, "lab1@example.test"),
+            Row(Notification2, Published2, "lab2@example.test"),
+            Row(Notification3, Published2, ""),
+        ]);
+
+        var summary = await h.Notifier.SendForPublishedTabulationAsync(Published1);
+
+        Assert.Equal(new PublicationNotificationRunSummary(1, 1, 0, 0), summary);
+        Assert.Equal(["lab1@example.test"], h.Notify.Sent.Select(s => s.Email));
+        Assert.Equal([Notification1], h.Repository.NotificationsSent.Select(s => s.Id));
+        Assert.Empty(h.Logger.At(LogLevel.Warning));
     }
 
     [Theory]
@@ -131,30 +146,30 @@ public class TabulationPublishedNotifierTests
     [InlineData("https://external.example.test:8443/a/b/", "https://external.example.test:8443", "a/b")]
     [InlineData("external.example.test/app/", "external.example.test/app", "")]
     [InlineData("", "", "")]
-    public async Task SendUnsentAsync_SplitsTheExternalAppUrlIntoServerAndAddress(string appUrl, string server, string address)
+    public async Task SendForPublishedTabulationAsync_SplitsTheExternalAppUrlIntoServerAndAddress(string appUrl, string server, string address)
     {
         var h = new Harness(externalUrl: appUrl);
         h.Repository.UnsentNotifications.Add(Row(Notification1, Published1, "lab1@example.test"));
 
-        await h.Notifier.SendUnsentAsync();
+        await h.Notifier.SendForPublishedTabulationAsync(Published1);
 
         var personalisation = Assert.Single(h.Notify.Sent).Personalisation!;
         Assert.Equal((server, address), (personalisation["ExternalServer"], personalisation["ExternalAddress"]));
     }
 
     [Fact]
-    public async Task SendUnsentAsync_NotifyFails_LeavesTheRowUnsentAndContinuesWithTheNext()
+    public async Task SendForPublishedTabulationAsync_NotifyFails_LeavesTheRowUnsentAndContinuesWithTheNext()
     {
         var h = new Harness();
         h.Repository.UnsentNotifications.AddRange(
         [
             Row(Notification1, Published1, "lab1@example.test"),
-            Row(Notification2, Published2, "lab2@example.test"),
+            Row(Notification2, Published1, "lab2@example.test"),
         ]);
         var failure = new InvalidOperationException("notify down");
         h.Notify.FailFor = email => email == "lab1@example.test" ? failure : null;
 
-        var summary = await h.Notifier.SendUnsentAsync();
+        var summary = await h.Notifier.SendForPublishedTabulationAsync(Published1);
 
         Assert.Equal(new PublicationNotificationRunSummary(2, 1, 0, 1), summary);
         Assert.Equal(["lab2@example.test"], h.Notify.Sent.Select(s => s.Email));
@@ -163,25 +178,17 @@ public class TabulationPublishedNotifierTests
         Assert.Same(failure, error.Exception);
         Assert.Contains("stays unsent", error.Message, StringComparison.Ordinal);
         h.AssertNoAddressesLogged();
-
-        // The failed row is retried on the next run.
-        h.Notify.FailFor = null;
-        h.Notify.Sent.Clear();
-        var retry = await h.Notifier.SendUnsentAsync();
-
-        Assert.Equal(["lab1@example.test", "lab2@example.test"], h.Notify.Sent.Select(s => s.Email));
-        Assert.Equal(2, retry.Unsent);
     }
 
     [Fact]
-    public async Task SendUnsentAsync_MarkingSentFails_CountsTheRowFailed()
+    public async Task SendForPublishedTabulationAsync_MarkingSentFails_CountsTheRowFailed()
     {
         var h = new Harness();
         h.Repository.UnsentNotifications.Add(Row(Notification1, Published1, "lab1@example.test"));
         var failure = new InvalidOperationException("database down");
         h.Repository.NotificationSentError = failure;
 
-        var summary = await h.Notifier.SendUnsentAsync();
+        var summary = await h.Notifier.SendForPublishedTabulationAsync(Published1);
 
         Assert.Equal(new PublicationNotificationRunSummary(1, 0, 0, 1), summary);
         Assert.Single(h.Notify.Sent);
@@ -192,34 +199,28 @@ public class TabulationPublishedNotifierTests
     [Theory]
     [InlineData("")]
     [InlineData("   ")]
-    public async Task SendUnsentAsync_BlankEmail_SkipsAndWarnsOncePerRowPerDay(string email)
+    public async Task SendForPublishedTabulationAsync_BlankEmail_SkipsTheRowAndWarns(string email)
     {
         var h = new Harness();
         h.Repository.UnsentNotifications.AddRange(
         [
             Row(Notification1, Published1, email),
-            Row(Notification2, Published2, "lab2@example.test"),
+            Row(Notification2, Published1, "lab2@example.test"),
         ]);
 
-        var first = await h.Notifier.SendUnsentAsync();
-        var second = await h.Notifier.SendUnsentAsync();
+        var summary = await h.Notifier.SendForPublishedTabulationAsync(Published1);
 
-        Assert.Equal(new PublicationNotificationRunSummary(2, 1, 1, 0), first);
-        Assert.Equal(new PublicationNotificationRunSummary(2, 1, 1, 0), second);
-        Assert.Equal(["lab2@example.test", "lab2@example.test"], h.Notify.Sent.Select(s => s.Email));
-        Assert.Equal([Notification2, Notification2], h.Repository.NotificationsSent.Select(s => s.Id));
+        Assert.Equal(new PublicationNotificationRunSummary(2, 1, 1, 0), summary);
+        Assert.Equal(["lab2@example.test"], h.Notify.Sent.Select(s => s.Email));
+        Assert.Equal([Notification2], h.Repository.NotificationsSent.Select(s => s.Id));
         var warning = Assert.Single(h.Logger.At(LogLevel.Warning));
         Assert.Contains("no email address", warning.Message, StringComparison.Ordinal);
         Assert.Contains(warning.State, kv => kv.Key == "NotificationEmailId" && Equals(kv.Value, Notification1));
-
-        h.Clock.Now = h.Clock.Now.AddDays(1);
-        await h.Notifier.SendUnsentAsync();
-        Assert.Equal(2, h.Logger.At(LogLevel.Warning).Count());
         h.AssertNoAddressesLogged();
     }
 
     [Fact]
-    public async Task SendUnsentAsync_BlankEmailRows_AreWarnedIndependently()
+    public async Task SendForPublishedTabulationAsync_BlankEmailRows_AreWarnedIndependently()
     {
         var h = new Harness();
         h.Repository.UnsentNotifications.AddRange(
@@ -228,7 +229,7 @@ public class TabulationPublishedNotifierTests
             Row(Notification3, Published1, " "),
         ]);
 
-        var summary = await h.Notifier.SendUnsentAsync();
+        var summary = await h.Notifier.SendForPublishedTabulationAsync(Published1);
 
         Assert.Equal(new PublicationNotificationRunSummary(2, 0, 2, 0), summary);
         Assert.Equal(2, h.Logger.At(LogLevel.Warning).Count());
@@ -236,57 +237,26 @@ public class TabulationPublishedNotifierTests
     }
 
     [Fact]
-    public async Task SendUnsentAsync_AroundMidnight_FormatsDateTimeNowInTheLondonZone()
+    public async Task SendForPublishedTabulationAsync_AroundMidnight_FormatsDateTimeNowInTheLondonZone()
     {
         var h = new Harness(now: new DateTimeOffset(2026, 5, 11, 23, 30, 0, TimeSpan.Zero));
         h.Repository.UnsentNotifications.Add(Row(Notification1, Published1, "lab1@example.test"));
 
-        await h.Notifier.SendUnsentAsync();
+        await h.Notifier.SendForPublishedTabulationAsync(Published1);
 
         Assert.Equal("12/05/2026", Assert.Single(h.Notify.Sent).Personalisation!["DateTimeNow"]);
     }
 
     [Fact]
-    public async Task SendUnsentAsync_CancelledWhileSending_PropagatesAndReleasesTheLock()
+    public async Task SendForPublishedTabulationAsync_CancelledWhileSending_PropagatesWithoutMarkingTheRow()
     {
         var h = new Harness();
         h.Repository.UnsentNotifications.Add(Row(Notification1, Published1, "lab1@example.test"));
         h.Notify.FailFor = _ => new OperationCanceledException();
 
-        await Assert.ThrowsAsync<OperationCanceledException>(() => h.Notifier.SendUnsentAsync());
+        await Assert.ThrowsAsync<OperationCanceledException>(() => h.Notifier.SendForPublishedTabulationAsync(Published1));
 
         Assert.Empty(h.Repository.NotificationsSent);
         Assert.Empty(h.Logger.At(LogLevel.Error));
-        Assert.Equal(1, h.Guard.Lock.CurrentCount);
-    }
-
-    [Fact]
-    public async Task SendUnsentAsync_AlreadyCancelled_PropagatesBeforeReadingTheRepository()
-    {
-        var h = new Harness();
-        using var cts = new CancellationTokenSource();
-        await cts.CancelAsync();
-
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => h.Notifier.SendUnsentAsync(cts.Token));
-
-        Assert.Equal(0, h.Repository.UnsentLoads);
-    }
-
-    [Fact]
-    public async Task SendUnsentAsync_WhileTheGuardLockIsHeld_WaitsForIt()
-    {
-        var h = new Harness();
-        await h.Guard.Lock.WaitAsync();
-
-        var run = h.Notifier.SendUnsentAsync();
-        await Task.Delay(50);
-
-        Assert.False(run.IsCompleted);
-        Assert.Equal(0, h.Repository.UnsentLoads);
-
-        h.Guard.Lock.Release();
-        await run;
-
-        Assert.Equal(1, h.Repository.UnsentLoads);
     }
 }

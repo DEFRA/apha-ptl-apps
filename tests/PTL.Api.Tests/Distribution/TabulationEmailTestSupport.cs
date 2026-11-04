@@ -7,7 +7,10 @@ namespace PTL.Api.Tests.Distribution;
 // what was logged and that no email address reached the logs.
 internal sealed class MessageCapturingLogger<T> : ILogger<T>
 {
-    public sealed record Entry(LogLevel Level, string Message, IReadOnlyList<KeyValuePair<string, object?>> State, Exception? Exception);
+    public sealed record Entry(LogLevel Level, string Message, IReadOnlyList<KeyValuePair<string, object?>> State, Exception? Exception)
+    {
+        public EventId EventId { get; init; }
+    }
 
     public List<Entry> Entries { get; } = [];
 
@@ -20,7 +23,7 @@ internal sealed class MessageCapturingLogger<T> : ILogger<T>
         var values = state is IEnumerable<KeyValuePair<string, object?>> pairs ? pairs.ToList() : [];
         lock (Entries)
         {
-            Entries.Add(new Entry(logLevel, formatter(state, exception), values, exception));
+            Entries.Add(new Entry(logLevel, formatter(state, exception), values, exception) { EventId = eventId });
         }
     }
 

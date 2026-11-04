@@ -44,6 +44,22 @@ public class ConfirmationControllerExtensionsTests
     }
 
     [Fact]
+    public void ConfirmationPage_DoesNotTreatTheAuditReasonFieldsAsItsOwn()
+    {
+        var controller = ControllerPosting(new()
+        {
+            ["IsAuditStep"] = ["true"],
+            ["AuditWhy"] = ["reason"],
+            ["Name"] = ["Scheme"],
+        });
+
+        var model = Assert.IsType<ConfirmationPageViewModel>(controller.ConfirmationPage(new ConfirmationPageViewModel { Title = "Remove" }).Model);
+
+        Assert.Equal([new("IsAuditStep", "true"), new("AuditWhy", "reason"), new("Name", "Scheme")], model.Fields);
+        Assert.False(controller.ViewData.ContainsKey(BreadcrumbRouteValues.Action));
+    }
+
+    [Fact]
     public void ConfirmationPage_ARequestWithoutAForm_HasNoFieldsAndKeepsTheUrl()
     {
         var context = new DefaultHttpContext();

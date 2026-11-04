@@ -71,4 +71,22 @@ public class IntendedResultsValidatorTests
 
         Assert.Null(message);
     }
+
+    [Theory]
+    [InlineData("01/02/2026")]
+    [InlineData("31/12/2026")]
+    public void ValidateValue_DateReturnType_WithDdMmYyyyValue_ReturnsNull(string value)
+    {
+        var message = IntendedResultsValidator.ValidateValue("^.*$", "Date", value);
+
+        Assert.Null(message);
+    }
+
+    [Fact]
+    public void ValidateValue_DateReturnType_WithInvalidDateFormat_ReturnsDdMmYyyyError()
+    {
+        var message = IntendedResultsValidator.ValidateValue("^.*$", "Date", "2026-12-31");
+
+        Assert.Equal("Input must be of format: dd/MM/yyyy", message);
+    }
 }

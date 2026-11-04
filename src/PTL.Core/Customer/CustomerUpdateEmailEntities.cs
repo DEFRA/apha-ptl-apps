@@ -22,7 +22,7 @@ public sealed record CustomerUpdateNotification(
     string Notes,
     bool IsApproved);
 
-// Replaces the legacy Windows service's SendCustomerUpdateEmails switch; its timer is now NotificationSchedulerOptions.
+// Replaces the legacy Windows service's SendCustomerUpdateEmails switch.
 public sealed class CustomerUpdateEmailOptions
 {
     public const string SectionName = "CustomerUpdateEmails";

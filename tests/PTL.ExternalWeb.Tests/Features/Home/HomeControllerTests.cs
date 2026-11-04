@@ -10,8 +10,8 @@ namespace PTL.ExternalWeb.Tests.Features.Home;
 
 public class HomeControllerTests
 {
-    private static HomeController CreateController(string? importantMessage = null, params Claim[] claims) =>
-        new(new FakeApiClient(), new FakeSystemMessageApiClient(importantMessage))
+    private static HomeController CreateController(string? importantMessage = null, FakeCreateOrderApiClient? createOrderApiClient = null, params Claim[] claims) =>
+        new(new FakeApiClient(), new FakeSystemMessageApiClient(importantMessage), createOrderApiClient ?? new FakeCreateOrderApiClient())
         {
             ControllerContext = new ControllerContext
             {
@@ -113,10 +113,75 @@ public class HomeControllerTests
         Assert.Null(model.ImportantMessageHtml);
     }
 
+    private static readonly Guid ParticipantId = Guid.NewGuid();
+
+    private static Claim[] OrderingParticipantClaims() =>
+    [
+        new Claim(ExternalUserClaimTypes.ResolvedRoles, "Participant"),
+        new Claim(ExternalUserClaimTypes.ParticipantId, ParticipantId.ToString()),
+        new Claim(ExternalUserClaimTypes.CanOrderOnline, "true")
+    ];
+
+    [Fact]
+    public async Task Index_ParticipantWhoCanOrder_PassesPerYearEligibilityToViewModel()
+    {
+        var fake = new FakeCreateOrderApiClient { Eligibility = new(true, false, true) };
+        var controller = CreateController(createOrderApiClient: fake, claims: OrderingParticipantClaims());
+
+        var result = await controller.Index();
+
+        var model = Assert.IsType<HomeIndexViewModel>(Assert.IsType<ViewResult>(result).Model);
+        Assert.False(model.CanCreateCurrentYearOrder);
+        Assert.True(model.CanCreateNextYearOrder);
+    }
+
+    [Fact]
+    public async Task Index_ParticipantWithoutCanOrderOnlineClaim_SkipsEligibilityLookup()
+    {
+        var fake = new FakeCreateOrderApiClient { EligibilityException = new InvalidOperationException("must not be called") };
+        var controller = CreateController(createOrderApiClient: fake, claims:
+        [
+            new Claim(ExternalUserClaimTypes.ResolvedRoles, "Participant"),
+            new Claim(ExternalUserClaimTypes.ParticipantId, ParticipantId.ToString())
+        ]);
+
+        var result = await controller.Index();
+
+        var model = Assert.IsType<HomeIndexViewModel>(Assert.IsType<ViewResult>(result).Model);
+        Assert.True(model.CanCreateCurrentYearOrder);
+        Assert.True(model.CanCreateNextYearOrder);
+    }
+
+    [Fact]
+    public async Task Index_EligibilityLookupFails_StillShowsBothOrderCards()
+    {
+        var fake = new FakeCreateOrderApiClient { EligibilityException = new HttpRequestException("api down") };
+        var controller = CreateController(createOrderApiClient: fake, claims: OrderingParticipantClaims());
+
+        var result = await controller.Index();
+
+        var model = Assert.IsType<HomeIndexViewModel>(Assert.IsType<ViewResult>(result).Model);
+        Assert.True(model.CanCreateCurrentYearOrder);
+        Assert.True(model.CanCreateNextYearOrder);
+    }
+
+    [Fact]
+    public async Task Index_ParticipantUnknownToApi_StillShowsBothOrderCards()
+    {
+        var fake = new FakeCreateOrderApiClient { Eligibility = null };
+        var controller = CreateController(createOrderApiClient: fake, claims: OrderingParticipantClaims());
+
+        var result = await controller.Index();
+
+        var model = Assert.IsType<HomeIndexViewModel>(Assert.IsType<ViewResult>(result).Model);
+        Assert.True(model.CanCreateCurrentYearOrder);
+        Assert.True(model.CanCreateNextYearOrder);
+    }
+
     [Fact]
     public void Privacy_ReturnsView()
     {
-        var controller = new HomeController(new FakeApiClient(), new FakeSystemMessageApiClient());
+        var controller = new HomeController(new FakeApiClient(), new FakeSystemMessageApiClient(), new FakeCreateOrderApiClient());
 
         var result = controller.Privacy();
 
@@ -126,7 +191,7 @@ public class HomeControllerTests
     [Fact]
     public async Task Information_MessagePublished_PassesHtmlToViewModel()
     {
-        var controller = new HomeController(new FakeApiClient(), new FakeSystemMessageApiClient(message: "<p>Welcome</p>"))
+        var controller = new HomeController(new FakeApiClient(), new FakeSystemMessageApiClient(message: "<p>Welcome</p>"), new FakeCreateOrderApiClient())
         {
             ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() }
         };
@@ -141,7 +206,7 @@ public class HomeControllerTests
     [Fact]
     public async Task Information_NoMessagePublished_ViewModelHasNullMessage()
     {
-        var controller = new HomeController(new FakeApiClient(), new FakeSystemMessageApiClient())
+        var controller = new HomeController(new FakeApiClient(), new FakeSystemMessageApiClient(), new FakeCreateOrderApiClient())
         {
             ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() }
         };
@@ -157,7 +222,7 @@ public class HomeControllerTests
     public async Task ApiStatus_ReturnsJsonFromApiClient()
     {
         var expected = new ApiHealthResponse("Healthy", 42, DateTime.UtcNow);
-        var controller = new HomeController(new FakeApiClient(expected), new FakeSystemMessageApiClient());
+        var controller = new HomeController(new FakeApiClient(expected), new FakeSystemMessageApiClient(), new FakeCreateOrderApiClient());
 
         var result = await controller.ApiStatus(CancellationToken.None);
 
@@ -168,7 +233,7 @@ public class HomeControllerTests
     [Fact]
     public void Error_ReturnsViewWithRequestId()
     {
-        var controller = new HomeController(new FakeApiClient(), new FakeSystemMessageApiClient())
+        var controller = new HomeController(new FakeApiClient(), new FakeSystemMessageApiClient(), new FakeCreateOrderApiClient())
         {
             ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() }
         };

@@ -1,0 +1,81 @@
+@model PTL.ExternalWeb.Features.Order.CreateOrderViewModel
+@{
+    var order = Model.Order;
+    var groups = Model.VisibleGroups;
+    var availableHeading = order.IsAphaCustomer
+        ? $"{order.Year}'s available schemes"
+        : $"{order.Year}'s commercially available schemes";
+    var noAvailableText = order.IsAphaCustomer
+        ? $"There are currently no available schemes for year {order.Year}"
+        : $"There are currently no commercially available schemes for year {order.Year}";
+    var isFiltered = !string.IsNullOrWhiteSpace(Model.Search);
+}
+
+<h2 class="govuk-heading-m">Schemes you participated in last year and/or schemes you are participating in year @order.Year</h2>
+@if (order.ParticipatingSchemes.Count == 0)
+{
+    <p class="govuk-body">There are no schemes that you are currently participating in year @order.Year</p>
+}
+else
+{
+    <partial name="_SchemeTable" model="@(("Schemes you are participating in", order.ParticipatingSchemes, Model))" />
+}
+
+<h2 class="govuk-heading-m govuk-!-margin-top-6">@availableHeading</h2>
+
+<form method="get" asp-controller="Order" asp-action="@Model.PageAction" role="search">
+    <div class="govuk-form-group">
+        <label class="govuk-label" for="search">Search schemes by name, code or schedule</label>
+        <input class="govuk-input govuk-input--width-20" id="search" name="search" type="search" value="@Model.Search" />
+    </div>
+    <div class="govuk-button-group">
+        <button type="submit" class="govuk-button govuk-button--secondary" data-module="govuk-button">Search</button>
+        @if (isFiltered)
+        {
+            <a class="govuk-link govuk-link--no-visited-state" asp-controller="Order" asp-action="@Model.PageAction">Show all</a>
+        }
+    </div>
+</form>
+
+@if (order.AvailableSchemes.Count == 0)
+{
+    <p class="govuk-body">@noAvailableText</p>
+}
+else if (groups.Count == 0)
+{
+    <p class="govuk-body">No schemes match your search.</p>
+}
+else
+{
+    foreach (var group in groups)
+    {
+        <partial name="_SchemeTable" model="@((group.Schedule, group.Schemes, Model))" />
+    }
+}
+
+<div class="app-order-totals" aria-live="polite" aria-atomic="true">
+    <h2 class="govuk-heading-m">Order totals</h2>
+    <dl class="govuk-summary-list govuk-summary-list--no-border">
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Scheme price</dt>
+            <dd class="govuk-summary-list__value" id="order-scheme-total">@Model.FormatMoney(order.SchemeTotal)</dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Combined postage (courier or bio-freeze)</dt>
+            <dd class="govuk-summary-list__value" id="order-postage-total">@Model.FormatMoney(order.PostageTotal)</dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Total amount</dt>
+            <dd class="govuk-summary-list__value" id="order-total"><strong>@Model.FormatMoney(order.OrderTotal)</strong></dd>
+        </div>
+    </dl>
+</div>
+
+@* One form so every action is a direct child of the button group and lines up on one baseline. *@
+<form method="get" asp-controller="Order" asp-action="Review" class="govuk-button-group">
+    <input type="hidden" name="year" value="@Model.YearSlug" />
+    <button type="submit" class="govuk-button" data-module="govuk-button"
+            disabled="@(!order.CanProceed)" aria-disabled="@(order.CanProceed ? "false" : "true")">Next</button>
+    <a class="govuk-button govuk-button--secondary" asp-controller="Order" asp-action="ConfirmClear" asp-route-year="@Model.YearSlug" draggable="false" data-module="govuk-button">Clear form</a>
+    <a class="govuk-link govuk-link--no-visited-state" asp-controller="Home" asp-action="Index">Cancel</a>
+</form>

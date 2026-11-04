@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using PTL.Api.BackgroundServices;
 using PTL.Core.Distribution;
 
 namespace PTL.Api.Tests.Distribution;
@@ -17,7 +18,16 @@ public class PackagingServiceRegistrationTests(WebApplicationFactory<Program> fa
         Assert.IsType<PackagingService>(scope.ServiceProvider.GetRequiredService<IPackagingService>());
         Assert.IsType<PackagingOutputService>(scope.ServiceProvider.GetRequiredService<IPackagingOutputService>());
         Assert.IsType<DistributionPostedNotifier>(scope.ServiceProvider.GetRequiredService<IDistributionPostedNotifier>());
+        Assert.IsType<DistributionPostedEmailDispatcher>(scope.ServiceProvider.GetRequiredService<IDistributionPostedEmailDispatcher>());
         Assert.Same(TimeProvider.System, scope.ServiceProvider.GetRequiredService<TimeProvider>());
+    }
+
+    [Fact]
+    public void DistributionPostedEmailOptions_WhenNotConfigured_DefaultToEnabled()
+    {
+        var options = factory.Services.GetRequiredService<IOptions<DistributionPostedEmailOptions>>().Value;
+
+        Assert.True(options.Enabled);
     }
 
     [Fact]
@@ -43,6 +53,6 @@ public class PackagingServiceRegistrationTests(WebApplicationFactory<Program> fa
 
         var external = scope.ServiceProvider.GetRequiredService<IOptions<PTL.Core.Configuration.ExternalOptions>>().Value;
 
-        Assert.Equal("http://localhost:5215", external.AppUrl);
+        Assert.Equal("http://localhost:5215/", external.AppUrl);
     }
 }

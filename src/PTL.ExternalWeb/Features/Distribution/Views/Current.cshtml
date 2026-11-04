@@ -1,0 +1,82 @@
+@model PTL.ExternalWeb.Features.Distribution.CurrentDistributionsViewModel
+@using PTL.SharedUI.Pagination
+@{
+    ViewData["Title"] = "Current distributions";
+    var pagination = new PaginationModel
+    {
+        CurrentPage = Model.Page,
+        PageSize = Model.PageSize,
+        TotalRecords = Model.TotalCount,
+        Action = "Current",
+        RouteValues = new Dictionary<string, object?>
+        {
+            ["sortBy"] = Model.SortBy,
+            ["sortDir"] = Model.SortDirection,
+        }
+    };
+
+    string SortUrl(string column)
+    {
+        var dir = Model.SortBy == column && Model.SortDirection == "asc" ? "desc" : "asc";
+        return Url.Action("Current", new { page = 1, pageSize = Model.PageSize, sortBy = column, sortDir = dir })!;
+    }
+}
+
+<h1 class="govuk-heading-l">Current distributions</h1>
+
+@if (Model.TotalCount == 0)
+{
+    <div class="govuk-inset-text">There are no current distributions to display.</div>
+    return;
+}
+
+<p class="govuk-body">Select View to enter or amend results for a current distribution.</p>
+
+<govuk-page-size-selector model="pagination" />
+
+<table class="govuk-table">
+    <thead class="govuk-table__head">
+        <tr class="govuk-table__row">
+            <th scope="col" class="govuk-table__header" aria-sort="@AriaSort(Model.SortBy, Model.SortDirection, "reference")">
+                <a class="govuk-link" href="@SortUrl("reference")">Distribution reference@(SortIndicator(Model.SortBy, Model.SortDirection, "reference"))</a>
+            </th>
+            <th scope="col" class="govuk-table__header" aria-sort="@AriaSort(Model.SortBy, Model.SortDirection, "schemeCode")">
+                <a class="govuk-link" href="@SortUrl("schemeCode")">Scheme code@(SortIndicator(Model.SortBy, Model.SortDirection, "schemeCode"))</a>
+            </th>
+            <th scope="col" class="govuk-table__header" aria-sort="@AriaSort(Model.SortBy, Model.SortDirection, "schemeName")">
+                <a class="govuk-link" href="@SortUrl("schemeName")">Scheme name@(SortIndicator(Model.SortBy, Model.SortDirection, "schemeName"))</a>
+            </th>
+            <th scope="col" class="govuk-table__header" aria-sort="@AriaSort(Model.SortBy, Model.SortDirection, "distributionDate")">
+                <a class="govuk-link" href="@SortUrl("distributionDate")">Distribution date@(SortIndicator(Model.SortBy, Model.SortDirection, "distributionDate"))</a>
+            </th>
+            <th scope="col" class="govuk-table__header" aria-sort="@AriaSort(Model.SortBy, Model.SortDirection, "deadlineDate")">
+                <a class="govuk-link" href="@SortUrl("deadlineDate")">Deadline date@(SortIndicator(Model.SortBy, Model.SortDirection, "deadlineDate"))</a>
+            </th>
+            <th scope="col" class="govuk-table__header" aria-sort="@AriaSort(Model.SortBy, Model.SortDirection, "status")">
+                <a class="govuk-link" href="@SortUrl("status")">Results entered@(SortIndicator(Model.SortBy, Model.SortDirection, "status"))</a>
+            </th>
+            <th scope="col" class="govuk-table__header">Results</th>
+        </tr>
+    </thead>
+    <tbody class="govuk-table__body">
+        @foreach (var distribution in Model.Distributions)
+        {
+            <tr class="govuk-table__row">
+                <td class="govuk-table__cell">@distribution.DistributionReference</td>
+                <td class="govuk-table__cell">@distribution.SchemeCode</td>
+                <td class="govuk-table__cell">@distribution.SchemeName</td>
+                <td class="govuk-table__cell">@distribution.DistributionDate.ToString("dddd d MMMM yyyy")</td>
+                <td class="govuk-table__cell">@distribution.DeadlineDate.ToString("dddd d MMMM yyyy")</td>
+                <td class="govuk-table__cell">@distribution.Status</td>
+                <td class="govuk-table__cell">
+                    <a class="govuk-link"
+                       asp-action="Entry"
+                       asp-route-schemeId="@distribution.MonthlyDistributionSchemeId"
+                       aria-label="View results entry for @distribution.DistributionReference">View</a>
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+<govuk-pagination model="pagination" />

@@ -32,8 +32,10 @@ public class DistributionControllerPackagingTests
                 new ResultsReceiptService(repository, TimeProvider.System),
                 new TabulationsService(repository, TimeProvider.System),
                 new ActualResultsService(repository, TimeProvider.System),
+                new ParticipantDistributionHistoryService(repository, new PTL.Api.Tests.Participant.FakeParticipantRepository(), new ActualResultsService(repository, TimeProvider.System)),
                 Packaging,
                 Output,
+                new PTL.Api.Tests.Contract.FakeAuditActorResolver("Guest"),
                 Microsoft.Extensions.Logging.Abstractions.NullLogger<DistributionController>.Instance)
             {
                 ControllerContext = new ControllerContext
@@ -197,16 +199,15 @@ public class DistributionControllerPackagingTests
     }
 
     [Fact]
-    public async Task SavePackaging_EmailFailures_AreReturnedToTheCaller()
+    public async Task SavePackaging_Success_ReturnsSuccessWithNoEmailFailures()
     {
         var h = new Harness();
-        h.Packaging.SaveOutcome = new PackagingSaveOutcome(true, ["lab@example.test (17152A/BA)"]);
 
         var result = await h.Controller.SavePackaging(2026, 5, new PackagingSaveRequest([]), CancellationToken.None);
 
         var saved = Assert.IsType<PackagingSaveResult>(Assert.IsType<OkObjectResult>(result.Result).Value);
         Assert.True(saved.Success);
-        Assert.Equal("lab@example.test (17152A/BA)", Assert.Single(saved.EmailFailures!));
+        Assert.Empty(saved.EmailFailures ?? []);
     }
 
     [Fact]

@@ -112,4 +112,12 @@ public class CidmOptionsValidatorTests
 
         Assert.Equal(["openid", "offline_access", "client-id"], options.AllScopes);
     }
+
+    [Fact]
+    public void AccountPortalUrl_DropsIdpHubPolicyPathFromAddress()
+    {
+        var options = ValidOptions();
+
+        Assert.Equal("https://your-account.cpdev.cui.defra.gov.uk/management", options.AccountPortalUrl);
+    }
 }

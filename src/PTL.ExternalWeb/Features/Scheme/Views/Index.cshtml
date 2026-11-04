@@ -1,5 +1,4 @@
 @model PTL.ExternalWeb.Features.Scheme.SchemeListViewModel
-@using Microsoft.AspNetCore.Html
 @using PTL.SharedUI.Pagination
 @{
     ViewData["Title"] = "View schemes";
@@ -45,34 +44,6 @@
             ncSortBy = column,
             ncSortDir = dir
         })!;
-    }
-
-    static string AriaSort(string currentSortBy, string currentSortDir, string column)
-    {
-        if (currentSortBy != column)
-        {
-            return "none";
-        }
-
-        return currentSortDir == "asc" ? "ascending" : "descending";
-    }
-}
-
-@* GOV.UK ships no sortable-table-header component - this is a hand-rolled, accessible pattern
-   (aria-sort on the th, a visually-hidden direction label alongside the glyph). The <th> itself is
-   written literally in each <tr> below (not behind a helper method) so static HTML analysis can see
-   the table's headers directly - only the repeated indicator fragment is factored out. *@
-@{
-    IHtmlContent SortIndicator(string currentSortBy, string currentSortDir, string column)
-    {
-        if (currentSortBy != column)
-        {
-            return HtmlString.Empty;
-        }
-
-        var arrow = currentSortDir == "asc" ? " \u25b2" : " \u25bc";
-        var direction = currentSortDir == "asc" ? "ascending" : "descending";
-        return new HtmlString($"""<span aria-hidden="true">{arrow}</span><span class="govuk-visually-hidden">, sorted {direction}</span>""");
     }
 }
 

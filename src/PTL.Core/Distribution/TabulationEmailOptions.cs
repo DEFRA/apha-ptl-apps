@@ -20,8 +20,8 @@ public sealed class PublicationNotificationOptions
 {
     public const string SectionName = "PublicationNotifications";
 
-    // Off until the publish workflow exists to queue tblNotificationEmail rows.
-    public bool Enabled { get; set; }
+    // Off keeps the emails queued in tblNotificationEmail: Authorise then sends nothing.
+    public bool Enabled { get; set; } = true;
 }
 
 // Fixed - the same GOV.UK Notify templates are used in every environment, so they are not configuration.

@@ -16,4 +16,11 @@
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- GovUkReadOnlyResultsTablesTagHelper renders directly off the API's Actual Results
+         contracts, shared verbatim by InternalWeb and ExternalWeb - see
+         docs/Code-Duplication-Playbook.md. -->
+    <ProjectReference Include="..\PTL.Contracts\PTL.Contracts.csproj" />
+  </ItemGroup>
+
 </Project>

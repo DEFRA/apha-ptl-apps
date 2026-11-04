@@ -13,8 +13,28 @@ internal sealed partial class FakeDistributionRepository : IDistributionReposito
 
     public List<MonthlyDistributionSchemeEntity> UpdatedSchemes { get; } = [];
 
+    public Guid? ResolvedDistributionParticipantId { get; set; }
+
+    public Task<Guid?> ResolveDistributionParticipantIdAsync(
+        Guid ssoId, Guid monthlyDistributionSchemeId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(ResolvedDistributionParticipantId);
+
+    public Dictionary<Guid, List<ParticipantPastDistributionEntity>> ParticipantHistoryBySsoId { get; } = [];
+
+    public Dictionary<Guid, List<PublishedTabulationSummaryEntity>> TabulationsBySsoId { get; } = [];
+
+    public Task<IReadOnlyList<PublishedTabulationSummaryEntity>> GetTabulationsForSsoIdAsync(
+        Guid ssoId, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<PublishedTabulationSummaryEntity>>(
+            TabulationsBySsoId.TryGetValue(ssoId, out var tabulations) ? tabulations : []);
+
     public Task<IReadOnlyList<DistributionMonthSummaryEntity>> GetMonthlyDistributionSummariesAsync(CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<DistributionMonthSummaryEntity>>(Summaries);
+
+    public Task<IReadOnlyList<ParticipantPastDistributionEntity>> GetParticipantDistributionHistoryAsync(
+        Guid ssoId, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<ParticipantPastDistributionEntity>>(
+            ParticipantHistoryBySsoId.TryGetValue(ssoId, out var history) ? history : []);
 
     public Task<IReadOnlyList<DistributionMonthYearEntity>> GetDistributionYearsAsync(CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<DistributionMonthYearEntity>>(Years);
@@ -90,6 +110,8 @@ internal sealed partial class FakeDistributionRepository : IDistributionReposito
 
     public Dictionary<Guid, DistributionParticipantsData> ParticipantsByScheme { get; } = [];
 
+    public Dictionary<Guid, List<CurrentDistributionData>> CurrentDistributionsByParticipant { get; } = [];
+
     public List<DistributionParticipantEntity> UpdatedParticipantDeadlines { get; } = [];
 
     public List<(MonthlyDistributionSchemeEntity NewScheme, IReadOnlyList<DistributionParticipantEntity> NewParticipants)> RepeatedDistributions { get; } = [];
@@ -97,6 +119,9 @@ internal sealed partial class FakeDistributionRepository : IDistributionReposito
     public Task<DistributionParticipantsData?> GetDistributionParticipantsAsync(
         Guid monthlyDistributionSchemeId, CancellationToken cancellationToken = default) =>
         Task.FromResult(ParticipantsByScheme.GetValueOrDefault(monthlyDistributionSchemeId));
+
+    public Task<IReadOnlyList<CurrentDistributionData>> GetCurrentDistributionsAsync(Guid participantId, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<CurrentDistributionData>>(CurrentDistributionsByParticipant.GetValueOrDefault(participantId) ?? []);
 
     public Task UpdateParticipantDeadlineAsync(DistributionParticipantEntity participant, CancellationToken cancellationToken = default)
     {
@@ -206,11 +231,16 @@ internal sealed partial class FakeDistributionRepository : IDistributionReposito
 
     public List<(IReadOnlyList<PackagingProgressUpdate> Updates, IReadOnlyList<DistributionPostedEmailEntity> Emails)> PackagingUpdates { get; } = [];
 
+    // When set, UpdatePackagingAsync fails without recording anything (the transaction rolled back).
+    public Exception? UpdatePackagingError { get; set; }
+
     public List<DistributionPostedEmailEntity> UnsentPostedEmails { get; } = [];
 
     public int UnsentPostedEmailRequests { get; private set; }
 
     public List<(Guid Id, DateTime DateSent)> MarkedSentEmails { get; } = [];
+
+    public Exception? PostedEmailSentError { get; set; }
 
     // Keyed by (participantId, schemeId) - an absent key returns null (no address row).
     public Dictionary<(Guid ParticipantId, Guid SchemeId), PackagingLabelAddressEntity> ParticipantLabelAddresses { get; } = [];
@@ -231,6 +261,11 @@ internal sealed partial class FakeDistributionRepository : IDistributionReposito
     public Task UpdatePackagingAsync(
         IReadOnlyList<PackagingProgressUpdate> updates, IReadOnlyList<DistributionPostedEmailEntity> emails, CancellationToken cancellationToken = default)
     {
+        if (UpdatePackagingError is not null)
+        {
+            return Task.FromException(UpdatePackagingError);
+        }
+
         PackagingUpdates.Add((updates, emails));
         return Task.CompletedTask;
     }
@@ -243,6 +278,12 @@ internal sealed partial class FakeDistributionRepository : IDistributionReposito
 
     public Task MarkDistributionPostedEmailSentAsync(Guid distributionPostedEmailId, DateTime dateSent, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (PostedEmailSentError is not null)
+        {
+            return Task.FromException(PostedEmailSentError);
+        }
+
         MarkedSentEmails.Add((distributionPostedEmailId, dateSent));
         return Task.CompletedTask;
     }

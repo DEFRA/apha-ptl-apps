@@ -12,7 +12,4 @@ internal sealed class FakePendingOrderNotifier : IPendingOrderNotifier
         SentForOrders.Add(pendingContractId);
         return Task.CompletedTask;
     }
-
-    public Task<OnlineOrderEmailRunSummary> SendUnsentAsync(CancellationToken cancellationToken = default) =>
-        Task.FromResult(OnlineOrderEmailRunSummary.Empty);
 }
