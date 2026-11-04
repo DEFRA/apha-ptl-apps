@@ -88,6 +88,17 @@ public class ParticipantSchemeFieldsRenderTests : IClassFixture<WebApplicationFa
 
     private static string InputTag(string html, string id) => Regex.Match(html, $"<input[^>]*id=\"{id}\"[^>]*>").Value;
 
+    // The Contracts and Contract Items crumbs are links here because the controller publishes the customer and contract ids; only their text is asserted.
+    [Fact]
+    public async Task Edit_RendersFullBreadcrumbTrail()
+    {
+        var crumbs = BreadcrumbHtml.Crumbs(await PageAsync($"/ParticipantScheme/Edit/{ParticipantSchemeId}"));
+
+        Assert.Equal(["Home", "Manage Contracts", "Customers", "Contracts", "Contract Items", "Contract Item Details", "Edit Contract Item"], crumbs.Select(c => c.Text));
+        Assert.Equal($"/ParticipantScheme/Details/{ParticipantSchemeId}", crumbs.Single(c => c.Text == "Contract Item Details").Href);
+        Assert.Null(crumbs[^1].Href);
+    }
+
     [Fact]
     public async Task Edit_SetsOfSamplesRequired_IsADropDownOfOneToTen()
     {

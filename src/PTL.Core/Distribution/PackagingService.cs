@@ -13,6 +13,7 @@ public interface IPackagingService
 public sealed class PackagingService(
     IDistributionRepository distributionRepository,
     IDistributionPostedNotifier postedNotifier,
+    IDistributionPostedEmailDispatcher emailDispatcher,
     TimeProvider timeProvider) : IPackagingService
 {
     private sealed record ProgressRow(
@@ -35,7 +36,8 @@ public sealed class PackagingService(
 
     // Legacy ButtonSave_Click/ButtonApply_Click: every sheet the user touched is saved. Ticking
     // Packed or Posted stamps today's date on a date that is still empty (never overwritten);
-    // Posted also stamps Packed and queues the Distribution Posted email.
+    // Posted also stamps Packed and queues the Distribution Posted email, which is sent in the
+    // background once the save has committed.
     public async Task<PackagingSaveOutcome> SavePackagingAsync(
         int yearId, int monthId, IReadOnlyList<PackagingStageUpdate> updates, CancellationToken cancellationToken = default)
     {
@@ -65,14 +67,18 @@ public sealed class PackagingService(
         }
 
         var emails = await postedNotifier.BuildEmailsAsync(newlyPosted, cancellationToken);
-        IReadOnlyList<DistributionPostedEmailEntity> failedEmails = [];
         if (progress.Count > 0 || emails.Count > 0)
         {
             await distributionRepository.UpdatePackagingAsync(progress, emails, cancellationToken);
-            failedEmails = await postedNotifier.DispatchAsync(emails, cancellationToken);
         }
 
-        return new PackagingSaveOutcome(true, [.. failedEmails.Select(e => $"{e.Email} ({e.Distribution})")]);
+        // Only after the commit, and without waiting: the packaging user never waits for GOV.UK Notify.
+        if (emails.Count > 0)
+        {
+            emailDispatcher.Dispatch(emails);
+        }
+
+        return new PackagingSaveOutcome(true);
     }
 
     private static void CollectProgress(

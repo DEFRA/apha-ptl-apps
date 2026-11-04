@@ -244,6 +244,13 @@ builder.Services.AddScoped<IParticipantTabulationService, ParticipantTabulationS
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddScoped<IDistributionPostedNotifier, DistributionPostedNotifier>();
 
+// Distribution Posted emails: queued in tblDistributionPostedEmail by the packaging save, then sent through GOV.UK Notify by their own hosted
+// worker as soon as the save has committed (the same hand-off as the publication emails). A failed send stays unsent and is not retried.
+builder.Services.Configure<DistributionPostedEmailOptions>(builder.Configuration.GetSection(DistributionPostedEmailOptions.SectionName));
+builder.Services.AddSingleton<PTL.Api.BackgroundServices.DistributionPostedEmailDispatcher>();
+builder.Services.AddSingleton<IDistributionPostedEmailDispatcher>(sp => sp.GetRequiredService<PTL.Api.BackgroundServices.DistributionPostedEmailDispatcher>());
+builder.Services.AddHostedService(sp => sp.GetRequiredService<PTL.Api.BackgroundServices.DistributionPostedEmailDispatcher>());
+
 // Test Consultant and publication emails: sent through GOV.UK Notify. The scheduler hosted in this process runs the Test Consultant
 // jobs; the publication emails are sent by their own hosted worker as soon as Authorise has committed.
 builder.Services.Configure<NotificationSchedulerOptions>(builder.Configuration.GetSection(NotificationSchedulerOptions.SectionName));

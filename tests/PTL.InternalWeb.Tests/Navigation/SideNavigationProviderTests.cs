@@ -45,6 +45,22 @@ public class SideNavigationProviderTests
         Assert.False(search.IsHidden);
     }
 
+    // Plural display text matches the Scheme list page heading; the route stays on the singular Scheme controller.
+    [Fact]
+    public void Build_ManageSchemes_ListsSchemesFirstAndKeepsItsRouteAndChildrenUnchanged()
+    {
+        var manageSchemes = SideNavigationProvider.Build().Single(i => i.Text == "Manage Schemes");
+
+        var schemes = manageSchemes.Children[0];
+
+        Assert.Equal("Schemes", schemes.Text);
+        Assert.Equal("Scheme", schemes.ControllerName);
+        Assert.Equal("Index", schemes.ActionName);
+        Assert.Equal(
+            ["Create Scheme for Current Year", "Create Scheme for Next Year", "Printable Schemes"],
+            schemes.Children.Where(c => !c.IsHidden).Select(c => c.Text));
+    }
+
     [Fact]
     public void Build_ReturnsNonEmptyTree()
     {
@@ -155,6 +171,31 @@ public class SideNavigationProviderTests
         Assert.NotNull(path);
         Assert.True(path!.Count > 1);
         Assert.Equal(expectedText, path[^1].Text);
+    }
+
+    // Edit pages follow List > Details > Edit, so the Details page is the Edit page's breadcrumb parent, not a sibling.
+    [Theory]
+    [InlineData("Customer", "Details", "Edit", "Manage Contracts > Customers > Customer Details > Edit Customer")]
+    [InlineData("Participant", "Details", "Edit", "Manage Contracts > Customers > Participants > Participant Details > Edit Participant")]
+    [InlineData("Contract", "Details", "Edit", "Manage Contracts > Customers > Contracts > Contract Details > Edit Contract")]
+    [InlineData("ParticipantScheme", "Details", "Edit", "Manage Contracts > Customers > Contracts > Contract Items > Contract Item Details > Edit Contract Item")]
+    [InlineData("Scheme", "Details", "Edit", "Manage Schemes > Schemes > Scheme Details > Edit Scheme")]
+    [InlineData("GroupAddress", "Details", "Edit", "Manage Contracts > Group Addresses > Group Address Details > Edit Group Address")]
+    [InlineData("Customer", "PendingCustomerUpdateDetails", "EditPendingCustomerUpdate", "Manage Contracts > Customers > Review Pending Customer Updates > Pending Customer Update Details > Edit Pending Customer Update")]
+    [InlineData("Participant", "PendingParticipantUpdateDetails", "EditPendingParticipantUpdate", "Manage Contracts > Customers > Review Pending Participant Updates > Pending Participant Update Details > Edit Pending Participant Update")]
+    public void FindPath_EditPage_NestsUnderItsDetailsPage(string controller, string detailsAction, string editAction, string expectedTrail)
+    {
+        var tree = SideNavigationProvider.Build();
+
+        var editPath = SideNavigationProvider.FindPath(tree, controller, editAction);
+        var detailsPath = SideNavigationProvider.FindPath(tree, controller, detailsAction);
+
+        Assert.NotNull(editPath);
+        Assert.NotNull(detailsPath);
+        Assert.Equal(expectedTrail, string.Join(" > ", editPath!.Select(n => n.Text)));
+        Assert.Same(detailsPath![^1], editPath[^2]);
+        Assert.Equal(detailsAction, detailsPath[^1].ActionName);
+        Assert.Equal(editPath.Take(editPath.Count - 1).Select(n => n.Text), detailsPath.Select(n => n.Text));
     }
 
     [Fact]

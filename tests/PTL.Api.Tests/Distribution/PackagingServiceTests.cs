@@ -5,7 +5,7 @@ namespace PTL.Api.Tests.Distribution;
 
 // Pins legacy PackagingSheet.aspx.vb read and ButtonSave_Click/ButtonApply_Click save behaviour:
 // ticking Packed/Posted stamps today's date on an empty date only, Posted also stamps Packed and
-// queues the Distribution Posted email.
+// queues the Distribution Posted email, which is handed to the background sender once the save has committed.
 public class PackagingServiceTests
 {
     private static readonly DateTimeOffset Now = new(2026, 5, 13, 10, 30, 0, TimeSpan.Zero);
@@ -14,6 +14,7 @@ public class PackagingServiceTests
     {
         public FakeDistributionRepository Repository { get; } = new();
         public FakePostedNotifier Notifier { get; } = new();
+        public FakePostedEmailDispatcher Dispatcher { get; }
         public PackagingService Service { get; }
 
         public Harness(bool initialised = true)
@@ -23,7 +24,8 @@ public class PackagingServiceTests
                 Repository.Schedules[(2026, 5)] = (MonthlyDistributionId, []);
             }
 
-            Service = new PackagingService(Repository, Notifier, new FixedTimeProvider(Now));
+            Dispatcher = new FakePostedEmailDispatcher(Repository);
+            Service = new PackagingService(Repository, Notifier, Dispatcher, new FixedTimeProvider(Now));
         }
 
         public void Sheet(PackagingMode mode, int week, PackagingRawData raw) =>
@@ -106,7 +108,8 @@ public class PackagingServiceTests
         Assert.Empty(h.Repository.PackagingSheetRequests);
         Assert.Empty(h.Notifier.BuildRequests);
         Assert.Empty(h.Repository.PackagingUpdates);
-        Assert.Empty(h.Notifier.Dispatched);
+        Assert.Empty(h.Dispatcher.Dispatched);
+        Assert.Empty(h.Notifier.SendRequests);
     }
 
     [Fact]
@@ -119,7 +122,7 @@ public class PackagingServiceTests
         Assert.True(outcome.Success);
         Assert.Empty(h.Repository.PackagingSheetRequests);
         Assert.Empty(h.Repository.PackagingUpdates);
-        Assert.Empty(h.Notifier.Dispatched);
+        Assert.Empty(h.Dispatcher.Dispatched);
         Assert.Empty(Assert.Single(h.Notifier.BuildRequests));
     }
 
@@ -137,7 +140,7 @@ public class PackagingServiceTests
         Assert.Equal(new PackagingProgressUpdate(Dp1, Now.UtcDateTime, null), update);
         Assert.Empty(emails);
         Assert.Empty(Assert.Single(h.Notifier.BuildRequests));
-        Assert.Single(h.Notifier.Dispatched);
+        Assert.Empty(h.Dispatcher.Dispatched);
     }
 
     [Fact]
@@ -149,7 +152,7 @@ public class PackagingServiceTests
         await h.Service.SavePackagingAsync(2026, 5, [Tick(Dp1, true, false)]);
 
         Assert.Empty(h.Repository.PackagingUpdates);
-        Assert.Empty(h.Notifier.Dispatched);
+        Assert.Empty(h.Dispatcher.Dispatched);
     }
 
     [Fact]
@@ -167,27 +170,55 @@ public class PackagingServiceTests
         var (updates, emails) = Assert.Single(h.Repository.PackagingUpdates);
         Assert.Equal(new PackagingProgressUpdate(Dp1, Now.UtcDateTime, Now.UtcDateTime), Assert.Single(updates));
         Assert.Same(queued, Assert.Single(emails));
-        Assert.Same(queued, Assert.Single(Assert.Single(h.Notifier.Dispatched)));
+        Assert.Same(queued, Assert.Single(Assert.Single(h.Dispatcher.Dispatched).Emails));
+        Assert.Empty(h.Notifier.SendRequests);
     }
 
     [Fact]
-    public async Task SavePackagingAsync_PostedTick_ReportsEmailsThatCouldNotBeSentWithoutFailingTheSave()
+    public async Task SavePackagingAsync_PostedTick_HandsTheCommittedEmailsOverOnceAndOnlyAfterTheCommit()
     {
         var h = new Harness();
         h.Sheet(PackagingMode.GroupAddress, 1, GroupRaw(Dp1));
-        var queued = new DistributionPostedEmailEntity { DistributionPostedEmailId = Guid.NewGuid(), Email = "a@example.test", Distribution = "17152A/BA" };
-        h.Notifier.EmailsToReturn.Add(queued);
-        h.Notifier.FailedEmails.Add(queued);
+        h.Notifier.EmailsToReturn.AddRange(
+        [
+            new DistributionPostedEmailEntity { DistributionPostedEmailId = Guid.NewGuid(), Email = "primary@example.test" },
+            new DistributionPostedEmailEntity { DistributionPostedEmailId = Guid.NewGuid(), Email = "secondary@example.test" },
+        ]);
 
-        var outcome = await h.Service.SavePackagingAsync(2026, 5, [Tick(Dp1, packed: false, posted: true)]);
+        await h.Service.SavePackagingAsync(2026, 5, [Tick(Dp1, packed: false, posted: true)]);
 
-        Assert.True(outcome.Success);
-        Assert.Equal("a@example.test (17152A/BA)", Assert.Single(outcome.EmailFailures!));
-        Assert.Single(h.Repository.PackagingUpdates);
+        var (dispatched, commitsBefore) = Assert.Single(h.Dispatcher.Dispatched);
+        Assert.Equal(1, commitsBefore);
+        Assert.Same(Assert.Single(h.Repository.PackagingUpdates).Emails, dispatched);
+        Assert.Equal(["primary@example.test", "secondary@example.test"], dispatched.Select(e => e.Email));
     }
 
     [Fact]
-    public async Task SavePackagingAsync_PostedTick_ReportsNoFailuresWhenEveryEmailIsSent()
+    public async Task SavePackagingAsync_SeveralPostedRows_HandOneBatchOverWithEveryEmail()
+    {
+        var h = new Harness();
+        h.Sheet(PackagingMode.GroupAddress, 1, Raw(
+            groups: [Group(GroupA)],
+            items: [Item(GroupA, Scheme1, sets: 2)],
+            participants:
+            [
+                ParticipantRow(GroupA, Scheme1, distributionParticipantId: Dp1, participantId: Part1),
+                ParticipantRow(GroupA, Scheme1, distributionParticipantId: Dp2, participantId: Part2),
+            ]));
+        h.Notifier.EmailsToReturn.AddRange(
+        [
+            new DistributionPostedEmailEntity { DistributionPostedEmailId = Guid.NewGuid(), ParticipantId = Part1, Email = "a@example.test" },
+            new DistributionPostedEmailEntity { DistributionPostedEmailId = Guid.NewGuid(), ParticipantId = Part2, Email = "b@example.test" },
+        ]);
+
+        await h.Service.SavePackagingAsync(2026, 5, [Tick(Dp1, false, true), Tick(Dp2, false, true)]);
+
+        Assert.Equal([Part1, Part2], Assert.Single(h.Notifier.BuildRequests).Select(p => p.ParticipantId));
+        Assert.Equal(["a@example.test", "b@example.test"], Assert.Single(h.Dispatcher.Dispatched).Emails.Select(e => e.Email));
+    }
+
+    [Fact]
+    public async Task SavePackagingAsync_PostedTick_SucceedsWithoutSendingAnythingItself()
     {
         var h = new Harness();
         h.Sheet(PackagingMode.GroupAddress, 1, GroupRaw(Dp1));
@@ -195,7 +226,24 @@ public class PackagingServiceTests
 
         var outcome = await h.Service.SavePackagingAsync(2026, 5, [Tick(Dp1, packed: false, posted: true)]);
 
-        Assert.Empty(outcome.EmailFailures!);
+        Assert.Equal(new PackagingSaveOutcome(true), outcome);
+        Assert.Empty(h.Notifier.SendRequests);
+        Assert.Single(h.Repository.PackagingUpdates);
+    }
+
+    [Fact]
+    public async Task SavePackagingAsync_CommitFails_DispatchesNothingAndTheErrorPropagates()
+    {
+        var h = new Harness();
+        h.Sheet(PackagingMode.GroupAddress, 1, GroupRaw(Dp1));
+        h.Notifier.EmailsToReturn.Add(new DistributionPostedEmailEntity { DistributionPostedEmailId = Guid.NewGuid(), Email = "a@example.test" });
+        h.Repository.UpdatePackagingError = new InvalidOperationException("database down");
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => h.Service.SavePackagingAsync(2026, 5, [Tick(Dp1, packed: false, posted: true)]));
+
+        Assert.Empty(h.Repository.PackagingUpdates);
+        Assert.Empty(h.Dispatcher.Dispatched);
+        Assert.Empty(h.Notifier.SendRequests);
     }
 
     [Fact]
@@ -220,7 +268,7 @@ public class PackagingServiceTests
 
         Assert.Empty(h.Repository.PackagingUpdates);
         Assert.Empty(Assert.Single(h.Notifier.BuildRequests));
-        Assert.Empty(h.Notifier.Dispatched);
+        Assert.Empty(h.Dispatcher.Dispatched);
     }
 
     // Data oddity: Posted set but Packed empty - the code still stamps Packed (and keeps Posted, no email).
@@ -236,6 +284,7 @@ public class PackagingServiceTests
         Assert.Equal(new PackagingProgressUpdate(Dp1, Now.UtcDateTime, Day2), Assert.Single(updates));
         Assert.Empty(emails);
         Assert.Empty(Assert.Single(h.Notifier.BuildRequests));
+        Assert.Empty(h.Dispatcher.Dispatched);
     }
 
     [Fact]
@@ -396,6 +445,6 @@ public class PackagingServiceTests
         var (updates, emails) = Assert.Single(h.Repository.PackagingUpdates);
         Assert.Empty(updates);
         Assert.Same(email, Assert.Single(emails));
-        Assert.Same(email, Assert.Single(Assert.Single(h.Notifier.Dispatched)));
+        Assert.Same(email, Assert.Single(Assert.Single(h.Dispatcher.Dispatched).Emails));
     }
 }
