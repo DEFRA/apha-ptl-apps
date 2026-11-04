@@ -68,6 +68,28 @@ public class DistributionControllerTests
     }
 
     [Theory]
+    [InlineData(false, false, "govuk-tag govuk-tag--grey")]
+    [InlineData(true, false, "govuk-tag govuk-tag--light-blue")]
+    [InlineData(true, true, "govuk-tag govuk-tag--green")]
+    public void CurrentRow_StatusTagClass_MatchesStatus(bool hasResults, bool submitted, string expected)
+    {
+        var row = new CurrentDistributionRowViewModel
+        {
+            MonthlyDistributionSchemeId = Guid.NewGuid(),
+            DistributionParticipantId = Guid.NewGuid(),
+            DistributionReference = "D26-01A/BA",
+            SchemeCode = "PT001",
+            SchemeName = "Bacteriology",
+            DistributionDate = new DateTime(2026, 4, 3),
+            DeadlineDate = new DateTime(2026, 4, 30),
+            HasResults = hasResults,
+            Submitted = submitted,
+        };
+
+        Assert.Equal(expected, row.StatusTagClass);
+    }
+
+    [Theory]
     [InlineData(null, null, "B,A,C", "", "asc")]
     [InlineData("reference", "asc", "A,B,C", "reference", "asc")]
     [InlineData("reference", "desc", "C,B,A", "reference", "desc")]

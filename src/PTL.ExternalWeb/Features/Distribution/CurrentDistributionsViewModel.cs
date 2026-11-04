@@ -40,4 +40,11 @@ public sealed class CurrentDistributionRowViewModel
             return HasResults ? "In Progress" : "No";
         }
     }
+
+    public string StatusTagClass => Status switch
+    {
+        "Submitted" => "govuk-tag govuk-tag--green",
+        "In Progress" => "govuk-tag govuk-tag--light-blue",
+        _ => "govuk-tag govuk-tag--grey"
+    };
 }

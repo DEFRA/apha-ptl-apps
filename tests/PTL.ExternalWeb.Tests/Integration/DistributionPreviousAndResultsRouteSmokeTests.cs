@@ -493,9 +493,9 @@ public class DistributionPreviousAndResultsRouteSmokeTests : IClassFixture<PtlEx
         var body = await response.Content.ReadAsStringAsync();
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.Contains("In Progress</td>", body, StringComparison.Ordinal);
-        Assert.Contains("Submitted</td>", body, StringComparison.Ordinal);
-        Assert.Contains("No</td>", body, StringComparison.Ordinal);
+        Assert.Contains("<strong class=\"govuk-tag govuk-tag--light-blue\">In Progress</strong>", body, StringComparison.Ordinal);
+        Assert.Contains("<strong class=\"govuk-tag govuk-tag--green\">Submitted</strong>", body, StringComparison.Ordinal);
+        Assert.Contains("<strong class=\"govuk-tag govuk-tag--grey\">No</strong>", body, StringComparison.Ordinal);
         Assert.Contains("aria-sort=\"descending\"", body, StringComparison.Ordinal);
         Assert.Contains("sortBy=status", body, StringComparison.Ordinal);
         Assert.Contains("sortBy=deadlineDate", body, StringComparison.Ordinal);
