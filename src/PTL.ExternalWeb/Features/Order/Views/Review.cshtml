@@ -58,5 +58,6 @@
 </dl>
 
 <div class="govuk-button-group">
+    <a class="govuk-button" asp-controller="Order" asp-action="Print" asp-route-year="@Model.YearSlug" draggable="false" data-module="govuk-button">Print</a>
     <a class="govuk-button govuk-button--secondary" asp-controller="Order" asp-action="@Model.BackAction" draggable="false" data-module="govuk-button">Back</a>
 </div>

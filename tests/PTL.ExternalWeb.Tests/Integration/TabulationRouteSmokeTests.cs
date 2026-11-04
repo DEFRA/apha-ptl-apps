@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using PTL.ApiClient.Distribution;
 using PTL.Contracts.Distribution;
+using PTL.ExternalWeb.Infrastructure.Pdf;
 using PTL.ExternalWeb.Tests.TestSupport;
 
 namespace PTL.ExternalWeb.Tests.Integration;
@@ -54,12 +55,18 @@ public class TabulationRouteSmokeTests : IClassFixture<PtlExternalWebTestFactory
         Print: new TabulationPrintResponse([], [], []),
         DistributionHeading: "D1a/S1 BT: Brucella");
 
-    private HttpClient CreateClient(FakeDistributionApiClient apiClient) =>
+    private HttpClient CreateClient(FakeDistributionApiClient apiClient, IHtmlToPdfRenderer? pdfRenderer = null) =>
         _factory.WithWebHostBuilder(builder =>
             builder.ConfigureServices(services =>
             {
                 services.RemoveAll<IDistributionApiClient>();
                 services.AddSingleton<IDistributionApiClient>(apiClient);
+
+                if (pdfRenderer is not null)
+                {
+                    services.RemoveAll<IHtmlToPdfRenderer>();
+                    services.AddSingleton(pdfRenderer);
+                }
             })).CreateClient();
 
     private static async Task<Dictionary<string, string>> SignInAsync(HttpClient client, string roles, Guid? participantId = null, Guid? viewerId = null)
@@ -243,6 +250,24 @@ public class TabulationRouteSmokeTests : IClassFixture<PtlExternalWebTestFactory
         Assert.Matches("<a class=\"govuk-breadcrumbs__link\" href=\"/Tabulation(/Index)?\">Reports</a>", breadcrumbs);
         Assert.Contains($"href=\"/Tabulation/Report?publishedTabulationId={tabulationId}\">View reports</a>", breadcrumbs, StringComparison.Ordinal);
         Assert.Contains("<li class=\"govuk-breadcrumbs__list-item\" aria-current=\"page\">Assessment results</li>", breadcrumbs, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task GeneratePdf_WhenReportExists_ReturnsPdfFile()
+    {
+        var tabulationId = Guid.NewGuid();
+        var expectedPdf = "%PDF-1.7"u8.ToArray();
+        var apiClient = new FakeDistributionApiClient { PublishedTabulation = Report(tabulationId) };
+        var client = CreateClient(apiClient, new FakeHtmlToPdfRenderer(expectedPdf));
+        var cookies = await SignInAsync(client, "Participant,Viewer", participantId: Guid.NewGuid());
+
+        var response = await CookieForwardingHttpClient.SendWithCookiesAsync(
+            client, HttpMethod.Get, $"/Tabulation/GeneratePdf?publishedTabulationId={tabulationId}", cookies);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("application/pdf", response.Content.Headers.ContentType?.MediaType);
+        Assert.Contains("filename=Summary.pdf", response.Content.Headers.ContentDisposition?.ToString(), StringComparison.Ordinal);
+        Assert.Equal(expectedPdf, await response.Content.ReadAsByteArrayAsync());
     }
 
     [Fact]

@@ -308,6 +308,39 @@ public partial class OrderRouteSmokeTests : IClassFixture<PtlExternalWebTestFact
     }
 
     [Fact]
+    public async Task Print_WithSelection_RendersPrintableSummary()
+    {
+        var api = new FakeCreateOrderApiClient { GetResult = new(CreateOrderApiStatus.Ok, FakeCreateOrderApiClient.SampleOrder(selected: true)) };
+        var client = CreateClient(api);
+        var cookies = await SignInAsync(client);
+
+        var body = await GetAsync(client, cookies, "/Order/Print?year=current");
+
+        Assert.Contains("Pending order summary", body);
+        Assert.Contains("Contract year", body);
+        Assert.Contains("Purchase order number", body);
+        Assert.Contains("Not yet available online", body);
+        Assert.Contains("Microbiology", body);
+        Assert.Contains("Apr, May", body);
+        Assert.Contains("Combined postage charges", body);
+        Assert.Contains("Total order value", body);
+        Assert.Contains("Print this page", body);
+        Assert.DoesNotContain("Submit", body);
+    }
+
+    [Fact]
+    public async Task Print_NothingSelected_RedirectsBackToTheOrderPage()
+    {
+        var client = CreateClient(new FakeCreateOrderApiClient(), allowAutoRedirect: false);
+        var cookies = await SignInAsync(client);
+
+        var response = await CookieForwardingHttpClient.SendWithCookiesAsync(client, HttpMethod.Get, "/Order/Print?year=current", cookies);
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        Assert.EndsWith("/Order/CurrentYear", response.Headers.Location!.ToString());
+    }
+
+    [Fact]
     public async Task Home_ParticipantWhoCanOrder_SeesBothYearCards()
     {
         var client = CreateClient(new FakeCreateOrderApiClient());

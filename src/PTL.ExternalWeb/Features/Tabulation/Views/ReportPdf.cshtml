@@ -1,0 +1,178 @@
+@model PTL.ExternalWeb.Features.Tabulation.TabulationPdfViewModel
+@{
+    Layout = null;
+    var report = Model.Page.Report;
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>@report.TabulationName</title>
+    <style>
+        body {
+            margin: 0;
+            color: #0b0c0c;
+            font-family: "GDS Transport", Arial, sans-serif;
+            font-size: 16px;
+            line-height: 1.25;
+        }
+
+        h1 { font-size: 32px; margin: 0 0 10px; }
+        h2 { font-size: 24px; margin: 16px 0 8px; }
+        h3 { font-size: 19px; margin: 10px 0 8px; }
+        p { margin: 0 0 8px; }
+
+        .ptl-table-scroll {
+            position: relative;
+            overflow: visible;
+            margin-bottom: 14px;
+        }
+
+        .TabulationTable {
+            width: 100%;
+            border-collapse: collapse;
+            empty-cells: show;
+            border: 1px solid black;
+            margin-left: 2px;
+        }
+
+        .TabulationTable :where(th) {
+            font-weight: inherit;
+            text-align: left;
+        }
+
+        .TabulationHeader1,
+        .TabulationHeader2 {
+            font-size: 8pt;
+            color: black;
+            background-color: white;
+            border: solid 1px black;
+            padding: 3px;
+        }
+
+        .TabulationHeader1 {
+            font-weight: bold;
+        }
+
+        .TabulationHeader2 {
+            vertical-align: bottom;
+        }
+
+        .TabulationCell {
+            font-size: 7.5pt;
+            border: solid 1px black;
+            padding: 3px;
+            color: black;
+            background-color: white;
+        }
+
+        .TabulationTable thead + tbody tr:first-child > * {
+            border-top: none;
+        }
+
+        .NilReturn {
+            background-color: #eeeeee;
+        }
+
+        .ptl-tabulation-ukas {
+            margin: 1em 0;
+            text-align: left;
+        }
+
+        .ptl-tabulation-ukas img {
+            display: block;
+            margin-bottom: 4px;
+        }
+
+        .cellVersionDate,
+        .cellTabulationSignature,
+        .cellTabulationSignature2 {
+            text-align: left;
+            font-size: 8.5pt;
+            color: black;
+            font-weight: normal;
+        }
+
+        .govuk-visually-hidden {
+            position: absolute !important;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border: 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>Report</h1>
+    <h2>@report.DistributionHeading</h2>
+    <h3>@report.TabulationName</h3>
+    <p>@report.DistributionDateText</p>
+
+    @foreach (var table in report.Tables)
+    {
+        <govuk-tabulation-table table="table" />
+    }
+
+    @if (report.Ratings is not null)
+    {
+        <govuk-tabulation-table table="report.Ratings" />
+    }
+
+    <div id="commentsDiv">
+        @if (!string.IsNullOrEmpty(report.StandardTabulationTextHtml))
+        {
+            <div>@Html.Raw(report.StandardTabulationTextHtml)</div>
+        }
+
+        @if (!string.IsNullOrEmpty(report.CommentsHtml))
+        {
+            <div>@Html.Raw(report.CommentsHtml)</div>
+        }
+
+        @if (!string.IsNullOrEmpty(report.TestConsultantCommentsHtml))
+        {
+            <div>
+                <h2>@report.TestConsultantCommentsTitle</h2>
+                @Html.Raw(report.TestConsultantCommentsHtml)
+            </div>
+        }
+
+        @if (report.Attachment is not null)
+        {
+            <p><strong>Supporting Document: </strong>@report.Attachment.FileName</p>
+        }
+
+        @if (report.Signatory is { } versionSignatory)
+        {
+            <div class="cellVersionDate">@versionSignatory.VersionText</div>
+        }
+
+        @if (report.ShowUkasLogo)
+        {
+            <div class="ptl-tabulation-ukas">
+                @if (!string.IsNullOrWhiteSpace(Model.UkasLogoDataUri))
+                {
+                    <img src="@Model.UkasLogoDataUri" alt="UKAS accredited" width="60" />
+                }
+                <div>0004</div>
+            </div>
+        }
+
+        @if (report.Signatory is { } signatory)
+        {
+            <div class="cellTabulationSignature">
+                <div>@signatory.Signatory</div>
+                @foreach (var line in signatory.AddressLines)
+                {
+                    <div class="cellTabulationSignature2">@line</div>
+                }
+                <div class="cellTabulationSignature2">@signatory.IssuedText</div>
+            </div>
+        }
+    </div>
+</body>
+</html>
