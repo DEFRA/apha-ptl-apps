@@ -16,5 +16,4 @@ internal sealed partial class FakeDistributionApiClient
         SavedAmendResults.Add(request);
         return Task.FromResult(AmendResultsSaveResult);
     }
-    
 }
