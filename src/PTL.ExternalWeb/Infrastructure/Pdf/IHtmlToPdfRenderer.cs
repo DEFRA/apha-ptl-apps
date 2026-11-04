@@ -6,6 +6,8 @@ public sealed record PdfRenderOptions(
     bool PreferCssPageSize = true,
     bool PrintBackground = true,
     string Format = "A4",
+    bool Landscape = false,
+    float Scale = 1f,
     string MarginTop = "12mm",
     string MarginBottom = "12mm",
     string MarginLeft = "10mm",
@@ -140,6 +142,8 @@ public sealed class PlaywrightHtmlToPdfRenderer(IConfiguration configuration, IL
         var pdf = await page.PdfAsync(new PagePdfOptions
         {
             Format = options.Format,
+            Landscape = options.Landscape,
+            Scale = options.Scale,
             PrintBackground = options.PrintBackground,
             PreferCSSPageSize = options.PreferCssPageSize,
             DisplayHeaderFooter = options.DisplayHeaderFooter,

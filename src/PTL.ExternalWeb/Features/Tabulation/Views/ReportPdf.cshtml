@@ -32,8 +32,11 @@
             width: 100%;
             border-collapse: collapse;
             empty-cells: show;
-            border: 1px solid black;
-            margin-left: 2px;
+            border: 1px solid black !important;
+            outline: 1px solid black;
+            outline-offset: -1px;
+            margin-left: 0;
+            box-sizing: border-box;
         }
 
         .TabulationTable :where(th) {
@@ -41,13 +44,24 @@
             text-align: left;
         }
 
+        .TabulationTable tr > :first-child {
+            border-left: 1px solid black !important;
+        }
+
+        .TabulationTable tr > :last-child {
+            border-right: 1px solid black !important;
+        }
+
         .TabulationHeader1,
         .TabulationHeader2 {
-            font-size: 8pt;
+            font-size: 10pt;
+            line-height: 1.25;
             color: black;
             background-color: white;
             border: solid 1px black;
-            padding: 3px;
+            padding: 4px;
+            white-space: normal;
+            word-break: break-word;
         }
 
         .TabulationHeader1 {
@@ -59,16 +73,20 @@
         }
 
         .TabulationCell {
-            font-size: 7.5pt;
+            font-size: 9.5pt;
+            line-height: 1.25;
             border: solid 1px black;
-            padding: 3px;
+            padding: 4px;
             color: black;
             background-color: white;
+            white-space: normal;
+            word-break: break-word;
         }
 
         .TabulationTable thead + tbody tr:first-child > * {
             border-top: none;
         }
+
 
         .NilReturn {
             background-color: #eeeeee;

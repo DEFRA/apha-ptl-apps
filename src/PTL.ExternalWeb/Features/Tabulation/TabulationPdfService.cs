@@ -26,10 +26,13 @@ public sealed class TabulationPdfService(
 
         var footerTitle = WebUtility.HtmlEncode($"{model.Report.DistributionHeading} - {model.Report.TabulationName}.");
         var options = new PdfRenderOptions(
-            MarginTop: "15mm",
-            MarginBottom: "18mm",
-            MarginLeft: "10mm",
-            MarginRight: "10mm",
+            Format: "A3",
+            Landscape: true,
+            Scale: 0.9f,
+            MarginTop: "12mm",
+            MarginBottom: "16mm",
+            MarginLeft: "8mm",
+            MarginRight: "8mm",
             FooterTemplate: "<div style=\"width:100%;font-size:8px;font-family:Arial,sans-serif;text-align:center\">"
                 + $"{footerTitle} Page <span class=\"pageNumber\"></span> of <span class=\"totalPages\"></span></div>");
 
