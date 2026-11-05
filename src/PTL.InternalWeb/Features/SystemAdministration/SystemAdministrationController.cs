@@ -462,12 +462,21 @@ public partial class SystemAdministrationController : Controller
         var actingUserId = GetCurrentUserId();
         var blockedMessages = new List<string>();
 
-        foreach (var row in model.Rows)
+        // Saved as a single batch request (one HTTP round trip, one DB transaction on PTL.Api)
+        // instead of one PUT per row - the previous per-row loop caused intermittent gateway
+        // timeouts on larger grids.
+        var batchRequest = new SetUserRolesBatchRequest(
+            model.Rows.Select(row => new SetUserRolesBatchItem(row.UserId, row.SelectedRoleIds)).ToList(),
+            actingUserId);
+        var batchResponse = await userApiClient.SetUserRolesBatchAsync(batchRequest, cancellationToken);
+
+        var friendlyNameByUserId = model.Rows.ToDictionary(r => r.UserId, r => r.FriendlyName);
+        foreach (var result in batchResponse.Results)
         {
-            var result = await userApiClient.SetUserRolesAsync(row.UserId, new SetUserRolesRequest(row.SelectedRoleIds, actingUserId), cancellationToken);
             if (!result.Success && result.Message is not null)
             {
-                blockedMessages.Add($"{row.FriendlyName}: {result.Message}");
+                var friendlyName = friendlyNameByUserId.GetValueOrDefault(result.UserId, result.UserId.ToString());
+                blockedMessages.Add($"{friendlyName}: {result.Message}");
             }
         }
 

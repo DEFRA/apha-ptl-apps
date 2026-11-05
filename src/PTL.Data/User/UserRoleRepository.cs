@@ -67,4 +67,41 @@ public sealed class UserRoleRepository(IDbConnectionFactory connectionFactory) :
             throw;
         }
     }
+
+    public async Task ApplyBatchRoleChangesWithAuditAsync(
+        IReadOnlyList<UserRoleChangeSet> changeSets,
+        CancellationToken cancellationToken = default)
+    {
+        using var connection = connectionFactory.CreateConnection();
+        connection.Open();
+        using var transaction = connection.BeginTransaction();
+
+        try
+        {
+            foreach (var changeSet in changeSets)
+            {
+                foreach (var roleId in changeSet.RoleIdsToAdd)
+                {
+                    await connection.ExecuteAsync(
+                        "EXEC dbo.spiUserRole @UserRoleId, @UserId, @RoleId",
+                        new { UserRoleId = Guid.NewGuid(), UserId = changeSet.UserId, RoleId = roleId },
+                        transaction);
+                }
+
+                foreach (var userRoleId in changeSet.UserRoleIdsToRemove)
+                {
+                    await connection.ExecuteAsync("EXEC dbo.spdUserRole @UserRoleId", new { UserRoleId = userRoleId }, transaction);
+                }
+
+                await AuditTrailWriter.WriteAsync(connection, transaction, changeSet.AuditEntry, cancellationToken);
+            }
+
+            transaction.Commit();
+        }
+        catch
+        {
+            transaction.Rollback();
+            throw;
+        }
+    }
 }
