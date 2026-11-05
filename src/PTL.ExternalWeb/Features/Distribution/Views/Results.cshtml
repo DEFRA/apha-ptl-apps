@@ -7,8 +7,8 @@
 
 <h2 class="govuk-heading-m">@Model.Heading</h2>
 
-<p class="govuk-body">These are the results you previously submitted for this distribution, shown read-only.</p>
+<p class="govuk-body">The tables below show the results that were entered for this distribution.</p>
 
-<govuk-readonly-results-tables tests="Model.Tests" />
+<govuk-readonly-results-tables tests="Model.Tests" per-sample="true" />
 
-<a class="govuk-button govuk-button--secondary" data-module="govuk-button" asp-action="Previous">Back</a>
+<a class="govuk-button govuk-button--secondary" data-module="govuk-button" href="@(ViewData["ListReturnUrl"] as string ?? Url.Action("Previous"))">Back</a>

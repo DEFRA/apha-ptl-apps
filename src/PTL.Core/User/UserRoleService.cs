@@ -14,6 +14,14 @@ public sealed class UserRoleService(
     private const string AdminRoleName = "Admin";
     private const string UserEntityType = "User";
 
+    // Defence-in-depth: PTL.Api's UserRoleController already rejects oversized batch payloads
+    // before this service is reached, but the service must not itself trust that every caller
+    // enforces those limits - an unbounded rows/RoleIds count here would let any caller force
+    // unbounded dictionary/hash-set allocation (a memory-exhaustion DoS), so the same caps are
+    // re-asserted at the service boundary.
+    private const int MaxBatchItems = 2_000;
+    private const int MaxRoleIdsPerItem = 500;
+
     public Task<IReadOnlyList<Role>> GetRolesAsync(CancellationToken cancellationToken = default) =>
         roleRepository.GetAllAsync(cancellationToken);
 
@@ -85,6 +93,23 @@ public sealed class UserRoleService(
         Guid? actingUserId,
         CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(rows);
+
+        if (rows.Count > MaxBatchItems)
+        {
+            throw new ArgumentOutOfRangeException(nameof(rows), $"No more than {MaxBatchItems} rows can be saved in a single request.");
+        }
+
+        if (rows.Any(r => r.RoleIds is null))
+        {
+            throw new ArgumentException("RoleIds must be provided for every row.", nameof(rows));
+        }
+
+        if (rows.Any(r => r.RoleIds.Count > MaxRoleIdsPerItem))
+        {
+            throw new ArgumentOutOfRangeException(nameof(rows), $"No more than {MaxRoleIdsPerItem} role ids can be submitted for a single user.");
+        }
+
         // Fetched once for the whole batch rather than once per row - the N+1 full-table
         // re-fetch per row (plus a separate connection/transaction per row) was the main cause of
         // the intermittent gateway timeouts on larger grids.

@@ -302,5 +302,31 @@ public class UserRoleServiceTests
         Assert.Empty(userRoles.Removed);
         Assert.Empty(userRoles.BatchAuditEntries);
     }
+
+    [Fact]
+    public async Task SetUserRolesBatchAsync_TooManyRows_ThrowsArgumentOutOfRangeException()
+    {
+        var users = new FakeUserRepository
+        {
+            Users = Enumerable.Range(0, 2_001)
+                .Select(i => new PTL.Core.User.User { UserId = Guid.NewGuid(), Username = $"m{i:000000}" })
+                .ToList()
+        };
+        var service = CreateService(users: users, userRoles: new FakeUserRoleRepository());
+        var rows = users.Users.Select(u => (u.UserId, (IReadOnlyList<Guid>)[])).ToList();
+
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => service.SetUserRolesBatchAsync(rows, actingUserId: null));
+    }
+
+    [Fact]
+    public async Task SetUserRolesBatchAsync_TooManyRoleIdsInSingleRow_ThrowsArgumentOutOfRangeException()
+    {
+        var userId = Guid.NewGuid();
+        var users = new FakeUserRepository { Users = [new PTL.Core.User.User { UserId = userId, Username = "m100001" }] };
+        var service = CreateService(users: users, userRoles: new FakeUserRoleRepository());
+        var roleIds = Enumerable.Range(0, 501).Select(_ => Guid.NewGuid()).ToList();
+
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => service.SetUserRolesBatchAsync([(userId, roleIds)], actingUserId: null));
+    }
 }
 

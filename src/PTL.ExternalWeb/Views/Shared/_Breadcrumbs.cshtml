@@ -33,6 +33,7 @@
     // (plain text, aria-current) - there is no "Results" section level in legacy's trail. A page that
     // names its own ViewData["BreadcrumbParent"] (e.g. the order "not available" page) opts out.
     var query = ViewContext.HttpContext.Request.Query;
+    var listReturnUrl = ViewData["ListReturnUrl"] as string;
     var trail = ViewData["BreadcrumbParent"] is null
         ? NavigationProvider.BreadcrumbTrail(controller, action, query["year"].FirstOrDefault())
         : null;
@@ -68,10 +69,22 @@
                     if (crumb.RouteKey is not null)
                     {
                         values[crumb.RouteKey] = routeValue;
+
+                        // A step that needs an id still has to carry the list URL on so the page it opens can go back to it.
+                        if (listReturnUrl is not null)
+                        {
+                            values["returnUrl"] = listReturnUrl;
+                        }
                     }
 
+                    // The step that is the filterable list itself returns to the filtered list the user came from.
+                    var listPath = PTL.ExternalWeb.ViewSupport.ListReturnUrl.ListPathFor(crumb.Controller, crumb.Action);
+                    var href = listPath is not null && PTL.ExternalWeb.ViewSupport.ListReturnUrl.Validate(listReturnUrl, listPath) is { } filteredList
+                        ? filteredList
+                        : Url.Action(crumb.Action, crumb.Controller, values);
+
                     <li class="govuk-breadcrumbs__list-item">
-                        <a class="govuk-breadcrumbs__link" href="@Url.Action(crumb.Action, crumb.Controller, values)">@crumb.Text</a>
+                        <a class="govuk-breadcrumbs__link" href="@href">@crumb.Text</a>
                     </li>
                 }
                 else

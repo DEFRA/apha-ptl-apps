@@ -1,0 +1,6 @@
+@model PTL.ExternalWeb.ViewSupport.SortableHeaderContext
+
+@* The three leading columns shared by Distribution/Current, Distribution/Previous and Tabulation/Index. *@
+<partial name="_SortableHeader" model="@(Model.Header("Distribution reference", "reference"))" />
+<partial name="_SortableHeader" model="@(Model.Header("Scheme code", "schemeCode"))" />
+<partial name="_SortableHeader" model="@(Model.Header("Scheme name", "schemeName"))" />
