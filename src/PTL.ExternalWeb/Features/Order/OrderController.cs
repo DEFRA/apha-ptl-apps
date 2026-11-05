@@ -1,17 +1,20 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
 using PTL.ApiClient;
 using PTL.Contracts.CreateOrder;
 using PTL.ExternalWeb.Authorization;
 using PTL.ExternalWeb.Features.Account;
+using PTL.SharedUI.Notifications;
 
 namespace PTL.ExternalWeb.Features.Order;
 
-// Legacy PendingContractOrder.aspx stage 1 (tracker row 12, Story 744642): a participant picks schemes and
-// distribution months for the current or next contract year and sees live pricing. The order is a server-side
+// Legacy PendingContractOrder.aspx (tracker row 12, Stories 744642 and 744643): a participant picks schemes and
+// distribution months for the current or next contract year and sees live pricing (stage 1), then reviews the pending
+// order, enters a purchase order number, accepts the terms and submits it (stage 2). The order is a server-side
 // draft that PTL.Api creates, prices and persists on every change, exactly as legacy did.
 [Authorize(Policy = ExternalPolicies.Participant)]
-public sealed class OrderController(ICreateOrderApiClient createOrderApiClient) : Controller
+public sealed class OrderController(ICreateOrderApiClient createOrderApiClient, IOptions<OrderPageOptions> pageOptions) : Controller
 {
     public const string CurrentYearSlug = "current";
     public const string NextYearSlug = "next";
@@ -86,13 +89,68 @@ public sealed class OrderController(ICreateOrderApiClient createOrderApiClient) 
         };
     }
 
-    // Legacy "Next": stage 2 of the wizard. This release shows the pending order read-only; entering a purchase order
-    // number, accepting the terms and submitting are not part of this stage.
+    // Legacy "Next": stage 2 of the wizard - the pending order with the purchase order number, the terms and Submit.
     [HttpGet]
     public async Task<IActionResult> Review(string? year, CancellationToken cancellationToken)
     {
-        var review = await GetReviewModelAsync(year, cancellationToken);
+        var review = await GetReviewModelAsync(year, includeConsents: true, cancellationToken);
         return review.Error ?? View(review.Model!);
+    }
+
+    // Legacy BtnSave_Click: keeps the purchase order number on the draft and stays on the page.
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Save(CreateOrderReviewForm form, CancellationToken cancellationToken)
+    {
+        var slug = NormaliseYear(form.Year);
+        var participantId = User.GetParticipantId();
+        if (slug is null || participantId is null)
+        {
+            return NotFound();
+        }
+
+        var result = await createOrderApiClient.SavePurchaseOrderAsync(
+            participantId.Value, slug, new CreateOrderSaveRequest(form.PurchaseOrderNumber), cancellationToken);
+        if (result.Status != CreateOrderApiStatus.Ok)
+        {
+            return result.Status == CreateOrderApiStatus.NotAllowed ? NotAvailable(slug) : NotFound();
+        }
+
+        if (result.Errors.Count > 0)
+        {
+            return await ReviewWithErrorsAsync(slug, form, result.Errors, cancellationToken);
+        }
+
+        TempData.SetNotification(NotificationType.Success, "Your pending order has been saved.");
+        return RedirectToAction(nameof(Review), new { year = slug });
+    }
+
+    // Legacy BtnSubmit_Click: the order is only submitted once the terms (and any data consent) are accepted.
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Submit(CreateOrderReviewForm form, CancellationToken cancellationToken)
+    {
+        var slug = NormaliseYear(form.Year);
+        var participantId = User.GetParticipantId();
+        if (slug is null || participantId is null)
+        {
+            return NotFound();
+        }
+
+        var result = await createOrderApiClient.SubmitAsync(
+            participantId.Value, slug, new CreateOrderSubmitRequest(form.PurchaseOrderNumber, form.TermsAccepted, form.ConsentedSchemeIds), cancellationToken);
+        if (result.Status != CreateOrderApiStatus.Ok)
+        {
+            return result.Status == CreateOrderApiStatus.NotAllowed ? NotAvailable(slug) : NotFound();
+        }
+
+        if (result.Errors.Count > 0)
+        {
+            return await ReviewWithErrorsAsync(slug, form, result.Errors, cancellationToken);
+        }
+
+        TempData.SetNotification(NotificationType.Success, "Your order has been submitted and is waiting for review.");
+        return RedirectToAction("Index", "Home");
     }
 
     // Req3 print-only slice: printable pending-order summary before submission, with the same access
@@ -100,11 +158,29 @@ public sealed class OrderController(ICreateOrderApiClient createOrderApiClient) 
     [HttpGet]
     public async Task<IActionResult> Print(string? year, CancellationToken cancellationToken)
     {
-        var review = await GetReviewModelAsync(year, cancellationToken);
+        var review = await GetReviewModelAsync(year, includeConsents: false, cancellationToken);
         return review.Error ?? View("Print", review.Model!);
     }
 
-    private async Task<(IActionResult? Error, CreateOrderReviewViewModel? Model)> GetReviewModelAsync(string? year, CancellationToken cancellationToken)
+    private async Task<IActionResult> ReviewWithErrorsAsync(
+        string slug, CreateOrderReviewForm form, IReadOnlyList<CreateOrderValidationErrorResponse> errors, CancellationToken cancellationToken)
+    {
+        var review = await GetReviewModelAsync(slug, includeConsents: true, cancellationToken);
+        if (review.Error is not null)
+        {
+            return review.Error;
+        }
+
+        return View("Review", review.Model! with
+        {
+            PurchaseOrderNumber = form.PurchaseOrderNumber ?? string.Empty,
+            TermsAccepted = form.TermsAccepted,
+            ConsentedSchemeIds = form.ConsentedSchemeIds,
+            Errors = errors
+        });
+    }
+
+    private async Task<(IActionResult? Error, CreateOrderReviewViewModel? Model)> GetReviewModelAsync(string? year, bool includeConsents, CancellationToken cancellationToken)
     {
         var slug = NormaliseYear(year);
         var participantId = User.GetParticipantId();
@@ -113,16 +189,20 @@ public sealed class OrderController(ICreateOrderApiClient createOrderApiClient) 
             return (NotFound(), null);
         }
 
-        var result = await createOrderApiClient.GetAsync(participantId.Value, slug, cancellationToken);
+        var result = await createOrderApiClient.GetAsync(participantId.Value, slug, includeConsents, cancellationToken);
         if (result.Status != CreateOrderApiStatus.Ok)
         {
             return (result.Status == CreateOrderApiStatus.NotAllowed ? NotAvailable(slug) : NotFound(), null);
         }
 
         // Legacy only enables Next once a scheme with a month is selected.
-        return result.Order!.CanProceed
-            ? (null, new CreateOrderReviewViewModel(slug, result.Order))
-            : (RedirectToAction(PageAction(slug)), null);
+        if (!result.Order!.CanProceed)
+        {
+            TempData.SetNotification(NotificationType.Error, "Select at least one scheme and at least one distribution month for it before you continue.");
+            return (RedirectToAction(PageAction(slug)), null);
+        }
+
+        return (null, new CreateOrderReviewViewModel(slug, result.Order) { TermsUrl = pageOptions.Value.SafeTermsAndConditionsUrl });
     }
 
     private async Task<IActionResult> ShowAsync(string slug, string? search, CancellationToken cancellationToken)
@@ -133,7 +213,7 @@ public sealed class OrderController(ICreateOrderApiClient createOrderApiClient) 
             return NotFound();
         }
 
-        var result = await createOrderApiClient.GetAsync(participantId.Value, slug, cancellationToken);
+        var result = await createOrderApiClient.GetAsync(participantId.Value, slug, cancellationToken: cancellationToken);
         return result.Status switch
         {
             CreateOrderApiStatus.Ok => View("Index", new CreateOrderViewModel { YearSlug = slug, Order = result.Order!, Search = search }),

@@ -1,9 +1,11 @@
 using System.Net;
 using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using PTL.ApiClient;
+using PTL.Contracts.CreateOrder;
 using PTL.ExternalWeb.Tests.TestSupport;
 
 namespace PTL.ExternalWeb.Tests.Integration;
@@ -114,6 +116,7 @@ public partial class OrderRouteSmokeTests : IClassFixture<PtlExternalWebTestFact
         var body = await GetAsync(client, cookies, "/Order/CurrentYear");
 
         Assert.Matches(NextButtonDisabledPattern, body);
+        Assert.Contains("Select at least one scheme and at least one distribution month for it to continue.", body);
         Assert.Matches("id=\"create-order-error\"[^>]*\\shidden", body);
         Assert.Matches("<form[^>]*govuk-button-group[^>]*>(?:(?!</form>).)*Next(?:(?!</form>).)*Clear form(?:(?!</form>).)*Cancel", body.Replace("\r", " ").Replace("\n", " "));
     }
@@ -288,11 +291,56 @@ public partial class OrderRouteSmokeTests : IClassFixture<PtlExternalWebTestFact
         var body = await GetAsync(client, cookies, "/Order/Review?year=current");
 
         Assert.Contains("Pending order", body);
-        Assert.Contains("Microbiology", body);
-        Assert.Contains("Apr, May", body);
+        Assert.Contains("QAL number", body);
+        Assert.Contains("Lab code", body);
+        Assert.Contains("Full price", body);
+        Assert.DoesNotContain("Annual price", body);
+        Assert.Contains("Microbiology - (Monthly)", body);
+        Assert.Contains("Apr<span class=\"govuk-visually-hidden\"> (selected)</span>", body);
+        Assert.Contains("May<span class=\"govuk-visually-hidden\"> (selected)</span>", body);
+        Assert.Contains("Jun<span class=\"govuk-visually-hidden\"> (not selected)</span>", body);
         Assert.Contains("Total amount", body);
         Assert.Contains("&#xA3;30.00", body);
         Assert.DoesNotContain("Chemistry", body);
+    }
+
+    [Fact]
+    public async Task Review_ShowsAMonthTheParticipantAlreadyHoldsAsGrey()
+    {
+        var order = FakeCreateOrderApiClient.SampleOrder(selected: true, participatingSelected: true);
+        var api = new FakeCreateOrderApiClient { GetResult = new(CreateOrderApiStatus.Ok, order) };
+        var client = CreateClient(api);
+        var cookies = await SignInAsync(client);
+
+        var body = await GetAsync(client, cookies, "/Order/Review?year=current");
+
+        Assert.Contains("govuk-tag govuk-tag--grey", body);
+        Assert.Contains("(you are already participating in this month)", body);
+    }
+
+    [Fact]
+    public async Task Review_FollowsTheLegacyOrderOfOrderDetailsAndButtons()
+    {
+        var client = CreateClient(ReviewApi());
+        var cookies = await SignInAsync(client);
+
+        var body = await GetAsync(client, cookies, "/Order/Review?year=current");
+
+        static void InOrder(string body, params string[] parts)
+        {
+            var last = -1;
+            foreach (var part in parts)
+            {
+                var index = body.IndexOf(part, last + 1, StringComparison.Ordinal);
+                Assert.True(index > last, $"Expected '{part}' after the previous item.");
+                last = index;
+            }
+        }
+
+        InOrder(body, "Order details", "Contract year", "Purchase order number", "Scheme price", "Combined postage", "Total amount");
+        InOrder(body, ">Submit</button>", ">Previous</a>", ">Save</button>", ">Print</a>");
+        Assert.Contains("You must agree to your data being shared for the schemes listed below before you can proceed with your order.", body);
+        Assert.Contains("PT200: Microbiology", body);
     }
 
     [Fact]
@@ -319,13 +367,165 @@ public partial class OrderRouteSmokeTests : IClassFixture<PtlExternalWebTestFact
         Assert.Contains("Pending order summary", body);
         Assert.Contains("Contract year", body);
         Assert.Contains("Purchase order number", body);
-        Assert.Contains("Not yet available online", body);
+        Assert.Contains("Not provided", body);
         Assert.Contains("Microbiology", body);
         Assert.Contains("Apr, May", body);
         Assert.Contains("Combined postage charges", body);
         Assert.Contains("Total order value", body);
         Assert.Contains("Print this page", body);
         Assert.DoesNotContain("Submit", body);
+    }
+
+    private static CreateOrderResponse ReviewOrder() => FakeCreateOrderApiClient.SampleOrder(selected: true) with
+    {
+        PurchaseOrderNumber = "PO-1",
+        Consents = [new CreateOrderConsentResponse(FakeCreateOrderApiClient.AvailableSchemeId, "PT200", "Microbiology", "I agree to share my data", false)]
+    };
+
+    private static FakeCreateOrderApiClient ReviewApi() => new() { GetResult = new(CreateOrderApiStatus.Ok, ReviewOrder()) };
+
+    [Fact]
+    public async Task Review_RendersThePurchaseOrderFieldTermsConsentAndButtons()
+    {
+        var client = CreateClient(ReviewApi());
+        var cookies = await SignInAsync(client);
+
+        var body = await GetAsync(client, cookies, "/Order/Review?year=current");
+
+        Assert.Contains("Schemes you have selected", body);
+        Assert.Contains("Order details", body);
+        Assert.Contains("Contract year", body);
+        Assert.Contains("name=\"PurchaseOrderNumber\"", body);
+        Assert.Contains("value=\"PO-1\"", body);
+        Assert.Contains("maxlength=\"255\"", body);
+        Assert.Contains("View terms and conditions (opens in new tab)", body);
+        Assert.Contains("target=\"_blank\"", body);
+        Assert.Contains("I have read and agreed to the terms and conditions", body);
+        Assert.Contains("I agree to share my data", body);
+        Assert.Contains("name=\"ConsentedSchemeIds\"", body);
+        Assert.Contains("id=\"submit-order\"", body);
+        Assert.Contains("formaction=\"/Order/Save\"", body);
+        Assert.Contains(">Save</button>", body);
+        Assert.Contains(">Print</a>", body);
+        Assert.Contains(">Previous</a>", body);
+        Assert.Contains("/js/review-order.js", body);
+        Assert.Matches(AntiforgeryTokenPattern, body);
+        Assert.DoesNotContain("not yet available online", body, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Review_WithoutConsentsOrATermsAddress_HidesBothSections()
+    {
+        var api = new FakeCreateOrderApiClient { GetResult = new(CreateOrderApiStatus.Ok, FakeCreateOrderApiClient.SampleOrder(selected: true)) };
+        var client = _factory.WithWebHostBuilder(builder =>
+        {
+            builder.ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(new Dictionary<string, string?> { ["CreateOrder:TermsAndConditionsUrl"] = "" }));
+            builder.ConfigureServices(services =>
+            {
+                services.RemoveAll<ICreateOrderApiClient>();
+                services.AddSingleton<ICreateOrderApiClient>(api);
+            });
+        }).CreateClient();
+        var cookies = await SignInAsync(client);
+
+        var body = await GetAsync(client, cookies, "/Order/Review?year=current");
+
+        Assert.DoesNotContain("View terms and conditions", body);
+        Assert.DoesNotContain("ConsentedSchemeIds", body);
+        Assert.Contains("I have read and agreed to the terms and conditions", body);
+    }
+
+    private static async Task<HttpResponseMessage> PostReviewFormAsync(HttpClient client, Dictionary<string, string> cookies, string action, params (string Key, string Value)[] fields)
+    {
+        var token = await GetAntiforgeryTokenAsync(client, cookies, "/Order/Review?year=current");
+        var form = new List<KeyValuePair<string, string>> { new("__RequestVerificationToken", token), new("Year", "current") };
+        form.AddRange(fields.Select(f => new KeyValuePair<string, string>(f.Key, f.Value)));
+        return await CookieForwardingHttpClient.SendWithCookiesAsync(client, HttpMethod.Post, $"/Order/{action}", cookies, new FormUrlEncodedContent(form));
+    }
+
+    [Fact]
+    public async Task Submit_Post_WithTheTermsAccepted_SubmitsAndGoesHome()
+    {
+        var api = ReviewApi();
+        var client = CreateClient(api, allowAutoRedirect: false);
+        var cookies = await SignInAsync(client);
+
+        var response = await PostReviewFormAsync(client, cookies, "Submit",
+            ("PurchaseOrderNumber", "PO-9"), ("TermsAccepted", "true"), ("ConsentedSchemeIds", FakeCreateOrderApiClient.AvailableSchemeId.ToString()));
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        Assert.Contains("/Home", response.Headers.Location!.ToString());
+        Assert.Equal("PO-9", api.LastSubmit!.PurchaseOrderNumber);
+        Assert.True(api.LastSubmit.TermsAccepted);
+        Assert.Equal([FakeCreateOrderApiClient.AvailableSchemeId], api.LastSubmit.ConsentedSchemeIds);
+    }
+
+    [Fact]
+    public async Task Submit_Post_WhenTheServerRejectsIt_ShowsTheErrorSummaryAndKeepsWhatWasTyped()
+    {
+        var api = ReviewApi();
+        api.SubmitResult = new(CreateOrderApiStatus.Ok,
+        [
+            new CreateOrderValidationErrorResponse("TermsAccepted", "Select that you have read the terms"),
+            new CreateOrderValidationErrorResponse("PurchaseOrderNumber", "The purchase order number is too long")
+        ]);
+        var client = CreateClient(api);
+        var cookies = await SignInAsync(client);
+
+        var response = await PostReviewFormAsync(client, cookies, "Submit", ("PurchaseOrderNumber", "PO-TYPED"));
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("There is a problem", body);
+        Assert.Contains("<title>Error: Pending order", body);
+        Assert.Contains("href=\"#TermsAccepted\"", body);
+        Assert.Contains("href=\"#PurchaseOrderNumber\"", body);
+        Assert.Contains("govuk-error-message", body);
+        Assert.Contains("Select that you have read the terms", body);
+        Assert.Contains("value=\"PO-TYPED\"", body);
+    }
+
+    [Fact]
+    public async Task Save_Post_StoresThePurchaseOrderAndReturnsToTheReview()
+    {
+        var api = ReviewApi();
+        var client = CreateClient(api, allowAutoRedirect: false);
+        var cookies = await SignInAsync(client);
+
+        var response = await PostReviewFormAsync(client, cookies, "Save", ("PurchaseOrderNumber", "PO-3"));
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        Assert.Contains("/Order/Review", response.Headers.Location!.ToString());
+        Assert.Equal(new CreateOrderSaveRequest("PO-3"), api.LastSave);
+    }
+
+    [Theory]
+    [InlineData("Save")]
+    [InlineData("Submit")]
+    public async Task SaveAndSubmit_Post_WithoutAntiforgeryToken_AreRejected(string action)
+    {
+        var api = ReviewApi();
+        var client = CreateClient(api);
+        var cookies = await SignInAsync(client);
+
+        var response = await CookieForwardingHttpClient.SendWithCookiesAsync(client, HttpMethod.Post, $"/Order/{action}", cookies,
+            new FormUrlEncodedContent(new Dictionary<string, string> { ["Year"] = "current", ["TermsAccepted"] = "true" }));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Null(api.LastSave);
+        Assert.Null(api.LastSubmit);
+    }
+
+    [Fact]
+    public async Task Print_ShowsTheSavedPurchaseOrderNumber()
+    {
+        var client = CreateClient(ReviewApi());
+        var cookies = await SignInAsync(client);
+
+        var body = await GetAsync(client, cookies, "/Order/Print?year=current");
+
+        Assert.Contains("PO-1", body);
+        Assert.DoesNotContain("Not provided", body);
     }
 
     [Fact]

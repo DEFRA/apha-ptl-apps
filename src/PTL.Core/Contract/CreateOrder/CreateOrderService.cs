@@ -6,6 +6,7 @@ using PTL.Core.Participant;
 using CoreCustomer = PTL.Core.Customer.Customer;
 using CoreParticipant = PTL.Core.Participant.Participant;
 using CoreScheme = PTL.Core.Scheme.Scheme;
+using CoreSchemeRepository = PTL.Core.Scheme.ISchemeRepository;
 
 namespace PTL.Core.Contract.CreateOrder;
 
@@ -15,8 +16,8 @@ public interface ICreateOrderService
     Task<CreateOrderEligibility?> GetEligibilityAsync(Guid participantId, CancellationToken cancellationToken = default);
 
     // Legacy PendingContractOrder.aspx Page_Load (stage 1): creates the draft pending order if the customer has none,
-    // renews next year's schemes, and returns the priced scheme grid.
-    Task<CreateOrderResult> GetOrderAsync(Guid participantId, OrderYear year, CancellationToken cancellationToken = default);
+    // renews next year's schemes, and returns the priced scheme grid. forReview also loads the stage 2 data consent section.
+    Task<CreateOrderResult> GetOrderAsync(Guid participantId, OrderYear year, bool forReview = false, CancellationToken cancellationToken = default);
 
     // Legacy Check_Clicked: applies one checkbox change to the draft, then returns the re-priced page.
     // Throws ArgumentException for an unknown field.
@@ -24,6 +25,12 @@ public interface ICreateOrderService
 
     // Legacy "Clear Form" confirmation: deletes the draft's scheme lines and the draft order itself.
     Task<CreateOrderAccess> ClearAsync(Guid participantId, OrderYear year, CancellationToken cancellationToken = default);
+
+    // Legacy stage 2 BtnSave_Click: stores the purchase order number on the draft; the order stays unsubmitted.
+    Task<CreateOrderSubmitOutcome> SavePurchaseOrderAsync(Guid participantId, OrderYear year, string? purchaseOrderNumber, CancellationToken cancellationToken = default);
+
+    // Legacy stage 2 BtnSubmit_Click: validates, then submits the draft for administrator review.
+    Task<CreateOrderSubmitOutcome> SubmitAsync(Guid participantId, OrderYear year, CreateOrderSubmission submission, CancellationToken cancellationToken = default);
 }
 
 public sealed class CreateOrderService(
@@ -32,8 +39,12 @@ public sealed class CreateOrderService(
     IParticipantRepository participantRepository,
     ICustomerRepository customerRepository,
     ILookupRepository lookupRepository,
+    CoreSchemeRepository schemeRepository,
     IOptions<CreateOrderOptions> options) : ICreateOrderService
 {
+    // Contract.PurchaseOrderNumber's CSLA StringMaxLength rule.
+    public const int PurchaseOrderNumberMaxLength = 255;
+
     private const string SelectField = "select";
     private const string ImportPermitField = "importexport";
 
@@ -75,7 +86,7 @@ public sealed class CreateOrderService(
             await NoSubmittedOrderAsync(participant.CustomerId, settings.NextYearId, cancellationToken));
     }
 
-    public async Task<CreateOrderResult> GetOrderAsync(Guid participantId, OrderYear year, CancellationToken cancellationToken = default)
+    public async Task<CreateOrderResult> GetOrderAsync(Guid participantId, OrderYear year, bool forReview = false, CancellationToken cancellationToken = default)
     {
         var (access, context) = await ResolveContextAsync(participantId, year, cancellationToken);
         if (context is null)
@@ -84,7 +95,7 @@ public sealed class CreateOrderService(
         }
 
         var state = await LoadStateAsync(context, cancellationToken);
-        return new CreateOrderResult(CreateOrderAccess.Allowed, await BuildPageAsync(state, cancellationToken));
+        return new CreateOrderResult(CreateOrderAccess.Allowed, await BuildPageAsync(state, forReview, cancellationToken));
     }
 
     public async Task<CreateOrderResult> ApplyChangeAsync(Guid participantId, OrderYear year, CreateOrderLineChange change, CancellationToken cancellationToken = default)
@@ -107,7 +118,7 @@ public sealed class CreateOrderService(
             state.Lines = (await pendingOrderRepository.GetSchemesAsync(state.Order.PendingContractId, cancellationToken)).ToList();
         }
 
-        return new CreateOrderResult(CreateOrderAccess.Allowed, await BuildPageAsync(state, cancellationToken));
+        return new CreateOrderResult(CreateOrderAccess.Allowed, await BuildPageAsync(state, includeConsents: false, cancellationToken));
     }
 
     public async Task<CreateOrderAccess> ClearAsync(Guid participantId, OrderYear year, CancellationToken cancellationToken = default)
@@ -131,6 +142,110 @@ public sealed class CreateOrderService(
 
         await pendingOrderRepository.MarkDecidedAsync(context.Customer.CustomerId, order.PendingContractId, cancellationToken);
         return CreateOrderAccess.Allowed;
+    }
+
+    public async Task<CreateOrderSubmitOutcome> SavePurchaseOrderAsync(Guid participantId, OrderYear year, string? purchaseOrderNumber, CancellationToken cancellationToken = default)
+    {
+        var (access, context) = await ResolveContextAsync(participantId, year, cancellationToken);
+        if (context is null)
+        {
+            return new CreateOrderSubmitOutcome(access, []);
+        }
+
+        var purchaseOrder = (purchaseOrderNumber ?? string.Empty).Trim();
+        if (purchaseOrder.Length > PurchaseOrderNumberMaxLength)
+        {
+            return new CreateOrderSubmitOutcome(CreateOrderAccess.Allowed, [PurchaseOrderTooLong()]);
+        }
+
+        var order = await createOrderRepository.GetPendingOrderAsync(context.Customer.CustomerId, context.YearId, isSubmitted: false, cancellationToken);
+        if (order is null)
+        {
+            return new CreateOrderSubmitOutcome(CreateOrderAccess.NotFound, []);
+        }
+
+        await pendingOrderRepository.UpdatePurchaseOrderNumberAsync(order.PendingContractId, purchaseOrder, cancellationToken);
+        return new CreateOrderSubmitOutcome(CreateOrderAccess.Allowed, []);
+    }
+
+    public async Task<CreateOrderSubmitOutcome> SubmitAsync(Guid participantId, OrderYear year, CreateOrderSubmission submission, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(submission);
+
+        var (access, context) = await ResolveContextAsync(participantId, year, cancellationToken);
+        if (context is null)
+        {
+            return new CreateOrderSubmitOutcome(access, []);
+        }
+
+        var purchaseOrder = (submission.PurchaseOrderNumber ?? string.Empty).Trim();
+        var state = await LoadStateAsync(context, cancellationToken);
+        var selected = state.Lines.Where(l => l.IsSelected).ToList();
+        var withMonths = selected.Where(l => l.HasAnyMonth()).ToList();
+        var consents = await LoadConsentsAsync(withMonths, cancellationToken);
+
+        // Legacy never reached these first two checks (Next stays disabled), so there is no legacy wording to keep.
+        var errors = new List<CreateOrderValidationError>();
+        if (selected.Count == 0)
+        {
+            errors.Add(new CreateOrderValidationError("Schemes", "Select at least one scheme before you submit your order."));
+        }
+
+        errors.AddRange(selected.Where(l => !l.HasAnyMonth())
+            .Select(l => new CreateOrderValidationError("Schemes", $"Select at least one distribution month for {state.Schemes.FirstOrDefault(s => s.SchemeId == l.SchemeId)?.Name ?? l.SchemeName}.")));
+
+        if (!submission.TermsAccepted)
+        {
+            errors.Add(new CreateOrderValidationError("TermsAccepted", "Select that you have read and agreed to the terms and conditions."));
+        }
+
+        if (consents.Any(c => !submission.ConsentedSchemeIds.Contains(c.SchemeId)))
+        {
+            errors.Add(new CreateOrderValidationError("DataConsent", "Select that you agree to your data being shared for every scheme listed."));
+        }
+
+        if (purchaseOrder.Length > PurchaseOrderNumberMaxLength)
+        {
+            errors.Add(PurchaseOrderTooLong());
+        }
+
+        if (errors.Count > 0)
+        {
+            return new CreateOrderSubmitOutcome(CreateOrderAccess.Allowed, errors);
+        }
+
+        // Legacy deletes the lines that were ticked off again before saving the submitted order.
+        foreach (var line in state.Lines.Where(l => !l.IsSelected))
+        {
+            await pendingOrderRepository.DeleteSchemeAsync(line.PendingParticipantSchemeId, cancellationToken);
+        }
+
+        foreach (var consent in consents)
+        {
+            await pendingOrderRepository.UpdateSchemeAsync(withMonths.First(l => l.SchemeId == consent.SchemeId), dataConsentDeclarationGiven: true, cancellationToken);
+        }
+
+        await pendingOrderRepository.SubmitAsync(state.Order.PendingContractId, purchaseOrder, cancellationToken);
+        return new CreateOrderSubmitOutcome(CreateOrderAccess.Allowed, []);
+    }
+
+    private static CreateOrderValidationError PurchaseOrderTooLong() =>
+        new("PurchaseOrderNumber", $"The purchase order number must be {PurchaseOrderNumberMaxLength} characters or fewer.");
+
+    // Legacy shows the consent section only for schemes whose Data Consent Declaration is active.
+    private async Task<List<CreateOrderConsent>> LoadConsentsAsync(IEnumerable<PendingOrderSchemeEntity> lines, CancellationToken cancellationToken)
+    {
+        var consents = new List<CreateOrderConsent>();
+        foreach (var line in lines)
+        {
+            var scheme = await schemeRepository.GetByIdAsync(line.SchemeId, cancellationToken);
+            if (scheme is { DataConsentDeclarationActive: true } && !string.IsNullOrWhiteSpace(scheme.DataConsentDeclarationText))
+            {
+                consents.Add(new CreateOrderConsent(line.SchemeId, scheme.Identifier, scheme.Name, scheme.DataConsentDeclarationText, line.DataConsentDeclarationGiven));
+            }
+        }
+
+        return consents;
     }
 
     // Legacy CreateCurrentOrderPageGuard / CreateNextOrderPageGuard: CanOrderOnline plus no submitted order for the year.
@@ -409,7 +524,7 @@ public sealed class CreateOrderService(
         return true;
     }
 
-    private async Task<CreateOrderPage> BuildPageAsync(OrderState state, CancellationToken cancellationToken)
+    private async Task<CreateOrderPage> BuildPageAsync(OrderState state, bool includeConsents, CancellationToken cancellationToken)
     {
         var context = state.Context;
         var customer = context.Customer;
@@ -492,6 +607,8 @@ public sealed class CreateOrderService(
             availableGroups,
             schemeTotal,
             postageTotal,
-            selected.Any(l => l.HasAnyMonth()));
+            selected.Any(l => l.HasAnyMonth()),
+            state.Order.PurchaseOrderNumber,
+            includeConsents ? await LoadConsentsAsync(selected.Where(l => l.HasAnyMonth()), cancellationToken) : null);
     }
 }

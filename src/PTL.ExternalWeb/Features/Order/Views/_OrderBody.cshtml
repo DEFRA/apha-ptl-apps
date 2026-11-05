@@ -71,6 +71,11 @@ else
     </dl>
 </div>
 
+@if (!order.CanProceed)
+{
+    <p class="govuk-hint" id="next-hint">Select at least one scheme and at least one distribution month for it to continue.</p>
+}
+
 @* One form so every action is a direct child of the button group and lines up on one baseline. *@
 <form method="get" asp-controller="Order" asp-action="Review" class="govuk-button-group">
     <input type="hidden" name="year" value="@Model.YearSlug" />

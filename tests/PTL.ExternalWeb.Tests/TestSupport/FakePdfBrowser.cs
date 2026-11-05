@@ -33,7 +33,9 @@ internal sealed class FakePdfBrowser
 
     public int DisposeCount { get; private set; }
 
-    public int PrintCount { get; private set; }
+    private int printCount;
+
+    public int PrintCount => Volatile.Read(ref printCount);
 
     public string? LastHtml { get; private set; }
 
@@ -59,7 +61,7 @@ internal sealed class FakePdfBrowser
                 LastHtml = (string)args[0]!;
                 return FakeProxy.Unhandled;
             case "PdfAsync":
-                PrintCount++;
+                Interlocked.Increment(ref printCount);
                 LastPdfOptions = (PagePdfOptions?)args[0];
                 return PdfFailure is null ? PdfBytes : throw PdfFailure;
             default:

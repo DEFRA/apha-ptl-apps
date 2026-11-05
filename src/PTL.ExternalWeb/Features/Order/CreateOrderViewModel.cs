@@ -74,6 +74,30 @@ public sealed record CreateOrderReviewViewModel(string YearSlug, CreateOrderResp
         ? nameof(OrderController.CurrentYear)
         : nameof(OrderController.NextYear);
 
+    // Legacy PurchaseOrderNumberTextbox / CheckBoxTermsAndConditions / consent checkboxes: the saved values on a first visit,
+    // the posted values when the page is shown again with errors.
+    public string PurchaseOrderNumber { get; init; } = Order.PurchaseOrderNumber;
+
+    public bool TermsAccepted { get; init; }
+
+    public IReadOnlyCollection<Guid> ConsentedSchemeIds { get; init; } = [.. Order.DataConsents.Where(c => c.Given).Select(c => c.SchemeId)];
+
+    public IReadOnlyList<CreateOrderValidationErrorResponse> Errors { get; init; } = [];
+
+    public string? TermsUrl { get; init; }
+
+    public bool HasConsents => Order.DataConsents.Count > 0;
+
+    public bool IsConsented(Guid schemeId) => ConsentedSchemeIds.Contains(schemeId);
+
+    public string? ErrorFor(string field) => Errors.FirstOrDefault(e => e.Field == field)?.Message;
+
+    // Field order follows the page, top to bottom.
+    public IReadOnlyList<(string Field, string Message)> ErrorSummary =>
+        [.. Errors.OrderBy(e => Array.IndexOf(ErrorFieldOrder, e.Field)).Select(e => (e.Field, e.Message))];
+
+    private static readonly string[] ErrorFieldOrder = ["Schemes", "PurchaseOrderNumber", "DataConsent", "TermsAccepted"];
+
     // Schemes in the pending order: selected, with at least one pending month (legacy GetPendingList).
     public IReadOnlyList<CreateOrderSchemeResponse> Schemes { get; } = Order.ParticipatingSchemes
         .Concat(Order.AvailableSchemes.SelectMany(g => g.Schemes))
@@ -82,4 +106,16 @@ public sealed record CreateOrderReviewViewModel(string YearSlug, CreateOrderResp
         .ToList();
 
     public string FormatMoney(decimal amount) => CreateOrderViewModel.Format(Order.CurrencySymbol, amount);
+}
+
+// Form posted by the Pending order page's Save and Submit buttons.
+public sealed class CreateOrderReviewForm
+{
+    public string? Year { get; set; }
+
+    public string? PurchaseOrderNumber { get; set; }
+
+    public bool TermsAccepted { get; set; }
+
+    public List<Guid> ConsentedSchemeIds { get; set; } = [];
 }

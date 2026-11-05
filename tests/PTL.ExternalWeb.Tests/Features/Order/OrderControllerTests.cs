@@ -1,9 +1,12 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ViewFeatures;
+using Microsoft.Extensions.Options;
 using PTL.ApiClient;
 using PTL.Contracts.CreateOrder;
 using PTL.ExternalWeb.Features.Order;
 using PTL.ExternalWeb.Tests.TestSupport;
+using PTL.SharedUI.Notifications;
 
 namespace PTL.ExternalWeb.Tests.Features.Order;
 
@@ -11,9 +14,11 @@ public class OrderControllerTests
 {
     private static readonly Guid ParticipantId = Guid.NewGuid();
 
-    private static OrderController CreateController(FakeCreateOrderApiClient? api = null, bool signedInAsParticipant = true)
+    private static OrderController CreateController(FakeCreateOrderApiClient? api = null, bool signedInAsParticipant = true, string? termsUrl = "https://example.test/terms.pdf")
     {
-        var controller = new OrderController(api ?? new FakeCreateOrderApiClient());
+        var controller = new OrderController(
+            api ?? new FakeCreateOrderApiClient(),
+            Options.Create(new OrderPageOptions { TermsAndConditionsUrl = termsUrl }));
         if (signedInAsParticipant)
         {
             AuthenticatedParticipant.Attach(controller, ParticipantId);
@@ -23,6 +28,7 @@ public class OrderControllerTests
             controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
         }
 
+        controller.TempData = new TempDataDictionary(controller.HttpContext, new FakeTempDataProvider());
         return controller;
     }
 
@@ -256,11 +262,175 @@ public class OrderControllerTests
     }
 
     [Fact]
-    public async Task Review_NothingSelectedYet_RedirectsBackToTheYearPage()
+    public async Task Review_NothingSelectedYet_RedirectsBackToTheYearPageWithAMessage()
     {
-        var result = await CreateController().Review("current", CancellationToken.None);
+        var controller = CreateController();
+
+        var result = await controller.Review("current", CancellationToken.None);
 
         Assert.Equal(nameof(OrderController.CurrentYear), Assert.IsType<RedirectToActionResult>(result).ActionName);
+        var notification = controller.TempData.GetNotification();
+        Assert.Equal(NotificationType.Error, notification!.Type);
+        Assert.Contains("at least one scheme", notification.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Review_AsksForTheConsentsAndCarriesTheSavedPurchaseOrderAndTermsLink()
+    {
+        var order = FakeCreateOrderApiClient.SampleOrder(selected: true) with { PurchaseOrderNumber = "PO-1" };
+        var api = new FakeCreateOrderApiClient { GetResult = new(CreateOrderApiStatus.Ok, order) };
+
+        var result = await CreateController(api).Review("current", CancellationToken.None);
+
+        var model = Assert.IsType<CreateOrderReviewViewModel>(Assert.IsType<ViewResult>(result).Model);
+        Assert.True(api.LastGetReview);
+        Assert.Equal("PO-1", model.PurchaseOrderNumber);
+        Assert.Equal("https://example.test/terms.pdf", model.TermsUrl);
+        Assert.False(model.TermsAccepted);
+        Assert.Empty(model.Errors);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("javascript:alert(1)")]
+    [InlineData("not a url")]
+    public async Task Review_WithoutAUsableTermsAddress_HasNoTermsLink(string? configured)
+    {
+        var api = new FakeCreateOrderApiClient { GetResult = new(CreateOrderApiStatus.Ok, FakeCreateOrderApiClient.SampleOrder(selected: true)) };
+
+        var result = await CreateController(api, termsUrl: configured).Review("current", CancellationToken.None);
+
+        Assert.Null(Assert.IsType<CreateOrderReviewViewModel>(Assert.IsType<ViewResult>(result).Model).TermsUrl);
+    }
+
+    private static FakeCreateOrderApiClient ApiWithOrder(CreateOrderResponse? order = null) =>
+        new() { GetResult = new(CreateOrderApiStatus.Ok, order ?? FakeCreateOrderApiClient.SampleOrder(selected: true)) };
+
+    [Fact]
+    public async Task Save_Ok_StoresThePurchaseOrderAndReturnsToTheReviewWithAMessage()
+    {
+        var api = ApiWithOrder();
+        var controller = CreateController(api);
+
+        var result = await controller.Save(new CreateOrderReviewForm { Year = "next", PurchaseOrderNumber = "PO-5" }, CancellationToken.None);
+
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal(nameof(OrderController.Review), redirect.ActionName);
+        Assert.Equal("next", redirect.RouteValues!["year"]);
+        Assert.Equal(new CreateOrderSaveRequest("PO-5"), api.LastSave);
+        Assert.Equal("next", api.LastSaveYear);
+        Assert.Equal(NotificationType.Success, controller.TempData.GetNotification()!.Type);
+    }
+
+    [Fact]
+    public async Task Save_WithErrors_ShowsThePageAgainWithThePostedValues()
+    {
+        var api = ApiWithOrder();
+        api.SaveResult = new(CreateOrderApiStatus.Ok, [new CreateOrderValidationErrorResponse("PurchaseOrderNumber", "Too long")]);
+        var form = new CreateOrderReviewForm { Year = "current", PurchaseOrderNumber = "PO-LONG", TermsAccepted = true };
+
+        var result = await CreateController(api).Save(form, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        Assert.Equal("Review", view.ViewName);
+        var model = Assert.IsType<CreateOrderReviewViewModel>(view.Model);
+        Assert.Equal("PO-LONG", model.PurchaseOrderNumber);
+        Assert.True(model.TermsAccepted);
+        Assert.Equal("Too long", model.ErrorFor("PurchaseOrderNumber"));
+    }
+
+    [Fact]
+    public async Task Submit_Ok_SubmitsTheOrderAndGoesHomeWithAMessage()
+    {
+        var api = ApiWithOrder();
+        var controller = CreateController(api);
+        var consent = Guid.NewGuid();
+        var form = new CreateOrderReviewForm { Year = "current", PurchaseOrderNumber = "PO-7", TermsAccepted = true, ConsentedSchemeIds = [consent] };
+
+        var result = await controller.Submit(form, CancellationToken.None);
+
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal("Index", redirect.ActionName);
+        Assert.Equal("Home", redirect.ControllerName);
+        Assert.Equal("PO-7", api.LastSubmit!.PurchaseOrderNumber);
+        Assert.True(api.LastSubmit.TermsAccepted);
+        Assert.Equal([consent], api.LastSubmit.ConsentedSchemeIds);
+        Assert.Equal("current", api.LastSubmitYear);
+        Assert.Equal(ParticipantId, api.LastParticipantId);
+        Assert.Equal(NotificationType.Success, controller.TempData.GetNotification()!.Type);
+    }
+
+    [Fact]
+    public async Task Submit_WithErrors_ShowsThePageAgainWithTheErrorsAndThePostedValues()
+    {
+        var consent = Guid.NewGuid();
+        var api = ApiWithOrder();
+        api.SubmitResult = new(CreateOrderApiStatus.Ok,
+        [
+            new CreateOrderValidationErrorResponse("TermsAccepted", "Accept the terms"),
+            new CreateOrderValidationErrorResponse("Schemes", "Pick a month for Beta")
+        ]);
+        var form = new CreateOrderReviewForm { Year = "current", PurchaseOrderNumber = "PO-8", ConsentedSchemeIds = [consent] };
+
+        var result = await CreateController(api).Submit(form, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        Assert.Equal("Review", view.ViewName);
+        var model = Assert.IsType<CreateOrderReviewViewModel>(view.Model);
+        Assert.Equal("PO-8", model.PurchaseOrderNumber);
+        Assert.False(model.TermsAccepted);
+        Assert.True(model.IsConsented(consent));
+        Assert.Equal(["Schemes", "TermsAccepted"], model.ErrorSummary.Select(e => e.Field));
+    }
+
+    [Fact]
+    public async Task Submit_WithErrorsAndNothingSelectedAnyMore_ReturnsToTheOrderPage()
+    {
+        var api = new FakeCreateOrderApiClient
+        {
+            SubmitResult = new(CreateOrderApiStatus.Ok, [new CreateOrderValidationErrorResponse("Schemes", "Pick a scheme")])
+        };
+
+        var result = await CreateController(api).Submit(new CreateOrderReviewForm { Year = "current" }, CancellationToken.None);
+
+        Assert.Equal(nameof(OrderController.CurrentYear), Assert.IsType<RedirectToActionResult>(result).ActionName);
+    }
+
+    [Fact]
+    public async Task SaveAndSubmit_NotAllowedOrNotFoundOrInvalid_AreHandled()
+    {
+        var forbidden = new FakeCreateOrderApiClient
+        {
+            SaveResult = new(CreateOrderApiStatus.NotAllowed, []),
+            SubmitResult = new(CreateOrderApiStatus.NotAllowed, [])
+        };
+        var missing = new FakeCreateOrderApiClient
+        {
+            SaveResult = new(CreateOrderApiStatus.NotFound, []),
+            SubmitResult = new(CreateOrderApiStatus.NotFound, [])
+        };
+        var form = new CreateOrderReviewForm { Year = "current" };
+
+        Assert.Equal("NotAvailable", Assert.IsType<ViewResult>(await CreateController(forbidden).Save(form, CancellationToken.None)).ViewName);
+        Assert.Equal("NotAvailable", Assert.IsType<ViewResult>(await CreateController(forbidden).Submit(form, CancellationToken.None)).ViewName);
+        Assert.IsType<NotFoundResult>(await CreateController(missing).Save(form, CancellationToken.None));
+        Assert.IsType<NotFoundResult>(await CreateController(missing).Submit(form, CancellationToken.None));
+        Assert.IsType<NotFoundResult>(await CreateController().Save(new CreateOrderReviewForm { Year = "bogus" }, CancellationToken.None));
+        Assert.IsType<NotFoundResult>(await CreateController().Submit(new CreateOrderReviewForm { Year = "bogus" }, CancellationToken.None));
+        Assert.IsType<NotFoundResult>(await CreateController(signedInAsParticipant: false).Save(form, CancellationToken.None));
+        Assert.IsType<NotFoundResult>(await CreateController(signedInAsParticipant: false).Submit(form, CancellationToken.None));
+    }
+
+    [Theory]
+    [InlineData(nameof(OrderController.Save))]
+    [InlineData(nameof(OrderController.Submit))]
+    public void SaveAndSubmit_ArePostOnlyAndRequireAnAntiforgeryToken(string action)
+    {
+        var method = typeof(OrderController).GetMethod(action)!;
+
+        Assert.NotEmpty(method.GetCustomAttributes(typeof(HttpPostAttribute), inherit: true));
+        Assert.NotEmpty(method.GetCustomAttributes(typeof(ValidateAntiForgeryTokenAttribute), inherit: true));
     }
 
     [Fact]

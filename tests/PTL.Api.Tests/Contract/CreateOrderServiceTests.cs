@@ -2,11 +2,13 @@ using Microsoft.Extensions.Options;
 using PTL.Api.Tests.Customer;
 using PTL.Api.Tests.Lookup;
 using PTL.Api.Tests.Participant;
+using PTL.Api.Tests.Scheme;
 using PTL.Core.Contract.CreateOrder;
 using PTL.Core.Contract.PendingOrder;
 using PTL.Core.Lookup;
 using CoreCustomer = PTL.Core.Customer.Customer;
 using CoreParticipant = PTL.Core.Participant.Participant;
+using CoreScheme = PTL.Core.Scheme.Scheme;
 
 namespace PTL.Api.Tests.Contract;
 
@@ -25,6 +27,7 @@ public class CreateOrderServiceTests
         public FakeParticipantRepository Participants { get; } = new();
         public FakeCustomerRepository Customers { get; } = new();
         public FakeLookupRepository Lookup { get; } = new();
+        public FakeSchemeRepository Schemes { get; } = new();
         public CreateOrderService Service { get; private set; } = null!;
         public Guid CurrencyId { get; } = Guid.NewGuid();
         public Guid CountryId { get; } = Guid.NewGuid();
@@ -53,6 +56,7 @@ public class CreateOrderServiceTests
                 fixture.Participants,
                 fixture.Customers,
                 fixture.Lookup,
+                fixture.Schemes,
                 Options.Create(new CreateOrderOptions()));
             return fixture;
         }
@@ -595,5 +599,248 @@ public class CreateOrderServiceTests
         merged.MergeMonthsFrom(other);
 
         Assert.All(Enumerable.Range(1, 12), month => Assert.True(merged.Holds(month)));
+    }
+
+    private static async Task<(Fixture Fixture, AvailableSchemeEntity Alpha, AvailableSchemeEntity Beta)> TwoSelectedSchemesAsync()
+    {
+        var fixture = await Fixture.CreateAsync();
+        var alpha = fixture.AddScheme("Alpha", "PT1");
+        var beta = fixture.AddScheme("Beta", "PT2");
+        await fixture.ChangeAsync(alpha.SchemeId, "select", true);
+        await fixture.ChangeAsync(beta.SchemeId, "select", true);
+        return (fixture, alpha, beta);
+    }
+
+    private static CreateOrderSubmission Submission(string? purchaseOrder = "", bool terms = true, params Guid[] consents) => new(purchaseOrder, terms, consents);
+
+    private static Task<CoreScheme> StoreSchemeAsync(Fixture fixture, AvailableSchemeEntity available, bool consentActive, string? consentText) =>
+        fixture.Schemes.CreateAsync(new CoreScheme
+        {
+            SchemeId = available.SchemeId,
+            Identifier = available.Identifier,
+            Name = available.Name,
+            DataConsentDeclarationActive = consentActive,
+            DataConsentDeclarationText = consentText
+        });
+
+    [Fact]
+    public async Task SavePurchaseOrder_StoresTheTrimmedNumberAndLeavesTheOrderUnsubmitted()
+    {
+        var (fixture, _, _) = await TwoSelectedSchemesAsync();
+
+        var outcome = await fixture.Service.SavePurchaseOrderAsync(fixture.ParticipantId, OrderYear.Current, "  PO-1  ");
+
+        Assert.True(outcome.Succeeded);
+        var order = Assert.Single(fixture.Store.Orders);
+        Assert.Equal("PO-1", order.PurchaseOrderNumber);
+        Assert.False(order.IsSubmitted);
+    }
+
+    [Fact]
+    public async Task SavePurchaseOrder_NullNumber_StoresAnEmptyOne()
+    {
+        var (fixture, _, _) = await TwoSelectedSchemesAsync();
+        await fixture.Service.SavePurchaseOrderAsync(fixture.ParticipantId, OrderYear.Current, "PO-1");
+
+        var outcome = await fixture.Service.SavePurchaseOrderAsync(fixture.ParticipantId, OrderYear.Current, null);
+
+        Assert.True(outcome.Succeeded);
+        Assert.Equal(string.Empty, Assert.Single(fixture.Store.Orders).PurchaseOrderNumber);
+    }
+
+    [Fact]
+    public async Task SavePurchaseOrder_TooLong_ReturnsAFieldErrorAndStoresNothing()
+    {
+        var (fixture, _, _) = await TwoSelectedSchemesAsync();
+
+        var outcome = await fixture.Service.SavePurchaseOrderAsync(fixture.ParticipantId, OrderYear.Current, new string('A', 256));
+
+        Assert.False(outcome.Succeeded);
+        Assert.Equal(CreateOrderAccess.Allowed, outcome.Access);
+        Assert.Equal("PurchaseOrderNumber", Assert.Single(outcome.Errors).Field);
+        Assert.Equal(string.Empty, Assert.Single(fixture.Store.Orders).PurchaseOrderNumber);
+    }
+
+    [Fact]
+    public async Task SavePurchaseOrder_NoDraftOrder_ReturnsNotFound()
+    {
+        var fixture = await Fixture.CreateAsync();
+
+        var outcome = await fixture.Service.SavePurchaseOrderAsync(fixture.ParticipantId, OrderYear.Current, "PO-1");
+
+        Assert.Equal(CreateOrderAccess.NotFound, outcome.Access);
+        Assert.False(outcome.Succeeded);
+    }
+
+    [Fact]
+    public async Task SavePurchaseOrder_NotEligible_IsRefused()
+    {
+        var fixture = await Fixture.CreateAsync(canOrderOnline: false);
+
+        var outcome = await fixture.Service.SavePurchaseOrderAsync(fixture.ParticipantId, OrderYear.Current, "PO-1");
+
+        Assert.Equal(CreateOrderAccess.NotEligible, outcome.Access);
+    }
+
+    [Fact]
+    public async Task Submit_ValidOrder_SubmitsItAndLocksTheYear()
+    {
+        var (fixture, alpha, beta) = await TwoSelectedSchemesAsync();
+        await fixture.ChangeAsync(beta.SchemeId, "select", false);
+
+        var outcome = await fixture.Service.SubmitAsync(fixture.ParticipantId, OrderYear.Current, Submission(" PO-9 "));
+
+        Assert.True(outcome.Succeeded);
+        var order = Assert.Single(fixture.Store.Orders);
+        Assert.True(order.IsSubmitted);
+        Assert.Equal("PO-9", order.PurchaseOrderNumber);
+        Assert.Equal(alpha.SchemeId, Assert.Single(fixture.Store.LinesFor(order.PendingContractId)).SchemeId);
+        Assert.Equal(CreateOrderAccess.NotEligible, (await fixture.Service.GetOrderAsync(fixture.ParticipantId, OrderYear.Current)).Access);
+    }
+
+    [Fact]
+    public async Task Submit_NullPurchaseOrder_SubmitsWithAnEmptyOne()
+    {
+        var (fixture, _, _) = await TwoSelectedSchemesAsync();
+
+        var outcome = await fixture.Service.SubmitAsync(fixture.ParticipantId, OrderYear.Current, Submission(purchaseOrder: null));
+
+        Assert.True(outcome.Succeeded);
+        Assert.Equal(string.Empty, Assert.Single(fixture.Store.Orders).PurchaseOrderNumber);
+    }
+
+    [Fact]
+    public async Task Submit_NoSchemeSelected_ReturnsASchemesErrorAndSubmitsNothing()
+    {
+        var fixture = await Fixture.CreateAsync();
+        fixture.AddScheme("Alpha", "PT1");
+
+        var outcome = await fixture.Service.SubmitAsync(fixture.ParticipantId, OrderYear.Current, Submission());
+
+        Assert.Equal("Schemes", Assert.Single(outcome.Errors).Field);
+        Assert.False(Assert.Single(fixture.Store.Orders).IsSubmitted);
+    }
+
+    [Fact]
+    public async Task Submit_SchemeWithoutMonths_NamesTheSchemeAndSubmitsNothing()
+    {
+        var (fixture, _, beta) = await TwoSelectedSchemesAsync();
+        foreach (var month in new[] { "apr", "may", "jun" })
+        {
+            await fixture.ChangeAsync(beta.SchemeId, month, false);
+        }
+
+        var outcome = await fixture.Service.SubmitAsync(fixture.ParticipantId, OrderYear.Current, Submission());
+
+        var error = Assert.Single(outcome.Errors);
+        Assert.Equal("Schemes", error.Field);
+        Assert.Contains("Beta", error.Message, StringComparison.Ordinal);
+        Assert.False(Assert.Single(fixture.Store.Orders).IsSubmitted);
+    }
+
+    [Fact]
+    public async Task Submit_TermsNotAccepted_ReturnsATermsErrorAndSubmitsNothing()
+    {
+        var (fixture, _, _) = await TwoSelectedSchemesAsync();
+
+        var outcome = await fixture.Service.SubmitAsync(fixture.ParticipantId, OrderYear.Current, Submission(terms: false));
+
+        Assert.Equal("TermsAccepted", Assert.Single(outcome.Errors).Field);
+        Assert.False(Assert.Single(fixture.Store.Orders).IsSubmitted);
+    }
+
+    [Fact]
+    public async Task Submit_PurchaseOrderTooLong_ReturnsAFieldError()
+    {
+        var (fixture, _, _) = await TwoSelectedSchemesAsync();
+
+        var outcome = await fixture.Service.SubmitAsync(fixture.ParticipantId, OrderYear.Current, Submission(new string('A', 256)));
+
+        Assert.Equal("PurchaseOrderNumber", Assert.Single(outcome.Errors).Field);
+    }
+
+    [Fact]
+    public async Task Submit_EveryRuleBroken_ReportsEachOneOnce()
+    {
+        var fixture = await Fixture.CreateAsync();
+
+        var outcome = await fixture.Service.SubmitAsync(fixture.ParticipantId, OrderYear.Current, Submission(new string('A', 256), terms: false));
+
+        Assert.Equal(["Schemes", "TermsAccepted", "PurchaseOrderNumber"], outcome.Errors.Select(e => e.Field));
+    }
+
+    [Fact]
+    public async Task Submit_ActiveConsentNotGiven_IsRefusedUntilItIsTicked()
+    {
+        var (fixture, alpha, _) = await TwoSelectedSchemesAsync();
+        await StoreSchemeAsync(fixture, alpha, consentActive: true, consentText: "Share my data");
+
+        var refused = await fixture.Service.SubmitAsync(fixture.ParticipantId, OrderYear.Current, Submission());
+        var accepted = await fixture.Service.SubmitAsync(fixture.ParticipantId, OrderYear.Current, Submission(consents: alpha.SchemeId));
+
+        Assert.Equal("DataConsent", Assert.Single(refused.Errors).Field);
+        Assert.True(accepted.Succeeded);
+        Assert.Equal((alpha.SchemeId, true), Assert.Single(fixture.Store.ConsentUpdates));
+    }
+
+    [Theory]
+    [InlineData(false, "Share my data")]
+    [InlineData(true, "")]
+    [InlineData(true, null)]
+    public async Task Submit_ConsentNotActiveOrWithoutText_IsNotRequired(bool active, string? text)
+    {
+        var (fixture, alpha, _) = await TwoSelectedSchemesAsync();
+        await StoreSchemeAsync(fixture, alpha, active, text);
+
+        var outcome = await fixture.Service.SubmitAsync(fixture.ParticipantId, OrderYear.Current, Submission());
+
+        Assert.True(outcome.Succeeded);
+        Assert.Empty(fixture.Store.ConsentUpdates);
+    }
+
+    [Fact]
+    public async Task Submit_NotEligibleOrUnknownParticipant_IsRefused()
+    {
+        var ineligible = await Fixture.CreateAsync(canOrderOnline: false);
+        var known = await Fixture.CreateAsync();
+
+        Assert.Equal(CreateOrderAccess.NotEligible, (await ineligible.Service.SubmitAsync(ineligible.ParticipantId, OrderYear.Current, Submission())).Access);
+        Assert.Equal(CreateOrderAccess.NotFound, (await known.Service.SubmitAsync(Guid.NewGuid(), OrderYear.Current, Submission())).Access);
+    }
+
+    [Fact]
+    public async Task Submit_AnAlreadySubmittedYear_IsRefused()
+    {
+        var fixture = await Fixture.CreateAsync();
+        fixture.Store.SeedSubmittedOrder(fixture.CustomerId, CurrentYearId);
+
+        var outcome = await fixture.Service.SubmitAsync(fixture.ParticipantId, OrderYear.Current, Submission());
+
+        Assert.Equal(CreateOrderAccess.NotEligible, outcome.Access);
+    }
+
+    [Fact]
+    public async Task Submit_WithoutASubmission_Throws()
+    {
+        var fixture = await Fixture.CreateAsync();
+
+        await Assert.ThrowsAsync<ArgumentNullException>(() => fixture.Service.SubmitAsync(fixture.ParticipantId, OrderYear.Current, null!));
+    }
+
+    [Fact]
+    public async Task GetOrder_ForReview_ReturnsTheSavedPurchaseOrderAndTheConsentsToAccept()
+    {
+        var (fixture, alpha, _) = await TwoSelectedSchemesAsync();
+        await StoreSchemeAsync(fixture, alpha, consentActive: true, consentText: "Share my data");
+        await fixture.Service.SavePurchaseOrderAsync(fixture.ParticipantId, OrderYear.Current, "PO-1");
+
+        var review = (await fixture.Service.GetOrderAsync(fixture.ParticipantId, OrderYear.Current, forReview: true)).Page!;
+        var stageOne = (await fixture.Service.GetOrderAsync(fixture.ParticipantId, OrderYear.Current)).Page!;
+
+        Assert.Equal("PO-1", review.PurchaseOrderNumber);
+        var consent = Assert.Single(review.Consents!);
+        Assert.Equal(new CreateOrderConsent(alpha.SchemeId, "PT1", "Alpha", "Share my data", false), consent);
+        Assert.Null(stageOne.Consents);
+        Assert.Equal("PO-1", stageOne.PurchaseOrderNumber);
     }
 }

@@ -41,7 +41,7 @@ public class PendingOrderRepositoryTests
         return table;
     }
 
-    private static DataTable OrderTable(Guid pendingContractId, Guid customerId, bool isDeleted = false)
+    private static DataTable OrderTable(Guid pendingContractId, Guid customerId, bool isDeleted = false, bool isSubmitted = true)
     {
         var table = new DataTable();
         table.Columns.Add("fldPendingContractId", typeof(Guid));
@@ -53,7 +53,7 @@ public class PendingOrderRepositoryTests
         table.Columns.Add("fldOrderSubmitDate", typeof(DateTime));
         table.Columns.Add("fldName", typeof(string));
         table.Columns.Add("fldSymbol", typeof(string));
-        table.Rows.Add(pendingContractId, customerId, 2026, true, isDeleted, "PO-1", new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc), "Sample Labs", "£");
+        table.Rows.Add(pendingContractId, customerId, 2026, isSubmitted, isDeleted, "PO-1", new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc), "Sample Labs", "£");
         return table;
     }
 
@@ -228,6 +228,48 @@ public class PendingOrderRepositoryTests
         Assert.Equal(false, (bool?)command.ParameterValue("IsDeleted"));
         Assert.Equal(true, (bool?)command.ParameterValue("IsSubmitted"));
         Assert.Equal(2026, (int?)command.ParameterValue("YearId"));
+    }
+
+    // Same reasoning as above - 17 arguments makes a positional mismatch easy to introduce.
+    [Fact]
+    public async Task SubmitAsync_UnknownOrder_DoesNotExecuteUpdate()
+    {
+        var (repository, connection) = CreateRepository();
+        connection.RespondToQuery(GetByIdSql, new DataTable());
+
+        await repository.SubmitAsync(Guid.NewGuid(), "PO-3");
+
+        Assert.DoesNotContain(connection.ExecutedCommands, c => c.CommandText.Contains("spuPendingContractByPendingContractID", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task SubmitAsync_SetsTheSubmittedFlagOnADraftAndStoresThePurchaseOrderNumber()
+    {
+        var (repository, connection) = CreateRepository();
+        var pendingContractId = Guid.NewGuid();
+        connection.RespondToQuery(GetByIdSql, OrderTable(pendingContractId, Guid.NewGuid(), isSubmitted: false));
+        connection.RespondToNonQuery(UpdateOrderSql, -1);
+
+        await repository.SubmitAsync(pendingContractId, "PO-3");
+
+        var command = Assert.Single(connection.ExecutedCommands, c => c.CommandText.Contains("spuPendingContractByPendingContractID", StringComparison.Ordinal));
+        Assert.Equal("PO-3", (string?)command.ParameterValue("PurchaseOrderNumber"));
+        Assert.Equal(true, (bool?)command.ParameterValue("IsSubmitted"));
+        Assert.Equal(false, (bool?)command.ParameterValue("IsDeleted"));
+    }
+
+    [Fact]
+    public async Task UpdatePurchaseOrderNumberAsync_LeavesADraftUnsubmitted()
+    {
+        var (repository, connection) = CreateRepository();
+        var pendingContractId = Guid.NewGuid();
+        connection.RespondToQuery(GetByIdSql, OrderTable(pendingContractId, Guid.NewGuid(), isSubmitted: false));
+        connection.RespondToNonQuery(UpdateOrderSql, -1);
+
+        await repository.UpdatePurchaseOrderNumberAsync(pendingContractId, "PO-4");
+
+        var command = Assert.Single(connection.ExecutedCommands, c => c.CommandText.Contains("spuPendingContractByPendingContractID", StringComparison.Ordinal));
+        Assert.Equal(false, (bool?)command.ParameterValue("IsSubmitted"));
     }
 
     // Same reasoning as above - 17 arguments makes a positional mismatch easy to introduce.

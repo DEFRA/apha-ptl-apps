@@ -188,6 +188,12 @@
   padding-left: 40px;
 }
 
+/* Read-only month on the Pending order page: a month that is not part of the order. */
+.app-month-off {
+  color: #505a5f;
+  padding: 2px 8px;
+}
+
 /* GOV.UK component rules that set display (e.g. error summary/message) otherwise win over the hidden attribute. */
 #create-order [hidden] {
   display: none;
