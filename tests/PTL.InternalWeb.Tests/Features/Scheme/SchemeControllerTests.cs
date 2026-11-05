@@ -14,7 +14,7 @@ using SchemeFormViewModel = PTL.InternalWeb.Features.Scheme.SchemeFormViewModel;
 
 namespace PTL.InternalWeb.Tests.Features.Scheme;
 
-public class SchemeControllerTests
+public partial class SchemeControllerTests
 {
     private static PTL.InternalWeb.Features.Scheme.SchemeController CreateController(FakeSchemeApiClient apiClient, FakeLookupApiClient? lookupApiClient = null) =>
         new(apiClient, lookupApiClient ?? new FakeLookupApiClient(), NullLogger<PTL.InternalWeb.Features.Scheme.SchemeController>.Instance);

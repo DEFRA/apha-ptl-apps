@@ -331,6 +331,39 @@ public class SchemeControllerTests
     }
 
     [Fact]
+    public async Task UpdateScheme_ReadOnlyScheme_SavesThePermittedChangeAndLeavesTheLockedFieldsAlone()
+    {
+        var controller = CreateController(new FakeSchemeRepository());
+        var created = await controller.CreateScheme(ValidCreateRequest(DateTime.UtcNow.Year - 1), CancellationToken.None);
+        var original = (SchemeResponse)((CreatedAtActionResult)created.Result!).Value!;
+        Assert.True(original.IsReadOnly);
+        var updateRequest = ToUpdateRequest(ValidCreateRequest(original.YearId)) with { CustomsDescription = "Revised customs description", Name = "Renamed Scheme" };
+
+        var result = await controller.UpdateScheme(original.SchemeId, updateRequest, CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var response = Assert.IsType<SchemeResponse>(ok.Value);
+        Assert.Equal("Revised customs description", response.CustomsDescription);
+        Assert.Equal(original.Name, response.Name);
+        Assert.True(response.IsReadOnly);
+    }
+
+    [Fact]
+    public async Task UpdateScheme_ReadOnlySchemeWithABlankCustomsDescription_ReturnsValidationProblem()
+    {
+        var controller = CreateController(new FakeSchemeRepository());
+        var created = await controller.CreateScheme(ValidCreateRequest(DateTime.UtcNow.Year - 1), CancellationToken.None);
+        var original = (SchemeResponse)((CreatedAtActionResult)created.Result!).Value!;
+        var invalidRequest = ToUpdateRequest(ValidCreateRequest(original.YearId)) with { CustomsDescription = string.Empty };
+
+        var result = await controller.UpdateScheme(original.SchemeId, invalidRequest, CancellationToken.None);
+
+        var objectResult = Assert.IsType<BadRequestObjectResult>(result.Result);
+        var problem = Assert.IsType<ValidationProblemDetails>(objectResult.Value);
+        Assert.Contains("CustomsDescription", problem.Errors.Keys);
+    }
+
+    [Fact]
     public async Task GetSchemeFamilyHistory_ReturnsCreatedScheme()
     {
         var controller = CreateController(new FakeSchemeRepository());

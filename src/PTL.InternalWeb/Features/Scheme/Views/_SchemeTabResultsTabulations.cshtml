@@ -304,10 +304,17 @@ else
                 <label class="govuk-label govuk-checkboxes__label" asp-for="UseExternalReference">External reference used on Tabulations</label>
 
             </div>
-            <div class="govuk-checkboxes__item">
-                <input class="govuk-checkboxes__input" asp-for="StoreRatings" />
-                <label class="govuk-label govuk-checkboxes__label" asp-for="StoreRatings">Score Samples</label>
-            </div>
+            @if (Model.IsPreviousYear)
+            {
+                <partial name="_SchemeLockedField" model="@((Kind: "checkbox", Field: nameof(Model.StoreRatings), Label: "Score Samples", Value: Model.StoreRatings.ToString(), Text: "", Width: ""))" />
+            }
+            else
+            {
+                <div class="govuk-checkboxes__item">
+                    <input class="govuk-checkboxes__input" asp-for="StoreRatings" />
+                    <label class="govuk-label govuk-checkboxes__label" asp-for="StoreRatings">Score Samples</label>
+                </div>
+            }
         </div>
     </div>
 

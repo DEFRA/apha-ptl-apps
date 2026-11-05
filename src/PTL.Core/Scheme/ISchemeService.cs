@@ -37,7 +37,8 @@ public interface ISchemeService
 
     // NotFound when schemeId does not exist. AuditReasonRequired (nothing saved) when the edit changes
     // an audited Test or Tabulation and auditWhy is blank - legacy diverted that save through Audit.aspx.
-    // Throws SchemeValidationException when business rules are violated, including when the existing
-    // scheme IsReadOnly (closed year).
+    // Throws SchemeValidationException when business rules are violated. When the existing scheme
+    // IsReadOnly (closed year) only the fields legacy leaves editable on a Previous Year scheme are
+    // taken from updatedFields (see SchemePreviousYearEdit); the rest keep their stored values.
     Task<SchemeUpdateResult> UpdateSchemeAsync(Guid schemeId, Scheme updatedFields, string auditWho, string? auditWhy, CancellationToken cancellationToken = default);
 }
