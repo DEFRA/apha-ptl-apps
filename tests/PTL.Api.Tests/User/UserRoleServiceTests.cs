@@ -204,4 +204,129 @@ public class UserRoleServiceTests
         Assert.Equal("You cannot remove your own account.", result.Message);
         Assert.Empty(users.Deleted);
     }
+
+    [Fact]
+    public async Task SetUserRolesBatchAsync_SavesEveryRowInOneRepositoryCall()
+    {
+        var userOneId = Guid.NewGuid();
+        var userTwoId = Guid.NewGuid();
+        var users = new FakeUserRepository
+        {
+            Users =
+            [
+                new PTL.Core.User.User { UserId = userOneId, Username = "m100001" },
+                new PTL.Core.User.User { UserId = userTwoId, Username = "m100002" }
+            ]
+        };
+        var userRoles = new FakeUserRoleRepository();
+        var service = CreateService(users: users, userRoles: userRoles);
+
+        var results = await service.SetUserRolesBatchAsync(
+            [(userOneId, [AdminRoleId]), (userTwoId, [SchemeAdminRoleId])],
+            actingUserId: null);
+
+        Assert.Equal(2, results.Count);
+        Assert.All(results, r => Assert.True(r.Success));
+        Assert.Contains(userRoles.Added, a => a.UserId == userOneId && a.RoleId == AdminRoleId);
+        Assert.Contains(userRoles.Added, a => a.UserId == userTwoId && a.RoleId == SchemeAdminRoleId);
+    }
+
+    [Fact]
+    public async Task SetUserRolesBatchAsync_RemovingOwnAdminRole_IsBlockedForThatRowOnlyAndOtherRowsStillSave()
+    {
+        var actingUserId = Guid.NewGuid();
+        var otherUserId = Guid.NewGuid();
+        var assignmentId = Guid.NewGuid();
+        var users = new FakeUserRepository
+        {
+            Users =
+            [
+                new PTL.Core.User.User { UserId = actingUserId, Username = "m100001" },
+                new PTL.Core.User.User { UserId = otherUserId, Username = "m100002" }
+            ]
+        };
+        var userRoles = new FakeUserRoleRepository
+        {
+            AssignmentsByUserId = new() { [actingUserId] = [new UserRoleAssignment { UserRoleId = assignmentId, UserId = actingUserId, RoleId = AdminRoleId }] }
+        };
+        var service = CreateService(users: users, userRoles: userRoles);
+
+        var results = await service.SetUserRolesBatchAsync(
+            [(actingUserId, []), (otherUserId, [SchemeAdminRoleId])],
+            actingUserId);
+
+        var blockedResult = Assert.Single(results, r => r.UserId == actingUserId);
+        Assert.False(blockedResult.Success);
+        Assert.Equal("You cannot remove your own Admin access.", blockedResult.Message);
+        var allowedResult = Assert.Single(results, r => r.UserId == otherUserId);
+        Assert.True(allowedResult.Success);
+        Assert.Contains(userRoles.Added, a => a.UserId == otherUserId && a.RoleId == SchemeAdminRoleId);
+        Assert.DoesNotContain(assignmentId, userRoles.Removed);
+    }
+
+    [Fact]
+    public async Task SetUserRolesBatchAsync_UserHasNoPtlimsAccount_IsBlockedForThatRowOnly()
+    {
+        var existingUserId = Guid.NewGuid();
+        var missingUserId = Guid.NewGuid();
+        var users = new FakeUserRepository { Users = [new PTL.Core.User.User { UserId = existingUserId, Username = "m100001" }] };
+        var userRoles = new FakeUserRoleRepository();
+        var service = CreateService(users: users, userRoles: userRoles);
+
+        var results = await service.SetUserRolesBatchAsync(
+            [(existingUserId, [AdminRoleId]), (missingUserId, [AdminRoleId])],
+            actingUserId: null);
+
+        var blockedResult = Assert.Single(results, r => r.UserId == missingUserId);
+        Assert.False(blockedResult.Success);
+        Assert.Equal("This user does not have a PT-LIMS account yet. Create the account before assigning roles.", blockedResult.Message);
+        Assert.Contains(userRoles.Added, a => a.UserId == existingUserId && a.RoleId == AdminRoleId);
+    }
+
+    [Fact]
+    public async Task SetUserRolesBatchAsync_NoChangesAcrossAnyRow_DoesNotCallTheRepository()
+    {
+        var userId = Guid.NewGuid();
+        var assignmentId = Guid.NewGuid();
+        var users = new FakeUserRepository { Users = [new PTL.Core.User.User { UserId = userId, Username = "m100001" }] };
+        var userRoles = new FakeUserRoleRepository
+        {
+            AssignmentsByUserId = new() { [userId] = [new UserRoleAssignment { UserRoleId = assignmentId, UserId = userId, RoleId = AdminRoleId }] }
+        };
+        var service = CreateService(users: users, userRoles: userRoles);
+
+        var results = await service.SetUserRolesBatchAsync([(userId, [AdminRoleId])], actingUserId: null);
+
+        Assert.True(Assert.Single(results).Success);
+        Assert.Empty(userRoles.Added);
+        Assert.Empty(userRoles.Removed);
+        Assert.Empty(userRoles.BatchAuditEntries);
+    }
+
+    [Fact]
+    public async Task SetUserRolesBatchAsync_TooManyRows_ThrowsArgumentOutOfRangeException()
+    {
+        var users = new FakeUserRepository
+        {
+            Users = Enumerable.Range(0, 2_001)
+                .Select(i => new PTL.Core.User.User { UserId = Guid.NewGuid(), Username = $"m{i:000000}" })
+                .ToList()
+        };
+        var service = CreateService(users: users, userRoles: new FakeUserRoleRepository());
+        var rows = users.Users.Select(u => (u.UserId, (IReadOnlyList<Guid>)[])).ToList();
+
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => service.SetUserRolesBatchAsync(rows, actingUserId: null));
+    }
+
+    [Fact]
+    public async Task SetUserRolesBatchAsync_TooManyRoleIdsInSingleRow_ThrowsArgumentOutOfRangeException()
+    {
+        var userId = Guid.NewGuid();
+        var users = new FakeUserRepository { Users = [new PTL.Core.User.User { UserId = userId, Username = "m100001" }] };
+        var service = CreateService(users: users, userRoles: new FakeUserRoleRepository());
+        var roleIds = Enumerable.Range(0, 501).Select(_ => Guid.NewGuid()).ToList();
+
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => service.SetUserRolesBatchAsync([(userId, roleIds)], actingUserId: null));
+    }
 }
+

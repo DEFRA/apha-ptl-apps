@@ -33,6 +33,22 @@ internal sealed class FakeUserApiClient : IUserApiClient
         return Task.FromResult(SetRolesResult);
     }
 
+    public SetUserRolesBatchResponse? SetRolesBatchResult { get; set; }
+    public List<SetUserRolesBatchRequest> SetRolesBatchCalls { get; } = [];
+
+    public Task<SetUserRolesBatchResponse> SetUserRolesBatchAsync(SetUserRolesBatchRequest request, CancellationToken cancellationToken = default)
+    {
+        SetRolesBatchCalls.Add(request);
+        foreach (var item in request.Items)
+        {
+            SetRolesCalls.Add((item.UserId, new SetUserRolesRequest(item.RoleIds, request.ActingUserId)));
+        }
+
+        var response = SetRolesBatchResult ?? new SetUserRolesBatchResponse(
+            request.Items.Select(i => new SetUserRolesItemResult(i.UserId, SetRolesResult.Success, SetRolesResult.Message)).ToList());
+        return Task.FromResult(response);
+    }
+
     public UserRemoveResponse RemoveResult { get; set; } = new(true, null);
     public List<Guid> RemoveCalls { get; } = [];
     public Guid? LastRemoveActingUserId { get; private set; }
