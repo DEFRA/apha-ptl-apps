@@ -27,8 +27,8 @@ public sealed record TabulationListViewModel(
 }
 
 /// <summary>Legacy TabulationView.aspx - the published tabulation itself.</summary>
-public sealed record TabulationReportPageViewModel(TabulationReportResponse Report);
+public sealed record TabulationReportPageViewModel(TabulationReportResponse Report, string? ReturnUrl = null);
 
 /// <summary>Legacy AssessmentResults.aspx - rendered as a data table rather than the legacy bar
 /// chart (not required by this story's acceptance criteria).</summary>
-public sealed record AssessmentResultsPageViewModel(Guid PublishedTabulationId, Guid TestId, AssessmentResultsResponse Results);
+public sealed record AssessmentResultsPageViewModel(Guid PublishedTabulationId, Guid TestId, AssessmentResultsResponse Results, string? ReturnUrl = null);

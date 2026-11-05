@@ -179,13 +179,13 @@ public sealed class DistributionController(IDistributionApiClient distributionAp
         var paged = sorted.Skip((page - 1) * pageSize).Take(pageSize).ToList();
 
         return View(new DistributionPreviousListViewModel(
-            paged, sorted.Count, page, pageSize, sortBy, sortDir, query.Year, query.Month, query.DistributionReference, query.SchemeCode, query.SchemeName));
+            paged, sorted.Count, page, pageSize, sortBy, sortDir, query.Year, query.Month, query.DistributionReference, query.SchemeCode, query.SchemeName, YearOptionsFor(history.Distributions)));
     }
 
     // Legacy ResultsView.aspx - read-only, no Save/Submit/Edit/Delete. Reuses the same
     // actual-results data as InternalWeb's Actual Results screen, resolved against the signed-in
     // participant server-side.
-    public async Task<IActionResult> Results(Guid monthlyDistributionSchemeId, CancellationToken cancellationToken)
+    public async Task<IActionResult> Results(Guid monthlyDistributionSchemeId, string? returnUrl, CancellationToken cancellationToken)
     {
         var participantId = User.GetParticipantId();
         if (participantId is null)
@@ -194,7 +194,13 @@ public sealed class DistributionController(IDistributionApiClient distributionAp
         }
 
         var page = await distributionApiClient.GetActualResultsForParticipantAsync(monthlyDistributionSchemeId, participantId.Value, cancellationToken);
-        return page is null ? NotFound() : View(page);
+        if (page is null)
+        {
+            return NotFound();
+        }
+
+        ViewData["ListReturnUrl"] = ListReturnUrl.Validate(returnUrl, ListReturnUrl.DistributionPrevious);
+        return View(page);
     }
 
     private async Task<ActualResultsResponse?> GetOwnResultsAsync(Guid monthlyDistributionSchemeId, CancellationToken cancellationToken)
@@ -406,12 +412,15 @@ public sealed class DistributionController(IDistributionApiClient distributionAp
         ],
     };
 
+    private static List<int> YearOptionsFor(IReadOnlyList<ParticipantPastDistributionResponse> distributions) =>
+        [.. distributions.SelectMany(d => new[] { d.YearId, d.DistributionDate.Year }).Distinct().Order()];
+
     private static List<ParticipantPastDistributionResponse> Filter(
         IReadOnlyList<ParticipantPastDistributionResponse> distributions,
         int? year, int? month, string? distributionReference, string? schemeCode, string? schemeName) =>
         [.. distributions.Where(d =>
-            (year is null or 0 || d.YearId == year)
-            && (month is null or 0 || d.MonthId == month)
+            (year is null or 0 || d.YearId == year || d.DistributionDate.Year == year)
+            && (month is null or 0 || d.MonthId == month || d.DistributionDate.Month == month)
             && Contains(d.DistributionReference, distributionReference)
             && Contains(d.SchemeCode, schemeCode)
             && ContainsAllWords(d.SchemeName, schemeName))];

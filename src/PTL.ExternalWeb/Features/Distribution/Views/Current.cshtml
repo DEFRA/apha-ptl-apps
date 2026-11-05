@@ -20,6 +20,8 @@
         var dir = Model.SortBy == column && Model.SortDirection == "asc" ? "desc" : "asc";
         return Url.Action("Current", new { page = 1, pageSize = Model.PageSize, sortBy = column, sortDir = dir })!;
     }
+
+    var sortHeaders = new SortableHeaderContext(Model.SortBy, Model.SortDirection, SortUrl);
 }
 
 <h1 class="govuk-heading-l">Current distributions</h1>
@@ -37,24 +39,10 @@
 <table class="govuk-table">
     <thead class="govuk-table__head">
         <tr class="govuk-table__row">
-            <th scope="col" class="govuk-table__header" aria-sort="@AriaSort(Model.SortBy, Model.SortDirection, "reference")">
-                <a class="govuk-link" href="@SortUrl("reference")">Distribution reference@(SortIndicator(Model.SortBy, Model.SortDirection, "reference"))</a>
-            </th>
-            <th scope="col" class="govuk-table__header" aria-sort="@AriaSort(Model.SortBy, Model.SortDirection, "schemeCode")">
-                <a class="govuk-link" href="@SortUrl("schemeCode")">Scheme code@(SortIndicator(Model.SortBy, Model.SortDirection, "schemeCode"))</a>
-            </th>
-            <th scope="col" class="govuk-table__header" aria-sort="@AriaSort(Model.SortBy, Model.SortDirection, "schemeName")">
-                <a class="govuk-link" href="@SortUrl("schemeName")">Scheme name@(SortIndicator(Model.SortBy, Model.SortDirection, "schemeName"))</a>
-            </th>
-            <th scope="col" class="govuk-table__header" aria-sort="@AriaSort(Model.SortBy, Model.SortDirection, "distributionDate")">
-                <a class="govuk-link" href="@SortUrl("distributionDate")">Distribution date@(SortIndicator(Model.SortBy, Model.SortDirection, "distributionDate"))</a>
-            </th>
-            <th scope="col" class="govuk-table__header" aria-sort="@AriaSort(Model.SortBy, Model.SortDirection, "deadlineDate")">
-                <a class="govuk-link" href="@SortUrl("deadlineDate")">Deadline date@(SortIndicator(Model.SortBy, Model.SortDirection, "deadlineDate"))</a>
-            </th>
-            <th scope="col" class="govuk-table__header" aria-sort="@AriaSort(Model.SortBy, Model.SortDirection, "status")">
-                <a class="govuk-link" href="@SortUrl("status")">Results entered@(SortIndicator(Model.SortBy, Model.SortDirection, "status"))</a>
-            </th>
+            <partial name="_DistributionReferenceSchemeHeaders" model="sortHeaders" />
+            <partial name="_SortableHeader" model="@(sortHeaders.Header("Distribution date", "distributionDate"))" />
+            <partial name="_SortableHeader" model="@(sortHeaders.Header("Deadline date", "deadlineDate"))" />
+            <partial name="_SortableHeader" model="@(sortHeaders.Header("Results entered", "status"))" />
             <th scope="col" class="govuk-table__header">Results</th>
         </tr>
     </thead>
@@ -67,7 +55,7 @@
                 <td class="govuk-table__cell">@distribution.SchemeName</td>
                 <td class="govuk-table__cell">@distribution.DistributionDate.ToString("dddd d MMMM yyyy")</td>
                 <td class="govuk-table__cell">@distribution.DeadlineDate.ToString("dddd d MMMM yyyy")</td>
-                <td class="govuk-table__cell">@distribution.Status</td>
+                <td class="govuk-table__cell"><strong class="@distribution.StatusTagClass">@distribution.Status</strong></td>
                 <td class="govuk-table__cell">
                     <a class="govuk-link"
                        asp-action="Entry"
