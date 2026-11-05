@@ -107,5 +107,52 @@ public class UserRoleRepositoryTests
         Assert.True(connection.LastTransaction!.RolledBack);
         Assert.False(connection.LastTransaction!.Committed);
     }
+
+    [Fact]
+    public async Task ApplyBatchRoleChangesWithAuditAsync_CommitsEveryUsersChangesAndAuditInOneTransaction()
+    {
+        var (repository, connection) = CreateRepository();
+        var userOneId = Guid.NewGuid();
+        var userTwoId = Guid.NewGuid();
+        var roleToAdd = Guid.NewGuid();
+        var userRoleToRemove = Guid.NewGuid();
+        connection.RespondToNonQuery(InsertRoleSql, 1);
+        connection.RespondToNonQuery(DeleteRoleSql, 1);
+        connection.RespondToNonQuery(AuditSql, 1);
+        var auditEntryOne = new AuditEntry(userOneId, "SetUserRoles", "User", userOneId.ToString(), "Added: [Scheme Admin]");
+        var auditEntryTwo = new AuditEntry(userTwoId, "SetUserRoles", "User", userTwoId.ToString(), "Removed: [Scheme Admin]");
+
+        await repository.ApplyBatchRoleChangesWithAuditAsync(
+        [
+            new PTL.Core.User.UserRoleChangeSet(userOneId, [roleToAdd], [], auditEntryOne),
+            new PTL.Core.User.UserRoleChangeSet(userTwoId, [], [userRoleToRemove], auditEntryTwo)
+        ]);
+
+        Assert.NotNull(connection.LastTransaction);
+        Assert.True(connection.LastTransaction!.Committed);
+        Assert.Contains(connection.ExecutedCommands, c => c.CommandText == InsertRoleSql);
+        Assert.Contains(connection.ExecutedCommands, c => c.CommandText == DeleteRoleSql);
+        Assert.Equal(2, connection.ExecutedCommands.Count(c => c.CommandText == AuditSql));
+    }
+
+    [Fact]
+    public async Task ApplyBatchRoleChangesWithAuditAsync_AuditWriteFailsForAnyUser_RollsBackTheWholeTransaction()
+    {
+        var (repository, connection) = CreateRepository();
+        var userId = Guid.NewGuid();
+        connection.RespondToNonQuery(InsertRoleSql, 1);
+        // AuditSql deliberately has no configured response - simulates the audit write failing.
+        var auditEntry = new AuditEntry(userId, "SetUserRoles", "User", userId.ToString(), "Added: [Scheme Admin]");
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => repository.ApplyBatchRoleChangesWithAuditAsync(
+            [
+                new PTL.Core.User.UserRoleChangeSet(userId, [Guid.NewGuid()], [], auditEntry)
+            ]));
+
+        Assert.NotNull(connection.LastTransaction);
+        Assert.True(connection.LastTransaction!.RolledBack);
+        Assert.False(connection.LastTransaction!.Committed);
+    }
 }
 

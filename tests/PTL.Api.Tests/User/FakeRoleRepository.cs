@@ -75,4 +75,40 @@ internal sealed class FakeUserRoleRepository : IUserRoleRepository
         LastAuditEntry = auditEntry;
         return Task.CompletedTask;
     }
+
+    public List<AuditEntry> BatchAuditEntries { get; } = [];
+
+    public Task ApplyBatchRoleChangesWithAuditAsync(
+        IReadOnlyList<UserRoleChangeSet> changeSets,
+        CancellationToken cancellationToken = default)
+    {
+        if (ThrowOnAudit)
+        {
+            throw new InvalidOperationException("Simulated audit trail write failure.");
+        }
+
+        foreach (var changeSet in changeSets)
+        {
+            foreach (var roleId in changeSet.RoleIdsToAdd)
+            {
+                Added.Add((Guid.NewGuid(), changeSet.UserId, roleId));
+                AssignmentsByUserId.TryAdd(changeSet.UserId, []);
+                AssignmentsByUserId[changeSet.UserId].Add(new UserRoleAssignment { UserRoleId = Added[^1].UserRoleId, UserId = changeSet.UserId, RoleId = roleId });
+            }
+
+            foreach (var userRoleId in changeSet.UserRoleIdsToRemove)
+            {
+                Removed.Add(userRoleId);
+                foreach (var list in AssignmentsByUserId.Values)
+                {
+                    list.RemoveAll(a => a.UserRoleId == userRoleId);
+                }
+            }
+
+            LastAuditEntry = changeSet.AuditEntry;
+            BatchAuditEntries.Add(changeSet.AuditEntry);
+        }
+
+        return Task.CompletedTask;
+    }
 }

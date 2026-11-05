@@ -450,7 +450,7 @@ public partial class SystemAdministrationController : Controller
         View(await BuildManageUserRolesViewModelAsync(cancellationToken));
 
     // Whole-grid submit, but only rows whose checkboxes differ from what the page loaded are sent to
-    // the API - one call per user for every row made the save time out. Unlike legacy's UserRoles.aspx
+    // the API. Unlike legacy's UserRoles.aspx
     // (every checkbox click is its own immediate save), this only persists on an explicit Save - matches
     // the story's "When I click Save... Then... persisted" acceptance criteria. Redirects back to the System
     // Administration landing page (matches legacy ButtonSubmit_Click's Response.Redirect).
@@ -461,12 +461,22 @@ public partial class SystemAdministrationController : Controller
         var actingUserId = GetCurrentUserId();
         var blockedMessages = new List<string>();
 
-        foreach (var row in model.Rows.Where(r => !r.IsUnchanged()))
+        // Only rows that differ from what the page loaded, sent as one batch request (one HTTP round trip,
+        // one DB transaction on PTL.Api) - the per-row loop caused intermittent gateway timeouts.
+        var changedRows = model.Rows.Where(r => !r.IsUnchanged()).ToList();
+        var batchResponse = changedRows.Count == 0
+            ? new SetUserRolesBatchResponse([])
+            : await userApiClient.SetUserRolesBatchAsync(
+                new SetUserRolesBatchRequest(changedRows.Select(row => new SetUserRolesBatchItem(row.UserId, row.SelectedRoleIds)).ToList(), actingUserId),
+                cancellationToken);
+
+        var friendlyNameByUserId = changedRows.GroupBy(r => r.UserId).ToDictionary(g => g.Key, g => g.First().FriendlyName);
+        foreach (var result in batchResponse.Results)
         {
-            var result = await userApiClient.SetUserRolesAsync(row.UserId, new SetUserRolesRequest(row.SelectedRoleIds, actingUserId), cancellationToken);
             if (!result.Success && result.Message is not null)
             {
-                blockedMessages.Add($"{row.FriendlyName}: {result.Message}");
+                var friendlyName = friendlyNameByUserId.GetValueOrDefault(result.UserId, result.UserId.ToString());
+                blockedMessages.Add($"{friendlyName}: {result.Message}");
             }
         }
 

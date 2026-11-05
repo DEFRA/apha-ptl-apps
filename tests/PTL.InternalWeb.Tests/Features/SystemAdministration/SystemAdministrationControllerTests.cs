@@ -984,6 +984,49 @@ public class SystemAdministrationControllerTests
     }
 
     [Fact]
+    public async Task ManageUserRoles_Post_NothingChanged_MakesNoApiCallAndShowsSuccess()
+    {
+        var roleId = Guid.NewGuid();
+        var userApiClient = new FakeUserApiClient();
+        var controller = CreateController(userApiClient: userApiClient);
+        var model = new ManageUserRolesViewModel
+        {
+            Rows = [new UserRoleRowViewModel { UserId = Guid.NewGuid(), SelectedRoleIds = [roleId], OriginalRoleIds = roleId.ToString() }]
+        };
+
+        var result = await controller.ManageUserRoles(model, CancellationToken.None);
+
+        Assert.IsType<RedirectToActionResult>(result);
+        Assert.Empty(userApiClient.SetRolesBatchCalls);
+        Assert.Equal(NotificationType.Success, controller.TempData.GetNotification()!.Type);
+    }
+
+    [Fact]
+    public async Task ManageUserRoles_Post_ChangedRowsGoInOneBatchRequest()
+    {
+        var roleA = Guid.NewGuid();
+        var changedA = Guid.NewGuid();
+        var changedB = Guid.NewGuid();
+        var unchanged = Guid.NewGuid();
+        var userApiClient = new FakeUserApiClient();
+        var controller = CreateController(userApiClient: userApiClient);
+        var model = new ManageUserRolesViewModel
+        {
+            Rows =
+            [
+                new UserRoleRowViewModel { UserId = changedA, SelectedRoleIds = [roleA], OriginalRoleIds = string.Empty },
+                new UserRoleRowViewModel { UserId = unchanged, SelectedRoleIds = [roleA], OriginalRoleIds = roleA.ToString() },
+                new UserRoleRowViewModel { UserId = changedB, SelectedRoleIds = [], OriginalRoleIds = roleA.ToString() }
+            ]
+        };
+
+        await controller.ManageUserRoles(model, CancellationToken.None);
+
+        var batch = Assert.Single(userApiClient.SetRolesBatchCalls);
+        Assert.Equal([changedA, changedB], batch.Items.Select(i => i.UserId));
+    }
+
+    [Fact]
     public async Task ManageUserRoles_Get_BuildsRolesAndRows()
     {
         var roleId = Guid.NewGuid();
