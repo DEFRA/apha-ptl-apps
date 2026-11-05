@@ -307,3 +307,8 @@ built, so the running container never downloads anything. In `src/PTL.ExternalWe
 
 Running outside Docker: build the project, then run `pwsh src/PTL.ExternalWeb/bin/<Configuration>/net10.0/playwright.ps1 install chromium`
 once. To use an already-installed browser instead, set `PdfGeneration:BrowserChannel` (for example `msedge`).
+
+Extra Chromium launch flags come from `PdfGeneration:ChromiumArgs` (an array; as environment variables
+`PdfGeneration__ChromiumArgs__0`, `__1`, ...). The image defaults it to `--disable-gpu` because the Windows Server
+Core container has no GPU stack. To see why Chromium exits, add `--enable-logging=stderr` and `--v=1`; the browser's
+stderr then appears in the "Browser logs" part of the Playwright exception.

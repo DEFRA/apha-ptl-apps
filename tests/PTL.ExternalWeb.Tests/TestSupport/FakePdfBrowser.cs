@@ -74,13 +74,16 @@ internal sealed class FakePdfBrowserLauncher(params FakePdfBrowser[] browsers) :
 
     public List<string?> Channels { get; } = [];
 
+    public List<IReadOnlyList<string>> Args { get; } = [];
+
     public bool Disposed { get; private set; }
 
     public TaskCompletionSource? Gate { get; init; }
 
-    public async Task<IBrowser> LaunchAsync(string? channel)
+    public async Task<IBrowser> LaunchAsync(string? channel, IReadOnlyList<string> args)
     {
         Channels.Add(channel);
+        Args.Add(args);
         if (Gate is not null)
         {
             await Gate.Task;
