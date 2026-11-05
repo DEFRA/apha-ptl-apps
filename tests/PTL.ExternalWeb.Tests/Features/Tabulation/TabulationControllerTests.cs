@@ -27,7 +27,7 @@ public class TabulationControllerTests
 
         var file = Assert.IsType<FileContentResult>(result);
         Assert.Equal("application/pdf", file.ContentType);
-        Assert.Equal("Summary.pdf", file.FileDownloadName);
+        Assert.Equal("D1a_S1_BT_ Brucella_01_05_2026.pdf", file.FileDownloadName);
         Assert.Equal("%PDF-1.7"u8.ToArray(), file.FileContents);
     }
 

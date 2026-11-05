@@ -111,6 +111,19 @@
             font-weight: normal;
         }
 
+        .cellTabulationSignature {
+            font-weight: bold;
+        }
+
+        .cellTabulationSignature2.cellTabulationIssued {
+            margin-top: 6px;
+            font-weight: normal;
+        }
+
+        #commentsDiv p {
+            margin: 0;
+        }
+
         .govuk-visually-hidden {
             position: absolute !important;
             width: 1px;
@@ -126,7 +139,7 @@
 </head>
 <body>
     <h1>Report</h1>
-    <h2>@report.DistributionHeading</h2>
+    <h2>@report.Title</h2>
     <h3>@report.TabulationName</h3>
     <p>@report.DistributionDateText</p>
 
@@ -188,7 +201,7 @@
                 {
                     <div class="cellTabulationSignature2">@line</div>
                 }
-                <div class="cellTabulationSignature2">@signatory.IssuedText</div>
+                <div class="cellTabulationSignature2 cellTabulationIssued">@signatory.IssuedText</div>
             </div>
         }
     </div>

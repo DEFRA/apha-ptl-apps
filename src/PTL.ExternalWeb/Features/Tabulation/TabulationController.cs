@@ -120,7 +120,7 @@ public sealed class TabulationController(
         {
             var model = new TabulationReportPageViewModel(report);
             var pdf = await tabulationPdfService.GenerateAsync(ControllerContext, model, cancellationToken);
-            return File(pdf, "application/pdf", BuildPdfFileName(report.TabulationName));
+            return File(pdf, "application/pdf", BuildPdfFileName(report));
         }
         catch (Exception exception) when (exception is PlaywrightException or InvalidOperationException)
         {
@@ -132,9 +132,19 @@ public sealed class TabulationController(
     private (Guid? ParticipantId, Guid? ViewerId, Guid? TestConsultantId) CallerIds() =>
         (User.GetParticipantId(), User.GetViewerId(), User.GetTestConsultantId());
 
-    private static string BuildPdfFileName(string tabulationName)
+    // Legacy ShowPrintableTabulation names the file {Distribution}_{SchemeName}_{DistributionDate}.pdf.
+    private static string BuildPdfFileName(TabulationReportResponse report)
     {
-        var safe = string.Concat(tabulationName.Select(c => Path.GetInvalidFileNameChars().Contains(c) ? '_' : c)).Trim();
+        var heading = report.DistributionHeading.Trim();
+        var space = heading.IndexOf(' ');
+        var dateSeparator = report.DistributionDateText.LastIndexOf(": ", StringComparison.Ordinal);
+        var date = dateSeparator < 0 ? report.DistributionDateText : report.DistributionDateText[(dateSeparator + 2)..];
+
+        var name = space < 0 || date.Length == 0
+            ? report.TabulationName
+            : $"{heading[..space]}_{heading[(space + 1)..]}_{date}";
+
+        var safe = string.Concat(name.Select(c => Path.GetInvalidFileNameChars().Contains(c) ? '_' : c)).Trim();
         return string.IsNullOrWhiteSpace(safe) ? "tabulation-report.pdf" : $"{safe}.pdf";
     }
 

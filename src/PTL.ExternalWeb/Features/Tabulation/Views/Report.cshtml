@@ -5,7 +5,7 @@
 }
 
 <h1 class="govuk-heading-l">View reports</h1>
-<h2 class="govuk-heading-m">@report.DistributionHeading</h2>
+<h2 class="govuk-heading-m">@report.Title</h2>
 <h3 class="govuk-heading-s">@report.TabulationName</h3>
 <p class="govuk-body">@report.DistributionDateText</p>
 
@@ -79,7 +79,7 @@
             {
                 <div class="cellTabulationSignature2">@line</div>
             }
-            <div class="cellTabulationSignature2">@signatory.IssuedText</div>
+            <div class="cellTabulationSignature2 cellTabulationIssued">@signatory.IssuedText</div>
         </div>
     }
 </div>

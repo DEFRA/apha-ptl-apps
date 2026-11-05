@@ -400,7 +400,7 @@ public class TabulationRouteSmokeTests : IClassFixture<PtlExternalWebTestFactory
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal("application/pdf", response.Content.Headers.ContentType?.MediaType);
-        Assert.Contains("filename=Summary.pdf", response.Content.Headers.ContentDisposition?.ToString(), StringComparison.Ordinal);
+        Assert.Contains("filename=\"D1a_S1_BT_ Brucella_01_05_2026.pdf\"", response.Content.Headers.ContentDisposition?.ToString(), StringComparison.Ordinal);
         Assert.Equal(expectedPdf, await response.Content.ReadAsByteArrayAsync());
     }
 
@@ -425,6 +425,22 @@ public class TabulationRouteSmokeTests : IClassFixture<PtlExternalWebTestFactory
         var logoIndex = body.IndexOf("ukas.png", StringComparison.Ordinal);
         Assert.True(versionIndex >= 0 && logoIndex >= 0 && versionIndex < logoIndex,
             "Expected the Version text to appear before the UKAS logo image in the rendered page.");
+        Assert.Contains("<div class=\"cellTabulationSignature2 cellTabulationIssued\">Issued 01/05/2026</div>", body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Report_Heading_IsTheLegacyFinalReportTitle()
+    {
+        var tabulationId = Guid.NewGuid();
+        var apiClient = new FakeDistributionApiClient { PublishedTabulation = Report(tabulationId) };
+        var client = CreateClient(apiClient);
+        var cookies = await SignInAsync(client, "Participant,Viewer", participantId: Guid.NewGuid());
+
+        var response = await CookieForwardingHttpClient.SendWithCookiesAsync(
+            client, HttpMethod.Get, $"/Tabulation/Report?publishedTabulationId={tabulationId}", cookies);
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Contains("<h2 class=\"govuk-heading-m\">FINAL REPORT for D1a/S1 BT: Brucella</h2>", body, StringComparison.Ordinal);
     }
 
     [Fact]
