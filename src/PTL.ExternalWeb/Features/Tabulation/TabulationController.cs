@@ -59,21 +59,35 @@ public sealed class TabulationController(
 
     // Legacy TabulationView.aspx - read only, no participant/viewer switcher (unlike InternalWeb's
     // staff-facing Tabulation/PublishedTabulation, this is always the signed-in user's own report).
-    public async Task<IActionResult> Report(Guid publishedTabulationId, CancellationToken cancellationToken)
+    public async Task<IActionResult> Report(Guid publishedTabulationId, string? returnUrl, CancellationToken cancellationToken)
     {
         var (participantId, viewerId, testConsultantId) = CallerIds();
         var report = await distributionApiClient.GetPublishedTabulationForUserAsync(
             publishedTabulationId, participantId, viewerId, testConsultantId, cancellationToken);
-        return report is null ? NotFound() : View(new TabulationReportPageViewModel(report));
+        if (report is null)
+        {
+            return NotFound();
+        }
+
+        var listUrl = ListReturnUrl.Validate(returnUrl, ListReturnUrl.TabulationIndex);
+        ViewData["ListReturnUrl"] = listUrl;
+        return View(new TabulationReportPageViewModel(report, listUrl));
     }
 
     // Legacy AssessmentResults.aspx - rendered as a data table (see AssessmentResultsPageViewModel).
-    public async Task<IActionResult> AssessmentResults(Guid publishedTabulationId, Guid testId, CancellationToken cancellationToken)
+    public async Task<IActionResult> AssessmentResults(Guid publishedTabulationId, Guid testId, string? returnUrl, CancellationToken cancellationToken)
     {
         var (participantId, viewerId, testConsultantId) = CallerIds();
         var results = await distributionApiClient.GetAssessmentResultsForUserAsync(
             publishedTabulationId, testId, participantId, viewerId, testConsultantId, cancellationToken);
-        return results is null ? NotFound() : View(new AssessmentResultsPageViewModel(publishedTabulationId, testId, results));
+        if (results is null)
+        {
+            return NotFound();
+        }
+
+        var listUrl = ListReturnUrl.Validate(returnUrl, ListReturnUrl.TabulationIndex);
+        ViewData["ListReturnUrl"] = listUrl;
+        return View(new AssessmentResultsPageViewModel(publishedTabulationId, testId, results, listUrl));
     }
 
     // Legacy AttachmentDisplay "View Supporting Document" (Attachment.aspx), without the session hand-off.

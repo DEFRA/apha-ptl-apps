@@ -27,7 +27,7 @@ public sealed class CurrentDistributionRowViewModel
     public required bool HasResults { get; init; }
     public required bool Submitted { get; init; }
 
-    // Legacy DistributionsCurrent.GetStatus: Submitted, else In Progress when any result exists, else No.
+    // Legacy DistributionsCurrent.GetStatus: Submitted, else In progress when any result exists, else No.
     public string Status
     {
         get
@@ -37,7 +37,14 @@ public sealed class CurrentDistributionRowViewModel
                 return "Submitted";
             }
 
-            return HasResults ? "In Progress" : "No";
+            return HasResults ? "In progress" : "No";
         }
     }
+
+    public string StatusTagClass => Status switch
+    {
+        "Submitted" => "govuk-tag govuk-tag--green",
+        "In progress" => "govuk-tag govuk-tag--light-blue",
+        _ => "govuk-tag govuk-tag--grey"
+    };
 }

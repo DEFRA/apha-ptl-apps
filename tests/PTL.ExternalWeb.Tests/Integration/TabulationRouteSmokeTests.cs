@@ -162,7 +162,7 @@ public class TabulationRouteSmokeTests : IClassFixture<PtlExternalWebTestFactory
         var body = await response.Content.ReadAsStringAsync();
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.Contains("""Scheme Code<span aria-hidden="true"> ▲</span><span class="govuk-visually-hidden">, sorted ascending</span>""", body, StringComparison.Ordinal);
+        Assert.Contains("""Scheme code<span aria-hidden="true"> ▲</span><span class="govuk-visually-hidden">, sorted ascending</span>""", body, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -205,6 +205,140 @@ public class TabulationRouteSmokeTests : IClassFixture<PtlExternalWebTestFactory
         // user's own, unlike InternalWeb's staff-facing equivalent.
         var main = Regex.Match(body, "<main.*?</main>", RegexOptions.Singleline).Value;
         Assert.DoesNotContain("<select", main, StringComparison.Ordinal);
+    }
+
+    private const string ListUrlWithFilters = "/Tabulation/Index?year=2026&month=5&sortBy=schemeCode&sortDir=desc";
+
+    [Fact]
+    public async Task Index_ViewLink_CarriesTheCurrentListUrlAsReturnUrl()
+    {
+        var tabulationId = Guid.NewGuid();
+        var apiClient = new FakeDistributionApiClient
+        {
+            Tabulations = new PublishedTabulationSummaryListResponse(
+                [Summary(tabulationId, "D1a/00001", "BT", "Brucella", "Summary", new DateTime(2026, 5, 1), 2026, 5)])
+        };
+        var client = CreateClient(apiClient);
+        var cookies = await SignInAsync(client, "Participant,Viewer", participantId: Guid.NewGuid());
+
+        var response = await CookieForwardingHttpClient.SendWithCookiesAsync(client, HttpMethod.Get, ListUrlWithFilters, cookies);
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Contains(
+            $"returnUrl={Uri.EscapeDataString(ListUrlWithFilters)}",
+            body.Replace("&amp;", "&", StringComparison.Ordinal),
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Report_WithReturnUrl_BackAndAssessmentLinksKeepTheListFilters()
+    {
+        var tabulationId = Guid.NewGuid();
+        var apiClient = new FakeDistributionApiClient { PublishedTabulation = Report(tabulationId, assessmentTestId: Guid.NewGuid()) };
+        var client = CreateClient(apiClient);
+        var cookies = await SignInAsync(client, "Participant,Viewer", participantId: Guid.NewGuid());
+
+        var response = await CookieForwardingHttpClient.SendWithCookiesAsync(
+            client, HttpMethod.Get, $"/Tabulation/Report?publishedTabulationId={tabulationId}&returnUrl={Uri.EscapeDataString(ListUrlWithFilters)}", cookies);
+        var main = Regex.Match(await response.Content.ReadAsStringAsync(), "<main.*?</main>", RegexOptions.Singleline).Value.Replace("&amp;", "&", StringComparison.Ordinal);
+
+        Assert.Contains($"href=\"{ListUrlWithFilters}\">Back</a>", main, StringComparison.Ordinal);
+        Assert.Contains($"returnUrl={Uri.EscapeDataString(ListUrlWithFilters)}", main, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task AssessmentResults_WithReturnUrl_BackReturnsToTheReportKeepingTheListFilters()
+    {
+        var tabulationId = Guid.NewGuid();
+        var apiClient = new FakeDistributionApiClient
+        {
+            AssessmentResults = new AssessmentResultsResponse(
+                IsAssessmentSubmitted: true,
+                Titles: [],
+                XAxisTitle: "Score",
+                YAxisTitle: "Number of participants",
+                Scores: [new AssessmentScoreFrequencyResponse(2, "Satisfactory", 5)],
+                DistributionHeading: "D1a/S1 BT: Brucella")
+        };
+        var client = CreateClient(apiClient);
+        var cookies = await SignInAsync(client, "Participant,Viewer", participantId: Guid.NewGuid());
+
+        var response = await CookieForwardingHttpClient.SendWithCookiesAsync(
+            client,
+            HttpMethod.Get,
+            $"/Tabulation/AssessmentResults?publishedTabulationId={tabulationId}&testId={Guid.NewGuid()}&returnUrl={Uri.EscapeDataString(ListUrlWithFilters)}",
+            cookies);
+        var main = Regex.Match(await response.Content.ReadAsStringAsync(), "<main.*?</main>", RegexOptions.Singleline).Value.Replace("&amp;", "&", StringComparison.Ordinal);
+
+        Assert.Contains($"/Tabulation/Report?publishedTabulationId={tabulationId}&returnUrl={Uri.EscapeDataString(ListUrlWithFilters)}\">Back</a>", main, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("https://evil.example/Tabulation/Index")]
+    [InlineData("//evil.example/Tabulation/Index")]
+    [InlineData("/\\evil.example")]
+    [InlineData("javascript:alert(1)")]
+    [InlineData("/Home/Index")]
+    [InlineData("/Tabulation/Index/../../Account/Logout")]
+    public async Task Report_WithUnsafeReturnUrl_IgnoresItAndBacksToTheList(string returnUrl)
+    {
+        var tabulationId = Guid.NewGuid();
+        var apiClient = new FakeDistributionApiClient { PublishedTabulation = Report(tabulationId) };
+        var client = CreateClient(apiClient);
+        var cookies = await SignInAsync(client, "Participant,Viewer", participantId: Guid.NewGuid());
+
+        var response = await CookieForwardingHttpClient.SendWithCookiesAsync(
+            client, HttpMethod.Get, $"/Tabulation/Report?publishedTabulationId={tabulationId}&returnUrl={Uri.EscapeDataString(returnUrl)}", cookies);
+        var main = Regex.Match(await response.Content.ReadAsStringAsync(), "<main.*?</main>", RegexOptions.Singleline).Value;
+
+        Assert.Matches("<a class=\"govuk-button govuk-button--secondary\" href=\"/Tabulation(/Index)?\">Back</a>", main);
+        Assert.DoesNotContain("evil.example", main, StringComparison.Ordinal);
+        Assert.DoesNotContain("javascript:", main, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Report_WithReturnUrl_BreadcrumbReportsLinksToTheFilteredList()
+    {
+        var tabulationId = Guid.NewGuid();
+        var apiClient = new FakeDistributionApiClient { PublishedTabulation = Report(tabulationId) };
+        var client = CreateClient(apiClient);
+        var cookies = await SignInAsync(client, "Participant,Viewer", participantId: Guid.NewGuid());
+
+        var response = await CookieForwardingHttpClient.SendWithCookiesAsync(
+            client, HttpMethod.Get, $"/Tabulation/Report?publishedTabulationId={tabulationId}&returnUrl={Uri.EscapeDataString(ListUrlWithFilters)}", cookies);
+        var breadcrumbs = Regex.Match(await response.Content.ReadAsStringAsync(), "<nav class=\"govuk-breadcrumbs\".*?</nav>", RegexOptions.Singleline).Value
+            .Replace("&amp;", "&", StringComparison.Ordinal);
+
+        Assert.Contains($"<a class=\"govuk-breadcrumbs__link\" href=\"{ListUrlWithFilters}\">Reports</a>", breadcrumbs, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task AssessmentResults_WithReturnUrl_BreadcrumbsKeepTheListFiltersThroughTheReport()
+    {
+        var tabulationId = Guid.NewGuid();
+        var apiClient = new FakeDistributionApiClient
+        {
+            AssessmentResults = new AssessmentResultsResponse(
+                IsAssessmentSubmitted: true,
+                Titles: [],
+                XAxisTitle: "Score",
+                YAxisTitle: "Number of participants",
+                Scores: [new AssessmentScoreFrequencyResponse(2, "Satisfactory", 5)],
+                DistributionHeading: "D1a/S1 BT: Brucella")
+        };
+        var client = CreateClient(apiClient);
+        var cookies = await SignInAsync(client, "Participant,Viewer", participantId: Guid.NewGuid());
+
+        var response = await CookieForwardingHttpClient.SendWithCookiesAsync(
+            client,
+            HttpMethod.Get,
+            $"/Tabulation/AssessmentResults?publishedTabulationId={tabulationId}&testId={Guid.NewGuid()}&returnUrl={Uri.EscapeDataString(ListUrlWithFilters)}",
+            cookies);
+        var breadcrumbs = Regex.Match(await response.Content.ReadAsStringAsync(), "<nav class=\"govuk-breadcrumbs\".*?</nav>", RegexOptions.Singleline).Value
+            .Replace("&amp;", "&", StringComparison.Ordinal);
+
+        Assert.Contains($"<a class=\"govuk-breadcrumbs__link\" href=\"{ListUrlWithFilters}\">Reports</a>", breadcrumbs, StringComparison.Ordinal);
+        Assert.Contains($"href=\"/Tabulation/Report?publishedTabulationId={tabulationId}&returnUrl={Uri.EscapeDataString(ListUrlWithFilters)}\">View reports</a>", breadcrumbs, StringComparison.Ordinal);
     }
 
     [Fact]
