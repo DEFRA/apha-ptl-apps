@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.Playwright;
 
 namespace PTL.ExternalWeb.Infrastructure.Pdf;
@@ -25,16 +26,58 @@ public interface IHtmlToPdfRenderer
     Task<byte[]> RenderAsync(string html, PdfRenderOptions? options = null, CancellationToken cancellationToken = default);
 }
 
-public sealed class PlaywrightHtmlToPdfRenderer(IConfiguration configuration, ILogger<PlaywrightHtmlToPdfRenderer> logger) : IHtmlToPdfRenderer, IAsyncDisposable
+// Seam over the Playwright driver so the render/retry logic can be tested without a real browser.
+internal interface IPdfBrowserLauncher : IAsyncDisposable
+{
+    Task<IBrowser> LaunchAsync(string? channel);
+}
+
+[ExcludeFromCodeCoverage(Justification = "Thin wrapper over the Playwright driver; needs a real Chromium install.")]
+internal sealed class PlaywrightBrowserLauncher : IPdfBrowserLauncher
+{
+    private IPlaywright? playwright;
+
+    public async Task<IBrowser> LaunchAsync(string? channel)
+    {
+        playwright ??= await Playwright.CreateAsync();
+        return await playwright.Chromium.LaunchAsync(new BrowserTypeLaunchOptions
+        {
+            Headless = true,
+            Channel = channel
+        });
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        playwright?.Dispose();
+        return ValueTask.CompletedTask;
+    }
+}
+
+public sealed partial class PlaywrightHtmlToPdfRenderer : IHtmlToPdfRenderer, IAsyncDisposable
 {
     private static readonly byte[] PdfSignature = "%PDF"u8.ToArray();
 
-    private readonly SemaphoreSlim renderSlots = new(Math.Max(1, configuration.GetValue("PdfGeneration:MaxConcurrentRenders", 2)));
+    private readonly ILogger<PlaywrightHtmlToPdfRenderer> logger;
+    private readonly IPdfBrowserLauncher launcher;
+    private readonly SemaphoreSlim renderSlots;
     private readonly SemaphoreSlim browserLock = new(1, 1);
-    private readonly string? browserChannel = configuration["PdfGeneration:BrowserChannel"];
+    private readonly string? browserChannel;
 
-    private IPlaywright? playwright;
     private IBrowser? browser;
+
+    public PlaywrightHtmlToPdfRenderer(IConfiguration configuration, ILogger<PlaywrightHtmlToPdfRenderer> logger)
+        : this(configuration, logger, new PlaywrightBrowserLauncher())
+    {
+    }
+
+    internal PlaywrightHtmlToPdfRenderer(IConfiguration configuration, ILogger<PlaywrightHtmlToPdfRenderer> logger, IPdfBrowserLauncher launcher)
+    {
+        this.logger = logger;
+        this.launcher = launcher;
+        renderSlots = new SemaphoreSlim(Math.Max(1, configuration.GetValue("PdfGeneration:MaxConcurrentRenders", 2)));
+        browserChannel = configuration["PdfGeneration:BrowserChannel"];
+    }
 
     public async Task<byte[]> RenderAsync(string html, PdfRenderOptions? options = null, CancellationToken cancellationToken = default)
     {
@@ -51,15 +94,10 @@ public sealed class PlaywrightHtmlToPdfRenderer(IConfiguration configuration, IL
             }
             catch (PlaywrightException exception)
             {
-                logger.LogWarning(exception, "The PDF browser closed during render; retrying once with a new browser.");
+                LogBrowserClosedDuringRender(exception);
                 await DiscardBrowserAsync(chromium, cancellationToken);
                 return await PrintAsync(await GetBrowserAsync(cancellationToken), html, renderOptions);
             }
-        }
-        catch (Exception exception) when (exception is PlaywrightException or TimeoutException)
-        {
-            logger.LogError(exception, "PDF rendering failed.");
-            throw;
         }
         finally
         {
@@ -75,7 +113,7 @@ public sealed class PlaywrightHtmlToPdfRenderer(IConfiguration configuration, IL
             await CloseQuietlyAsync(closing);
         }
 
-        playwright?.Dispose();
+        await launcher.DisposeAsync();
         renderSlots.Dispose();
         browserLock.Dispose();
     }
@@ -101,13 +139,7 @@ public sealed class PlaywrightHtmlToPdfRenderer(IConfiguration configuration, IL
                 await CloseQuietlyAsync(existing);
             }
 
-            playwright ??= await Playwright.CreateAsync();
-            browser = await playwright.Chromium.LaunchAsync(new BrowserTypeLaunchOptions
-            {
-                Headless = true,
-                Channel = string.IsNullOrWhiteSpace(browserChannel) ? null : browserChannel.Trim()
-            });
-
+            browser = await launcher.LaunchAsync(string.IsNullOrWhiteSpace(browserChannel) ? null : browserChannel.Trim());
             return browser;
         }
         finally
@@ -174,7 +206,13 @@ public sealed class PlaywrightHtmlToPdfRenderer(IConfiguration configuration, IL
         }
         catch (PlaywrightException exception)
         {
-            logger.LogWarning(exception, "The PDF browser could not be closed cleanly.");
+            LogBrowserCloseFailed(exception);
         }
     }
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "The PDF browser closed during render; retrying once with a new browser.")]
+    private partial void LogBrowserClosedDuringRender(Exception exception);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "The PDF browser could not be closed cleanly.")]
+    private partial void LogBrowserCloseFailed(Exception exception);
 }

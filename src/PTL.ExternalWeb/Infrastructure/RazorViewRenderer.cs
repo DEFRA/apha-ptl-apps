@@ -14,8 +14,7 @@ public interface IRazorViewRenderer
 
 public sealed class RazorViewRenderer(
     IRazorViewEngine viewEngine,
-    ITempDataProvider tempDataProvider,
-    IServiceProvider serviceProvider) : IRazorViewRenderer
+    ITempDataProvider tempDataProvider) : IRazorViewRenderer
 {
     public async Task<string> RenderAsync(ActionContext actionContext, string viewPath, object model)
     {

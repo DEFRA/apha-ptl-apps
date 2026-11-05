@@ -30,4 +30,10 @@ public class HelpLinkTests
     {
         Assert.Equal("/Help/Index", HelpLink.Href(new FakeUrlHelper(), controller, action));
     }
+
+    [Fact]
+    public void Href_WhenTheHelpRouteCannotBeResolved_FallsBackToTheHelpPath()
+    {
+        Assert.Equal("/Help#contextHelpHome", HelpLink.Href(new FakeUrlHelper(actionReturnsNull: true), "Home", "Index"));
+    }
 }

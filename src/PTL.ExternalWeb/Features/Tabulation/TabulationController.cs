@@ -17,7 +17,7 @@ namespace PTL.ExternalWeb.Features.Tabulation;
 // to the caller's own access by PTL.Api's "for-user" tabulation endpoints
 // (ParticipantTabulationService), never by trusting a bare id from the URL.
 [Authorize(Policy = ExternalPolicies.Viewer)]
-public sealed class TabulationController(
+public sealed partial class TabulationController(
     IDistributionApiClient distributionApiClient,
     ITabulationPdfService tabulationPdfService,
     ILogger<TabulationController> logger) : Controller
@@ -124,10 +124,13 @@ public sealed class TabulationController(
         }
         catch (Exception exception) when (exception is PlaywrightException or InvalidOperationException)
         {
-            logger.LogError(exception, "Failed to generate tabulation PDF for published tabulation {PublishedTabulationId}.", publishedTabulationId);
+            LogPdfGenerationFailed(exception, publishedTabulationId);
             return StatusCode(StatusCodes.Status503ServiceUnavailable);
         }
     }
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Failed to generate tabulation PDF for published tabulation {PublishedTabulationId}.")]
+    private partial void LogPdfGenerationFailed(Exception exception, Guid publishedTabulationId);
 
     private (Guid? ParticipantId, Guid? ViewerId, Guid? TestConsultantId) CallerIds() =>
         (User.GetParticipantId(), User.GetViewerId(), User.GetTestConsultantId());

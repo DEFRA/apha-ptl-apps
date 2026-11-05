@@ -82,6 +82,64 @@ public class TabulationControllerTests
         Assert.Contains("D1a/S1 BT: Brucella - Summary.", options.FooterTemplate, StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData("D1a/S1 BT: Brucella", "Date Of Distribution: 01/05/2026", "Summary", "D1a_S1_BT_ Brucella_01_05_2026.pdf")]
+    [InlineData("D1a/S1 BT: Brucella", "01/05/2026", "Summary", "D1a_S1_BT_ Brucella_01_05_2026.pdf")]
+    [InlineData("D1a", "Date Of Distribution: 01/05/2026", "Summary", "Summary.pdf")]
+    [InlineData("D1a/S1 BT", "Date Of Distribution: ", "Summary", "Summary.pdf")]
+    [InlineData("", "", "   ", "tabulation-report.pdf")]
+    public async Task GeneratePdf_NamesTheFileLikeLegacy(string heading, string dateText, string tabulationName, string expected)
+    {
+        var report = Report(Guid.NewGuid()) with { DistributionHeading = heading, DistributionDateText = dateText, TabulationName = tabulationName };
+        var controller = CreateController(new FakeDistributionApiClient { PublishedTabulation = report }, CreatePdfService());
+
+        var result = await controller.GeneratePdf(Guid.NewGuid(), CancellationToken.None);
+
+        Assert.Equal(expected, Assert.IsType<FileContentResult>(result).FileDownloadName);
+    }
+
+    [Fact]
+    public async Task TabulationPdfService_WhenTheUkasLogoExists_EmbedsItAsADataUri()
+    {
+        var webRoot = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(Path.Combine(webRoot, "images"));
+        try
+        {
+            await File.WriteAllBytesAsync(Path.Combine(webRoot, "images", "ukas.png"), [1, 2, 3]);
+            var viewRenderer = new FakeRazorViewRenderer("<html></html>");
+            var service = new TabulationPdfService(viewRenderer, new FakeHtmlToPdfRenderer(), new FakeWebHostEnvironment { WebRootPath = webRoot });
+
+            await service.GenerateAsync(new ActionContext(), new TabulationReportPageViewModel(Report(Guid.NewGuid())), CancellationToken.None);
+
+            var model = Assert.IsType<TabulationPdfViewModel>(viewRenderer.LastModel);
+            Assert.Equal("data:image/png;base64,AQID", model.UkasLogoDataUri);
+        }
+        finally
+        {
+            Directory.Delete(webRoot, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task TabulationPdfService_WhenTheUkasLogoIsMissing_OmitsIt()
+    {
+        var webRoot = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(webRoot);
+        try
+        {
+            var viewRenderer = new FakeRazorViewRenderer("<html></html>");
+            var service = new TabulationPdfService(viewRenderer, new FakeHtmlToPdfRenderer(), new FakeWebHostEnvironment { WebRootPath = webRoot });
+
+            await service.GenerateAsync(new ActionContext(), new TabulationReportPageViewModel(Report(Guid.NewGuid())), CancellationToken.None);
+
+            Assert.Null(Assert.IsType<TabulationPdfViewModel>(viewRenderer.LastModel).UkasLogoDataUri);
+        }
+        finally
+        {
+            Directory.Delete(webRoot, recursive: true);
+        }
+    }
+
     private static TabulationController CreateController(FakeDistributionApiClient api, ITabulationPdfService service)
     {
         var controller = new TabulationController(api, service, NullLogger<TabulationController>.Instance)
@@ -127,7 +185,13 @@ public class TabulationControllerTests
 
 internal sealed class FakeRazorViewRenderer(string html) : IRazorViewRenderer
 {
-    public Task<string> RenderAsync(ActionContext actionContext, string viewPath, object model) => Task.FromResult(html);
+    public object? LastModel { get; private set; }
+
+    public Task<string> RenderAsync(ActionContext actionContext, string viewPath, object model)
+    {
+        LastModel = model;
+        return Task.FromResult(html);
+    }
 }
 
 internal sealed class FakeWebHostEnvironment : IWebHostEnvironment

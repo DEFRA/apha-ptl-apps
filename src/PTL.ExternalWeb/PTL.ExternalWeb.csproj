@@ -14,6 +14,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="PTL.ExternalWeb.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\PTL.ApiClient\PTL.ApiClient.csproj" />
     <ProjectReference Include="..\PTL.Auth.Cidm\PTL.Auth.Cidm.csproj" />
     <ProjectReference Include="..\PTL.Common\PTL.Common.csproj" />
