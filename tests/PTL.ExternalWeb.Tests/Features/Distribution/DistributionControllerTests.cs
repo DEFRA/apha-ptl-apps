@@ -46,7 +46,7 @@ public class DistributionControllerTests
 
     [Theory]
     [InlineData(false, false, "No")]
-    [InlineData(true, false, "In Progress")]
+    [InlineData(true, false, "In progress")]
     [InlineData(true, true, "Submitted")]
     [InlineData(false, true, "Submitted")]
     public void CurrentRow_Status_FollowsLegacyGetStatus(bool hasResults, bool submitted, string expected)
@@ -65,6 +65,28 @@ public class DistributionControllerTests
         };
 
         Assert.Equal(expected, row.Status);
+    }
+
+    [Theory]
+    [InlineData(false, false, "govuk-tag govuk-tag--grey")]
+    [InlineData(true, false, "govuk-tag govuk-tag--light-blue")]
+    [InlineData(true, true, "govuk-tag govuk-tag--green")]
+    public void CurrentRow_StatusTagClass_MatchesStatus(bool hasResults, bool submitted, string expected)
+    {
+        var row = new CurrentDistributionRowViewModel
+        {
+            MonthlyDistributionSchemeId = Guid.NewGuid(),
+            DistributionParticipantId = Guid.NewGuid(),
+            DistributionReference = "D26-01A/BA",
+            SchemeCode = "PT001",
+            SchemeName = "Bacteriology",
+            DistributionDate = new DateTime(2026, 4, 3),
+            DeadlineDate = new DateTime(2026, 4, 30),
+            HasResults = hasResults,
+            Submitted = submitted,
+        };
+
+        Assert.Equal(expected, row.StatusTagClass);
     }
 
     [Theory]
@@ -389,7 +411,7 @@ public class DistributionControllerTests
             ControllerContext = new ControllerContext { HttpContext = new Microsoft.AspNetCore.Http.DefaultHttpContext() }
         };
 
-        Assert.IsType<NotFoundResult>(await controller.Results(Guid.NewGuid(), CancellationToken.None));
+        Assert.IsType<NotFoundResult>(await controller.Results(Guid.NewGuid(), null, CancellationToken.None));
     }
 
     [Theory]

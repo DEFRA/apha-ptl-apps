@@ -16,8 +16,12 @@ public sealed record DistributionPreviousListViewModel(
     int? Month,
     string? DistributionReference,
     string? SchemeCode,
-    string? SchemeName)
+    string? SchemeName,
+    IReadOnlyList<int>? YearOptions = null)
 {
+    // Legacy PopulatePastDistributionsYearDropDown: every YearId and distribution calendar year in the participant's history.
+    public IReadOnlyList<int> Years => YearOptions ?? [];
+
     public bool IsFiltered =>
         Year is not null || Month is not null
         || !string.IsNullOrWhiteSpace(DistributionReference)

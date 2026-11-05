@@ -1,5 +1,6 @@
 @model PTL.ExternalWeb.Features.Tabulation.TabulationListViewModel
 @using System.Globalization
+@using Microsoft.AspNetCore.Http.Extensions
 @using PTL.SharedUI.Pagination
 @{
     ViewData["Title"] = "Reports";
@@ -36,6 +37,8 @@
             schemeName = Model.SchemeName,
         })!;
     }
+
+    var sortHeaders = new SortableHeaderContext(Model.SortBy, Model.SortDirection, SortUrl);
 }
 
 <h1 class="govuk-heading-l">Reports</h1>
@@ -74,21 +77,9 @@ else
     <table class="govuk-table">
         <thead class="govuk-table__head">
             <tr class="govuk-table__row">
-                <th scope="col" class="govuk-table__header" aria-sort="@AriaSort(Model.SortBy, Model.SortDirection, "reference")">
-                    <a class="govuk-link" href="@SortUrl("reference")">Distribution Reference@(SortIndicator(Model.SortBy, Model.SortDirection, "reference"))</a>
-                </th>
-                <th scope="col" class="govuk-table__header" aria-sort="@AriaSort(Model.SortBy, Model.SortDirection, "schemeCode")">
-                    <a class="govuk-link" href="@SortUrl("schemeCode")">Scheme Code@(SortIndicator(Model.SortBy, Model.SortDirection, "schemeCode"))</a>
-                </th>
-                <th scope="col" class="govuk-table__header" aria-sort="@AriaSort(Model.SortBy, Model.SortDirection, "schemeName")">
-                    <a class="govuk-link" href="@SortUrl("schemeName")">Scheme Name@(SortIndicator(Model.SortBy, Model.SortDirection, "schemeName"))</a>
-                </th>
-                <th scope="col" class="govuk-table__header" aria-sort="@AriaSort(Model.SortBy, Model.SortDirection, "tabulationName")">
-                    <a class="govuk-link" href="@SortUrl("tabulationName")">Report Name@(SortIndicator(Model.SortBy, Model.SortDirection, "tabulationName"))</a>
-                </th>
-                <th scope="col" class="govuk-table__header" aria-sort="@AriaSort(Model.SortBy, Model.SortDirection, "distributionDate")">
-                    <a class="govuk-link" href="@SortUrl("distributionDate")">Distribution Date@(SortIndicator(Model.SortBy, Model.SortDirection, "distributionDate"))</a>
-                </th>
+                <partial name="_DistributionReferenceSchemeHeaders" model="sortHeaders" />
+                <partial name="_SortableHeader" model="@(sortHeaders.Header("Report name", "tabulationName"))" />
+                <partial name="_SortableHeader" model="@(sortHeaders.Header("Distribution date", "distributionDate"))" />
                 <th scope="col" class="govuk-table__header">Report</th>
             </tr>
         </thead>
@@ -105,6 +96,7 @@ else
                         <a class="govuk-link"
                            asp-action="Report"
                            asp-route-publishedTabulationId="@tabulation.TabulationId"
+                           asp-route-returnUrl="@Context.Request.GetEncodedPathAndQuery()"
                            aria-label="View report for @tabulation.DistributionReference">View</a>
                     </td>
                 </tr>
