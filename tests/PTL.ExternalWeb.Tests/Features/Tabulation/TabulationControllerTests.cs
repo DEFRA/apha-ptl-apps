@@ -150,7 +150,7 @@ public class TabulationControllerTests
         return controller;
     }
 
-    private static ITabulationPdfService CreatePdfService(Exception? throwOnRender = null)
+    private static TabulationPdfService CreatePdfService(Exception? throwOnRender = null)
     {
         var htmlRenderer = new FakeHtmlToPdfRenderer("%PDF-1.7"u8.ToArray(), throwOnRender);
         return new TabulationPdfService(

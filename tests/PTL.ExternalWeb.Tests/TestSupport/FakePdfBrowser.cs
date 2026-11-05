@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using Microsoft.Playwright;
 using PTL.ExternalWeb.Infrastructure.Pdf;
@@ -95,6 +96,8 @@ internal sealed class FakePdfBrowserLauncher(params FakePdfBrowser[] browsers) :
     }
 }
 
+// DispatchProxy emits a subclass at runtime, so the proxy type cannot be sealed.
+[SuppressMessage("Performance", "CA1852:Seal internal types", Justification = "DispatchProxy generates a subclass at runtime.")]
 internal class FakeProxy : DispatchProxy
 {
     public static readonly object Unhandled = new();
