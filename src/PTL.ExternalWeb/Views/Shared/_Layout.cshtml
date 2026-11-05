@@ -53,7 +53,7 @@
         </div>
     </main>
 </div>
-@await Html.PartialAsync("_Footer", "#")
+@await Html.PartialAsync("_Footer", HelpLink.Href(Url, currentController, currentAction))
 <script type="module" src="/js/govuk-frontend-6.5.0.min.js"></script>
 <script type="module">
         import {

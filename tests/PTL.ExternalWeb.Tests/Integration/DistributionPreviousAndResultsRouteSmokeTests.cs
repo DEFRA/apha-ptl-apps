@@ -429,7 +429,7 @@ public class DistributionPreviousAndResultsRouteSmokeTests : IClassFixture<PtlEx
     }
 
     [Fact]
-    public async Task Entry_RendersLegacyIntroAndOneTablePerSampleWithRequiredFormatOnlyForTextInputs()
+    public async Task Entry_RendersLegacyIntroAndOneTablePerSampleWithRequiredFormatForEveryField()
     {
         var schemeId = Guid.NewGuid();
         var textItem = Guid.NewGuid();
@@ -470,6 +470,7 @@ public class DistributionPreviousAndResultsRouteSmokeTests : IClassFixture<PtlEx
         Assert.Equal(2, Regex.Count(main, "<option[^>]*value=\"\"[^>]*>- Please Select -</option>"));
         Assert.Equal(3, Regex.Count(main, "maxlength=\"8000\""));
         Assert.Equal(3, Regex.Count(main, "<td class=\"govuk-table__cell\">X\\((15|10)\\)</td>"));
+        Assert.Equal(2, Regex.Count(main, "<td class=\"govuk-table__cell\">Drop down list</td>"));
         Assert.DoesNotContain("Input must be of format", main, StringComparison.Ordinal);
     }
 
@@ -750,6 +751,23 @@ public class DistributionPreviousAndResultsRouteSmokeTests : IClassFixture<PtlEx
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Contains("PI Values must be in format X(15)", body, StringComparison.Ordinal);
         Assert.Contains("value=\"bad value\"", body, StringComparison.Ordinal);
+        Assert.Contains("govuk-form-group govuk-form-group--error", body, StringComparison.Ordinal);
+        Assert.Matches("<input class=\"govuk-input govuk-input--error[^\"]*\" aria-describedby=\"Tests_0__Samples_0__Values_0__Result-error\"", body);
+        Assert.Contains("<p id=\"Tests_0__Samples_0__Values_0__Result-error\" class=\"govuk-error-message\"><span class=\"govuk-visually-hidden\">Error:</span> PI Values must be in format X(15)</p>", body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Entry_Get_FieldsWithoutErrors_AreNotStyledAsInvalid()
+    {
+        var f = NewEntryFixture();
+        var client = CreateClient(new FakeDistributionApiClient { ActualResults = f.Own });
+        var cookies = await SignInAsync(client);
+
+        var response = await CookieForwardingHttpClient.SendWithCookiesAsync(client, HttpMethod.Get, $"/Distribution/Entry?schemeId={f.SchemeId}", cookies);
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.DoesNotContain("--error", body, StringComparison.Ordinal);
+        Assert.DoesNotContain("aria-describedby", body, StringComparison.Ordinal);
     }
 
     [Fact]

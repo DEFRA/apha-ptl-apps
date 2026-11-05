@@ -89,4 +89,24 @@ public class IntendedResultsValidatorTests
 
         Assert.Equal("Input must be of format: dd/MM/yyyy", message);
     }
+
+    // Representative patterns only - the real format strings are configured per scheme in the database.
+    [Theory]
+    [InlineData("^.{0,12}$", "X(12)", "Positive", true)]
+    [InlineData("^.{0,12}$", "X(12)", "Longer than twelve characters", false)]
+    [InlineData("^[0-9]+(\\.[0-9]+)?$", "9.999", "12.345", true)]
+    [InlineData("^[0-9]+(\\.[0-9]+)?$", "9.999", "12,5", false)]
+    [InlineData("^(100(\\.0+)?|[0-9]{1,2}(\\.[0-9]+)?)%?$", "Percentage", "87.5%", true)]
+    [InlineData("^(100(\\.0+)?|[0-9]{1,2}(\\.[0-9]+)?)%?$", "Percentage", "101%", false)]
+    [InlineData("^[0-9]{1,3}/[0-9]{1,4}$", "999/9999", "1/128", true)]
+    [InlineData("^[0-9]{1,3}/[0-9]{1,4}$", "999/9999", "0.5", false)]
+    [InlineData("^(0[1-9]|[12][0-9]|3[01])/(0[1-9]|1[0-2])/[0-9]{4}$", "dd/mm/yyyy", "31/12/2026", true)]
+    [InlineData("^(0[1-9]|[12][0-9]|3[01])/(0[1-9]|1[0-2])/[0-9]{4}$", "dd/mm/yyyy", "2026-12-31", false)]
+    public void ValidateValue_ConfiguredFormat_AcceptsMatchingValuesAndNamesTheFormatOtherwise(
+        string formatString, string returnValueType, string value, bool valid)
+    {
+        var message = IntendedResultsValidator.ValidateValue(formatString, returnValueType, value);
+
+        Assert.Equal(valid ? null : $"Input must be of format: {returnValueType}", message);
+    }
 }
