@@ -91,23 +91,38 @@ public sealed class OrderController(ICreateOrderApiClient createOrderApiClient) 
     [HttpGet]
     public async Task<IActionResult> Review(string? year, CancellationToken cancellationToken)
     {
+        var review = await GetReviewModelAsync(year, cancellationToken);
+        return review.Error ?? View(review.Model!);
+    }
+
+    // Req3 print-only slice: printable pending-order summary before submission, with the same access
+    // and selection guard as Review.
+    [HttpGet]
+    public async Task<IActionResult> Print(string? year, CancellationToken cancellationToken)
+    {
+        var review = await GetReviewModelAsync(year, cancellationToken);
+        return review.Error ?? View("Print", review.Model!);
+    }
+
+    private async Task<(IActionResult? Error, CreateOrderReviewViewModel? Model)> GetReviewModelAsync(string? year, CancellationToken cancellationToken)
+    {
         var slug = NormaliseYear(year);
         var participantId = User.GetParticipantId();
         if (slug is null || participantId is null)
         {
-            return NotFound();
+            return (NotFound(), null);
         }
 
         var result = await createOrderApiClient.GetAsync(participantId.Value, slug, cancellationToken);
         if (result.Status != CreateOrderApiStatus.Ok)
         {
-            return result.Status == CreateOrderApiStatus.NotAllowed ? NotAvailable(slug) : NotFound();
+            return (result.Status == CreateOrderApiStatus.NotAllowed ? NotAvailable(slug) : NotFound(), null);
         }
 
         // Legacy only enables Next once a scheme with a month is selected.
         return result.Order!.CanProceed
-            ? View(new CreateOrderReviewViewModel(slug, result.Order))
-            : RedirectToAction(PageAction(slug));
+            ? (null, new CreateOrderReviewViewModel(slug, result.Order))
+            : (RedirectToAction(PageAction(slug)), null);
     }
 
     private async Task<IActionResult> ShowAsync(string slug, string? search, CancellationToken cancellationToken)

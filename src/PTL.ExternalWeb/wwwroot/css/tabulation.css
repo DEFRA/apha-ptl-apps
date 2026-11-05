@@ -80,10 +80,22 @@ table.TabulationTable {
 .cellTabulationSignature {
     text-align: left;
     font-size: smaller;
+    font-weight: 700;
 }
 
 .cellTabulationSignature2 {
     text-align: left;
+}
+
+/* Legacy bolds the signatory and address and sets the Issued line apart in normal weight. */
+.cellTabulationIssued {
+    margin-top: 0.5rem;
+    font-weight: 400;
+}
+
+/* Legacy turned each stored <p> into a line break, so a blank paragraph is one blank line, not two paragraph gaps. */
+#commentsDiv p {
+    margin: 0;
 }
 
 @media print {
@@ -124,7 +136,6 @@ table.TabulationTable {
     .cellVersionDate {
         font-size: 8.5pt;
         color: black;
-        font-weight: normal;
     }
 }
 
@@ -167,5 +178,15 @@ table.TabulationTable {
     .cellVersionDate,
     .cellTabulationSignature {
         font-size: 1rem;
+        line-height: 1.25;
+    }
+}
+
+/* Same size as the report comments (govuk-body) from the tablet breakpoint up. */
+@media screen and (min-width: 40.0625em) {
+    .cellVersionDate,
+    .cellTabulationSignature {
+        font-size: 1.1875rem;
+        line-height: 1.3157894737;
     }
 }

@@ -450,7 +450,9 @@ public class DistributionControllerTests
         Assert.Equal("Input must be of format: Text", dropdown.InputFormatMessage);
         Assert.False(date.IsDropdown);
         Assert.Empty(date.DropdownOptions);
-        Assert.Equal("dd/MM/yyyy", date.RequiredFormat);
+        Assert.Equal("dd/mm/yyyy", date.RequiredFormat);
+        Assert.Equal("Drop down list", dropdown.RequiredFormatHint);
+        Assert.Equal("dd/mm/yyyy", date.RequiredFormatHint);
     }
 
     [Fact]
@@ -507,6 +509,61 @@ public class DistributionControllerTests
         Assert.Equal("Some other problem", Message(string.Empty));
     }
 
+    [Fact]
+    public async Task Entry_Post_ApiDateFormatError_IsShownInLowercaseNamingTheDateItem()
+    {
+        var schemeId = Guid.NewGuid();
+        var methodItemId = Guid.NewGuid();
+        var page = new ActualResultsResponse(
+            Guid.NewGuid(), schemeId, "D26-01A/BA PT001: Bacteriology", "audit", new DateTime(2026, 4, 30), false,
+            [new ActualResultsTestResponse(
+                Guid.NewGuid(),
+                "ELISA",
+                [],
+                [new ActualResultsMethodItemResponse(methodItemId, "Date of Testing", "^.*$", "Date of testing", "")],
+                [])]);
+        var apiClient = new FakeDistributionApiClient
+        {
+            ActualResults = page,
+            ActualResultsSaveResult = new ActualResultsSaveResult(false, new Dictionary<Guid, string> { [methodItemId] = "Input must be of format: dd/MM/yyyy" })
+        };
+        var controller = new DistributionController(apiClient);
+        AuthenticatedParticipant.Attach(controller, Guid.NewGuid());
+
+        await controller.Entry(EntryModel(schemeId), "save", CancellationToken.None);
+
+        Assert.Equal("Date of Testing must be in format dd/mm/yyyy", Assert.Single(controller.ModelState["Tests[0].MethodItems[0].Result"]!.Errors).ErrorMessage);
+    }
+
+    [Fact]
+    public void ResultEntryField_ForAnErroredKey_StylesTheFieldAndLinksTheMessage()
+    {
+        const string key = "Tests[0].Samples[1].Values[2].Result";
+        var modelState = new Microsoft.AspNetCore.Mvc.ModelBinding.ModelStateDictionary();
+        modelState.AddModelError(key, "PI Values must be in format X(15)");
+
+        var field = PTL.ExternalWeb.ViewSupport.ResultEntryField.For(modelState, key);
+
+        Assert.True(field.Invalid);
+        Assert.Equal("PI Values must be in format X(15)", field.Message);
+        Assert.Equal("Tests_0__Samples_1__Values_2__Result-error", field.ErrorId);
+        Assert.Equal(field.ErrorId, field.DescribedBy);
+        Assert.Contains("govuk-form-group--error", field.GroupClass, StringComparison.Ordinal);
+        Assert.Equal("govuk-input govuk-input--error", field.InputClass);
+        Assert.Equal("govuk-select govuk-select--error", field.SelectClass);
+    }
+
+    [Fact]
+    public void ResultEntryField_ForAKeyWithoutErrors_KeepsTheDefaultStyling()
+    {
+        var field = PTL.ExternalWeb.ViewSupport.ResultEntryField.For(new Microsoft.AspNetCore.Mvc.ModelBinding.ModelStateDictionary(), "Tests[0].MethodItems[0].Result");
+
+        Assert.False(field.Invalid);
+        Assert.Null(field.Message);
+        Assert.Null(field.DescribedBy);
+        Assert.DoesNotContain("error", field.GroupClass + field.InputClass + field.SelectClass, StringComparison.Ordinal);
+    }
+
     [Theory]
     [InlineData(1, 15, 15, 15, 1)]
     [InlineData(2, 15, 15, 5, 2)]
@@ -560,6 +617,6 @@ public class DistributionControllerTests
             FormatString = "^.*$"
         };
 
-        Assert.Equal("Input must be of format: dd/MM/yyyy", item.InputFormatMessage);
+        Assert.Equal("Input must be of format: dd/mm/yyyy", item.InputFormatMessage);
     }
 }

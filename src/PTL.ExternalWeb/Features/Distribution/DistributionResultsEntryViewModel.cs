@@ -44,6 +44,8 @@ public sealed class DistributionResultsEntryResultItemViewModel
     public string InputFormatMessage => $"Input must be of format: {RequiredFormat}";
 
     public string RequiredFormat => DistributionResultsEntryFormatMessages.For(ReturnValueType);
+
+    public string RequiredFormatHint => DistributionResultsEntryFormatMessages.Hint(IsDropdown, ReturnValueType);
 }
 
 public sealed class DistributionResultsEntryMethodItemViewModel
@@ -66,14 +68,22 @@ public sealed class DistributionResultsEntryMethodItemViewModel
     public string InputFormatMessage => $"Input must be of format: {RequiredFormat}";
 
     public string RequiredFormat => DistributionResultsEntryFormatMessages.For(ReturnValueType);
+
+    public string RequiredFormatHint => DistributionResultsEntryFormatMessages.Hint(IsDropdown, ReturnValueType);
 }
 
 internal static class DistributionResultsEntryFormatMessages
 {
+    public const string DateFormat = "dd/mm/yyyy";
+
+    public const string DropdownHint = "Drop down list";
+
     public static string For(string? returnValueType) =>
         returnValueType?.Contains("date", StringComparison.OrdinalIgnoreCase) == true
-            ? "dd/MM/yyyy"
+            ? DateFormat
             : returnValueType ?? string.Empty;
+
+    public static string Hint(bool isDropdown, string? returnValueType) => isDropdown ? DropdownHint : For(returnValueType);
 }
 
 public sealed class DistributionResultsEntrySampleRowViewModel

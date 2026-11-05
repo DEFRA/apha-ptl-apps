@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using PTL.ApiClient.Distribution;
 using PTL.Contracts.Distribution;
+using PTL.ExternalWeb.Infrastructure.Pdf;
 using PTL.ExternalWeb.Tests.TestSupport;
 
 namespace PTL.ExternalWeb.Tests.Integration;
@@ -54,12 +55,18 @@ public class TabulationRouteSmokeTests : IClassFixture<PtlExternalWebTestFactory
         Print: new TabulationPrintResponse([], [], []),
         DistributionHeading: "D1a/S1 BT: Brucella");
 
-    private HttpClient CreateClient(FakeDistributionApiClient apiClient) =>
+    private HttpClient CreateClient(FakeDistributionApiClient apiClient, IHtmlToPdfRenderer? pdfRenderer = null) =>
         _factory.WithWebHostBuilder(builder =>
             builder.ConfigureServices(services =>
             {
                 services.RemoveAll<IDistributionApiClient>();
                 services.AddSingleton<IDistributionApiClient>(apiClient);
+
+                if (pdfRenderer is not null)
+                {
+                    services.RemoveAll<IHtmlToPdfRenderer>();
+                    services.AddSingleton(pdfRenderer);
+                }
             })).CreateClient();
 
     private static async Task<Dictionary<string, string>> SignInAsync(HttpClient client, string roles, Guid? participantId = null, Guid? viewerId = null)
@@ -380,6 +387,24 @@ public class TabulationRouteSmokeTests : IClassFixture<PtlExternalWebTestFactory
     }
 
     [Fact]
+    public async Task GeneratePdf_WhenReportExists_ReturnsPdfFile()
+    {
+        var tabulationId = Guid.NewGuid();
+        var expectedPdf = "%PDF-1.7"u8.ToArray();
+        var apiClient = new FakeDistributionApiClient { PublishedTabulation = Report(tabulationId) };
+        var client = CreateClient(apiClient, new FakeHtmlToPdfRenderer(expectedPdf));
+        var cookies = await SignInAsync(client, "Participant,Viewer", participantId: Guid.NewGuid());
+
+        var response = await CookieForwardingHttpClient.SendWithCookiesAsync(
+            client, HttpMethod.Get, $"/Tabulation/GeneratePdf?publishedTabulationId={tabulationId}", cookies);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("application/pdf", response.Content.Headers.ContentType?.MediaType);
+        Assert.Contains("filename=\"D1a_S1_BT_ Brucella_01_05_2026.pdf\"", response.Content.Headers.ContentDisposition?.ToString(), StringComparison.Ordinal);
+        Assert.Equal(expectedPdf, await response.Content.ReadAsByteArrayAsync());
+    }
+
+    [Fact]
     public async Task Report_WithSignatoryAndUkasLogo_RendersVersionAboveTheLogo()
     {
         // Legacy TabulationView.aspx's tabulation-footer stacks tabulation-version-info ->
@@ -400,6 +425,22 @@ public class TabulationRouteSmokeTests : IClassFixture<PtlExternalWebTestFactory
         var logoIndex = body.IndexOf("ukas.png", StringComparison.Ordinal);
         Assert.True(versionIndex >= 0 && logoIndex >= 0 && versionIndex < logoIndex,
             "Expected the Version text to appear before the UKAS logo image in the rendered page.");
+        Assert.Contains("<div class=\"cellTabulationSignature2 cellTabulationIssued\">Issued 01/05/2026</div>", body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Report_Heading_IsTheLegacyFinalReportTitle()
+    {
+        var tabulationId = Guid.NewGuid();
+        var apiClient = new FakeDistributionApiClient { PublishedTabulation = Report(tabulationId) };
+        var client = CreateClient(apiClient);
+        var cookies = await SignInAsync(client, "Participant,Viewer", participantId: Guid.NewGuid());
+
+        var response = await CookieForwardingHttpClient.SendWithCookiesAsync(
+            client, HttpMethod.Get, $"/Tabulation/Report?publishedTabulationId={tabulationId}", cookies);
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Contains("<h2 class=\"govuk-heading-m\">FINAL REPORT for D1a/S1 BT: Brucella</h2>", body, StringComparison.Ordinal);
     }
 
     [Fact]

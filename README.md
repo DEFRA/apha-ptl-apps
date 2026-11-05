@@ -291,3 +291,19 @@ The only required PR status check is `gate`, which aggregates `changes` (path de
 it: create the project, configure its access token and project identifiers as repo secrets/variables (see
 the `sonarcloud` job in `build-test-publish-images.yml` for what it expects), then set `SONAR_ENABLED` to
 `'true'`.
+
+### PDF generation: Playwright Chromium (PTL.ExternalWeb)
+
+`PTL.ExternalWeb` renders the Tabulation report PDF by printing a Razor view in headless Chromium via
+`Microsoft.Playwright` (`Infrastructure/Pdf/IHtmlToPdfRenderer.cs`). The browser is installed when the image is
+built, so the running container never downloads anything. In `src/PTL.ExternalWeb/Dockerfile`:
+
+- `PLAYWRIGHT_BROWSERS_PATH=C:\ms-playwright` sets where the browsers live.
+- `RUN powershell ... .\playwright.ps1 install chromium` downloads Chromium into the image.
+- That `RUN` step fails the image build if the script is missing or the download fails, so a broken install
+  cannot silently ship.
+- `playwright.ps1` comes from the `Microsoft.Playwright` 1.64.1 package (published alongside the app), so the
+  installed browser version always matches the library.
+
+Running outside Docker: build the project, then run `pwsh src/PTL.ExternalWeb/bin/<Configuration>/net10.0/playwright.ps1 install chromium`
+once. To use an already-installed browser instead, set `PdfGeneration:BrowserChannel` (for example `msedge`).

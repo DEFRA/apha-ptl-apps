@@ -5,7 +5,7 @@
 }
 
 <h1 class="govuk-heading-l">View reports</h1>
-<h2 class="govuk-heading-m">@report.DistributionHeading</h2>
+<h2 class="govuk-heading-m">@report.Title</h2>
 <h3 class="govuk-heading-s">@report.TabulationName</h3>
 <p class="govuk-body">@report.DistributionDateText</p>
 
@@ -79,13 +79,12 @@
             {
                 <div class="cellTabulationSignature2">@line</div>
             }
-            <div class="cellTabulationSignature2">@signatory.IssuedText</div>
+            <div class="cellTabulationSignature2 cellTabulationIssued">@signatory.IssuedText</div>
         </div>
     }
 </div>
 
 <div class="govuk-button-group govuk-!-margin-top-6">
     <a class="govuk-button govuk-button--secondary" href="@(Model.ReturnUrl ?? Url.Action("Index"))">Back</a>
-    @* PDF export is a separate Reporting workstream deliverable - placeholder link only until then. *@
     <a class="govuk-button govuk-button--secondary" asp-action="GeneratePdf" asp-route-publishedTabulationId="@report.TabulationId">Generate PDF</a>
 </div>

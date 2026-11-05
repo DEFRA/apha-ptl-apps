@@ -30,7 +30,8 @@ WORKDIR /app
 # port, if fronted by one) - coordinate any change here with infra.
 EXPOSE 8081
 ENV ASPNETCORE_URLS=http://+:8081 \
-    DOTNET_EnableDiagnostics=0
+    DOTNET_EnableDiagnostics=0 \
+    PLAYWRIGHT_BROWSERS_PATH=C:\\ms-playwright
 
 # FortiGate egress performs TLS inspection on outbound calls to CIDM/Azure AD B2C (b2clogin.com) -
 # without trusting its inspection CA, the OIDC handler's metadata/JWKS fetch fails with PartialChain.
@@ -38,6 +39,11 @@ COPY ["build/certs/fortigate-root-ca.cer", "C:/certs/fortigate-root-ca.cer"]
 COPY ["build/certs/fortigate-ca.cer", "C:/certs/fortigate-ca.cer"]
 RUN certutil -addstore -f Root C:/certs/fortigate-root-ca.cer && certutil -addstore -f CA C:/certs/fortigate-ca.cer
 
-USER $APP_UID
 COPY --from=build /app/publish .
+
+# Playwright's headless Chromium generates external PDF reports. Install browser binaries at
+# image build time so the app never attempts runtime downloads.
+RUN powershell -NoProfile -ExecutionPolicy Bypass -File .\playwright.ps1 install chromium
+
+USER $APP_UID
 ENTRYPOINT ["dotnet", "PTL.ExternalWeb.dll"]

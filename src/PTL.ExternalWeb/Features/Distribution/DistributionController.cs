@@ -304,7 +304,7 @@ public sealed class DistributionController(IDistributionApiClient distributionAp
     {
         const string prefix = "Input must be of format:";
         return apiMessage.StartsWith(prefix, StringComparison.Ordinal)
-            ? $"{itemName} must be in format {apiMessage[prefix.Length..].Trim()}"
+            ? $"{itemName} must be in format {apiMessage[prefix.Length..].Trim().Replace("dd/MM/yyyy", DistributionResultsEntryFormatMessages.DateFormat, StringComparison.Ordinal)}"
             : apiMessage;
     }
 
