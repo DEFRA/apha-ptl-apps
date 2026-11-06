@@ -249,6 +249,21 @@ public class DistributionControllerTests
         Assert.Equal(signedInParticipantId, Assert.Single(apiClient.RequestedOwnResultsParticipantIds));
     }
 
+    [Fact]
+    public async Task Entry_Get_ReadOnlyRecord_MapsReadOnlyStateToViewModel()
+    {
+        var schemeId = Guid.NewGuid();
+        var signedInParticipantId = Guid.NewGuid();
+        var apiClient = new FakeDistributionApiClient { ActualResults = OwnResults(schemeId, Guid.NewGuid()) with { IsReadOnly = true } };
+        var controller = new DistributionController(apiClient);
+        AuthenticatedParticipant.Attach(controller, signedInParticipantId);
+
+        var result = await controller.Entry(schemeId, CancellationToken.None);
+
+        var model = Assert.IsType<DistributionResultsEntryViewModel>(Assert.IsType<ViewResult>(result).Model);
+        Assert.True(model.IsReadOnly);
+    }
+
     private sealed record DropdownFixture(
         Guid SchemeId, Guid ResultItemId, Guid SampleValueId, Guid MethodItemId, ActualResultsResponse Own);
 

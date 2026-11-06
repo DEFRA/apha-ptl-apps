@@ -2,7 +2,7 @@
 @{
     ViewData["Title"] = $"Results entry - {Model.Heading}";
 
-    const string saveFailedMessage = "Save Failed: No results can be saved after the deadline date.";
+    const string closedMessage = "This distribution is closed and results can no longer be edited.";
 
     var errors = ViewData.ModelState
         .Where(entry => entry.Value?.Errors.Count > 0)
@@ -13,7 +13,7 @@
 
     if (saveFailed)
     {
-        errors.Insert(0, (Field: string.Empty, Message: saveFailedMessage));
+        errors.Insert(0, (Field: string.Empty, Message: closedMessage));
         if (ViewData.ModelState.IsValid)
         {
             ViewData["Title"] = $"Error: {ViewData["Title"]}";
@@ -26,8 +26,16 @@
 <h1 class="govuk-heading-l">Results entry</h1>
 <h2 class="govuk-heading-m">@Model.Heading</h2>
 
-<p class="govuk-body">Enter the Test Results below. Tests are divided into Result Items which are tested for each Sample, and Method Items which apply to the Test itself.</p>
-<p class="govuk-body">Results can be saved at any time up until the deadline date provided that all the inputs are valid.</p>
+@if (Model.IsReadOnly)
+{
+    <p class="govuk-body">This distribution is closed and results can no longer be edited.</p>
+    <p class="govuk-body">The tables below show the results that were entered for this distribution.</p>
+}
+else
+{
+    <p class="govuk-body">Enter the Test Results below. Tests are divided into Result Items which are tested for each Sample, and Method Items which apply to the Test itself.</p>
+    <p class="govuk-body">Results can be saved at any time up until the deadline date provided that all the inputs are valid.</p>
+}
 
 <form method="post" asp-action="Entry">
     @Html.AntiForgeryToken()
@@ -96,7 +104,11 @@
                                         {
                                             <p id="@entryField.ErrorId" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @entryField.Message</p>
                                         }
-                                        @if (resultItem.IsDropdown)
+                                        @if (Model.IsReadOnly)
+                                        {
+                                            <p class="govuk-body">@Model.Tests[t].Samples[s].Values[valueIndex].Result</p>
+                                        }
+                                        else if (resultItem.IsDropdown)
                                         {
                                             <select class="@entryField.SelectClass" aria-describedby="@entryField.DescribedBy" asp-for="Tests[t].Samples[s].Values[valueIndex].Result">
                                                 <option value="">- Please Select -</option>
@@ -151,7 +163,11 @@
                                         {
                                             <p id="@entryField.ErrorId" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @entryField.Message</p>
                                         }
-                                        @if (methodItem.IsDropdown)
+                                        @if (Model.IsReadOnly)
+                                        {
+                                            <p class="govuk-body">@Model.Tests[t].MethodItems[m].Result</p>
+                                        }
+                                        else if (methodItem.IsDropdown)
                                         {
                                             <select class="@entryField.SelectClass" aria-describedby="@entryField.DescribedBy" asp-for="Tests[t].MethodItems[m].Result">
                                                 <option value="">- Please Select -</option>
@@ -179,8 +195,15 @@
     }
 
     <div class="govuk-button-group">
-        <button type="submit" name="command" value="submit" class="govuk-button" data-module="govuk-button">Submit</button>
-        <button type="submit" name="command" value="save" class="govuk-button govuk-button--secondary" data-module="govuk-button">Save</button>
-        <button type="submit" name="command" value="cancel" class="govuk-button govuk-button--secondary" data-module="govuk-button" formnovalidate>Cancel</button>
+        @if (Model.IsReadOnly)
+        {
+            <a class="govuk-button govuk-button--secondary" data-module="govuk-button" asp-action="Current">Back</a>
+        }
+        else
+        {
+            <button type="submit" name="command" value="submit" class="govuk-button" data-module="govuk-button">Submit</button>
+            <button type="submit" name="command" value="save" class="govuk-button govuk-button--secondary" data-module="govuk-button">Save</button>
+            <button type="submit" name="command" value="cancel" class="govuk-button govuk-button--secondary" data-module="govuk-button" formnovalidate>Cancel</button>
+        }
     </div>
 </form>

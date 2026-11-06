@@ -7,6 +7,8 @@ public sealed class DistributionResultsEntryViewModel
 
     public string Heading { get; set; } = string.Empty;
 
+    public bool IsReadOnly { get; set; }
+
     public List<DistributionResultsEntryTestViewModel> Tests { get; set; } = [];
 }
 
