@@ -536,7 +536,7 @@ public class TabulationsRenderTests : IClassFixture<WebApplicationFactory<Progra
     // ---- Staged sends, Save and Cancel (A1) ---------------------------------------------------
 
     [Fact]
-    public async Task Get_NothingStaged_RendersOneFormWithSaveAndCancelButNoInsetTextOrStagedInputs()
+    public async Task Get_NothingStaged_RendersOneFormWithSaveApplyAndCancelButNoInsetTextOrStagedInputs()
     {
         Seed(Plain());
 
@@ -546,8 +546,9 @@ public class TabulationsRenderTests : IClassFixture<WebApplicationFactory<Progra
         Assert.True(form.Success);
         Assert.Equal("/Distribution/Tabulations?year=2026&monthId=5", WebUtility.HtmlDecode(form.Groups[1].Value));
         Assert.Matches("<button type=\"submit\" name=\"command\" value=\"save\"[^>]*>Save</button>", form.Groups[2].Value);
+        Assert.Matches("<button type=\"submit\" name=\"command\" value=\"apply\"[^>]*>Apply</button>", form.Groups[2].Value);
         Assert.Matches("<button type=\"submit\" name=\"command\" value=\"cancel\"[^>]*>Cancel</button>", form.Groups[2].Value);
-        Assert.DoesNotContain("value=\"apply\"", html, StringComparison.Ordinal);
+        Assert.Matches("value=\"save\"[\\s\\S]*value=\"apply\"[\\s\\S]*value=\"cancel\"", form.Groups[2].Value);
         Assert.DoesNotContain("name=\"staged\"", html, StringComparison.Ordinal);
         Assert.DoesNotContain("govuk-inset-text", html, StringComparison.Ordinal);
     }
@@ -572,8 +573,9 @@ public class TabulationsRenderTests : IClassFixture<WebApplicationFactory<Progra
             "<div class=\"govuk-inset-text\">You have changes that have not been saved. Select Save to keep them.</div>",
             form.Groups[2].Value, StringComparison.Ordinal);
         Assert.Matches("name=\"command\" value=\"save\"[^>]*>Save</button>", form.Groups[2].Value);
+        Assert.Matches("name=\"command\" value=\"apply\"[^>]*>Apply</button>", form.Groups[2].Value);
         Assert.Matches("name=\"command\" value=\"cancel\"[^>]*>Cancel</button>", form.Groups[2].Value);
-        Assert.DoesNotContain(">Apply</button>", html, StringComparison.Ordinal);
+        Assert.Matches("value=\"save\"[\\s\\S]*value=\"apply\"[\\s\\S]*value=\"cancel\"", form.Groups[2].Value);
         Assert.Empty(_apiClient.SavedTabulations);
     }
 

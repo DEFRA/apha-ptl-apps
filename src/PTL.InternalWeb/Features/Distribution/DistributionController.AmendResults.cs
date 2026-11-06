@@ -9,7 +9,7 @@ using Keys = PTL.Contracts.Distribution.AmendResultsFieldKeys;
 namespace PTL.InternalWeb.Features.Distribution;
 
 // Amend Results - legacy Scheduling/AmendResults.aspx, reached from the Tabulations page's
-// "Amend Results" action. Save and Cancel return to Tabulations (legacy Apply is not carried over).
+// "Amend Results" action. Save and Cancel return to Tabulations; Apply saves and stays here.
 public sealed partial class DistributionController
 {
     private const string AuditWhyRequiredMessage = "The reason for these changes must be specified";
@@ -47,7 +47,8 @@ public sealed partial class DistributionController
 
         if (string.Equals(command, "cancelAudit", StringComparison.OrdinalIgnoreCase))
         {
-            return RedirectToAction(nameof(Tabulations), new { year, monthId });
+            // Legacy Audit.aspx returns to wherever the save was heading, which for Apply is this page.
+            return RedirectAfterAmendResults(audit.PendingCommand, year, monthId, schemeId);
         }
 
         var page = await distributionApiClient.GetAmendResultsAsync(schemeId, cancellationToken);
@@ -117,8 +118,14 @@ public sealed partial class DistributionController
         }
 
         TempData.SetNotification(NotificationType.Success, "Amended Results updated successfully.");
-        return RedirectToAction(nameof(Tabulations), new { year, monthId });
+        return RedirectAfterAmendResults(effectiveCommand, year, monthId, schemeId);
     }
+
+    // Legacy BtnApply_Click saves and redisplays this scheme; BtnSave_Click leaves for Tabulations.
+    private RedirectToActionResult RedirectAfterAmendResults(string? command, int year, int monthId, Guid schemeId) =>
+        string.Equals(command, ApplyCommand, StringComparison.OrdinalIgnoreCase)
+            ? RedirectToAction(nameof(AmendResults), new { year, monthId, schemeId })
+            : RedirectToAction(nameof(Tabulations), new { year, monthId });
 
     // Reads back every input the page rendered; anything not posted is left out (and so unchanged).
     private static AmendResultsSaveRequest ToAmendResultsRequest(AmendResultsResponse page, AmendResultsViewModel model, string? auditWhy)

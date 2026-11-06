@@ -123,6 +123,7 @@ else
     btnCancel (discard, return to the contract list). *@
     <div class="govuk-button-group">
         <button class="govuk-button" data-module="govuk-button" type="submit" formaction="@Url.Action("ImportPermits", new { id = Model.ContractId, command = ImportPermitCommands.Save })">Save</button>
+        <button class="govuk-button govuk-button--secondary" data-module="govuk-button" type="submit" formaction="@Url.Action("ImportPermits", new { id = Model.ContractId, command = ImportPermitCommands.Apply })">Apply</button>
         <button class="govuk-button govuk-button--secondary" data-module="govuk-button" type="submit" formnovalidate formaction="@Url.Action("ImportPermits", new { id = Model.ContractId, command = ImportPermitCommands.Cancel })">Cancel</button>
     </div>
     </form>

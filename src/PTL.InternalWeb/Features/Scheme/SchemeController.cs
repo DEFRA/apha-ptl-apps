@@ -24,6 +24,11 @@ public class SchemeController(ISchemeApiClient schemeApiClient, ILookupApiClient
     // with most of it locked and Apply and Back in place of Save and Cancel.
     private const string PreviousYearView = "PreviousYear";
 
+    // Legacy Scheme.aspx has Apply beside Save on every tab: both save, but Apply stays on the scheme.
+    private const string ApplyCommand = "apply";
+
+    private static bool IsApply(string? command) => string.Equals(command, ApplyCommand, StringComparison.OrdinalIgnoreCase);
+
     private static readonly Action<ILogger, int, string?, int, int, Exception?> LogDisplayedSchemeListMessage =
         LoggerMessage.Define<int, string?, int, int>(
             LogLevel.Information,
@@ -173,7 +178,13 @@ public class SchemeController(ISchemeApiClient schemeApiClient, ILookupApiClient
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Create(SchemeFormViewModel model, string? testCommand = null, Guid? selectedItemTypeId = null, string? confirmation = null, CancellationToken cancellationToken = default)
+    public async Task<IActionResult> Create(
+        SchemeFormViewModel model,
+        string? testCommand = null,
+        Guid? selectedItemTypeId = null,
+        string? confirmation = null,
+        string? command = null,
+        CancellationToken cancellationToken = default)
     {
         if (ConfirmRemoval(testCommand, confirmation) is { } confirmationPage)
         {
@@ -213,7 +224,12 @@ public class SchemeController(ISchemeApiClient schemeApiClient, ILookupApiClient
 
         LogCreatedSchemeMessage(logger, result.Scheme.SchemeId, null);
         TempData.SetNotification(NotificationType.Success, "Scheme created successfully.");
-        return RedirectToAction(nameof(Index));
+
+        // Legacy Apply saves and stays on the scheme. The scheme now exists, so staying means its
+        // Edit page - redisplaying Create would insert a second scheme on the next Apply.
+        return IsApply(command)
+            ? RedirectToAction(nameof(Edit), new { id = result.Scheme.SchemeId })
+            : RedirectToAction(nameof(Index));
     }
 
     [HttpGet]
@@ -299,7 +315,14 @@ public class SchemeController(ISchemeApiClient schemeApiClient, ILookupApiClient
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Edit(Guid id, SchemeFormViewModel model, string? testCommand = null, Guid? selectedItemTypeId = null, string? confirmation = null, CancellationToken cancellationToken = default)
+    public async Task<IActionResult> Edit(
+        Guid id,
+        SchemeFormViewModel model,
+        string? testCommand = null,
+        Guid? selectedItemTypeId = null,
+        string? confirmation = null,
+        string? command = null,
+        CancellationToken cancellationToken = default)
     {
         if (ConfirmRemoval(testCommand, confirmation) is { } confirmationPage)
         {
@@ -317,7 +340,13 @@ public class SchemeController(ISchemeApiClient schemeApiClient, ILookupApiClient
             return await RedisplayEditAsync(model, formView: null, cancellationToken);
         }
 
-        return await SaveEditAsync(id, model, formView: null, () => RedirectToAction(nameof(Index)), cancellationToken);
+        // Legacy ButtonApply_Click saves and stays on the scheme; ButtonSave_Click leaves for the Scheme List.
+        return await SaveEditAsync(
+            id,
+            model,
+            formView: null,
+            () => IsApply(command) ? RedirectToAction(nameof(Edit), new { id }) : RedirectToAction(nameof(Index)),
+            cancellationToken);
     }
 
     // Legacy's Apply button on a Previous Year scheme: saves what that page leaves editable and stays on the

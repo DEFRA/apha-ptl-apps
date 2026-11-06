@@ -139,11 +139,12 @@ public class SchemePreviousYearRenderTests : IClassFixture<WebApplicationFactory
         return $"Expected a redirect, got {(int)response.StatusCode}: {string.Join("; ", errors)}";
     }
 
-    private static void AssertSaveAndCancel(SchemeFormPage page)
+    // The editable Create/Edit form: legacy Scheme.aspx offers Save, Apply and Cancel, and no Back.
+    private static void AssertSaveApplyAndCancel(SchemeFormPage page)
     {
         Assert.Equal("submit", Assert.Single(page.Tags("button"), b => b.Text == "Save")["type"]);
+        Assert.Equal("submit", Assert.Single(page.Tags("button"), b => b.Text == "Apply")["type"]);
         Assert.Equal("/Scheme/Index", Assert.Single(page.Tags("a"), a => a.Text == "Cancel")["href"]);
-        Assert.DoesNotContain(page.Tags("button"), b => b.Text == "Apply");
         Assert.DoesNotContain(page.Tags("a"), a => a.Text == "Back");
     }
 
@@ -578,7 +579,7 @@ public class SchemePreviousYearRenderTests : IClassFixture<WebApplicationFactory
 
         Assert.Equal("Edit Scheme", Assert.Single(page.Tags("h1")).Text);
         Assert.EndsWith($"/Scheme/Edit/{SchemeFormTestData.SchemeId}", Assert.Single(page.Tags("form"))["action"], StringComparison.Ordinal);
-        AssertSaveAndCancel(page);
+        AssertSaveApplyAndCancel(page);
 
         // Nothing is locked: the fields Previous Year locks are ordinary controls, and the only read-only or disabled ones are the usual few.
         Assert.Equal(SchemeFormTestData.Identifier, page.AssertEditable("Identifier")["value"]);
@@ -609,7 +610,7 @@ public class SchemePreviousYearRenderTests : IClassFixture<WebApplicationFactory
 
         Assert.Equal("Create Scheme", Assert.Single(page.Tags("h1")).Text);
         Assert.Equal("/Scheme/Create", Assert.Single(page.Tags("form"))["action"]);
-        AssertSaveAndCancel(page);
+        AssertSaveApplyAndCancel(page);
 
         Assert.Equal(string.Empty, page.AssertEditable("Identifier")["value"]);
         Assert.Equal(string.Empty, page.AssertEditable("Name")["value"]);

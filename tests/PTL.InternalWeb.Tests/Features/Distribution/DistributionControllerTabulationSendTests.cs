@@ -108,6 +108,75 @@ public class DistributionControllerTabulationSendTests
             notification.Message);
     }
 
+    // ---- Apply ----
+
+    // Legacy ButtonApply_Click wrote every staged send and re-bound the grid from the saved data.
+    [Theory]
+    [InlineData("apply")]
+    [InlineData("APPLY")]
+    public async Task Post_ApplySucceeds_SavesEveryStagedSendAndStaysOnTabulations(string command)
+    {
+        var apiClient = ApiClient();
+        var controller = CreateController(apiClient);
+
+        var result = await PostAsync(controller, command, staged: [Value(SchemeA, "SendToTestConsultant"), Value(SchemeB, "SendToResultsSignOff")]);
+
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal("Tabulations", redirect.ActionName);
+        Assert.Null(redirect.ControllerName);
+        Assert.Equal((2026, 5), ((int)redirect.RouteValues!["year"]!, (int)redirect.RouteValues["monthId"]!));
+        Assert.Equal(
+            [new TabulationStagedSendRequest(SchemeA, "SendToTestConsultant"), new TabulationStagedSendRequest(SchemeB, "SendToResultsSignOff")],
+            Assert.Single(apiClient.SavedTabulations));
+        var notification = controller.TempData.GetNotification();
+        Assert.Equal(NotificationType.Success, notification!.Type);
+        Assert.Equal("Tabulations updated successfully.", notification.Message);
+        Assert.Empty(apiClient.PreviewedTabulations);
+    }
+
+    [Fact]
+    public async Task Post_ApplyWithNothingStaged_StillSavesAndStaysOnTabulations()
+    {
+        var apiClient = ApiClient();
+
+        var result = await PostAsync(CreateController(apiClient), "apply");
+
+        Assert.Equal("Tabulations", Assert.IsType<RedirectToActionResult>(result).ActionName);
+        Assert.Empty(Assert.Single(apiClient.SavedTabulations));
+    }
+
+    [Fact]
+    public async Task Post_ApplyFails_ShowsTheSameConcurrencyErrorAndRedirectsBackToTabulations()
+    {
+        var apiClient = ApiClient();
+        apiClient.SaveTabulationsResult = false;
+        var controller = CreateController(apiClient);
+
+        var result = await PostAsync(controller, "apply", staged: [Value(SchemeA, "SendToTestConsultant")]);
+
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal("Tabulations", redirect.ActionName);
+        Assert.Equal((2026, 5), ((int)redirect.RouteValues!["year"]!, (int)redirect.RouteValues["monthId"]!));
+        var notification = controller.TempData.GetNotification();
+        Assert.Equal(NotificationType.Error, notification!.Type);
+        Assert.Equal(
+            "The changes could not be saved because the Tabulations have been changed by someone else. Please try again.",
+            notification.Message);
+    }
+
+    // A send is staged by its own button, never by Apply, so Apply must not also stage the posted send.
+    [Fact]
+    public async Task Post_ApplyAlongsideAStageValue_SavesWithoutStagingThatSend()
+    {
+        var apiClient = ApiClient(Send("Are you sure?"));
+
+        var result = await PostAsync(CreateController(apiClient), "apply", stage: Value(SchemeA, "SendToTestConsultant"));
+
+        Assert.Equal("Tabulations", Assert.IsType<RedirectToActionResult>(result).ActionName);
+        Assert.Empty(apiClient.StagedTabulationSends);
+        Assert.Empty(Assert.Single(apiClient.SavedTabulations));
+    }
+
     // ---- Stage ----
 
     [Fact]
