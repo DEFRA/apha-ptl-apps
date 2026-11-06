@@ -186,6 +186,26 @@ public class DistributionControllerTests
         Assert.Null(controller.TempData.GetNotification());
     }
 
+    // Legacy LeavePage() returns to MenuDistributions.aspx with the year still held in Session; the
+    // Dashboard is keyed by financial year, so January to March belong to the year before.
+    [Theory]
+    [InlineData("save", 4, 2026, 2026)]
+    [InlineData("save", 1, 2027, 2026)]
+    [InlineData("cancel", 4, 2026, 2026)]
+    [InlineData("cancel", 3, 2027, 2026)]
+    public async Task Schedule_Post_LeavingThePage_ReturnsToTheSelectedFinancialYear(string command, int monthId, int year, int expectedYear)
+    {
+        var apiClient = new FakeDistributionApiClient { SaveResult = new MonthlyDistributionScheduleSaveResult(true, new Dictionary<Guid, string[]>()) };
+        var controller = CreateController(apiClient);
+        var model = new MonthlyDistributionScheduleViewModel { YearId = year, MonthId = monthId, Schemes = [] };
+
+        var result = await controller.Schedule(year, monthId, model, command, CancellationToken.None);
+
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal(nameof(DistributionController.Index), redirect.ActionName);
+        Assert.Equal(expectedYear, redirect.RouteValues!["year"]);
+    }
+
     // Matches the save notification every other migrated save screen raises.
     [Theory]
     [InlineData("save")]
@@ -278,6 +298,43 @@ public class DistributionControllerTests
         Assert.Equal(nameof(DistributionController.Schedule), redirect.ActionName);
     }
 
+    // Legacy ButtonApply_Click: Save() then LoadMonth(True) - the month stays on screen and is
+    // re-read from the database, so the redirect has to carry the same month/year back.
+    [Fact]
+    public async Task Schedule_Post_ApplyCommand_PersistsEveryRowAndKeepsTheMonthContext()
+    {
+        var schemeId = Guid.NewGuid();
+        var apiClient = new FakeDistributionApiClient { SaveResult = new MonthlyDistributionScheduleSaveResult(true, new Dictionary<Guid, string[]>()) };
+        var controller = CreateController(apiClient);
+        var model = new MonthlyDistributionScheduleViewModel
+        {
+            YearId = 2027,
+            MonthId = 1,
+            Schemes =
+            [
+                new MonthlyDistributionScheduleRowViewModel
+                {
+                    MonthlyDistributionSchemeId = schemeId,
+                    DistributionDate = new DateTime(2027, 1, 1),
+                    OverseasPostingDate = new DateTime(2027, 1, 1),
+                    DeadlineDate = new DateTime(2027, 1, 5),
+                    ResultsIssueTargetDate = new DateTime(2027, 1, 10),
+                    IsCancelled = true,
+                },
+            ],
+        };
+
+        var result = await controller.Schedule(2027, 1, model, "apply", CancellationToken.None);
+
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal(nameof(DistributionController.Schedule), redirect.ActionName);
+        Assert.Equal(2027, redirect.RouteValues!["year"]);
+        Assert.Equal(1, redirect.RouteValues["monthId"]);
+        var saved = Assert.Single(apiClient.SavedRows);
+        Assert.Equal(schemeId, saved.MonthlyDistributionSchemeId);
+        Assert.True(saved.IsCancelled);
+    }
+
     [Fact]
     public async Task Schedule_Post_SaveFails_RedisplaysViewWithFieldErrors()
     {
@@ -368,6 +425,52 @@ public class DistributionControllerTests
         var view = Assert.IsType<ViewResult>(result);
         Assert.Equal("Schedule", view.ViewName);
         Assert.False(Assert.IsType<MonthlyDistributionScheduleViewModel>(view.Model).Schemes.Single().IsCancelled);
+    }
+
+    // MonthYearLabel is never posted back, so every redisplay has to re-derive it from the route or
+    // the heading renders as "Monthly Distributions - ".
+    [Fact]
+    public void ToggleCancelled_RestoresTheMonthYearHeading()
+    {
+        var schemeId = Guid.NewGuid();
+        var controller = CreateController(new FakeDistributionApiClient());
+        var model = new MonthlyDistributionScheduleViewModel
+        {
+            Schemes = [new MonthlyDistributionScheduleRowViewModel { MonthlyDistributionSchemeId = schemeId }],
+        };
+
+        var result = controller.ToggleCancelled(2026, 4, schemeId, model, ConfirmationFlow.Confirmed);
+
+        var redisplayed = Assert.IsType<MonthlyDistributionScheduleViewModel>(Assert.IsType<ViewResult>(result).Model);
+        Assert.Equal("Apr 2026", redisplayed.MonthYearLabel);
+        Assert.Equal(2026, redisplayed.YearId);
+        Assert.Equal(4, redisplayed.MonthId);
+    }
+
+    [Fact]
+    public async Task Schedule_Post_InvalidModelState_RestoresTheMonthYearHeading()
+    {
+        var controller = CreateController(new FakeDistributionApiClient());
+        controller.ModelState.AddModelError("Schemes[0].DistributionDate", "Distribution Date required.");
+        var model = new MonthlyDistributionScheduleViewModel();
+
+        var result = await controller.Schedule(2026, 12, model, "save", CancellationToken.None);
+
+        var redisplayed = Assert.IsType<MonthlyDistributionScheduleViewModel>(Assert.IsType<ViewResult>(result).Model);
+        Assert.Equal("Dec 2026", redisplayed.MonthYearLabel);
+    }
+
+    [Fact]
+    public async Task Schedule_Post_SaveFails_RestoresTheMonthYearHeading()
+    {
+        var apiClient = new FakeDistributionApiClient { SaveResult = null };
+        var controller = CreateController(apiClient);
+        var model = new MonthlyDistributionScheduleViewModel { Schemes = [] };
+
+        var result = await controller.Schedule(2027, 1, model, "apply", CancellationToken.None);
+
+        var redisplayed = Assert.IsType<MonthlyDistributionScheduleViewModel>(Assert.IsType<ViewResult>(result).Model);
+        Assert.Equal("Jan 2027", redisplayed.MonthYearLabel);
     }
 
     [Fact]

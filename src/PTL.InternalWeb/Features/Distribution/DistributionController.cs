@@ -139,13 +139,12 @@ public sealed partial class DistributionController(IDistributionApiClient distri
     {
         if (string.Equals(command, CancelCommand, StringComparison.OrdinalIgnoreCase))
         {
-            return RedirectToAction(nameof(Index));
+            return RedirectToAction(nameof(Index), new { year = FinancialYearFor(year, monthId) });
         }
 
         if (!ModelState.IsValid)
         {
-            model.YearId = year;
-            model.MonthId = monthId;
+            ApplyScheduleRedisplayContext(model, year, monthId);
             return View(model);
         }
 
@@ -173,8 +172,7 @@ public sealed partial class DistributionController(IDistributionApiClient distri
                 }
             }
 
-            model.YearId = year;
-            model.MonthId = monthId;
+            ApplyScheduleRedisplayContext(model, year, monthId);
             return View(model);
         }
 
@@ -185,7 +183,7 @@ public sealed partial class DistributionController(IDistributionApiClient distri
             return RedirectToAction(nameof(Schedule), new { year, monthId });
         }
 
-        return RedirectToAction(nameof(Index));
+        return RedirectToAction(nameof(Index), new { year = FinancialYearFor(year, monthId) });
     }
 
     // Preserves the legacy Cancel/Commence toggle exactly: dlMonth_RowCommand only flips the
@@ -225,10 +223,24 @@ public sealed partial class DistributionController(IDistributionApiClient distri
             row.IsCancelled = !row.IsCancelled;
         }
 
-        model.YearId = year;
-        model.MonthId = monthId;
+        ApplyScheduleRedisplayContext(model, year, monthId);
         return View(nameof(Schedule), model);
     }
+
+    // Re-applies the page context the form never posts back - legacy reads the month/year from
+    // Session on every request.
+    private static void ApplyScheduleRedisplayContext(MonthlyDistributionScheduleViewModel model, int year, int monthId)
+    {
+        model.YearId = year;
+        model.MonthId = monthId;
+        model.MonthYearLabel = ToMonthYearLabel(year, monthId);
+    }
+
+    // The dashboard is keyed by financial year (April to March); January to March belong to the year before.
+    private static int FinancialYearFor(int year, int monthId) => monthId < 4 ? year - 1 : year;
+
+    private static string ToMonthYearLabel(int year, int monthId) =>
+        new DateTime(year, monthId, 1, 0, 0, 0, DateTimeKind.Utc).ToString("MMM yyyy", System.Globalization.CultureInfo.InvariantCulture);
 
     // Sample Preparation - legacy Internal User/PreparationSheet.aspx. Reached from the
     // Dashboard's "Preparation: View" link.
@@ -1606,7 +1618,7 @@ public sealed partial class DistributionController(IDistributionApiClient distri
         {
             YearId = year,
             MonthId = monthId,
-            MonthYearLabel = new DateTime(year, monthId, 1, 0, 0, 0, DateTimeKind.Utc).ToString("MMM yyyy", System.Globalization.CultureInfo.InvariantCulture),
+            MonthYearLabel = ToMonthYearLabel(year, monthId),
             Schemes = [.. schedule.Schemes.Select(ToRowViewModel)],
         };
 
