@@ -1,0 +1,117 @@
+@model PTL.ExternalWeb.Features.Help.HelpViewModel
+@{
+    ViewData["Title"] = "Help";
+}
+
+<h1 class="govuk-heading-l">Help</h1>
+
+<h2 class="govuk-heading-m" id="contextHelpHome">Proficiency Testing</h2>
+<h3 class="govuk-heading-s">Home</h3>
+<p class="govuk-body">The Home page displays links to the different areas listed below. The list will vary depending upon the parts of the site to which you have access.</p>
+
+@if (Model.ShowParticipant)
+{
+    <h2 class="govuk-heading-m" id="contextHelpParticipantResults">Participant results</h2>
+
+    <h3 class="govuk-heading-s" id="contextHelpCurrentdistributions">Current distributions</h3>
+    <p class="govuk-body">This page shows a list of each distribution for which you can enter results. The list will not show any distributions that have not yet been dispatched or for which the deadline date has passed.</p>
+
+    <h3 class="govuk-heading-s" id="contextHelpResultsentry">Results entry</h3>
+    <p class="govuk-body">Each test on a distribution may have result items and method items.</p>
+    <p class="govuk-body">A result item should be tested for each sample on the test.</p>
+    <p class="govuk-body">A method item applies to the way the test was conducted.</p>
+    <p class="govuk-body">Both result and method items have a return format which describes the type of result expected.</p>
+
+    <table class="govuk-table">
+        <caption class="govuk-table__caption govuk-table__caption--s">Result formats</caption>
+        <thead class="govuk-table__head">
+            <tr class="govuk-table__row">
+                <th scope="col" class="govuk-table__header">Format string</th>
+                <th scope="col" class="govuk-table__header">Explanation and example</th>
+            </tr>
+        </thead>
+        <tbody class="govuk-table__body">
+            <tr class="govuk-table__row">
+                <td class="govuk-table__cell">X(12)</td>
+                <td class="govuk-table__cell">A string of up to 12 characters (including letters, number and spaces eg. "abc 123 XYZ")</td>
+            </tr>
+            <tr class="govuk-table__row">
+                <td class="govuk-table__cell">A(12)</td>
+                <td class="govuk-table__cell">A string of up to 12 letters, including spaces. Eg: "abc def ghij"</td>
+            </tr>
+            <tr class="govuk-table__row">
+                <td class="govuk-table__cell">9.999</td>
+                <td class="govuk-table__cell">A numeric result of 1 digit followed by up to 3 decimal places. Eg: "1.234"</td>
+            </tr>
+            <tr class="govuk-table__row">
+                <td class="govuk-table__cell">dd/mm/yyyy</td>
+                <td class="govuk-table__cell">A date field of day followed by month followed by year. Eg: "25/12/2007"</td>
+            </tr>
+            <tr class="govuk-table__row">
+                <td class="govuk-table__cell">Percentage</td>
+                <td class="govuk-table__cell">A percentage between 0 and 999 with 2 optional decimal places (the % symbol is also optional). Eg: "12.34%"</td>
+            </tr>
+            <tr class="govuk-table__row">
+                <td class="govuk-table__cell">1/9999</td>
+                <td class="govuk-table__cell">A fraction written as 1 over a number between 1 and 9999. Eg: "1/1234"</td>
+            </tr>
+            <tr class="govuk-table__row">
+                <td class="govuk-table__cell">999/999</td>
+                <td class="govuk-table__cell">A fraction written as a number between 1 and 999 over a number between 1 and 999</td>
+            </tr>
+            <tr class="govuk-table__row">
+                <td class="govuk-table__cell">X(3),X(3),X(3)</td>
+                <td class="govuk-table__cell">Three lots of three letters separated by commas. Eg: "ABC,DEF,GHI"</td>
+            </tr>
+            <tr class="govuk-table__row">
+                <td class="govuk-table__cell">Drop down list</td>
+                <td class="govuk-table__cell">An item selected from the list.</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h3 class="govuk-heading-s" id="contextHelpPreviousdistributions">Previous distributions</h3>
+    <p class="govuk-body">This page offers fields that specify criteria to search for a previous distribution in which results were entered.</p>
+    <p class="govuk-body">The search can be performed on the year and month of the distribution, the distribution reference and the scheme name.</p>
+    <p class="govuk-body">The more criteria that are specified the more exact the search will be. The table below will list all distributions that match the specified criteria.</p>
+
+    <h3 class="govuk-heading-s" id="contextHelpViewresults">View results</h3>
+    <p class="govuk-body">This page provides a view of the results that were entered for the given distribution.</p>
+}
+
+@if (Model.ShowTestConsultant)
+{
+    <h2 class="govuk-heading-m" id="contextHelpTestConsultantComments">Test consultant comments</h2>
+
+    <h3 class="govuk-heading-s" id="contextHelpDistributions">Distributions</h3>
+    <p class="govuk-body">This page offers fields that specify criteria to search for distributions for which you are a test consultant.</p>
+    <p class="govuk-body">The search can be performed on the distribution reference and the scheme name.</p>
+    <p class="govuk-body">The more criteria that are specified the more exact the search will be. The table below will list all distributions that match the specified criteria.</p>
+    <p class="govuk-body">An item in the table will display "Comments Required" if comments have yet to be entered.</p>
+    <p class="govuk-body">Please note that if you are the designated secondary or deputy test consultant you will still be able to enter comments if the primary test consultant is unavailable.</p>
+
+    <h3 class="govuk-heading-s" id="contextHelpEntercomments">Comments entry</h3>
+    <p class="govuk-body">The three tabs provide information to enable test consultants to provide commentary on a distribution.</p>
+    <p class="govuk-body">The first tab shows the report about which your comments should be written.</p>
+    <p class="govuk-body">The second tab shows the full set of results displaying all result items and all method items for all tests. It also shows a table with extra information about participants which may be useful.</p>
+    <p class="govuk-body">The third tab shows detailed sample information if it is available.</p>
+    <p class="govuk-body">Samples can be filtered out of the report by unselecting the corresponding check box and redrawing the reports. The reports can be redrawn by pressing the Draw Report button.</p>
+    <p class="govuk-body">The Full Report can be exported to excel by pressing the Export to Excel button.</p>
+    <p class="govuk-body">Saving the test consultant comment by pressing the Save button allows the test consultant to come back to the comments and alter them later. Once the comments are finished they should be submitted by pressing the Save and Submit button. The comments cannot be modified after they have been submitted.</p>
+}
+
+@if (Model.ShowViewer)
+{
+    <h2 class="govuk-heading-m" id="contextHelpReportViewing">Report viewing</h2>
+
+    <h3 class="govuk-heading-s" id="contextHelpReports">Reports</h3>
+    <p class="govuk-body">This page offers fields that specify criteria to search for a published report.</p>
+    <p class="govuk-body">The search can be performed on the year and month of the distribution, the distribution reference and the scheme name.</p>
+    <p class="govuk-body">The more criteria that are specified the more exact the search will be. The table below will list all reports that match the specified criteria.</p>
+
+    <h3 class="govuk-heading-s" id="contextHelpViewreports">View report</h3>
+    <p class="govuk-body">This page shows the selected report. Participants are identified by either their lab code or external references on the left.</p>
+    <p class="govuk-body">If the scheme involves an assessment step the report shows the categories, criteria, assessment scores and assessment comments. Links to bar charts showing the frequency of assessment scores are present if applicable.</p>
+    <p class="govuk-body">Results that were not entered and nil returns are shown in grey.</p>
+    <p class="govuk-body">A PDF document of the report can be obtained by pressing the Generate PDF button.</p>
+}

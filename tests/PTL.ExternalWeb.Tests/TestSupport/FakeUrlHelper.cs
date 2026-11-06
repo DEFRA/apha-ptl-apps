@@ -4,11 +4,11 @@ using Microsoft.AspNetCore.Mvc.Routing;
 namespace PTL.ExternalWeb.Tests.TestSupport;
 
 // Minimal IUrlHelper so controller unit tests can exercise Url.IsLocalUrl without a real routing context.
-internal sealed class FakeUrlHelper : IUrlHelper
+internal sealed class FakeUrlHelper(bool actionReturnsNull = false) : IUrlHelper
 {
     public ActionContext ActionContext { get; } = new();
 
-    public string? Action(UrlActionContext actionContext) => $"/{actionContext.Controller}/{actionContext.Action}";
+    public string? Action(UrlActionContext actionContext) => actionReturnsNull ? null : $"/{actionContext.Controller}/{actionContext.Action}";
 
     public string? Content(string? contentPath) => contentPath;
 

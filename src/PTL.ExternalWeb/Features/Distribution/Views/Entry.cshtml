@@ -83,17 +83,22 @@
                                 continue;
                             }
 
+                            var entryField = ResultEntryField.For(ViewData.ModelState, $"Tests[{t}].Samples[{s}].Values[{valueIndex}].Result");
+
                             <tr class="govuk-table__row">
                                 <th scope="row" class="govuk-table__header govuk-!-font-weight-regular">@resultItem.Name</th>
                                 <td class="govuk-table__cell">
                                     <input type="hidden" asp-for="Tests[t].Samples[s].Values[valueIndex].SampleResultItemId" />
                                     <input type="hidden" asp-for="Tests[t].Samples[s].Values[valueIndex].TestResultItemId" />
-                                    <div class="govuk-form-group govuk-!-margin-bottom-0">
+                                    <div class="@entryField.GroupClass">
                                         <label class="govuk-label govuk-visually-hidden" asp-for="Tests[t].Samples[s].Values[valueIndex].Result">@resultItem.Name, sample @sample.SampleNumber</label>
-                                        <span asp-validation-for="Tests[t].Samples[s].Values[valueIndex].Result" class="govuk-error-message"></span>
+                                        @if (entryField.Invalid)
+                                        {
+                                            <p id="@entryField.ErrorId" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @entryField.Message</p>
+                                        }
                                         @if (resultItem.IsDropdown)
                                         {
-                                            <select class="govuk-select" asp-for="Tests[t].Samples[s].Values[valueIndex].Result">
+                                            <select class="@entryField.SelectClass" aria-describedby="@entryField.DescribedBy" asp-for="Tests[t].Samples[s].Values[valueIndex].Result">
                                                 <option value="">- Please Select -</option>
                                                 @foreach (var option in resultItem.DropdownOptions)
                                                 {
@@ -103,11 +108,11 @@
                                         }
                                         else
                                         {
-                                            <input class="govuk-input" maxlength="8000" asp-for="Tests[t].Samples[s].Values[valueIndex].Result" />
+                                            <input class="@entryField.InputClass" aria-describedby="@entryField.DescribedBy" maxlength="8000" asp-for="Tests[t].Samples[s].Values[valueIndex].Result" />
                                         }
                                     </div>
                                 </td>
-                                <td class="govuk-table__cell">@(resultItem.IsDropdown ? string.Empty : resultItem.RequiredFormat)</td>
+                                <td class="govuk-table__cell">@resultItem.RequiredFormatHint</td>
                             </tr>
                         }
                     </tbody>
@@ -135,16 +140,20 @@
                         @for (var m = 0; m < test.MethodItems.Count; m++)
                         {
                             var methodItem = test.MethodItems[m];
+                            var entryField = ResultEntryField.For(ViewData.ModelState, $"Tests[{t}].MethodItems[{m}].Result");
                             <tr class="govuk-table__row">
                                 <th scope="row" class="govuk-table__header govuk-!-font-weight-regular">@methodItem.Name</th>
                                 <td class="govuk-table__cell">
                                     <input type="hidden" asp-for="Tests[t].MethodItems[m].TestMethodItemId" />
-                                    <div class="govuk-form-group govuk-!-margin-bottom-0">
+                                    <div class="@entryField.GroupClass">
                                         <label class="govuk-label govuk-visually-hidden" asp-for="Tests[t].MethodItems[m].Result">@methodItem.Name</label>
-                                        <span asp-validation-for="Tests[t].MethodItems[m].Result" class="govuk-error-message"></span>
+                                        @if (entryField.Invalid)
+                                        {
+                                            <p id="@entryField.ErrorId" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @entryField.Message</p>
+                                        }
                                         @if (methodItem.IsDropdown)
                                         {
-                                            <select class="govuk-select" asp-for="Tests[t].MethodItems[m].Result">
+                                            <select class="@entryField.SelectClass" aria-describedby="@entryField.DescribedBy" asp-for="Tests[t].MethodItems[m].Result">
                                                 <option value="">- Please Select -</option>
                                                 @foreach (var option in methodItem.DropdownOptions)
                                                 {
@@ -154,11 +163,11 @@
                                         }
                                         else
                                         {
-                                            <input class="govuk-input" maxlength="8000" asp-for="Tests[t].MethodItems[m].Result" />
+                                            <input class="@entryField.InputClass" aria-describedby="@entryField.DescribedBy" maxlength="8000" asp-for="Tests[t].MethodItems[m].Result" />
                                         }
                                     </div>
                                 </td>
-                                <td class="govuk-table__cell">@(methodItem.IsDropdown ? string.Empty : methodItem.RequiredFormat)</td>
+                                <td class="govuk-table__cell">@methodItem.RequiredFormatHint</td>
                             </tr>
                         }
                     </tbody>

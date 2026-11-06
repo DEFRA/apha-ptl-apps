@@ -143,6 +143,7 @@ public static class NavigationProvider
     private static readonly Dictionary<string, BreadcrumbCrumb[]> Trails = new(StringComparer.OrdinalIgnoreCase)
     {
         ["Distribution/Current"] = [new("Current distributions")],
+        ["Help/Index"] = [new("Help")],
         ["Distribution/Entry"] = [new("Current distributions", DistributionControllerName, "Current"), new("Results entry")],
         ["Distribution/Previous"] = [new("Previous distributions")],
         ["Distribution/Results"] = [new("Previous distributions", DistributionControllerName, "Previous"), new("View results")],

@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Playwright;
 using PTL.ApiClient.Distribution;
 using PTL.Contracts.Distribution;
 using PTL.ExternalWeb.Authorization;
@@ -16,7 +17,10 @@ namespace PTL.ExternalWeb.Features.Tabulation;
 // to the caller's own access by PTL.Api's "for-user" tabulation endpoints
 // (ParticipantTabulationService), never by trusting a bare id from the URL.
 [Authorize(Policy = ExternalPolicies.Viewer)]
-public sealed class TabulationController(IDistributionApiClient distributionApiClient) : Controller
+public sealed partial class TabulationController(
+    IDistributionApiClient distributionApiClient,
+    ITabulationPdfService tabulationPdfService,
+    ILogger<TabulationController> logger) : Controller
 {
     private static readonly string[] ValidSortColumns = ["reference", "schemeCode", "schemeName", "tabulationName", "distributionDate"];
     private static readonly string[] ValidSortDirections = ["asc", "desc"];
@@ -101,11 +105,51 @@ public sealed class TabulationController(IDistributionApiClient distributionApiC
         return File(file.Content, file.ContentType);
     }
 
-    // PDF export is a separate Reporting workstream deliverable - placeholder only until then.
-    public IActionResult GeneratePdf(Guid publishedTabulationId) => View("_ComingSoonBody", "Generate PDF");
+    [HttpGet]
+    public async Task<IActionResult> GeneratePdf(Guid publishedTabulationId, CancellationToken cancellationToken)
+    {
+        var (participantId, viewerId, testConsultantId) = CallerIds();
+        var report = await distributionApiClient.GetPublishedTabulationForUserAsync(
+            publishedTabulationId, participantId, viewerId, testConsultantId, cancellationToken);
+        if (report is null)
+        {
+            return NotFound();
+        }
+
+        try
+        {
+            var model = new TabulationReportPageViewModel(report);
+            var pdf = await tabulationPdfService.GenerateAsync(ControllerContext, model, cancellationToken);
+            return File(pdf, "application/pdf", BuildPdfFileName(report));
+        }
+        catch (Exception exception) when (exception is PlaywrightException or InvalidOperationException)
+        {
+            LogPdfGenerationFailed(exception, publishedTabulationId);
+            return StatusCode(StatusCodes.Status503ServiceUnavailable);
+        }
+    }
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Failed to generate tabulation PDF for published tabulation {PublishedTabulationId}.")]
+    private partial void LogPdfGenerationFailed(Exception exception, Guid publishedTabulationId);
 
     private (Guid? ParticipantId, Guid? ViewerId, Guid? TestConsultantId) CallerIds() =>
         (User.GetParticipantId(), User.GetViewerId(), User.GetTestConsultantId());
+
+    // Legacy ShowPrintableTabulation names the file {Distribution}_{SchemeName}_{DistributionDate}.pdf.
+    private static string BuildPdfFileName(TabulationReportResponse report)
+    {
+        var heading = report.DistributionHeading.Trim();
+        var space = heading.IndexOf(' ');
+        var dateSeparator = report.DistributionDateText.LastIndexOf(": ", StringComparison.Ordinal);
+        var date = dateSeparator < 0 ? report.DistributionDateText : report.DistributionDateText[(dateSeparator + 2)..];
+
+        var name = space < 0 || date.Length == 0
+            ? report.TabulationName
+            : $"{heading[..space]}_{heading[(space + 1)..]}_{date}";
+
+        var safe = string.Concat(name.Select(c => Path.GetInvalidFileNameChars().Contains(c) ? '_' : c)).Trim();
+        return string.IsNullOrWhiteSpace(safe) ? "tabulation-report.pdf" : $"{safe}.pdf";
+    }
 
     private static List<PublishedTabulationSummaryResponse> Filter(
         IReadOnlyList<PublishedTabulationSummaryResponse> tabulations,
