@@ -29,7 +29,7 @@ public interface IHtmlToPdfRenderer
 // Seam over the Playwright driver so the render/retry logic can be tested without a real browser.
 internal interface IPdfBrowserLauncher : IAsyncDisposable
 {
-    Task<IBrowser> LaunchAsync(string? channel, IReadOnlyList<string> args);
+    Task<IBrowser> LaunchAsync(string? channel);
 }
 
 [ExcludeFromCodeCoverage(Justification = "Thin wrapper over the Playwright driver; needs a real Chromium install.")]
@@ -37,14 +37,13 @@ internal sealed class PlaywrightBrowserLauncher : IPdfBrowserLauncher
 {
     private IPlaywright? playwright;
 
-    public async Task<IBrowser> LaunchAsync(string? channel, IReadOnlyList<string> args)
+    public async Task<IBrowser> LaunchAsync(string? channel)
     {
         playwright ??= await Playwright.CreateAsync();
         return await playwright.Chromium.LaunchAsync(new BrowserTypeLaunchOptions
         {
             Headless = true,
-            Channel = channel,
-            Args = args
+            Channel = channel
         });
     }
 
@@ -64,7 +63,6 @@ public sealed partial class PlaywrightHtmlToPdfRenderer : IHtmlToPdfRenderer, IA
     private readonly SemaphoreSlim renderSlots;
     private readonly SemaphoreSlim browserLock = new(1, 1);
     private readonly string? browserChannel;
-    private readonly string[] browserArgs;
 
     private IBrowser? browser;
 
@@ -79,7 +77,6 @@ public sealed partial class PlaywrightHtmlToPdfRenderer : IHtmlToPdfRenderer, IA
         this.launcher = launcher;
         renderSlots = new SemaphoreSlim(Math.Max(1, configuration.GetValue("PdfGeneration:MaxConcurrentRenders", 2)));
         browserChannel = configuration["PdfGeneration:BrowserChannel"];
-        browserArgs = [.. (configuration.GetSection("PdfGeneration:ChromiumArgs").Get<string[]>() ?? []).Where(a => !string.IsNullOrWhiteSpace(a)).Select(a => a.Trim())];
     }
 
     public async Task<byte[]> RenderAsync(string html, PdfRenderOptions? options = null, CancellationToken cancellationToken = default)
@@ -142,7 +139,7 @@ public sealed partial class PlaywrightHtmlToPdfRenderer : IHtmlToPdfRenderer, IA
                 await CloseQuietlyAsync(existing);
             }
 
-            browser = await launcher.LaunchAsync(string.IsNullOrWhiteSpace(browserChannel) ? null : browserChannel.Trim(), browserArgs);
+            browser = await launcher.LaunchAsync(string.IsNullOrWhiteSpace(browserChannel) ? null : browserChannel.Trim());
             return browser;
         }
         finally

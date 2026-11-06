@@ -94,34 +94,6 @@ public class PlaywrightHtmlToPdfRendererTests
     }
 
     [Fact]
-    public async Task RenderAsync_PassesTheConfiguredChromiumArgumentsToTheLauncher()
-    {
-        var launcher = new FakePdfBrowserLauncher(new FakePdfBrowser());
-        var settings = new Dictionary<string, string?>
-        {
-            ["PdfGeneration:ChromiumArgs:0"] = " --disable-gpu ",
-            ["PdfGeneration:ChromiumArgs:1"] = "  ",
-            ["PdfGeneration:ChromiumArgs:2"] = "--enable-logging=stderr"
-        };
-        await using var renderer = CreateRenderer(launcher, settings);
-
-        await renderer.RenderAsync("<p>x</p>");
-
-        Assert.Equal(["--disable-gpu", "--enable-logging=stderr"], Assert.Single(launcher.Args));
-    }
-
-    [Fact]
-    public async Task RenderAsync_WithoutChromiumArguments_LaunchesWithNone()
-    {
-        var launcher = new FakePdfBrowserLauncher(new FakePdfBrowser());
-        await using var renderer = CreateRenderer(launcher);
-
-        await renderer.RenderAsync("<p>x</p>");
-
-        Assert.Empty(Assert.Single(launcher.Args));
-    }
-
-    [Fact]
     public async Task RenderAsync_WhenTheBrowserDisconnected_ClosesItAndLaunchesANewOne()
     {
         var first = new FakePdfBrowser();

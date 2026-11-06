@@ -31,8 +31,7 @@ WORKDIR /app
 EXPOSE 8081
 ENV ASPNETCORE_URLS=http://+:8081 \
     DOTNET_EnableDiagnostics=0 \
-    PLAYWRIGHT_BROWSERS_PATH=C:\\ms-playwright \
-    PdfGeneration__ChromiumArgs__0=--disable-gpu
+    PLAYWRIGHT_BROWSERS_PATH=C:\\ms-playwright
 
 # FortiGate egress performs TLS inspection on outbound calls to CIDM/Azure AD B2C (b2clogin.com) -
 # without trusting its inspection CA, the OIDC handler's metadata/JWKS fetch fails with PartialChain.
