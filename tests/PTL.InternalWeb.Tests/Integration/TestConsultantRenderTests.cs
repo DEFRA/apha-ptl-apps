@@ -82,6 +82,8 @@ public class TestConsultantRenderTests : IClassFixture<WebApplicationFactory<Pro
         Assert.Contains("View Results / Comments", html, StringComparison.Ordinal);
         Assert.Contains("<option value=\"2026\" selected=\"selected\">2026</option>", html, StringComparison.Ordinal);
         Assert.Contains("<option value=\"2025\">2025</option>", html, StringComparison.Ordinal);
+        Assert.Contains("<details class=\"govuk-details\">", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("<details class=\"govuk-details\" open", html, StringComparison.Ordinal);
     }
 
     [Fact]

@@ -107,15 +107,15 @@ public class AssessorRenderTests(WebApplicationFactory<Program> rawFactory) : IC
         Assert.Equal(2020, Assert.Single(_apiClient.RequestedMenus));
     }
 
+    // Legacy MenuAssessor opened every month (tree state "1"); Test Consultant and Results Sign-off started closed.
     [Fact]
-    public async Task Menu_EachMonthStartsCollapsedAndListsItsDistributionsAndTests()
+    public async Task Menu_EachMonthStartsOpenAsLegacyDidAndListsItsDistributionsAndTests()
     {
         Menu();
 
         var html = await GetAsync("/Assessor");
 
-        Assert.Contains("<details class=\"govuk-details\">", html, StringComparison.Ordinal);
-        Assert.DoesNotContain(" open", Regex.Match(html, "<details[^>]*>").Value, StringComparison.Ordinal);
+        Assert.Contains("<details class=\"govuk-details\" open>", html, StringComparison.Ordinal);
         Assert.Contains("<span class=\"govuk-details__summary-text\">February 2021</span>", html, StringComparison.Ordinal);
         Assert.Contains("<h2 class=\"govuk-heading-s\">14468/A/HI: PT0166 Cellular Pathology Technique (CPT)</h2>", html, StringComparison.Ordinal);
         Assert.Contains("Giemsa", html, StringComparison.Ordinal);
