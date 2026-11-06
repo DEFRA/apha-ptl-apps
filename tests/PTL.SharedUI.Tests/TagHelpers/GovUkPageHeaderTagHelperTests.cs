@@ -41,7 +41,7 @@ public class GovUkPageHeaderTagHelperTests
             TextWriter.Null,
             new HtmlHelperOptions());
 
-        var helper = new GovUkPageHeaderTagHelper(provider.GetRequiredService<LinkGenerator>(), provider.GetRequiredService<IUrlHelperFactory>())
+        var helper = new GovUkPageHeaderTagHelper(provider.GetRequiredService<IUrlHelperFactory>())
         {
             ServiceName = serviceName,
             LogoStyle = logoStyle,
@@ -74,17 +74,17 @@ public class GovUkPageHeaderTagHelperTests
         Assert.Contains("AphaLogo.png", html, StringComparison.Ordinal);
     }
 
-    // No "Home"/"Index" endpoint is registered in this minimal host, so LinkGenerator can't
-    // resolve a path - exercises the "?? \"/\"" fallback rather than a real resolved route.
+    // The Home breadcrumb is the single Home link; a second one on the logo is a WAVE "Redundant link".
     [Fact]
-    public async Task ProcessAsync_NoMatchingRoute_FallsBackToRootHomeLink()
+    public async Task ProcessAsync_LogoIsDecorativeImageWithoutLink()
     {
         var (helper, context, output) = Create("Proficiency Testing - External", null, string.Empty);
 
         await helper.ProcessAsync(context, output);
 
         var html = output.Content.GetContent();
-        Assert.Contains("href=\"/\"", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("<a ", html, StringComparison.Ordinal);
+        Assert.Matches("<img [^>]*alt=\"\"", html);
     }
 
     [Fact]
