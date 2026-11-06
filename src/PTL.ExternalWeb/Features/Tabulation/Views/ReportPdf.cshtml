@@ -92,20 +92,58 @@
             background-color: #eeeeee;
         }
 
+        .ptl-pdf-header-image {
+            display: block;
+            width: 70%;
+            margin: 0 0 8px;
+        }
+
+        .ptl-pdf-title-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            gap: 24px;
+        }
+
+        .ptl-pdf-distribution-date {
+            margin: 0;
+            font-weight: bold;
+            white-space: nowrap;
+        }
+
+        .ptl-pdf-footer {
+            margin-top: 1em;
+            break-inside: avoid;
+        }
+
+        .ptl-pdf-footer-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            align-items: start;
+            gap: 24px;
+        }
+
         .ptl-tabulation-ukas {
-            margin: 1em 0;
-            text-align: left;
+            text-align: center;
         }
 
         .ptl-tabulation-ukas img {
             display: block;
-            margin-bottom: 4px;
+            margin: 0 auto 4px;
+        }
+
+        .cellVersionDate {
+            text-align: left;
+        }
+
+        .cellTabulationSignature,
+        .cellTabulationSignature2 {
+            text-align: right;
         }
 
         .cellVersionDate,
         .cellTabulationSignature,
         .cellTabulationSignature2 {
-            text-align: left;
             font-size: 8.5pt;
             color: black;
             font-weight: normal;
@@ -138,10 +176,16 @@
     </style>
 </head>
 <body>
-    <h1>Report</h1>
-    <h2>@report.Title</h2>
+    @if (!string.IsNullOrWhiteSpace(Model.HeaderImageDataUri))
+    {
+        <img class="ptl-pdf-header-image" src="@Model.HeaderImageDataUri" alt="VETQAS and APHA Scientific" />
+    }
+
+    <div class="ptl-pdf-title-row">
+        <h2>@report.Title</h2>
+        <p class="ptl-pdf-distribution-date">@report.DistributionDateText</p>
+    </div>
     <h3>@report.TabulationName</h3>
-    <p>@report.DistributionDateText</p>
 
     @foreach (var table in report.Tables)
     {
@@ -177,31 +221,35 @@
             <p><strong>Supporting Document: </strong>@report.Attachment.FileName</p>
         }
 
-        @if (report.Signatory is { } versionSignatory)
+        @if (report.Signatory is not null || report.ShowUkasLogo)
         {
-            <div class="cellVersionDate">@versionSignatory.VersionText</div>
-        }
-
-        @if (report.ShowUkasLogo)
-        {
-            <div class="ptl-tabulation-ukas">
-                @if (!string.IsNullOrWhiteSpace(Model.UkasLogoDataUri))
+            <div class="ptl-pdf-footer">
+                @if (report.ShowUkasLogo)
                 {
-                    <img src="@Model.UkasLogoDataUri" alt="UKAS accredited" width="60" />
+                    <div class="ptl-tabulation-ukas">
+                        @if (!string.IsNullOrWhiteSpace(Model.UkasLogoDataUri))
+                        {
+                            <img src="@Model.UkasLogoDataUri" alt="UKAS accredited" width="60" />
+                        }
+                        <div>0004</div>
+                    </div>
                 }
-                <div>0004</div>
-            </div>
-        }
 
-        @if (report.Signatory is { } signatory)
-        {
-            <div class="cellTabulationSignature">
-                <div>@signatory.Signatory</div>
-                @foreach (var line in signatory.AddressLines)
-                {
-                    <div class="cellTabulationSignature2">@line</div>
-                }
-                <div class="cellTabulationSignature2 cellTabulationIssued">@signatory.IssuedText</div>
+                <div class="ptl-pdf-footer-row">
+                    <div class="cellVersionDate">@report.Signatory?.VersionText</div>
+
+                    <div class="cellTabulationSignature">
+                        @if (report.Signatory is { } signatory)
+                        {
+                            <div>@signatory.Signatory</div>
+                            @foreach (var line in signatory.AddressLines)
+                            {
+                                <div class="cellTabulationSignature2">@line</div>
+                            }
+                            <div class="cellTabulationSignature2 cellTabulationIssued">@signatory.IssuedText</div>
+                        }
+                    </div>
+                </div>
             </div>
         }
     </div>
