@@ -3,18 +3,17 @@ using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.AspNetCore.Mvc.Routing;
 using Microsoft.AspNetCore.Mvc.ViewFeatures;
 using Microsoft.AspNetCore.Razor.TagHelpers;
-using Microsoft.AspNetCore.Routing;
 
 namespace PTL.SharedUI.TagHelpers;
 
 /// <summary>
 /// Renders the GOV.UK header markup shared by InternalWeb and ExternalWeb's _Header.cshtml
-/// partials (logo, service name, Home link) - only the authenticated-user info section (different
+/// partials (logo, service name) - only the authenticated-user info section (different
 /// per app: InternalWeb's simple "Signed in as", ExternalWeb's lab-code/sign-out nav) is left to
 /// the caller as child content, spliced into the still-open service-navigation wrapper markup.
 /// </summary>
 [HtmlTargetElement("govuk-page-header")]
-public class GovUkPageHeaderTagHelper(LinkGenerator linkGenerator, IUrlHelperFactory urlHelperFactory) : TagHelper
+public class GovUkPageHeaderTagHelper(IUrlHelperFactory urlHelperFactory) : TagHelper
 {
     public string ServiceName { get; set; } = string.Empty;
 
@@ -41,17 +40,14 @@ public class GovUkPageHeaderTagHelper(LinkGenerator linkGenerator, IUrlHelperFac
     {
         var childContent = await output.GetChildContentAsync();
 
-        // LinkGenerator/IUrlHelper (rather than hardcoded absolute paths) so the Home link and
-        // logo image still resolve correctly if the app is ever hosted behind a reverse proxy
-        // with a path prefix.
-        var homeUrl = linkGenerator.GetPathByAction(ViewContext.HttpContext, action: "Index", controller: "Home") ?? "/";
+        // IUrlHelper (rather than a hardcoded absolute path) so the logo image still resolves
+        // behind a reverse proxy with a path prefix.
         var logoUrl = urlHelperFactory.GetUrlHelper(ViewContext).Content("~/assets/images/AphaLogo.png");
 
         // HTML-encoded like Razor's @Model.ServiceName would auto-encode it, since this is built
         // as a raw HTML string rather than going through Razor's output encoding.
         var encodedServiceName = WebUtility.HtmlEncode(ServiceName);
         var encodedLogoStyle = WebUtility.HtmlEncode(LogoStyle);
-        var encodedHomeUrl = WebUtility.HtmlEncode(homeUrl);
         var encodedLogoUrl = WebUtility.HtmlEncode(logoUrl);
 
         var helpLink = !string.IsNullOrWhiteSpace(HelpLinkText) && !string.IsNullOrWhiteSpace(HelpLinkHref)
@@ -91,9 +87,7 @@ public class GovUkPageHeaderTagHelper(LinkGenerator linkGenerator, IUrlHelperFac
                     <div class="govuk-width-container">
                         <div class="govuk-service-navigation__container">
                             <span class="govuk-service-navigation__service-name">
-                                <a href="{encodedHomeUrl}" class="govuk-service-navigation__link govuk-link-image" aria-label="Home">
-                                    <img src="{encodedLogoUrl}" alt="APHA" style="{encodedLogoStyle}" />
-                                </a>
+                                <img src="{encodedLogoUrl}" alt="" style="{encodedLogoStyle}" />
                             </span>
             """);
         output.Content.AppendHtml(childContent);

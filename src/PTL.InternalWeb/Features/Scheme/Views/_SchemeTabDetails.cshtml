@@ -122,9 +122,17 @@
 }
 else
 {
+@if (Model.IsPreviousYear)
+{
+    <partial name="_SchemeLockedField" model="@((Kind: "text", Field: nameof(Model.Identifier), Label: "Identifier", Value: Model.Identifier, Text: "", Width: "govuk-input--width-10"))" />
+    <partial name="_SchemeLockedField" model="@((Kind: "text", Field: nameof(Model.Name), Label: "Name", Value: Model.Name, Text: "", Width: ""))" />
+}
+else
+{
     <govuk-input asp-for="Identifier" label="Identifier" input-class="govuk-input govuk-input--width-10" />
 
-<govuk-input asp-for="Name" label="Name" />
+    <govuk-input asp-for="Name" label="Name" />
+}
 
 <div class="govuk-form-group">
     <label class="govuk-label govuk-label--s" for="YearLabel">Year</label>
@@ -137,9 +145,17 @@ else
     <input id="StartDate" class="govuk-input govuk-input--width-10" type="text" value="@(Model.StartDate?.ToString("d MMMM yyyy") ?? string.Empty)" readonly />
 </div>
 
-<govuk-select asp-for="ScheduleId" label="Schedule" asp-items="Model.ScheduleOptions" option-label="- Please Select -" />
+@if (Model.IsPreviousYear)
+{
+    <partial name="_SchemeLockedField" model="@((Kind: "select", Field: nameof(Model.ScheduleId), Label: "Schedule", Value: Model.ScheduleId?.ToString(), Text: OptionText(Model.ScheduleOptions, Model.ScheduleId), Width: "govuk-!-width-one-half"))" />
+    <partial name="_SchemeLockedField" model="@((Kind: "select", Field: nameof(Model.ScheduleCodeId), Label: "Schedule Code", Value: Model.ScheduleCodeId?.ToString(), Text: OptionText(Model.ScheduleCodeOptions, Model.ScheduleCodeId), Width: "govuk-!-width-one-half"))" />
+}
+else
+{
+    <govuk-select asp-for="ScheduleId" label="Schedule" asp-items="Model.ScheduleOptions" option-label="- Please Select -" />
 
-<govuk-select asp-for="ScheduleCodeId" label="Schedule Code" asp-items="Model.ScheduleCodeOptions" option-label="- Please Select -" />
+    <govuk-select asp-for="ScheduleCodeId" label="Schedule Code" asp-items="Model.ScheduleCodeOptions" option-label="- Please Select -" />
+}
 
 @if (Model.SchemeId is not null)
 {
@@ -163,7 +179,7 @@ else
                    an adjacent sibling selector - nothing may sit between the checkbox and its label,
                    so the hidden companion goes after the label. *@
                 <div class="govuk-checkboxes__item">
-                    @if (month.CanEdit)
+                    @if (month.CanEdit && !Model.IsPreviousYear)
                     {
                         <input class="govuk-checkboxes__input" type="checkbox" id="@month.Property" name="@month.Property" value="true" checked="@monthValues[month.Property]" />
                         <label class="govuk-label govuk-checkboxes__label" for="@month.Property">@month.Label</label>
@@ -179,10 +195,17 @@ else
                     }
                 </div>
             }
-            <div class="govuk-checkboxes__item">
-                <input class="govuk-checkboxes__input" asp-for="DistributionAsAvailable" />
-                <label class="govuk-label govuk-checkboxes__label" asp-for="DistributionAsAvailable">As Available</label>
-            </div>
+            @if (Model.IsPreviousYear)
+            {
+                <partial name="_SchemeLockedField" model="@((Kind: "checkbox", Field: nameof(Model.DistributionAsAvailable), Label: "As Available", Value: Model.DistributionAsAvailable.ToString(), Text: "", Width: ""))" />
+            }
+            else
+            {
+                <div class="govuk-checkboxes__item">
+                    <input class="govuk-checkboxes__input" asp-for="DistributionAsAvailable" />
+                    <label class="govuk-label govuk-checkboxes__label" asp-for="DistributionAsAvailable">As Available</label>
+                </div>
+            }
         </div>
     </fieldset>
 </div>
@@ -203,11 +226,20 @@ else
 <input type="hidden" asp-for="CanEditFeb" />
 <input type="hidden" asp-for="CanEditMar" />
 
-<govuk-select asp-for="WeekNumber" label="Week No" asp-items="PTL.InternalWeb.Features.Scheme.SchemeFormViewModel.WeekNumberOptions" />
+@if (Model.IsPreviousYear)
+{
+    <partial name="_SchemeLockedField" model="@((Kind: "select", Field: nameof(Model.WeekNumber), Label: "Week No", Value: Model.WeekNumber?.ToString(CultureInfo.CurrentCulture), Text: Model.WeekNumber?.ToString(CultureInfo.CurrentCulture) ?? "", Width: "govuk-input--width-5"))" />
+    <partial name="_SchemeLockedField" model="@((Kind: "select", Field: nameof(Model.DayOfWeekId), Label: "Day of Week", Value: Model.DayOfWeekId?.ToString(), Text: OptionText(Model.DayOfWeekOptions, Model.DayOfWeekId), Width: "govuk-input--width-20"))" />
+    <partial name="_SchemeLockedField" model="@((Kind: "text", Field: nameof(Model.NumberOfSamples), Label: "Number of Samples", Value: Model.NumberOfSamples?.ToString(CultureInfo.CurrentCulture), Text: "", Width: "govuk-input--width-5"))" />
+}
+else
+{
+    <govuk-select asp-for="WeekNumber" label="Week No" asp-items="PTL.InternalWeb.Features.Scheme.SchemeFormViewModel.WeekNumberOptions" />
 
-<govuk-select asp-for="DayOfWeekId" label="Day of Week" asp-items="Model.DayOfWeekOptions" />
+    <govuk-select asp-for="DayOfWeekId" label="Day of Week" asp-items="Model.DayOfWeekOptions" />
 
-<govuk-input asp-for="NumberOfSamples" label="Number of Samples" input-class="govuk-input govuk-input--width-5" />
+    <govuk-input asp-for="NumberOfSamples" label="Number of Samples" input-class="govuk-input govuk-input--width-5" />
+}
 
 <div class="govuk-form-group">
     <label class="govuk-label govuk-label--s" for="SampleNoSequence">Sample No Sequence</label>
@@ -218,53 +250,89 @@ else
     <input type="hidden" asp-for="SampleNoSequence" id="SampleNoSequenceValue" />
 </div>
 
-<govuk-input asp-for="SampleOrigin" label="Sample Origin" />
+@if (Model.IsPreviousYear)
+{
+    <partial name="_SchemeLockedField" model="@((Kind: "text", Field: nameof(Model.SampleOrigin), Label: "Sample Origin", Value: Model.SampleOrigin, Text: "", Width: ""))" />
+    <partial name="_SchemeLockedField" model="@((Kind: "text", Field: nameof(Model.Subcontractor), Label: "Subcontractor", Value: Model.Subcontractor, Text: "", Width: ""))" />
+    <partial name="_SchemeLockedField" model="@((Kind: "text", Field: nameof(Model.Deadline), Label: "Deadline (days)", Value: Model.Deadline?.ToString(CultureInfo.CurrentCulture), Text: "", Width: "govuk-input--width-5"))" />
+}
+else
+{
+    <govuk-input asp-for="SampleOrigin" label="Sample Origin" />
 
-<govuk-input asp-for="Subcontractor" label="Subcontractor" />
+    <govuk-input asp-for="Subcontractor" label="Subcontractor" />
 
-<govuk-input asp-for="Deadline" label="Deadline (days)" input-class="govuk-input govuk-input--width-5" />
+    <govuk-input asp-for="Deadline" label="Deadline (days)" input-class="govuk-input govuk-input--width-5" />
+}
 
 <div class="govuk-form-group">
     <div class="govuk-checkboxes" data-module="govuk-checkboxes">
-        <div class="govuk-checkboxes__item">
-            <input class="govuk-checkboxes__input" asp-for="CombinedPackaging" />
-            <label class="govuk-label govuk-checkboxes__label" asp-for="CombinedPackaging">Combined Packaging</label>
-        </div>
+        @if (Model.IsPreviousYear)
+        {
+            <partial name="_SchemeLockedField" model="@((Kind: "checkbox", Field: nameof(Model.CombinedPackaging), Label: "Combined Packaging", Value: Model.CombinedPackaging.ToString(), Text: "", Width: ""))" />
+        }
+        else
+        {
+            <div class="govuk-checkboxes__item">
+                <input class="govuk-checkboxes__input" asp-for="CombinedPackaging" />
+                <label class="govuk-label govuk-checkboxes__label" asp-for="CombinedPackaging">Combined Packaging</label>
+            </div>
+        }
     </div>
 </div>
 
-<govuk-textarea asp-for="SamplePackingInstructions" label="Sample Packing Instructions" rows="5" />
+@if (Model.IsPreviousYear)
+{
+    <partial name="_SchemeLockedField" model="@((Kind: "textarea", Field: nameof(Model.SamplePackingInstructions), Label: "Sample Packing Instructions", Value: Model.SamplePackingInstructions, Text: "", Width: ""))" />
+    <partial name="_SchemeLockedField" model="@((Kind: "select", Field: nameof(Model.Postage), Label: "Postage Type", Value: Model.Postage?.ToString(), Text: OptionText(Model.PostageOptions, Model.Postage), Width: "govuk-!-width-one-half"))" />
+}
+else
+{
+    <govuk-textarea asp-for="SamplePackingInstructions" label="Sample Packing Instructions" rows="5" />
 
-<govuk-select asp-for="Postage" label="Postage Type" asp-items="Model.PostageOptions" option-label="- Please Select -" />
+    <govuk-select asp-for="Postage" label="Postage Type" asp-items="Model.PostageOptions" option-label="- Please Select -" />
+}
 
 <govuk-input asp-for="CustomsVolume" label="Sample Volume" input-class="govuk-input govuk-input--width-10" />
 
 <div class="govuk-form-group">
     <div class="govuk-checkboxes" data-module="govuk-checkboxes">
-        <div class="govuk-checkboxes__item">
-            <input class="govuk-checkboxes__input" asp-for="CommentsRequired" />
-            <label class="govuk-label govuk-checkboxes__label" asp-for="CommentsRequired">Ext. Comments Required</label>
-        </div>
-        <div class="govuk-checkboxes__item">
-            <input class="govuk-checkboxes__input" asp-for="Pilot" />
-            <label class="govuk-label govuk-checkboxes__label" asp-for="Pilot">Pilot Scheme</label>
-        </div>
-        <div class="govuk-checkboxes__item">
-            <input class="govuk-checkboxes__input" asp-for="LimitedSampleAvailability" />
-            <label class="govuk-label govuk-checkboxes__label" asp-for="LimitedSampleAvailability">Limited Sample Availability</label>
-        </div>
-        <div class="govuk-checkboxes__item">
-            <input class="govuk-checkboxes__input" asp-for="Accredited" />
-            <label class="govuk-label govuk-checkboxes__label" asp-for="Accredited">Accredited</label>
-        </div>
-        <div class="govuk-checkboxes__item">
-            <input class="govuk-checkboxes__input" asp-for="NoVLALabs" />
-            <label class="govuk-label govuk-checkboxes__label" asp-for="NoVLALabs">No VLA Labs</label>
-        </div>
-        <div class="govuk-checkboxes__item">
-            <input class="govuk-checkboxes__input" asp-for="ComerciallyAvailable" />
-            <label class="govuk-label govuk-checkboxes__label" asp-for="ComerciallyAvailable">Commercially available</label>
-        </div>
+        @if (Model.IsPreviousYear)
+        {
+            <partial name="_SchemeLockedField" model="@((Kind: "checkbox", Field: nameof(Model.CommentsRequired), Label: "Ext. Comments Required", Value: Model.CommentsRequired.ToString(), Text: "", Width: ""))" />
+            <partial name="_SchemeLockedField" model="@((Kind: "checkbox", Field: nameof(Model.Pilot), Label: "Pilot Scheme", Value: Model.Pilot.ToString(), Text: "", Width: ""))" />
+            <partial name="_SchemeLockedField" model="@((Kind: "checkbox", Field: nameof(Model.LimitedSampleAvailability), Label: "Limited Sample Availability", Value: Model.LimitedSampleAvailability.ToString(), Text: "", Width: ""))" />
+            <partial name="_SchemeLockedField" model="@((Kind: "checkbox", Field: nameof(Model.Accredited), Label: "Accredited", Value: Model.Accredited.ToString(), Text: "", Width: ""))" />
+            <partial name="_SchemeLockedField" model="@((Kind: "checkbox", Field: nameof(Model.NoVLALabs), Label: "No VLA Labs", Value: Model.NoVLALabs.ToString(), Text: "", Width: ""))" />
+            <partial name="_SchemeLockedField" model="@((Kind: "checkbox", Field: nameof(Model.ComerciallyAvailable), Label: "Commercially available", Value: Model.ComerciallyAvailable.ToString(), Text: "", Width: ""))" />
+        }
+        else
+        {
+            <div class="govuk-checkboxes__item">
+                <input class="govuk-checkboxes__input" asp-for="CommentsRequired" />
+                <label class="govuk-label govuk-checkboxes__label" asp-for="CommentsRequired">Ext. Comments Required</label>
+            </div>
+            <div class="govuk-checkboxes__item">
+                <input class="govuk-checkboxes__input" asp-for="Pilot" />
+                <label class="govuk-label govuk-checkboxes__label" asp-for="Pilot">Pilot Scheme</label>
+            </div>
+            <div class="govuk-checkboxes__item">
+                <input class="govuk-checkboxes__input" asp-for="LimitedSampleAvailability" />
+                <label class="govuk-label govuk-checkboxes__label" asp-for="LimitedSampleAvailability">Limited Sample Availability</label>
+            </div>
+            <div class="govuk-checkboxes__item">
+                <input class="govuk-checkboxes__input" asp-for="Accredited" />
+                <label class="govuk-label govuk-checkboxes__label" asp-for="Accredited">Accredited</label>
+            </div>
+            <div class="govuk-checkboxes__item">
+                <input class="govuk-checkboxes__input" asp-for="NoVLALabs" />
+                <label class="govuk-label govuk-checkboxes__label" asp-for="NoVLALabs">No VLA Labs</label>
+            </div>
+            <div class="govuk-checkboxes__item">
+                <input class="govuk-checkboxes__input" asp-for="ComerciallyAvailable" />
+                <label class="govuk-label govuk-checkboxes__label" asp-for="ComerciallyAvailable">Commercially available</label>
+            </div>
+        }
     </div>
 </div>
 
@@ -301,6 +369,7 @@ else
             @for (var i = 0; i < Model.Prices.Count; i++)
             {
                 var priceField = $"Prices[{i}].Price";
+                var priceId = TagBuilder.CreateSanitizedId(priceField, "_");
                 <tr class="govuk-table__row">
                     <td class="govuk-table__cell">
                         @Model.Prices[i].CurrencyName
@@ -318,7 +387,14 @@ else
                             }
                             <div class="govuk-input__wrapper">
                                 <div class="govuk-input__prefix" aria-hidden="true">@Model.Prices[i].CurrencySymbol</div>
-                                <input class="govuk-input govuk-input--width-10 @(HasError(priceField) ? "govuk-input--error" : null)" asp-for="Prices[i].Price" inputmode="decimal" />
+                                @if (Model.IsPreviousYear)
+                                {
+                                    <input class="govuk-input govuk-input--width-10 @(HasError(priceField) ? "govuk-input--error" : null)" id="@priceId" name="@priceField" type="text" value="@(Model.Prices[i].Price?.ToString(CultureInfo.CurrentCulture))" inputmode="decimal" readonly />
+                                }
+                                else
+                                {
+                                    <input class="govuk-input govuk-input--width-10 @(HasError(priceField) ? "govuk-input--error" : null)" asp-for="Prices[i].Price" inputmode="decimal" />
+                                }
                             </div>
                         </div>
                     </td>

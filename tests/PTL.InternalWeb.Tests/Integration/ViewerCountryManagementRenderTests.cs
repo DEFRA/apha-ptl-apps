@@ -196,13 +196,13 @@ public partial class ViewerCountryManagementRenderTests : IClassFixture<WebAppli
     }
 
     [Fact]
-    public async Task ViewerGet_HasPageLevelSaveAndCancelButtonsAnAddButtonAndNoApply()
+    public async Task ViewerGet_HasPageLevelSaveApplyAndCancelButtonsAndAnAddButton()
     {
         var main = MainContent(await _factory.CreateClient().GetStringAsync("/SystemAdministration/ViewerManagement"));
 
         Assert.Matches(Button("ViewerManagement", "Save", "save", cssClass: "govuk-button\""), main);
-        Assert.DoesNotContain("command=apply", main, StringComparison.Ordinal);
-        Assert.DoesNotContain(">Apply<", main, StringComparison.Ordinal);
+        Assert.Matches(Button("ViewerManagement", "Apply", "apply"), main);
+        Assert.Matches("command=save\"[^>]*>Save</button>[\\s\\S]*command=apply\"[^>]*>Apply</button>[\\s\\S]*command=cancel\"[^>]*>Cancel</button>", main);
         Assert.Matches(Button("ViewerManagement", "Cancel", "cancel"), main);
         Assert.Matches(Button("ViewerManagement", "Add", "add"), main);
         Assert.Matches("formnovalidate[^>]*formaction=\"/SystemAdministration/ViewerManagement\\?command=cancel\"", main);

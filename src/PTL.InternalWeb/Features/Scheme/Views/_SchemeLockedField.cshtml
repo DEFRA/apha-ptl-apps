@@ -1,0 +1,47 @@
+@model (string Kind, string Field, string Label, string? Value, string Text, string Width)
+@using Microsoft.AspNetCore.Mvc.Rendering
+@* Kind is "text", "textarea", "select" (Text is the chosen option's text) or "checkbox" (Value is "true"/"false"); Width is an
+   optional input width class. The form posts the whole model, so a locked control still sends Value: text and textarea stay
+   readonly under their own name, while a select or checkbox (disabled controls post nothing) sends it from a hidden input. *@
+@{
+    var field = Model.Field;
+    var id = TagBuilder.CreateSanitizedId(field, "_");
+    var error = ViewData.ModelState.TryGetValue(field, out var entry) && entry.Errors.Count > 0 ? entry.Errors[0].ErrorMessage : null;
+    var errorId = $"{field}-error";
+    var isSelect = Model.Kind == "select";
+    var inputClass = string.Join(' ', new[] { "govuk-input", Model.Width, error is null ? null : "govuk-input--error" }.Where(c => !string.IsNullOrEmpty(c)));
+}
+
+@if (Model.Kind == "checkbox")
+{
+    var isChecked = string.Equals(Model.Value, "true", StringComparison.OrdinalIgnoreCase);
+
+    @* The tick is drawn by an adjacent-sibling selector, so the hidden companion goes after the label. *@
+    <div class="govuk-checkboxes__item">
+        <input class="govuk-checkboxes__input" type="checkbox" id="@id" checked="@isChecked" disabled />
+        <label class="govuk-label govuk-checkboxes__label" for="@id">@Model.Label</label>
+        <input type="hidden" name="@field" value="@(isChecked ? "true" : "false")" />
+    </div>
+}
+else
+{
+    <div class="@(error is null ? "govuk-form-group" : "govuk-form-group govuk-form-group--error")">
+        <label class="govuk-label" for="@id">@Model.Label</label>
+        @if (error is not null)
+        {
+            <p id="@errorId" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @error</p>
+        }
+        @if (Model.Kind == "textarea")
+        {
+            <textarea class="@(error is null ? "govuk-textarea" : "govuk-textarea govuk-textarea--error")" id="@id" name="@field" rows="5" aria-describedby="@(error is null ? null : errorId)" readonly>@Model.Value</textarea>
+        }
+        else
+        {
+            <input class="@inputClass" id="@id" name="@(isSelect ? null : field)" type="text" value="@(isSelect ? Model.Text : Model.Value)" aria-describedby="@(error is null ? null : errorId)" readonly />
+            @if (isSelect)
+            {
+                <input type="hidden" name="@field" value="@Model.Value" />
+            }
+        }
+    </div>
+}

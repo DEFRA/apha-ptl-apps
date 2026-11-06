@@ -10,7 +10,7 @@ public interface ITabulationPdfService
     Task<byte[]> GenerateAsync(ActionContext actionContext, TabulationReportPageViewModel model, CancellationToken cancellationToken = default);
 }
 
-public sealed record TabulationPdfViewModel(TabulationReportPageViewModel Page, string? UkasLogoDataUri);
+public sealed record TabulationPdfViewModel(TabulationReportPageViewModel Page, string? UkasLogoDataUri, string? HeaderImageDataUri = null);
 
 public sealed class TabulationPdfService(
     IRazorViewRenderer viewRenderer,
@@ -19,9 +19,15 @@ public sealed class TabulationPdfService(
 {
     public const string ReportPdfViewPath = "/Features/Tabulation/Views/ReportPdf.cshtml";
 
+    // Legacy header strip: strapline plus the VETQAS and APHA Scientific logos.
+    public const string HeaderImageFileName = "vetqasheader.png";
+
     public async Task<byte[]> GenerateAsync(ActionContext actionContext, TabulationReportPageViewModel model, CancellationToken cancellationToken = default)
     {
-        var viewModel = new TabulationPdfViewModel(model, await BuildUkasLogoDataUriAsync(cancellationToken));
+        var viewModel = new TabulationPdfViewModel(
+            model,
+            await BuildImageDataUriAsync("ukas.png", cancellationToken),
+            await BuildImageDataUriAsync(HeaderImageFileName, cancellationToken));
         var html = await viewRenderer.RenderAsync(actionContext, ReportPdfViewPath, viewModel);
 
         var footerTitle = WebUtility.HtmlEncode($"{model.Report.DistributionHeading} - {model.Report.TabulationName}.");
@@ -39,7 +45,7 @@ public sealed class TabulationPdfService(
         return await pdfRenderer.RenderAsync(html, options, cancellationToken);
     }
 
-    private async Task<string?> BuildUkasLogoDataUriAsync(CancellationToken cancellationToken)
+    private async Task<string?> BuildImageDataUriAsync(string fileName, CancellationToken cancellationToken)
     {
         var webRoot = hostEnvironment.WebRootPath;
         if (string.IsNullOrWhiteSpace(webRoot))
@@ -47,13 +53,13 @@ public sealed class TabulationPdfService(
             return null;
         }
 
-        var ukasPath = Path.Combine(webRoot, "images", "ukas.png");
-        if (!File.Exists(ukasPath))
+        var imagePath = Path.Combine(webRoot, "images", fileName);
+        if (!File.Exists(imagePath))
         {
             return null;
         }
 
-        var bytes = await File.ReadAllBytesAsync(ukasPath, cancellationToken);
+        var bytes = await File.ReadAllBytesAsync(imagePath, cancellationToken);
         return $"data:image/png;base64,{Convert.ToBase64String(bytes)}";
     }
 }

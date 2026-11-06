@@ -616,6 +616,20 @@ public class SystemAdministrationControllerTests
     }
 
     [Fact]
+    public async Task ExternalSiteManagement_Post_EmptyMessages_SavesEmptyStrings()
+    {
+        var apiClient = new FakeExternalSiteMessageApiClient();
+        var controller = CreateController(externalSiteMessageApiClient: apiClient);
+        var model = new ExternalSiteManagementViewModel { Message = null, ImportantMessage = null, SupportEmailAddress = "vetqas@apha.gov.uk" };
+
+        var result = await controller.ExternalSiteManagement(model, CancellationToken.None);
+
+        Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal(string.Empty, apiClient.LastSaveRequest?.Message);
+        Assert.Equal(string.Empty, apiClient.LastSaveRequest?.ImportantMessage);
+    }
+
+    [Fact]
     public async Task ExternalSiteManagement_Post_InvalidModelState_DoesNotCallApi()
     {
         var apiClient = new FakeExternalSiteMessageApiClient();
@@ -985,6 +999,66 @@ public class SystemAdministrationControllerTests
         Assert.Single(model.Roles);
         var row = Assert.Single(model.Rows);
         Assert.Contains(roleId, row.SelectedRoleIds);
+    }
+
+    [Fact]
+    public async Task ManageUserRoles_Get_KnowsTheSignedInUserFromTheClaims()
+    {
+        var signedInUserId = Guid.NewGuid();
+        var controller = CreateController(userApiClient: new FakeUserApiClient(), roleApiClient: new FakeRoleApiClient());
+        controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext
+            {
+                User = new ClaimsPrincipal(new ClaimsIdentity(
+                    [new Claim(InternalUserClaimTypes.InternalUserId, signedInUserId.ToString())], "Test"))
+            }
+        };
+
+        var result = await controller.ManageUserRoles(CancellationToken.None);
+
+        Assert.Equal(signedInUserId, Assert.IsType<ManageUserRolesViewModel>(Assert.IsType<ViewResult>(result).Model).CurrentUserId);
+    }
+
+    [Fact]
+    public async Task ManageUserRoles_Get_WithoutASignedInUser_HasNoCurrentUser()
+    {
+        var controller = CreateController(userApiClient: new FakeUserApiClient(), roleApiClient: new FakeRoleApiClient());
+
+        var result = await controller.ManageUserRoles(CancellationToken.None);
+
+        Assert.Null(Assert.IsType<ManageUserRolesViewModel>(Assert.IsType<ViewResult>(result).Model).CurrentUserId);
+    }
+
+    [Theory]
+    [InlineData("Admin", true, true)]
+    [InlineData("admin", true, true)]
+    [InlineData("Admin", false, false)]
+    [InlineData("Support", true, false)]
+    public void IsOwnAdminRole_OnlyTheSignedInUsersOwnAdminBox(string roleName, bool ownRow, bool expected)
+    {
+        var me = Guid.NewGuid();
+        var model = new ManageUserRolesViewModel { CurrentUserId = me };
+        var row = new UserRoleRowViewModel { UserId = ownRow ? me : Guid.NewGuid() };
+
+        Assert.Equal(expected, model.IsOwnAdminRole(row, new RoleColumnViewModel { RoleId = Guid.NewGuid(), Name = roleName }));
+    }
+
+    [Fact]
+    public void IsOwnAdminRole_WithNoSignedInUser_IsNeverTrue()
+    {
+        var model = new ManageUserRolesViewModel();
+
+        Assert.False(model.IsOwnAdminRole(new UserRoleRowViewModel { UserId = Guid.Empty }, new RoleColumnViewModel { Name = "Admin" }));
+    }
+
+    [Fact]
+    public void IsOwnAdminRole_NullArguments_Throw()
+    {
+        var model = new ManageUserRolesViewModel();
+
+        Assert.Throws<ArgumentNullException>(() => model.IsOwnAdminRole(null!, new RoleColumnViewModel()));
+        Assert.Throws<ArgumentNullException>(() => model.IsOwnAdminRole(new UserRoleRowViewModel(), null!));
     }
 
     // spgaRole returns fldOrder DESC; legacy's grid inserted each role at column 2, so it listed them in the reverse order.

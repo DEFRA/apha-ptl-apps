@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Microsoft.Extensions.Logging.Abstractions;
 using PTL.Api.Tests.Lookup;
 using PTL.Api.Tests.Participant;
@@ -24,6 +25,46 @@ public class SchemeServiceAuditTests
     {
         var updated = Build();
         updated.Tests.RemoveAt(1);
+        return updated;
+    }
+
+    // A closed-year scheme is read-only, but legacy still lets its Tests tab be re-ordered and a Category removed.
+    private static CoreScheme ClosedYearScheme()
+    {
+        var scheme = Build();
+        scheme.YearId = DateTime.UtcNow.Year - 1;
+        return scheme;
+    }
+
+    private static void Swap<T>(IList<T> items) => (items[0], items[1]) = (items[1], items[0]);
+
+    // The request for a closed-year scheme with one of the Tests tab edits legacy still allows.
+    private static CoreScheme ClosedYearEdit(string edit)
+    {
+        var updated = ClosedYearScheme();
+        var test = updated.Tests[0];
+
+        switch (edit)
+        {
+            case "results":
+                Swap(test.ResultItems);
+                break;
+            case "methods":
+                Swap(test.MethodItems);
+                break;
+            case "categories":
+                Swap(test.Categories);
+                break;
+            case "criteria":
+                Swap(test.Categories[0].Criteria);
+                break;
+            case "category removed":
+                test.Categories.RemoveAt(1);
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(edit), edit, null);
+        }
+
         return updated;
     }
 
@@ -188,18 +229,181 @@ public class SchemeServiceAuditTests
         Assert.NotNull(Assert.Single(repository.AuditWrites));
     }
 
-    [Fact]
-    public async Task UpdateSchemeAsync_ReadOnlyScheme_StillThrowsBeforeAnyAuditDecision()
+    [Theory]
+    [InlineData("results")]
+    [InlineData("methods")]
+    [InlineData("categories")]
+    [InlineData("criteria")]
+    [InlineData("category removed")]
+    public async Task UpdateSchemeAsync_ReadOnlyScheme_AuditedChangeWithoutAReason_AsksForOneAndSavesNothing(string edit)
     {
-        var stored = Build();
-        stored.YearId = DateTime.UtcNow.Year - 1;
-        var (service, repository) = await StoredSchemeAsync(stored);
-        var updated = AuditableEdit();
-        updated.YearId = stored.YearId;
+        var (service, repository) = await StoredSchemeAsync(ClosedYearScheme());
+        var before = JsonSerializer.Serialize(await repository.GetByIdAsync(SchemeId));
+        var updated = ClosedYearEdit(edit);
+        // Name is locked on a closed year, so the prompt still names the stored scheme.
+        updated.Name = "Renamed Scheme";
 
-        var exception = await Assert.ThrowsAsync<SchemeValidationException>(() => UpdateAsync(service, updated, "Reason"));
+        var result = await UpdateAsync(service, updated);
 
-        Assert.Equal("This scheme belongs to a closed year and cannot be edited.", Assert.Single(exception.Errors).Message);
+        Assert.Equal(SchemeUpdateStatus.AuditReasonRequired, result.Status);
+        Assert.Equal("Scheme PT1234: Test Scheme", result.AuditObjectName);
+        Assert.Null(result.Scheme);
+        Assert.Empty(repository.AuditWrites);
+        Assert.Equal(before, JsonSerializer.Serialize(await repository.GetByIdAsync(SchemeId)));
+    }
+
+    [Theory]
+    [InlineData("results")]
+    [InlineData("methods")]
+    [InlineData("categories")]
+    [InlineData("criteria")]
+    [InlineData("category removed")]
+    public async Task UpdateSchemeAsync_ReadOnlyScheme_AuditedChangeWithAReason_SavesItAndWritesTheAudit(string edit)
+    {
+        var (service, repository) = await StoredSchemeAsync(ClosedYearScheme());
+
+        var result = await UpdateAsync(service, ClosedYearEdit(edit), "Closed year clean-up");
+
+        Assert.Equal(SchemeUpdateStatus.Updated, result.Status);
+        var audit = Assert.Single(repository.AuditWrites);
+        Assert.NotNull(audit);
+        Assert.Equal("tester", audit.AuditWho);
+        Assert.Equal("Closed year clean-up", audit.AuditWhy);
+        Assert.False(audit.Plan.IsEmpty);
+    }
+
+    [Fact]
+    public async Task UpdateSchemeAsync_ReadOnlyScheme_ReorderedResultItems_AreSavedInTheNewOrderAndAudited()
+    {
+        var (service, repository) = await StoredSchemeAsync(ClosedYearScheme());
+
+        var result = await UpdateAsync(service, ClosedYearEdit("results"), "Results re-ordered");
+
+        Assert.Equal(new[] { Result2, Result1 }, result.Scheme!.Tests[0].ResultItems.Select(i => i.TestResultItemId));
+        Assert.Equal(new[] { Result2, Result1 }, (await repository.GetByIdAsync(SchemeId))!.Tests[0].ResultItems.Select(i => i.TestResultItemId));
+        var plan = repository.LastAudit!.Plan;
+        Assert.Equal(2, plan.TestResultItems.Count);
+        Assert.Contains(plan.TestResultItems, a => a == new SchemeItemAudit(Result2, SchemeAuditOperation.Update, TypeA, false, 1, true));
+        Assert.Contains(plan.TestResultItems, a => a == new SchemeItemAudit(Result1, SchemeAuditOperation.Update, TypeA, false, 2, true));
+        Assert.Empty(plan.Tests);
+        Assert.Empty(plan.TestMethodItems);
+        Assert.Empty(plan.CategoryItems);
+        Assert.Empty(plan.CriterionItems);
+        Assert.Empty(plan.Tabulations);
+    }
+
+    [Fact]
+    public async Task UpdateSchemeAsync_ReadOnlyScheme_RemovedCategory_IsSavedWithoutItAndAuditedAsADelete()
+    {
+        var (service, repository) = await StoredSchemeAsync(ClosedYearScheme());
+
+        var result = await UpdateAsync(service, ClosedYearEdit("category removed"), "Timeliness category withdrawn");
+
+        Assert.Equal(new[] { Category1 }, result.Scheme!.Tests[0].Categories.Select(c => c.CategoryItemId));
+        Assert.Equal(new[] { Category1 }, (await repository.GetByIdAsync(SchemeId))!.Tests[0].Categories.Select(c => c.CategoryItemId));
+        var plan = repository.LastAudit!.Plan;
+        Assert.Equal(new SchemeItemAudit(Category2, SchemeAuditOperation.Delete, TypeA, false, 2, false), Assert.Single(plan.CategoryItems));
+        Assert.Empty(plan.Tests);
+        Assert.Empty(plan.CriterionItems);
+    }
+
+    [Fact]
+    public async Task UpdateSchemeAsync_ReadOnlyScheme_TestsAddedOrRemoved_AreIgnoredSoNoReasonIsNeeded()
+    {
+        var (service, repository) = await StoredSchemeAsync(ClosedYearScheme());
+        var updated = ClosedYearScheme();
+        updated.Tests.RemoveAt(1);
+        updated.Tests.Add(new SchemeTest { TestTypeId = TypeA, MethodItems = [new SchemeTestMethodItem { TestMethodItemTypeId = TypeA }] });
+
+        var result = await UpdateAsync(service, updated);
+
+        Assert.Equal(SchemeUpdateStatus.Updated, result.Status);
+        Assert.Null(Assert.Single(repository.AuditWrites));
+        Assert.Equal(new[] { Test1, Test2 }, result.Scheme!.Tests.Select(t => t.TestId));
+        Assert.Equal(new[] { Test1, Test2 }, (await repository.GetByIdAsync(SchemeId))!.Tests.Select(t => t.TestId));
+    }
+
+    [Fact]
+    public async Task UpdateSchemeAsync_ReadOnlyScheme_ResultAndMethodItemsAddedOrRemovedFromTheEnd_AreIgnoredSoNoReasonIsNeeded()
+    {
+        var (service, repository) = await StoredSchemeAsync(ClosedYearScheme());
+        var updated = ClosedYearScheme();
+        updated.Tests[0].ResultItems.RemoveAt(1);
+        updated.Tests[0].MethodItems.RemoveAt(1);
+        updated.Tests[1].ResultItems.Add(new SchemeTestResultItem { TestResultItemTypeId = TypeB });
+        updated.Tests[1].MethodItems.Add(new SchemeTestMethodItem { TestMethodItemTypeId = TypeB });
+
+        var result = await UpdateAsync(service, updated);
+
+        Assert.Equal(SchemeUpdateStatus.Updated, result.Status);
+        Assert.Null(Assert.Single(repository.AuditWrites));
+        var saved = (await repository.GetByIdAsync(SchemeId))!;
+        Assert.Equal(new[] { Result1, Result2 }, saved.Tests[0].ResultItems.Select(i => i.TestResultItemId));
+        Assert.Equal(new[] { Method1, Method2 }, saved.Tests[0].MethodItems.Select(i => i.TestMethodItemId));
+        Assert.Equal(new[] { Result3 }, saved.Tests[1].ResultItems.Select(i => i.TestResultItemId));
+        Assert.Equal(new[] { Method3 }, saved.Tests[1].MethodItems.Select(i => i.TestMethodItemId));
+    }
+
+    // Leaving out any item but the last moves it to the end, which is a re-order and so audited.
+    [Fact]
+    public async Task UpdateSchemeAsync_ReadOnlyScheme_ResultItemOmittedFromTheFront_IsKeptAtTheEndAndAudited()
+    {
+        var (service, repository) = await StoredSchemeAsync(ClosedYearScheme());
+        CoreScheme Edit()
+        {
+            var updated = ClosedYearScheme();
+            updated.Tests[0].ResultItems.RemoveAt(0);
+            return updated;
+        }
+
+        var withoutReason = await UpdateAsync(service, Edit());
+
+        Assert.Equal(SchemeUpdateStatus.AuditReasonRequired, withoutReason.Status);
+        Assert.Empty(repository.AuditWrites);
+
+        var withReason = await UpdateAsync(service, Edit(), "Reason");
+
+        Assert.Equal(SchemeUpdateStatus.Updated, withReason.Status);
+        Assert.Equal(new[] { Result2, Result1 }, (await repository.GetByIdAsync(SchemeId))!.Tests[0].ResultItems.Select(i => i.TestResultItemId));
+    }
+
+    [Fact]
+    public async Task UpdateSchemeAsync_ReadOnlyScheme_TabulationAdded_StillNeedsAReasonAndIsAudited()
+    {
+        var (service, repository) = await StoredSchemeAsync(ClosedYearScheme());
+
+        CoreScheme Edit()
+        {
+            var updated = ClosedYearScheme();
+            updated.Tabulations.Add(new SchemeTabulation { Name = "Extra" });
+            return updated;
+        }
+
+        var withoutReason = await UpdateAsync(service, Edit());
+
+        Assert.Equal(SchemeUpdateStatus.AuditReasonRequired, withoutReason.Status);
+        Assert.Empty(repository.AuditWrites);
+
+        var withReason = await UpdateAsync(service, Edit(), "Added a tabulation");
+
+        Assert.Equal(SchemeUpdateStatus.Updated, withReason.Status);
+        var saved = (await repository.GetByIdAsync(SchemeId))!;
+        Assert.Equal(3, saved.Tabulations.Count);
+        var insert = Assert.Single(repository.LastAudit!.Plan.Tabulations);
+        Assert.Equal(SchemeAuditOperation.Insert, insert.Operation);
+        Assert.Equal(saved.Tabulations[2].TabulationId, insert.Id);
+    }
+
+    [Fact]
+    public async Task UpdateSchemeAsync_ReadOnlyScheme_ValidationErrorsWinOverTheAuditPrompt()
+    {
+        var (service, repository) = await StoredSchemeAsync(ClosedYearScheme());
+        var updated = ClosedYearEdit("results");
+        updated.CustomsDescription = string.Empty;
+
+        var exception = await Assert.ThrowsAsync<SchemeValidationException>(() => UpdateAsync(service, updated));
+
+        Assert.Contains(exception.Errors, e => e.Field == "CustomsDescription");
         Assert.Empty(repository.AuditWrites);
     }
 

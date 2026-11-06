@@ -1,0 +1,22 @@
+@model PTL.InternalWeb.Features.Scheme.SchemeFormViewModel
+@{
+    ViewData["Title"] = "Edit scheme";
+}
+
+@* Legacy SetReadonly(): _SchemeForm and its tabs lock most fields while Model.IsPreviousYear; Apply and Back replace Save and Cancel. *@
+<h1 class="govuk-heading-l">Edit Scheme</h1>
+
+<form method="post" asp-action="Apply" asp-route-id="@Model.SchemeId" novalidate>
+    @await Html.PartialAsync("_SchemeForm", Model)
+
+    <div class="govuk-button-group">
+        <button class="govuk-button" data-module="govuk-button" type="submit">Apply</button>
+        <a class="govuk-button govuk-button--secondary" data-module="govuk-button" asp-controller="Scheme" asp-action="Index">Back</a>
+    </div>
+</form>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script src="~/lib/tinymce/tinymce.min.js" asp-append-version="true"></script>
+    <script src="~/js/ptl-rich-text-editor.js" asp-append-version="true"></script>
+}

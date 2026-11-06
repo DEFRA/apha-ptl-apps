@@ -207,6 +207,101 @@ public class TabulationRouteSmokeTests : IClassFixture<PtlExternalWebTestFactory
         Assert.DoesNotContain("<select", main, StringComparison.Ordinal);
     }
 
+    private static TabulationReportResponse ReportWithPrint(Guid tabulationId, TabulationSignatoryResponse? signatory = null) =>
+        Report(tabulationId, assessmentTestId: Guid.NewGuid(), signatory: signatory) with
+        {
+            Ratings = new TabulationTableResponse(
+                "QAU Ratings",
+                [new TabulationGridRowResponse([new TabulationCellResponse("Lab Code", 1, 1, "Header1", false)], IsHeader: true)],
+                null),
+            Print = new TabulationPrintResponse(
+                [new TabulationPrintParticipantResponse("2567", true, string.Empty)],
+                [
+                    new TabulationPrintTestResponse(
+                        "Culture",
+                        [],
+                        [
+                            new TabulationPrintSampleColumnResponse(
+                                "26/1028",
+                                "Sample description",
+                                [new TabulationPrintResultColumnResponse("Pathogen", "Salmonella", [new TabulationPrintResultResponse("Salmonella", 1)])]),
+                        ]),
+                ],
+                []),
+        };
+
+    private async Task<string> GetReportBodyAsync(TabulationReportResponse report)
+    {
+        var client = CreateClient(new FakeDistributionApiClient { PublishedTabulation = report });
+        var cookies = await SignInAsync(client, "Participant,Viewer", participantId: Guid.NewGuid());
+
+        var response = await CookieForwardingHttpClient.SendWithCookiesAsync(
+            client, HttpMethod.Get, $"/Tabulation/Report?publishedTabulationId={report.TabulationId}", cookies);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        return Regex.Match(await response.Content.ReadAsStringAsync(), "<main.*?</main>", RegexOptions.Singleline).Value;
+    }
+
+    [Fact]
+    public async Task Report_WithPrintData_RendersEachSampleAndTheRatingsAsExpandedAccordionSections()
+    {
+        var main = await GetReportBodyAsync(ReportWithPrint(Guid.NewGuid()));
+
+        Assert.Contains("""<div class="govuk-accordion" data-module="govuk-accordion" id="tabulation-test-1">""", main, StringComparison.Ordinal);
+        Assert.Contains("""<div class="govuk-accordion__section govuk-accordion__section--expanded">""", main, StringComparison.Ordinal);
+        Assert.Contains("""<span class="govuk-accordion__section-button" id="tabulation-test-1-heading-1">26/1028</span>""", main, StringComparison.Ordinal);
+        Assert.Contains("""id="tabulation-test-1-content-1" class="govuk-accordion__section-content">""", main, StringComparison.Ordinal);
+        Assert.Contains("""<span class="govuk-accordion__section-button" id="tabulation-ratings-heading-1">QAU Ratings</span>""", main, StringComparison.Ordinal);
+        Assert.Contains("Sample 26/1028 results for Culture", main, StringComparison.Ordinal);
+        Assert.Contains("View assessment results", main, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Report_WithoutPrintData_KeepsTheOneTablePerTestLayout()
+    {
+        var main = await GetReportBodyAsync(Report(Guid.NewGuid()));
+
+        Assert.DoesNotContain("govuk-accordion", main, StringComparison.Ordinal);
+        Assert.Contains("S001", main, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Report_WithASignatory_ShowsTheSigningUsersNameInTheSignature()
+    {
+        var signatory = new TabulationSignatoryResponse("Version: 14/04/2026", "Silambarasan Duraiswamy", ["Animal and Plant Health Agency"], "Issued: 06/11/2026");
+
+        var main = await GetReportBodyAsync(Report(Guid.NewGuid(), signatory: signatory));
+
+        Assert.Matches("""<div class="cellTabulationSignature">\s*<h3 class="govuk-heading-m govuk-!-margin-bottom-1">Silambarasan Duraiswamy</h3>""", main);
+        Assert.Contains("Issued: 06/11/2026", main, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Report_WithABlankSignatoryName_OmitsTheEmptyNameLine()
+    {
+        var signatory = new TabulationSignatoryResponse("Version: 14/04/2026", "  ", ["Animal and Plant Health Agency"], "Issued: 06/11/2026");
+
+        var main = await GetReportBodyAsync(Report(Guid.NewGuid(), signatory: signatory));
+
+        Assert.DoesNotMatch("""<div class="cellTabulationSignature">\s*<h3[^>]*>\s*</h3>""", main);
+        Assert.Contains("Animal and Plant Health Agency", main, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Report_WithConsultantComments_ShowsTheCommentsUnderAnH3Heading()
+    {
+        var report = Report(Guid.NewGuid()) with
+        {
+            TestConsultantCommentsHtml = "<p>Adding dev testing comments</p>",
+            TestConsultantCommentsTitle = "Comments :",
+        };
+
+        var main = await GetReportBodyAsync(report);
+
+        Assert.Contains("""<h3 class="govuk-heading-m">Comments :</h3>""", main, StringComparison.Ordinal);
+        Assert.Contains("Adding dev testing comments", main, StringComparison.Ordinal);
+    }
+
     private const string ListUrlWithFilters = "/Tabulation/Index?year=2026&month=5&sortBy=schemeCode&sortDir=desc";
 
     [Fact]

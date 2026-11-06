@@ -149,13 +149,14 @@ public partial class TestConsultantPagesRenderTests : IClassFixture<WebApplicati
     }
 
     [Fact]
-    public async Task ExternalGet_HasRemoveAndAddButtonsNoApplyAndCarriesEachPendingRowInHiddenInputs()
+    public async Task ExternalGet_HasRemoveAddAndApplyButtonsAndCarriesEachPendingRowInHiddenInputs()
     {
         var main = MainContent(await _factory.CreateClient().GetStringAsync($"/SystemAdministration/{External}"));
 
         Assert.Matches(Button(External, "Remove", "remove", 0), main);
         Assert.Matches(Button(External, "Remove", "remove", 1), main);
-        Assert.DoesNotContain("command=apply", main, StringComparison.Ordinal);
+        Assert.Matches(Button(External, "Apply", "apply"), main);
+        Assert.Matches("command=save\"[^>]*>Save</button>[\\s\\S]*command=apply\"[^>]*>Apply</button>[\\s\\S]*command=cancel\"[^>]*>Cancel</button>", main);
         Assert.Matches(Button(External, "Add", "add"), main);
         Assert.Matches("<table id=\"Rows\"", main);
         Assert.Matches(Hidden("Rows[0].ExternalTestConsultantId", IdAlan.ToString()), main);

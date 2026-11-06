@@ -8,8 +8,10 @@ using PTL.SharedUI.Notifications;
 namespace PTL.InternalWeb.Features.Distribution;
 
 // Tabulations "Send To Test Consultant" / "Send For Assessment" / "Send For Results Sign-Off" with
-// Save and Cancel. As in legacy, a send (after its confirm() question) only changes what the page
-// shows; Save writes every staged send, Cancel discards them. The staged sends travel in the form.
+// Save, Apply and Cancel. As in legacy, a send (after its confirm() question) only changes what the
+// page shows; Save and Apply write every staged send, Cancel discards them. The staged sends travel
+// in the form. Save then leaves for the Dashboard, Apply stays here (legacy ButtonApply_Click
+// re-bound the grid from the saved data).
 public sealed partial class DistributionController
 {
     private const string SaveCommand = "save";
@@ -28,16 +30,10 @@ public sealed partial class DistributionController
             return RedirectToAction(nameof(Index), new { year });
         }
 
-        if (string.Equals(command, SaveCommand, StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(command, SaveCommand, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(command, ApplyCommand, StringComparison.OrdinalIgnoreCase))
         {
-            if (await distributionApiClient.SaveTabulationsAsync(year, monthId, stagedSends, cancellationToken))
-            {
-                TempData.SetNotification(NotificationType.Success, "Tabulations updated successfully.");
-                return RedirectToAction(nameof(Index), new { year });
-            }
-
-            TempData.SetNotification(NotificationType.Error, "The changes could not be saved because the Tabulations have been changed by someone else. Please try again.");
-            return RedirectToAction(nameof(Tabulations), new { year, monthId });
+            return await SaveStagedSendsAsync(year, monthId, command, stagedSends, cancellationToken);
         }
 
         // Cancel on the confirmation page posts the form back declined: the send is dropped and the
@@ -72,6 +68,21 @@ public sealed partial class DistributionController
             Schemes = page.Schemes,
             Staged = stagedSends,
         });
+    }
+
+    private async Task<IActionResult> SaveStagedSendsAsync(
+        int year, int monthId, string? command, IReadOnlyList<TabulationStagedSendRequest> stagedSends, CancellationToken cancellationToken)
+    {
+        if (await distributionApiClient.SaveTabulationsAsync(year, monthId, stagedSends, cancellationToken))
+        {
+            TempData.SetNotification(NotificationType.Success, "Tabulations updated successfully.");
+            return string.Equals(command, ApplyCommand, StringComparison.OrdinalIgnoreCase)
+                ? RedirectToAction(nameof(Tabulations), new { year, monthId })
+                : RedirectToAction(nameof(Index), new { year });
+        }
+
+        TempData.SetNotification(NotificationType.Error, "The changes could not be saved because the Tabulations have been changed by someone else. Please try again.");
+        return RedirectToAction(nameof(Tabulations), new { year, monthId });
     }
 
     // "{schemeId}:{command}" values; anything malformed is ignored.
