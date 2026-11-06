@@ -112,4 +112,16 @@ public class Scheme
 
     // Results Tabulations tab, also replaced wholesale on save.
     public IList<SchemeTabulation> Tabulations { get; set; } = [];
+
+    // Every field copied, with fresh collections so the copy can be edited without touching this
+    // scheme. The items inside the collections are shared, not cloned.
+    internal Scheme ShallowCopy()
+    {
+        var copy = (Scheme)MemberwiseClone();
+        copy.Prices = [.. Prices];
+        copy.ViewerIds = [.. ViewerIds];
+        copy.Tests = [.. Tests];
+        copy.Tabulations = [.. Tabulations];
+        return copy;
+    }
 }

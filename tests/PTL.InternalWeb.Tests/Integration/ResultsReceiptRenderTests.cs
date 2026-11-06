@@ -206,7 +206,7 @@ public partial class ResultsReceiptRenderTests : IClassFixture<WebApplicationFac
     }
 
     [Fact]
-    public async Task Get_RendersSaveAndCancelButtonsPostingTheCommand()
+    public async Task Get_RendersSaveApplyAndCancelButtonsPostingTheCommand()
     {
         _apiClient.ResultsReceipt = Receipt();
 
@@ -215,7 +215,7 @@ public partial class ResultsReceiptRenderTests : IClassFixture<WebApplicationFac
         var buttons = Regex.Matches(html, "<button type=\"submit\" name=\"command\" value=\"(\\w+)\"[^>]*>(.*?)</button>", RegexOptions.Singleline)
             .Select(m => (Value: m.Groups[1].Value, Label: Text(m.Groups[2].Value)))
             .ToList();
-        Assert.Equal([("save", "Save"), ("cancel", "Cancel")], buttons);
+        Assert.Equal([("save", "Save"), ("apply", "Apply"), ("cancel", "Cancel")], buttons);
     }
 
     [Fact]

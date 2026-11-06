@@ -223,16 +223,16 @@ public partial class AmendResultsRenderTests : IClassFixture<WebApplicationFacto
     }
 
     [Fact]
-    public async Task Get_RendersSaveAndCancelCommandButtonsOnlyAndTheScript()
+    public async Task Get_RendersSaveApplyAndCancelCommandButtonsAndTheScript()
     {
         Seed();
 
         var html = await GetHtmlAsync();
 
         Assert.True(HasCommandButton(html, "save", "Save"));
+        // Legacy Scheduling/AmendResults.aspx has Apply alongside Save and Cancel.
+        Assert.True(HasCommandButton(html, "apply", "Apply"));
         Assert.True(HasCommandButton(html, "cancel", "Cancel"));
-        Assert.False(HasCommandButton(html, "apply", "Apply"));
-        Assert.DoesNotContain(">Apply</button>", html, StringComparison.Ordinal);
         Assert.Matches("<script src=\"/js/amend-results\\.js(\\?v=[^\"]+)?\"></script>", html);
         var form = Regex.Match(html, "<form[^>]*data-amend-results[^>]*>").Value;
         Assert.Contains("method=\"post\"", form, StringComparison.Ordinal);

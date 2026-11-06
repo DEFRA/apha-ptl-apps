@@ -13,6 +13,12 @@
         <govuk-summary-row label="Secondary Test Consultant">@OptionText(Model.TestConsultantOptions, Model.TestConsultant3)</govuk-summary-row>
     </dl>
 }
+else if (Model.IsPreviousYear)
+{
+    <partial name="_SchemeLockedField" model="@((Kind: "select", Field: nameof(Model.TestConsultant1), Label: "Primary Test Consultant", Value: Model.TestConsultant1?.ToString(), Text: OptionText(Model.PrimaryTestConsultantOptions, Model.TestConsultant1), Width: "govuk-!-width-one-half"))" />
+    <partial name="_SchemeLockedField" model="@((Kind: "select", Field: nameof(Model.TestConsultant2), Label: "Deputy Test Consultant", Value: Model.TestConsultant2?.ToString(), Text: OptionText(Model.TestConsultantOptions, Model.TestConsultant2), Width: "govuk-!-width-one-half"))" />
+    <partial name="_SchemeLockedField" model="@((Kind: "select", Field: nameof(Model.TestConsultant3), Label: "Secondary Test Consultant", Value: Model.TestConsultant3?.ToString(), Text: OptionText(Model.TestConsultantOptions, Model.TestConsultant3), Width: "govuk-!-width-one-half"))" />
+}
 else
 {
     <govuk-select asp-for="TestConsultant1" label="Primary Test Consultant" asp-items="Model.PrimaryTestConsultantOptions" />
