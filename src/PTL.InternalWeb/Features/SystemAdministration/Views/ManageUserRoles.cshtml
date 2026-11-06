@@ -42,7 +42,6 @@
                         <input type="hidden" name="Rows[@i].UserId" value="@row.UserId" />
                         <input type="hidden" name="Rows[@i].Username" value="@row.Username" />
                         <input type="hidden" name="Rows[@i].FriendlyName" value="@row.FriendlyName" />
-                        <input type="hidden" name="Rows[@i].OriginalRoleIds" value="@row.OriginalRoleIds" />
                     </th>
                     <td class="govuk-table__cell">@row.FriendlyName</td>
                     @foreach (var role in Model.Roles)

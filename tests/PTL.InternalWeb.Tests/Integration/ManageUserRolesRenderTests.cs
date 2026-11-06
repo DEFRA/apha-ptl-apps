@@ -39,14 +39,6 @@ public class ManageUserRolesRenderTests(WebApplicationFactory<Program> factory) 
         Assert.Contains("</table>\n    </section>", html.Replace("\r\n", "\n"), StringComparison.Ordinal);
     }
 
-    [Fact]
-    public async Task Grid_PostsEachUsersLoadedRolesAsOneHiddenField()
-    {
-        var html = await GetAsync();
-
-        Assert.Matches($"name=\"Rows\\[0\\]\\.OriginalRoleIds\" value=\"{Support.RoleId}\"", html);
-    }
-
     private async Task<string> GetSignedInAsAsync(Guid signedInUserId)
     {
         var rows = new[]

@@ -984,49 +984,6 @@ public class SystemAdministrationControllerTests
     }
 
     [Fact]
-    public async Task ManageUserRoles_Post_NothingChanged_MakesNoApiCallAndShowsSuccess()
-    {
-        var roleId = Guid.NewGuid();
-        var userApiClient = new FakeUserApiClient();
-        var controller = CreateController(userApiClient: userApiClient);
-        var model = new ManageUserRolesViewModel
-        {
-            Rows = [new UserRoleRowViewModel { UserId = Guid.NewGuid(), SelectedRoleIds = [roleId], OriginalRoleIds = roleId.ToString() }]
-        };
-
-        var result = await controller.ManageUserRoles(model, CancellationToken.None);
-
-        Assert.IsType<RedirectToActionResult>(result);
-        Assert.Empty(userApiClient.SetRolesBatchCalls);
-        Assert.Equal(NotificationType.Success, controller.TempData.GetNotification()!.Type);
-    }
-
-    [Fact]
-    public async Task ManageUserRoles_Post_ChangedRowsGoInOneBatchRequest()
-    {
-        var roleA = Guid.NewGuid();
-        var changedA = Guid.NewGuid();
-        var changedB = Guid.NewGuid();
-        var unchanged = Guid.NewGuid();
-        var userApiClient = new FakeUserApiClient();
-        var controller = CreateController(userApiClient: userApiClient);
-        var model = new ManageUserRolesViewModel
-        {
-            Rows =
-            [
-                new UserRoleRowViewModel { UserId = changedA, SelectedRoleIds = [roleA], OriginalRoleIds = string.Empty },
-                new UserRoleRowViewModel { UserId = unchanged, SelectedRoleIds = [roleA], OriginalRoleIds = roleA.ToString() },
-                new UserRoleRowViewModel { UserId = changedB, SelectedRoleIds = [], OriginalRoleIds = roleA.ToString() }
-            ]
-        };
-
-        await controller.ManageUserRoles(model, CancellationToken.None);
-
-        var batch = Assert.Single(userApiClient.SetRolesBatchCalls);
-        Assert.Equal([changedA, changedB], batch.Items.Select(i => i.UserId));
-    }
-
-    [Fact]
     public async Task ManageUserRoles_Get_BuildsRolesAndRows()
     {
         var roleId = Guid.NewGuid();
@@ -1042,7 +999,6 @@ public class SystemAdministrationControllerTests
         Assert.Single(model.Roles);
         var row = Assert.Single(model.Rows);
         Assert.Contains(roleId, row.SelectedRoleIds);
-        Assert.Equal(roleId.ToString(), row.OriginalRoleIds);
     }
 
     [Fact]
@@ -1143,51 +1099,6 @@ public class SystemAdministrationControllerTests
         var call = Assert.Single(userApiClient.SetRolesCalls);
         Assert.Equal(userId, call.UserId);
         Assert.Contains(roleId, call.Request.RoleIds);
-    }
-
-    [Fact]
-    public async Task ManageUserRoles_Post_OnlySavesRowsWhoseRolesChanged()
-    {
-        var roleA = Guid.NewGuid();
-        var roleB = Guid.NewGuid();
-        var unchangedUser = Guid.NewGuid();
-        var changedUser = Guid.NewGuid();
-        var noRolesUser = Guid.NewGuid();
-        var userApiClient = new FakeUserApiClient();
-        var controller = CreateController(userApiClient: userApiClient);
-        var model = new ManageUserRolesViewModel
-        {
-            Rows =
-            [
-                new UserRoleRowViewModel { UserId = unchangedUser, SelectedRoleIds = [roleB, roleA], OriginalRoleIds = $"{roleA},{roleB}" },
-                new UserRoleRowViewModel { UserId = changedUser, SelectedRoleIds = [roleA, roleB], OriginalRoleIds = roleA.ToString() },
-                new UserRoleRowViewModel { UserId = noRolesUser, SelectedRoleIds = [], OriginalRoleIds = string.Empty }
-            ]
-        };
-
-        var result = await controller.ManageUserRoles(model, CancellationToken.None);
-
-        Assert.IsType<RedirectToActionResult>(result);
-        var call = Assert.Single(userApiClient.SetRolesCalls);
-        Assert.Equal(changedUser, call.UserId);
-        Assert.Equal(NotificationType.Success, controller.TempData.GetNotification()!.Type);
-    }
-
-    [Theory]
-    [InlineData(null)]
-    [InlineData("not-a-guid")]
-    public async Task ManageUserRoles_Post_UnknownOrMalformedOriginal_StillSavesTheRow(string? original)
-    {
-        var userApiClient = new FakeUserApiClient();
-        var controller = CreateController(userApiClient: userApiClient);
-        var model = new ManageUserRolesViewModel
-        {
-            Rows = [new UserRoleRowViewModel { UserId = Guid.NewGuid(), SelectedRoleIds = [], OriginalRoleIds = original }]
-        };
-
-        await controller.ManageUserRoles(model, CancellationToken.None);
-
-        Assert.Single(userApiClient.SetRolesCalls);
     }
 
     [Fact]

@@ -1,4 +1,3 @@
-using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
 using PTL.InternalWeb.Authorization;
 
@@ -43,30 +42,4 @@ public sealed class UserRoleRowViewModel
     // indexed name) - matches legacy's per-row CheckBoxUserRole grid, just batched into one Save
     // instead of a save-per-click.
     public List<Guid> SelectedRoleIds { get; set; } = [];
-
-    // Comma-joined role ids as loaded on the page; a single field keeps the form under the 1,024-value limit.
-    // Null (absent) means unknown, so the row is always saved. "" must stay "" (a user with no roles), not become null.
-    [DisplayFormat(ConvertEmptyStringToNull = false)]
-    public string? OriginalRoleIds { get; set; }
-
-    public bool IsUnchanged()
-    {
-        if (OriginalRoleIds is null)
-        {
-            return false;
-        }
-
-        var original = new HashSet<Guid>();
-        foreach (var part in OriginalRoleIds.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-        {
-            if (!Guid.TryParse(part, out var roleId))
-            {
-                return false;
-            }
-
-            original.Add(roleId);
-        }
-
-        return original.SetEquals(SelectedRoleIds);
-    }
 }

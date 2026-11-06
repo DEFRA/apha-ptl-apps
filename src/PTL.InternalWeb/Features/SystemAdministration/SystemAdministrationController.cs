@@ -449,10 +449,11 @@ public partial class SystemAdministrationController : Controller
     public async Task<IActionResult> ManageUserRoles(CancellationToken cancellationToken) =>
         View(await BuildManageUserRolesViewModelAsync(cancellationToken));
 
-    // Whole-grid submit, but only rows whose checkboxes differ from what the page loaded are sent to
-    // the API. Unlike legacy's UserRoles.aspx
-    // (every checkbox click is its own immediate save), this only persists on an explicit Save - matches
-    // the story's "When I click Save... Then... persisted" acceptance criteria. Redirects back to the System
+    // Whole-grid submit: every user's role set shown on screen is (re)saved, not just the ones
+    // actually changed - idempotent for unchanged rows, mirrors the AdministrationCharge screen's
+    // save-the-whole-grid convention. Unlike legacy's UserRoles.aspx (every checkbox click is its
+    // own immediate save), this only persists on an explicit Save - matches the story's "When I
+    // click Save... Then... persisted" acceptance criteria. Redirects back to the System
     // Administration landing page (matches legacy ButtonSubmit_Click's Response.Redirect).
     [HttpPost]
     [ValidateAntiForgeryToken]
@@ -461,16 +462,15 @@ public partial class SystemAdministrationController : Controller
         var actingUserId = GetCurrentUserId();
         var blockedMessages = new List<string>();
 
-        // Only rows that differ from what the page loaded, sent as one batch request (one HTTP round trip,
-        // one DB transaction on PTL.Api) - the per-row loop caused intermittent gateway timeouts.
-        var changedRows = model.Rows.Where(r => !r.IsUnchanged()).ToList();
-        var batchResponse = changedRows.Count == 0
-            ? new SetUserRolesBatchResponse([])
-            : await userApiClient.SetUserRolesBatchAsync(
-                new SetUserRolesBatchRequest(changedRows.Select(row => new SetUserRolesBatchItem(row.UserId, row.SelectedRoleIds)).ToList(), actingUserId),
-                cancellationToken);
+        // Saved as a single batch request (one HTTP round trip, one DB transaction on PTL.Api)
+        // instead of one PUT per row - the previous per-row loop caused intermittent gateway
+        // timeouts on larger grids.
+        var batchRequest = new SetUserRolesBatchRequest(
+            model.Rows.Select(row => new SetUserRolesBatchItem(row.UserId, row.SelectedRoleIds)).ToList(),
+            actingUserId);
+        var batchResponse = await userApiClient.SetUserRolesBatchAsync(batchRequest, cancellationToken);
 
-        var friendlyNameByUserId = changedRows.GroupBy(r => r.UserId).ToDictionary(g => g.Key, g => g.First().FriendlyName);
+        var friendlyNameByUserId = model.Rows.ToDictionary(r => r.UserId, r => r.FriendlyName);
         foreach (var result in batchResponse.Results)
         {
             if (!result.Success && result.Message is not null)
@@ -508,8 +508,7 @@ public partial class SystemAdministrationController : Controller
                 UserId = r.UserId,
                 Username = r.Username,
                 FriendlyName = r.FriendlyName,
-                SelectedRoleIds = r.RoleIds.ToList(),
-                OriginalRoleIds = string.Join(',', r.RoleIds)
+                SelectedRoleIds = r.RoleIds.ToList()
             }).ToList()
         };
     }
