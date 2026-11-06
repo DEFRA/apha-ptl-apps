@@ -190,3 +190,12 @@ table.TabulationTable {
         line-height: 1.3157894737;
     }
 }
+
+/* A table inside an accordion section fills the section and sits flush with its bottom padding. */
+.govuk-accordion__section-content .ptl-table-scroll {
+    margin-bottom: 0;
+}
+
+.govuk-accordion__section-content .TabulationTable {
+    width: 100%;
+}
