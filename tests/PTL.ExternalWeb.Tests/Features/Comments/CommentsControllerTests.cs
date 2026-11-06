@@ -1,4 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
+using PTL.ApiClient;
+using PTL.ApiClient.Distribution;
+using PTL.Contracts.Distribution;
 using PTL.ExternalWeb.Features.Comments;
 
 namespace PTL.ExternalWeb.Tests.Features.Comments;
@@ -6,14 +9,122 @@ namespace PTL.ExternalWeb.Tests.Features.Comments;
 public class CommentsControllerTests
 {
     [Fact]
-    public void Index_ReturnsComingSoonViewForEnterComments()
+    public async Task Index_WithSearch_FiltersDistributionsByTitle()
     {
-        var controller = new CommentsController();
+        var api = new FakeTestConsultantApiClient
+        {
+            Distributions =
+                new TestConsultantDistributionsResponse(
+                [
+                    Distribution("D1a/S1 BT: Brucella"),
+                    Distribution("D2a/S2 PTX: Salmonella")
+                ])
+        };
+        var controller = new CommentsController(api);
 
-        var result = controller.Index();
+        var result = await controller.Index("Brucella", CancellationToken.None);
 
-        var viewResult = Assert.IsType<ViewResult>(result);
-        Assert.Equal("_ComingSoonBody", viewResult.ViewName);
-        Assert.Equal("Enter comments", viewResult.Model);
+        var model = Assert.IsType<CommentsListViewModel>(Assert.IsType<ViewResult>(result).Model);
+        var row = Assert.Single(model.Distributions);
+        Assert.Contains("Brucella", row.DistributionTitle, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Entry_Get_WhenTabulationLoads_ReturnsEntryViewModel()
+    {
+        var api = new FakeTestConsultantApiClient { Tabulation = Ok(Tabulation(submitted: false)) };
+        var controller = new CommentsController(api);
+
+        var result = await controller.Entry(Guid.NewGuid(), CancellationToken.None);
+
+        var model = Assert.IsType<CommentsEntryViewModel>(Assert.IsType<ViewResult>(result).Model);
+        Assert.Equal("Title", model.Title);
+        Assert.False(model.IsSubmitted);
+    }
+
+    [Fact]
+    public async Task Entry_Post_SubmitWithoutAcknowledgement_AddsValidationError_AndDoesNotSave()
+    {
+        var api = new FakeTestConsultantApiClient { Tabulation = Ok(Tabulation(submitted: false)) };
+        var controller = new CommentsController(api);
+        var schemeId = Guid.NewGuid();
+
+        var result = await controller.Entry(schemeId, new CommentsEntryViewModel { Comments = "<p>Text</p>", Acknowledged = false }, "submit", CancellationToken.None);
+
+        Assert.IsType<ViewResult>(result);
+        Assert.False(controller.ModelState.IsValid);
+        Assert.True(controller.ModelState.ContainsKey(nameof(CommentsEntryViewModel.Acknowledged)));
+        Assert.Empty(api.SavedRequests);
+    }
+
+    [Fact]
+    public async Task Entry_Post_Save_Success_RedirectsToIndex_AndSendsDraftRequest()
+    {
+        var api = new FakeTestConsultantApiClient
+        {
+            Tabulation = Ok(Tabulation(submitted: false)),
+            SaveResult = new TestConsultantApiResult<TestConsultantTabulationSaveResult>(TestConsultantApiStatus.Ok, new TestConsultantTabulationSaveResult(true, false, new Dictionary<string, string>()))
+        };
+        var controller = new CommentsController(api);
+        var schemeId = Guid.NewGuid();
+
+        var result = await controller.Entry(schemeId, new CommentsEntryViewModel { Comments = "<p>Draft</p>", Acknowledged = false }, "save", CancellationToken.None);
+
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal(nameof(CommentsController.Index), redirect.ActionName);
+        var request = Assert.Single(api.SavedRequests);
+        Assert.False(request.Submit);
+        Assert.Equal("<p>Draft</p>", request.Comments);
+    }
+
+    private static TestConsultantApiResult<TestConsultantTabulationResponse> Ok(TestConsultantTabulationResponse value) =>
+        new(TestConsultantApiStatus.Ok, value);
+
+    private static TestConsultantDistributionResponse Distribution(string title) =>
+        new(Guid.NewGuid(), 2026, 6, title, new DateTime(2026, 6, 30), false, "Awaiting comments");
+
+    private static TestConsultantTabulationResponse Tabulation(bool submitted) =>
+        new(
+            Guid.NewGuid(),
+            "Title",
+            "30 June 2026",
+            "",
+            "",
+            HasMethodItems: false,
+            SampleNumbers: [],
+            ResultsTables: [],
+            ResultsRatings: null,
+            FullTables: [],
+            FullRatings: null,
+            ParticipantInformation: null,
+            SampleInformation: [],
+            Comments: new TestConsultantCommentsStateResponse(submitted, "Add your comments here:", "<p>Saved</p>", true));
+
+    private sealed class FakeTestConsultantApiClient : ITestConsultantTabulationApiClient
+    {
+        public TestConsultantDistributionsResponse Distributions { get; set; } = new([]);
+        public TestConsultantApiResult<TestConsultantTabulationResponse> Tabulation { get; set; } = new(TestConsultantApiStatus.NotFound);
+        public TestConsultantApiResult<TestConsultantTabulationSaveResult> SaveResult { get; set; } =
+            new(TestConsultantApiStatus.Ok, new TestConsultantTabulationSaveResult(true, false, new Dictionary<string, string>()));
+
+        public List<TestConsultantTabulationSaveRequest> SavedRequests { get; } = [];
+
+        public Task<TestConsultantDistributionsResponse> GetDistributionsAsync(CancellationToken cancellationToken = default) =>
+            Task.FromResult(Distributions);
+
+        public Task<TestConsultantApiResult<TestConsultantTabulationResponse>> GetTabulationAsync(
+            Guid monthlyDistributionSchemeId, TestConsultantTabulationFilter filter, CancellationToken cancellationToken = default) =>
+            Task.FromResult(Tabulation);
+
+        public Task<TestConsultantApiResult<PTL.ApiClient.Distribution.TabulationAttachmentFile>> ExportTabulationAsync(
+            Guid monthlyDistributionSchemeId, TestConsultantTabulationFilter filter, CancellationToken cancellationToken = default) =>
+            Task.FromResult(new TestConsultantApiResult<PTL.ApiClient.Distribution.TabulationAttachmentFile>(TestConsultantApiStatus.NotFound));
+
+        public Task<TestConsultantApiResult<TestConsultantTabulationSaveResult>> SaveCommentsAsync(
+            Guid monthlyDistributionSchemeId, TestConsultantTabulationSaveRequest request, CancellationToken cancellationToken = default)
+        {
+            SavedRequests.Add(request);
+            return Task.FromResult(SaveResult);
+        }
     }
 }

@@ -1,0 +1,51 @@
+@model PTL.ExternalWeb.Features.Comments.CommentsListViewModel
+@{
+    ViewData["Title"] = "Enter comments";
+}
+
+<h1 class="govuk-heading-l">Distributions</h1>
+
+<p class="govuk-body">Select View to open a distribution and enter or submit comments.</p>
+
+<form method="get" asp-action="Index" class="govuk-!-margin-bottom-6">
+    <div class="govuk-form-group">
+        <label class="govuk-label" for="search">Search distributions</label>
+        <input class="govuk-input govuk-!-width-two-thirds" id="search" name="search" value="@Model.Search" />
+    </div>
+
+    <div class="govuk-button-group">
+        <button class="govuk-button" data-module="govuk-button" type="submit">Search</button>
+        <a class="govuk-button govuk-button--secondary" data-module="govuk-button" asp-action="Index">Show All</a>
+    </div>
+</form>
+
+@if (Model.Distributions.Count == 0)
+{
+    <p class="govuk-body">@(Model.IsFiltered ? "No distributions found for the selected search criteria." : "There are no distributions to display.")</p>
+}
+else
+{
+    <table class="govuk-table">
+        <thead class="govuk-table__head">
+            <tr class="govuk-table__row">
+                <th scope="col" class="govuk-table__header">Distribution</th>
+                <th scope="col" class="govuk-table__header">Target date</th>
+                <th scope="col" class="govuk-table__header">Comments status</th>
+                <th scope="col" class="govuk-table__header">Comments</th>
+            </tr>
+        </thead>
+        <tbody class="govuk-table__body">
+            @foreach (var distribution in Model.Distributions)
+            {
+                <tr class="govuk-table__row">
+                    <td class="govuk-table__cell">@distribution.DistributionTitle</td>
+                    <td class="govuk-table__cell">@distribution.TargetDate.ToString("dddd d MMMM yyyy")</td>
+                    <td class="govuk-table__cell">@distribution.CommentStatus</td>
+                    <td class="govuk-table__cell">
+                        <a class="govuk-link" asp-action="Entry" asp-route-schemeId="@distribution.MonthlyDistributionSchemeId">View</a>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}

@@ -1,0 +1,152 @@
+@model PTL.ExternalWeb.Features.Comments.CommentsEntryViewModel
+@{
+    ViewData["Title"] = "Enter comments";
+
+    var errors = ViewData.ModelState
+        .Where(entry => entry.Value?.Errors.Count > 0)
+        .SelectMany(entry => entry.Value!.Errors.Select(error => (Field: entry.Key, Message: error.ErrorMessage)))
+        .ToList();
+}
+
+<govuk-error-summary errors="@errors" />
+
+<h1 class="govuk-heading-l">Enter comments</h1>
+<h2 class="govuk-heading-m">@Model.Title</h2>
+
+<p class="govuk-body">Review the distribution results and enter comments below.</p>
+
+<div class="govuk-tabs" data-module="govuk-tabs">
+    <h2 class="govuk-tabs__title">Report sections</h2>
+    <ul class="govuk-tabs__list">
+        <li class="govuk-tabs__list-item govuk-tabs__list-item--selected"><a class="govuk-tabs__tab" href="#results-report">Results Report</a></li>
+        <li class="govuk-tabs__list-item"><a class="govuk-tabs__tab" href="#full-report">Full Report</a></li>
+        <li class="govuk-tabs__list-item"><a class="govuk-tabs__tab" href="#additional-sample-information">Additional Sample Information</a></li>
+    </ul>
+
+    <div class="govuk-tabs__panel" id="results-report">
+        <h2 class="govuk-heading-m">Results Report</h2>
+        @foreach (var table in Model.ResultsTables)
+        {
+            <govuk-tabulation-table table="table" />
+        }
+        @if (Model.ResultsRatings is not null)
+        {
+            <govuk-tabulation-table table="Model.ResultsRatings" />
+        }
+    </div>
+
+    <div class="govuk-tabs__panel govuk-tabs__panel--hidden" id="full-report">
+        <h2 class="govuk-heading-m">Full Report</h2>
+        @foreach (var table in Model.FullTables)
+        {
+            <govuk-tabulation-table table="table" />
+        }
+        @if (Model.FullRatings is not null)
+        {
+            <govuk-tabulation-table table="Model.FullRatings" />
+        }
+        @if (Model.ParticipantInformation is not null)
+        {
+            <govuk-tabulation-table table="Model.ParticipantInformation" />
+        }
+    </div>
+
+    <div class="govuk-tabs__panel govuk-tabs__panel--hidden" id="additional-sample-information">
+        <h2 class="govuk-heading-m">Additional Sample Information</h2>
+        @if (Model.SampleInformation.Count == 0)
+        {
+            <p class="govuk-body">No additional sample information is available.</p>
+        }
+        @foreach (var sample in Model.SampleInformation)
+        {
+            <h3 class="govuk-heading-s govuk-!-margin-bottom-1">@sample.SampleNumber @sample.TabulationDescription</h3>
+            <p class="govuk-body">@sample.TestConsultantsDescription</p>
+        }
+    </div>
+</div>
+
+<div id="commentsDiv">
+    @if (!string.IsNullOrEmpty(Model.StandardTabulationTextHtml))
+    {
+        <div class="govuk-body">
+            @Html.Raw(Model.StandardTabulationTextHtml)
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(Model.ExistingCommentsHtml))
+    {
+        <div class="govuk-body">
+            @Html.Raw(Model.ExistingCommentsHtml)
+        </div>
+    }
+
+    @if (Model.IsSubmitted)
+    {
+        <div class="govuk-body">
+            <h2 class="govuk-heading-m">@Model.State.Heading</h2>
+            @if (Model.State.HasComments)
+            {
+                @Html.Raw(Model.State.CommentsHtml)
+            }
+        </div>
+    }
+</div>
+
+@if (Model.IsSubmitted)
+{
+    <div class="govuk-button-group">
+        <a class="govuk-button govuk-button--secondary" data-module="govuk-button" asp-action="Index">Back</a>
+    </div>
+}
+else
+{
+    <form method="post" asp-action="Entry" asp-route-schemeId="@Model.MonthlyDistributionSchemeId" novalidate>
+        <input type="hidden" asp-for="MonthlyDistributionSchemeId" />
+
+        <govuk-rich-text asp-for="Comments" label="@Model.State.Heading" />
+
+        <div class="govuk-form-group @(ViewData.ModelState.ContainsKey(nameof(Model.Acknowledged)) ? "govuk-form-group--error" : string.Empty)">
+            <fieldset class="govuk-fieldset">
+                <legend class="govuk-visually-hidden">Submission acknowledgement</legend>
+                @if (ViewData.ModelState.TryGetValue(nameof(Model.Acknowledged), out var acknowledgedError) && acknowledgedError.Errors.Count > 0)
+                {
+                    <p class="govuk-error-message" id="Acknowledged-error"><span class="govuk-visually-hidden">Error:</span> @acknowledgedError.Errors[0].ErrorMessage</p>
+                }
+                <div class="govuk-checkboxes" data-module="govuk-checkboxes">
+                    <div class="govuk-checkboxes__item">
+                        <input class="govuk-checkboxes__input" asp-for="Acknowledged" type="checkbox" value="true" />
+                        <label class="govuk-label govuk-checkboxes__label" asp-for="Acknowledged">I understand that once my comments are submitted, you will not be able to edit them.</label>
+                    </div>
+                </div>
+            </fieldset>
+        </div>
+
+        <div class="govuk-button-group">
+            <button type="submit" name="command" value="save" class="govuk-button govuk-button--secondary" data-module="govuk-button">Save</button>
+            <button id="submit-comments-button" type="submit" name="command" value="submit" class="govuk-button" data-module="govuk-button" disabled>Submit</button>
+            <button type="submit" name="command" value="cancel" class="govuk-button govuk-button--secondary" data-module="govuk-button" formnovalidate>Cancel</button>
+        </div>
+    </form>
+
+    <script>
+        (function () {
+            var checkbox = document.getElementById('Acknowledged');
+            var submit = document.getElementById('submit-comments-button');
+            if (!checkbox || !submit) {
+                return;
+            }
+
+            function update() {
+                submit.disabled = !checkbox.checked;
+            }
+
+            checkbox.addEventListener('change', update);
+            update();
+        })();
+    </script>
+}
+
+@section Scripts {
+    <script src="~/lib/tinymce/tinymce.min.js" asp-append-version="true"></script>
+    <script src="~/js/ptl-rich-text-editor.js" asp-append-version="true"></script>
+}
