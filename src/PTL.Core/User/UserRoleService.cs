@@ -54,10 +54,9 @@ public sealed class UserRoleService(
         var existingRoleIds = existing.Select(a => a.RoleId).ToHashSet();
         var desiredRoleIds = roleIds.ToHashSet();
 
-        // Only blocks the CURRENT user removing their OWN Admin role. Legacy's
-        // PreventAdminUncheck() blocked every user's Admin checkbox client-side only, for
-        // everyone, with no server-side guard at all - this is a deliberate fix matching the
-        // story's narrower, explicit scope, not a port of legacy's (undocumented, broader) behaviour.
+        // Only blocks the CURRENT user removing their OWN Admin role - legacy's PreventAdminUncheck()
+        // greyed out the Admin checkbox on the signed-in user's own row (UserRoles.aspx) and nothing else.
+        // Here the check is server-side, so it holds whatever the form posts.
         var roles = await roleRepository.GetAllAsync(cancellationToken);
         var adminRoleId = roles.FirstOrDefault(r => string.Equals(r.Name, AdminRoleName, StringComparison.OrdinalIgnoreCase))?.RoleId;
 

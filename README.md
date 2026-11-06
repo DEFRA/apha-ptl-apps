@@ -304,6 +304,10 @@ built, so the running container never downloads anything. In `src/PTL.ExternalWe
   cannot silently ship.
 - `playwright.ps1` comes from the `Microsoft.Playwright` 1.64.1 package (published alongside the app), so the
   installed browser version always matches the library.
+- The final stage is the full `mcr.microsoft.com/windows/server:ltsc2022` image, not Windows Server Core: Chromium
+  exits as soon as it opens a page on Server Core. The ASP.NET Core runtime is copied in from the
+  `aspnet:10.0-windowsservercore-ltsc2022` image because the full Windows Server image does not include it.
+- A build step runs `playwright.ps1 pdf about:blank`, so an image whose Chromium cannot print fails to build.
 
 Running outside Docker: build the project, then run `pwsh src/PTL.ExternalWeb/bin/<Configuration>/net10.0/playwright.ps1 install chromium`
 once. To use an already-installed browser instead, set `PdfGeneration:BrowserChannel` (for example `msedge`).

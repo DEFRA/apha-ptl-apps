@@ -280,7 +280,7 @@ public partial class SystemAdministrationController : Controller
         if (ModelState.IsValid)
         {
             var result = await externalSiteMessageApiClient.UpdateExternalSiteMessageAsync(
-                new ExternalSiteMessageSaveRequest(model.Message, model.ImportantMessage, model.SupportEmailAddress),
+                new ExternalSiteMessageSaveRequest(model.Message ?? string.Empty, model.ImportantMessage ?? string.Empty, model.SupportEmailAddress),
                 cancellationToken);
 
             if (result.Success)
@@ -499,6 +499,7 @@ public partial class SystemAdministrationController : Controller
 
         return new ManageUserRolesViewModel
         {
+            CurrentUserId = GetCurrentUserId(),
             // spgaRole returns the roles by fldOrder DESC. Legacy UserRoles.aspx inserted each one at column 2 as it
             // looped, so its columns ran the other way (fldOrder ascending): do the same here.
             Roles = roles.Reverse().Select(r => new RoleColumnViewModel { RoleId = r.RoleId, Name = r.Name }).ToList(),

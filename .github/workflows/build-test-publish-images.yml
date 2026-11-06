@@ -349,7 +349,8 @@ jobs:
     needs: [changes, quality]
     if: needs.changes.outputs.components != '[]'
     runs-on: windows-2022
-    timeout-minutes: 20
+    # The externalweb image's full Windows Server base is much larger than Server Core, so building, saving and uploading it takes longer.
+    timeout-minutes: 35
     permissions:
       contents: read
     strategy:
