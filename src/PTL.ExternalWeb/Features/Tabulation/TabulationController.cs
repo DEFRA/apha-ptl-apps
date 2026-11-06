@@ -71,7 +71,7 @@ public sealed partial class TabulationController(
 
         var listUrl = ListReturnUrl.Validate(returnUrl, ListReturnUrl.TabulationIndex);
         ViewData["ListReturnUrl"] = listUrl;
-        return View(new TabulationReportPageViewModel(report, listUrl));
+        return View(new TabulationReportPageViewModel(report, listUrl, TabulationAccordionBuilder.Build(report)));
     }
 
     // Legacy AssessmentResults.aspx - rendered as a data table (see AssessmentResultsPageViewModel).
