@@ -124,6 +124,7 @@
 
 @section Scripts {
     <script src="~/js/amend-results.js" asp-append-version="true"></script>
+    <script src="~/js/unsaved-changes.js" asp-append-version="true"></script>
 }
 
 @if (audit)
@@ -147,9 +148,12 @@ else
     <h2 class="govuk-heading-m">@amend.DistributionTitle</h2>
 
     <p class="govuk-body">All of the Intended Results and the Results received from Participants are shown below for Amending.</p>
+
+    @* Hidden until the user tries to leave with edits in place; unsaved-changes.js reveals it. *@
+    <partial name="_UnsavedChangesBanner" model="@Model.HasUnsavedChanges" />
 }
 
-<form method="post" asp-action="AmendResults" asp-route-year="@Model.YearId" asp-route-monthId="@Model.MonthId" asp-route-schemeId="@Model.MonthlyDistributionSchemeId" data-amend-results>
+<form method="post" asp-action="AmendResults" asp-route-year="@Model.YearId" asp-route-monthId="@Model.MonthId" asp-route-schemeId="@Model.MonthlyDistributionSchemeId" data-amend-results data-unsaved-watch>
     @if (audit)
     {
         @* No server-side session holds the pending edits, so the whole grid rides along (read-only) and is re-posted. *@
@@ -535,6 +539,7 @@ else
     {
         <div class="govuk-button-group">
             <button type="submit" name="command" value="save" class="govuk-button" data-module="govuk-button">Save</button>
+            <button type="submit" name="command" value="apply" class="govuk-button govuk-button--secondary" data-module="govuk-button">Apply</button>
             <button type="submit" name="command" value="cancel" class="govuk-button govuk-button--secondary" data-module="govuk-button" formnovalidate>Cancel</button>
         </div>
     }

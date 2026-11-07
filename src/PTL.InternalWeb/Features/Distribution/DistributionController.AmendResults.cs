@@ -3,16 +3,25 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using PTL.Contracts.Distribution;
 using PTL.InternalWeb.Authorization;
+using PTL.InternalWeb.Confirmation;
+using PTL.InternalWeb.Navigation;
 using PTL.SharedUI.Notifications;
 using Keys = PTL.Contracts.Distribution.AmendResultsFieldKeys;
 
 namespace PTL.InternalWeb.Features.Distribution;
 
 // Amend Results - legacy Scheduling/AmendResults.aspx, reached from the Tabulations page's
-// "Amend Results" action. Save and Cancel return to Tabulations (legacy Apply is not carried over).
+// "Amend Results" action. Save and Cancel return to Tabulations; Apply saves and stays, re-reading
+// the page (legacy BtnSave / BtnApply / BtnCancel).
 public sealed partial class DistributionController
 {
     private const string AuditWhyRequiredMessage = "The reason for these changes must be specified";
+
+    // Legacy OnChangeFunc armed a navigate-away dialog once a cell had been edited. Cancel is the one
+    // exit the server sees, and the form posts every value, so the warning is raised only when the
+    // posted values actually differ from the stored ones.
+    public const string DiscardTitle = "You have changes that have not been saved";
+    public const string DiscardMessage = "If you continue, your amendments will be discarded.";
 
     private static readonly string[] AmendInputPrefixes = ["im_", "ir1_", "ir2_", "pm_", "pr_", "ac_", "as_", "pc_", "rr_", "rg_", "nr_"];
 
@@ -40,11 +49,6 @@ public sealed partial class DistributionController
     {
         ArgumentNullException.ThrowIfNull(audit);
 
-        if (string.Equals(command, CancelCommand, StringComparison.OrdinalIgnoreCase))
-        {
-            return RedirectToAction(nameof(Tabulations), new { year, monthId });
-        }
-
         if (string.Equals(command, "cancelAudit", StringComparison.OrdinalIgnoreCase))
         {
             return RedirectToAction(nameof(Tabulations), new { year, monthId });
@@ -68,6 +72,42 @@ public sealed partial class DistributionController
             {
                 values[name] = changed;
             }
+        }
+
+        if (string.Equals(command, CancelCommand, StringComparison.OrdinalIgnoreCase))
+        {
+            if (!HasAmendments(page, values) || ConfirmationFlow.IsConfirmed(audit.Confirmation))
+            {
+                return RedirectToAction(nameof(Tabulations), new { year, monthId });
+            }
+
+            // Declined: back to the page with the edits intact, and the banner saying so.
+            if (ConfirmationFlow.IsCancelled(audit.Confirmation))
+            {
+                return View(new AmendResultsViewModel
+                {
+                    YearId = year,
+                    MonthId = monthId,
+                    MonthlyDistributionSchemeId = schemeId,
+                    Page = page,
+                    Values = values,
+                    HasUnsavedChanges = true,
+                });
+            }
+
+            ViewData[BreadcrumbRouteValues.Action] = nameof(AmendResults);
+            return this.ConfirmationPage(
+                new ConfirmationPageViewModel
+                {
+                    Title = DiscardTitle,
+                    PageTitle = "Leave Amend Results",
+                    Caption = page.DistributionTitle,
+                    Message = DiscardMessage,
+                    ConfirmText = "Discard changes",
+                    IsDestructive = true,
+                    CancelText = "Go back to Amend Results",
+                },
+                nameof(AmendResults));
         }
 
         var isAuditStep = audit.IsAuditStep is true;
@@ -117,7 +157,54 @@ public sealed partial class DistributionController
         }
 
         TempData.SetNotification(NotificationType.Success, "Amended Results updated successfully.");
-        return RedirectToAction(nameof(Tabulations), new { year, monthId });
+
+        // Apply keeps the user on the page with the saved values re-read; the audit step carries the
+        // original command forward, so an audited Apply stays here too.
+        return string.Equals(effectiveCommand, ApplyCommand, StringComparison.OrdinalIgnoreCase)
+            ? RedirectToAction(nameof(AmendResults), new { year, monthId, schemeId })
+            : RedirectToAction(nameof(Tabulations), new { year, monthId });
+    }
+
+    // True when any posted input differs from the value the page was drawn with. Only inputs the page
+    // actually rendered are posted, so anything absent is by definition unchanged.
+    private static bool HasAmendments(AmendResultsResponse page, Dictionary<string, string> values)
+    {
+        bool Changed(string name, string stored) =>
+            values.TryGetValue(name, out var posted) && !string.Equals(posted, stored, StringComparison.Ordinal);
+
+        bool ScoreChanged(string name, int stored) =>
+            values.TryGetValue(name, out var posted)
+            && !string.Equals(posted, stored.ToString(CultureInfo.InvariantCulture), StringComparison.Ordinal);
+
+        foreach (var test in page.Tests)
+        {
+            if (test.IntendedMethodResults.Any(i => Changed(Keys.IntendedMethod(i.ItemId), i.Value))
+                || test.IntendedResultItemResults.Any(i =>
+                    Changed(Keys.IntendedResult(i.SampleId, i.ItemId, 1), i.Value)
+                    || Changed(Keys.IntendedResult(i.SampleId, i.ItemId, 2), i.Value2))
+                || test.ResultItems.Any(r => values.ContainsKey(Keys.Range(r.ItemId) + "_shown") && values.ContainsKey(Keys.Range(r.ItemId)) != r.IsRange))
+            {
+                return true;
+            }
+        }
+
+        foreach (var participant in page.Participants)
+        {
+            var id = participant.DistributionParticipantId;
+            if (participant.MethodResults.Any(m => Changed(Keys.ParticipantMethod(id, m.ItemId), m.Value))
+                || participant.ResultItemResults.Any(r => Changed(Keys.ParticipantResult(id, r.SampleId, r.ItemId), r.Value))
+                || participant.CategoryResults.Any(c => ScoreChanged(Keys.CategoryScore(id, c.SampleId, c.CategoryItemId), c.Score))
+                || participant.Assessments.Any(a =>
+                    Changed(Keys.AssessmentComment(id, a.TestId, a.SampleId), a.Comment)
+                    || ScoreChanged(Keys.AssessmentScore(id, a.TestId, a.SampleId), a.Score))
+                || Changed(Keys.NilReturn(id), participant.NilReturnReason)
+                || participant.Ratings.Any(r => Changed(Keys.Rating(id, r.SampleId), r.RatingId.ToString())))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     // Reads back every input the page rendered; anything not posted is left out (and so unchanged).

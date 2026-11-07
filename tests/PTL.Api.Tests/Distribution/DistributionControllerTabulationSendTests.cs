@@ -122,14 +122,28 @@ public class DistributionControllerTabulationSendTests
     [Fact]
     public async Task SaveTabulations_StaleSend_ReturnsConflict()
     {
+        Seed();
+
+        var result = await CreateController().SaveTabulations(
+            2026, 5, Staged(new TabulationStagedSendRequest(Guid.NewGuid(), "SendToResultsSignOff")), Service, CancellationToken.None);
+
+        Assert.IsType<ConflictResult>(result);
+        Assert.Empty(_repository.TabulationSends);
+    }
+
+    // Legacy guarded every Send* with "If <date>.IsEmpty Then": a replayed send does nothing and must
+    // not be reported as the page having been changed by someone else.
+    [Fact]
+    public async Task SaveTabulations_SameSendStagedTwice_AppliesItOnceAndReturnsNoContent()
+    {
         var scheme = Seed();
 
         var result = await CreateController().SaveTabulations(
             2026, 5, Staged(new(scheme.MonthlyDistributionSchemeId, "SendToResultsSignOff"), new(scheme.MonthlyDistributionSchemeId, "SendToResultsSignOff")),
             Service, CancellationToken.None);
 
-        Assert.IsType<ConflictResult>(result);
-        Assert.Empty(_repository.TabulationSends);
+        Assert.IsType<NoContentResult>(result);
+        Assert.Single(Assert.Single(_repository.TabulationSends));
     }
 
     [Fact]

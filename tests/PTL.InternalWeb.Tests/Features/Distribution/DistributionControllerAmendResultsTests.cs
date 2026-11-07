@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ViewFeatures;
 using Microsoft.Extensions.Primitives;
 using PTL.Contracts.Distribution;
+using PTL.InternalWeb.Confirmation;
 using PTL.InternalWeb.Features.Distribution;
 using PTL.InternalWeb.Tests.TestSupport;
 using PTL.SharedUI.Notifications;
@@ -109,7 +110,7 @@ public class DistributionControllerAmendResultsTests
     private static (string, string[]) Field(string key, params string[] values) => (key, values);
 
     private static Task<IActionResult> PostAsync(
-        DistributionController controller, string? command, bool isAuditStep = false, string? pendingCommand = null, string? auditWhy = null) =>
+        DistributionController controller, string? command, bool isAuditStep = false, string? pendingCommand = null, string? auditWhy = null, string? confirmation = null) =>
         controller.AmendResults(
             2026,
             5,
@@ -121,6 +122,7 @@ public class DistributionControllerAmendResultsTests
                 PendingCommand = pendingCommand,
                 AuditObjectName = isAuditStep ? AuditObject : null,
                 AuditWhy = auditWhy,
+                Confirmation = confirmation,
             },
             CancellationToken.None);
 
@@ -147,6 +149,17 @@ public class DistributionControllerAmendResultsTests
         Assert.Equal(2026, redirect.RouteValues!["year"]);
         Assert.Equal(5, redirect.RouteValues["monthId"]);
         Assert.False(redirect.RouteValues.ContainsKey("schemeId"));
+    }
+
+    // Legacy BtnApply: saved, then the same scheme is redrawn from the database.
+    private static void AssertRedirectToAmendResults(IActionResult result)
+    {
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal("AmendResults", redirect.ActionName);
+        Assert.Null(redirect.ControllerName);
+        Assert.Equal(2026, redirect.RouteValues!["year"]);
+        Assert.Equal(5, redirect.RouteValues["monthId"]);
+        Assert.Equal(SchemeId, redirect.RouteValues["schemeId"]);
     }
 
     private static AmendResultsViewModel AssertRedisplayed(IActionResult result)
@@ -194,6 +207,95 @@ public class DistributionControllerAmendResultsTests
 
         AssertRedirectToTabulations(result);
         Assert.Empty(apiClient.SavedAmendResults);
+    }
+
+    // Legacy only warned once a cell had been edited: posting back what the page was drawn with is
+    // not an edit, so Cancel leaves straight away.
+    [Fact]
+    public async Task Post_CancelWithUnchangedValues_ReturnsToTabulationsWithoutAsking()
+    {
+        var apiClient = ApiClient(Saved());
+        var controller = CreateController(
+            apiClient,
+            Field(Keys.IntendedMethod(MethodItem), "10"),
+            Field(Keys.ParticipantResult(WithResults, Sample1, ResultItem), "Pos"),
+            Field(Keys.NilReturn(NilReturn), StoredNilReason));
+
+        AssertRedirectToTabulations(await PostAsync(controller, "cancel"));
+        Assert.Empty(apiClient.SavedAmendResults);
+    }
+
+    [Theory]
+    [InlineData("im_")]
+    [InlineData("pr_")]
+    [InlineData("nr_")]
+    [InlineData("ac_")]
+    public async Task Post_CancelWithAnEdit_AsksBeforeDiscarding(string edited)
+    {
+        var apiClient = ApiClient(Saved());
+        (string, string[]) change = edited switch
+        {
+            "im_" => Field(Keys.IntendedMethod(MethodItem), "99"),
+            "pr_" => Field(Keys.ParticipantResult(WithResults, Sample1, ResultItem), "Neg"),
+            "nr_" => Field(Keys.NilReturn(NilReturn), "Changed reason"),
+            _ => Field(Keys.AssessmentComment(WithResults, TestId, Sample1), "Reworded"),
+        };
+
+        AssertDiscardConfirmation(await PostAsync(CreateController(apiClient, change), "cancel"));
+        Assert.Empty(apiClient.SavedAmendResults);
+    }
+
+    // A Range tick box that was stored ticked and comes back unticked is an edit too.
+    [Fact]
+    public async Task Post_CancelWithAClearedRangeTickBox_AsksBeforeDiscarding()
+    {
+        var apiClient = ApiClient(Saved(), Page(rangeStored: true));
+        var controller = CreateController(apiClient, Field(Keys.Range(ResultItem) + "_shown", "true"));
+
+        AssertDiscardConfirmation(await PostAsync(controller, "cancel"));
+        Assert.Empty(apiClient.SavedAmendResults);
+    }
+
+    private static void AssertDiscardConfirmation(IActionResult result)
+    {
+        var view = Assert.IsType<ViewResult>(result);
+        Assert.Equal(ConfirmationFlow.ViewName, view.ViewName);
+        var page = Assert.IsType<ConfirmationPageViewModel>(view.Model);
+        Assert.Equal(DistributionController.DiscardTitle, page.Title);
+        Assert.Equal(DistributionController.DiscardMessage, page.Message);
+        Assert.True(page.IsDestructive);
+    }
+
+    [Fact]
+    public async Task Post_CancelConfirmed_DiscardsTheEditsAndReturnsToTabulations()
+    {
+        var apiClient = ApiClient(Saved());
+        var controller = CreateController(apiClient, Field(Keys.IntendedMethod(MethodItem), "99"));
+
+        AssertRedirectToTabulations(await PostAsync(controller, "cancel", confirmation: ConfirmationFlow.Confirmed));
+        Assert.Empty(apiClient.SavedAmendResults);
+    }
+
+    // Declining returns to the page with the edits still in place and the banner explaining the state.
+    [Fact]
+    public async Task Post_CancelDeclined_RedisplaysTheEditsAndRaisesTheUnsavedChangesBanner()
+    {
+        var apiClient = ApiClient(Saved());
+        var controller = CreateController(apiClient, Field(Keys.IntendedMethod(MethodItem), "99"));
+
+        var model = AssertRedisplayed(await PostAsync(controller, "cancel", confirmation: ConfirmationFlow.Cancelled));
+
+        Assert.Equal("99", model.Values[Keys.IntendedMethod(MethodItem)]);
+        Assert.True(model.HasUnsavedChanges);
+        Assert.Empty(apiClient.SavedAmendResults);
+    }
+
+    [Fact]
+    public async Task Get_DoesNotRaiseTheUnsavedChangesBanner()
+    {
+        var result = await CreateController(ApiClient(page: Page())).AmendResults(2026, 5, SchemeId, CancellationToken.None);
+
+        Assert.False(AssertRedisplayed(result).HasUnsavedChanges);
     }
 
     // No Apply any more: cancelling the audit step always leaves for Tabulations.
@@ -500,21 +602,23 @@ public class DistributionControllerAmendResultsTests
         Assert.Single(apiClient.SavedAmendResults);
     }
 
-    // A stale "apply" post is treated as Save.
+    // Legacy BtnApply_Click: Save() then redraw, so the user stays on the scheme they are amending.
     [Theory]
     [InlineData("apply")]
     [InlineData("APPLY")]
-    public async Task Post_SavedWithAStaleApplyCommand_ReturnsToTabulations(string command)
+    public async Task Post_SavedWithApply_StaysOnAmendResults(string command)
     {
         var apiClient = ApiClient(Saved());
+        var controller = CreateController(apiClient);
 
-        AssertRedirectToTabulations(await PostAsync(CreateController(apiClient), command));
+        AssertRedirectToAmendResults(await PostAsync(controller, command));
+
         Assert.Single(apiClient.SavedAmendResults);
+        Assert.Equal("Amended Results updated successfully.", controller.TempData.GetNotification()!.Message);
     }
 
     [Theory]
     [InlineData("save", "save")]
-    [InlineData("save", "apply")]
     [InlineData("apply", "save")]
     public async Task Post_AuditStepSaved_ReturnsToTabulationsAndSendsTheReason(string button, string pendingCommand)
     {
@@ -523,6 +627,20 @@ public class DistributionControllerAmendResultsTests
         var result = await PostAsync(CreateController(apiClient), button, isAuditStep: true, pendingCommand: pendingCommand, auditWhy: "Because");
 
         AssertRedirectToTabulations(result);
+        Assert.Equal("Because", Assert.Single(apiClient.SavedAmendResults).AuditWhy);
+    }
+
+    // The audit step carries the original button forward, so an audited Apply still stays on the page.
+    [Theory]
+    [InlineData("save", "apply")]
+    [InlineData("apply", "apply")]
+    public async Task Post_AuditStepApplied_StaysOnAmendResultsAndSendsTheReason(string button, string pendingCommand)
+    {
+        var apiClient = ApiClient(Saved());
+
+        var result = await PostAsync(CreateController(apiClient), button, isAuditStep: true, pendingCommand: pendingCommand, auditWhy: "Because");
+
+        AssertRedirectToAmendResults(result);
         Assert.Equal("Because", Assert.Single(apiClient.SavedAmendResults).AuditWhy);
     }
 }

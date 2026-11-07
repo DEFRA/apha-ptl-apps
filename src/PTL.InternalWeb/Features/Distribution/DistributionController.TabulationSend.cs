@@ -22,18 +22,23 @@ public sealed partial class DistributionController
     {
         var stagedSends = ParseStaged(staged);
 
-        // Legacy ButtonSave/ButtonCancel both leave for the Distributions menu.
+        // Legacy ButtonCancel leaves for the Distributions menu, which the year is keyed by.
         if (string.Equals(command, CancelCommand, StringComparison.OrdinalIgnoreCase))
         {
-            return RedirectToAction(nameof(Index), new { year });
+            return RedirectToAction(nameof(Index), new { year = FinancialYearFor(year, monthId) });
         }
 
-        if (string.Equals(command, SaveCommand, StringComparison.OrdinalIgnoreCase))
+        // Save = persist then leave (legacy ButtonSave_Click -> mdi.Save() -> LeavePage()).
+        // Apply = persist then stay, re-reading the month (legacy ButtonApply_Click -> mdi.Save() -> rebind).
+        var isApply = string.Equals(command, ApplyCommand, StringComparison.OrdinalIgnoreCase);
+        if (isApply || string.Equals(command, SaveCommand, StringComparison.OrdinalIgnoreCase))
         {
             if (await distributionApiClient.SaveTabulationsAsync(year, monthId, stagedSends, cancellationToken))
             {
                 TempData.SetNotification(NotificationType.Success, "Tabulations updated successfully.");
-                return RedirectToAction(nameof(Index), new { year });
+                return isApply
+                    ? RedirectToAction(nameof(Tabulations), new { year, monthId })
+                    : RedirectToAction(nameof(Index), new { year = FinancialYearFor(year, monthId) });
             }
 
             TempData.SetNotification(NotificationType.Error, "The changes could not be saved because the Tabulations have been changed by someone else. Please try again.");
