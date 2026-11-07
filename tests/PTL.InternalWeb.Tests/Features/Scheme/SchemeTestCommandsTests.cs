@@ -341,4 +341,122 @@ public class SchemeTestCommandsTests
 
         Assert.False(SchemeTestCommands.TryApply(model, "detonate:0:0", Guid.Empty));
     }
+
+    [Theory]
+    [MemberData(nameof(ClosedYearCommandData.Allowed), MemberType = typeof(ClosedYearCommandData))]
+    public void TryApplyClosedYear_CommandLegacyKeepsOnAPreviousYearScheme_MutatesExactlyAsTryApplyDoes(string command)
+    {
+        var before = ClosedYearCommandData.Describe(ClosedYearCommandData.Tree());
+        var viaTryApply = ClosedYearCommandData.Tree();
+        var viaClosedYear = ClosedYearCommandData.Tree();
+
+        Assert.True(SchemeTestCommands.TryApply(viaTryApply, command, Guid.NewGuid()));
+        Assert.True(SchemeTestCommands.TryApplyClosedYear(viaClosedYear, command, Guid.NewGuid()));
+
+        var after = ClosedYearCommandData.Describe(viaTryApply);
+        Assert.NotEqual(before, after);
+        Assert.Equal(after, ClosedYearCommandData.Describe(viaClosedYear));
+    }
+
+    [Theory]
+    [MemberData(nameof(ClosedYearCommandData.Blocked), MemberType = typeof(ClosedYearCommandData))]
+    public void TryApplyClosedYear_CommandLegacyHidesOnAPreviousYearScheme_ReturnsFalseAndLeavesTheModelUnchanged(string command)
+    {
+        var model = ClosedYearCommandData.Tree();
+        var before = ClosedYearCommandData.Describe(model);
+
+        Assert.False(SchemeTestCommands.TryApplyClosedYear(model, command, Guid.NewGuid()));
+
+        Assert.Equal(before, ClosedYearCommandData.Describe(model));
+    }
+
+    [Theory]
+    [MemberData(nameof(ClosedYearCommandData.Blocked), MemberType = typeof(ClosedYearCommandData))]
+    public void TryApply_CommandLegacyHidesOnAPreviousYearScheme_StillAppliesForAnyOtherScheme(string command)
+    {
+        var before = ClosedYearCommandData.Describe(ClosedYearCommandData.Tree());
+        var model = ClosedYearCommandData.Tree();
+
+        Assert.True(SchemeTestCommands.TryApply(model, command, Guid.NewGuid()));
+
+        Assert.NotEqual(before, ClosedYearCommandData.Describe(model));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void NoCommand_DoesNothing(string? command)
+    {
+        var model = ClosedYearCommandData.Tree();
+        var before = ClosedYearCommandData.Describe(model);
+
+        Assert.False(SchemeTestCommands.TryApply(model, command, Guid.NewGuid()));
+        Assert.False(SchemeTestCommands.TryApplyClosedYear(model, command, Guid.NewGuid()));
+
+        Assert.Equal(before, ClosedYearCommandData.Describe(model));
+    }
+
+    [Theory]
+    [InlineData("detonate:0")]
+    [InlineData("detonate:0:0")]
+    [InlineData(":0")]
+    [InlineData("Move-Result-Up:0:1")]
+    [InlineData(" move-result-up:0:1")]
+    [InlineData("move-result:0:1")]
+    public void UnknownAction_IsIgnoredByBoth(string command)
+    {
+        var model = ClosedYearCommandData.Tree();
+        var before = ClosedYearCommandData.Describe(model);
+
+        Assert.False(SchemeTestCommands.TryApply(model, command, Guid.NewGuid()));
+        Assert.False(SchemeTestCommands.TryApplyClosedYear(model, command, Guid.NewGuid()));
+
+        Assert.Equal(before, ClosedYearCommandData.Describe(model));
+    }
+
+    [Theory]
+    [InlineData("move-result-up:0:0")]
+    [InlineData("move-result-down:0:1")]
+    [InlineData("move-result-up:0")]
+    [InlineData("move-result-up:5:0")]
+    [InlineData("move-result-up:0:9")]
+    [InlineData("move-method-up:0:0")]
+    [InlineData("move-method-down:0:9")]
+    [InlineData("move-category-up:0:0")]
+    [InlineData("move-category-down:0:1")]
+    [InlineData("remove-category:0:9")]
+    [InlineData("remove-category:9:0")]
+    [InlineData("remove-category:0:x")]
+    [InlineData("move-criterion-up:0:0:0")]
+    [InlineData("move-criterion-down:0:0:1")]
+    [InlineData("move-criterion-up:0:9:0")]
+    [InlineData("move-criterion-down:0:0:9")]
+    [InlineData("remove-tabulation:9")]
+    [InlineData("remove-tabulation:-1")]
+    [InlineData("remove-tabulation")]
+    public void CommandLegacyKeepsButWithAnIndexThatMatchesNothing_ChangesNothingInEither(string command)
+    {
+        var model = ClosedYearCommandData.Tree();
+        var before = ClosedYearCommandData.Describe(model);
+
+        Assert.False(SchemeTestCommands.TryApply(model, command, Guid.NewGuid()));
+        Assert.False(SchemeTestCommands.TryApplyClosedYear(model, command, Guid.NewGuid()));
+
+        Assert.Equal(before, ClosedYearCommandData.Describe(model));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void TryApplyClosedYear_AddTabulationWithoutAName_IsIgnored(string? name)
+    {
+        var model = new SchemeFormViewModel { NewTabulationName = name };
+        model.Tabulations.Add(new SchemeTabulationViewModel { Name = "Published" });
+
+        Assert.False(SchemeTestCommands.TryApplyClosedYear(model, "add-tabulation", Guid.Empty));
+
+        Assert.Equal("Published", Assert.Single(model.Tabulations).Name);
+    }
 }

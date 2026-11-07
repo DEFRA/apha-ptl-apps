@@ -388,42 +388,46 @@ public sealed class SchemeService(
             return new SchemeUpdateResult(SchemeUpdateStatus.NotFound);
         }
 
-        if (existing.IsReadOnly)
-        {
-            // Preserves the legacy Scheme.aspx.vb SetReadonly() intent as an explicit server-side
-            // rule: schemes belonging to a closed year (YearId < current year) cannot be edited.
-            throw new SchemeValidationException([new SchemeValidationError(string.Empty, "This scheme belongs to a closed year and cannot be edited.")]);
-        }
+        // A closed-year scheme (YearId < current year) is not frozen: legacy Scheme.aspx.vb's SetReadonly()
+        // locks most of the form but its Apply button still saves the rest. Only the fields legacy
+        // leaves editable are taken from the request, whatever else it carries.
+        var fields = existing.IsReadOnly ? SchemePreviousYearEdit.Apply(existing, updatedFields) : updatedFields;
 
         // SchemeId and SharedId are immutable via this API; RequiresAssessment can only be set at
         // creation (Scheme.aspx.vb disables the checkbox once a SchemeId exists) - so the existing
         // value always wins here regardless of what was posted.
-        updatedFields.SchemeId = existing.SchemeId;
-        updatedFields.SharedId = existing.SharedId;
-        updatedFields.RequiresAssessment = existing.RequiresAssessment;
-        updatedFields.LastModified = DateTime.UtcNow;
+        fields.SchemeId = existing.SchemeId;
+        fields.SharedId = existing.SharedId;
+        fields.RequiresAssessment = existing.RequiresAssessment;
+        fields.LastModified = DateTime.UtcNow;
 
-        await ValidateAsync(updatedFields, existing, cancellationToken);
+        await ValidateAsync(fields, existing, cancellationToken);
+
+        // Start Date is read-only on a closed year, and legacy only recalculates it when the distribution changes.
+        if (existing.IsReadOnly)
+        {
+            fields.StartDate = existing.StartDate ?? fields.StartDate;
+        }
 
         // Detection runs on what will actually be written, so it follows the derived-field rules above.
-        AssignMissingIds(updatedFields);
-        var plan = SchemeAuditDetector.Detect(existing, updatedFields);
+        AssignMissingIds(fields);
+        var plan = SchemeAuditDetector.Detect(existing, fields);
         if (!plan.IsEmpty && string.IsNullOrWhiteSpace(auditWhy))
         {
             LogAuditReasonRequiredMessage(logger, schemeId, null);
-            return new SchemeUpdateResult(SchemeUpdateStatus.AuditReasonRequired, null, $"Scheme {updatedFields.Identifier}: {updatedFields.Name}");
+            return new SchemeUpdateResult(SchemeUpdateStatus.AuditReasonRequired, AuditObjectName: $"Scheme {fields.Identifier}: {fields.Name}");
         }
 
         var audit = BuildAudit(plan, auditWho, auditWhy);
 
-        var updated = await schemeRepository.UpdateAsync(updatedFields, audit, cancellationToken);
+        var updated = await schemeRepository.UpdateAsync(fields, audit, cancellationToken);
         if (updated is null)
         {
             return new SchemeUpdateResult(SchemeUpdateStatus.NotFound);
         }
 
-        await SyncViewersAsync(schemeId, updatedFields.ViewerIds, cancellationToken);
-        updated.ViewerIds = updatedFields.ViewerIds;
+        await SyncViewersAsync(schemeId, fields.ViewerIds, cancellationToken);
+        updated.ViewerIds = fields.ViewerIds;
         LogUpdatedSchemeMessage(logger, schemeId, null);
         return new SchemeUpdateResult(SchemeUpdateStatus.Updated, updated);
     }

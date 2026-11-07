@@ -1,4 +1,6 @@
 using System.ComponentModel.DataAnnotations;
+using System.Reflection;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 
 namespace PTL.InternalWeb.Tests.Features.Scheme;
 
@@ -204,5 +206,28 @@ public class SchemeFormViewModelTests
             Label: "Titre in Published");
 
         Assert.Equal($"Tabulations_0__ResultItemIds{itemId:N}", checkbox.CheckboxId);
+    }
+
+    [Theory]
+    [InlineData(null, false, false)]
+    [InlineData(null, true, false)]
+    [InlineData(false, false, false)]
+    [InlineData(false, true, false)]
+    [InlineData(true, false, true)]
+    [InlineData(true, true, false)]
+    public void IsPreviousYear_IsAClosedYearSchemeOpenForEditingAndNeitherOtherwise(bool? isReadOnly, bool isViewMode, bool expected)
+    {
+        var model = new PTL.InternalWeb.Features.Scheme.SchemeFormViewModel { IsReadOnly = isReadOnly, IsViewMode = isViewMode };
+
+        Assert.Equal(expected, model.IsPreviousYear);
+    }
+
+    [Fact]
+    public void IsPreviousYear_CannotBePostedBecauseItIsDerivedAndIsViewModeIsNeverBound()
+    {
+        var type = typeof(PTL.InternalWeb.Features.Scheme.SchemeFormViewModel);
+
+        Assert.False(type.GetProperty(nameof(PTL.InternalWeb.Features.Scheme.SchemeFormViewModel.IsPreviousYear))!.CanWrite);
+        Assert.NotNull(type.GetProperty(nameof(PTL.InternalWeb.Features.Scheme.SchemeFormViewModel.IsViewMode))!.GetCustomAttribute<BindNeverAttribute>());
     }
 }

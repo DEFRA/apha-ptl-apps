@@ -150,6 +150,11 @@ public sealed class SchemeFormViewModel : IValidatableObject
 
     public bool? IsReadOnly { get; set; }
 
+    // A closed-year (Previous Year) scheme open for editing. Legacy locks most of the form but leaves a
+    // few fields, three tabs and re-ordering on the Tests tab editable, and offers Apply and Back in
+    // place of Save and Cancel. Derived from IsReadOnly, which SchemeController sets, so never posted.
+    public bool IsPreviousYear => IsReadOnly == true && !IsViewMode;
+
     public DateTime? LastModified { get; set; }
 
     public int? SampleNoSequence { get; set; }

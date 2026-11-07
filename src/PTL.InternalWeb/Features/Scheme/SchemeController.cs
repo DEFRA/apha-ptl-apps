@@ -20,6 +20,15 @@ namespace PTL.InternalWeb.Features.Scheme;
 [Authorize(Policy = PtlPolicies.SchemeAdmin)]
 public class SchemeController(ISchemeApiClient schemeApiClient, ILookupApiClient lookupApiClient, ILogger<SchemeController> logger) : Controller
 {
+    // The form for a closed-year (Previous Year) scheme: legacy opens the same page as for any other year,
+    // with most of it locked and Apply and Back in place of Save and Cancel.
+    private const string PreviousYearView = "PreviousYear";
+
+    // Legacy Scheme.aspx has Apply beside Save on every tab: both save, but Apply stays on the scheme.
+    private const string ApplyCommand = "apply";
+
+    private static bool IsApply(string? command) => string.Equals(command, ApplyCommand, StringComparison.OrdinalIgnoreCase);
+
     private static readonly Action<ILogger, int, string?, int, int, Exception?> LogDisplayedSchemeListMessage =
         LoggerMessage.Define<int, string?, int, int>(
             LogLevel.Information,
@@ -169,7 +178,13 @@ public class SchemeController(ISchemeApiClient schemeApiClient, ILookupApiClient
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Create(SchemeFormViewModel model, string? testCommand = null, Guid? selectedItemTypeId = null, string? confirmation = null, CancellationToken cancellationToken = default)
+    public async Task<IActionResult> Create(
+        SchemeFormViewModel model,
+        string? testCommand = null,
+        Guid? selectedItemTypeId = null,
+        string? confirmation = null,
+        string? command = null,
+        CancellationToken cancellationToken = default)
     {
         if (ConfirmRemoval(testCommand, confirmation) is { } confirmationPage)
         {
@@ -209,7 +224,12 @@ public class SchemeController(ISchemeApiClient schemeApiClient, ILookupApiClient
 
         LogCreatedSchemeMessage(logger, result.Scheme.SchemeId, null);
         TempData.SetNotification(NotificationType.Success, "Scheme created successfully.");
-        return RedirectToAction(nameof(Index));
+
+        // Legacy Apply saves and stays on the scheme. The scheme now exists, so staying means its
+        // Edit page - redisplaying Create would insert a second scheme on the next Apply.
+        return IsApply(command)
+            ? RedirectToAction(nameof(Edit), new { id = result.Scheme.SchemeId })
+            : RedirectToAction(nameof(Index));
     }
 
     [HttpGet]
@@ -288,12 +308,21 @@ public class SchemeController(ISchemeApiClient schemeApiClient, ILookupApiClient
 
         var model = ToFormViewModel(scheme);
         await PopulateFormAsync(model, cancellationToken);
-        return View(model);
+
+        // A Previous Year scheme is never offered as a fully editable form, even by typing the Edit URL.
+        return scheme.IsReadOnly ? View(PreviousYearView, model) : View(model);
     }
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Edit(Guid id, SchemeFormViewModel model, string? testCommand = null, Guid? selectedItemTypeId = null, string? confirmation = null, CancellationToken cancellationToken = default)
+    public async Task<IActionResult> Edit(
+        Guid id,
+        SchemeFormViewModel model,
+        string? testCommand = null,
+        Guid? selectedItemTypeId = null,
+        string? confirmation = null,
+        string? command = null,
+        CancellationToken cancellationToken = default)
     {
         if (ConfirmRemoval(testCommand, confirmation) is { } confirmationPage)
         {
@@ -308,18 +337,55 @@ public class SchemeController(ISchemeApiClient schemeApiClient, ILookupApiClient
         ValidatePriceText(model);
         if (!ModelState.IsValid)
         {
-            // Only the reason is wrong on the audit step: stay there rather than redisplay the whole form.
-            if (model.IsAuditStep && OnlyAuditWhyHasErrors())
-            {
-                return AuditReasonView(model.AuditObjectName, model.AuditWhy);
-            }
-
-            model.IsAuditStep = false;
-            model.Instructions = SchemeInstructions.Sanitise(model.Instructions);
-            await PopulateFormAsync(model, cancellationToken);
-            return View(model);
+            return await RedisplayEditAsync(model, formView: null, cancellationToken);
         }
 
+        // Legacy ButtonApply_Click saves and stays on the scheme; ButtonSave_Click leaves for the Scheme List.
+        return await SaveEditAsync(
+            id,
+            model,
+            formView: null,
+            () => IsApply(command) ? RedirectToAction(nameof(Edit), new { id }) : RedirectToAction(nameof(Index)),
+            cancellationToken);
+    }
+
+    // Legacy's Apply button on a Previous Year scheme: saves what that page leaves editable and stays on the
+    // page, where Save would return to the list. The form posts the whole scheme, like Edit, but only the
+    // fields legacy leaves editable are taken from it (SchemePreviousYearEdit), so nothing locked can change.
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Apply(
+        Guid id,
+        SchemeFormViewModel model,
+        string? testCommand = null,
+        Guid? selectedItemTypeId = null,
+        string? confirmation = null,
+        CancellationToken cancellationToken = default)
+    {
+        model.IsReadOnly = true;
+
+        if (ConfirmRemoval(testCommand, confirmation) is { } confirmationPage)
+        {
+            return confirmationPage;
+        }
+
+        if (await TryHandleTestCommandAsync(model, testCommand, selectedItemTypeId, confirmation, cancellationToken, closedYear: true))
+        {
+            return View(PreviousYearView, model);
+        }
+
+        if (!ModelState.IsValid)
+        {
+            return await RedisplayEditAsync(model, PreviousYearView, cancellationToken);
+        }
+
+        return await SaveEditAsync(id, model, PreviousYearView, () => RedirectToAction(nameof(Edit), new { id }), cancellationToken);
+    }
+
+    // Sends an edit to the API and decides what comes next. Edit and Apply differ only in the form they
+    // redisplay (null is the action's own view) and where a successful save goes.
+    private async Task<IActionResult> SaveEditAsync(Guid id, SchemeFormViewModel model, string? formView, Func<IActionResult> saved, CancellationToken cancellationToken)
+    {
         var result = await schemeApiClient.UpdateSchemeAsync(id, ToRequest(model), cancellationToken);
 
         // Legacy diverted a save that changes an audited Test or Tabulation through Audit.aspx for a reason.
@@ -332,20 +398,26 @@ public class SchemeController(ISchemeApiClient schemeApiClient, ILookupApiClient
         {
             LogUpdateFailedMessage(logger, id, null);
             AddErrors(result.FieldErrors);
-            if (model.IsAuditStep && OnlyAuditWhyHasErrors())
-            {
-                return AuditReasonView(model.AuditObjectName, model.AuditWhy);
-            }
-
-            model.IsAuditStep = false;
-            model.Instructions = SchemeInstructions.Sanitise(model.Instructions);
-            await PopulateFormAsync(model, cancellationToken);
-            return View(model);
+            return await RedisplayEditAsync(model, formView, cancellationToken);
         }
 
         LogUpdatedSchemeMessage(logger, id, null);
         TempData.SetNotification(NotificationType.Success, "Scheme updated successfully.");
-        return RedirectToAction(nameof(Index));
+        return saved();
+    }
+
+    private async Task<IActionResult> RedisplayEditAsync(SchemeFormViewModel model, string? formView, CancellationToken cancellationToken)
+    {
+        // Only the reason is wrong on the audit step: stay there rather than redisplay the whole form.
+        if (model.IsAuditStep && OnlyAuditWhyHasErrors())
+        {
+            return AuditReasonView(model.AuditObjectName, model.AuditWhy);
+        }
+
+        model.IsAuditStep = false;
+        model.Instructions = SchemeInstructions.Sanitise(model.Instructions);
+        await PopulateFormAsync(model, cancellationToken);
+        return View(formView, model);
     }
 
     private bool OnlyAuditWhyHasErrors() =>
@@ -398,7 +470,13 @@ public class SchemeController(ISchemeApiClient schemeApiClient, ILookupApiClient
     // re-rendered tree reflects the mutated model rather than the posted values.
     // The Tests tab always posts its hidden picker field, empty unless an Add button filled it,
     // so it has to be nullable or every Save fails to bind it.
-    private async Task<bool> TryHandleTestCommandAsync(SchemeFormViewModel model, string? testCommand, Guid? selectedItemTypeId, string? confirmation, CancellationToken cancellationToken)
+    private async Task<bool> TryHandleTestCommandAsync(
+        SchemeFormViewModel model,
+        string? testCommand,
+        Guid? selectedItemTypeId,
+        string? confirmation,
+        CancellationToken cancellationToken,
+        bool closedYear = false)
     {
         var declined = ConfirmationFlow.IsCancelled(confirmation);
         if (!declined && string.IsNullOrWhiteSpace(testCommand))
@@ -408,7 +486,15 @@ public class SchemeController(ISchemeApiClient schemeApiClient, ILookupApiClient
 
         if (!declined)
         {
-            SchemeTestCommands.TryApply(model, testCommand!, selectedItemTypeId ?? PickedItemTypeId(testCommand!) ?? Guid.Empty);
+            var typeId = selectedItemTypeId ?? PickedItemTypeId(testCommand!) ?? Guid.Empty;
+            if (closedYear)
+            {
+                SchemeTestCommands.TryApplyClosedYear(model, testCommand, typeId);
+            }
+            else
+            {
+                SchemeTestCommands.TryApply(model, testCommand!, typeId);
+            }
         }
 
         ModelState.Clear();
@@ -544,13 +630,15 @@ public class SchemeController(ISchemeApiClient schemeApiClient, ILookupApiClient
 
     // Legacy renders one price row per currency, whether or not the scheme already has a
     // tlnkSchemeCurrency row for it - so the full currency list drives the grid and any existing
-    // price is merged in on top.
+    // price is merged in on top. A Previous Year scheme's prices are locked and legacy only fetches
+    // the rows it has, so there the grid lists just those: a blank, required row could never be filled in.
     private async Task PopulatePricesAsync(SchemeFormViewModel model, CancellationToken cancellationToken)
     {
         var currencies = await lookupApiClient.GetCurrenciesAsync(cancellationToken);
         var postedPrices = model.Prices.ToDictionary(p => p.CurrencyId);
 
         model.Prices = currencies
+            .Where(currency => !model.IsPreviousYear || postedPrices.ContainsKey(currency.CurrencyId))
             .Select(currency =>
             {
                 postedPrices.TryGetValue(currency.CurrencyId, out var posted);

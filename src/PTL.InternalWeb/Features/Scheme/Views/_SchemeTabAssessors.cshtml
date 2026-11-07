@@ -7,7 +7,7 @@
 
 <h2 class="govuk-heading-m">Assessors</h2>
 
-@if (!Model.IsViewMode)
+@if (!Model.IsViewMode && !Model.IsPreviousYear)
 {
     <p class="govuk-body">Assessors apply to schemes that require assessment. At least two must be selected.</p>
 }
@@ -20,6 +20,13 @@
         <govuk-summary-row label="Tertiary Assessor">@OptionText(Model.AssessorOptions, Model.Assessor3)</govuk-summary-row>
         <govuk-summary-row label="Quaternary Assessor">@OptionText(Model.AssessorOptions, Model.Assessor4)</govuk-summary-row>
     </dl>
+}
+else if (Model.IsPreviousYear)
+{
+    <partial name="_SchemeLockedField" model="@((Kind: "select", Field: nameof(Model.Assessor1), Label: "Primary Assessor", Value: Model.Assessor1?.ToString(), Text: OptionText(Model.AssessorOptions, Model.Assessor1), Width: "govuk-!-width-one-half"))" />
+    <partial name="_SchemeLockedField" model="@((Kind: "select", Field: nameof(Model.Assessor2), Label: "Secondary Assessor", Value: Model.Assessor2?.ToString(), Text: OptionText(Model.AssessorOptions, Model.Assessor2), Width: "govuk-!-width-one-half"))" />
+    <partial name="_SchemeLockedField" model="@((Kind: "select", Field: nameof(Model.Assessor3), Label: "Tertiary Assessor", Value: Model.Assessor3?.ToString(), Text: OptionText(Model.AssessorOptions, Model.Assessor3), Width: "govuk-!-width-one-half"))" />
+    <partial name="_SchemeLockedField" model="@((Kind: "select", Field: nameof(Model.Assessor4), Label: "Quaternary Assessor", Value: Model.Assessor4?.ToString(), Text: OptionText(Model.AssessorOptions, Model.Assessor4), Width: "govuk-!-width-one-half"))" />
 }
 else
 {

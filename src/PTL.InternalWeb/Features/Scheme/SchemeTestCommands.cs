@@ -7,6 +7,28 @@ namespace PTL.InternalWeb.Features.Scheme;
 // here touches the database - everything is only persisted when the user presses Save.
 public static class SchemeTestCommands
 {
+    // What legacy leaves on a closed-year (Previous Year) scheme: re-ordering Result, Method and Criterion
+    // items, moving or removing a Category, and the Results Tabulations tab's Add and Remove. Adding or
+    // removing Tests and items is hidden there.
+    private static readonly HashSet<string> ClosedYearCommands = new(StringComparer.Ordinal)
+    {
+        "move-result-up",
+        "move-result-down",
+        "move-method-up",
+        "move-method-down",
+        "move-category-up",
+        "move-category-down",
+        "remove-category",
+        "move-criterion-up",
+        "move-criterion-down",
+        "add-tabulation",
+        "remove-tabulation",
+    };
+
+    // The same as TryApply, but only for what legacy leaves on a closed-year (Previous Year) scheme.
+    public static bool TryApplyClosedYear(SchemeFormViewModel model, string? command, Guid selectedTypeId) =>
+        command is not null && ClosedYearCommands.Contains(command.Split(':')[0]) && TryApply(model, command, selectedTypeId);
+
     // Posted as "<action>:<testIndex>[:<childIndex>[:<grandchildIndex>]]" by the tabs' buttons.
     public static bool TryApply(SchemeFormViewModel model, string? command, Guid selectedTypeId)
     {
