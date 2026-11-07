@@ -266,7 +266,7 @@ public partial class ResultsReceiptRenderTests : IClassFixture<WebApplicationFac
         Assert.DoesNotContain("data-unsaved-ignore", form, StringComparison.Ordinal);
 
         // Save, Apply and Cancel are submit buttons, which the script never intercepts.
-        Assert.Equal(3, Regex.Matches(form, "<button type=\"submit\" name=\"command\"").Count);
+        Assert.Equal(3, Regex.Count(form, "<button type=\"submit\" name=\"command\""));
     }
 
     [Theory]
