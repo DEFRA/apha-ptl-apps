@@ -1002,14 +1002,19 @@ public class DistributionControllerTests
                     Samples: [new PreparationSampleResponse(PreparationSampleId, "S1", "Internal 1")]),
             ]);
 
-    [Fact]
-    public async Task Preparation_Get_MonthNotInitialised_ReturnsNotFound()
+    [Theory]
+    [InlineData(2026, 4, 2026)]
+    [InlineData(2027, 2, 2026)]
+    public async Task Preparation_Get_MonthNotInitialised_RedirectsToDashboardForTheFinancialYear(int year, int monthId, int financialYear)
     {
         var controller = CreateController(new FakeDistributionApiClient());
 
-        var result = await controller.Preparation(2026, 4, CancellationToken.None);
+        var result = await controller.Preparation(year, monthId, CancellationToken.None);
 
-        Assert.IsType<NotFoundResult>(result);
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal(nameof(DistributionController.Index), redirect.ActionName);
+        Assert.Equal(financialYear, redirect.RouteValues!["year"]);
+        Assert.Null(controller.TempData.GetNotification());
     }
 
     [Fact]
@@ -1032,36 +1037,42 @@ public class DistributionControllerTests
         Assert.Equal("S1", Assert.Single(row.Samples).SampleNumber);
     }
 
-    [Fact]
-    public async Task Preparation_Post_CancelCommand_RedirectsToIndexWithoutSaving()
+    [Theory]
+    [InlineData(2026, 4, 2026)]
+    [InlineData(2027, 2, 2026)]
+    public async Task Preparation_Post_CancelCommand_RedirectsToIndexForTheFinancialYearWithoutSaving(int year, int monthId, int financialYear)
     {
         var apiClient = new FakeDistributionApiClient();
         var controller = CreateController(apiClient);
-        var model = new PreparationViewModel { YearId = 2026, MonthId = 4 };
+        var model = new PreparationViewModel { YearId = year, MonthId = monthId };
 
-        var result = await controller.Preparation(2026, 4, model, "cancel", CancellationToken.None);
+        var result = await controller.Preparation(year, monthId, model, "cancel", CancellationToken.None);
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
         Assert.Equal(nameof(DistributionController.Index), redirect.ActionName);
+        Assert.Equal(financialYear, redirect.RouteValues!["year"]);
         Assert.Empty(apiClient.SavedPreparationRequests);
     }
 
-    [Fact]
-    public async Task Preparation_Post_SaveCommand_PersistsAndRedirectsToIndex()
+    [Theory]
+    [InlineData(2026, 4, 2026)]
+    [InlineData(2027, 2, 2026)]
+    public async Task Preparation_Post_SaveCommand_PersistsAndRedirectsToIndexForTheFinancialYear(int year, int monthId, int financialYear)
     {
         var apiClient = new FakeDistributionApiClient { PreparationSaveResult = new PreparationSaveResult(true) };
         var controller = CreateController(apiClient);
         var model = new PreparationViewModel
         {
-            YearId = 2026,
-            MonthId = 4,
+            YearId = year,
+            MonthId = monthId,
             Schemes = [new PreparationSchemeRowViewModel { MonthlyDistributionSchemeId = PreparationSchemeId, DiaryEntryChecked = true }],
         };
 
-        var result = await controller.Preparation(2026, 4, model, "save", CancellationToken.None);
+        var result = await controller.Preparation(year, monthId, model, "save", CancellationToken.None);
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
         Assert.Equal(nameof(DistributionController.Index), redirect.ActionName);
+        Assert.Equal(financialYear, redirect.RouteValues!["year"]);
         var saved = Assert.Single(apiClient.SavedPreparationRequests);
         Assert.True(Assert.Single(saved.Updates).DiaryEntryChecked);
         var notification = controller.TempData.GetNotification();
@@ -1144,6 +1155,25 @@ public class DistributionControllerTests
         Assert.Equal(2026, model.YearId);
         Assert.Equal(4, model.MonthId);
         Assert.Equal("PT0060: Mastitis bovine", model.SchemeHeading);
+    }
+
+    [Fact]
+    public async Task PrintableResults_Get_KnownScheme_TakesDatesAndAccreditationFromTheSchemeResolvedById()
+    {
+        var apiClient = new FakeDistributionApiClient
+        {
+            IntendedResults = new IntendedResultsResponse(
+                ParticipantsSchemeId, "17152A/BA", "PT0060", "Mastitis bovine", false, [],
+                DistributionDate: new DateTime(2026, 4, 14), DeadlineDate: new DateTime(2026, 5, 1), IsAccredited: true),
+        };
+        var controller = CreateController(apiClient);
+
+        var result = await controller.PrintableResults(2026, 4, ParticipantsSchemeId, showValues: false, CancellationToken.None);
+
+        var model = Assert.IsType<PrintableResultsWorksheet>(Assert.IsType<ViewResult>(result).Model);
+        Assert.True(model.IsAccredited);
+        Assert.Equal("DATE OF DISTRIBUTION: 14/04/2026", model.DateOfDistributionLabel);
+        Assert.Contains("01/05/2026", model.DeadlineMessage);
     }
 
     [Fact]

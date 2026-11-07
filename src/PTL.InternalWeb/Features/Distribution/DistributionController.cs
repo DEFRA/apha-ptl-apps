@@ -249,7 +249,11 @@ public sealed partial class DistributionController(IDistributionApiClient distri
     public async Task<IActionResult> Preparation(int year, int monthId, CancellationToken cancellationToken)
     {
         var sheet = await distributionApiClient.GetPreparationAsync(year, monthId, cancellationToken);
-        return sheet is null ? NotFound() : View(ToPreparationViewModel(year, monthId, sheet));
+
+        // Legacy LeavePage() when the month has no distribution yet: back to the Dashboard, no error.
+        return sheet is null
+            ? RedirectToAction(nameof(Index), new { year = FinancialYearFor(year, monthId) })
+            : View(ToPreparationViewModel(year, monthId, sheet));
     }
 
     // Save = persist then leave (legacy ButtonSave_Click -> Save() -> LeavePage() ->
@@ -263,7 +267,7 @@ public sealed partial class DistributionController(IDistributionApiClient distri
     {
         if (string.Equals(command, CancelCommand, StringComparison.OrdinalIgnoreCase))
         {
-            return RedirectToAction(nameof(Index));
+            return RedirectToAction(nameof(Index), new { year = FinancialYearFor(year, monthId) });
         }
 
         var updates = model.Schemes
@@ -285,7 +289,7 @@ public sealed partial class DistributionController(IDistributionApiClient distri
             return RedirectToAction(nameof(Preparation), new { year, monthId });
         }
 
-        return RedirectToAction(nameof(Index));
+        return RedirectToAction(nameof(Index), new { year = FinancialYearFor(year, monthId) });
     }
 
     // Results Receipt - legacy Internal User/ResultsReceipt.aspx. Reached from the Dashboard's
@@ -1202,21 +1206,16 @@ public sealed partial class DistributionController(IDistributionApiClient distri
             return NotFound();
         }
 
-        // DATE OF DISTRIBUTION/the deadline message/the UKAS accreditation mark only exist on the
-        // Scheduling-level scheme row (legacy's separate MonthlyDistributionScheme.
-        // FetchMonthlyDistributionSchemeChild call) - already-available via the same schedule
-        // lookup the Scheduling screen itself uses.
-        var schedule = await distributionApiClient.GetScheduleAsync(year, monthId, cancellationToken);
-        var scheduleScheme = schedule?.Schemes.FirstOrDefault(s => s.MonthlyDistributionSchemeId == schemeId);
-
+        // DATE OF DISTRIBUTION/the deadline message/the UKAS accreditation mark come from the
+        // scheme resolved by id (legacy FetchMonthlyDistributionSchemeChild), already on the page.
         var worksheet = PrintableResultsWorksheetBuilder.Build(
             year,
             monthId,
             page,
             page.HasIntendedResults && showValues,
-            scheduleScheme?.DistributionDate ?? default,
-            scheduleScheme?.DeadlineDate ?? default,
-            scheduleScheme?.IsAccredited ?? false);
+            page.DistributionDate,
+            page.DeadlineDate,
+            page.IsAccredited);
 
         return View(worksheet);
     }

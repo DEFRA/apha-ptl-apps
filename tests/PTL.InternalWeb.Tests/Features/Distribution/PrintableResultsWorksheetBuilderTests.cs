@@ -304,6 +304,37 @@ public class PrintableResultsWorksheetBuilderTests
     }
 
     [Fact]
+    public void Build_SampleInstructions_EmptyExternalDescription_RowIsOmitted()
+    {
+        var page = Page([Test([], [Sample("S1", externalDescription: ""), Sample("S2", externalDescription: "Keep cool"), Sample("S3", externalDescription: "")])]);
+
+        var worksheet = PrintableResultsWorksheetBuilder.Build(2026, 4, page, showValues: false);
+
+        var row = Assert.Single(worksheet.SampleInstructions);
+        Assert.Equal("S2", row.SampleNumber);
+    }
+
+    [Fact]
+    public void Build_SampleInstructions_EveryExternalDescriptionEmpty_IsEmpty()
+    {
+        var page = Page([Test([], [Sample("S1"), Sample("S2")])]);
+
+        var worksheet = PrintableResultsWorksheetBuilder.Build(2026, 4, page, showValues: false);
+
+        Assert.Empty(worksheet.SampleInstructions);
+    }
+
+    [Fact]
+    public void Build_ExternalAddress_IsTheTrimmedExternalAppUrlFromThePage()
+    {
+        var page = Page([]) with { ExternalAppUrl = " https://ptl.example.test/ " };
+
+        var worksheet = PrintableResultsWorksheetBuilder.Build(2026, 4, page, showValues: false);
+
+        Assert.Equal("https://ptl.example.test/", worksheet.ExternalAddress);
+    }
+
+    [Fact]
     public void Build_SampleInstructions_NoTests_IsEmpty()
     {
         var page = Page([]);

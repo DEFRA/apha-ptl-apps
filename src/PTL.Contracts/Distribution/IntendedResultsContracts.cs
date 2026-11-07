@@ -16,7 +16,13 @@ public sealed record IntendedResultsResponse(
     bool DateOfReceipt = false,
     bool StorageConditions = false,
     bool ConditionOnReceipt = false,
-    string Instructions = "");
+    string Instructions = "",
+    // Resolved from the scheme by id - Printable Results only.
+    DateTime DistributionDate = default,
+    DateTime DeadlineDate = default,
+    bool IsAccredited = false,
+    // The API's existing External:AppUrl - Printable Results only.
+    string ExternalAppUrl = "");
 
 public sealed record IntendedResultsTestResponse(
     Guid TestId,

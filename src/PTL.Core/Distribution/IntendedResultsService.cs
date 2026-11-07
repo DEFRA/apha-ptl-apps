@@ -1,3 +1,6 @@
+using Microsoft.Extensions.Options;
+using PTL.Core.Configuration;
+
 namespace PTL.Core.Distribution;
 
 // Intended Results (legacy Scheduling/IntendedResults.aspx) read/save behaviour.
@@ -9,7 +12,9 @@ public interface IIntendedResultsService
         Guid monthlyDistributionSchemeId, IntendedResultsUpdate update, CancellationToken cancellationToken = default);
 }
 
-public sealed class IntendedResultsService(IDistributionRepository distributionRepository) : IIntendedResultsService
+public sealed class IntendedResultsService(
+    IDistributionRepository distributionRepository,
+    IOptions<ExternalOptions>? externalOptions = null) : IIntendedResultsService
 {
     // Legacy IntendedResultsSet.AuditObjectName(), shown as the heading on Audit.aspx.
     private const string AuditObjectNameValue = "Intended Results Set";
@@ -27,7 +32,7 @@ public sealed class IntendedResultsService(IDistributionRepository distributionR
         }
 
         var data = await distributionRepository.GetIntendedResultsAsync(monthlyDistributionSchemeId, cancellationToken);
-        return data is null ? null : BuildPage(scheme, data);
+        return data is null ? null : BuildPage(scheme, data, externalOptions?.Value.AppUrl ?? string.Empty);
     }
 
     // Legacy ButtonSave_Click:
@@ -102,7 +107,7 @@ public sealed class IntendedResultsService(IDistributionRepository distributionR
         data.TestMethodItems.Any(m => !string.IsNullOrEmpty(m.IntendedResult)) ||
         data.SampleResultItems.Any(s => !string.IsNullOrEmpty(s.IntendedResult) || !string.IsNullOrEmpty(s.IntendedResult2));
 
-    private static IntendedResultsPage BuildPage(MonthlyDistributionSchemeEntity scheme, IntendedResultsData data)
+    private static IntendedResultsPage BuildPage(MonthlyDistributionSchemeEntity scheme, IntendedResultsData data, string externalAppUrl)
     {
         var sampleTestLookup = data.SampleTests.ToDictionary(st => (st.SampleId, st.TestId));
         var sampleResultItemLookup = data.SampleResultItems.ToDictionary(sri => (sri.SampleTestId, sri.TestResultItemId));
@@ -124,7 +129,11 @@ public sealed class IntendedResultsService(IDistributionRepository distributionR
             data.Header.DateOfReceipt,
             data.Header.StorageConditions,
             data.Header.ConditionOnReceipt,
-            data.Header.Instructions ?? string.Empty);
+            data.Header.Instructions ?? string.Empty,
+            scheme.DistributionDate,
+            scheme.DeadlineDate,
+            scheme.IsAccredited,
+            externalAppUrl);
     }
 
     private static IntendedResultsTest BuildTest(

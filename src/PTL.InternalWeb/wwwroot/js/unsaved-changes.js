@@ -18,7 +18,12 @@
     var watched = document.querySelector('[data-unsaved-watch]');
     if (watched) {
         // Editing only arms the warning - the banner stays hidden until a link is actually followed.
-        var markDirty = function () {
+        // Controls marked data-unsaved-ignore (e.g. selections that are never saved) do not count.
+        var markDirty = function (event) {
+            if (event.target.closest && event.target.closest('[data-unsaved-ignore]')) {
+                return;
+            }
+
             dirty = true;
         };
 
