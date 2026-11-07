@@ -17,14 +17,19 @@
 
     var watched = document.querySelector('[data-unsaved-watch]');
     if (watched) {
-        // Editing only arms the warning - the banner stays hidden until a link is actually followed.
+        // Editing arms the warning. The banner stays hidden until a link is followed, unless the page
+        // opts in with data-unsaved-reveal to show it as soon as there is something unsaved.
         // Controls marked data-unsaved-ignore (e.g. selections that are never saved) do not count.
+        var revealOnChange = watched.hasAttribute('data-unsaved-reveal');
         var markDirty = function (event) {
             if (event.target.closest && event.target.closest('[data-unsaved-ignore]')) {
                 return;
             }
 
             dirty = true;
+            if (revealOnChange) {
+                banner.removeAttribute('hidden');
+            }
         };
 
         watched.addEventListener('input', markDirty);

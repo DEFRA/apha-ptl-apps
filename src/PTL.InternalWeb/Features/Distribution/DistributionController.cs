@@ -300,20 +300,22 @@ public sealed partial class DistributionController(IDistributionApiClient distri
     public async Task<IActionResult> ResultsReceipt(int year, int monthId, CancellationToken cancellationToken)
     {
         var receipt = await distributionApiClient.GetResultsReceiptAsync(year, monthId, cancellationToken);
-        return receipt is null ? NotFound() : View(ToResultsReceiptViewModel(year, monthId, receipt));
+        return receipt is null ? RedirectToDashboardForMonth(year, monthId) : View(ToResultsReceiptViewModel(year, monthId, receipt));
     }
 
     // Save = persist then leave (legacy ButtonSave_Click -> Save() -> LeavePage() -> MenuDistributions.aspx).
     // Apply = persist then stay, re-reading fresh data (legacy ButtonApply_Click -> Save() -> re-fetch).
     // Cancel = discard then leave, no save at all (legacy ButtonCancel_Click -> LeavePage()).
+    // Every participant row posts several fields, so a large month exceeds the 1,024-value default.
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [RequestFormLimits(ValueCountLimit = 20000)]
     [Authorize(Policy = PtlPolicies.InternalUser)]
     public async Task<IActionResult> ResultsReceipt(int year, int monthId, ResultsReceiptViewModel model, string command, CancellationToken cancellationToken)
     {
         if (string.Equals(command, CancelCommand, StringComparison.OrdinalIgnoreCase))
         {
-            return RedirectToAction(nameof(Index));
+            return RedirectToDashboardForMonth(year, monthId);
         }
 
         var updates = model.Schemes
@@ -333,7 +335,7 @@ public sealed partial class DistributionController(IDistributionApiClient distri
 
         return string.Equals(command, ApplyCommand, StringComparison.OrdinalIgnoreCase)
             ? RedirectToAction(nameof(ResultsReceipt), new { year, monthId })
-            : RedirectToAction(nameof(Index));
+            : RedirectToDashboardForMonth(year, monthId);
     }
 
     // Monthly Distributions - Tabulations - legacy Scheduling/Tabulations.aspx. Reached from the
@@ -369,8 +371,12 @@ public sealed partial class DistributionController(IDistributionApiClient distri
     public async Task<IActionResult> SampleReceipt(int year, int monthId, Guid schemeId, Guid participantId, CancellationToken cancellationToken)
     {
         var page = await distributionApiClient.GetSampleReceiptAsync(schemeId, participantId, cancellationToken);
-        return page is null ? NotFound() : View(ToSampleReceiptViewModel(year, monthId, schemeId, participantId, page));
+        return page is null ? RedirectToResultsReceipt(year, monthId) : View(ToSampleReceiptViewModel(year, monthId, schemeId, participantId, page));
     }
+
+    // Legacy LeavePage() when the session holds no participant or scheme: back to Results Receipt, no error.
+    private RedirectToActionResult RedirectToResultsReceipt(int year, int monthId) =>
+        RedirectToAction(nameof(ResultsReceipt), new { year, monthId });
 
     // Save = persist then return to Results Receipt (legacy ButtonSave_Click -> LeavePage()).
     // Apply = persist then stay (legacy ButtonApply_Click). Cancel = discard, no save.
@@ -443,7 +449,7 @@ public sealed partial class DistributionController(IDistributionApiClient distri
     public async Task<IActionResult> ActualResults(int year, int monthId, Guid schemeId, Guid participantId, CancellationToken cancellationToken)
     {
         var page = await distributionApiClient.GetActualResultsAsync(schemeId, participantId, cancellationToken);
-        return page is null ? NotFound() : View(ToActualResultsViewModel(year, monthId, page));
+        return page is null ? RedirectToResultsReceipt(year, monthId) : View(ToActualResultsViewModel(year, monthId, page));
     }
 
     // Save = persist then return to Results Receipt (legacy ButtonSave_Click -> LeavePage()).

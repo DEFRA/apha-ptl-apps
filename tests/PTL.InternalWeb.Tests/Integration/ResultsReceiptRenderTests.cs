@@ -139,7 +139,7 @@ public partial class ResultsReceiptRenderTests : IClassFixture<WebApplicationFac
         Assert.Contains("/Distribution/SampleReceipt", cells[6], StringComparison.Ordinal);
         Assert.Contains($"participantId={Posted}", cells[6], StringComparison.Ordinal);
         Assert.Contains($"schemeId={SchemeA}", cells[6], StringComparison.Ordinal);
-        Assert.EndsWith("(Y)", Text(cells[6]), StringComparison.Ordinal);
+        Assert.EndsWith("(N)", Text(cells[6]), StringComparison.Ordinal);
         Assert.Equal("05/05/2026", Text(cells[7]));
         Assert.DoesNotContain("type=\"checkbox\"", cells[7], StringComparison.Ordinal);
     }
@@ -166,7 +166,7 @@ public partial class ResultsReceiptRenderTests : IClassFixture<WebApplicationFac
         Assert.Contains("ptl-link-disabled", cells[5], StringComparison.Ordinal);
         Assert.Contains(SamplesDisabledTip, Text(cells[5]), StringComparison.Ordinal);
         Assert.DoesNotContain("title=", cells[5], StringComparison.Ordinal);
-        Assert.Contains("(N)", Text(cells[5]), StringComparison.Ordinal);
+        Assert.Contains("(Y)", Text(cells[5]), StringComparison.Ordinal);
 
         Assert.Contains("type=\"checkbox\"", cells[6], StringComparison.Ordinal);
         Assert.Contains("name=\"Schemes[0].Participants[1].ReturnedChecked\"", cells[6], StringComparison.Ordinal);
@@ -205,6 +205,145 @@ public partial class ResultsReceiptRenderTests : IClassFixture<WebApplicationFac
         Assert.Contains("name=\"Schemes[0].Participants[1].ReturnedChecked\"", html, StringComparison.Ordinal);
     }
 
+    // Legacy: " (Y)" when no sample is unaccounted for, " (N)" when some are; assessment schemes only.
+    [Fact]
+    public async Task Get_SubmissionStatusIndicator_YWhenEverySampleIsAccountedForAndNWhenSomeAreNot()
+    {
+        var accounted = Guid.NewGuid();
+        var outstanding = Guid.NewGuid();
+        var notAssessed = Guid.NewGuid();
+        _apiClient.ResultsReceipt = new ResultsReceiptResponse(Guid.NewGuid(), 2026, 5,
+        [
+            new ResultsReceiptSchemeResponse(SchemeA, "D1a/S1: BT Brucella", RequiresAssessment: true, ProgressPercentage: 0,
+            [
+                new ResultsReceiptParticipantResponse(accounted, "L010: Accounted", new DateTime(2026, 6, 30), null, null, false, true, HasUnaccountedSamples: false, null),
+                new ResultsReceiptParticipantResponse(outstanding, "L011: Outstanding", new DateTime(2026, 6, 30), null, null, false, true, HasUnaccountedSamples: true, null),
+            ]),
+            new ResultsReceiptSchemeResponse(SchemeB, "D2/S2: TB Tuberculosis", RequiresAssessment: false, ProgressPercentage: 0,
+            [
+                new ResultsReceiptParticipantResponse(notAssessed, "L012: Not assessed", new DateTime(2026, 6, 30), null, null, false, true, HasUnaccountedSamples: true, null),
+            ]),
+        ]);
+
+        var html = await GetHtmlAsync();
+
+        Assert.EndsWith("(Y)", Text(Cells(ParticipantRow(html, "L010: Accounted"))[5]), StringComparison.Ordinal);
+        Assert.EndsWith("(N)", Text(Cells(ParticipantRow(html, "L011: Outstanding"))[5]), StringComparison.Ordinal);
+
+        var notAssessedRow = ParticipantRow(html, "L012: Not assessed");
+        Assert.DoesNotContain("(Y)", notAssessedRow, StringComparison.Ordinal);
+        Assert.DoesNotContain("(N)", notAssessedRow, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Get_RendersTheSharedUnsavedChangesBannerHiddenAndLoadsItsScript()
+    {
+        _apiClient.ResultsReceipt = Receipt();
+
+        var html = await GetHtmlAsync();
+
+        var banner = Regex.Match(html, "<div[^>]*id=\"unsaved-changes\"[^>]*>").Value;
+        Assert.Contains("govuk-notification-banner", banner, StringComparison.Ordinal);
+        Assert.Contains("hidden", banner, StringComparison.Ordinal);
+        Assert.Contains("You have changes that have not been saved.", html, StringComparison.Ordinal);
+        Assert.Contains("/js/unsaved-changes.js", html, StringComparison.Ordinal);
+        Assert.Matches("<form[^>]*id=\"results-receipt-form\"[^>]*data-unsaved-watch[^>]*data-unsaved-reveal", html);
+        Assert.DoesNotContain("confirm(", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("beforeunload", html, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Get_OnlyTheExtraDocumentsAndReturnedTicksAreWatched()
+    {
+        _apiClient.ResultsReceipt = Receipt();
+
+        var html = await GetHtmlAsync();
+
+        var form = Regex.Match(html, "<form[^>]*id=\"results-receipt-form\".*?</form>", RegexOptions.Singleline).Value;
+        var checkboxes = Regex.Matches(form, "<input[^>]*type=\"checkbox\"[^>]*>").Select(m => m.Value).ToList();
+        Assert.NotEmpty(checkboxes);
+        Assert.All(checkboxes, c => Assert.Matches("name=\"Schemes\\[\\d+\\]\\.Participants\\[\\d+\\]\\.(ExtraDocumentsReturned|ReturnedChecked)\"", c));
+        Assert.DoesNotContain("data-unsaved-ignore", form, StringComparison.Ordinal);
+
+        // Save, Apply and Cancel are submit buttons, which the script never intercepts.
+        Assert.Equal(3, Regex.Matches(form, "<button type=\"submit\" name=\"command\"").Count);
+    }
+
+    [Theory]
+    [InlineData("year=2026&monthId=5", "year=2026")]
+    [InlineData("year=2027&monthId=2", "year=2026")]
+    public async Task Get_DistributionsBreadcrumbLinksToTheMonthsFinancialYear(string query, string expectedYear)
+    {
+        _apiClient.ResultsReceipt = Receipt();
+
+        var html = await (await _factory.CreateClient().GetAsync($"/Distribution/ResultsReceipt?{query}")).Content.ReadAsStringAsync();
+
+        var nav = Regex.Match(html, "<nav class=\"govuk-breadcrumbs\".*?</nav>", RegexOptions.Singleline).Value;
+        var href = WebUtility.HtmlDecode(Regex.Match(nav, "href=\"([^\"]*Distribution[^\"]*)\"").Groups[1].Value);
+        Assert.Contains(expectedYear, href, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("year=2026&monthId=5", "year=2026")]
+    [InlineData("year=2027&monthId=2", "year=2026")]
+    public async Task Get_MonthNotInitialised_RedirectsToTheDashboardForTheFinancialYear(string query, string expectedYear)
+    {
+        _apiClient.ResultsReceipt = null;
+        var client = _factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+
+        var response = await client.GetAsync($"/Distribution/ResultsReceipt?{query}");
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        var location = response.Headers.Location!.OriginalString;
+        Assert.Contains(expectedYear, location, StringComparison.Ordinal);
+        Assert.DoesNotContain("ResultsReceipt", location, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Get_SampleReceiptAndActualResultsWithUnknownIds_RedirectBackToResultsReceipt()
+    {
+        _apiClient.SampleReceipt = null;
+        _apiClient.ActualResults = null;
+        var client = _factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+
+        foreach (var action in new[] { "SampleReceipt", "ActualResults" })
+        {
+            var response = await client.GetAsync($"/Distribution/{action}?{BaseQuery}&schemeId={SchemeA}&participantId={Posted}");
+
+            Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+            var location = response.Headers.Location!.OriginalString;
+            Assert.Contains("/Distribution/ResultsReceipt", location, StringComparison.Ordinal);
+            Assert.Contains("year=2026", location, StringComparison.Ordinal);
+            Assert.Contains("monthId=5", location, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public async Task Post_SaveOfAVeryLargeMonth_IsNotRejectedByTheFormValueLimit()
+    {
+        _apiClient.ResultsReceipt = Receipt();
+        _apiClient.ResultsReceiptSaveResult = new ResultsReceiptSaveResult(true);
+        var fields = new List<(string Name, string Value)>();
+        for (var s = 0; s < 3; s++)
+        {
+            fields.Add(($"Schemes[{s}].MonthlyDistributionSchemeId", Guid.NewGuid().ToString()));
+            for (var p = 0; p < 400; p++)
+            {
+                var prefix = $"Schemes[{s}].Participants[{p}]";
+                fields.Add(($"{prefix}.DistributionParticipantId", Guid.NewGuid().ToString()));
+                fields.Add(($"{prefix}.ExtraDocumentsReturned", "true"));
+                fields.Add(($"{prefix}.ExtraDocumentsReturned", "false"));
+                fields.Add(($"{prefix}.ReturnedChecked", "false"));
+            }
+        }
+
+        var response = await PostAsync(_factory.CreateClient(), "save", [.. fields]);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.True(fields.Count > 1024);
+        Assert.Equal(1200, Assert.Single(_apiClient.SavedResultsReceiptRequests).Updates.Count);
+    }
+
     [Fact]
     public async Task Get_RendersSaveApplyAndCancelButtonsPostingTheCommand()
     {
@@ -227,16 +366,6 @@ public partial class ResultsReceiptRenderTests : IClassFixture<WebApplicationFac
 
         Assert.Contains("There are no Schemes for this Distribution", html, StringComparison.Ordinal);
         Assert.DoesNotContain("ptl-results-receipt-scheme-row", html, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public async Task Get_ApiReturnsNull_Returns404()
-    {
-        _apiClient.ResultsReceipt = null;
-
-        var response = await _factory.CreateClient().GetAsync($"/Distribution/ResultsReceipt?{BaseQuery}");
-
-        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
     [Fact]
@@ -304,15 +433,29 @@ public partial class ResultsReceiptRenderTests : IClassFixture<WebApplicationFac
     }
 
     [Fact]
-    public async Task Post_Cancel_DoesNotCallTheApi()
+    public async Task Post_Cancel_DoesNotCallTheApiAndReturnsToTheDashboardForTheFinancialYear()
     {
         _apiClient.ResultsReceipt = Receipt();
+        var client = _factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
 
-        var response = await PostAsync(_factory.CreateClient(), "cancel");
+        var response = await PostAsync(client, "cancel");
 
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        Assert.Contains("year=2026", response.Headers.Location!.OriginalString, StringComparison.Ordinal);
         Assert.Empty(_apiClient.SavedResultsReceiptRequests);
-        Assert.DoesNotContain("Results Receipt updated successfully.", await response.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Post_Save_LeavesForTheDashboardForTheFinancialYear()
+    {
+        _apiClient.ResultsReceipt = Receipt();
+        _apiClient.ResultsReceiptSaveResult = new ResultsReceiptSaveResult(true);
+        var client = _factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+
+        var response = await PostAsync(client, "save");
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        Assert.Contains("year=2026", response.Headers.Location!.OriginalString, StringComparison.Ordinal);
     }
 
     [Fact]
