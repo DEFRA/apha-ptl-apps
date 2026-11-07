@@ -783,7 +783,7 @@ public sealed partial class DistributionController(IDistributionApiClient distri
         }
         else if (model.Mode is 0 or 1 && model.Week is < 1 or > 4)
         {
-            if (model.WeekVisible)
+            if (model.WeekVisible is true)
             {
                 model.WeekError = "Select a week";
             }

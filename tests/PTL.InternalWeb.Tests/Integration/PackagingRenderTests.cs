@@ -683,7 +683,7 @@ public partial class PackagingRenderTests : IClassFixture<WebApplicationFactory<
     {
         var html = await GetHtmlAsync(BaseQuery);
 
-        var banner = Regex.Match(html, "<div[^>]*id=\"unsaved-changes\"[^>]*>").Value;
+        var banner = Regex.Match(html, "<section[^>]*id=\"unsaved-changes\"[^>]*>").Value;
         Assert.Contains("govuk-notification-banner", banner, StringComparison.Ordinal);
         Assert.Contains("hidden", banner, StringComparison.Ordinal);
         Assert.Contains("You have changes that have not been saved.", html, StringComparison.Ordinal);
@@ -717,7 +717,7 @@ public partial class PackagingRenderTests : IClassFixture<WebApplicationFactory<
     {
         var html = await PostHtmlAsync(("command", "select"), ("PackedTicks", Tick(0, 1, Id(41))));
 
-        Assert.DoesNotContain("hidden", Regex.Match(html, "<div[^>]*id=\"unsaved-changes\"[^>]*>").Value, StringComparison.Ordinal);
+        Assert.DoesNotContain("hidden", Regex.Match(html, "<section[^>]*id=\"unsaved-changes\"[^>]*>").Value, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -725,7 +725,7 @@ public partial class PackagingRenderTests : IClassFixture<WebApplicationFactory<
     {
         var html = await PostHtmlAsync(("command", "select"), ("PrintKeys", "k1"));
 
-        Assert.Contains("hidden", Regex.Match(html, "<div[^>]*id=\"unsaved-changes\"[^>]*>").Value, StringComparison.Ordinal);
+        Assert.Contains("hidden", Regex.Match(html, "<section[^>]*id=\"unsaved-changes\"[^>]*>").Value, StringComparison.Ordinal);
     }
 
     [Theory]

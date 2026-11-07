@@ -20,9 +20,9 @@
         // Editing arms the warning. The banner stays hidden until a link is followed, unless the page
         // opts in with data-unsaved-reveal to show it as soon as there is something unsaved.
         // Controls marked data-unsaved-ignore (e.g. selections that are never saved) do not count.
-        var revealOnChange = watched.hasAttribute('data-unsaved-reveal');
+        var revealOnChange = 'unsavedReveal' in watched.dataset;
         var markDirty = function (event) {
-            if (event.target.closest && event.target.closest('[data-unsaved-ignore]')) {
+            if (event.target.closest?.('[data-unsaved-ignore]')) {
                 return;
             }
 
@@ -61,7 +61,7 @@
 
         var name = (link.textContent || '').replace(/\s+/g, ' ').trim();
         blockedText.textContent = name
-            ? 'You selected "' + name + '". Your changes will be lost if you go there now. '
+            ? `You selected "${name}". Your changes will be lost if you go there now. `
             : 'Your changes will be lost if you leave this page now. ';
         leave.setAttribute('href', link.href);
         blocked.removeAttribute('hidden');

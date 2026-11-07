@@ -190,35 +190,21 @@ public sealed partial class DistributionController
             values.TryGetValue(name, out var posted)
             && !string.Equals(posted, stored.ToString(CultureInfo.InvariantCulture), StringComparison.Ordinal);
 
-        foreach (var test in page.Tests)
-        {
-            if (test.IntendedMethodResults.Any(i => Changed(Keys.IntendedMethod(i.ItemId), i.Value))
+        return page.Tests.Any(test =>
+                test.IntendedMethodResults.Any(i => Changed(Keys.IntendedMethod(i.ItemId), i.Value))
                 || test.IntendedResultItemResults.Any(i =>
                     Changed(Keys.IntendedResult(i.SampleId, i.ItemId, 1), i.Value)
                     || Changed(Keys.IntendedResult(i.SampleId, i.ItemId, 2), i.Value2))
                 || test.ResultItems.Any(r => values.ContainsKey(Keys.Range(r.ItemId) + "_shown") && values.ContainsKey(Keys.Range(r.ItemId)) != r.IsRange))
-            {
-                return true;
-            }
-        }
-
-        foreach (var participant in page.Participants)
-        {
-            var id = participant.DistributionParticipantId;
-            if (participant.MethodResults.Any(m => Changed(Keys.ParticipantMethod(id, m.ItemId), m.Value))
-                || participant.ResultItemResults.Any(r => Changed(Keys.ParticipantResult(id, r.SampleId, r.ItemId), r.Value))
-                || participant.CategoryResults.Any(c => ScoreChanged(Keys.CategoryScore(id, c.SampleId, c.CategoryItemId), c.Score))
+            || page.Participants.Any(participant =>
+                participant.MethodResults.Any(m => Changed(Keys.ParticipantMethod(participant.DistributionParticipantId, m.ItemId), m.Value))
+                || participant.ResultItemResults.Any(r => Changed(Keys.ParticipantResult(participant.DistributionParticipantId, r.SampleId, r.ItemId), r.Value))
+                || participant.CategoryResults.Any(c => ScoreChanged(Keys.CategoryScore(participant.DistributionParticipantId, c.SampleId, c.CategoryItemId), c.Score))
                 || participant.Assessments.Any(a =>
-                    Changed(Keys.AssessmentComment(id, a.TestId, a.SampleId), a.Comment)
-                    || ScoreChanged(Keys.AssessmentScore(id, a.TestId, a.SampleId), a.Score))
-                || Changed(Keys.NilReturn(id), participant.NilReturnReason)
-                || participant.Ratings.Any(r => Changed(Keys.Rating(id, r.SampleId), r.RatingId.ToString())))
-            {
-                return true;
-            }
-        }
-
-        return false;
+                    Changed(Keys.AssessmentComment(participant.DistributionParticipantId, a.TestId, a.SampleId), a.Comment)
+                    || ScoreChanged(Keys.AssessmentScore(participant.DistributionParticipantId, a.TestId, a.SampleId), a.Score))
+                || Changed(Keys.NilReturn(participant.DistributionParticipantId), participant.NilReturnReason)
+                || participant.Ratings.Any(r => Changed(Keys.Rating(participant.DistributionParticipantId, r.SampleId), r.RatingId.ToString())));
     }
 
     // Reads back every input the page rendered; anything not posted is left out (and so unchanged).

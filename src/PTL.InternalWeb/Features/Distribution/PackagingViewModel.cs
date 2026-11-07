@@ -23,7 +23,7 @@ public sealed class PackagingViewModel
 #pragma warning restore S6964
 
     // Posted by the page when it showed the Week dropdown, so a missing week is only an error once the user could pick one.
-    public bool WeekVisible { get; set; }
+    public bool? WeekVisible { get; set; }
 
     // Packed/Posted ticks as "{mode}:{week}:{distributionParticipantId}". Ticks made on another
     // option/week are carried in hidden fields so Save/Apply still persist them (legacy keeps every

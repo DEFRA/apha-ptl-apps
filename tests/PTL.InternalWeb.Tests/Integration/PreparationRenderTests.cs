@@ -53,7 +53,7 @@ public class PreparationRenderTests : IClassFixture<WebApplicationFactory<Progra
     {
         var html = await GetHtmlAsync();
 
-        var banner = Regex.Match(html, "<div[^>]*id=\"unsaved-changes\"[^>]*>").Value;
+        var banner = Regex.Match(html, "<section[^>]*id=\"unsaved-changes\"[^>]*>").Value;
         Assert.Contains("govuk-notification-banner", banner, StringComparison.Ordinal);
         Assert.Contains("hidden", banner, StringComparison.Ordinal);
         Assert.Contains("You have changes that have not been saved.", html, StringComparison.Ordinal);
