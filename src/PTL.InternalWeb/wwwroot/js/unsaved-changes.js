@@ -43,7 +43,7 @@
         }
 
         var href = link.getAttribute('href');
-        return !!href && href.charAt(0) !== '#' && href.toLowerCase().indexOf('javascript:') !== 0;
+        return !!href && href.charAt(0) !== '#' && !/^\s*(?:javascript|data|vbscript):/i.test(href);
     }
 
     document.addEventListener('click', function (event) {
