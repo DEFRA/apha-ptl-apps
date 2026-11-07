@@ -679,8 +679,12 @@ public sealed partial class DistributionController(IDistributionApiClient distri
     public async Task<IActionResult> Packaging(int year, int monthId, int? mode, int week, CancellationToken cancellationToken)
     {
         var model = await BuildPackagingViewModelAsync(year, monthId, new PackagingViewModel { Mode = mode, Week = week }, cancellationToken);
-        return model is null ? NotFound() : View(model);
+        return model is null ? RedirectToDashboardForMonth(year, monthId) : View(model);
     }
+
+    // Legacy LeavePage() when the month has no distribution yet: back to the Dashboard, no error.
+    private RedirectToActionResult RedirectToDashboardForMonth(int year, int monthId) =>
+        RedirectToAction(nameof(Index), new { year = FinancialYearFor(year, monthId) });
 
     // select = explicit View button after choosing the Packaging/Week values: redisplay, keeping unsaved ticks.
     // Save = persist then leave (legacy ButtonSave_Click -> LeavePage() -> MenuDistributions.aspx).
@@ -693,13 +697,13 @@ public sealed partial class DistributionController(IDistributionApiClient distri
     {
         if (string.Equals(command, CancelCommand, StringComparison.OrdinalIgnoreCase))
         {
-            return RedirectToAction(nameof(Index));
+            return RedirectToDashboardForMonth(year, monthId);
         }
 
         if (!ValidatePackagingSelection(model))
         {
             var invalid = await BuildPackagingViewModelAsync(year, monthId, model, cancellationToken);
-            return invalid is null ? NotFound() : View(invalid);
+            return invalid is null ? RedirectToDashboardForMonth(year, monthId) : View(invalid);
         }
 
         if (string.Equals(command, "save", StringComparison.OrdinalIgnoreCase) || string.Equals(command, ApplyCommand, StringComparison.OrdinalIgnoreCase))
@@ -714,7 +718,7 @@ public sealed partial class DistributionController(IDistributionApiClient distri
         }
 
         var rebuilt = await BuildPackagingViewModelAsync(year, monthId, model, cancellationToken);
-        return rebuilt is null ? NotFound() : View(rebuilt);
+        return rebuilt is null ? RedirectToDashboardForMonth(year, monthId) : View(rebuilt);
     }
 
     // The labels / customs print commands; null means redisplay the page (with model.Message set).
@@ -761,6 +765,9 @@ public sealed partial class DistributionController(IDistributionApiClient distri
         return null;
     }
 
+    // False means the selection is incomplete. Only an option or a week the user was shown is an error:
+    // the Week dropdown appears once Group Address or Participant Combined is chosen, so the first
+    // View after choosing one just reveals it.
     private static bool ValidatePackagingSelection(PackagingViewModel model)
     {
         if (model.Mode is not (0 or 1 or 2))
@@ -770,7 +777,12 @@ public sealed partial class DistributionController(IDistributionApiClient distri
         }
         else if (model.Mode is 0 or 1 && model.Week is < 1 or > 4)
         {
-            model.WeekError = "Select a week";
+            if (model.WeekVisible)
+            {
+                model.WeekError = "Select a week";
+            }
+
+            return false;
         }
 
         return !model.HasSelectionError;
@@ -799,7 +811,7 @@ public sealed partial class DistributionController(IDistributionApiClient distri
 
         return string.Equals(command, ApplyCommand, StringComparison.OrdinalIgnoreCase)
             ? RedirectToAction(nameof(Packaging), new { year, monthId, mode = model.Mode, week = model.Week })
-            : RedirectToAction(nameof(Index));
+            : RedirectToDashboardForMonth(year, monthId);
     }
 
     private async Task<PackagingViewModel?> BuildPackagingViewModelAsync(int year, int monthId, PackagingViewModel model, CancellationToken cancellationToken)
@@ -813,7 +825,8 @@ public sealed partial class DistributionController(IDistributionApiClient distri
         var weekNeeded = model.Mode is 0 or 1;
         if (model.Mode is not (0 or 1 or 2) || (weekNeeded && model.Week is < 1 or > 4))
         {
-            return model;
+            // No sheet yet, so the month itself is checked: an uninitialised month never shows the page.
+            return await distributionApiClient.GetScheduleAsync(year, monthId, cancellationToken) is null ? null : model;
         }
 
         model.Sheet = await distributionApiClient.GetPackagingAsync(year, monthId, model.Mode.Value, weekNeeded ? model.Week : 0, cancellationToken);

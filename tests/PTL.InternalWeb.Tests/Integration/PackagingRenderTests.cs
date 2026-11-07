@@ -38,6 +38,8 @@ public partial class PackagingRenderTests : IClassFixture<WebApplicationFactory<
                 services.RemoveAll<IDistributionApiClient>();
                 services.AddSingleton<IDistributionApiClient>(_apiClient);
             }));
+
+        _apiClient.Schedule = new MonthlyDistributionResponse(Guid.NewGuid(), 2026, 4, []);
     }
 
     // ---- data builders ------------------------------------------------------------------------
@@ -163,7 +165,7 @@ public partial class PackagingRenderTests : IClassFixture<WebApplicationFactory<
 
         Assert.Matches("<button[^>]*id=\"packaging-print-button\"[^>]*>Print</button>", html);
         Assert.Matches("<button type=\"submit\" form=\"packaging-cancel-form\" class=\"govuk-button govuk-button--secondary\"[^>]*>Cancel</button>", html);
-        Assert.Matches("<form id=\"packaging-cancel-form\" method=\"get\" class=\"noprint\" action=\"[^\"]*\"></form>|<form id=\"packaging-cancel-form\" method=\"get\" action=\"[^\"]*\" class=\"noprint\"></form>", html);
+        Assert.Matches("<form id=\"packaging-cancel-form\"[^>]*method=\"get\"[^>]*>\\s*<input type=\"hidden\" name=\"year\" value=\"2026\" />\\s*</form>", html);
         Assert.DoesNotContain(">Cancel</a>", html, StringComparison.Ordinal);
 
         if (customs)
@@ -230,6 +232,37 @@ public partial class PackagingRenderTests : IClassFixture<WebApplicationFactory<
         Assert.Equal(5, Options(html, "packaging-week").Count);
         Assert.DoesNotContain("<table", html, StringComparison.Ordinal);
         AssertButtons(html, customs: false);
+    }
+
+    [Fact]
+    public async Task Select_GroupAddressBeforeTheWeekDropdownIsShown_RevealsItWithoutAnError()
+    {
+        var html = await PostHtmlAsync(("command", "select"), ("Mode", "0"));
+
+        Assert.Equal(5, Options(html, "packaging-week").Count);
+        Assert.Contains("name=\"WeekVisible\" value=\"true\"", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("govuk-error-summary", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("Select a week", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("<table", html, StringComparison.Ordinal);
+        Assert.Empty(_apiClient.PackagingRequests);
+    }
+
+    [Fact]
+    public async Task Select_WhenTheWeekDropdownWasShownButNoWeekPicked_ShowsTheWeekError()
+    {
+        var html = await PostHtmlAsync(("command", "select"), ("Mode", "0"), ("WeekVisible", "true"), ("Week", "0"));
+
+        Assert.Contains("<a href=\"#packaging-week\">Select a week</a>", html, StringComparison.Ordinal);
+        Assert.Contains("id=\"packaging-week-error\"", html, StringComparison.Ordinal);
+        Assert.Contains("<title>Error: ", html, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Get_DailyDoesNotRenderTheWeekVisibleMarker()
+    {
+        var html = await GetHtmlAsync($"{BaseQuery}&mode=2");
+
+        Assert.DoesNotContain("WeekVisible", html, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -631,6 +664,86 @@ public partial class PackagingRenderTests : IClassFixture<WebApplicationFactory<
         Assert.DoesNotContain("govuk-notification-banner--success", html, StringComparison.Ordinal);
         Assert.Contains("Sample Packaging could not be saved. Please try again later.", html, StringComparison.Ordinal);
         Assert.Contains("id=\"packaging-table\"", html, StringComparison.Ordinal);
+    }
+
+    // ---- 9b: financial year, unsaved changes and the uninitialised month ----------------------
+
+    [Theory]
+    [InlineData("year=2026&monthId=4", "2026")]
+    [InlineData("year=2027&monthId=2", "2026")]
+    public async Task Cancel_GoesBackToTheDashboardOfTheMonthsFinancialYear(string query, string financialYear)
+    {
+        var html = await GetHtmlAsync(query);
+
+        Assert.Matches($"<form id=\"packaging-cancel-form\"[^>]*method=\"get\"[^>]*>\\s*<input type=\"hidden\" name=\"year\" value=\"{financialYear}\" />", html);
+    }
+
+    [Fact]
+    public async Task Get_RendersTheSharedUnsavedChangesBannerHiddenAndLoadsItsScript()
+    {
+        var html = await GetHtmlAsync(BaseQuery);
+
+        var banner = Regex.Match(html, "<div[^>]*id=\"unsaved-changes\"[^>]*>").Value;
+        Assert.Contains("govuk-notification-banner", banner, StringComparison.Ordinal);
+        Assert.Contains("hidden", banner, StringComparison.Ordinal);
+        Assert.Contains("You have changes that have not been saved.", html, StringComparison.Ordinal);
+        Assert.Contains("/js/unsaved-changes.js", html, StringComparison.Ordinal);
+        Assert.Matches("<form[^>]*id=\"packaging-form\"[^>]*data-unsaved-watch|<form[^>]*data-unsaved-watch[^>]*id=\"packaging-form\"", html);
+        Assert.DoesNotContain("confirm(", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("beforeunload", html, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Get_OnlyPackedAndPostedTicksCountAsChanges()
+    {
+        var scheme = Scheme(1, "Scheme A", participants: [Part(41, "Lab 1")], packedTotal: 2, postedTotal: 2);
+        _apiClient.Packaging = Sheet(0, 1, Block("k1", Apr13, "Group A", schemes: [scheme]));
+
+        var html = await GetHtmlAsync($"{BaseQuery}&mode=0&week=1");
+
+        Assert.All(Checkboxes(html, "PrintKeys"), t => Assert.Contains("data-unsaved-ignore", t, StringComparison.Ordinal));
+        Assert.Contains("data-unsaved-ignore", Regex.Match(html, "<input[^>]*data-select-all=\"print\"[^>]*>").Value, StringComparison.Ordinal);
+        Assert.DoesNotContain("data-unsaved-ignore", Regex.Match(html, "<input[^>]*data-select-all=\"packed\"[^>]*>").Value, StringComparison.Ordinal);
+        Assert.DoesNotContain("data-unsaved-ignore", Regex.Match(html, "<input[^>]*data-select-all=\"posted\"[^>]*>").Value, StringComparison.Ordinal);
+        Assert.All(Checkboxes(html, "PackedTicks"), t => Assert.DoesNotContain("data-unsaved-ignore", t, StringComparison.Ordinal));
+        Assert.All(Checkboxes(html, "PostedTicks"), t => Assert.DoesNotContain("data-unsaved-ignore", t, StringComparison.Ordinal));
+        Assert.All(Regex.Matches(html, "<input[^>]*ptl-tick-scheme[^>]*>").Select(m => m.Value), t => Assert.DoesNotContain("data-unsaved-ignore", t, StringComparison.Ordinal));
+        Assert.Contains("data-unsaved-ignore", Regex.Match(html, "<select[^>]*id=\"packaging-mode\"[^>]*>").Value, StringComparison.Ordinal);
+        Assert.Contains("data-unsaved-ignore", Regex.Match(html, "<select[^>]*id=\"packaging-week\"[^>]*>").Value, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Select_WithCarriedTicks_ShowsTheUnsavedChangesBannerVisible()
+    {
+        var html = await PostHtmlAsync(("command", "select"), ("PackedTicks", Tick(0, 1, Id(41))));
+
+        Assert.DoesNotContain("hidden", Regex.Match(html, "<div[^>]*id=\"unsaved-changes\"[^>]*>").Value, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Select_WithoutTicks_KeepsTheUnsavedChangesBannerHidden()
+    {
+        var html = await PostHtmlAsync(("command", "select"), ("PrintKeys", "k1"));
+
+        Assert.Contains("hidden", Regex.Match(html, "<div[^>]*id=\"unsaved-changes\"[^>]*>").Value, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("year=2026&monthId=4", "year=2026")]
+    [InlineData("year=2027&monthId=2", "year=2026")]
+    [InlineData("year=2026&monthId=4&mode=2", "year=2026")]
+    public async Task MonthNotInitialised_RedirectsToTheDashboardForTheFinancialYear(string query, string expectedYear)
+    {
+        _apiClient.Schedule = null;
+        _apiClient.Packaging = null;
+        var client = _factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+
+        var response = await client.GetAsync($"/Distribution/Packaging?{query}");
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        var location = response.Headers.Location!.OriginalString;
+        Assert.Contains(expectedYear, location, StringComparison.Ordinal);
+        Assert.DoesNotContain("Packaging", location, StringComparison.Ordinal);
     }
 
     // ---- 10: labels view ----------------------------------------------------------------------

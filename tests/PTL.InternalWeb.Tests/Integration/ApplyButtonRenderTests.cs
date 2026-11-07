@@ -120,6 +120,8 @@ public class ApplyButtonRenderTests : IClassFixture<WebApplicationFactory<Progra
     [Fact]
     public async Task Packaging_ShowsApplyBetweenSaveAndCancel()
     {
+        _apiClient.Schedule = new MonthlyDistributionResponse(Guid.NewGuid(), 2026, 5, []);
+
         ButtonGroupHtml.AssertApplyBetweenSaveAndCancel(await MainAsync("/Distribution/Packaging?year=2026&monthId=5"));
     }
 
