@@ -239,6 +239,14 @@ public sealed partial class DistributionController(IDistributionApiClient distri
     // The dashboard is keyed by financial year (April to March); January to March belong to the year before.
     private static int FinancialYearFor(int year, int monthId) => monthId < 4 ? year - 1 : year;
 
+    // Legacy LeavePage() when the month has no distribution yet: back to the Dashboard, no error.
+    private RedirectToActionResult RedirectToDashboardForMonth(int year, int monthId) =>
+        RedirectToAction(nameof(Index), new { year = FinancialYearFor(year, monthId) });
+
+    // Legacy LeavePage() when the session holds no participant or scheme: back to Results Receipt, no error.
+    private RedirectToActionResult RedirectToResultsReceipt(int year, int monthId) =>
+        RedirectToAction(nameof(ResultsReceipt), new { year, monthId });
+
     private static string ToMonthYearLabel(int year, int monthId) =>
         new DateTime(year, monthId, 1, 0, 0, 0, DateTimeKind.Utc).ToString("MMM yyyy", System.Globalization.CultureInfo.InvariantCulture);
 
@@ -373,10 +381,6 @@ public sealed partial class DistributionController(IDistributionApiClient distri
         var page = await distributionApiClient.GetSampleReceiptAsync(schemeId, participantId, cancellationToken);
         return page is null ? RedirectToResultsReceipt(year, monthId) : View(ToSampleReceiptViewModel(year, monthId, schemeId, participantId, page));
     }
-
-    // Legacy LeavePage() when the session holds no participant or scheme: back to Results Receipt, no error.
-    private RedirectToActionResult RedirectToResultsReceipt(int year, int monthId) =>
-        RedirectToAction(nameof(ResultsReceipt), new { year, monthId });
 
     // Save = persist then return to Results Receipt (legacy ButtonSave_Click -> LeavePage()).
     // Apply = persist then stay (legacy ButtonApply_Click). Cancel = discard, no save.
@@ -687,10 +691,6 @@ public sealed partial class DistributionController(IDistributionApiClient distri
         var model = await BuildPackagingViewModelAsync(year, monthId, new PackagingViewModel { Mode = mode, Week = week }, cancellationToken);
         return model is null ? RedirectToDashboardForMonth(year, monthId) : View(model);
     }
-
-    // Legacy LeavePage() when the month has no distribution yet: back to the Dashboard, no error.
-    private RedirectToActionResult RedirectToDashboardForMonth(int year, int monthId) =>
-        RedirectToAction(nameof(Index), new { year = FinancialYearFor(year, monthId) });
 
     // select = explicit View button after choosing the Packaging/Week values: redisplay, keeping unsaved ticks.
     // Save = persist then leave (legacy ButtonSave_Click -> LeavePage() -> MenuDistributions.aspx).

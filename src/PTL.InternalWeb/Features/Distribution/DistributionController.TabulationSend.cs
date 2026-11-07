@@ -45,22 +45,10 @@ public sealed partial class DistributionController
             return RedirectToAction(nameof(Tabulations), new { year, monthId });
         }
 
-        // Cancel on the confirmation page posts the form back declined: the send is dropped and the
-        // page redisplays with only the earlier staged sends.
-        if (!ConfirmationFlow.IsCancelled(confirmation) && ParseStaged(stage is null ? [] : [stage]) is [var send])
+        var confirmationPage = await StageSendAsync(year, monthId, stage, confirmation, stagedSends, cancellationToken);
+        if (confirmationPage is not null)
         {
-            var sendConfirmation = await distributionApiClient.StageTabulationSendAsync(
-                year, monthId, new TabulationStageRequest(stagedSends, send.MonthlyDistributionSchemeId, send.Command), cancellationToken);
-
-            if (sendConfirmation is not null)
-            {
-                if (sendConfirmation.ConfirmationQuestion.Length > 0 && !ConfirmationFlow.IsConfirmed(confirmation))
-                {
-                    return this.ConfirmationPage(ToSendConfirmationPage(sendConfirmation), nameof(Tabulations));
-                }
-
-                stagedSends.Add(send);
-            }
+            return confirmationPage;
         }
 
         var page = await distributionApiClient.PreviewTabulationsAsync(year, monthId, stagedSends, cancellationToken);
@@ -77,6 +65,32 @@ public sealed partial class DistributionController
             Schemes = page.Schemes,
             Staged = stagedSends,
         });
+    }
+
+    // Cancel on the confirmation page posts the form back declined: the send is dropped and the page
+    // redisplays with only the earlier staged sends. Returns the confirmation page when one is needed.
+    private async Task<IActionResult?> StageSendAsync(
+        int year, int monthId, string? stage, string? confirmation, List<TabulationStagedSendRequest> stagedSends, CancellationToken cancellationToken)
+    {
+        if (ConfirmationFlow.IsCancelled(confirmation) || ParseStaged(stage is null ? [] : [stage]) is not [var send])
+        {
+            return null;
+        }
+
+        var sendConfirmation = await distributionApiClient.StageTabulationSendAsync(
+            year, monthId, new TabulationStageRequest(stagedSends, send.MonthlyDistributionSchemeId, send.Command), cancellationToken);
+        if (sendConfirmation is null)
+        {
+            return null;
+        }
+
+        if (sendConfirmation.ConfirmationQuestion.Length > 0 && !ConfirmationFlow.IsConfirmed(confirmation))
+        {
+            return this.ConfirmationPage(ToSendConfirmationPage(sendConfirmation), nameof(Tabulations));
+        }
+
+        stagedSends.Add(send);
+        return null;
     }
 
     // "{schemeId}:{command}" values; anything malformed is ignored.

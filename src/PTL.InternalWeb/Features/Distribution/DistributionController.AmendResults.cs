@@ -64,50 +64,14 @@ public sealed partial class DistributionController
             .Where(k => AmendInputPrefixes.Any(p => k.StartsWith(p, StringComparison.Ordinal)))
             .ToDictionary(k => k, k => Request.Form[k].LastOrDefault() ?? string.Empty, StringComparer.Ordinal);
 
-        // The Nil Return box repeats on every test; as in legacy the changed one wins.
-        foreach (var participant in page.Participants)
+        foreach (var (name, changed) in ChangedNilReturns(page))
         {
-            var name = Keys.NilReturn(participant.DistributionParticipantId);
-            if (Request.Form[name].LastOrDefault(v => v != participant.NilReturnReason) is { } changed)
-            {
-                values[name] = changed;
-            }
+            values[name] = changed;
         }
 
         if (string.Equals(command, CancelCommand, StringComparison.OrdinalIgnoreCase))
         {
-            if (!HasAmendments(page, values) || ConfirmationFlow.IsConfirmed(audit.Confirmation))
-            {
-                return RedirectToAction(nameof(Tabulations), new { year, monthId });
-            }
-
-            // Declined: back to the page with the edits intact, and the banner saying so.
-            if (ConfirmationFlow.IsCancelled(audit.Confirmation))
-            {
-                return View(new AmendResultsViewModel
-                {
-                    YearId = year,
-                    MonthId = monthId,
-                    MonthlyDistributionSchemeId = schemeId,
-                    Page = page,
-                    Values = values,
-                    HasUnsavedChanges = true,
-                });
-            }
-
-            ViewData[BreadcrumbRouteValues.Action] = nameof(AmendResults);
-            return this.ConfirmationPage(
-                new ConfirmationPageViewModel
-                {
-                    Title = DiscardTitle,
-                    PageTitle = "Leave Amend Results",
-                    Caption = page.DistributionTitle,
-                    Message = DiscardMessage,
-                    ConfirmText = "Discard changes",
-                    IsDestructive = true,
-                    CancelText = "Go back to Amend Results",
-                },
-                nameof(AmendResults));
+            return CancelAmendResults(year, monthId, schemeId, page, values, audit);
         }
 
         var isAuditStep = audit.IsAuditStep is true;
@@ -165,9 +129,59 @@ public sealed partial class DistributionController
             : RedirectToAction(nameof(Tabulations), new { year, monthId });
     }
 
+    // The Nil Return box repeats on every test; as in legacy the changed one wins.
+    private IEnumerable<(string Name, string Value)> ChangedNilReturns(AmendResultsResponse page)
+    {
+        foreach (var participant in page.Participants)
+        {
+            var name = Keys.NilReturn(participant.DistributionParticipantId);
+            if (Request.Form[name].LastOrDefault(v => v != participant.NilReturnReason) is { } changed)
+            {
+                yield return (name, changed);
+            }
+        }
+    }
+
+    private IActionResult CancelAmendResults(
+        int year, int monthId, Guid schemeId, AmendResultsResponse page, IReadOnlyDictionary<string, string> values, AmendResultsAuditForm audit)
+    {
+        if (!HasAmendments(page, values) || ConfirmationFlow.IsConfirmed(audit.Confirmation))
+        {
+            return RedirectToAction(nameof(Tabulations), new { year, monthId });
+        }
+
+        // Declined: back to the page with the edits intact, and the banner saying so.
+        if (ConfirmationFlow.IsCancelled(audit.Confirmation))
+        {
+            return View(new AmendResultsViewModel
+            {
+                YearId = year,
+                MonthId = monthId,
+                MonthlyDistributionSchemeId = schemeId,
+                Page = page,
+                Values = values,
+                HasUnsavedChanges = true,
+            });
+        }
+
+        ViewData[BreadcrumbRouteValues.Action] = nameof(AmendResults);
+        return this.ConfirmationPage(
+            new ConfirmationPageViewModel
+            {
+                Title = DiscardTitle,
+                PageTitle = "Leave Amend Results",
+                Caption = page.DistributionTitle,
+                Message = DiscardMessage,
+                ConfirmText = "Discard changes",
+                IsDestructive = true,
+                CancelText = "Go back to Amend Results",
+            },
+            nameof(AmendResults));
+    }
+
     // True when any posted input differs from the value the page was drawn with. Only inputs the page
     // actually rendered are posted, so anything absent is by definition unchanged.
-    private static bool HasAmendments(AmendResultsResponse page, Dictionary<string, string> values)
+    private static bool HasAmendments(AmendResultsResponse page, IReadOnlyDictionary<string, string> values)
     {
         bool Changed(string name, string stored) =>
             values.TryGetValue(name, out var posted) && !string.Equals(posted, stored, StringComparison.Ordinal);
