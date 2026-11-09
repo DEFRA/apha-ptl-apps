@@ -52,4 +52,14 @@ public static class AddressLabelComposer
             fields.Address1, fields.Address2, fields.Address3, fields.Address4, fields.Address5,
             fields.Country, fields.Telephone);
     }
+
+    // Legacy LabelGroupAddress.SetLabelString - same Address/Country/Telephone fields as a
+    // participant label, but a Group Address has no contact name or organisation.
+    public static AddressLabel GroupAddress(AddressLabelFields fields)
+    {
+        ArgumentNullException.ThrowIfNull(fields);
+        return AddressLabel.FromFields(
+            fields.Address1, fields.Address2, fields.Address3, fields.Address4, fields.Address5,
+            fields.Country, fields.Telephone);
+    }
 }

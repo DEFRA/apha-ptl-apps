@@ -21,7 +21,7 @@ public class DistributionControllerSampleReceiptTests
     private static readonly Guid Sample2 = Guid.Parse("50000000-0000-0000-0000-000000000002");
 
     private static DistributionController CreateController(FakeDistributionApiClient apiClient) =>
-        new(apiClient, new FakeSearchApiClient(), new FakeLookupApiClient())
+        new(apiClient, new FakeSearchApiClient(), new FakeLookupApiClient(), new FakeGroupAddressApiClient(), new FakeParticipantApiClient(), new FakeLabelPrinterApiClient())
         {
             TempData = new TempDataDictionary(new DefaultHttpContext(), new FakeTempDataProvider()),
         };

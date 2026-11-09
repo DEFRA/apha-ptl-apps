@@ -1,4 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
+using PTL.Core.Labels;
+using PTL.SharedUI.Notifications;
 
 namespace PTL.InternalWeb.Features.Distribution;
 
@@ -17,12 +19,43 @@ public sealed partial class DistributionController
         return View(new GroupAddressLabelsViewModel { GroupAddresses = groupAddresses });
     }
 
-    // [PRINT FUNCTIONALITY DEFERRED] - legacy prints directly to a Windows printer configured in
-    // web.config via System.Drawing.Printing.PrintDocument (PtaBusinessObjects.Labels.LabelBase/
-    // LabelGroupAddress, dbo.spgLabelGroupAddress). The target printing architecture for this
-    // platform has not yet been agreed, so this action only reaches the shared "not yet migrated"
-    // stub - same pattern already used for Contract/Export and Distribution/ParticipantAddressLabels.
+    // Legacy GroupAddress.aspx LinkButtonPrint_Click: a fresh GroupAddressInfo fetch by id (not the
+    // row already on screen), composed via LabelGroupAddress and sent straight to a Windows printer
+    // (PtaBusinessObjects.Labels.LabelBase, web.config LabelPrinterName). Printing is now delegated
+    // to PTL.Api (ILabelPrinterApiClient), which holds the actual printer connection - as in legacy,
+    // nothing is ever sent to the browser as a file.
     [HttpGet]
-    public IActionResult PrintGroupAddressLabel(Guid groupAddressId) =>
-        View("FeatureNotAvailable", "Print Group Address Label");
+    public async Task<IActionResult> PrintGroupAddressLabel(Guid groupAddressId, CancellationToken cancellationToken)
+    {
+        var groupAddress = await groupAddressApiClient.GetGroupAddressAsync(groupAddressId, cancellationToken);
+        if (groupAddress is null)
+        {
+            return NotFound();
+        }
+
+        var label = AddressLabelComposer.GroupAddress(new AddressLabelFields
+        {
+            Address1 = groupAddress.Address1,
+            Address2 = groupAddress.Address2,
+            Address3 = groupAddress.Address3,
+            Address4 = groupAddress.Address4,
+            Address5 = groupAddress.Address5,
+            Country = await CountryNameAsync(groupAddress.CountryId, cancellationToken),
+            Telephone = groupAddress.Telephone
+        });
+
+        var printed = await labelPrinterApiClient.PrintAsync(label.Lines, cancellationToken);
+        TempData.SetNotification(
+            printed ? NotificationType.Success : NotificationType.Error,
+            printed ? "Label sent to printer." : "There was a problem printing the label. Please try again.");
+        return RedirectToAction(nameof(GroupAddressLabels));
+    }
+
+    // Legacy took the country from a label-specific query that already joins to the country name
+    // (dbo.spgLabelGroupAddress) - the lookup list is the faithful equivalent here.
+    private async Task<string> CountryNameAsync(Guid countryId, CancellationToken cancellationToken)
+    {
+        var countries = await lookupApiClient.GetCountriesAsync(cancellationToken);
+        return countries.FirstOrDefault(c => c.CountryId == countryId)?.Country ?? string.Empty;
+    }
 }

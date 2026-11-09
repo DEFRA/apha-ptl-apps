@@ -133,6 +133,12 @@ public static class ApiClientServiceCollectionExtensions
         })
             .AddStandardResilienceHandler();
 
+        services.AddHttpClient<ILabelPrinterApiClient, LabelPrinterApiClient>(client =>
+        {
+            client.BaseAddress = new Uri(apiBaseUrl);
+        })
+            .AddStandardResilienceHandler();
+
         services.AddHttpClient<IImportPermitApiClient, ImportPermitApiClient>(client =>
         {
             client.BaseAddress = new Uri(apiBaseUrl);

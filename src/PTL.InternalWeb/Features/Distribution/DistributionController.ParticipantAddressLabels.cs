@@ -1,5 +1,8 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Routing;
+using PTL.Core.Labels;
 using PTL.InternalWeb.Features.Search;
+using PTL.SharedUI.Notifications;
 
 namespace PTL.InternalWeb.Features.Distribution;
 
@@ -30,13 +33,48 @@ public sealed partial class DistributionController
         });
     }
 
-    // [PRINT FUNCTIONALITY DEFERRED] - legacy prints directly to a Windows printer configured in
-    // web.config via System.Drawing.Printing.PrintDocument (PtaBusinessObjects.Labels.LabelBase/
-    // LabelParticipantAddress, dbo.spgLabelParticipantAddress). The target printing architecture
-    // for this platform (thermal SDK/PrintNode/browser print/etc.) has not yet been agreed, so this
-    // action only reaches the shared "not yet migrated" stub - same pattern already used for
-    // Contract/Export and Distribution/ContractItems.
+    // Legacy ParticipantAddress.aspx LinkButtonPrint_Click: a fresh ParticipantAddressInfo fetch by
+    // id (not the search result row already on screen), composed via LabelParticipantAddress and
+    // sent straight to a Windows printer (PtaBusinessObjects.Labels.LabelBase, web.config
+    // LabelPrinterName). Printing is now delegated to PTL.Api (ILabelPrinterApiClient), which holds
+    // the actual printer connection - the same participantApiClient fetch as
+    // Features/Participant/ParticipantController's own "Print Address Label" action. The search
+    // criteria are round-tripped through the Print link so the redirect back restores the same
+    // result list legacy's ViewState would have kept on screen.
     [HttpGet]
-    public IActionResult PrintParticipantAddressLabel(Guid participantId) =>
-        View("FeatureNotAvailable", "Print Participant Address Label");
+    public async Task<IActionResult> PrintParticipantAddressLabel(
+        Guid participantId, string? labCode, string? labName, string? contactName, CancellationToken cancellationToken)
+    {
+        var participant = await participantApiClient.GetParticipantAsync(participantId, cancellationToken);
+        if (participant is null)
+        {
+            return NotFound();
+        }
+
+        var label = AddressLabelComposer.ParticipantAddress(new AddressLabelFields
+        {
+            ContactName = participant.ContactName,
+            Organisation = participant.Organisation,
+            Address1 = participant.Address1,
+            Address2 = participant.Address2,
+            Address3 = participant.Address3,
+            Address4 = participant.Address4,
+            Address5 = participant.Address5,
+            Country = await CountryNameAsync(participant.CountryId, cancellationToken),
+            Telephone = participant.Telephone
+        });
+
+        var printed = await labelPrinterApiClient.PrintAsync(label.Lines, cancellationToken);
+        TempData.SetNotification(
+            printed ? NotificationType.Success : NotificationType.Error,
+            printed ? "Label sent to printer." : "There was a problem printing the label. Please try again.");
+
+        return RedirectToAction(nameof(ParticipantAddressLabels), new RouteValueDictionary
+        {
+            ["searched"] = true,
+            ["search.LabCode"] = labCode,
+            ["search.LabName"] = labName,
+            ["search.ContactName"] = contactName
+        });
+    }
 }

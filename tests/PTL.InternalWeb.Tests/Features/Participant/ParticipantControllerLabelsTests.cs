@@ -9,9 +9,9 @@ namespace PTL.InternalWeb.Tests.Features.Participant;
 
 public class ParticipantControllerLabelsTests
 {
-    private static ParticipantController CreateController(FakeParticipantApiClient? participantApiClient = null, FakeLookupApiClient? lookupApiClient = null, FakeCustomerApiClient? customerApiClient = null) =>
+    private static ParticipantController CreateController(FakeParticipantApiClient? participantApiClient = null, FakeLookupApiClient? lookupApiClient = null, FakeCustomerApiClient? customerApiClient = null, FakeLabelPrinterApiClient? labelPrinterApiClient = null) =>
         new(participantApiClient ?? new FakeParticipantApiClient(), customerApiClient ?? new FakeCustomerApiClient(), lookupApiClient ?? new FakeLookupApiClient(),
-            NullLogger<ParticipantController>.Instance);
+            labelPrinterApiClient ?? new FakeLabelPrinterApiClient(), NullLogger<ParticipantController>.Instance);
 
     private static ParticipantResponse SampleParticipant(Guid participantId, Guid customerId, Guid countryId) => new(
         participantId, Guid.NewGuid(), customerId, "LAB-01", "Sample Laboratory", Guid.NewGuid(), "Alice Example",
@@ -29,30 +29,35 @@ public class ParticipantControllerLabelsTests
     }
 
     [Fact]
-    public async Task PrintAddressLabel_Get_ExistingParticipant_ReturnsAddressLabelPdfWithMatchedCountry()
+    public async Task PrintAddressLabel_Get_ExistingParticipant_PrintsLabelWithMatchedCountryAndRedirectsToDetails()
     {
         var participantId = Guid.NewGuid();
         var countryId = Guid.NewGuid();
         var participantApiClient = new FakeParticipantApiClient { ParticipantResponse = SampleParticipant(participantId, Guid.NewGuid(), countryId) };
         var lookupApiClient = new FakeLookupApiClient { Countries = [new CountryResponse(countryId, "United Kingdom")] };
-        var controller = CreateController(participantApiClient, lookupApiClient);
+        var labelPrinterApiClient = new FakeLabelPrinterApiClient();
+        var controller = CreateController(participantApiClient, lookupApiClient, labelPrinterApiClient: labelPrinterApiClient);
 
         var result = await controller.PrintAddressLabel(participantId, CancellationToken.None);
 
-        var file = Assert.IsType<FileContentResult>(result);
-        Assert.Equal("address-label.pdf", file.FileDownloadName);
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal(nameof(ParticipantController.Details), redirect.ActionName);
+        var lines = Assert.Single(labelPrinterApiClient.PrintedLines);
+        Assert.Contains("United Kingdom", lines);
     }
 
     [Fact]
-    public async Task PrintAddressLabel_Get_CountryNotInLookup_RendersWithBlankCountry()
+    public async Task PrintAddressLabel_Get_CountryNotInLookup_PrintsLabelWithoutACountryLine()
     {
         var participantId = Guid.NewGuid();
         var participantApiClient = new FakeParticipantApiClient { ParticipantResponse = SampleParticipant(participantId, Guid.NewGuid(), Guid.NewGuid()) };
-        var controller = CreateController(participantApiClient, new FakeLookupApiClient { Countries = [] });
+        var labelPrinterApiClient = new FakeLabelPrinterApiClient();
+        var controller = CreateController(participantApiClient, new FakeLookupApiClient { Countries = [] }, labelPrinterApiClient: labelPrinterApiClient);
 
         var result = await controller.PrintAddressLabel(participantId, CancellationToken.None);
 
-        Assert.IsType<FileContentResult>(result);
+        Assert.IsType<RedirectToActionResult>(result);
+        Assert.Single(labelPrinterApiClient.PrintedLines);
     }
 
     [Fact]
@@ -86,10 +91,11 @@ public class ParticipantControllerLabelsTests
     }
 
     [Fact]
-    public async Task PrintAddressLabel_Post_ValidModel_ReturnsAddressLabelPdf()
+    public async Task PrintAddressLabel_Post_ValidModel_PrintsLabelAndRedisplaysCreateForm()
     {
         var countryId = Guid.NewGuid();
-        var controller = CreateController(lookupApiClient: new FakeLookupApiClient { Countries = [new CountryResponse(countryId, "United Kingdom")] });
+        var labelPrinterApiClient = new FakeLabelPrinterApiClient();
+        var controller = CreateController(lookupApiClient: new FakeLookupApiClient { Countries = [new CountryResponse(countryId, "United Kingdom")] }, labelPrinterApiClient: labelPrinterApiClient);
         var model = new ParticipantFormViewModel
         {
             CustomerId = Guid.NewGuid(),
@@ -102,8 +108,10 @@ public class ParticipantControllerLabelsTests
 
         var result = await controller.PrintAddressLabel(model, CancellationToken.None);
 
-        var file = Assert.IsType<FileContentResult>(result);
-        Assert.Equal("address-label.pdf", file.FileDownloadName);
+        var view = Assert.IsType<ViewResult>(result);
+        Assert.Equal(nameof(ParticipantController.Create), view.ViewName);
+        var lines = Assert.Single(labelPrinterApiClient.PrintedLines);
+        Assert.Contains("Alice Example", lines);
     }
 
     [Fact]
