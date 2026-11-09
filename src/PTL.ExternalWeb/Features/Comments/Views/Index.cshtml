@@ -8,15 +8,13 @@
 <p class="govuk-body">Select View to open a distribution and enter or submit comments.</p>
 
 <form method="get" asp-action="Index" class="govuk-!-margin-bottom-6">
-    <div class="govuk-form-group">
-        <label class="govuk-label" for="search">Search distributions</label>
-        <input class="govuk-input govuk-!-width-two-thirds" id="search" name="search" value="@Model.Search" />
+    <div class="govuk-grid-row">
+        <div class="govuk-grid-column-one-half">
+            <partial name="_DistributionReferenceSchemeSearchFields" model="@(new PTL.ExternalWeb.ViewSupport.DistributionReferenceSchemeSearchFields(null, Model.DistributionReference, Model.SchemeCode, Model.SchemeName))" />
+        </div>
     </div>
 
-    <div class="govuk-button-group">
-        <button class="govuk-button" data-module="govuk-button" type="submit">Search</button>
-        <a class="govuk-button govuk-button--secondary" data-module="govuk-button" asp-action="Index">Show All</a>
-    </div>
+    <partial name="_SearchFormButtonGroup" model="@(nameof(PTL.ExternalWeb.Features.Comments.CommentsController.Index))" />
 </form>
 
 @if (Model.Distributions.Count == 0)
@@ -28,7 +26,9 @@ else
     <table class="govuk-table">
         <thead class="govuk-table__head">
             <tr class="govuk-table__row">
-                <th scope="col" class="govuk-table__header">Distribution</th>
+                <th scope="col" class="govuk-table__header">Distribution reference</th>
+                <th scope="col" class="govuk-table__header">Scheme code</th>
+                <th scope="col" class="govuk-table__header">Scheme name</th>
                 <th scope="col" class="govuk-table__header">Target date</th>
                 <th scope="col" class="govuk-table__header">Comments status</th>
                 <th scope="col" class="govuk-table__header">Comments</th>
@@ -38,7 +38,9 @@ else
             @foreach (var distribution in Model.Distributions)
             {
                 <tr class="govuk-table__row">
-                    <td class="govuk-table__cell">@distribution.DistributionTitle</td>
+                    <td class="govuk-table__cell">@distribution.DistributionReference</td>
+                    <td class="govuk-table__cell">@distribution.SchemeCode</td>
+                    <td class="govuk-table__cell">@distribution.SchemeName</td>
                     <td class="govuk-table__cell">@distribution.TargetDate.ToString("dddd d MMMM yyyy")</td>
                     <td class="govuk-table__cell">@distribution.CommentStatus</td>
                     <td class="govuk-table__cell">

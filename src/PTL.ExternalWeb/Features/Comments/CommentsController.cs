@@ -15,15 +15,22 @@ public sealed class CommentsController(ITestConsultantTabulationApiClient apiCli
     private const string CommentsLockedMessage = "These comments have already been submitted and can no longer be edited.";
     private const string AcknowledgementRequiredMessage = "Select to confirm you understand submitted comments cannot be edited.";
 
-    public async Task<IActionResult> Index(string? search, CancellationToken cancellationToken)
+    public async Task<IActionResult> Index(
+        string? distributionReference,
+        string? schemeCode,
+        string? schemeName,
+        CancellationToken cancellationToken)
     {
         var distributions = await apiClient.GetDistributionsAsync(cancellationToken);
 
-        var rows = string.IsNullOrWhiteSpace(search)
-            ? distributions.Distributions
-            : [.. distributions.Distributions.Where(d => d.DistributionTitle.Contains(search, StringComparison.OrdinalIgnoreCase))];
-
-        return View(new CommentsListViewModel(rows, search));
+        var rows = distributions.Distributions
+            .Select(MapRow)
+            .Where(d =>
+                Contains(d.DistributionReference, distributionReference)
+                && Contains(d.SchemeCode, schemeCode)
+                && ContainsAllWords(d.SchemeName, schemeName))
+            .ToList();
+        return View(new CommentsListViewModel(rows, distributionReference, schemeCode, schemeName));
     }
 
     [HttpGet]
@@ -120,6 +127,43 @@ public sealed class CommentsController(ITestConsultantTabulationApiClient apiCli
         }
     }
 
+    private static CommentsDistributionListRow MapRow(TestConsultantDistributionResponse distribution)
+    {
+        var parsed = ParseTitle(distribution.DistributionTitle);
+        return new CommentsDistributionListRow(
+            distribution.MonthlyDistributionSchemeId,
+            parsed.DistributionReference,
+            parsed.SchemeCode,
+            parsed.SchemeName,
+            distribution.TargetDate,
+            distribution.CommentStatus);
+    }
+
+    private static ParsedDistributionTitle ParseTitle(string title)
+    {
+        var slash = title.IndexOf('/');
+        var colon = title.IndexOf(':');
+        var hasSegments = slash > 0 && colon > slash;
+        if (!hasSegments)
+        {
+            return new ParsedDistributionTitle(title, string.Empty, title);
+        }
+
+        var distributionReference = title[..slash].Trim();
+        var schemeCode = title[(slash + 1)..colon].Trim();
+        var schemeName = title[(colon + 1)..].Trim();
+        return new ParsedDistributionTitle(distributionReference, schemeCode, schemeName);
+    }
+
+    private static bool Contains(string value, string? term) =>
+        string.IsNullOrWhiteSpace(term) || value.Contains(term, StringComparison.OrdinalIgnoreCase);
+
+    private static bool ContainsAllWords(string value, string? term) =>
+        string.IsNullOrWhiteSpace(term)
+        || term.Split(' ', StringSplitOptions.RemoveEmptyEntries).All(word => value.Contains(word, StringComparison.OrdinalIgnoreCase));
+
     private IActionResult NotOk(TestConsultantApiStatus status) =>
         status == TestConsultantApiStatus.Forbidden ? Forbid() : NotFound();
+
+    private sealed record ParsedDistributionTitle(string DistributionReference, string SchemeCode, string SchemeName);
 }

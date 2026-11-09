@@ -156,8 +156,8 @@ public static class NavigationProvider
             new(ViewReportsText, TabulationControllerName, "Report", "publishedTabulationId"),
             new("Assessment results")
         ],
-        ["Comments/Index"] = [new("Enter comments")],
-        ["Comments/Entry"] = [new("Enter comments", CommentsControllerName, IndexAction), new("Comments entry")],
+        ["Comments/Index"] = [new("Distributions")],
+        ["Comments/Entry"] = [new("Distributions", CommentsControllerName, IndexAction), new("Comments entry")],
         ["Scheme/Index"] = [new("View schemes")],
         ["Customer/Index"] = [new(MyAccountText)],
         ["Participant/Index"] = [new(MyAccountText)],
