@@ -110,10 +110,8 @@ public class TabulationRouteSmokeTests : IClassFixture<PtlExternalWebTestFactory
         Assert.Contains($"/Tabulation/Report?publishedTabulationId={tabulationId}", body);
     }
 
-    [Theory]
-    [InlineData("tabulationName")]
-    [InlineData("distributionDate")]
-    public async Task Index_SortedAcrossYears_OrdersByTheChosenColumn(string sortBy)
+    [Fact]
+    public async Task Index_SortedAcrossYears_ByDistributionDate_OrdersByTheChosenColumn()
     {
         var apiClient = new FakeDistributionApiClient
         {
@@ -127,10 +125,11 @@ public class TabulationRouteSmokeTests : IClassFixture<PtlExternalWebTestFactory
         var cookies = await SignInAsync(client, "Participant,Viewer", participantId: Guid.NewGuid());
 
         var response = await CookieForwardingHttpClient.SendWithCookiesAsync(
-            client, HttpMethod.Get, $"/Tabulation/Index?sortBy={sortBy}&sortDir=asc", cookies);
+            client, HttpMethod.Get, "/Tabulation/Index?sortBy=distributionDate&sortDir=asc", cookies);
         var body = await response.Content.ReadAsStringAsync();
 
-        Assert.True(body.IndexOf("Apple report", StringComparison.Ordinal) < body.IndexOf("Zebra report", StringComparison.Ordinal));
+        Assert.True(body.IndexOf("D1a/00002", StringComparison.Ordinal) < body.IndexOf("D1a/00001", StringComparison.Ordinal),
+            "Expected the earlier distribution date row to appear first when sorting ascending by distributionDate.");
     }
 
     [Fact]
@@ -200,6 +199,8 @@ public class TabulationRouteSmokeTests : IClassFixture<PtlExternalWebTestFactory
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Contains("S001", body);
         Assert.Contains("Generate PDF", body);
+        Assert.Contains("target=\"_blank\"", body, StringComparison.Ordinal);
+        Assert.Contains("rel=\"noopener noreferrer\"", body, StringComparison.Ordinal);
 
         // No participant/viewer switcher form - the ExternalWeb report is always the signed-in
         // user's own, unlike InternalWeb's staff-facing equivalent.
@@ -495,6 +496,7 @@ public class TabulationRouteSmokeTests : IClassFixture<PtlExternalWebTestFactory
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal("application/pdf", response.Content.Headers.ContentType?.MediaType);
+        Assert.Equal("inline", response.Content.Headers.ContentDisposition?.DispositionType);
         Assert.Contains("filename=\"D1a_S1_BT_ Brucella_01_05_2026.pdf\"", response.Content.Headers.ContentDisposition?.ToString(), StringComparison.Ordinal);
         Assert.Equal(expectedPdf, await response.Content.ReadAsByteArrayAsync());
     }

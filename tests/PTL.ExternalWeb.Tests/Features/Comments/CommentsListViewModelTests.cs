@@ -1,4 +1,3 @@
-using PTL.Contracts.Distribution;
 using PTL.ExternalWeb.Features.Comments;
 
 namespace PTL.ExternalWeb.Tests.Features.Comments;
@@ -6,20 +5,26 @@ namespace PTL.ExternalWeb.Tests.Features.Comments;
 public class CommentsListViewModelTests
 {
     [Fact]
-    public void IsFiltered_WhenSearchHasText_IsTrue()
+    public void IsFiltered_WhenAnyFilterHasText_IsTrue()
     {
-        var model = new CommentsListViewModel(
-            [new TestConsultantDistributionResponse(Guid.NewGuid(), 2026, 6, "D1", new DateTime(2026, 6, 30), false, "Awaiting comments")],
-            "Brucella");
+        List<CommentsDistributionListRow> rows =
+        [
+            new CommentsDistributionListRow(Guid.NewGuid(), "D1a", "S1 BT", "Brucella", new DateTime(2026, 6, 30), "Awaiting comments")
+        ];
+        var modelByReference = new CommentsListViewModel(rows, "D1a", null, null);
+        var modelBySchemeCode = new CommentsListViewModel(rows, null, "S1", null);
+        var modelBySchemeName = new CommentsListViewModel(rows, null, null, "Brucella");
 
-        Assert.True(model.IsFiltered);
+        Assert.True(modelByReference.IsFiltered);
+        Assert.True(modelBySchemeCode.IsFiltered);
+        Assert.True(modelBySchemeName.IsFiltered);
     }
 
     [Fact]
-    public void IsFiltered_WhenSearchIsNullOrWhitespace_IsFalse()
+    public void IsFiltered_WhenAllFiltersAreNullOrWhitespace_IsFalse()
     {
-        var modelWithNull = new CommentsListViewModel([], null);
-        var modelWithWhitespace = new CommentsListViewModel([], "   ");
+        var modelWithNull = new CommentsListViewModel([], null, null, null);
+        var modelWithWhitespace = new CommentsListViewModel([], "   ", "", "\t");
 
         Assert.False(modelWithNull.IsFiltered);
         Assert.False(modelWithWhitespace.IsFiltered);
