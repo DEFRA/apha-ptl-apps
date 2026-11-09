@@ -169,7 +169,7 @@ public partial class DistributionParticipantsRenderTests : IClassFixture<WebAppl
     public async Task Post_Save_ChangesThatParticipantsDeadline()
     {
         var (response, _) = await PostAsync("ChangeDeadline", $"participantId={Second}",
-            new("Participants[1].NewDeadlineDate", "2026-06-10"),
+            new("Participants[1].NewDeadlineDate", "10/06/2026"),
             new("Participants[1].NewDeadlineReason", "Courier delay"));
 
         Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);

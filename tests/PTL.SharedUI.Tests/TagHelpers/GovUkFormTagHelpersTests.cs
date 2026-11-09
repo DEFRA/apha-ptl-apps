@@ -64,42 +64,45 @@ public class GovUkFormTagHelpersTests
     {
         var model = new TestModel();
         var (viewContext, expression, generator) = TagHelperRenderContext.Create(model, nameof(TestModel.Name));
-        var helper = new GovUkInputTagHelper(generator) { For = expression, Label = "Name", Disabled = true, Type = "date", ViewContext = viewContext };
+        var helper = new GovUkInputTagHelper(generator) { For = expression, Label = "Name", Disabled = true, Type = "email", ViewContext = viewContext };
         var (context, output) = CreateTagHelperContext("govuk-input");
 
         helper.Process(context, output);
 
         var html = output.Content.GetContent();
         Assert.Contains("disabled=\"disabled\"", html, StringComparison.Ordinal);
-        Assert.Contains("type=\"date\"", html, StringComparison.Ordinal);
+        Assert.Contains("type=\"email\"", html, StringComparison.Ordinal);
     }
 
     [Fact]
-    public void Input_DateTypeWithDateTimeValue_RendersIsoValueTheDatePickerAccepts()
+    public void Input_DateEntryWithDateTimeValue_RendersDdMmYyyyInATextBox()
     {
-        var model = new TestModel { StartDate = new DateTime(2026, 4, 1, 0, 0, 0, DateTimeKind.Utc) };
+        var model = new TestModel { StartDate = new DateTime(2027, 4, 8, 0, 0, 0, DateTimeKind.Utc) };
         var (viewContext, expression, generator) = TagHelperRenderContext.Create(model, nameof(TestModel.StartDate));
-        var helper = new GovUkInputTagHelper(generator) { For = expression, Label = "Start date", Type = "date", ViewContext = viewContext };
+        var helper = new GovUkInputTagHelper(generator) { For = expression, Label = "Start date", DateEntry = true, ViewContext = viewContext };
         var (context, output) = CreateTagHelperContext("govuk-input");
 
         helper.Process(context, output);
 
         var html = output.Content.GetContent();
-        Assert.Contains("value=\"2026-04-01\"", html, StringComparison.Ordinal);
+        Assert.Contains("value=\"08/04/2027\"", html, StringComparison.Ordinal);
+        Assert.Contains("type=\"text\"", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("type=\"date\"", html, StringComparison.Ordinal);
+        Assert.Contains("autocomplete=\"off\"", html, StringComparison.Ordinal);
     }
 
     [Fact]
-    public void Input_DateTypeWithNoValue_RendersEmptyValue()
+    public void Input_DateEntryWithNoValue_RendersEmptyValue()
     {
         var model = new TestModel();
         var (viewContext, expression, generator) = TagHelperRenderContext.Create(model, nameof(TestModel.StartDate));
-        var helper = new GovUkInputTagHelper(generator) { For = expression, Label = "Start date", Type = "date", ViewContext = viewContext };
+        var helper = new GovUkInputTagHelper(generator) { For = expression, Label = "Start date", DateEntry = true, ViewContext = viewContext };
         var (context, output) = CreateTagHelperContext("govuk-input");
 
         helper.Process(context, output);
 
         var html = output.Content.GetContent();
-        Assert.Contains("type=\"date\"", html, StringComparison.Ordinal);
+        Assert.Contains("type=\"text\"", html, StringComparison.Ordinal);
         Assert.DoesNotContain("value=\"2026", html, StringComparison.Ordinal);
     }
 

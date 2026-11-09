@@ -1,4 +1,6 @@
 using System.ComponentModel.DataAnnotations;
+using Microsoft.AspNetCore.Mvc;
+using PTL.InternalWeb.ModelBinding;
 
 namespace PTL.InternalWeb.Features.Distribution;
 
@@ -76,6 +78,7 @@ public sealed class DistributionParticipantRowViewModel
     // the InternalWeb DistributionController.ChangeDeadline action enforces this manually.
     [Display(Name = "New Date")]
     [DataType(DataType.Date)]
+    [ModelBinder(typeof(UkDateModelBinder))]
     public DateTime? NewDeadlineDate { get; set; }
 
     [Display(Name = "Reason")]
