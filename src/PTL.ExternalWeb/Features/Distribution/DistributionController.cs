@@ -364,6 +364,7 @@ public sealed class DistributionController(IDistributionApiClient distributionAp
     {
         MonthlyDistributionSchemeId = page.MonthlyDistributionSchemeId,
         Heading = page.Heading,
+        IsReadOnly = page.IsReadOnly,
         Tests =
         [
             .. page.Tests.Select(test => new DistributionResultsEntryTestViewModel

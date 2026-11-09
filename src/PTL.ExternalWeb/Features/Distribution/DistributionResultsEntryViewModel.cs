@@ -1,3 +1,5 @@
+using Microsoft.AspNetCore.Mvc.ModelBinding;
+
 namespace PTL.ExternalWeb.Features.Distribution;
 
 public sealed class DistributionResultsEntryViewModel
@@ -6,6 +8,9 @@ public sealed class DistributionResultsEntryViewModel
     public Guid? MonthlyDistributionSchemeId { get; set; }
 
     public string Heading { get; set; } = string.Empty;
+
+    [BindRequired]
+    public bool IsReadOnly { get; set; }
 
     public List<DistributionResultsEntryTestViewModel> Tests { get; set; } = [];
 }

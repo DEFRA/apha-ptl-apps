@@ -1,5 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
+using System.Threading;
 using Microsoft.Playwright;
 using PTL.ExternalWeb.Infrastructure.Pdf;
 
@@ -8,6 +9,8 @@ namespace PTL.ExternalWeb.Tests.TestSupport;
 // Browser-free stand-ins for the Playwright interfaces the PDF renderer touches (CI has no Chromium).
 internal sealed class FakePdfBrowser
 {
+    private int printCount;
+
     public static readonly byte[] ValidPdf = "%PDF-1.7 fake"u8.ToArray();
 
     public FakePdfBrowser()
@@ -32,8 +35,6 @@ internal sealed class FakePdfBrowser
     public Exception? DisposeFailure { get; set; }
 
     public int DisposeCount { get; private set; }
-
-    private int printCount;
 
     public int PrintCount => Volatile.Read(ref printCount);
 

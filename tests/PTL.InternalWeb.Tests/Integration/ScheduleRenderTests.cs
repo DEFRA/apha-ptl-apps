@@ -119,10 +119,10 @@ public partial class ScheduleRenderTests : IClassFixture<WebApplicationFactory<P
                 ["Schemes[0].MonthlyDistributionSchemeId"] = SchemeId.ToString(),
                 ["Schemes[0].SchemeIdentifier"] = "PT0060",
                 ["Schemes[0].SchemeName"] = "Mastitis bovine",
-                ["Schemes[0].DistributionDate"] = "2027-01-01",
-                ["Schemes[0].OverseasPostingDate"] = "2027-01-01",
+                ["Schemes[0].DistributionDate"] = "01/01/2027",
+                ["Schemes[0].OverseasPostingDate"] = "01/01/2027",
                 ["Schemes[0].DeadlineDate"] = string.Empty,
-                ["Schemes[0].ResultsIssueTargetDate"] = "2027-01-10",
+                ["Schemes[0].ResultsIssueTargetDate"] = "10/01/2027",
             }));
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -150,10 +150,10 @@ public partial class ScheduleRenderTests : IClassFixture<WebApplicationFactory<P
                 ["Schemes[0].SchemeIdentifier"] = "PT0060",
                 ["Schemes[0].SchemeName"] = "Mastitis bovine",
                 ["Schemes[0].IsCancelled"] = "false",
-                ["Schemes[0].DistributionDate"] = "2026-04-01",
-                ["Schemes[0].OverseasPostingDate"] = "2026-04-01",
-                ["Schemes[0].DeadlineDate"] = "2026-04-05",
-                ["Schemes[0].ResultsIssueTargetDate"] = "2026-04-10",
+                ["Schemes[0].DistributionDate"] = "01/04/2026",
+                ["Schemes[0].OverseasPostingDate"] = "01/04/2026",
+                ["Schemes[0].DeadlineDate"] = "05/04/2026",
+                ["Schemes[0].ResultsIssueTargetDate"] = "10/04/2026",
             }));
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
