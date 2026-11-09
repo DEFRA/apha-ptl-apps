@@ -46,6 +46,9 @@ public sealed class DistributionParticipantsViewModel
     // to repeat.
     public bool ShowRepeatDistributionButton =>
         !IsRepeatDistribution && (Participants.Count > 0 || AdditionalParticipants.Count > 0);
+
+    // Legacy adds "hiddenobject" to divAdditionalParticipants once the distribution is a repeat.
+    public bool ShowAdditionalParticipants => !IsRepeatDistribution;
 }
 
 public sealed class DistributionParticipantRowViewModel

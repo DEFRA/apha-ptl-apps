@@ -52,7 +52,9 @@ public sealed record PrintableResultsWorksheet(
     // (LitAddress/LblContact1/LblContact2 string literals in PrintableResults.aspx.vb, not
     // fetched from any data source).
     bool IsAccredited = false,
-    string DeadlineMessage = "");
+    string DeadlineMessage = "",
+    // The API's External:AppUrl - where participants enter results online.
+    string ExternalAddress = "");
 
 // Port of legacy PrintableResults.aspx.vb's BuildTable()/ResultsTable - the column-width packing
 // is genuine business logic (ExpectedLength drives the budget) and is preserved faithfully,
@@ -67,11 +69,8 @@ public static class PrintableResultsWorksheetBuilder
     private const int SampleColumnWidth = 100;
     private const double Tolerance = 0.05;
 
-    // distributionDate/deadlineDate/isAccredited only exist on the Scheduling-level
-    // MonthlyDistributionSchemeEntity (spgMonthlyDistribution), a different stored procedure from
-    // spgIntendedResults - legacy fetches them via a second business object
-    // (MonthlyDistributionScheme.FetchMonthlyDistributionSchemeChild), which the caller mirrors
-    // with its own already-available GetScheduleAsync call.
+    // distributionDate/deadlineDate/isAccredited come from the scheme resolved by id (legacy
+    // MonthlyDistributionScheme.FetchMonthlyDistributionSchemeChild) and are supplied by the caller.
     public static PrintableResultsWorksheet Build(
         int yearId, int monthId, IntendedResultsResponse page, bool showValues, DateTime distributionDate = default, DateTime deadlineDate = default, bool isAccredited = false)
     {
@@ -79,8 +78,10 @@ public static class PrintableResultsWorksheetBuilder
 
         // Legacy GVsampleInstruction binds to IntendedResultsSet.Samples - the distribution's one
         // shared sample list. Every Test carries the identical set (just with per-test
-        // IsApplicable/Values), so the first Test (if any) supplies it unfiltered, in fetch order.
+        // IsApplicable/Values), so the first Test (if any) supplies it, in fetch order. Legacy
+        // hides every row whose external description is empty (and the grid with them).
         var sampleInstructions = (page.Tests.Count > 0 ? page.Tests[0].Samples : [])
+            .Where(s => !string.IsNullOrEmpty(s.ExternalDescription))
             .Select(s => new PrintableSampleInstructionRow(s.SampleNumber, s.ExternalDescription))
             .ToList();
 
@@ -103,7 +104,8 @@ public static class PrintableResultsWorksheetBuilder
             ShowValues: showValues,
             Tests: [.. page.Tests.Select(t => BuildTestWorksheet(t, showValues))],
             IsAccredited: isAccredited,
-            DeadlineMessage: $"Results should be entered online no later than 23:00 GMT on {deadlineDate:dd/MM/yyyy}. After this time the result entry page will be locked and results cannot be entered.");
+            DeadlineMessage: $"Results should be entered online no later than 23:00 GMT on {deadlineDate:dd/MM/yyyy}. After this time the result entry page will be locked and results cannot be entered.",
+            ExternalAddress: page.ExternalAppUrl?.Trim() ?? string.Empty);
     }
 
     private static PrintableResultsTestWorksheet BuildTestWorksheet(IntendedResultsTestResponse test, bool showValues)

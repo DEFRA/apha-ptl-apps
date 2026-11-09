@@ -83,25 +83,54 @@ public class DistributionControllerResultsReceiptTests
         Assert.Null(scheme.Participants[1].FirstEditDate);
     }
 
-    [Fact]
-    public async Task ResultsReceipt_Get_ApiReturnsNull_ReturnsNotFound()
+    [Theory]
+    [InlineData(2026, 5, 2026)]
+    [InlineData(2027, 1, 2026)]
+    [InlineData(2027, 3, 2026)]
+    public async Task ResultsReceipt_Get_MonthNotInitialised_RedirectsToTheDashboardForTheFinancialYear(int year, int monthId, int financialYear)
     {
         var controller = CreateController(new FakeDistributionApiClient { ResultsReceipt = null });
 
-        Assert.IsType<NotFoundResult>(await controller.ResultsReceipt(Year, Month, CancellationToken.None));
+        var result = await controller.ResultsReceipt(year, monthId, CancellationToken.None);
+
+        AssertDashboardRedirect(result, financialYear);
+        Assert.Null(controller.TempData.GetNotification());
     }
 
-    [Fact]
-    public async Task ResultsReceipt_Post_Cancel_RedirectsToIndexWithoutCallingTheApi()
+    private static void AssertDashboardRedirect(IActionResult result, int financialYear)
+    {
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal("Index", redirect.ActionName);
+        Assert.Equal(financialYear, redirect.RouteValues!["year"]);
+    }
+
+    [Theory]
+    [InlineData(2026, 5, 2026)]
+    [InlineData(2027, 2, 2026)]
+    public async Task ResultsReceipt_Post_Cancel_RedirectsToTheDashboardForTheFinancialYearWithoutCallingTheApi(int year, int monthId, int financialYear)
     {
         var apiClient = new FakeDistributionApiClient { ResultsReceiptSaveResult = new ResultsReceiptSaveResult(true) };
         var controller = CreateController(apiClient);
 
-        var result = await controller.ResultsReceipt(Year, Month, Posted(), "cancel", CancellationToken.None);
+        var result = await controller.ResultsReceipt(year, monthId, Posted(), "cancel", CancellationToken.None);
 
-        Assert.Equal("Index", Assert.IsType<RedirectToActionResult>(result).ActionName);
+        AssertDashboardRedirect(result, financialYear);
         Assert.Empty(apiClient.SavedResultsReceiptRequests);
         Assert.Null(controller.TempData.GetNotification());
+    }
+
+    [Theory]
+    [InlineData(2026, 5, 2026)]
+    [InlineData(2027, 1, 2026)]
+    [InlineData(2027, 3, 2026)]
+    public async Task ResultsReceipt_Post_Save_LeavesForTheDashboardOfTheMonthsFinancialYear(int year, int monthId, int financialYear)
+    {
+        var apiClient = new FakeDistributionApiClient { ResultsReceiptSaveResult = new ResultsReceiptSaveResult(true) };
+        var controller = CreateController(apiClient);
+
+        var result = await controller.ResultsReceipt(year, monthId, Posted(extra1: true), "save", CancellationToken.None);
+
+        AssertDashboardRedirect(result, financialYear);
     }
 
     [Theory]

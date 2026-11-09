@@ -128,6 +128,9 @@
     </table>
     }
 
+    @* Legacy hides divAdditionalParticipants entirely once the distribution is itself a repeat. *@
+    @if (Model.ShowAdditionalParticipants)
+    {
     <h3 class="govuk-heading-m">Add Additional Participants</h3>
     @if (Model.AdditionalParticipants.Count == 0)
     {
@@ -173,6 +176,7 @@
                 }
         </tbody>
     </table>
+    }
     }
 
     <hr class="govuk-section-break govuk-section-break--visible govuk-section-break--m">

@@ -123,11 +123,27 @@ public class DistributionControllerActualResultsTests
     // ---------- GET ----------
 
     [Fact]
-    public async Task Get_ApiReturnsNull_ReturnsNotFound()
+    public async Task Get_ApiReturnsNull_RedirectsBackToResultsReceiptForTheSameMonth()
     {
         var controller = CreateController(new FakeDistributionApiClient { ActualResults = null });
 
-        Assert.IsType<NotFoundResult>(await controller.ActualResults(Year, Month, SchemeId, ParticipantId, CancellationToken.None));
+        var result = await controller.ActualResults(Year, Month, SchemeId, ParticipantId, CancellationToken.None);
+
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal(nameof(DistributionController.ResultsReceipt), redirect.ActionName);
+        Assert.Equal(Year, redirect.RouteValues!["year"]);
+        Assert.Equal(Month, redirect.RouteValues["monthId"]);
+        Assert.Null(controller.TempData.GetNotification());
+    }
+
+    [Fact]
+    public async Task Get_MissingIds_RedirectsBackToResultsReceipt()
+    {
+        var controller = CreateController(new FakeDistributionApiClient { ActualResults = null });
+
+        var result = await controller.ActualResults(Year, Month, Guid.Empty, Guid.Empty, CancellationToken.None);
+
+        Assert.Equal(nameof(DistributionController.ResultsReceipt), Assert.IsType<RedirectToActionResult>(result).ActionName);
     }
 
     [Fact]

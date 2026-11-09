@@ -149,9 +149,21 @@ public sealed class TabulationSendService(
             foreach (var send in staged)
             {
                 var scheme = schemes.Find(s => s.MonthlyDistributionSchemeId == send.MonthlyDistributionSchemeId);
-                if (scheme is null
-                    || !Enum.TryParse<TabulationCommand>(send.Command, out var command)
-                    || AvailableAction(scheme, command) is null)
+                if (scheme is null || !Enum.TryParse<TabulationCommand>(send.Command, out var command))
+                {
+                    allApplied = false;
+                    continue;
+                }
+
+                // Legacy guards every Send* with "If <date>.IsEmpty Then", so replaying one that has
+                // already been applied does nothing at all - it is not a failure, and must not be
+                // reported as the page having been changed by someone else.
+                if (AlreadySent(scheme, command))
+                {
+                    continue;
+                }
+
+                if (AvailableAction(scheme, command) is null)
                 {
                     allApplied = false;
                     continue;
@@ -163,6 +175,14 @@ public sealed class TabulationSendService(
 
             return allApplied;
         }
+
+        private static bool AlreadySent(TabulationsSchemeEntity scheme, TabulationCommand command) => command switch
+        {
+            TabulationCommand.SendToTestConsultant => TabulationsSchemeEntity.IsSet(scheme.IsReadyForTestConsultant),
+            TabulationCommand.SendForAssessment => TabulationsSchemeEntity.IsSet(scheme.IsReadyForAssessor),
+            TabulationCommand.SendToResultsSignOff => TabulationsSchemeEntity.IsSet(scheme.IsReadyForResultsSignOff),
+            _ => false,
+        };
 
         public TabulationAction? AvailableAction(TabulationsSchemeEntity scheme, TabulationCommand command)
         {
@@ -201,6 +221,12 @@ public sealed class TabulationSendService(
         // comments are discarded on Save (sppSubmitComment). IsReadyForAssessor keeps its date.
         private void SendForResultsSignOff(TabulationsSchemeEntity scheme, DateTime today)
         {
+            // Legacy "If mIsReadyForResultsSignOff.IsEmpty Then".
+            if (TabulationsSchemeEntity.IsSet(scheme.IsReadyForResultsSignOff))
+            {
+                return;
+            }
+
             scheme.IsReadyForResultsSignOff = today;
             foreach (var tabulation in scheme.Tabulations)
             {

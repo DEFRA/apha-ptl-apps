@@ -22,6 +22,9 @@ public sealed class PackagingViewModel
     public int Week { get; set; }
 #pragma warning restore S6964
 
+    // Posted by the page when it showed the Week dropdown, so a missing week is only an error once the user could pick one.
+    public bool? WeekVisible { get; set; }
+
     // Packed/Posted ticks as "{mode}:{week}:{distributionParticipantId}". Ticks made on another
     // option/week are carried in hidden fields so Save/Apply still persist them (legacy keeps every
     // fetched sheet in ViewState and saves them all).
@@ -45,6 +48,12 @@ public sealed class PackagingViewModel
     public string? ModeError { get; set; }
 
     public string? WeekError { get; set; }
+
+    // The dashboard is keyed by financial year (April to March); January to March belong to the year before.
+    public int DashboardYearId => MonthId < 4 ? YearId - 1 : YearId;
+
+    // Ticks carried back from a post are changes that have not been saved yet.
+    public bool HasUnsavedChanges => PackedTicks.Count > 0 || PostedTicks.Count > 0;
 
     public bool HasSelectionError => ModeError is not null || WeekError is not null;
 

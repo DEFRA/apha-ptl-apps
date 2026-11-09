@@ -533,10 +533,10 @@ public class TabulationsRenderTests : IClassFixture<WebApplicationFactory<Progra
         Assert.Equal(enabled, item.Contains("<a ", StringComparison.Ordinal));
     }
 
-    // ---- Staged sends, Save and Cancel (A1) ---------------------------------------------------
+    // ---- Staged sends, Save, Apply and Cancel (A1) ----------------------------------------------
 
     [Fact]
-    public async Task Get_NothingStaged_RendersOneFormWithSaveApplyAndCancelButNoInsetTextOrStagedInputs()
+    public async Task Get_NothingStaged_RendersOneFormWithSaveApplyAndCancelButNoBannerOrStagedInputs()
     {
         Seed(Plain());
 
@@ -548,13 +548,17 @@ public class TabulationsRenderTests : IClassFixture<WebApplicationFactory<Progra
         Assert.Matches("<button type=\"submit\" name=\"command\" value=\"save\"[^>]*>Save</button>", form.Groups[2].Value);
         Assert.Matches("<button type=\"submit\" name=\"command\" value=\"apply\"[^>]*>Apply</button>", form.Groups[2].Value);
         Assert.Matches("<button type=\"submit\" name=\"command\" value=\"cancel\"[^>]*>Cancel</button>", form.Groups[2].Value);
-        Assert.Matches("value=\"save\"[\\s\\S]*value=\"apply\"[\\s\\S]*value=\"cancel\"", form.Groups[2].Value);
         Assert.DoesNotContain("name=\"staged\"", html, StringComparison.Ordinal);
+
+        // The banner is in the markup for unsaved-changes.js, but stays hidden while nothing is staged.
+        Assert.Matches("id=\"unsaved-changes\"[^>]*hidden", html);
+        Assert.Matches("<script src=\"/js/unsaved-changes\\.js(\\?v=[^\"]+)?\"></script>", html);
         Assert.DoesNotContain("govuk-inset-text", html, StringComparison.Ordinal);
     }
 
+    // Legacy raised its navigate-away dialog from mdi.IsDirty; the GOV.UK notification banner replaces it.
     [Fact]
-    public async Task Post_StageWithoutAQuestion_RendersStagedInputsAndTheUnsavedChangesInsetText()
+    public async Task Post_StageWithoutAQuestion_RendersStagedInputsAndTheUnsavedChangesBanner()
     {
         var scheme = Plain();
         Seed(scheme);
@@ -569,13 +573,15 @@ public class TabulationsRenderTests : IClassFixture<WebApplicationFactory<Progra
         Assert.Equal("/Distribution/Tabulations?year=2026&monthId=5", WebUtility.HtmlDecode(form.Groups[1].Value));
         var staged = Regex.Matches(form.Groups[2].Value, "<input type=\"hidden\" name=\"staged\" value=\"([^\"]+)\"").Select(m => m.Groups[1].Value);
         Assert.Equal([Stage(earlier, "SendToResultsSignOff"), Stage(scheme.MonthlyDistributionSchemeId, "SendToTestConsultant")], staged);
-        Assert.Contains(
-            "<div class=\"govuk-inset-text\">You have changes that have not been saved. Select Save to keep them.</div>",
-            form.Groups[2].Value, StringComparison.Ordinal);
+
+        Assert.Contains("govuk-notification-banner", html, StringComparison.Ordinal);
+        Assert.DoesNotMatch("id=\"unsaved-changes\"[^>]*hidden", html);
+        Assert.Contains("You have changes that have not been saved.", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("govuk-inset-text", html, StringComparison.Ordinal);
+
         Assert.Matches("name=\"command\" value=\"save\"[^>]*>Save</button>", form.Groups[2].Value);
         Assert.Matches("name=\"command\" value=\"apply\"[^>]*>Apply</button>", form.Groups[2].Value);
         Assert.Matches("name=\"command\" value=\"cancel\"[^>]*>Cancel</button>", form.Groups[2].Value);
-        Assert.Matches("value=\"save\"[\\s\\S]*value=\"apply\"[\\s\\S]*value=\"cancel\"", form.Groups[2].Value);
         Assert.Empty(_apiClient.SavedTabulations);
     }
 

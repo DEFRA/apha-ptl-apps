@@ -59,6 +59,22 @@ public class PackagingViewModelTests
     public void ShowCustoms_ParticipantCombinedNeedsAWeekAndDailyAlwaysQualifies(int? mode, int week, bool expected) =>
         Assert.Equal(expected, new PackagingViewModel { Mode = mode, Week = week }.ShowCustoms);
 
+    [Theory]
+    [InlineData(2026, 4, 2026)]
+    [InlineData(2026, 12, 2026)]
+    [InlineData(2027, 1, 2026)]
+    [InlineData(2027, 3, 2026)]
+    public void DashboardYearId_IsTheFinancialYearOfTheMonth(int year, int monthId, int expected) =>
+        Assert.Equal(expected, new PackagingViewModel { YearId = year, MonthId = monthId }.DashboardYearId);
+
+    [Fact]
+    public void HasUnsavedChanges_OnlyWhenPackedOrPostedTicksAreCarried()
+    {
+        Assert.False(new PackagingViewModel { PrintKeys = ["key"] }.HasUnsavedChanges);
+        Assert.True(new PackagingViewModel { PackedTicks = ["0:1:x"] }.HasUnsavedChanges);
+        Assert.True(new PackagingViewModel { PostedTicks = ["0:1:x"] }.HasUnsavedChanges);
+    }
+
     [Fact]
     public void TickKey_IsModeWeekAndParticipantRowSeparatedByColons() =>
         Assert.Equal($"1:3:{Dp1}", PackagingViewModel.TickKey(1, 3, Dp1));
