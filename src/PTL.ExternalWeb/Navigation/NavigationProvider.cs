@@ -22,6 +22,7 @@ public static class NavigationProvider
     private const string IndexAction = "Index";
     private const string DistributionControllerName = "Distribution";
     private const string TabulationControllerName = "Tabulation";
+    private const string CommentsControllerName = "Comments";
     private const string ReportsText = "Reports";
     private const string ViewReportsText = "View reports";
     private const string MyAccountText = "My account";
@@ -105,7 +106,7 @@ public static class NavigationProvider
                 new NavigationItem
                 {
                     Text = "Enter comments",
-                    ControllerName = "Comments",
+                    ControllerName = CommentsControllerName,
                     ActionName = IndexAction,
                     Description = "Provide or view proficiency test comments",
                     RequiredRole = ExternalRoleNames.TestConsultant
@@ -155,6 +156,8 @@ public static class NavigationProvider
             new(ViewReportsText, TabulationControllerName, "Report", "publishedTabulationId"),
             new("Assessment results")
         ],
+        ["Comments/Index"] = [new("Enter comments")],
+        ["Comments/Entry"] = [new("Enter comments", CommentsControllerName, IndexAction), new("Comments entry")],
         ["Scheme/Index"] = [new("View schemes")],
         ["Customer/Index"] = [new(MyAccountText)],
         ["Participant/Index"] = [new(MyAccountText)],

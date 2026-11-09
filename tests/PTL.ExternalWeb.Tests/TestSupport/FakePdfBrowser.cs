@@ -1,5 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
+using System.Threading;
 using Microsoft.Playwright;
 using PTL.ExternalWeb.Infrastructure.Pdf;
 
@@ -8,6 +9,8 @@ namespace PTL.ExternalWeb.Tests.TestSupport;
 // Browser-free stand-ins for the Playwright interfaces the PDF renderer touches (CI has no Chromium).
 internal sealed class FakePdfBrowser
 {
+    private int printCount;
+
     public static readonly byte[] ValidPdf = "%PDF-1.7 fake"u8.ToArray();
 
     public FakePdfBrowser()
@@ -33,7 +36,7 @@ internal sealed class FakePdfBrowser
 
     public int DisposeCount { get; private set; }
 
-    public int PrintCount { get; private set; }
+    public int PrintCount => Volatile.Read(ref printCount);
 
     public string? LastHtml { get; private set; }
 
@@ -59,7 +62,7 @@ internal sealed class FakePdfBrowser
                 LastHtml = (string)args[0]!;
                 return FakeProxy.Unhandled;
             case "PdfAsync":
-                PrintCount++;
+                Interlocked.Increment(ref printCount);
                 LastPdfOptions = (PagePdfOptions?)args[0];
                 return PdfFailure is null ? PdfBytes : throw PdfFailure;
             default:
