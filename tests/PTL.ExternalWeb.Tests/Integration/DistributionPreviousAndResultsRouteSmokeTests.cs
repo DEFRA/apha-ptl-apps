@@ -628,6 +628,7 @@ public class DistributionPreviousAndResultsRouteSmokeTests : IClassFixture<PtlEx
     {
         ["__RequestVerificationToken"] = token,
         ["MonthlyDistributionSchemeId"] = f.SchemeId.ToString(),
+        ["IsReadOnly"] = f.Own.IsReadOnly ? "true" : "false",
         ["Tests[0].TestId"] = f.TestId.ToString(),
         ["Tests[0].ResultItems[0].TestResultItemId"] = f.ResultItemId.ToString(),
         ["Tests[0].Samples[0].SampleId"] = f.SampleId.ToString(),
@@ -660,6 +661,7 @@ public class DistributionPreviousAndResultsRouteSmokeTests : IClassFixture<PtlEx
         // The hand-built field names below must be the ones the real form posts.
         Assert.Contains("name=\"Tests[0].Samples[0].Values[0].Result\"", formBody, StringComparison.Ordinal);
         Assert.Contains("name=\"MonthlyDistributionSchemeId\"", formBody, StringComparison.Ordinal);
+        Assert.Contains("name=\"IsReadOnly\"", formBody, StringComparison.Ordinal);
         Assert.DoesNotContain("DistributionParticipantId", formBody, StringComparison.Ordinal);
 
         var response = await CookieForwardingHttpClient.SendWithCookiesAsync(
