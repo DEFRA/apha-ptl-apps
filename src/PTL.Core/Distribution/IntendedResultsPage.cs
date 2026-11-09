@@ -19,7 +19,13 @@ public sealed record IntendedResultsPage(
     bool DateOfReceipt = false,
     bool StorageConditions = false,
     bool ConditionOnReceipt = false,
-    string Instructions = "");
+    string Instructions = "",
+    // Resolved from the scheme by id (legacy FetchMonthlyDistributionSchemeChild) - Printable Results only.
+    DateTime DistributionDate = default,
+    DateTime DeadlineDate = default,
+    bool IsAccredited = false,
+    // The API's existing External:AppUrl - Printable Results prints it as the results-entry address.
+    string ExternalAppUrl = "");
 
 public sealed record IntendedResultsTest(
     Guid TestId,

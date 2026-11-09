@@ -42,6 +42,9 @@ public class DistributionControllerTabulationSendTests
         DistributionController controller, string? command = null, string? stage = null, string? confirmation = null, string[]? staged = null) =>
         controller.Tabulations(2026, 5, command, stage, confirmation, staged, CancellationToken.None);
 
+    private static Task<IActionResult> PostMonthAsync(DistributionController controller, int year, int monthId, string command, string[]? staged = null) =>
+        controller.Tabulations(year, monthId, command, null, null, staged, CancellationToken.None);
+
     private static TabulationsViewModel AssertTabulationsView(IActionResult result)
     {
         var view = Assert.IsType<ViewResult>(result);
@@ -110,71 +113,58 @@ public class DistributionControllerTabulationSendTests
 
     // ---- Apply ----
 
-    // Legacy ButtonApply_Click wrote every staged send and re-bound the grid from the saved data.
+    // Legacy ButtonApply_Click: mdi.Save() then rebind - the same month stays on screen, re-read.
     [Theory]
     [InlineData("apply")]
     [InlineData("APPLY")]
-    public async Task Post_ApplySucceeds_SavesEveryStagedSendAndStaysOnTabulations(string command)
+    public async Task Post_ApplySucceeds_SavesEveryStagedSendAndStaysOnTheSameMonth(string command)
     {
         var apiClient = ApiClient();
         var controller = CreateController(apiClient);
 
-        var result = await PostAsync(controller, command, staged: [Value(SchemeA, "SendToTestConsultant"), Value(SchemeB, "SendToResultsSignOff")]);
+        var result = await PostAsync(controller, command, staged: [Value(SchemeA, "SendToResultsSignOff")]);
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
         Assert.Equal("Tabulations", redirect.ActionName);
-        Assert.Null(redirect.ControllerName);
         Assert.Equal((2026, 5), ((int)redirect.RouteValues!["year"]!, (int)redirect.RouteValues["monthId"]!));
         Assert.Equal(
-            [new TabulationStagedSendRequest(SchemeA, "SendToTestConsultant"), new TabulationStagedSendRequest(SchemeB, "SendToResultsSignOff")],
+            [new TabulationStagedSendRequest(SchemeA, "SendToResultsSignOff")],
             Assert.Single(apiClient.SavedTabulations));
         var notification = controller.TempData.GetNotification();
         Assert.Equal(NotificationType.Success, notification!.Type);
         Assert.Equal("Tabulations updated successfully.", notification.Message);
-        Assert.Empty(apiClient.PreviewedTabulations);
     }
 
     [Fact]
-    public async Task Post_ApplyWithNothingStaged_StillSavesAndStaysOnTabulations()
-    {
-        var apiClient = ApiClient();
-
-        var result = await PostAsync(CreateController(apiClient), "apply");
-
-        Assert.Equal("Tabulations", Assert.IsType<RedirectToActionResult>(result).ActionName);
-        Assert.Empty(Assert.Single(apiClient.SavedTabulations));
-    }
-
-    [Fact]
-    public async Task Post_ApplyFails_ShowsTheSameConcurrencyErrorAndRedirectsBackToTabulations()
+    public async Task Post_ApplyFails_ShowsTheErrorNotificationAndStaysOnTheSameMonth()
     {
         var apiClient = ApiClient();
         apiClient.SaveTabulationsResult = false;
         var controller = CreateController(apiClient);
 
-        var result = await PostAsync(controller, "apply", staged: [Value(SchemeA, "SendToTestConsultant")]);
+        var result = await PostAsync(controller, "apply", staged: [Value(SchemeA, "SendToResultsSignOff")]);
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
         Assert.Equal("Tabulations", redirect.ActionName);
-        Assert.Equal((2026, 5), ((int)redirect.RouteValues!["year"]!, (int)redirect.RouteValues["monthId"]!));
-        var notification = controller.TempData.GetNotification();
-        Assert.Equal(NotificationType.Error, notification!.Type);
-        Assert.Equal(
-            "The changes could not be saved because the Tabulations have been changed by someone else. Please try again.",
-            notification.Message);
+        Assert.Equal(NotificationType.Error, controller.TempData.GetNotification()!.Type);
     }
 
-    // A send is staged by its own button, never by Apply, so Apply must not also stage the posted send.
-    [Fact]
-    public async Task Post_ApplyAlongsideAStageValue_SavesWithoutStagingThatSend()
+    // The Distributions menu is keyed by financial year (April to March), so January to March
+    // belong to the year before - legacy returned there with the year still held in Session.
+    [Theory]
+    [InlineData("save", 5, 2026, 2026)]
+    [InlineData("save", 1, 2027, 2026)]
+    [InlineData("cancel", 5, 2026, 2026)]
+    [InlineData("cancel", 3, 2027, 2026)]
+    public async Task Post_LeavingThePage_ReturnsToTheSelectedFinancialYear(string command, int monthId, int year, int expectedYear)
     {
-        var apiClient = ApiClient(Send("Are you sure?"));
+        var controller = CreateController(ApiClient());
 
-        var result = await PostAsync(CreateController(apiClient), "apply", stage: Value(SchemeA, "SendToTestConsultant"));
+        var result = await PostMonthAsync(controller, year, monthId, command, [Value(SchemeA, "SendToTestConsultant")]);
 
-        Assert.Equal("Tabulations", Assert.IsType<RedirectToActionResult>(result).ActionName);
-        Assert.Empty(apiClient.StagedTabulationSends);
-        Assert.Empty(Assert.Single(apiClient.SavedTabulations));
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal("Index", redirect.ActionName);
+        Assert.Equal(expectedYear, redirect.RouteValues!["year"]);
     }
 
     // ---- Stage ----

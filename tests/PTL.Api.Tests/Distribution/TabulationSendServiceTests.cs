@@ -322,13 +322,30 @@ public class TabulationSendServiceTests
         Assert.Empty(_repository.TabulationSends);
     }
 
-    [Fact]
-    public async Task Save_SameSchemeSignedOffTwice_ReturnsFalse()
+    // Legacy guards every Send* with "If <date>.IsEmpty Then", so a replayed send is a no-op - the
+    // save still succeeds and must not be reported as a concurrent change by someone else.
+    [Theory]
+    [InlineData(ToSignOff)]
+    [InlineData(ToTestConsultant)]
+    public async Task Save_SameSendStagedTwice_AppliesItOnceAndStillSucceeds(string command)
     {
         var scheme = NewScheme();
         SeedMonth(scheme);
 
-        Assert.False(await _service.SaveAsync(2026, 5, [Send(scheme, ToSignOff), Send(scheme, ToSignOff)]));
+        Assert.True(await _service.SaveAsync(2026, 5, [Send(scheme, command), Send(scheme, command)]));
+
+        var write = Assert.Single(Assert.Single(_repository.TabulationSends));
+        Assert.Equal(scheme.MonthlyDistributionSchemeId, write.MonthlyDistributionSchemeId);
+    }
+
+    // The same replay against a scheme the database already shows as sent writes nothing at all.
+    [Fact]
+    public async Task Save_SignOffReplayedAfterItWasAlreadySent_WritesNothingAndStillSucceeds()
+    {
+        var scheme = NewScheme(s => s.IsReadyForResultsSignOff = Today.AddDays(-1));
+        SeedMonth(scheme);
+
+        Assert.True(await _service.SaveAsync(2026, 5, [Send(scheme, ToSignOff)]));
         Assert.Empty(_repository.TabulationSends);
     }
 

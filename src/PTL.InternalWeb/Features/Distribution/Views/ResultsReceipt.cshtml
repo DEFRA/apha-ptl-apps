@@ -10,7 +10,9 @@
 
 <p class="govuk-body">Each Scheme can be expanded to show the list of Participants. For each Participant clicking 'View' will show the results entered. The tick box is for registering the receipt of any extra documentation received.</p>
 
-<form method="post" asp-action="ResultsReceipt" asp-route-year="@Model.YearId" asp-route-monthId="@Model.MonthId" id="results-receipt-form">
+<partial name="_UnsavedChangesBanner" model="false" />
+
+<form method="post" asp-action="ResultsReceipt" asp-route-year="@Model.YearId" asp-route-monthId="@Model.MonthId" id="results-receipt-form" data-unsaved-watch data-unsaved-reveal>
     @Html.AntiForgeryToken()
     <input type="hidden" asp-for="YearId" />
     <input type="hidden" asp-for="MonthId" />
@@ -104,7 +106,8 @@
                         <td class="govuk-table__cell">
                             @if (scheme.RequiresAssessment)
                             {
-                                var samplesSuffix = participant.HasUnaccountedSamples ? " (Y)" : " (N)";
+                                // Legacy: " (Y)" when no sample is unaccounted for, " (N)" when some are.
+                                var samplesSuffix = participant.HasUnaccountedSamples ? " (N)" : " (Y)";
                                 if (participant.CanViewResults)
                                 {
                                     <a class="govuk-link" asp-action="SampleReceipt" asp-route-year="@Model.YearId" asp-route-monthId="@Model.MonthId" asp-route-schemeId="@scheme.MonthlyDistributionSchemeId" asp-route-participantId="@participant.DistributionParticipantId">View/Edit<span class="govuk-visually-hidden"> Submission Status for @participant.FullName</span></a>@samplesSuffix
@@ -152,3 +155,7 @@
         <button type="submit" name="command" value="cancel" class="govuk-button govuk-button--secondary" data-module="govuk-button" formnovalidate>Cancel</button>
     </div>
 </form>
+
+@section Scripts {
+    <script src="~/js/unsaved-changes.js" asp-append-version="true"></script>
+}

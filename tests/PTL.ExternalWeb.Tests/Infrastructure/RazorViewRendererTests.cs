@@ -30,6 +30,66 @@ public class RazorViewRendererTests : IClassFixture<PtlExternalWebTestFactory>
     }
 
     [Fact]
+    public async Task RenderAsync_PdfView_PutsTheDistributionDateOnTheTitleRowAndTheHeaderImageAtTheTop()
+    {
+        using var scope = factory.Services.CreateScope();
+        var renderer = scope.ServiceProvider.GetRequiredService<IRazorViewRenderer>();
+
+        var html = await renderer.RenderAsync(
+            ActionContextFor(scope, controller: null),
+            PdfViewPath,
+            Model() with { HeaderImageDataUri = "data:image/png;base64,AQID" });
+
+        var header = html.IndexOf("class=\"ptl-pdf-header-image\"", StringComparison.Ordinal);
+        var titleRow = html.IndexOf("class=\"ptl-pdf-title-row\"", StringComparison.Ordinal);
+        var title = html.IndexOf("FINAL REPORT for D1a/S1 BT: Brucella", titleRow, StringComparison.Ordinal);
+        var date = html.IndexOf("class=\"ptl-pdf-distribution-date\"", titleRow, StringComparison.Ordinal);
+
+        Assert.True(header >= 0 && header < titleRow);
+        Assert.True(title > titleRow && date > title);
+        Assert.Contains("Date Of Distribution: 01/05/2026", html[date..], StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task RenderAsync_PdfView_WithoutAHeaderImage_OmitsIt()
+    {
+        using var scope = factory.Services.CreateScope();
+        var renderer = scope.ServiceProvider.GetRequiredService<IRazorViewRenderer>();
+
+        var html = await renderer.RenderAsync(ActionContextFor(scope, controller: null), PdfViewPath, Model());
+
+        Assert.DoesNotContain("<img class=\"ptl-pdf-header-image\"", html, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task RenderAsync_PdfView_PutsUkasCentredAboveTheVersionAndSignatureRow()
+    {
+        using var scope = factory.Services.CreateScope();
+        var renderer = scope.ServiceProvider.GetRequiredService<IRazorViewRenderer>();
+        var model = Model();
+        var report = model.Page.Report with
+        {
+            ShowUkasLogo = true,
+            Signatory = new TabulationSignatoryResponse("Version 1 - 01/05/2026", "A N Other", ["Weybridge", "Surrey"], "Issued: 01/05/2026")
+        };
+
+        var html = await renderer.RenderAsync(
+            ActionContextFor(scope, controller: null),
+            PdfViewPath,
+            model with { Page = new TabulationReportPageViewModel(report), UkasLogoDataUri = "data:image/png;base64,AQID" });
+
+        var footer = html.IndexOf("class=\"ptl-pdf-footer\"", StringComparison.Ordinal);
+        var ukas = html.IndexOf("alt=\"UKAS accredited\"", footer, StringComparison.Ordinal);
+        var row = html.IndexOf("class=\"ptl-pdf-footer-row\"", footer, StringComparison.Ordinal);
+        var version = html.IndexOf("Version 1 - 01/05/2026", footer, StringComparison.Ordinal);
+        var signature = html.IndexOf("A N Other", footer, StringComparison.Ordinal);
+
+        Assert.True(footer >= 0);
+        Assert.True(ukas > footer && row > ukas && version > row && signature > version);
+        Assert.Contains("Issued: 01/05/2026", html[signature..], StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task RenderAsync_WithAViewNameAndControllerRoute_FindsTheViewThroughTheActionContext()
     {
         using var scope = factory.Services.CreateScope();
