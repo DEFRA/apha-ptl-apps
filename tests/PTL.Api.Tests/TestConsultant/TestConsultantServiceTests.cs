@@ -56,6 +56,51 @@ public class TestConsultantServiceTests
     }
 
     [Fact]
+    public async Task CreateAsync_DuplicateNameIgnoringCaseAndSpaces_ThrowsValidationException()
+    {
+        var repository = new FakeTestConsultantRepository();
+        repository.Seed(new PTL.Core.TestConsultant.TestConsultant { ExternalTestConsultantId = Guid.NewGuid(), Name = "Jane Smith" });
+        var service = CreateService(repository);
+
+        var ex = await Assert.ThrowsAsync<ExternalTestConsultantValidationException>(
+            () => service.CreateAsync("  jane SMITH ", "Science", "other@example.com"));
+
+        var error = Assert.Single(ex.Errors);
+        Assert.Equal("Name", error.Field);
+        Assert.Equal(ExternalTestConsultantValidator.DuplicateNameMessage, error.Message);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_RenamingToAnotherConsultantsName_ThrowsValidationException()
+    {
+        var id = Guid.NewGuid();
+        var repository = new FakeTestConsultantRepository();
+        repository.Seed(new PTL.Core.TestConsultant.TestConsultant { ExternalTestConsultantId = id, Name = "Old Name" });
+        repository.Seed(new PTL.Core.TestConsultant.TestConsultant { ExternalTestConsultantId = Guid.NewGuid(), Name = "Taken" });
+        var service = CreateService(repository);
+
+        var ex = await Assert.ThrowsAsync<ExternalTestConsultantValidationException>(
+            () => service.UpdateAsync(id, "taken", "Science", "new@example.com"));
+
+        Assert.Contains(ex.Errors, e => e.Message == ExternalTestConsultantValidator.DuplicateNameMessage);
+        Assert.Empty(repository.UpdateCalls);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_KeepingItsOwnName_IsNotADuplicate()
+    {
+        var id = Guid.NewGuid();
+        var repository = new FakeTestConsultantRepository();
+        repository.Seed(new PTL.Core.TestConsultant.TestConsultant { ExternalTestConsultantId = id, Name = "Jane Smith" });
+        var service = CreateService(repository);
+
+        var updated = await service.UpdateAsync(id, "JANE SMITH", "Virology", "jane@example.com");
+
+        Assert.NotNull(updated);
+        Assert.Equal("JANE SMITH", updated.Name);
+    }
+
+    [Fact]
     public async Task UpdateAsync_ExistingConsultant_PreservesSsoIdAndStatus()
     {
         var id = Guid.NewGuid();

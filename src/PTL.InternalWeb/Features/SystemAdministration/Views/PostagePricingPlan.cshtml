@@ -95,7 +95,7 @@
                     <td class="govuk-table__cell">
                         <div class="govuk-button-group govuk-!-margin-bottom-0">
                             <button form="postagePriceEditForm" class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0" data-module="govuk-button" type="submit">Save</button>
-                            <button form="postagePriceViewForm" class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0" data-module="govuk-button" type="submit">Cancel</button>
+                            <a class="govuk-link" href="@Url.Action("PostagePricingPlan", new { yearId = Model.SelectedYearId })">Cancel<span class="govuk-visually-hidden"> editing @row.DisplayName</span></a>
                         </div>
                     </td>
                 }
@@ -105,7 +105,7 @@
                     <td class="govuk-table__cell">@row.EUPrice.ToString("N2")</td>
                     <td class="govuk-table__cell">@row.NonEUPrice.ToString("N2")</td>
                     <td class="govuk-table__cell">
-                        <button form="postagePriceViewForm" name="editId" value="@row.PostageId" class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0" data-module="govuk-button" type="submit">Edit</button>
+                        <a class="govuk-link" href="@Url.Action("PostagePricingPlan", new { yearId = Model.SelectedYearId, editId = row.PostageId })">Edit<span class="govuk-visually-hidden"> @row.DisplayName</span></a>
                     </td>
                 }
             </tr>
@@ -113,10 +113,7 @@
     </tbody>
 </table>
 
-@* Edit and Cancel are buttons of this GET form (via the form attribute), so entering or leaving edit mode needs no link or script. *@
-<form id="postagePriceViewForm" method="get" asp-action="PostagePricingPlan">
-    <input type="hidden" name="yearId" value="@Model.SelectedYearId" />
-</form>
+@* Edit and Cancel are plain links back to this page (GET), so entering or leaving edit mode needs no script. *@
 
 @if (editingRow is not null)
 {

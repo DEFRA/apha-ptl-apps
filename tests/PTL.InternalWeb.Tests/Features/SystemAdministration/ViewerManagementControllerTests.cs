@@ -555,7 +555,9 @@ public class ViewerManagementControllerTests
         Assert.Equal(["Zoe", "Grace"], page.Rows.Select(r => r.Name));
         Assert.True(page.Rows[0].IsRemoved);
         Assert.False(page.Rows[1].IsRemoved);
-        Assert.Equal(["Zoe: Zoe is still assigned."], controller.ModelState["Rows"]!.Errors.Select(e => e.ErrorMessage));
+        Assert.Equal("Zoe: Zoe is still assigned.", page.Message);
+        Assert.True(page.MessageIsError);
+        Assert.True(controller.ModelState.IsValid);
         Assert.Null(controller.TempData.GetNotification());
         Assert.Equal("Grace", Assert.Single(api.CreateRequests).Name);
     }
@@ -571,7 +573,8 @@ public class ViewerManagementControllerTests
         var page = PageModel(await controller.ViewerManagement(model, PendingListCommands.Save, null, CancellationToken.None));
 
         Assert.True(Assert.Single(page.Rows).IsRemoved);
-        Assert.Equal("Alan: The viewer could not be removed.", Assert.Single(controller.ModelState["Rows"]!.Errors).ErrorMessage);
+        Assert.Equal("Alan: The viewer could not be removed.", page.Message);
+        Assert.True(page.MessageIsError);
         Assert.Null(controller.TempData.GetNotification());
     }
 
@@ -617,7 +620,8 @@ public class ViewerManagementControllerTests
         var page = PageModel(await controller.ViewerManagement(model, PendingListCommands.Apply, null, CancellationToken.None));
 
         Assert.True(Assert.Single(page.Rows).IsRemoved);
-        Assert.Equal("Alan: Alan is still assigned.", Assert.Single(controller.ModelState["Rows"]!.Errors).ErrorMessage);
+        Assert.Equal("Alan: Alan is still assigned.", page.Message);
+        Assert.True(page.MessageIsError);
         Assert.Null(controller.TempData.GetNotification());
     }
 

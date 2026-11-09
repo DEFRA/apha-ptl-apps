@@ -63,7 +63,6 @@
                 <th scope="col" class="govuk-table__header">Name</th>
                 <th scope="col" class="govuk-table__header">Department</th>
                 <th scope="col" class="govuk-table__header">Inactive Date</th>
-                <th scope="col" class="govuk-table__header">Status</th>
                 <th scope="col" class="govuk-table__header">Actions</th>
             </tr>
         </thead>
@@ -71,7 +70,7 @@
             @if (Model.Rows.Count == 0)
             {
                 <tr class="govuk-table__row">
-                    <td class="govuk-table__cell" colspan="6">There are no Internal Test Consultants to display.</td>
+                    <td class="govuk-table__cell" colspan="5">There are no Internal Test Consultants to display.</td>
                 </tr>
             }
             @for (var i = 0; i < Model.Rows.Count; i++)
@@ -102,19 +101,17 @@
                     }
                     <td class="govuk-table__cell">@(row.IsInactive && row.InactiveDate is { } inactiveDate ? inactiveDate.ToString("d MMM yyyy", CultureInfo.CurrentCulture) : "")</td>
                     <td class="govuk-table__cell">
-                        <button class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0" data-module="govuk-button" type="submit" formnovalidate formaction="@ButtonUrl(PendingListCommands.Toggle, i)">@(row.IsInactive ? "Inactive" : "Active")<span class="govuk-visually-hidden"> - select to make @row.FriendlyName @(row.IsInactive ? "active" : "inactive")</span></button>
-                    </td>
-                    <td class="govuk-table__cell">
-                        <div class="govuk-button-group govuk-!-margin-bottom-0">
+                        <div class="ptl-row-links">
                             @if (row.IsEditing)
                             {
-                                <button class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0" data-module="govuk-button" type="submit" formaction="@ButtonUrl(PendingListCommands.Update, i)">Save<span class="govuk-visually-hidden"> department for @row.FriendlyName</span></button>
-                                <button class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0" data-module="govuk-button" type="submit" formnovalidate formaction="@ButtonUrl(PendingListCommands.CancelEdit, i)">Cancel<span class="govuk-visually-hidden"> editing department for @row.FriendlyName</span></button>
+                                <a class="govuk-link" href="@ButtonUrl(PendingListCommands.Update, i)" data-form-submit>Save<span class="govuk-visually-hidden"> department for @row.FriendlyName</span></a>
+                                <a class="govuk-link" href="@ButtonUrl(PendingListCommands.CancelEdit, i)" data-form-submit data-skip-validation>Cancel<span class="govuk-visually-hidden"> editing department for @row.FriendlyName</span></a>
                             }
                             else
                             {
-                                <button class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0" data-module="govuk-button" type="submit" formnovalidate formaction="@ButtonUrl(PendingListCommands.Edit, i)">Edit<span class="govuk-visually-hidden"> department for @row.FriendlyName</span></button>
+                                <a class="govuk-link" href="@ButtonUrl(PendingListCommands.Edit, i)" data-form-submit data-skip-validation>Edit<span class="govuk-visually-hidden"> department for @row.FriendlyName</span></a>
                             }
+                            <a class="govuk-link" href="@ButtonUrl(PendingListCommands.Toggle, i)" data-form-submit data-skip-validation>@(row.IsInactive ? "Inactive" : "Active")<span class="govuk-visually-hidden"> - select to make @row.FriendlyName @(row.IsInactive ? "active" : "inactive")</span></a>
                         </div>
                     </td>
                 </tr>
@@ -126,6 +123,10 @@
 
     <div class="govuk-button-group">
         <button class="govuk-button" data-module="govuk-button" type="submit" formaction="@ButtonUrl(PendingListCommands.Save)">Save</button>
-        <button class="govuk-button govuk-button--secondary" data-module="govuk-button" type="submit" formnovalidate formaction="@ButtonUrl(PendingListCommands.Cancel)">Cancel</button>
+        <a class="govuk-button govuk-button--secondary" data-module="govuk-button" href="@Url.Action("Index")">Cancel</a>
     </div>
 </form>
+
+@section Scripts {
+    <script src="~/js/ptl-form-links.js" asp-append-version="true"></script>
+}

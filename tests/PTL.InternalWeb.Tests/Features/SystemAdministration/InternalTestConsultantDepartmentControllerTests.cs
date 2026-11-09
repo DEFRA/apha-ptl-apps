@@ -39,17 +39,19 @@ public class InternalTestConsultantDepartmentControllerTests
         controller.InternalTestConsultantDepartment(model, command, rowIndex, CancellationToken.None);
 
     [Fact]
-    public async Task Get_BuildsRowsSortedByNameIgnoringCase()
+    public async Task Get_BuildsRowsInTheLegacyLastNameThenFirstNameOrderIgnoringCase()
     {
-        var (controller, _) = Arrange(Persisted(IdA, "zoe"), Persisted(IdB, "Alan", "Virology", isInactive: true));
+        var (controller, _) = Arrange(
+            Persisted(IdA, "zoe") with { LastName = "adams" },
+            Persisted(IdB, "Alan", "Virology", isInactive: true) with { LastName = "Brown" });
 
         var model = PageModel(await controller.InternalTestConsultantDepartment(CancellationToken.None));
 
-        Assert.Equal(["Alan", "zoe"], model.Rows.Select(r => r.FriendlyName));
-        Assert.Equal(IdB, model.Rows[0].UserId);
-        Assert.Equal("Virology", model.Rows[0].Department);
-        Assert.True(model.Rows[0].IsInactive);
-        Assert.Equal(StoredInactiveDate, model.Rows[0].InactiveDate);
+        Assert.Equal(["zoe", "Alan"], model.Rows.Select(r => r.FriendlyName));
+        Assert.Equal(IdB, model.Rows[1].UserId);
+        Assert.Equal("Virology", model.Rows[1].Department);
+        Assert.True(model.Rows[1].IsInactive);
+        Assert.Equal(StoredInactiveDate, model.Rows[1].InactiveDate);
         Assert.All(model.Rows, r => Assert.False(r.IsEditing));
         Assert.Null(model.EditIndex);
     }

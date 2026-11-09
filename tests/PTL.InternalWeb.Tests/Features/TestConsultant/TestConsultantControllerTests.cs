@@ -1,12 +1,14 @@
 using System.Net;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ViewFeatures;
 using PTL.ApiClient;
 using PTL.ApiClient.Distribution;
 using PTL.Contracts.Distribution;
 using PTL.InternalWeb.Confirmation;
 using PTL.InternalWeb.Features.TestConsultant;
 using PTL.InternalWeb.Tests.TestSupport;
+using PTL.SharedUI.Notifications;
 using static PTL.InternalWeb.Tests.TestSupport.TestConsultantTestData;
 
 namespace PTL.InternalWeb.Tests.Features.TestConsultant;
@@ -16,7 +18,11 @@ public class TestConsultantControllerTests
     private readonly FakeTestConsultantTabulationApiClient _apiClient = new();
 
     private TestConsultantController CreateController() =>
-        new(_apiClient) { ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() } };
+        new(_apiClient)
+        {
+            ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() },
+            TempData = new TempDataDictionary(new DefaultHttpContext(), new FakeTempDataProvider())
+        };
 
     private void SeedTabulation(bool submitted = false) =>
         _apiClient.Tabulation = new(TestConsultantApiStatus.Ok, Tabulation(submitted: submitted));
@@ -243,7 +249,7 @@ public class TestConsultantControllerTests
     }
 
     [Fact]
-    public async Task TabulationPost_AlreadySubmitted_ShowsALockedMessageAndTheReadOnlyComments()
+    public async Task TabulationPost_AlreadySubmitted_ShowsALockedBannerAndTheReadOnlyComments()
     {
         SeedTabulation(submitted: true);
         _apiClient.SaveResult = new(TestConsultantApiStatus.Ok, new TestConsultantTabulationSaveResult(false, true, new Dictionary<string, string>()));
@@ -253,7 +259,10 @@ public class TestConsultantControllerTests
 
         var model = Assert.IsType<TestConsultantTabulationViewModel>(Assert.IsType<ViewResult>(result).Model);
         Assert.True(model.Tabulation!.Comments.IsSubmitted);
-        Assert.Equal("These comments have already been submitted and can no longer be edited.", Assert.Single(controller.ModelState[string.Empty]!.Errors).ErrorMessage);
+        var notification = controller.TempData.GetNotification();
+        Assert.Equal(NotificationType.Error, notification!.Type);
+        Assert.Equal("These comments have already been submitted and can no longer be edited.", notification.Message);
+        Assert.True(controller.ModelState.IsValid);
     }
 
     [Theory]

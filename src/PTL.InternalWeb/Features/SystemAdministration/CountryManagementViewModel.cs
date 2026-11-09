@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Mvc.Rendering;
 
 namespace PTL.InternalWeb.Features.SystemAdministration;
 
-public sealed class CountryManagementViewModel
+public sealed class CountryManagementViewModel : IPendingListMessage
 {
     // Legacy held this list in ViewState until the page-level Save wrote it to the database; here it
     // is round-tripped through the page's form (Rows[i].*) instead.

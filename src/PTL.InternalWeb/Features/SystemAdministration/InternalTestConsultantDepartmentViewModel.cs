@@ -5,7 +5,7 @@ namespace PTL.InternalWeb.Features.SystemAdministration;
 
 // Internal Test Consultant Department - legacy TCDepartment.aspx. Department edits and Active/Inactive toggles stay
 // on the page (round-tripped through the form, where legacy used ViewState) until the page-level Save writes them.
-public sealed class InternalTestConsultantDepartmentViewModel
+public sealed class InternalTestConsultantDepartmentViewModel : IPendingListMessage
 {
     public List<InternalTestConsultantRowViewModel> Rows { get; set; } = [];
 

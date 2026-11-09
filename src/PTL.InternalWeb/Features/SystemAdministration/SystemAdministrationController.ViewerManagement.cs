@@ -126,7 +126,7 @@ public partial class SystemAdministrationController
         await DeleteRemovedViewersAsync(model, cancellationToken);
         await WriteChangedViewersAsync(model, cancellationToken);
 
-        if (!ModelState.IsValid)
+        if (!ModelState.IsValid || model.MessageIsError)
         {
             return ViewerPage(model);
         }
@@ -150,7 +150,7 @@ public partial class SystemAdministrationController
             }
 
             LogViewerRemoveBlockedMessage(logger, row.ViewerId.GetValueOrDefault(), null);
-            ModelState.AddModelError(nameof(model.Rows), $"{row.Name}: {result.Message ?? "The viewer could not be removed."}");
+            PendingList.AddOutcomeError(model, $"{row.Name}: {result.Message ?? "The viewer could not be removed."}");
         }
     }
 

@@ -1,6 +1,6 @@
 @model PTL.InternalWeb.Features.SystemAdministration.CreateUserViewModel
 @{
-    ViewData["Title"] = "Create user";
+    ViewData["Title"] = "Create User";
 
     var errors = ViewData.ModelState
         .Where(entry => entry.Value?.Errors.Count > 0)
@@ -10,7 +10,7 @@
 
 @if (Model.IsCreated)
 {
-    <h1 class="govuk-heading-l">Create user</h1>
+    <h1 class="govuk-heading-l">Create User</h1>
 
     <div class="govuk-notification-banner govuk-notification-banner--success" role="alert" aria-labelledby="govuk-notification-banner-title" data-module="govuk-notification-banner">
         <div class="govuk-notification-banner__header">
@@ -30,18 +30,16 @@ else
 {
     <govuk-error-summary errors="@errors" />
 
-    <h1 class="govuk-heading-l">Create user</h1>
+    <h1 class="govuk-heading-l">Create User</h1>
 
     <form method="post" asp-action="CreateUserSearch">
         <govuk-input asp-for="SearchTerm" label="Search for a user"
                       hint="Enter an employee number (for example, m123456), first name or last name." />
-        <button class="govuk-button" data-module="govuk-button" type="submit">Search</button>
+        <div class="govuk-button-group">
+            <button class="govuk-button" data-module="govuk-button" type="submit">Search</button>
+            <a class="govuk-button govuk-button--secondary" draggable="false" data-module="govuk-button" asp-action="Index">Cancel</a>
+        </div>
     </form>
-
-    @if (Model.Message is not null)
-    {
-        <div class="govuk-inset-text">@Model.Message</div>
-    }
 
     @if (Model.HasSearched && Model.ResultOptions.Count > 0)
     {
@@ -52,7 +50,10 @@ else
             <input type="hidden" asp-for="SearchTerm" id="SearchTermForCreate" />
             <govuk-select asp-for="SelectedCandidate" label="Select a user" asp-items="Model.ResultOptions" />
             <govuk-input asp-for="Department" label="Department" maxlength="50" />
-            <button class="govuk-button" data-module="govuk-button" type="submit">Create user</button>
+            <div class="govuk-button-group">
+                <button class="govuk-button" data-module="govuk-button" type="submit">Create user</button>
+                <a class="govuk-button govuk-button--secondary" draggable="false" data-module="govuk-button" asp-action="CreateUser">Back to Search</a>
+            </div>
         </form>
     }
 }

@@ -312,7 +312,8 @@ public partial class SystemAdministrationController : Controller
 
     // Matches legacy GetADList - searches the staff directory (Microsoft Graph, called from this app) and shows
     // "No valid search results found" whether nobody matched at all, or everybody who matched already
-    // has a PT-LIMS account (both collapse to an empty result set, same as legacy).
+    // has a PT-LIMS account (both collapse to an empty result set, same as legacy). An incorrect search (no results,
+    // or a directory failure) shows its outcome banner on a fresh Create User page, so a refresh clears it.
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> CreateUserSearch(CreateUserViewModel model, CancellationToken cancellationToken)
@@ -323,12 +324,13 @@ public partial class SystemAdministrationController : Controller
         }
 
         var search = await TrySearchStaffDirectoryAsync(model.SearchTerm, cancellationToken);
-        if (search is not null)
+        if (search is null)
         {
-            ApplySearchResult(model, search);
+            return RedirectToAction(nameof(CreateUser));
         }
 
-        return View(nameof(CreateUser), model);
+        ApplySearchResult(model, search);
+        return search.Users.Count == 0 ? RedirectToAction(nameof(CreateUser)) : View(nameof(CreateUser), model);
     }
 
     // Only the candidate matching model.SelectedCandidate (a username) is ever created - matches legacy
@@ -353,7 +355,7 @@ public partial class SystemAdministrationController : Controller
         var search = await TrySearchStaffDirectoryAsync(model.SearchTerm, cancellationToken);
         if (search is null)
         {
-            return View(nameof(CreateUser), model);
+            return RedirectToAction(nameof(CreateUser));
         }
 
         if (ModelState.IsValid)
@@ -402,8 +404,8 @@ public partial class SystemAdministrationController : Controller
     // The directory is searched from this app (Microsoft Graph, credentials held here), then anyone who already
     // has a PT-LIMS account is dropped - legacy GetADList's mUserList.ContainsByName check, and what makes a
     // search where every match already has an account collapse to an empty result set.
-    // A directory failure shows a problem message at the top of the page (no field to link to) instead of
-    // the generic error page; legacy showed "An Error has occured whilst Loading the User List".
+    // A directory failure shows an error banner and sends the user back to a fresh Create User page (no field to
+    // link to) instead of the generic error page; legacy showed "An Error has occured whilst Loading the User List".
     private async Task<StaffDirectorySearchResponse?> TrySearchStaffDirectoryAsync(string searchTerm, CancellationToken cancellationToken)
     {
         try
@@ -423,23 +425,23 @@ public partial class SystemAdministrationController : Controller
             || (ex is OperationCanceledException && !cancellationToken.IsCancellationRequested))
         {
             LogDirectorySearchFailedMessage(logger, ex);
-            ModelState.AddModelError(string.Empty, "There was a problem searching the staff directory. Try again, and contact support if it keeps happening");
+            TempData.SetNotification(NotificationType.Error, "There was a problem searching the staff directory. Try again, and contact support if it keeps happening");
             return null;
         }
     }
 
-    private static void ApplySearchResult(CreateUserViewModel model, StaffDirectorySearchResponse search)
+    private void ApplySearchResult(CreateUserViewModel model, StaffDirectorySearchResponse search)
     {
         model.HasSearched = true;
         model.ResultOptions = BuildResultOptions(search.Users);
 
-        if (search.IsTruncated)
+        if (model.ResultOptions.Count == 0)
         {
-            model.Message = "Only some of the matching users are shown. Enter more of the name or the employee number to narrow your search";
+            TempData.SetNotification(NotificationType.Information, "No valid search results found");
         }
-        else if (model.ResultOptions.Count == 0)
+        else if (search.IsTruncated)
         {
-            model.Message = "No valid search results found";
+            TempData.SetNotification(NotificationType.Information, "Only some of the matching users are shown. Enter more of the name or the employee number to narrow your search");
         }
     }
 
@@ -518,14 +520,29 @@ public partial class SystemAdministrationController : Controller
 
     // Matches legacy Button_DeleteUser_Click - revokes every role then removes the user record.
     // Blocked (Success = false) if the selection is the current user, same reasoning as the
-    // self-Admin-removal guard in ManageUserRoles.
+    // self-Admin-removal guard in ManageUserRoles. Asks first on the shared confirmation page.
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> RemoveUser(RemoveUserViewModel model, CancellationToken cancellationToken)
+    public async Task<IActionResult> RemoveUser(RemoveUserViewModel model, string? confirmation, CancellationToken cancellationToken)
     {
         if (model.SelectedUserId is not Guid userId)
         {
             return View(await BuildRemoveUserViewModelAsync("Select a user to remove.", messageIsError: true, cancellationToken));
+        }
+
+        if (!ConfirmationFlow.IsConfirmed(confirmation))
+        {
+            return this.ConfirmationPage(
+                new ConfirmationPageViewModel
+                {
+                    Title = "Remove User",
+                    Message = "Are you sure you want to remove this user? This will revoke all of their application access.",
+                    ConfirmText = "Remove User",
+                    IsDestructive = true,
+                    CancelUrl = Url.Action(nameof(RemoveUser)),
+                    CancelAsButton = true,
+                },
+                nameof(RemoveUser));
         }
 
         var result = await userApiClient.RemoveUserAsync(userId, GetCurrentUserId(), cancellationToken);

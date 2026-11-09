@@ -5,6 +5,7 @@ using PTL.ApiClient;
 using PTL.Contracts.Distribution;
 using PTL.InternalWeb.Authorization;
 using PTL.InternalWeb.Confirmation;
+using PTL.SharedUI.Notifications;
 
 namespace PTL.InternalWeb.Features.TestConsultant;
 
@@ -143,7 +144,7 @@ public sealed class TestConsultantController(ITestConsultantTabulationApiClient 
     {
         if (result.IsLocked)
         {
-            ModelState.AddModelError(string.Empty, "These comments have already been submitted and can no longer be edited.");
+            TempData.SetNotification(NotificationType.Error, "These comments have already been submitted and can no longer be edited.");
             return;
         }
 

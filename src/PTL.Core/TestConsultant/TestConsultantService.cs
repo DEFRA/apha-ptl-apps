@@ -15,6 +15,7 @@ public sealed class TestConsultantService(ITestConsultantRepository repository, 
     public async Task<TestConsultant> CreateAsync(string name, string department, string email, CancellationToken cancellationToken = default)
     {
         Validate(name, email);
+        await EnsureNameNotDuplicatedAsync(name, excludingId: null, cancellationToken);
 
         var newConsultant = new TestConsultant
         {
@@ -40,6 +41,7 @@ public sealed class TestConsultantService(ITestConsultantRepository repository, 
         }
 
         Validate(name, email);
+        await EnsureNameNotDuplicatedAsync(name, existing.ExternalTestConsultantId, cancellationToken);
 
         existing.Name = name.Trim();
         existing.Department = department.Trim();
@@ -103,6 +105,18 @@ public sealed class TestConsultantService(ITestConsultantRepository repository, 
     {
         var all = await repository.GetAllAsync(cancellationToken);
         return all.FirstOrDefault(c => c.ExternalTestConsultantId == externalTestConsultantId);
+    }
+
+    // Case-insensitive on the trimmed name; a consultant keeping its own name on update is not a duplicate.
+    private async Task EnsureNameNotDuplicatedAsync(string name, Guid? excludingId, CancellationToken cancellationToken)
+    {
+        var trimmed = name.Trim();
+        var all = await repository.GetAllAsync(cancellationToken);
+        if (all.Any(c => c.ExternalTestConsultantId != excludingId && string.Equals(c.Name.Trim(), trimmed, StringComparison.OrdinalIgnoreCase)))
+        {
+            throw new ExternalTestConsultantValidationException(
+                [new ExternalTestConsultantValidationError(nameof(TestConsultant.Name), ExternalTestConsultantValidator.DuplicateNameMessage)]);
+        }
     }
 
     private static void Validate(string name, string email)

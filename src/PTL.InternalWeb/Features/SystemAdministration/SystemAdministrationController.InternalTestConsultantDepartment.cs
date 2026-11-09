@@ -16,7 +16,8 @@ public partial class SystemAdministrationController
         return InternalTestConsultantPage(new InternalTestConsultantDepartmentViewModel
         {
             Rows = [.. consultants
-                .OrderBy(c => c.FriendlyName, StringComparer.OrdinalIgnoreCase)
+                .OrderBy(c => c.LastName, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(c => c.FirstName, StringComparer.OrdinalIgnoreCase)
                 .Select(c => new InternalTestConsultantRowViewModel
                 {
                     UserId = c.UserId,

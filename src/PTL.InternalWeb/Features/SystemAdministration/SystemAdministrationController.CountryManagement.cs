@@ -152,7 +152,7 @@ public partial class SystemAdministrationController
         await DeleteRemovedCountriesAsync(model, cancellationToken);
         await WriteChangedCountriesAsync(model, cancellationToken);
 
-        if (!ModelState.IsValid)
+        if (!ModelState.IsValid || model.MessageIsError)
         {
             return await CountryPageAsync(model, cancellationToken);
         }
@@ -176,7 +176,7 @@ public partial class SystemAdministrationController
             }
 
             LogCountryRemoveBlockedMessage(logger, row.CountryId.GetValueOrDefault(), null);
-            ModelState.AddModelError(nameof(model.Rows), $"{row.Country}: {result.Message ?? "The country could not be removed."}");
+            PendingList.AddOutcomeError(model, $"{row.Country}: {result.Message ?? "The country could not be removed."}");
         }
     }
 

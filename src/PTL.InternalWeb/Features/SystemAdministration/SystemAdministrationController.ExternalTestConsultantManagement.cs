@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using PTL.Contracts.TestConsultant;
+using PTL.Core.TestConsultant;
 using PTL.SharedUI.Notifications;
 
 namespace PTL.InternalWeb.Features.SystemAdministration;
@@ -98,15 +99,27 @@ public partial class SystemAdministrationController
         }
         else if (PendingListCommands.Is(command, PendingListCommands.Add) && TryValidateModel(model.Add, nameof(model.Add)))
         {
+            var name = model.Add.Name.Trim();
+            if (IsDuplicateExternalTestConsultantName(model, name, excludingIndex: null))
+            {
+                ModelState.AddModelError($"{nameof(model.Add)}.{nameof(model.Add.Name)}", ExternalTestConsultantValidator.DuplicateNameMessage);
+                return;
+            }
+
             model.Rows.Add(new ExternalTestConsultantRowViewModel
             {
-                Name = model.Add.Name.Trim(),
+                Name = name,
                 Department = model.Add.Department.Trim(),
                 Email = model.Add.Email.Trim(),
             });
             model.Add = new ExternalTestConsultantAddViewModel();
         }
     }
+
+    // Case-insensitive on the trimmed name, against every row still on the page (removed rows no longer count).
+    private static bool IsDuplicateExternalTestConsultantName(ExternalTestConsultantManagementViewModel model, string name, int? excludingIndex) =>
+        model.Rows.Where((row, index) => index != excludingIndex && !row.IsRemoved)
+            .Any(row => string.Equals(row.Name.Trim(), name, StringComparison.OrdinalIgnoreCase));
 
     // Matches legacy GridViewTC_Updating: applies the edited row to the in-memory list only.
     private void UpdatePendingExternalTestConsultantRow(ExternalTestConsultantManagementViewModel model, int rowIndex)
@@ -118,7 +131,15 @@ public partial class SystemAdministrationController
         }
 
         var row = model.Rows[rowIndex];
-        row.Name = model.Edit.Name.Trim();
+        var name = model.Edit.Name.Trim();
+        if (IsDuplicateExternalTestConsultantName(model, name, excludingIndex: rowIndex))
+        {
+            ModelState.AddModelError($"{nameof(model.Edit)}.{nameof(model.Edit.Name)}", ExternalTestConsultantValidator.DuplicateNameMessage);
+            model.EditIndex = rowIndex;
+            return;
+        }
+
+        row.Name = name;
         row.Department = model.Edit.Department.Trim();
         row.Email = model.Edit.Email.Trim();
         model.Edit = new ExternalTestConsultantEditViewModel();
@@ -176,7 +197,7 @@ public partial class SystemAdministrationController
         await DeleteRemovedExternalTestConsultantsAsync(model, cancellationToken);
         await WriteChangedExternalTestConsultantsAsync(model, cancellationToken);
 
-        if (!ModelState.IsValid)
+        if (!ModelState.IsValid || model.MessageIsError)
         {
             return ExternalTestConsultantPage(model);
         }
@@ -199,7 +220,7 @@ public partial class SystemAdministrationController
                 continue;
             }
 
-            ModelState.AddModelError(nameof(model.Rows), $"{row.Name}: {result.Message ?? "The external test consultant could not be removed."}");
+            PendingList.AddOutcomeError(model, $"{row.Name}: {result.Message ?? "The external test consultant could not be removed."}");
         }
     }
 
@@ -215,7 +236,7 @@ public partial class SystemAdministrationController
                 persisted.TryGetValue(id, out stored);
             }
 
-            if (!await SaveExternalTestConsultantDetailsAsync(row, stored, cancellationToken))
+            if (!await SaveExternalTestConsultantDetailsAsync(model, row, stored, cancellationToken))
             {
                 continue;
             }
@@ -223,13 +244,13 @@ public partial class SystemAdministrationController
             if (row.ExternalTestConsultantId is { } savedId && row.IsInactive != (stored?.IsInactive ?? false))
             {
                 var status = await externalTestConsultantApiClient.SetStatusAsync(savedId, row.IsInactive, cancellationToken);
-                AddExternalTestConsultantErrors(row, status);
+                AddExternalTestConsultantErrors(model, row, status);
             }
         }
     }
 
     // Creates a new consultant or updates one whose name, department or email changed. False if the API rejected it.
-    private async Task<bool> SaveExternalTestConsultantDetailsAsync(ExternalTestConsultantRowViewModel row, ExternalTestConsultantResponse? stored, CancellationToken cancellationToken)
+    private async Task<bool> SaveExternalTestConsultantDetailsAsync(ExternalTestConsultantManagementViewModel model, ExternalTestConsultantRowViewModel row, ExternalTestConsultantResponse? stored, CancellationToken cancellationToken)
     {
         if (stored is not null && stored.Name == row.Name && stored.Department == row.Department && stored.Email == row.Email)
         {
@@ -247,26 +268,39 @@ public partial class SystemAdministrationController
             return true;
         }
 
-        AddExternalTestConsultantErrors(row, result);
+        AddExternalTestConsultantErrors(model, row, result);
         return false;
     }
 
-    private void AddExternalTestConsultantErrors(ExternalTestConsultantRowViewModel row, ExternalTestConsultantSaveResult result)
+    // Problems with a field (name, email) go in the validation summary; a refusal that belongs to no field (still
+    // allocated to schemes) or an unspecific failure goes in the banner at the top of the page.
+    private void AddExternalTestConsultantErrors(ExternalTestConsultantManagementViewModel model, ExternalTestConsultantRowViewModel row, ExternalTestConsultantSaveResult result)
     {
         if (result.Success)
         {
             return;
         }
 
-        var messages = result.FieldErrors.SelectMany(e => e.Value).ToList();
-        if (messages.Count == 0)
+        var reported = false;
+        foreach (var (field, messages) in result.FieldErrors)
         {
-            messages.Add("The external test consultant could not be saved.");
+            foreach (var message in messages)
+            {
+                reported = true;
+                if (string.IsNullOrEmpty(field))
+                {
+                    PendingList.AddOutcomeError(model, $"{row.Name}: {message}");
+                }
+                else
+                {
+                    ModelState.AddModelError("Rows", $"{row.Name}: {message}");
+                }
+            }
         }
 
-        foreach (var message in messages)
+        if (!reported)
         {
-            ModelState.AddModelError("Rows", $"{row.Name}: {message}");
+            PendingList.AddOutcomeError(model, $"{row.Name}: The external test consultant could not be saved.");
         }
     }
 

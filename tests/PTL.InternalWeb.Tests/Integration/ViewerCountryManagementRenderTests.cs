@@ -74,6 +74,15 @@ public partial class ViewerCountryManagementRenderTests : IClassFixture<WebAppli
 
     private static string Hidden(string name, string value) => $"<input type=\"hidden\" name=\"{Regex.Escape(name)}\" value=\"{Regex.Escape(value)}\" />";
 
+    // Matches a row-action link of the given label whose href is ?command=<command>[&rowIndex=<row>] and which submits the page's form.
+    private static string Link(string page, string label, string command, int? row = null) =>
+        $"<a class=\"govuk-link\" href=\"/SystemAdministration/{page}\\?command={command}"
+        + (row is null ? string.Empty : $"(?:&amp;|&)rowIndex={row}")
+        + $"\"[^>]*data-form-submit[^>]*>{label}<";
+
+    // Cancel is a link to the System Administration landing page, not a submit button.
+    private const string CancelLink = "<a class=\"govuk-button govuk-button--secondary\"[^>]*href=\"/SystemAdministration(/Index)?\">Cancel</a>";
+
     private static KeyValuePair<string, string> Field(string name, string value) => new(name, value);
 
     private static List<KeyValuePair<string, string>> ViewerRows(params (Guid? Id, string Name, string Email)[] rows) =>
@@ -150,18 +159,18 @@ public partial class ViewerCountryManagementRenderTests : IClassFixture<WebAppli
     [Theory]
     [InlineData("ViewerManagement")]
     [InlineData("CountryManagement")]
-    public async Task Get_RendersEditAndRemoveAsSecondarySubmitButtonsWithNoLinksScriptOrBrowserDialogs(string page)
+    public async Task Get_RendersEditAndRemoveAsLinksThatSubmitTheFormWithNoBrowserDialogs(string page)
     {
         var html = await _factory.CreateClient().GetStringAsync($"/SystemAdministration/{page}");
         var main = MainContent(html);
 
-        Assert.Matches(Button(page, "Edit", "edit", 0), main);
-        Assert.Matches(Button(page, "Remove", "remove", 0), main);
-        Assert.Matches(Button(page, "Edit", "edit", 1), main);
-        Assert.Matches(Button(page, "Remove", "remove", 1), main);
-        Assert.DoesNotMatch("<a[^>]*govuk-button", main);
-        Assert.DoesNotContain(">Edit</a>", main, StringComparison.Ordinal);
-        Assert.DoesNotContain(">Remove</a>", main, StringComparison.Ordinal);
+        Assert.Matches(Link(page, "Edit", "edit", 0), main);
+        Assert.Matches(Link(page, "Remove", "remove", 0), main);
+        Assert.Matches(Link(page, "Edit", "edit", 1), main);
+        Assert.Matches(Link(page, "Remove", "remove", 1), main);
+        Assert.DoesNotMatch(Button(page, "Edit", "edit", 0), main);
+        Assert.DoesNotMatch(Button(page, "Remove", "remove", 0), main);
+        Assert.Contains("/js/ptl-form-links.js", html, StringComparison.Ordinal);
         Assert.DoesNotContain("onclick", html, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("confirm(", html, StringComparison.Ordinal);
         Assert.DoesNotContain("alert(", html, StringComparison.Ordinal);
@@ -203,9 +212,9 @@ public partial class ViewerCountryManagementRenderTests : IClassFixture<WebAppli
         Assert.Matches(Button("ViewerManagement", "Save", "save", cssClass: "govuk-button\""), main);
         Assert.DoesNotContain("command=apply", main, StringComparison.Ordinal);
         Assert.DoesNotContain(">Apply<", main, StringComparison.Ordinal);
-        Assert.Matches(Button("ViewerManagement", "Cancel", "cancel"), main);
+        Assert.Matches(CancelLink, main);
         Assert.Matches(Button("ViewerManagement", "Add", "add"), main);
-        Assert.Matches("formnovalidate[^>]*formaction=\"/SystemAdministration/ViewerManagement\\?command=cancel\"", main);
+        Assert.DoesNotContain("command=cancel", main, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -214,8 +223,9 @@ public partial class ViewerCountryManagementRenderTests : IClassFixture<WebAppli
         var main = MainContent(await _factory.CreateClient().GetStringAsync("/SystemAdministration/CountryManagement"));
 
         Assert.Matches(Button("CountryManagement", "Save", "save", cssClass: "govuk-button\""), main);
-        Assert.Matches(Button("CountryManagement", "Cancel", "cancel"), main);
+        Assert.Matches(CancelLink, main);
         Assert.Matches(Button("CountryManagement", "Add", "add"), main);
+        Assert.DoesNotContain("command=cancel", main, StringComparison.Ordinal);
         Assert.DoesNotContain("command=apply", main, StringComparison.Ordinal);
         Assert.DoesNotContain(">Apply<", main, StringComparison.Ordinal);
     }
@@ -231,11 +241,11 @@ public partial class ViewerCountryManagementRenderTests : IClassFixture<WebAppli
         Assert.Matches("<input id=\"Edit_Email\" name=\"Edit.Email\" value=\"zoe@example.com\"", main);
         Assert.Matches("<input type=\"hidden\" name=\"EditIndex\" value=\"1\" />", main);
         Assert.Matches(Hidden("Rows[1].Name", "Zoe"), main);
-        Assert.Matches(Button("ViewerManagement", "Save", "update", 1), main);
-        Assert.Matches(Button("ViewerManagement", "Cancel", "cancelEdit", 1), main);
-        Assert.Matches(Button("ViewerManagement", "Edit", "edit", 0), main);
-        Assert.DoesNotMatch(Button("ViewerManagement", "Edit", "edit", 1), main);
-        Assert.DoesNotMatch(Button("ViewerManagement", "Remove", "remove", 1), main);
+        Assert.Matches(Link("ViewerManagement", "Save", "update", 1), main);
+        Assert.Matches(Link("ViewerManagement", "Cancel", "cancelEdit", 1), main);
+        Assert.Matches(Link("ViewerManagement", "Edit", "edit", 0), main);
+        Assert.DoesNotMatch(Link("ViewerManagement", "Edit", "edit", 1), main);
+        Assert.DoesNotMatch(Link("ViewerManagement", "Remove", "remove", 1), main);
         Assert.Empty(_viewers.UpdateCalls);
     }
 
@@ -251,9 +261,9 @@ public partial class ViewerCountryManagementRenderTests : IClassFixture<WebAppli
         Assert.Matches($"<option value=\"{TypeNonEu}\"[^>]*selected", main);
         Assert.DoesNotMatch($"<option value=\"{TypeEu}\"[^>]*selected", main);
         Assert.Matches("<input type=\"hidden\" name=\"EditIndex\" value=\"1\" />", main);
-        Assert.Matches(Button("CountryManagement", "Save", "update", 1), main);
-        Assert.Matches(Button("CountryManagement", "Cancel", "cancelEdit", 1), main);
-        Assert.DoesNotMatch(Button("CountryManagement", "Remove", "remove", 1), main);
+        Assert.Matches(Link("CountryManagement", "Save", "update", 1), main);
+        Assert.Matches(Link("CountryManagement", "Cancel", "cancelEdit", 1), main);
+        Assert.DoesNotMatch(Link("CountryManagement", "Remove", "remove", 1), main);
         Assert.Empty(_countries.UpdateRequests);
     }
 
@@ -324,8 +334,8 @@ public partial class ViewerCountryManagementRenderTests : IClassFixture<WebAppli
         Assert.Matches(Hidden("Rows[1].Name", "Zoe"), main);
         Assert.Contains(">Alan</td>", main, StringComparison.Ordinal);
         Assert.DoesNotContain(">Zoe</td>", main, StringComparison.Ordinal);
-        Assert.DoesNotMatch(Button("ViewerManagement", "Edit", "edit", 1), main);
-        Assert.DoesNotMatch(Button("ViewerManagement", "Remove", "remove", 1), main);
+        Assert.DoesNotMatch(Link("ViewerManagement", "Edit", "edit", 1), main);
+        Assert.DoesNotMatch(Link("ViewerManagement", "Remove", "remove", 1), main);
         Assert.DoesNotContain("There are no Viewers to display.", main, StringComparison.Ordinal);
         Assert.DoesNotContain("saved successfully", main, StringComparison.Ordinal);
         Assert.Empty(_viewers.DeleteCalls);
@@ -347,7 +357,7 @@ public partial class ViewerCountryManagementRenderTests : IClassFixture<WebAppli
         Assert.Matches(Hidden("Rows[0].CountryTypeId", TypeEu.ToString()), main);
         Assert.DoesNotContain(">France</td>", main, StringComparison.Ordinal);
         Assert.Contains(">Germany</td>", main, StringComparison.Ordinal);
-        Assert.DoesNotMatch(Button("CountryManagement", "Remove", "remove", 0), main);
+        Assert.DoesNotMatch(Link("CountryManagement", "Remove", "remove", 0), main);
         Assert.DoesNotContain("There are no Countries to display.", main, StringComparison.Ordinal);
         Assert.DoesNotContain("saved successfully", main, StringComparison.Ordinal);
         Assert.Empty(_countries.DeleteCalls);
@@ -367,8 +377,8 @@ public partial class ViewerCountryManagementRenderTests : IClassFixture<WebAppli
         Assert.Contains(emptyText, main, StringComparison.Ordinal);
         Assert.True(IsRemovedFlag(main, 0, "true"));
         Assert.True(IsRemovedFlag(main, 1, "true"));
-        Assert.DoesNotMatch("formaction=\"[^\"]*command=edit", main);
-        Assert.DoesNotMatch("formaction=\"[^\"]*command=remove", main);
+        Assert.DoesNotMatch("href=\"[^\"]*command=edit", main);
+        Assert.DoesNotMatch("href=\"[^\"]*command=remove", main);
         Assert.Equal(2, Regex.Count(main, "<tr class=\"govuk-table__row\">"));
     }
 
@@ -386,7 +396,7 @@ public partial class ViewerCountryManagementRenderTests : IClassFixture<WebAppli
         Assert.True(IsRemovedFlag(main, 1, "false"));
         Assert.Matches("<input type=\"hidden\" name=\"EditIndex\" value=\"1\" />", main);
         Assert.DoesNotContain(page == "ViewerManagement" ? ">Alan</td>" : ">France</td>", main, StringComparison.Ordinal);
-        Assert.DoesNotMatch(Button(page, "Edit", "edit", 0), main);
+        Assert.DoesNotMatch(Link(page, "Edit", "edit", 0), main);
     }
 
     [Fact]
@@ -474,7 +484,8 @@ public partial class ViewerCountryManagementRenderTests : IClassFixture<WebAppli
         var main = MainContent(await saved.Content.ReadAsStringAsync());
 
         Assert.Equal(HttpStatusCode.OK, saved.StatusCode);
-        Assert.Contains("govuk-error-summary", main, StringComparison.Ordinal);
+        Assert.Contains("govuk-notification-banner", main, StringComparison.Ordinal);
+        Assert.DoesNotContain("govuk-error-summary", main, StringComparison.Ordinal);
         Assert.Contains("Alan: Alan is still assigned.", main, StringComparison.Ordinal);
         Assert.True(IsRemovedFlag(main, 0, "true"));
         Assert.DoesNotContain(">Alan</td>", main, StringComparison.Ordinal);
@@ -489,7 +500,8 @@ public partial class ViewerCountryManagementRenderTests : IClassFixture<WebAppli
         var main = MainContent(await saved.Content.ReadAsStringAsync());
 
         Assert.Equal(HttpStatusCode.OK, saved.StatusCode);
-        Assert.Contains("govuk-error-summary", main, StringComparison.Ordinal);
+        Assert.Contains("govuk-notification-banner", main, StringComparison.Ordinal);
+        Assert.DoesNotContain("govuk-error-summary", main, StringComparison.Ordinal);
         Assert.Contains("France: France is in use.", main, StringComparison.Ordinal);
         Assert.True(IsRemovedFlag(main, 0, "true"));
         Assert.DoesNotContain(">France</td>", main, StringComparison.Ordinal);

@@ -38,8 +38,26 @@ public static class PendingListCommands
         string.Equals(command, expected, StringComparison.OrdinalIgnoreCase);
 }
 
+// The banner at the top of a pending-list page (all four carry a Message the page shows when MessageIsError is set).
+public interface IPendingListMessage
+{
+    string? Message { get; set; }
+
+    bool MessageIsError { get; set; }
+}
+
 public static class PendingList
 {
+    // An outcome of a save or remove (as opposed to a problem with a field) goes in the banner at the top of the
+    // page, not the validation summary; several outcomes are joined.
+    public static void AddOutcomeError(IPendingListMessage model, string message)
+    {
+        ArgumentNullException.ThrowIfNull(model);
+
+        model.Message = model.MessageIsError && !string.IsNullOrEmpty(model.Message) ? $"{model.Message} {message}" : message;
+        model.MessageIsError = true;
+    }
+
     public static bool IsRow<T>(IReadOnlyList<T> rows, int? index) =>
         index is >= 0 && index < rows.Count;
 
