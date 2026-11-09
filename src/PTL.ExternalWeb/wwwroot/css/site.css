@@ -185,6 +185,12 @@
   margin-bottom: 0;
 }
 
+/* Month strip as in legacy: twelve equal columns under the scheme, each with the checkbox centred and the month name below. */
+.app-month-cell {
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
 .app-month-strip {
   display: flex;
   flex-wrap: wrap;
@@ -192,13 +198,79 @@
   gap: 5px 20px;
 }
 
-.app-month .govuk-checkboxes__item {
-  float: none;
+.app-month-cell .app-month-strip {
+  display: grid;
+  gap: 0;
+  grid-template-columns: repeat(12, minmax(3rem, 1fr));
 }
 
-.app-month--unavailable {
-  color: #505a5f;
-  padding-left: 40px;
+/* Two fixed rows (44px checkbox slot, then the name) so every month name sits on the same line, ticked or not. */
+.app-month {
+  display: grid;
+  grid-template-rows: 44px auto;
+  justify-items: center;
+  align-content: start;
+  padding-bottom: 5px;
+  border-left: 1px solid var(--govuk-border-colour, #b1b4b6);
+}
+
+.app-month .govuk-checkboxes {
+  height: 44px;
+}
+
+.app-month .govuk-checkboxes__item {
+  float: none;
+  width: 44px;
+  height: 44px;
+  min-height: 0;
+  padding: 0;
+  margin: 0;
+}
+
+.app-month .govuk-checkboxes__input {
+  top: 0;
+  left: 0;
+  margin: 0;
+}
+
+.app-month .govuk-checkboxes__label {
+  display: block;
+  box-sizing: border-box;
+  width: 44px;
+  height: 44px;
+  min-height: 0;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* The small checkbox box is 24px wide; centre it in the 44px target. */
+.app-month .govuk-checkboxes__label::before {
+  left: 10px;
+}
+
+.app-month .govuk-checkboxes__label::after {
+  left: 16px;
+}
+
+.app-month__box {
+  display: block;
+  width: 44px;
+  height: 44px;
+}
+
+/* One style for every month name, offered or not, as in legacy. */
+.app-month__name {
+  display: block;
+  margin: -6px 0 0;
+  font-size: 1rem;
+  line-height: 1.25;
+  text-align: center;
+  cursor: pointer;
+}
+
+.app-month--unavailable .app-month__name {
+  cursor: default;
 }
 
 /* Read-only month on the Pending order page: a month that is not part of the order. */

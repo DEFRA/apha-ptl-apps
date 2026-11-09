@@ -181,6 +181,8 @@ public partial class OrderRouteSmokeTests : IClassFixture<PtlExternalWebTestFact
         // The month the participant already holds is ticked and locked; unoffered months are plain text.
         Assert.Matches("id=\"month-" + FakeCreateOrderApiClient.ParticipatingSchemeId + "-4\"[^>]*checked[^>]*disabled|id=\"month-" + FakeCreateOrderApiClient.ParticipatingSchemeId + "-4\"[^>]*disabled[^>]*checked", body);
         Assert.Contains("app-month--unavailable", body);
+        // As in legacy, each month's name sits under its checkbox (a second, aria-hidden label); the checkbox keeps one accessible name.
+        Assert.Matches("<label class=\"app-month__name\" for=\"month-[^\"]+\" aria-hidden=\"true\">Apr</label>", body);
     }
 
     [Fact]
