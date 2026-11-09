@@ -73,10 +73,10 @@ public class ConfirmationPageRenderTests : IClassFixture<WebApplicationFactory<P
             $"/Distribution/ToggleCancelled?year=2026&monthId=4&schemeId={SchemeId}",
             ("Schemes[0].MonthlyDistributionSchemeId", SchemeId.ToString()),
             ("Schemes[0].IsCancelled", "false"),
-            ("Schemes[0].DistributionDate", "2026-04-20")));
+            ("Schemes[0].DistributionDate", "20/04/2026")));
 
         Assert.Contains("Are you sure you wish to Cancel this Distribution?", html, StringComparison.Ordinal);
-        Assert.Equal(2, Regex.Count(html, "name=\"Schemes\\[0\\]\\.DistributionDate\" value=\"2026-04-20\""));
+        Assert.Equal(2, Regex.Count(html, "name=\"Schemes\\[0\\]\\.DistributionDate\" value=\"20/04/2026\""));
         Assert.Contains("name=\"confirmation\" value=\"confirm\"", html, StringComparison.Ordinal);
         Assert.Contains("name=\"confirmation\" value=\"cancel\"", html, StringComparison.Ordinal);
         Assert.DoesNotContain("__RequestVerificationToken\" value=\"\"", html, StringComparison.Ordinal);

@@ -13,6 +13,18 @@ namespace PTL.Core.Labels;
 // printing failure, only for a null label.
 public sealed class LabelPrinterClient(IOptions<LabelPrinterOptions> options, ILogger<LabelPrinterClient> logger) : ILabelPrinterClient
 {
+    private static readonly Action<ILogger, Exception?> LogHostNotConfiguredMessage =
+        LoggerMessage.Define(
+            LogLevel.Error,
+            new EventId(1, nameof(LogHostNotConfiguredMessage)),
+            "LabelPrinter:Host is not configured - cannot print label");
+
+    private static readonly Action<ILogger, string?, int, Exception?> LogPrintErrorMessage =
+        LoggerMessage.Define<string?, int>(
+            LogLevel.Error,
+            new EventId(2, nameof(LogPrintErrorMessage)),
+            "Error whilst printing label to {Host}:{Port}");
+
     public async Task<bool> PrintAsync(AddressLabel label, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(label);
@@ -20,7 +32,7 @@ public sealed class LabelPrinterClient(IOptions<LabelPrinterOptions> options, IL
         var settings = options.Value;
         if (string.IsNullOrWhiteSpace(settings.Host))
         {
-            logger.LogError("LabelPrinter:Host is not configured - cannot print label");
+            LogHostNotConfiguredMessage(logger, null);
             return false;
         }
 
@@ -42,7 +54,7 @@ public sealed class LabelPrinterClient(IOptions<LabelPrinterOptions> options, IL
         }
         catch (Exception ex) when (ex is SocketException or IOException or OperationCanceledException)
         {
-            logger.LogError(ex, "Error whilst printing label to {Host}:{Port}", settings.Host, settings.Port);
+            LogPrintErrorMessage(logger, settings.Host, settings.Port, ex);
             return false;
         }
     }

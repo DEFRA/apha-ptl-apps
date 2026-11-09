@@ -66,6 +66,8 @@ else
                         var editReceived = Model.EditReceived ?? permit.ImportPermitReceived;
                         var editExpiry = Model.EditExpiry ?? permit.ImportPermitExpiry;
                         var expiryError = ViewData.ModelState["importPermitExpiry"]?.Errors.FirstOrDefault()?.ErrorMessage;
+                        var expiryHintId = $"expiry-hint-{permit.ParticipantSchemeId}";
+                        var expiryDescribedBy = expiryError is null ? expiryHintId : $"{expiryHintId} importPermitExpiry-error";
                         <td class="govuk-table__cell" colspan="2">
                             <div class="govuk-form-group">
                                 <label class="govuk-label" for="received-@permit.ParticipantSchemeId">Import Permit Received</label>
@@ -76,11 +78,12 @@ else
                             </div>
                             <div id="importPermitExpiry" class="govuk-form-group @(expiryError is null ? null : "govuk-form-group--error")">
                                 <label class="govuk-label" for="expiry-@permit.ParticipantSchemeId">Import Permit Expiry</label>
+                                <div id="@expiryHintId" class="govuk-hint">For example, 08/04/2027</div>
                                 @if (expiryError is not null)
                                 {
                                     <p id="importPermitExpiry-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @expiryError</p>
                                 }
-                                <input class="govuk-input ptl-permit-expiry @(expiryError is null ? null : "govuk-input--error")" id="expiry-@permit.ParticipantSchemeId" name="editExpiry" placeholder="dd/mm/yyyy" data-row="@permit.ParticipantSchemeId" value="@editExpiry" disabled="@(!(permit.ImportPermitRequired && editReceived))" />
+                                <input class="govuk-input ptl-permit-expiry @(expiryError is null ? null : "govuk-input--error")" id="expiry-@permit.ParticipantSchemeId" name="editExpiry" autocomplete="off" spellcheck="false" aria-describedby="@expiryDescribedBy" data-row="@permit.ParticipantSchemeId" value="@editExpiry" disabled="@(!(permit.ImportPermitRequired && editReceived))" />
                             </div>
                         </td>
                         <td class="govuk-table__cell">

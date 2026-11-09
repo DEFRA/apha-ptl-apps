@@ -1,13 +1,12 @@
-// Initialises TinyMCE over any textarea marked data-module="ptl-rich-text". Self-hosted from
-// wwwroot/lib/tinymce - no CDN. Configuration mirrors the legacy Scheme.aspx tinyMCE.init call so
-// stored markup stays byte-compatible with existing fldInstructions data.
+// Initialises TinyMCE over any textarea marked data-module="ptl-rich-text" in InternalWeb.
+// Self-hosted from wwwroot/lib/tinymce - no CDN. Configuration keeps stored markup compatible.
 (function () {
     'use strict';
 
-    var DEFAULT_EDITOR_HEIGHT = 400;
+    var defaultEditorHeight = 400;
 
-    var editors = document.querySelectorAll('textarea[data-module="ptl-rich-text"]');
-    if (editors.length === 0 || typeof tinymce === 'undefined') {
+    var editorTextareas = document.querySelectorAll('textarea[data-module="ptl-rich-text"]');
+    if (editorTextareas.length === 0 || typeof tinymce === 'undefined') {
         return;
     }
 
@@ -16,7 +15,7 @@
     // validation-failure re-render. Initialising TinyMCE while its textarea is hidden leaves the
     // raw markup showing as literal text instead of the WYSIWYG view, so initialisation for a
     // field in a hidden panel is deferred until that panel's hidden class is actually removed.
-    function initEditor(textarea) {
+    function initialiseEditor(textarea) {
         if (textarea.dataset.ptlRichTextInitialised === 'true') {
             return;
         }
@@ -37,14 +36,12 @@
             license_key: 'gpl',
             plugins: 'lists save charmap',
             toolbar: textarea.dataset.toolbar,
-            height: Number.parseInt(textarea.dataset.height, 10) || DEFAULT_EDITOR_HEIGHT,
+            height: Number.parseInt(textarea.dataset.height, 10) || defaultEditorHeight,
             readonly: textarea.dataset.readonly === 'true',
             menubar: false,
             branding: false,
             statusbar: false,
             promotion: false,
-            // Legacy stored named entities (&deg; &nbsp;) - keep emitting them so existing rows and
-            // newly saved rows look the same in the database.
             entity_encoding: 'named',
             encoding: 'xml',
             setup: function (editor) {
@@ -66,31 +63,35 @@
         });
     }
 
-    editors.forEach(function (textarea) {
-        var panel = textarea.closest('.govuk-tabs__panel');
-        if (!panel?.classList.contains('govuk-tabs__panel--hidden')) {
-            initEditor(textarea);
+    editorTextareas.forEach(function (textarea) {
+        var tabsPanel = textarea.closest('.govuk-tabs__panel');
+        if (!tabsPanel?.classList.contains('govuk-tabs__panel--hidden')) {
+            initialiseEditor(textarea);
             return;
         }
 
-        var observer = new MutationObserver(function () {
-            if (!panel.classList.contains('govuk-tabs__panel--hidden')) {
-                observer.disconnect();
-                initEditor(textarea);
+        var visibilityObserver = new MutationObserver(function () {
+            if (tabsPanel.classList.contains('govuk-tabs__panel--hidden')) {
+                return;
             }
+
+            visibilityObserver.disconnect();
+            initialiseEditor(textarea);
         });
-        observer.observe(panel, { attributes: true, attributeFilter: ['class'] });
+
+        visibilityObserver.observe(tabsPanel, { attributes: true, attributeFilter: ['class'] });
     });
 
-    // The error summary links to the field id, but TinyMCE hides that textarea, so the browser cannot focus it.
-    // Move focus into the editor instead (WCAG 2.4.3 / 3.3.1).
+    // Move focus from error-summary anchor targets into TinyMCE when a linked field is hidden.
     document.addEventListener('click', function (event) {
-        var link = event.target.closest?.('.govuk-error-summary a[href^="#"]');
-        var editor = link ? tinymce.get(link.getAttribute('href').slice(1)) : null;
-        if (editor) {
-            event.preventDefault();
-            editor.focus();
+        var targetLink = event.target.closest?.('.govuk-error-summary a[href^="#"]');
+        var richTextEditor = targetLink ? tinymce.get(targetLink.getAttribute('href').slice(1)) : null;
+        if (!richTextEditor) {
+            return;
         }
+
+        event.preventDefault();
+        richTextEditor.focus();
     });
 
     // TinyMCE keeps its content in an iframe until asked to write it back.

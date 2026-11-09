@@ -1,8 +1,10 @@
 using System.ComponentModel.DataAnnotations;
 using System.Text.RegularExpressions;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using PTL.Contracts.Contract;
 using PTL.Contracts.Customer;
+using PTL.InternalWeb.ModelBinding;
 
 namespace PTL.InternalWeb.Features.Contract;
 
@@ -116,19 +118,27 @@ public sealed partial class ContractFormViewModel : IValidatableObject
     // Not [Required] - legacy Contract.aspx has no RequiredFieldValidator on these dates, only a
     // dd/mm/yyyy RegularExpressionValidator; a blank value is left as null, matching
     // ContractValidator's ValidateNotSentinel (only the 1/1/9999 sentinel is rejected).
+    [Display(Name = "Acknowledgement Posted Date")]
     [DataType(DataType.Date)]
+    [ModelBinder(typeof(UkDateModelBinder))]
     public DateTime? AcknowledgementPostedDate { get; set; }
 
+    [Display(Name = "Acknowledgement Returned Date")]
     [DataType(DataType.Date)]
+    [ModelBinder(typeof(UkDateModelBinder))]
     public DateTime? AcknowledgementReturnedDate { get; set; }
 
+    [Display(Name = "Job Sheet Sent Date")]
     [DataType(DataType.Date)]
+    [ModelBinder(typeof(UkDateModelBinder))]
     public DateTime? JobSheetPostedDate { get; set; }
 
     [StringLength(255, ErrorMessage = "Reason for closure must not exceed 255 characters")]
     public string? ReasonForClosure { get; set; }
 
+    [Display(Name = "Cancellation date")]
     [DataType(DataType.Date)]
+    [ModelBinder(typeof(UkDateModelBinder))]
     public DateTime? DateOfLeaving { get; set; }
 
     // S6964 (value-type controller-action input) suppressed for this block: these are HTML

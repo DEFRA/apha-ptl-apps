@@ -1,5 +1,7 @@
 using System.ComponentModel.DataAnnotations;
+using Microsoft.AspNetCore.Mvc;
 using PTL.Core.Distribution;
+using PTL.InternalWeb.ModelBinding;
 
 namespace PTL.InternalWeb.Features.Distribution;
 
@@ -24,21 +26,25 @@ public sealed class MonthlyDistributionScheduleRowViewModel
     [Required(ErrorMessage = "Distribution Date required.")]
     [Display(Name = "Distribution")]
     [DataType(DataType.Date)]
+    [ModelBinder(typeof(UkDateModelBinder))]
     public DateTime? DistributionDate { get; set; }
 
     [Required(ErrorMessage = "Overseas Posting Date required.")]
     [Display(Name = "O/seas Posting")]
     [DataType(DataType.Date)]
+    [ModelBinder(typeof(UkDateModelBinder))]
     public DateTime? OverseasPostingDate { get; set; }
 
     [Required(ErrorMessage = "Deadline Date required.")]
     [Display(Name = "Deadline")]
     [DataType(DataType.Date)]
+    [ModelBinder(typeof(UkDateModelBinder))]
     public DateTime? DeadlineDate { get; set; }
 
     [Required(ErrorMessage = "Results Issue Target Date required.")]
     [Display(Name = "Results")]
     [DataType(DataType.Date)]
+    [ModelBinder(typeof(UkDateModelBinder))]
     public DateTime? ResultsIssueTargetDate { get; set; }
 
 #pragma warning disable S6964

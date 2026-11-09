@@ -42,6 +42,20 @@ public class ActingUserDelegatingHandlerTests
     }
 
     [Fact]
+    public async Task ExternalTestConsultantId_IsForwardedWhenNoInternalUserIdClaimExists()
+    {
+        var testConsultantId = Guid.NewGuid();
+        var context = new DefaultHttpContext
+        {
+            User = new ClaimsPrincipal(new ClaimsIdentity([new Claim("testConsultantId", testConsultantId.ToString())], "test"))
+        };
+
+        var request = await SendAsync(context);
+
+        Assert.Equal(testConsultantId.ToString(), Assert.Single(request.Headers.GetValues(ActingUser.HeaderName)));
+    }
+
+    [Fact]
     public async Task NoSignedInUser_SendsNoHeader()
     {
         var request = await SendAsync(new DefaultHttpContext());
