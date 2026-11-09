@@ -1,10 +1,12 @@
 using System.ComponentModel.DataAnnotations;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 using PTL.Contracts.Distribution;
 
 namespace PTL.ExternalWeb.Features.Comments;
 
 public sealed class CommentsEntryViewModel
 {
+    [BindRequired]
     public Guid MonthlyDistributionSchemeId { get; set; }
 
     public string Title { get; set; } = string.Empty;
@@ -30,6 +32,7 @@ public sealed class CommentsEntryViewModel
     [StringLength(50000, ErrorMessage = "Comments must not exceed 50,000 characters. Note that rich text such as font changes and bullet points will artificially count towards this character limit.")]
     public string? Comments { get; set; }
 
+    [BindRequired]
     public bool Acknowledged { get; set; }
 
     public bool IsSubmitted => State.IsSubmitted;

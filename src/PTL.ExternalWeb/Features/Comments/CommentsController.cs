@@ -12,6 +12,8 @@ namespace PTL.ExternalWeb.Features.Comments;
 public sealed class CommentsController(ITestConsultantTabulationApiClient apiClient) : Controller
 {
     private const string SubmitCommand = "submit";
+    private const string CommentsLockedMessage = "These comments have already been submitted and can no longer be edited.";
+    private const string AcknowledgementRequiredMessage = "Select to confirm you understand submitted comments cannot be edited.";
 
     public async Task<IActionResult> Index(string? search, CancellationToken cancellationToken)
     {
@@ -53,19 +55,17 @@ public sealed class CommentsController(ITestConsultantTabulationApiClient apiCli
             return NotOk(latest.Status);
         }
 
-        if (latest.Value.Comments.IsSubmitted)
+        if (!ValidateEditableState(schemeId, model, latest.Value, command))
         {
-            ModelState.AddModelError(string.Empty, "These comments have already been submitted and can no longer be edited.");
+            return View(CommentsEntryViewModel.From(schemeId, latest.Value, model.Comments));
+        }
+
+        if (!ModelState.IsValid)
+        {
             return View(CommentsEntryViewModel.From(schemeId, latest.Value, model.Comments));
         }
 
         var submit = string.Equals(command, SubmitCommand, StringComparison.OrdinalIgnoreCase);
-        if (submit && !model.Acknowledged)
-        {
-            ModelState.AddModelError(nameof(CommentsEntryViewModel.Acknowledged), "Select to confirm you understand submitted comments cannot be edited.");
-            return View(CommentsEntryViewModel.From(schemeId, latest.Value, model.Comments));
-        }
-
         var saved = await apiClient.SaveCommentsAsync(
             schemeId,
             new TestConsultantTabulationSaveRequest(model.Comments, submit),
@@ -77,23 +77,48 @@ public sealed class CommentsController(ITestConsultantTabulationApiClient apiCli
 
         if (!saved.Value.Success)
         {
-            if (saved.Value.IsLocked)
-            {
-                ModelState.AddModelError(string.Empty, "These comments have already been submitted and can no longer be edited.");
-            }
-            else
-            {
-                foreach (var (key, message) in saved.Value.Errors)
-                {
-                    ModelState.AddModelError(key == "Comments" ? nameof(CommentsEntryViewModel.Comments) : string.Empty, message);
-                }
-            }
-
+            ApplySaveErrors(saved.Value);
             return View(CommentsEntryViewModel.From(schemeId, latest.Value, model.Comments));
         }
 
         TempData.SetNotification(NotificationType.Success, submit ? "Comments submitted successfully." : "Comments saved successfully.");
         return RedirectToAction(nameof(Index));
+    }
+
+    private bool ValidateEditableState(
+        Guid schemeId,
+        CommentsEntryViewModel model,
+        TestConsultantTabulationResponse latest,
+        string? command)
+    {
+        if (latest.Comments.IsSubmitted)
+        {
+            ModelState.AddModelError(string.Empty, CommentsLockedMessage);
+            return false;
+        }
+
+        var submit = string.Equals(command, SubmitCommand, StringComparison.OrdinalIgnoreCase);
+        if (submit && !model.Acknowledged)
+        {
+            ModelState.AddModelError(nameof(CommentsEntryViewModel.Acknowledged), AcknowledgementRequiredMessage);
+            return false;
+        }
+
+        return true;
+    }
+
+    private void ApplySaveErrors(TestConsultantTabulationSaveResult result)
+    {
+        if (result.IsLocked)
+        {
+            ModelState.AddModelError(string.Empty, CommentsLockedMessage);
+            return;
+        }
+
+        foreach (var (key, message) in result.Errors)
+        {
+            ModelState.AddModelError(key == "Comments" ? nameof(CommentsEntryViewModel.Comments) : string.Empty, message);
+        }
     }
 
     private IActionResult NotOk(TestConsultantApiStatus status) =>
