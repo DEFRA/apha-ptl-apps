@@ -9,7 +9,7 @@ namespace PTL.ExternalWeb.Tests.Features.Comments;
 public class CommentsControllerTests
 {
     [Fact]
-    public async Task Index_WithSearch_FiltersDistributionsByTitle()
+    public async Task Index_WithSchemeNameFilter_FiltersDistributionsByTitleSchemeNamePart()
     {
         var api = new FakeTestConsultantApiClient
         {
@@ -22,11 +22,13 @@ public class CommentsControllerTests
         };
         var controller = new CommentsController(api);
 
-        var result = await controller.Index("Brucella", CancellationToken.None);
+        var result = await controller.Index(null, null, "Brucella", CancellationToken.None);
 
         var model = Assert.IsType<CommentsListViewModel>(Assert.IsType<ViewResult>(result).Model);
         var row = Assert.Single(model.Distributions);
-        Assert.Contains("Brucella", row.DistributionTitle, StringComparison.Ordinal);
+        Assert.Equal("D1a", row.DistributionReference);
+        Assert.Equal("S1 BT", row.SchemeCode);
+        Assert.Equal("Brucella", row.SchemeName);
     }
 
     [Fact]
@@ -206,6 +208,29 @@ public class CommentsControllerTests
 
     private static TestConsultantDistributionResponse Distribution(string title) =>
         new(Guid.NewGuid(), 2026, 6, title, new DateTime(2026, 6, 30), false, "Awaiting comments");
+
+    [Fact]
+    public async Task Index_WithDistributionReferenceAndSchemeCode_FiltersByParsedFields()
+    {
+        var api = new FakeTestConsultantApiClient
+        {
+            Distributions =
+                new TestConsultantDistributionsResponse(
+                [
+                    Distribution("D1a/S1 BT: Brucella"),
+                    Distribution("D2a/S2 PTX: Salmonella")
+                ])
+        };
+        var controller = new CommentsController(api);
+
+        var result = await controller.Index("D2a", "S2 PTX", null, CancellationToken.None);
+
+        var model = Assert.IsType<CommentsListViewModel>(Assert.IsType<ViewResult>(result).Model);
+        var row = Assert.Single(model.Distributions);
+        Assert.Equal("D2a", row.DistributionReference);
+        Assert.Equal("S2 PTX", row.SchemeCode);
+        Assert.Equal("Salmonella", row.SchemeName);
+    }
 
     private static TestConsultantTabulationResponse Tabulation(bool submitted) =>
         new(
