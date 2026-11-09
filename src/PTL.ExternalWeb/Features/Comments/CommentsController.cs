@@ -55,7 +55,7 @@ public sealed class CommentsController(ITestConsultantTabulationApiClient apiCli
             return NotOk(latest.Status);
         }
 
-        if (!ValidateEditableState(schemeId, model, latest.Value, command))
+        if (!ValidateEditableState(model, latest.Value, command))
         {
             return View(CommentsEntryViewModel.From(schemeId, latest.Value, model.Comments));
         }
@@ -86,7 +86,6 @@ public sealed class CommentsController(ITestConsultantTabulationApiClient apiCli
     }
 
     private bool ValidateEditableState(
-        Guid schemeId,
         CommentsEntryViewModel model,
         TestConsultantTabulationResponse latest,
         string? command)
