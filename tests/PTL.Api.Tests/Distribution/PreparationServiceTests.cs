@@ -11,7 +11,7 @@ public class PreparationServiceTests
     private static readonly Guid SchemeId = Guid.Parse("22222222-2222-2222-2222-222222222222");
     private static readonly Guid OtherSchemeId = Guid.Parse("33333333-3333-3333-3333-333333333333");
 
-    private static PreparationSchemeEntity Scheme(DateTime? diaryEntry = null, DateTime? prepStart = null, DateTime? prepComplete = null) => new()
+    private static PreparationSchemeEntity Scheme(DateTime? diaryEntry = null, DateTime? prepStart = null, DateTime? prepComplete = null, bool hasSamples = true) => new()
     {
         MonthlyDistributionSchemeId = SchemeId,
         SchemeIdentifier = "PT0060",
@@ -19,6 +19,7 @@ public class PreparationServiceTests
         DiaryEntry = diaryEntry,
         PrepStartDate = prepStart,
         PrepCompleteDate = prepComplete,
+        Samples = hasSamples ? [new PreparationSampleEntity { MonthlyDistributionSchemeId = SchemeId, SampleNumber = "S1" }] : [],
     };
 
     private static FakeDistributionRepository RepositoryWith(PreparationSchemeEntity scheme)
@@ -149,6 +150,40 @@ public class PreparationServiceTests
 
         Assert.True(outcome.Success);
         Assert.Empty(repository.UpdatedPreparationSchemes);
+    }
+
+    [Fact]
+    public async Task SavePreparationAsync_SchemeHasNoSamples_UpdateIsIgnored()
+    {
+        var repository = RepositoryWith(Scheme(hasSamples: false));
+        var service = new PreparationService(repository);
+        var updates = new[] { new PreparationStageUpdate(SchemeId, DiaryEntryChecked: true, PrepStartChecked: true, PrepCompleteChecked: true) };
+
+        var outcome = await service.SavePreparationAsync(2026, 4, updates, CancellationToken.None);
+
+        Assert.True(outcome.Success);
+        Assert.Empty(repository.UpdatedPreparationSchemes);
+    }
+
+    [Fact]
+    public async Task SavePreparationAsync_SchemeHasNoSamples_DoesNotStopOtherSchemesBeingSaved()
+    {
+        var repository = RepositoryWith(Scheme(hasSamples: false));
+        var sampled = Scheme();
+        sampled.MonthlyDistributionSchemeId = OtherSchemeId;
+        repository.PreparationSheets[MonthlyDistributionId] = new PreparationSheetData(
+            MonthlyDistributionId, 2026, 4, [Scheme(hasSamples: false), sampled]);
+        var service = new PreparationService(repository);
+        var updates = new[]
+        {
+            new PreparationStageUpdate(SchemeId, true, false, false),
+            new PreparationStageUpdate(OtherSchemeId, true, false, false),
+        };
+
+        await service.SavePreparationAsync(2026, 4, updates, CancellationToken.None);
+
+        var saved = Assert.Single(repository.UpdatedPreparationSchemes);
+        Assert.Equal(OtherSchemeId, saved.MonthlyDistributionSchemeId);
     }
 
     [Fact]

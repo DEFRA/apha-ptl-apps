@@ -1,4 +1,5 @@
 @model PTL.ExternalWeb.Features.Tabulation.TabulationReportPageViewModel
+@using PTL.ExternalWeb.Features.Tabulation
 @{
     var report = Model.Report;
     ViewData["Title"] = report.TabulationName;
@@ -9,22 +10,51 @@
 <h3 class="govuk-heading-s">@report.TabulationName</h3>
 <p class="govuk-body">@report.DistributionDateText</p>
 
-@foreach (var table in report.Tables)
+@if (Model.Tests is { } tests)
 {
-    <govuk-tabulation-table table="table" />
-    @if (table.AssessmentTestId is { } testId)
+    for (var t = 0; t < tests.Count; t++)
     {
-        <p class="govuk-body">
-            <a class="govuk-link" asp-action="AssessmentResults" asp-route-publishedTabulationId="@report.TabulationId" asp-route-testId="@testId" asp-route-returnUrl="@Model.ReturnUrl">
-                View assessment results<span class="govuk-visually-hidden"> for @table.Caption</span>
-            </a>
-        </p>
+        var test = tests[t];
+        var testAccordion = new TabulationAccordionViewModel($"tabulation-test-{t + 1}", test.Sections);
+
+        <h3 class="govuk-heading-m">@test.TestName</h3>
+        @if (test.AssessmentTestId is { } testId)
+        {
+            <p class="govuk-body">
+                <a class="govuk-link" asp-action="AssessmentResults" asp-route-publishedTabulationId="@report.TabulationId" asp-route-testId="@testId" asp-route-returnUrl="@Model.ReturnUrl">
+                    View assessment results<span class="govuk-visually-hidden"> for @test.TestName</span>
+                </a>
+            </p>
+        }
+
+        @await Html.PartialAsync("_TabulationAccordion", testAccordion)
+    }
+
+    if (report.Ratings is not null)
+    {
+        var ratingsAccordion = new TabulationAccordionViewModel("tabulation-ratings", [new TabulationAccordionSection(report.Ratings.Caption, report.Ratings)]);
+        await Html.RenderPartialAsync("_TabulationAccordion", ratingsAccordion);
     }
 }
-
-@if (report.Ratings is not null)
+else
 {
-    <govuk-tabulation-table table="report.Ratings" />
+    foreach (var table in report.Tables)
+    {
+        <govuk-tabulation-table table="table" />
+        @if (table.AssessmentTestId is { } testId)
+        {
+            <p class="govuk-body">
+                <a class="govuk-link" asp-action="AssessmentResults" asp-route-publishedTabulationId="@report.TabulationId" asp-route-testId="@testId" asp-route-returnUrl="@Model.ReturnUrl">
+                    View assessment results<span class="govuk-visually-hidden"> for @table.Caption</span>
+                </a>
+            </p>
+        }
+    }
+
+    if (report.Ratings is not null)
+    {
+        <govuk-tabulation-table table="report.Ratings" />
+    }
 }
 
 <div id="commentsDiv">
@@ -45,7 +75,7 @@
     @if (!string.IsNullOrEmpty(report.TestConsultantCommentsHtml))
     {
         <div class="govuk-body">
-            <h2 class="govuk-heading-m">@report.TestConsultantCommentsTitle</h2>
+            <h3 class="govuk-heading-m">@report.TestConsultantCommentsTitle</h3>
             @Html.Raw(report.TestConsultantCommentsHtml)
         </div>
     }
@@ -74,7 +104,10 @@
     @if (report.Signatory is { } signatory)
     {
         <div class="cellTabulationSignature">
-            <div>@signatory.Signatory</div>
+            @if (!string.IsNullOrWhiteSpace(signatory.Signatory))
+            {
+                <h3 class="govuk-heading-m govuk-!-margin-bottom-1">@signatory.Signatory</h3>
+            }
             @foreach (var line in signatory.AddressLines)
             {
                 <div class="cellTabulationSignature2">@line</div>

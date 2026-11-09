@@ -46,7 +46,8 @@ public sealed class PreparationService(IDistributionRepository distributionRepos
 
         foreach (var scheme in sheet.Schemes)
         {
-            if (!updatesById.TryGetValue(scheme.MonthlyDistributionSchemeId, out var update))
+            // A scheme with no samples shows no stage checkboxes, so a posted update for it is ignored.
+            if (scheme.Samples.Count == 0 || !updatesById.TryGetValue(scheme.MonthlyDistributionSchemeId, out var update))
             {
                 continue;
             }

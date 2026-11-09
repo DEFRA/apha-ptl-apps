@@ -562,7 +562,11 @@ public sealed partial class DistributionController(
             page.DateOfReceipt,
             page.StorageConditions,
             page.ConditionOnReceipt,
-            page.Instructions);
+            page.Instructions,
+            page.DistributionDate,
+            page.DeadlineDate,
+            page.IsAccredited,
+            page.ExternalAppUrl);
 
     private static SampleNumbersResponse ToResponse(SampleNumbersPage page) =>
         new(

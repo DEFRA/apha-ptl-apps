@@ -223,20 +223,34 @@ public partial class AmendResultsRenderTests : IClassFixture<WebApplicationFacto
     }
 
     [Fact]
-    public async Task Get_RendersSaveAndCancelCommandButtonsOnlyAndTheScript()
+    public async Task Get_RendersSaveApplyAndCancelCommandButtonsAndTheScripts()
     {
         Seed();
 
         var html = await GetHtmlAsync();
 
         Assert.True(HasCommandButton(html, "save", "Save"));
+        Assert.True(HasCommandButton(html, "apply", "Apply"));
         Assert.True(HasCommandButton(html, "cancel", "Cancel"));
-        Assert.False(HasCommandButton(html, "apply", "Apply"));
-        Assert.DoesNotContain(">Apply</button>", html, StringComparison.Ordinal);
         Assert.Matches("<script src=\"/js/amend-results\\.js(\\?v=[^\"]+)?\"></script>", html);
+        Assert.Matches("<script src=\"/js/unsaved-changes\\.js(\\?v=[^\"]+)?\"></script>", html);
         var form = Regex.Match(html, "<form[^>]*data-amend-results[^>]*>").Value;
         Assert.Contains("method=\"post\"", form, StringComparison.Ordinal);
+        Assert.Contains("data-unsaved-watch", form, StringComparison.Ordinal);
         Assert.Contains($"action=\"/Distribution/AmendResults?year=2026&amp;monthId=5&amp;schemeId={Scheme}\"", form, StringComparison.Ordinal);
+    }
+
+    // Legacy OnChangeFunc armed a navigate-away dialog once a cell was edited; unsaved-changes.js
+    // reveals this banner at the same point, so on load it is present but hidden.
+    [Fact]
+    public async Task Get_RendersTheUnsavedChangesBannerHidden()
+    {
+        Seed();
+
+        var html = await GetHtmlAsync();
+
+        Assert.Contains("govuk-notification-banner", html, StringComparison.Ordinal);
+        Assert.Matches("id=\"unsaved-changes\"[^>]*hidden", html);
     }
 
     [Theory]
@@ -305,4 +319,24 @@ public partial class AmendResultsRenderTests : IClassFixture<WebApplicationFacto
         Assert.Equal("/Distribution/Tabulations?year=2026&monthId=5", response.Headers.Location!.OriginalString);
         Assert.Equal("11", Assert.Single(Assert.Single(_apiClient.SavedAmendResults).IntendedMethodResults).Value);
     }
+
+    // Legacy BtnApply: saved, then the same scheme is redrawn.
+    [Fact]
+    public async Task Post_Applied_SavesAndStaysOnAmendResults()
+    {
+        Seed();
+        _apiClient.AmendResultsSaveResult = new AmendResultsSaveResult(true, false, string.Empty, new Dictionary<string, string>());
+        var client = _factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        var token = AntiforgeryTokenPattern().Match(await (await client.GetAsync(Url)).Content.ReadAsStringAsync()).Groups[1].Value;
+
+        var response = await client.PostAsync(Url, new FormUrlEncodedContent(
+            [new("__RequestVerificationToken", token), new("command", "apply"), new(Keys.IntendedMethod(MethodItem), "11")]));
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        Assert.Equal(Url, response.Headers.Location!.OriginalString);
+        Assert.Equal("11", Assert.Single(Assert.Single(_apiClient.SavedAmendResults).IntendedMethodResults).Value);
+    }
+
+    // Legacy OnChangeFunc armed a navigate-away dialog once a cell was edited. The server cannot see
+    // the form is dirty without scripting, so Cancel asks instead - covered by the controller tests.
 }

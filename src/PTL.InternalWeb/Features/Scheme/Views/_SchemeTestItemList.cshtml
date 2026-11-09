@@ -1,8 +1,12 @@
 @model PTL.InternalWeb.Features.Scheme.SchemeTestItemListViewModel
+@{
+    // Set by _SchemeTabTests. Legacy hides Add and Remove on a Previous Year scheme but leaves Up and Down.
+    var previousYear = ViewData["IsPreviousYear"] is true;
+}
 
 <h4 class="govuk-heading-s">@Model.Heading</h4>
 
-@if (!Model.IsViewMode)
+@if (!Model.IsViewMode && !previousYear)
 {
     <div class="govuk-form-group">
         <div class="item-picker">
@@ -26,7 +30,7 @@
 
 @if (Model.Items.Count == 0)
 {
-    <p class="govuk-body">@Model.EmptyMessage</p>
+    <p class="govuk-body">@(previousYear ? "No Items Defined" : Model.EmptyMessage)</p>
 }
 else if (Model.IsViewMode)
 {
@@ -53,7 +57,10 @@ else
             <tr class="govuk-table__row">
                 <th scope="col" class="govuk-table__header">Order</th>
                 <th scope="col" class="govuk-table__header">Name</th>
-                <th scope="col" class="govuk-table__header">Actions</th>
+                @if (!previousYear)
+                {
+                    <th scope="col" class="govuk-table__header">Actions</th>
+                }
             </tr>
         </thead>
         <tbody class="govuk-table__body">
@@ -77,9 +84,12 @@ else
                         <input type="hidden" name="@(Model.FieldPrefix)[@i].ItemTypeId" value="@item.ItemTypeId" />
                         <input type="hidden" name="@(Model.FieldPrefix)[@i].Name" value="@item.Name" />
                     </td>
-                    <td class="govuk-table__cell govuk-!-width-one-quarter">
-                        <button type="submit" class="govuk-link ptl-link-button" name="testCommand" value="@(Model.RemoveCommand):@i">Remove</button>
-                    </td>
+                    @if (!previousYear)
+                    {
+                        <td class="govuk-table__cell govuk-!-width-one-quarter">
+                            <button type="submit" class="govuk-link ptl-link-button" name="testCommand" value="@(Model.RemoveCommand):@i">Remove</button>
+                        </td>
+                    }
                 </tr>
             }
         </tbody>

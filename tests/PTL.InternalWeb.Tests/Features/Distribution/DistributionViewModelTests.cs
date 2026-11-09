@@ -253,4 +253,32 @@ public class DistributionViewModelTests
 
         Assert.True(model.ShowRepeatDistributionButton);
     }
+
+    // Legacy adds "hiddenobject" to divAdditionalParticipants once the distribution is a repeat.
+    [Theory]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    public void ParticipantsViewModel_ShowAdditionalParticipants_FollowsRepeatDistribution(bool isRepeat, bool expected)
+    {
+        var model = new DistributionParticipantsViewModel
+        {
+            IsRepeatDistribution = isRepeat,
+            AdditionalParticipants = [new DistributionAdditionalParticipantRowViewModel()],
+        };
+
+        Assert.Equal(expected, model.ShowAdditionalParticipants);
+    }
+
+    // The Dashboard is keyed by financial year (April to March), so January to March belong to the year before.
+    [Theory]
+    [InlineData(4, 2026, 2026)]
+    [InlineData(12, 2026, 2026)]
+    [InlineData(1, 2027, 2026)]
+    [InlineData(3, 2027, 2026)]
+    public void ScheduleViewModel_DashboardYearId_MapsMonthToItsFinancialYear(int monthId, int yearId, int expected)
+    {
+        var model = new MonthlyDistributionScheduleViewModel { YearId = yearId, MonthId = monthId };
+
+        Assert.Equal(expected, model.DashboardYearId);
+    }
 }

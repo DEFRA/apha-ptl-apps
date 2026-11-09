@@ -92,6 +92,17 @@
                 {
                     var value = ViewContext.HttpContext.Request.Query[key].FirstOrDefault()
                         ?? ViewContext.RouteData.Values[key]?.ToString();
+
+                    // A month page's year is the month's calendar year; the Dashboard is keyed by financial year (April to March).
+                    var month = ViewContext.HttpContext.Request.Query["monthId"].FirstOrDefault();
+                    if (key == "year"
+                        && int.TryParse(value, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var calendarYear)
+                        && int.TryParse(month, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var monthNumber)
+                        && monthNumber < 4)
+                    {
+                        value = (calendarYear - 1).ToString(System.Globalization.CultureInfo.InvariantCulture);
+                    }
+
                     if (!string.IsNullOrEmpty(value))
                     {
                         routeData[key] = value;

@@ -1,0 +1,21 @@
+@model PTL.ExternalWeb.Features.Tabulation.TabulationAccordionViewModel
+
+<div class="govuk-accordion" data-module="govuk-accordion" id="@Model.Id">
+    @for (var s = 0; s < Model.Sections.Count; s++)
+    {
+        var item = Model.Sections[s];
+        var headingId = $"{Model.Id}-heading-{s + 1}";
+        var contentId = $"{Model.Id}-content-{s + 1}";
+
+        <div class="govuk-accordion__section govuk-accordion__section--expanded">
+            <div class="govuk-accordion__section-header">
+                <h4 class="govuk-accordion__section-heading">
+                    <span class="govuk-accordion__section-button" id="@headingId">@item.Title</span>
+                </h4>
+            </div>
+            <div id="@contentId" class="govuk-accordion__section-content">
+                <govuk-tabulation-table table="item.Table" />
+            </div>
+        </div>
+    }
+</div>

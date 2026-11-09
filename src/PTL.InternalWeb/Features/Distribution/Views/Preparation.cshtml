@@ -12,7 +12,9 @@
 
 <h1 class="govuk-heading-l">Sample preparation – @Model.MonthDescription</h1>
 
-<form method="post" asp-action="Preparation" asp-route-year="@Model.YearId" asp-route-monthId="@Model.MonthId">
+<partial name="_UnsavedChangesBanner" model="false" />
+
+<form method="post" asp-action="Preparation" asp-route-year="@Model.YearId" asp-route-monthId="@Model.MonthId" data-unsaved-watch>
     <input type="hidden" asp-for="YearId" />
     <input type="hidden" asp-for="MonthId" />
     <input type="hidden" asp-for="MonthDescription" />
@@ -32,7 +34,7 @@
                         Print
                         <div class="govuk-checkboxes govuk-checkboxes--small govuk-!-margin-top-1" data-module="govuk-checkboxes">
                             <div class="govuk-checkboxes__item">
-                                <input class="govuk-checkboxes__input" type="checkbox" id="preparation-print-select-all" />
+                                <input class="govuk-checkboxes__input" type="checkbox" id="preparation-print-select-all" data-unsaved-ignore />
                                 <label class="govuk-label govuk-checkboxes__label" for="preparation-print-select-all">
                                     <span class="govuk-visually-hidden">Select all schemes for printing</span>
                                 </label>
@@ -59,7 +61,7 @@
                             }
                             <div class="govuk-checkboxes govuk-checkboxes--small" data-module="govuk-checkboxes">
                                 <div class="govuk-checkboxes__item">
-                                    <input class="govuk-checkboxes__input ptl-preparation-print-checkbox" type="checkbox" id="@printId" asp-for="Schemes[i].Selected" />
+                                    <input class="govuk-checkboxes__input ptl-preparation-print-checkbox" type="checkbox" id="@printId" asp-for="Schemes[i].Selected" data-unsaved-ignore />
                                     <label class="govuk-label govuk-checkboxes__label" for="@printId">
                                         <span class="govuk-visually-hidden">Select @scheme.SchemeHeading for printing</span>
                                     </label>
@@ -171,6 +173,7 @@
 
     <div class="govuk-button-group noprint">
         <button type="submit" name="command" value="save" class="govuk-button" data-module="govuk-button">Save</button>
+        <button type="submit" name="command" value="apply" class="govuk-button govuk-button--secondary" data-module="govuk-button">Apply</button>
         <button type="submit" name="command" value="cancel" formnovalidate class="govuk-button govuk-button--secondary" data-module="govuk-button">Cancel</button>
         <button type="button" id="preparation-print-button" class="govuk-button govuk-button--secondary noprint" data-module="govuk-button">Print</button>
     </div>
@@ -226,3 +229,7 @@
         window.print();
     });
 </script>
+
+@section Scripts {
+    <script src="~/js/unsaved-changes.js" asp-append-version="true"></script>
+}

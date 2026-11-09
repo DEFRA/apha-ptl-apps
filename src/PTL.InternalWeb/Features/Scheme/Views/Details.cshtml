@@ -13,14 +13,7 @@
         <h1 class="govuk-heading-l">@Model.Identifier - @Model.Name</h1>
     </div>
     <div class="govuk-grid-column-one-third govuk-!-text-align-right">
-        @if (Model.IsReadOnly == true)
-        {
-            <strong class="govuk-tag govuk-tag--grey">Read only (closed year)</strong>
-        }
-        else
-        {
-            <a class="govuk-button" data-module="govuk-button" asp-action="Edit" asp-route-id="@Model.SchemeId">Edit scheme</a>
-        }
+        <a class="govuk-button" data-module="govuk-button" asp-action="Edit" asp-route-id="@Model.SchemeId">Edit scheme</a>
     </div>
 </div>
 

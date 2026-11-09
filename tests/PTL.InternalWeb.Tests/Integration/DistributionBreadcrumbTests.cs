@@ -110,10 +110,28 @@ public class DistributionBreadcrumbTests : IClassFixture<WebApplicationFactory<P
     [Fact]
     public async Task Packaging_ShowsSamplePackagingInsteadOfAPlainControllerAndActionCrumb()
     {
+        _apiClient.Schedule = new MonthlyDistributionResponse(Guid.NewGuid(), 2026, 5, []);
+
         var crumbs = await CrumbsAsync("/Distribution/Packaging?year=2026&monthId=5");
 
         Assert.Equal(["Home", "Distributions", "Sample Packaging"], crumbs.Select(c => c.Text));
         Assert.Contains("year=2026", crumbs[1].Href, StringComparison.Ordinal);
+    }
+
+    // The month page carries the month's calendar year; the Dashboard is keyed by financial year (April to March).
+    [Theory]
+    [InlineData("year=2027&monthId=2", "year=2026")]
+    [InlineData("year=2027&monthId=1", "year=2026")]
+    [InlineData("year=2027&monthId=3", "year=2026")]
+    [InlineData("year=2026&monthId=4", "year=2026")]
+    [InlineData("year=2026&monthId=12", "year=2026")]
+    public async Task Packaging_DistributionsCrumbLinksToTheMonthsFinancialYear(string query, string expectedYear)
+    {
+        _apiClient.Schedule = new MonthlyDistributionResponse(Guid.NewGuid(), 2027, 2, []);
+
+        var crumbs = await CrumbsAsync($"/Distribution/Packaging?{query}");
+
+        Assert.Contains(expectedYear, crumbs[1].Href, StringComparison.Ordinal);
     }
 
     // Search has no year/month context at all (legacy Distributions/Search.aspx), so the
@@ -181,6 +199,8 @@ public class DistributionBreadcrumbTests : IClassFixture<WebApplicationFactory<P
     [Fact]
     public async Task Packaging_HasNoBackLinkBecauseTheBreadcrumbsLeadBack()
     {
+        _apiClient.Schedule = new MonthlyDistributionResponse(Guid.NewGuid(), 2026, 5, []);
+
         var html = await HtmlAsync("/Distribution/Packaging?year=2026&monthId=5");
 
         Assert.DoesNotContain("govuk-back-link", html, StringComparison.Ordinal);

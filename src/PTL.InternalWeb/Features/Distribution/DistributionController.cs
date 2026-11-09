@@ -139,13 +139,12 @@ public sealed partial class DistributionController(IDistributionApiClient distri
     {
         if (string.Equals(command, CancelCommand, StringComparison.OrdinalIgnoreCase))
         {
-            return RedirectToAction(nameof(Index));
+            return RedirectToAction(nameof(Index), new { year = FinancialYearFor(year, monthId) });
         }
 
         if (!ModelState.IsValid)
         {
-            model.YearId = year;
-            model.MonthId = monthId;
+            ApplyScheduleRedisplayContext(model, year, monthId);
             return View(model);
         }
 
@@ -173,8 +172,7 @@ public sealed partial class DistributionController(IDistributionApiClient distri
                 }
             }
 
-            model.YearId = year;
-            model.MonthId = monthId;
+            ApplyScheduleRedisplayContext(model, year, monthId);
             return View(model);
         }
 
@@ -185,7 +183,7 @@ public sealed partial class DistributionController(IDistributionApiClient distri
             return RedirectToAction(nameof(Schedule), new { year, monthId });
         }
 
-        return RedirectToAction(nameof(Index));
+        return RedirectToAction(nameof(Index), new { year = FinancialYearFor(year, monthId) });
     }
 
     // Preserves the legacy Cancel/Commence toggle exactly: dlMonth_RowCommand only flips the
@@ -225,10 +223,32 @@ public sealed partial class DistributionController(IDistributionApiClient distri
             row.IsCancelled = !row.IsCancelled;
         }
 
-        model.YearId = year;
-        model.MonthId = monthId;
+        ApplyScheduleRedisplayContext(model, year, monthId);
         return View(nameof(Schedule), model);
     }
+
+    // Re-applies the page context the form never posts back - legacy reads the month/year from
+    // Session on every request.
+    private static void ApplyScheduleRedisplayContext(MonthlyDistributionScheduleViewModel model, int year, int monthId)
+    {
+        model.YearId = year;
+        model.MonthId = monthId;
+        model.MonthYearLabel = ToMonthYearLabel(year, monthId);
+    }
+
+    // The dashboard is keyed by financial year (April to March); January to March belong to the year before.
+    private static int FinancialYearFor(int year, int monthId) => monthId < 4 ? year - 1 : year;
+
+    // Legacy LeavePage() when the month has no distribution yet: back to the Dashboard, no error.
+    private RedirectToActionResult RedirectToDashboardForMonth(int year, int monthId) =>
+        RedirectToAction(nameof(Index), new { year = FinancialYearFor(year, monthId) });
+
+    // Legacy LeavePage() when the session holds no participant or scheme: back to Results Receipt, no error.
+    private RedirectToActionResult RedirectToResultsReceipt(int year, int monthId) =>
+        RedirectToAction(nameof(ResultsReceipt), new { year, monthId });
+
+    private static string ToMonthYearLabel(int year, int monthId) =>
+        new DateTime(year, monthId, 1, 0, 0, 0, DateTimeKind.Utc).ToString("MMM yyyy", System.Globalization.CultureInfo.InvariantCulture);
 
     // Sample Preparation - legacy Internal User/PreparationSheet.aspx. Reached from the
     // Dashboard's "Preparation: View" link.
@@ -237,7 +257,11 @@ public sealed partial class DistributionController(IDistributionApiClient distri
     public async Task<IActionResult> Preparation(int year, int monthId, CancellationToken cancellationToken)
     {
         var sheet = await distributionApiClient.GetPreparationAsync(year, monthId, cancellationToken);
-        return sheet is null ? NotFound() : View(ToPreparationViewModel(year, monthId, sheet));
+
+        // Legacy LeavePage() when the month has no distribution yet: back to the Dashboard, no error.
+        return sheet is null
+            ? RedirectToAction(nameof(Index), new { year = FinancialYearFor(year, monthId) })
+            : View(ToPreparationViewModel(year, monthId, sheet));
     }
 
     // Save = persist then leave (legacy ButtonSave_Click -> Save() -> LeavePage() ->
@@ -251,7 +275,7 @@ public sealed partial class DistributionController(IDistributionApiClient distri
     {
         if (string.Equals(command, CancelCommand, StringComparison.OrdinalIgnoreCase))
         {
-            return RedirectToAction(nameof(Index));
+            return RedirectToAction(nameof(Index), new { year = FinancialYearFor(year, monthId) });
         }
 
         var updates = model.Schemes
@@ -273,7 +297,7 @@ public sealed partial class DistributionController(IDistributionApiClient distri
             return RedirectToAction(nameof(Preparation), new { year, monthId });
         }
 
-        return RedirectToAction(nameof(Index));
+        return RedirectToAction(nameof(Index), new { year = FinancialYearFor(year, monthId) });
     }
 
     // Results Receipt - legacy Internal User/ResultsReceipt.aspx. Reached from the Dashboard's
@@ -284,20 +308,22 @@ public sealed partial class DistributionController(IDistributionApiClient distri
     public async Task<IActionResult> ResultsReceipt(int year, int monthId, CancellationToken cancellationToken)
     {
         var receipt = await distributionApiClient.GetResultsReceiptAsync(year, monthId, cancellationToken);
-        return receipt is null ? NotFound() : View(ToResultsReceiptViewModel(year, monthId, receipt));
+        return receipt is null ? RedirectToDashboardForMonth(year, monthId) : View(ToResultsReceiptViewModel(year, monthId, receipt));
     }
 
     // Save = persist then leave (legacy ButtonSave_Click -> Save() -> LeavePage() -> MenuDistributions.aspx).
     // Apply = persist then stay, re-reading fresh data (legacy ButtonApply_Click -> Save() -> re-fetch).
     // Cancel = discard then leave, no save at all (legacy ButtonCancel_Click -> LeavePage()).
+    // Every participant row posts several fields, so a large month exceeds the 1,024-value default.
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [RequestFormLimits(ValueCountLimit = 20000)]
     [Authorize(Policy = PtlPolicies.InternalUser)]
     public async Task<IActionResult> ResultsReceipt(int year, int monthId, ResultsReceiptViewModel model, string command, CancellationToken cancellationToken)
     {
         if (string.Equals(command, CancelCommand, StringComparison.OrdinalIgnoreCase))
         {
-            return RedirectToAction(nameof(Index));
+            return RedirectToDashboardForMonth(year, monthId);
         }
 
         var updates = model.Schemes
@@ -317,7 +343,7 @@ public sealed partial class DistributionController(IDistributionApiClient distri
 
         return string.Equals(command, ApplyCommand, StringComparison.OrdinalIgnoreCase)
             ? RedirectToAction(nameof(ResultsReceipt), new { year, monthId })
-            : RedirectToAction(nameof(Index));
+            : RedirectToDashboardForMonth(year, monthId);
     }
 
     // Monthly Distributions - Tabulations - legacy Scheduling/Tabulations.aspx. Reached from the
@@ -353,7 +379,7 @@ public sealed partial class DistributionController(IDistributionApiClient distri
     public async Task<IActionResult> SampleReceipt(int year, int monthId, Guid schemeId, Guid participantId, CancellationToken cancellationToken)
     {
         var page = await distributionApiClient.GetSampleReceiptAsync(schemeId, participantId, cancellationToken);
-        return page is null ? NotFound() : View(ToSampleReceiptViewModel(year, monthId, schemeId, participantId, page));
+        return page is null ? RedirectToResultsReceipt(year, monthId) : View(ToSampleReceiptViewModel(year, monthId, schemeId, participantId, page));
     }
 
     // Save = persist then return to Results Receipt (legacy ButtonSave_Click -> LeavePage()).
@@ -427,7 +453,7 @@ public sealed partial class DistributionController(IDistributionApiClient distri
     public async Task<IActionResult> ActualResults(int year, int monthId, Guid schemeId, Guid participantId, CancellationToken cancellationToken)
     {
         var page = await distributionApiClient.GetActualResultsAsync(schemeId, participantId, cancellationToken);
-        return page is null ? NotFound() : View(ToActualResultsViewModel(year, monthId, page));
+        return page is null ? RedirectToResultsReceipt(year, monthId) : View(ToActualResultsViewModel(year, monthId, page));
     }
 
     // Save = persist then return to Results Receipt (legacy ButtonSave_Click -> LeavePage()).
@@ -663,7 +689,7 @@ public sealed partial class DistributionController(IDistributionApiClient distri
     public async Task<IActionResult> Packaging(int year, int monthId, int? mode, int week, CancellationToken cancellationToken)
     {
         var model = await BuildPackagingViewModelAsync(year, monthId, new PackagingViewModel { Mode = mode, Week = week }, cancellationToken);
-        return model is null ? NotFound() : View(model);
+        return model is null ? RedirectToDashboardForMonth(year, monthId) : View(model);
     }
 
     // select = explicit View button after choosing the Packaging/Week values: redisplay, keeping unsaved ticks.
@@ -677,13 +703,13 @@ public sealed partial class DistributionController(IDistributionApiClient distri
     {
         if (string.Equals(command, CancelCommand, StringComparison.OrdinalIgnoreCase))
         {
-            return RedirectToAction(nameof(Index));
+            return RedirectToDashboardForMonth(year, monthId);
         }
 
         if (!ValidatePackagingSelection(model))
         {
             var invalid = await BuildPackagingViewModelAsync(year, monthId, model, cancellationToken);
-            return invalid is null ? NotFound() : View(invalid);
+            return invalid is null ? RedirectToDashboardForMonth(year, monthId) : View(invalid);
         }
 
         if (string.Equals(command, "save", StringComparison.OrdinalIgnoreCase) || string.Equals(command, ApplyCommand, StringComparison.OrdinalIgnoreCase))
@@ -698,7 +724,7 @@ public sealed partial class DistributionController(IDistributionApiClient distri
         }
 
         var rebuilt = await BuildPackagingViewModelAsync(year, monthId, model, cancellationToken);
-        return rebuilt is null ? NotFound() : View(rebuilt);
+        return rebuilt is null ? RedirectToDashboardForMonth(year, monthId) : View(rebuilt);
     }
 
     // The labels / customs print commands; null means redisplay the page (with model.Message set).
@@ -745,6 +771,9 @@ public sealed partial class DistributionController(IDistributionApiClient distri
         return null;
     }
 
+    // False means the selection is incomplete. Only an option or a week the user was shown is an error:
+    // the Week dropdown appears once Group Address or Participant Combined is chosen, so the first
+    // View after choosing one just reveals it.
     private static bool ValidatePackagingSelection(PackagingViewModel model)
     {
         if (model.Mode is not (0 or 1 or 2))
@@ -754,7 +783,12 @@ public sealed partial class DistributionController(IDistributionApiClient distri
         }
         else if (model.Mode is 0 or 1 && model.Week is < 1 or > 4)
         {
-            model.WeekError = "Select a week";
+            if (model.WeekVisible is true)
+            {
+                model.WeekError = "Select a week";
+            }
+
+            return false;
         }
 
         return !model.HasSelectionError;
@@ -783,7 +817,7 @@ public sealed partial class DistributionController(IDistributionApiClient distri
 
         return string.Equals(command, ApplyCommand, StringComparison.OrdinalIgnoreCase)
             ? RedirectToAction(nameof(Packaging), new { year, monthId, mode = model.Mode, week = model.Week })
-            : RedirectToAction(nameof(Index));
+            : RedirectToDashboardForMonth(year, monthId);
     }
 
     private async Task<PackagingViewModel?> BuildPackagingViewModelAsync(int year, int monthId, PackagingViewModel model, CancellationToken cancellationToken)
@@ -797,7 +831,8 @@ public sealed partial class DistributionController(IDistributionApiClient distri
         var weekNeeded = model.Mode is 0 or 1;
         if (model.Mode is not (0 or 1 or 2) || (weekNeeded && model.Week is < 1 or > 4))
         {
-            return model;
+            // No sheet yet, so the month itself is checked: an uninitialised month never shows the page.
+            return await distributionApiClient.GetScheduleAsync(year, monthId, cancellationToken) is null ? null : model;
         }
 
         model.Sheet = await distributionApiClient.GetPackagingAsync(year, monthId, model.Mode.Value, weekNeeded ? model.Week : 0, cancellationToken);
@@ -1190,21 +1225,16 @@ public sealed partial class DistributionController(IDistributionApiClient distri
             return NotFound();
         }
 
-        // DATE OF DISTRIBUTION/the deadline message/the UKAS accreditation mark only exist on the
-        // Scheduling-level scheme row (legacy's separate MonthlyDistributionScheme.
-        // FetchMonthlyDistributionSchemeChild call) - already-available via the same schedule
-        // lookup the Scheduling screen itself uses.
-        var schedule = await distributionApiClient.GetScheduleAsync(year, monthId, cancellationToken);
-        var scheduleScheme = schedule?.Schemes.FirstOrDefault(s => s.MonthlyDistributionSchemeId == schemeId);
-
+        // DATE OF DISTRIBUTION/the deadline message/the UKAS accreditation mark come from the
+        // scheme resolved by id (legacy FetchMonthlyDistributionSchemeChild), already on the page.
         var worksheet = PrintableResultsWorksheetBuilder.Build(
             year,
             monthId,
             page,
             page.HasIntendedResults && showValues,
-            scheduleScheme?.DistributionDate ?? default,
-            scheduleScheme?.DeadlineDate ?? default,
-            scheduleScheme?.IsAccredited ?? false);
+            page.DistributionDate,
+            page.DeadlineDate,
+            page.IsAccredited);
 
         return View(worksheet);
     }
@@ -1606,7 +1636,7 @@ public sealed partial class DistributionController(IDistributionApiClient distri
         {
             YearId = year,
             MonthId = monthId,
-            MonthYearLabel = new DateTime(year, monthId, 1, 0, 0, 0, DateTimeKind.Utc).ToString("MMM yyyy", System.Globalization.CultureInfo.InvariantCulture),
+            MonthYearLabel = ToMonthYearLabel(year, monthId),
             Schemes = [.. schedule.Schemes.Select(ToRowViewModel)],
         };
 

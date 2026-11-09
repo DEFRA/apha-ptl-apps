@@ -121,6 +121,29 @@ public class TabulationControllerTests
     }
 
     [Fact]
+    public async Task TabulationPdfService_WhenTheHeaderImageExists_EmbedsItAsADataUri()
+    {
+        var webRoot = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(Path.Combine(webRoot, "images"));
+        try
+        {
+            await File.WriteAllBytesAsync(Path.Combine(webRoot, "images", TabulationPdfService.HeaderImageFileName), [1, 2, 3]);
+            var viewRenderer = new FakeRazorViewRenderer("<html></html>");
+            var service = new TabulationPdfService(viewRenderer, new FakeHtmlToPdfRenderer(), new FakeWebHostEnvironment { WebRootPath = webRoot });
+
+            await service.GenerateAsync(new ActionContext(), new TabulationReportPageViewModel(Report(Guid.NewGuid())), CancellationToken.None);
+
+            var model = Assert.IsType<TabulationPdfViewModel>(viewRenderer.LastModel);
+            Assert.Equal("data:image/png;base64,AQID", model.HeaderImageDataUri);
+            Assert.Null(model.UkasLogoDataUri);
+        }
+        finally
+        {
+            Directory.Delete(webRoot, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task TabulationPdfService_WhenTheUkasLogoIsMissing_OmitsIt()
     {
         var webRoot = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
@@ -132,7 +155,9 @@ public class TabulationControllerTests
 
             await service.GenerateAsync(new ActionContext(), new TabulationReportPageViewModel(Report(Guid.NewGuid())), CancellationToken.None);
 
-            Assert.Null(Assert.IsType<TabulationPdfViewModel>(viewRenderer.LastModel).UkasLogoDataUri);
+            var model = Assert.IsType<TabulationPdfViewModel>(viewRenderer.LastModel);
+            Assert.Null(model.UkasLogoDataUri);
+            Assert.Null(model.HeaderImageDataUri);
         }
         finally
         {

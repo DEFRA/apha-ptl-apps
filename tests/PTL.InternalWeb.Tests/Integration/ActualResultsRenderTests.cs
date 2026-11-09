@@ -162,7 +162,7 @@ public partial class ActualResultsRenderTests : IClassFixture<WebApplicationFact
         var buttons = Regex.Matches(html, "<button type=\"submit\" name=\"command\" value=\"(\\w+)\"[^>]*>(.*?)</button>", RegexOptions.Singleline)
             .Select(m => (Value: m.Groups[1].Value, Label: Text(m.Groups[2].Value)))
             .ToList();
-        Assert.Equal([("save", "Save"), ("cancel", "Cancel")], buttons);
+        Assert.Equal([("save", "Save"), ("apply", "Apply"), ("cancel", "Cancel")], buttons);
         Assert.Matches("<button[^>]*value=\"cancel\"[^>]*formnovalidate", html);
         Assert.DoesNotContain("govuk-back-link", html, StringComparison.Ordinal);
     }
@@ -285,13 +285,17 @@ public partial class ActualResultsRenderTests : IClassFixture<WebApplicationFact
     }
 
     [Fact]
-    public async Task Get_ApiReturnsNull_Returns404()
+    public async Task Get_ApiReturnsNull_RedirectsBackToResultsReceipt()
     {
         _apiClient.ActualResults = null;
+        var client = _factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
 
-        var response = await _factory.CreateClient().GetAsync(Url);
+        var response = await client.GetAsync(Url);
 
-        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        var location = response.Headers.Location!.OriginalString;
+        Assert.Contains("/Distribution/ResultsReceipt", location, StringComparison.Ordinal);
+        Assert.Contains("year=2026", location, StringComparison.Ordinal);
     }
 
     [Fact]

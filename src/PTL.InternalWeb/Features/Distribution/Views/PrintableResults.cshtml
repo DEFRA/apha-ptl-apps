@@ -60,24 +60,27 @@
 
     @Html.Raw(Model.Instructions)
 
-    <table class="tblSampleInstruction">
-        <caption class="govuk-visually-hidden">Sample Instructions</caption>
-        <thead>
-            <tr>
-                <th scope="col" class="cellSampleInstruction">Sample No.</th>
-                <th scope="col" class="cellSampleInstruction">Sample Instruction</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var sampleInstruction in Model.SampleInstructions)
-            {
+    @if (Model.SampleInstructions.Count > 0)
+    {
+        <table class="tblSampleInstruction">
+            <caption class="govuk-visually-hidden">Sample Instructions</caption>
+            <thead>
                 <tr>
-                    <th scope="row" class="cellSampleInstruction">@sampleInstruction.SampleNumber</th>
-                    <td class="cellSampleInstruction">@sampleInstruction.ExternalDescription</td>
+                    <th scope="col" class="cellSampleInstruction">Sample No.</th>
+                    <th scope="col" class="cellSampleInstruction">Sample Instruction</th>
                 </tr>
-            }
-        </tbody>
-    </table>
+            </thead>
+            <tbody>
+                @foreach (var sampleInstruction in Model.SampleInstructions)
+                {
+                    <tr>
+                        <th scope="row" class="cellSampleInstruction">@sampleInstruction.SampleNumber</th>
+                        <td class="cellSampleInstruction">@sampleInstruction.ExternalDescription</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
 
     @if (Model.ShowDistributionItems)
     {
@@ -158,16 +161,14 @@
         }
     }
 
-    <table class="tblWorkSheetNoBorder" role="presentation">
-        <tr><td>Date of Receipt:</td></tr>
-        <tr><td>Date of Testing:</td></tr>
-    </table>
-
     <table class="tblWorkSheetNoBorder" id="tblFooter" role="presentation">
         <tr>
             <td class="cellWorkSheetAddress">
-                Enter results online at:<br />
-                <strong>https://new.uat-science.apha.gov.uk/ProficiencyTesting</strong><br /><br />
+                @if (!string.IsNullOrEmpty(Model.ExternalAddress))
+                {
+                    <text>Enter results online at:<br /></text>
+                    <strong>@Model.ExternalAddress</strong><br /><br />
+                }
                 Animal and Plant Health Agency<br />
                 Quality Assurance Unit<br />
                 The Elms, College Road<br />

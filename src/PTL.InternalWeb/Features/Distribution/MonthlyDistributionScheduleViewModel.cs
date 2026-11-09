@@ -113,6 +113,10 @@ public sealed class MonthlyDistributionScheduleViewModel : IValidatableObject
     // "MMM yyyy" - legacy lblMonthYear.
     public string MonthYearLabel { get; set; } = string.Empty;
 
+    // The Dashboard is keyed by financial year (April to March), so January to March belong to the
+    // year before - legacy returns there with the year still held in Session.
+    public int DashboardYearId => MonthId < 4 ? YearId - 1 : YearId;
+
     public List<MonthlyDistributionScheduleRowViewModel> Schemes { get; set; } = [];
 
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)

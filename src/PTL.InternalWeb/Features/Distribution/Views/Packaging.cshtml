@@ -45,7 +45,7 @@
         var id = $"packaging-tick-{++tickId}";
         <div class="govuk-checkboxes govuk-checkboxes--small" data-module="govuk-checkboxes">
             <div class="govuk-checkboxes__item">
-                <input class="govuk-checkboxes__input @cssClass" type="checkbox" id="@id" name="@name" value="@value" checked="@isChecked" data-kind="@data.Kind" data-scheme="@data.Scheme" />
+                <input class="govuk-checkboxes__input @cssClass" type="checkbox" id="@id" name="@name" value="@value" checked="@isChecked" data-kind="@data.Kind" data-scheme="@data.Scheme" @(cssClass == "ptl-print-checkbox" ? "data-unsaved-ignore" : string.Empty) />
                 <label class="govuk-label govuk-checkboxes__label" for="@id">
                     @if (labelVisible)
                     {
@@ -100,7 +100,7 @@
             @title
             <div class="govuk-checkboxes govuk-checkboxes--small govuk-!-margin-top-1 noprint" data-module="govuk-checkboxes">
                 <div class="govuk-checkboxes__item">
-                    <input class="govuk-checkboxes__input" type="checkbox" id="packaging-select-all-@kind" data-select-all="@kind" />
+                    <input class="govuk-checkboxes__input" type="checkbox" id="packaging-select-all-@kind" data-select-all="@kind" @(kind == "print" ? "data-unsaved-ignore" : string.Empty) />
                     <label class="govuk-label govuk-checkboxes__label" for="packaging-select-all-@kind">
                         <span class="govuk-visually-hidden">@label</span>
                     </label>
@@ -206,7 +206,11 @@
 
 <h1 class="govuk-heading-l noprint">Sample packaging – @Model.MonthDescription</h1>
 
-<form method="post" asp-action="Packaging" asp-route-year="@Model.YearId" asp-route-monthId="@Model.MonthId" id="packaging-form">
+<div class="noprint">
+    <partial name="_UnsavedChangesBanner" model="@Model.HasUnsavedChanges" />
+</div>
+
+<form method="post" asp-action="Packaging" asp-route-year="@Model.YearId" asp-route-monthId="@Model.MonthId" id="packaging-form" data-unsaved-watch>
     @foreach (var tick in Model.CarriedTicks(Model.PackedTicks))
     {
         <input type="hidden" name="PackedTicks" value="@tick" />
@@ -227,7 +231,7 @@
                 {
                     <p id="packaging-mode-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @Model.ModeError</p>
                 }
-                <select class="govuk-select @(Model.ModeError is null ? "" : "govuk-select--error")" id="packaging-mode" name="Mode" aria-describedby="@(Model.ModeError is null ? null : "packaging-mode-error")">
+                <select class="govuk-select @(Model.ModeError is null ? "" : "govuk-select--error")" id="packaging-mode" name="Mode" aria-describedby="@(Model.ModeError is null ? null : "packaging-mode-error")" data-unsaved-ignore>
                     @if (Model.Mode is null)
                     {
                         <option value="" selected="selected">Select</option>
@@ -239,13 +243,14 @@
             </div>
             @if (Model.ShowWeek)
             {
+                <input type="hidden" name="WeekVisible" value="true" />
                 <div class="govuk-form-group @(Model.WeekError is null ? "" : "govuk-form-group--error")">
                     <label class="govuk-label" for="packaging-week">Week</label>
                     @if (Model.WeekError is not null)
                     {
                         <p id="packaging-week-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @Model.WeekError</p>
                     }
-                    <select class="govuk-select @(Model.WeekError is null ? "" : "govuk-select--error")" id="packaging-week" name="Week" aria-describedby="@(Model.WeekError is null ? null : "packaging-week-error")">
+                    <select class="govuk-select @(Model.WeekError is null ? "" : "govuk-select--error")" id="packaging-week" name="Week" aria-describedby="@(Model.WeekError is null ? null : "packaging-week-error")" data-unsaved-ignore>
                         @if (Model.Week == 0)
                         {
                             <option value="0" selected="selected">Select</option>
@@ -398,6 +403,7 @@
         <div class="ptl-packaging-actions">
             <div class="govuk-button-group">
                 <button type="submit" name="command" value="save" class="govuk-button" data-module="govuk-button">Save</button>
+                <button type="submit" name="command" value="apply" class="govuk-button govuk-button--secondary" data-module="govuk-button">Apply</button>
                 <button type="submit" form="packaging-cancel-form" class="govuk-button govuk-button--secondary" data-module="govuk-button">Cancel</button>
             </div>
             <div class="govuk-button-group">
@@ -413,7 +419,9 @@
 </form>
 
 @* Cancel is a button of this separate GET form (via the form attribute); it can't be nested in the POST form above. *@
-<form id="packaging-cancel-form" method="get" asp-action="Index" class="noprint"></form>
+<form id="packaging-cancel-form" method="get" asp-action="Index" class="noprint">
+    <input type="hidden" name="year" value="@Model.DashboardYearId" />
+</form>
 
 <script>
     (function () {
@@ -472,3 +480,7 @@
         updatePrint();
     })();
 </script>
+
+@section Scripts {
+    <script src="~/js/unsaved-changes.js" asp-append-version="true"></script>
+}

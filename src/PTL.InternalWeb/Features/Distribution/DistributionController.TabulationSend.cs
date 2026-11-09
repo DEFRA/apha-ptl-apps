@@ -22,40 +22,33 @@ public sealed partial class DistributionController
     {
         var stagedSends = ParseStaged(staged);
 
-        // Legacy ButtonSave/ButtonCancel both leave for the Distributions menu.
+        // Legacy ButtonCancel leaves for the Distributions menu, which the year is keyed by.
         if (string.Equals(command, CancelCommand, StringComparison.OrdinalIgnoreCase))
         {
-            return RedirectToAction(nameof(Index), new { year });
+            return RedirectToAction(nameof(Index), new { year = FinancialYearFor(year, monthId) });
         }
 
-        if (string.Equals(command, SaveCommand, StringComparison.OrdinalIgnoreCase))
+        // Save = persist then leave (legacy ButtonSave_Click -> mdi.Save() -> LeavePage()).
+        // Apply = persist then stay, re-reading the month (legacy ButtonApply_Click -> mdi.Save() -> rebind).
+        var isApply = string.Equals(command, ApplyCommand, StringComparison.OrdinalIgnoreCase);
+        if (isApply || string.Equals(command, SaveCommand, StringComparison.OrdinalIgnoreCase))
         {
             if (await distributionApiClient.SaveTabulationsAsync(year, monthId, stagedSends, cancellationToken))
             {
                 TempData.SetNotification(NotificationType.Success, "Tabulations updated successfully.");
-                return RedirectToAction(nameof(Index), new { year });
+                return isApply
+                    ? RedirectToAction(nameof(Tabulations), new { year, monthId })
+                    : RedirectToAction(nameof(Index), new { year = FinancialYearFor(year, monthId) });
             }
 
             TempData.SetNotification(NotificationType.Error, "The changes could not be saved because the Tabulations have been changed by someone else. Please try again.");
             return RedirectToAction(nameof(Tabulations), new { year, monthId });
         }
 
-        // Cancel on the confirmation page posts the form back declined: the send is dropped and the
-        // page redisplays with only the earlier staged sends.
-        if (!ConfirmationFlow.IsCancelled(confirmation) && ParseStaged(stage is null ? [] : [stage]) is [var send])
+        var confirmationPage = await StageSendAsync(year, monthId, stage, confirmation, stagedSends, cancellationToken);
+        if (confirmationPage is not null)
         {
-            var sendConfirmation = await distributionApiClient.StageTabulationSendAsync(
-                year, monthId, new TabulationStageRequest(stagedSends, send.MonthlyDistributionSchemeId, send.Command), cancellationToken);
-
-            if (sendConfirmation is not null)
-            {
-                if (sendConfirmation.ConfirmationQuestion.Length > 0 && !ConfirmationFlow.IsConfirmed(confirmation))
-                {
-                    return this.ConfirmationPage(ToSendConfirmationPage(sendConfirmation), nameof(Tabulations));
-                }
-
-                stagedSends.Add(send);
-            }
+            return confirmationPage;
         }
 
         var page = await distributionApiClient.PreviewTabulationsAsync(year, monthId, stagedSends, cancellationToken);
@@ -72,6 +65,32 @@ public sealed partial class DistributionController
             Schemes = page.Schemes,
             Staged = stagedSends,
         });
+    }
+
+    // Cancel on the confirmation page posts the form back declined: the send is dropped and the page
+    // redisplays with only the earlier staged sends. Returns the confirmation page when one is needed.
+    private async Task<IActionResult?> StageSendAsync(
+        int year, int monthId, string? stage, string? confirmation, List<TabulationStagedSendRequest> stagedSends, CancellationToken cancellationToken)
+    {
+        if (ConfirmationFlow.IsCancelled(confirmation) || ParseStaged(stage is null ? [] : [stage]) is not [var send])
+        {
+            return null;
+        }
+
+        var sendConfirmation = await distributionApiClient.StageTabulationSendAsync(
+            year, monthId, new TabulationStageRequest(stagedSends, send.MonthlyDistributionSchemeId, send.Command), cancellationToken);
+        if (sendConfirmation is null)
+        {
+            return null;
+        }
+
+        if (sendConfirmation.ConfirmationQuestion.Length > 0 && !ConfirmationFlow.IsConfirmed(confirmation))
+        {
+            return this.ConfirmationPage(ToSendConfirmationPage(sendConfirmation), nameof(Tabulations));
+        }
+
+        stagedSends.Add(send);
+        return null;
     }
 
     // "{schemeId}:{command}" values; anything malformed is ignored.

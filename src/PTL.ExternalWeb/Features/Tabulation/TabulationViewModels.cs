@@ -26,8 +26,18 @@ public sealed record TabulationListViewModel(
         || !string.IsNullOrWhiteSpace(SchemeName);
 }
 
-/// <summary>Legacy TabulationView.aspx - the published tabulation itself.</summary>
-public sealed record TabulationReportPageViewModel(TabulationReportResponse Report, string? ReturnUrl = null);
+/// <summary>Legacy TabulationView.aspx - the published tabulation itself. Tests holds the accordion
+/// sections built from the report; null keeps the one-table-per-test layout.</summary>
+public sealed record TabulationReportPageViewModel(
+    TabulationReportResponse Report,
+    string? ReturnUrl = null,
+    IReadOnlyList<TabulationTestSections>? Tests = null);
+
+public sealed record TabulationTestSections(string TestName, Guid? AssessmentTestId, IReadOnlyList<TabulationAccordionSection> Sections);
+
+public sealed record TabulationAccordionSection(string Title, TabulationTableResponse Table);
+
+public sealed record TabulationAccordionViewModel(string Id, IReadOnlyList<TabulationAccordionSection> Sections);
 
 /// <summary>Legacy AssessmentResults.aspx - rendered as a data table rather than the legacy bar
 /// chart (not required by this story's acceptance criteria).</summary>

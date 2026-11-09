@@ -322,13 +322,20 @@ public class SchemeServiceTests
     }
 
     [Fact]
-    public async Task UpdateSchemeAsync_ReadOnlyScheme_ThrowsSchemeValidationException()
+    public async Task UpdateSchemeAsync_ReadOnlyScheme_SavesAChangeToAFieldLegacyLeavesEditable()
     {
         var repository = new FakeSchemeRepository();
         var service = CreateService(repository);
         var created = await service.CreateSchemeAsync(ValidScheme(yearId: DateTime.UtcNow.Year - 1));
+        Assert.True(created.IsReadOnly);
+        var update = ValidUpdate(created);
+        update.CustomsDescription = "Revised customs description";
 
-        await Assert.ThrowsAsync<SchemeValidationException>(() => service.UpdateSchemeAsync(created.SchemeId, ValidScheme(created.YearId), "tester", null));
+        var result = await service.UpdateSchemeAsync(created.SchemeId, update, "tester", null);
+
+        Assert.Equal(SchemeUpdateStatus.Updated, result.Status);
+        Assert.Equal("Revised customs description", result.Scheme!.CustomsDescription);
+        Assert.Equal("Revised customs description", (await repository.GetByIdAsync(created.SchemeId))!.CustomsDescription);
     }
 
     [Fact]
