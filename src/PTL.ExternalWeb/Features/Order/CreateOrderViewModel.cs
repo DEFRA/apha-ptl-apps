@@ -15,11 +15,23 @@ public sealed class CreateOrderViewModel
     // The term the commercial list is currently filtered by; null/blank shows every scheme (legacy "Show All").
     public string? Search { get; init; }
 
+    // Target of the "website" link in the intro; null shows the word as plain text.
+    public string? DistributionTimetableUrl { get; init; }
+
+    // Per-table sort choices carried in the address (legacy kept them in its page state).
+    public OrderSortState Sort { get; init; } = OrderSortState.Empty;
+
     public bool IsCurrentYear => YearSlug == OrderController.CurrentYearSlug;
 
     public string PageAction => IsCurrentYear ? nameof(OrderController.CurrentYear) : nameof(OrderController.NextYear);
 
-    public IReadOnlyList<CreateOrderScheduleGroupResponse> VisibleGroups => CreateOrderSearch.Filter(Order.AvailableSchemes, Search);
+    public IReadOnlyList<CreateOrderSchemeResponse> ParticipatingSchemes => Sort.Apply(OrderSortState.ParticipatingTable, Order.ParticipatingSchemes);
+
+    public IReadOnlyList<CreateOrderScheduleGroupResponse> VisibleGroups =>
+    [
+        .. CreateOrderSearch.Filter(Order.AvailableSchemes, Search)
+            .Select(g => g with { Schemes = Sort.Apply(OrderSortState.ScheduleTable(g.Schedule), g.Schemes) })
+    ];
 
     public string FormatMoney(decimal amount) => Format(Order.CurrencySymbol, amount);
 
@@ -66,6 +78,9 @@ public sealed class CreateOrderChangeModel
     public bool Checked { get; set; }
 
     public string? Search { get; set; }
+
+    // Posted by create-order.js so the re-priced body keeps the sort the page was loaded with.
+    public List<string> Sort { get; set; } = [];
 }
 
 public sealed record CreateOrderReviewViewModel(string YearSlug, CreateOrderResponse Order)
@@ -86,6 +101,9 @@ public sealed record CreateOrderReviewViewModel(string YearSlug, CreateOrderResp
 
     public string? TermsUrl { get; init; }
 
+    // Pending-order table sort; the summary starts on scheme name ascending, as in legacy.
+    public OrderSortState Sort { get; init; } = OrderSortState.Empty;
+
     public bool HasConsents => Order.DataConsents.Count > 0;
 
     public bool IsConsented(Guid schemeId) => ConsentedSchemeIds.Contains(schemeId);
@@ -99,11 +117,11 @@ public sealed record CreateOrderReviewViewModel(string YearSlug, CreateOrderResp
     private static readonly string[] ErrorFieldOrder = ["Schemes", "PurchaseOrderNumber", "DataConsent", "TermsAccepted"];
 
     // Schemes in the pending order: selected, with at least one pending month (legacy GetPendingList).
-    public IReadOnlyList<CreateOrderSchemeResponse> Schemes { get; } = Order.ParticipatingSchemes
-        .Concat(Order.AvailableSchemes.SelectMany(g => g.Schemes))
-        .Where(s => s.Selected && s.HasPendingMonths)
-        .OrderBy(s => s.Name, StringComparer.Ordinal)
-        .ToList();
+    public IReadOnlyList<CreateOrderSchemeResponse> Schemes => Sort.Apply(
+        OrderSortState.SummaryTable,
+        [.. Order.ParticipatingSchemes
+            .Concat(Order.AvailableSchemes.SelectMany(g => g.Schemes))
+            .Where(s => s.Selected && s.HasPendingMonths)]);
 
     public string FormatMoney(decimal amount) => CreateOrderViewModel.Format(Order.CurrencySymbol, amount);
 }
@@ -118,4 +136,7 @@ public sealed class CreateOrderReviewForm
     public bool TermsAccepted { get; set; }
 
     public List<Guid> ConsentedSchemeIds { get; set; } = [];
+
+    // The Pending order table's sort when the form was posted, so a failed submit keeps it.
+    public List<string> Sort { get; set; } = [];
 }

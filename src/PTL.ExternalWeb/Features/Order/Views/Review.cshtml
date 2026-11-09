@@ -2,6 +2,7 @@
 @model CreateOrderReviewViewModel
 @{
     ViewData["Title"] = Model.Errors.Count > 0 ? "Error: Pending order" : "Pending order";
+    var headers = Model.Sort.Headers(OrderSortState.SummaryTable, sort => Url.Action("Review", "Order", new { year = Model.YearSlug, sort })!);
 }
 
 <govuk-error-summary errors="@Model.ErrorSummary" />
@@ -24,8 +25,8 @@
     <caption class="govuk-table__caption govuk-table__caption--m" id="Schemes">Schemes you have selected</caption>
     <thead class="govuk-table__head">
         <tr class="govuk-table__row">
-            <th scope="col" class="govuk-table__header">Scheme code</th>
-            <th scope="col" class="govuk-table__header">Scheme name</th>
+            <partial name="_SortableHeader" model="@(headers.Header("Scheme code", "code"))" />
+            <partial name="_SortableHeader" model="@(headers.Header("Scheme name", "name"))" />
             <th scope="col" class="govuk-table__header govuk-table__header--numeric">Full price</th>
             <th scope="col" class="govuk-table__header">Import permit required</th>
             <th scope="col" class="govuk-table__header govuk-table__header--numeric">Postage</th>
@@ -75,6 +76,10 @@
 
 <form method="post" asp-controller="Order" asp-action="Submit" novalidate>
     <input type="hidden" name="Year" value="@Model.YearSlug" />
+    @foreach (var sortValue in Model.Sort.Values)
+    {
+        <input type="hidden" name="Sort" value="@sortValue" />
+    }
 
     <dl class="govuk-summary-list govuk-summary-list--no-border">
         <div class="govuk-summary-list__row">

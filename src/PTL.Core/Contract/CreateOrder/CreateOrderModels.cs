@@ -14,8 +14,9 @@ public enum CreateOrderAccess
 }
 
 // Legacy PermissionState.CanOrderOnline / CanCreateNewCurrentOrder / CanCreateNewNextOrder: the two
-// per-year flags already include CanOrderOnline, as legacy's CreateCurrent/NextOrderPageGuard needs both.
-public sealed record CreateOrderEligibility(bool CanOrderOnline, bool CanCreateCurrentYearOrder, bool CanCreateNextYearOrder);
+// per-year flags already include CanOrderOnline, as legacy's CreateCurrent/NextOrderPageGuard needs both. The year labels
+// ("2026/27") are for the Home cards, which legacy kept but disabled once that year's order was submitted.
+public sealed record CreateOrderEligibility(bool CanOrderOnline, bool CanCreateCurrentYearOrder, bool CanCreateNextYearOrder, string CurrentYear = "", string NextYear = "");
 
 // One distribution-month checkbox. Selected + AlreadyParticipating means the participant already
 // holds that month (shown ticked and locked); Selected without it is a month in the pending order.

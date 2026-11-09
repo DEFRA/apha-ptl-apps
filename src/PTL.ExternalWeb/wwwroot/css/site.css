@@ -163,6 +163,19 @@
   position: absolute;
   inset: 0;
 }
+
+/* Disabled tile (legacy MaterialCard.Enabled = False): greyed, no hover colour change. */
+.app-card--disabled,
+.app-card--disabled:hover {
+  background-color: #f3f2f1;
+}
+
+.app-card--disabled .govuk-heading-m,
+.app-card--disabled p,
+.app-card--disabled:hover .govuk-heading-m,
+.app-card--disabled:hover p {
+  color: #505a5f;
+}
 /* Create New Order (legacy PendingContractOrder.aspx): month strip under each selected scheme row */
 .app-order-row--selected {
   background-color: #f3f2f1;

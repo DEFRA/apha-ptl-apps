@@ -17,7 +17,8 @@ public sealed class CreateOrderController(ICreateOrderService createOrderService
         var eligibility = await createOrderService.GetEligibilityAsync(participantId, cancellationToken);
         return eligibility is null
             ? NotFound()
-            : Ok(new CreateOrderEligibilityResponse(eligibility.CanOrderOnline, eligibility.CanCreateCurrentYearOrder, eligibility.CanCreateNextYearOrder));
+            : Ok(new CreateOrderEligibilityResponse(
+                eligibility.CanOrderOnline, eligibility.CanCreateCurrentYearOrder, eligibility.CanCreateNextYearOrder, eligibility.CurrentYear, eligibility.NextYear));
     }
 
     [HttpGet("{participantId:guid}/{year}")]

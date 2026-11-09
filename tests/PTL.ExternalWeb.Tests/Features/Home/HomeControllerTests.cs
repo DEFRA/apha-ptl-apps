@@ -125,7 +125,7 @@ public class HomeControllerTests
     [Fact]
     public async Task Index_ParticipantWhoCanOrder_PassesPerYearEligibilityToViewModel()
     {
-        var fake = new FakeCreateOrderApiClient { Eligibility = new(true, false, true) };
+        var fake = new FakeCreateOrderApiClient { Eligibility = new(true, false, true, "2026/27", "2027/28") };
         var controller = CreateController(createOrderApiClient: fake, claims: OrderingParticipantClaims());
 
         var result = await controller.Index();
@@ -133,6 +133,8 @@ public class HomeControllerTests
         var model = Assert.IsType<HomeIndexViewModel>(Assert.IsType<ViewResult>(result).Model);
         Assert.False(model.CanCreateCurrentYearOrder);
         Assert.True(model.CanCreateNextYearOrder);
+        Assert.Equal("2026/27", model.CurrentYear);
+        Assert.Equal("2027/28", model.NextYear);
     }
 
     [Fact]

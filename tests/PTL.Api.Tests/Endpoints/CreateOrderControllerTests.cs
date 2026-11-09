@@ -59,7 +59,7 @@ public class CreateOrderControllerTests
         var result = await setup.Controller.GetEligibility(setup.ParticipantId, CancellationToken.None);
 
         var response = Assert.IsType<CreateOrderEligibilityResponse>(Assert.IsType<OkObjectResult>(result.Result).Value);
-        Assert.Equal(new CreateOrderEligibilityResponse(true, true, true), response);
+        Assert.Equal(new CreateOrderEligibilityResponse(true, true, true, "2026/27", ""), response);
     }
 
     [Fact]

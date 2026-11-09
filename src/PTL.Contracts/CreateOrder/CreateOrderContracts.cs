@@ -3,7 +3,8 @@ using System.Text.Json.Serialization;
 namespace PTL.Contracts.CreateOrder;
 
 // Legacy PermissionState: the per-year flags already include CanOrderOnline.
-public sealed record CreateOrderEligibilityResponse(bool CanOrderOnline, bool CanCreateCurrentYearOrder, bool CanCreateNextYearOrder);
+public sealed record CreateOrderEligibilityResponse(
+    bool CanOrderOnline, bool CanCreateCurrentYearOrder, bool CanCreateNextYearOrder, string CurrentYear = "", string NextYear = "");
 
 public sealed record CreateOrderMonthResponse(string Label, int MonthNumber, bool Offered, bool Selected, bool Enabled, bool AlreadyParticipating);
 

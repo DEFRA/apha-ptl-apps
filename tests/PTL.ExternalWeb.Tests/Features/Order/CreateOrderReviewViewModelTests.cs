@@ -74,4 +74,16 @@ public class CreateOrderReviewViewModelTests
 
         Assert.Equal(expected, options.SafeTermsAndConditionsUrl);
     }
+
+    [Theory]
+    [InlineData("https://example.test/prices", "https://example.test/prices")]
+    [InlineData("javascript:alert(1)", null)]
+    [InlineData("/relative", null)]
+    [InlineData(null, null)]
+    public void DistributionTimetableUrl_OnlyAnAbsoluteWebAddressIsUsed(string? configured, string? expected)
+    {
+        var options = new OrderPageOptions { DistributionTimetableUrl = configured };
+
+        Assert.Equal(expected, options.SafeDistributionTimetableUrl);
+    }
 }

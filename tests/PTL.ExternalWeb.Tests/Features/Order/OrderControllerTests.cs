@@ -14,11 +14,11 @@ public class OrderControllerTests
 {
     private static readonly Guid ParticipantId = Guid.NewGuid();
 
-    private static OrderController CreateController(FakeCreateOrderApiClient? api = null, bool signedInAsParticipant = true, string? termsUrl = "https://example.test/terms.pdf")
+    private static OrderController CreateController(FakeCreateOrderApiClient? api = null, bool signedInAsParticipant = true, string? termsUrl = "https://example.test/terms.pdf", string? timetableUrl = null)
     {
         var controller = new OrderController(
             api ?? new FakeCreateOrderApiClient(),
-            Options.Create(new OrderPageOptions { TermsAndConditionsUrl = termsUrl }));
+            Options.Create(new OrderPageOptions { TermsAndConditionsUrl = termsUrl, DistributionTimetableUrl = timetableUrl }));
         if (signedInAsParticipant)
         {
             AuthenticatedParticipant.Attach(controller, ParticipantId);
@@ -61,6 +61,17 @@ public class OrderControllerTests
         Assert.Equal(nameof(OrderController.CurrentYear), model.PageAction);
         Assert.Equal("current", api.LastGetYear);
         Assert.Equal(ParticipantId, api.LastParticipantId);
+    }
+
+    [Theory]
+    [InlineData("https://example.test/prices", "https://example.test/prices")]
+    [InlineData(null, null)]
+    public async Task CurrentYear_PassesTheConfiguredTimetableLinkToTheView(string? configured, string? expected)
+    {
+        var result = await CreateController(timetableUrl: configured).CurrentYear(null, CancellationToken.None);
+
+        var model = Assert.IsType<CreateOrderViewModel>(Assert.IsType<ViewResult>(result).Model);
+        Assert.Equal(expected, model.DistributionTimetableUrl);
     }
 
     [Fact]
@@ -126,6 +137,44 @@ public class OrderControllerTests
         Assert.Equal("alpha", model.Search);
         Assert.Equal("next", api.LastChangeYear);
         Assert.Equal(new CreateOrderLineChangeRequest(schemeId, "apr", true), api.LastChange);
+    }
+
+    [Fact]
+    public async Task Change_KeepsTheSortThePageWasLoadedWith()
+    {
+        var controller = CreateController();
+
+        var result = await controller.Change(
+            new CreateOrderChangeModel { Year = "current", SchemeId = Guid.NewGuid(), Field = "select", Checked = true, Sort = ["name|desc|participating"] },
+            CancellationToken.None);
+
+        var model = Assert.IsType<CreateOrderViewModel>(Assert.IsType<PartialViewResult>(result).Model);
+        Assert.Equal(("name", "desc"), model.Sort.For(OrderSortState.ParticipatingTable));
+    }
+
+    [Fact]
+    public async Task CurrentYear_ReadsTheSortFromTheQueryString()
+    {
+        var controller = CreateController();
+        controller.HttpContext.Request.QueryString = new QueryString("?sort=code%7Cdesc%7Cparticipating");
+
+        var result = await controller.CurrentYear(null, CancellationToken.None);
+
+        var model = Assert.IsType<CreateOrderViewModel>(Assert.IsType<ViewResult>(result).Model);
+        Assert.Equal(("code", "desc"), model.Sort.For(OrderSortState.ParticipatingTable));
+    }
+
+    [Fact]
+    public async Task Review_ReadsTheSortFromTheQueryString()
+    {
+        var api = new FakeCreateOrderApiClient { GetResult = new(CreateOrderApiStatus.Ok, FakeCreateOrderApiClient.SampleOrder(selected: true)) };
+        var controller = CreateController(api);
+        controller.HttpContext.Request.QueryString = new QueryString("?sort=code%7Cdesc%7Csummary");
+
+        var result = await controller.Review("current", CancellationToken.None);
+
+        var model = Assert.IsType<CreateOrderReviewViewModel>(Assert.IsType<ViewResult>(result).Model);
+        Assert.Equal(("code", "desc"), model.Sort.For(OrderSortState.SummaryTable));
     }
 
     [Theory]

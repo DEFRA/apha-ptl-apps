@@ -123,7 +123,7 @@ public class CreateOrderServiceTests
 
         var eligibility = await fixture.Service.GetEligibilityAsync(fixture.ParticipantId);
 
-        Assert.Equal(new CreateOrderEligibility(true, true, true), eligibility);
+        Assert.Equal(new CreateOrderEligibility(true, true, true, "2026/27", "2027/28"), eligibility);
     }
 
     [Fact]
@@ -134,7 +134,7 @@ public class CreateOrderServiceTests
 
         var eligibility = await fixture.Service.GetEligibilityAsync(fixture.ParticipantId);
 
-        Assert.Equal(new CreateOrderEligibility(true, false, true), eligibility);
+        Assert.Equal(new CreateOrderEligibility(true, false, true, "2026/27", "2027/28"), eligibility);
     }
 
     [Fact]

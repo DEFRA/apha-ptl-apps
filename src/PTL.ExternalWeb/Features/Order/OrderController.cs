@@ -56,7 +56,13 @@ public sealed class OrderController(ICreateOrderApiClient createOrderApiClient, 
 
         return result.Status switch
         {
-            CreateOrderApiStatus.Ok => PartialView(BodyPartial, new CreateOrderViewModel { YearSlug = year, Order = result.Order!, Search = model.Search }),
+            CreateOrderApiStatus.Ok => PartialView(BodyPartial, new CreateOrderViewModel
+            {
+                YearSlug = year,
+                Order = result.Order!,
+                Search = model.Search,
+                Sort = OrderSortState.Parse(model.Sort)
+            }),
             CreateOrderApiStatus.NotAllowed => StatusCode(StatusCodes.Status403Forbidden),
             _ => NotFound()
         };
@@ -93,7 +99,7 @@ public sealed class OrderController(ICreateOrderApiClient createOrderApiClient, 
     [HttpGet]
     public async Task<IActionResult> Review(string? year, CancellationToken cancellationToken)
     {
-        var review = await GetReviewModelAsync(year, includeConsents: true, cancellationToken);
+        var review = await GetReviewModelAsync(year, includeConsents: true, Request.Query["sort"], cancellationToken);
         return review.Error ?? View(review.Model!);
     }
 
@@ -122,7 +128,7 @@ public sealed class OrderController(ICreateOrderApiClient createOrderApiClient, 
         }
 
         TempData.SetNotification(NotificationType.Success, "Your pending order has been saved.");
-        return RedirectToAction(nameof(Review), new { year = slug });
+        return RedirectToAction(nameof(Review), new { year = slug, sort = form.Sort });
     }
 
     // Legacy BtnSubmit_Click: the order is only submitted once the terms (and any data consent) are accepted.
@@ -158,14 +164,14 @@ public sealed class OrderController(ICreateOrderApiClient createOrderApiClient, 
     [HttpGet]
     public async Task<IActionResult> Print(string? year, CancellationToken cancellationToken)
     {
-        var review = await GetReviewModelAsync(year, includeConsents: false, cancellationToken);
+        var review = await GetReviewModelAsync(year, includeConsents: false, null, cancellationToken);
         return review.Error ?? View("Print", review.Model!);
     }
 
     private async Task<IActionResult> ReviewWithErrorsAsync(
         string slug, CreateOrderReviewForm form, IReadOnlyList<CreateOrderValidationErrorResponse> errors, CancellationToken cancellationToken)
     {
-        var review = await GetReviewModelAsync(slug, includeConsents: true, cancellationToken);
+        var review = await GetReviewModelAsync(slug, includeConsents: true, form.Sort, cancellationToken);
         if (review.Error is not null)
         {
             return review.Error;
@@ -180,7 +186,8 @@ public sealed class OrderController(ICreateOrderApiClient createOrderApiClient, 
         });
     }
 
-    private async Task<(IActionResult? Error, CreateOrderReviewViewModel? Model)> GetReviewModelAsync(string? year, bool includeConsents, CancellationToken cancellationToken)
+    private async Task<(IActionResult? Error, CreateOrderReviewViewModel? Model)> GetReviewModelAsync(
+        string? year, bool includeConsents, IEnumerable<string?>? sort, CancellationToken cancellationToken)
     {
         var slug = NormaliseYear(year);
         var participantId = User.GetParticipantId();
@@ -202,7 +209,7 @@ public sealed class OrderController(ICreateOrderApiClient createOrderApiClient, 
             return (RedirectToAction(PageAction(slug)), null);
         }
 
-        return (null, new CreateOrderReviewViewModel(slug, result.Order) { TermsUrl = pageOptions.Value.SafeTermsAndConditionsUrl });
+        return (null, new CreateOrderReviewViewModel(slug, result.Order) { TermsUrl = pageOptions.Value.SafeTermsAndConditionsUrl, Sort = OrderSortState.Parse(sort) });
     }
 
     private async Task<IActionResult> ShowAsync(string slug, string? search, CancellationToken cancellationToken)
@@ -216,7 +223,14 @@ public sealed class OrderController(ICreateOrderApiClient createOrderApiClient, 
         var result = await createOrderApiClient.GetAsync(participantId.Value, slug, cancellationToken: cancellationToken);
         return result.Status switch
         {
-            CreateOrderApiStatus.Ok => View("Index", new CreateOrderViewModel { YearSlug = slug, Order = result.Order!, Search = search }),
+            CreateOrderApiStatus.Ok => View("Index", new CreateOrderViewModel
+            {
+                YearSlug = slug,
+                Order = result.Order!,
+                Search = search,
+                Sort = OrderSortState.Parse(Request.Query["sort"]),
+                DistributionTimetableUrl = pageOptions.Value.SafeDistributionTimetableUrl
+            }),
             CreateOrderApiStatus.NotAllowed => NotAvailable(slug),
             _ => NotFound()
         };

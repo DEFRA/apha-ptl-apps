@@ -1,7 +1,8 @@
 @using PTL.Contracts.CreateOrder
-@model (string Caption, IReadOnlyList<CreateOrderSchemeResponse> Schemes, PTL.ExternalWeb.Features.Order.CreateOrderViewModel Page)
+@model (string Caption, string Table, IReadOnlyList<CreateOrderSchemeResponse> Schemes, PTL.ExternalWeb.Features.Order.CreateOrderViewModel Page)
 @{
     var orderPage = Model.Page;
+    var headers = orderPage.Sort.Headers(Model.Table, sort => Url.Action(orderPage.PageAction, "Order", new { search = orderPage.Search, sort })!);
 }
 
 <section class="app-table-scroll" aria-label="@Model.Caption">
@@ -10,8 +11,8 @@
     <thead class="govuk-table__head">
         <tr class="govuk-table__row">
             <th scope="col" class="govuk-table__header">Select</th>
-            <th scope="col" class="govuk-table__header">Scheme code</th>
-            <th scope="col" class="govuk-table__header">Scheme name</th>
+            <partial name="_SortableHeader" model="@(headers.Header("Scheme code", "code"))" />
+            <partial name="_SortableHeader" model="@(headers.Header("Scheme name", "name"))" />
             <th scope="col" class="govuk-table__header govuk-table__header--numeric">Annual price</th>
             <th scope="col" class="govuk-table__header">Import permit required</th>
             <th scope="col" class="govuk-table__header govuk-table__header--numeric">Postage</th>

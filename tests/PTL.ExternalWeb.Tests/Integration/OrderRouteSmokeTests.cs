@@ -57,6 +57,10 @@ public partial class OrderRouteSmokeTests : IClassFixture<PtlExternalWebTestFact
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Contains("Create new order", body);
+        Assert.Contains("For price-lists, including distribution dates, please refer to our", body);
+        Assert.Contains("To participate in a new scheme(s)", body);
+        Assert.Contains("you are unable to cancel existing orders from this page", body);
+        Assert.Contains("href=\"mailto:vetqas@apha.gov.uk\"", body);
         Assert.Contains("2026/27", body);
         Assert.Contains("QAL/00001", body);
         Assert.Contains("Schemes you participated in last year and/or schemes you are participating in year 2026/27", body);
@@ -64,10 +68,16 @@ public partial class OrderRouteSmokeTests : IClassFixture<PtlExternalWebTestFact
         Assert.Contains("Chemistry", body);
         Assert.Contains("Microbiology", body);
         Assert.Contains("Monthly", body);
-        foreach (var column in new[] { "Select", "Scheme code", "Scheme name", "Annual price", "Import permit required", "Postage", "Scheme price", "Total" })
+        foreach (var column in new[] { "Select", "Annual price", "Import permit required", "Postage", "Scheme price", "Total" })
         {
             Assert.Contains($">{column}</th>", body);
         }
+
+        // Code and name are sortable column links; nothing is sorted until one is clicked.
+        Assert.Contains("aria-sort=\"none\"", body);
+        Assert.Contains(">Scheme code</a>", body);
+        Assert.Contains(">Scheme name</a>", body);
+        Assert.DoesNotContain("aria-sort=\"ascending\"", body);
 
         Assert.Contains("&#xA3;100.00", body);
         Assert.Contains("id=\"create-order-body\"", body);
@@ -86,6 +96,72 @@ public partial class OrderRouteSmokeTests : IClassFixture<PtlExternalWebTestFact
         var body = await GetAsync(client, cookies, "/Order/NextYear");
 
         Assert.Contains("data-year=\"next\"", body);
+    }
+
+    private static CreateOrderSchemeResponse AvailableScheme(string identifier, string name) =>
+        new(Guid.NewGuid(), identifier, name, "Monthly", 100m, false, false, true, 0m, 0m, 0m, false, []);
+
+    private static FakeCreateOrderApiClient ApiWithTwoMonthlySchemes() => new()
+    {
+        GetResult = new(CreateOrderApiStatus.Ok, FakeCreateOrderApiClient.SampleOrder() with
+        {
+            AvailableSchemes = [new CreateOrderScheduleGroupResponse("Monthly", [AvailableScheme("PT300", "Zulu"), AvailableScheme("PT100", "Alpha")])]
+        })
+    };
+
+    [Fact]
+    public async Task CurrentYear_SortedByName_OrdersThatTableAndLinksToTheOppositeDirection()
+    {
+        var client = CreateClient(ApiWithTwoMonthlySchemes());
+        var cookies = await SignInAsync(client);
+
+        var body = await GetAsync(client, cookies, "/Order/CurrentYear?sort=name%7Casc%7Cschedule%3AMonthly");
+
+        Assert.True(body.IndexOf("Alpha", StringComparison.Ordinal) < body.IndexOf("Zulu", StringComparison.Ordinal));
+        Assert.Contains("aria-sort=\"ascending\"", body);
+        Assert.Contains("sort=name%7Cdesc%7Cschedule%3AMonthly", body);
+        Assert.Contains("sorted ascending", body);
+    }
+
+    [Fact]
+    public async Task CurrentYear_SortedDescending_ReversesTheTable()
+    {
+        var client = CreateClient(ApiWithTwoMonthlySchemes());
+        var cookies = await SignInAsync(client);
+
+        var body = await GetAsync(client, cookies, "/Order/CurrentYear?sort=code%7Cdesc%7Cschedule%3AMonthly");
+
+        Assert.True(body.IndexOf("Zulu", StringComparison.Ordinal) < body.IndexOf("Alpha", StringComparison.Ordinal));
+        Assert.Contains("aria-sort=\"descending\"", body);
+    }
+
+    [Fact]
+    public async Task CurrentYear_SortChoices_SurviveASearchAndTheChangeScript()
+    {
+        var client = CreateClient(ApiWithTwoMonthlySchemes());
+        var cookies = await SignInAsync(client);
+
+        var body = await GetAsync(client, cookies, "/Order/CurrentYear?sort=name%7Casc%7Cschedule%3AMonthly&search=a");
+
+        Assert.Matches("name=\"sort\"\\s+value=\"name", body);
+        Assert.Contains("data-sort=", body);
+        Assert.Contains("schedule:Monthly", body.Replace("&#x3A;", ":").Replace("&#x7C;", "|"));
+    }
+
+    [Fact]
+    public async Task Review_SummaryStartsOnSchemeNameAscending_AndHonoursAChosenSort()
+    {
+        var api = new FakeCreateOrderApiClient { GetResult = new(CreateOrderApiStatus.Ok, FakeCreateOrderApiClient.SampleOrder(selected: true)) };
+        var client = CreateClient(api);
+        var cookies = await SignInAsync(client);
+
+        var initial = await GetAsync(client, cookies, "/Order/Review?year=current");
+        var chosen = await GetAsync(client, cookies, "/Order/Review?year=current&sort=code%7Cdesc%7Csummary");
+
+        Assert.Contains("aria-sort=\"ascending\"", initial);
+        Assert.Contains(">Scheme code</a>", initial);
+        Assert.Contains("aria-sort=\"descending\"", chosen);
+        Assert.Matches("name=\"Sort\"\\s+value=\"code", chosen);
     }
 
     [Fact]
@@ -118,7 +194,7 @@ public partial class OrderRouteSmokeTests : IClassFixture<PtlExternalWebTestFact
         Assert.Matches(NextButtonDisabledPattern, body);
         Assert.Contains("Select at least one scheme and at least one distribution month for it to continue.", body);
         Assert.Matches("id=\"create-order-error\"[^>]*\\shidden", body);
-        Assert.Matches("<form[^>]*govuk-button-group[^>]*>(?:(?!</form>).)*Next(?:(?!</form>).)*Clear form(?:(?!</form>).)*Cancel", body.Replace("\r", " ").Replace("\n", " "));
+        Assert.Matches("<form[^>]*govuk-button-group[^>]*>(?:(?!</form>).)*Next(?:(?!</form>).)*Back(?:(?!</form>).)*Clear form", body.Replace("\r", " ").Replace("\n", " "));
     }
 
     [Fact]
@@ -555,19 +631,34 @@ public partial class OrderRouteSmokeTests : IClassFixture<PtlExternalWebTestFact
     }
 
     [Fact]
-    public async Task Home_OrderAlreadySubmittedForCurrentYear_HidesThatYearsCardOnly()
+    public async Task Home_OrderAlreadySubmittedForCurrentYear_DisablesThatYearsCardAndShowsTheMessage()
     {
-        var api = new FakeCreateOrderApiClient { Eligibility = new(true, false, true) };
+        var api = new FakeCreateOrderApiClient { Eligibility = new(true, false, true, "2026/27", "2027/28") };
         var client = CreateClient(api);
         var cookies = await SignInAsync(client);
 
         var homeBody = await GetAsync(client, cookies, "/Home/Index");
 
-        // The header menu stays claim-based and lists both links; only the Home card for the submitted year disappears.
-        var currentYearMentions = Regex.Count(homeBody, "Create order for current year");
-        var nextYearMentions = Regex.Count(homeBody, "Create order for next year");
-        Assert.True(nextYearMentions > 0);
-        Assert.Equal(nextYearMentions - 1, currentYearMentions);
+        // The card stays, as in legacy, but is plain text with the submitted message; the next year's card is a normal link.
+        Assert.Contains("app-card--disabled", homeBody);
+        Assert.Contains("Order has been submitted for 2026/27.", homeBody);
+        Assert.DoesNotContain("Order has been submitted for 2027/28", homeBody);
+        Assert.DoesNotContain("app-card-link--header\" href=\"/Order/CurrentYear", homeBody);
+        Assert.Contains("app-card-link--header\" href=\"/Order/NextYear", homeBody);
+    }
+
+    [Fact]
+    public async Task Home_OrderAlreadySubmittedForNextYear_DisablesThatYearsCardAndShowsTheMessage()
+    {
+        var api = new FakeCreateOrderApiClient { Eligibility = new(true, true, false, "2026/27", "2027/28") };
+        var client = CreateClient(api);
+        var cookies = await SignInAsync(client);
+
+        var homeBody = await GetAsync(client, cookies, "/Home/Index");
+
+        Assert.Contains("Order has been submitted for 2027/28.", homeBody);
+        Assert.DoesNotContain("app-card-link--header\" href=\"/Order/NextYear", homeBody);
+        Assert.Contains("app-card-link--header\" href=\"/Order/CurrentYear", homeBody);
     }
 
     [Fact]

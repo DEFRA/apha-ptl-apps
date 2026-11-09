@@ -80,10 +80,14 @@ public sealed class CreateOrderService(
         }
 
         var settings = await lookupRepository.GetSystemSettingsAsync(cancellationToken);
+        var years = await lookupRepository.GetAllYearsAsync(cancellationToken);
+        string YearLabel(int yearId) => years.FirstOrDefault(y => y.YearId == yearId)?.Year ?? string.Empty;
         return new CreateOrderEligibility(
             true,
             await NoSubmittedOrderAsync(participant.CustomerId, settings.CurrentYearId, cancellationToken),
-            await NoSubmittedOrderAsync(participant.CustomerId, settings.NextYearId, cancellationToken));
+            await NoSubmittedOrderAsync(participant.CustomerId, settings.NextYearId, cancellationToken),
+            YearLabel(settings.CurrentYearId),
+            YearLabel(settings.NextYearId));
     }
 
     public async Task<CreateOrderResult> GetOrderAsync(Guid participantId, OrderYear year, bool forReview = false, CancellationToken cancellationToken = default)
