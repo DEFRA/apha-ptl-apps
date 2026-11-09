@@ -59,6 +59,9 @@
 
 <h1 class="govuk-heading-l">Monthly Distributions - @Model.MonthDescription</h1>
 
+@* Legacy raised its navigate-away dialog from mdi.IsDirty; the staged sends are the same state. *@
+<partial name="_UnsavedChangesBanner" model="@(Model.Staged.Count > 0)" />
+
 @* One form so the staged sends (legacy kept them in Session) round-trip until Save. *@
 <form method="post" asp-action="Tabulations" asp-route-year="@Model.YearId" asp-route-monthId="@Model.MonthId" novalidate>
 @foreach (var s in Model.Staged)
@@ -180,14 +183,13 @@
     <hr class="govuk-section-break govuk-section-break--l govuk-section-break--visible">
 }
 
-@if (Model.Staged.Count > 0)
-{
-    <div class="govuk-inset-text">You have changes that have not been saved. Select Save to keep them.</div>
-}
-
 <div class="govuk-button-group">
     <button type="submit" name="command" value="save" class="govuk-button" data-module="govuk-button">Save</button>
     <button type="submit" name="command" value="apply" class="govuk-button govuk-button--secondary" data-module="govuk-button">Apply</button>
     <button type="submit" name="command" value="cancel" class="govuk-button govuk-button--secondary" data-module="govuk-button">Cancel</button>
 </div>
 </form>
+
+@section Scripts {
+    <script src="~/js/unsaved-changes.js" asp-append-version="true"></script>
+}

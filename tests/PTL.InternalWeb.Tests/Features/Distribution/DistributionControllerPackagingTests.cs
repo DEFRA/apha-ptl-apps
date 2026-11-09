@@ -19,21 +19,30 @@ public class DistributionControllerPackagingTests
     private static readonly Guid Dp2 = Guid.Parse("d0000000-0000-0000-0000-0000000000d2");
     private static readonly Guid Dp3 = Guid.Parse("d0000000-0000-0000-0000-0000000000d3");
 
-    private static DistributionController CreateController(FakeDistributionApiClient apiClient) =>
-        new(apiClient, new FakeSearchApiClient(), new FakeLookupApiClient())
+    // An initialised month by default; the dashboard redirect is what the not-initialised tests exercise.
+    private static DistributionController CreateController(FakeDistributionApiClient apiClient, bool monthInitialised = true)
+    {
+        if (monthInitialised)
+        {
+            apiClient.Schedule ??= new MonthlyDistributionResponse(Guid.NewGuid(), Year, Month, []);
+        }
+
+        return new(apiClient, new FakeSearchApiClient(), new FakeLookupApiClient())
         {
             TempData = new TempDataDictionary(new DefaultHttpContext(), new FakeTempDataProvider()),
         };
+    }
 
     private static PackagingSheetResponse Sheet(int mode = 0, int week = 1) =>
         new(mode, week, Year, Month, []);
 
     private static PackagingViewModel ModelOf(
-        int? mode = 0, int week = 1, IEnumerable<string>? packed = null, IEnumerable<string>? posted = null, IEnumerable<string>? printKeys = null) =>
+        int? mode = 0, int week = 1, IEnumerable<string>? packed = null, IEnumerable<string>? posted = null, IEnumerable<string>? printKeys = null, bool weekVisible = false) =>
         new()
         {
             Mode = mode,
             Week = week,
+            WeekVisible = weekVisible,
             PackedTicks = [.. packed ?? []],
             PostedTicks = [.. posted ?? []],
             PrintKeys = [.. printKeys ?? []],
@@ -106,13 +115,49 @@ public class DistributionControllerPackagingTests
     }
 
     [Fact]
-    public async Task Packaging_Get_ApiReturnsNoSheet_ReturnsNotFound()
+    public async Task Packaging_Get_ApiReturnsNoSheet_RedirectsToTheDashboard()
     {
         var controller = CreateController(new FakeDistributionApiClient { Packaging = null });
 
         var result = await controller.Packaging(Year, Month, mode: 0, week: 1, CancellationToken.None);
 
-        Assert.IsType<NotFoundResult>(result);
+        AssertDashboardRedirect(result, Year);
+    }
+
+    [Theory]
+    [InlineData(null, 0)]
+    [InlineData(0, 0)]
+    [InlineData(3, 1)]
+    public async Task Packaging_Get_MonthNotInitialisedAndNoSheetRequested_RedirectsToTheDashboardWithoutFetchingASheet(int? mode, int week)
+    {
+        var apiClient = new FakeDistributionApiClient { Packaging = Sheet() };
+        var controller = CreateController(apiClient, monthInitialised: false);
+
+        var result = await controller.Packaging(Year, Month, mode, week, CancellationToken.None);
+
+        AssertDashboardRedirect(result, Year);
+        Assert.Empty(apiClient.PackagingRequests);
+    }
+
+    [Theory]
+    [InlineData(2026, 4, 2026)]
+    [InlineData(2027, 1, 2026)]
+    [InlineData(2027, 3, 2026)]
+    public async Task Packaging_Get_MonthNotInitialised_RedirectsToTheDashboardForTheFinancialYear(int year, int monthId, int financialYear)
+    {
+        var controller = CreateController(new FakeDistributionApiClient(), monthInitialised: false);
+
+        var result = await controller.Packaging(year, monthId, mode: null, week: 0, CancellationToken.None);
+
+        AssertDashboardRedirect(result, financialYear);
+        Assert.Null(controller.TempData.GetNotification());
+    }
+
+    private static void AssertDashboardRedirect(IActionResult result, int financialYear)
+    {
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal(nameof(DistributionController.Index), redirect.ActionName);
+        Assert.Equal(financialYear, redirect.RouteValues!["year"]);
     }
 
     // ---------- print title and month description ----------
@@ -160,16 +205,17 @@ public class DistributionControllerPackagingTests
     // ---------- POST: cancel / select ----------
 
     [Theory]
-    [InlineData("cancel")]
-    [InlineData("CANCEL")]
-    public async Task Packaging_Post_Cancel_RedirectsToIndexWithoutCallingTheApi(string command)
+    [InlineData("cancel", 2026, 5, 2026)]
+    [InlineData("CANCEL", 2026, 5, 2026)]
+    [InlineData("cancel", 2027, 2, 2026)]
+    public async Task Packaging_Post_Cancel_RedirectsToTheDashboardForTheFinancialYearWithoutCallingTheApi(string command, int year, int monthId, int financialYear)
     {
         var apiClient = new FakeDistributionApiClient();
         var controller = CreateController(apiClient);
 
-        var result = await controller.Packaging(Year, Month, ModelOf(packed: [Tick(0, 1, Dp1)]), command, CancellationToken.None);
+        var result = await controller.Packaging(year, monthId, ModelOf(packed: [Tick(0, 1, Dp1)]), command, CancellationToken.None);
 
-        Assert.Equal(nameof(DistributionController.Index), Assert.IsType<RedirectToActionResult>(result).ActionName);
+        AssertDashboardRedirect(result, financialYear);
         Assert.Empty(apiClient.SavedPackagingRequests);
         Assert.Empty(apiClient.PackagingRequests);
         Assert.Null(controller.TempData.GetNotification());
@@ -208,13 +254,23 @@ public class DistributionControllerPackagingTests
     }
 
     [Fact]
-    public async Task Packaging_Post_Select_ApiReturnsNoSheet_ReturnsNotFound()
+    public async Task Packaging_Post_Select_ApiReturnsNoSheet_RedirectsToTheDashboard()
     {
         var controller = CreateController(new FakeDistributionApiClient { Packaging = null });
 
         var result = await controller.Packaging(Year, Month, ModelOf(0, 1), "select", CancellationToken.None);
 
-        Assert.IsType<NotFoundResult>(result);
+        AssertDashboardRedirect(result, Year);
+    }
+
+    [Fact]
+    public async Task Packaging_Post_NoModeChosen_MonthNotInitialised_RedirectsToTheDashboard()
+    {
+        var controller = CreateController(new FakeDistributionApiClient(), monthInitialised: false);
+
+        var result = await controller.Packaging(Year, Month, ModelOf(mode: null, week: 0), "select", CancellationToken.None);
+
+        AssertDashboardRedirect(result, Year);
     }
 
     [Fact]
@@ -337,10 +393,24 @@ public class DistributionControllerPackagingTests
 
         var result = await controller.Packaging(Year, Month, ModelOf(packed: [Tick(0, 1, Dp1)]), command, CancellationToken.None);
 
-        Assert.Equal(nameof(DistributionController.Index), Assert.IsType<RedirectToActionResult>(result).ActionName);
+        AssertDashboardRedirect(result, Year);
         var notification = controller.TempData.GetNotification();
         Assert.Equal(NotificationType.Success, notification!.Type);
         Assert.Equal("Sample Packaging updated successfully.", notification.Message);
+    }
+
+    [Theory]
+    [InlineData(2026, 4, 2026)]
+    [InlineData(2027, 1, 2026)]
+    [InlineData(2027, 3, 2026)]
+    public async Task Packaging_Post_Save_LeavesForTheDashboardOfTheMonthsFinancialYear(int year, int monthId, int financialYear)
+    {
+        var apiClient = new FakeDistributionApiClient { PackagingSaveResult = new PackagingSaveResult(true) };
+        var controller = CreateController(apiClient);
+
+        var result = await controller.Packaging(year, monthId, ModelOf(posted: [Tick(0, 1, Dp1)]), "save", CancellationToken.None);
+
+        AssertDashboardRedirect(result, financialYear);
     }
 
     [Fact]
@@ -399,15 +469,41 @@ public class DistributionControllerPackagingTests
     [InlineData("select")]
     [InlineData("save")]
     [InlineData("apply")]
-    public async Task Packaging_Post_GroupAddressWithNoWeek_ShowsWeekError(string command)
+    public async Task Packaging_Post_OptionNeedingAWeekWhenTheWeekDropdownWasShown_ShowsWeekError(string command)
     {
         var controller = CreateController(new FakeDistributionApiClient());
 
-        var result = await controller.Packaging(Year, Month, ModelOf(0, 0), command, CancellationToken.None);
+        var result = await controller.Packaging(Year, Month, ModelOf(0, 0, weekVisible: true), command, CancellationToken.None);
 
         var model = ViewModelOf(result);
         Assert.Equal("Select a week", model.WeekError);
         Assert.Null(model.ModeError);
+    }
+
+    [Theory]
+    [InlineData("select", 0)]
+    [InlineData("select", 1)]
+    [InlineData("save", 0)]
+    [InlineData("apply", 1)]
+    [InlineData("labels", 0)]
+    [InlineData("customs", 1)]
+    public async Task Packaging_Post_OptionNeedingAWeekBeforeTheWeekDropdownWasShown_ShowsItWithoutAnErrorOrASheet(string command, int mode)
+    {
+        var apiClient = new FakeDistributionApiClient { PackagingSaveResult = new PackagingSaveResult(true) };
+        var controller = CreateController(apiClient);
+
+        var result = await controller.Packaging(Year, Month, ModelOf(mode, 0, packed: [Tick(mode, 0, Dp1)]), command, CancellationToken.None);
+
+        var model = ViewModelOf(result);
+        Assert.Null(model.WeekError);
+        Assert.Null(model.ModeError);
+        Assert.True(model.ShowWeek);
+        Assert.Null(model.Sheet);
+        Assert.Equal([Tick(mode, 0, Dp1)], model.PackedTicks);
+        Assert.Empty(apiClient.SavedPackagingRequests);
+        Assert.Empty(apiClient.PackagingRequests);
+        Assert.Empty(apiClient.PackagingLabelRequests);
+        Assert.Empty(apiClient.PackagingCustomsRequests);
     }
 
     [Theory]
@@ -512,13 +608,13 @@ public class DistributionControllerPackagingTests
     }
 
     [Fact]
-    public async Task Packaging_Post_Labels_NoLabelsAndSheetGone_ReturnsNotFound()
+    public async Task Packaging_Post_Labels_NoLabelsAndSheetGone_RedirectsToTheDashboard()
     {
         var controller = CreateController(new FakeDistributionApiClient { PackagingLabels = null, Packaging = null });
 
         var result = await controller.Packaging(Year, Month, ModelOf(0, 1), "labels", CancellationToken.None);
 
-        Assert.IsType<NotFoundResult>(result);
+        AssertDashboardRedirect(result, Year);
     }
 
     // ---------- POST: customs ----------

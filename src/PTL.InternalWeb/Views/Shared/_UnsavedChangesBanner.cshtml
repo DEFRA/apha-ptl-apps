@@ -1,0 +1,18 @@
+@model bool
+@* Replaces the legacy Master.SetNavigateAwayDialog confirm(). Rendered visible when the server
+   already knows the page holds unsaved changes; otherwise unsaved-changes.js reveals it at the
+   point a link is followed, with the blocked-navigation line filled in. *@
+<section class="govuk-notification-banner" aria-labelledby="unsaved-changes-title"
+     data-module="govuk-notification-banner" id="unsaved-changes" tabindex="-1" hidden="@(!Model)">
+    <div class="govuk-notification-banner__header">
+        <h2 class="govuk-notification-banner__title" id="unsaved-changes-title">Important</h2>
+    </div>
+    <div class="govuk-notification-banner__content">
+        <p class="govuk-notification-banner__heading">You have changes that have not been saved.</p>
+        <p class="govuk-body">Select <strong>Save</strong> to keep them and leave this page, or <strong>Apply</strong> to keep them and carry on working.</p>
+        <p class="govuk-body" id="unsaved-changes-blocked" hidden>
+            <span id="unsaved-changes-blocked-text"></span>
+            <a class="govuk-link" href="#" id="unsaved-changes-leave">Leave this page without saving</a>
+        </p>
+    </div>
+</section>

@@ -18,6 +18,9 @@ public sealed class AmendResultsViewModel
     public string? PendingCommand { get; set; }
     public string? AuditWhy { get; set; }
 
+    // Set when the server already knows the posted form holds edits (the declined discard).
+    public bool HasUnsavedChanges { get; set; }
+
     public string Value(string name, string stored) => Values.TryGetValue(name, out var posted) ? posted : stored;
 
     public bool IsRange(AmendItemResponse resultItem)
@@ -35,4 +38,7 @@ public sealed class AmendResultsAuditForm
     public string? PendingCommand { get; set; }
     public string? AuditObjectName { get; set; }
     public string? AuditWhy { get; set; }
+
+    // Set by the discard-changes confirmation page when Cancel is answered.
+    public string? Confirmation { get; set; }
 }

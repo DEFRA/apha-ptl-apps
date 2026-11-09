@@ -1,3 +1,5 @@
+using Microsoft.Extensions.Options;
+using PTL.Core.Configuration;
 using PTL.Core.Distribution;
 
 namespace PTL.Api.Tests.Distribution;
@@ -182,6 +184,46 @@ public class IntendedResultsServiceTests
         Assert.Equal("17152A/BA", page.DistributionReferenceFull);
         Assert.Equal("PT0060", page.SchemeIdentifier);
         Assert.Equal("Mastitis bovine", page.SchemeName);
+    }
+
+    [Fact]
+    public async Task GetIntendedResultsAsync_CarriesDatesAndAccreditationOfTheSchemeResolvedById()
+    {
+        var scheme = Scheme();
+        scheme.DistributionDate = new DateTime(2026, 4, 14);
+        scheme.DeadlineDate = new DateTime(2026, 5, 1);
+        scheme.IsAccredited = true;
+        var (service, _) = CreateService(scheme, Data());
+
+        var page = await service.GetIntendedResultsAsync(SchemeId, CancellationToken.None);
+
+        Assert.Equal(new DateTime(2026, 4, 14), page!.DistributionDate);
+        Assert.Equal(new DateTime(2026, 5, 1), page.DeadlineDate);
+        Assert.True(page.IsAccredited);
+    }
+
+    [Fact]
+    public async Task GetIntendedResultsAsync_CarriesTheConfiguredExternalAppUrl()
+    {
+        var repository = new FakeDistributionRepository();
+        repository.SchemesById[SchemeId] = Scheme();
+        repository.IntendedResults[SchemeId] = Data();
+        var options = Options.Create(new ExternalOptions { AppUrl = "https://ptl.example.test/" });
+        var service = new IntendedResultsService(repository, options);
+
+        var page = await service.GetIntendedResultsAsync(SchemeId, CancellationToken.None);
+
+        Assert.Equal("https://ptl.example.test/", page!.ExternalAppUrl);
+    }
+
+    [Fact]
+    public async Task GetIntendedResultsAsync_NoExternalOptions_ExternalAppUrlIsEmpty()
+    {
+        var (service, _) = CreateService(Scheme(), Data());
+
+        var page = await service.GetIntendedResultsAsync(SchemeId, CancellationToken.None);
+
+        Assert.Equal(string.Empty, page!.ExternalAppUrl);
     }
 
     [Fact]
