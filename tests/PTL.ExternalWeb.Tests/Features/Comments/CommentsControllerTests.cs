@@ -78,6 +78,21 @@ public class CommentsControllerTests
     }
 
     [Fact]
+    public async Task Entry_Post_SaveApiFailure_ReturnsNotFound()
+    {
+        var api = new FakeTestConsultantApiClient
+        {
+            Tabulation = Ok(Tabulation(submitted: false)),
+            SaveResult = new TestConsultantApiResult<TestConsultantTabulationSaveResult>(TestConsultantApiStatus.NotFound)
+        };
+        var controller = new CommentsController(api);
+
+        var result = await controller.Entry(Guid.NewGuid(), new CommentsEntryViewModel { Comments = "<p>Draft</p>", Acknowledged = true }, "save", CancellationToken.None);
+
+        Assert.IsType<NotFoundResult>(result);
+    }
+
+    [Fact]
     public async Task Entry_Post_Cancel_RedirectsToIndex_WithoutLoadingOrSaving()
     {
         var api = new FakeTestConsultantApiClient { Tabulation = Ok(Tabulation(submitted: false)) };

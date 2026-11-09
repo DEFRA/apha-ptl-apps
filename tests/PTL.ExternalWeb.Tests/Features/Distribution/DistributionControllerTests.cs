@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using PTL.Contracts.Distribution;
 using PTL.ExternalWeb.Features.Distribution;
 using PTL.ExternalWeb.Tests.TestSupport;
+using PTL.ExternalWeb.ViewSupport;
 
 namespace PTL.ExternalWeb.Tests.Features.Distribution;
 
@@ -132,6 +133,137 @@ public class DistributionControllerTests
 
         var model = Assert.IsType<CurrentDistributionsViewModel>(Assert.IsType<ViewResult>(result).Model);
         Assert.Equal(["NONE", "WITH"], model.Distributions.Select(d => d.DistributionReference));
+    }
+
+    [Fact]
+    public async Task Current_NoSignedInParticipant_ReturnsEmptyPagedModel()
+    {
+        var controller = new DistributionController(new FakeDistributionApiClient())
+        {
+            ControllerContext = new ControllerContext { HttpContext = new Microsoft.AspNetCore.Http.DefaultHttpContext() }
+        };
+
+        var result = await controller.Current(page: 0, pageSize: 999);
+
+        var model = Assert.IsType<CurrentDistributionsViewModel>(Assert.IsType<ViewResult>(result).Model);
+        Assert.Equal(1, model.Page);
+        Assert.Equal(ReferenceSchemeListQuery.DefaultPageSize, model.PageSize);
+        Assert.Empty(model.Distributions);
+    }
+
+    [Fact]
+    public async Task Previous_NoSignedInParticipant_ReturnsEmptyPagedModel()
+    {
+        var controller = new DistributionController(new FakeDistributionApiClient())
+        {
+            ControllerContext = new ControllerContext { HttpContext = new Microsoft.AspNetCore.Http.DefaultHttpContext() }
+        };
+
+        var result = await controller.Previous(new ReferenceSchemeListQuery(), CancellationToken.None);
+
+        var model = Assert.IsType<DistributionPreviousListViewModel>(Assert.IsType<ViewResult>(result).Model);
+        Assert.Empty(model.Distributions);
+        Assert.Equal(ReferenceSchemeListQuery.DefaultPageSize, model.PageSize);
+        Assert.Equal("distributionDate", model.SortBy);
+        Assert.Equal("desc", model.SortDirection);
+    }
+
+    [Fact]
+    public async Task Previous_UsesLegacyDefaults_FiltersAndBuildsYearOptions()
+    {
+        var apiClient = new FakeDistributionApiClient
+        {
+            ParticipantHistory = new ParticipantPastDistributionListResponse(
+            [
+                new ParticipantPastDistributionResponse(Guid.NewGuid(), "REF-1", "PTA", "Alpha Beta", new DateTime(2026, 3, 10), 2025, 3),
+                new ParticipantPastDistributionResponse(Guid.NewGuid(), "REF-2", "PTB", "Alpha Gamma", new DateTime(2026, 3, 20), 2026, 3),
+                new ParticipantPastDistributionResponse(Guid.NewGuid(), "REF-3", "PTC", "Other", new DateTime(2025, 2, 1), 2024, 2),
+            ])
+        };
+        var controller = new DistributionController(apiClient);
+        AuthenticatedParticipant.Attach(controller, Guid.NewGuid());
+
+        var query = new ReferenceSchemeListQuery
+        {
+            SortBy = "invalid",
+            SortDir = "invalid",
+            Year = 2026,
+            Month = 3,
+            SchemeName = "Alpha Beta"
+        };
+
+        var result = await controller.Previous(query, CancellationToken.None);
+
+        var model = Assert.IsType<DistributionPreviousListViewModel>(Assert.IsType<ViewResult>(result).Model);
+        Assert.Equal("distributionDate", model.SortBy);
+        Assert.Equal("desc", model.SortDirection);
+        Assert.Single(model.Distributions);
+        Assert.Equal("REF-1", model.Distributions[0].DistributionReference);
+        Assert.Equal([2024, 2025, 2026], model.Years);
+    }
+
+    [Fact]
+    public async Task Results_WhenParticipantRecordNotFound_ReturnsNotFound()
+    {
+        var apiClient = new FakeDistributionApiClient { ActualResults = null };
+        var controller = new DistributionController(apiClient);
+        AuthenticatedParticipant.Attach(controller, Guid.NewGuid());
+
+        var result = await controller.Results(Guid.NewGuid(), null, CancellationToken.None);
+
+        Assert.IsType<NotFoundResult>(result);
+    }
+
+    [Fact]
+    public async Task Results_StoresValidatedListReturnUrl()
+    {
+        var schemeId = Guid.NewGuid();
+        var apiClient = new FakeDistributionApiClient { ActualResults = OwnResults(schemeId, Guid.NewGuid()) };
+        var controller = new DistributionController(apiClient);
+        AuthenticatedParticipant.Attach(controller, Guid.NewGuid());
+
+        var result = await controller.Results(schemeId, "/Distribution/Previous?page=2", CancellationToken.None);
+
+        Assert.IsType<ViewResult>(result);
+        Assert.Equal("/Distribution/Previous?page=2", controller.ViewData["ListReturnUrl"]);
+    }
+
+    [Fact]
+    public async Task Results_RejectsUnsafeListReturnUrl()
+    {
+        var schemeId = Guid.NewGuid();
+        var apiClient = new FakeDistributionApiClient { ActualResults = OwnResults(schemeId, Guid.NewGuid()) };
+        var controller = new DistributionController(apiClient);
+        AuthenticatedParticipant.Attach(controller, Guid.NewGuid());
+
+        await controller.Results(schemeId, "//evil.example/Distribution/Previous", CancellationToken.None);
+
+        Assert.Null(controller.ViewData["ListReturnUrl"]);
+    }
+
+    [Theory]
+    [InlineData("reference", "asc", "REF-1,REF-2")]
+    [InlineData("reference", "desc", "REF-2,REF-1")]
+    [InlineData("schemeCode", "asc", "REF-2,REF-1")]
+    [InlineData("schemeName", "asc", "REF-1,REF-2")]
+    [InlineData("distributionDate", "asc", "REF-2,REF-1")]
+    public async Task Previous_SortsBySupportedColumns(string sortBy, string sortDir, string expectedOrder)
+    {
+        var apiClient = new FakeDistributionApiClient
+        {
+            ParticipantHistory = new ParticipantPastDistributionListResponse(
+            [
+                new ParticipantPastDistributionResponse(Guid.NewGuid(), "REF-1", "PTB", "Alpha", new DateTime(2026, 2, 1), 2026, 2),
+                new ParticipantPastDistributionResponse(Guid.NewGuid(), "REF-2", "PTA", "Beta", new DateTime(2026, 1, 1), 2026, 1),
+            ])
+        };
+        var controller = new DistributionController(apiClient);
+        AuthenticatedParticipant.Attach(controller, Guid.NewGuid());
+
+        var result = await controller.Previous(new ReferenceSchemeListQuery { SortBy = sortBy, SortDir = sortDir }, CancellationToken.None);
+
+        var model = Assert.IsType<DistributionPreviousListViewModel>(Assert.IsType<ViewResult>(result).Model);
+        Assert.Equal(expectedOrder, string.Join(",", model.Distributions.Select(d => d.DistributionReference)));
     }
 
     private static DistributionResultsEntryViewModel EntryModel(Guid schemeId) => new()
