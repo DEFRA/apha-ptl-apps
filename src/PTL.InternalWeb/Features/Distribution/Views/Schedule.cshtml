@@ -14,6 +14,8 @@
 
 <p class="govuk-body">This page shows all of the Schemes that have a Distribution for the selected month.</p>
 
+<div id="date-format-hint" class="govuk-hint">Enter dates as DD/MM/YYYY, for example 08/04/2027.</div>
+
 <govuk-error-summary errors="@errors" />
 
 <form method="post" asp-action="Schedule" asp-route-year="@Model.YearId" asp-route-monthId="@Model.MonthId">
@@ -50,16 +52,16 @@
                 <h3 class="govuk-heading-s govuk-!-margin-bottom-2">Dates</h3>
                 <div class="govuk-grid-row">
                     <div class="govuk-grid-column-one-quarter">
-                        <govuk-input asp-for="Schemes[i].DistributionDate" label="Distribution" type="date" input-class="govuk-input govuk-input--width-10" />
+                        <govuk-input asp-for="Schemes[i].DistributionDate" label="Distribution" date-entry="true" described-by="date-format-hint" input-class="govuk-input govuk-input--width-10" />
                     </div>
                     <div class="govuk-grid-column-one-quarter">
-                        <govuk-input asp-for="Schemes[i].OverseasPostingDate" label="O/seas Posting" type="date" input-class="govuk-input govuk-input--width-10" />
+                        <govuk-input asp-for="Schemes[i].OverseasPostingDate" label="O/seas Posting" date-entry="true" described-by="date-format-hint" input-class="govuk-input govuk-input--width-10" />
                     </div>
                     <div class="govuk-grid-column-one-quarter">
-                        <govuk-input asp-for="Schemes[i].DeadlineDate" label="Deadline" type="date" input-class="govuk-input govuk-input--width-10" />
+                        <govuk-input asp-for="Schemes[i].DeadlineDate" label="Deadline" date-entry="true" described-by="date-format-hint" input-class="govuk-input govuk-input--width-10" />
                     </div>
                     <div class="govuk-grid-column-one-quarter">
-                        <govuk-input asp-for="Schemes[i].ResultsIssueTargetDate" label="Results" type="date" input-class="govuk-input govuk-input--width-10" />
+                        <govuk-input asp-for="Schemes[i].ResultsIssueTargetDate" label="Results" date-entry="true" described-by="date-format-hint" input-class="govuk-input govuk-input--width-10" />
                     </div>
                 </div>
 
