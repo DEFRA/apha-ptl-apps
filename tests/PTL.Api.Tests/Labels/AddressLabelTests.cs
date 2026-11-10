@@ -77,6 +77,29 @@ public class AddressLabelTests
             label.Lines);
     }
 
+    // Legacy LabelGroupAddress.SetLabelString - same Address/Country/Telephone fields as a
+    // participant label, but a Group Address has no contact name or organisation.
+    [Fact]
+    public void GroupAddress_UsesLegacyFieldOrderWithNoContactOrOrganisation()
+    {
+        var label = AddressLabelComposer.GroupAddress(new AddressLabelFields
+        {
+            ContactName = "Should Be Ignored",
+            Organisation = "Should Be Ignored",
+            Address1 = "Line 1",
+            Address2 = "Line 2",
+            Address3 = "Line 3",
+            Address4 = "Line 4",
+            Address5 = "Line 5",
+            Country = "United Kingdom",
+            Telephone = "01234 567890"
+        });
+
+        Assert.Equal(
+            ["Line 1", "Line 2", "Line 3", "Line 4", "Line 5", "United Kingdom", "01234 567890"],
+            label.Lines);
+    }
+
     [Fact]
     public void Render_ProducesAPdfWithASinglePage()
     {

@@ -13,7 +13,7 @@ namespace PTL.InternalWeb.Features.Customer;
 
 // Legacy "Contracts Admin" folder - requires the Contracts Admin role (PtlPolicies.ContractsAdmin).
 [Authorize(Policy = PtlPolicies.ContractsAdmin)]
-public class CustomerController(ICustomerApiClient customerApiClient, ILookupApiClient lookupApiClient, ILogger<CustomerController> logger) : Controller
+public class CustomerController(ICustomerApiClient customerApiClient, ILookupApiClient lookupApiClient, ILabelPrinterApiClient labelPrinterApiClient, ILogger<CustomerController> logger) : Controller
 {
     // Legacy DropDownXxx.Items.Insert(0, New ListItem("- Please Select -", Guid.Empty)) placeholder.
     private const string PleaseSelectOptionText = "- Please Select -";
@@ -334,7 +334,13 @@ public class CustomerController(ICustomerApiClient customerApiClient, ILookupApi
                 Country = CountryName(countryNames, model.CountryId)
             };
 
-        return LabelPdf(AddressLabelComposer.CustomerAddress(fields), invoice);
+        var printed = await labelPrinterApiClient.PrintAsync(AddressLabelComposer.CustomerAddress(fields).Lines, cancellationToken);
+        SetPrintNotification(printed);
+
+        // Legacy's print button re-renders the SAME postback (ViewState intact) - redisplaying the
+        // posted model here preserves any not-yet-saved edits the same way, rather than navigating
+        // away and discarding them.
+        return await RedisplayCustomerFormAsync(model, cancellationToken);
     }
 
     private async Task<IActionResult> PrintSavedCustomerLabelAsync(Guid id, bool invoice, CancellationToken cancellationToken)
@@ -371,14 +377,15 @@ public class CustomerController(ICustomerApiClient customerApiClient, ILookupApi
                 Country = CountryName(countryNames, customer.CountryId)
             };
 
-        return LabelPdf(AddressLabelComposer.CustomerAddress(fields), invoice);
+        var printed = await labelPrinterApiClient.PrintAsync(AddressLabelComposer.CustomerAddress(fields).Lines, cancellationToken);
+        SetPrintNotification(printed);
+        return RedirectToAction(nameof(Details), new { id });
     }
 
-    private FileContentResult LabelPdf(AddressLabel label, bool invoice) =>
-        File(
-            AddressLabelPdfRenderer.Render(label),
-            AddressLabelPdfRenderer.ContentType,
-            invoice ? "invoice-address-label.pdf" : "contact-address-label.pdf");
+    private void SetPrintNotification(bool printed) =>
+        TempData.SetNotification(
+            printed ? NotificationType.Success : NotificationType.Error,
+            printed ? "Label sent to printer." : "There was a problem printing the label. Please try again.");
 
     // Legacy took the country from DropDownCountry.SelectedItem.Text - the name shown on the form,
     // not a saved value - so the lookup list is the faithful equivalent for unsaved form state.
