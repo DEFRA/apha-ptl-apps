@@ -3,8 +3,8 @@ using Microsoft.AspNetCore.Mvc;
 using PTL.ApiClient;
 using PTL.Contracts.Distribution;
 using PTL.ExternalWeb.Authorization;
-using PTL.SharedUI.Notifications;
 using PTL.ExternalWeb.ViewSupport;
+using PTL.SharedUI.Notifications;
 
 namespace PTL.ExternalWeb.Features.Comments;
 
@@ -271,7 +271,7 @@ public sealed class CommentsController(ITestConsultantTabulationApiClient apiCli
         return updated;
     }
 
-    private IActionResult EntryView(Guid schemeId, TestConsultantTabulationResponse tabulation, CommentsEntryViewModel previous)
+    private ViewResult EntryView(Guid schemeId, TestConsultantTabulationResponse tabulation, CommentsEntryViewModel previous)
     {
         var viewModel = CommentsEntryViewModel.From(schemeId, tabulation, previous.Comments, previous);
         viewModel.ReturnUrl = ListReturnUrl.Validate(previous.ReturnUrl, ListReturnUrl.CommentsIndex);
@@ -282,7 +282,7 @@ public sealed class CommentsController(ITestConsultantTabulationApiClient apiCli
     private IActionResult RedirectToIndex(string? returnUrl)
     {
         var safeReturnUrl = ListReturnUrl.Validate(returnUrl, ListReturnUrl.CommentsIndex);
-        return safeReturnUrl is null ? RedirectToAction(nameof(Index)) : Redirect(safeReturnUrl);
+        return safeReturnUrl is null ? RedirectToAction(nameof(Index)) : LocalRedirect(safeReturnUrl);
     }
 
     private IActionResult NotOk(TestConsultantApiStatus status) =>

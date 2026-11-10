@@ -128,7 +128,7 @@ public class CommentsControllerTests
             ReturnUrl = "/Comments/Index?schemeName=Brucella&sortBy=schemeName&sortDir=asc"
         }, "save", CancellationToken.None);
 
-        var redirect = Assert.IsType<RedirectResult>(result);
+        var redirect = Assert.IsType<LocalRedirectResult>(result);
         Assert.Equal("/Comments/Index?schemeName=Brucella&sortBy=schemeName&sortDir=asc", redirect.Url);
         var request = Assert.Single(api.SavedRequests);
         Assert.False(request.Submit);
@@ -161,7 +161,7 @@ public class CommentsControllerTests
             ReturnUrl = "/Comments/Index?distributionReference=D1a"
         }, "cancel", CancellationToken.None);
 
-        var redirect = Assert.IsType<RedirectResult>(result);
+        var redirect = Assert.IsType<LocalRedirectResult>(result);
         Assert.Equal("/Comments/Index?distributionReference=D1a", redirect.Url);
         Assert.Equal(0, api.GetTabulationCalls);
         Assert.Empty(api.SavedRequests);
