@@ -178,4 +178,31 @@ public class IntendedResultsRenderTests : IClassFixture<WebApplicationFactory<Pr
         Assert.Contains("The reason for these changes must be specified", html, StringComparison.Ordinal);
         Assert.Empty(_apiClient.SavedIntendedResults);
     }
+
+    // ASP.NET Core rejects a form of more than 1,024 values by default; a distribution with many samples posts far more.
+    [Fact]
+    public async Task Post_FormWithMoreThanTheDefaultFormValueLimit_IsAcceptedAndSaved()
+    {
+        var template = Page();
+        var test = template.Tests[0];
+        var samples = Enumerable.Range(1, 150).Select(i => new IntendedResultsSampleRowResponse(
+            Guid.NewGuid(), $"S{i:000}", $"Sample {i}", IsApplicable: true,
+            [
+                new IntendedResultsSampleResultValueResponse(Guid.NewGuid(), DropdownItem, "Positive", "Negative"),
+                new IntendedResultsSampleResultValueResponse(Guid.NewGuid(), TextItem, "10", "20"),
+            ])).ToList();
+        _apiClient.IntendedResults = template with { Tests = [test with { Samples = samples }] };
+        _apiClient.IntendedResultsSaveResult = new IntendedResultsSaveResult(true, new Dictionary<Guid, IntendedResultsFieldError[]>(), AuditReasonRequired: false, AuditObjectName: string.Empty);
+
+        var client = _factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        var form = SchemeFormPage.Parse(await (await client.GetAsync(Url)).Content.ReadAsStringAsync()).Submission();
+        form.Add(new("command", "save"));
+        Assert.True(form.Count > 1024, $"The test form posts only {form.Count} values, so it does not exercise the default limit.");
+
+        var response = await client.PostAsync(Url, new FormUrlEncodedContent(form));
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        Assert.Single(_apiClient.SavedIntendedResults);
+        Assert.Equal(samples.Count, _apiClient.SavedIntendedResults[0].Tests[0].Samples.Count);
+    }
 }
