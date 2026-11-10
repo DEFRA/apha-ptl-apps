@@ -237,7 +237,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Set up .NET
-        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
       - name: Restore solution
@@ -284,11 +284,11 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
       - name: Set up .NET
-        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
       - name: Set up Java
-        uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
         with:
           distribution: temurin
           java-version: "17"
@@ -464,8 +464,10 @@ jobs:
           if ($preparedContent -match '--mount=type=cache,target=/root/\.nuget/packages') {
             throw "The prepared Dockerfile still contains the unsupported NuGet cache mount."
           }
+          # --pull forces fresh base images: the floating dotnet 10.0 tags and any image cached on
+          # the runner would otherwise keep shipping an older, vulnerable runtime.
           $dockerArgs = @(
-            "build", "--file", $env:BUILD_DOCKERFILE,
+            "build", "--pull", "--file", $env:BUILD_DOCKERFILE,
             "--tag", "ptl-${{ matrix.component }}:$env:GITHUB_SHA",
             "--label", "org.opencontainers.image.revision=$env:GITHUB_SHA",
             "--label", "org.opencontainers.image.source=https://github.com/$env:GITHUB_REPOSITORY",
@@ -496,6 +498,12 @@ jobs:
           $output = docker run --rm -e "ROOT_THUMBPRINT=$env:ROOT_THUMBPRINT" -e "SUBCA_THUMBPRINT=$env:SUBCA_THUMBPRINT" --entrypoint powershell $image -NoProfile -EncodedCommand $encoded
           if ($LASTEXITCODE -ne 0) { throw "FortiGate CA chain check failed in ${image}: $($output | Out-String)" }
           Write-Host "FortiGate CA chain validates in $image."
+
+      - name: Scan image for vulnerabilities
+        uses: ./.github/actions/trivy-image-scan
+        with:
+          image: ptl-${{ matrix.component }}:${{ github.sha }}
+          name: ${{ matrix.component }}
 
       - name: Save validated image for publishing
         if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
