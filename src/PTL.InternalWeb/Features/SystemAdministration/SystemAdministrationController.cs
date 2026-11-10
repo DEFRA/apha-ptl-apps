@@ -36,6 +36,7 @@ public partial class SystemAdministrationController : Controller
     private readonly ILookupApiClient lookupApiClient;
     private readonly IExternalTestConsultantApiClient externalTestConsultantApiClient;
     private readonly IViewerApiClient viewerApiClient;
+    private readonly ILoginInstructionsApiClient loginInstructionsApiClient;
     private readonly IStaffDirectoryService staffDirectoryService;
     private readonly ILogger<SystemAdministrationController> logger;
 
@@ -53,6 +54,7 @@ public partial class SystemAdministrationController : Controller
         lookupApiClient = apiClients.Lookup;
         externalTestConsultantApiClient = apiClients.ExternalTestConsultant;
         viewerApiClient = apiClients.Viewer;
+        loginInstructionsApiClient = apiClients.LoginInstructions;
         this.staffDirectoryService = staffDirectoryService;
         this.logger = logger;
     }

@@ -33,7 +33,7 @@ public class AddressLabelActionTests
         };
 
     private static ParticipantController CreateParticipantController(FakeParticipantApiClient? apiClient = null, FakeLabelPrinterApiClient? labelPrinterApiClient = null) =>
-        new(apiClient ?? new FakeParticipantApiClient(), new FakeCustomerApiClient(), Lookups(), labelPrinterApiClient ?? new FakeLabelPrinterApiClient(), NullLogger<ParticipantController>.Instance)
+        new(apiClient ?? new FakeParticipantApiClient(), new FakeCustomerApiClient(), Lookups(), labelPrinterApiClient ?? new FakeLabelPrinterApiClient(), new FakeLoginInstructionsApiClient(), NullLogger<ParticipantController>.Instance)
         {
             TempData = new TempDataDictionary(new DefaultHttpContext(), new FakeTempDataProvider())
         };

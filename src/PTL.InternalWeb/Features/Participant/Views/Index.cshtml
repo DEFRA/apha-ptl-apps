@@ -30,6 +30,7 @@ else
                 <th scope="col" class="govuk-table__header">Status</th>
                 <th scope="col" class="govuk-table__header">Details</th>
                 <th scope="col" class="govuk-table__header">Viewers</th>
+                <th scope="col" class="govuk-table__header">Login Instructions</th>
             </tr>
         </thead>
         <tbody class="govuk-table__body">
@@ -49,6 +50,19 @@ else
                     </td>
                     <td class="govuk-table__cell">
                         <a class="govuk-link" asp-action="Viewers" asp-route-participantId="@participant.ParticipantId">Viewers</a>
+                    </td>
+                    <td class="govuk-table__cell">
+                        @if (participant.LoginInstructionsSent)
+                        {
+                            <strong class="govuk-tag govuk-tag--green">Sent</strong>
+                        }
+                        else
+                        {
+                            <form method="post" asp-action="SendLoginInstructions" asp-route-participantId="@participant.ParticipantId" asp-route-customerId="@Model.CustomerId"
+                                  asp-route-includeInactive="@Model.IncludeInactive" asp-route-page="@Model.Page" asp-route-pageSize="@Model.PageSize">
+                                <button type="submit" class="govuk-link ptl-link-button">Send Instructions<span class="govuk-visually-hidden"> to @participant.LabCode @participant.LabName</span></button>
+                            </form>
+                        }
                     </td>
                 </tr>
             }

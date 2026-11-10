@@ -70,5 +70,6 @@ public sealed class ViewerController(IViewerService viewerService) : ControllerB
             viewer.Name,
             viewer.Email,
             viewer.Schemes.Select(s => new ViewerSchemeResponse(s.Identifier, s.Name)).ToList(),
-            viewer.Participants.Select(p => new ViewerParticipantResponse(p.LabCode, p.LabName)).ToList());
+            viewer.Participants.Select(p => new ViewerParticipantResponse(p.LabCode, p.LabName)).ToList(),
+            viewer.LoginInstructionsSent);
 }

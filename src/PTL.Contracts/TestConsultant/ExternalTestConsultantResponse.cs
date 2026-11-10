@@ -8,4 +8,5 @@ public sealed record ExternalTestConsultantResponse(
     bool IsInactive,
     DateTime? InactiveDate,
     int AllocationCount = 0,
-    string? AllocationString = null);
+    string? AllocationString = null,
+    bool LoginInstructionsSent = false);

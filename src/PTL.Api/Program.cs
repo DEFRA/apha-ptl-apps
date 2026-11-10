@@ -179,6 +179,10 @@ builder.Services.Configure<ParticipantUpdateEmailOptions>(builder.Configuration.
 builder.Services.AddScoped<ICustomerUpdateNotifier, CustomerUpdateNotifier>();
 builder.Services.AddScoped<IParticipantUpdateNotifier, ParticipantUpdateNotifier>();
 
+// Login instruction emails (Manage Participants / Viewers / External Test Consultants): sent through GOV.UK Notify when a user presses Send Instructions.
+builder.Services.AddScoped<PTL.Core.LoginInstructions.ILoginInstructionsRepository, PTL.Data.LoginInstructions.LoginInstructionsRepository>();
+builder.Services.AddScoped<PTL.Core.LoginInstructions.ILoginInstructionsService, PTL.Core.LoginInstructions.LoginInstructionsService>();
+
 // Single shared S3 configuration root for every S3-backed feature (export templates, invoice
 // archives) - one bucket, one prefix per feature (docs/migration/invoice-migration.md). Provider
 // and region never vary by environment, so they are not bound from configuration at all - see

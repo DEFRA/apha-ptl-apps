@@ -60,7 +60,8 @@ builder.Services.AddScoped(sp => new SystemAdministrationApiClients
     Role = sp.GetRequiredService<IRoleApiClient>(),
     Lookup = sp.GetRequiredService<ILookupApiClient>(),
     ExternalTestConsultant = sp.GetRequiredService<IExternalTestConsultantApiClient>(),
-    Viewer = sp.GetRequiredService<IViewerApiClient>()
+    Viewer = sp.GetRequiredService<IViewerApiClient>(),
+    LoginInstructions = sp.GetRequiredService<ILoginInstructionsApiClient>()
 });
 
 var app = builder.Build();

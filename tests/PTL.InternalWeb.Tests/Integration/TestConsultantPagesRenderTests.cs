@@ -131,7 +131,17 @@ public partial class TestConsultantPagesRenderTests : IClassFixture<WebApplicati
         var main = MainContent(html);
 
         var headers = Regex.Matches(main, "<th scope=\"col\" class=\"govuk-table__header\">([^<]*)</th>").Select(m => m.Groups[1].Value).ToList();
-        Assert.Equal("Actions", headers[^1]);
+        // The External page's Login Instructions column comes after Actions; the Internal page has no such column.
+        if (page == External)
+        {
+            Assert.Equal("Login Instructions", headers[^1]);
+            Assert.Equal("Actions", headers[^2]);
+        }
+        else
+        {
+            Assert.Equal("Actions", headers[^1]);
+        }
+
         Assert.Equal(1, headers.Count(h => h == "Actions"));
         Assert.Matches(Button(page, "Edit", "edit", 0), main);
         Assert.Matches(Button(page, "Edit", "edit", 1), main);
