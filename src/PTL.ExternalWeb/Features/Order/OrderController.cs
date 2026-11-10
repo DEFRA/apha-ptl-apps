@@ -164,7 +164,7 @@ public sealed class OrderController(ICreateOrderApiClient createOrderApiClient, 
     [HttpGet]
     public async Task<IActionResult> Print(string? year, CancellationToken cancellationToken)
     {
-        var review = await GetReviewModelAsync(year, includeConsents: false, null, cancellationToken);
+        var review = await GetReviewModelAsync(year, includeConsents: true, Request.Query["sort"], cancellationToken);
         return review.Error ?? View("Print", review.Model!);
     }
 
@@ -209,7 +209,12 @@ public sealed class OrderController(ICreateOrderApiClient createOrderApiClient, 
             return (RedirectToAction(PageAction(slug)), null);
         }
 
-        return (null, new CreateOrderReviewViewModel(slug, result.Order) { TermsUrl = pageOptions.Value.SafeTermsAndConditionsUrl, Sort = OrderSortState.Parse(sort) });
+        return (null, new CreateOrderReviewViewModel(slug, result.Order)
+        {
+            TermsUrl = pageOptions.Value.SafeTermsAndConditionsUrl,
+            DistributionTimetableUrl = pageOptions.Value.SafeDistributionTimetableUrl,
+            Sort = OrderSortState.Parse(sort)
+        });
     }
 
     private async Task<IActionResult> ShowAsync(string slug, string? search, CancellationToken cancellationToken)

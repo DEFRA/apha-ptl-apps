@@ -101,6 +101,9 @@ public sealed record CreateOrderReviewViewModel(string YearSlug, CreateOrderResp
 
     public string? TermsUrl { get; init; }
 
+    // Target of the price-list "website" link on the printout; null shows the word as plain text.
+    public string? DistributionTimetableUrl { get; init; }
+
     // Pending-order table sort; the summary starts on scheme name ascending, as in legacy.
     public OrderSortState Sort { get; init; } = OrderSortState.Empty;
 
@@ -124,6 +127,9 @@ public sealed record CreateOrderReviewViewModel(string YearSlug, CreateOrderResp
             .Where(s => s.Selected && s.HasPendingMonths)]);
 
     public string FormatMoney(decimal amount) => CreateOrderViewModel.Format(Order.CurrencySymbol, amount);
+
+    // Legacy's Order details block put the currency in the label and showed the bare amount.
+    public static string FormatAmount(decimal amount) => amount.ToString("N2", CultureInfo.InvariantCulture);
 }
 
 // Form posted by the Pending order page's Save and Submit buttons.

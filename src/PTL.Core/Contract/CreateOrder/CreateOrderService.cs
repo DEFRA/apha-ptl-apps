@@ -184,19 +184,16 @@ public sealed class CreateOrderService(
 
         var purchaseOrder = (submission.PurchaseOrderNumber ?? string.Empty).Trim();
         var state = await LoadStateAsync(context, cancellationToken);
-        var selected = state.Lines.Where(l => l.IsSelected).ToList();
-        var withMonths = selected.Where(l => l.HasAnyMonth()).ToList();
+        var withMonths = state.Lines.Where(l => l.IsSelected && l.HasAnyMonth()).ToList();
         var consents = await LoadConsentsAsync(withMonths, cancellationToken);
 
-        // Legacy never reached these first two checks (Next stays disabled), so there is no legacy wording to keep.
+        // A ticked scheme with no new months (for example one the participant already holds in full) is not on the review
+        // page, so it is left out of the order rather than blocking Submit on something the user cannot fix.
         var errors = new List<CreateOrderValidationError>();
-        if (selected.Count == 0)
+        if (withMonths.Count == 0)
         {
-            errors.Add(new CreateOrderValidationError("Schemes", "Select at least one scheme before you submit your order."));
+            errors.Add(new CreateOrderValidationError("Schemes", "Select at least one scheme and at least one distribution month for it before you submit your order."));
         }
-
-        errors.AddRange(selected.Where(l => !l.HasAnyMonth())
-            .Select(l => new CreateOrderValidationError("Schemes", $"Select at least one distribution month for {state.Schemes.FirstOrDefault(s => s.SchemeId == l.SchemeId)?.Name ?? l.SchemeName}.")));
 
         if (!submission.TermsAccepted)
         {
@@ -219,7 +216,7 @@ public sealed class CreateOrderService(
         }
 
         // Legacy deletes the lines that were ticked off again before saving the submitted order.
-        foreach (var line in state.Lines.Where(l => !l.IsSelected))
+        foreach (var line in state.Lines.Where(l => !l.IsSelected || !l.HasAnyMonth()))
         {
             await pendingOrderRepository.DeleteSchemeAsync(line.PendingParticipantSchemeId, cancellationToken);
         }

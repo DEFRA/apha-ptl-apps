@@ -722,9 +722,9 @@ public class CreateOrderServiceTests
     }
 
     [Fact]
-    public async Task Submit_SchemeWithoutMonths_NamesTheSchemeAndSubmitsNothing()
+    public async Task Submit_SchemeWithoutMonths_IsLeftOutOfTheSubmittedOrder()
     {
-        var (fixture, _, beta) = await TwoSelectedSchemesAsync();
+        var (fixture, alpha, beta) = await TwoSelectedSchemesAsync();
         foreach (var month in new[] { "apr", "may", "jun" })
         {
             await fixture.ChangeAsync(beta.SchemeId, month, false);
@@ -732,9 +732,26 @@ public class CreateOrderServiceTests
 
         var outcome = await fixture.Service.SubmitAsync(fixture.ParticipantId, OrderYear.Current, Submission());
 
-        var error = Assert.Single(outcome.Errors);
-        Assert.Equal("Schemes", error.Field);
-        Assert.Contains("Beta", error.Message, StringComparison.Ordinal);
+        Assert.True(outcome.Succeeded);
+        var order = Assert.Single(fixture.Store.Orders);
+        Assert.True(order.IsSubmitted);
+        Assert.Equal(alpha.SchemeId, Assert.Single(fixture.Store.LinesFor(order.PendingContractId)).SchemeId);
+    }
+
+    [Fact]
+    public async Task Submit_OnlySchemesWithoutMonths_ReturnsASchemesErrorAndSubmitsNothing()
+    {
+        var fixture = await Fixture.CreateAsync();
+        var alpha = fixture.AddScheme("Alpha", "PT1");
+        await fixture.ChangeAsync(alpha.SchemeId, "select", true);
+        foreach (var month in new[] { "apr", "may", "jun" })
+        {
+            await fixture.ChangeAsync(alpha.SchemeId, month, false);
+        }
+
+        var outcome = await fixture.Service.SubmitAsync(fixture.ParticipantId, OrderYear.Current, Submission());
+
+        Assert.Equal("Schemes", Assert.Single(outcome.Errors).Field);
         Assert.False(Assert.Single(fixture.Store.Orders).IsSubmitted);
     }
 

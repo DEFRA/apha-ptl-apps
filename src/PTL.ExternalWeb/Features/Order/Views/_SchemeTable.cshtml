@@ -5,16 +5,26 @@
     var headers = orderPage.Sort.Headers(Model.Table, sort => Url.Action(orderPage.PageAction, "Order", new { search = orderPage.Search, sort })!);
 }
 
-<section class="app-table-scroll" aria-label="@Model.Caption">
-<table class="govuk-table app-order-table">
+<section class="app-table-scroll app-order-scroll" aria-label="@Model.Caption">
+<table class="govuk-table app-order-table app-order-table--fixed">
     <caption class="govuk-table__caption govuk-table__caption--s">@Model.Caption</caption>
+    <colgroup>
+        <col style="width: 7%" />
+        <col style="width: 9%" />
+        <col style="width: 24%" />
+        <col style="width: 11%" />
+        <col style="width: 16%" />
+        <col style="width: 10%" />
+        <col style="width: 11%" />
+        <col style="width: 12%" />
+    </colgroup>
     <thead class="govuk-table__head">
         <tr class="govuk-table__row">
             <th scope="col" class="govuk-table__header">Select</th>
             <partial name="_SortableHeader" model="@(headers.Header("Scheme code", "code"))" />
             <partial name="_SortableHeader" model="@(headers.Header("Scheme name", "name"))" />
             <th scope="col" class="govuk-table__header govuk-table__header--numeric">Annual price</th>
-            <th scope="col" class="govuk-table__header">Import permit required</th>
+            <th scope="col" class="govuk-table__header app-cell-centre">Import permit required</th>
             <th scope="col" class="govuk-table__header govuk-table__header--numeric">Postage</th>
             <th scope="col" class="govuk-table__header govuk-table__header--numeric">Scheme price</th>
             <th scope="col" class="govuk-table__header govuk-table__header--numeric">Total</th>
@@ -41,7 +51,7 @@
                 <td class="govuk-table__cell">
                     @if (scheme.Selected)
                     {
-                        <div class="govuk-checkboxes govuk-checkboxes--small">
+                        <div class="govuk-checkboxes govuk-checkboxes--small app-checkbox-centre">
                             <div class="govuk-checkboxes__item">
                                 <input class="govuk-checkboxes__input" id="import-@scheme.SchemeId" type="checkbox"
                                        data-order-field="importexport" data-scheme-id="@scheme.SchemeId"

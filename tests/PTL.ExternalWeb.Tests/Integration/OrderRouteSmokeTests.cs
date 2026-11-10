@@ -208,9 +208,20 @@ public partial class OrderRouteSmokeTests : IClassFixture<PtlExternalWebTestFact
         var body = await GetAsync(client, cookies, "/Order/CurrentYear?search=zzz");
 
         Assert.Contains("No schemes match your search.", body);
-        Assert.Contains("Show all", body);
+        Assert.Contains("Show All</a>", body);
         Assert.DoesNotContain("Microbiology", body);
         Assert.Contains("Chemistry", body);
+    }
+
+    [Fact]
+    public async Task CurrentYear_UnfilteredPage_AlsoShowsShowAllButton()
+    {
+        var client = CreateClient(new FakeCreateOrderApiClient());
+        var cookies = await SignInAsync(client);
+
+        var body = await GetAsync(client, cookies, "/Order/CurrentYear");
+
+        Assert.Contains("Show All</a>", body);
     }
 
     [Fact]
@@ -369,6 +380,7 @@ public partial class OrderRouteSmokeTests : IClassFixture<PtlExternalWebTestFact
         var body = await GetAsync(client, cookies, "/Order/Review?year=current");
 
         Assert.Contains("Pending order", body);
+        Assert.Contains("For price-lists, including distribution dates, please refer to our", body);
         Assert.Contains("QAL number", body);
         Assert.Contains("Lab code", body);
         Assert.Contains("Full price", body);
@@ -442,16 +454,57 @@ public partial class OrderRouteSmokeTests : IClassFixture<PtlExternalWebTestFact
 
         var body = await GetAsync(client, cookies, "/Order/Print?year=current");
 
-        Assert.Contains("Pending order summary", body);
+        Assert.Contains("<h1 class=\"govuk-heading-xl\">Pending order</h1>", body);
         Assert.Contains("Contract year", body);
         Assert.Contains("Purchase order number", body);
         Assert.Contains("Not provided", body);
         Assert.Contains("Microbiology", body);
-        Assert.Contains("Apr, May", body);
-        Assert.Contains("Combined postage charges", body);
-        Assert.Contains("Total order value", body);
+        Assert.Contains("Combined postage (", body);
+        Assert.Contains("(Courier or Bio-Freeze)", body);
+        Assert.Contains("Total amount (", body);
         Assert.Contains("Print this page", body);
         Assert.DoesNotContain("Submit", body);
+    }
+
+    [Fact]
+    public async Task Print_FollowsTheLegacyPendingOrderPrintout_LogoDetailsMonthStripAndFooter()
+    {
+        var api = new FakeCreateOrderApiClient { GetResult = new(CreateOrderApiStatus.Ok, FakeCreateOrderApiClient.SampleOrder(selected: true)) };
+        var client = CreateClient(api);
+        var cookies = await SignInAsync(client);
+
+        var body = await GetAsync(client, cookies, "/Order/Print?year=current");
+
+        // Print-only identity: the legacy logo block and copyright line (the app header and footer are hidden in print).
+        Assert.Contains("class=\"app-print-only app-print-logo\" src=\"/images/vetqasheader.png\" alt=\"VETQAS and APHA Scientific\"", body);
+        Assert.Matches("class=\"govuk-body-s app-print-only app-print-footer\">&copy; Copyright \\d{4}, Animal and Plant Health Agency", body);
+        Assert.Contains("For price-lists, including distribution dates, please refer to our", body);
+        Assert.Contains("QAL/00001", body);
+        Assert.Contains("LAB001", body);
+        Assert.Contains("Schemes you have selected", body);
+        Assert.Contains(">Full price</th>", body);
+        Assert.Contains("Order details", body);
+
+        // Months are a 12-cell strip with a text tick and a spoken state, not colour alone.
+        Assert.Contains("aria-label=\"Distribution months for Microbiology\"", body);
+        Assert.Contains("app-print-month--selected", body);
+        Assert.Contains("(in this order)", body);
+        Assert.Contains("(not in this order)", body);
+        Assert.Equal(12, Regex.Matches(body, "<li class=\"app-print-month[ \"]").Count);
+    }
+
+    [Fact]
+    public async Task Print_ShowsTheConsentsTermsLinkAndTheConfiguredPriceListLink()
+    {
+        var client = CreateClient(ReviewApi());
+        var cookies = await SignInAsync(client);
+
+        var body = await GetAsync(client, cookies, "/Order/Print?year=current");
+
+        Assert.Contains("Data consent", body);
+        Assert.Contains("I agree to share my data", body);
+        Assert.Contains("Not yet agreed", body);
+        Assert.Contains("Terms and conditions:", body);
     }
 
     private static CreateOrderResponse ReviewOrder() => FakeCreateOrderApiClient.SampleOrder(selected: true) with

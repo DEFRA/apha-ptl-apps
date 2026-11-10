@@ -9,6 +9,8 @@
 
 <h1 class="govuk-heading-xl">Pending order</h1>
 
+<partial name="_PriceListNote" model="@(Model.DistributionTimetableUrl ?? string.Empty)" />
+
 <dl class="govuk-summary-list govuk-summary-list--no-border">
     <div class="govuk-summary-list__row">
         <dt class="govuk-summary-list__key">QAL number</dt>
@@ -21,14 +23,23 @@
 </dl>
 
 <section class="app-table-scroll" aria-label="Schemes you have selected">
-<table class="govuk-table app-order-table">
+<table class="govuk-table app-order-table app-order-table--review">
     <caption class="govuk-table__caption govuk-table__caption--m" id="Schemes">Schemes you have selected</caption>
+    <colgroup>
+        <col style="width: 9%" />
+        <col style="width: 25%" />
+        <col style="width: 13%" />
+        <col style="width: 15%" />
+        <col style="width: 11%" />
+        <col style="width: 14%" />
+        <col style="width: 13%" />
+    </colgroup>
     <thead class="govuk-table__head">
         <tr class="govuk-table__row">
             <partial name="_SortableHeader" model="@(headers.Header("Scheme code", "code"))" />
             <partial name="_SortableHeader" model="@(headers.Header("Scheme name", "name"))" />
             <th scope="col" class="govuk-table__header govuk-table__header--numeric">Full price</th>
-            <th scope="col" class="govuk-table__header">Import permit required</th>
+            <th scope="col" class="govuk-table__header app-cell-centre">Import permit required</th>
             <th scope="col" class="govuk-table__header govuk-table__header--numeric">Postage</th>
             <th scope="col" class="govuk-table__header govuk-table__header--numeric">Scheme price</th>
             <th scope="col" class="govuk-table__header govuk-table__header--numeric">Total</th>
@@ -41,13 +52,14 @@
                 <td class="govuk-table__cell">@scheme.Identifier</td>
                 <td class="govuk-table__cell">@(string.IsNullOrWhiteSpace(scheme.Schedule) ? scheme.Name : $"{scheme.Name} - ({scheme.Schedule})")</td>
                 <td class="govuk-table__cell govuk-table__cell--numeric">@Model.FormatMoney(scheme.AnnualPrice)</td>
-                <td class="govuk-table__cell">@(scheme.ImportPermitRequired ? "Yes" : "No")</td>
+                <td class="govuk-table__cell app-cell-centre">@(scheme.ImportPermitRequired ? "Yes" : "No")</td>
                 <td class="govuk-table__cell govuk-table__cell--numeric">@Model.FormatMoney(scheme.PostagePrice)</td>
                 <td class="govuk-table__cell govuk-table__cell--numeric">@Model.FormatMoney(scheme.SchemePrice)</td>
                 <td class="govuk-table__cell govuk-table__cell--numeric">@Model.FormatMoney(scheme.TotalPrice)</td>
             </tr>
             <tr class="govuk-table__row app-order-row--selected">
-                <td class="govuk-table__cell" colspan="7">
+                <td class="govuk-table__cell" colspan="2"></td>
+                <td class="govuk-table__cell app-month-cell" colspan="5">
                     <div class="app-month-strip" role="group" aria-label="Distribution months for @scheme.Name">
                         @foreach (var month in scheme.Months)
                         {
@@ -174,7 +186,7 @@
         <button type="submit" id="submit-order" class="govuk-button" data-module="govuk-button" data-prevent-double-click="true">Submit</button>
         <a class="govuk-button govuk-button--secondary" asp-controller="Order" asp-action="@Model.BackAction" draggable="false" data-module="govuk-button">Previous</a>
         <button type="submit" class="govuk-button govuk-button--secondary" data-module="govuk-button" formaction="@Url.Action("Save", "Order")">Save</button>
-        <a class="govuk-button govuk-button--secondary" asp-controller="Order" asp-action="Print" asp-route-year="@Model.YearSlug" draggable="false" data-module="govuk-button">Print</a>
+        <a class="govuk-button govuk-button--secondary" href="@Url.Action("Print", "Order", new { year = Model.YearSlug, sort = Model.Sort.Values })" draggable="false" data-module="govuk-button">Print</a>
     </div>
 </form>
 

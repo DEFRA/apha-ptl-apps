@@ -214,11 +214,40 @@
   border-left: 1px solid var(--govuk-border-colour, #b1b4b6);
 }
 
-.app-month .govuk-checkboxes {
+.app-month .govuk-checkboxes,
+.app-checkbox-centre {
   height: 44px;
 }
 
-.app-month .govuk-checkboxes__item {
+/* Centres a small checkbox in its table column. */
+.app-checkbox-centre {
+  display: flex;
+  justify-content: center;
+}
+
+.app-cell-centre {
+  text-align: center;
+}
+
+/* Same column widths in every scheme table so headers wrap identically whether or not a row is selected. */
+.app-order-table--fixed {
+  table-layout: fixed;
+  min-width: 56rem;
+}
+
+/* Pending order and Print: same fixed layout; the minimum width only applies on screen so the printout fits the page. */
+.app-order-table--review {
+  table-layout: fixed;
+}
+
+@media screen {
+  .app-order-table--review {
+    min-width: 56rem;
+  }
+}
+
+.app-month .govuk-checkboxes__item,
+.app-checkbox-centre .govuk-checkboxes__item {
   float: none;
   width: 44px;
   height: 44px;
@@ -227,13 +256,15 @@
   margin: 0;
 }
 
-.app-month .govuk-checkboxes__input {
+.app-month .govuk-checkboxes__input,
+.app-checkbox-centre .govuk-checkboxes__input {
   top: 0;
   left: 0;
   margin: 0;
 }
 
-.app-month .govuk-checkboxes__label {
+.app-month .govuk-checkboxes__label,
+.app-checkbox-centre .govuk-checkboxes__label {
   display: block;
   box-sizing: border-box;
   width: 44px;
@@ -245,11 +276,13 @@
 }
 
 /* The small checkbox box is 24px wide; centre it in the 44px target. */
-.app-month .govuk-checkboxes__label::before {
+.app-month .govuk-checkboxes__label::before,
+.app-checkbox-centre .govuk-checkboxes__label::before {
   left: 10px;
 }
 
-.app-month .govuk-checkboxes__label::after {
+.app-month .govuk-checkboxes__label::after,
+.app-checkbox-centre .govuk-checkboxes__label::after {
   left: 16px;
 }
 
@@ -279,6 +312,84 @@
   padding: 2px 8px;
 }
 
+/* Pending order: months sit in twelve equal cells, centred, with compact tags so they fit the five price columns. */
+.app-month-cell .app-month-strip > .govuk-tag,
+.app-month-cell .app-month-strip > .app-month-off {
+  justify-self: center;
+  padding-right: 4px;
+  padding-left: 4px;
+}
+
+/* Order printout (legacy printed the Pending Order page: logo block shown, navigation and breadcrumb hidden). */
+.app-print-only {
+  display: none;
+}
+
+/* Twelve equal cells, tick above the month name, as legacy's month strip. */
+.app-print-months {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.app-print-month {
+  margin: 0;
+  padding: 0 2px;
+  border-left: 1px solid var(--govuk-border-colour, #b1b4b6);
+  text-align: center;
+  color: #505a5f;
+}
+
+.app-print-month--selected {
+  color: var(--govuk-text-colour, #0b0c0c);
+  font-weight: 700;
+}
+
+.app-print-month__tick,
+.app-print-month__name {
+  display: block;
+}
+
+@media print {
+  .app-print-actions,
+  .govuk-back-link,
+  .govuk-breadcrumbs,
+  .govuk-header,
+  .govuk-footer,
+  .govuk-phase-banner,
+  .govuk-service-navigation,
+  .govuk-skip-link {
+    display: none !important;
+  }
+
+  .govuk-main-wrapper {
+    padding-top: 0;
+  }
+
+  .app-print-only {
+    display: block;
+  }
+
+  .app-print-logo {
+    max-width: 100%;
+    height: auto;
+    margin-bottom: 20px;
+  }
+
+  .app-print-footer {
+    margin-top: 30px;
+    padding-top: 10px;
+    border-top: 1px solid #0b0c0c;
+  }
+
+  /* Keep a scheme row with its month strip, and never split a row across pages. */
+  .app-order-table tr {
+    break-inside: avoid;
+  }
+}
+
 /* GOV.UK component rules that set display (e.g. error summary/message) otherwise win over the hidden attribute. */
 #create-order [hidden] {
   display: none;
@@ -286,6 +397,12 @@
 
 .app-table-scroll {
   overflow-x: auto;
+}
+
+/* overflow-x:auto also clips the 10px checkbox hover halo; pad the wrapper and pull it back so the table stays aligned. */
+.app-order-scroll {
+  padding: 10px 0 10px 10px;
+  margin: -10px 0 -10px -10px;
 }
 
 /* Read-only results tables: fixed 65/35 columns as legacy (pt-results__table-readonly-column1/2) so values line up. */
