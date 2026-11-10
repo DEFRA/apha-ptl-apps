@@ -305,5 +305,6 @@ public sealed class ParticipantController(IParticipantService participantService
         participant.LabCode,
         participant.LabName,
         participant.ContactName,
-        participant.IsActive);
+        participant.IsActive,
+        participant.LoginInstructionsSent);
 }

@@ -619,6 +619,18 @@ public class SchemePreviousYearRenderTests : IClassFixture<WebApplicationFactory
         Assert.Contains("add-test", page.Commands);
     }
 
+    [Fact]
+    public async Task Create_PrimaryTestConsultantOffersInternalAndExternalConsultants()
+    {
+        var page = await PageAsync("/Scheme/Create", scheme: null);
+
+        var primary = Assert.Single(page.Named("TestConsultant1"));
+        var deputy = Assert.Single(page.Named("TestConsultant2"));
+
+        Assert.Equal(["- Please Select -", "Ada Internal", "Ben Deputy", "Cleo External"], SchemeFormPage.OptionTexts(primary));
+        Assert.Equal(["None", "Ada Internal", "Ben Deputy", "Cleo External"], SchemeFormPage.OptionTexts(deputy));
+    }
+
     [Theory]
     [InlineData("Details")]
     [InlineData("Edit")]

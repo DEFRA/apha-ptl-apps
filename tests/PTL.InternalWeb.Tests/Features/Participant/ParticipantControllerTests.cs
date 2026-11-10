@@ -7,8 +7,8 @@ namespace PTL.InternalWeb.Tests.Features.Participant;
 
 public class ParticipantControllerTests
 {
-    private static PTL.InternalWeb.Features.Participant.ParticipantController CreateController(FakeParticipantApiClient apiClient, FakeCustomerApiClient? customerApiClient = null) =>
-        new(apiClient, customerApiClient ?? new FakeCustomerApiClient(), new FakeLookupApiClient(), new FakeLabelPrinterApiClient(), NullLogger<PTL.InternalWeb.Features.Participant.ParticipantController>.Instance);
+    private static PTL.InternalWeb.Features.Participant.ParticipantController CreateController(FakeParticipantApiClient apiClient, FakeCustomerApiClient? customerApiClient = null, FakeLoginInstructionsApiClient? loginInstructionsApiClient = null) =>
+        new(apiClient, customerApiClient ?? new FakeCustomerApiClient(), new FakeLookupApiClient(), new FakeLabelPrinterApiClient(), loginInstructionsApiClient ?? new FakeLoginInstructionsApiClient(), NullLogger<PTL.InternalWeb.Features.Participant.ParticipantController>.Instance);
 
     private static ParticipantResponse SampleParticipant(Guid participantId, Guid customerId, bool isActive = true) => new(
         participantId,
@@ -103,7 +103,7 @@ public class ParticipantControllerTests
         };
         var controller = new PTL.InternalWeb.Features.Participant.ParticipantController(
             new FakeParticipantApiClient { ParticipantResponse = participant }, new FakeCustomerApiClient(), lookupApiClient,
-            new FakeLabelPrinterApiClient(), NullLogger<PTL.InternalWeb.Features.Participant.ParticipantController>.Instance);
+            new FakeLabelPrinterApiClient(), new FakeLoginInstructionsApiClient(), NullLogger<PTL.InternalWeb.Features.Participant.ParticipantController>.Instance);
 
         var result = await controller.Details(participantId, CancellationToken.None);
 

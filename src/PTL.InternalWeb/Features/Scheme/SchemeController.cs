@@ -590,7 +590,7 @@ public class SchemeController(ISchemeApiClient schemeApiClient, ILookupApiClient
 
         // Legacy's Primary Test Consultant dropdown opens on "- Please Select -" (it is required);
         // Deputy and Secondary are optional and open on "None".
-        model.PrimaryTestConsultantOptions = WithPlaceholder(consultants.Where(c => !c.IsExternal).Select(c => new SelectListItem(c.FriendlyName, c.UserId.ToString())), "- Please Select -");
+        model.PrimaryTestConsultantOptions = WithPlaceholder(consultants.Select(c => new SelectListItem(c.FriendlyName, c.UserId.ToString())), "- Please Select -");
         model.TestConsultantOptions = WithNone(consultants.Select(c => new SelectListItem(c.FriendlyName, c.UserId.ToString())));
         model.AssessorOptions = WithNone(assessors.Select(a => new SelectListItem(a.FriendlyName, a.UserId.ToString())));
         model.ViewerOptions = viewers.Select(v => new SelectListItem(v.Name, v.ViewerId.ToString())).ToList();

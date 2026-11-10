@@ -586,17 +586,6 @@ public sealed class SchemeService(
             }
         }
 
-        // Legacy populates the Primary Test Consultant dropdown from internal users only; the
-        // Deputy and Secondary lists also include external consultants.
-        if (!scheme.RequiresAssessment && scheme.TestConsultant1 is { } primary && primary != Guid.Empty)
-        {
-            var consultants = await lookupRepository.GetTestConsultantsAsync(cancellationToken);
-            if (consultants.Any(c => c.UserId == primary && c.IsExternal))
-            {
-                errors.Add(new SchemeValidationError(nameof(Scheme.TestConsultant1), "The Primary Test Consultant must be an internal Test Consultant"));
-            }
-        }
-
         if (errors.Count > 0)
         {
             LogSchemeValidationFailedMessage(logger, scheme.SchemeId, string.Join("; ", errors.Select(e => e.Message)), null);

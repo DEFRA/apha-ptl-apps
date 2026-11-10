@@ -9,4 +9,5 @@ public sealed record ViewerResponse(
     string Name,
     string Email,
     IReadOnlyList<ViewerSchemeResponse> Schemes,
-    IReadOnlyList<ViewerParticipantResponse> Participants);
+    IReadOnlyList<ViewerParticipantResponse> Participants,
+    bool LoginInstructionsSent = false);

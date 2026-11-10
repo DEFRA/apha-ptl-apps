@@ -10,7 +10,7 @@ namespace PTL.InternalWeb.Tests.Features.Participant;
 public class ParticipantViewerControllerTests
 {
     private static PTL.InternalWeb.Features.Participant.ParticipantController CreateController(FakeParticipantApiClient apiClient) =>
-        new(apiClient, new FakeCustomerApiClient(), new FakeLookupApiClient(), new FakeLabelPrinterApiClient(), NullLogger<PTL.InternalWeb.Features.Participant.ParticipantController>.Instance)
+        new(apiClient, new FakeCustomerApiClient(), new FakeLookupApiClient(), new FakeLabelPrinterApiClient(), new FakeLoginInstructionsApiClient(), NullLogger<PTL.InternalWeb.Features.Participant.ParticipantController>.Instance)
         {
             TempData = new TempDataDictionary(new DefaultHttpContext(), new FakeTempDataProvider())
         };

@@ -35,6 +35,7 @@ public class SystemAdministrationControllerTests
         FakeLookupApiClient? lookupApiClient = null,
         FakeExternalTestConsultantApiClient? externalTestConsultantApiClient = null,
         FakeViewerApiClient? viewerApiClient = null,
+        FakeLoginInstructionsApiClient? loginInstructionsApiClient = null,
         FakeStaffDirectoryService? staffDirectoryService = null) =>
         new(
             new SystemAdministrationApiClients
@@ -48,7 +49,8 @@ public class SystemAdministrationControllerTests
                 Role = roleApiClient ?? new FakeRoleApiClient(),
                 Lookup = lookupApiClient ?? new FakeLookupApiClient(),
                 ExternalTestConsultant = externalTestConsultantApiClient ?? new FakeExternalTestConsultantApiClient(),
-                Viewer = viewerApiClient ?? new FakeViewerApiClient()
+                Viewer = viewerApiClient ?? new FakeViewerApiClient(),
+                LoginInstructions = loginInstructionsApiClient ?? new FakeLoginInstructionsApiClient()
             },
             staffDirectoryService ?? new FakeStaffDirectoryService(),
             NullLogger<SystemAdministrationController>.Instance)

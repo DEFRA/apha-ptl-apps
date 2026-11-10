@@ -12,6 +12,9 @@ public sealed class ViewerEntity
     public Guid SsoId { get; set; }
     public Guid? SsoIdExt { get; set; }
 
+    // Set only by the Send Instructions action; the database clears it when the email address changes.
+    public bool LoginInstructionsSent { get; set; }
+
     // Only populated by GetAllWithAssignmentsAsync (the admin grid's read) - GetAllAsync's plain
     // single-result-set read leaves these at their empty default, matching its existing callers
     // (e.g. ParticipantService's "available viewers to assign" list) which never needed them.

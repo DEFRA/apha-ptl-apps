@@ -11,7 +11,7 @@ public class ParticipantControllerLabelsTests
 {
     private static ParticipantController CreateController(FakeParticipantApiClient? participantApiClient = null, FakeLookupApiClient? lookupApiClient = null, FakeCustomerApiClient? customerApiClient = null, FakeLabelPrinterApiClient? labelPrinterApiClient = null) =>
         new(participantApiClient ?? new FakeParticipantApiClient(), customerApiClient ?? new FakeCustomerApiClient(), lookupApiClient ?? new FakeLookupApiClient(),
-            labelPrinterApiClient ?? new FakeLabelPrinterApiClient(), NullLogger<ParticipantController>.Instance);
+            labelPrinterApiClient ?? new FakeLabelPrinterApiClient(), new FakeLoginInstructionsApiClient(), NullLogger<ParticipantController>.Instance);
 
     private static ParticipantResponse SampleParticipant(Guid participantId, Guid customerId, Guid countryId) => new(
         participantId, Guid.NewGuid(), customerId, "LAB-01", "Sample Laboratory", Guid.NewGuid(), "Alice Example",
