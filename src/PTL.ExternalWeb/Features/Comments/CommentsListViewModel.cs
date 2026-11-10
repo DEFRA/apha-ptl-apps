@@ -1,10 +1,21 @@
-using PTL.Contracts.Distribution;
-
 namespace PTL.ExternalWeb.Features.Comments;
 
 public sealed record CommentsListViewModel(
-    IReadOnlyList<TestConsultantDistributionResponse> Distributions,
-    string? Search)
+    IReadOnlyList<CommentsDistributionListRow> Distributions,
+    string? DistributionReference,
+    string? SchemeCode,
+    string? SchemeName)
 {
-    public bool IsFiltered => !string.IsNullOrWhiteSpace(Search);
+    public bool IsFiltered =>
+        !string.IsNullOrWhiteSpace(DistributionReference)
+        || !string.IsNullOrWhiteSpace(SchemeCode)
+        || !string.IsNullOrWhiteSpace(SchemeName);
 }
+
+public sealed record CommentsDistributionListRow(
+    Guid MonthlyDistributionSchemeId,
+    string DistributionReference,
+    string SchemeCode,
+    string SchemeName,
+    DateTime TargetDate,
+    string CommentStatus);

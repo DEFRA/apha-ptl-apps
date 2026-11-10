@@ -46,12 +46,17 @@ public class CommentsRouteSmokeTests : IClassFixture<PtlExternalWebTestFactory>
         var client = CreateClient(apiClient);
         var cookies = await SignInAsync(client, Guid.NewGuid());
 
-        var response = await CookieForwardingHttpClient.SendWithCookiesAsync(client, HttpMethod.Get, "/Comments/Index?search=Brucella", cookies);
+        var response = await CookieForwardingHttpClient.SendWithCookiesAsync(client, HttpMethod.Get, "/Comments/Index?schemeName=Brucella", cookies);
         var body = await response.Content.ReadAsStringAsync();
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.Contains("D1a/S1 BT: Brucella", body, StringComparison.Ordinal);
-        Assert.DoesNotContain("D2a/S2 PTX: Salmonella", body, StringComparison.Ordinal);
+        Assert.Contains("<th scope=\"col\" class=\"govuk-table__header\">Distribution reference</th>", body, StringComparison.Ordinal);
+        Assert.Contains("<th scope=\"col\" class=\"govuk-table__header\">Scheme code</th>", body, StringComparison.Ordinal);
+        Assert.Contains("<th scope=\"col\" class=\"govuk-table__header\">Scheme name</th>", body, StringComparison.Ordinal);
+        Assert.Contains("<td class=\"govuk-table__cell\">D1a</td>", body, StringComparison.Ordinal);
+        Assert.Contains("<td class=\"govuk-table__cell\">S1 BT</td>", body, StringComparison.Ordinal);
+        Assert.Contains("<td class=\"govuk-table__cell\">Brucella</td>", body, StringComparison.Ordinal);
+        Assert.DoesNotContain("Salmonella", body, StringComparison.Ordinal);
     }
 
     [Fact]

@@ -78,7 +78,6 @@ else
         <thead class="govuk-table__head">
             <tr class="govuk-table__row">
                 <partial name="_DistributionReferenceSchemeHeaders" model="sortHeaders" />
-                <partial name="_SortableHeader" model="@(sortHeaders.Header("Report name", "tabulationName"))" />
                 <partial name="_SortableHeader" model="@(sortHeaders.Header("Distribution date", "distributionDate"))" />
                 <th scope="col" class="govuk-table__header">Report</th>
             </tr>
@@ -90,7 +89,6 @@ else
                     <td class="govuk-table__cell">@tabulation.DistributionReference</td>
                     <td class="govuk-table__cell">@tabulation.SchemeCode</td>
                     <td class="govuk-table__cell">@tabulation.SchemeName</td>
-                    <td class="govuk-table__cell">@tabulation.TabulationName</td>
                     <td class="govuk-table__cell">@tabulation.DistributionDate.ToString("dddd d MMMM yyyy", CultureInfo.InvariantCulture)</td>
                     <td class="govuk-table__cell">
                         <a class="govuk-link"

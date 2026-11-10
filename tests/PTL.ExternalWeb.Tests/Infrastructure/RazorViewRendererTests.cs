@@ -47,6 +47,7 @@ public class RazorViewRendererTests : IClassFixture<PtlExternalWebTestFactory>
 
         Assert.True(header >= 0 && header < titleRow);
         Assert.True(title > titleRow && date > title);
+        Assert.DoesNotContain("<h3>Summary</h3>", html, StringComparison.Ordinal);
         Assert.Contains("Date Of Distribution: 01/05/2026", html[date..], StringComparison.Ordinal);
     }
 
