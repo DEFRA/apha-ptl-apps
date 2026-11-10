@@ -120,7 +120,6 @@ public class ParticipantSchemeController(
             YearId = contract.YearId,
             ParticipantId = participantId,
             SchemeId = schemeId,
-            SchemeSearchTerm = schemeList.SchemeSearchTerm,
             SchemeOptionsPage = schemeList.Page,
             SchemeOptionsPageSize = PTL.SharedUI.Pagination.PaginationModel.AvailablePageSizes.Contains(schemeList.PageSize.GetValueOrDefault())
                 ? schemeList.PageSize
@@ -354,7 +353,7 @@ public class ParticipantSchemeController(
 
         var request = new SchemeSearchRequest(
             model.YearId.GetValueOrDefault(),
-            model.SchemeSearchTerm,
+            SearchTerm: null,
             model.SchemeOptionsPage.GetValueOrDefault(1),
             model.SchemeOptionsPageSize.GetValueOrDefault(PTL.SharedUI.Pagination.PaginationModel.DefaultPageSize));
         var result = await schemeApiClient.GetSchemesForYearAsync(request, cancellationToken);

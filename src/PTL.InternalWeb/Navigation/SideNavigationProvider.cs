@@ -369,6 +369,8 @@ public static class SideNavigationProvider
                         new SideNavigationItem { Text = "Printable Scheme", ControllerName = SchemeControllerName, ActionName = "PrintableScheme", IsHidden = true }
                     ]
                 },
+                // Legacy sitemap: "Search" ("Search for a scheme") sits directly under Manage Schemes, after Schemes.
+                new SideNavigationItem { Text = "Search", ControllerName = SchemeControllerName, ActionName = "Search" },
                 new SideNavigationItem { Text = "Test Types", ControllerName = "SchemeAdmin", ActionName = "TestType" },
                 new SideNavigationItem { Text = "Test Result Items", ControllerName = "SchemeAdmin", ActionName = "TestResultItemType" },
                 new SideNavigationItem { Text = "Test Method Items", ControllerName = "SchemeAdmin", ActionName = "TestMethodItemType" },

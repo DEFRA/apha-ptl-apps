@@ -13,4 +13,8 @@ public interface ISearchRepository
 
     // dbo.spgSearchSchemeBySampleNumber - rows come back ordered by sample number, as in legacy.
     Task<IReadOnlyList<SampleNumberSearchRow>> SearchBySampleNumberAsync(SampleNumberSearchCriteria criteria, CancellationToken cancellationToken = default);
+
+    // dbo.spgaSearchSchemeBySchemeName takes no parameters and returns every scheme (one row per
+    // scheme per year); matching on the name is done by the caller, as in legacy.
+    Task<IReadOnlyList<SchemeNameSearchRow>> GetAllSchemesForNameSearchAsync(CancellationToken cancellationToken = default);
 }

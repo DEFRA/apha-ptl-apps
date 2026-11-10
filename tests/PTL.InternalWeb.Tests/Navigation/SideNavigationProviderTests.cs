@@ -62,6 +62,21 @@ public class SideNavigationProviderTests
     }
 
     [Fact]
+    public void Build_ManageSchemes_ListsSearchDirectlyAfterSchemesAsAnEnabledLiveNode()
+    {
+        var manageSchemes = SideNavigationProvider.Build().Single(i => i.Text == "Manage Schemes");
+
+        Assert.Equal(["Schemes", "Search"], manageSchemes.Children.Take(2).Select(c => c.Text));
+
+        var search = SideNavigationProvider.FindNode(SideNavigationProvider.Build(), "Scheme", "Search");
+        Assert.NotNull(search);
+        Assert.Equal("Search", search!.Text);
+        Assert.True(search.IsEnabled);
+        Assert.False(search.IsHidden);
+        Assert.Equal(PTL.InternalWeb.Authorization.PtlPolicies.SchemeAdmin, search.RequiredPolicy);
+    }
+
+    [Fact]
     public void Build_ReturnsNonEmptyTree()
     {
         var tree = SideNavigationProvider.Build();

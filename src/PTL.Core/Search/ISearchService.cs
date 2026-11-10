@@ -11,4 +11,6 @@ public interface ISearchService
     Task<IReadOnlyList<DistributionNumberSearchRow>> SearchByDistributionNumberAsync(DistributionNumberSearchCriteriaRequest criteria, CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<SampleNumberSearchRow>> SearchBySampleNumberAsync(SampleNumberSearchCriteriaRequest criteria, CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<SchemeNameSearchRow>> SearchSchemesByNameAsync(SchemeNameSearchCriteriaRequest criteria, CancellationToken cancellationToken = default);
 }

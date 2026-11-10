@@ -33,6 +33,12 @@ public sealed class SearchService(ISearchRepository searchRepository, ILogger<Se
             new EventId(4, nameof(LogSampleNumberSearchMessage)),
             "Sample number search returned {ResultCount} result(s)");
 
+    private static readonly Action<ILogger, int, Exception?> LogSchemeNameSearchMessage =
+        LoggerMessage.Define<int>(
+            LogLevel.Information,
+            new EventId(5, nameof(LogSchemeNameSearchMessage)),
+            "Scheme name search returned {ResultCount} result(s)");
+
     public async Task<IReadOnlyList<CustomerSearchRow>> SearchCustomersAsync(CustomerSearchCriteriaRequest criteria, CancellationToken cancellationToken = default)
     {
         var results = await searchRepository.SearchCustomersAsync(
@@ -79,6 +85,24 @@ public sealed class SearchService(ISearchRepository searchRepository, ILogger<Se
             cancellationToken);
 
         LogSampleNumberSearchMessage(logger, results.Count, null);
+        return results;
+    }
+
+    // Legacy SearchSchemeBySchemeNameCollection.GetSearchedList: the search text is split on spaces and a
+    // scheme is kept only when its name contains every word (case-insensitive); a blank search keeps
+    // every scheme. The result is sorted by Scheme Name.
+    public async Task<IReadOnlyList<SchemeNameSearchRow>> SearchSchemesByNameAsync(SchemeNameSearchCriteriaRequest criteria, CancellationToken cancellationToken = default)
+    {
+        var all = await searchRepository.GetAllSchemesForNameSearchAsync(cancellationToken);
+        var words = (criteria.SchemeName ?? string.Empty).Split(' ', StringSplitOptions.RemoveEmptyEntries);
+
+        var results = all
+            .Where(row => words.All(word => (row.SchemeName ?? string.Empty).Contains(word, StringComparison.OrdinalIgnoreCase)))
+            .OrderBy(row => row.SchemeName, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(row => row.Year, StringComparer.Ordinal)
+            .ToList();
+
+        LogSchemeNameSearchMessage(logger, results.Count, null);
         return results;
     }
 }

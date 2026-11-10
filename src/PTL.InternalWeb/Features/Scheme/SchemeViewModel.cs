@@ -2,21 +2,28 @@ using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using PTL.Contracts.Scheme;
+using PTL.Contracts.Search;
 using PTL.Core.Scheme;
 using CoreScheme = PTL.Core.Scheme.Scheme;
 using CoreSchemeIdentifier = PTL.Core.Scheme.SchemeIdentifier;
 
 namespace PTL.InternalWeb.Features.Scheme;
 
-// Legacy SchemeList.aspx has no year filter; the Scheme Name search box is carried over from the
-// legacy Scheme Admin/Search.aspx page, which this screen now absorbs - a plain substring match,
-// no other filtering behaviour.
+// Legacy SchemeList.aspx has no year filter and no search box; Scheme Name search lives on its own
+// Search page (SchemeSearchViewModel).
 public sealed record SchemeListViewModel(
     int Page,
     int PageSize,
     int TotalCount,
-    string? SearchTerm,
     IReadOnlyList<SchemeSummaryResponse> Schemes);
+
+// Legacy Scheme Admin/Search.aspx. Results is null until a search has been run, so a first visit shows
+// only the search box (legacy hides the results panel until Search is pressed).
+public sealed record SchemeSearchViewModel(string? SchemeName, IReadOnlyList<SchemeNameSearchResultResponse>? Results)
+{
+    // Legacy TextboxSchemeName MaxLength.
+    public const int SchemeNameMaxLength = 100;
+}
 
 // Legacy SchemeHistory.aspx.vb GetYearNameFromYearId() resolves each row's YearId against
 // YearCollection and displays the "2026/27"-style label, not the raw integer.
