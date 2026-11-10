@@ -1,0 +1,2 @@
+# Accepted image vulnerabilities, one ID per line (CVE-... or GHSA-...), read by .github/actions/trivy-image-scan.
+# Always give a reason and an expiry so the risk is reviewed: CVE-2026-00000 exp:2026-12-31
