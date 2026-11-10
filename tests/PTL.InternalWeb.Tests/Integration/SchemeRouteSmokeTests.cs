@@ -6,6 +6,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using PTL.ApiClient;
 using PTL.Contracts.Participant;
 using PTL.Contracts.Scheme;
+using PTL.Contracts.Search;
 using PTL.InternalWeb.Tests.TestSupport;
 
 namespace PTL.InternalWeb.Tests.Integration;
@@ -17,6 +18,7 @@ public class SchemeRouteSmokeTests : IClassFixture<WebApplicationFactory<Program
 {
     private readonly WebApplicationFactory<Program> _factory;
     private readonly FakeSchemeApiClient _fakeApiClient;
+    private readonly FakeSearchApiClient _fakeSearchApiClient = new();
 
     public SchemeRouteSmokeTests(WebApplicationFactory<Program> factory)
     {
@@ -39,6 +41,8 @@ public class SchemeRouteSmokeTests : IClassFixture<WebApplicationFactory<Program
             {
                 services.RemoveAll<ISchemeApiClient>();
                 services.AddSingleton<ISchemeApiClient>(_fakeApiClient);
+                services.RemoveAll<ISearchApiClient>();
+                services.AddSingleton<ISearchApiClient>(_fakeSearchApiClient);
                 services.RemoveAll<ILookupApiClient>();
                 services.AddSingleton<ILookupApiClient>(new FakeLookupApiClient());
             }));
@@ -58,6 +62,7 @@ public class SchemeRouteSmokeTests : IClassFixture<WebApplicationFactory<Program
 
     [Theory]
     [InlineData("/Scheme/Index")]
+    [InlineData("/Scheme/Search")]
     [InlineData("/Scheme/Create")]
     public async Task StaticRoutes_ReturnSuccess(string url)
     {
@@ -319,11 +324,76 @@ public class SchemeRouteSmokeTests : IClassFixture<WebApplicationFactory<Program
         _fakeApiClient.SearchResponse = new SchemeSearchResponse([], 0, 1, 20);
         var client = _factory.CreateClient();
 
-        var response = await client.GetAsync("/Scheme/Index?yearId=2027&searchTerm=nothing-matches");
+        var response = await client.GetAsync("/Scheme/Index?yearId=2027");
         var body = await response.Content.ReadAsStringAsync();
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Contains("There are no schemes to display", body);
+    }
+
+    // Legacy SchemeList.aspx has no search box - Scheme Name search is the separate Search page.
+    [Fact]
+    public async Task Index_HasNoSearchBox_AndIgnoresALegacySearchTerm()
+    {
+        var client = _factory.CreateClient();
+
+        var body = await client.GetStringAsync("/Scheme/Index?searchTerm=nothing-matches");
+
+        Assert.DoesNotContain("searchTerm", body, StringComparison.Ordinal);
+        Assert.DoesNotContain("name=\"schemeName\"", body, StringComparison.Ordinal);
+        Assert.Null(_fakeApiClient.LastFamiliesSearchTerm);
+        Assert.DoesNotContain("There are no schemes to display", body, StringComparison.Ordinal);
+        Assert.Contains("govuk-table", body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Search_FirstVisit_ShowsTheSearchBoxWithoutResults()
+    {
+        var client = _factory.CreateClient();
+
+        var body = await client.GetStringAsync("/Scheme/Search");
+
+        Assert.Contains("Use the search box below to identify the required Scheme by Scheme Name.", body, StringComparison.Ordinal);
+        Assert.Contains("for=\"schemeName\"", body, StringComparison.Ordinal);
+        Assert.DoesNotContain("Search Results:", body, StringComparison.Ordinal);
+        Assert.Empty(_fakeSearchApiClient.SchemeSearches);
+    }
+
+    [Fact]
+    public async Task Search_WithResults_ListsEachSchemeWithAViewLinkToItsDetails()
+    {
+        var schemeId = Guid.NewGuid();
+        _fakeSearchApiClient.SchemeResults = [new SchemeNameSearchResultResponse(schemeId, "Salmonella", "PT1234", "2026/27")];
+        var client = _factory.CreateClient();
+
+        var body = await client.GetStringAsync("/Scheme/Search?schemeName=salmon&searched=true");
+
+        Assert.Contains("Search Results:", body, StringComparison.Ordinal);
+        Assert.Contains("<td class=\"govuk-table__cell\">Salmonella</td>", body, StringComparison.Ordinal);
+        Assert.Contains("<td class=\"govuk-table__cell\">2026/27</td>", body, StringComparison.Ordinal);
+        Assert.Matches($"<a class=\"govuk-link\" href=\"/Scheme/Details/{schemeId}\">View", body);
+        Assert.Contains("value=\"salmon\"", body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Search_NoMatches_ShowsTheLegacyEmptyMessage()
+    {
+        _fakeSearchApiClient.SchemeResults = [];
+        var client = _factory.CreateClient();
+
+        var body = await client.GetStringAsync("/Scheme/Search?schemeName=zzz&searched=true");
+
+        Assert.Contains("There are no Results to Display", body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Search_LeftNavigationOffersSearchUnderManageSchemes()
+    {
+        var client = _factory.CreateClient();
+
+        var body = await client.GetStringAsync("/Scheme/ManageSchemes");
+
+        Assert.Matches("<a[^>]*href=\"/Scheme/Search\"[^>]*>\\s*Search\\s*</a>", body);
     }
 
     [Fact]

@@ -416,4 +416,84 @@ public class SearchServiceTests
         Assert.Contains("1", entry.Message, StringComparison.Ordinal);
         Assert.DoesNotContain("S-SECRET", entry.Message, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public async Task SearchSchemesByNameAsync_EveryWordMustAppearInTheName_CaseInsensitive()
+    {
+        var (service, repository, _) = CreateService();
+        repository.SchemeNameRows =
+        [
+            new SchemeNameSearchRow { SchemeName = "Salmonella Isolation", SchemeIdentifier = "PT1" },
+            new SchemeNameSearchRow { SchemeName = "Salmonella Typing", SchemeIdentifier = "PT2" },
+            new SchemeNameSearchRow { SchemeName = "Brucella Isolation", SchemeIdentifier = "PT3" },
+        ];
+
+        var results = await service.SearchSchemesByNameAsync(new SchemeNameSearchCriteriaRequest("SALMONELLA  isolation"));
+
+        Assert.Equal("PT1", Assert.Single(results).SchemeIdentifier);
+    }
+
+    [Fact]
+    public async Task SearchSchemesByNameAsync_BlankOrNullName_ReturnsEverySchemeSortedByName()
+    {
+        var (service, repository, _) = CreateService();
+        repository.SchemeNameRows =
+        [
+            new SchemeNameSearchRow { SchemeName = "beta", Year = "2026/27" },
+            new SchemeNameSearchRow { SchemeName = "Alpha", Year = "2026/27" },
+            new SchemeNameSearchRow { SchemeName = "Alpha", Year = "2025/26" },
+        ];
+
+        var blank = await service.SearchSchemesByNameAsync(new SchemeNameSearchCriteriaRequest("   "));
+        var none = await service.SearchSchemesByNameAsync(new SchemeNameSearchCriteriaRequest());
+
+        Assert.Equal(["Alpha", "Alpha", "beta"], blank.Select(r => r.SchemeName));
+        Assert.Equal(["2025/26", "2026/27"], blank.Take(2).Select(r => r.Year));
+        Assert.Equal(3, none.Count);
+    }
+
+    [Fact]
+    public async Task SearchSchemesByNameAsync_NullSchemeName_IsNeverMatchedByAWord()
+    {
+        var (service, repository, _) = CreateService();
+        repository.SchemeNameRows = [new SchemeNameSearchRow { SchemeName = null }];
+
+        Assert.Empty(await service.SearchSchemesByNameAsync(new SchemeNameSearchCriteriaRequest("x")));
+        Assert.Single(await service.SearchSchemesByNameAsync(new SchemeNameSearchCriteriaRequest()));
+    }
+
+    [Fact]
+    public async Task SearchSchemesByNameAsync_NoMatches_ReturnsEmptyList()
+    {
+        var (service, repository, _) = CreateService();
+        repository.SchemeNameRows = [new SchemeNameSearchRow { SchemeName = "Alpha" }];
+
+        Assert.Empty(await service.SearchSchemesByNameAsync(new SchemeNameSearchCriteriaRequest("zzz")));
+    }
+
+    [Fact]
+    public async Task SearchSchemesByNameAsync_ForwardsTheCancellationTokenAndPropagatesFailures()
+    {
+        var (service, repository, _) = CreateService();
+        using var source = new CancellationTokenSource();
+
+        await service.SearchSchemesByNameAsync(new SchemeNameSearchCriteriaRequest(), source.Token);
+        Assert.Equal(source.Token, repository.LastCancellationToken);
+
+        repository.Failure = new InvalidOperationException("db down");
+        await Assert.ThrowsAsync<InvalidOperationException>(() => service.SearchSchemesByNameAsync(new SchemeNameSearchCriteriaRequest("x")));
+    }
+
+    [Fact]
+    public async Task SearchSchemesByNameAsync_LogsOnlyTheResultCount_NeverTheSearchText()
+    {
+        var (service, repository, logger) = CreateService();
+        repository.SchemeNameRows = [new SchemeNameSearchRow { SchemeName = "Secretname" }];
+
+        await service.SearchSchemesByNameAsync(new SchemeNameSearchCriteriaRequest("Secretname"));
+
+        var entry = Assert.Single(logger.Entries);
+        Assert.Contains("1", entry.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("Secretname", entry.Message, StringComparison.Ordinal);
+    }
 }

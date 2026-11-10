@@ -69,3 +69,13 @@ public class SampleNumberSearchRow
     public int MonthId { get; set; }
     public string? Year { get; set; }
 }
+
+// Keyless projection of a dbo.spgaSearchSchemeBySchemeName result row; Year is the procedure's own
+// "2026/27" style label.
+public class SchemeNameSearchRow
+{
+    public Guid SchemeId { get; set; }
+    public string? SchemeName { get; set; }
+    public string? SchemeIdentifier { get; set; }
+    public string? Year { get; set; }
+}

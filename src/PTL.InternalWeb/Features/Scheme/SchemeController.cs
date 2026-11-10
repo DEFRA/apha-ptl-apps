@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging;
 using PTL.ApiClient;
 using PTL.Contracts.Lookup;
 using PTL.Contracts.Scheme;
+using PTL.Contracts.Search;
 using PTL.Core.Scheme;
 using PTL.InternalWeb.AuditReason;
 using PTL.InternalWeb.Authorization;
@@ -18,7 +19,7 @@ namespace PTL.InternalWeb.Features.Scheme;
 
 // Legacy "Scheme Admin" folder - requires the Scheme Admin role (PtlPolicies.SchemeAdmin).
 [Authorize(Policy = PtlPolicies.SchemeAdmin)]
-public class SchemeController(ISchemeApiClient schemeApiClient, ILookupApiClient lookupApiClient, ILogger<SchemeController> logger) : Controller
+public class SchemeController(ISchemeApiClient schemeApiClient, ILookupApiClient lookupApiClient, ISearchApiClient searchApiClient, ILogger<SchemeController> logger) : Controller
 {
     // The form for a closed-year (Previous Year) scheme: legacy opens the same page as for any other year,
     // with most of it locked and Apply and Back in place of Save and Cancel.
@@ -76,14 +77,33 @@ public class SchemeController(ISchemeApiClient schemeApiClient, ILookupApiClient
     // supplies the actual section contents.
     public IActionResult ManageSchemes() => View();
 
-    // Legacy SchemeList.aspx has no year filter - the Scheme Name search box is the only filter,
-    // searching across every scheme family regardless of year.
-    public async Task<IActionResult> Index(string? searchTerm = null, int page = 1, int pageSize = PTL.SharedUI.Pagination.PaginationModel.DefaultPageSize, CancellationToken cancellationToken = default)
+    // Legacy SchemeList.aspx has no year filter and no search box - Scheme Name search is the separate
+    // Search page (Scheme Admin/Search.aspx), reached from Manage Schemes > Search.
+    public async Task<IActionResult> Index(int page = 1, int pageSize = PTL.SharedUI.Pagination.PaginationModel.DefaultPageSize, CancellationToken cancellationToken = default)
     {
-        var result = await schemeApiClient.GetSchemeFamiliesAsync(page, pageSize, searchTerm, cancellationToken);
-        LogDisplayedSchemeListMessage(logger, 0, searchTerm, result.Page, result.TotalCount, null);
+        var result = await schemeApiClient.GetSchemeFamiliesAsync(page, pageSize, searchTerm: null, cancellationToken);
+        LogDisplayedSchemeListMessage(logger, 0, null, result.Page, result.TotalCount, null);
 
-        return View(new SchemeListViewModel(result.Page, result.PageSize, result.TotalCount, searchTerm, result.Items));
+        return View(new SchemeListViewModel(result.Page, result.PageSize, result.TotalCount, result.Items));
+    }
+
+    // Legacy Scheme Admin/Search.aspx: "Use the search box below to identify the required Scheme by
+    // Scheme Name." Nothing is listed until Search is pressed (searched); a blank name then lists every
+    // scheme, and each row's View link opens that scheme.
+    [HttpGet]
+    public async Task<IActionResult> Search(string? schemeName = null, bool searched = false, CancellationToken cancellationToken = default)
+    {
+        if (schemeName is { Length: > SchemeSearchViewModel.SchemeNameMaxLength })
+        {
+            ModelState.AddModelError(nameof(schemeName), $"Scheme Name must be {SchemeSearchViewModel.SchemeNameMaxLength} characters or fewer");
+            return View(new SchemeSearchViewModel(schemeName, null));
+        }
+
+        var results = searched
+            ? await searchApiClient.SearchSchemesByNameAsync(new SchemeNameSearchCriteriaRequest(schemeName), cancellationToken)
+            : null;
+
+        return View(new SchemeSearchViewModel(schemeName, results));
     }
 
     // Legacy SchemeListForPrinting.aspx: the same spgaSchemeInfo family list as the main Scheme
@@ -94,7 +114,7 @@ public class SchemeController(ISchemeApiClient schemeApiClient, ILookupApiClient
         var result = await schemeApiClient.GetSchemeFamiliesAsync(page, pageSize, searchTerm: null, cancellationToken);
         LogDisplayedSchemeListMessage(logger, 0, null, result.Page, result.TotalCount, null);
 
-        return View(new SchemeListViewModel(result.Page, result.PageSize, result.TotalCount, null, result.Items));
+        return View(new SchemeListViewModel(result.Page, result.PageSize, result.TotalCount, result.Items));
     }
 
     // Legacy PrintableScheme.aspx: a standalone worksheet (no site chrome) built from the same

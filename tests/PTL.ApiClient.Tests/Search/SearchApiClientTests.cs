@@ -146,4 +146,31 @@ public class SearchApiClientTests
 
         await Assert.ThrowsAsync<HttpRequestException>(() => client.SearchParticipantsAsync(new ParticipantSearchCriteriaRequest()));
     }
+
+    [Fact]
+    public async Task SearchSchemesByNameAsync_BuildsTheEscapedUrlAndReturnsTheRows()
+    {
+        const string json = """[{"schemeId":"11111111-1111-1111-1111-111111111111","schemeName":"Salmonella","schemeIdentifier":"PT1234","year":"2026/27"}]""";
+        var (client, requests) = CreateClient(HttpStatusCode.OK, json);
+
+        var result = await client.SearchSchemesByNameAsync(new SchemeNameSearchCriteriaRequest("Sal & mon"));
+
+        var uri = Assert.Single(requests)!;
+        Assert.Equal("/api/search/schemes", uri.AbsolutePath);
+        Assert.Equal("?schemeName=Sal%20%26%20mon", uri.Query);
+        var row = Assert.Single(result);
+        Assert.Equal("Salmonella", row.SchemeName);
+        Assert.Equal("2026/27", row.Year);
+    }
+
+    [Fact]
+    public async Task SearchSchemesByNameAsync_NullNameSendsEmptyValue_AndNullResponseReturnsEmptyList()
+    {
+        var (client, requests) = CreateClient(HttpStatusCode.OK, "null");
+
+        var result = await client.SearchSchemesByNameAsync(new SchemeNameSearchCriteriaRequest());
+
+        Assert.Equal("?schemeName=", Assert.Single(requests)!.Query);
+        Assert.Empty(result);
+    }
 }

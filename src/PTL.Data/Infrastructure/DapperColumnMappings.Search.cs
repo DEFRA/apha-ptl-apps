@@ -52,5 +52,14 @@ public static partial class DapperColumnMappings
             [ColMonthId] = nameof(SampleNumberSearchRow.MonthId),
             ["fldYear"] = nameof(SampleNumberSearchRow.Year),
         });
+
+        // spgaSearchSchemeBySchemeName result columns (Scheme Admin/Search.aspx).
+        Map<SchemeNameSearchRow>(new(StringComparer.OrdinalIgnoreCase)
+        {
+            [ColSchemeId] = nameof(SchemeNameSearchRow.SchemeId),
+            [ColSchemeName] = nameof(SchemeNameSearchRow.SchemeName),
+            ["fldSchemeIdentifier"] = nameof(SchemeNameSearchRow.SchemeIdentifier),
+            ["fldYear"] = nameof(SchemeNameSearchRow.Year),
+        });
     }
 }

@@ -14,7 +14,7 @@ public sealed record ParticipantSchemeDetailsViewModel(ParticipantSchemeFormView
 // The scheme list's query string on Create. Bundled into one object so the action stays under Sonar's
 // 7-parameter limit (S107); page and pageSize are the names govuk-pagination and
 // govuk-page-size-selector submit.
-public sealed record SchemeListQuery(string? SchemeSearchTerm = null, int? Page = null, int? PageSize = null);
+public sealed record SchemeListQuery(int? Page = null, int? PageSize = null);
 
 // Shared by Create.cshtml and Edit.cshtml. Participant/Scheme selection only happens on Create -
 // legacy hides DropDownParticipant/GridViewSchemes once mParticipantScheme.IsNew is false, so Edit
@@ -41,8 +41,6 @@ public sealed class ParticipantSchemeFormViewModel
 
     // Populated on Create only, while no SchemeId has been chosen yet - matches legacy
     // GridViewSchemes (paged list of SchemeInfoCollection.FetchSchemeInfoCollectionByYearId).
-    public string? SchemeSearchTerm { get; set; }
-
     public IReadOnlyList<SchemeSummaryResponse> SchemeOptions { get; set; } = [];
 
     public int? SchemeOptionsTotalCount { get; set; }
@@ -57,7 +55,7 @@ public sealed class ParticipantSchemeFormViewModel
         PageSize = SchemeOptionsPageSize.GetValueOrDefault(PaginationModel.DefaultPageSize),
         TotalRecords = SchemeOptionsTotalCount.GetValueOrDefault(),
         Action = "Create",
-        RouteValues = new Dictionary<string, object?> { ["contractId"] = ContractId, ["customerId"] = CustomerId, ["participantId"] = ParticipantId, ["schemeSearchTerm"] = SchemeSearchTerm }
+        RouteValues = new Dictionary<string, object?> { ["contractId"] = ContractId, ["customerId"] = CustomerId, ["participantId"] = ParticipantId }
     };
 
     // Real GOV.UK checkboxes (ASP.NET Core's CheckBoxTagHelper only emits its hidden "false"
