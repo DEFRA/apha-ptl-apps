@@ -22,7 +22,7 @@ public class CommentsControllerTests
         };
         var controller = new CommentsController(api);
 
-        var result = await controller.Index(null, null, "Brucella", CancellationToken.None);
+        var result = await controller.Index(null, null, "Brucella", null, null, CancellationToken.None);
 
         var model = Assert.IsType<CommentsListViewModel>(Assert.IsType<ViewResult>(result).Model);
         var row = Assert.Single(model.Distributions);
@@ -32,16 +32,67 @@ public class CommentsControllerTests
     }
 
     [Fact]
+    public async Task Index_WithoutSort_DefaultsToTargetDateDescending()
+    {
+        var api = new FakeTestConsultantApiClient
+        {
+            Distributions =
+                new TestConsultantDistributionsResponse(
+                [
+                    new TestConsultantDistributionResponse(Guid.NewGuid(), 2026, 6, "B2/PT1: Alpha", new DateTime(2026, 7, 14), false, "Awaiting comments"),
+                    new TestConsultantDistributionResponse(Guid.NewGuid(), 2026, 6, "A1/PT9: Zulu", new DateTime(2026, 7, 14), false, "Submitted"),
+                    new TestConsultantDistributionResponse(Guid.NewGuid(), 2026, 6, "C3/PT2: Beta", new DateTime(2026, 1, 13), false, "Submitted")
+                ])
+        };
+        var controller = new CommentsController(api);
+
+        var result = await controller.Index(null, null, null, null, null, CancellationToken.None);
+
+        var model = Assert.IsType<CommentsListViewModel>(Assert.IsType<ViewResult>(result).Model);
+        Assert.Equal("targetDate", model.SortBy);
+        Assert.Equal("desc", model.SortDirection);
+        Assert.Equal("A1,B2,C3", string.Join(",", model.Distributions.Select(d => d.DistributionReference)));
+    }
+
+    [Theory]
+    [InlineData("reference", "asc", "A1,B2")]
+    [InlineData("reference", "desc", "B2,A1")]
+    [InlineData("schemeCode", "asc", "B2,A1")]
+    [InlineData("schemeName", "asc", "B2,A1")]
+    [InlineData("targetDate", "asc", "B2,A1")]
+    [InlineData("commentsProvidedBy", "asc", "B2,A1")]
+    [InlineData("submitted", "asc", "B2,A1")]
+    public async Task Index_WithSort_SortsDistributions(string sortBy, string sortDir, string expectedOrder)
+    {
+        var api = new FakeTestConsultantApiClient
+        {
+            Distributions =
+                new TestConsultantDistributionsResponse(
+                [
+                    new TestConsultantDistributionResponse(Guid.NewGuid(), 2026, 6, "A1/PT9: Zulu", new DateTime(2026, 6, 30), false, "Submitted"),
+                    new TestConsultantDistributionResponse(Guid.NewGuid(), 2026, 6, "B2/PT1: Alpha", new DateTime(2026, 5, 30), false, "Awaiting comments")
+                ])
+        };
+        var controller = new CommentsController(api);
+
+        var result = await controller.Index(null, null, null, sortBy, sortDir, CancellationToken.None);
+
+        var model = Assert.IsType<CommentsListViewModel>(Assert.IsType<ViewResult>(result).Model);
+        Assert.Equal(expectedOrder, string.Join(",", model.Distributions.Select(d => d.DistributionReference)));
+    }
+
+    [Fact]
     public async Task Entry_Get_WhenTabulationLoads_ReturnsEntryViewModel()
     {
         var api = new FakeTestConsultantApiClient { Tabulation = Ok(Tabulation(submitted: false)) };
         var controller = new CommentsController(api);
 
-        var result = await controller.Entry(Guid.NewGuid(), CancellationToken.None);
+        var result = await controller.Entry(Guid.NewGuid(), "/Comments/Index?schemeName=Brucella", CancellationToken.None);
 
         var model = Assert.IsType<CommentsEntryViewModel>(Assert.IsType<ViewResult>(result).Model);
         Assert.Equal("Title", model.Title);
         Assert.False(model.IsSubmitted);
+        Assert.Equal("/Comments/Index?schemeName=Brucella", model.ReturnUrl);
     }
 
     [Fact]
@@ -60,7 +111,7 @@ public class CommentsControllerTests
     }
 
     [Fact]
-    public async Task Entry_Post_Save_Success_RedirectsToIndex_AndSendsDraftRequest()
+    public async Task Entry_Post_Save_Success_RedirectsToReturnUrl_AndSendsDraftRequest()
     {
         var api = new FakeTestConsultantApiClient
         {
@@ -70,10 +121,15 @@ public class CommentsControllerTests
         var controller = new CommentsController(api);
         var schemeId = Guid.NewGuid();
 
-        var result = await controller.Entry(schemeId, new CommentsEntryViewModel { Comments = "<p>Draft</p>", Acknowledged = false }, "save", CancellationToken.None);
+        var result = await controller.Entry(schemeId, new CommentsEntryViewModel
+        {
+            Comments = "<p>Draft</p>",
+            Acknowledged = false,
+            ReturnUrl = "/Comments/Index?schemeName=Brucella&sortBy=schemeName&sortDir=asc"
+        }, "save", CancellationToken.None);
 
-        var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal(nameof(CommentsController.Index), redirect.ActionName);
+        var redirect = Assert.IsType<LocalRedirectResult>(result);
+        Assert.Equal("/Comments/Index?schemeName=Brucella&sortBy=schemeName&sortDir=asc", redirect.Url);
         var request = Assert.Single(api.SavedRequests);
         Assert.False(request.Submit);
         Assert.Equal("<p>Draft</p>", request.Comments);
@@ -95,17 +151,49 @@ public class CommentsControllerTests
     }
 
     [Fact]
-    public async Task Entry_Post_Cancel_RedirectsToIndex_WithoutLoadingOrSaving()
+    public async Task Entry_Post_Cancel_RedirectsToReturnUrl_WithoutLoadingOrSaving()
     {
         var api = new FakeTestConsultantApiClient { Tabulation = Ok(Tabulation(submitted: false)) };
         var controller = new CommentsController(api);
 
-        var result = await controller.Entry(Guid.NewGuid(), new CommentsEntryViewModel(), "cancel", CancellationToken.None);
+        var result = await controller.Entry(Guid.NewGuid(), new CommentsEntryViewModel
+        {
+            ReturnUrl = "/Comments/Index?distributionReference=D1a"
+        }, "cancel", CancellationToken.None);
 
-        var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal(nameof(CommentsController.Index), redirect.ActionName);
+        var redirect = Assert.IsType<LocalRedirectResult>(result);
+        Assert.Equal("/Comments/Index?distributionReference=D1a", redirect.Url);
         Assert.Equal(0, api.GetTabulationCalls);
         Assert.Empty(api.SavedRequests);
+        Assert.Empty(api.ExportedRequests);
+    }
+
+    [Fact]
+    public async Task Entry_Post_Draw_UsesFilterAndRedisplaysWithoutSaving()
+    {
+        var tabulation = Tabulation(submitted: false) with { SampleNumbers = ["26/1", "26/2"], HasMethodItems = true };
+        var api = new FakeTestConsultantApiClient { Tabulation = Ok(tabulation) };
+        var controller = new CommentsController(api);
+
+        var result = await controller.Entry(Guid.NewGuid(), new CommentsEntryViewModel
+        {
+            Comments = "<p>Edit</p>",
+            IsFiltered = true,
+            AllSamples = ["26/1", "26/2"],
+            ShownSamples = ["26/1"],
+            ShowMethodItems = false,
+            ReturnUrl = "/Comments/Index?schemeName=Brucella"
+        }, "draw", CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<CommentsEntryViewModel>(view.Model);
+        Assert.Equal("<p>Edit</p>", model.Comments);
+        Assert.Equal("/Comments/Index?schemeName=Brucella", model.ReturnUrl);
+        Assert.Equal("/Comments/Index?schemeName=Brucella", controller.ViewData["ListReturnUrl"]);
+        Assert.Empty(api.SavedRequests);
+        var filter = Assert.Single(api.GetTabulationFilters);
+        Assert.Equal(["26/2"], filter.HiddenSamples);
+        Assert.True(filter.HideMethodItems);
     }
 
     [Fact]
@@ -176,6 +264,36 @@ public class CommentsControllerTests
     }
 
     [Fact]
+    public async Task Export_ReturnsFile_WhenApiReturnsAttachment()
+    {
+        var api = new FakeTestConsultantApiClient
+        {
+            ExportResult = new TestConsultantApiResult<TabulationAttachmentFile>(
+                TestConsultantApiStatus.Ok,
+                new TabulationAttachmentFile([1, 2, 3], "application/vnd.ms-excel", "attachment; filename=test.xlsx"))
+        };
+        var controller = new CommentsController(api)
+        {
+            ControllerContext = new ControllerContext { HttpContext = new Microsoft.AspNetCore.Http.DefaultHttpContext() }
+        };
+
+        var result = await controller.Export(Guid.NewGuid(), new CommentsEntryViewModel
+        {
+            IsFiltered = true,
+            AllSamples = ["26/1", "26/2"],
+            ShownSamples = ["26/2"],
+            ShowMethodItems = false
+        }, CancellationToken.None);
+
+        var file = Assert.IsType<FileContentResult>(result);
+        Assert.Equal("application/vnd.ms-excel", file.ContentType);
+        Assert.Equal(new byte[] { 1, 2, 3 }, file.FileContents);
+        var filter = Assert.Single(api.ExportedRequests);
+        Assert.Equal(["26/1"], filter.HiddenSamples);
+        Assert.True(filter.HideMethodItems);
+    }
+
+    [Fact]
     public async Task Entry_Get_NotFoundFromApi_ReturnsNotFound()
     {
         var api = new FakeTestConsultantApiClient
@@ -184,7 +302,7 @@ public class CommentsControllerTests
         };
         var controller = new CommentsController(api);
 
-        var result = await controller.Entry(Guid.NewGuid(), CancellationToken.None);
+        var result = await controller.Entry(Guid.NewGuid(), null, CancellationToken.None);
 
         Assert.IsType<NotFoundResult>(result);
     }
@@ -203,11 +321,67 @@ public class CommentsControllerTests
         Assert.IsType<ForbidResult>(result);
     }
 
+    [Fact]
+    public async Task Export_WhenApiReturnsNotFound_ReturnsNotFound()
+    {
+        var api = new FakeTestConsultantApiClient
+        {
+            ExportResult = new TestConsultantApiResult<TabulationAttachmentFile>(TestConsultantApiStatus.NotFound)
+        };
+        var controller = new CommentsController(api);
+
+        var result = await controller.Export(Guid.NewGuid(), new CommentsEntryViewModel(), CancellationToken.None);
+
+        Assert.IsType<NotFoundResult>(result);
+    }
+
+    [Fact]
+    public async Task Index_WithUnparseableTitle_UsesFallbackValues()
+    {
+        var api = new FakeTestConsultantApiClient
+        {
+            Distributions = new TestConsultantDistributionsResponse(
+            [
+                new TestConsultantDistributionResponse(Guid.NewGuid(), 2026, 6, "Unparseable title", new DateTime(2026, 6, 30), false, "Awaiting comments", "")
+            ])
+        };
+        var controller = new CommentsController(api);
+
+        var result = await controller.Index(null, null, "unparseable", null, null, CancellationToken.None);
+
+        var model = Assert.IsType<CommentsListViewModel>(Assert.IsType<ViewResult>(result).Model);
+        var row = Assert.Single(model.Distributions);
+        Assert.Equal("Unparseable title", row.DistributionReference);
+        Assert.Equal(string.Empty, row.SchemeCode);
+        Assert.Equal("Unparseable title", row.SchemeName);
+    }
+
+    [Fact]
+    public async Task Index_WhenCommentsProvidedByAlreadySet_DoesNotLoadEntryTabulation()
+    {
+        var api = new FakeTestConsultantApiClient
+        {
+            Distributions = new TestConsultantDistributionsResponse(
+            [
+                new TestConsultantDistributionResponse(Guid.NewGuid(), 2026, 6, "D1a/S1 BT: Brucella", new DateTime(2026, 6, 30), false, "Comments submitted", "Dr Who")
+            ])
+        };
+        var controller = new CommentsController(api);
+
+        var result = await controller.Index(null, null, null, null, null, CancellationToken.None);
+
+        var model = Assert.IsType<CommentsListViewModel>(Assert.IsType<ViewResult>(result).Model);
+        var row = Assert.Single(model.Distributions);
+        Assert.Equal("Dr Who", row.CommentsProvidedBy);
+        Assert.Equal("Comments submitted", row.CommentStatus);
+        Assert.Equal(0, api.GetTabulationCalls);
+    }
+
     private static TestConsultantApiResult<TestConsultantTabulationResponse> Ok(TestConsultantTabulationResponse value) =>
         new(TestConsultantApiStatus.Ok, value);
 
     private static TestConsultantDistributionResponse Distribution(string title) =>
-        new(Guid.NewGuid(), 2026, 6, title, new DateTime(2026, 6, 30), false, "Awaiting comments");
+        new(Guid.NewGuid(), 2026, 6, title, new DateTime(2026, 6, 30), false, "Awaiting comments", "");
 
     [Fact]
     public async Task Index_WithDistributionReferenceAndSchemeCode_FiltersByParsedFields()
@@ -223,13 +397,45 @@ public class CommentsControllerTests
         };
         var controller = new CommentsController(api);
 
-        var result = await controller.Index("D2a", "S2 PTX", null, CancellationToken.None);
+        var result = await controller.Index("D2a", "S2 PTX", null, null, null, CancellationToken.None);
 
         var model = Assert.IsType<CommentsListViewModel>(Assert.IsType<ViewResult>(result).Model);
         var row = Assert.Single(model.Distributions);
         Assert.Equal("D2a", row.DistributionReference);
         Assert.Equal("S2 PTX", row.SchemeCode);
         Assert.Equal("Salmonella", row.SchemeName);
+    }
+
+    [Fact]
+    public async Task Index_WhenCommentsProvidedByMissing_PopulatesFromEntryHeading()
+    {
+        var schemeId = Guid.NewGuid();
+        var api = new FakeTestConsultantApiClient
+        {
+            Distributions = new TestConsultantDistributionsResponse(
+            [
+                new TestConsultantDistributionResponse(
+                    schemeId,
+                    2026,
+                    6,
+                    "D1a/S1 BT: Brucella",
+                    new DateTime(2026, 6, 30),
+                    true,
+                    "Comments submitted",
+                    "")
+            ]),
+            Tabulation = Ok(Tabulation(submitted: true) with
+            {
+                Comments = new TestConsultantCommentsStateResponse(true, "Comments provided by External Test Consultant Name 14:", "<p>Saved</p>", true)
+            })
+        };
+        var controller = new CommentsController(api);
+
+        var result = await controller.Index(null, null, null, null, null, CancellationToken.None);
+
+        var model = Assert.IsType<CommentsListViewModel>(Assert.IsType<ViewResult>(result).Model);
+        var row = Assert.Single(model.Distributions);
+        Assert.Equal("External Test Consultant Name 14", row.CommentsProvidedBy);
     }
 
     private static TestConsultantTabulationResponse Tabulation(bool submitted) =>
@@ -253,10 +459,13 @@ public class CommentsControllerTests
     {
         public TestConsultantDistributionsResponse Distributions { get; set; } = new([]);
         public TestConsultantApiResult<TestConsultantTabulationResponse> Tabulation { get; set; } = new(TestConsultantApiStatus.NotFound);
+        public TestConsultantApiResult<TabulationAttachmentFile> ExportResult { get; set; } = new(TestConsultantApiStatus.NotFound);
         public TestConsultantApiResult<TestConsultantTabulationSaveResult> SaveResult { get; set; } =
             new(TestConsultantApiStatus.Ok, new TestConsultantTabulationSaveResult(true, false, new Dictionary<string, string>()));
 
         public List<TestConsultantTabulationSaveRequest> SavedRequests { get; } = [];
+        public List<TestConsultantTabulationFilter> GetTabulationFilters { get; } = [];
+        public List<TestConsultantTabulationFilter> ExportedRequests { get; } = [];
 
         public int GetTabulationCalls { get; private set; }
 
@@ -267,12 +476,16 @@ public class CommentsControllerTests
             Guid monthlyDistributionSchemeId, TestConsultantTabulationFilter filter, CancellationToken cancellationToken = default)
         {
             GetTabulationCalls++;
+            GetTabulationFilters.Add(filter);
             return Task.FromResult(Tabulation);
         }
 
         public Task<TestConsultantApiResult<PTL.ApiClient.Distribution.TabulationAttachmentFile>> ExportTabulationAsync(
-            Guid monthlyDistributionSchemeId, TestConsultantTabulationFilter filter, CancellationToken cancellationToken = default) =>
-            Task.FromResult(new TestConsultantApiResult<PTL.ApiClient.Distribution.TabulationAttachmentFile>(TestConsultantApiStatus.NotFound));
+            Guid monthlyDistributionSchemeId, TestConsultantTabulationFilter filter, CancellationToken cancellationToken = default)
+        {
+            ExportedRequests.Add(filter);
+            return Task.FromResult(ExportResult);
+        }
 
         public Task<TestConsultantApiResult<TestConsultantTabulationSaveResult>> SaveCommentsAsync(
             Guid monthlyDistributionSchemeId, TestConsultantTabulationSaveRequest request, CancellationToken cancellationToken = default)
