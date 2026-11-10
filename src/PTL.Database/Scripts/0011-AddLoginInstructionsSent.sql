@@ -14,25 +14,24 @@
 ------------------------------------------------------------------------------------------------------------------------
 -- 1. Columns: existing rows become Sent (1); the default for new rows is Not sent (0)
 ------------------------------------------------------------------------------------------------------------------------
-IF COL_LENGTH('dbo.tblParticipant', 'fldLoginInstructionsSent') IS NULL
+-- One batch: a variable does not survive a GO, so the three column checks share the name declared here.
+DECLARE @SentColumn SYSNAME = 'fldLoginInstructionsSent'
+
+IF COL_LENGTH('dbo.tblParticipant', @SentColumn) IS NULL
 BEGIN
         ALTER TABLE [dbo].[tblParticipant] ADD
                 [fldLoginInstructionsSent] BIT NOT NULL CONSTRAINT [DF_tblParticipant_fldLoginInstructionsSent] DEFAULT (1),
                 [fldLoginInstructionsSentDate] DATETIME2 NULL
 END
 
-GO
-
-IF COL_LENGTH('dbo.tblViewer', 'fldLoginInstructionsSent') IS NULL
+IF COL_LENGTH('dbo.tblViewer', @SentColumn) IS NULL
 BEGIN
         ALTER TABLE [dbo].[tblViewer] ADD
                 [fldLoginInstructionsSent] BIT NOT NULL CONSTRAINT [DF_tblViewer_fldLoginInstructionsSent] DEFAULT (1),
                 [fldLoginInstructionsSentDate] DATETIME2 NULL
 END
 
-GO
-
-IF COL_LENGTH('dbo.tblExternalTestConsultant', 'fldLoginInstructionsSent') IS NULL
+IF COL_LENGTH('dbo.tblExternalTestConsultant', @SentColumn) IS NULL
 BEGIN
         ALTER TABLE [dbo].[tblExternalTestConsultant] ADD
                 [fldLoginInstructionsSent] BIT NOT NULL CONSTRAINT [DF_tblExternalTestConsultant_fldLoginInstructionsSent] DEFAULT (1),

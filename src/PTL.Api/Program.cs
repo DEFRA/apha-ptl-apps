@@ -181,6 +181,7 @@ builder.Services.AddScoped<IParticipantUpdateNotifier, ParticipantUpdateNotifier
 
 // Login instruction emails (Manage Participants / Viewers / External Test Consultants): sent through GOV.UK Notify when a user presses Send Instructions.
 builder.Services.AddScoped<PTL.Core.LoginInstructions.ILoginInstructionsRepository, PTL.Data.LoginInstructions.LoginInstructionsRepository>();
+builder.Services.AddScoped<PTL.Core.LoginInstructions.ILoginInstructionRecipientResolver, PTL.Core.LoginInstructions.LoginInstructionRecipientResolver>();
 builder.Services.AddScoped<PTL.Core.LoginInstructions.ILoginInstructionsService, PTL.Core.LoginInstructions.LoginInstructionsService>();
 
 // Single shared S3 configuration root for every S3-backed feature (export templates, invoice

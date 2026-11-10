@@ -57,12 +57,9 @@ public class LoginInstructionsServiceTests
         public FakeActingUserAccessor ActingUser { get; } = new() { ActingUserId = Guid.NewGuid() };
 
         public LoginInstructionsService Service => new(
-            Participants,
-            Viewers,
-            TestConsultants,
+            new LoginInstructionRecipientResolver(Participants, Viewers, TestConsultants, Options.Create(new ExternalOptions { AppUrl = ExternalAppUrl })),
             Repository,
             Notify,
-            Options.Create(new ExternalOptions { AppUrl = ExternalAppUrl }),
             ActingUser,
             new FixedTimeProvider(Now),
             NullLogger<LoginInstructionsService>.Instance);
