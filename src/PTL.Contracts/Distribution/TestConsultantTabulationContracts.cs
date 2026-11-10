@@ -12,7 +12,8 @@ public sealed record TestConsultantDistributionResponse(
     string DistributionTitle,
     DateTime TargetDate,
     bool IsCommentSubmitted,
-    string CommentStatus);
+    string CommentStatus,
+    string CommentsProvidedBy = "");
 
 // Which columns the Test Consultant has un-ticked before pressing "Draw tabulations" (legacy HiddenColumnBlocks).
 // HiddenSamples holds sample numbers such as "26/1257".

@@ -11,7 +11,7 @@ namespace PTL.InternalWeb.Tests.Features.Customer;
 public class CustomerControllerTests
 {
     private static PTL.InternalWeb.Features.Customer.CustomerController CreateController(FakeCustomerApiClient apiClient) =>
-        new(apiClient, new FakeLookupApiClient(), NullLogger<PTL.InternalWeb.Features.Customer.CustomerController>.Instance)
+        new(apiClient, new FakeLookupApiClient(), new FakeLabelPrinterApiClient(), NullLogger<PTL.InternalWeb.Features.Customer.CustomerController>.Instance)
         {
             TempData = new TempDataDictionary(new DefaultHttpContext(), new FakeTempDataProvider())
         };
@@ -556,15 +556,18 @@ public class CustomerControllerTests
     }
 
     [Fact]
-    public async Task PrintContactLabel_ById_ExistingCustomer_ReturnsContactAddressLabelPdf()
+    public async Task PrintContactLabel_ById_ExistingCustomer_SendsLabelToPrinterAndRedirectsToDetails()
     {
         var customerId = Guid.NewGuid();
         var controller = CreateController(new FakeCustomerApiClient { CustomerResponse = SampleCustomer(customerId) });
 
         var result = await controller.PrintContactLabel(customerId, CancellationToken.None);
 
-        var file = Assert.IsType<FileContentResult>(result);
-        Assert.Equal("contact-address-label.pdf", file.FileDownloadName);
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal(nameof(PTL.InternalWeb.Features.Customer.CustomerController.Details), redirect.ActionName);
+        var notification = controller.TempData.GetNotification();
+        Assert.Equal(NotificationType.Success, notification!.Type);
+        Assert.Equal("Label sent to printer.", notification.Message);
     }
 
     [Fact]
@@ -578,15 +581,18 @@ public class CustomerControllerTests
     }
 
     [Fact]
-    public async Task PrintInvoiceLabel_ById_ExistingCustomer_ReturnsInvoiceAddressLabelPdf()
+    public async Task PrintInvoiceLabel_ById_ExistingCustomer_SendsLabelToPrinterAndRedirectsToDetails()
     {
         var customerId = Guid.NewGuid();
         var controller = CreateController(new FakeCustomerApiClient { CustomerResponse = SampleCustomer(customerId) });
 
         var result = await controller.PrintInvoiceLabel(customerId, CancellationToken.None);
 
-        var file = Assert.IsType<FileContentResult>(result);
-        Assert.Equal("invoice-address-label.pdf", file.FileDownloadName);
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal(nameof(PTL.InternalWeb.Features.Customer.CustomerController.Details), redirect.ActionName);
+        var notification = controller.TempData.GetNotification();
+        Assert.Equal(NotificationType.Success, notification!.Type);
+        Assert.Equal("Label sent to printer.", notification.Message);
     }
 
     [Fact]
@@ -618,26 +624,34 @@ public class CustomerControllerTests
     }
 
     [Fact]
-    public async Task PrintContactLabel_Post_ValidModel_ReturnsContactAddressLabelPdf()
+    public async Task PrintContactLabel_Post_ValidModel_SendsLabelToPrinterAndRedisplaysForm()
     {
         var controller = CreateController(new FakeCustomerApiClient());
         var model = new PTL.InternalWeb.Features.Customer.CustomerFormViewModel { ContactName = "Alice Example" };
 
         var result = await controller.PrintContactLabel(model, CancellationToken.None);
 
-        var file = Assert.IsType<FileContentResult>(result);
-        Assert.Equal("contact-address-label.pdf", file.FileDownloadName);
+        var view = Assert.IsType<ViewResult>(result);
+        Assert.Equal(nameof(PTL.InternalWeb.Features.Customer.CustomerController.Create), view.ViewName);
+        Assert.Same(model, view.Model);
+        var notification = controller.TempData.GetNotification();
+        Assert.Equal(NotificationType.Success, notification!.Type);
+        Assert.Equal("Label sent to printer.", notification.Message);
     }
 
     [Fact]
-    public async Task PrintInvoiceLabel_Post_ValidModel_ReturnsInvoiceAddressLabelPdf()
+    public async Task PrintInvoiceLabel_Post_ValidModel_SendsLabelToPrinterAndRedisplaysForm()
     {
         var controller = CreateController(new FakeCustomerApiClient());
         var model = new PTL.InternalWeb.Features.Customer.CustomerFormViewModel { InvoiceName = "Alice Example" };
 
         var result = await controller.PrintInvoiceLabel(model, CancellationToken.None);
 
-        var file = Assert.IsType<FileContentResult>(result);
-        Assert.Equal("invoice-address-label.pdf", file.FileDownloadName);
+        var view = Assert.IsType<ViewResult>(result);
+        Assert.Equal(nameof(PTL.InternalWeb.Features.Customer.CustomerController.Create), view.ViewName);
+        Assert.Same(model, view.Model);
+        var notification = controller.TempData.GetNotification();
+        Assert.Equal(NotificationType.Success, notification!.Type);
+        Assert.Equal("Label sent to printer.", notification.Message);
     }
 }

@@ -1,7 +1,11 @@
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ViewFeatures;
 using PTL.Contracts.Lookup;
 using PTL.InternalWeb.Features.Distribution;
 using PTL.InternalWeb.Tests.TestSupport;
+using PTL.SharedUI.Notifications;
+using FullGroupAddressResponse = PTL.Contracts.GroupAddress.GroupAddressResponse;
 
 namespace PTL.InternalWeb.Tests.Features.Distribution;
 
@@ -9,8 +13,20 @@ namespace PTL.InternalWeb.Tests.Features.Distribution;
 // fetches every configured Group Address and renders the grid (or the empty-state message).
 public class DistributionControllerGroupAddressLabelsTests
 {
-    private static DistributionController CreateController(FakeLookupApiClient lookupApiClient) =>
-        new(new FakeDistributionApiClient(), new FakeSearchApiClient(), lookupApiClient);
+    private static DistributionController CreateController(
+        FakeLookupApiClient lookupApiClient,
+        FakeGroupAddressApiClient? groupAddressApiClient = null,
+        FakeLabelPrinterApiClient? labelPrinterApiClient = null) =>
+        new(
+            new FakeDistributionApiClient(),
+            new FakeSearchApiClient(),
+            lookupApiClient,
+            groupAddressApiClient ?? new FakeGroupAddressApiClient(),
+            new FakeParticipantApiClient(),
+            labelPrinterApiClient ?? new FakeLabelPrinterApiClient())
+        {
+            TempData = new TempDataDictionary(new DefaultHttpContext(), new FakeTempDataProvider())
+        };
 
     private static GroupAddressLabelsViewModel ModelOf(IActionResult result) =>
         Assert.IsType<GroupAddressLabelsViewModel>(Assert.IsType<ViewResult>(result).Model);
@@ -45,14 +61,51 @@ public class DistributionControllerGroupAddressLabelsTests
     }
 
     [Fact]
-    public void PrintGroupAddressLabel_ReturnsTheFeatureNotAvailableStub()
+    public async Task PrintGroupAddressLabel_KnownId_PrintsTheLegacyFieldOrderAndRedirectsBackWithSuccessNotification()
+    {
+        var countryId = Guid.NewGuid();
+        var groupAddressId = Guid.NewGuid();
+        var groupAddressApiClient = new FakeGroupAddressApiClient
+        {
+            GroupAddress = new FullGroupAddressResponse(groupAddressId, "GA1", "1 Group Street", "Group District", string.Empty, string.Empty, string.Empty, countryId, "01234 567890", string.Empty)
+        };
+        var lookupApiClient = new FakeLookupApiClient { Countries = [new CountryResponse(countryId, "United Kingdom")] };
+        var labelPrinterApiClient = new FakeLabelPrinterApiClient();
+        var controller = CreateController(lookupApiClient, groupAddressApiClient, labelPrinterApiClient);
+
+        var result = await controller.PrintGroupAddressLabel(groupAddressId, CancellationToken.None);
+
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal(nameof(DistributionController.GroupAddressLabels), redirect.ActionName);
+        var lines = Assert.Single(labelPrinterApiClient.PrintedLines);
+        Assert.Equal(["1 Group Street", "Group District", "United Kingdom", "01234 567890"], lines);
+        Assert.Equal(NotificationType.Success, controller.TempData.GetNotification()!.Type);
+    }
+
+    [Fact]
+    public async Task PrintGroupAddressLabel_PrinterFails_RedirectsWithErrorNotification()
+    {
+        var groupAddressId = Guid.NewGuid();
+        var groupAddressApiClient = new FakeGroupAddressApiClient
+        {
+            GroupAddress = new FullGroupAddressResponse(groupAddressId, "GA1", "1 Group Street", string.Empty, string.Empty, string.Empty, string.Empty, Guid.NewGuid(), string.Empty, string.Empty)
+        };
+        var labelPrinterApiClient = new FakeLabelPrinterApiClient { PrintResult = false };
+        var controller = CreateController(new FakeLookupApiClient(), groupAddressApiClient, labelPrinterApiClient);
+
+        var result = await controller.PrintGroupAddressLabel(groupAddressId, CancellationToken.None);
+
+        Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal(NotificationType.Error, controller.TempData.GetNotification()!.Type);
+    }
+
+    [Fact]
+    public async Task PrintGroupAddressLabel_UnknownId_ReturnsNotFound()
     {
         var controller = CreateController(new FakeLookupApiClient());
 
-        var result = controller.PrintGroupAddressLabel(Guid.NewGuid());
+        var result = await controller.PrintGroupAddressLabel(Guid.NewGuid(), CancellationToken.None);
 
-        var view = Assert.IsType<ViewResult>(result);
-        Assert.Equal("FeatureNotAvailable", view.ViewName);
-        Assert.Equal("Print Group Address Label", view.Model);
+        Assert.IsType<NotFoundResult>(result);
     }
 }

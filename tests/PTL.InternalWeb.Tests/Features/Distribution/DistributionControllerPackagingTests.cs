@@ -27,7 +27,7 @@ public class DistributionControllerPackagingTests
             apiClient.Schedule ??= new MonthlyDistributionResponse(Guid.NewGuid(), Year, Month, []);
         }
 
-        return new(apiClient, new FakeSearchApiClient(), new FakeLookupApiClient())
+        return new(apiClient, new FakeSearchApiClient(), new FakeLookupApiClient(), new FakeGroupAddressApiClient(), new FakeParticipantApiClient(), new FakeLabelPrinterApiClient())
         {
             TempData = new TempDataDictionary(new DefaultHttpContext(), new FakeTempDataProvider()),
         };

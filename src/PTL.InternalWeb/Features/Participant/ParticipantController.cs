@@ -14,7 +14,7 @@ namespace PTL.InternalWeb.Features.Participant;
 
 // Legacy "Contracts Admin" folder - requires the Contracts Admin role (PtlPolicies.ContractsAdmin).
 [Authorize(Policy = PtlPolicies.ContractsAdmin)]
-public class ParticipantController(IParticipantApiClient participantApiClient, ICustomerApiClient customerApiClient, ILookupApiClient lookupApiClient, ILogger<ParticipantController> logger) : Controller
+public class ParticipantController(IParticipantApiClient participantApiClient, ICustomerApiClient customerApiClient, ILookupApiClient lookupApiClient, ILabelPrinterApiClient labelPrinterApiClient, ILogger<ParticipantController> logger) : Controller
 {
     // Legacy ReviewPendingParticipantUpdates.aspx GridView.PageSize.
     private const int PendingUpdatesPageSize = 20;
@@ -498,7 +498,13 @@ public class ParticipantController(IParticipantApiClient participantApiClient, I
             Telephone = model.Telephone
         });
 
-        return LabelPdf(label);
+        var printed = await labelPrinterApiClient.PrintAsync(label.Lines, cancellationToken);
+        SetPrintNotification(printed);
+
+        // Legacy's print button re-renders the SAME postback (ViewState intact) - redisplaying the
+        // posted model here preserves any not-yet-saved edits the same way, rather than navigating
+        // away and discarding them.
+        return await RedisplayParticipantFormAsync(model, cancellationToken);
     }
 
     [HttpGet]
@@ -524,11 +530,15 @@ public class ParticipantController(IParticipantApiClient participantApiClient, I
             Telephone = participant.Telephone
         });
 
-        return LabelPdf(label);
+        var printed = await labelPrinterApiClient.PrintAsync(label.Lines, cancellationToken);
+        SetPrintNotification(printed);
+        return RedirectToAction(nameof(Details), new { id });
     }
 
-    private FileContentResult LabelPdf(AddressLabel label) =>
-        File(AddressLabelPdfRenderer.Render(label), AddressLabelPdfRenderer.ContentType, "address-label.pdf");
+    private void SetPrintNotification(bool printed) =>
+        TempData.SetNotification(
+            printed ? NotificationType.Success : NotificationType.Error,
+            printed ? "Label sent to printer." : "There was a problem printing the label. Please try again.");
 
     // Legacy took the country from DropDownCountry.SelectedItem.Text - the name shown on the form,
     // not a saved value - so the lookup list is the faithful equivalent for unsaved form state.

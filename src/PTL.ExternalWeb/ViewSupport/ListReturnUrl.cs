@@ -6,6 +6,7 @@ public static class ListReturnUrl
 {
     public const string DistributionPrevious = "/Distribution/Previous";
     public const string TabulationIndex = "/Tabulation/Index";
+    public const string CommentsIndex = "/Comments/Index";
 
     // The list page a breadcrumb step points at, when that step is one of the filterable lists.
     public static string? ListPathFor(string? controller, string? action) =>
@@ -13,6 +14,7 @@ public static class ListReturnUrl
         {
             ("Distribution", "Previous") => DistributionPrevious,
             ("Tabulation", "Index") => TabulationIndex,
+            ("Comments", "Index") => CommentsIndex,
             _ => null
         };
 

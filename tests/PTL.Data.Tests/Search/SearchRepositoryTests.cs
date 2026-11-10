@@ -436,4 +436,28 @@ public class SearchRepositoryTests
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
             repository.SearchBySampleNumberAsync(new SampleNumberSearchCriteria(string.Empty)));
     }
+
+    [Fact]
+    public async Task GetAllSchemesForNameSearchAsync_ExecutesTheParameterlessLegacyProcedureAndMapsEveryColumn()
+    {
+        const string sql = "EXEC dbo.spgaSearchSchemeBySchemeName";
+        var (repository, connection) = CreateRepository();
+        var schemeId = Guid.NewGuid();
+        var table = new DataTable();
+        table.Columns.Add("fldSchemeId", typeof(Guid));
+        table.Columns.Add("fldSchemeName", typeof(string));
+        table.Columns.Add("fldSchemeIdentifier", typeof(string));
+        table.Columns.Add("fldYear", typeof(string));
+        table.Rows.Add(schemeId, "Salmonella", "PT1234", "2026/27");
+        connection.RespondToQuery(sql, table);
+
+        var results = await repository.GetAllSchemesForNameSearchAsync();
+
+        Assert.Equal(sql, Assert.Single(connection.ExecutedCommands).CommandText);
+        var row = Assert.Single(results);
+        Assert.Equal(schemeId, row.SchemeId);
+        Assert.Equal("Salmonella", row.SchemeName);
+        Assert.Equal("PT1234", row.SchemeIdentifier);
+        Assert.Equal("2026/27", row.Year);
+    }
 }

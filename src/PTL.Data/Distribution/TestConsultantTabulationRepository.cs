@@ -42,6 +42,7 @@ public sealed class TestConsultantTabulationRepository(IDbConnectionFactory conn
                 ScheduleCode = s.ScheduleCode ?? string.Empty,
                 TargetDate = s.ResultsIssueTargetDate ?? default,
                 IsCommentSubmitted = s.IsCommentSubmitted ?? false,
+                CommentsProvidedBy = s.TestConsultantCommentsAuthor ?? string.Empty,
             })];
     }
 
