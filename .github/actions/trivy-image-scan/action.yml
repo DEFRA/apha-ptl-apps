@@ -1,0 +1,115 @@
+name: Scan container image for vulnerabilities (Trivy)
+description: >
+  Generates an SBOM for a locally built image and fails on any fixable High or Critical vulnerability
+  found in it (runtimes bundled in the image, application dependencies and, on Linux images, OS
+  packages). The vulnerability database is refreshed on every run, so newly published advisories
+  are caught without changing the pipeline. Accepted risks go in .trivyignore with an expiry date.
+
+inputs:
+  image:
+    description: Local image reference to scan, for example cdc-api:<sha>
+    required: true
+  name:
+    description: Short name used for the SBOM artifact, for example api
+    required: true
+  severity:
+    description: Comma-separated severities that fail the scan
+    required: false
+    default: HIGH,CRITICAL
+
+runs:
+  using: composite
+  steps:
+    # The release is pinned and its SHA-256 (from the release's checksums file) is verified before use.
+    - name: Install Trivy (Windows)
+      if: runner.os == 'Windows'
+      shell: pwsh
+      env:
+        TRIVY_VERSION: "0.76.2"
+        TRIVY_SHA256: "691f737a7e5566a673c3a74dab9160552ec32101e953b659e5c77443d16dddb6"
+      run: |
+        $ErrorActionPreference = "Stop"
+        $zip = Join-Path $env:RUNNER_TEMP "trivy.zip"
+        Invoke-WebRequest -UseBasicParsing -Uri "https://github.com/aquasecurity/trivy/releases/download/v$($env:TRIVY_VERSION)/trivy_$($env:TRIVY_VERSION)_windows-64bit.zip" -OutFile $zip
+        if ((Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant() -ne $env:TRIVY_SHA256) { throw "Trivy download failed its SHA-256 check." }
+        Expand-Archive -Path $zip -DestinationPath (Join-Path $env:RUNNER_TEMP "trivy") -Force
+        "TRIVY_BIN=$(Join-Path $env:RUNNER_TEMP 'trivy\trivy.exe')" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+    - name: Install Trivy (Linux)
+      if: runner.os == 'Linux'
+      shell: bash
+      env:
+        TRIVY_VERSION: "0.76.2"
+        TRIVY_SHA256: "bc0fc726e017b8927a62b2d3531d7a84ee01769daf5c99ed866dced54089fdbf"
+      run: |
+        set -euo pipefail
+        curl --silent --show-error --fail --location --proto '=https' --tlsv1.2 \
+          --output "${RUNNER_TEMP}/trivy.tar.gz" \
+          "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
+        echo "${TRIVY_SHA256}  ${RUNNER_TEMP}/trivy.tar.gz" | sha256sum --check --strict
+        mkdir -p "${RUNNER_TEMP}/trivy"
+        tar --extract --gzip --file "${RUNNER_TEMP}/trivy.tar.gz" --directory "${RUNNER_TEMP}/trivy" trivy
+        echo "TRIVY_BIN=${RUNNER_TEMP}/trivy/trivy" >> "${GITHUB_ENV}"
+
+    - name: Generate SBOM and scan image
+      shell: bash
+      env:
+        IMAGE: ${{ inputs.image }}
+        SCAN_NAME: ${{ inputs.name }}
+        SEVERITY: ${{ inputs.severity }}
+        TRIVY_NO_PROGRESS: "true"
+        TRIVY_TIMEOUT: 15m
+        # Two registries, so one being rate limited does not fail the scan.
+        TRIVY_DB_REPOSITORY: public.ecr.aws/aquasecurity/trivy-db:2,ghcr.io/aquasecurity/trivy-db:2
+      run: |
+        set -euo pipefail
+
+        TEMP_DIR="${RUNNER_TEMP//\\//}"
+        TAR="${TEMP_DIR}/trivy-${SCAN_NAME}.tar"
+        SBOM="${TEMP_DIR}/sbom-${SCAN_NAME}.cdx.json"
+        REPORT="${TEMP_DIR}/trivy-${SCAN_NAME}.txt"
+
+        docker save "${IMAGE}" --output "${TAR}"
+
+        "${TRIVY_BIN}" image --input "${TAR}" --format cyclonedx --output "${SBOM}"
+
+        # Vulnerabilities without a fix cannot be acted on, so they do not fail the build.
+        STATUS=0
+        "${TRIVY_BIN}" image --input "${TAR}" \
+          --scanners vuln \
+          --severity "${SEVERITY}" \
+          --ignore-unfixed \
+          --exit-code 1 \
+          --format table \
+          --output "${REPORT}" || STATUS=$?
+
+        rm -f "${TAR}"
+        cat "${REPORT}"
+
+        {
+          echo "### Image vulnerability scan: ${SCAN_NAME}"
+          echo
+          if (( STATUS == 0 )); then
+            echo "No fixable ${SEVERITY} vulnerabilities."
+          else
+            echo '```'
+            head -c 60000 "${REPORT}"
+            echo '```'
+          fi
+        } >> "${GITHUB_STEP_SUMMARY}"
+
+        if (( STATUS != 0 )); then
+          echo "::error::${IMAGE} contains fixable ${SEVERITY} vulnerabilities. Rebuild on updated base images or dependencies; see the job summary."
+        fi
+
+        exit "${STATUS}"
+
+    - name: Upload SBOM
+      if: always()
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      with:
+        name: sbom-${{ inputs.name }}-${{ github.run_id }}
+        path: ${{ runner.temp }}/sbom-${{ inputs.name }}.cdx.json
+        retention-days: 30
+        if-no-files-found: ignore
+        overwrite: true
