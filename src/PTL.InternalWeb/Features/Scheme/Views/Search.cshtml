@@ -1,0 +1,73 @@
+@model PTL.InternalWeb.Features.Scheme.SchemeSearchViewModel
+@{
+    ViewData["Title"] = "Search";
+
+    var errors = ViewData.ModelState
+        .Where(entry => entry.Value?.Errors.Count > 0)
+        .SelectMany(entry => entry.Value!.Errors.Select(error => (Field: entry.Key, Message: error.ErrorMessage)))
+        .ToList();
+    var nameError = errors.FirstOrDefault().Message;
+}
+
+<govuk-error-summary errors="@errors" />
+
+<h1 class="govuk-heading-l">Search</h1>
+
+<p class="govuk-body">This page can be used to search for Schemes.</p>
+
+<p class="govuk-body">Use the search box below to identify the required Scheme by Scheme Name.</p>
+
+<form method="get" asp-action="Search">
+    <input type="hidden" name="searched" value="true" />
+
+    <div class="govuk-form-group @(nameError is null ? null : "govuk-form-group--error")">
+        <label class="govuk-label" for="schemeName">Scheme Name</label>
+        @if (nameError is not null)
+        {
+            <p id="schemeName-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @nameError</p>
+        }
+        <input class="govuk-input govuk-!-width-one-half @(nameError is null ? null : "govuk-input--error")" id="schemeName" name="schemeName"
+               type="text" value="@Model.SchemeName" maxlength="@PTL.InternalWeb.Features.Scheme.SchemeSearchViewModel.SchemeNameMaxLength"
+               aria-describedby="@(nameError is null ? null : "schemeName-error")" />
+    </div>
+
+    <button class="govuk-button" data-module="govuk-button" type="submit">Search</button>
+</form>
+
+@if (Model.Results is not null)
+{
+    <hr class="govuk-section-break govuk-section-break--m govuk-section-break--visible">
+    <h2 class="govuk-heading-m">Search Results:</h2>
+
+    @if (Model.Results.Count == 0)
+    {
+        <p class="govuk-body">There are no Results to Display</p>
+    }
+    else
+    {
+        <table class="govuk-table">
+            <caption class="govuk-table__caption govuk-visually-hidden">Scheme search results</caption>
+            <thead class="govuk-table__head">
+                <tr class="govuk-table__row">
+                    <th scope="col" class="govuk-table__header">Scheme Name</th>
+                    <th scope="col" class="govuk-table__header">Scheme Identifier</th>
+                    <th scope="col" class="govuk-table__header">Year</th>
+                    <th scope="col" class="govuk-table__header">View</th>
+                </tr>
+            </thead>
+            <tbody class="govuk-table__body">
+                @foreach (var row in Model.Results)
+                {
+                    <tr class="govuk-table__row">
+                        <td class="govuk-table__cell">@row.SchemeName</td>
+                        <td class="govuk-table__cell">@row.SchemeIdentifier</td>
+                        <td class="govuk-table__cell">@row.Year</td>
+                        <td class="govuk-table__cell">
+                            <a class="govuk-link" asp-action="Details" asp-route-id="@row.SchemeId">View<span class="govuk-visually-hidden"> @row.SchemeName, @row.Year</span></a>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+}

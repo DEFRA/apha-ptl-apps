@@ -79,6 +79,20 @@ public sealed class SearchController(ISearchService searchService) : ControllerB
             MonthName(r.MonthId))).ToList());
     }
 
+    // GET /api/search/schemes?schemeName= - legacy Scheme Admin/Search.aspx. Every word of the name
+    // must appear in the scheme name; an empty/omitted value returns every scheme, as in legacy.
+    [HttpGet("schemes")]
+    public async Task<ActionResult<IReadOnlyList<SchemeNameSearchResultResponse>>> SearchSchemes(
+        [FromQuery] SchemeNameSearchCriteriaRequest criteria, CancellationToken cancellationToken)
+    {
+        var rows = await searchService.SearchSchemesByNameAsync(criteria, cancellationToken);
+        return Ok(rows.Select(r => new SchemeNameSearchResultResponse(
+            r.SchemeId,
+            r.SchemeName ?? string.Empty,
+            r.SchemeIdentifier ?? string.Empty,
+            r.Year ?? string.Empty)).ToList());
+    }
+
     // Legacy SearchSchemeByDistribution/SearchSchemeBySampleNumber.MonthId applied VB's MonthName()
     // to the raw fldMonthId column; reproduces that with the same en-GB month names used elsewhere
     // in the Distribution domain (see PackagingOutputService).

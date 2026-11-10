@@ -463,4 +463,52 @@ public class SearchControllerTests : IClassFixture<WebApplicationFactory<Program
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal(new SampleNumberSearchCriteria(string.Empty), Assert.Single(repository.SampleNumberCalls));
     }
+
+    [Fact]
+    public async Task SearchSchemes_MapsRowsAndFiltersByEveryWordOfTheName()
+    {
+        var (controller, repository) = CreateController();
+        var schemeId = Guid.NewGuid();
+        repository.SchemeNameRows =
+        [
+            new SchemeNameSearchRow { SchemeId = schemeId, SchemeName = "Salmonella Isolation", SchemeIdentifier = "PT1234", Year = "2026/27" },
+            new SchemeNameSearchRow { SchemeId = Guid.NewGuid(), SchemeName = "Brucella", SchemeIdentifier = "PT9", Year = "2026/27" },
+        ];
+
+        var result = await controller.SearchSchemes(new SchemeNameSearchCriteriaRequest("salmonella isolation"), CancellationToken.None);
+
+        var rows = Assert.IsType<List<SchemeNameSearchResultResponse>>(Assert.IsType<OkObjectResult>(result.Result).Value);
+        Assert.Equal(new SchemeNameSearchResultResponse(schemeId, "Salmonella Isolation", "PT1234", "2026/27"), Assert.Single(rows));
+    }
+
+    [Fact]
+    public async Task SearchSchemes_NullStringsInRowsBecomeEmpty()
+    {
+        var (controller, repository) = CreateController();
+        repository.SchemeNameRows = [new SchemeNameSearchRow { SchemeId = Guid.NewGuid() }];
+
+        var result = await controller.SearchSchemes(new SchemeNameSearchCriteriaRequest(), CancellationToken.None);
+
+        var row = Assert.Single(Assert.IsType<List<SchemeNameSearchResultResponse>>(Assert.IsType<OkObjectResult>(result.Result).Value));
+        Assert.Equal(string.Empty, row.SchemeName);
+        Assert.Equal(string.Empty, row.SchemeIdentifier);
+        Assert.Equal(string.Empty, row.Year);
+    }
+
+    [Fact]
+    public async Task GetSchemes_BindsTheSchemeNameQueryValue()
+    {
+        var repository = new FakeSearchRepository
+        {
+            SchemeNameRows = [new SchemeNameSearchRow { SchemeId = Guid.NewGuid(), SchemeName = "Salmonella & Co", SchemeIdentifier = "PT1", Year = "2026/27" }],
+        };
+        var client = WithRepository(repository).CreateClient();
+
+        var response = await client.GetAsync("/api/search/schemes?schemeName=salmonella%20%26");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var rows = await response.Content.ReadFromJsonAsync<List<SchemeNameSearchResultResponse>>();
+        Assert.Equal("Salmonella & Co", Assert.Single(rows!).SchemeName);
+        Assert.Equal(1, repository.SchemeNameCalls);
+    }
 }

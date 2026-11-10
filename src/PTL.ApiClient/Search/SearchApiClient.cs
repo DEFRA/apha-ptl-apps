@@ -7,6 +7,7 @@ public interface ISearchApiClient
 {
     Task<IReadOnlyList<CustomerSearchResultResponse>> SearchCustomersAsync(CustomerSearchCriteriaRequest criteria, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<ParticipantSearchResultResponse>> SearchParticipantsAsync(ParticipantSearchCriteriaRequest criteria, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<SchemeNameSearchResultResponse>> SearchSchemesByNameAsync(SchemeNameSearchCriteriaRequest criteria, CancellationToken cancellationToken = default);
 }
 
 // Thin typed HttpClient wrapper around PTL.Api's search endpoints.
@@ -32,6 +33,12 @@ public sealed class SearchApiClient(HttpClient httpClient) : ISearchApiClient
         var query = $"labCode={Escape(criteria.LabCode)}&labName={Escape(criteria.LabName)}&contactName={Escape(criteria.ContactName)}";
 
         var results = await httpClient.GetFromJsonAsync<IReadOnlyList<ParticipantSearchResultResponse>>($"/api/search/participants?{query}", cancellationToken);
+        return results ?? [];
+    }
+
+    public async Task<IReadOnlyList<SchemeNameSearchResultResponse>> SearchSchemesByNameAsync(SchemeNameSearchCriteriaRequest criteria, CancellationToken cancellationToken = default)
+    {
+        var results = await httpClient.GetFromJsonAsync<IReadOnlyList<SchemeNameSearchResultResponse>>($"/api/search/schemes?schemeName={Escape(criteria.SchemeName)}", cancellationToken);
         return results ?? [];
     }
 

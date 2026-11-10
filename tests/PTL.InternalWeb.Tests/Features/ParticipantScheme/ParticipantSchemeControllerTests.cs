@@ -548,7 +548,7 @@ public class ParticipantSchemeControllerTests
         };
         var controller = CreateController(contractApiClient: contractApiClient, schemeApiClient: schemeApiClient);
 
-        var result = await controller.Create(contractId, customerId, schemeList: new SchemeListQuery(SchemeSearchTerm: "sal"));
+        var result = await controller.Create(contractId, customerId, schemeList: new SchemeListQuery());
 
         var view = Assert.IsType<ViewResult>(result);
         var model = Assert.IsType<ParticipantSchemeFormViewModel>(view.Model);
@@ -560,7 +560,8 @@ public class ParticipantSchemeControllerTests
         Assert.Equal(1, pagination.TotalRecords);
         Assert.Equal("Create", pagination.Action);
         Assert.Equal(contractId, pagination.RouteValues["contractId"]);
-        Assert.Equal("sal", pagination.RouteValues["schemeSearchTerm"]);
+        Assert.False(pagination.RouteValues.ContainsKey("schemeSearchTerm"));
+        Assert.Null(schemeApiClient.LastSearchRequest!.SearchTerm);
     }
 
     [Fact]

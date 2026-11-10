@@ -50,6 +50,16 @@ public sealed record DistributionNumberSearchResultResponse(
 // Sample Number is mandatory in the UI ("A Sample Number must be supplied."), enforced client-side.
 public sealed record SampleNumberSearchCriteriaRequest(string? SampleNumber = null);
 
+// Legacy Scheme Admin/Search.aspx (dbo.spgaSearchSchemeBySchemeName). An empty/omitted name does not
+// filter - legacy lists every scheme in that case.
+public sealed record SchemeNameSearchCriteriaRequest(string? SchemeName = null);
+
+public sealed record SchemeNameSearchResultResponse(
+    Guid SchemeId,
+    string SchemeName,
+    string SchemeIdentifier,
+    string Year);
+
 public sealed record SampleNumberSearchResultResponse(
     Guid SampleId,
     Guid SchemeId,

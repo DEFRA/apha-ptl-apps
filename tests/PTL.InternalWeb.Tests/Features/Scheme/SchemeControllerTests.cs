@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Primitives;
 using PTL.Contracts.Lookup;
 using PTL.Contracts.Scheme;
+using PTL.Contracts.Search;
 using PTL.InternalWeb.AuditReason;
 using PTL.InternalWeb.Confirmation;
 using PTL.InternalWeb.Tests.TestSupport;
@@ -16,8 +17,8 @@ namespace PTL.InternalWeb.Tests.Features.Scheme;
 
 public partial class SchemeControllerTests
 {
-    private static PTL.InternalWeb.Features.Scheme.SchemeController CreateController(FakeSchemeApiClient apiClient, FakeLookupApiClient? lookupApiClient = null) =>
-        new(apiClient, lookupApiClient ?? new FakeLookupApiClient(), NullLogger<PTL.InternalWeb.Features.Scheme.SchemeController>.Instance);
+    private static PTL.InternalWeb.Features.Scheme.SchemeController CreateController(FakeSchemeApiClient apiClient, FakeLookupApiClient? lookupApiClient = null, FakeSearchApiClient? searchApiClient = null) =>
+        new(apiClient, lookupApiClient ?? new FakeLookupApiClient(), searchApiClient ?? new FakeSearchApiClient(), NullLogger<PTL.InternalWeb.Features.Scheme.SchemeController>.Instance);
 
     private static SchemeResponse SampleScheme(Guid schemeId, Guid sharedId, bool isReadOnly = false) => new(
         schemeId, sharedId, DateTime.UtcNow.Year + 1, "PT1234", "Test Scheme", Guid.NewGuid(), Guid.NewGuid(), null,
@@ -39,7 +40,7 @@ public partial class SchemeControllerTests
         };
         var controller = CreateController(apiClient);
 
-        var result = await controller.Index(null, 1, 15, CancellationToken.None);
+        var result = await controller.Index(1, 15, CancellationToken.None);
 
         var view = Assert.IsType<ViewResult>(result);
         var model = Assert.IsType<PTL.InternalWeb.Features.Scheme.SchemeListViewModel>(view.Model);
@@ -64,7 +65,6 @@ public partial class SchemeControllerTests
 
         var view = Assert.IsType<ViewResult>(result);
         var model = Assert.IsType<PTL.InternalWeb.Features.Scheme.SchemeListViewModel>(view.Model);
-        Assert.Null(model.SearchTerm);
         Assert.Single(model.Schemes);
     }
 
@@ -92,7 +92,7 @@ public partial class SchemeControllerTests
     }
 
     [Fact]
-    public async Task Index_SearchTermProvided_FiltersBySchemeName()
+    public async Task Index_ListsSchemesWithoutAnySearchTerm()
     {
         var apiClient = new FakeSchemeApiClient
         {
@@ -100,11 +100,70 @@ public partial class SchemeControllerTests
         };
         var controller = CreateController(apiClient);
 
-        var result = await controller.Index("PT1234", 1, 20, CancellationToken.None);
+        await controller.Index(1, 20, CancellationToken.None);
 
-        var view = Assert.IsType<ViewResult>(result);
-        var model = Assert.IsType<PTL.InternalWeb.Features.Scheme.SchemeListViewModel>(view.Model);
-        Assert.Equal("PT1234", model.SearchTerm);
+        Assert.Null(apiClient.LastFamiliesSearchTerm);
+    }
+
+    [Fact]
+    public async Task Search_NotYetSearched_ShowsOnlyTheSearchBox()
+    {
+        var search = new FakeSearchApiClient();
+        var controller = CreateController(new FakeSchemeApiClient(), searchApiClient: search);
+
+        var result = await controller.Search(null, false, CancellationToken.None);
+
+        var model = Assert.IsType<PTL.InternalWeb.Features.Scheme.SchemeSearchViewModel>(Assert.IsType<ViewResult>(result).Model);
+        Assert.Null(model.Results);
+        Assert.Empty(search.SchemeSearches);
+    }
+
+    [Fact]
+    public async Task Search_Searched_PassesTheNameAndReturnsTheResults()
+    {
+        var schemeId = Guid.NewGuid();
+        var search = new FakeSearchApiClient
+        {
+            SchemeResults = [new SchemeNameSearchResultResponse(schemeId, "Salmonella", "PT1234", "2026/27")]
+        };
+        var controller = CreateController(new FakeSchemeApiClient(), searchApiClient: search);
+
+        var result = await controller.Search("salmon", true, CancellationToken.None);
+
+        var model = Assert.IsType<PTL.InternalWeb.Features.Scheme.SchemeSearchViewModel>(Assert.IsType<ViewResult>(result).Model);
+        Assert.Equal("salmon", model.SchemeName);
+        Assert.Equal(schemeId, Assert.Single(model.Results!).SchemeId);
+        Assert.Equal("salmon", Assert.Single(search.SchemeSearches).SchemeName);
+    }
+
+    [Fact]
+    public async Task Search_SearchedWithBlankName_StillSearchesAndListsEveryScheme()
+    {
+        var search = new FakeSearchApiClient
+        {
+            SchemeResults = [new SchemeNameSearchResultResponse(Guid.NewGuid(), "Salmonella", "PT1234", "2026/27")]
+        };
+        var controller = CreateController(new FakeSchemeApiClient(), searchApiClient: search);
+
+        var result = await controller.Search(string.Empty, true, CancellationToken.None);
+
+        var model = Assert.IsType<PTL.InternalWeb.Features.Scheme.SchemeSearchViewModel>(Assert.IsType<ViewResult>(result).Model);
+        Assert.Single(model.Results!);
+        Assert.Single(search.SchemeSearches);
+    }
+
+    [Fact]
+    public async Task Search_NameLongerThanLegacyMaxLength_ReturnsAnErrorWithoutSearching()
+    {
+        var search = new FakeSearchApiClient();
+        var controller = CreateController(new FakeSchemeApiClient(), searchApiClient: search);
+
+        var result = await controller.Search(new string('a', 101), true, CancellationToken.None);
+
+        var model = Assert.IsType<PTL.InternalWeb.Features.Scheme.SchemeSearchViewModel>(Assert.IsType<ViewResult>(result).Model);
+        Assert.Null(model.Results);
+        Assert.Empty(search.SchemeSearches);
+        Assert.Equal("Scheme Name must be 100 characters or fewer", Assert.Single(controller.ModelState["schemeName"]!.Errors).ErrorMessage);
     }
 
     [Fact]

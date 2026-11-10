@@ -16,6 +16,7 @@ internal sealed class FakeSchemeApiClient : ISchemeApiClient
     public SchemeRequest? LastCreateRequest { get; private set; }
     public SchemeRequest? LastUpdateRequest { get; private set; }
     public SchemeSearchRequest? LastSearchRequest { get; private set; }
+    public string? LastFamiliesSearchTerm { get; private set; }
 
     public Task<SchemeResponse?> GetSchemeAsync(Guid schemeId, CancellationToken cancellationToken = default) =>
         Task.FromResult(SchemeResponse);
@@ -26,8 +27,11 @@ internal sealed class FakeSchemeApiClient : ISchemeApiClient
         return Task.FromResult(SearchResponse);
     }
 
-    public Task<SchemeSearchResponse> GetSchemeFamiliesAsync(int page, int pageSize, string? searchTerm = null, CancellationToken cancellationToken = default) =>
-        Task.FromResult(SearchResponse);
+    public Task<SchemeSearchResponse> GetSchemeFamiliesAsync(int page, int pageSize, string? searchTerm = null, CancellationToken cancellationToken = default)
+    {
+        LastFamiliesSearchTerm = searchTerm;
+        return Task.FromResult(SearchResponse);
+    }
 
     public Task<IReadOnlyList<SchemeHistoryResponse>> GetSchemeHistoryAsync(Guid sharedId, CancellationToken cancellationToken = default) =>
         Task.FromResult(HistoryResponse);
