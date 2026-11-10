@@ -11,14 +11,21 @@ namespace PTL.ExternalWeb.Features.Comments;
 [Authorize(Policy = ExternalPolicies.TestConsultant)]
 public sealed class CommentsController(ITestConsultantTabulationApiClient apiClient) : Controller
 {
+    private const string DrawCommand = "draw";
+    private const string ExportCommand = "export";
     private const string SubmitCommand = "submit";
     private const string CommentsLockedMessage = "These comments have already been submitted and can no longer be edited.";
     private const string AcknowledgementRequiredMessage = "Select to confirm you understand submitted comments cannot be edited.";
+
+    private static readonly string[] ValidSortColumns = ["reference", "schemeCode", "schemeName", "targetDate", "commentsProvidedBy", "submitted"];
+    private static readonly string[] ValidSortDirections = ["asc", "desc"];
 
     public async Task<IActionResult> Index(
         string? distributionReference,
         string? schemeCode,
         string? schemeName,
+        string? sortBy,
+        string? sortDir,
         CancellationToken cancellationToken)
     {
         var distributions = await apiClient.GetDistributionsAsync(cancellationToken);
@@ -30,7 +37,14 @@ public sealed class CommentsController(ITestConsultantTabulationApiClient apiCli
                 && Contains(d.SchemeCode, schemeCode)
                 && ContainsAllWords(d.SchemeName, schemeName))
             .ToList();
-        return View(new CommentsListViewModel(rows, distributionReference, schemeCode, schemeName));
+
+        rows = await PopulateMissingCommentsProvidedByAsync(rows, cancellationToken);
+
+        var column = sortBy is not null && ValidSortColumns.Contains(sortBy) ? sortBy : "targetDate";
+        var direction = sortDir is not null && ValidSortDirections.Contains(sortDir) ? sortDir : "desc";
+        var sorted = Sort(rows, column, direction);
+
+        return View(new CommentsListViewModel(sorted, distributionReference, schemeCode, schemeName, column, direction));
     }
 
     [HttpGet]
@@ -47,6 +61,20 @@ public sealed class CommentsController(ITestConsultantTabulationApiClient apiCli
 
     [HttpPost]
     [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Export(Guid schemeId, CommentsEntryViewModel model, CancellationToken cancellationToken)
+    {
+        var result = await apiClient.ExportTabulationAsync(schemeId, model.ToFilter(), cancellationToken);
+        if (!result.IsOk || result.Value is null)
+        {
+            return NotOk(result.Status);
+        }
+
+        Response.Headers.ContentDisposition = result.Value.ContentDisposition;
+        return File(result.Value.Content, result.Value.ContentType);
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
     public async Task<IActionResult> Entry(Guid schemeId, CommentsEntryViewModel model, string? command, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(model);
@@ -56,20 +84,35 @@ public sealed class CommentsController(ITestConsultantTabulationApiClient apiCli
             return RedirectToAction(nameof(Index));
         }
 
-        var latest = await apiClient.GetTabulationAsync(schemeId, TestConsultantTabulationFilter.None, cancellationToken);
+        var isDraw = string.Equals(command, DrawCommand, StringComparison.OrdinalIgnoreCase);
+        if (isDraw)
+        {
+            ModelState.Remove(nameof(CommentsEntryViewModel.Comments));
+            ModelState.Remove(nameof(CommentsEntryViewModel.Acknowledged));
+        }
+
+        var latest = await apiClient.GetTabulationAsync(
+            schemeId,
+            isDraw ? model.ToFilter() : TestConsultantTabulationFilter.None,
+            cancellationToken);
         if (!latest.IsOk || latest.Value is null)
         {
             return NotOk(latest.Status);
         }
 
+        if (isDraw)
+        {
+            return View(CommentsEntryViewModel.From(schemeId, latest.Value, model.Comments, model));
+        }
+
         if (!ValidateEditableState(model, latest.Value, command))
         {
-            return View(CommentsEntryViewModel.From(schemeId, latest.Value, model.Comments));
+            return View(CommentsEntryViewModel.From(schemeId, latest.Value, model.Comments, model));
         }
 
         if (!ModelState.IsValid)
         {
-            return View(CommentsEntryViewModel.From(schemeId, latest.Value, model.Comments));
+            return View(CommentsEntryViewModel.From(schemeId, latest.Value, model.Comments, model));
         }
 
         var submit = string.Equals(command, SubmitCommand, StringComparison.OrdinalIgnoreCase);
@@ -85,7 +128,7 @@ public sealed class CommentsController(ITestConsultantTabulationApiClient apiCli
         if (!saved.Value.Success)
         {
             ApplySaveErrors(saved.Value);
-            return View(CommentsEntryViewModel.From(schemeId, latest.Value, model.Comments));
+            return View(CommentsEntryViewModel.From(schemeId, latest.Value, model.Comments, model));
         }
 
         TempData.SetNotification(NotificationType.Success, submit ? "Comments submitted successfully." : "Comments saved successfully.");
@@ -136,7 +179,9 @@ public sealed class CommentsController(ITestConsultantTabulationApiClient apiCli
             parsed.SchemeCode,
             parsed.SchemeName,
             distribution.TargetDate,
-            distribution.CommentStatus);
+            distribution.CommentStatus,
+            distribution.CommentsProvidedBy,
+            distribution.IsCommentSubmitted);
     }
 
     private static ParsedDistributionTitle ParseTitle(string title)
@@ -161,6 +206,60 @@ public sealed class CommentsController(ITestConsultantTabulationApiClient apiCli
     private static bool ContainsAllWords(string value, string? term) =>
         string.IsNullOrWhiteSpace(term)
         || term.Split(' ', StringSplitOptions.RemoveEmptyEntries).All(word => value.Contains(word, StringComparison.OrdinalIgnoreCase));
+
+    private static IReadOnlyList<CommentsDistributionListRow> Sort(IReadOnlyList<CommentsDistributionListRow> rows, string sortBy, string sortDir)
+    {
+        IOrderedEnumerable<CommentsDistributionListRow> Order<TKey>(Func<CommentsDistributionListRow, TKey> keySelector) =>
+            sortDir == "desc" ? rows.OrderByDescending(keySelector) : rows.OrderBy(keySelector);
+
+        var ordered = sortBy switch
+        {
+            "reference" => Order(d => d.DistributionReference).ThenBy(d => d.TargetDate).ThenBy(d => d.DistributionReference),
+            "schemeCode" => Order(d => d.SchemeCode).ThenBy(d => d.TargetDate).ThenBy(d => d.DistributionReference),
+            "schemeName" => Order(d => d.SchemeName).ThenBy(d => d.TargetDate).ThenBy(d => d.DistributionReference),
+            "targetDate" => sortDir == "desc"
+                ? rows.OrderByDescending(d => d.TargetDate).ThenBy(d => d.DistributionReference)
+                : rows.OrderBy(d => d.TargetDate).ThenBy(d => d.DistributionReference),
+            "commentsProvidedBy" => Order(d => d.CommentsProvidedBy).ThenBy(d => d.TargetDate).ThenBy(d => d.DistributionReference),
+            "submitted" => Order(d => d.IsSubmitted).ThenBy(d => d.TargetDate).ThenBy(d => d.DistributionReference),
+            _ => rows.OrderByDescending(d => d.TargetDate).ThenBy(d => d.DistributionReference),
+        };
+
+        return [.. ordered];
+    }
+
+    private async Task<List<CommentsDistributionListRow>> PopulateMissingCommentsProvidedByAsync(
+        IReadOnlyList<CommentsDistributionListRow> rows,
+        CancellationToken cancellationToken)
+    {
+        var updated = new List<CommentsDistributionListRow>(rows.Count);
+
+        foreach (var row in rows)
+        {
+            if (row.CommentsProvidedBy.Length > 0)
+            {
+                updated.Add(row);
+                continue;
+            }
+
+            var tabulation = await apiClient.GetTabulationAsync(row.MonthlyDistributionSchemeId, TestConsultantTabulationFilter.None, cancellationToken);
+            if (!tabulation.IsOk || tabulation.Value is null)
+            {
+                updated.Add(row);
+                continue;
+            }
+
+            var heading = tabulation.Value.Comments.Heading;
+            const string prefix = "Comments provided by ";
+            var providedBy = heading.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)
+                ? heading[prefix.Length..].Trim().TrimEnd(':')
+                : string.Empty;
+
+            updated.Add(row with { CommentsProvidedBy = providedBy });
+        }
+
+        return updated;
+    }
 
     private IActionResult NotOk(TestConsultantApiStatus status) =>
         status == TestConsultantApiStatus.Forbidden ? Forbid() : NotFound();

@@ -76,7 +76,8 @@ public sealed class TestConsultantTabulationService(
                 $"{d.DistributionReference}{d.DistributionReferenceSuffix}/{d.ScheduleCode}: {d.SchemeIdentifier} {d.SchemeName}",
                 d.TargetDate,
                 d.IsCommentSubmitted,
-                d.IsCommentSubmitted ? SubmittedStatus : RequiredStatus))]));
+                d.IsCommentSubmitted ? SubmittedStatus : RequiredStatus,
+                d.CommentsProvidedBy))]));
     }
 
     public async Task<TestConsultantResult<TestConsultantTabulationResponse>> GetTabulationAsync(

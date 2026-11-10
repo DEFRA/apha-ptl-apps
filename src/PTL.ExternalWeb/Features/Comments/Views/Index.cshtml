@@ -1,6 +1,21 @@
 @model PTL.ExternalWeb.Features.Comments.CommentsListViewModel
 @{
     ViewData["Title"] = "Enter comments";
+
+    string SortUrl(string column)
+    {
+        var dir = Model.SortBy == column && Model.SortDirection == "asc" ? "desc" : "asc";
+        return Url.Action("Index", new
+        {
+            distributionReference = Model.DistributionReference,
+            schemeCode = Model.SchemeCode,
+            schemeName = Model.SchemeName,
+            sortBy = column,
+            sortDir = dir
+        })!;
+    }
+
+    var sortHeaders = new PTL.ExternalWeb.ViewSupport.SortableHeaderContext(Model.SortBy, Model.SortDirection, SortUrl);
 }
 
 <h1 class="govuk-heading-l">Distributions</h1>
@@ -10,7 +25,20 @@
 <form method="get" asp-action="Index" class="govuk-!-margin-bottom-6">
     <div class="govuk-grid-row">
         <div class="govuk-grid-column-one-half">
-            <partial name="_DistributionReferenceSchemeSearchFields" model="@(new PTL.ExternalWeb.ViewSupport.DistributionReferenceSchemeSearchFields(null, Model.DistributionReference, Model.SchemeCode, Model.SchemeName))" />
+            <div class="govuk-form-group">
+                <label class="govuk-label" for="distributionReference">Distribution reference</label>
+                <input class="govuk-input" id="distributionReference" name="distributionReference" value="@Model.DistributionReference" />
+            </div>
+
+            <div class="govuk-form-group">
+                <label class="govuk-label" for="schemeName">Scheme name</label>
+                <input class="govuk-input" id="schemeName" name="schemeName" value="@Model.SchemeName" />
+            </div>
+
+            <div class="govuk-form-group">
+                <label class="govuk-label" for="schemeCode">Scheme code</label>
+                <input class="govuk-input" id="schemeCode" name="schemeCode" value="@Model.SchemeCode" />
+            </div>
         </div>
     </div>
 
@@ -26,12 +54,11 @@ else
     <table class="govuk-table">
         <thead class="govuk-table__head">
             <tr class="govuk-table__row">
-                <th scope="col" class="govuk-table__header">Distribution reference</th>
-                <th scope="col" class="govuk-table__header">Scheme code</th>
-                <th scope="col" class="govuk-table__header">Scheme name</th>
-                <th scope="col" class="govuk-table__header">Target date</th>
-                <th scope="col" class="govuk-table__header">Comments status</th>
-                <th scope="col" class="govuk-table__header">Comments</th>
+                <partial name="_DistributionReferenceSchemeHeaders" model="sortHeaders" />
+                <partial name="_SortableHeader" model="@(sortHeaders.Header("Results Issue Target Date", "targetDate"))" />
+                <partial name="_SortableHeader" model="@(sortHeaders.Header("Comments Provided By", "commentsProvidedBy"))" />
+                <partial name="_SortableHeader" model="@(sortHeaders.Header("Submitted", "submitted"))" />
+                <th scope="col" class="govuk-table__header">View</th>
             </tr>
         </thead>
         <tbody class="govuk-table__body">
@@ -42,7 +69,8 @@ else
                     <td class="govuk-table__cell">@distribution.SchemeCode</td>
                     <td class="govuk-table__cell">@distribution.SchemeName</td>
                     <td class="govuk-table__cell">@distribution.TargetDate.ToString("dddd d MMMM yyyy")</td>
-                    <td class="govuk-table__cell">@distribution.CommentStatus</td>
+                    <td class="govuk-table__cell">@distribution.CommentsProvidedBy</td>
+                    <td class="govuk-table__cell">@(distribution.IsSubmitted ? "Yes" : "No")</td>
                     <td class="govuk-table__cell">
                         <a class="govuk-link" asp-action="Entry" asp-route-schemeId="@distribution.MonthlyDistributionSchemeId">View</a>
                     </td>

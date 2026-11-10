@@ -24,6 +24,7 @@ internal static partial class TabulationReportRows
         public string? ScheduleCode { get; set; }
         public DateTime? ResultsIssueTargetDate { get; set; }
         public bool? IsCommentSubmitted { get; set; }
+        public string? TestConsultantCommentsAuthor { get; set; }
     }
 
     public sealed class TestConsultantHeader

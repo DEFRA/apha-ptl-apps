@@ -29,6 +29,14 @@ public sealed class CommentsEntryViewModel
 
     public IReadOnlyList<TestConsultantSampleInformationResponse> SampleInformation { get; set; } = [];
 
+    public List<string> AllSamples { get; set; } = [];
+
+    public List<string> ShownSamples { get; set; } = [];
+
+    public bool ShowMethodItems { get; set; } = true;
+
+    public bool? IsFiltered { get; set; }
+
     [StringLength(50000, ErrorMessage = "Comments must not exceed 50,000 characters. Note that rich text such as font changes and bullet points will artificially count towards this character limit.")]
     public string? Comments { get; set; }
 
@@ -37,8 +45,18 @@ public sealed class CommentsEntryViewModel
 
     public bool IsSubmitted => State.IsSubmitted;
 
-    public static CommentsEntryViewModel From(Guid schemeId, TestConsultantTabulationResponse tabulation, string? commentsOverride = null) =>
-        new()
+    public TestConsultantTabulationFilter ToFilter() =>
+        IsFiltered == true
+            ? new TestConsultantTabulationFilter([.. AllSamples.Except(ShownSamples, StringComparer.Ordinal)], !ShowMethodItems)
+            : TestConsultantTabulationFilter.None;
+
+    public static CommentsEntryViewModel From(
+        Guid schemeId,
+        TestConsultantTabulationResponse tabulation,
+        string? commentsOverride = null,
+        CommentsEntryViewModel? previous = null)
+    {
+        var model = new CommentsEntryViewModel
         {
             MonthlyDistributionSchemeId = schemeId,
             Title = tabulation.Title,
@@ -52,5 +70,16 @@ public sealed class CommentsEntryViewModel
             ParticipantInformation = tabulation.ParticipantInformation,
             SampleInformation = tabulation.SampleInformation,
             Comments = commentsOverride ?? tabulation.Comments.CommentsHtml,
+            IsFiltered = previous?.IsFiltered ?? true,
+            ShowMethodItems = previous?.ShowMethodItems ?? true,
+            Acknowledged = previous?.Acknowledged ?? false,
+            AllSamples = [.. tabulation.SampleNumbers],
         };
+
+        model.ShownSamples = previous?.IsFiltered == true
+            ? [.. tabulation.SampleNumbers.Intersect(previous.ShownSamples, StringComparer.Ordinal)]
+            : [.. tabulation.SampleNumbers];
+
+        return model;
+    }
 }
