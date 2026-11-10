@@ -79,13 +79,8 @@ public class SchemeController(ISchemeApiClient schemeApiClient, ILookupApiClient
 
     // Legacy SchemeList.aspx has no year filter and no search box - Scheme Name search is the separate
     // Search page (Scheme Admin/Search.aspx), reached from Manage Schemes > Search.
-    public async Task<IActionResult> Index(int page = 1, int pageSize = PTL.SharedUI.Pagination.PaginationModel.DefaultPageSize, CancellationToken cancellationToken = default)
-    {
-        var result = await schemeApiClient.GetSchemeFamiliesAsync(page, pageSize, searchTerm: null, cancellationToken);
-        LogDisplayedSchemeListMessage(logger, 0, null, result.Page, result.TotalCount, null);
-
-        return View(new SchemeListViewModel(result.Page, result.PageSize, result.TotalCount, result.Items));
-    }
+    public async Task<IActionResult> Index(int page = 1, int pageSize = PTL.SharedUI.Pagination.PaginationModel.DefaultPageSize, CancellationToken cancellationToken = default) =>
+        View(await GetSchemeFamilyListAsync(page, pageSize, cancellationToken));
 
     // Legacy Scheme Admin/Search.aspx: "Use the search box below to identify the required Scheme by
     // Scheme Name." Nothing is listed until Search is pressed (searched); a blank name then lists every
@@ -109,12 +104,15 @@ public class SchemeController(ISchemeApiClient schemeApiClient, ILookupApiClient
     // Legacy SchemeListForPrinting.aspx: the same spgaSchemeInfo family list as the main Scheme
     // List, but with no Search box, no Year filter, and no History column - just Identifier, Name,
     // and a View link per year that opens that scheme's printable worksheet.
-    public async Task<IActionResult> PrintableSchemes(int page = 1, int pageSize = PTL.SharedUI.Pagination.PaginationModel.DefaultPageSize, CancellationToken cancellationToken = default)
+    public async Task<IActionResult> PrintableSchemes(int page = 1, int pageSize = PTL.SharedUI.Pagination.PaginationModel.DefaultPageSize, CancellationToken cancellationToken = default) =>
+        View(await GetSchemeFamilyListAsync(page, pageSize, cancellationToken));
+
+    private async Task<SchemeListViewModel> GetSchemeFamilyListAsync(int page, int pageSize, CancellationToken cancellationToken)
     {
         var result = await schemeApiClient.GetSchemeFamiliesAsync(page, pageSize, searchTerm: null, cancellationToken);
         LogDisplayedSchemeListMessage(logger, 0, null, result.Page, result.TotalCount, null);
 
-        return View(new SchemeListViewModel(result.Page, result.PageSize, result.TotalCount, result.Items));
+        return new SchemeListViewModel(result.Page, result.PageSize, result.TotalCount, result.Items);
     }
 
     // Legacy PrintableScheme.aspx: a standalone worksheet (no site chrome) built from the same
