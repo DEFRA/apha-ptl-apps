@@ -94,6 +94,7 @@ jobs:
               - 'NuGet.config'
               - 'global.json'
               - '.github/workflows/build-test-publish-images.yml'
+              - '.github/actions/**'
             internalweb:
               - 'src/PTL.InternalWeb/**'
               - 'src/PTL.ApiClient/**'
@@ -113,6 +114,7 @@ jobs:
               - 'NuGet.config'
               - 'global.json'
               - '.github/workflows/build-test-publish-images.yml'
+              - '.github/actions/**'
             externalweb:
               - 'src/PTL.ExternalWeb/**'
               - 'src/PTL.ApiClient/**'
@@ -131,6 +133,7 @@ jobs:
               - 'NuGet.config'
               - 'global.json'
               - '.github/workflows/build-test-publish-images.yml'
+              - '.github/actions/**'
 
 
       - name: Resolve affected components
