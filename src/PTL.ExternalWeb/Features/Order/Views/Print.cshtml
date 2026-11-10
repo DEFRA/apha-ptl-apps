@@ -66,10 +66,20 @@
                         @foreach (var month in scheme.Months)
                         {
                             var inOrder = month.Selected && !month.AlreadyParticipating;
+                            var monthStatus = "(not in this order)";
+                            if (inOrder)
+                            {
+                                monthStatus = "(in this order)";
+                            }
+                            else if (month.AlreadyParticipating)
+                            {
+                                monthStatus = "(already participating)";
+                            }
+
                             <li class="app-print-month @(inOrder ? "app-print-month--selected" : null)">
                                 <span class="app-print-month__tick" aria-hidden="true">@(inOrder ? Html.Raw("&#10004;") : Html.Raw("&nbsp;"))</span>
                                 <span class="app-print-month__name">@month.Label</span>
-                                <span class="govuk-visually-hidden">@(inOrder ? "(in this order)" : month.AlreadyParticipating ? "(already participating)" : "(not in this order)")</span>
+                                <span class="govuk-visually-hidden">@monthStatus</span>
                             </li>
                         }
                     </ul>

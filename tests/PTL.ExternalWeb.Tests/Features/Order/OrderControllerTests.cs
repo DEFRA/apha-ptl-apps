@@ -156,7 +156,7 @@ public class OrderControllerTests
     public async Task CurrentYear_ReadsTheSortFromTheQueryString()
     {
         var controller = CreateController();
-        controller.HttpContext.Request.QueryString = new QueryString("?sort=code%7Cdesc%7Cparticipating");
+        controller.SortValues = ["code|desc|participating"];
 
         var result = await controller.CurrentYear(null, CancellationToken.None);
 
@@ -169,7 +169,7 @@ public class OrderControllerTests
     {
         var api = new FakeCreateOrderApiClient { GetResult = new(CreateOrderApiStatus.Ok, FakeCreateOrderApiClient.SampleOrder(selected: true)) };
         var controller = CreateController(api);
-        controller.HttpContext.Request.QueryString = new QueryString("?sort=code%7Cdesc%7Csummary");
+        controller.SortValues = ["code|desc|summary"];
 
         var result = await controller.Review("current", CancellationToken.None);
 

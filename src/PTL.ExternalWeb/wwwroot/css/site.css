@@ -353,15 +353,15 @@
 }
 
 @media print {
-  .app-print-actions,
-  .govuk-back-link,
-  .govuk-breadcrumbs,
-  .govuk-header,
-  .govuk-footer,
-  .govuk-phase-banner,
-  .govuk-service-navigation,
-  .govuk-skip-link {
-    display: none !important;
+  body .app-print-actions,
+  body .govuk-back-link,
+  body .govuk-breadcrumbs,
+  body .govuk-header,
+  body .govuk-footer,
+  body .govuk-phase-banner,
+  body .govuk-service-navigation,
+  body .govuk-skip-link {
+    display: none;
   }
 
   .govuk-main-wrapper {

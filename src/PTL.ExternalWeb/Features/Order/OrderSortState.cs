@@ -17,7 +17,7 @@ public sealed class OrderSortState
     private const int MaxChoices = 40;
     private const int MaxTableLength = 200;
 
-    public static readonly OrderSortState Empty = new(new Dictionary<string, (string Column, string Direction)>());
+    public static readonly OrderSortState Empty = new([]);
 
     private readonly Dictionary<string, (string Column, string Direction)> choices;
 
@@ -49,8 +49,15 @@ public sealed class OrderSortState
     public IReadOnlyList<string> Values => [.. choices.Select(c => $"{c.Value.Column}|{c.Value.Direction}|{c.Key}")];
 
     // An empty column means the table keeps its default order. Legacy sorted the pending-order summary by name from the start.
-    public (string Column, string Direction) For(string table) =>
-        choices.TryGetValue(table, out var choice) ? choice : table == SummaryTable ? (NameColumn, Ascending) : (string.Empty, string.Empty);
+    public (string Column, string Direction) For(string table)
+    {
+        if (choices.TryGetValue(table, out var choice))
+        {
+            return choice;
+        }
+
+        return table == SummaryTable ? (NameColumn, Ascending) : (string.Empty, string.Empty);
+    }
 
     // Legacy toggled: an unsorted or descending column sorts ascending, an ascending one descending.
     public OrderSortState Toggled(string table, string column)

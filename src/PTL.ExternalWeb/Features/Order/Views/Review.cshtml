@@ -60,23 +60,26 @@
             <tr class="govuk-table__row app-order-row--selected">
                 <td class="govuk-table__cell" colspan="2"></td>
                 <td class="govuk-table__cell app-month-cell" colspan="5">
-                    <div class="app-month-strip" role="group" aria-label="Distribution months for @scheme.Name">
-                        @foreach (var month in scheme.Months)
-                        {
-                            if (month.AlreadyParticipating)
+                    <fieldset class="govuk-fieldset">
+                        <legend class="govuk-visually-hidden">Distribution months for @scheme.Name</legend>
+                        <div class="app-month-strip">
+                            @foreach (var month in scheme.Months)
                             {
-                                <strong class="govuk-tag govuk-tag--grey">@month.Label<span class="govuk-visually-hidden"> (you are already participating in this month)</span></strong>
+                                if (month.AlreadyParticipating)
+                                {
+                                    <strong class="govuk-tag govuk-tag--grey">@month.Label<span class="govuk-visually-hidden"> (you are already participating in this month)</span></strong>
+                                }
+                                else if (month.Selected)
+                                {
+                                    <strong class="govuk-tag">@month.Label<span class="govuk-visually-hidden"> (selected)</span></strong>
+                                }
+                                else
+                                {
+                                    <span class="app-month-off">@month.Label<span class="govuk-visually-hidden"> (not selected)</span></span>
+                                }
                             }
-                            else if (month.Selected)
-                            {
-                                <strong class="govuk-tag">@month.Label<span class="govuk-visually-hidden"> (selected)</span></strong>
-                            }
-                            else
-                            {
-                                <span class="app-month-off">@month.Label<span class="govuk-visually-hidden"> (not selected)</span></span>
-                            }
-                        }
-                    </div>
+                        </div>
+                    </fieldset>
                 </td>
             </tr>
         }

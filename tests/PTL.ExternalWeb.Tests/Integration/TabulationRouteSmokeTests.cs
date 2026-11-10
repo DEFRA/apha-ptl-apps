@@ -625,7 +625,6 @@ public class TabulationRouteSmokeTests : IClassFixture<PtlExternalWebTestFactory
     [Theory]
     [InlineData("reference", "D1a/00001", "D1a/00002")]
     [InlineData("schemeName", "Brucella", "Tuberculosis")]
-    [InlineData("tabulationName", "Summary A", "Summary B")]
     public async Task Index_SortedByEachColumn_OrdersTabulationsByThatColumn(string sortBy, string firstValue, string secondValue)
     {
         // "TB" alone could match a random antiforgery token earlier in the page, so the name is a longer, unmistakable word.

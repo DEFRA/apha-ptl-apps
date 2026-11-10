@@ -12,7 +12,7 @@
     // An Orders card stays on Home but is disabled, with its blurb replaced, once an order for its year has been submitted
     // (the header menu stays claim-based; the order page itself explains why the year is unavailable).
     string? SubmittedMessage(NavigationItem item) =>
-        item.ControllerName == "Order" ? Model.SubmittedOrderMessage(item.ActionName) : null;
+        item.ControllerName == "Order" && item.ActionName is { } actionName ? Model.SubmittedOrderMessage(actionName) : null;
 
     // See _HeaderMenu.cshtml for why groups and children are each filtered independently
     // (Results has no group-level role - only its children do).

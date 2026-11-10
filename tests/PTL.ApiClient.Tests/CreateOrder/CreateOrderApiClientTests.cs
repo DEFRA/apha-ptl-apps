@@ -204,6 +204,16 @@ public class CreateOrderApiClientTests
     }
 
     [Fact]
+    public async Task SubmitAsync_Forbidden_DoesNotSucceed()
+    {
+        var (client, _) = CreateClient(HttpStatusCode.Forbidden, null);
+
+        var result = await client.SubmitAsync(Guid.NewGuid(), "current", new CreateOrderSubmitRequest("PO", true, []));
+
+        Assert.False(result.Succeeded);
+    }
+
+    [Fact]
     public async Task SubmitAsync_ServerError_Throws()
     {
         var (client, _) = CreateClient(HttpStatusCode.InternalServerError, null);

@@ -22,6 +22,10 @@ public sealed class OrderController(ICreateOrderApiClient createOrderApiClient, 
     private const string BodyPartial = "_OrderBody";
     private static readonly HashSet<string> MonthFields = new(["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"], StringComparer.Ordinal);
 
+    // The "sort" query values of the tables on the page; see OrderSortState.
+    [FromQuery(Name = "sort")]
+    public string[] SortValues { get; set; } = [];
+
     // "Orders" used to land here; the section now has one page per contract year, so send anyone with an old link Home.
     public IActionResult Index() => RedirectToAction("Index", "Home");
 
@@ -99,7 +103,7 @@ public sealed class OrderController(ICreateOrderApiClient createOrderApiClient, 
     [HttpGet]
     public async Task<IActionResult> Review(string? year, CancellationToken cancellationToken)
     {
-        var review = await GetReviewModelAsync(year, includeConsents: true, Request.Query["sort"], cancellationToken);
+        var review = await GetReviewModelAsync(year, includeConsents: true, SortValues, cancellationToken);
         return review.Error ?? View(review.Model!);
     }
 
@@ -144,7 +148,7 @@ public sealed class OrderController(ICreateOrderApiClient createOrderApiClient, 
         }
 
         var result = await createOrderApiClient.SubmitAsync(
-            participantId.Value, slug, new CreateOrderSubmitRequest(form.PurchaseOrderNumber, form.TermsAccepted, form.ConsentedSchemeIds), cancellationToken);
+            participantId.Value, slug, new CreateOrderSubmitRequest(form.PurchaseOrderNumber, form.TermsAccepted == true, form.ConsentedSchemeIds), cancellationToken);
         if (result.Status != CreateOrderApiStatus.Ok)
         {
             return result.Status == CreateOrderApiStatus.NotAllowed ? NotAvailable(slug) : NotFound();
@@ -164,7 +168,7 @@ public sealed class OrderController(ICreateOrderApiClient createOrderApiClient, 
     [HttpGet]
     public async Task<IActionResult> Print(string? year, CancellationToken cancellationToken)
     {
-        var review = await GetReviewModelAsync(year, includeConsents: true, Request.Query["sort"], cancellationToken);
+        var review = await GetReviewModelAsync(year, includeConsents: true, SortValues, cancellationToken);
         return review.Error ?? View("Print", review.Model!);
     }
 
@@ -180,7 +184,7 @@ public sealed class OrderController(ICreateOrderApiClient createOrderApiClient, 
         return View("Review", review.Model! with
         {
             PurchaseOrderNumber = form.PurchaseOrderNumber ?? string.Empty,
-            TermsAccepted = form.TermsAccepted,
+            TermsAccepted = form.TermsAccepted == true,
             ConsentedSchemeIds = form.ConsentedSchemeIds,
             Errors = errors
         });
@@ -233,7 +237,7 @@ public sealed class OrderController(ICreateOrderApiClient createOrderApiClient, 
                 YearSlug = slug,
                 Order = result.Order!,
                 Search = search,
-                Sort = OrderSortState.Parse(Request.Query["sort"]),
+                Sort = OrderSortState.Parse(SortValues),
                 DistributionTimetableUrl = pageOptions.Value.SafeDistributionTimetableUrl
             }),
             CreateOrderApiStatus.NotAllowed => NotAvailable(slug),

@@ -139,7 +139,8 @@ public sealed class CreateOrderReviewForm
 
     public string? PurchaseOrderNumber { get; set; }
 
-    public bool TermsAccepted { get; set; }
+    // Nullable so a missing field is told apart from an unticked box; both mean the terms were not accepted.
+    public bool? TermsAccepted { get; set; }
 
     public List<Guid> ConsentedSchemeIds { get; set; } = [];
 

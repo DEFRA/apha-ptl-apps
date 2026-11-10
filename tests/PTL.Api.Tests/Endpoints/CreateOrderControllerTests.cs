@@ -12,6 +12,7 @@ using PTL.Core.Contract.CreateOrder;
 using PTL.Core.Lookup;
 using CoreCustomer = PTL.Core.Customer.Customer;
 using CoreParticipant = PTL.Core.Participant.Participant;
+using CoreScheme = PTL.Core.Scheme.Scheme;
 
 namespace PTL.Api.Tests.Endpoints;
 
@@ -19,12 +20,13 @@ public class CreateOrderControllerTests
 {
     private sealed record Setup(CreateOrderController Controller, Guid ParticipantId, FakeCreateOrderStore Store, AvailableSchemeEntity Scheme);
 
-    private static async Task<Setup> CreateAsync(bool canOrderOnline = true)
+    private static async Task<Setup> CreateAsync(bool canOrderOnline = true, string? consentText = null)
     {
         var store = new FakeCreateOrderStore();
         var participants = new FakeParticipantRepository();
         var customers = new FakeCustomerRepository();
         var lookup = new FakeLookupRepository();
+        var schemes = new FakeSchemeRepository();
 
         var currencyId = Guid.NewGuid();
         var customer = await customers.CreateAsync(new CoreCustomer { CanOrderOnline = canOrderOnline, CurrencyId = currencyId });
@@ -37,7 +39,19 @@ public class CreateOrderControllerTests
         store.AvailableSchemes.Add(scheme);
         lookup.SchemeCurrencies = [new SchemeCurrencyEntity { SchemeId = scheme.SchemeId, CurrencyId = currencyId, Price = 100m, CurrencySymbol = "£" }];
 
-        var service = new CreateOrderService(store, store, participants, customers, lookup, new FakeSchemeRepository(), Options.Create(new CreateOrderOptions()));
+        if (consentText is not null)
+        {
+            await schemes.CreateAsync(new CoreScheme
+            {
+                SchemeId = scheme.SchemeId,
+                Identifier = scheme.Identifier,
+                Name = scheme.Name,
+                DataConsentDeclarationActive = true,
+                DataConsentDeclarationText = consentText
+            });
+        }
+
+        var service = new CreateOrderService(store, store, participants, customers, lookup, schemes, Options.Create(new CreateOrderOptions()));
         return new Setup(new CreateOrderController(service), participant.ParticipantId, store, scheme);
     }
 
@@ -79,6 +93,8 @@ public class CreateOrderControllerTests
         Assert.Equal(100m, scheme.AnnualPrice);
         Assert.Equal(12, scheme.Months.Count);
         Assert.False(response.CanProceed);
+        Assert.Null(response.Consents);
+        Assert.Empty(response.DataConsents);
     }
 
     [Fact]
@@ -185,6 +201,20 @@ public class CreateOrderControllerTests
         Assert.Equal("PO-1", response.PurchaseOrderNumber);
         Assert.NotNull(response.Consents);
         Assert.Empty(response.DataConsents);
+    }
+
+    [Fact]
+    public async Task Get_ForReview_WithAnActiveConsentDeclaration_ReturnsTheConsent()
+    {
+        var setup = await CreateAsync(consentText: "Share my data");
+        await setup.Controller.Change(
+            setup.ParticipantId, OrderYear.Current, new CreateOrderLineChangeRequest(setup.Scheme.SchemeId, "select", true), CancellationToken.None);
+
+        var result = await setup.Controller.Get(setup.ParticipantId, OrderYear.Current, review: true, CancellationToken.None);
+
+        var response = Assert.IsType<CreateOrderResponse>(Assert.IsType<OkObjectResult>(result.Result).Value);
+        var consent = Assert.Single(response.DataConsents);
+        Assert.Equal(new CreateOrderConsentResponse(setup.Scheme.SchemeId, "PT1", "Alpha", "Share my data", false), consent);
     }
 
     [Fact]
