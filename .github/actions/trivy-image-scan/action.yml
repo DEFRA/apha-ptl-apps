@@ -16,6 +16,10 @@ inputs:
     description: Comma-separated severities that fail the scan
     required: false
     default: HIGH,CRITICAL
+  windows-paths:
+    description: Comma-separated paths inside a Windows image that are exported and scanned
+    required: false
+    default: C:\app,C:\Program Files\dotnet
 
 runs:
   using: composite
@@ -51,7 +55,70 @@ runs:
         tar --extract --gzip --file "${RUNNER_TEMP}/trivy.tar.gz" --directory "${RUNNER_TEMP}/trivy" trivy
         echo "TRIVY_BIN=${RUNNER_TEMP}/trivy/trivy" >> "${GITHUB_ENV}"
 
-    - name: Generate SBOM and scan image
+    # Windows images are scanned by exporting the files this repo ships (the app and the .NET runtime)
+    # and scanning them as a directory. Scanning the saved image instead means analysing the whole Windows
+    # base layer, which for the full windows/server image takes longer than the scan timeout. Trivy does
+    # not report on Windows OS packages either way.
+    - name: Generate SBOM and scan image (Windows)
+      if: runner.os == 'Windows'
+      shell: pwsh
+      env:
+        IMAGE: ${{ inputs.image }}
+        SCAN_NAME: ${{ inputs.name }}
+        SEVERITY: ${{ inputs.severity }}
+        SCAN_PATHS: ${{ inputs.windows-paths }}
+        TRIVY_NO_PROGRESS: "true"
+        TRIVY_TIMEOUT: 15m
+        TRIVY_DB_REPOSITORY: public.ecr.aws/aquasecurity/trivy-db:2,ghcr.io/aquasecurity/trivy-db:2
+      run: |
+        $ErrorActionPreference = "Stop"
+        $root = Join-Path $env:RUNNER_TEMP "trivy-$($env:SCAN_NAME)"
+        $sbom = Join-Path $env:RUNNER_TEMP "sbom-$($env:SCAN_NAME).cdx.json"
+        $report = Join-Path $env:RUNNER_TEMP "trivy-$($env:SCAN_NAME).txt"
+        New-Item -ItemType Directory -Path $root -Force | Out-Null
+
+        $container = (docker create $env:IMAGE | Out-String).Trim()
+        if ($LASTEXITCODE -ne 0) { throw "docker create failed for $($env:IMAGE)." }
+        try {
+          foreach ($path in $env:SCAN_PATHS -split ',') {
+            $path = $path.Trim()
+            $destination = Join-Path $root ($path -replace '[:\\ ]', '_')
+            docker cp "${container}:${path}" $destination
+            if ($LASTEXITCODE -ne 0) { throw "Could not copy $path out of $($env:IMAGE)." }
+          }
+        }
+        finally {
+          docker rm -f $container | Out-Null
+        }
+
+        & $env:TRIVY_BIN fs $root --scanners vuln --format cyclonedx --output $sbom
+        if ($LASTEXITCODE -ne 0) { throw "SBOM generation failed." }
+
+        # Vulnerabilities without a fix cannot be acted on, so they do not fail the build.
+        & $env:TRIVY_BIN fs $root --scanners vuln --severity $env:SEVERITY --ignore-unfixed --exit-code 1 --format table --output $report
+        $status = $LASTEXITCODE
+
+        Remove-Item $root -Recurse -Force
+        Get-Content $report
+
+        $summary = @("### Image vulnerability scan: $($env:SCAN_NAME)", "")
+        if ($status -eq 0) {
+          $summary += "No fixable $($env:SEVERITY) vulnerabilities."
+        }
+        else {
+          $summary += '```'
+          $summary += (Get-Content $report -TotalCount 600)
+          $summary += '```'
+        }
+        $summary | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8 -Append
+
+        if ($status -ne 0) {
+          Write-Host "::error::$($env:IMAGE) contains fixable $($env:SEVERITY) vulnerabilities. Rebuild on updated base images or dependencies; see the job summary."
+        }
+        exit $status
+
+    - name: Generate SBOM and scan image (Linux)
+      if: runner.os == 'Linux'
       shell: bash
       env:
         IMAGE: ${{ inputs.image }}
