@@ -53,7 +53,7 @@ public static class CommentsAccordionBuilder
         string caption,
         string sample,
         IReadOnlyList<TabulationGridRowResponse> headerRows,
-        IReadOnlyList<TabulationGridRowResponse> sampleRows)
+        List<TabulationGridRowResponse> sampleRows)
     {
         var rows = new List<TabulationGridRowResponse>();
         rows.AddRange(headerRows);

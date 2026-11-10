@@ -27,6 +27,7 @@
 
 <form method="post" asp-action="Entry" asp-route-schemeId="@Model.MonthlyDistributionSchemeId" novalidate>
     <input type="hidden" asp-for="MonthlyDistributionSchemeId" />
+    <input type="hidden" asp-for="ReturnUrl" />
     <input type="hidden" name="IsFiltered" value="true" />
     @foreach (var sample in Model.AllSamples)
     {
@@ -183,7 +184,14 @@
     @if (Model.IsSubmitted)
     {
         <div class="govuk-button-group">
-            <a class="govuk-button govuk-button--secondary" data-module="govuk-button" asp-action="Index">Back</a>
+            @if (!string.IsNullOrWhiteSpace(Model.ReturnUrl))
+            {
+                <a class="govuk-button govuk-button--secondary" data-module="govuk-button" href="@Model.ReturnUrl">Back</a>
+            }
+            else
+            {
+                <a class="govuk-button govuk-button--secondary" data-module="govuk-button" asp-action="Index">Back</a>
+            }
         </div>
     }
     else
@@ -209,7 +217,14 @@
         <div class="govuk-button-group">
             <button type="submit" name="command" value="save" class="govuk-button govuk-button--secondary" data-module="govuk-button">Save</button>
             <button id="submit-comments-button" type="submit" name="command" value="submit" class="govuk-button" data-module="govuk-button" disabled>Submit</button>
-            <a class="govuk-button govuk-button--secondary" data-module="govuk-button" asp-action="Index">Cancel</a>
+            @if (!string.IsNullOrWhiteSpace(Model.ReturnUrl))
+            {
+                <a class="govuk-button govuk-button--secondary" data-module="govuk-button" href="@Model.ReturnUrl">Cancel</a>
+            }
+            else
+            {
+                <a class="govuk-button govuk-button--secondary" data-module="govuk-button" asp-action="Index">Cancel</a>
+            }
         </div>
     }
 </form>

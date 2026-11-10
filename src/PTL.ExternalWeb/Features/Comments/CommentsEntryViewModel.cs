@@ -11,6 +11,8 @@ public sealed class CommentsEntryViewModel
 
     public string Title { get; set; } = string.Empty;
 
+    public string? ReturnUrl { get; set; }
+
     public TestConsultantCommentsStateResponse State { get; set; } = new(false, string.Empty, string.Empty, false);
 
     public string StandardTabulationTextHtml { get; set; } = string.Empty;
@@ -60,6 +62,7 @@ public sealed class CommentsEntryViewModel
         {
             MonthlyDistributionSchemeId = schemeId,
             Title = tabulation.Title,
+            ReturnUrl = previous?.ReturnUrl,
             State = tabulation.Comments,
             StandardTabulationTextHtml = tabulation.StandardTabulationTextHtml,
             ExistingCommentsHtml = tabulation.CommentsHtml,

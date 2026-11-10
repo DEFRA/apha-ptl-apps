@@ -156,12 +156,14 @@ public class CommentsRouteSmokeTests : IClassFixture<PtlExternalWebTestFactory>
         var cookies = await SignInAsync(client, Guid.NewGuid());
         var (token, _) = await GetEntryTokenAsync(client, cookies, apiClient.SchemeId);
 
+        var returnUrl = "/Comments/Index?schemeName=Brucella&sortBy=schemeName&sortDir=asc";
         var form = new Dictionary<string, string>
         {
             ["__RequestVerificationToken"] = token,
             ["MonthlyDistributionSchemeId"] = apiClient.SchemeId.ToString(),
             ["Comments"] = "<p>Submit</p>",
             ["Acknowledged"] = "true",
+            ["ReturnUrl"] = returnUrl,
             ["command"] = "submit"
         };
 
@@ -169,7 +171,7 @@ public class CommentsRouteSmokeTests : IClassFixture<PtlExternalWebTestFactory>
             client, HttpMethod.Post, $"/Comments/Entry?schemeId={apiClient.SchemeId}", cookies, new FormUrlEncodedContent(form));
 
         Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
-        Assert.EndsWith("/Comments/Index", response.Headers.Location!.ToString(), StringComparison.Ordinal);
+        Assert.Equal(returnUrl, response.Headers.Location!.ToString());
         var request = Assert.Single(apiClient.SavedRequests);
         Assert.True(request.Submit);
         Assert.Equal("<p>Submit</p>", request.Comments);
@@ -308,6 +310,30 @@ public class CommentsRouteSmokeTests : IClassFixture<PtlExternalWebTestFactory>
         var body = await response.Content.ReadAsStringAsync();
         var token = Regex.Match(body, "__RequestVerificationToken[^>]*value=\"([^\"]+)\"").Groups[1].Value;
         return (token, body);
+    }
+
+    [Fact]
+    public async Task Index_ViewLink_IncludesCurrentSearchAsReturnUrl()
+    {
+        var apiClient = new FakeTestConsultantTabulationApiClient
+        {
+            Distributions = new TestConsultantDistributionsResponse(
+            [
+                Distribution("D1a/S1 BT: Brucella")
+            ])
+        };
+        var client = CreateClient(apiClient);
+        var cookies = await SignInAsync(client, Guid.NewGuid());
+
+        var response = await CookieForwardingHttpClient.SendWithCookiesAsync(
+            client,
+            HttpMethod.Get,
+            "/Comments/Index?schemeName=Brucella&sortBy=schemeName&sortDir=asc",
+            cookies);
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains($"returnUrl={Uri.EscapeDataString("/Comments/Index?schemeName=Brucella&sortBy=schemeName&sortDir=asc")}", body, StringComparison.Ordinal);
     }
 
     private static TestConsultantDistributionResponse Distribution(string title) =>

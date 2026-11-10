@@ -87,11 +87,12 @@ public class CommentsControllerTests
         var api = new FakeTestConsultantApiClient { Tabulation = Ok(Tabulation(submitted: false)) };
         var controller = new CommentsController(api);
 
-        var result = await controller.Entry(Guid.NewGuid(), CancellationToken.None);
+        var result = await controller.Entry(Guid.NewGuid(), "/Comments/Index?schemeName=Brucella", CancellationToken.None);
 
         var model = Assert.IsType<CommentsEntryViewModel>(Assert.IsType<ViewResult>(result).Model);
         Assert.Equal("Title", model.Title);
         Assert.False(model.IsSubmitted);
+        Assert.Equal("/Comments/Index?schemeName=Brucella", model.ReturnUrl);
     }
 
     [Fact]
@@ -110,7 +111,7 @@ public class CommentsControllerTests
     }
 
     [Fact]
-    public async Task Entry_Post_Save_Success_RedirectsToIndex_AndSendsDraftRequest()
+    public async Task Entry_Post_Save_Success_RedirectsToReturnUrl_AndSendsDraftRequest()
     {
         var api = new FakeTestConsultantApiClient
         {
@@ -120,10 +121,15 @@ public class CommentsControllerTests
         var controller = new CommentsController(api);
         var schemeId = Guid.NewGuid();
 
-        var result = await controller.Entry(schemeId, new CommentsEntryViewModel { Comments = "<p>Draft</p>", Acknowledged = false }, "save", CancellationToken.None);
+        var result = await controller.Entry(schemeId, new CommentsEntryViewModel
+        {
+            Comments = "<p>Draft</p>",
+            Acknowledged = false,
+            ReturnUrl = "/Comments/Index?schemeName=Brucella&sortBy=schemeName&sortDir=asc"
+        }, "save", CancellationToken.None);
 
-        var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal(nameof(CommentsController.Index), redirect.ActionName);
+        var redirect = Assert.IsType<RedirectResult>(result);
+        Assert.Equal("/Comments/Index?schemeName=Brucella&sortBy=schemeName&sortDir=asc", redirect.Url);
         var request = Assert.Single(api.SavedRequests);
         Assert.False(request.Submit);
         Assert.Equal("<p>Draft</p>", request.Comments);
@@ -145,15 +151,18 @@ public class CommentsControllerTests
     }
 
     [Fact]
-    public async Task Entry_Post_Cancel_RedirectsToIndex_WithoutLoadingOrSaving()
+    public async Task Entry_Post_Cancel_RedirectsToReturnUrl_WithoutLoadingOrSaving()
     {
         var api = new FakeTestConsultantApiClient { Tabulation = Ok(Tabulation(submitted: false)) };
         var controller = new CommentsController(api);
 
-        var result = await controller.Entry(Guid.NewGuid(), new CommentsEntryViewModel(), "cancel", CancellationToken.None);
+        var result = await controller.Entry(Guid.NewGuid(), new CommentsEntryViewModel
+        {
+            ReturnUrl = "/Comments/Index?distributionReference=D1a"
+        }, "cancel", CancellationToken.None);
 
-        var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal(nameof(CommentsController.Index), redirect.ActionName);
+        var redirect = Assert.IsType<RedirectResult>(result);
+        Assert.Equal("/Comments/Index?distributionReference=D1a", redirect.Url);
         Assert.Equal(0, api.GetTabulationCalls);
         Assert.Empty(api.SavedRequests);
         Assert.Empty(api.ExportedRequests);
@@ -172,12 +181,15 @@ public class CommentsControllerTests
             IsFiltered = true,
             AllSamples = ["26/1", "26/2"],
             ShownSamples = ["26/1"],
-            ShowMethodItems = false
+            ShowMethodItems = false,
+            ReturnUrl = "/Comments/Index?schemeName=Brucella"
         }, "draw", CancellationToken.None);
 
         var view = Assert.IsType<ViewResult>(result);
         var model = Assert.IsType<CommentsEntryViewModel>(view.Model);
         Assert.Equal("<p>Edit</p>", model.Comments);
+        Assert.Equal("/Comments/Index?schemeName=Brucella", model.ReturnUrl);
+        Assert.Equal("/Comments/Index?schemeName=Brucella", controller.ViewData["ListReturnUrl"]);
         Assert.Empty(api.SavedRequests);
         var filter = Assert.Single(api.GetTabulationFilters);
         Assert.Equal(["26/2"], filter.HiddenSamples);
@@ -290,7 +302,7 @@ public class CommentsControllerTests
         };
         var controller = new CommentsController(api);
 
-        var result = await controller.Entry(Guid.NewGuid(), CancellationToken.None);
+        var result = await controller.Entry(Guid.NewGuid(), null, CancellationToken.None);
 
         Assert.IsType<NotFoundResult>(result);
     }

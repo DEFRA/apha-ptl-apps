@@ -4,6 +4,7 @@ using PTL.ApiClient;
 using PTL.Contracts.Distribution;
 using PTL.ExternalWeb.Authorization;
 using PTL.SharedUI.Notifications;
+using PTL.ExternalWeb.ViewSupport;
 
 namespace PTL.ExternalWeb.Features.Comments;
 
@@ -12,7 +13,6 @@ namespace PTL.ExternalWeb.Features.Comments;
 public sealed class CommentsController(ITestConsultantTabulationApiClient apiClient) : Controller
 {
     private const string DrawCommand = "draw";
-    private const string ExportCommand = "export";
     private const string SubmitCommand = "submit";
     private const string CommentsLockedMessage = "These comments have already been submitted and can no longer be edited.";
     private const string AcknowledgementRequiredMessage = "Select to confirm you understand submitted comments cannot be edited.";
@@ -48,7 +48,7 @@ public sealed class CommentsController(ITestConsultantTabulationApiClient apiCli
     }
 
     [HttpGet]
-    public async Task<IActionResult> Entry(Guid schemeId, CancellationToken cancellationToken)
+    public async Task<IActionResult> Entry(Guid schemeId, string? returnUrl, CancellationToken cancellationToken)
     {
         var tabulation = await apiClient.GetTabulationAsync(schemeId, TestConsultantTabulationFilter.None, cancellationToken);
         if (!tabulation.IsOk || tabulation.Value is null)
@@ -56,21 +56,10 @@ public sealed class CommentsController(ITestConsultantTabulationApiClient apiCli
             return NotOk(tabulation.Status);
         }
 
-        return View(CommentsEntryViewModel.From(schemeId, tabulation.Value));
-    }
-
-    [HttpPost]
-    [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Export(Guid schemeId, CommentsEntryViewModel model, CancellationToken cancellationToken)
-    {
-        var result = await apiClient.ExportTabulationAsync(schemeId, model.ToFilter(), cancellationToken);
-        if (!result.IsOk || result.Value is null)
-        {
-            return NotOk(result.Status);
-        }
-
-        Response.Headers.ContentDisposition = result.Value.ContentDisposition;
-        return File(result.Value.Content, result.Value.ContentType);
+        var model = CommentsEntryViewModel.From(schemeId, tabulation.Value);
+        model.ReturnUrl = ListReturnUrl.Validate(returnUrl, ListReturnUrl.CommentsIndex);
+        ViewData["ListReturnUrl"] = model.ReturnUrl;
+        return View(model);
     }
 
     [HttpPost]
@@ -79,9 +68,11 @@ public sealed class CommentsController(ITestConsultantTabulationApiClient apiCli
     {
         ArgumentNullException.ThrowIfNull(model);
 
+        model.ReturnUrl = ListReturnUrl.Validate(model.ReturnUrl, ListReturnUrl.CommentsIndex);
+
         if (string.Equals(command, "cancel", StringComparison.OrdinalIgnoreCase))
         {
-            return RedirectToAction(nameof(Index));
+            return RedirectToIndex(model.ReturnUrl);
         }
 
         var isDraw = string.Equals(command, DrawCommand, StringComparison.OrdinalIgnoreCase);
@@ -102,17 +93,17 @@ public sealed class CommentsController(ITestConsultantTabulationApiClient apiCli
 
         if (isDraw)
         {
-            return View(CommentsEntryViewModel.From(schemeId, latest.Value, model.Comments, model));
+            return EntryView(schemeId, latest.Value, model);
         }
 
         if (!ValidateEditableState(model, latest.Value, command))
         {
-            return View(CommentsEntryViewModel.From(schemeId, latest.Value, model.Comments, model));
+            return EntryView(schemeId, latest.Value, model);
         }
 
         if (!ModelState.IsValid)
         {
-            return View(CommentsEntryViewModel.From(schemeId, latest.Value, model.Comments, model));
+            return EntryView(schemeId, latest.Value, model);
         }
 
         var submit = string.Equals(command, SubmitCommand, StringComparison.OrdinalIgnoreCase);
@@ -128,11 +119,30 @@ public sealed class CommentsController(ITestConsultantTabulationApiClient apiCli
         if (!saved.Value.Success)
         {
             ApplySaveErrors(saved.Value);
-            return View(CommentsEntryViewModel.From(schemeId, latest.Value, model.Comments, model));
+            return EntryView(schemeId, latest.Value, model);
         }
 
         TempData.SetNotification(NotificationType.Success, submit ? "Comments submitted successfully." : "Comments saved successfully.");
-        return RedirectToAction(nameof(Index));
+        return RedirectToIndex(model.ReturnUrl);
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Export(Guid schemeId, CommentsEntryViewModel model, CancellationToken cancellationToken)
+    {
+        if (!ModelState.IsValid)
+        {
+            return ValidationProblem(ModelState);
+        }
+
+        var result = await apiClient.ExportTabulationAsync(schemeId, model.ToFilter(), cancellationToken);
+        if (!result.IsOk || result.Value is null)
+        {
+            return NotOk(result.Status);
+        }
+
+        Response.Headers.ContentDisposition = result.Value.ContentDisposition;
+        return File(result.Value.Content, result.Value.ContentType);
     }
 
     private bool ValidateEditableState(
@@ -229,7 +239,7 @@ public sealed class CommentsController(ITestConsultantTabulationApiClient apiCli
     }
 
     private async Task<List<CommentsDistributionListRow>> PopulateMissingCommentsProvidedByAsync(
-        IReadOnlyList<CommentsDistributionListRow> rows,
+        List<CommentsDistributionListRow> rows,
         CancellationToken cancellationToken)
     {
         var updated = new List<CommentsDistributionListRow>(rows.Count);
@@ -259,6 +269,20 @@ public sealed class CommentsController(ITestConsultantTabulationApiClient apiCli
         }
 
         return updated;
+    }
+
+    private IActionResult EntryView(Guid schemeId, TestConsultantTabulationResponse tabulation, CommentsEntryViewModel previous)
+    {
+        var viewModel = CommentsEntryViewModel.From(schemeId, tabulation, previous.Comments, previous);
+        viewModel.ReturnUrl = ListReturnUrl.Validate(previous.ReturnUrl, ListReturnUrl.CommentsIndex);
+        ViewData["ListReturnUrl"] = viewModel.ReturnUrl;
+        return View(viewModel);
+    }
+
+    private IActionResult RedirectToIndex(string? returnUrl)
+    {
+        var safeReturnUrl = ListReturnUrl.Validate(returnUrl, ListReturnUrl.CommentsIndex);
+        return safeReturnUrl is null ? RedirectToAction(nameof(Index)) : Redirect(safeReturnUrl);
     }
 
     private IActionResult NotOk(TestConsultantApiStatus status) =>

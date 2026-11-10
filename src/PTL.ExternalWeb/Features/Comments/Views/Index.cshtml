@@ -72,7 +72,10 @@ else
                     <td class="govuk-table__cell">@distribution.CommentsProvidedBy</td>
                     <td class="govuk-table__cell">@(distribution.IsSubmitted ? "Yes" : "No")</td>
                     <td class="govuk-table__cell">
-                        <a class="govuk-link" asp-action="Entry" asp-route-schemeId="@distribution.MonthlyDistributionSchemeId">View</a>
+                        <a class="govuk-link"
+                           asp-action="Entry"
+                           asp-route-schemeId="@distribution.MonthlyDistributionSchemeId"
+                           asp-route-returnUrl="@Context.Request.Path@Context.Request.QueryString">View</a>
                     </td>
                 </tr>
             }
