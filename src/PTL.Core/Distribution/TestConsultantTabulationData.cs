@@ -13,6 +13,7 @@ public sealed class TestConsultantDistributionEntity
     public string ScheduleCode { get; init; } = string.Empty;
     public DateTime TargetDate { get; init; }
     public bool IsCommentSubmitted { get; init; }
+    public string CommentsProvidedBy { get; init; } = string.Empty;
 }
 
 // spgMonthlyDistributionSchemeForTestConsultant - legacy Test Consultant MonthlyDistributionScheme. The tabulation

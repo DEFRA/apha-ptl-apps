@@ -1,4 +1,5 @@
 @model PTL.ExternalWeb.Features.Comments.CommentsEntryViewModel
+@using PTL.ExternalWeb.Features.Tabulation
 @{
     ViewData["Title"] = "Enter comments";
 
@@ -6,103 +7,195 @@
         .Where(entry => entry.Value?.Errors.Count > 0)
         .SelectMany(entry => entry.Value!.Errors.Select(error => (Field: entry.Key, Message: error.ErrorMessage)))
         .ToList();
+
+    var resultsSections = PTL.ExternalWeb.Features.Comments.CommentsAccordionBuilder.Build(Model.ResultsTables, Model.ShowMethodItems, Model.ShownSamples);
+    var fullSections = PTL.ExternalWeb.Features.Comments.CommentsAccordionBuilder.Build(Model.FullTables, Model.ShowMethodItems, Model.ShownSamples);
 }
 
 <govuk-error-summary errors="@errors" />
 
-<h1 class="govuk-heading-l">Enter comments</h1>
-<h2 class="govuk-heading-m">@Model.Title</h2>
+<h1 class="govuk-heading-l">Comments entry</h1>
+<h2 class="govuk-heading-m">@((Model.Title?.StartsWith("FINAL REPORT for ", StringComparison.OrdinalIgnoreCase) ?? false) ? Model.Title[17..] : Model.Title)</h2>
 
-<p class="govuk-body">Review the distribution results and enter comments below.</p>
+@if (!Model.IsSubmitted)
+{
+    <p class="govuk-body">Please use the box below the report to record your comments.</p>
+}
 
-<div class="govuk-tabs" data-module="govuk-tabs">
-    <h2 class="govuk-tabs__title">Report sections</h2>
-    <ul class="govuk-tabs__list">
-        <li class="govuk-tabs__list-item govuk-tabs__list-item--selected"><a class="govuk-tabs__tab" href="#results-report">Results Report</a></li>
-        <li class="govuk-tabs__list-item"><a class="govuk-tabs__tab" href="#full-report">Full Report</a></li>
-        <li class="govuk-tabs__list-item"><a class="govuk-tabs__tab" href="#additional-sample-information">Additional Sample Information</a></li>
-    </ul>
+<p class="govuk-body">Also provided to assist in your commentary are the full set of results with extra participant information, and additional sample information (if available).</p>
+<p class="govuk-body">To view a subset of the reports, un-tick several of the check boxes below and press the draw reports button.</p>
 
-    <div class="govuk-tabs__panel" id="results-report">
-        <h2 class="govuk-heading-m">Results Report</h2>
-        @foreach (var table in Model.ResultsTables)
-        {
-            <govuk-tabulation-table table="table" />
-        }
-        @if (Model.ResultsRatings is not null)
-        {
-            <govuk-tabulation-table table="Model.ResultsRatings" />
-        }
-    </div>
-
-    <div class="govuk-tabs__panel govuk-tabs__panel--hidden" id="full-report">
-        <h2 class="govuk-heading-m">Full Report</h2>
-        @foreach (var table in Model.FullTables)
-        {
-            <govuk-tabulation-table table="table" />
-        }
-        @if (Model.FullRatings is not null)
-        {
-            <govuk-tabulation-table table="Model.FullRatings" />
-        }
-        @if (Model.ParticipantInformation is not null)
-        {
-            <govuk-tabulation-table table="Model.ParticipantInformation" />
-        }
-    </div>
-
-    <div class="govuk-tabs__panel govuk-tabs__panel--hidden" id="additional-sample-information">
-        <h2 class="govuk-heading-m">Additional Sample Information</h2>
-        @if (Model.SampleInformation.Count == 0)
-        {
-            <p class="govuk-body">No additional sample information is available.</p>
-        }
-        @foreach (var sample in Model.SampleInformation)
-        {
-            <h3 class="govuk-heading-s govuk-!-margin-bottom-1">@sample.SampleNumber @sample.TabulationDescription</h3>
-            <p class="govuk-body">@sample.TestConsultantsDescription</p>
-        }
-    </div>
-</div>
-
-<div id="commentsDiv">
-    @if (!string.IsNullOrEmpty(Model.StandardTabulationTextHtml))
+<form method="post" asp-action="Entry" asp-route-schemeId="@Model.MonthlyDistributionSchemeId" novalidate>
+    <input type="hidden" asp-for="MonthlyDistributionSchemeId" />
+    <input type="hidden" asp-for="ReturnUrl" />
+    <input type="hidden" name="IsFiltered" value="true" />
+    @foreach (var sample in Model.AllSamples)
     {
-        <div class="govuk-body">
-            @Html.Raw(Model.StandardTabulationTextHtml)
+        <input type="hidden" name="AllSamples" value="@sample" />
+    }
+
+    @if (Model.AllSamples.Count > 0)
+    {
+        <div class="govuk-form-group">
+            <fieldset class="govuk-fieldset">
+                <div class="govuk-checkboxes govuk-checkboxes--small" data-module="govuk-checkboxes">
+                    <div class="govuk-checkboxes__item">
+                        <input class="govuk-checkboxes__input" id="show-method-items" name="ShowMethodItems" type="checkbox" value="true" checked="@(Model.ShowMethodItems ? "checked" : null)" />
+                        <label class="govuk-label govuk-checkboxes__label" for="show-method-items">Method Items</label>
+                        <input name="ShowMethodItems" type="hidden" value="false" />
+                    </div>
+                    @for (var i = 0; i < Model.AllSamples.Count; i++)
+                    {
+                        var sample = Model.AllSamples[i];
+                        <div class="govuk-checkboxes__item">
+                            <input class="govuk-checkboxes__input" id="shown-sample-@i" name="ShownSamples" type="checkbox" value="@sample" checked="@(Model.ShownSamples.Contains(sample) ? "checked" : null)" />
+                            <label class="govuk-label govuk-checkboxes__label" for="shown-sample-@i">@sample</label>
+                        </div>
+                    }
+                </div>
+            </fieldset>
+        </div>
+
+        <div class="govuk-button-group">
+            <button type="submit" name="command" value="draw" class="govuk-button govuk-button--secondary" data-module="govuk-button" formnovalidate>Draw reports</button>
         </div>
     }
 
-    @if (!string.IsNullOrEmpty(Model.ExistingCommentsHtml))
-    {
-        <div class="govuk-body">
-            @Html.Raw(Model.ExistingCommentsHtml)
+    <div class="govuk-tabs" data-module="govuk-tabs">
+        <h2 class="govuk-tabs__title">Report sections</h2>
+        <ul class="govuk-tabs__list">
+            <li class="govuk-tabs__list-item govuk-tabs__list-item--selected"><a class="govuk-tabs__tab" href="#results-report">Results Report</a></li>
+            <li class="govuk-tabs__list-item"><a class="govuk-tabs__tab" href="#full-report">Full Report</a></li>
+            <li class="govuk-tabs__list-item"><a class="govuk-tabs__tab" href="#additional-sample-information">Additional Sample Information</a></li>
+        </ul>
+
+        <div class="govuk-tabs__panel" id="results-report">
+            <h2 class="govuk-heading-m">Results Report</h2>
+            @if (resultsSections is null)
+            {
+                @foreach (var table in Model.ResultsTables)
+                {
+                    <govuk-tabulation-table table="table" />
+                }
+            }
+            else
+            {
+                @for (var i = 0; i < resultsSections.Count; i++)
+                {
+                    var test = resultsSections[i];
+                    var testAccordion = new TabulationAccordionViewModel($"tabulation-test-{i + 1}", test.Sections);
+                    <h3 class="govuk-heading-s">@test.TestName</h3>
+                    @await Html.PartialAsync("~/Features/Tabulation/Views/_TabulationAccordion.cshtml", testAccordion)
+                }
+            }
+
+            @if (Model.ResultsRatings is not null)
+            {
+                <govuk-tabulation-table table="Model.ResultsRatings" />
+            }
         </div>
-    }
+
+        <div class="govuk-tabs__panel govuk-tabs__panel--hidden" id="full-report">
+            <h2 class="govuk-heading-m">Full Report</h2>
+            @if (fullSections is null)
+            {
+                @foreach (var table in Model.FullTables)
+                {
+                    <govuk-tabulation-table table="table" />
+                }
+
+                @if (Model.ParticipantInformation is not null)
+                {
+                    <govuk-tabulation-table table="Model.ParticipantInformation" />
+                }
+            }
+            else
+            {
+                @for (var i = 0; i < fullSections.Count; i++)
+                {
+                    var test = fullSections[i];
+                    var sections = test.Sections.ToList();
+                    if (i == fullSections.Count - 1 && Model.ParticipantInformation is not null)
+                    {
+                        sections.Add(new TabulationAccordionSection("Participant Information", Model.ParticipantInformation));
+                    }
+
+                    var testAccordion = new TabulationAccordionViewModel($"full-tabulation-test-{i + 1}", sections);
+                    <h3 class="govuk-heading-s">@test.TestName</h3>
+                    @await Html.PartialAsync("~/Features/Tabulation/Views/_TabulationAccordion.cshtml", testAccordion)
+                }
+            }
+            @if (Model.FullRatings is not null)
+            {
+                <govuk-tabulation-table table="Model.FullRatings" />
+            }
+        </div>
+
+        <div class="govuk-tabs__panel govuk-tabs__panel--hidden" id="additional-sample-information">
+            <h2 class="govuk-heading-m">Additional Sample Information</h2>
+            @if (Model.SampleInformation.Count == 0)
+            {
+                <p class="govuk-body">No additional sample information is available.</p>
+            }
+            @foreach (var sample in Model.SampleInformation)
+            {
+                <h3 class="govuk-heading-s govuk-!-margin-bottom-1">@sample.SampleNumber @sample.TabulationDescription</h3>
+                <p class="govuk-body">@sample.TestConsultantsDescription</p>
+            }
+        </div>
+    </div>
+
+    <button type="submit"
+            formaction="@Url.Action("Export", "Comments", new { schemeId = Model.MonthlyDistributionSchemeId })"
+            formmethod="post"
+            class="govuk-button govuk-button--secondary"
+            data-module="govuk-button"
+            formnovalidate>
+        Export to Excel
+    </button>
+
+    <div id="commentsDiv">
+        @if (!string.IsNullOrEmpty(Model.StandardTabulationTextHtml))
+        {
+            <div class="govuk-body">
+                @Html.Raw(Model.StandardTabulationTextHtml)
+            </div>
+        }
+
+        @if (!string.IsNullOrEmpty(Model.ExistingCommentsHtml))
+        {
+            <div class="govuk-body">
+                @Html.Raw(Model.ExistingCommentsHtml)
+            </div>
+        }
+
+        @if (Model.IsSubmitted)
+        {
+            <div class="govuk-body">
+                <h2 class="govuk-heading-m">@Model.State.Heading</h2>
+                @if (Model.State.HasComments)
+                {
+                    @Html.Raw(Model.State.CommentsHtml)
+                }
+            </div>
+        }
+    </div>
 
     @if (Model.IsSubmitted)
     {
-        <div class="govuk-body">
-            <h2 class="govuk-heading-m">@Model.State.Heading</h2>
-            @if (Model.State.HasComments)
+        <div class="govuk-button-group">
+            @if (!string.IsNullOrWhiteSpace(Model.ReturnUrl))
             {
-                @Html.Raw(Model.State.CommentsHtml)
+                <a class="govuk-button govuk-button--secondary" data-module="govuk-button" href="@Model.ReturnUrl">Back</a>
+            }
+            else
+            {
+                <a class="govuk-button govuk-button--secondary" data-module="govuk-button" asp-action="Index">Back</a>
             }
         </div>
     }
-</div>
-
-@if (Model.IsSubmitted)
-{
-    <div class="govuk-button-group">
-        <a class="govuk-button govuk-button--secondary" data-module="govuk-button" asp-action="Index">Back</a>
-    </div>
-}
-else
-{
-    <form method="post" asp-action="Entry" asp-route-schemeId="@Model.MonthlyDistributionSchemeId" novalidate>
-        <input type="hidden" asp-for="MonthlyDistributionSchemeId" />
-
+    else
+    {
         <govuk-rich-text asp-for="Comments" label="@Model.State.Heading" />
 
         <div class="govuk-form-group @(ViewData.ModelState.ContainsKey(nameof(Model.Acknowledged)) ? "govuk-form-group--error" : string.Empty)">
@@ -124,10 +217,20 @@ else
         <div class="govuk-button-group">
             <button type="submit" name="command" value="save" class="govuk-button govuk-button--secondary" data-module="govuk-button">Save</button>
             <button id="submit-comments-button" type="submit" name="command" value="submit" class="govuk-button" data-module="govuk-button" disabled>Submit</button>
-            <button type="submit" name="command" value="cancel" class="govuk-button govuk-button--secondary" data-module="govuk-button" formnovalidate>Cancel</button>
+            @if (!string.IsNullOrWhiteSpace(Model.ReturnUrl))
+            {
+                <a class="govuk-button govuk-button--secondary" data-module="govuk-button" href="@Model.ReturnUrl">Cancel</a>
+            }
+            else
+            {
+                <a class="govuk-button govuk-button--secondary" data-module="govuk-button" asp-action="Index">Cancel</a>
+            }
         </div>
-    </form>
+    }
+</form>
 
+@if (!Model.IsSubmitted)
+{
     <script>
         (function () {
             var checkbox = document.getElementById('Acknowledged');

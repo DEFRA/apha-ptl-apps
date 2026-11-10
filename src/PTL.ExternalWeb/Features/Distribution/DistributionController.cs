@@ -23,7 +23,6 @@ public sealed class DistributionController(IDistributionApiClient distributionAp
     private static readonly string[] ValidSortDirections = ["asc", "desc"];
     private static readonly string[] ValidCurrentSortColumns = [.. ValidSortColumns, "deadlineDate", "status"];
 
-    // Legacy DistributionsCurrent has no default sort: rows keep the stored-procedure order until a column is chosen.
     // Legacy pages the grid at 15 rows by default.
     public async Task<IActionResult> Current(
         string? sortBy = null,
@@ -34,11 +33,13 @@ public sealed class DistributionController(IDistributionApiClient distributionAp
     {
         page = Math.Max(page, 1);
         pageSize = PaginationModel.AvailablePageSizes.Contains(pageSize) ? pageSize : ReferenceSchemeListQuery.DefaultPageSize;
+        var column = sortBy is not null && ValidCurrentSortColumns.Contains(sortBy) ? sortBy : "distributionDate";
+        var direction = sortDir is not null && ValidSortDirections.Contains(sortDir) ? sortDir : "desc";
 
         var participantId = User.GetParticipantId();
         if (participantId is null)
         {
-            return View(new CurrentDistributionsViewModel { Page = page, PageSize = pageSize });
+            return View(new CurrentDistributionsViewModel { Page = page, PageSize = pageSize, SortBy = column, SortDirection = direction });
         }
 
         var distributions = await distributionApiClient.GetCurrentDistributionsAsync(participantId.Value, cancellationToken);
@@ -58,10 +59,7 @@ public sealed class DistributionController(IDistributionApiClient distributionAp
             })
             .ToList();
 
-        var column = sortBy is not null && ValidCurrentSortColumns.Contains(sortBy) ? sortBy : string.Empty;
-        var direction = sortDir is not null && ValidSortDirections.Contains(sortDir) ? sortDir : "asc";
-
-        var sorted = column.Length == 0 ? rows : SortCurrent(rows, column, direction);
+        var sorted = SortCurrent(rows, column, direction);
 
         return View(new CurrentDistributionsViewModel
         {
