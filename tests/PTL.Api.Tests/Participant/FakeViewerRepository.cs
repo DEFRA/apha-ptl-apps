@@ -18,12 +18,6 @@ internal sealed class FakeViewerRepository : IViewerRepository
     public Task<IReadOnlyList<ViewerEntity>> GetAllWithAssignmentsAsync(CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<ViewerEntity>>(Viewers);
 
-    public Task<ViewerEntity?> GetBySsoIdExtAsync(Guid ssoIdExt, CancellationToken cancellationToken = default) =>
-        Task.FromResult(Viewers.FirstOrDefault(v => v.SsoIdExt == ssoIdExt));
-
-    public Task<ViewerEntity?> GetByEmailAsync(string email, CancellationToken cancellationToken = default) =>
-        Task.FromResult(Viewers.FirstOrDefault(v => string.Equals(v.Email, email, StringComparison.OrdinalIgnoreCase)));
-
     public Task<ViewerEntity> CreateAsync(ViewerEntity viewer, AuditEntry? auditEntry = null, CancellationToken cancellationToken = default)
     {
         LastAuditEntry = auditEntry;

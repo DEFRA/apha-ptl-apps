@@ -16,6 +16,34 @@
   color: var(--govuk-link-colour, #1a65a6);
 }
 
+/* A button that reads as a link in a table cell - for an action that posts (sends an email) rather than navigates. */
+.app-inline-form {
+  display: inline;
+  margin: 0;
+}
+
+.app-link-button {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  cursor: pointer;
+  color: var(--govuk-link-colour, #1a65a6);
+  text-decoration: underline;
+}
+
+.app-link-button:hover {
+  color: var(--govuk-link-hover-colour, #0f385c);
+}
+
+.app-link-button:focus {
+  outline: 3px solid transparent;
+  color: var(--govuk-focus-text-colour, #0b0c0c);
+  background-color: var(--govuk-focus-colour, #fd0);
+  box-shadow: 0 -2px var(--govuk-focus-colour, #fd0), 0 4px var(--govuk-focus-text-colour, #0b0c0c);
+  text-decoration: none;
+}
+
 /* Scheme List "enrolment highlighting" (AC3) - legacy's bold-schemes.js reproduced as a server-rendered, accessible row tint rather than client-side jQuery/yellow DOM manipulation */
 .app-table__row--enrolled {
   background-color: #f3f2f1;

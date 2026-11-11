@@ -36,24 +36,6 @@ public sealed class ViewerRepository(IDbConnectionFactory connectionFactory) : I
         return viewers;
     }
 
-    public async Task<ViewerEntity?> GetBySsoIdExtAsync(Guid ssoIdExt, CancellationToken cancellationToken = default)
-    {
-        using var connection = connectionFactory.CreateConnection();
-
-        return await connection.QuerySingleOrDefaultAsync<ViewerEntity>(
-            "EXEC dbo.spgViewerBySsoId @SsoIdExt=@SsoIdExt",
-            new { SsoIdExt = ssoIdExt });
-    }
-
-    public async Task<ViewerEntity?> GetByEmailAsync(string email, CancellationToken cancellationToken = default)
-    {
-        using var connection = connectionFactory.CreateConnection();
-
-        return await connection.QuerySingleOrDefaultAsync<ViewerEntity>(
-            "EXEC dbo.spgViewerByEmail @Email",
-            new { Email = email });
-    }
-
     public Task<ViewerEntity> CreateAsync(ViewerEntity viewer, AuditEntry? auditEntry = null, CancellationToken cancellationToken = default) =>
         AuditTrailWriter.ExecuteAsync(connectionFactory, auditEntry, async (connection, transaction) =>
         {

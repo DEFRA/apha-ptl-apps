@@ -1,3 +1,4 @@
+using System.Net;
 using System.Net.Http.Json;
 using PTL.Contracts.ExternalUser;
 
@@ -11,6 +12,26 @@ public sealed class ExternalUserApiClient(HttpClient httpClient) : IExternalUser
         response.EnsureSuccessStatusCode();
 
         var result = await response.Content.ReadFromJsonAsync<ResolveExternalUserResponse>(cancellationToken);
-        return result ?? new ResolveExternalUserResponse(request.DisplayName, [], null, null, null, null);
+        return result ?? ResolveExternalUserResponse.Denied(ExternalUserResolutionStatus.NotFound, request.DisplayName);
+    }
+
+    public async Task<IReadOnlyList<ExternalLab>> GetLabsAsync(Guid ssoIdExt, CancellationToken cancellationToken = default)
+    {
+        using var response = await httpClient.GetAsync($"/api/external-users/{ssoIdExt}/labs", cancellationToken);
+        response.EnsureSuccessStatusCode();
+
+        return await response.Content.ReadFromJsonAsync<List<ExternalLab>>(cancellationToken) ?? [];
+    }
+
+    public async Task<ExternalLabContext?> GetLabAsync(Guid ssoIdExt, Guid participantId, CancellationToken cancellationToken = default)
+    {
+        using var response = await httpClient.GetAsync($"/api/external-users/{ssoIdExt}/labs/{participantId}", cancellationToken);
+        if (response.StatusCode == HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<ExternalLabContext>(cancellationToken);
     }
 }

@@ -26,6 +26,7 @@ public sealed class LoginInstructionsRepository(IDbConnectionFactory connectionF
         LoginInstructionUserType.Participant => "EXEC dbo.spuParticipantLoginInstructions @ParticipantId = @Id, @LoginInstructionsSent = @LoginInstructionsSent, @LoginInstructionsSentDate = @LoginInstructionsSentDate",
         LoginInstructionUserType.Viewer => "EXEC dbo.spuViewerLoginInstructions @ViewerId = @Id, @LoginInstructionsSent = @LoginInstructionsSent, @LoginInstructionsSentDate = @LoginInstructionsSentDate",
         LoginInstructionUserType.ExternalTestConsultant => "EXEC dbo.spuExtTestConsultantLoginInstructions @ExternalTestConsultantId = @Id, @LoginInstructionsSent = @LoginInstructionsSent, @LoginInstructionsSentDate = @LoginInstructionsSentDate",
+        LoginInstructionUserType.LabUser => "EXEC dbo.spuLabUserLoginInstructions @LabUserParticipantId = @Id, @LoginInstructionsSent = @LoginInstructionsSent, @LoginInstructionsSentDate = @LoginInstructionsSentDate",
         _ => throw new ArgumentOutOfRangeException(nameof(userType), userType, null),
     };
 }

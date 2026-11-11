@@ -22,6 +22,7 @@ public class LoginInstructionsRepositoryTests
     [InlineData(LoginInstructionUserType.Participant, "EXEC dbo.spuParticipantLoginInstructions @ParticipantId = @Id, @LoginInstructionsSent = @LoginInstructionsSent, @LoginInstructionsSentDate = @LoginInstructionsSentDate")]
     [InlineData(LoginInstructionUserType.Viewer, "EXEC dbo.spuViewerLoginInstructions @ViewerId = @Id, @LoginInstructionsSent = @LoginInstructionsSent, @LoginInstructionsSentDate = @LoginInstructionsSentDate")]
     [InlineData(LoginInstructionUserType.ExternalTestConsultant, "EXEC dbo.spuExtTestConsultantLoginInstructions @ExternalTestConsultantId = @Id, @LoginInstructionsSent = @LoginInstructionsSent, @LoginInstructionsSentDate = @LoginInstructionsSentDate")]
+    [InlineData(LoginInstructionUserType.LabUser, "EXEC dbo.spuLabUserLoginInstructions @LabUserParticipantId = @Id, @LoginInstructionsSent = @LoginInstructionsSent, @LoginInstructionsSentDate = @LoginInstructionsSentDate")]
     public async Task MarkSentAsync_RunsTheUserTypesProcedureAndAuditsInOneTransaction(LoginInstructionUserType userType, string sql)
     {
         var (repository, connection) = CreateRepository();

@@ -1,24 +1,27 @@
+using PTL.Contracts.ExternalUser;
+
 namespace PTL.Core.ExternalUser;
 
 /// <summary>
-/// Outcome of resolving a CIDM-authenticated external user against the Participant, Viewer and
-/// Test Consultant tables. A role is present in <see cref="Roles"/> only when a matching (or
-/// newly linked) record was found - roles that did not resolve are omitted, never auto-created.
+/// Outcome of resolving a CIDM-authenticated external user to a single PTL user type. Only <see cref="ExternalUserResolutionStatus.Resolved"/>
+/// carries roles, labs and ids; every other status is a denial with the reason.
 /// </summary>
 public sealed record ExternalUserResolutionResult(
+    ExternalUserResolutionStatus Status,
     string DisplayName,
-    IReadOnlyList<string> Roles,
-    Guid? ParticipantId,
-    string? LabCode,
-    Guid? ViewerId,
-    Guid? TestConsultantId,
-    // Only ever true for a resolved Participant whose linked Customer has CanOrderOnline set -
-    // see ExternalUserService.ResolveParticipantAsync.
-    bool CanOrderOnline = false,
-    // True when a Participant or Test Consultant record was found but excluded solely for being
-    // inactive (Viewer has no inactive concept at all) - lets the caller distinguish "no matching
-    // record exists" from "a matching record exists but is inactive" for sign-in denial messaging.
-    bool HasInactiveMatch = false)
+    ExternalUserType? UserType = null,
+    IReadOnlyList<string>? Roles = null,
+    IReadOnlyList<ExternalLab>? Labs = null,
+    Guid? ParticipantId = null,
+    string? LabCode = null,
+    Guid? ViewerId = null,
+    Guid? TestConsultantId = null,
+    Guid? LabUserId = null,
+    // Only ever true when exactly one active lab resolved and its Customer has CanOrderOnline set.
+    bool CanOrderOnline = false)
 {
-    public bool IsResolved => Roles.Count > 0;
+    public bool IsResolved => Status == ExternalUserResolutionStatus.Resolved;
+
+    public static ExternalUserResolutionResult Denied(ExternalUserResolutionStatus status, string displayName) =>
+        new(status, displayName);
 }

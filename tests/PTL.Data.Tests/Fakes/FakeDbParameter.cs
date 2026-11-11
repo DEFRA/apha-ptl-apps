@@ -79,10 +79,11 @@ internal sealed class FakeDbParameterCollection : DbParameterCollection
     // Dapper's DynamicParameters may or may not preserve the leading "@" on the actual
     // IDbDataParameter.ParameterName it creates - compare with it stripped, case-insensitively, so
     // tests can just ask for "@Foo" regardless of that internal detail.
-    public object? ValueOf(string parameterName)
+    public object? ValueOf(string parameterName) => ParameterOf(parameterName).Value;
+
+    public DbParameter ParameterOf(string parameterName)
     {
         var normalised = parameterName.TrimStart('@');
-        var parameter = _parameters.Single(p => p.ParameterName.TrimStart('@').Equals(normalised, StringComparison.OrdinalIgnoreCase));
-        return parameter.Value;
+        return _parameters.Single(p => p.ParameterName.TrimStart('@').Equals(normalised, StringComparison.OrdinalIgnoreCase));
     }
 }

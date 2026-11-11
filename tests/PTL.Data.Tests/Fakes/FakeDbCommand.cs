@@ -24,6 +24,8 @@ internal sealed class FakeDbCommand(FakeDbConnection connection) : DbCommand
 
     public object? ParameterValue(string name) => _parameters.ValueOf(name);
 
+    public DbParameter Parameter(string name) => _parameters.ParameterOf(name);
+
     // The transaction the repository enlisted this command in, if any.
     public DbTransaction? EnlistedTransaction => DbTransaction;
 
