@@ -490,7 +490,7 @@ public partial class OrderRouteSmokeTests : IClassFixture<PtlExternalWebTestFact
         Assert.Contains("app-print-month--selected", body);
         Assert.Contains("(in this order)", body);
         Assert.Contains("(not in this order)", body);
-        Assert.Equal(12, Regex.Matches(body, "<li class=\"app-print-month[ \"]").Count);
+        Assert.Equal(12, Regex.Count(body, "<li class=\"app-print-month[ \"]"));
     }
 
     [Fact]
