@@ -1,9 +1,9 @@
+using PTL.Api.Tests.Participant;
 using PTL.Contracts.LabUsers;
 using PTL.Core.Audit;
 using PTL.Core.LabUsers;
 using PTL.Core.LoginInstructions;
 using CoreParticipant = PTL.Core.Participant.Participant;
-using PTL.Api.Tests.Participant;
 
 namespace PTL.Api.Tests.LabUsers;
 
