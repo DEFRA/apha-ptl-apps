@@ -37,6 +37,7 @@
             outline-offset: -1px;
             margin-left: 0;
             box-sizing: border-box;
+            table-layout: auto;
         }
 
         .TabulationTable :where(th) {
@@ -54,14 +55,18 @@
 
         .TabulationHeader1,
         .TabulationHeader2 {
-            font-size: 10pt;
-            line-height: 1.25;
+            font-size: 8.5pt;
+            line-height: 1.15;
             color: black;
             background-color: white;
             border: solid 1px black;
-            padding: 4px;
+            padding: 2px 3px;
             white-space: normal;
-            word-break: break-word;
+            overflow-wrap: break-word;
+            word-break: normal;
+            hyphens: none;
+            writing-mode: horizontal-tb;
+            text-orientation: mixed;
         }
 
         .TabulationHeader1 {
@@ -70,17 +75,23 @@
 
         .TabulationHeader2 {
             vertical-align: bottom;
+            font-size: 8pt;
+            line-height: 1.15;
         }
 
         .TabulationCell {
-            font-size: 9.5pt;
-            line-height: 1.25;
+            font-size: 8pt;
+            line-height: 1.15;
             border: solid 1px black;
-            padding: 4px;
+            padding: 2px 3px;
             color: black;
             background-color: white;
             white-space: normal;
-            word-break: break-word;
+            overflow-wrap: break-word;
+            word-break: normal;
+            hyphens: none;
+            writing-mode: horizontal-tb;
+            text-orientation: mixed;
         }
 
         .TabulationTable thead + tbody tr:first-child > * {
@@ -96,6 +107,20 @@
             display: block;
             width: 70%;
             margin: 0 0 8px;
+        }
+
+        .TabulationTable th,
+        .TabulationTable td {
+            vertical-align: top;
+            writing-mode: horizontal-tb;
+            text-orientation: mixed;
+            transform: none;
+            text-transform: none;
+            letter-spacing: normal;
+            white-space: normal;
+            overflow-wrap: break-word;
+            word-break: normal;
+            hyphens: none;
         }
 
         .ptl-pdf-title-row {
@@ -186,15 +211,235 @@
         <p class="ptl-pdf-distribution-date">@report.DistributionDateText</p>
     </div>
 
-    @foreach (var table in report.Tables)
-    {
-        <govuk-tabulation-table table="table" />
-    }
+    <div class="ptl-tabulation-screen">
+        @foreach (var table in report.Tables)
+        {
+            <govuk-tabulation-table table="table" />
+        }
 
-    @if (report.Ratings is not null)
-    {
-        <govuk-tabulation-table table="report.Ratings" />
-    }
+        @if (report.Ratings is not null)
+        {
+            <govuk-tabulation-table table="report.Ratings" />
+        }
+    </div>
+
+    <div id="tabulation-print-tables"></div>
+    <script type="application/json" id="tabulation-print-data">@Html.Raw(System.Text.Json.JsonSerializer.Serialize(report.Print, new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web)))</script>
+    <script>
+        (function () {
+            "use strict";
+
+            const pageWidth = 900;
+            const stretchWidth = 300;
+
+            function cell(text, className) {
+                const td = document.createElement("td");
+                td.textContent = text;
+                td.className = className;
+                return td;
+            }
+
+            function withSpace(text) {
+                return (text || "") + "\u00a0";
+            }
+
+            const INTENDED_VALUE_ROW = 3;
+            const FIRST_PARTICIPANT_ROW = INTENDED_VALUE_ROW + 1;
+
+            class CustomTable {
+                constructor(testName, participants) {
+                    this.table = document.createElement("table");
+                    this.table.className = "TabulationTable";
+                    const body = document.createElement("tbody");
+
+                    const header = document.createElement("tr");
+                    const headerCell = cell(testName, "TabulationHeader1");
+                    headerCell.rowSpan = 2;
+                    header.appendChild(headerCell);
+                    body.appendChild(header);
+                    body.appendChild(document.createElement("tr"));
+
+                    const intended = document.createElement("tr");
+                    const intendedCell = cell("Intended", "TabulationCell");
+                    intendedCell.rowSpan = 2;
+                    intended.appendChild(intendedCell);
+                    body.appendChild(intended);
+                    body.appendChild(document.createElement("tr"));
+
+                    participants.forEach(function (p) {
+                        const row = document.createElement("tr");
+                        row.appendChild(cell(withSpace(p.labCode), "TabulationCell"));
+                        body.appendChild(row);
+                    });
+
+                    this.table.appendChild(body);
+                    this.participants = participants;
+                }
+
+                addNilReturn(rowIndex, isFirstColumn) {
+                    const row = this.table.rows[FIRST_PARTICIPANT_ROW + rowIndex];
+                    if (isFirstColumn) {
+                        row.appendChild(cell(this.participants[rowIndex].nilReturnReason, "TabulationCell NilReturn"));
+                    } else {
+                        row.cells[row.cells.length - 1].colSpan += 1;
+                    }
+                }
+
+                addMethodColumn(column) {
+                    const header = cell(column.headerText, "TabulationHeader2");
+                    header.rowSpan = 2;
+                    this.table.rows[0].appendChild(header);
+                    this.table.rows[2].appendChild(cell("\u00a0", "TabulationCell"));
+                    this.table.rows[INTENDED_VALUE_ROW].appendChild(cell(withSpace(column.intendedResult), "TabulationCell"));
+
+                    const isFirstColumn = this.table.rows[0].cells.length === 2;
+                    for (let i = 0; i < column.results.length; i++) {
+                        if (this.participants[i].hasResults) {
+                            this.table.rows[FIRST_PARTICIPANT_ROW + i].appendChild(cell(column.results[i], "TabulationCell"));
+                        } else {
+                            this.addNilReturn(i, isFirstColumn);
+                        }
+                    }
+                }
+
+                addSampleColumn(sample) {
+                    const header = cell(sample.sampleNumber, "TabulationHeader1");
+                    header.colSpan = sample.resultColumns.length;
+                    this.table.rows[0].appendChild(header);
+
+                    const intended = cell(withSpace(sample.tabulationDescription), "TabulationCell");
+                    intended.colSpan = sample.resultColumns.length;
+                    this.table.rows[2].appendChild(intended);
+
+                    for (const column of sample.resultColumns) {
+                        this.table.rows[1].appendChild(cell(column.headerText, "TabulationHeader2"));
+                        this.table.rows[INTENDED_VALUE_ROW].appendChild(cell(withSpace(column.intendedResult), "TabulationCell"));
+                        this.addSampleResults(column.results);
+                    }
+                }
+
+                addSampleResults(results) {
+                    for (let j = 0; j < results.length; j++) {
+                        const row = this.table.rows[FIRST_PARTICIPANT_ROW + j];
+                        if (!this.participants[j].hasResults) {
+                            this.addNilReturn(j, row.cells.length === 1);
+                        } else if (results[j].span > 0) {
+                            const td = cell(results[j].result, "TabulationCell");
+                            td.colSpan = results[j].span;
+                            row.appendChild(td);
+                        }
+                    }
+                }
+            }
+
+            class RatingTable {
+                constructor(participants) {
+                    this.table = document.createElement("table");
+                    this.table.className = "TabulationTable";
+                    const body = document.createElement("tbody");
+
+                    const header = document.createElement("tr");
+                    header.appendChild(cell("QAU Ratings", "TabulationHeader1"));
+                    body.appendChild(header);
+
+                    const labels = participants.map(function (p) { return withSpace(p.labCode); })
+                        .concat(["Mean score of all laboratories: ",
+                            "No. of Labs reporting intended results: ",
+                            "No. Of Participants: ",
+                            "Percent Correct: "]);
+                    labels.forEach(function (label) {
+                        const row = document.createElement("tr");
+                        row.appendChild(cell(label, "TabulationCell"));
+                        body.appendChild(row);
+                    });
+
+                    this.table.appendChild(body);
+                }
+
+                addRatingColumn(column) {
+                    const rows = this.table.rows;
+                    rows[0].appendChild(cell(column.sampleNumber, "TabulationHeader2"));
+                    column.ratings.forEach(function (rating, i) {
+                        rows[1 + i].appendChild(cell(rating, "TabulationCell"));
+                    });
+
+                    const statistics = [column.sampleMean, column.numberReportingIntendedResult, column.numberOfParticipants, column.samplePassRate];
+                    statistics.forEach(function (value, i) {
+                        rows[1 + column.ratings.length + i].appendChild(cell(value, "TabulationHeader2"));
+                    });
+                }
+            }
+
+            function addColumns(container, columns, createTable, addColumn) {
+                let table = createTable();
+                container.appendChild(table.table);
+                container.appendChild(document.createElement("br"));
+
+                for (let i = 0; i < columns.length; i++) {
+                    const previous = table.table.cloneNode(true);
+                    const isFirstColumn = table.table.rows[0].cells.length === 1;
+                    addColumn(table, columns[i]);
+
+                    if (table.table.offsetWidth > pageWidth && !isFirstColumn) {
+                        table.table.parentNode.replaceChild(previous, table.table);
+                        table = createTable();
+                        container.appendChild(table.table);
+                        container.appendChild(document.createElement("br"));
+                        i--;
+                    }
+                }
+            }
+
+            function build(container, data) {
+                container.style.width = pageWidth + "px";
+                const participants = data.participants || [];
+
+                (data.tests || []).forEach(function (test) {
+                    const columns = (test.methodColumns || []).map(function (c) { return { kind: "method", value: c }; })
+                        .concat((test.sampleColumns || [])
+                            .filter(function (s) { return (s.resultColumns || []).length > 0; })
+                            .map(function (s) { return { kind: "sample", value: s }; }));
+
+                    addColumns(container, columns,
+                        function () { return new CustomTable(test.name, participants); },
+                        function (table, column) {
+                            if (column.kind === "method") {
+                                table.addMethodColumn(column.value);
+                            } else {
+                                table.addSampleColumn(column.value);
+                            }
+                        });
+                });
+
+                if ((data.ratingColumns || []).length > 0) {
+                    addColumns(container, data.ratingColumns,
+                        function () { return new RatingTable(participants); },
+                        function (table, column) { table.addRatingColumn(column); });
+                }
+
+                const tables = container.getElementsByTagName("table");
+                for (const printTable of tables) {
+                    if (printTable.offsetWidth >= stretchWidth) {
+                        printTable.style.width = pageWidth + "px";
+                    }
+                }
+
+                if (tables.length > 0) {
+                    document.querySelectorAll(".ptl-tabulation-screen").forEach(function (screen) {
+                        screen.style.display = "none";
+                    });
+                }
+            }
+
+            const dataElement = document.getElementById("tabulation-print-data");
+            const container = document.getElementById("tabulation-print-tables");
+            if (!dataElement || !container || !dataElement.textContent) {
+                return;
+            }
+
+            build(container, JSON.parse(dataElement.textContent));
+        })();
+    </script>
 
     <div id="commentsDiv">
         @if (!string.IsNullOrEmpty(report.StandardTabulationTextHtml))
