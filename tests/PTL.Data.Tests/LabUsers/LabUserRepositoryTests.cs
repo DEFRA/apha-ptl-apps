@@ -1,4 +1,4 @@
-﻿using System.Data;
+using System.Data;
 using PTL.Core.Audit;
 using PTL.Core.LabUsers;
 using PTL.Data.LabUsers;
