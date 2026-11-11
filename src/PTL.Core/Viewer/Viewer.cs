@@ -49,14 +49,8 @@ public interface IViewerRepository
     // attached, for the Manage Viewers admin grid's remove-confirmation listing.
     Task<IReadOnlyList<ViewerEntity>> GetAllWithAssignmentsAsync(CancellationToken cancellationToken = default);
 
-    /// <summary>Reads the viewer row matching a CIDM contact id via <c>spgViewerBySsoId</c>.</summary>
-    Task<ViewerEntity?> GetBySsoIdExtAsync(Guid ssoIdExt, CancellationToken cancellationToken = default);
-
-    /// <summary>Reads the viewer row matching an email address via <c>spgViewerByEmail</c>, used only as a CIDM fallback.</summary>
-    Task<ViewerEntity?> GetByEmailAsync(string email, CancellationToken cancellationToken = default);
-
     // A non-null auditEntry is written in the same transaction as the change (System Administration
-    // changes); null is for system-initiated updates such as the SSO link at external sign-in.
+    // changes); null is for system-initiated changes.
     Task<ViewerEntity> CreateAsync(ViewerEntity viewer, AuditEntry? auditEntry = null, CancellationToken cancellationToken = default);
     Task<ViewerEntity?> UpdateAsync(ViewerEntity viewer, AuditEntry? auditEntry = null, CancellationToken cancellationToken = default);
 

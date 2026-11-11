@@ -36,12 +36,16 @@
             || string.Equals(currentAction, "SignedOut", StringComparison.OrdinalIgnoreCase)
             || string.Equals(currentAction, "NotPermitted", StringComparison.OrdinalIgnoreCase)
             || string.Equals(currentAction, "AccessDenied", StringComparison.OrdinalIgnoreCase));
+
+    // Choosing a lab is the step before Home, so there is no trail above it (its "Home" link would only bring the user back here).
+    var isLabSelectionPage = string.Equals(currentController, "Lab", StringComparison.OrdinalIgnoreCase)
+        && string.Equals(currentAction, "Select", StringComparison.OrdinalIgnoreCase);
 }
 
 @await Html.PartialAsync("_Header", ("Proficiency Testing - External", "height:80px; width:auto;"))
 <div class="govuk-width-container app-width-container">
     <main role="main" class="pb-3" id="main-content">
-        @if (!isAccountFlowPage)
+        @if (!isAccountFlowPage && !isLabSelectionPage)
         {
             @await Html.PartialAsync("_Breadcrumbs")
         }

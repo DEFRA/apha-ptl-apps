@@ -75,6 +75,14 @@ public static class ApiClientServiceCollectionExtensions
             .AddHttpMessageHandler<CorrelationIdDelegatingHandler>()
             .AddStandardResilienceHandler();
 
+        // Adding a lab user must not be repeated by a retry (the second add would report "already a lab user").
+        services.AddHttpClient<ILabUserApiClient, LabUserApiClient>(client =>
+        {
+            client.BaseAddress = new Uri(apiBaseUrl);
+        })
+            .AddHttpMessageHandler<CorrelationIdDelegatingHandler>()
+            .AddStandardResilienceHandler(options => options.Retry.DisableForUnsafeHttpMethods());
+
         services.AddHttpClient<ISystemMessageApiClient, SystemMessageApiClient>(client =>
         {
             client.BaseAddress = new Uri(apiBaseUrl);

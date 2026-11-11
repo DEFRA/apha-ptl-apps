@@ -4,12 +4,15 @@ using Microsoft.AspNetCore.Mvc;
 using PTL.ApiClient;
 using PTL.Auth.Cidm;
 using PTL.ExternalWeb.Features.Account;
+using PTL.ExternalWeb.Features.Lab;
 
 namespace PTL.ExternalWeb.Features.Account
 {
     // Sign-in for this app is entirely via CIDM (Gov.UK One Login / Government Gateway / RPA / Trusted
     // Third Party, brokered by DEFRA Customer Identity) - the base class's username/password form is a
     // stub shared with PTL.InternalWeb only, and is not used here.
+    // Sign-out must work before a lab has been chosen.
+    [SkipLabSelection]
     public class AccountController : PtlAccountControllerBase<AccountViewModel>
     {
         protected override string PostLoginRedirectController => "Home";
@@ -48,11 +51,11 @@ namespace PTL.ExternalWeb.Features.Account
         [AllowAnonymous]
         public IActionResult SignedOut() => View();
 
-        // Reached via ExternalUserResolver's denial redirect when no CIDM role resolves to an
-        // existing record - no local cookie exists at this point, since TokenValidated redirects
+        // Reached via ExternalUserResolver's denial redirect when the CIDM identity doesn't resolve to
+        // an active PTL record - no local cookie exists at this point, since TokenValidated redirects
         // here before the OIDC handler ever signs the principal into the cookie scheme. reason is
-        // "inactive" when the only matching record was found but excluded for being inactive (see
-        // ExternalUserResolver), so the view can show more specific guidance than the generic case.
+        // one of NotPermittedReasons (inactive record, or a Lab User with no active lab) so the view can
+        // show more specific guidance than the generic case. Any other value shows the generic message.
         [HttpGet]
         [AllowAnonymous]
         public IActionResult NotPermitted(string? reason) => View(model: reason);

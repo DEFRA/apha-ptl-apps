@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using PTL.Contracts.ExternalUser;
 using PTL.ExternalWeb.Authorization;
 using PTL.ExternalWeb.Features.Account;
 
@@ -43,6 +44,17 @@ public class ExternalRoleClaimsTransformationTests
 
         Assert.Equal(2, RoleClaims(twice).Count());
         Assert.Same(once, twice);
+    }
+
+    [Fact]
+    public async Task TransformAsync_LabUserRoles_BecomeRoleClaimsSoParticipantGatedPagesStillWork()
+    {
+        var result = await Transformation.TransformAsync(Principal("Lab User,Participant,Viewer"));
+
+        Assert.Equal(["Lab User", "Participant", "Viewer"], RoleClaims(result).Order());
+        Assert.True(result.IsInRole(ExternalRoleNames.LabUser));
+        Assert.True(result.IsInRole(ExternalRoleNames.Participant));
+        Assert.False(result.IsInRole(ExternalRoleNames.TestConsultant));
     }
 
     [Fact]

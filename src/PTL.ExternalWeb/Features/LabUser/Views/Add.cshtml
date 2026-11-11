@@ -1,0 +1,9 @@
+@model PTL.ExternalWeb.Features.LabUser.LabUserFormViewModel
+@{
+    ViewData["Title"] = "Add lab user";
+    ViewData["Heading"] = "Add lab user";
+    ViewData["SubmitText"] = "Add lab user";
+    ViewData["Intro"] = "If this person is already a lab user for another of your labs, they are added to this lab too and keep their existing name.";
+}
+
+<partial name="_Form" model="Model" view-data="ViewData" />

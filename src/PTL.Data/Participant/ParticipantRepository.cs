@@ -26,24 +26,6 @@ public sealed class ParticipantRepository(IDbConnectionFactory connectionFactory
             new { SsoId = ssoId });
     }
 
-    public async Task<CoreParticipant?> GetBySsoIdExtAsync(Guid ssoIdExt, CancellationToken cancellationToken = default)
-    {
-        using var connection = connectionFactory.CreateConnection();
-
-        return await connection.QuerySingleOrDefaultAsync<CoreParticipant>(
-            "EXEC dbo.spgParticipantBySsoId @SsoIdExt=@SsoIdExt",
-            new { SsoIdExt = ssoIdExt });
-    }
-
-    public async Task<CoreParticipant?> GetByEmailAsync(string email, CancellationToken cancellationToken = default)
-    {
-        using var connection = connectionFactory.CreateConnection();
-
-        return await connection.QuerySingleOrDefaultAsync<CoreParticipant>(
-            "EXEC dbo.spgParticipantByEmail @Email",
-            new { Email = email });
-    }
-
     public async Task<IReadOnlyList<ParticipantSummaryEntity>> GetSummariesAsync(Guid customerId, bool includeInactive = false, CancellationToken cancellationToken = default)
     {
         using var connection = connectionFactory.CreateConnection();

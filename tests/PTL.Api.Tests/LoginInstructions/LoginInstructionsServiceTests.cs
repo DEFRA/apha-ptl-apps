@@ -2,9 +2,11 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using PTL.Api.Tests.Audit;
 using PTL.Api.Tests.ExternalUser;
+using PTL.Api.Tests.LabUsers;
 using PTL.Api.Tests.Participant;
 using PTL.Core.Audit;
 using PTL.Core.Configuration;
+using PTL.Core.LabUsers;
 using PTL.Core.LoginInstructions;
 using PTL.Core.Notifications;
 using PTL.Core.Viewer;
@@ -52,12 +54,18 @@ public class LoginInstructionsServiceTests
         public FakeParticipantRepository Participants { get; } = new();
         public FakeViewerRepository Viewers { get; } = new();
         public FakeTestConsultantRepository TestConsultants { get; } = new();
+        public FakeLabUserRepository LabUsers { get; } = new();
         public RecordingLoginInstructionsRepository Repository { get; } = new();
         public RecordingNotifyClient Notify { get; } = new();
         public FakeActingUserAccessor ActingUser { get; } = new() { ActingUserId = Guid.NewGuid() };
 
         public LoginInstructionsService Service => new(
-            new LoginInstructionRecipientResolver(Participants, Viewers, TestConsultants, Options.Create(new ExternalOptions { AppUrl = ExternalAppUrl })),
+            new LoginInstructionRecipientResolver(
+                Participants,
+                Viewers,
+                TestConsultants,
+                LabUsers,
+                Options.Create(new ExternalOptions { AppUrl = ExternalAppUrl })),
             Repository,
             Notify,
             ActingUser,
@@ -198,6 +206,7 @@ public class LoginInstructionsServiceTests
     [InlineData(LoginInstructionUserType.Participant)]
     [InlineData(LoginInstructionUserType.Viewer)]
     [InlineData(LoginInstructionUserType.ExternalTestConsultant)]
+    [InlineData(LoginInstructionUserType.LabUser)]
     public async Task SendAsync_UnknownRecord_ReturnsNotFound(LoginInstructionUserType userType)
     {
         var harness = new Harness();
@@ -215,5 +224,59 @@ public class LoginInstructionsServiceTests
         var harness = new Harness();
 
         await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => harness.Service.SendAsync((LoginInstructionUserType)99, Guid.NewGuid()));
+    }
+
+    private static LabUserLink NewLink(string email = "lara@example.org") => new()
+    {
+        LabUserParticipantId = Guid.NewGuid(),
+        LabUserId = Guid.NewGuid(),
+        ParticipantId = Guid.NewGuid(),
+        Name = "Lara Lab",
+        Email = email,
+        IsActive = true,
+        LabCode = "0142",
+        LabName = "Bristol Veterinary Diagnostics"
+    };
+
+    // The id is the lab link's own id, because the email is about access to one lab.
+    [Fact]
+    public async Task SendAsync_LabUser_SendsTheLabUserTemplateNamingThePersonAndTheLab()
+    {
+        var harness = new Harness();
+        var link = NewLink();
+        harness.LabUsers.Links.Add(link);
+
+        var result = await harness.Service.SendAsync(LoginInstructionUserType.LabUser, link.LabUserParticipantId);
+
+        Assert.True(result.Success);
+        var sent = Assert.Single(harness.Notify.Sent);
+        Assert.Equal("72662826-7561-4506-ab41-b36a9035f1ea", sent.TemplateId);
+        Assert.Equal("lara@example.org", sent.EmailAddress);
+        Assert.Equal(link.LabUserParticipantId.ToString(), sent.Reference);
+        Assert.Equal(
+            new Dictionary<string, string>
+            {
+                ["LabUserName"] = "Lara Lab",
+                ["LabCode"] = "0142",
+                ["LabName"] = "Bristol Veterinary Diagnostics",
+                ["ExternalAppLink"] = ExternalAppUrl
+            },
+            sent.Personalisation);
+        var marked = Assert.Single(harness.Repository.Marked);
+        Assert.Equal((LoginInstructionUserType.LabUser, link.LabUserParticipantId), (marked.UserType, marked.Id));
+        Assert.Equal("Template: lab-user-login-instructions", marked.Audit.Details);
+    }
+
+    [Theory]
+    [InlineData(LoginInstructionsOutcome.Sent, true, null)]
+    [InlineData(LoginInstructionsOutcome.NoEmailAddress, false, "There is no email address saved to send the login instructions to.")]
+    [InlineData(LoginInstructionsOutcome.NotActive, false, "Login instructions can only be sent to an active lab user.")]
+    [InlineData(LoginInstructionsOutcome.SendFailed, false, "The login instructions email could not be sent. Please try again.")]
+    public void ToResponse_DescribesEachOutcome(LoginInstructionsOutcome outcome, bool success, string? message)
+    {
+        var response = outcome.ToResponse();
+
+        Assert.Equal(success, response.Success);
+        Assert.Equal(message, response.Message);
     }
 }

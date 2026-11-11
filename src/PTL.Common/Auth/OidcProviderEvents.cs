@@ -10,7 +10,7 @@ namespace PTL.Common.Auth;
 /// OpenID Connect events shared by every PTL auth provider (CIDM, Entra ID): resolves the signed-in
 /// identity against the app's own user record, trims the session cookie, and hides failure detail from
 /// the user. A provider supplies only its resolver call, retained claims and any provider-specific
-/// claim mapping or protocol hooks.
+/// protocol hooks.
 /// </summary>
 /// <typeparam name="TResolver">The provider's optional per-request user resolver.</typeparam>
 /// <typeparam name="TResolution">The outcome the resolver returns.</typeparam>
@@ -36,8 +36,6 @@ public abstract class OidcProviderEvents<TResolver, TResolution> : OpenIdConnect
             return;
         }
 
-        MapClaims(context.Principal, identity);
-
         // Resolved per-request rather than constructor-injected (this class is a singleton) - if
         // the consuming app hasn't registered one (or RequestServices isn't set, as in some unit
         // test contexts), sign-in proceeds exactly as before this hook existed.
@@ -56,11 +54,6 @@ public abstract class OidcProviderEvents<TResolver, TResolution> : OpenIdConnect
         OpenIdConnectEventHelpers.HandleRemoteFailureAsync(
             context,
             exception => OidcProviderLog.AuthenticationFailed(_logger, _providerName, exception));
-
-    /// <summary>Adjusts the validated identity's claims before the resolver runs. Does nothing by default.</summary>
-    protected virtual void MapClaims(ClaimsPrincipal principal, ClaimsIdentity identity)
-    {
-    }
 
     /// <summary>Calls the provider's own resolver.</summary>
     protected abstract Task<TResolution> ResolveAsync(TResolver resolver, ClaimsPrincipal principal, CancellationToken cancellationToken);
