@@ -1,7 +1,7 @@
 @model PTL.InternalWeb.Features.Scheme.SchemeFormViewModel
 @using Microsoft.AspNetCore.Mvc.Rendering
 @{
-    string OptionText(IEnumerable<SelectListItem> options, Guid? value) =>
+    static string OptionText(IEnumerable<SelectListItem> options, Guid? value) =>
         value is null ? string.Empty : options.FirstOrDefault(o => o.Value == value.Value.ToString())?.Text ?? string.Empty;
 }
 

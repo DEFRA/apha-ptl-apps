@@ -84,7 +84,7 @@ public sealed class UserRoleRepository(IDbConnectionFactory connectionFactory) :
                 {
                     await connection.ExecuteAsync(
                         "EXEC dbo.spiUserRole @UserRoleId, @UserId, @RoleId",
-                        new { UserRoleId = Guid.NewGuid(), UserId = changeSet.UserId, RoleId = roleId },
+                        new { UserRoleId = Guid.NewGuid(), changeSet.UserId, RoleId = roleId },
                         transaction);
                 }
 

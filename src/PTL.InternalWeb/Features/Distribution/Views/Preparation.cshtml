@@ -3,7 +3,7 @@
     ViewData["Title"] = $"Sample preparation – {Model.MonthDescription}";
 
     // GOV.UK date style (4 April 2026).
-    string Day(DateTime date) => date.ToString("d MMMM yyyy", System.Globalization.CultureInfo.GetCultureInfo("en-GB"));
+    static string Day(DateTime date) => date.ToString("d MMMM yyyy", System.Globalization.CultureInfo.GetCultureInfo("en-GB"));
 }
 
 @section Styles {
