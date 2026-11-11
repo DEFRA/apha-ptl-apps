@@ -194,8 +194,11 @@ public class SchemeController(ISchemeApiClient schemeApiClient, ILookupApiClient
     public Task<IActionResult> Create(CancellationToken cancellationToken) =>
         CreateForYearAsync(currentYear: false, cancellationToken);
 
+    // Every Test, Result Item, Category and Tabulation posts several fields, so a large scheme exceeds the 1,024-value
+    // default; Edit and Apply carry the same limit.
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [RequestFormLimits(ValueCountLimit = 20000)]
     public async Task<IActionResult> Create(
         SchemeFormViewModel model,
         string? testCommand = null,
@@ -333,6 +336,7 @@ public class SchemeController(ISchemeApiClient schemeApiClient, ILookupApiClient
 
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [RequestFormLimits(ValueCountLimit = 20000)]
     public async Task<IActionResult> Edit(
         Guid id,
         SchemeFormViewModel model,
@@ -372,6 +376,7 @@ public class SchemeController(ISchemeApiClient schemeApiClient, ILookupApiClient
     // fields legacy leaves editable are taken from it (SchemePreviousYearEdit), so nothing locked can change.
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [RequestFormLimits(ValueCountLimit = 20000)]
     public async Task<IActionResult> Apply(
         Guid id,
         SchemeFormViewModel model,
