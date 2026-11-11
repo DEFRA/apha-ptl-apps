@@ -100,6 +100,45 @@ public class TabulationWorkbookWriterTests
         Assert.Equal(("26", "27", "28"), (written["Z1"], written["AA1"], written["AB1"]));
     }
 
+    // Legacy opened the HTML tables in Excel with a border on every cell.
+    [Fact]
+    public void Write_EveryTableCellHasAThinBorderOnAllFourSides_IncludingTheCellsAMergeCovers()
+    {
+        var bytes = TabulationWorkbookWriter.Write(
+        [
+            Table(
+                Row(true, Cell("Test", rowSpan: 2), Cell("Wide", colSpan: 2)),
+                Row(true, Cell("x"), Cell("y"))),
+        ]);
+
+        using var stream = new MemoryStream(bytes);
+        using var document = SpreadsheetDocument.Open(stream, false);
+        var worksheet = document.WorkbookPart!.WorksheetParts.Single().Worksheet!;
+        var stylesheet = document.WorkbookPart.WorkbookStylesPart!.Stylesheet!;
+        var cells = worksheet.Descendants<Cell>().ToList();
+
+        Assert.Equal(["A1", "B1", "C1", "A2", "B2", "C2"], cells.Select(c => c.CellReference!.Value).OrderBy(r => r[1]).ThenBy(r => r[0]));
+        foreach (var cell in cells)
+        {
+            var format = stylesheet.CellFormats!.Elements<CellFormat>().ElementAt((int)cell.StyleIndex!.Value);
+            var border = stylesheet.Borders!.Elements<Border>().ElementAt((int)format.BorderId!.Value);
+
+            Assert.All(
+                new BorderPropertiesType?[] { border.LeftBorder, border.RightBorder, border.TopBorder, border.BottomBorder },
+                side => Assert.Equal(BorderStyleValues.Thin, side!.Style!.Value));
+        }
+    }
+
+    [Fact]
+    public void Write_BlankRowBetweenTables_HasNoCellsSoItStaysUnbordered()
+    {
+        var bytes = TabulationWorkbookWriter.Write([Table(Row(true, Cell("First"))), Table(Row(true, Cell("Second")))]);
+
+        var (_, _, rows) = Read(bytes);
+
+        Assert.DoesNotContain(2, rows);
+    }
+
     [Fact]
     public void Write_NoTables_StillMakesAValidWorkbook()
     {

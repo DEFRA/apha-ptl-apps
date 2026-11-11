@@ -7,9 +7,12 @@ namespace PTL.Core.Distribution;
 
 // "Export to Excel" of the Test Consultant Tabulation (legacy TableExportUtil wrote the HTML tables out as .xls).
 // The tables are stacked on one sheet, one blank row apart, and the grid's column/row spans become merged cells.
+// Every table cell has a thin border, as the legacy HTML tables did when Excel opened them.
 public static class TabulationWorkbookWriter
 {
     public const string ContentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+
+    private const uint BorderedStyleIndex = 1;
 
     public static byte[] Write(IEnumerable<TabulationTableResponse> tables)
     {
@@ -29,6 +32,9 @@ public static class TabulationWorkbookWriter
         {
             var workbookPart = document.AddWorkbookPart();
             workbookPart.Workbook = new Workbook();
+            var stylesPart = workbookPart.AddNewPart<WorkbookStylesPart>();
+            stylesPart.Stylesheet = BuildStylesheet();
+            stylesPart.Stylesheet.Save();
             var worksheetPart = workbookPart.AddNewPart<WorksheetPart>();
             worksheetPart.Worksheet = new Worksheet(BuildSheetData(cells));
             if (merges.Count > 0)
@@ -99,6 +105,15 @@ public static class TabulationWorkbookWriter
             for (var c = 0; c < colSpan; c++)
             {
                 covered.Add((row + r, column + c));
+
+                // Excel draws a merged cell's border from the cells it covers, so they exist too.
+                if (!cells.TryGetValue(row + r, out var coveredRow))
+                {
+                    coveredRow = [];
+                    cells[row + r] = coveredRow;
+                }
+
+                coveredRow.TryAdd(column + c, string.Empty);
             }
         }
 
@@ -121,6 +136,7 @@ public static class TabulationWorkbookWriter
                 row.Append(new Cell
                 {
                     CellReference = $"{ColumnName(columnIndex)}{rowIndex}",
+                    StyleIndex = BorderedStyleIndex,
                     DataType = CellValues.InlineString,
                     InlineString = new InlineString(new Text(text)),
                 });
@@ -131,6 +147,28 @@ public static class TabulationWorkbookWriter
 
         return sheetData;
     }
+
+    // Style 0 is the default; style 1 adds a thin border on all four sides.
+    private static Stylesheet BuildStylesheet() => new(
+        new Fonts(new Font(new FontSize { Val = 11 }, new FontName { Val = "Calibri" })) { Count = 1 },
+        new Fills(
+            new Fill(new PatternFill { PatternType = PatternValues.None }),
+            new Fill(new PatternFill { PatternType = PatternValues.Gray125 }))
+        { Count = 2 },
+        new Borders(
+            new Border(new LeftBorder(), new RightBorder(), new TopBorder(), new BottomBorder(), new DiagonalBorder()),
+            new Border(
+                new LeftBorder(new Color { Auto = true }) { Style = BorderStyleValues.Thin },
+                new RightBorder(new Color { Auto = true }) { Style = BorderStyleValues.Thin },
+                new TopBorder(new Color { Auto = true }) { Style = BorderStyleValues.Thin },
+                new BottomBorder(new Color { Auto = true }) { Style = BorderStyleValues.Thin },
+                new DiagonalBorder()))
+        { Count = 2 },
+        new CellStyleFormats(new CellFormat { NumberFormatId = 0, FontId = 0, FillId = 0, BorderId = 0 }) { Count = 1 },
+        new CellFormats(
+            new CellFormat { NumberFormatId = 0, FontId = 0, FillId = 0, BorderId = 0, FormatId = 0 },
+            new CellFormat { NumberFormatId = 0, FontId = 0, FillId = 0, BorderId = 1, FormatId = 0, ApplyBorder = true })
+        { Count = 2 });
 
     // 1 = A, 27 = AA.
     private static string ColumnName(int index)
