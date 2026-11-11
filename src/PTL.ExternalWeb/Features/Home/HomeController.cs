@@ -1,3 +1,4 @@
+using System.Reflection;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Polly;
@@ -56,6 +57,25 @@ public class HomeController(IApiClient apiClient, ISystemMessageApiClient system
     // [AllowAnonymous] pages (ApiStatus, Error), since it must be reachable before sign-in.
     [AllowAnonymous]
     public IActionResult Privacy() => View();
+
+    // Legacy AccessibilityStatement.aspx (footer link) - anonymous like Privacy, so it is reachable before sign-in.
+    [AllowAnonymous]
+    public IActionResult Accessibility() => View();
+
+    // Legacy About.aspx (footer "System Information"): the application version and environment; requires sign-in, as legacy did.
+    public IActionResult SystemInformation([FromServices] IHostEnvironment environment) =>
+        View(new SystemInformationViewModel(ApplicationVersion(), environment.EnvironmentName));
+
+    private static string ApplicationVersion()
+    {
+        var assembly = typeof(HomeController).Assembly;
+        var informational = assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
+        var version = informational ?? assembly.GetName().Version?.ToString() ?? string.Empty;
+
+        // Drop the source-revision suffix the SDK appends ("1.2.3+abc123").
+        var revision = version.IndexOf('+', StringComparison.Ordinal);
+        return revision < 0 ? version : version[..revision];
+    }
 
     // Legacy ViewInformation.aspx, linked from Index's static "Important" banner - shows
     // tblExtWebsiteMessage.fldMessage, requires sign-in (same as legacy).

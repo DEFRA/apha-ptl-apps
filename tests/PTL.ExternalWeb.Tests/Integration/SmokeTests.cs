@@ -15,6 +15,7 @@ public class SmokeTests : IClassFixture<PtlExternalWebTestFactory>
 
     [Theory]
     [InlineData("/Home/Privacy")]
+    [InlineData("/Home/Accessibility")]
     public async Task Routes_ReturnSuccess(string url)
     {
         var client = _factory.CreateClient();
@@ -22,6 +23,57 @@ public class SmokeTests : IClassFixture<PtlExternalWebTestFactory>
         var response = await client.GetAsync(url);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task LegalPages_Anonymous_ShowTheLegacyContent()
+    {
+        var client = _factory.CreateClient();
+
+        var privacy = await client.GetStringAsync("/Home/Privacy");
+        var accessibility = await client.GetStringAsync("/Home/Accessibility");
+
+        Assert.Contains("VETQAS privacy notice", privacy);
+        Assert.Contains("Who collects your personal data?", privacy);
+        Assert.Contains("Accessibility statement for the PT", accessibility);
+        Assert.Contains("Enforcement procedure", accessibility);
+    }
+
+    [Fact]
+    public async Task Footer_LinksToTheLegacyAccessibilitySystemInformationAndPrivacyPages()
+    {
+        var client = _factory.CreateClient();
+
+        var body = await client.GetStringAsync("/Home/Privacy");
+
+        Assert.Contains("href=\"/Home/Accessibility\"", body);
+        Assert.Contains("href=\"/Home/SystemInformation\"", body);
+        Assert.Contains("href=\"/Home/Privacy\"", body);
+        Assert.DoesNotContain("Terms and conditions", body);
+    }
+
+    [Fact]
+    public async Task SystemInformation_Anonymous_RedirectsToLogin()
+    {
+        var client = _factory.CreateClient(new() { AllowAutoRedirect = false });
+
+        var response = await client.GetAsync("/Home/SystemInformation");
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        Assert.Contains("/Account/Login", response.Headers.Location!.ToString());
+    }
+
+    [Fact]
+    public async Task SystemInformation_SignedIn_ShowsVersionAndEnvironment()
+    {
+        var client = _factory.CreateClient();
+        await client.GetAsync(PtlExternalWebTestFactory.TestSignInPath);
+
+        var body = await client.GetStringAsync("/Home/SystemInformation");
+
+        Assert.Contains("System information", body);
+        Assert.Contains("Version", body);
+        Assert.Contains("Environment", body);
     }
 
     [Fact]

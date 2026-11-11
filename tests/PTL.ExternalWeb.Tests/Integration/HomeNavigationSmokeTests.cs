@@ -145,6 +145,7 @@ public class HomeNavigationSmokeTests : IClassFixture<PtlExternalWebTestFactory>
         Assert.Contains("govuk-notification-banner", body);
         Assert.Contains("Please read our information regarding online orders", body);
         Assert.Contains("View Information", body);
+        Assert.DoesNotContain("app-important-message", body);
     }
 
     [Fact]
@@ -161,6 +162,7 @@ public class HomeNavigationSmokeTests : IClassFixture<PtlExternalWebTestFactory>
         var body = await homeResponse.Content.ReadAsStringAsync();
 
         Assert.Contains("govuk-notification-banner", body);
+        Assert.Contains("app-important-message__icon", body);
         Assert.Contains("<p>Planned maintenance <strong>Friday</strong></p>", body);
     }
 
@@ -253,8 +255,9 @@ public class HomeNavigationSmokeTests : IClassFixture<PtlExternalWebTestFactory>
         var body = await GetHomePageAsSignedInUserAsync(roles: "Participant");
 
         Assert.Contains(
-            """<a class="govuk-service-navigation__link" href="https://cidm.test/management" target="_blank" rel="noopener noreferrer">CIDM account</a>""",
+            "href=\"https://cidm.test/management\" target=\"_blank\" rel=\"noopener noreferrer\"",
             body, StringComparison.Ordinal);
+        Assert.Matches("app-header__help-link\" href=\"https://cidm.test/management\"[^>]*>\\s*CIDM account", body);
     }
 
     [Fact]

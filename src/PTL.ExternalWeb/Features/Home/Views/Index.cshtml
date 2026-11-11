@@ -36,7 +36,7 @@
    published. Html.Raw preserves its formatting (AC: "formatting is preserved") - safe here
    because this content is never user-supplied: it's written by internal staff via
    ProficiencyTestingWeb/Admin/EditMessageOnWebsite.aspx, which already sanitises it on save. *@
-<section class="govuk-notification-banner" aria-labelledby="important-message-title" data-module="govuk-notification-banner">
+<section class="govuk-notification-banner app-notification-banner--full" aria-labelledby="important-message-title" data-module="govuk-notification-banner">
     <div class="govuk-notification-banner__header">
         <h2 class="govuk-notification-banner__title" id="important-message-title">Important</h2>
     </div>
@@ -47,7 +47,13 @@
         </p>
         @if (!string.IsNullOrWhiteSpace(Model.ImportantMessageHtml))
         {
-            <div>@Html.Raw(Model.ImportantMessageHtml)</div>
+            <div class="app-important-message">
+                <span class="app-important-message__icon" aria-hidden="true">!</span>
+                <div class="app-important-message__text">
+                    <span class="govuk-visually-hidden">Warning:</span>
+                    @Html.Raw(Model.ImportantMessageHtml)
+                </div>
+            </div>
         }
     </div>
 </section>

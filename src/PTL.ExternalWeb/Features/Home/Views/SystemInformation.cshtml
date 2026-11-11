@@ -1,0 +1,17 @@
+@model PTL.ExternalWeb.Features.Home.SystemInformationViewModel
+@{
+    ViewData["Title"] = "System information";
+}
+
+<h1 class="govuk-heading-l">System information</h1>
+
+<dl class="govuk-summary-list">
+    <div class="govuk-summary-list__row">
+        <dt class="govuk-summary-list__key">Version</dt>
+        <dd class="govuk-summary-list__value">@Model.Version</dd>
+    </div>
+    <div class="govuk-summary-list__row">
+        <dt class="govuk-summary-list__key">Environment</dt>
+        <dd class="govuk-summary-list__value">@Model.Environment</dd>
+    </div>
+</dl>

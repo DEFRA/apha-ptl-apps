@@ -56,6 +56,19 @@ public class ExternalSiteMessageServiceTests
     }
 
     [Fact]
+    public async Task UpdateAsync_EntityEscapedEditorOutput_IsSavedAsRealHtml()
+    {
+        var repository = new FakeExternalSiteMessageRepository();
+        var service = CreateService(repository);
+
+        var result = await service.UpdateAsync(
+            "&lt;p&gt;Body&amp;nbsp;text&lt;/p&gt;", "&lt;p&gt;Test &lt;strong&gt;notice&lt;/strong&gt;&lt;/p&gt;", "vetqas@apha.gov.uk");
+
+        Assert.Equal("<p>Body&nbsp;text</p>", repository.Updated!.Message);
+        Assert.Equal("<p>Test <strong>notice</strong></p>", result.ImportantMessage);
+    }
+
+    [Fact]
     public async Task UpdateAsync_ClearedImportantMessage_Succeeds()
     {
         var repository = new FakeExternalSiteMessageRepository();

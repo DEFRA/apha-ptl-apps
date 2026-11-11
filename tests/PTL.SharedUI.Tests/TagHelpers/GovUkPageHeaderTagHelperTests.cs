@@ -88,6 +88,79 @@ public class GovUkPageHeaderTagHelperTests
     }
 
     [Fact]
+    public async Task ProcessAsync_CustomLogos_ReplaceTheDefaultAndRenderBothWithTheirAltText()
+    {
+        var (helper, context, output) = Create("Proficiency Testing - External", "width:180px;", string.Empty);
+        helper.LogoUrl = "~/images/apha-scientific-logo.png";
+        helper.LogoAlt = "APHA Scientific";
+        helper.SecondaryLogoUrl = "~/images/vetqas-logo.jpg";
+        helper.SecondaryLogoAlt = "VETQAS";
+        helper.SecondaryLogoStyle = "width:70px;";
+
+        await helper.ProcessAsync(context, output);
+
+        var html = output.Content.GetContent();
+        Assert.DoesNotContain("AphaLogo.png", html, StringComparison.Ordinal);
+        Assert.Contains("/images/apha-scientific-logo.png", html, StringComparison.Ordinal);
+        Assert.Contains("alt=\"APHA Scientific\"", html, StringComparison.Ordinal);
+        Assert.Contains("/images/vetqas-logo.jpg", html, StringComparison.Ordinal);
+        Assert.Contains("alt=\"VETQAS\"", html, StringComparison.Ordinal);
+        Assert.Contains("width:70px;", html, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ProcessAsync_NoSecondaryLogo_RendersASingleImage()
+    {
+        var (helper, context, output) = Create("Proficiency Testing - Internal", null, string.Empty);
+
+        await helper.ProcessAsync(context, output);
+
+        Assert.Equal(1, System.Text.RegularExpressions.Regex.Count(output.Content.GetContent(), "<img "));
+    }
+
+    [Fact]
+    public async Task ProcessAsync_AccountLink_RendersInTheActionsAreaBetweenMenuAndHelp()
+    {
+        var (helper, context, output) = Create("Proficiency Testing - External", null, string.Empty, showMenuToggle: true, helpLinkText: "User Manual", helpLinkHref: "/help.pdf");
+        helper.AccountLinkText = "CIDM account";
+        helper.AccountLinkHref = "https://account.example/portal";
+
+        await helper.ProcessAsync(context, output);
+
+        var html = output.Content.GetContent();
+        var menu = html.IndexOf(">Menu</button>", StringComparison.Ordinal);
+        var account = html.IndexOf("CIDM account", StringComparison.Ordinal);
+        var help = html.IndexOf("User Manual", StringComparison.Ordinal);
+        Assert.True(menu >= 0 && menu < account && account < help);
+        Assert.Contains("href=\"https://account.example/portal\" target=\"_blank\" rel=\"noopener noreferrer\"", html, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ProcessAsync_NoAccountLink_RendersNone()
+    {
+        var (helper, context, output) = Create("Proficiency Testing - External", null, string.Empty, showMenuToggle: true);
+
+        await helper.ProcessAsync(context, output);
+
+        Assert.DoesNotContain("opens in new tab)", output.Content.GetContent(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ProcessAsync_ExtraActions_RenderAfterTheHelpLinkInTheActionsArea()
+    {
+        var (helper, context, output) = Create("Proficiency Testing - External", null, "<nav>Lab</nav>", showMenuToggle: true, helpLinkText: "User Manual", helpLinkHref: "/help.pdf");
+        helper.ExtraActions = new Microsoft.AspNetCore.Html.HtmlString("<form id=\"sign-out\">Sign out</form>");
+
+        await helper.ProcessAsync(context, output);
+
+        var html = output.Content.GetContent();
+        var help = html.IndexOf("User Manual", StringComparison.Ordinal);
+        var extra = html.IndexOf("<form id=\"sign-out\">Sign out</form>", StringComparison.Ordinal);
+        var serviceNavigation = html.IndexOf("govuk-service-navigation\"", StringComparison.Ordinal);
+        Assert.True(help >= 0 && help < extra && extra < serviceNavigation);
+    }
+
+    [Fact]
     public async Task ProcessAsync_ServiceNameContainsMarkup_IsHtmlEncoded()
     {
         var (helper, context, output) = Create("<script>alert(1)</script>", null, string.Empty);
