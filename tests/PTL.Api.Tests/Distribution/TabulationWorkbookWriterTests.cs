@@ -117,7 +117,7 @@ public class TabulationWorkbookWriterTests
         var stylesheet = document.WorkbookPart.WorkbookStylesPart!.Stylesheet!;
         var cells = worksheet.Descendants<Cell>().ToList();
 
-        Assert.Equal(["A1", "B1", "C1", "A2", "B2", "C2"], cells.Select(c => c.CellReference!.Value).OrderBy(r => r[1]).ThenBy(r => r[0]));
+        Assert.Equal(["A1", "B1", "C1", "A2", "B2", "C2"], cells.Select(c => c.CellReference!.Value!).OrderBy(r => r[1]).ThenBy(r => r[0]));
         foreach (var cell in cells)
         {
             var format = stylesheet.CellFormats!.Elements<CellFormat>().ElementAt((int)cell.StyleIndex!.Value);
