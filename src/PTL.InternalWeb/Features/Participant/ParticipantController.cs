@@ -55,7 +55,8 @@ public class ParticipantController(IParticipantApiClient participantApiClient, I
             new EventId(6, nameof(LogFailedToReactivateParticipantMessage)),
             "Failed to reactivate participant {ParticipantId}");
 
-    public async Task<IActionResult> Index(Guid customerId, bool includeInactive = false, int page = 1, int pageSize = PTL.SharedUI.Pagination.PaginationModel.DefaultPageSize, CancellationToken cancellationToken = default)
+    // Legacy ParticipantList.aspx fetches every participant (FetchParticipantInfoCollection, activeOnly = False) and shows a Status column.
+    public async Task<IActionResult> Index(Guid customerId, bool includeInactive = true, int page = 1, int pageSize = PTL.SharedUI.Pagination.PaginationModel.DefaultPageSize, CancellationToken cancellationToken = default)
     {
         var result = await participantApiClient.SearchParticipantsAsync(new ParticipantSearchRequest(customerId, includeInactive, page, pageSize), cancellationToken);
         LogDisplayedParticipantListMessage(logger, includeInactive, page, result.TotalCount, null);
@@ -65,7 +66,7 @@ public class ParticipantController(IParticipantApiClient participantApiClient, I
     // The Send Instructions link of the Login Instructions column: emails the address saved on the participant, then comes back to the same page of the list.
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> SendLoginInstructions(Guid participantId, Guid customerId, bool includeInactive = false, int page = 1, int pageSize = PTL.SharedUI.Pagination.PaginationModel.DefaultPageSize, CancellationToken cancellationToken = default)
+    public async Task<IActionResult> SendLoginInstructions(Guid participantId, Guid customerId, bool includeInactive = true, int page = 1, int pageSize = PTL.SharedUI.Pagination.PaginationModel.DefaultPageSize, CancellationToken cancellationToken = default)
     {
         var result = await loginInstructionsApiClient.SendToParticipantAsync(participantId, cancellationToken);
         if (result.Success)

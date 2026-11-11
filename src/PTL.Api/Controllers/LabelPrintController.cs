@@ -12,7 +12,6 @@ namespace PTL.Api.Controllers;
 public sealed class LabelPrintController(ILabelPrinterClient labelPrinterClient) : ControllerBase
 {
     [HttpPost("print")]
-    [ValidateAntiForgeryToken]
     public async Task<ActionResult<LabelPrintResponse>> Print([FromBody] LabelPrintRequest request, CancellationToken cancellationToken)
     {
         var printed = await labelPrinterClient.PrintAsync(new AddressLabel(request.Lines), cancellationToken);
