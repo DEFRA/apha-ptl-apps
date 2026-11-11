@@ -199,30 +199,6 @@ public class HomeControllerTests
     }
 
     [Fact]
-    public void SystemInformation_ShowsTheApplicationVersionAndEnvironment()
-    {
-        var controller = new HomeController(new FakeApiClient(), new FakeSystemMessageApiClient(), new FakeCreateOrderApiClient());
-
-        var result = controller.SystemInformation(new FakeHostEnvironment("Staging"));
-
-        var model = Assert.IsType<SystemInformationViewModel>(Assert.IsType<ViewResult>(result).Model);
-        Assert.Equal("Staging", model.Environment);
-        Assert.False(string.IsNullOrWhiteSpace(model.Version));
-        Assert.DoesNotContain('+', model.Version);
-    }
-
-    private sealed class FakeHostEnvironment(string environmentName) : Microsoft.Extensions.Hosting.IHostEnvironment
-    {
-        public string EnvironmentName { get; set; } = environmentName;
-
-        public string ApplicationName { get; set; } = "PTL.ExternalWeb";
-
-        public string ContentRootPath { get; set; } = string.Empty;
-
-        public Microsoft.Extensions.FileProviders.IFileProvider ContentRootFileProvider { get; set; } = new Microsoft.Extensions.FileProviders.NullFileProvider();
-    }
-
-    [Fact]
     public async Task Information_MessagePublished_PassesHtmlToViewModel()
     {
         var controller = new HomeController(new FakeApiClient(), new FakeSystemMessageApiClient(message: "<p>Welcome</p>"), new FakeCreateOrderApiClient())

@@ -40,40 +40,16 @@ public class SmokeTests : IClassFixture<PtlExternalWebTestFactory>
     }
 
     [Fact]
-    public async Task Footer_LinksToTheLegacyAccessibilitySystemInformationAndPrivacyPages()
+    public async Task Footer_LinksToTheAccessibilityAndPrivacyPages()
     {
         var client = _factory.CreateClient();
 
         var body = await client.GetStringAsync("/Home/Privacy");
 
         Assert.Contains("href=\"/Home/Accessibility\"", body);
-        Assert.Contains("href=\"/Home/SystemInformation\"", body);
         Assert.Contains("href=\"/Home/Privacy\"", body);
+        Assert.DoesNotContain("/Home/SystemInformation", body);
         Assert.DoesNotContain("Terms and conditions", body);
-    }
-
-    [Fact]
-    public async Task SystemInformation_Anonymous_RedirectsToLogin()
-    {
-        var client = _factory.CreateClient(new() { AllowAutoRedirect = false });
-
-        var response = await client.GetAsync("/Home/SystemInformation");
-
-        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
-        Assert.Contains("/Account/Login", response.Headers.Location!.ToString());
-    }
-
-    [Fact]
-    public async Task SystemInformation_SignedIn_ShowsVersionAndEnvironment()
-    {
-        var client = _factory.CreateClient();
-        await client.GetAsync(PtlExternalWebTestFactory.TestSignInPath);
-
-        var body = await client.GetStringAsync("/Home/SystemInformation");
-
-        Assert.Contains("System information", body);
-        Assert.Contains("Version", body);
-        Assert.Contains("Environment", body);
     }
 
     [Fact]
