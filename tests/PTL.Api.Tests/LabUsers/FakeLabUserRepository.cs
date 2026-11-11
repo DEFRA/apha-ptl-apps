@@ -42,9 +42,9 @@ internal sealed class FakeLabUserRepository : ILabUserRepository
     }
 
     public Task<LabUserUpdateOutcome> UpdateAsync(
-        Guid participantId, Guid labUserId, string name, string email, bool isActive, bool changeDetails, AuditEntry audit, CancellationToken cancellationToken = default)
+        Guid participantId, Guid labUserId, LabUserEdit edit, AuditEntry audit, CancellationToken cancellationToken = default)
     {
-        UpdateCalls.Add((participantId, labUserId, name, email, isActive, changeDetails, audit));
+        UpdateCalls.Add((participantId, labUserId, edit.Name, edit.Email, edit.IsActive, edit.ChangeDetails, audit));
         return Task.FromResult(UpdateOutcome);
     }
 }

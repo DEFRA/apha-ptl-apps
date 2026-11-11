@@ -100,7 +100,7 @@ GO
 -- 4. Sign-in matches an unlinked user by email, so each table needs an index on it. The Lab User table is
 --    small and its email column is nvarchar (matching the varchar lookup would force a scan anyway), so
 --    it is deliberately not indexed.
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_tblParticipant_fldEmail' AND object_id = OBJECT_ID('dbo.tblParticipant'))
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_tblParticipant_fldEmail' AND object_id = OBJECT_ID(N'[dbo].[tblParticipant]'))
 BEGIN
 	CREATE NONCLUSTERED INDEX [IX_tblParticipant_fldEmail]
 	ON [dbo].[tblParticipant] ([fldEmail])

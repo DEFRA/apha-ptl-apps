@@ -153,7 +153,7 @@ public class LabControllerTests
         var controller = CreateController(User(contactId: null));
 
         var get = await controller.Select(CancellationToken.None);
-        var post = await controller.Select(new LabSelectionViewModel { SelectedLabId = LabA }, CancellationToken.None);
+        var post = await controller.Select(new LabSelectionInput { SelectedLabId = LabA }, CancellationToken.None);
 
         Assert.IsType<RedirectResult>(get);
         Assert.IsType<RedirectResult>(post);
@@ -171,7 +171,7 @@ public class LabControllerTests
         properties.StoreTokens([new AuthenticationToken { Name = "id_token", Value = "t" }]);
         var controller = CreateController(User(ContactId), properties);
 
-        var result = await controller.Select(new LabSelectionViewModel { SelectedLabId = LabB }, CancellationToken.None);
+        var result = await controller.Select(new LabSelectionInput { SelectedLabId = LabB }, CancellationToken.None);
 
         Assert.Equal(("Index", "Home"), (Assert.IsType<RedirectToActionResult>(result).ActionName, Assert.IsType<RedirectToActionResult>(result).ControllerName));
         var (scheme, principal, signInProperties) = Assert.Single(_auth.SignIns);
@@ -194,7 +194,7 @@ public class LabControllerTests
         AddLab(LabB, "0187", "Northern");
         var controller = CreateController(User(ContactId));
 
-        await controller.Select(new LabSelectionViewModel { SelectedLabId = LabA }, CancellationToken.None);
+        await controller.Select(new LabSelectionInput { SelectedLabId = LabA }, CancellationToken.None);
 
         Assert.Null(controller.TempData.GetNotification());
     }
@@ -206,7 +206,7 @@ public class LabControllerTests
         AddLab(LabB, "0187", "Northern");
         var controller = CreateController(User(ContactId, currentLab: LabA));
 
-        await controller.Select(new LabSelectionViewModel { SelectedLabId = LabB }, CancellationToken.None);
+        await controller.Select(new LabSelectionInput { SelectedLabId = LabB }, CancellationToken.None);
 
         var notification = controller.TempData.GetNotification();
         Assert.Equal(NotificationType.Success, notification!.Type);
@@ -220,7 +220,7 @@ public class LabControllerTests
         AddLab(LabB, "0187", "Northern");
         var controller = CreateController(User(ContactId, currentLab: LabA));
 
-        await controller.Select(new LabSelectionViewModel { SelectedLabId = LabA }, CancellationToken.None);
+        await controller.Select(new LabSelectionInput { SelectedLabId = LabA }, CancellationToken.None);
 
         Assert.Null(controller.TempData.GetNotification());
         Assert.Single(_auth.SignIns);
@@ -233,7 +233,7 @@ public class LabControllerTests
         AddLab(LabB, "0187", "Northern");
         var controller = CreateController(User(ContactId, currentLab: LabA));
 
-        var result = await controller.Select(new LabSelectionViewModel(), CancellationToken.None);
+        var result = await controller.Select(new LabSelectionInput(), CancellationToken.None);
 
         var model = Assert.IsType<LabSelectionViewModel>(Assert.IsType<ViewResult>(result).Model);
         Assert.Equal("Select a lab", ErrorFor(controller));
@@ -252,7 +252,7 @@ public class LabControllerTests
         var foreign = Guid.NewGuid();
         var controller = CreateController(User(ContactId));
 
-        var result = await controller.Select(new LabSelectionViewModel { SelectedLabId = foreign }, CancellationToken.None);
+        var result = await controller.Select(new LabSelectionInput { SelectedLabId = foreign }, CancellationToken.None);
 
         Assert.IsType<ViewResult>(result);
         Assert.Equal("Select a lab", ErrorFor(controller));
@@ -265,7 +265,7 @@ public class LabControllerTests
     {
         var controller = CreateController(User(ContactId));
 
-        var result = await controller.Select(new LabSelectionViewModel { SelectedLabId = LabA }, CancellationToken.None);
+        var result = await controller.Select(new LabSelectionInput { SelectedLabId = LabA }, CancellationToken.None);
 
         Assert.Equal("/Account/NotPermitted?reason=no-active-lab", Assert.IsType<RedirectResult>(result).Url);
     }
@@ -278,7 +278,7 @@ public class LabControllerTests
         var controller = CreateController(User(ContactId));
         _auth.AuthenticateResult = AuthenticateResult.NoResult();
 
-        var result = await controller.Select(new LabSelectionViewModel { SelectedLabId = LabA }, CancellationToken.None);
+        var result = await controller.Select(new LabSelectionInput { SelectedLabId = LabA }, CancellationToken.None);
 
         Assert.IsType<RedirectToActionResult>(result);
         Assert.Empty(_auth.SignIns);

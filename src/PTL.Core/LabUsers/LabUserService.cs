@@ -99,10 +99,7 @@ public sealed class LabUserService(
         var outcome = await labUserRepository.UpdateAsync(
             participantId,
             labUserId,
-            name,
-            email,
-            request.IsActive,
-            changeDetails,
+            new LabUserEdit(name, email, request.IsActive, changeDetails),
             new AuditEntry(participantId, "UpdateLabUser", "LabUser", labUserId.ToString(), $"Lab: {current.LabCode}; Name: {name}; Active: {request.IsActive}; DetailsChanged: {changeDetails}"),
             cancellationToken);
 

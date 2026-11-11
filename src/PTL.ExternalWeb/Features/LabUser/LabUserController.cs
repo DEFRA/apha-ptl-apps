@@ -42,14 +42,14 @@ public sealed class LabUserController(ILabUserApiClient labUserApiClient) : Cont
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Add(LabUserFormViewModel model, CancellationToken cancellationToken)
+    public async Task<IActionResult> Add(LabUserInput input, CancellationToken cancellationToken)
     {
         if (User.GetParticipantId() is not { } participantId)
         {
             return NotFound();
         }
 
-        var result = await labUserApiClient.AddAsync(participantId, ToRequest(model), cancellationToken);
+        var result = await labUserApiClient.AddAsync(participantId, ToRequest(input), cancellationToken);
         if (result is null)
         {
             return NotFound();
@@ -58,6 +58,7 @@ public sealed class LabUserController(ILabUserApiClient labUserApiClient) : Cont
         if (!result.Success)
         {
             AddErrors(result.FieldErrors);
+            var model = new LabUserFormViewModel { Name = input.Name, Email = input.Email, IsActive = input.IsActive };
             await FillLabAsync(model, participantId, cancellationToken);
             return View(model);
         }
@@ -82,7 +83,7 @@ public sealed class LabUserController(ILabUserApiClient labUserApiClient) : Cont
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Edit(Guid labUserId, LabUserFormViewModel model, CancellationToken cancellationToken)
+    public async Task<IActionResult> Edit(Guid labUserId, LabUserInput input, CancellationToken cancellationToken)
     {
         if (User.GetParticipantId() is not { } participantId)
         {
@@ -100,11 +101,11 @@ public sealed class LabUserController(ILabUserApiClient labUserApiClient) : Cont
         var current = details.User;
         if (!current.CanChangeDetails)
         {
-            model.Name = current.Name;
-            model.Email = current.Email;
+            input.Name = current.Name;
+            input.Email = current.Email;
         }
 
-        var result = await labUserApiClient.UpdateAsync(participantId, labUserId, ToRequest(model), cancellationToken);
+        var result = await labUserApiClient.UpdateAsync(participantId, labUserId, ToRequest(input), cancellationToken);
         if (result is null)
         {
             return NotFound();
@@ -114,13 +115,13 @@ public sealed class LabUserController(ILabUserApiClient labUserApiClient) : Cont
         {
             AddErrors(result.FieldErrors);
             var form = ToForm(details);
-            form.Name = model.Name;
-            form.Email = model.Email;
-            form.IsActive = model.IsActive;
+            form.Name = input.Name;
+            form.Email = input.Email;
+            form.IsActive = input.IsActive;
             return View(form);
         }
 
-        TempData.SetNotification(NotificationType.Success, UpdatedMessage(result.Outcome, model.IsActive));
+        TempData.SetNotification(NotificationType.Success, UpdatedMessage(result.Outcome, input.IsActive));
         return RedirectToAction(nameof(Index));
     }
 
@@ -187,6 +188,6 @@ public sealed class LabUserController(ILabUserApiClient labUserApiClient) : Cont
         HasSignedIn = details.User.HasSignedIn
     };
 
-    private static LabUserSaveRequest ToRequest(LabUserFormViewModel model) =>
-        new(model.Name ?? string.Empty, model.Email ?? string.Empty, model.IsActive);
+    private static LabUserSaveRequest ToRequest(LabUserInput input) =>
+        new(input.Name ?? string.Empty, input.Email ?? string.Empty, input.IsActive);
 }

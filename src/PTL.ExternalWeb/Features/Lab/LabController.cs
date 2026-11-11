@@ -54,7 +54,7 @@ public sealed class LabController(IExternalUserApiClient externalUserApiClient) 
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Select(LabSelectionViewModel model, CancellationToken cancellationToken)
+    public async Task<IActionResult> Select(LabSelectionInput input, CancellationToken cancellationToken)
     {
         if (User.GetContactId() is not { } contactId)
         {
@@ -68,17 +68,15 @@ public sealed class LabController(IExternalUserApiClient externalUserApiClient) 
         }
 
         var current = User.GetParticipantId();
-        model.Labs = labs;
-        model.IsSwitch = current is not null;
 
-        var lab = model.SelectedLabId is { } selected
+        var lab = input.SelectedLabId is { } selected
             ? await externalUserApiClient.GetLabAsync(contactId, selected, cancellationToken)
             : null;
         if (lab is null)
         {
             // One message for "nothing chosen" and "not one of your labs", so a lab id cannot be probed through the form.
             ModelState.AddModelError(nameof(LabSelectionViewModel.SelectedLabId), SelectLabMessage);
-            return View(model);
+            return View(new LabSelectionViewModel { Labs = labs, IsSwitch = current is not null, SelectedLabId = input.SelectedLabId });
         }
 
         await SignInForLabAsync(lab, labs.Count);

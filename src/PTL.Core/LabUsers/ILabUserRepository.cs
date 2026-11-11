@@ -43,6 +43,9 @@ public enum LabUserUpdateOutcome
 /// <param name="LabUserId">The person's id when one was added or found.</param>
 public sealed record LabUserAddResult(LabUserAddOutcome Outcome, Guid? LabUserId);
 
+/// <summary>What an edit sets: the person's access to the lab and, when <paramref name="ChangeDetails"/> is true, their name and email.</summary>
+public sealed record LabUserEdit(string Name, string Email, bool IsActive, bool ChangeDetails);
+
 public interface ILabUserRepository
 {
     /// <summary>Everyone linked to the lab, active or not, by name.</summary>
@@ -62,9 +65,9 @@ public interface ILabUserRepository
         Guid participantId, string name, string email, bool isActive, Func<Guid, AuditEntry> auditFor, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Sets the person's access to the lab and, when <paramref name="changeDetails"/> is true, their name and email. The audit
+    /// Sets the person's access to the lab and, when <see cref="LabUserEdit.ChangeDetails"/> is true, their name and email. The audit
     /// entry is written in the same transaction, only when something was changed.
     /// </summary>
     Task<LabUserUpdateOutcome> UpdateAsync(
-        Guid participantId, Guid labUserId, string name, string email, bool isActive, bool changeDetails, AuditEntry audit, CancellationToken cancellationToken = default);
+        Guid participantId, Guid labUserId, LabUserEdit edit, AuditEntry audit, CancellationToken cancellationToken = default);
 }

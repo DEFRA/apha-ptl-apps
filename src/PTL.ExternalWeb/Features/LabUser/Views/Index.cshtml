@@ -13,7 +13,9 @@
             Edit a user to make them inactive if they should no longer have access.
         </p>
 
-        <a class="govuk-button" data-module="govuk-button" role="button" draggable="false" asp-controller="LabUser" asp-action="Add">Add lab user</a>
+        <form asp-controller="LabUser" asp-action="Add" method="get">
+            <button type="submit" class="govuk-button" data-module="govuk-button">Add lab user</button>
+        </form>
 
         @if (Model.Users.Count == 0)
         {

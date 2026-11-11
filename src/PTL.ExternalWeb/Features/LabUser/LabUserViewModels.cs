@@ -30,3 +30,14 @@ public sealed class LabUserFormViewModel
 
     public bool IsEdit => LabUserId is not null;
 }
+
+/// <summary>What the Add / Edit lab user form posts - only the fields the user can change, so nothing else can be set from the request.</summary>
+public sealed class LabUserInput
+{
+    // Nullable so an empty box is reported once, by the API's message, rather than also by ASP.NET Core's own "required" check.
+    public string? Name { get; set; }
+
+    public string? Email { get; set; }
+
+    public bool IsActive { get; set; } = true;
+}

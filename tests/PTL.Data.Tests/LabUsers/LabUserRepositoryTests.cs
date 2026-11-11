@@ -1,4 +1,4 @@
-using System.Data;
+﻿using System.Data;
 using PTL.Core.Audit;
 using PTL.Core.LabUsers;
 using PTL.Data.LabUsers;
@@ -201,7 +201,7 @@ public class LabUserRepositoryTests
         connection.RespondToQuery(UpdateSql, OutcomeTable(outcome));
         connection.RespondToNonQuery(AuditSql, 1);
 
-        var result = await repository.UpdateAsync(lab, user, "Emma", "e@example.org", false, true, new AuditEntry(lab, "UpdateLabUser", "LabUser", user.ToString(), "Details"));
+        var result = await repository.UpdateAsync(lab, user, new LabUserEdit("Emma", "e@example.org", false, true), new AuditEntry(lab, "UpdateLabUser", "LabUser", user.ToString(), "Details"));
 
         Assert.Equal(expected, result);
         var update = Assert.Single(connection.ExecutedCommands, c => c.CommandText == UpdateSql);
@@ -223,7 +223,7 @@ public class LabUserRepositoryTests
         var (repository, connection) = CreateRepository();
         connection.RespondToQuery(UpdateSql, OutcomeTable(outcome));
 
-        var result = await repository.UpdateAsync(Guid.NewGuid(), Guid.NewGuid(), "Emma", "e@example.org", true, true, new AuditEntry(null, "UpdateLabUser", "LabUser", null, null));
+        var result = await repository.UpdateAsync(Guid.NewGuid(), Guid.NewGuid(), new LabUserEdit("Emma", "e@example.org", true, true), new AuditEntry(null, "UpdateLabUser", "LabUser", null, null));
 
         Assert.Equal(expected, result);
         Assert.DoesNotContain(connection.ExecutedCommands, c => c.CommandText == AuditSql);

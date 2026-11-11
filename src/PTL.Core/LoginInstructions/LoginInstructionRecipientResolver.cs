@@ -23,6 +23,9 @@ public sealed class LoginInstructionRecipientResolver(
     ILabUserRepository labUserRepository,
     IOptions<ExternalOptions> externalOptions) : ILoginInstructionRecipientResolver
 {
+    // The Notify personalisation field every login instructions template uses for the link to the external app.
+    private const string ExternalAppLinkField = "ExternalAppLink";
+
     public Task<LoginInstructionRecipient?> FindAsync(LoginInstructionUserType userType, Guid id, CancellationToken cancellationToken = default) => userType switch
     {
         LoginInstructionUserType.Participant => FindParticipantAsync(id, cancellationToken),
@@ -47,7 +50,7 @@ public sealed class LoginInstructionRecipientResolver(
                     ["LabUserName"] = link.Name,
                     ["LabCode"] = link.LabCode,
                     ["LabName"] = link.LabName,
-                    ["ExternalAppLink"] = externalOptions.Value.AppUrl,
+                    [ExternalAppLinkField] = externalOptions.Value.AppUrl,
                 });
     }
 
@@ -65,7 +68,7 @@ public sealed class LoginInstructionRecipientResolver(
                     ["ParticipantName"] = participant.ContactName,
                     ["LabCode"] = participant.LabCode,
                     ["LabName"] = participant.LabName,
-                    ["ExternalAppLink"] = externalOptions.Value.AppUrl,
+                    [ExternalAppLinkField] = externalOptions.Value.AppUrl,
                 });
     }
 
@@ -81,7 +84,7 @@ public sealed class LoginInstructionRecipientResolver(
                 new Dictionary<string, string>
                 {
                     ["ViewerName"] = viewer.Name,
-                    ["ExternalAppLink"] = externalOptions.Value.AppUrl,
+                    [ExternalAppLinkField] = externalOptions.Value.AppUrl,
                 });
     }
 
@@ -97,7 +100,7 @@ public sealed class LoginInstructionRecipientResolver(
                 new Dictionary<string, string>
                 {
                     ["ConsultantName"] = consultant.Name,
-                    ["ExternalAppLink"] = externalOptions.Value.AppUrl,
+                    [ExternalAppLinkField] = externalOptions.Value.AppUrl,
                 });
     }
 }

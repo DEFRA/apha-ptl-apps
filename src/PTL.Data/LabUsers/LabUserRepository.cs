@@ -70,13 +70,13 @@ public sealed class LabUserRepository(IDbConnectionFactory connectionFactory) : 
     }
 
     public async Task<LabUserUpdateOutcome> UpdateAsync(
-        Guid participantId, Guid labUserId, string name, string email, bool isActive, bool changeDetails, AuditEntry audit, CancellationToken cancellationToken = default)
+        Guid participantId, Guid labUserId, LabUserEdit edit, AuditEntry audit, CancellationToken cancellationToken = default)
     {
         return await InTransactionAsync(async (connection, transaction) =>
         {
             var outcome = (LabUserUpdateOutcome)await connection.QuerySingleAsync<int>(new CommandDefinition(
                 "EXEC dbo.spuLabUserForParticipant @ParticipantId, @LabUserId, @Name, @Email, @IsActive, @ChangeDetails",
-                new { ParticipantId = participantId, LabUserId = labUserId, Name = name, Email = email, IsActive = isActive, ChangeDetails = changeDetails },
+                new { ParticipantId = participantId, LabUserId = labUserId, edit.Name, edit.Email, edit.IsActive, edit.ChangeDetails },
                 transaction,
                 cancellationToken: cancellationToken));
 

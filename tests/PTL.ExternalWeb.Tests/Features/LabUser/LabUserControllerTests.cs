@@ -36,7 +36,7 @@ public class LabUserControllerTests
     private static LabUserResponse Person(bool canChange = true, bool active = true) =>
         new(PersonId, "Sam Smith", "sam@lab.example", active, LoginInstructionsSent: true, canChange, HasSignedIn: true);
 
-    private static LabUserFormViewModel Form(string name = "New Person", string email = "new@lab.example", bool active = true) =>
+    private static LabUserInput Form(string name = "New Person", string email = "new@lab.example", bool active = true) =>
         new() { Name = name, Email = email, IsActive = active };
 
     [Fact]
@@ -163,7 +163,7 @@ public class LabUserControllerTests
     {
         var controller = CreateController();
 
-        await controller.Add(new LabUserFormViewModel(), CancellationToken.None);
+        await controller.Add(new LabUserInput(), CancellationToken.None);
 
         Assert.Equal(new LabUserSaveRequest(string.Empty, string.Empty, true), Assert.Single(_api.AddCalls).Request);
     }

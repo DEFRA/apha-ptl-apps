@@ -49,7 +49,7 @@ END
 
 GO
 
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_tlnkLabUserParticipant_fldParticipantId' AND object_id = OBJECT_ID('dbo.tlnkLabUserParticipant'))
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_tlnkLabUserParticipant_fldParticipantId' AND object_id = OBJECT_ID(N'[dbo].[tlnkLabUserParticipant]'))
 BEGIN
 	CREATE NONCLUSTERED INDEX [IX_tlnkLabUserParticipant_fldParticipantId]
 	ON [dbo].[tlnkLabUserParticipant] ([fldParticipantId])
