@@ -27,12 +27,8 @@ public sealed class LoginInstructionsController(ILoginInstructionsService loginI
     {
         var result = await loginInstructionsService.SendAsync(userType, id, cancellationToken);
 
-        return result.Outcome switch
-        {
-            LoginInstructionsOutcome.Sent => Ok(new LoginInstructionsResponse(true)),
-            LoginInstructionsOutcome.NotFound => NotFound(),
-            LoginInstructionsOutcome.NoEmailAddress => Ok(new LoginInstructionsResponse(false, "There is no email address saved to send the login instructions to.")),
-            _ => Ok(new LoginInstructionsResponse(false, "The login instructions email could not be sent. Please try again.")),
-        };
+        return result.Outcome == LoginInstructionsOutcome.NotFound
+            ? NotFound()
+            : Ok(result.Outcome.ToResponse());
     }
 }

@@ -1,3 +1,5 @@
+using PTL.Contracts.ExternalUser;
+
 namespace PTL.ExternalWeb.Features.Home;
 
 /// <summary>View model for the external landing page, showing the signed-in CIDM user's display
@@ -12,9 +14,9 @@ public sealed record HomeIndexViewModel(
     bool CanCreateCurrentYearOrder = true,
     bool CanCreateNextYearOrder = true)
 {
-    public bool IsParticipant => Roles.Contains(Account.ExternalRoleNames.Participant, StringComparer.OrdinalIgnoreCase);
+    public bool IsParticipant => Roles.Contains(ExternalRoleNames.Participant, StringComparer.OrdinalIgnoreCase);
 
-    public bool IsViewer => Roles.Contains(Account.ExternalRoleNames.Viewer, StringComparer.OrdinalIgnoreCase);
+    public bool IsViewer => Roles.Contains(ExternalRoleNames.Viewer, StringComparer.OrdinalIgnoreCase);
 
-    public bool IsTestConsultant => Roles.Contains(Account.ExternalRoleNames.TestConsultant, StringComparer.OrdinalIgnoreCase);
+    public bool IsTestConsultant => Roles.Contains(ExternalRoleNames.TestConsultant, StringComparer.OrdinalIgnoreCase);
 }

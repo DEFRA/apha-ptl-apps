@@ -8,24 +8,6 @@ namespace PTL.Data.TestConsultant;
 
 public sealed class TestConsultantRepository(IDbConnectionFactory connectionFactory) : ITestConsultantRepository
 {
-    public async Task<Core.TestConsultant.TestConsultant?> GetBySsoIdExtAsync(Guid ssoIdExt, CancellationToken cancellationToken = default)
-    {
-        using var connection = connectionFactory.CreateConnection();
-
-        return await connection.QuerySingleOrDefaultAsync<Core.TestConsultant.TestConsultant>(
-            "EXEC dbo.spgTestConsultantBySsoId @SsoIdExt=@SsoIdExt",
-            new { SsoIdExt = ssoIdExt });
-    }
-
-    public async Task<Core.TestConsultant.TestConsultant?> GetByEmailAsync(string email, CancellationToken cancellationToken = default)
-    {
-        using var connection = connectionFactory.CreateConnection();
-
-        return await connection.QuerySingleOrDefaultAsync<Core.TestConsultant.TestConsultant>(
-            "EXEC dbo.spgTestConsultantByEmail @Email",
-            new { Email = email });
-    }
-
     public async Task<IReadOnlyList<Core.TestConsultant.TestConsultant>> GetAllAsync(CancellationToken cancellationToken = default)
     {
         using var connection = connectionFactory.CreateConnection();

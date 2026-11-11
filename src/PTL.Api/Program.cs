@@ -133,7 +133,10 @@ builder.Services.AddScoped<IParticipantSchemeRepository, ParticipantSchemeReposi
 builder.Services.AddScoped<IParticipantSchemeService, ParticipantSchemeService>();
 
 builder.Services.AddScoped<ITestConsultantRepository, TestConsultantRepository>();
+builder.Services.AddScoped<IExternalUserRepository, PTL.Data.ExternalUser.ExternalUserRepository>();
 builder.Services.AddScoped<IExternalUserService, ExternalUserService>();
+builder.Services.AddScoped<PTL.Core.LabUsers.ILabUserRepository, PTL.Data.LabUsers.LabUserRepository>();
+builder.Services.AddScoped<PTL.Core.LabUsers.ILabUserService, PTL.Core.LabUsers.LabUserService>();
 builder.Services.AddScoped<ITestConsultantService, TestConsultantService>();
 
 builder.Services.AddScoped<ISystemMessageRepository, SystemMessageRepository>();

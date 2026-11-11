@@ -1,164 +1,210 @@
+using Microsoft.Extensions.Logging;
+using PTL.Contracts.ExternalUser;
 using PTL.Core.Contract.CreateOrder;
 using PTL.Core.Customer;
 using PTL.Core.Participant;
-using PTL.Core.TestConsultant;
-using PTL.Core.Viewer;
-using CoreParticipant = PTL.Core.Participant.Participant;
 
 namespace PTL.Core.ExternalUser;
 
-public sealed class ExternalUserService(
+public sealed partial class ExternalUserService(
+    IExternalUserRepository externalUserRepository,
     IParticipantRepository participantRepository,
-    IViewerRepository viewerRepository,
-    ITestConsultantRepository testConsultantRepository,
-    ICustomerRepository customerRepository) : IExternalUserService
+    ICustomerRepository customerRepository,
+    ILogger<ExternalUserService> logger) : IExternalUserService
 {
-    private const string ParticipantRoleName = "Participant";
-    private const string ViewerRoleName = "Viewer";
-    private const string TestConsultantRoleName = "Test Consultant";
+    private static readonly IReadOnlyList<ExternalUserMatch> NoMatches = [];
+
+    // Legacy Generate Login always granted a Participant (and an External Test Consultant) the Viewer SSO role as
+    // well - "View reports" only ever checked IsViewer - so those roles imply Viewer without a Viewer record. A Lab
+    // User works like a Participant for now (the lab-selection screen will narrow what they can do), so it carries
+    // Participant too and every existing role-gated page keeps working for them.
+    private static readonly Dictionary<ExternalUserType, IReadOnlyList<string>> RolesByUserType =
+        new()
+        {
+            [ExternalUserType.Participant] = [ExternalRoleNames.Participant, ExternalRoleNames.Viewer],
+            [ExternalUserType.Viewer] = [ExternalRoleNames.Viewer],
+            [ExternalUserType.TestConsultant] = [ExternalRoleNames.TestConsultant, ExternalRoleNames.Viewer],
+            [ExternalUserType.LabUser] = [ExternalRoleNames.LabUser, ExternalRoleNames.Participant, ExternalRoleNames.Viewer]
+        };
 
     public async Task<ExternalUserResolutionResult> ResolveAsync(
         Guid ssoIdExt,
         string email,
         string displayName,
-        IReadOnlyList<string> cidmRoles,
         CancellationToken cancellationToken = default)
     {
-        var resolvedRoles = new List<string>();
-        Guid? participantId = null;
-        string? labCode = null;
-        Guid? viewerId = null;
-        Guid? testConsultantId = null;
-        var canOrderOnline = false;
-        var hasInactiveMatch = false;
+        var normalisedEmail = email.Trim();
+        var matches = await externalUserRepository.FindBySsoIdExtAsync(ssoIdExt, cancellationToken);
+        var justLinked = false;
 
-        if (HasRole(cidmRoles, ParticipantRoleName))
+        if (matches.Count == 0)
         {
-            var (participant, foundButInactive) = await ResolveParticipantAsync(ssoIdExt, email, cancellationToken);
-            hasInactiveMatch |= foundButInactive;
-            if (participant is not null)
+            var (linked, denial) = await LinkByEmailAsync(ssoIdExt, normalisedEmail, cancellationToken);
+            if (denial is { } status)
             {
-                participantId = participant.ParticipantId;
-                labCode = participant.LabCode;
-                resolvedRoles.Add(ParticipantRoleName);
-
-                var customer = await customerRepository.GetByIdAsync(participant.CustomerId, cancellationToken);
-                canOrderOnline = await OnlineOrderingEligibility.CanOrderOnlineAsync(participantRepository, participant, customer, cancellationToken);
-
-                // Legacy's Generate Login always granted a Participant account both the
-                // Participant and Viewer SSO roles - "View reports" only ever checked IsViewer, so
-                // every Participant could see it without CIDM separately sending "Viewer". There is
-                // no real Viewer record backing this (ViewerId stays null); it's a role grant only.
-                AddRoleIfMissing(resolvedRoles, ViewerRoleName);
+                return ExternalUserResolutionResult.Denied(status, displayName);
             }
+
+            matches = linked;
+            justLinked = true;
         }
 
-        if (HasRole(cidmRoles, ViewerRoleName))
+        // The lowest user type is the first table that matched; anything else under the same contact id is ignored.
+        var userType = matches.Min(match => match.UserType);
+        var rows = matches.Where(match => match.UserType == userType).ToList();
+
+        if (!justLinked)
         {
-            viewerId = await ResolveViewerAsync(ssoIdExt, email, cancellationToken);
-            if (viewerId is not null)
-            {
-                AddRoleIfMissing(resolvedRoles, ViewerRoleName);
-            }
+            LogIfEmailChanged(normalisedEmail, userType, rows);
         }
 
-        if (HasRole(cidmRoles, TestConsultantRoleName))
-        {
-            var (resolvedTestConsultantId, foundButInactive) = await ResolveTestConsultantAsync(ssoIdExt, email, cancellationToken);
-            hasInactiveMatch |= foundButInactive;
-            testConsultantId = resolvedTestConsultantId;
-            if (testConsultantId is not null)
-            {
-                resolvedRoles.Add(TestConsultantRoleName);
-
-                // Same reasoning as Participant above - an external Test Consultant account was
-                // always also granted the Viewer SSO role at Generate Login.
-                AddRoleIfMissing(resolvedRoles, ViewerRoleName);
-            }
-        }
-
-        return new ExternalUserResolutionResult(displayName, resolvedRoles, participantId, labCode, viewerId, testConsultantId, canOrderOnline, hasInactiveMatch);
+        return await BuildResultAsync(userType, rows, displayName, cancellationToken);
     }
 
-    private static void AddRoleIfMissing(List<string> resolvedRoles, string roleName)
+    // Email is only a one-time bootstrap: it finds the record to link, and is never consulted again once the
+    // contact id is on it. A record already linked to any identity is left alone, so a changed or re-used email
+    // can never move an account to another person.
+    private async Task<(IReadOnlyList<ExternalUserMatch> Matches, ExternalUserResolutionStatus? Denial)> LinkByEmailAsync(
+        Guid ssoIdExt, string email, CancellationToken cancellationToken)
     {
-        if (!resolvedRoles.Contains(roleName, StringComparer.OrdinalIgnoreCase))
+        if (email.Length == 0)
         {
-            resolvedRoles.Add(roleName);
+            return (NoMatches, ExternalUserResolutionStatus.NotFound);
         }
+
+        var candidates = await externalUserRepository.FindByEmailAsync(email, cancellationToken);
+        if (candidates.Count == 0)
+        {
+            return (NoMatches, ExternalUserResolutionStatus.NotFound);
+        }
+
+        var userType = candidates.Min(candidate => candidate.UserType);
+        var rows = candidates.Where(candidate => candidate.UserType == userType).ToList();
+
+        if (rows.Any(row => row.SsoIdExt is not null))
+        {
+            LogLinkedToAnotherIdentity(logger, userType, rows[0].UserId);
+            return (NoMatches, ExternalUserResolutionStatus.LinkedToAnotherIdentity);
+        }
+
+        // A Participant's email legitimately appears on several lab rows; for every other type it identifies a person.
+        var userCount = rows.Select(row => row.UserId).Distinct().Count();
+        if (userType != ExternalUserType.Participant && userCount > 1)
+        {
+            LogAmbiguousEmail(logger, userType, userCount);
+            return (NoMatches, ExternalUserResolutionStatus.Ambiguous);
+        }
+
+        var linked = await externalUserRepository.LinkAsync(userType, email, ssoIdExt, cancellationToken);
+        if (linked.Count == 0)
+        {
+            return (NoMatches, ExternalUserResolutionStatus.NotFound);
+        }
+
+        LogLinked(logger, userType, linked[0].UserId, ssoIdExt);
+        return (linked, null);
     }
 
-    private static bool HasRole(IReadOnlyList<string> cidmRoles, string roleName) =>
-        cidmRoles.Contains(roleName, StringComparer.OrdinalIgnoreCase);
-
-    private async Task<(CoreParticipant? Participant, bool FoundButInactive)> ResolveParticipantAsync(Guid ssoIdExt, string email, CancellationToken cancellationToken)
+    private async Task<ExternalUserResolutionResult> BuildResultAsync(
+        ExternalUserType userType,
+        List<ExternalUserMatch> rows,
+        string displayName,
+        CancellationToken cancellationToken)
     {
-        var participant = await participantRepository.GetBySsoIdExtAsync(ssoIdExt, cancellationToken);
-        if (participant is not null)
+        var activeRows = rows.Where(row => row.IsActive).ToList();
+        if (activeRows.Count == 0)
         {
-            // Inactive Participants must not access Participant functionality, even if they were
-            // previously linked (SsoIdExt already set from an earlier sign-in).
-            return participant.IsActive ? (participant, false) : (null, true);
+            var status = userType == ExternalUserType.LabUser
+                ? ExternalUserResolutionStatus.NoActiveLab
+                : ExternalUserResolutionStatus.Inactive;
+            return ExternalUserResolutionResult.Denied(status, displayName);
         }
 
-        participant = await participantRepository.GetByEmailAsync(email, cancellationToken);
+        var labs = ActiveLabs(activeRows);
+
+        // With one lab there is nothing to choose, so the user acts for it straight away; with several, the
+        // lab-selection screen sets the lab and nothing is scoped to a lab until then.
+        var singleLab = labs.Count == 1 ? labs[0] : null;
+        var userId = rows[0].UserId;
+
+        return new ExternalUserResolutionResult(
+            ExternalUserResolutionStatus.Resolved,
+            displayName,
+            userType,
+            RolesByUserType[userType],
+            labs,
+            ParticipantId: singleLab?.ParticipantId,
+            LabCode: singleLab?.LabCode,
+            ViewerId: userType == ExternalUserType.Viewer ? userId : null,
+            TestConsultantId: userType == ExternalUserType.TestConsultant ? userId : null,
+            LabUserId: userType == ExternalUserType.LabUser ? userId : null,
+            CanOrderOnline: singleLab is not null && await CanOrderOnlineAsync(singleLab.ParticipantId, cancellationToken));
+    }
+
+    public async Task<IReadOnlyList<ExternalLab>> GetLabsAsync(Guid ssoIdExt, CancellationToken cancellationToken = default)
+    {
+        var matches = await externalUserRepository.FindBySsoIdExtAsync(ssoIdExt, cancellationToken);
+        if (matches.Count == 0)
+        {
+            return [];
+        }
+
+        // The same user type sign-in resolved to: the lowest one, so a lab is never offered from a lesser match.
+        var userType = matches.Min(match => match.UserType);
+        return ActiveLabs(matches.Where(match => match.UserType == userType && match.IsActive));
+    }
+
+    public async Task<ExternalLabContext?> GetLabAsync(Guid ssoIdExt, Guid participantId, CancellationToken cancellationToken = default)
+    {
+        var labs = await GetLabsAsync(ssoIdExt, cancellationToken);
+        var lab = labs.FirstOrDefault(candidate => candidate.ParticipantId == participantId);
+        return lab is null
+            ? null
+            : new ExternalLabContext(lab.ParticipantId, lab.LabCode, lab.LabName, await CanOrderOnlineAsync(lab.ParticipantId, cancellationToken));
+    }
+
+    // Only Participant and Lab User rows carry a lab; a lab seen twice (a link listed again) counts once.
+    private static List<ExternalLab> ActiveLabs(IEnumerable<ExternalUserMatch> activeRows) => activeRows
+        .Where(row => row.LabParticipantId.HasValue)
+        .Select(row => new ExternalLab(row.LabParticipantId.GetValueOrDefault(), row.LabCode ?? string.Empty, row.LabName ?? string.Empty))
+        .DistinctBy(lab => lab.ParticipantId)
+        .ToList();
+
+    private async Task<bool> CanOrderOnlineAsync(Guid participantId, CancellationToken cancellationToken)
+    {
+        var participant = await participantRepository.GetByIdAsync(participantId, cancellationToken);
         if (participant is null)
         {
-            return (null, false);
+            return false;
         }
 
-        if (!participant.IsActive)
-        {
-            return (null, true);
-        }
-
-        participant.SsoIdExt = ssoIdExt;
-        await participantRepository.UpdateAsync(participant, cancellationToken);
-        return (participant, false);
+        var customer = await customerRepository.GetByIdAsync(participant.CustomerId, cancellationToken);
+        return await OnlineOrderingEligibility.CanOrderOnlineAsync(participantRepository, participant, customer, cancellationToken);
     }
 
-    private async Task<Guid?> ResolveViewerAsync(Guid ssoIdExt, string email, CancellationToken cancellationToken)
+    // Signing in never depends on the emails still matching - the contact id decides - but a difference
+    // means the CIDM account or the PTL record was edited, which an administrator may need to know about.
+    private void LogIfEmailChanged(string email, ExternalUserType userType, List<ExternalUserMatch> rows)
     {
-        var viewer = await viewerRepository.GetBySsoIdExtAsync(ssoIdExt, cancellationToken);
-        if (viewer is not null)
+        if (email.Length > 0 && !rows.Any(row => string.Equals(row.Email, email, StringComparison.OrdinalIgnoreCase)))
         {
-            return viewer.ViewerId;
+            LogEmailChanged(logger, userType, rows[0].UserId);
         }
-
-        viewer = await viewerRepository.GetByEmailAsync(email, cancellationToken);
-        if (viewer is null)
-        {
-            return null;
-        }
-
-        viewer.SsoIdExt = ssoIdExt;
-        await viewerRepository.UpdateAsync(viewer, cancellationToken: cancellationToken);
-        return viewer.ViewerId;
     }
 
-    private async Task<(Guid? TestConsultantId, bool FoundButInactive)> ResolveTestConsultantAsync(Guid ssoIdExt, string email, CancellationToken cancellationToken)
-    {
-        var testConsultant = await testConsultantRepository.GetBySsoIdExtAsync(ssoIdExt, cancellationToken);
-        if (testConsultant is not null)
-        {
-            // Inactive External Test Consultants must not access Test Consultant functionality,
-            // even if they were previously linked (SsoIdExt already set from an earlier sign-in).
-            return testConsultant.IsInactive ? (null, true) : (testConsultant.ExternalTestConsultantId, false);
-        }
+    [LoggerMessage(EventId = 121, Level = LogLevel.Information,
+        Message = "External user linked to CIDM contact. UserType={UserType} UserId={UserId} ContactId={ContactId}")]
+    private static partial void LogLinked(ILogger logger, ExternalUserType userType, Guid userId, Guid contactId);
 
-        testConsultant = await testConsultantRepository.GetByEmailAsync(email, cancellationToken);
-        if (testConsultant is null)
-        {
-            return (null, false);
-        }
+    [LoggerMessage(EventId = 122, Level = LogLevel.Warning,
+        Message = "CIDM sign-in denied: the email matches a record already linked to a different CIDM contact. UserType={UserType} UserId={UserId}")]
+    private static partial void LogLinkedToAnotherIdentity(ILogger logger, ExternalUserType userType, Guid userId);
 
-        if (testConsultant.IsInactive)
-        {
-            return (null, true);
-        }
+    [LoggerMessage(EventId = 123, Level = LogLevel.Warning,
+        Message = "CIDM sign-in denied: the email matches {UserCount} {UserType} records, so no single user can be chosen")]
+    private static partial void LogAmbiguousEmail(ILogger logger, ExternalUserType userType, int userCount);
 
-        testConsultant.SsoIdExt = ssoIdExt;
-        await testConsultantRepository.UpdateAsync(testConsultant, cancellationToken: cancellationToken);
-        return (testConsultant.ExternalTestConsultantId, false);
-    }
+    [LoggerMessage(EventId = 124, Level = LogLevel.Warning,
+        Message = "CIDM email differs from the PTL record's email; signed in by contact id. UserType={UserType} UserId={UserId}")]
+    private static partial void LogEmailChanged(ILogger logger, ExternalUserType userType, Guid userId);
 }

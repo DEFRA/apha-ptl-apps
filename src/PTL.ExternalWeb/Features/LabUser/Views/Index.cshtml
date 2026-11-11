@@ -1,0 +1,84 @@
+@model PTL.ExternalWeb.Features.LabUser.LabUserListViewModel
+@{
+    ViewData["Title"] = "Lab users";
+}
+
+<div class="govuk-grid-row">
+    <div class="govuk-grid-column-full">
+        <span class="govuk-caption-l">Lab @Model.LabCode – @Model.LabName</span>
+        <h1 class="govuk-heading-xl">Lab users</h1>
+
+        <p class="govuk-body">
+            These people can sign in to this lab to enter and view results.
+            Edit a user to make them inactive if they should no longer have access.
+        </p>
+
+        <a class="govuk-button" data-module="govuk-button" role="button" draggable="false" asp-controller="LabUser" asp-action="Add">Add lab user</a>
+
+        @if (Model.Users.Count == 0)
+        {
+            <div class="govuk-inset-text">
+                No lab users have been added to this lab yet. Select ‘Add lab user’ to give someone access.
+            </div>
+        }
+        else
+        {
+            <table class="govuk-table">
+                <caption class="govuk-table__caption govuk-visually-hidden">People who can sign in to lab @Model.LabCode</caption>
+                <thead class="govuk-table__head">
+                    <tr class="govuk-table__row">
+                        <th scope="col" class="govuk-table__header">Name</th>
+                        <th scope="col" class="govuk-table__header">Email</th>
+                        <th scope="col" class="govuk-table__header">Status</th>
+                        <th scope="col" class="govuk-table__header">Login instructions</th>
+                        <th scope="col" class="govuk-table__header">Action</th>
+                    </tr>
+                </thead>
+                <tbody class="govuk-table__body">
+                    @foreach (var user in Model.Users)
+                    {
+                        <tr class="govuk-table__row">
+                            <td class="govuk-table__cell">@user.Name</td>
+                            <td class="govuk-table__cell">@user.Email</td>
+                            <td class="govuk-table__cell">
+                                @if (user.IsActive)
+                                {
+                                    <strong class="govuk-tag govuk-tag--green">Active</strong>
+                                }
+                                else
+                                {
+                                    <strong class="govuk-tag govuk-tag--grey">Inactive</strong>
+                                }
+                            </td>
+                            <td class="govuk-table__cell">
+                                @if (user.LoginInstructionsSent)
+                                {
+                                    <strong class="govuk-tag govuk-tag--green">Sent</strong>
+                                }
+                                else if (user.IsActive)
+                                {
+                                    @* A form post (not a link) because it sends an email: it must not be followed by a prefetch or a crawler. *@
+                                    <form asp-controller="LabUser" asp-action="SendInstructions" asp-route-labUserId="@user.LabUserId" method="post" class="app-inline-form">
+                                        @Html.AntiForgeryToken()
+                                        <button type="submit" class="app-link-button">
+                                            Send instructions<span class="govuk-visually-hidden"> to @user.Name</span>
+                                        </button>
+                                    </form>
+                                }
+                                else
+                                {
+                                    <strong class="govuk-tag govuk-tag--grey">Not sent</strong>
+                                }
+                            </td>
+                            <td class="govuk-table__cell">
+                                <a class="govuk-link" asp-controller="LabUser" asp-action="Edit" asp-route-labUserId="@user.LabUserId">
+                                    Edit<span class="govuk-visually-hidden"> @user.Name</span>
+                                </a>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </div>
+</div>

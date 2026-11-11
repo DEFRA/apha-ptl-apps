@@ -1,3 +1,4 @@
+using PTL.Contracts.LoginInstructions;
 using PTL.Core.Audit;
 
 namespace PTL.Core.LoginInstructions;
@@ -7,6 +8,9 @@ public enum LoginInstructionUserType
     Participant,
     Viewer,
     ExternalTestConsultant,
+
+    /// <summary>A lab user; the id is the lab link's own id (<c>tlnkLabUserParticipant</c>), because the email names the lab.</summary>
+    LabUser,
 }
 
 public enum LoginInstructionsOutcome
@@ -15,11 +19,26 @@ public enum LoginInstructionsOutcome
     NotFound,
     NoEmailAddress,
     SendFailed,
+
+    /// <summary>The lab user's access to the lab is inactive, so there is nothing to give instructions for.</summary>
+    NotActive,
 }
 
 public sealed record LoginInstructionsResult(LoginInstructionsOutcome Outcome)
 {
     public bool Success => Outcome == LoginInstructionsOutcome.Sent;
+}
+
+// The response every caller sends for an outcome other than "the record was not found" (which each caller reports in its own way).
+public static class LoginInstructionsOutcomeExtensions
+{
+    public static LoginInstructionsResponse ToResponse(this LoginInstructionsOutcome outcome) => outcome switch
+    {
+        LoginInstructionsOutcome.Sent => new LoginInstructionsResponse(true),
+        LoginInstructionsOutcome.NoEmailAddress => new LoginInstructionsResponse(false, "There is no email address saved to send the login instructions to."),
+        LoginInstructionsOutcome.NotActive => new LoginInstructionsResponse(false, "Login instructions can only be sent to an active lab user."),
+        _ => new LoginInstructionsResponse(false, "The login instructions email could not be sent. Please try again."),
+    };
 }
 
 // Fixed - the same GOV.UK Notify templates are used in every environment, so they are not configuration.
@@ -33,6 +52,9 @@ public static class LoginInstructionEmailTemplates
 
     public const string ParticipantName = "participant-login-instructions";
     public const string ParticipantId = "64091cdb-eaf5-4c55-8680-84a727b87c91";
+
+    public const string LabUserName = "lab-user-login-instructions";
+    public const string LabUserId = "72662826-7561-4506-ab41-b36a9035f1ea";
 }
 
 public interface ILoginInstructionsService

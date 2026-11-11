@@ -1,0 +1,58 @@
+@model PTL.ExternalWeb.Features.Lab.LabSelectionViewModel
+@{
+    ViewData["Title"] = "Select a lab";
+
+    var hasError = !ViewData.ModelState.IsValid;
+    var errorMessage = ViewData.ModelState[nameof(Model.SelectedLabId)]?.Errors.FirstOrDefault()?.ErrorMessage;
+    var errors = errorMessage is null
+        ? []
+        : new List<(string Field, string Message)> { (nameof(Model.SelectedLabId), errorMessage) };
+}
+
+<div class="govuk-grid-row">
+    <div class="govuk-grid-column-two-thirds">
+        <govuk-error-summary errors="@errors" />
+
+        <form asp-controller="Lab" asp-action="Select" method="post" novalidate>
+            @Html.AntiForgeryToken()
+
+            <div class="govuk-form-group govuk-!-margin-top-4 @(hasError ? "govuk-form-group--error" : null)">
+                <fieldset class="govuk-fieldset" aria-describedby="lab-hint@(hasError ? " lab-error" : null)">
+                    <legend class="govuk-fieldset__legend govuk-fieldset__legend--xl">
+                        <h1 class="govuk-fieldset__heading">Select a lab</h1>
+                    </legend>
+
+                    <div id="lab-hint" class="govuk-hint">
+                        You are linked to more than one lab. Choose the lab you want to work on.
+                        You can switch to a different lab at any time using the ‘Switch lab’ link at the top of the page.
+                    </div>
+
+                    @if (hasError)
+                    {
+                        <p id="lab-error" class="govuk-error-message">
+                            <span class="govuk-visually-hidden">Error:</span> @errorMessage
+                        </p>
+                    }
+
+                    <div class="govuk-radios" data-module="govuk-radios">
+                        @for (var index = 0; index < Model.Labs.Count; index++)
+                        {
+                            var lab = Model.Labs[index];
+                            // The first radio carries the field name as its id, which is where the error summary link points.
+                            var id = index == 0 ? nameof(Model.SelectedLabId) : $"{nameof(Model.SelectedLabId)}-{index + 1}";
+                            <div class="govuk-radios__item">
+                                <input class="govuk-radios__input" id="@id" name="@nameof(Model.SelectedLabId)" type="radio"
+                                       value="@lab.ParticipantId" aria-describedby="@id-item-hint"
+                                       checked="@(Model.SelectedLabId == lab.ParticipantId)">
+                                <label class="govuk-label govuk-radios__label" for="@id">Lab @lab.LabCode</label>
+                                <div id="@id-item-hint" class="govuk-hint govuk-radios__hint">@lab.LabName</div>
+                            </div>
+                        }
+                    </div>
+                </fieldset>
+            </div>
+
+            <button type="submit" class="govuk-button" data-module="govuk-button">Continue</button>
+        </form>
+    </div>
+</div>

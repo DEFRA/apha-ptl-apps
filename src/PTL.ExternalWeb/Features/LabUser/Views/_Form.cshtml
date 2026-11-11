@@ -1,0 +1,91 @@
+@model PTL.ExternalWeb.Features.LabUser.LabUserFormViewModel
+@{
+    // The form for adding a lab user and for editing one - the same fields and layout; the page supplies its own
+    // heading, buttons and the notes that apply to it.
+    string[] fieldOrder = ["Name", "Email", "IsActive"];
+
+    var errors = ViewData.ModelState
+        .Where(entry => entry.Value?.Errors.Count > 0)
+        .SelectMany(entry => entry.Value!.Errors.Select(error => (Field: entry.Key, Message: error.ErrorMessage)))
+        .OrderBy(error => Array.IndexOf(fieldOrder, error.Field) is var index && index == -1 ? int.MaxValue : index)
+        .ToList();
+    var submitText = ViewData["SubmitText"] as string ?? "Save";
+}
+
+<div class="govuk-grid-row">
+    <div class="govuk-grid-column-two-thirds">
+        <govuk-error-summary errors="@errors" />
+
+        <span class="govuk-caption-l">Lab @Model.LabCode – @Model.LabName</span>
+        <h1 class="govuk-heading-xl">@ViewData["Heading"]</h1>
+
+        @if (ViewData["Intro"] is string intro)
+        {
+            <div class="govuk-inset-text">@intro</div>
+        }
+
+        @* Each action goes to its own form post; Edit carries the person in the route. *@
+        <form method="post" novalidate>
+            @Html.AntiForgeryToken()
+
+            @if (Model.CanChangeDetails)
+            {
+                <govuk-input asp-for="Name" label="Name" maxlength="255" />
+                <govuk-input asp-for="Email" label="Email address" type="email" maxlength="254"
+                             hint="The user will sign in to this lab with this email address." />
+
+                @if (Model.IsEdit && Model.HasSignedIn)
+                {
+                    <div class="govuk-warning-text">
+                        <span class="govuk-warning-text__icon" aria-hidden="true">!</span>
+                        <strong class="govuk-warning-text__text">
+                            <span class="govuk-visually-hidden">Warning</span>
+                            This person has already signed in. If you change their email address they lose their current access and must register or sign in again with the new address in GOV.UK One Login and CIDM. You will also need to send them the login instructions again.
+                        </strong>
+                    </div>
+                }
+            }
+            else
+            {
+                @* Shared with other labs: plain text, and the form posts neither value (see LabUserController.Edit). *@
+                <dl class="govuk-summary-list govuk-!-margin-bottom-6">
+                    <div class="govuk-summary-list__row">
+                        <dt class="govuk-summary-list__key">Name</dt>
+                        <dd class="govuk-summary-list__value">@Model.Name</dd>
+                    </div>
+                    <div class="govuk-summary-list__row">
+                        <dt class="govuk-summary-list__key">Email address</dt>
+                        <dd class="govuk-summary-list__value">@Model.Email</dd>
+                    </div>
+                </dl>
+                <div class="govuk-inset-text">
+                    This person also works with other labs, so their name and email address are shared and cannot be changed here.
+                    You can still make them active or inactive for this lab.
+                </div>
+            }
+
+            <div class="govuk-form-group">
+                <fieldset class="govuk-fieldset" aria-describedby="active-hint">
+                    <legend class="govuk-fieldset__legend govuk-fieldset__legend--s">Access to this lab</legend>
+                    <div class="govuk-checkboxes" data-module="govuk-checkboxes">
+                        <div class="govuk-checkboxes__item">
+                            <input class="govuk-checkboxes__input" id="IsActive" name="IsActive" type="checkbox" value="true"
+                                   aria-describedby="active-hint" checked="@Model.IsActive">
+                            <label class="govuk-label govuk-checkboxes__label" for="IsActive">Active</label>
+                            <div id="active-hint" class="govuk-hint govuk-checkboxes__hint">
+                                Clear this box to stop the user signing in to this lab.
+                            </div>
+                        </div>
+                    </div>
+                    @* An unticked box posts nothing, so this stands in for "false". *@
+                    <input type="hidden" name="IsActive" value="false">
+                </fieldset>
+            </div>
+
+            <div class="govuk-button-group">
+                <button type="submit" class="govuk-button" data-module="govuk-button">@submitText</button>
+                <a class="govuk-button govuk-button--secondary" data-module="govuk-button" role="button" draggable="false" asp-controller="LabUser" asp-action="Index">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>

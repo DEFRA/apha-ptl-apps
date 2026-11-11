@@ -1,4 +1,4 @@
-using PTL.ExternalWeb.Features.Account;
+using PTL.Contracts.ExternalUser;
 
 namespace PTL.ExternalWeb.Navigation;
 
@@ -26,6 +26,8 @@ public static class NavigationProvider
     private const string ReportsText = "Reports";
     private const string ViewReportsText = "View reports";
     private const string MyAccountText = "My account";
+    private const string LabUsersText = "Lab users";
+    private const string LabUserControllerName = "LabUser";
     private const string CreateNewOrderText = "Create new order";
 
     public static IReadOnlyList<NavigationItem> Build() =>
@@ -117,6 +119,8 @@ public static class NavigationProvider
         {
             Text = MyAccountText,
             RequiredRole = ExternalRoleNames.Participant,
+            // Editing the customer and the lab's own details is for the primary contact; a Lab User cannot.
+            ExcludeLabUsers = true,
             Children =
             [
                 new NavigationItem
@@ -133,6 +137,32 @@ public static class NavigationProvider
                     ControllerName = "Participant",
                     ActionName = IndexAction,
                     Description = "Submit an update to participating laboratory details",
+                    RequiredRole = ExternalRoleNames.Participant
+                }
+            ]
+        },
+        new NavigationItem
+        {
+            Text = LabUsersText,
+            RequiredRole = ExternalRoleNames.Participant,
+            // Only the lab's primary contact manages who can sign in to the lab.
+            ExcludeLabUsers = true,
+            Children =
+            [
+                new NavigationItem
+                {
+                    Text = "View lab users",
+                    ControllerName = LabUserControllerName,
+                    ActionName = IndexAction,
+                    Description = "See who can sign in to this lab and make users active or inactive",
+                    RequiredRole = ExternalRoleNames.Participant
+                },
+                new NavigationItem
+                {
+                    Text = "Add lab user",
+                    ControllerName = LabUserControllerName,
+                    ActionName = "Add",
+                    Description = "Give a new person access to this lab",
                     RequiredRole = ExternalRoleNames.Participant
                 }
             ]
@@ -161,6 +191,9 @@ public static class NavigationProvider
         ["Scheme/Index"] = [new("View schemes")],
         ["Customer/Index"] = [new(MyAccountText)],
         ["Participant/Index"] = [new(MyAccountText)],
+        ["LabUser/Index"] = [new(LabUsersText)],
+        ["LabUser/Add"] = [new(LabUsersText, LabUserControllerName, IndexAction), new("Add lab user")],
+        ["LabUser/Edit"] = [new(LabUsersText, LabUserControllerName, IndexAction), new("Edit lab user")],
         ["Order/CurrentYear"] = [new(CreateNewOrderText)],
         ["Order/NextYear"] = [new(CreateNewOrderText)]
     };

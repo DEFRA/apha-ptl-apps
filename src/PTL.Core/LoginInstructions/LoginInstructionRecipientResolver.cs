@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Options;
 using PTL.Core.Configuration;
+using PTL.Core.LabUsers;
 using PTL.Core.Participant;
 using PTL.Core.TestConsultant;
 using PTL.Core.Viewer;
@@ -19,6 +20,7 @@ public sealed class LoginInstructionRecipientResolver(
     IParticipantRepository participantRepository,
     IViewerRepository viewerRepository,
     ITestConsultantRepository testConsultantRepository,
+    ILabUserRepository labUserRepository,
     IOptions<ExternalOptions> externalOptions) : ILoginInstructionRecipientResolver
 {
     public Task<LoginInstructionRecipient?> FindAsync(LoginInstructionUserType userType, Guid id, CancellationToken cancellationToken = default) => userType switch
@@ -26,8 +28,28 @@ public sealed class LoginInstructionRecipientResolver(
         LoginInstructionUserType.Participant => FindParticipantAsync(id, cancellationToken),
         LoginInstructionUserType.Viewer => FindViewerAsync(id, cancellationToken),
         LoginInstructionUserType.ExternalTestConsultant => FindTestConsultantAsync(id, cancellationToken),
+        LoginInstructionUserType.LabUser => FindLabUserAsync(id, cancellationToken),
         _ => throw new ArgumentOutOfRangeException(nameof(userType), userType, null),
     };
+
+    // The id is the lab link's id: the email names the lab the person is being given access to.
+    private async Task<LoginInstructionRecipient?> FindLabUserAsync(Guid labUserParticipantId, CancellationToken cancellationToken)
+    {
+        var link = await labUserRepository.FindByLinkIdAsync(labUserParticipantId, cancellationToken);
+        return link is null
+            ? null
+            : new LoginInstructionRecipient(
+                LoginInstructionEmailTemplates.LabUserName,
+                LoginInstructionEmailTemplates.LabUserId,
+                link.Email,
+                new Dictionary<string, string>
+                {
+                    ["LabUserName"] = link.Name,
+                    ["LabCode"] = link.LabCode,
+                    ["LabName"] = link.LabName,
+                    ["ExternalAppLink"] = externalOptions.Value.AppUrl,
+                });
+    }
 
     private async Task<LoginInstructionRecipient?> FindParticipantAsync(Guid id, CancellationToken cancellationToken)
     {

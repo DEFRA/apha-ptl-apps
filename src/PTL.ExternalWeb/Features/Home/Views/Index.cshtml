@@ -5,9 +5,9 @@
     ViewData["Title"] = "Home";
     var roles = User.GetResolvedExternalRoles();
     var canOrderOnline = User.CanOrderOnline();
+    var isLabUser = User.IsLabUser();
     bool IsVisible(NavigationItem item) =>
-        (item.RequiredRole is null || roles.Contains(item.RequiredRole, StringComparer.OrdinalIgnoreCase))
-        && (!item.RequireCanOrderOnline || canOrderOnline)
+        item.IsVisibleTo(roles, isLabUser, canOrderOnline)
         && !IsSubmittedOrderCard(item);
 
     // An Orders card disappears once an order for its year has been submitted (the header menu stays claim-based;
