@@ -164,7 +164,7 @@ public class ParticipantController(IParticipantApiClient participantApiClient, I
         }
 
         TempData.SetNotification(NotificationType.Success, "Participant created successfully.");
-        return RedirectToAction(nameof(Details), new { id = result.Participant.ParticipantId });
+        return RedirectToAction(nameof(Index), new { customerId });
     }
 
     [HttpGet]
@@ -233,7 +233,7 @@ public class ParticipantController(IParticipantApiClient participantApiClient, I
         }
 
         TempData.SetNotification(NotificationType.Success, "Participant updated successfully.");
-        return RedirectToAction(nameof(Details), new { id = result.Participant.ParticipantId });
+        return RedirectToAction(nameof(Index), new { customerId = result.Participant.CustomerId });
     }
 
     // Review Pending Participant Updates (legacy ReviewPendingParticipantUpdates.aspx). Legacy loaded every pending
