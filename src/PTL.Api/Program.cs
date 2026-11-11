@@ -133,7 +133,10 @@ builder.Services.AddScoped<IParticipantSchemeRepository, ParticipantSchemeReposi
 builder.Services.AddScoped<IParticipantSchemeService, ParticipantSchemeService>();
 
 builder.Services.AddScoped<ITestConsultantRepository, TestConsultantRepository>();
+builder.Services.AddScoped<IExternalUserRepository, PTL.Data.ExternalUser.ExternalUserRepository>();
 builder.Services.AddScoped<IExternalUserService, ExternalUserService>();
+builder.Services.AddScoped<PTL.Core.LabUsers.ILabUserRepository, PTL.Data.LabUsers.LabUserRepository>();
+builder.Services.AddScoped<PTL.Core.LabUsers.ILabUserService, PTL.Core.LabUsers.LabUserService>();
 builder.Services.AddScoped<ITestConsultantService, TestConsultantService>();
 
 builder.Services.AddScoped<ISystemMessageRepository, SystemMessageRepository>();
@@ -178,6 +181,11 @@ builder.Services.Configure<CustomerUpdateEmailOptions>(builder.Configuration.Get
 builder.Services.Configure<ParticipantUpdateEmailOptions>(builder.Configuration.GetSection(ParticipantUpdateEmailOptions.SectionName));
 builder.Services.AddScoped<ICustomerUpdateNotifier, CustomerUpdateNotifier>();
 builder.Services.AddScoped<IParticipantUpdateNotifier, ParticipantUpdateNotifier>();
+
+// Login instruction emails (Manage Participants / Viewers / External Test Consultants): sent through GOV.UK Notify when a user presses Send Instructions.
+builder.Services.AddScoped<PTL.Core.LoginInstructions.ILoginInstructionsRepository, PTL.Data.LoginInstructions.LoginInstructionsRepository>();
+builder.Services.AddScoped<PTL.Core.LoginInstructions.ILoginInstructionRecipientResolver, PTL.Core.LoginInstructions.LoginInstructionRecipientResolver>();
+builder.Services.AddScoped<PTL.Core.LoginInstructions.ILoginInstructionsService, PTL.Core.LoginInstructions.LoginInstructionsService>();
 
 // Single shared S3 configuration root for every S3-backed feature (export templates, invoice
 // archives) - one bucket, one prefix per feature (docs/migration/invoice-migration.md). Provider

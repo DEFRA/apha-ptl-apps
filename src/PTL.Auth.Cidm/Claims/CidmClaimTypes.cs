@@ -11,17 +11,4 @@ public static class CidmClaimTypes
     public const string AuthenticationAssuranceLevel = "aal";
     public const string EnrolmentCount = "enrolmentCount";
     public const string EnrolmentRequestCount = "enrolmentRequestCount";
-    public const string CurrentRelationshipId = "currentRelationshipId";
-
-    /// <summary>Raw claim name for each "relationships" array entry, before parsing.</summary>
-    public const string RawRelationships = "relationships";
-
-    /// <summary>Raw claim name for each "roles" array entry, before parsing.</summary>
-    public const string RawRoles = "roles";
-
-    /// <summary>Claim type used to store each parsed <see cref="RelationshipInfo"/> (as JSON) on the principal.</summary>
-    public const string Relationship = "cidm:relationship";
-
-    /// <summary>Claim type used to store each parsed <see cref="RoleInfo"/> (as JSON) on the principal.</summary>
-    public const string Role = "cidm:role";
 }

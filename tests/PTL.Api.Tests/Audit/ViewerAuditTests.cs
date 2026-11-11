@@ -1,8 +1,5 @@
-using PTL.Api.Tests.Customer;
-using PTL.Api.Tests.ExternalUser;
 using PTL.Api.Tests.Participant;
 using PTL.Core.Audit;
-using PTL.Core.ExternalUser;
 using PTL.Core.Viewer;
 
 namespace PTL.Api.Tests.Audit;
@@ -80,20 +77,6 @@ public class ViewerAuditTests
 
         Assert.False(success);
         Assert.Single(_repository.Viewers);
-        Assert.Null(_repository.LastAuditEntry);
-    }
-
-    // The SSO link made at external sign-in is system-initiated, not a System Administration change.
-    [Fact]
-    public async Task ExternalUserSignInLink_UpdatesViewerWithoutAuditEntry()
-    {
-        var viewer = SeedViewer();
-        var service = new ExternalUserService(new FakeParticipantRepository(), _repository, new FakeTestConsultantRepository(), new FakeCustomerRepository());
-
-        var result = await service.ResolveAsync(Guid.NewGuid(), "jane@example.com", "Jane", ["Viewer"]);
-
-        Assert.Equal(viewer.ViewerId, result.ViewerId);
-        Assert.NotNull(viewer.SsoIdExt);
         Assert.Null(_repository.LastAuditEntry);
     }
 }

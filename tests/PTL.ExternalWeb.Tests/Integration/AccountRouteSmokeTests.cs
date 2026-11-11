@@ -16,6 +16,21 @@ public partial class AccountRouteSmokeTests : IClassFixture<PtlExternalWebTestFa
 
     public AccountRouteSmokeTests(PtlExternalWebTestFactory factory) => _factory = factory;
 
+    // CIDM sends the browser back to /signout-oidc after the end-session call. It must redirect to the signed-out page: when the
+    // OIDC handler's remote sign-out path was also /signout-oidc, this answered an empty 200 (a white page).
+    [Theory]
+    [InlineData("/signout-oidc")]
+    [InlineData("/signout-oidc?state=not-a-valid-state")]
+    public async Task SignedOutCallback_RedirectsToTheSignedOutPage(string path)
+    {
+        var client = _factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+
+        var response = await client.GetAsync(path);
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        Assert.Equal("/Account/SignedOut", response.Headers.Location!.OriginalString);
+    }
+
     [Fact]
     public async Task Login_Get_RedirectsToCidmAuthorizeEndpoint()
     {

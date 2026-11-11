@@ -14,6 +14,9 @@ public sealed class TestConsultant
     public bool IsInactive { get; set; }
     public DateTime? InactiveDate { get; set; }
 
+    // Set only by the Send Instructions action; the database clears it when the email address changes.
+    public bool LoginInstructionsSent { get; set; }
+
     // Only populated by spgaExtTestConsultants (the admin grid's read): how many schemes in the
     // current and next year the consultant is allocated to, and which ones.
     public int AllocationCount { get; set; }

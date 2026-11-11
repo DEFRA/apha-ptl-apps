@@ -8,4 +8,7 @@ public class ParticipantSummaryEntity
     public string LabName { get; set; } = string.Empty;
     public string ContactName { get; set; } = string.Empty;
     public bool IsActive { get; set; }
+
+    // Set only by the Send Instructions action; the database clears it when the email address changes.
+    public bool LoginInstructionsSent { get; set; }
 }

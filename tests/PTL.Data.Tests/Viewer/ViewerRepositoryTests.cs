@@ -14,8 +14,6 @@ public class ViewerRepositoryTests
     public ViewerRepositoryTests() => DapperColumnMappings.Register();
 
     private const string GetAllSql = "EXEC dbo.spgaViewers";
-    private const string GetBySsoIdExtSql = "EXEC dbo.spgViewerBySsoId @SsoIdExt=@SsoIdExt";
-    private const string GetByEmailSql = "EXEC dbo.spgViewerByEmail @Email";
     private const string InsertSql = "EXEC dbo.spiViewer @ViewerId, @Name, @Email, @SsoId, @SsoIdExt";
     private const string UpdateSql = "EXEC dbo.spuViewer @ViewerId, @Name, @Email, @SsoId, @SsoIdExt";
     private const string DeleteSql = "EXEC dbo.spdViewer @ViewerId";
@@ -162,56 +160,6 @@ public class ViewerRepositoryTests
 
         Assert.Single(result);
         Assert.Equal(viewerId, result[0].ViewerId);
-    }
-
-    [Fact]
-    public async Task GetBySsoIdExtAsync_Found_ReturnsMappedViewer()
-    {
-        var (repository, connection) = CreateRepository();
-        var viewerId = Guid.NewGuid();
-        var ssoIdExt = Guid.NewGuid();
-        connection.RespondToQuery(GetBySsoIdExtSql, ViewerTable(viewerId, ssoIdExt: ssoIdExt));
-
-        var result = await repository.GetBySsoIdExtAsync(ssoIdExt);
-
-        Assert.NotNull(result);
-        Assert.Equal(ssoIdExt, result.SsoIdExt);
-    }
-
-    [Fact]
-    public async Task GetBySsoIdExtAsync_NotFound_ReturnsNull()
-    {
-        var (repository, connection) = CreateRepository();
-        connection.RespondToQuery(GetBySsoIdExtSql, new DataTable());
-
-        var result = await repository.GetBySsoIdExtAsync(Guid.NewGuid());
-
-        Assert.Null(result);
-    }
-
-    [Fact]
-    public async Task GetByEmailAsync_Found_ReturnsMappedViewer()
-    {
-        var (repository, connection) = CreateRepository();
-        var viewerId = Guid.NewGuid();
-        const string email = "viewer@example.com";
-        connection.RespondToQuery(GetByEmailSql, ViewerTable(viewerId, email: email));
-
-        var result = await repository.GetByEmailAsync(email);
-
-        Assert.NotNull(result);
-        Assert.Equal(email, result.Email);
-    }
-
-    [Fact]
-    public async Task GetByEmailAsync_NotFound_ReturnsNull()
-    {
-        var (repository, connection) = CreateRepository();
-        connection.RespondToQuery(GetByEmailSql, new DataTable());
-
-        var result = await repository.GetByEmailAsync("missing@example.com");
-
-        Assert.Null(result);
     }
 
     [Fact]

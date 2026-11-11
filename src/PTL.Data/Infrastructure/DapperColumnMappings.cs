@@ -115,6 +115,7 @@ public static partial class DapperColumnMappings
     private const string ColSampleId = "fldSampleId";
     private const string ColTestResultItemId = "fldTestResultItemId";
     private const string ColSchemeName = "fldSchemeName";
+    private const string ColLoginInstructionsSent = "fldLoginInstructionsSent";
     private const string ColImportExportLicenceRequired = "fldImportExportLicenceRequired";
     private const string ColRequiresAssessment = "fldRequiresAssessment";
     private const string ColScheduleCode = "fldScheduleCode";
@@ -263,6 +264,7 @@ public static partial class DapperColumnMappings
             [ColLabName] = nameof(ParticipantSummaryEntity.LabName),
             [ColContactName] = nameof(ParticipantSummaryEntity.ContactName),
             [ColIsActive] = nameof(ParticipantSummaryEntity.IsActive),
+            [ColLoginInstructionsSent] = nameof(ParticipantSummaryEntity.LoginInstructionsSent),
         });
 
         Map<ViewerEntity>(new(StringComparer.OrdinalIgnoreCase)
@@ -272,6 +274,7 @@ public static partial class DapperColumnMappings
             [ColEmail] = nameof(ViewerEntity.Email),
             ["fldSsoId"] = nameof(ViewerEntity.SsoId),
             ["fldSsoIdExt"] = nameof(ViewerEntity.SsoIdExt),
+            [ColLoginInstructionsSent] = nameof(ViewerEntity.LoginInstructionsSent),
         });
 
         Map<ViewerSchemeEntity>(new(StringComparer.OrdinalIgnoreCase)
@@ -298,6 +301,7 @@ public static partial class DapperColumnMappings
             ["fldSsoIdExt"] = nameof(PTL.Core.TestConsultant.TestConsultant.SsoIdExt),
             [ColIsInactive] = nameof(PTL.Core.TestConsultant.TestConsultant.IsInactive),
             [ColInactiveDate] = nameof(PTL.Core.TestConsultant.TestConsultant.InactiveDate),
+            [ColLoginInstructionsSent] = nameof(PTL.Core.TestConsultant.TestConsultant.LoginInstructionsSent),
             ["fldAllocationCount"] = nameof(PTL.Core.TestConsultant.TestConsultant.AllocationCount),
             ["fldAllocationString"] = nameof(PTL.Core.TestConsultant.TestConsultant.AllocationString),
         });

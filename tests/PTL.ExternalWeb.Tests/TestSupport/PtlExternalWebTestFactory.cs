@@ -12,6 +12,8 @@ using Microsoft.IdentityModel.Protocols;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using PTL.ApiClient;
 using PTL.Auth.Cidm;
+using PTL.Auth.Cidm.Claims;
+using PTL.Contracts.ExternalUser;
 using PTL.ExternalWeb.Features.Account;
 
 namespace PTL.ExternalWeb.Tests.TestSupport;
@@ -30,6 +32,12 @@ public sealed class PtlExternalWebTestFactory : WebApplicationFactory<Program>
     public const string FakeEndSessionEndpoint = "https://cidm.test/signout";
     public const string TestSignInPath = "/__test/sign-in";
     public const string TestIdToken = "test-id-token";
+
+    /// <summary>The PTL.Api lab calls the lab selection page makes, answered from what a test puts in it.</summary>
+    internal FakeExternalUserApiClient ExternalUserApi { get; } = new(ResolveExternalUserResponse.Denied(ExternalUserResolutionStatus.NotFound, string.Empty));
+
+    /// <summary>The PTL.Api lab user calls the Lab users pages make, answered from what a test puts in it.</summary>
+    internal FakeLabUserApiClient LabUserApi { get; } = new();
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -71,6 +79,10 @@ public sealed class PtlExternalWebTestFactory : WebApplicationFactory<Program>
 
             // HomeController.Index() asks for the order eligibility of a participant who can order online.
             services.AddScoped<ICreateOrderApiClient>(_ => new FakeCreateOrderApiClient());
+
+            // The lab selection and Lab users pages call these; tests set up what they return (see ExternalUserApi/LabUserApi).
+            services.AddSingleton<IExternalUserApiClient>(ExternalUserApi);
+            services.AddSingleton<ILabUserApiClient>(LabUserApi);
         });
     }
 
@@ -129,6 +141,25 @@ public sealed class PtlExternalWebTestFactory : WebApplicationFactory<Program>
                     if (!string.IsNullOrEmpty(testConsultantId))
                     {
                         claims.Add(new Claim(ExternalUserClaimTypes.TestConsultantId, testConsultantId));
+                    }
+
+                    // What sign-in adds for a Participant or Lab User: who they are, how many labs they have, and the CIDM contact id.
+                    var userType = context.Request.Query["userType"].FirstOrDefault();
+                    if (!string.IsNullOrEmpty(userType))
+                    {
+                        claims.Add(new Claim(ExternalUserClaimTypes.UserType, userType));
+                    }
+
+                    var labCount = context.Request.Query["labCount"].FirstOrDefault();
+                    if (!string.IsNullOrEmpty(labCount))
+                    {
+                        claims.Add(new Claim(ExternalUserClaimTypes.LabCount, labCount));
+                    }
+
+                    var contactId = context.Request.Query["contactId"].FirstOrDefault();
+                    if (!string.IsNullOrEmpty(contactId))
+                    {
+                        claims.Add(new Claim(CidmClaimTypes.ContactId, contactId));
                     }
 
                     var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);

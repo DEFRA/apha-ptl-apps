@@ -165,7 +165,7 @@ public class SchemeServiceTests
     }
 
     [Fact]
-    public async Task CreateSchemeAsync_ExternalPrimaryTestConsultant_ThrowsSchemeValidationException()
+    public async Task CreateSchemeAsync_ExternalPrimaryTestConsultant_Succeeds()
     {
         var externalConsultantId = Guid.NewGuid();
         var lookupRepository = new FakeLookupRepository
@@ -176,11 +176,9 @@ public class SchemeServiceTests
         var scheme = ValidScheme();
         scheme.TestConsultant1 = externalConsultantId;
 
-        var exception = await Assert.ThrowsAsync<SchemeValidationException>(() => service.CreateSchemeAsync(scheme));
+        var created = await service.CreateSchemeAsync(scheme);
 
-        Assert.Contains(exception.Errors, e =>
-            e.Field == "TestConsultant1" &&
-            e.Message == "The Primary Test Consultant must be an internal Test Consultant");
+        Assert.Equal(externalConsultantId, created.TestConsultant1);
     }
 
     [Fact]

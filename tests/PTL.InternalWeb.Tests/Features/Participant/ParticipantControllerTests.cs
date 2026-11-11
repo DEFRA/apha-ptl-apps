@@ -1,14 +1,20 @@
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ViewFeatures;
 using Microsoft.Extensions.Logging.Abstractions;
 using PTL.Contracts.Participant;
 using PTL.InternalWeb.Tests.TestSupport;
+using PTL.SharedUI.Notifications;
 
 namespace PTL.InternalWeb.Tests.Features.Participant;
 
 public class ParticipantControllerTests
 {
-    private static PTL.InternalWeb.Features.Participant.ParticipantController CreateController(FakeParticipantApiClient apiClient, FakeCustomerApiClient? customerApiClient = null) =>
-        new(apiClient, customerApiClient ?? new FakeCustomerApiClient(), new FakeLookupApiClient(), new FakeLabelPrinterApiClient(), NullLogger<PTL.InternalWeb.Features.Participant.ParticipantController>.Instance);
+    private static PTL.InternalWeb.Features.Participant.ParticipantController CreateController(FakeParticipantApiClient apiClient, FakeCustomerApiClient? customerApiClient = null, FakeLoginInstructionsApiClient? loginInstructionsApiClient = null) =>
+        new(apiClient, customerApiClient ?? new FakeCustomerApiClient(), new FakeLookupApiClient(), new FakeLabelPrinterApiClient(), loginInstructionsApiClient ?? new FakeLoginInstructionsApiClient(), NullLogger<PTL.InternalWeb.Features.Participant.ParticipantController>.Instance)
+        {
+            TempData = new TempDataDictionary(new DefaultHttpContext(), new FakeTempDataProvider())
+        };
 
     private static ParticipantResponse SampleParticipant(Guid participantId, Guid customerId, bool isActive = true) => new(
         participantId,
@@ -103,7 +109,7 @@ public class ParticipantControllerTests
         };
         var controller = new PTL.InternalWeb.Features.Participant.ParticipantController(
             new FakeParticipantApiClient { ParticipantResponse = participant }, new FakeCustomerApiClient(), lookupApiClient,
-            new FakeLabelPrinterApiClient(), NullLogger<PTL.InternalWeb.Features.Participant.ParticipantController>.Instance);
+            new FakeLabelPrinterApiClient(), new FakeLoginInstructionsApiClient(), NullLogger<PTL.InternalWeb.Features.Participant.ParticipantController>.Instance);
 
         var result = await controller.Details(participantId, CancellationToken.None);
 
@@ -171,7 +177,7 @@ public class ParticipantControllerTests
     }
 
     [Fact]
-    public async Task Create_Post_Success_RedirectsToDetails()
+    public async Task Create_Post_Success_RedirectsToTheCustomersParticipantListWithSuccessNotification()
     {
         var customerId = Guid.NewGuid();
         var participantId = Guid.NewGuid();
@@ -195,8 +201,11 @@ public class ParticipantControllerTests
         var result = await controller.Create(customerId, model, CancellationToken.None);
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal(nameof(PTL.InternalWeb.Features.Participant.ParticipantController.Details), redirect.ActionName);
-        Assert.Equal(participantId, redirect.RouteValues!["id"]);
+        Assert.Equal(nameof(PTL.InternalWeb.Features.Participant.ParticipantController.Index), redirect.ActionName);
+        Assert.Equal(customerId, redirect.RouteValues!["customerId"]);
+        var notification = controller.TempData.GetNotification()!;
+        Assert.Equal(NotificationType.Success, notification.Type);
+        Assert.Equal("Participant created successfully.", notification.Message);
     }
 
     [Fact]
@@ -210,7 +219,7 @@ public class ParticipantControllerTests
     }
 
     [Fact]
-    public async Task Edit_Post_Success_RedirectsToDetails()
+    public async Task Edit_Post_Success_RedirectsToTheCustomersParticipantListWithSuccessNotification()
     {
         var participantId = Guid.NewGuid();
         var customerId = Guid.NewGuid();
@@ -235,7 +244,11 @@ public class ParticipantControllerTests
         var result = await controller.Edit(participantId, model, CancellationToken.None);
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal(nameof(PTL.InternalWeb.Features.Participant.ParticipantController.Details), redirect.ActionName);
+        Assert.Equal(nameof(PTL.InternalWeb.Features.Participant.ParticipantController.Index), redirect.ActionName);
+        Assert.Equal(customerId, redirect.RouteValues!["customerId"]);
+        var notification = controller.TempData.GetNotification()!;
+        Assert.Equal(NotificationType.Success, notification.Type);
+        Assert.Equal("Participant updated successfully.", notification.Message);
     }
 
     [Fact]

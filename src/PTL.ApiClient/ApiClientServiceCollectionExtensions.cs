@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Http.Resilience;
 using PTL.Common.Audit;
 using PTL.Common.Correlation;
 
@@ -73,6 +74,14 @@ public static class ApiClientServiceCollectionExtensions
         })
             .AddHttpMessageHandler<CorrelationIdDelegatingHandler>()
             .AddStandardResilienceHandler();
+
+        // Adding a lab user must not be repeated by a retry (the second add would report "already a lab user").
+        services.AddHttpClient<ILabUserApiClient, LabUserApiClient>(client =>
+        {
+            client.BaseAddress = new Uri(apiBaseUrl);
+        })
+            .AddHttpMessageHandler<CorrelationIdDelegatingHandler>()
+            .AddStandardResilienceHandler(options => options.Retry.DisableForUnsafeHttpMethods());
 
         services.AddHttpClient<ISystemMessageApiClient, SystemMessageApiClient>(client =>
         {
@@ -267,6 +276,14 @@ public static class ApiClientServiceCollectionExtensions
         })
             .AddHttpMessageHandler<ActingUserDelegatingHandler>()
             .AddStandardResilienceHandler();
+
+        // Each send is an email: a timed-out request must not be retried, or the recipient could get it twice.
+        services.AddHttpClient<ILoginInstructionsApiClient, LoginInstructionsApiClient>(client =>
+        {
+            client.BaseAddress = new Uri(apiBaseUrl);
+        })
+            .AddHttpMessageHandler<ActingUserDelegatingHandler>()
+            .AddStandardResilienceHandler(options => options.Retry.DisableForUnsafeHttpMethods());
 
         services.AddHttpClient<PTL.ApiClient.Distribution.IDistributionApiClient, PTL.ApiClient.Distribution.DistributionApiClient>(client =>
         {

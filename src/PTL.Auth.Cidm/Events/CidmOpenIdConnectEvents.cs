@@ -1,5 +1,4 @@
 using System.Security.Claims;
-using System.Text.Json;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Http;
@@ -13,20 +12,17 @@ namespace PTL.Auth.Cidm.Events;
 
 /// <summary>
 /// CIDM-specific hooks into the OpenID Connect handler: injects the non-standard serviceId parameter,
-/// maps the relationships/roles array claims, hides OIDC failure detail from the user, and renders the
-/// POST-based sign-out form CIDM recommends.
+/// hides OIDC failure detail from the user, and renders the POST-based sign-out form CIDM recommends.
+/// The user's role is never read from the token - it comes from the PTL record the resolver matches.
 /// </summary>
 public sealed class CidmOpenIdConnectEvents : OidcProviderEvents<ICidmExternalUserResolver, CidmExternalUserResolution>
 {
-    // Claims the app reads after sign-in, on top of the common identity claims. The raw relationships/roles
-    // arrays are dropped because the parsed claims below carry the same data.
+    // Claims the app reads after sign-in, on top of the common identity claims. Everything else in the
+    // token (roles, relationships, assurance levels, ...) is dropped to keep the session cookie small.
     private static readonly IReadOnlySet<string> RetainedClaimTypes = OpenIdConnectEventHelpers.RetainedClaims(
-        ClaimTypes.Role,
         "firstName",
         "lastName",
-        CidmClaimTypes.CurrentRelationshipId,
-        CidmClaimTypes.Relationship,
-        CidmClaimTypes.Role);
+        CidmClaimTypes.ContactId);
 
     private readonly CidmOptions _cidmOptions;
 
@@ -55,35 +51,6 @@ public sealed class CidmOpenIdConnectEvents : OidcProviderEvents<ICidmExternalUs
         }
 
         return Task.CompletedTask;
-    }
-
-    protected override void MapClaims(ClaimsPrincipal principal, ClaimsIdentity identity)
-    {
-        var rawRelationships = principal.FindAll(CidmClaimTypes.RawRelationships).Select(c => c.Value);
-        foreach (var relationship in CidmClaimsMapper.ParseRelationships(rawRelationships))
-        {
-            identity.AddClaim(new Claim(CidmClaimTypes.Relationship, JsonSerializer.Serialize(relationship)));
-        }
-
-        // "role" is a well-known short JWT claim name, so ASP.NET Core's default inbound claim-type
-        // mapping has already renamed it to ClaimTypes.Role (keeping its raw, unparsed
-        // "relationshipId:roleName:status" value) by the time this handler runs - CidmClaimTypes.RawRoles
-        // only ever matches in tests that build the principal directly, never against a real CIDM token.
-        var rawRoleClaims = principal.FindAll(CidmClaimTypes.RawRoles)
-            .Concat(principal.FindAll(ClaimTypes.Role))
-            .ToList();
-        foreach (var rawRoleClaim in rawRoleClaims)
-        {
-            identity.RemoveClaim(rawRoleClaim);
-        }
-
-        foreach (var role in CidmClaimsMapper.ParseRoles(rawRoleClaims.Select(c => c.Value)))
-        {
-            // Standard role claim so [Authorize(Roles = "...")] works against the role name directly,
-            // plus the full parsed detail (including which relationship/organisation it applies to).
-            identity.AddClaim(new Claim(ClaimTypes.Role, role.RoleName));
-            identity.AddClaim(new Claim(CidmClaimTypes.Role, JsonSerializer.Serialize(role)));
-        }
     }
 
     protected override Task<CidmExternalUserResolution> ResolveAsync(

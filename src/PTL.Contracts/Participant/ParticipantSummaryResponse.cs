@@ -6,4 +6,5 @@ public sealed record ParticipantSummaryResponse(
     string LabCode,
     string LabName,
     string ContactName,
-    bool IsActive);
+    bool IsActive,
+    bool LoginInstructionsSent = false);

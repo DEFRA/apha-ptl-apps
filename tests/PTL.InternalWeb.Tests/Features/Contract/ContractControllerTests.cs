@@ -346,30 +346,33 @@ public class ContractControllerTests
     }
 
     [Fact]
-    public async Task Create_Post_Success_RedirectsToDetails()
+    public async Task Create_Post_Success_RedirectsToTheCustomersContractListWithSuccessNotification()
     {
-        var contractId = Guid.NewGuid();
+        var customerId = Guid.NewGuid();
         var apiClient = new FakeContractApiClient
         {
-            SaveResult = new PTL.Contracts.Contract.ContractSaveResult(true, SampleContract(contractId, Guid.NewGuid()), new Dictionary<string, string[]>())
+            SaveResult = new PTL.Contracts.Contract.ContractSaveResult(true, SampleContract(Guid.NewGuid(), customerId), new Dictionary<string, string[]>())
         };
         var controller = CreateController(apiClient);
         var model = new PTL.InternalWeb.Features.Contract.ContractFormViewModel { YearId = 2027, UTNumber = "UT12345" };
 
-        var result = await controller.Create(Guid.NewGuid(), model, CancellationToken.None);
+        var result = await controller.Create(customerId, model, CancellationToken.None);
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal("Details", redirect.ActionName);
-        Assert.Equal(contractId, redirect.RouteValues!["id"]);
+        Assert.Equal("Index", redirect.ActionName);
+        Assert.Equal(customerId, redirect.RouteValues!["customerId"]);
+        var notification = controller.TempData.GetNotification()!;
+        Assert.Equal(NotificationType.Success, notification.Type);
+        Assert.Equal("Contract created successfully.", notification.Message);
     }
 
     [Fact]
-    public async Task Create_Post_Success_WithOptionalFieldsPopulated_RedirectsToDetails()
+    public async Task Create_Post_Success_WithOptionalFieldsPopulated_RedirectsToTheCustomersContractList()
     {
-        var contractId = Guid.NewGuid();
+        var customerId = Guid.NewGuid();
         var apiClient = new FakeContractApiClient
         {
-            SaveResult = new PTL.Contracts.Contract.ContractSaveResult(true, SampleContract(contractId, Guid.NewGuid()), new Dictionary<string, string[]>())
+            SaveResult = new PTL.Contracts.Contract.ContractSaveResult(true, SampleContract(Guid.NewGuid(), customerId), new Dictionary<string, string[]>())
         };
         var controller = CreateController(apiClient);
         var model = new PTL.InternalWeb.Features.Contract.ContractFormViewModel
@@ -385,11 +388,11 @@ public class ContractControllerTests
             PurchaseOrderNumber = "PO-99"
         };
 
-        var result = await controller.Create(Guid.NewGuid(), model, CancellationToken.None);
+        var result = await controller.Create(customerId, model, CancellationToken.None);
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal("Details", redirect.ActionName);
-        Assert.Equal(contractId, redirect.RouteValues!["id"]);
+        Assert.Equal("Index", redirect.ActionName);
+        Assert.Equal(customerId, redirect.RouteValues!["customerId"]);
     }
 
     [Fact]
@@ -403,12 +406,13 @@ public class ContractControllerTests
     }
 
     [Fact]
-    public async Task Edit_Post_Success_RedirectsToDetails()
+    public async Task Edit_Post_Success_RedirectsToTheCustomersContractListWithSuccessNotification()
     {
         var contractId = Guid.NewGuid();
+        var customerId = Guid.NewGuid();
         var apiClient = new FakeContractApiClient
         {
-            SaveResult = new PTL.Contracts.Contract.ContractSaveResult(true, SampleContract(contractId, Guid.NewGuid()), new Dictionary<string, string[]>())
+            SaveResult = new PTL.Contracts.Contract.ContractSaveResult(true, SampleContract(contractId, customerId), new Dictionary<string, string[]>())
         };
         var controller = CreateController(apiClient);
         var model = new PTL.InternalWeb.Features.Contract.ContractFormViewModel { YearId = 2027, UTNumber = "UT12345" };
@@ -416,8 +420,11 @@ public class ContractControllerTests
         var result = await controller.Edit(contractId, model, CancellationToken.None);
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal("Details", redirect.ActionName);
-        Assert.Equal(contractId, redirect.RouteValues!["id"]);
+        Assert.Equal("Index", redirect.ActionName);
+        Assert.Equal(customerId, redirect.RouteValues!["customerId"]);
+        var notification = controller.TempData.GetNotification()!;
+        Assert.Equal(NotificationType.Success, notification.Type);
+        Assert.Equal("Contract updated successfully.", notification.Message);
     }
 
     [Fact]

@@ -1143,8 +1143,10 @@ public sealed partial class DistributionController(
     // Cancel = discard, no save at all (legacy ButtonCancel_Click, CausesValidation=False).
     // cancelAudit = Cancel on the audit-reason step - legacy Audit.aspx always returns to
     // ~/Scheduling/monthlys.aspx for this screen, so there is only one destination.
+    // Every sample/result cell posts several fields, so a large distribution exceeds the 1,024-value default.
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [RequestFormLimits(ValueCountLimit = 20000)]
     [Authorize(Policy = PtlPolicies.Scheduling)]
     public async Task<IActionResult> IntendedResults(int year, int monthId, Guid schemeId, IntendedResultsViewModel model, string command, CancellationToken cancellationToken)
     {

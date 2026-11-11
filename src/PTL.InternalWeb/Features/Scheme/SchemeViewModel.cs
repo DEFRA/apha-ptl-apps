@@ -330,9 +330,8 @@ public sealed class SchemeFormViewModel : IValidatableObject
     [StringLength(500, ErrorMessage = "Standard tabulation text must not exceed 500 characters")]
     public string? StandardTabulationText { get; set; }
 
-    // Test Consultants tab. The Primary list is internal consultants only (legacy populates it
-    // from spgaUserAllTestConsultant's first result set); Deputy and Secondary also offer
-    // external consultants. Both lists carry a "None" entry, as legacy does.
+    // Test Consultants tab. Primary, Deputy and Secondary all offer the same active internal and
+    // external consultants (spgaUserAllTestConsultant); only the leading placeholder differs.
     public IEnumerable<SelectListItem> PrimaryTestConsultantOptions { get; set; } = [];
 
     public IEnumerable<SelectListItem> TestConsultantOptions { get; set; } = [];

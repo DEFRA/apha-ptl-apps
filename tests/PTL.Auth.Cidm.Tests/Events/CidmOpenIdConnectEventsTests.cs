@@ -120,56 +120,6 @@ public class CidmOpenIdConnectEventsTests
     }
 
     [Fact]
-    public async Task TokenValidated_ParsesRelationshipsAndRolesIntoClaims()
-    {
-        var identity = new ClaimsIdentity(
-        [
-            new Claim("relationships", "23950a2d-c37d-43da-9fcb-0a4ce9aa11ee:bc19305a-f9b6-ea11-a812-000d3ab4653d:ABC Organisation2:0:Employee:0"),
-            new Claim("roles", "23950a2d-c37d-43da-9fcb-0a4ce9aa11ee:Certifier:3")
-        ]);
-        var principal = new ClaimsPrincipal(identity);
-        var context = new TokenValidatedContext(new DefaultHttpContext(), CreateScheme(), new OpenIdConnectOptions(), principal, new AuthenticationProperties());
-
-        await CreateEvents().TokenValidated(context);
-
-        Assert.Contains(identity.Claims, c => c.Type == ClaimTypes.Role && c.Value == "Certifier");
-        Assert.Contains(identity.Claims, c => c.Type == "cidm:relationship");
-        Assert.Contains(identity.Claims, c => c.Type == "cidm:role");
-    }
-
-    [Fact]
-    public async Task TokenValidated_RawRoleClaimAlreadyMappedToClaimTypesRole_StillParsesCleanRoleName()
-    {
-        // Mirrors real CIDM tokens: ASP.NET Core's default inbound claim-type map renames the "role"
-        // JWT claim straight to ClaimTypes.Role before TokenValidated runs, so the raw unparsed
-        // "relationshipId:roleName:status" string arrives under ClaimTypes.Role, not "roles".
-        var identity = new ClaimsIdentity(
-        [
-            new Claim(ClaimTypes.Role, "23950a2d-c37d-43da-9fcb-0a4ce9aa11ee:Participant:3")
-        ]);
-        var principal = new ClaimsPrincipal(identity);
-        var context = new TokenValidatedContext(new DefaultHttpContext(), CreateScheme(), new OpenIdConnectOptions(), principal, new AuthenticationProperties());
-
-        await CreateEvents().TokenValidated(context);
-
-        Assert.Contains(identity.Claims, c => c.Type == ClaimTypes.Role && c.Value == "Participant");
-        Assert.DoesNotContain(identity.Claims, c => c.Type == ClaimTypes.Role && c.Value.Contains(':'));
-        Assert.Contains(identity.Claims, c => c.Type == "cidm:role");
-    }
-
-    [Fact]
-    public async Task TokenValidated_NoRelationshipsOrRoles_AddsNoExtraClaims()
-    {
-        var identity = new ClaimsIdentity([new Claim(ClaimTypes.Name, "test-user")]);
-        var principal = new ClaimsPrincipal(identity);
-        var context = new TokenValidatedContext(new DefaultHttpContext(), CreateScheme(), new OpenIdConnectOptions(), principal, new AuthenticationProperties());
-
-        await CreateEvents().TokenValidated(context);
-
-        Assert.DoesNotContain(identity.Claims, c => c.Type == "cidm:relationship" || c.Type == "cidm:role");
-    }
-
-    [Fact]
     public async Task TokenValidated_PrincipalWithoutClaimsIdentity_ReturnsWithoutThrowing()
     {
         var principal = new ClaimsPrincipal();
@@ -183,7 +133,7 @@ public class CidmOpenIdConnectEventsTests
     }
 
     [Fact]
-    public async Task TokenValidated_TrimsBulkyClaims_ButKeepsTheOnesTheAppReadsAndTheResolvedOnes()
+    public async Task TokenValidated_TrimsTokenClaimsTheAppDoesNotRead_ButKeepsTheOnesItDoesAndTheResolvedOnes()
     {
         var identity = new ClaimsIdentity(
         [
@@ -192,6 +142,7 @@ public class CidmOpenIdConnectEventsTests
             new Claim("currentRelationshipId", "23950a2d-c37d-43da-9fcb-0a4ce9aa11ee"),
             new Claim("relationships", "23950a2d-c37d-43da-9fcb-0a4ce9aa11ee:bc19305a-f9b6-ea11-a812-000d3ab4653d:ABC Organisation2:0:Employee:0"),
             new Claim(ClaimTypes.Role, "23950a2d-c37d-43da-9fcb-0a4ce9aa11ee:Participant:3"),
+            new Claim("roles", "23950a2d-c37d-43da-9fcb-0a4ce9aa11ee:Participant:3"),
             new Claim("sessionId", "bulky"),
             new Claim("aud", "bulky")
         ]);
@@ -205,14 +156,13 @@ public class CidmOpenIdConnectEventsTests
         await CreateEvents().TokenValidated(context);
 
         Assert.Contains(identity.Claims, c => c.Type == ClaimTypes.Email);
-        Assert.Contains(identity.Claims, c => c.Type == "currentRelationshipId");
-        Assert.Contains(identity.Claims, c => c.Type == ClaimTypes.Role && c.Value == "Participant");
-        Assert.Contains(identity.Claims, c => c.Type == "cidm:relationship");
-        Assert.Contains(identity.Claims, c => c.Type == "cidm:role");
+        Assert.Contains(identity.Claims, c => c.Type == "contactId");
         Assert.Contains(identity.Claims, c => c.Type == "displayName");
         Assert.Contains(identity.Claims, c => c.Type == "sessionId" && c.Value == "added-by-resolver");
-        Assert.DoesNotContain(identity.Claims, c => c.Type == "contactId");
+        Assert.DoesNotContain(identity.Claims, c => c.Type == "currentRelationshipId");
         Assert.DoesNotContain(identity.Claims, c => c.Type == "relationships");
+        Assert.DoesNotContain(identity.Claims, c => c.Type == "roles");
+        Assert.DoesNotContain(identity.Claims, c => c.Type == ClaimTypes.Role);
         Assert.DoesNotContain(identity.Claims, c => c.Type == "aud");
         Assert.DoesNotContain(identity.Claims, c => c.Type == "sessionId" && c.Value == "bulky");
     }

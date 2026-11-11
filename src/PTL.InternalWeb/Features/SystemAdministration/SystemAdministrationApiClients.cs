@@ -18,4 +18,5 @@ public sealed class SystemAdministrationApiClients
     public required ILookupApiClient Lookup { get; init; }
     public required IExternalTestConsultantApiClient ExternalTestConsultant { get; init; }
     public required IViewerApiClient Viewer { get; init; }
+    public required ILoginInstructionsApiClient LoginInstructions { get; init; }
 }

@@ -30,6 +30,12 @@
                         Lab Number: <strong>@labCode</strong>
                     </li>
                 }
+                @if (User.CanSwitchLab())
+                {
+                    <li class="govuk-service-navigation__item">
+                        <a class="govuk-service-navigation__link" asp-controller="Lab" asp-action="Select">Switch lab</a>
+                    </li>
+                }
                 @if (!string.IsNullOrWhiteSpace(friendlyName))
                 {
                     <li class="govuk-service-navigation__item">

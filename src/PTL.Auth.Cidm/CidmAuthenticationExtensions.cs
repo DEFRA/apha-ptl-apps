@@ -69,6 +69,7 @@ public static class CidmAuthenticationExtensions
                 options.ResponseMode = useLocalHttpFriendlyOidcSettings ? "query" : cidm.ResponseMode;
                 options.CallbackPath = cidm.CallbackPath;
                 options.SignedOutCallbackPath = cidm.SignedOutCallbackPath;
+                options.RemoteSignOutPath = CidmAuthenticationDefaults.RemoteSignOutPath;
                 options.SaveTokens = true;
                 options.UsePkce = true;
                 options.GetClaimsFromUserInfoEndpoint = false;

@@ -5,9 +5,9 @@
     ViewData["Title"] = "Home";
     var roles = User.GetResolvedExternalRoles();
     var canOrderOnline = User.CanOrderOnline();
+    var isLabUser = User.IsLabUser();
     bool IsVisible(NavigationItem item) =>
-        (item.RequiredRole is null || roles.Contains(item.RequiredRole, StringComparer.OrdinalIgnoreCase))
-        && (!item.RequireCanOrderOnline || canOrderOnline);
+        item.IsVisibleTo(roles, isLabUser, canOrderOnline);
 
     // An Orders card stays on Home but is disabled, with its blurb replaced, once an order for its year has been submitted
     // (the header menu stays claim-based; the order page itself explains why the year is unavailable).

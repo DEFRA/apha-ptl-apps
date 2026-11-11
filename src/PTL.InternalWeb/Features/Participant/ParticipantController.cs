@@ -14,7 +14,7 @@ namespace PTL.InternalWeb.Features.Participant;
 
 // Legacy "Contracts Admin" folder - requires the Contracts Admin role (PtlPolicies.ContractsAdmin).
 [Authorize(Policy = PtlPolicies.ContractsAdmin)]
-public class ParticipantController(IParticipantApiClient participantApiClient, ICustomerApiClient customerApiClient, ILookupApiClient lookupApiClient, ILabelPrinterApiClient labelPrinterApiClient, ILogger<ParticipantController> logger) : Controller
+public class ParticipantController(IParticipantApiClient participantApiClient, ICustomerApiClient customerApiClient, ILookupApiClient lookupApiClient, ILabelPrinterApiClient labelPrinterApiClient, ILoginInstructionsApiClient loginInstructionsApiClient, ILogger<ParticipantController> logger) : Controller
 {
     // Legacy ReviewPendingParticipantUpdates.aspx GridView.PageSize.
     private const int PendingUpdatesPageSize = 20;
@@ -60,6 +60,26 @@ public class ParticipantController(IParticipantApiClient participantApiClient, I
         var result = await participantApiClient.SearchParticipantsAsync(new ParticipantSearchRequest(customerId, includeInactive, page, pageSize), cancellationToken);
         LogDisplayedParticipantListMessage(logger, includeInactive, page, result.TotalCount, null);
         return View(new ParticipantListViewModel(customerId, includeInactive, page, pageSize, result.TotalCount, result.Items));
+    }
+
+    // The Send Instructions link of the Login Instructions column: emails the address saved on the participant, then comes back to the same page of the list.
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> SendLoginInstructions(Guid participantId, Guid customerId, bool includeInactive = false, int page = 1, int pageSize = PTL.SharedUI.Pagination.PaginationModel.DefaultPageSize, CancellationToken cancellationToken = default)
+    {
+        var result = await loginInstructionsApiClient.SendToParticipantAsync(participantId, cancellationToken);
+        if (result.Success)
+        {
+            var participant = await participantApiClient.GetParticipantAsync(participantId, cancellationToken);
+            var recipient = string.IsNullOrWhiteSpace(participant?.ContactName) ? string.Empty : $" to {participant.ContactName}";
+            TempData.SetNotification(NotificationType.Success, $"Login instructions sent{recipient}.");
+        }
+        else
+        {
+            TempData.SetNotification(NotificationType.Error, result.Message ?? "The login instructions email could not be sent. Please try again.");
+        }
+
+        return RedirectToAction(nameof(Index), new { customerId, includeInactive, page, pageSize });
     }
 
     public async Task<IActionResult> Details(Guid id, CancellationToken cancellationToken)
@@ -144,7 +164,7 @@ public class ParticipantController(IParticipantApiClient participantApiClient, I
         }
 
         TempData.SetNotification(NotificationType.Success, "Participant created successfully.");
-        return RedirectToAction(nameof(Details), new { id = result.Participant.ParticipantId });
+        return RedirectToAction(nameof(Index), new { customerId });
     }
 
     [HttpGet]
@@ -213,7 +233,7 @@ public class ParticipantController(IParticipantApiClient participantApiClient, I
         }
 
         TempData.SetNotification(NotificationType.Success, "Participant updated successfully.");
-        return RedirectToAction(nameof(Details), new { id = result.Participant.ParticipantId });
+        return RedirectToAction(nameof(Index), new { customerId = result.Participant.CustomerId });
     }
 
     // Review Pending Participant Updates (legacy ReviewPendingParticipantUpdates.aspx). Legacy loaded every pending

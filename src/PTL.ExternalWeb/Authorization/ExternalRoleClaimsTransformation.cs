@@ -7,7 +7,7 @@ namespace PTL.ExternalWeb.Authorization;
 // Expands ExternalUserResolver's ResolvedRoles claim into one ClaimTypes.Role claim per role, so
 // ASP.NET Core [Authorize(Policy=...)] can use them - mirrors
 // PTL.InternalWeb.Authorization.PtlRoleClaimsTransformation. No normalization table is needed here
-// (unlike PtlRoles.ToClaimValue()) since ExternalRoleNames' values are already valid policy/role
+// (unlike PtlRoles.ToClaimValue()) since ExternalRoleNames' values (PTL.Contracts) are already valid policy/role
 // names as-is. Runs on every request, so it must be idempotent.
 public sealed class ExternalRoleClaimsTransformation : IClaimsTransformation
 {
