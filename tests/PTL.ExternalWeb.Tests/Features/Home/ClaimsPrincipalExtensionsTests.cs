@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using PTL.Contracts.ExternalUser;
 using PTL.ExternalWeb.Features.Account;
 
 namespace PTL.ExternalWeb.Tests.Features.Home;

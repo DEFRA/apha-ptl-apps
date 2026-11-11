@@ -34,18 +34,6 @@ internal sealed class FakeParticipantRepository : IParticipantRepository
         return Task.FromResult(participant is null ? null : Clone(participant));
     }
 
-    public Task<ParticipantEntity?> GetBySsoIdExtAsync(Guid ssoIdExt, CancellationToken cancellationToken = default)
-    {
-        var participant = _participants.Values.FirstOrDefault(p => p.SsoIdExt == ssoIdExt);
-        return Task.FromResult(participant is null ? null : Clone(participant));
-    }
-
-    public Task<ParticipantEntity?> GetByEmailAsync(string email, CancellationToken cancellationToken = default)
-    {
-        var participant = _participants.Values.FirstOrDefault(p => string.Equals(p.Email, email, StringComparison.OrdinalIgnoreCase));
-        return Task.FromResult(participant is null ? null : Clone(participant));
-    }
-
     public Task<ParticipantEntity> CreateAsync(ParticipantEntity participant, CancellationToken cancellationToken = default)
     {
         participant.ParticipantId = participant.ParticipantId == Guid.Empty ? Guid.NewGuid() : participant.ParticipantId;

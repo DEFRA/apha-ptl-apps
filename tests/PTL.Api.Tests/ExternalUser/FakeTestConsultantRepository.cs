@@ -18,18 +18,6 @@ internal sealed class FakeTestConsultantRepository : ITestConsultantRepository
     public void Seed(CoreTestConsultant testConsultant) =>
         _testConsultants[testConsultant.ExternalTestConsultantId] = testConsultant;
 
-    public Task<CoreTestConsultant?> GetBySsoIdExtAsync(Guid ssoIdExt, CancellationToken cancellationToken = default)
-    {
-        var match = _testConsultants.Values.FirstOrDefault(t => t.SsoIdExt == ssoIdExt);
-        return Task.FromResult(match);
-    }
-
-    public Task<CoreTestConsultant?> GetByEmailAsync(string email, CancellationToken cancellationToken = default)
-    {
-        var match = _testConsultants.Values.FirstOrDefault(t => string.Equals(t.Email, email, StringComparison.OrdinalIgnoreCase));
-        return Task.FromResult(match);
-    }
-
     public Task<CoreTestConsultant> CreateAsync(CoreTestConsultant testConsultant, AuditEntry? auditEntry = null, CancellationToken cancellationToken = default)
     {
         LastAuditEntry = auditEntry;
