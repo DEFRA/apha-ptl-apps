@@ -21,6 +21,7 @@ public static class SideNavigationProvider
     private const string DetailsAction = "Details";
     private const string TabulationAction = "Tabulation";
     private const string SchemeControllerName = "Scheme";
+    private const string SchemeAdminControllerName = "SchemeAdmin";
     private const string CustomerControllerName = "Customer";
     private const string ParticipantControllerName = "Participant";
     private const string ContractControllerName = "Contract";
@@ -371,11 +372,11 @@ public static class SideNavigationProvider
                 },
                 // Legacy sitemap: "Search" ("Search for a scheme") sits directly under Manage Schemes, after Schemes.
                 new SideNavigationItem { Text = "Search", ControllerName = SchemeControllerName, ActionName = "Search" },
-                new SideNavigationItem { Text = "Test Types", ControllerName = "SchemeAdmin", ActionName = "TestType" },
-                new SideNavigationItem { Text = "Test Result Items", ControllerName = "SchemeAdmin", ActionName = "TestResultItemType" },
-                new SideNavigationItem { Text = "Test Method Items", ControllerName = "SchemeAdmin", ActionName = "TestMethodItemType" },
-                new SideNavigationItem { Text = "Category Items", ControllerName = "SchemeAdmin", ActionName = "CategoryItemType" },
-                new SideNavigationItem { Text = "Criterion Items", ControllerName = "SchemeAdmin", ActionName = "CriterionItemType" }
+                new SideNavigationItem { Text = "Test Types", ControllerName = SchemeAdminControllerName, ActionName = "TestType" },
+                new SideNavigationItem { Text = "Test Result Items", ControllerName = SchemeAdminControllerName, ActionName = "TestResultItemType" },
+                new SideNavigationItem { Text = "Test Method Items", ControllerName = SchemeAdminControllerName, ActionName = "TestMethodItemType" },
+                new SideNavigationItem { Text = "Category Items", ControllerName = SchemeAdminControllerName, ActionName = "CategoryItemType" },
+                new SideNavigationItem { Text = "Criterion Items", ControllerName = SchemeAdminControllerName, ActionName = "CriterionItemType" }
             ]
         },
         new SideNavigationItem

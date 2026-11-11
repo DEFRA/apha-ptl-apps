@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="utf-8">
-    <title>GOV.UK - Customised page template</title>
+    <title>@(ViewData["Title"] is string pageTitle && pageTitle.Length > 0 ? $"{pageTitle} - Proficiency Testing - GOV.UK" : "GOV.UK - Customised page template")</title>
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="theme-color" content="blue">
     <link rel="stylesheet" href="/css/govuk-frontend-6.5.0.min.css">
@@ -42,7 +42,7 @@
         && string.Equals(currentAction, "Select", StringComparison.OrdinalIgnoreCase);
 }
 
-@await Html.PartialAsync("_Header", ("Proficiency Testing - External", "height:80px; width:auto;"))
+@await Html.PartialAsync("_Header", ("Proficiency Testing - External", "width:180px; height:auto;"))
 <div class="govuk-width-container app-width-container">
     <main role="main" class="pb-3" id="main-content">
         @if (!isAccountFlowPage && !isLabSelectionPage)

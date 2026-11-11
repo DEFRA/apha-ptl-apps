@@ -5,6 +5,8 @@
 
 <h1 class="govuk-heading-xl">Create new order</h1>
 
+<partial name="_PriceListNote" model="@(Model.DistributionTimetableUrl ?? string.Empty)" />
+
 <dl class="govuk-summary-list govuk-summary-list--no-border">
     <div class="govuk-summary-list__row">
         <dt class="govuk-summary-list__key">Contract year</dt>
@@ -20,16 +22,18 @@
     </div>
 </dl>
 
-<p class="govuk-body">
-    Select the schemes you want to order and the distribution months for each. Prices update as you make changes.
-</p>
+<p class="govuk-body">To participate in a scheme for this year or order additional distributions for a scheme you have already ordered, select the scheme in the first table below. All available months will be selected by default. If you do not want a distribution for a specific month, deselect it.</p>
+<p class="govuk-body">To participate in a new scheme(s), select the scheme from the commercially available schemes tables. All available months are selected by default. If you do not want a distribution for a specific month, deselect it.</p>
+<p class="govuk-body">Once you have made all your selections, please select &lsquo;Next&rsquo; at the bottom of this screen.</p>
+<p class="govuk-body">Please note, you are unable to cancel existing orders from this page. If you wish to do this, please contact us on <a class="govuk-link" href="mailto:vetqas@apha.gov.uk">vetqas@apha.gov.uk</a></p>
 
 @* The draft order is saved on every change, so the page body is swapped in place by create-order.js - no
    page refresh. The antiforgery token sits outside the swapped body so it survives each update. *@
 <div id="create-order"
      data-change-url="@Url.Action("Change", "Order")"
      data-year="@Model.YearSlug"
-     data-search="@Model.Search">
+     data-search="@Model.Search"
+     data-sort="@System.Text.Json.JsonSerializer.Serialize(Model.Sort.Values)">
     @Html.AntiForgeryToken()
     <div id="create-order-error" class="govuk-error-summary" tabindex="-1" hidden>
         <div role="alert">

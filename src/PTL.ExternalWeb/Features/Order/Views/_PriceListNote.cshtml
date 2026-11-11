@@ -1,0 +1,13 @@
+@model string
+@* Legacy PendingContractOrder.aspx price-list line, shown on both the order page and its printout. An empty model means no link is configured. *@
+<p class="govuk-body">
+    For price-lists, including distribution dates, please refer to our
+    @if (!string.IsNullOrEmpty(Model))
+    {
+        <a class="govuk-link" href="@Model" target="_blank" rel="noopener noreferrer">website (opens in new tab)</a>
+    }
+    else
+    {
+        <text>website</text>
+    }.
+</p>

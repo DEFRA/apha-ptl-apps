@@ -52,11 +52,10 @@ RUN certutil -addstore -f Root C:/certs/fortigate-root-ca.cer && certutil -addst
 COPY --from=build /app/publish .
 
 # Playwright's headless Chromium generates external PDF reports. Install browser binaries at
-# image build time so the app never attempts runtime downloads.
-RUN powershell -NoProfile -ExecutionPolicy Bypass -File .\playwright.ps1 install chromium
-
-# Fails the build if the browser cannot print a page; DEBUG logs the browser's exit code and errors to the build output.
-RUN set DEBUG=pw:browser&& \
+# image build time so the app never attempts runtime downloads. The same instruction then fails the build if
+# the browser cannot print a page; DEBUG logs the browser's exit code and errors to the build output.
+RUN powershell -NoProfile -ExecutionPolicy Bypass -File .\playwright.ps1 install chromium && \
+    set DEBUG=pw:browser&& \
     powershell -NoProfile -ExecutionPolicy Bypass -File .\playwright.ps1 pdf about:blank smoke.pdf && \
     del smoke.pdf
 

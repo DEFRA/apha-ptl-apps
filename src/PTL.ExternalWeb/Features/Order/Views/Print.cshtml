@@ -5,48 +5,44 @@
     ViewData["BreadcrumbParent"] = "Orders";
 }
 
-<style>
-    @@media print {
-        .app-print-actions,
-        .govuk-back-link,
-        .govuk-breadcrumbs,
-        .govuk-header,
-        .govuk-footer,
-        .govuk-phase-banner,
-        .govuk-service-navigation,
-        .govuk-skip-link {
-            display: none !important;
-        }
+@* Legacy printed the Pending Order page itself (logo block, no navigation or breadcrumb). The header and footer are hidden
+   in print by site.css; the logo and copyright line below are print-only so the paper copy keeps legacy's identity. *@
+<img class="app-print-only app-print-logo" src="~/images/vetqasheader.png" alt="VETQAS and APHA Scientific" />
 
-        .govuk-main-wrapper {
-            padding-top: 0;
-        }
-    }
-</style>
+<h1 class="govuk-heading-xl">Pending order</h1>
 
-<h1 class="govuk-heading-xl">Pending order summary</h1>
+<partial name="_PriceListNote" model="@(Model.DistributionTimetableUrl ?? string.Empty)" />
 
 <dl class="govuk-summary-list govuk-summary-list--no-border">
     <div class="govuk-summary-list__row">
-        <dt class="govuk-summary-list__key">Contract year</dt>
-        <dd class="govuk-summary-list__value">@Model.Order.Year</dd>
+        <dt class="govuk-summary-list__key">QAL number</dt>
+        <dd class="govuk-summary-list__value">@Model.Order.QalNumber</dd>
     </div>
     <div class="govuk-summary-list__row">
-        <dt class="govuk-summary-list__key">Purchase order number</dt>
-        <dd class="govuk-summary-list__value">Not yet available online</dd>
+        <dt class="govuk-summary-list__key">Lab code</dt>
+        <dd class="govuk-summary-list__value">@Model.Order.LabCode</dd>
     </div>
 </dl>
 
-<table class="govuk-table">
-    <caption class="govuk-table__caption govuk-table__caption--m">Schemes in your order</caption>
+<table class="govuk-table app-order-table app-order-table--review">
+    <caption class="govuk-table__caption govuk-table__caption--m">Schemes you have selected</caption>
+    <colgroup>
+        <col style="width: 9%" />
+        <col style="width: 25%" />
+        <col style="width: 13%" />
+        <col style="width: 15%" />
+        <col style="width: 11%" />
+        <col style="width: 14%" />
+        <col style="width: 13%" />
+    </colgroup>
     <thead class="govuk-table__head">
         <tr class="govuk-table__row">
             <th scope="col" class="govuk-table__header">Scheme code</th>
             <th scope="col" class="govuk-table__header">Scheme name</th>
-            <th scope="col" class="govuk-table__header">Distribution months</th>
-            <th scope="col" class="govuk-table__header">Import permit required</th>
-            <th scope="col" class="govuk-table__header govuk-table__header--numeric">Scheme cost</th>
+            <th scope="col" class="govuk-table__header govuk-table__header--numeric">Full price</th>
+            <th scope="col" class="govuk-table__header app-cell-centre">Import permit required</th>
             <th scope="col" class="govuk-table__header govuk-table__header--numeric">Postage</th>
+            <th scope="col" class="govuk-table__header govuk-table__header--numeric">Scheme price</th>
             <th scope="col" class="govuk-table__header govuk-table__header--numeric">Total</th>
         </tr>
     </thead>
@@ -55,31 +51,95 @@
         {
             <tr class="govuk-table__row">
                 <td class="govuk-table__cell">@scheme.Identifier</td>
-                <td class="govuk-table__cell">@scheme.Name</td>
-                <td class="govuk-table__cell">@string.Join(", ", scheme.Months.Where(m => m.Selected && !m.AlreadyParticipating).Select(m => m.Label))</td>
-                <td class="govuk-table__cell">@(scheme.ImportPermitRequired ? "Yes" : "No")</td>
-                <td class="govuk-table__cell govuk-table__cell--numeric">@Model.FormatMoney(scheme.SchemePrice)</td>
+                <td class="govuk-table__cell">@(string.IsNullOrWhiteSpace(scheme.Schedule) ? scheme.Name : $"{scheme.Name} - ({scheme.Schedule})")</td>
+                <td class="govuk-table__cell govuk-table__cell--numeric">@Model.FormatMoney(scheme.AnnualPrice)</td>
+                <td class="govuk-table__cell app-cell-centre">@(scheme.ImportPermitRequired ? "Yes" : "No")</td>
                 <td class="govuk-table__cell govuk-table__cell--numeric">@Model.FormatMoney(scheme.PostagePrice)</td>
+                <td class="govuk-table__cell govuk-table__cell--numeric">@Model.FormatMoney(scheme.SchemePrice)</td>
                 <td class="govuk-table__cell govuk-table__cell--numeric">@Model.FormatMoney(scheme.TotalPrice)</td>
+            </tr>
+            <tr class="govuk-table__row">
+                <td class="govuk-table__cell" colspan="2"></td>
+                <td class="govuk-table__cell app-month-cell" colspan="5">
+                    @* A ticked month is one in this order. The tick is text, not a box or colour, so it survives black-and-white printing and is read out. *@
+                    <ul class="govuk-list app-print-months" aria-label="Distribution months for @scheme.Name">
+                        @foreach (var month in scheme.Months)
+                        {
+                            var inOrder = month.Selected && !month.AlreadyParticipating;
+                            var monthStatus = "(not in this order)";
+                            if (inOrder)
+                            {
+                                monthStatus = "(in this order)";
+                            }
+                            else if (month.AlreadyParticipating)
+                            {
+                                monthStatus = "(already participating)";
+                            }
+
+                            <li class="app-print-month @(inOrder ? "app-print-month--selected" : null)">
+                                <span class="app-print-month__tick" aria-hidden="true">@(inOrder ? Html.Raw("&#10004;") : Html.Raw("&nbsp;"))</span>
+                                <span class="app-print-month__name">@month.Label</span>
+                                <span class="govuk-visually-hidden">@monthStatus</span>
+                            </li>
+                        }
+                    </ul>
+                </td>
             </tr>
         }
     </tbody>
 </table>
 
+<h2 class="govuk-heading-m">Order details</h2>
+
 <dl class="govuk-summary-list govuk-summary-list--no-border">
     <div class="govuk-summary-list__row">
-        <dt class="govuk-summary-list__key">Scheme costs</dt>
-        <dd class="govuk-summary-list__value">@Model.FormatMoney(Model.Order.SchemeTotal)</dd>
+        <dt class="govuk-summary-list__key">Contract year</dt>
+        <dd class="govuk-summary-list__value">@Model.Order.Year</dd>
     </div>
     <div class="govuk-summary-list__row">
-        <dt class="govuk-summary-list__key">Combined postage charges</dt>
-        <dd class="govuk-summary-list__value">@Model.FormatMoney(Model.Order.PostageTotal)</dd>
+        <dt class="govuk-summary-list__key">Purchase order number</dt>
+        <dd class="govuk-summary-list__value">@(string.IsNullOrWhiteSpace(Model.PurchaseOrderNumber) ? "Not provided" : Model.PurchaseOrderNumber)</dd>
     </div>
     <div class="govuk-summary-list__row">
-        <dt class="govuk-summary-list__key">Total order value</dt>
-        <dd class="govuk-summary-list__value"><strong>@Model.FormatMoney(Model.Order.OrderTotal)</strong></dd>
+        <dt class="govuk-summary-list__key">Scheme price (@Model.Order.CurrencySymbol)</dt>
+        <dd class="govuk-summary-list__value">@CreateOrderReviewViewModel.FormatAmount(Model.Order.SchemeTotal)</dd>
+    </div>
+    <div class="govuk-summary-list__row">
+        <dt class="govuk-summary-list__key">
+            Combined postage (@Model.Order.CurrencySymbol)
+            <span class="govuk-hint govuk-!-margin-bottom-0">(Courier or Bio-Freeze)</span>
+        </dt>
+        <dd class="govuk-summary-list__value">@CreateOrderReviewViewModel.FormatAmount(Model.Order.PostageTotal)</dd>
+    </div>
+    <div class="govuk-summary-list__row">
+        <dt class="govuk-summary-list__key">Total amount (@Model.Order.CurrencySymbol)</dt>
+        <dd class="govuk-summary-list__value"><strong>@CreateOrderReviewViewModel.FormatAmount(Model.Order.OrderTotal)</strong></dd>
     </div>
 </dl>
+
+@if (Model.HasConsents)
+{
+    <h2 class="govuk-heading-m">Data consent</h2>
+    <p class="govuk-body">You must agree to your data being shared for the schemes listed below before you can proceed with your order.</p>
+    @foreach (var consent in Model.Order.DataConsents)
+    {
+        <p class="govuk-body">
+            <strong>@consent.Identifier: @consent.Name</strong><br />
+            @consent.Text<br />
+            <strong>@(Model.IsConsented(consent.SchemeId) ? "Agreed" : "Not yet agreed")</strong>
+        </p>
+    }
+}
+
+@if (Model.TermsUrl is not null)
+{
+    <p class="govuk-body">
+        Terms and conditions:
+        <a class="govuk-link" href="@Model.TermsUrl" target="_blank" rel="noopener noreferrer">View terms and conditions (opens in new tab)</a>
+    </p>
+}
+
+<p class="govuk-body-s app-print-only app-print-footer">&copy; Copyright @DateTime.UtcNow.Year, Animal and Plant Health Agency</p>
 
 <div class="govuk-button-group app-print-actions">
     <button type="button" class="govuk-button" data-module="govuk-button" onclick="window.print()">Print this page</button>

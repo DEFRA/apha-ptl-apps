@@ -22,7 +22,7 @@ public sealed partial class TabulationController(
     ITabulationPdfService tabulationPdfService,
     ILogger<TabulationController> logger) : Controller
 {
-    private static readonly string[] ValidSortColumns = ["reference", "schemeCode", "schemeName", "tabulationName", "distributionDate"];
+    private static readonly string[] ValidSortColumns = ["reference", "schemeCode", "schemeName", "distributionDate"];
     private static readonly string[] ValidSortDirections = ["asc", "desc"];
 
     // Legacy Tabulations.aspx - Year/Month dropdowns are exact matches, the 3 text criteria are
@@ -179,7 +179,6 @@ public sealed partial class TabulationController(
         {
             "schemeCode" => Order(t => t.SchemeCode),
             "schemeName" => Order(t => t.SchemeName),
-            "tabulationName" => Order(t => t.TabulationName),
             "distributionDate" => Order(t => t.DistributionDate),
             _ => Order(t => t.DistributionReference),
         };

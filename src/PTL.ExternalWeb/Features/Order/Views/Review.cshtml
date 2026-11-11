@@ -1,25 +1,45 @@
 @using PTL.ExternalWeb.Features.Order
 @model CreateOrderReviewViewModel
 @{
-    ViewData["Title"] = "Pending order";
+    ViewData["Title"] = Model.Errors.Count > 0 ? "Error: Pending order" : "Pending order";
+    var headers = Model.Sort.Headers(OrderSortState.SummaryTable, sort => Url.Action("Review", "Order", new { year = Model.YearSlug, sort })!);
 }
+
+<govuk-error-summary errors="@Model.ErrorSummary" />
 
 <h1 class="govuk-heading-xl">Pending order</h1>
 
-<div class="govuk-inset-text">
-    This is a summary of the order you have selected for @Model.Order.Year. Entering a purchase order number, accepting the
-    terms and conditions and submitting the order are not yet available online.
-</div>
+<partial name="_PriceListNote" model="@(Model.DistributionTimetableUrl ?? string.Empty)" />
 
-<table class="govuk-table">
-    <caption class="govuk-table__caption govuk-table__caption--m">Schemes in your order</caption>
+<dl class="govuk-summary-list govuk-summary-list--no-border">
+    <div class="govuk-summary-list__row">
+        <dt class="govuk-summary-list__key">QAL number</dt>
+        <dd class="govuk-summary-list__value">@Model.Order.QalNumber</dd>
+    </div>
+    <div class="govuk-summary-list__row">
+        <dt class="govuk-summary-list__key">Lab code</dt>
+        <dd class="govuk-summary-list__value">@Model.Order.LabCode</dd>
+    </div>
+</dl>
+
+<section class="app-table-scroll" aria-label="Schemes you have selected">
+<table class="govuk-table app-order-table app-order-table--review">
+    <caption class="govuk-table__caption govuk-table__caption--m" id="Schemes">Schemes you have selected</caption>
+    <colgroup>
+        <col style="width: 9%" />
+        <col style="width: 25%" />
+        <col style="width: 13%" />
+        <col style="width: 15%" />
+        <col style="width: 11%" />
+        <col style="width: 14%" />
+        <col style="width: 13%" />
+    </colgroup>
     <thead class="govuk-table__head">
         <tr class="govuk-table__row">
-            <th scope="col" class="govuk-table__header">Scheme code</th>
-            <th scope="col" class="govuk-table__header">Scheme name</th>
-            <th scope="col" class="govuk-table__header govuk-table__header--numeric">Annual price</th>
-            <th scope="col" class="govuk-table__header">Distribution months</th>
-            <th scope="col" class="govuk-table__header">Import permit required</th>
+            <partial name="_SortableHeader" model="@(headers.Header("Scheme code", "code"))" />
+            <partial name="_SortableHeader" model="@(headers.Header("Scheme name", "name"))" />
+            <th scope="col" class="govuk-table__header govuk-table__header--numeric">Full price</th>
+            <th scope="col" class="govuk-table__header app-cell-centre">Import permit required</th>
             <th scope="col" class="govuk-table__header govuk-table__header--numeric">Postage</th>
             <th scope="col" class="govuk-table__header govuk-table__header--numeric">Scheme price</th>
             <th scope="col" class="govuk-table__header govuk-table__header--numeric">Total</th>
@@ -30,34 +50,149 @@
         {
             <tr class="govuk-table__row">
                 <td class="govuk-table__cell">@scheme.Identifier</td>
-                <td class="govuk-table__cell">@scheme.Name</td>
+                <td class="govuk-table__cell">@(string.IsNullOrWhiteSpace(scheme.Schedule) ? scheme.Name : $"{scheme.Name} - ({scheme.Schedule})")</td>
                 <td class="govuk-table__cell govuk-table__cell--numeric">@Model.FormatMoney(scheme.AnnualPrice)</td>
-                <td class="govuk-table__cell">@string.Join(", ", scheme.Months.Where(m => m.Selected && !m.AlreadyParticipating).Select(m => m.Label))</td>
-                <td class="govuk-table__cell">@(scheme.ImportPermitRequired ? "Yes" : "No")</td>
+                <td class="govuk-table__cell app-cell-centre">@(scheme.ImportPermitRequired ? "Yes" : "No")</td>
                 <td class="govuk-table__cell govuk-table__cell--numeric">@Model.FormatMoney(scheme.PostagePrice)</td>
                 <td class="govuk-table__cell govuk-table__cell--numeric">@Model.FormatMoney(scheme.SchemePrice)</td>
                 <td class="govuk-table__cell govuk-table__cell--numeric">@Model.FormatMoney(scheme.TotalPrice)</td>
             </tr>
+            <tr class="govuk-table__row app-order-row--selected">
+                <td class="govuk-table__cell" colspan="2"></td>
+                <td class="govuk-table__cell app-month-cell" colspan="5">
+                    <fieldset class="govuk-fieldset">
+                        <legend class="govuk-visually-hidden">Distribution months for @scheme.Name</legend>
+                        <div class="app-month-strip">
+                            @foreach (var month in scheme.Months)
+                            {
+                                if (month.AlreadyParticipating)
+                                {
+                                    <strong class="govuk-tag govuk-tag--grey">@month.Label<span class="govuk-visually-hidden"> (you are already participating in this month)</span></strong>
+                                }
+                                else if (month.Selected)
+                                {
+                                    <strong class="govuk-tag">@month.Label<span class="govuk-visually-hidden"> (selected)</span></strong>
+                                }
+                                else
+                                {
+                                    <span class="app-month-off">@month.Label<span class="govuk-visually-hidden"> (not selected)</span></span>
+                                }
+                            }
+                        </div>
+                    </fieldset>
+                </td>
+            </tr>
         }
     </tbody>
 </table>
+</section>
 
-<dl class="govuk-summary-list govuk-summary-list--no-border">
-    <div class="govuk-summary-list__row">
-        <dt class="govuk-summary-list__key">Scheme price</dt>
-        <dd class="govuk-summary-list__value">@Model.FormatMoney(Model.Order.SchemeTotal)</dd>
-    </div>
-    <div class="govuk-summary-list__row">
-        <dt class="govuk-summary-list__key">Combined postage (courier or bio-freeze)</dt>
-        <dd class="govuk-summary-list__value">@Model.FormatMoney(Model.Order.PostageTotal)</dd>
-    </div>
-    <div class="govuk-summary-list__row">
-        <dt class="govuk-summary-list__key">Total amount</dt>
-        <dd class="govuk-summary-list__value"><strong>@Model.FormatMoney(Model.Order.OrderTotal)</strong></dd>
-    </div>
-</dl>
+<h2 class="govuk-heading-m">Order details</h2>
 
-<div class="govuk-button-group">
-    <a class="govuk-button" asp-controller="Order" asp-action="Print" asp-route-year="@Model.YearSlug" draggable="false" data-module="govuk-button">Print</a>
-    <a class="govuk-button govuk-button--secondary" asp-controller="Order" asp-action="@Model.BackAction" draggable="false" data-module="govuk-button">Back</a>
-</div>
+<form method="post" asp-controller="Order" asp-action="Submit" novalidate>
+    <input type="hidden" name="Year" value="@Model.YearSlug" />
+    @foreach (var sortValue in Model.Sort.Values)
+    {
+        <input type="hidden" name="Sort" value="@sortValue" />
+    }
+
+    <dl class="govuk-summary-list govuk-summary-list--no-border">
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Contract year</dt>
+            <dd class="govuk-summary-list__value">@Model.Order.Year</dd>
+        </div>
+    </dl>
+
+    @{
+        var poError = Model.ErrorFor("PurchaseOrderNumber");
+    }
+    <div class="govuk-form-group @(poError is null ? null : "govuk-form-group--error")">
+        <label class="govuk-label govuk-label--s" for="PurchaseOrderNumber">Purchase order number (optional)</label>
+        <div id="PurchaseOrderNumber-hint" class="govuk-hint">Select Save to keep it for later or to include it when you print.</div>
+        @if (poError is not null)
+        {
+            <p id="PurchaseOrderNumber-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @poError</p>
+        }
+        <input class="govuk-input govuk-input--width-20 @(poError is null ? null : "govuk-input--error")" id="PurchaseOrderNumber" name="PurchaseOrderNumber"
+               type="text" maxlength="255" value="@Model.PurchaseOrderNumber"
+               aria-describedby="PurchaseOrderNumber-hint@(poError is null ? null : " PurchaseOrderNumber-error")" />
+    </div>
+
+    <dl class="govuk-summary-list govuk-summary-list--no-border">
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Scheme price</dt>
+            <dd class="govuk-summary-list__value">@Model.FormatMoney(Model.Order.SchemeTotal)</dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Combined postage (courier or bio-freeze)</dt>
+            <dd class="govuk-summary-list__value">@Model.FormatMoney(Model.Order.PostageTotal)</dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Total amount</dt>
+            <dd class="govuk-summary-list__value"><strong>@Model.FormatMoney(Model.Order.OrderTotal)</strong></dd>
+        </div>
+    </dl>
+
+    @if (Model.HasConsents)
+    {
+        var consentError = Model.ErrorFor("DataConsent");
+        <div class="govuk-form-group @(consentError is null ? null : "govuk-form-group--error")" id="DataConsent">
+            <fieldset class="govuk-fieldset" aria-describedby="DataConsent-hint">
+                <legend class="govuk-fieldset__legend govuk-fieldset__legend--s">Data consent</legend>
+                <div id="DataConsent-hint" class="govuk-hint">You must agree to your data being shared for the schemes listed below before you can proceed with your order.</div>
+                @if (consentError is not null)
+                {
+                    <p class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @consentError</p>
+                }
+                @foreach (var consent in Model.Order.DataConsents)
+                {
+                    <div class="govuk-!-margin-top-4">
+                        <p class="govuk-body govuk-!-font-weight-bold govuk-!-margin-bottom-2">@consent.Identifier: @consent.Name</p>
+                        <div class="govuk-checkboxes govuk-checkboxes--small" data-module="govuk-checkboxes">
+                            <div class="govuk-checkboxes__item">
+                                <input class="govuk-checkboxes__input" id="consent-@consent.SchemeId" name="ConsentedSchemeIds" type="checkbox"
+                                       value="@consent.SchemeId" checked="@Model.IsConsented(consent.SchemeId)" />
+                                <label class="govuk-label govuk-checkboxes__label" for="consent-@consent.SchemeId">@consent.Text</label>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </fieldset>
+        </div>
+    }
+
+    @{
+        var termsError = Model.ErrorFor("TermsAccepted");
+        var termsDescribedBy = string.Join(' ', new[] { Model.TermsUrl is null ? null : "TermsAccepted-hint", termsError is null ? null : "TermsAccepted-error" }.Where(id => id is not null));
+    }
+    <div class="govuk-form-group @(termsError is null ? null : "govuk-form-group--error")">
+        @if (termsError is not null)
+        {
+            <p id="TermsAccepted-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @termsError</p>
+        }
+        <div class="govuk-checkboxes govuk-checkboxes--small" data-module="govuk-checkboxes">
+            <div class="govuk-checkboxes__item">
+                <input class="govuk-checkboxes__input" id="TermsAccepted" name="TermsAccepted" type="checkbox" value="true"
+                       checked="@Model.TermsAccepted" aria-describedby="@(termsDescribedBy.Length == 0 ? null : termsDescribedBy)" />
+                <label class="govuk-label govuk-checkboxes__label" for="TermsAccepted">I have read and agreed to the terms and conditions</label>
+                @if (Model.TermsUrl is not null)
+                {
+                    <div id="TermsAccepted-hint" class="govuk-hint govuk-checkboxes__hint">
+                        <a class="govuk-link" href="@Model.TermsUrl" target="_blank" rel="noopener noreferrer">View terms and conditions (opens in new tab)</a>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+
+    <div class="govuk-button-group">
+        <button type="submit" id="submit-order" class="govuk-button" data-module="govuk-button" data-prevent-double-click="true">Submit</button>
+        <a class="govuk-button govuk-button--secondary" asp-controller="Order" asp-action="@Model.BackAction" draggable="false" data-module="govuk-button">Previous</a>
+        <button type="submit" class="govuk-button govuk-button--secondary" data-module="govuk-button" formaction="@Url.Action("Save", "Order")">Save</button>
+        <a class="govuk-button govuk-button--secondary" href="@Url.Action("Print", "Order", new { year = Model.YearSlug, sort = Model.Sort.Values })" draggable="false" data-module="govuk-button">Print</a>
+    </div>
+</form>
+
+@section Scripts {
+    <script src="~/js/review-order.js" defer></script>
+}

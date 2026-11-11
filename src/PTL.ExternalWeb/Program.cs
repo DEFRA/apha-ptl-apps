@@ -6,6 +6,7 @@ using PTL.Auth.Cidm.Events;
 using PTL.ExternalWeb.Authorization;
 using PTL.ExternalWeb.Features.Account;
 using PTL.ExternalWeb.Features.Lab;
+using PTL.ExternalWeb.Features.Order;
 using PTL.ExternalWeb.Features.Tabulation;
 using PTL.ExternalWeb.Infrastructure;
 using PTL.ExternalWeb.Infrastructure.Pdf;
@@ -16,6 +17,7 @@ builder.AddCidmAuthentication();
 builder.Services.AddScoped<ICidmExternalUserResolver, ExternalUserResolver>();
 builder.Services.AddScoped<IRazorViewRenderer, RazorViewRenderer>();
 builder.Services.AddScoped<ITabulationPdfService, TabulationPdfService>();
+builder.Services.Configure<OrderPageOptions>(builder.Configuration.GetSection(OrderPageOptions.SectionName));
 // One Chromium browser is shared for the app's lifetime.
 builder.Services.AddSingleton<IHtmlToPdfRenderer, PlaywrightHtmlToPdfRenderer>();
 

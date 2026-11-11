@@ -1,3 +1,4 @@
+using System.Text;
 using DocumentFormat.OpenXml;
 using DocumentFormat.OpenXml.Packaging;
 using DocumentFormat.OpenXml.Spreadsheet;
@@ -30,18 +31,21 @@ public static class TabulationWorkbookWriter
             var workbookPart = document.AddWorkbookPart();
             workbookPart.Workbook = new Workbook();
             var worksheetPart = workbookPart.AddNewPart<WorksheetPart>();
-            worksheetPart.Worksheet = new Worksheet(BuildSheetData(cells));
+            worksheetPart.Worksheet = new Worksheet();
+            worksheetPart.Worksheet.AppendChild(BuildSheetData(cells));
             if (merges.Count > 0)
             {
-                worksheetPart.Worksheet.Append(new MergeCells(merges.Select(reference => new MergeCell { Reference = reference })));
+                worksheetPart.Worksheet.AppendChild(new MergeCells(merges.Select(reference => new MergeCell { Reference = reference })));
             }
 
-            workbookPart.Workbook.AppendChild(new Sheets(new Sheet
+            var sheets = new Sheets();
+            sheets.AppendChild(new Sheet
             {
                 Id = workbookPart.GetIdOfPart(worksheetPart),
                 SheetId = 1,
                 Name = "Tabulation",
-            }));
+            });
+            workbookPart.Workbook.AppendChild(sheets);
             workbookPart.Workbook.Save();
         }
 
@@ -118,15 +122,17 @@ public static class TabulationWorkbookWriter
             var row = new Row { RowIndex = (uint)rowIndex };
             foreach (var (columnIndex, text) in rowCells)
             {
-                row.Append(new Cell
+                var inlineString = new InlineString();
+                inlineString.AppendChild(new Text(text));
+                row.AppendChild(new Cell
                 {
                     CellReference = $"{ColumnName(columnIndex)}{rowIndex}",
                     DataType = CellValues.InlineString,
-                    InlineString = new InlineString(new Text(text)),
+                    InlineString = inlineString,
                 });
             }
 
-            sheetData.Append(row);
+            sheetData.AppendChild(row);
         }
 
         return sheetData;
@@ -135,14 +141,14 @@ public static class TabulationWorkbookWriter
     // 1 = A, 27 = AA.
     private static string ColumnName(int index)
     {
-        var name = string.Empty;
+        var name = new StringBuilder();
         while (index > 0)
         {
             var remainder = (index - 1) % 26;
-            name = (char)('A' + remainder) + name;
+            name.Insert(0, (char)('A' + remainder));
             index = (index - 1) / 26;
         }
 
-        return name;
+        return name.ToString();
     }
 }

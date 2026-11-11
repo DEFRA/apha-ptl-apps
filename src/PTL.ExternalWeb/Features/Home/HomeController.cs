@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Polly;
 using PTL.ApiClient;
 using PTL.Common.Auth;
+using PTL.Contracts.CreateOrder;
 using PTL.ExternalWeb.Features.Account;
 
 namespace PTL.ExternalWeb.Features.Home;
@@ -18,35 +19,47 @@ public class HomeController(IApiClient apiClient, ISystemMessageApiClient system
     {
         var displayName = User.GetDisplayName(preferredClaimType: ExternalUserClaimTypes.DisplayName) ?? string.Empty;
         var importantMessage = await systemMessageApiClient.GetImportantMessageAsync(HttpContext.RequestAborted);
-        var (canCreateCurrent, canCreateNext) = await GetOrderEligibilityAsync(HttpContext.RequestAborted);
-        return View(new HomeIndexViewModel(displayName, User.GetResolvedExternalRoles(), importantMessage.ImportantMessage, canCreateCurrent, canCreateNext));
+        var eligibility = await GetOrderEligibilityAsync(HttpContext.RequestAborted);
+        return View(new HomeIndexViewModel(
+            displayName,
+            User.GetResolvedExternalRoles(),
+            importantMessage.ImportantMessage,
+            eligibility.CanCreateCurrentYearOrder,
+            eligibility.CanCreateNextYearOrder,
+            eligibility.CurrentYear,
+            eligibility.NextYear));
     }
 
-    // Legacy Home.aspx hides each "Create order" card once an order for that year is submitted. The order pages enforce
-    // the same rules themselves, so a failed lookup shows both cards rather than breaking Home.
-    private async Task<(bool Current, bool Next)> GetOrderEligibilityAsync(CancellationToken cancellationToken)
+    // Legacy Home.aspx keeps each "Create order" card but disables it once an order for that year is submitted. The order
+    // pages enforce the same rules themselves, so a failed lookup shows both cards enabled rather than breaking Home.
+    private async Task<CreateOrderEligibilityResponse> GetOrderEligibilityAsync(CancellationToken cancellationToken)
     {
         var participantId = User.GetParticipantId();
         if (participantId is null || !User.CanOrderOnline())
         {
-            return (true, true);
+            return AllowBoth;
         }
 
         try
         {
-            var eligibility = await createOrderApiClient.GetEligibilityAsync(participantId.Value, cancellationToken);
-            return eligibility is null ? (true, true) : (eligibility.CanCreateCurrentYearOrder, eligibility.CanCreateNextYearOrder);
+            return await createOrderApiClient.GetEligibilityAsync(participantId.Value, cancellationToken) ?? AllowBoth;
         }
         catch (Exception exception) when (exception is HttpRequestException or TaskCanceledException or ExecutionRejectedException)
         {
-            return (true, true);
+            return AllowBoth;
         }
     }
+
+    private static readonly CreateOrderEligibilityResponse AllowBoth = new(true, true, true);
 
     // Legal/informational page - deliberately anonymous, like PTL.ExternalWeb's other
     // [AllowAnonymous] pages (ApiStatus, Error), since it must be reachable before sign-in.
     [AllowAnonymous]
     public IActionResult Privacy() => View();
+
+    // Legacy AccessibilityStatement.aspx (footer link) - anonymous like Privacy, so it is reachable before sign-in.
+    [AllowAnonymous]
+    public IActionResult Accessibility() => View();
 
     // Legacy ViewInformation.aspx, linked from Index's static "Important" banner - shows
     // tblExtWebsiteMessage.fldMessage, requires sign-in (same as legacy).

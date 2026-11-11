@@ -82,7 +82,13 @@ public sealed class PendingOrderRepository(IDbConnectionFactory connectionFactor
             new { PendingParticipantSchemeId = pendingParticipantSchemeId });
     }
 
-    public async Task UpdatePurchaseOrderNumberAsync(Guid pendingContractId, string purchaseOrderNumber, CancellationToken cancellationToken = default)
+    public Task UpdatePurchaseOrderNumberAsync(Guid pendingContractId, string purchaseOrderNumber, CancellationToken cancellationToken = default) =>
+        UpdateContractAsync(pendingContractId, purchaseOrderNumber, submit: false, cancellationToken);
+
+    public Task SubmitAsync(Guid pendingContractId, string purchaseOrderNumber, CancellationToken cancellationToken = default) =>
+        UpdateContractAsync(pendingContractId, purchaseOrderNumber, submit: true, cancellationToken);
+
+    private async Task UpdateContractAsync(Guid pendingContractId, string purchaseOrderNumber, bool submit, CancellationToken cancellationToken)
     {
         using var connection = connectionFactory.CreateConnection();
 
@@ -92,8 +98,8 @@ public sealed class PendingOrderRepository(IDbConnectionFactory connectionFactor
             return;
         }
 
-        // @IsSubmitted must stay 1 - passing 0 would clear the submitted flag, and passing 1 makes
-        // the procedure re-stamp fldOrderSubmitDate, which matches legacy's own Save() behaviour.
+        // Without submit, @IsSubmitted must keep the stored value - passing 0 would clear the submitted flag, and passing 1
+        // makes the procedure re-stamp fldOrderSubmitDate, which matches legacy's own Save() behaviour.
         // Bound by name: the procedure declares @PurchaseOrderNumber BEFORE @IsDeleted, so a
         // positional EXEC silently passes the varchar into the bit parameter.
         await connection.ExecuteAsync(
@@ -102,7 +108,7 @@ public sealed class PendingOrderRepository(IDbConnectionFactory connectionFactor
             {
                 PendingContractId = pendingContractId,
                 existing.YearId,
-                existing.IsSubmitted,
+                IsSubmitted = submit || existing.IsSubmitted,
                 existing.IsDeleted,
                 PurchaseOrderNumber = purchaseOrderNumber
             });

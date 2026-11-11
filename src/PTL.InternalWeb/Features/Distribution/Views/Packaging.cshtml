@@ -13,7 +13,7 @@
     const string preparationIncompleteText = "The preparation for this scheme is not complete";
 
     // GOV.UK date style (4 April 2026); the sheet's own LongDate/ShortDate stay for the merged documents.
-    string Day(DateTime date) => date.ToString("d MMMM yyyy", System.Globalization.CultureInfo.GetCultureInfo("en-GB"));
+    static string Day(DateTime date) => date.ToString("d MMMM yyyy", System.Globalization.CultureInfo.GetCultureInfo("en-GB"));
 
     // Extra full-width rows shown beneath a Scheme row (legacy cellWorkSheetSchemePacking).
     List<string> PackingLines(PackagingSchemeResponse scheme)

@@ -4,8 +4,8 @@
 @{
     bool HasError(string field) => ViewData.ModelState.TryGetValue(field, out var entry) && entry.Errors.Count > 0;
     string? FirstError(string field) => ViewData.ModelState.TryGetValue(field, out var entry) && entry.Errors.Count > 0 ? entry.Errors[0].ErrorMessage : null;
-    string YesNo(bool value) => value ? "Yes" : "No";
-    string OptionText(IEnumerable<SelectListItem> options, Guid? value) =>
+    static string YesNo(bool value) => value ? "Yes" : "No";
+    static string OptionText(IEnumerable<SelectListItem> options, Guid? value) =>
         value is null ? string.Empty : options.FirstOrDefault(o => o.Value == value.Value.ToString())?.Text ?? string.Empty;
 
     // Legacy renders the months in two rows of six, financial-year order, with "As Available"

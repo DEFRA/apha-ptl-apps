@@ -28,6 +28,7 @@
 <form method="post" asp-action="Entry" asp-route-schemeId="@Model.MonthlyDistributionSchemeId" novalidate>
     <input type="hidden" asp-for="MonthlyDistributionSchemeId" />
     <input type="hidden" asp-for="ReturnUrl" />
+    <input type="hidden" asp-for="Acknowledged" value="false" />
     <input type="hidden" name="IsFiltered" value="true" />
     @foreach (var sample in Model.AllSamples)
     {

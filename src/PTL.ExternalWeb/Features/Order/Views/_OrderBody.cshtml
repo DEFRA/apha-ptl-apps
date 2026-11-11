@@ -1,40 +1,40 @@
 @model PTL.ExternalWeb.Features.Order.CreateOrderViewModel
+@using PTL.ExternalWeb.Features.Order
 @{
     var order = Model.Order;
     var groups = Model.VisibleGroups;
+    var participating = Model.ParticipatingSchemes;
     var availableHeading = order.IsAphaCustomer
         ? $"{order.Year}'s available schemes"
         : $"{order.Year}'s commercially available schemes";
     var noAvailableText = order.IsAphaCustomer
         ? $"There are currently no available schemes for year {order.Year}"
         : $"There are currently no commercially available schemes for year {order.Year}";
-    var isFiltered = !string.IsNullOrWhiteSpace(Model.Search);
 }
 
 <h2 class="govuk-heading-m">Schemes you participated in last year and/or schemes you are participating in year @order.Year</h2>
-@if (order.ParticipatingSchemes.Count == 0)
+@if (participating.Count == 0)
 {
     <p class="govuk-body">There are no schemes that you are currently participating in year @order.Year</p>
 }
 else
 {
-    <partial name="_SchemeTable" model="@(("Schemes you are participating in", order.ParticipatingSchemes, Model))" />
+    <partial name="_SchemeTable" model="@(("Schemes you are participating in", OrderSortState.ParticipatingTable, participating, Model))" />
 }
 
 <h2 class="govuk-heading-m govuk-!-margin-top-6">@availableHeading</h2>
 
 <form method="get" asp-controller="Order" asp-action="@Model.PageAction" role="search">
+    @foreach (var sortValue in Model.Sort.Values)
+    {
+        <input type="hidden" name="sort" value="@sortValue" />
+    }
     <div class="govuk-form-group">
         <label class="govuk-label" for="search">Search schemes by name, code or schedule</label>
         <input class="govuk-input govuk-input--width-20" id="search" name="search" type="search" value="@Model.Search" />
     </div>
-    <div class="govuk-button-group">
-        <button type="submit" class="govuk-button govuk-button--secondary" data-module="govuk-button">Search</button>
-        @if (isFiltered)
-        {
-            <a class="govuk-link govuk-link--no-visited-state" asp-controller="Order" asp-action="@Model.PageAction">Show all</a>
-        }
-    </div>
+    <partial name="_SearchFormButtonGroup" model="@Model.PageAction"
+             view-data="@(new ViewDataDictionary(ViewData) { ["ShowAllUrl"] = Url.Action(Model.PageAction, "Order", new { sort = Model.Sort.Values }) })" />
 </form>
 
 @if (order.AvailableSchemes.Count == 0)
@@ -49,7 +49,7 @@ else
 {
     foreach (var group in groups)
     {
-        <partial name="_SchemeTable" model="@((group.Schedule, group.Schemes, Model))" />
+        <partial name="_SchemeTable" model="@((group.Schedule, OrderSortState.ScheduleTable(group.Schedule), group.Schemes, Model))" />
     }
 }
 
@@ -71,11 +71,16 @@ else
     </dl>
 </div>
 
+@if (!order.CanProceed)
+{
+    <p class="govuk-hint" id="next-hint">Select at least one scheme and at least one distribution month for it to continue.</p>
+}
+
 @* One form so every action is a direct child of the button group and lines up on one baseline. *@
 <form method="get" asp-controller="Order" asp-action="Review" class="govuk-button-group">
     <input type="hidden" name="year" value="@Model.YearSlug" />
     <button type="submit" class="govuk-button" data-module="govuk-button"
             disabled="@(!order.CanProceed)" aria-disabled="@(order.CanProceed ? "false" : "true")">Next</button>
+    <a class="govuk-button govuk-button--secondary" asp-controller="Home" asp-action="Index" draggable="false" data-module="govuk-button">Back</a>
     <a class="govuk-button govuk-button--secondary" asp-controller="Order" asp-action="ConfirmClear" asp-route-year="@Model.YearSlug" draggable="false" data-module="govuk-button">Clear form</a>
-    <a class="govuk-link govuk-link--no-visited-state" asp-controller="Home" asp-action="Index">Cancel</a>
 </form>

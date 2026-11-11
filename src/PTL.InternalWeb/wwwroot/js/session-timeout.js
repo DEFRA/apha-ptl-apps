@@ -82,7 +82,7 @@
     function formatCountdown(totalSeconds) {
         var minutes = Math.floor(totalSeconds / 60);
         var seconds = totalSeconds % 60;
-        return String(minutes).padStart(2, '0') + ':' + String(seconds).padStart(2, '0');
+        return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
     }
 
     function announceMilestone(remainingSeconds) {

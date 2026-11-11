@@ -1,19 +1,30 @@
 @using PTL.Contracts.CreateOrder
-@model (string Caption, IReadOnlyList<CreateOrderSchemeResponse> Schemes, PTL.ExternalWeb.Features.Order.CreateOrderViewModel Page)
+@model (string Caption, string Table, IReadOnlyList<CreateOrderSchemeResponse> Schemes, PTL.ExternalWeb.Features.Order.CreateOrderViewModel Page)
 @{
     var orderPage = Model.Page;
+    var headers = orderPage.Sort.Headers(Model.Table, sort => Url.Action(orderPage.PageAction, "Order", new { search = orderPage.Search, sort })!);
 }
 
-<section class="app-table-scroll" aria-label="@Model.Caption">
-<table class="govuk-table app-order-table">
+<section class="app-table-scroll app-order-scroll" aria-label="@Model.Caption">
+<table class="govuk-table app-order-table app-order-table--fixed">
     <caption class="govuk-table__caption govuk-table__caption--s">@Model.Caption</caption>
+    <colgroup>
+        <col style="width: 7%" />
+        <col style="width: 9%" />
+        <col style="width: 24%" />
+        <col style="width: 11%" />
+        <col style="width: 16%" />
+        <col style="width: 10%" />
+        <col style="width: 11%" />
+        <col style="width: 12%" />
+    </colgroup>
     <thead class="govuk-table__head">
         <tr class="govuk-table__row">
             <th scope="col" class="govuk-table__header">Select</th>
-            <th scope="col" class="govuk-table__header">Scheme code</th>
-            <th scope="col" class="govuk-table__header">Scheme name</th>
+            <partial name="_SortableHeader" model="@(headers.Header("Scheme code", "code"))" />
+            <partial name="_SortableHeader" model="@(headers.Header("Scheme name", "name"))" />
             <th scope="col" class="govuk-table__header govuk-table__header--numeric">Annual price</th>
-            <th scope="col" class="govuk-table__header">Import permit required</th>
+            <th scope="col" class="govuk-table__header app-cell-centre">Import permit required</th>
             <th scope="col" class="govuk-table__header govuk-table__header--numeric">Postage</th>
             <th scope="col" class="govuk-table__header govuk-table__header--numeric">Scheme price</th>
             <th scope="col" class="govuk-table__header govuk-table__header--numeric">Total</th>
@@ -40,7 +51,7 @@
                 <td class="govuk-table__cell">
                     @if (scheme.Selected)
                     {
-                        <div class="govuk-checkboxes govuk-checkboxes--small">
+                        <div class="govuk-checkboxes govuk-checkboxes--small app-checkbox-centre">
                             <div class="govuk-checkboxes__item">
                                 <input class="govuk-checkboxes__input" id="import-@scheme.SchemeId" type="checkbox"
                                        data-order-field="importexport" data-scheme-id="@scheme.SchemeId"
@@ -59,31 +70,39 @@
             if (scheme.Selected)
             {
                 <tr class="govuk-table__row app-order-row--selected">
-                    <td class="govuk-table__cell" colspan="8">
+                    <td class="govuk-table__cell" colspan="2"></td>
+                    <td class="govuk-table__cell app-month-cell" colspan="6">
                         <fieldset class="govuk-fieldset">
-                            <legend class="govuk-fieldset__legend govuk-fieldset__legend--s">Distribution months for @scheme.Name</legend>
+                            <legend class="govuk-visually-hidden">Distribution months for @scheme.Name</legend>
                             <div class="app-month-strip">
                                 @foreach (var month in scheme.Months)
                                 {
                                     if (!month.Offered)
                                     {
-                                        <span class="app-month app-month--unavailable"><span class="govuk-visually-hidden">Not offered: </span>@month.Label</span>
+                                        <div class="app-month app-month--unavailable">
+                                            <span class="app-month__box" aria-hidden="true"></span>
+                                            <span class="app-month__name"><span class="govuk-visually-hidden">Not offered: </span>@month.Label</span>
+                                        </div>
                                     }
                                     else
                                     {
-                                        <div class="govuk-checkboxes govuk-checkboxes--small app-month">
-                                            <div class="govuk-checkboxes__item">
-                                                <input class="govuk-checkboxes__input" id="month-@scheme.SchemeId-@month.MonthNumber" type="checkbox"
-                                                       data-order-field="@month.Label.ToLowerInvariant()" data-scheme-id="@scheme.SchemeId"
-                                                       checked="@month.Selected" disabled="@(!month.Enabled)" />
-                                                <label class="govuk-label govuk-checkboxes__label" for="month-@scheme.SchemeId-@month.MonthNumber">
-                                                    @month.Label
-                                                    @if (month.AlreadyParticipating)
-                                                    {
-                                                        <span class="govuk-visually-hidden"> (you are already participating in this month)</span>
-                                                    }
-                                                </label>
+                                        <div class="app-month">
+                                            <div class="govuk-checkboxes govuk-checkboxes--small">
+                                                <div class="govuk-checkboxes__item">
+                                                    <input class="govuk-checkboxes__input" id="month-@scheme.SchemeId-@month.MonthNumber" type="checkbox"
+                                                           data-order-field="@month.Label.ToLowerInvariant()" data-scheme-id="@scheme.SchemeId"
+                                                           checked="@month.Selected" disabled="@(!month.Enabled)" />
+                                                    <label class="govuk-label govuk-checkboxes__label" for="month-@scheme.SchemeId-@month.MonthNumber">
+                                                        <span class="govuk-visually-hidden">@month.Label</span>
+                                                        @if (month.AlreadyParticipating)
+                                                        {
+                                                            <span class="govuk-visually-hidden"> (you are already participating in this month)</span>
+                                                        }
+                                                    </label>
+                                                </div>
                                             </div>
+                                            @* As in legacy, the month name sits under its checkbox; the hidden label above names the input. *@
+                                            <label class="app-month__name" for="month-@scheme.SchemeId-@month.MonthNumber" aria-hidden="true">@month.Label</label>
                                         </div>
                                     }
                                 }
