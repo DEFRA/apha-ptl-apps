@@ -73,6 +73,18 @@ public class ParticipantControllerTests
     }
 
     [Fact]
+    public async Task Index_WithNoFilter_AsksForActiveAndInactiveParticipants()
+    {
+        var customerId = Guid.NewGuid();
+        var apiClient = new FakeParticipantApiClient();
+        var controller = CreateController(apiClient);
+
+        await controller.Index(customerId, cancellationToken: CancellationToken.None);
+
+        Assert.True(apiClient.LastSearchRequest!.IncludeInactive);
+    }
+
+    [Fact]
     public async Task Details_UnknownParticipant_ReturnsNotFound()
     {
         var controller = CreateController(new FakeParticipantApiClient { ParticipantResponse = null });
