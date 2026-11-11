@@ -111,7 +111,7 @@ public class CustomerControllerTests
     }
 
     [Fact]
-    public async Task Create_Post_Success_RedirectsToDetails()
+    public async Task Create_Post_Success_RedirectsToIndexWithSuccessNotification()
     {
         var customerId = Guid.NewGuid();
         var apiClient = new FakeCustomerApiClient
@@ -124,8 +124,10 @@ public class CustomerControllerTests
         var result = await controller.Create(model, CancellationToken.None);
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal(nameof(PTL.InternalWeb.Features.Customer.CustomerController.Details), redirect.ActionName);
-        Assert.Equal(customerId, redirect.RouteValues!["id"]);
+        Assert.Equal(nameof(PTL.InternalWeb.Features.Customer.CustomerController.Index), redirect.ActionName);
+        var notification = controller.TempData.GetNotification()!;
+        Assert.Equal(NotificationType.Success, notification.Type);
+        Assert.Equal("Customer created successfully.", notification.Message);
     }
 
     [Fact]
@@ -227,7 +229,7 @@ public class CustomerControllerTests
     }
 
     [Fact]
-    public async Task Edit_Post_Success_RedirectsToDetails()
+    public async Task Edit_Post_Success_RedirectsToIndexWithSuccessNotification()
     {
         var customerId = Guid.NewGuid();
         var apiClient = new FakeCustomerApiClient
@@ -240,8 +242,10 @@ public class CustomerControllerTests
         var result = await controller.Edit(customerId, model, CancellationToken.None);
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal(nameof(PTL.InternalWeb.Features.Customer.CustomerController.Details), redirect.ActionName);
-        Assert.Equal(customerId, redirect.RouteValues!["id"]);
+        Assert.Equal(nameof(PTL.InternalWeb.Features.Customer.CustomerController.Index), redirect.ActionName);
+        var notification = controller.TempData.GetNotification()!;
+        Assert.Equal(NotificationType.Success, notification.Type);
+        Assert.Equal("Customer updated successfully.", notification.Message);
     }
 
     [Fact]

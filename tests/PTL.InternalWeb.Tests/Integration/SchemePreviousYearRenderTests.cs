@@ -689,6 +689,51 @@ public class SchemePreviousYearRenderTests : IClassFixture<WebApplicationFactory
         Assert.Equivalent(scheme.Tabulations, saved.Tabulations, strict: true);
     }
 
+    // ASP.NET Core rejects a form of more than 1,024 values by default; a scheme with many Tests, Result Items and Categories posts far more.
+    private const int LargeSchemeRepeats = 40;
+
+    private static SchemeResponse LargeScheme(bool isReadOnly)
+    {
+        var scheme = SchemeFormTestData.Scheme(requiresAssessment: true, isReadOnly);
+        return scheme with { Tests = [.. Enumerable.Repeat(scheme.Tests!, LargeSchemeRepeats).SelectMany(tests => tests)] };
+    }
+
+    private async Task<(HttpClient Client, SchemeFormPage Page, int Expected)> OpenLargeSchemeAsync(bool isReadOnly)
+    {
+        var scheme = LargeScheme(isReadOnly);
+        _schemes.SchemeResponse = scheme;
+        var client = _factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        var page = await OpenAsync(client, $"/Scheme/Edit/{SchemeFormTestData.SchemeId}");
+
+        Assert.True(page.Submission().Count > 1024, "The test form does not exceed the default form value limit.");
+        return (client, page, scheme.Tests!.Count);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task EditAndApply_FormWithMoreThanTheDefaultFormValueLimit_IsSaved(bool isReadOnly)
+    {
+        var (client, page, expectedTests) = await OpenLargeSchemeAsync(isReadOnly);
+
+        var response = await ApplyAsync(client, page);
+
+        Assert.True(response.StatusCode == HttpStatusCode.Redirect, await RedisplayedErrorsAsync(response));
+        Assert.Equal(expectedTests, _schemes.LastUpdateRequest!.Tests!.Count);
+    }
+
+    [Fact]
+    public async Task Create_FormWithMoreThanTheDefaultFormValueLimit_IsSaved()
+    {
+        var (client, page, expectedTests) = await OpenLargeSchemeAsync(isReadOnly: false);
+        _schemes.SaveResult = new SchemeSaveResult(true, SchemeFormTestData.Scheme(requiresAssessment: true, isReadOnly: false), new Dictionary<string, string[]>());
+
+        var response = await client.PostAsync("/Scheme/Create", new FormUrlEncodedContent(page.Submission()));
+
+        Assert.True(response.StatusCode == HttpStatusCode.Redirect, await RedisplayedErrorsAsync(response));
+        Assert.Equal(expectedTests, _schemes.LastCreateRequest!.Tests!.Count);
+    }
+
     [Fact]
     public async Task Apply_WithAnInvalidEditableField_RedisplaysThePreviousYearFormWithTheError()
     {

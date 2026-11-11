@@ -128,7 +128,7 @@ public class CustomerController(ICustomerApiClient customerApiClient, ILookupApi
 
         LogCreatedCustomerMessage(logger, result.Customer.CustomerId, null);
         TempData.SetNotification(NotificationType.Success, "Customer created successfully.");
-        return RedirectToAction(nameof(Details), new { id = result.Customer.CustomerId });
+        return RedirectToAction(nameof(Index));
     }
 
     [HttpGet]
@@ -168,7 +168,7 @@ public class CustomerController(ICustomerApiClient customerApiClient, ILookupApi
 
         LogUpdatedCustomerMessage(logger, id, null);
         TempData.SetNotification(NotificationType.Success, "Customer updated successfully.");
-        return RedirectToAction(nameof(Details), new { id });
+        return RedirectToAction(nameof(Index));
     }
 
     // Review Pending Customer Updates (legacy ReviewPendingCustomerUpdates.aspx). Legacy loaded every pending
