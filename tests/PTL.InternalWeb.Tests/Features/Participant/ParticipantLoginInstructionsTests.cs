@@ -39,7 +39,7 @@ public class ParticipantLoginInstructionsTests
         var redirect = Assert.IsType<RedirectToActionResult>(result);
         Assert.Equal(nameof(ParticipantController.Index), redirect.ActionName);
         Assert.Equal(customerId, redirect.RouteValues!["customerId"]);
-        Assert.Equal(true, redirect.RouteValues["includeInactive"]);
+        Assert.True((bool)redirect.RouteValues["includeInactive"]!);
         Assert.Equal(3, redirect.RouteValues["page"]);
         Assert.Equal(50, redirect.RouteValues["pageSize"]);
         var notification = controller.TempData.GetNotification();

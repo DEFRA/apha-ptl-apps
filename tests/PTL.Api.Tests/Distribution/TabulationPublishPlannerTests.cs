@@ -229,7 +229,7 @@ public class TabulationPublishPlannerTests
         var plan = Plan(Source(requiresAssessment: false));
 
         Assert.DoesNotContain(plan.Commands, c => c.Procedure is "spiPublishedCategoryItem" or "spiPublishedCriterionItem" or "spiPublishedParticipantSampleTest" or "spiPublishedParticipantCategoryItem" or "spiPublishedParticipantCriterionItem");
-        Assert.Equal(false, Value(Single(plan, "spiPublishedTabulation"), "RequiresAssessment"));
+        Assert.False((bool)Value(Single(plan, "spiPublishedTabulation"), "RequiresAssessment")!);
     }
 
     [Fact]
