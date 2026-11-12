@@ -13,6 +13,7 @@ public static class LabSession
         ExternalUserClaimTypes.ParticipantId,
         ExternalUserClaimTypes.LabCode,
         ExternalUserClaimTypes.CanOrderOnline,
+        ExternalUserClaimTypes.CanEditDetails,
         ExternalUserClaimTypes.LabCount
     ];
 
@@ -40,6 +41,11 @@ public static class LabSession
         if (lab.CanOrderOnline)
         {
             identity.AddClaim(new Claim(ExternalUserClaimTypes.CanOrderOnline, "true"));
+        }
+
+        if (lab.CanEditDetails)
+        {
+            identity.AddClaim(new Claim(ExternalUserClaimTypes.CanEditDetails, "true"));
         }
 
         return new ClaimsPrincipal(identity);

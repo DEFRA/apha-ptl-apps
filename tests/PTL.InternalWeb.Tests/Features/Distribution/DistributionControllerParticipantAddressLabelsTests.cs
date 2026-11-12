@@ -125,7 +125,7 @@ public class DistributionControllerParticipantAddressLabelsTests
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
         Assert.Equal(nameof(DistributionController.ParticipantAddressLabels), redirect.ActionName);
-        Assert.Equal(true, redirect.RouteValues!["searched"]);
+        Assert.True((bool)redirect.RouteValues!["searched"]!);
         Assert.Equal("LAB1", redirect.RouteValues!["search.LabCode"]);
         Assert.Equal("Lab One", redirect.RouteValues!["search.LabName"]);
         Assert.Equal("Bob Example", redirect.RouteValues!["search.ContactName"]);

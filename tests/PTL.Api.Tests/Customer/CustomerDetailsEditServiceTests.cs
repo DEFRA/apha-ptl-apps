@@ -16,6 +16,56 @@ public class CustomerDetailsEditServiceTests
     }
 
     [Fact]
+    public async Task GetAsync_AnotherActiveParticipantOnTheCustomer_ReturnsNull()
+    {
+        var (service, participants, customers, _) = CreateService();
+        var customerId = Guid.NewGuid();
+        await customers.CreateAsync(new PTL.Core.Customer.Customer { CustomerId = customerId, QalNumber = "QAL/00001" });
+        var participant = await participants.CreateAsync(new CoreParticipant { CustomerId = customerId });
+        await participants.CreateAsync(new CoreParticipant { CustomerId = customerId });
+
+        Assert.Null(await service.GetAsync(participant.ParticipantId));
+    }
+
+    [Fact]
+    public async Task GetAsync_TheOtherParticipantOnTheCustomerIsInactive_ReturnsTheDetails()
+    {
+        var (service, participants, customers, _) = CreateService();
+        var customerId = Guid.NewGuid();
+        await customers.CreateAsync(new PTL.Core.Customer.Customer { CustomerId = customerId, QalNumber = "QAL/00001" });
+        var participant = await participants.CreateAsync(new CoreParticipant { CustomerId = customerId });
+        await participants.CreateAsync(new CoreParticipant { CustomerId = customerId, IsActive = false });
+
+        Assert.NotNull(await service.GetAsync(participant.ParticipantId));
+    }
+
+    [Fact]
+    public async Task GetAsync_TheParticipantIsInactive_ReturnsNull()
+    {
+        var (service, participants, customers, _) = CreateService();
+        var customerId = Guid.NewGuid();
+        await customers.CreateAsync(new PTL.Core.Customer.Customer { CustomerId = customerId });
+        var participant = await participants.CreateAsync(new CoreParticipant { CustomerId = customerId, IsActive = false });
+
+        Assert.Null(await service.GetAsync(participant.ParticipantId));
+    }
+
+    [Fact]
+    public async Task SubmitAsync_AnotherActiveParticipantOnTheCustomer_IsRefusedAndDoesNotPersist()
+    {
+        var (service, participants, customers, pendingUpdates) = CreateService();
+        var customerId = Guid.NewGuid();
+        await customers.CreateAsync(new PTL.Core.Customer.Customer { CustomerId = customerId });
+        var participant = await participants.CreateAsync(new CoreParticipant { CustomerId = customerId });
+        await participants.CreateAsync(new CoreParticipant { CustomerId = customerId });
+
+        await Assert.ThrowsAsync<PTL.Core.Participant.DetailsEditNotPermittedException>(() =>
+            service.SubmitAsync(participant.ParticipantId, new PendingCustomerUpdate { ContactName = "Anyone" }));
+
+        Assert.Null(await pendingUpdates.GetByCustomerIdAsync(customerId));
+    }
+
+    [Fact]
     public async Task GetAsync_ParticipantNotFound_ReturnsNull()
     {
         var (service, _, _, _) = CreateService();

@@ -37,6 +37,10 @@ public static class ExternalUserClaimTypes
     /// CanOrderOnline set - gates the Orders section (NavigationProvider).</summary>
     public const string CanOrderOnline = "canOrderOnline";
 
+    /// <summary>Present (value "true") only when the single active lab is its customer's only active
+    /// participant - gates editing the customer and participant details (legacy CanEditCustomer/CanEditParticipant).</summary>
+    public const string CanEditDetails = "canEditDetails";
+
     /// <summary>The own id of the lab the user acts for (a Participant, or a Lab User's single lab), only
     /// present when the user has exactly one active lab - lets participant-scoped features (e.g. Scheme List)
     /// query by id directly without re-resolving the user against PTL.Api.</summary>

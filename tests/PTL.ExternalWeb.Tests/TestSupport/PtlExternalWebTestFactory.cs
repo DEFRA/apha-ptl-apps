@@ -125,6 +125,13 @@ public sealed class PtlExternalWebTestFactory : WebApplicationFactory<Program>
                         claims.Add(new Claim(ExternalUserClaimTypes.CanOrderOnline, "true"));
                     }
 
+                    // On unless a test asks for the not-the-only-active-participant case with canEditDetails=false.
+                    var canEditDetails = context.Request.Query["canEditDetails"].FirstOrDefault();
+                    if (!string.Equals(canEditDetails, "false", StringComparison.OrdinalIgnoreCase))
+                    {
+                        claims.Add(new Claim(ExternalUserClaimTypes.CanEditDetails, "true"));
+                    }
+
                     var participantId = context.Request.Query["participantId"].FirstOrDefault();
                     if (!string.IsNullOrEmpty(participantId))
                     {

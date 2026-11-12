@@ -1,6 +1,6 @@
 using Microsoft.Extensions.Options;
 
-namespace PTL.InternalWeb.SessionTimeout;
+namespace PTL.Common.SessionTimeout;
 
 /// <summary>Fails fast at startup when <see cref="SessionTimeoutOptions"/> values are missing or malformed.</summary>
 public sealed class SessionTimeoutOptionsValidator : IValidateOptions<SessionTimeoutOptions>

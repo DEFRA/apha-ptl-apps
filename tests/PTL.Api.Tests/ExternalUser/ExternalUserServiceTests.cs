@@ -268,6 +268,64 @@ public class ExternalUserServiceTests
         Assert.Equal(string.Empty, result.LabCode);
     }
 
+    // ---- editing the customer and participant details: legacy CanEditCustomer/CanEditParticipant (only active participant) ----
+
+    [Fact]
+    public async Task ResolveAsync_SingleLabThatIsTheCustomersOnlyActiveParticipant_CanEditDetailsEvenWhenTheCustomerCannotOrderOnline()
+    {
+        var ssoIdExt = Guid.NewGuid();
+        var customerId = Guid.NewGuid();
+        await _customers.CreateAsync(new CoreCustomer { CustomerId = customerId, CanOrderOnline = false });
+        var labId = await AddLabAsync(customerId, "LAB001");
+        AddParticipantRow(ssoIdExt, labId, "LAB001");
+
+        var result = await ResolveAsync(ssoIdExt);
+
+        Assert.True(result.CanEditDetails);
+        Assert.False(result.CanOrderOnline);
+    }
+
+    [Fact]
+    public async Task ResolveAsync_SingleLabWithAnotherActiveParticipantOnTheCustomer_CannotEditDetails()
+    {
+        var ssoIdExt = Guid.NewGuid();
+        var customerId = Guid.NewGuid();
+        await _customers.CreateAsync(new CoreCustomer { CustomerId = customerId, CanOrderOnline = true });
+        var labId = await AddLabAsync(customerId, "LAB001");
+        await AddLabAsync(customerId, "LAB002");
+        AddParticipantRow(ssoIdExt, labId, "LAB001");
+
+        var result = await ResolveAsync(ssoIdExt);
+
+        Assert.False(result.CanEditDetails);
+    }
+
+    [Fact]
+    public async Task ResolveAsync_SingleLabWithAnotherParticipantOnTheCustomerInactive_CanEditDetails()
+    {
+        var ssoIdExt = Guid.NewGuid();
+        var customerId = Guid.NewGuid();
+        await _customers.CreateAsync(new CoreCustomer { CustomerId = customerId });
+        var labId = await AddLabAsync(customerId, "LAB001");
+        await AddLabAsync(customerId, "LAB002", isActive: false);
+        AddParticipantRow(ssoIdExt, labId, "LAB001");
+
+        var result = await ResolveAsync(ssoIdExt);
+
+        Assert.True(result.CanEditDetails);
+    }
+
+    [Fact]
+    public async Task ResolveAsync_SingleLabWhoseParticipantRecordIsMissing_CannotEditDetails()
+    {
+        var ssoIdExt = Guid.NewGuid();
+        AddParticipantRow(ssoIdExt, Guid.NewGuid(), "LAB001");
+
+        var result = await ResolveAsync(ssoIdExt);
+
+        Assert.False(result.CanEditDetails);
+    }
+
     // ---- online ordering (only evaluated for a single lab) ----
 
     [Fact]
@@ -630,7 +688,7 @@ public class ExternalUserServiceTests
 
         var lab = await CreateService().GetLabAsync(ssoIdExt, labId);
 
-        Assert.Equal(new ExternalLabContext(labId, "LAB001", "LAB001 Lab", CanOrderOnline: true), lab);
+        Assert.Equal(new ExternalLabContext(labId, "LAB001", "LAB001 Lab", CanOrderOnline: true, CanEditDetails: true), lab);
     }
 
     [Fact]
@@ -644,6 +702,19 @@ public class ExternalUserServiceTests
         AddParticipantRow(ssoIdExt, labId, "LAB001");
 
         Assert.False((await CreateService().GetLabAsync(ssoIdExt, labId))!.CanOrderOnline);
+    }
+
+    [Fact]
+    public async Task GetLabAsync_ACustomerWithTwoActiveLabs_CannotEditDetails()
+    {
+        var ssoIdExt = Guid.NewGuid();
+        var customerId = Guid.NewGuid();
+        await _customers.CreateAsync(new CoreCustomer { CustomerId = customerId, CanOrderOnline = true });
+        var labId = await AddLabAsync(customerId, "LAB001");
+        await AddLabAsync(customerId, "LAB002");
+        AddParticipantRow(ssoIdExt, labId, "LAB001");
+
+        Assert.False((await CreateService().GetLabAsync(ssoIdExt, labId))!.CanEditDetails);
     }
 
     [Fact]

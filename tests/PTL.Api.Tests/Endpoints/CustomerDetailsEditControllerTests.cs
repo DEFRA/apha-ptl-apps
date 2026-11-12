@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using PTL.Api.Controllers;
 using PTL.Api.Tests.Customer;
@@ -17,6 +18,40 @@ public class CustomerDetailsEditControllerTests
         var pendingUpdates = new FakePendingCustomerUpdateRepository();
         var service = new CustomerDetailsEditService(participants, customers, pendingUpdates);
         return (new CustomerDetailsEditController(service), participants, customers, pendingUpdates);
+    }
+
+    [Fact]
+    public async Task Get_AnotherActiveParticipantOnTheCustomer_ReturnsNotFound()
+    {
+        var (controller, participants, customers, _) = CreateController();
+        var customerId = Guid.NewGuid();
+        await customers.CreateAsync(new PTL.Core.Customer.Customer { CustomerId = customerId });
+        var participant = await participants.CreateAsync(new CoreParticipant { CustomerId = customerId });
+        await participants.CreateAsync(new CoreParticipant { CustomerId = customerId });
+
+        var result = await controller.Get(participant.ParticipantId, CancellationToken.None);
+
+        Assert.IsType<NotFoundResult>(result.Result);
+    }
+
+    [Fact]
+    public async Task Submit_AnotherActiveParticipantOnTheCustomer_ReturnsForbidden()
+    {
+        var (controller, participants, customers, pendingUpdates) = CreateController();
+        var customerId = Guid.NewGuid();
+        await customers.CreateAsync(new PTL.Core.Customer.Customer { CustomerId = customerId });
+        var participant = await participants.CreateAsync(new CoreParticipant { CustomerId = customerId });
+        await participants.CreateAsync(new CoreParticipant { CustomerId = customerId });
+        var request = new CustomerDetailsEditSaveRequest(
+            "Jane Doe", "Test Lab", "1 Test Street", "Testville", "", "", "",
+            Guid.NewGuid(), "01234 567890", "", "jane@example.com",
+            "", "Test Lab Invoicing", "1 Test Street", "Testville", "", "", "",
+            Guid.NewGuid(), "", "", "");
+
+        var result = await controller.Submit(participant.ParticipantId, request, CancellationToken.None);
+
+        Assert.Equal(StatusCodes.Status403Forbidden, Assert.IsType<StatusCodeResult>(result.Result).StatusCode);
+        Assert.Null(await pendingUpdates.GetByCustomerIdAsync(customerId));
     }
 
     [Fact]

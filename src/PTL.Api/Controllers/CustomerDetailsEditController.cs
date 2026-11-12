@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using PTL.Contracts.Customer;
 using PTL.Core.Customer;
+using PTL.Core.Participant;
 
 namespace PTL.Api.Controllers;
 
@@ -38,6 +39,10 @@ public sealed class CustomerDetailsEditController(ICustomerDetailsEditService cu
         catch (PendingCustomerUpdateAlreadySubmittedException ex)
         {
             return Ok(new CustomerDetailsEditSaveResult(false, new Dictionary<string, string[]> { [string.Empty] = [ex.Message] }));
+        }
+        catch (DetailsEditNotPermittedException)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden);
         }
     }
 

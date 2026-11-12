@@ -13,6 +13,42 @@ public class ParticipantDetailsEditServiceTests
     }
 
     [Fact]
+    public async Task GetAsync_AnotherActiveParticipantOnTheCustomer_ReturnsNull()
+    {
+        var (service, participants, _) = CreateService();
+        var customerId = Guid.NewGuid();
+        var participant = await participants.CreateAsync(new PTL.Core.Participant.Participant { CustomerId = customerId, LabCode = "001" });
+        await participants.CreateAsync(new PTL.Core.Participant.Participant { CustomerId = customerId, LabCode = "002" });
+
+        Assert.Null(await service.GetAsync(participant.ParticipantId));
+    }
+
+    [Fact]
+    public async Task GetAsync_TheOtherParticipantOnTheCustomerIsInactive_ReturnsTheDetails()
+    {
+        var (service, participants, _) = CreateService();
+        var customerId = Guid.NewGuid();
+        var participant = await participants.CreateAsync(new PTL.Core.Participant.Participant { CustomerId = customerId, LabCode = "001" });
+        await participants.CreateAsync(new PTL.Core.Participant.Participant { CustomerId = customerId, LabCode = "002", IsActive = false });
+
+        Assert.NotNull(await service.GetAsync(participant.ParticipantId));
+    }
+
+    [Fact]
+    public async Task SubmitAsync_AnotherActiveParticipantOnTheCustomer_IsRefusedAndDoesNotPersist()
+    {
+        var (service, participants, pendingUpdates) = CreateService();
+        var customerId = Guid.NewGuid();
+        var participant = await participants.CreateAsync(new PTL.Core.Participant.Participant { CustomerId = customerId, LabCode = "001" });
+        await participants.CreateAsync(new PTL.Core.Participant.Participant { CustomerId = customerId, LabCode = "002" });
+
+        await Assert.ThrowsAsync<DetailsEditNotPermittedException>(() =>
+            service.SubmitAsync(participant.ParticipantId, new PendingParticipantUpdate { ContactName = "Anyone" }));
+
+        Assert.Null(await pendingUpdates.GetByParticipantIdAsync(participant.ParticipantId));
+    }
+
+    [Fact]
     public async Task GetAsync_ParticipantNotFound_ReturnsNull()
     {
         var (service, _, _) = CreateService();

@@ -45,6 +45,35 @@ public abstract class PtlAccountControllerBase<T> : Controller where T : class, 
     public virtual Task<IActionResult> Logout() => SignOutAndRedirectToHomeAsync();
 
     /// <summary>
+    /// Called by session-timeout.js when the user chooses to stay signed in. Reaching this [Authorize]-by-default
+    /// action at all (cookie validation and any token refresh already ran in the pipeline) proves the session is still
+    /// valid and slides the cookie; a failed or redirected response tells the script to show Session expired instead.
+    /// </summary>
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public IActionResult ExtendSession() => NoContent();
+
+    /// <summary>
+    /// Reached when the inactivity countdown elapses with no action. Signs out of this app's own cookie only (not the
+    /// identity provider's sign-out), so a live single sign-on session signs the user straight back in on the next
+    /// sign-in. Signed out unconditionally so a stale principal can never slip through; NoStore so a cached copy can
+    /// never mask the sign-out that just happened.
+    /// </summary>
+    [HttpGet]
+    [AllowAnonymous]
+    [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
+    public async Task<IActionResult> SessionExpired()
+    {
+        await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+
+        // SignOutAsync only affects later requests; clear the user for this response so the header does not
+        // still show "Signed in as" on the page that says the session has ended.
+        HttpContext.User = new ClaimsPrincipal(new ClaimsIdentity());
+
+        return View();
+    }
+
+    /// <summary>
     /// Redirects to an external identity provider's OIDC challenge - shared by every PTL web
     /// front-end that signs in via an external IdP (CIDM for external users, Entra ID for internal
     /// users) instead of this base class's default username/password flow.

@@ -35,7 +35,9 @@
         && (string.Equals(currentAction, "Login", StringComparison.OrdinalIgnoreCase)
             || string.Equals(currentAction, "SignedOut", StringComparison.OrdinalIgnoreCase)
             || string.Equals(currentAction, "NotPermitted", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(currentAction, "AccessDenied", StringComparison.OrdinalIgnoreCase));
+            || string.Equals(currentAction, "AccessDenied", StringComparison.OrdinalIgnoreCase)
+            // The user has just been signed out, so a Home trail would only bounce them back to sign-in.
+            || string.Equals(currentAction, "SessionExpired", StringComparison.OrdinalIgnoreCase));
 
     // Choosing a lab is the step before Home, so there is no trail above it (its "Home" link would only bring the user back here).
     var isLabSelectionPage = string.Equals(currentController, "Lab", StringComparison.OrdinalIgnoreCase)
@@ -58,6 +60,10 @@
     </main>
 </div>
 @await Html.PartialAsync("_Footer", HelpLink.Href(Url, currentController, currentAction))
+@if (User.Identity?.IsAuthenticated == true)
+{
+    @await Html.PartialAsync("_SessionTimeoutWarning")
+}
 <script type="module" src="/js/govuk-frontend-6.5.0.min.js"></script>
 <script type="module">
         import {

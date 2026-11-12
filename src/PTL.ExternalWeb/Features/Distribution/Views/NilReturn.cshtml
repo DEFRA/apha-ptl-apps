@@ -1,0 +1,39 @@
+@model PTL.ExternalWeb.Features.Distribution.DistributionNilReturnViewModel
+@{
+    ViewData["Title"] = $"Nil return - {Model.Heading}";
+
+    var errors = ViewData.ModelState
+        .Where(entry => entry.Value?.Errors.Count > 0)
+        .SelectMany(entry => entry.Value!.Errors.Select(error => (Field: entry.Key, Message: error.ErrorMessage)))
+        .ToList();
+}
+
+<govuk-error-summary errors="@errors" />
+
+<h1 class="govuk-heading-l">Nil return</h1>
+<h2 class="govuk-heading-m">@Model.Heading</h2>
+
+<p class="govuk-body">Use this page to tell us why you are not submitting results for this distribution.</p>
+
+<form method="post" asp-action="NilReturn">
+    @Html.AntiForgeryToken()
+    <input type="hidden" asp-for="MonthlyDistributionSchemeId" />
+
+    <div class="govuk-form-group @(ViewData.ModelState.ContainsKey(nameof(Model.NilReturnReason)) ? "govuk-form-group--error" : string.Empty)">
+        <label class="govuk-label" asp-for="NilReturnReason">Reason for nil return</label>
+        <div id="nil-return-hint" class="govuk-hint">Enter up to 100 characters.</div>
+        @if (ViewData.ModelState.TryGetValue(nameof(Model.NilReturnReason), out var nilReturnReasonError) && nilReturnReasonError.Errors.Count > 0)
+        {
+            <p id="NilReturnReason-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @nilReturnReasonError.Errors[0].ErrorMessage</p>
+        }
+        <input class="govuk-input @(ViewData.ModelState.ContainsKey(nameof(Model.NilReturnReason)) ? "govuk-input--error" : string.Empty)"
+               asp-for="NilReturnReason"
+               maxlength="100"
+               aria-describedby="nil-return-hint" />
+    </div>
+
+    <div class="govuk-button-group">
+        <button type="submit" name="command" value="submit" class="govuk-button" data-module="govuk-button">Submit nil return</button>
+        <button type="submit" name="command" value="cancel" class="govuk-button govuk-button--secondary" data-module="govuk-button" formnovalidate>Cancel</button>
+    </div>
+</form>

@@ -21,6 +21,13 @@ public static class ExternalPolicies
     public const string PrimaryContact = nameof(PrimaryContact);
 
     /// <summary>
+    /// Editing the customer and participant details: the lab's primary contact, and only while it is the customer's only active
+    /// participant (legacy CanEditCustomer/CanEditParticipant). The claim is set at sign-in and on choosing a lab; the API
+    /// re-checks the rule on every request.
+    /// </summary>
+    public const string CanEditDetails = nameof(CanEditDetails);
+
+    /// <summary>
     /// Registers the role claims transformation, the policies above, the access-denied
     /// audit logger and a fallback policy that makes every endpoint require a signed-in user
     /// unless it opts out with [AllowAnonymous].
@@ -38,7 +45,10 @@ public static class ExternalPolicies
             .AddPolicy(LabUser, policy => policy.RequireRole(ExternalRoleNames.LabUser))
             .AddPolicy(PrimaryContact, policy => policy
                 .RequireRole(ExternalRoleNames.Participant)
-                .RequireAssertion(context => !context.User.IsLabUser()));
+                .RequireAssertion(context => !context.User.IsLabUser()))
+            .AddPolicy(CanEditDetails, policy => policy
+                .RequireRole(ExternalRoleNames.Participant)
+                .RequireAssertion(context => !context.User.IsLabUser() && context.User.CanEditDetails()));
 
         return services;
     }

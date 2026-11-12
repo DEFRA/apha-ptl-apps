@@ -50,6 +50,42 @@ public class HomeNavigationSmokeTests : IClassFixture<PtlExternalWebTestFactory>
     }
 
     [Fact]
+    public async Task ParticipantWhoIsNotTheCustomersOnlyActiveParticipant_SeesNoEditCardsOrMyAccountMenu()
+    {
+        var client = _factory.CreateClient();
+        var cookies = new Dictionary<string, string>();
+        var signInResponse = await client.GetAsync(
+            $"{PtlExternalWebTestFactory.TestSignInPath}?roles={Uri.EscapeDataString("Participant,Viewer")}&labCode=LAB001&canEditDetails=false");
+        CookieForwardingHttpClient.CaptureCookies(signInResponse, cookies);
+
+        var body = await (await CookieForwardingHttpClient.SendWithCookiesAsync(client, HttpMethod.Get, "/Home/Index", cookies))
+            .Content.ReadAsStringAsync();
+
+        // Legacy hid CanEditCustomer/CanEditParticipant for everyone but the customer's only active participant.
+        Assert.DoesNotContain("Edit customer details", body);
+        Assert.DoesNotContain("Edit participant details", body);
+        Assert.DoesNotContain("My account", body);
+        // Their other cards are unaffected.
+        Assert.Contains("Enter results", body);
+    }
+
+    [Theory]
+    [InlineData("/Customer/Index")]
+    [InlineData("/Participant/Index")]
+    public async Task EditPages_ParticipantWhoIsNotTheCustomersOnlyActiveParticipant_AreForbidden(string path)
+    {
+        var client = _factory.CreateClient();
+        var cookies = new Dictionary<string, string>();
+        var signInResponse = await client.GetAsync(
+            $"{PtlExternalWebTestFactory.TestSignInPath}?roles={Uri.EscapeDataString("Participant,Viewer")}&participantId={Guid.NewGuid()}&canEditDetails=false");
+        CookieForwardingHttpClient.CaptureCookies(signInResponse, cookies);
+
+        var response = await CookieForwardingHttpClient.SendWithCookiesAsync(client, HttpMethod.Get, path, cookies);
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
     public async Task ParticipantWithoutCanOrderOnline_StillSeesTheEditCustomerAndParticipantCards()
     {
         // A customer with several active participants gets no CanOrderOnline claim; the edit cards do not depend on it.

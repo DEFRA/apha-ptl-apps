@@ -18,7 +18,9 @@ public sealed record ExternalUserResolutionResult(
     Guid? TestConsultantId = null,
     Guid? LabUserId = null,
     // Only ever true when exactly one active lab resolved and its Customer has CanOrderOnline set.
-    bool CanOrderOnline = false)
+    bool CanOrderOnline = false,
+    // Only ever true when exactly one active lab resolved and it is its customer's only active participant.
+    bool CanEditDetails = false)
 {
     public bool IsResolved => Status == ExternalUserResolutionStatus.Resolved;
 

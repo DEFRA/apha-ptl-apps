@@ -29,6 +29,11 @@ public sealed class ParticipantDetailsEditApiClient(HttpClient httpClient) : IPa
     public async Task<ParticipantDetailsEditSaveResult> SubmitAsync(Guid participantId, ParticipantDetailsEditSaveRequest request, CancellationToken cancellationToken = default)
     {
         var response = await httpClient.PostAsJsonAsync($"/api/participant-details-edit/{participantId}", request, cancellationToken);
+        if (response.StatusCode == HttpStatusCode.Forbidden)
+        {
+            return new ParticipantDetailsEditSaveResult(false, new Dictionary<string, string[]> { [string.Empty] = ["You can no longer edit these details because your customer has another active participant."] });
+        }
+
         response.EnsureSuccessStatusCode();
         var result = await response.Content.ReadFromJsonAsync<ParticipantDetailsEditSaveResult>(cancellationToken);
         return result ?? new ParticipantDetailsEditSaveResult(false, new Dictionary<string, string[]> { [string.Empty] = ["The request was invalid."] });

@@ -11,7 +11,7 @@ namespace PTL.ExternalWeb.Features.Customer;
 
 // Legacy EditCustomerDetails.aspx (tracker row 6) - participant self-service edit of
 // customer/invoice details, submitted as a pending update for admin approval (Story 744638).
-[Authorize(Policy = ExternalPolicies.PrimaryContact)]
+[Authorize(Policy = ExternalPolicies.CanEditDetails)]
 public sealed class CustomerController(ICustomerDetailsEditApiClient customerDetailsEditApiClient, ILookupApiClient lookupApiClient) : Controller
 {
     private const string PleaseSelectOptionText = "Please select";

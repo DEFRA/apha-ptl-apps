@@ -14,7 +14,7 @@
     var hasLabCode = !string.IsNullOrWhiteSpace(User.FindFirst(ExternalUserClaimTypes.LabCode)?.Value);
     // Unlike the Home cards (disabled once submitted), legacy hid a Create order menu link after the year's order was submitted.
     bool IsVisible(NavigationItem item) =>
-        item.IsVisibleTo(roles, isLabUser, canOrderOnline, hasLabCode)
+        item.IsVisibleTo(roles, isLabUser, canOrderOnline, hasLabCode, User.CanEditDetails())
         && item.IsOrderYearOpen(Model.CanCreateCurrentYearOrder, Model.CanCreateNextYearOrder);
 
     var visibleGroups = NavigationProvider.Build()

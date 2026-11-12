@@ -23,6 +23,18 @@ public class LabSessionTests
         ], "Test", ClaimTypes.Name, ClaimTypes.Role));
 
     [Fact]
+    public void WithLab_AddsTheEditDetailsClaimOnlyWhenTheNewLabMayEdit()
+    {
+        var staleClaim = new Claim(ExternalUserClaimTypes.CanEditDetails, "true");
+
+        var mayEdit = LabSession.WithLab(Principal(), new ExternalLabContext(NewLab, "NEW", "New Lab", CanOrderOnline: false, CanEditDetails: true), labCount: 2);
+        var mayNotEdit = LabSession.WithLab(Principal(staleClaim), new ExternalLabContext(NewLab, "NEW", "New Lab", CanOrderOnline: false, CanEditDetails: false), labCount: 2);
+
+        Assert.True(mayEdit.CanEditDetails());
+        Assert.False(mayNotEdit.CanEditDetails());
+    }
+
+    [Fact]
     public void WithLab_ReplacesEveryLabClaimAndKeepsTheRest()
     {
         var result = LabSession.WithLab(Principal(new Claim("other", "kept")), new ExternalLabContext(NewLab, "NEW", "New Lab", CanOrderOnline: false), labCount: 2);
