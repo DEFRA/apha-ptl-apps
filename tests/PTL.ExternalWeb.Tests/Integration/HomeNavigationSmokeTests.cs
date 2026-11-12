@@ -50,6 +50,16 @@ public class HomeNavigationSmokeTests : IClassFixture<PtlExternalWebTestFactory>
     }
 
     [Fact]
+    public async Task ParticipantWithoutCanOrderOnline_StillSeesTheEditCustomerAndParticipantCards()
+    {
+        // A customer with several active participants gets no CanOrderOnline claim; the edit cards do not depend on it.
+        var body = await GetHomePageAsSignedInUserAsync(roles: "Participant,Viewer", labCode: "LAB001");
+
+        Assert.Contains("Edit customer details", body);
+        Assert.Contains("Edit participant details", body);
+    }
+
+    [Fact]
     public async Task ParticipantWithCanOrderOnline_OrdersMenuAndCardDisplayed()
     {
         var client = _factory.CreateClient();
@@ -67,12 +77,53 @@ public class HomeNavigationSmokeTests : IClassFixture<PtlExternalWebTestFactory>
     }
 
     [Fact]
+    public async Task HomeCards_AreGroupedInLegacyOrder_OrdersThenSchemesThenResultsThenAccounts()
+    {
+        var client = _factory.CreateClient();
+        var cookies = new Dictionary<string, string>();
+        var signInResponse = await client.GetAsync(
+            $"{PtlExternalWebTestFactory.TestSignInPath}?roles={Uri.EscapeDataString("Participant,Viewer")}&canOrderOnline=true&labCode=LAB001");
+        CookieForwardingHttpClient.CaptureCookies(signInResponse, cookies);
+
+        var homeResponse = await CookieForwardingHttpClient.SendWithCookiesAsync(client, HttpMethod.Get, "/Home/Index", cookies);
+        var body = await homeResponse.Content.ReadAsStringAsync();
+
+        var headings = Regex.Matches(body, "<h2 class=\"govuk-heading-l\">(?<text>[^<]+)</h2>")
+            .Select(match => match.Groups["text"].Value.Trim())
+            .ToList();
+        Assert.Equal(["Orders", "Schemes", "Results", "My account", "Lab users"], headings);
+    }
+
+    [Fact]
+    public async Task ParticipantWithoutLabCode_MenuHidesSchemesAndResultsLinksButHomeCardsStay()
+    {
+        // Legacy NavigationBar needed a Lab Code for these links; the Home cards only checked the Participant role.
+        var body = await GetHomePageAsSignedInUserAsync(roles: "Participant");
+
+        Assert.DoesNotMatch("app-menu-panel__link\"[^>]*>View schemes", body);
+        Assert.DoesNotMatch("app-menu-panel__link\"[^>]*>Enter results", body);
+        Assert.DoesNotMatch("app-menu-panel__link\"[^>]*>View results", body);
+        Assert.Contains("List of current proficiency tests available", body);
+        Assert.Contains("Submit results for a current distribution", body);
+    }
+
+    [Fact]
+    public async Task ParticipantWithLabCode_MenuShowsSchemesAndResultsLinks()
+    {
+        var body = await GetHomePageAsSignedInUserAsync(roles: "Participant", labCode: "LAB001");
+
+        Assert.Matches("app-menu-panel__link\"[^>]*>View schemes", body);
+        Assert.Matches("app-menu-panel__link\"[^>]*>Enter results", body);
+        Assert.Matches("app-menu-panel__link\"[^>]*>View results", body);
+    }
+
+    [Fact]
     public async Task NavigationCardAndSideNavItem_BothRenderForSameEntry_AndReachTheSameDestination()
     {
         // AC: selecting a navigation card reaches the same destination as the equivalent side-nav
         // item - both are driven by the same NavigationProvider entry, so prove it end-to-end
         // rather than relying on construction alone.
-        var body = await GetHomePageAsSignedInUserAsync(roles: "Participant");
+        var body = await GetHomePageAsSignedInUserAsync(roles: "Participant", labCode: "LAB001");
 
         var hrefs = Regex.Matches(body, "href=\"(?<href>[^\"]*Distribution/Current[^\"]*title=Enter(%20|\\+)results[^\"]*)\"")
             .Select(match => match.Groups["href"].Value)
@@ -303,14 +354,15 @@ public class HomeNavigationSmokeTests : IClassFixture<PtlExternalWebTestFactory>
         Assert.DoesNotContain("has not been migrated to the new service yet", distributionBody);
     }
 
-    private async Task<string> GetHomePageAsSignedInUserAsync(string? roles)
+    private async Task<string> GetHomePageAsSignedInUserAsync(string? roles, string? labCode = null)
     {
         var client = _factory.CreateClient();
         var cookies = new Dictionary<string, string>();
 
         var signInUrl = roles is null
             ? PtlExternalWebTestFactory.TestSignInPath
-            : $"{PtlExternalWebTestFactory.TestSignInPath}?roles={Uri.EscapeDataString(roles)}";
+            : $"{PtlExternalWebTestFactory.TestSignInPath}?roles={Uri.EscapeDataString(roles)}"
+                + (labCode is null ? string.Empty : $"&labCode={Uri.EscapeDataString(labCode)}");
         var signInResponse = await client.GetAsync(signInUrl);
         CookieForwardingHttpClient.CaptureCookies(signInResponse, cookies);
 
