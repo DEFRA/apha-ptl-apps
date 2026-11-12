@@ -12,6 +12,7 @@ namespace PTL.Common.Auth;
 public static class OpenIdConnectEventHelpers
 {
     private const string AccessTokenName = "access_token";
+    private const string ErrorPath = "/Home/Error";
 
     // Claims every provider's app code reads after sign-in; each provider adds its own on top via RetainedClaims.
     private static readonly string[] CommonRetainedClaimTypes =
@@ -101,12 +102,22 @@ public static class OpenIdConnectEventHelpers
         return Task.CompletedTask;
     }
 
+    /// <summary>
+    /// Denies sign-in from <c>TokenValidated</c> by redirecting to the generic error page. Runs before the OIDC handler
+    /// signs the principal into the cookie scheme, so no local session is created.
+    /// </summary>
+    public static void DenyWithErrorPage(TokenValidatedContext context)
+    {
+        context.HandleResponse();
+        context.HttpContext.Response.Redirect(ErrorPath);
+    }
+
     /// <summary>Logs then hides raw OIDC failure detail from the user behind a generic error page.</summary>
     public static Task HandleRemoteFailureAsync(RemoteFailureContext context, Action<Exception?> logFailure)
     {
         logFailure(context.Failure);
         context.HandleResponse();
-        context.Response.Redirect("/Home/Error");
+        context.Response.Redirect(ErrorPath);
         return Task.CompletedTask;
     }
 }
