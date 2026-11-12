@@ -1,6 +1,3 @@
-using System.Security.Claims;
-using Microsoft.AspNetCore.Authentication;
-using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -53,33 +50,6 @@ namespace PTL.ExternalWeb.Features.Account
         [HttpGet]
         [AllowAnonymous]
         public IActionResult SignedOut() => View();
-
-        // Called by session-timeout.js when the user selects Yes on the "Extend Session?" warning. Reaching
-        // this [Authorize]-by-default action at all (cookie validation and CIDM token refresh already ran in
-        // the pipeline) proves the session is still valid and slides the cookie; a failed or redirected
-        // response tells the script to show Session Expired instead.
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public IActionResult ExtendSession() => NoContent();
-
-        // Reached when the warning's countdown elapses with no action. Signs out of THIS app's cookie only -
-        // not CIDM's federated sign-out - so a live CIDM single sign-on session re-authorises the user
-        // automatically when they select OK, and CIDM's own sign-in appears otherwise. Signed out
-        // unconditionally so a stale principal can never slip through; NoStore so a cached copy can never
-        // mask the sign-out that just happened.
-        [HttpGet]
-        [AllowAnonymous]
-        [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
-        public async Task<IActionResult> SessionExpired()
-        {
-            await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
-
-            // SignOutAsync only affects later requests; clear the user for this response so the header
-            // does not still show "Signed in as" on the page that says the session has ended.
-            HttpContext.User = new ClaimsPrincipal(new ClaimsIdentity());
-
-            return View();
-        }
 
         // Reached via ExternalUserResolver's denial redirect when the CIDM identity doesn't resolve to
         // an active PTL record - no local cookie exists at this point, since TokenValidated redirects

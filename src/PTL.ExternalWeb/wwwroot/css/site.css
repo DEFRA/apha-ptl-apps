@@ -548,3 +548,9 @@
 .app-session-timeout-dialog .govuk-button-group {
   margin-bottom: 0;
 }
+
+/* A link that sits beside a checkbox's label (the terms link) instead of wrapping below it as a hint would; it still wraps on a narrow screen. */
+.govuk-checkboxes__item .app-checkboxes__inline-link {
+  align-self: center;
+  padding: 8px 0 5px;
+}
