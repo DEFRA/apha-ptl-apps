@@ -8,7 +8,7 @@ using PTL.Core.Viewer;
 namespace PTL.Core.LoginInstructions;
 
 // The address, template and placeholder values a login instructions email is built from.
-public sealed record LoginInstructionRecipient(string TemplateName, string TemplateId, string EmailAddress, Dictionary<string, string> Personalisation);
+public sealed record LoginInstructionRecipient(string TemplateName, string TemplateId, string EmailAddress, Dictionary<string, string> Personalisation, bool IsActive = true);
 
 public interface ILoginInstructionRecipientResolver
 {
@@ -69,7 +69,8 @@ public sealed class LoginInstructionRecipientResolver(
                     ["LabCode"] = participant.LabCode,
                     ["LabName"] = participant.LabName,
                     [ExternalAppLinkField] = externalOptions.Value.AppUrl,
-                });
+                },
+                participant.IsActive);
     }
 
     private async Task<LoginInstructionRecipient?> FindViewerAsync(Guid id, CancellationToken cancellationToken)
@@ -101,6 +102,7 @@ public sealed class LoginInstructionRecipientResolver(
                 {
                     ["ConsultantName"] = consultant.Name,
                     [ExternalAppLinkField] = externalOptions.Value.AppUrl,
-                });
+                },
+                !consultant.IsInactive);
     }
 }

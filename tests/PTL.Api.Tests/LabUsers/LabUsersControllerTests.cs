@@ -150,7 +150,7 @@ public class LabUsersControllerTests
 
         var body = Assert.IsType<LoginInstructionsResponse>(Assert.IsType<OkObjectResult>(response.Result).Value);
         Assert.False(body.Success);
-        Assert.Contains("active lab user", body.Message);
+        Assert.Contains("active user", body.Message);
     }
 
     [Fact]

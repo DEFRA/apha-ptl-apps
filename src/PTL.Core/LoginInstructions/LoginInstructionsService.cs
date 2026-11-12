@@ -20,6 +20,12 @@ public sealed partial class LoginInstructionsService(
             return new LoginInstructionsResult(LoginInstructionsOutcome.NotFound);
         }
 
+        if (!recipient.IsActive)
+        {
+            LogNotActive(logger, userType, id);
+            return new LoginInstructionsResult(LoginInstructionsOutcome.NotActive);
+        }
+
         if (string.IsNullOrWhiteSpace(recipient.EmailAddress))
         {
             LogNoEmailAddress(logger, userType, id);
@@ -55,4 +61,8 @@ public sealed partial class LoginInstructionsService(
     [LoggerMessage(EventId = 103, Level = LogLevel.Warning,
         Message = "Login instructions email not sent: the record has no email address. UserType={UserType} UserId={UserId}")]
     private static partial void LogNoEmailAddress(ILogger logger, LoginInstructionUserType userType, Guid userId);
+
+    [LoggerMessage(EventId = 104, Level = LogLevel.Warning,
+        Message = "Login instructions email not sent: the user is inactive. UserType={UserType} UserId={UserId}")]
+    private static partial void LogNotActive(ILogger logger, LoginInstructionUserType userType, Guid userId);
 }
