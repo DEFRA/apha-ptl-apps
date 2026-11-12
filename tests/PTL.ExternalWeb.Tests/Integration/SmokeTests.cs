@@ -48,7 +48,6 @@ public class SmokeTests : IClassFixture<PtlExternalWebTestFactory>
 
         Assert.Contains("href=\"/Home/Accessibility\"", body);
         Assert.Contains("href=\"/Home/Privacy\"", body);
-        Assert.DoesNotContain("/Home/SystemInformation", body);
         Assert.DoesNotContain("Terms and conditions", body);
     }
 

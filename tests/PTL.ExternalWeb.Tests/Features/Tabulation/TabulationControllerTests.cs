@@ -73,11 +73,12 @@ public class TabulationControllerTests
         Assert.NotNull(options);
         Assert.Equal("A3", options!.Format);
         Assert.True(options.Landscape);
-        Assert.Equal(0.9f, options.Scale, 3);
+        Assert.True(options.JavaScriptEnabled);
+        Assert.Equal(0.72f, options.Scale, 3);
         Assert.Equal("12mm", options.MarginTop);
         Assert.Equal("16mm", options.MarginBottom);
-        Assert.Equal("8mm", options.MarginLeft);
-        Assert.Equal("8mm", options.MarginRight);
+        Assert.Equal("3mm", options.MarginLeft);
+        Assert.Equal("3mm", options.MarginRight);
         Assert.Contains("pageNumber", options.FooterTemplate, StringComparison.Ordinal);
         Assert.Contains("totalPages", options.FooterTemplate, StringComparison.Ordinal);
         Assert.Contains("D1a/S1 BT: Brucella - Summary.", options.FooterTemplate, StringComparison.Ordinal);

@@ -34,11 +34,12 @@ public sealed class TabulationPdfService(
         var options = new PdfRenderOptions(
             Format: "A3",
             Landscape: true,
-            Scale: 0.9f,
+            Scale: 0.72f,
             MarginTop: "12mm",
             MarginBottom: "16mm",
-            MarginLeft: "8mm",
-            MarginRight: "8mm",
+            MarginLeft: "3mm",
+            MarginRight: "3mm",
+            JavaScriptEnabled: true,
             FooterTemplate: "<div style=\"width:100%;font-size:8px;font-family:Arial,sans-serif;text-align:center\">"
                 + $"{footerTitle} Page <span class=\"pageNumber\"></span> of <span class=\"totalPages\"></span></div>");
 

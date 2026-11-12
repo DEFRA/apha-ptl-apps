@@ -703,6 +703,48 @@ public partial class OrderRouteSmokeTests : IClassFixture<PtlExternalWebTestFact
     }
 
     [Fact]
+    public async Task Menu_OrderAlreadySubmittedForCurrentYear_HidesThatYearsLinkAndKeepsTheNextYears()
+    {
+        var api = new FakeCreateOrderApiClient { Eligibility = new(true, false, true, "2026/27", "2027/28") };
+        var client = CreateClient(api);
+        var cookies = await SignInAsync(client);
+
+        var homeBody = await GetAsync(client, cookies, "/Home/Index");
+
+        // Legacy hid the menu link once submitted (the Home card is disabled instead).
+        Assert.DoesNotMatch("app-menu-panel__link\"[^>]*>Create order for current year", homeBody);
+        Assert.Matches("app-menu-panel__link\"[^>]*>Create order for next year", homeBody);
+        Assert.Contains("Order has been submitted for 2026/27.", homeBody);
+    }
+
+    [Fact]
+    public async Task Menu_OrderAlreadySubmittedForNextYear_HidesThatYearsLinkAndKeepsTheCurrentYears()
+    {
+        var api = new FakeCreateOrderApiClient { Eligibility = new(true, true, false, "2026/27", "2027/28") };
+        var client = CreateClient(api);
+        var cookies = await SignInAsync(client);
+
+        var body = await GetAsync(client, cookies, "/Order/CurrentYear");
+
+        // The menu is on every page, not just Home.
+        Assert.Matches("app-menu-panel__link\"[^>]*>Create order for current year", body);
+        Assert.DoesNotMatch("app-menu-panel__link\"[^>]*>Create order for next year", body);
+    }
+
+    [Fact]
+    public async Task Menu_EligibilityLookupFails_StillShowsBothYearLinks()
+    {
+        var api = new FakeCreateOrderApiClient { EligibilityException = new HttpRequestException("down") };
+        var client = CreateClient(api);
+        var cookies = await SignInAsync(client);
+
+        var body = await GetAsync(client, cookies, "/Home/Index");
+
+        Assert.Matches("app-menu-panel__link\"[^>]*>Create order for current year", body);
+        Assert.Matches("app-menu-panel__link\"[^>]*>Create order for next year", body);
+    }
+
+    [Fact]
     public async Task Home_OrderAlreadySubmittedForNextYear_DisablesThatYearsCardAndShowsTheMessage()
     {
         var api = new FakeCreateOrderApiClient { Eligibility = new(true, true, false, "2026/27", "2027/28") };

@@ -30,6 +30,12 @@ public static class NavigationProvider
     private const string LabUserControllerName = "LabUser";
     private const string CreateNewOrderText = "Create new order";
 
+    // Legacy Home.aspx lists Orders, Schemes, Results, Accounts, while its top menu (NavigationBar.ascx) lists Schemes, Orders, Results.
+    private static readonly string[] HomeSectionOrder = ["Orders", "Schemes", "Results", MyAccountText, LabUsersText];
+
+    public static IReadOnlyList<NavigationItem> BuildForHome() =>
+        [.. Build().OrderBy(section => Array.IndexOf(HomeSectionOrder, section.Text))];
+
     public static IReadOnlyList<NavigationItem> Build() =>
     [
         new NavigationItem
@@ -43,7 +49,8 @@ public static class NavigationProvider
                     Text = "View schemes",
                     ControllerName = "Scheme",
                     ActionName = IndexAction,
-                    Description = "List of current proficiency tests available"
+                    Description = "List of current proficiency tests available",
+                    RequireLabCode = true
                 }
             ]
         },
@@ -87,7 +94,8 @@ public static class NavigationProvider
                     ControllerName = DistributionControllerName,
                     ActionName = "Current",
                     Description = "Submit results for a current distribution",
-                    RequiredRole = ExternalRoleNames.Participant
+                    RequiredRole = ExternalRoleNames.Participant,
+                    RequireLabCode = true
                 },
                 new NavigationItem
                 {
@@ -95,7 +103,8 @@ public static class NavigationProvider
                     ControllerName = DistributionControllerName,
                     ActionName = "Previous",
                     Description = "View your results from a previous proficiency test",
-                    RequiredRole = ExternalRoleNames.Participant
+                    RequiredRole = ExternalRoleNames.Participant,
+                    RequireLabCode = true
                 },
                 new NavigationItem
                 {
