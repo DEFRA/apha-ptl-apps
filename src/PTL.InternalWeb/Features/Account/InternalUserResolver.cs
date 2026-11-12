@@ -1,9 +1,12 @@
 using System.Security.Claims;
 using Microsoft.Extensions.Logging;
 using PTL.ApiClient;
+using PTL.Auth.Entra;
 using PTL.Auth.Entra.Claims;
 using PTL.Auth.Entra.Events;
+using PTL.Common.Graph;
 using PTL.Contracts.InternalUser;
+using PTL.InternalWeb.Infrastructure;
 
 namespace PTL.InternalWeb.Features.Account;
 
@@ -16,7 +19,11 @@ namespace PTL.InternalWeb.Features.Account;
 /// </summary>
 /// <param name="internalUserApiClient">Calls PTL.Api's internal-user resolve endpoint.</param>
 /// <param name="logger">Logs resolution failures so a sign-in landing on /Home/Error is diagnosable.</param>
-public sealed partial class InternalUserResolver(IInternalUserApiClient internalUserApiClient, ILogger<InternalUserResolver> logger) : IEntraInternalUserResolver
+/// <param name="employeeIdLookup">Looks up the employee id when the token has no usable account claims; no lookup is made without one.</param>
+public sealed partial class InternalUserResolver(
+    IInternalUserApiClient internalUserApiClient,
+    ILogger<InternalUserResolver> logger,
+    IEmployeeIdLookup? employeeIdLookup = null) : IEntraInternalUserResolver
 {
     /// <inheritdoc />
     public async Task<EntraInternalUserResolution> ResolveAsync(ClaimsPrincipal principal, CancellationToken cancellationToken)
@@ -49,6 +56,13 @@ public sealed partial class InternalUserResolver(IInternalUserApiClient internal
         var username = !string.IsNullOrEmpty(domainName) && !string.IsNullOrEmpty(samAccountName)
             ? $"{domainName}\\{samAccountName}"
             : samAccountName;
+
+        // The token may not carry the on-premises claims (or only a bare account name), so the directory's employee id
+        // - looked up by the object id - gives the DEMETER\employeeId form instead.
+        if (!username.Contains('\\', StringComparison.Ordinal))
+        {
+            username = await FindEmployeeUsernameAsync(entraSsoId, cancellationToken) ?? username;
+        }
 
         if (string.IsNullOrEmpty(username))
         {
@@ -85,6 +99,37 @@ public sealed partial class InternalUserResolver(IInternalUserApiClient internal
             [InternalUserClaimTypes.ResolvedRoles] = string.Join(',', response.Roles)
         });
     }
+
+    private async Task<string?> FindEmployeeUsernameAsync(Guid entraSsoId, CancellationToken cancellationToken)
+    {
+        if (employeeIdLookup is null)
+        {
+            return null;
+        }
+
+        try
+        {
+            var username = EmployeeUserName.FromEmployeeId(await employeeIdLookup.FindEmployeeIdAsync(entraSsoId, cancellationToken));
+            if (username is null)
+            {
+                LogEmployeeIdNotFound(entraSsoId);
+            }
+
+            return username;
+        }
+        catch (GraphException exception)
+        {
+            // A directory outage must not take down sign-in for users whose token does carry a usable name.
+            LogEmployeeIdLookupFailed(entraSsoId, exception);
+            return null;
+        }
+    }
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "No usable employee id was found in the directory for Entra sign-in (SsoIdInt={SsoIdInt})")]
+    private partial void LogEmployeeIdNotFound(Guid ssoIdInt);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "The directory employee id lookup failed for Entra sign-in (SsoIdInt={SsoIdInt})")]
+    private partial void LogEmployeeIdLookupFailed(Guid ssoIdInt, Exception exception);
 
     [LoggerMessage(Level = LogLevel.Error, Message = "Failed to resolve internal user (SsoIdInt={SsoIdInt}) against PTL.Api")]
     private partial void LogInternalUserResolutionFailed(Guid ssoIdInt, Exception exception);
