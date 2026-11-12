@@ -31,6 +31,42 @@ public class LabUserNavigationTests
         Assert.False(section.IsVisibleTo([ExternalRoleNames.Viewer], isLabUser: false, canOrderOnline: false));
     }
 
+    [Theory]
+    [InlineData("Schemes", "View schemes")]
+    [InlineData("Results", "Enter results")]
+    [InlineData("Results", "View results")]
+    public void ParticipantLinks_NeedALabCodeInTheMenuOnly(string section, string link)
+    {
+        var item = Section(section).Children.Single(child => child.Text == link);
+        string[] roles = [ExternalRoleNames.Participant];
+
+        Assert.True(item.RequireLabCode);
+        Assert.False(item.IsVisibleTo(roles, isLabUser: false, canOrderOnline: false, hasLabCode: false));
+        Assert.True(item.IsVisibleTo(roles, isLabUser: false, canOrderOnline: false, hasLabCode: true));
+        // The Home cards call without a lab code and must keep showing the link, as legacy did.
+        Assert.True(item.IsVisibleTo(roles, isLabUser: false, canOrderOnline: false));
+    }
+
+    [Theory]
+    [InlineData("CurrentYear", false, true, false)]
+    [InlineData("CurrentYear", true, false, true)]
+    [InlineData("NextYear", true, false, false)]
+    [InlineData("NextYear", false, true, true)]
+    public void CreateOrderLinks_AreClosedOnlyForTheirOwnSubmittedYear(string action, bool currentOpen, bool nextOpen, bool expected)
+    {
+        var link = Section("Orders").Children.Single(child => child.ActionName == action);
+
+        Assert.Equal(expected, link.IsOrderYearOpen(currentOpen, nextOpen));
+    }
+
+    [Fact]
+    public void LinksOutsideOrders_AreNeverClosedByASubmittedOrder()
+    {
+        var reports = Section("Results").Children[0];
+
+        Assert.True(reports.IsOrderYearOpen(currentYearOpen: false, nextYearOpen: false));
+    }
+
     [Fact]
     public void SectionsWithoutTheExclusion_AreStillVisibleToLabUsers()
     {

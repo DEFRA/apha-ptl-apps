@@ -49,7 +49,7 @@
 @if (User.Identity is not null && User.Identity.IsAuthenticated)
 {
     <govuk-menu-panel>
-        <partial name="_HeaderMenu" />
+        @await Component.InvokeAsync("HeaderMenu")
     </govuk-menu-panel>
 }
 

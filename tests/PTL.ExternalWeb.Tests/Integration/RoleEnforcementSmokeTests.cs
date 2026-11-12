@@ -132,4 +132,54 @@ public class RoleEnforcementSmokeTests : IClassFixture<PtlExternalWebTestFactory
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
+
+    // Viewer and Test Consultant may only read reports / enter comments - every participant-only
+    // and primary-contact-only screen must refuse them at the controller boundary.
+    [Theory]
+    [InlineData("Viewer", "/Distribution/Current")]
+    [InlineData("Viewer", "/Distribution/Previous")]
+    [InlineData("Viewer", "/Order/CurrentYear")]
+    [InlineData("Viewer", "/Order/NextYear")]
+    [InlineData("Viewer", "/Customer/Index")]
+    [InlineData("Viewer", "/Participant/Index")]
+    [InlineData("Viewer", "/Comments/Index")]
+    [InlineData("Test Consultant", "/Distribution/Current")]
+    [InlineData("Test Consultant", "/Distribution/Previous")]
+    [InlineData("Test Consultant", "/Order/CurrentYear")]
+    [InlineData("Test Consultant", "/Order/NextYear")]
+    [InlineData("Test Consultant", "/Customer/Index")]
+    [InlineData("Test Consultant", "/Participant/Index")]
+    [InlineData("Test Consultant", "/Scheme/Index")]
+    public async Task RestrictedScreen_SignedInAsViewerOrTestConsultantOnly_IsForbidden(string role, string path)
+    {
+        var client = _factory.CreateClient();
+        var cookies = new Dictionary<string, string>();
+        var signInResponse = await client.GetAsync(
+            $"{PtlExternalWebTestFactory.TestSignInPath}?roles={Uri.EscapeDataString(role)}&viewerId={Guid.NewGuid()}&testConsultantId={Guid.NewGuid()}");
+        CookieForwardingHttpClient.CaptureCookies(signInResponse, cookies);
+
+        var response = await CookieForwardingHttpClient.SendWithCookiesAsync(client, HttpMethod.Get, path, cookies);
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task TabulationIndex_SignedInAsTestConsultantWithViewerRole_Succeeds()
+    {
+        var client = _factory.WithWebHostBuilder(builder =>
+            builder.ConfigureServices(services =>
+            {
+                services.RemoveAll<IDistributionApiClient>();
+                services.AddSingleton<IDistributionApiClient>(new FakeDistributionApiClient());
+            })).CreateClient();
+        var cookies = new Dictionary<string, string>();
+        // ExternalUserService always grants Viewer alongside Test Consultant, so this is the real resolved shape.
+        var signInResponse = await client.GetAsync(
+            $"{PtlExternalWebTestFactory.TestSignInPath}?roles={Uri.EscapeDataString("Test Consultant,Viewer")}&testConsultantId={Guid.NewGuid()}");
+        CookieForwardingHttpClient.CaptureCookies(signInResponse, cookies);
+
+        var response = await CookieForwardingHttpClient.SendWithCookiesAsync(client, HttpMethod.Get, "/Tabulation/Index", cookies);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
 }
