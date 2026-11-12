@@ -521,3 +521,30 @@
 .app-results-entry-table .govuk-table__cell {
   overflow-wrap: anywhere;
 }
+
+/* Session timeout warning (_SessionTimeoutWarning.cshtml): a native modal <dialog> dressed as a GOV.UK notification
+   banner (blue header band and border come from govuk-notification-banner), centred by the browser over a dimmed
+   backdrop. The width and max-height keep it usable on a narrow or zoomed viewport without a second scrollbar. */
+.app-session-timeout-dialog {
+  box-sizing: border-box;
+  width: 90%;
+  max-width: 500px;
+  max-height: 90vh;
+  overflow-y: auto;
+  margin: auto;
+  padding: 0;
+  color: #0b0c0c;
+}
+
+.app-session-timeout-dialog::backdrop {
+  background: rgba(11, 12, 12, 0.6);
+}
+
+/* The title takes focus when the dialog opens so a screen reader starts at it; that is not an action, so no outline. */
+.app-session-timeout-dialog__title:focus {
+  outline: none;
+}
+
+.app-session-timeout-dialog .govuk-button-group {
+  margin-bottom: 0;
+}

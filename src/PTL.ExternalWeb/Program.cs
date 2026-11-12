@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using PTL.ApiClient;
 using PTL.Auth.Cidm;
 using PTL.Auth.Cidm.Events;
+using PTL.Common.SessionTimeout;
 using PTL.ExternalWeb.Authorization;
 using PTL.ExternalWeb.Features.Account;
 using PTL.ExternalWeb.Features.Lab;
@@ -15,6 +16,9 @@ var builder = WebApplication.CreateBuilder(args);
 builder.AddPtlWebFrontEnd();
 builder.AddCidmAuthentication();
 builder.Services.AddScoped<ICidmExternalUserResolver, ExternalUserResolver>();
+// Client-side inactivity warning (see _SessionTimeoutWarning.cshtml/session-timeout.js), independent of the
+// sliding auth cookie and CIDM token refresh.
+builder.Services.AddPtlSessionTimeout(builder.Configuration);
 builder.Services.AddScoped<IRazorViewRenderer, RazorViewRenderer>();
 builder.Services.AddScoped<ITabulationPdfService, TabulationPdfService>();
 builder.Services.Configure<OrderPageOptions>(builder.Configuration.GetSection(OrderPageOptions.SectionName));

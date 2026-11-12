@@ -771,7 +771,8 @@ public class DistributionPreviousAndResultsRouteSmokeTests : IClassFixture<PtlEx
         var body = await response.Content.ReadAsStringAsync();
 
         Assert.DoesNotContain("--error", body, StringComparison.Ordinal);
-        Assert.DoesNotContain("aria-describedby", body, StringComparison.Ordinal);
+        // Scoped to the form fields: the session timeout dialog legitimately uses aria-describedby.
+        Assert.DoesNotMatch("<(input|select|textarea)[^>]*aria-describedby", body);
     }
 
     [Fact]

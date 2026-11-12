@@ -1,6 +1,6 @@
-using PTL.InternalWeb.SessionTimeout;
+using PTL.Common.SessionTimeout;
 
-namespace PTL.InternalWeb.Tests.SessionTimeout;
+namespace PTL.Common.Tests.SessionTimeout;
 
 public class SessionTimeoutOptionsValidatorTests
 {
