@@ -46,13 +46,14 @@
                     <td class="govuk-table__cell">@row.FriendlyName</td>
                     @foreach (var role in Model.Roles)
                     {
-                        var isChecked = row.SelectedRoleIds.Contains(role.RoleId);
+                        var isChecked = row.RoleSelections.GetValueOrDefault(role.RoleId);
                         var isLocked = Model.IsOwnAdminRole(row, role);
+                        var boxName = $"Rows[{i}].RoleSelections[{role.RoleId}]";
                         <td class="govuk-table__cell">
                             <div class="govuk-checkboxes govuk-checkboxes--small govuk-!-margin-bottom-0" data-module="govuk-checkboxes">
                                 <div class="govuk-checkboxes__item">
                                     <input class="govuk-checkboxes__input" type="checkbox"
-                                           id="Rows_@(i)__@(role.RoleId)" name="Rows[@i].SelectedRoleIds" value="@role.RoleId"
+                                           id="Rows_@(i)__@(role.RoleId)" name="@(isLocked ? null : boxName)" value="true"
                                            checked="@(isChecked ? "checked" : null)" disabled="@isLocked"
                                            aria-describedby="@(isLocked ? "own-admin-hint" : null)" />
                                     <!-- The visible checkbox box is a pseudo-element on the LABEL itself (govuk-checkboxes__label:before) -
@@ -64,7 +65,7 @@
                                     @if (isLocked && isChecked)
                                     {
                                         @* A disabled box posts nothing, so the role is sent from here instead. *@
-                                        <input type="hidden" name="Rows[@i].SelectedRoleIds" value="@role.RoleId" />
+                                        <input type="hidden" name="@boxName" value="true" />
                                     }
                                 </div>
                             </div>

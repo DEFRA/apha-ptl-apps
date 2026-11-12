@@ -38,8 +38,15 @@ public sealed class UserRoleRowViewModel
 
     public string FriendlyName { get; set; } = string.Empty;
 
-    // Bound from the posted checkbox values (one checkbox per role, all sharing this same
-    // indexed name) - matches legacy's per-row CheckBoxUserRole grid, just batched into one Save
-    // instead of a save-per-click.
-    public List<Guid> SelectedRoleIds { get; set; } = [];
+    // Posted as one uniquely named checkbox per role (Rows[i].RoleSelections[roleId]=true), like the separately
+    // named boxes of legacy's per-row CheckBoxUserRole grid. Boxes sharing one name read as an unfenced checkbox
+    // group to accessibility checkers, and each box here is a standalone yes/no already labelled by its row and column.
+    public Dictionary<Guid, bool> RoleSelections { get; set; } = [];
+
+    [BindNever]
+    public List<Guid> SelectedRoleIds
+    {
+        get => [.. RoleSelections.Where(selection => selection.Value).Select(selection => selection.Key)];
+        set => RoleSelections = value.Distinct().ToDictionary(id => id, _ => true);
+    }
 }
