@@ -25,6 +25,11 @@ public static class ClaimsPrincipalExtensions
     public static bool CanOrderOnline(this ClaimsPrincipal principal) =>
         principal.HasClaim(claim => claim.Type == ExternalUserClaimTypes.CanOrderOnline);
 
+    /// <summary>Whether the signed-in lab is its customer's only active participant, the legacy condition for editing
+    /// the customer and participant details.</summary>
+    public static bool CanEditDetails(this ClaimsPrincipal principal) =>
+        principal.HasClaim(claim => claim.Type == ExternalUserClaimTypes.CanEditDetails);
+
     /// <summary>The resolved Participant's own id, or null if the Participant role didn't resolve
     /// (e.g. a Viewer/Test Consultant-only user).</summary>
     public static Guid? GetParticipantId(this ClaimsPrincipal principal) =>

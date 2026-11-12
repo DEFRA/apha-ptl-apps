@@ -226,6 +226,24 @@ public class ExternalUserResolverTests
         Assert.DoesNotContain(ExternalUserClaimTypes.CanOrderOnline, claims.Keys);
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task ResolveAsync_AddsTheEditDetailsClaimOnlyWhenThePlatformSaysSo(bool canEditDetails)
+    {
+        var response = Resolved(
+            ExternalUserType.Participant,
+            [ExternalRoleNames.Participant, ExternalRoleNames.Viewer],
+            labs: [new ExternalLab(LabId, "LAB001", "North Lab")],
+            participantId: LabId,
+            labCode: "LAB001");
+        response = response with { CanEditDetails = canEditDetails };
+
+        var result = await ResolveAsync(PrincipalWithContact(), new FakeExternalUserApiClient(response));
+
+        Assert.Equal(canEditDetails, result.Claims!.ContainsKey(ExternalUserClaimTypes.CanEditDetails));
+    }
+
     [Fact]
     public async Task ResolveAsync_ParticipantWithOneLab_AddsTheLabClaims()
     {

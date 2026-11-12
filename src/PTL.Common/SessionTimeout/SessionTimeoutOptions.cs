@@ -11,7 +11,7 @@ public sealed class SessionTimeoutOptions
     public const string SectionName = "SessionTimeout";
 
     /// <summary>How long the user may be inactive before the "Extend session?" warning appears.</summary>
-    public TimeSpan InactivityWarningAfter { get; set; } = TimeSpan.FromMinutes(15);
+    public TimeSpan InactivityWarningAfter { get; set; } = TimeSpan.FromMinutes(20);
 
     /// <summary>
     /// How long the warning remains visible (counting down) before the session is actively expired

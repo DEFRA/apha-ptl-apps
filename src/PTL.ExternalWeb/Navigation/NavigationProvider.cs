@@ -138,7 +138,8 @@ public static class NavigationProvider
                     ControllerName = "Customer",
                     ActionName = IndexAction,
                     Description = "Submit an update to your customer details",
-                    RequiredRole = ExternalRoleNames.Participant
+                    RequiredRole = ExternalRoleNames.Participant,
+                    RequireCanEditDetails = true
                 },
                 new NavigationItem
                 {
@@ -146,7 +147,8 @@ public static class NavigationProvider
                     ControllerName = "Participant",
                     ActionName = IndexAction,
                     Description = "Submit an update to participating laboratory details",
-                    RequiredRole = ExternalRoleNames.Participant
+                    RequiredRole = ExternalRoleNames.Participant,
+                    RequireCanEditDetails = true
                 }
             ]
         },

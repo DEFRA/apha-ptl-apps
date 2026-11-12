@@ -39,6 +39,10 @@ public sealed class ParticipantDetailsEditController(IParticipantDetailsEditServ
         {
             return Ok(new ParticipantDetailsEditSaveResult(false, new Dictionary<string, string[]> { [string.Empty] = [ex.Message] }));
         }
+        catch (DetailsEditNotPermittedException)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden);
+        }
     }
 
     private static ParticipantDetailsEditResponse ToResponse(ParticipantDetailsEditState state) => new(

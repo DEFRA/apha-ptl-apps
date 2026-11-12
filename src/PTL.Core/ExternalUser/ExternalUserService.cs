@@ -138,7 +138,8 @@ public sealed partial class ExternalUserService(
             ViewerId: userType == ExternalUserType.Viewer ? userId : null,
             TestConsultantId: userType == ExternalUserType.TestConsultant ? userId : null,
             LabUserId: userType == ExternalUserType.LabUser ? userId : null,
-            CanOrderOnline: singleLab is not null && await CanOrderOnlineAsync(singleLab.ParticipantId, cancellationToken));
+            CanOrderOnline: singleLab is not null && await CanOrderOnlineAsync(singleLab.ParticipantId, cancellationToken),
+            CanEditDetails: singleLab is not null && await CanEditDetailsAsync(singleLab.ParticipantId, cancellationToken));
     }
 
     public async Task<IReadOnlyList<ExternalLab>> GetLabsAsync(Guid ssoIdExt, CancellationToken cancellationToken = default)
@@ -158,9 +159,17 @@ public sealed partial class ExternalUserService(
     {
         var labs = await GetLabsAsync(ssoIdExt, cancellationToken);
         var lab = labs.FirstOrDefault(candidate => candidate.ParticipantId == participantId);
-        return lab is null
-            ? null
-            : new ExternalLabContext(lab.ParticipantId, lab.LabCode, lab.LabName, await CanOrderOnlineAsync(lab.ParticipantId, cancellationToken));
+        if (lab is null)
+        {
+            return null;
+        }
+
+        return new ExternalLabContext(
+            lab.ParticipantId,
+            lab.LabCode,
+            lab.LabName,
+            await CanOrderOnlineAsync(lab.ParticipantId, cancellationToken),
+            await CanEditDetailsAsync(lab.ParticipantId, cancellationToken));
     }
 
     // Only Participant and Lab User rows carry a lab; a lab seen twice (a link listed again) counts once.
@@ -180,6 +189,13 @@ public sealed partial class ExternalUserService(
 
         var customer = await customerRepository.GetByIdAsync(participant.CustomerId, cancellationToken);
         return await OnlineOrderingEligibility.CanOrderOnlineAsync(participantRepository, participant, customer, cancellationToken);
+    }
+
+    // Legacy CanEditCustomer/CanEditParticipant: only the customer's single active participant may edit the details.
+    private async Task<bool> CanEditDetailsAsync(Guid participantId, CancellationToken cancellationToken)
+    {
+        var participant = await participantRepository.GetByIdAsync(participantId, cancellationToken);
+        return participant is not null && await SoleActiveParticipant.IsAsync(participantRepository, participant, cancellationToken);
     }
 
     // Signing in never depends on the emails still matching - the contact id decides - but a difference

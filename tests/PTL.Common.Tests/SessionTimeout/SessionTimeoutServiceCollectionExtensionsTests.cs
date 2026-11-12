@@ -35,7 +35,7 @@ public class SessionTimeoutServiceCollectionExtensionsTests
 
         var options = provider.GetRequiredService<IOptions<SessionTimeoutOptions>>().Value;
 
-        Assert.Equal(TimeSpan.FromMinutes(15), options.InactivityWarningAfter);
+        Assert.Equal(TimeSpan.FromMinutes(20), options.InactivityWarningAfter);
         Assert.Equal(TimeSpan.FromMinutes(2), options.ExpireAfterWarning);
     }
 

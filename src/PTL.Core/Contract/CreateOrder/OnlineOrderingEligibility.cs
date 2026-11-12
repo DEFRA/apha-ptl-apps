@@ -15,13 +15,11 @@ internal static class OnlineOrderingEligibility
         CoreCustomer? customer,
         CancellationToken cancellationToken)
     {
-        if (customer is null || !customer.CanOrderOnline || !participant.IsActive)
+        if (customer is null || !customer.CanOrderOnline)
         {
             return false;
         }
 
-        var customerParticipants = await participantRepository.GetSummariesAsync(participant.CustomerId, includeInactive: true, cancellationToken);
-        var active = customerParticipants.Where(p => p.IsActive).ToList();
-        return active.Count == 1 && active[0].ParticipantId == participant.ParticipantId;
+        return await SoleActiveParticipant.IsAsync(participantRepository, participant, cancellationToken);
     }
 }

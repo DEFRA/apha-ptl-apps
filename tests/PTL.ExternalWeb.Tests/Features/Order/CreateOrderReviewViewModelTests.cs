@@ -65,14 +65,27 @@ public class CreateOrderReviewViewModelTests
     [InlineData("https://example.test/terms.pdf", "https://example.test/terms.pdf")]
     [InlineData("  http://example.test/terms  ", "http://example.test/terms")]
     [InlineData("ftp://example.test/terms", null)]
-    [InlineData("/relative/terms", null)]
+    [InlineData("/relative/terms", "/relative/terms")]
+    [InlineData("//evil.test/terms", null)]
+    [InlineData("/\\evil.test/terms", null)]
+    [InlineData("/", null)]
+    [InlineData("relative/terms", null)]
     [InlineData("", null)]
     [InlineData(null, null)]
-    public void TermsAndConditionsUrl_OnlyAnAbsoluteWebAddressIsUsed(string? configured, string? expected)
+    public void TermsAndConditionsUrl_OnlyAWebAddressOrAPathOnThisSiteIsUsed(string? configured, string? expected)
     {
         var options = new OrderPageOptions { TermsAndConditionsUrl = configured };
 
         Assert.Equal(expected, options.SafeTermsAndConditionsUrl);
+    }
+
+    [Fact]
+    public void Defaults_PointAtTheShippedTermsPdfAndTheVetqasTimetablePage()
+    {
+        var options = new OrderPageOptions();
+
+        Assert.Equal("/documents/VETQAS%20Ts%20%26%20Cs%20April%202025%20Version%206%201.pdf", options.SafeTermsAndConditionsUrl);
+        Assert.Equal("https://www.aphascientific.com/services/vetqas-proficiency-testing/", options.SafeDistributionTimetableUrl);
     }
 
     [Theory]

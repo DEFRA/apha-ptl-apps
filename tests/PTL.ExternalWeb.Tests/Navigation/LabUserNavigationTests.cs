@@ -59,6 +59,19 @@ public class LabUserNavigationTests
         Assert.Equal(expected, link.IsOrderYearOpen(currentOpen, nextOpen));
     }
 
+    [Theory]
+    [InlineData("Edit customer details")]
+    [InlineData("Edit participant details")]
+    public void EditLinks_NeedTheOnlyActiveParticipantRule_OnBothTheMenuAndTheCards(string link)
+    {
+        var item = Section("My account").Children.Single(child => child.Text == link);
+        string[] roles = [ExternalRoleNames.Participant];
+
+        Assert.True(item.RequireCanEditDetails);
+        Assert.False(item.IsVisibleTo(roles, isLabUser: false, canOrderOnline: false, canEditDetails: false));
+        Assert.True(item.IsVisibleTo(roles, isLabUser: false, canOrderOnline: false, canEditDetails: true));
+    }
+
     [Fact]
     public void LinksOutsideOrders_AreNeverClosedByASubmittedOrder()
     {

@@ -30,14 +30,19 @@ public sealed class NavigationItem
     /// menu passes the real <c>hasLabCode</c> to <see cref="IsVisibleTo"/>.</summary>
     public bool RequireLabCode { get; init; }
 
+    /// <summary>Legacy showed the edit customer and participant details only to the customer's only active participant
+    /// (CanEditCustomer/CanEditParticipant), on the Home cards and the menu alike.</summary>
+    public bool RequireCanEditDetails { get; init; }
+
     public IReadOnlyList<NavigationItem> Children { get; init; } = [];
 
     /// <summary>Whether a user with these roles may see the item - the one rule the header menu and the Home cards share.</summary>
-    public bool IsVisibleTo(IReadOnlyList<string> roles, bool isLabUser, bool canOrderOnline, bool hasLabCode = true) =>
+    public bool IsVisibleTo(IReadOnlyList<string> roles, bool isLabUser, bool canOrderOnline, bool hasLabCode = true, bool canEditDetails = true) =>
         (RequiredRole is null || roles.Contains(RequiredRole, StringComparer.OrdinalIgnoreCase))
         && (!RequireCanOrderOnline || canOrderOnline)
         && (!ExcludeLabUsers || !isLabUser)
-        && (!RequireLabCode || hasLabCode);
+        && (!RequireLabCode || hasLabCode)
+        && (!RequireCanEditDetails || canEditDetails);
 
     /// <summary>False for a Create order link whose year's order is already submitted. Legacy hid it from the menu, while the
     /// Home card stays but is disabled. Any other item is always open.</summary>

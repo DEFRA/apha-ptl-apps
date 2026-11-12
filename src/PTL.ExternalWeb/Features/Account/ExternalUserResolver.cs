@@ -87,6 +87,11 @@ public sealed partial class ExternalUserResolver(IExternalUserApiClient external
             claims[ExternalUserClaimTypes.CanOrderOnline] = "true";
         }
 
+        if (response.CanEditDetails)
+        {
+            claims[ExternalUserClaimTypes.CanEditDetails] = "true";
+        }
+
         AddId(claims, ExternalUserClaimTypes.ParticipantId, response.ParticipantId);
         AddId(claims, ExternalUserClaimTypes.ViewerId, response.ViewerId);
         AddId(claims, ExternalUserClaimTypes.TestConsultantId, response.TestConsultantId);

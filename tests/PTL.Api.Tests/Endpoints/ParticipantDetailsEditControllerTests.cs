@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using PTL.Api.Controllers;
 using PTL.Api.Tests.Participant;
@@ -14,6 +15,36 @@ public class ParticipantDetailsEditControllerTests
         var pendingUpdates = new FakePendingParticipantUpdateRepository();
         var service = new ParticipantDetailsEditService(participants, pendingUpdates);
         return (new ParticipantDetailsEditController(service), participants, pendingUpdates);
+    }
+
+    [Fact]
+    public async Task Get_AnotherActiveParticipantOnTheCustomer_ReturnsNotFound()
+    {
+        var (controller, participants, _) = CreateController();
+        var customerId = Guid.NewGuid();
+        var participant = await participants.CreateAsync(new PTL.Core.Participant.Participant { CustomerId = customerId, LabCode = "001" });
+        await participants.CreateAsync(new PTL.Core.Participant.Participant { CustomerId = customerId, LabCode = "002" });
+
+        var result = await controller.Get(participant.ParticipantId, CancellationToken.None);
+
+        Assert.IsType<NotFoundResult>(result.Result);
+    }
+
+    [Fact]
+    public async Task Submit_AnotherActiveParticipantOnTheCustomer_ReturnsForbidden()
+    {
+        var (controller, participants, pendingUpdates) = CreateController();
+        var customerId = Guid.NewGuid();
+        var participant = await participants.CreateAsync(new PTL.Core.Participant.Participant { CustomerId = customerId, LabCode = "001" });
+        await participants.CreateAsync(new PTL.Core.Participant.Participant { CustomerId = customerId, LabCode = "002" });
+        var request = new ParticipantDetailsEditSaveRequest(
+            "Jane Doe", "Test Lab", "1 Test Street", "Testville", "", "", "",
+            Guid.NewGuid(), "01234 567890", "jane@example.com", "");
+
+        var result = await controller.Submit(participant.ParticipantId, request, CancellationToken.None);
+
+        Assert.Equal(StatusCodes.Status403Forbidden, Assert.IsType<StatusCodeResult>(result.Result).StatusCode);
+        Assert.Null(await pendingUpdates.GetByParticipantIdAsync(participant.ParticipantId));
     }
 
     [Fact]

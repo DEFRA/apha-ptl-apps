@@ -545,6 +545,23 @@ public partial class OrderRouteSmokeTests : IClassFixture<PtlExternalWebTestFact
     }
 
     [Fact]
+    public async Task Review_TermsLinkOpensTheTermsPdfShippedWithTheApp()
+    {
+        var client = CreateClient(ReviewApi());
+        var cookies = await SignInAsync(client);
+
+        var body = await GetAsync(client, cookies, "/Order/Review?year=current");
+
+        const string href = "/documents/VETQAS%20Ts%20%26%20Cs%20April%202025%20Version%206%201.pdf";
+        Assert.Contains($"href=\"{href}\"", body);
+
+        var pdf = await client.GetAsync(href);
+
+        Assert.Equal(HttpStatusCode.OK, pdf.StatusCode);
+        Assert.Equal("application/pdf", pdf.Content.Headers.ContentType?.MediaType);
+    }
+
+    [Fact]
     public async Task Review_WithoutConsentsOrATermsAddress_HidesBothSections()
     {
         var api = new FakeCreateOrderApiClient { GetResult = new(CreateOrderApiStatus.Ok, FakeCreateOrderApiClient.SampleOrder(selected: true)) };
