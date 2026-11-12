@@ -1,3 +1,4 @@
+using System.Net;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Polly;
@@ -23,7 +24,8 @@ public class HomeController(IApiClient apiClient, ISystemMessageApiClient system
         return View(new HomeIndexViewModel(
             displayName,
             User.GetResolvedExternalRoles(),
-            importantMessage.ImportantMessage,
+            // Rows saved before the save-time decode fix hold entity-escaped HTML; decoding here repairs them without a data patch.
+            importantMessage.ImportantMessage is { } stored ? WebUtility.HtmlDecode(stored) : null,
             eligibility.CanCreateCurrentYearOrder,
             eligibility.CanCreateNextYearOrder,
             eligibility.CurrentYear,

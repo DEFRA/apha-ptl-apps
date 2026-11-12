@@ -102,6 +102,17 @@ public class HomeControllerTests
     }
 
     [Fact]
+    public async Task Index_ImportantMessageStoredEntityEscaped_DecodesToRealHtml()
+    {
+        var controller = CreateController(importantMessage: "&lt;p&gt;Planned &amp;amp; maintenance&lt;/p&gt;");
+
+        var result = await controller.Index();
+
+        var model = Assert.IsType<HomeIndexViewModel>(Assert.IsType<ViewResult>(result).Model);
+        Assert.Equal("<p>Planned &amp; maintenance</p>", model.ImportantMessageHtml);
+    }
+
+    [Fact]
     public async Task Index_NoImportantMessagePublished_ViewModelHasNullMessage()
     {
         var controller = CreateController();
