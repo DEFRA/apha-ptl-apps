@@ -70,11 +70,14 @@ body {
   white-space: nowrap;
 }
 
-/* Row action links (Edit/Remove/Active) sit side by side in a table cell. */
-.ptl-row-links {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 5px 20px;
+/* Row action buttons (Edit/Remove) stay side by side in a table cell instead of wrapping or stacking. */
+.ptl-row-actions {
+  flex-direction: row;
+  flex-wrap: nowrap;
+}
+
+.ptl-row-actions .govuk-button {
+  width: auto;
 }
 
 /* Inactive contracts render struck-through, matching legacy ContractList.aspx.vb

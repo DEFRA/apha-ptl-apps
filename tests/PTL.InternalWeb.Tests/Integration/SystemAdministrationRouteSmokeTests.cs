@@ -275,12 +275,17 @@ public partial class SystemAdministrationRouteSmokeTests : IClassFixture<WebAppl
         Assert.Contains("Dry Ice", body, StringComparison.Ordinal);
         Assert.Contains("postagePriceEditForm", body, StringComparison.Ordinal);
 
-        // Save is a real secondary button (it posts postagePriceEditForm); Edit and Cancel are plain links back to
-        // the page (GET), so entering or leaving edit mode needs no script.
+        // Save, Cancel and the other row's Edit are all real secondary buttons (Cancel/Edit of the GET
+        // form postagePriceViewForm), not links. Checked precisely (not just "govuk-link is absent
+        // anywhere") since the shared layout's footer/phase-banner render their own unrelated
+        // govuk-link elements on every page.
         Assert.Contains("govuk-button--secondary govuk-!-margin-bottom-0\" data-module=\"govuk-button\" type=\"submit\">Save</button>", body, StringComparison.Ordinal);
-        Assert.Matches($"<a class=\"govuk-link\" href=\"/SystemAdministration/PostagePricingPlan\\?yearId=2026&amp;editId={otherPostageId}\">Edit<", body);
-        Assert.Matches("<a class=\"govuk-link\" href=\"/SystemAdministration/PostagePricingPlan\\?yearId=2026\">Cancel<", body);
-        Assert.DoesNotContain("postagePriceViewForm", body, StringComparison.Ordinal);
+        Assert.DoesNotContain("govuk-button--secondary govuk-!-margin-bottom-0\" data-module=\"govuk-button\" href=", body, StringComparison.Ordinal);
+        Assert.Matches($"<button form=\"postagePriceViewForm\" name=\"editId\" value=\"{otherPostageId}\"[^>]*type=\"submit\">Edit</button>", body);
+        Assert.Matches("<button form=\"postagePriceViewForm\"[^>]*type=\"submit\">Cancel</button>", body);
+        Assert.Matches("<form id=\"postagePriceViewForm\" method=\"get\" action=\"/SystemAdministration/PostagePricingPlan\">\\s*<input type=\"hidden\" name=\"yearId\" value=\"2026\" />", body);
+        Assert.DoesNotContain(">Edit</a>", body, StringComparison.Ordinal);
+        Assert.DoesNotContain(">Cancel</a>", body, StringComparison.Ordinal);
     }
 
     // Locks in the Postage equivalent of the AdministrationCharge anchor fix - here the ModelState
