@@ -147,4 +147,27 @@ public class DistributionRepositoryParticipantNilReturnTests
         Assert.Equal(DistributionParticipantId, command.ParameterValue("DistributionParticipantId"));
         Assert.Equal(SchemeId, command.ParameterValue("MonthlyDistributionSchemeId"));
     }
+
+    [Fact]
+    public async Task GetParticipantNilReturnAsync_NoRow_ReturnsNull()
+    {
+        var (repository, connection) = CreateRepository();
+        connection.RespondToQuery(GetNilReturnSql, NilReturnTable());
+
+        Assert.Null(await repository.GetParticipantNilReturnAsync(DistributionParticipantId));
+    }
+
+    [Fact]
+    public async Task GetSampleReceiptRowsForParticipantAsync_NoLabOrSchemeRow_ReturnsNoRows()
+    {
+        var (repository, connection) = CreateRepository();
+        var data = new DataSet();
+        data.Tables.Add(TestTable());
+        data.Tables.Add(SampleTable());
+        data.Tables.Add(LabTable());
+        data.Tables.Add(SchemeTable());
+        connection.RespondToQuery(GetSampleReceiptSql, data);
+
+        Assert.Empty(await repository.GetSampleReceiptRowsForParticipantAsync(DistributionParticipantId, SchemeId));
+    }
 }

@@ -1,9 +1,9 @@
 using Microsoft.AspNetCore.Mvc;
 using PTL.Api.Controllers;
+using PTL.Api.Tests.Participant;
 using PTL.Contracts.Distribution;
 using PTL.Core.Distribution;
 using PTL.Core.Participant;
-using PTL.Api.Tests.Participant;
 
 namespace PTL.Api.Tests.Distribution;
 
@@ -12,7 +12,7 @@ public class DistributionControllerParticipantNilReturnTests
     private static readonly Guid SchemeId = Guid.NewGuid();
     private static readonly Guid ParticipantId = Guid.NewGuid();
 
-    private static DistributionController CreateController(FakeDistributionRepository repository, FakeParticipantRepository? participantRepository = null)
+    internal static DistributionController CreateController(FakeDistributionRepository repository, FakeParticipantRepository? participantRepository = null)
     {
         participantRepository ??= new FakeParticipantRepository();
 
