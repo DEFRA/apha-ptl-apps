@@ -27,8 +27,7 @@ public class DistributionControllerParticipantNilReturnMappingTests
         }
     }
 
-    private static DistributionController Controller() =>
-        DistributionControllerParticipantNilReturnTests.CreateController(new FakeDistributionRepository());
+    private static ParticipantNilReturnController Controller(IParticipantNilReturnService service) => new(service);
 
     [Theory]
     [InlineData("No samples received", true)]
@@ -38,7 +37,7 @@ public class DistributionControllerParticipantNilReturnMappingTests
     {
         var service = new StubNilReturnService(new ParticipantNilReturnData(ParticipantId, reason), ParticipantNilReturnSaveStatus.Saved);
 
-        var result = await Controller().GetParticipantNilReturn(SchemeId, ParticipantId, service, CancellationToken.None);
+        var result = await Controller(service).GetParticipantNilReturn(SchemeId, ParticipantId, CancellationToken.None);
 
         var payload = Assert.IsType<ParticipantNilReturnResponse>(Assert.IsType<OkObjectResult>(result.Result).Value);
         Assert.Equal(expectedHasNilReturn, payload.HasNilReturn);
@@ -50,8 +49,8 @@ public class DistributionControllerParticipantNilReturnMappingTests
     {
         var service = new StubNilReturnService(null, ParticipantNilReturnSaveStatus.NotFound);
 
-        var result = await Controller().SaveParticipantNilReturn(
-            SchemeId, ParticipantId, new ParticipantNilReturnSaveRequest("x"), service, CancellationToken.None);
+        var result = await Controller(service).SaveParticipantNilReturn(
+            SchemeId, ParticipantId, new ParticipantNilReturnSaveRequest("x"), CancellationToken.None);
 
         Assert.IsType<NotFoundResult>(result.Result);
     }
@@ -67,8 +66,8 @@ public class DistributionControllerParticipantNilReturnMappingTests
     {
         var service = new StubNilReturnService(null, status);
 
-        var result = await Controller().SaveParticipantNilReturn(
-            SchemeId, ParticipantId, new ParticipantNilReturnSaveRequest("Lost in post"), service, CancellationToken.None);
+        var result = await Controller(service).SaveParticipantNilReturn(
+            SchemeId, ParticipantId, new ParticipantNilReturnSaveRequest("Lost in post"), CancellationToken.None);
 
         var payload = Assert.IsType<ParticipantNilReturnSaveResult>(Assert.IsType<OkObjectResult>(result.Result).Value);
         Assert.Equal((success, deadlinePassed, reasonRequired, hasResults), (payload.Success, payload.DeadlinePassed, payload.ReasonRequired, payload.HasResults));

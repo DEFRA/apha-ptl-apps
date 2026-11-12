@@ -4,7 +4,10 @@ using PTL.Core.Distribution;
 
 namespace PTL.Api.Controllers;
 
-public sealed partial class DistributionController
+// Shares the api/distributions prefix so the Nil Return URLs are unchanged.
+[ApiController]
+[Route("api/distributions")]
+public sealed class ParticipantNilReturnController(IParticipantNilReturnService nilReturnService) : ControllerBase
 {
     [HttpGet("schemes/{monthlyDistributionSchemeId:guid}/participants/{distributionParticipantId:guid}/nil-return")]
     [ProducesResponseType<ParticipantNilReturnResponse>(StatusCodes.Status200OK)]
@@ -12,7 +15,6 @@ public sealed partial class DistributionController
     public async Task<ActionResult<ParticipantNilReturnResponse>> GetParticipantNilReturn(
         Guid monthlyDistributionSchemeId,
         Guid distributionParticipantId,
-        [FromServices] IParticipantNilReturnService nilReturnService,
         CancellationToken cancellationToken)
     {
         var data = await nilReturnService.GetAsync(distributionParticipantId, monthlyDistributionSchemeId, cancellationToken);
@@ -28,7 +30,6 @@ public sealed partial class DistributionController
         Guid monthlyDistributionSchemeId,
         Guid distributionParticipantId,
         [FromBody] ParticipantNilReturnSaveRequest request,
-        [FromServices] IParticipantNilReturnService nilReturnService,
         CancellationToken cancellationToken)
     {
         var outcome = await nilReturnService.SaveAsync(

@@ -37,7 +37,7 @@ else
     <p class="govuk-body">Results can be saved at any time up until the deadline date provided that all the inputs are valid.</p>
     <p class="govuk-body">If you are not submitting results, you can submit a nil return with a reason.</p>
 
-    if (Model.HasNilReturn)
+    if (Model.HasNilReturn == true)
     {
         <div class="govuk-inset-text">
             <p class="govuk-body govuk-!-margin-bottom-2">A nil return has been submitted for this distribution.</p>
@@ -217,7 +217,7 @@ else
             <button type="submit" name="command" value="submit" class="govuk-button" data-module="govuk-button">Submit</button>
             <button type="submit" name="command" value="save" class="govuk-button govuk-button--secondary" data-module="govuk-button">Save</button>
             <button type="submit" name="command" value="cancel" class="govuk-button govuk-button--secondary" data-module="govuk-button" formnovalidate>Cancel</button>
-            <a class="govuk-button govuk-button--secondary" data-module="govuk-button" asp-action="NilReturn" asp-route-schemeId="@Model.MonthlyDistributionSchemeId">@(Model.HasNilReturn ? "View nil return" : "Nil return")</a>
+            <a class="govuk-button govuk-button--secondary" data-module="govuk-button" asp-action="NilReturn" asp-route-schemeId="@Model.MonthlyDistributionSchemeId">@(Model.HasNilReturn == true ? "View nil return" : "Nil return")</a>
         }
     </div>
 </form>

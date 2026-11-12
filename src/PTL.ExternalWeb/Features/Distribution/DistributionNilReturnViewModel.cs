@@ -6,7 +6,7 @@ public sealed class DistributionNilReturnViewModel
 
     public string Heading { get; set; } = string.Empty;
 
-    public bool HasNilReturn { get; set; }
+    public bool? HasNilReturn { get; set; }
 
     public string? NilReturnReason { get; set; }
 }

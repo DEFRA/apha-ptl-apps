@@ -1,9 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using PTL.Api.Controllers;
-using PTL.Api.Tests.Participant;
 using PTL.Contracts.Distribution;
 using PTL.Core.Distribution;
-using PTL.Core.Participant;
 
 namespace PTL.Api.Tests.Distribution;
 
@@ -12,33 +10,15 @@ public class DistributionControllerParticipantNilReturnTests
     private static readonly Guid SchemeId = Guid.NewGuid();
     private static readonly Guid ParticipantId = Guid.NewGuid();
 
-    internal static DistributionController CreateController(FakeDistributionRepository repository, FakeParticipantRepository? participantRepository = null)
-    {
-        participantRepository ??= new FakeParticipantRepository();
-
-        return new DistributionController(
-            new DistributionService(repository),
-            new SampleNumbersService(repository, new FakeSchemeService()),
-            new IntendedResultsService(repository),
-            new DistributionParticipantsService(repository),
-            new PreparationService(repository),
-            new ResultsReceiptService(repository, TimeProvider.System),
-            new TabulationsService(repository, TimeProvider.System),
-            new ActualResultsService(repository, TimeProvider.System),
-            new ParticipantDistributionHistoryService(repository, participantRepository, new ActualResultsService(repository, TimeProvider.System)),
-            new FakePackagingService(),
-            new FakePackagingOutputService(),
-            new PTL.Api.Tests.Contract.FakeAuditActorResolver("Guest"),
-            Microsoft.Extensions.Logging.Abstractions.NullLogger<DistributionController>.Instance);
-    }
+    private static ParticipantNilReturnController CreateController(FakeDistributionRepository repository) =>
+        new(new ParticipantNilReturnService(repository, new ActualResultsService(repository, TimeProvider.System), TimeProvider.System));
 
     [Fact]
     public async Task GetParticipantNilReturn_NotFound_ReturnsNotFound()
     {
-        var repo = new FakeDistributionRepository();
-        var controller = CreateController(repo);
+        var controller = CreateController(new FakeDistributionRepository());
 
-        var result = await controller.GetParticipantNilReturn(SchemeId, ParticipantId, new ParticipantNilReturnService(repo, new ActualResultsService(repo, TimeProvider.System), TimeProvider.System), CancellationToken.None);
+        var result = await controller.GetParticipantNilReturn(SchemeId, ParticipantId, CancellationToken.None);
 
         Assert.IsType<NotFoundResult>(result.Result);
     }
@@ -54,9 +34,8 @@ public class DistributionControllerParticipantNilReturnTests
         repo.IntendedResults[SchemeId] = new ActualResultsScenario().Structure();
 
         var controller = CreateController(repo);
-        var service = new ParticipantNilReturnService(repo, new ActualResultsService(repo, TimeProvider.System), TimeProvider.System);
 
-        var result = await controller.SaveParticipantNilReturn(SchemeId, ParticipantId, new ParticipantNilReturnSaveRequest(""), service, CancellationToken.None);
+        var result = await controller.SaveParticipantNilReturn(SchemeId, ParticipantId, new ParticipantNilReturnSaveRequest(""), CancellationToken.None);
 
         var payload = Assert.IsType<ParticipantNilReturnSaveResult>(Assert.IsType<OkObjectResult>(result.Result).Value);
         Assert.False(payload.Success);
@@ -108,14 +87,12 @@ public class DistributionControllerParticipantNilReturnTests
             [new SampleReceiptTestEntity { TestId = sample1.TestId, TestType = "Test" }],
             [sample1, sample2]);
 
-        var service = new ParticipantNilReturnService(repo, new ActualResultsService(repo, TimeProvider.System), TimeProvider.System);
         var controller = CreateController(repo);
 
         var result = await controller.SaveParticipantNilReturn(
             SchemeId,
             ParticipantId,
             new ParticipantNilReturnSaveRequest("No samples received"),
-            service,
             CancellationToken.None);
 
         var payload = Assert.IsType<ParticipantNilReturnSaveResult>(Assert.IsType<OkObjectResult>(result.Result).Value);

@@ -12,7 +12,7 @@ public sealed class DistributionResultsEntryViewModel
     [BindRequired]
     public bool IsReadOnly { get; set; }
 
-    public bool HasNilReturn { get; set; }
+    public bool? HasNilReturn { get; set; }
 
     public string? NilReturnReason { get; set; }
 
