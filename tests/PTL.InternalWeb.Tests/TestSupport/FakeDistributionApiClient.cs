@@ -8,8 +8,30 @@ internal sealed partial class FakeDistributionApiClient : IDistributionApiClient
 {
     public IReadOnlyList<CurrentDistributionResponse> CurrentDistributions { get; set; } = [];
 
+    public ParticipantNilReturnResponse? ParticipantNilReturn { get; set; }
+
+    public ParticipantNilReturnSaveResult? ParticipantNilReturnSaveResult { get; set; }
+
+    public List<(Guid SchemeId, Guid DistributionParticipantId, ParticipantNilReturnSaveRequest Request)> SavedParticipantNilReturns { get; } = [];
+
     public Task<IReadOnlyList<CurrentDistributionResponse>> GetCurrentDistributionsAsync(Guid participantId, CancellationToken cancellationToken = default) =>
         Task.FromResult(CurrentDistributions);
+
+    public Task<ParticipantNilReturnResponse?> GetParticipantNilReturnAsync(
+        Guid monthlyDistributionSchemeId,
+        Guid distributionParticipantId,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult(ParticipantNilReturn);
+
+    public Task<ParticipantNilReturnSaveResult?> SaveParticipantNilReturnAsync(
+        Guid monthlyDistributionSchemeId,
+        Guid distributionParticipantId,
+        ParticipantNilReturnSaveRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        SavedParticipantNilReturns.Add((monthlyDistributionSchemeId, distributionParticipantId, request));
+        return Task.FromResult(ParticipantNilReturnSaveResult);
+    }
 
     public IReadOnlyList<DistributionDashboardMonthResponse> Months { get; set; } = [];
     public IReadOnlyList<DistributionYearOptionResponse> Years { get; set; } = [];

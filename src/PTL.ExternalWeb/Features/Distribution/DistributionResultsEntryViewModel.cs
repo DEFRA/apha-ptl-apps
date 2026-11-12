@@ -12,6 +12,10 @@ public sealed class DistributionResultsEntryViewModel
     [BindRequired]
     public bool IsReadOnly { get; set; }
 
+    public bool HasNilReturn { get; set; }
+
+    public string? NilReturnReason { get; set; }
+
     public List<DistributionResultsEntryTestViewModel> Tests { get; set; } = [];
 }
 

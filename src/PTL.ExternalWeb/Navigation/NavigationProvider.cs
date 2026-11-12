@@ -187,6 +187,7 @@ public static class NavigationProvider
         ["Distribution/Current"] = [new("Current distributions")],
         ["Help/Index"] = [new("Help")],
         ["Distribution/Entry"] = [new("Current distributions", DistributionControllerName, "Current"), new("Results entry")],
+        ["Distribution/NilReturn"] = [new("Current distributions", DistributionControllerName, "Current"), new("Nil return")],
         ["Distribution/Previous"] = [new("Previous distributions")],
         ["Distribution/Results"] = [new("Previous distributions", DistributionControllerName, "Previous"), new("View results")],
         ["Tabulation/Index"] = [new(ReportsText)],

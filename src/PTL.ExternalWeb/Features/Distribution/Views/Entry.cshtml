@@ -35,6 +35,18 @@ else
 {
     <p class="govuk-body">Enter the Test Results below. Tests are divided into Result Items which are tested for each Sample, and Method Items which apply to the Test itself.</p>
     <p class="govuk-body">Results can be saved at any time up until the deadline date provided that all the inputs are valid.</p>
+    <p class="govuk-body">If you are not submitting results, you can submit a nil return with a reason.</p>
+
+    if (Model.HasNilReturn)
+    {
+        <div class="govuk-inset-text">
+            <p class="govuk-body govuk-!-margin-bottom-2">A nil return has been submitted for this distribution.</p>
+            @if (!string.IsNullOrWhiteSpace(Model.NilReturnReason))
+            {
+                <p class="govuk-body govuk-!-margin-bottom-0"><strong>Reason:</strong> @Model.NilReturnReason</p>
+            }
+        </div>
+    }
 }
 
 <form method="post" asp-action="Entry">
@@ -205,6 +217,7 @@ else
             <button type="submit" name="command" value="submit" class="govuk-button" data-module="govuk-button">Submit</button>
             <button type="submit" name="command" value="save" class="govuk-button govuk-button--secondary" data-module="govuk-button">Save</button>
             <button type="submit" name="command" value="cancel" class="govuk-button govuk-button--secondary" data-module="govuk-button" formnovalidate>Cancel</button>
+            <a class="govuk-button govuk-button--secondary" data-module="govuk-button" asp-action="NilReturn" asp-route-schemeId="@Model.MonthlyDistributionSchemeId">@(Model.HasNilReturn ? "View nil return" : "Nil return")</a>
         }
     </div>
 </form>
