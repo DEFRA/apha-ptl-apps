@@ -120,7 +120,8 @@ public sealed partial class TabulationController(
         {
             var model = new TabulationReportPageViewModel(report);
             var pdf = await tabulationPdfService.GenerateAsync(ControllerContext, model, cancellationToken);
-            return File(pdf, "application/pdf", BuildPdfFileName(report));
+            Response.Headers.ContentDisposition = $"inline; filename=\"{BuildPdfFileName(report)}\"";
+            return File(pdf, "application/pdf");
         }
         catch (Exception exception) when (exception is PlaywrightException or InvalidOperationException)
         {

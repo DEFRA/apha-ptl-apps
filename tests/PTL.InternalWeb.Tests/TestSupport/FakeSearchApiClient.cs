@@ -14,6 +14,16 @@ internal sealed class FakeSearchApiClient : ISearchApiClient
 
     public List<ParticipantSearchCriteriaRequest> ParticipantSearches { get; } = [];
 
+    public IReadOnlyList<SchemeNameSearchResultResponse> SchemeResults { get; set; } = [];
+
+    public List<SchemeNameSearchCriteriaRequest> SchemeSearches { get; } = [];
+
+    public Task<IReadOnlyList<SchemeNameSearchResultResponse>> SearchSchemesByNameAsync(SchemeNameSearchCriteriaRequest criteria, CancellationToken cancellationToken = default)
+    {
+        SchemeSearches.Add(criteria);
+        return Task.FromResult(SchemeResults);
+    }
+
     public Task<IReadOnlyList<CustomerSearchResultResponse>> SearchCustomersAsync(CustomerSearchCriteriaRequest criteria, CancellationToken cancellationToken = default)
     {
         CustomerSearches.Add(criteria);

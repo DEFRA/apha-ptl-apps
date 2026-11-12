@@ -53,4 +53,12 @@ public sealed class SearchRepository(IDbConnectionFactory connectionFactory) : I
             "EXEC dbo.spgSearchSchemeBySampleNumber @SampleNumber",
             new { criteria.SampleNumber })).ToList();
     }
+
+    // Legacy Scheme Admin/Search.aspx - the procedure has no parameters and returns every scheme.
+    public async Task<IReadOnlyList<SchemeNameSearchRow>> GetAllSchemesForNameSearchAsync(CancellationToken cancellationToken = default)
+    {
+        using var connection = connectionFactory.CreateConnection();
+
+        return (await connection.QueryAsync<SchemeNameSearchRow>("EXEC dbo.spgaSearchSchemeBySchemeName")).ToList();
+    }
 }

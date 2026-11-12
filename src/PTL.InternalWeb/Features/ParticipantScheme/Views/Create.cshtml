@@ -31,16 +31,6 @@
 @if (Model.SchemeId is null)
 {
     <h2 class="govuk-heading-m">Please select a Scheme from the List</h2>
-    <form method="get" asp-action="Create" class="govuk-!-margin-bottom-4">
-        <input type="hidden" name="contractId" value="@Model.ContractId" />
-        <input type="hidden" name="customerId" value="@Model.CustomerId" />
-        <input type="hidden" name="participantId" value="@Model.ParticipantId" />
-        <div class="govuk-form-group">
-            <label class="govuk-label" for="schemeSearchTerm">Search schemes</label>
-            <input class="govuk-input" id="schemeSearchTerm" name="schemeSearchTerm" type="text" value="@Model.SchemeSearchTerm" />
-        </div>
-        <button class="govuk-button" data-module="govuk-button" type="submit">Search</button>
-    </form>
 
     @if (Model.SchemeOptions.Count == 0)
     {

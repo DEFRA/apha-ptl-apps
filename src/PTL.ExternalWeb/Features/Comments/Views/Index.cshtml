@@ -1,0 +1,53 @@
+@model PTL.ExternalWeb.Features.Comments.CommentsListViewModel
+@{
+    ViewData["Title"] = "Enter comments";
+}
+
+<h1 class="govuk-heading-l">Distributions</h1>
+
+<p class="govuk-body">The table below shows all of the distributions of schemes for which you are a test consultant. Enter the distribution reference or scheme name to search for a particular distribution.</p>
+
+<form method="get" asp-action="Index" class="govuk-!-margin-bottom-6">
+    <div class="govuk-grid-row">
+        <div class="govuk-grid-column-one-half">
+            <partial name="_DistributionReferenceSchemeSearchFields" model="@(new PTL.ExternalWeb.ViewSupport.DistributionReferenceSchemeSearchFields(null, Model.DistributionReference, Model.SchemeCode, Model.SchemeName))" />
+        </div>
+    </div>
+
+    <partial name="_SearchFormButtonGroup" model="@(nameof(PTL.ExternalWeb.Features.Comments.CommentsController.Index))" />
+</form>
+
+@if (Model.Distributions.Count == 0)
+{
+    <p class="govuk-body">@(Model.IsFiltered ? "No distributions found for the selected search criteria." : "There are no distributions to display.")</p>
+}
+else
+{
+    <table class="govuk-table">
+        <thead class="govuk-table__head">
+            <tr class="govuk-table__row">
+                <th scope="col" class="govuk-table__header">Distribution reference</th>
+                <th scope="col" class="govuk-table__header">Scheme code</th>
+                <th scope="col" class="govuk-table__header">Scheme name</th>
+                <th scope="col" class="govuk-table__header">Target date</th>
+                <th scope="col" class="govuk-table__header">Comments status</th>
+                <th scope="col" class="govuk-table__header">Comments</th>
+            </tr>
+        </thead>
+        <tbody class="govuk-table__body">
+            @foreach (var distribution in Model.Distributions)
+            {
+                <tr class="govuk-table__row">
+                    <td class="govuk-table__cell">@distribution.DistributionReference</td>
+                    <td class="govuk-table__cell">@distribution.SchemeCode</td>
+                    <td class="govuk-table__cell">@distribution.SchemeName</td>
+                    <td class="govuk-table__cell">@distribution.TargetDate.ToString("dddd d MMMM yyyy")</td>
+                    <td class="govuk-table__cell">@distribution.CommentStatus</td>
+                    <td class="govuk-table__cell">
+                        <a class="govuk-link" asp-action="Entry" asp-route-schemeId="@distribution.MonthlyDistributionSchemeId">View</a>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}

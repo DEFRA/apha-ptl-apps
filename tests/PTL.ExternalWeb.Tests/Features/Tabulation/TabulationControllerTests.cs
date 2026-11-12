@@ -27,7 +27,8 @@ public class TabulationControllerTests
 
         var file = Assert.IsType<FileContentResult>(result);
         Assert.Equal("application/pdf", file.ContentType);
-        Assert.Equal("D1a_S1_BT_ Brucella_01_05_2026.pdf", file.FileDownloadName);
+        Assert.True(string.IsNullOrEmpty(file.FileDownloadName));
+        Assert.Equal("inline; filename=\"D1a_S1_BT_ Brucella_01_05_2026.pdf\"", controller.Response.Headers.ContentDisposition.ToString());
         Assert.Equal("%PDF-1.7"u8.ToArray(), file.FileContents);
     }
 
@@ -95,7 +96,8 @@ public class TabulationControllerTests
 
         var result = await controller.GeneratePdf(Guid.NewGuid(), CancellationToken.None);
 
-        Assert.Equal(expected, Assert.IsType<FileContentResult>(result).FileDownloadName);
+        Assert.Equal($"inline; filename=\"{expected}\"", controller.Response.Headers.ContentDisposition.ToString());
+        Assert.True(string.IsNullOrEmpty(Assert.IsType<FileContentResult>(result).FileDownloadName));
     }
 
     [Fact]

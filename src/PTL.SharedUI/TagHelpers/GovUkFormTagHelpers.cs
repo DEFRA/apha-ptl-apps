@@ -43,8 +43,16 @@ public class GovUkInputTagHelper(IHtmlGenerator generator) : TagHelper
     [HtmlAttributeName("described-by")]
     public string? DescribedBy { get; set; }
 
-    /// <summary>Overrides the rendered &lt;input&gt;'s type attribute (e.g. "date"); defaults to "text".</summary>
+    /// <summary>Overrides the rendered &lt;input&gt;'s type attribute; defaults to "text".</summary>
     public string? Type { get; set; }
+
+    /// <summary>
+    /// Renders the PTL date-entry standard: one text box showing DD/MM/YYYY. Used instead of the GOV.UK
+    /// day/month/year Date Input (too tall for the multi-date grids) and the native date picker
+    /// (inconsistent across browsers) - a documented exception to the Design System component.
+    /// </summary>
+    [HtmlAttributeName("date-entry")]
+    public bool DateEntry { get; set; }
 
     [ViewContext]
     [HtmlAttributeNotBound]
@@ -77,12 +85,17 @@ public class GovUkInputTagHelper(IHtmlGenerator generator) : TagHelper
             htmlAttributes["type"] = Type;
         }
 
-        // A native <input type="date"> only accepts/displays a value in "yyyy-MM-dd" - GenerateTextBox's
-        // default (format: null) formats DateTime with the current culture (e.g. "01/04/2026 00:00:00"),
-        // which the date picker silently rejects, leaving the field blank.
-        var format = string.Equals(Type, "date", StringComparison.OrdinalIgnoreCase) && For.Model is DateTime
-            ? "{0:yyyy-MM-dd}"
-            : null;
+        // Format with escaped separators so the value is DD/MM/YYYY whatever the host culture's date separator is.
+        string? format = null;
+        if (DateEntry)
+        {
+            htmlAttributes["autocomplete"] = "off";
+            htmlAttributes["spellcheck"] = "false";
+            if (For.Model is DateTime)
+            {
+                format = "{0:dd'/'MM'/'yyyy}";
+            }
+        }
 
         var input = generator.GenerateTextBox(ViewContext, For.ModelExplorer, field, For.Model, format, htmlAttributes);
         output.Content.AppendHtml(input);

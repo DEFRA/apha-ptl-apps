@@ -52,7 +52,7 @@ public partial class SchemeControllerTests
 
     private static SchemeController SpyPostingController(UpdateSpySchemeApiClient apiClient, FakeLookupApiClient? lookupApiClient = null, (string Key, string Value)[]? fields = null)
     {
-        var controller = new SchemeController(apiClient, lookupApiClient ?? new FakeLookupApiClient(), NullLogger<SchemeController>.Instance);
+        var controller = new SchemeController(apiClient, lookupApiClient ?? new FakeLookupApiClient(), new FakeSearchApiClient(), NullLogger<SchemeController>.Instance);
         var context = FormContext(fields ?? []);
         context.HttpContext.Request.PathBase = "/internal";
         context.HttpContext.Request.Path = "/Scheme/Apply/1";

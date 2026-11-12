@@ -628,6 +628,7 @@ public class DistributionPreviousAndResultsRouteSmokeTests : IClassFixture<PtlEx
     {
         ["__RequestVerificationToken"] = token,
         ["MonthlyDistributionSchemeId"] = f.SchemeId.ToString(),
+        ["IsReadOnly"] = f.Own.IsReadOnly ? "true" : "false",
         ["Tests[0].TestId"] = f.TestId.ToString(),
         ["Tests[0].ResultItems[0].TestResultItemId"] = f.ResultItemId.ToString(),
         ["Tests[0].Samples[0].SampleId"] = f.SampleId.ToString(),
@@ -660,6 +661,7 @@ public class DistributionPreviousAndResultsRouteSmokeTests : IClassFixture<PtlEx
         // The hand-built field names below must be the ones the real form posts.
         Assert.Contains("name=\"Tests[0].Samples[0].Values[0].Result\"", formBody, StringComparison.Ordinal);
         Assert.Contains("name=\"MonthlyDistributionSchemeId\"", formBody, StringComparison.Ordinal);
+        Assert.Contains("name=\"IsReadOnly\"", formBody, StringComparison.Ordinal);
         Assert.DoesNotContain("DistributionParticipantId", formBody, StringComparison.Ordinal);
 
         var response = await CookieForwardingHttpClient.SendWithCookiesAsync(
@@ -713,7 +715,7 @@ public class DistributionPreviousAndResultsRouteSmokeTests : IClassFixture<PtlEx
     }
 
     [Fact]
-    public async Task Entry_Post_PastTheDeadline_RendersTheSaveFailedMessageAndSavesNothing()
+    public async Task Entry_Post_PastTheDeadline_RendersTheClosedMessageAndReadOnlyValuesAndSavesNothing()
     {
         var f = NewEntryFixture(isReadOnly: true);
         var apiClient = new FakeDistributionApiClient { ActualResults = f.Own };
@@ -726,8 +728,10 @@ public class DistributionPreviousAndResultsRouteSmokeTests : IClassFixture<PtlEx
         var body = await response.Content.ReadAsStringAsync();
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.Contains("Save Failed: No results can be saved after the deadline date.", body, StringComparison.Ordinal);
-        Assert.Contains("value=\"POSITIVE\"", body, StringComparison.Ordinal);
+        Assert.Contains("This distribution is closed and results can no longer be edited.", body, StringComparison.Ordinal);
+        Assert.Contains("<p class=\"govuk-body\">POSITIVE</p>", body, StringComparison.Ordinal);
+        Assert.DoesNotContain("name=\"command\" value=\"save\"", body, StringComparison.Ordinal);
+        Assert.DoesNotContain("name=\"command\" value=\"submit\"", body, StringComparison.Ordinal);
         Assert.Empty(apiClient.SavedActualResultsRequests);
     }
 
@@ -768,6 +772,23 @@ public class DistributionPreviousAndResultsRouteSmokeTests : IClassFixture<PtlEx
 
         Assert.DoesNotContain("--error", body, StringComparison.Ordinal);
         Assert.DoesNotContain("aria-describedby", body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Entry_Get_ReadOnly_ShowsClosedMessage_AndHidesEntryActions()
+    {
+        var f = NewEntryFixture(isReadOnly: true);
+        var client = CreateClient(new FakeDistributionApiClient { ActualResults = f.Own });
+        var cookies = await SignInAsync(client);
+
+        var response = await CookieForwardingHttpClient.SendWithCookiesAsync(client, HttpMethod.Get, $"/Distribution/Entry?schemeId={f.SchemeId}", cookies);
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("This distribution is closed and results can no longer be edited.", body, StringComparison.Ordinal);
+        Assert.DoesNotContain("name=\"command\" value=\"save\"", body, StringComparison.Ordinal);
+        Assert.DoesNotContain("name=\"command\" value=\"submit\"", body, StringComparison.Ordinal);
+        Assert.Contains(">Back<", body, StringComparison.Ordinal);
     }
 
     [Fact]

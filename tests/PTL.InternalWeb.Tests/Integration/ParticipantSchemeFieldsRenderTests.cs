@@ -203,13 +203,14 @@ public class ParticipantSchemeFieldsRenderTests : IClassFixture<WebApplicationFa
         Assert.Contains("Full scheme pricing", select, StringComparison.Ordinal);
     }
 
-    // The search box and the page controls submit schemeSearchTerm, page and pageSize; the Create action must bind them rather than ignore them.
+    // The page controls submit page and pageSize; the Create action must bind them rather than ignore them. The scheme list has no search box (legacy has none).
     [Fact]
-    public async Task Create_SchemeList_BindsTheSearchAndPagingValuesItsControlsSubmit()
+    public async Task Create_SchemeList_BindsThePagingValuesItsControlsSubmitAndHasNoSearchBox()
     {
-        var html = await MainContentAsync($"/ParticipantScheme/Create?contractId={ContractId}&customerId={CustomerId}&schemeSearchTerm=sal&page=2&pageSize=50");
+        var html = await MainContentAsync($"/ParticipantScheme/Create?contractId={ContractId}&customerId={CustomerId}&page=2&pageSize=50");
 
-        Assert.Contains("name=\"schemeSearchTerm\" type=\"text\" value=\"sal\"", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("schemeSearchTerm", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("Search schemes", html, StringComparison.Ordinal);
         Assert.Contains("<option value=\"50\" selected>50</option>", html, StringComparison.Ordinal);
         Assert.Contains("aria-label=\"Page 2\" aria-current=\"page\"", html, StringComparison.Ordinal);
     }

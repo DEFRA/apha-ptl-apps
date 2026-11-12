@@ -37,6 +37,17 @@ internal sealed class FakeSearchRepository : ISearchRepository
 
     public IReadOnlyList<SampleNumberSearchRow> SampleNumberRows { get; set; } = [];
 
+    public IReadOnlyList<SchemeNameSearchRow> SchemeNameRows { get; set; } = [];
+
+    public int SchemeNameCalls { get; private set; }
+
+    public Task<IReadOnlyList<SchemeNameSearchRow>> GetAllSchemesForNameSearchAsync(CancellationToken cancellationToken = default)
+    {
+        SchemeNameCalls++;
+        LastCancellationToken = cancellationToken;
+        return Failure is null ? Task.FromResult(SchemeNameRows) : Task.FromException<IReadOnlyList<SchemeNameSearchRow>>(Failure);
+    }
+
     public List<DistributionNumberSearchCriteria> DistributionNumberCalls { get; } = [];
 
     public List<SampleNumberSearchCriteria> SampleNumberCalls { get; } = [];
