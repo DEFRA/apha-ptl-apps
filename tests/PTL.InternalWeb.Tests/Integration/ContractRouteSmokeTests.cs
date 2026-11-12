@@ -172,6 +172,52 @@ public class ContractRouteSmokeTests : IClassFixture<WebApplicationFactory<Progr
         Assert.Contains($"value=\"{1.25m}\"", input.Value, StringComparison.Ordinal);
     }
 
+    // The prices are stored as decimal(18,4), so the raw value renders as 10.5000; the form shows it to two decimal places
+    // (more only when the stored value really has them) without changing the value.
+    [Fact]
+    public async Task Edit_RendersPricePerItemFieldsToTwoDecimalPlaces()
+    {
+        _fakeApiClient.ContractResponse = SampleContract(ContractId, CustomerId) with { CourierPrice = 10.5000m, PostagePrice = 5.0000m, SpecialDeliveryPrice = 123.4500m };
+        var client = _factory.CreateClient();
+
+        var body = await client.GetStringAsync($"/Contract/Edit/{ContractId}");
+
+        Assert.Equal("10.50", InputValue(body, "CourierPrice"));
+        Assert.Equal("5.00", InputValue(body, "PostagePrice"));
+        Assert.Equal("123.45", InputValue(body, "SpecialDeliveryPrice"));
+    }
+
+    [Fact]
+    public async Task Edit_PricePerItemWithMoreThanTwoDecimalPlaces_IsNotRoundedInTheForm()
+    {
+        _fakeApiClient.ContractResponse = SampleContract(ContractId, CustomerId) with { CourierPrice = 10.5050m };
+        var client = _factory.CreateClient();
+
+        var body = await client.GetStringAsync($"/Contract/Edit/{ContractId}");
+
+        Assert.Equal("10.505", InputValue(body, "CourierPrice"));
+    }
+
+    [Fact]
+    public async Task Create_PricePerItemFieldsStartEmpty()
+    {
+        var client = _factory.CreateClient();
+
+        var body = await client.GetStringAsync($"/Contract/Create?customerId={CustomerId}");
+
+        Assert.Equal(string.Empty, InputValue(body, "CourierPrice"));
+        Assert.Equal(string.Empty, InputValue(body, "PostagePrice"));
+        Assert.Equal(string.Empty, InputValue(body, "SpecialDeliveryPrice"));
+    }
+
+    private static string InputValue(string body, string id)
+    {
+        var input = System.Text.RegularExpressions.Regex.Match(body, $"<input[^>]*id=\"{id}\"[^>]*>", System.Text.RegularExpressions.RegexOptions.None, TimeSpan.FromSeconds(5));
+        Assert.True(input.Success, $"The {id} input was not rendered.");
+        var value = System.Text.RegularExpressions.Regex.Match(input.Value, "value=\"([^\"]*)\"", System.Text.RegularExpressions.RegexOptions.None, TimeSpan.FromSeconds(5));
+        return value.Success ? value.Groups[1].Value : string.Empty;
+    }
+
     [Fact]
     public async Task Index_NoResults_RendersEmptyState()
     {

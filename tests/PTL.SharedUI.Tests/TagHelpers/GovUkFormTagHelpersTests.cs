@@ -17,6 +17,8 @@ public class GovUkFormTagHelpersTests
         public string? Comments { get; set; }
 
         public DateTime? StartDate { get; set; }
+
+        public decimal? Price { get; set; }
     }
 
     private static (TagHelperContext Context, TagHelperOutput Output) CreateTagHelperContext(string tagName) =>
@@ -89,6 +91,51 @@ public class GovUkFormTagHelpersTests
         Assert.Contains("type=\"text\"", html, StringComparison.Ordinal);
         Assert.DoesNotContain("type=\"date\"", html, StringComparison.Ordinal);
         Assert.Contains("autocomplete=\"off\"", html, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("10.5000", "10.50")]
+    [InlineData("5", "5.00")]
+    [InlineData("123.4500", "123.45")]
+    [InlineData("10.5050", "10.505")]
+    public void Input_WithFormat_RendersTheValueInThatFormatWithoutRoundingAwayDigits(string stored, string expected)
+    {
+        var model = new TestModel { Price = decimal.Parse(stored, System.Globalization.CultureInfo.InvariantCulture) };
+        var (viewContext, expression, generator) = TagHelperRenderContext.Create(model, nameof(TestModel.Price));
+        var helper = new GovUkInputTagHelper(generator) { For = expression, Label = "Price", Format = "{0:0.00##}", ViewContext = viewContext };
+        var (context, output) = CreateTagHelperContext("govuk-input");
+
+        using (new CultureScope("en-GB"))
+        {
+            helper.Process(context, output);
+        }
+
+        Assert.Contains($"value=\"{expected}\"", output.Content.GetContent(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Input_WithoutFormat_RendersTheValuesDefaultString()
+    {
+        var model = new TestModel { Price = 10.5000m };
+        var (viewContext, expression, generator) = TagHelperRenderContext.Create(model, nameof(TestModel.Price));
+        var helper = new GovUkInputTagHelper(generator) { For = expression, Label = "Price", ViewContext = viewContext };
+        var (context, output) = CreateTagHelperContext("govuk-input");
+
+        using (new CultureScope("en-GB"))
+        {
+            helper.Process(context, output);
+        }
+
+        Assert.Contains("value=\"10.5000\"", output.Content.GetContent(), StringComparison.Ordinal);
+    }
+
+    private sealed class CultureScope : IDisposable
+    {
+        private readonly System.Globalization.CultureInfo _previous = System.Globalization.CultureInfo.CurrentCulture;
+
+        public CultureScope(string name) => System.Globalization.CultureInfo.CurrentCulture = new System.Globalization.CultureInfo(name);
+
+        public void Dispose() => System.Globalization.CultureInfo.CurrentCulture = _previous;
     }
 
     [Fact]

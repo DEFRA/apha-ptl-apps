@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Net;
 using System.Net.Sockets;
+using System.Text;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using PTL.Api.Tests.Distribution;
@@ -52,16 +53,44 @@ public class LabelPrinterClientDiagnosticsTests
         var expected = ZplLabelFormatter.ToZpl(Label);
         Assert.True(printed);
         Assert.Equal(expected, received.ToArray());
-        Assert.Equal([3, 4, 5, 6, 7], logger.Entries.Select(e => e.EventId.Id));
+        Assert.Equal([3, 4, 5, 8, 6, 7], logger.Entries.Select(e => e.EventId.Id));
         Assert.All(logger.Entries, e =>
         {
-            Assert.Equal(LogLevel.Information, e.Level);
             Assert.Equal("127.0.0.1", Value(e, "Host"));
             Assert.Equal(port.ToString(CultureInfo.InvariantCulture), Value(e, "Port"));
         });
-        Assert.Equal(expected.Length.ToString(CultureInfo.InvariantCulture), Value(logger.Entries[3], "PayloadLength"));
-        Assert.Equal("True", Value(logger.Entries[4], "Success"));
-        logger.AssertNoneContain("Alice", "Sample Street");
+        Assert.All(logger.Entries.Where(e => e.EventId.Id != 8), e => Assert.Equal(LogLevel.Information, e.Level));
+        Assert.Equal(expected.Length.ToString(CultureInfo.InvariantCulture), Value(logger.Entries[4], "PayloadLength"));
+        Assert.Equal("True", Value(logger.Entries[5], "Success"));
+
+        // Label text is personal data: only the ZPL entry may carry it.
+        foreach (var entry in logger.Entries.Where(e => e.EventId.Id != 8))
+        {
+            Assert.DoesNotContain("Alice", entry.Message, StringComparison.Ordinal);
+            Assert.DoesNotContain("Sample Street", entry.Message, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public async Task PrintAsync_Success_LogsTheGeneratedZplWithHostPortAndPayloadLengthBeforeItIsSent()
+    {
+        var logger = new MessageCapturingLogger<LabelPrinterClient>();
+        using var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        var port = ((IPEndPoint)listener.LocalEndpoint).Port;
+
+        await CreateClient("127.0.0.1", port, logger).PrintAsync(Label);
+
+        var zpl = Assert.Single(logger.Entries, e => e.EventId.Id == 8);
+        var expected = ZplLabelFormatter.ToZpl(Label);
+        Assert.Equal(LogLevel.Information, zpl.Level);
+        Assert.Equal(Encoding.ASCII.GetString(expected), Value(zpl, "ZplPayload"));
+        Assert.Equal(expected.Length.ToString(CultureInfo.InvariantCulture), Value(zpl, "PayloadLength"));
+        Assert.Equal("127.0.0.1", Value(zpl, "Host"));
+        Assert.Equal(port.ToString(CultureInfo.InvariantCulture), Value(zpl, "Port"));
+        Assert.StartsWith("Generated ZPL payload.", zpl.Message, StringComparison.Ordinal);
+        Assert.Contains("^XA", zpl.Message, StringComparison.Ordinal);
+        Assert.True(logger.Entries.IndexOf(zpl) < logger.Entries.FindIndex(e => e.EventId.Id == 6));
     }
 
     [Fact]

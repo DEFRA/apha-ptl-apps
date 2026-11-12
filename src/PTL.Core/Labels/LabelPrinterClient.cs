@@ -1,4 +1,5 @@
 using System.Net.Sockets;
+using System.Text;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -55,6 +56,13 @@ public sealed class LabelPrinterClient(IOptions<LabelPrinterOptions> options, IL
             new EventId(7, nameof(LogPrintCompletedMessage)),
             "Print request completed. Success={Success} Host={Host} Port={Port}");
 
+    // TEMPORARY: always logged for troubleshooting. Label text is name and address data - revert to Debug or remove.
+    private static readonly Action<ILogger, string?, int, int, string, Exception?> LogGeneratedZplMessage =
+        LoggerMessage.Define<string?, int, int, string>(
+            LogLevel.Information,
+            new EventId(8, nameof(LogGeneratedZplMessage)),
+            "Generated ZPL payload. Host={Host} Port={Port} PayloadLength={PayloadLength}\n{ZplPayload}");
+
     public async Task<bool> PrintAsync(AddressLabel label, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(label);
@@ -81,6 +89,8 @@ public sealed class LabelPrinterClient(IOptions<LabelPrinterOptions> options, IL
             await using var stream = client.GetStream();
 
             var payload = ZplLabelFormatter.ToZpl(label);
+            LogGeneratedZplMessage(logger, settings.Host, settings.Port, payload.Length, Encoding.ASCII.GetString(payload), null);
+
             await stream.WriteAsync(payload, cancellationToken);
             await stream.FlushAsync(cancellationToken);
             LogDataSentMessage(logger, settings.Host, settings.Port, payload.Length, null);

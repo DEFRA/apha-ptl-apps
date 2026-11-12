@@ -20,7 +20,7 @@ public enum LoginInstructionsOutcome
     NoEmailAddress,
     SendFailed,
 
-    /// <summary>The lab user's access to the lab is inactive, so there is nothing to give instructions for.</summary>
+    /// <summary>The user (or the lab user's access to the lab) is inactive, so no instructions are sent.</summary>
     NotActive,
 }
 
@@ -36,7 +36,7 @@ public static class LoginInstructionsOutcomeExtensions
     {
         LoginInstructionsOutcome.Sent => new LoginInstructionsResponse(true),
         LoginInstructionsOutcome.NoEmailAddress => new LoginInstructionsResponse(false, "There is no email address saved to send the login instructions to."),
-        LoginInstructionsOutcome.NotActive => new LoginInstructionsResponse(false, "Login instructions can only be sent to an active lab user."),
+        LoginInstructionsOutcome.NotActive => new LoginInstructionsResponse(false, "Login instructions can only be sent to an active user."),
         _ => new LoginInstructionsResponse(false, "The login instructions email could not be sent. Please try again."),
     };
 }

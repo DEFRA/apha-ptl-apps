@@ -268,6 +268,26 @@ public class LoginInstructionsPendingListTests
     }
 
     [Fact]
+    public async Task Consultant_SendInstructions_ForAnInactiveRow_SendsNothingAndExplainsWhy()
+    {
+        var login = new FakeLoginInstructionsApiClient();
+        var controller = SystemAdministrationControllerFactory.Create(
+            externalTestConsultantApiClient: new FakeExternalTestConsultantApiClient { TestConsultants = [StoredConsultant(sent: false)] },
+            loginInstructionsApiClient: login);
+        var inactiveRow = ConsultantRow();
+        inactiveRow.IsInactive = true;
+        var model = new ExternalTestConsultantManagementViewModel { Rows = [inactiveRow] };
+
+        var result = ConsultantPage(await controller.ExternalTestConsultantManagement(model, PendingListCommands.SendInstructions, 0, CancellationToken.None));
+
+        Assert.Empty(login.ExternalTestConsultantCalls);
+        Assert.True(result.MessageIsError);
+        Assert.Equal("Login instructions can only be sent to an active test consultant.", result.Message);
+        Assert.False(result.Rows[0].LoginInstructionsSent);
+        Assert.Null(controller.TempData.GetNotification());
+    }
+
+    [Fact]
     public async Task Consultant_SendInstructions_WhenTheEmailCannotBeSent_ShowsTheReasonAndKeepsTheLink()
     {
         var login = new FakeLoginInstructionsApiClient { Result = new LoginInstructionsResponse(false, "There is no email address saved to send the login instructions to.") };

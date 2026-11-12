@@ -144,6 +144,35 @@ public class LoginInstructionsServiceTests
     }
 
     [Fact]
+    public async Task SendAsync_InactiveParticipant_SendsNothingAndRecordsNothing()
+    {
+        var harness = new Harness();
+        var participant = new CoreParticipant { ParticipantId = Guid.NewGuid(), ContactName = "Pat Participant", Email = "pat@example.org", IsActive = false };
+        await harness.Participants.CreateAsync(participant);
+
+        var result = await harness.Service.SendAsync(LoginInstructionUserType.Participant, participant.ParticipantId);
+
+        Assert.Equal(LoginInstructionsOutcome.NotActive, result.Outcome);
+        Assert.False(result.Success);
+        Assert.Empty(harness.Notify.Sent);
+        Assert.Empty(harness.Repository.Marked);
+    }
+
+    [Fact]
+    public async Task SendAsync_InactiveExternalTestConsultant_SendsNothingAndRecordsNothing()
+    {
+        var harness = new Harness();
+        var consultant = new CoreTestConsultant { ExternalTestConsultantId = Guid.NewGuid(), Name = "Tom Consultant", Email = "tom@example.org", IsInactive = true };
+        harness.TestConsultants.Seed(consultant);
+
+        var result = await harness.Service.SendAsync(LoginInstructionUserType.ExternalTestConsultant, consultant.ExternalTestConsultantId);
+
+        Assert.Equal(LoginInstructionsOutcome.NotActive, result.Outcome);
+        Assert.Empty(harness.Notify.Sent);
+        Assert.Empty(harness.Repository.Marked);
+    }
+
+    [Fact]
     public async Task SendAsync_AfterNotifyAcceptsTheEmail_PersistsTheSentStateWithDateAndAudit()
     {
         var harness = new Harness();
@@ -270,7 +299,7 @@ public class LoginInstructionsServiceTests
     [Theory]
     [InlineData(LoginInstructionsOutcome.Sent, true, null)]
     [InlineData(LoginInstructionsOutcome.NoEmailAddress, false, "There is no email address saved to send the login instructions to.")]
-    [InlineData(LoginInstructionsOutcome.NotActive, false, "Login instructions can only be sent to an active lab user.")]
+    [InlineData(LoginInstructionsOutcome.NotActive, false, "Login instructions can only be sent to an active user.")]
     [InlineData(LoginInstructionsOutcome.SendFailed, false, "The login instructions email could not be sent. Please try again.")]
     public void ToResponse_DescribesEachOutcome(LoginInstructionsOutcome outcome, bool success, string? message)
     {

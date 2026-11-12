@@ -151,6 +151,10 @@
                         {
                             <strong class="govuk-tag govuk-tag--green">Sent</strong>
                         }
+                        else if (row.IsInactive)
+                        {
+                            <strong class="govuk-tag govuk-tag--grey">Not Sent</strong>
+                        }
                         else
                         {
                             <button type="submit" class="govuk-link ptl-link-button" formnovalidate formaction="@ButtonUrl(PendingListCommands.SendInstructions, i)">Send Instructions<span class="govuk-visually-hidden"> to test consultant @row.Name</span></button>
