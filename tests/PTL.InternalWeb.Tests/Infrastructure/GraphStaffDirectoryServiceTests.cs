@@ -76,7 +76,7 @@ public class GraphStaffDirectoryServiceTests
         var request = Assert.Single(handler.Requests);
         Assert.Equal(HttpMethod.Get, request.Method);
         Assert.StartsWith("https://graph.example.test/v1.0/users?", request.RequestUri!.ToString(), StringComparison.Ordinal);
-        Assert.Contains("$select=id,onPremisesSamAccountName,onPremisesDomainName,mail,givenName,surname,displayName,accountEnabled", request.RequestUri.Query, StringComparison.Ordinal);
+        Assert.Contains("$select=id,onPremisesSamAccountName,onPremisesDomainName,employeeId,mail,givenName,surname,displayName,accountEnabled", request.RequestUri.Query, StringComparison.Ordinal);
         Assert.Contains("$top=100", request.RequestUri.Query, StringComparison.Ordinal);
     }
 
@@ -94,16 +94,16 @@ public class GraphStaffDirectoryServiceTests
     }
 
     [Fact]
-    public async Task SearchAsync_MatchesEachPieceAgainstAccountFirstNameSurnameAndDisplayName()
+    public async Task SearchAsync_MatchesEachPieceAgainstAccountFirstNameSurnameDisplayNameAndEmployeeId()
     {
         var (service, handler, _) = Create();
 
         await service.SearchAsync("dt2\\jsmith  Jane");
 
         Assert.Equal(
-            "(startsWith(onPremisesSamAccountName,'dt2') or startsWith(givenName,'dt2') or startsWith(surname,'dt2') or startsWith(displayName,'dt2')"
-            + " or startsWith(onPremisesSamAccountName,'jsmith') or startsWith(givenName,'jsmith') or startsWith(surname,'jsmith') or startsWith(displayName,'jsmith')"
-            + " or startsWith(onPremisesSamAccountName,'Jane') or startsWith(givenName,'Jane') or startsWith(surname,'Jane') or startsWith(displayName,'Jane'))"
+            "(startsWith(onPremisesSamAccountName,'dt2') or startsWith(givenName,'dt2') or startsWith(surname,'dt2') or startsWith(displayName,'dt2') or startsWith(employeeId,'dt2')"
+            + " or startsWith(onPremisesSamAccountName,'jsmith') or startsWith(givenName,'jsmith') or startsWith(surname,'jsmith') or startsWith(displayName,'jsmith') or startsWith(employeeId,'jsmith')"
+            + " or startsWith(onPremisesSamAccountName,'Jane') or startsWith(givenName,'Jane') or startsWith(surname,'Jane') or startsWith(displayName,'Jane') or startsWith(employeeId,'Jane'))"
             + " and accountEnabled eq true",
             DecodedFilter(Assert.Single(handler.Requests)));
     }
@@ -170,13 +170,14 @@ public class GraphStaffDirectoryServiceTests
     }
 
     [Fact]
-    public async Task SearchAsync_SkipsDisabledAccountsAndUsersWithNoOnPremisesAccountName_AndSortsByUsername()
+    public async Task SearchAsync_SkipsDisabledAccountsAndUsersWithNeitherAnAccountNameNorAnEmployeeId_AndSortsByUsername()
     {
         var (service, _, _) = Create("""
             {"value":[
               {"onPremisesSamAccountName":"zed","onPremisesDomainName":"dt2","displayName":"Zed","accountEnabled":true},
               {"onPremisesSamAccountName":"off","onPremisesDomainName":"dt2","displayName":"Off","accountEnabled":false},
               {"onPremisesSamAccountName":null,"displayName":"Cloud only","accountEnabled":true},
+              {"onPremisesSamAccountName":null,"employeeId":"12;34","displayName":"Odd id","accountEnabled":true},
               {"onPremisesSamAccountName":"abe","onPremisesDomainName":"dt2","displayName":"Abe"}
             ]}
             """);
@@ -184,6 +185,35 @@ public class GraphStaffDirectoryServiceTests
         var results = await service.SearchAsync("e");
 
         Assert.Equal(["dt2\\abe", "dt2\\zed"], results.Users.Select(r => r.Username));
+    }
+
+    [Fact]
+    public async Task SearchAsync_ListsAUserWithOnlyAnEmployeeIdUnderTheDemeterUsername()
+    {
+        var (service, _, _) = Create("""
+            {"value":[
+              {"onPremisesSamAccountName":null,"employeeId":" 12345 ","mail":"jane@example.test","givenName":"Jane","surname":"Smith","displayName":"Jane Smith","accountEnabled":true},
+              {"onPremisesSamAccountName":"  ","employeeId":"9876","displayName":"Blank account","accountEnabled":true}
+            ]}
+            """);
+
+        var results = await service.SearchAsync("1234");
+
+        Assert.Equal(["demeter\\12345", "demeter\\9876"], results.Users.Select(r => r.Username));
+        Assert.Equal("Jane Smith", results.Users[0].FriendlyName);
+        Assert.Equal("jane@example.test", results.Users[0].Email);
+    }
+
+    [Fact]
+    public async Task SearchAsync_PrefersTheOnPremisesAccountOverTheEmployeeId()
+    {
+        var (service, _, _) = Create("""
+            {"value":[{"onPremisesSamAccountName":"JSmith","onPremisesDomainName":"DT2.local","employeeId":"12345","displayName":"Jane Smith"}]}
+            """);
+
+        var user = Assert.Single((await service.SearchAsync("12345")).Users);
+
+        Assert.Equal("dt2\\jsmith", user.Username);
     }
 
     [Fact]
