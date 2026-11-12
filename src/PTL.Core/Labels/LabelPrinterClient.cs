@@ -17,22 +17,54 @@ public sealed class LabelPrinterClient(IOptions<LabelPrinterOptions> options, IL
         LoggerMessage.Define(
             LogLevel.Error,
             new EventId(1, nameof(LogHostNotConfiguredMessage)),
-            "LabelPrinter:Host is not configured - cannot print label");
+            "Label printer host is not configured.");
 
-    private static readonly Action<ILogger, string?, int, Exception?> LogPrintErrorMessage =
-        LoggerMessage.Define<string?, int>(
+    private static readonly Action<ILogger, string?, int, string, Exception?> LogPrintErrorMessage =
+        LoggerMessage.Define<string?, int, string>(
             LogLevel.Error,
             new EventId(2, nameof(LogPrintErrorMessage)),
-            "Error whilst printing label to {Host}:{Port}");
+            "Printer communication failed. Host={Host} Port={Port} Reason={Reason}");
+
+    private static readonly Action<ILogger, string?, int, Exception?> LogConfigurationLoadedMessage =
+        LoggerMessage.Define<string?, int>(
+            LogLevel.Information,
+            new EventId(3, nameof(LogConfigurationLoadedMessage)),
+            "Label printer configuration loaded. Host={Host} Port={Port}");
+
+    private static readonly Action<ILogger, string?, int, Exception?> LogAttemptingCommunicationMessage =
+        LoggerMessage.Define<string?, int>(
+            LogLevel.Information,
+            new EventId(4, nameof(LogAttemptingCommunicationMessage)),
+            "Attempting printer communication. Host={Host} Port={Port}");
+
+    private static readonly Action<ILogger, string?, int, Exception?> LogConnectionEstablishedMessage =
+        LoggerMessage.Define<string?, int>(
+            LogLevel.Information,
+            new EventId(5, nameof(LogConnectionEstablishedMessage)),
+            "Printer connection established. Host={Host} Port={Port}");
+
+    private static readonly Action<ILogger, string?, int, int, Exception?> LogDataSentMessage =
+        LoggerMessage.Define<string?, int, int>(
+            LogLevel.Information,
+            new EventId(6, nameof(LogDataSentMessage)),
+            "Label data sent to printer. Host={Host} Port={Port} PayloadLength={PayloadLength}");
+
+    private static readonly Action<ILogger, bool, string?, int, Exception?> LogPrintCompletedMessage =
+        LoggerMessage.Define<bool, string?, int>(
+            LogLevel.Information,
+            new EventId(7, nameof(LogPrintCompletedMessage)),
+            "Print request completed. Success={Success} Host={Host} Port={Port}");
 
     public async Task<bool> PrintAsync(AddressLabel label, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(label);
 
         var settings = options.Value;
+        LogConfigurationLoadedMessage(logger, settings.Host, settings.Port, null);
         if (string.IsNullOrWhiteSpace(settings.Host))
         {
             LogHostNotConfiguredMessage(logger, null);
+            LogPrintCompletedMessage(logger, false, settings.Host, settings.Port, null);
             return false;
         }
 
@@ -42,19 +74,24 @@ public sealed class LabelPrinterClient(IOptions<LabelPrinterOptions> options, IL
             using var connectTimeout = new CancellationTokenSource(settings.ConnectTimeoutMilliseconds);
             using var linkedSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, connectTimeout.Token);
 
+            LogAttemptingCommunicationMessage(logger, settings.Host, settings.Port, null);
             await client.ConnectAsync(settings.Host, settings.Port, linkedSource.Token);
+            LogConnectionEstablishedMessage(logger, settings.Host, settings.Port, null);
 
             await using var stream = client.GetStream();
 
             var payload = ZplLabelFormatter.ToZpl(label);
             await stream.WriteAsync(payload, cancellationToken);
             await stream.FlushAsync(cancellationToken);
+            LogDataSentMessage(logger, settings.Host, settings.Port, payload.Length, null);
 
+            LogPrintCompletedMessage(logger, true, settings.Host, settings.Port, null);
             return true;
         }
         catch (Exception ex) when (ex is SocketException or IOException or OperationCanceledException)
         {
-            LogPrintErrorMessage(logger, settings.Host, settings.Port, ex);
+            LogPrintErrorMessage(logger, settings.Host, settings.Port, $"{ex.GetType().Name}: {ex.Message}", ex);
+            LogPrintCompletedMessage(logger, false, settings.Host, settings.Port, null);
             return false;
         }
     }
