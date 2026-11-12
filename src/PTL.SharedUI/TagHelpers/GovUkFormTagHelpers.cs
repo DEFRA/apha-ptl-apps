@@ -46,6 +46,9 @@ public class GovUkInputTagHelper(IHtmlGenerator generator) : TagHelper
     /// <summary>Overrides the rendered &lt;input&gt;'s type attribute; defaults to "text".</summary>
     public string? Type { get; set; }
 
+    /// <summary>Composite format for the rendered value (for example <c>{0:0.00##}</c>); null renders the value's default string.</summary>
+    public string? Format { get; set; }
+
     /// <summary>
     /// Renders the PTL date-entry standard: one text box showing DD/MM/YYYY. Used instead of the GOV.UK
     /// day/month/year Date Input (too tall for the multi-date grids) and the native date picker
@@ -86,12 +89,12 @@ public class GovUkInputTagHelper(IHtmlGenerator generator) : TagHelper
         }
 
         // Format with escaped separators so the value is DD/MM/YYYY whatever the host culture's date separator is.
-        string? format = null;
+        string? format = Format;
         if (DateEntry)
         {
             htmlAttributes["autocomplete"] = "off";
             htmlAttributes["spellcheck"] = "false";
-            if (For.Model is DateTime)
+            if (format is null && For.Model is DateTime)
             {
                 format = "{0:dd'/'MM'/'yyyy}";
             }

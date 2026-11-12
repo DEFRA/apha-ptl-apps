@@ -18,6 +18,9 @@
     // time and the other is cleared client-side before submit (see the script block below).
     var isUt = !string.Equals(Model.ContractType, "FT", StringComparison.OrdinalIgnoreCase);
     var currency = string.IsNullOrEmpty(Model.CurrencySymbol) ? "£" : Model.CurrencySymbol;
+
+    // Prices are stored to 4dp: show at least 2dp (10.50, not 10.5000) and keep any further digits that are really there.
+    const string PriceFormat = "{0:0.00##}";
 }
 
 <govuk-error-summary errors="@errors" />
@@ -93,15 +96,15 @@
 
 <govuk-input asp-for="NumberCourier" label="Number of Courier Items" input-class="govuk-input govuk-input--width-5" />
 
-<govuk-input asp-for="CourierPrice" label="@($"Courier Price per Item ({currency})")" input-class="govuk-input govuk-input--width-5" />
+<govuk-input asp-for="CourierPrice" label="@($"Courier Price per Item ({currency})")" format="@PriceFormat" input-class="govuk-input govuk-input--width-5" />
 
 <govuk-input asp-for="NumberPostage" label="Number of Postage Items" input-class="govuk-input govuk-input--width-5" />
 
-<govuk-input asp-for="PostagePrice" label="@($"Postage Price per Item ({currency})")" input-class="govuk-input govuk-input--width-5" />
+<govuk-input asp-for="PostagePrice" label="@($"Postage Price per Item ({currency})")" format="@PriceFormat" input-class="govuk-input govuk-input--width-5" />
 
 <govuk-input asp-for="NumberSpecialDelivery" label="Number of Special Delivery Items" input-class="govuk-input govuk-input--width-5" />
 
-<govuk-input asp-for="SpecialDeliveryPrice" label="@($"Special Delivery Price per Item ({currency})")" input-class="govuk-input govuk-input--width-5" />
+<govuk-input asp-for="SpecialDeliveryPrice" label="@($"Special Delivery Price per Item ({currency})")" format="@PriceFormat" input-class="govuk-input govuk-input--width-5" />
 
 <h2 class="govuk-heading-m">Contract setup</h2>
 
