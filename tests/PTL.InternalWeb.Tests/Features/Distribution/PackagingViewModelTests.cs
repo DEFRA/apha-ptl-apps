@@ -172,17 +172,4 @@ public class PackagingViewModelTests
     [Fact]
     public void CarriedTicks_WithNoTicksIsEmpty() =>
         Assert.Empty(new PackagingViewModel { Sheet = SheetOf(0, 1, Scheme(Dp1)) }.CarriedTicks([]));
-
-    [Fact]
-    public void PackagingLabelsViewModel_Defaults()
-    {
-        var model = new PackagingLabelsViewModel();
-
-        Assert.Equal(0, model.YearId);
-        Assert.Equal(0, model.MonthId);
-        Assert.Equal(0, model.Mode);
-        Assert.Equal(0, model.Week);
-        Assert.Equal(string.Empty, model.MonthDescription);
-        Assert.Empty(model.Labels);
-    }
 }

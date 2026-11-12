@@ -3,6 +3,7 @@ using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using PTL.ApiClient;
 using PTL.ApiClient.Distribution;
 using PTL.Contracts.Distribution;
 using PTL.InternalWeb.Features.Distribution;
@@ -10,7 +11,7 @@ using PTL.InternalWeb.Tests.TestSupport;
 
 namespace PTL.InternalWeb.Tests.Integration;
 
-// Renders Features/Distribution/Views/Packaging.cshtml and PackagingLabels.cshtml through the real
+// Renders Features/Distribution/Views/Packaging.cshtml through the real
 // view engine (legacy Internal User/PackagingSheet.aspx parity), so runtime view errors and the
 // legacy column/row/checkbox rules are exercised as markup, not just as controller return values.
 public partial class PackagingRenderTests : IClassFixture<WebApplicationFactory<Program>>
@@ -29,6 +30,7 @@ public partial class PackagingRenderTests : IClassFixture<WebApplicationFactory<
 
     private readonly WebApplicationFactory<Program> _factory;
     private readonly FakeDistributionApiClient _apiClient = new();
+    private readonly FakeLabelPrinterApiClient _printer = new();
 
     public PackagingRenderTests(WebApplicationFactory<Program> factory)
     {
@@ -37,6 +39,8 @@ public partial class PackagingRenderTests : IClassFixture<WebApplicationFactory<
             {
                 services.RemoveAll<IDistributionApiClient>();
                 services.AddSingleton<IDistributionApiClient>(_apiClient);
+                services.RemoveAll<ILabelPrinterApiClient>();
+                services.AddSingleton<ILabelPrinterApiClient>(_printer);
             }));
 
         _apiClient.Schedule = new MonthlyDistributionResponse(Guid.NewGuid(), 2026, 4, []);
@@ -746,12 +750,12 @@ public partial class PackagingRenderTests : IClassFixture<WebApplicationFactory<
         Assert.DoesNotContain("Packaging", location, StringComparison.Ordinal);
     }
 
-    // ---- 10: labels view ----------------------------------------------------------------------
+    // ---- 10: print labels ---------------------------------------------------------------------
 
     [Fact]
-    public async Task Labels_WhenReturned_RendersOneBlockPerLabelWithLinesInOrderAndABackLink()
+    public async Task Labels_WhenReturned_SendsEachLabelToThePrinterAndRedisplaysThePageWithASuccessBanner()
     {
-        _apiClient.Packaging = Sheet(1, 2);
+        _apiClient.Packaging = Sheet(1, 2, Block("k2", Apr13, "Lab One", schemes: [Scheme(1, "Scheme A")]));
         _apiClient.PackagingLabels = new PackagingLabelsResponse(
         [
             new PackagingLabelResponse(["LAB01", "Lab One & Co", "1 High Street"]),
@@ -760,32 +764,31 @@ public partial class PackagingRenderTests : IClassFixture<WebApplicationFactory<
 
         var html = await PostHtmlAsync(("command", "labels"), ("Mode", "1"), ("Week", "2"), ("PrintKeys", "k2"));
 
-        Assert.Contains("<title>Sample Packaging Labels - April 2026", html, StringComparison.Ordinal);
-        Assert.Contains("Sample Packaging Labels - April 2026</h1>", html, StringComparison.Ordinal);
-        Assert.Matches("<button[^>]*id=\"labels-print-button\"[^>]*>Print</button>", html);
-
-        var blocks = Regex.Matches(html, "<div class=\"ptl-label\">(.*?)</div>", RegexOptions.Singleline).Select(m => m.Groups[1].Value).ToList();
-        Assert.Equal(2, blocks.Count);
-        Assert.Equal(
-            ["LAB01", "Lab One & Co", "1 High Street"],
-            Regex.Matches(blocks[0], "<p class=\"govuk-body ptl-label__line\">(.*?)</p>").Select(m => WebUtility.HtmlDecode(m.Groups[1].Value)));
-        Assert.Equal(
-            ["LAB02", "Lab Two"],
-            Regex.Matches(blocks[1], "<p class=\"govuk-body ptl-label__line\">(.*?)</p>").Select(m => WebUtility.HtmlDecode(m.Groups[1].Value)));
-        Assert.Contains("Lab One &amp; Co", html, StringComparison.Ordinal);
-
-        var back = Regex.Match(html, "<a class=\"govuk-back-link noprint\" href=\"([^\"]*)\">Back</a>");
-        Assert.True(back.Success);
-        var href = WebUtility.HtmlDecode(back.Groups[1].Value);
-        Assert.StartsWith("/Distribution/Packaging?", href, StringComparison.Ordinal);
-        var query = System.Web.HttpUtility.ParseQueryString(href[(href.IndexOf('?') + 1)..]);
-        Assert.Equal("2026", query["year"]);
-        Assert.Equal("4", query["monthId"]);
-        Assert.Equal("1", query["mode"]);
-        Assert.Equal("2", query["week"]);
+        Assert.Equal(2, _printer.PrintedLines.Count);
+        Assert.Equal(["LAB01", "Lab One & Co", "1 High Street"], _printer.PrintedLines[0]);
+        Assert.Equal(["LAB02", "Lab Two"], _printer.PrintedLines[1]);
+        Assert.Contains("govuk-notification-banner govuk-notification-banner--success", html, StringComparison.Ordinal);
+        Assert.Contains("Labels sent to printer.", html, StringComparison.Ordinal);
+        Assert.Contains("id=\"packaging-table\"", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("ptl-label", html, StringComparison.Ordinal);
 
         var request = Assert.Single(_apiClient.PackagingLabelRequests);
         Assert.Equal((1, 2), (request.Mode, request.Week));
         Assert.Equal(["k2"], request.SelectedKeys);
+    }
+
+    [Fact]
+    public async Task Labels_WhenThePrinterFails_RedisplaysThePageWithAnErrorBanner()
+    {
+        _apiClient.Packaging = Sheet(1, 2, Block("k2", Apr13, "Lab One", schemes: [Scheme(1, "Scheme A")]));
+        _apiClient.PackagingLabels = new PackagingLabelsResponse([new PackagingLabelResponse(["LAB01"])]);
+        _printer.PrintResult = false;
+
+        var html = await PostHtmlAsync(("command", "labels"), ("Mode", "1"), ("Week", "2"), ("PrintKeys", "k2"));
+
+        Assert.Single(_printer.PrintedLines);
+        Assert.Contains("govuk-notification-banner", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("govuk-notification-banner--success", html, StringComparison.Ordinal);
+        Assert.Contains("There was a problem printing the labels. Please try again.", html, StringComparison.Ordinal);
     }
 }

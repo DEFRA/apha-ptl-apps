@@ -743,18 +743,12 @@ public sealed partial class DistributionController(
 
             if (labels is { Labels.Count: > 0 })
             {
-                return View("PackagingLabels", new PackagingLabelsViewModel
-                {
-                    YearId = year,
-                    MonthId = monthId,
-                    Mode = labelMode,
-                    Week = model.Week,
-                    MonthDescription = PackagingMonthDescription(year, monthId),
-                    Labels = labels.Labels,
-                });
+                await PrintPackagingLabelsAsync(labels.Labels, cancellationToken);
             }
-
-            model.Message = "No Labels to Print";
+            else
+            {
+                model.Message = "No Labels to Print";
+            }
         }
         else if (string.Equals(command, "customs", StringComparison.OrdinalIgnoreCase) && model.Mode is { } customsMode)
         {
@@ -775,6 +769,21 @@ public sealed partial class DistributionController(
         }
 
         return null;
+    }
+
+    // Same print path as the Customer, Participant and Group Address labels (ILabelPrinterApiClient -> PTL.Api -> ZPL over the
+    // printer socket). Like legacy ButtonPrintLabels_Click, every label is attempted and one failure fails the whole report.
+    private async Task PrintPackagingLabelsAsync(IReadOnlyList<PackagingLabelResponse> labels, CancellationToken cancellationToken)
+    {
+        var allPrinted = true;
+        foreach (var label in labels)
+        {
+            allPrinted &= await labelPrinterApiClient.PrintAsync(label.Lines, cancellationToken);
+        }
+
+        TempData.SetNotification(
+            allPrinted ? NotificationType.Success : NotificationType.Error,
+            allPrinted ? "Labels sent to printer." : "There was a problem printing the labels. Please try again.");
     }
 
     // False means the selection is incomplete. Only an option or a week the user was shown is an error:

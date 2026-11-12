@@ -16,7 +16,7 @@ public interface IPackagingOutputService
 }
 
 // Print Labels and Print Customs - legacy ButtonPrintLabels_Click / ButtonPrintCustomsDocument_Click.
-// Labels are returned as printable text lines instead of being sent to a server-side label printer.
+// Labels are returned as address lines; the caller prints them through the standard label printer client.
 public sealed class PackagingOutputService(
     IDistributionRepository distributionRepository,
     ITemplateStorageService templateStorage,
