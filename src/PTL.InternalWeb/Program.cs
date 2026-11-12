@@ -46,6 +46,7 @@ builder.Services.AddScoped<ITemplateMergeService, TemplateMergeService>();
 // (the "Graph" configuration section) are held by this app only - PTL.Api no longer has them.
 builder.Services.AddGraphClient(builder.Configuration);
 builder.Services.AddScoped<IStaffDirectoryService, GraphStaffDirectoryService>();
+builder.Services.AddScoped<IEmployeeIdLookup, GraphEmployeeIdLookup>();
 
 // Bundled so SystemAdministrationController's constructor takes one parameter instead of 8 - see
 // SystemAdministrationApiClients remarks.
