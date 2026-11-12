@@ -58,6 +58,8 @@ public class CidmOpenIdConnectEventsTests
     private static CidmOpenIdConnectEvents CreateEvents() =>
         new(Microsoft.Extensions.Options.Options.Create(TestCidmOptions), NullLogger<CidmOpenIdConnectEvents>.Instance);
 
+    private static Claim MatchingServiceIdClaim() => new("serviceId", TestCidmOptions.ServiceId);
+
     private static AuthenticationScheme CreateScheme() =>
         new("oidc", "oidc", typeof(OpenIdConnectHandler));
 
@@ -137,6 +139,7 @@ public class CidmOpenIdConnectEventsTests
     {
         var identity = new ClaimsIdentity(
         [
+            MatchingServiceIdClaim(),
             new Claim("contactId", "22222222-2222-2222-2222-222222222222"),
             new Claim(ClaimTypes.Email, "jane@example.com"),
             new Claim("currentRelationshipId", "23950a2d-c37d-43da-9fcb-0a4ce9aa11ee"),
@@ -164,6 +167,7 @@ public class CidmOpenIdConnectEventsTests
         Assert.DoesNotContain(identity.Claims, c => c.Type == "roles");
         Assert.DoesNotContain(identity.Claims, c => c.Type == ClaimTypes.Role);
         Assert.DoesNotContain(identity.Claims, c => c.Type == "aud");
+        Assert.DoesNotContain(identity.Claims, c => c.Type == "serviceId");
         Assert.DoesNotContain(identity.Claims, c => c.Type == "sessionId" && c.Value == "bulky");
     }
 
@@ -318,7 +322,7 @@ public class CidmOpenIdConnectEventsTests
     [Fact]
     public async Task TokenValidated_NoResolverRegistered_LeavesPrincipalUnchanged()
     {
-        var identity = new ClaimsIdentity([new Claim(ClaimTypes.Name, "test-user")]);
+        var identity = new ClaimsIdentity([MatchingServiceIdClaim(), new Claim(ClaimTypes.Name, "test-user")]);
         var principal = new ClaimsPrincipal(identity);
         var context = CreateTokenValidatedContext(principal);
 
@@ -331,7 +335,7 @@ public class CidmOpenIdConnectEventsTests
     [Fact]
     public async Task TokenValidated_ResolverAllows_AddsReturnedClaims()
     {
-        var identity = new ClaimsIdentity([new Claim(ClaimTypes.Name, "test-user")]);
+        var identity = new ClaimsIdentity([MatchingServiceIdClaim(), new Claim(ClaimTypes.Name, "test-user")]);
         var principal = new ClaimsPrincipal(identity);
         var resolver = new FakeCidmExternalUserResolver(CidmExternalUserResolution.Allow(new Dictionary<string, string>
         {
@@ -351,7 +355,7 @@ public class CidmOpenIdConnectEventsTests
     [Fact]
     public async Task TokenValidated_ResolverDenies_HandlesResponseAndRedirectsToDenialPath()
     {
-        var identity = new ClaimsIdentity([new Claim(ClaimTypes.Name, "test-user")]);
+        var identity = new ClaimsIdentity([MatchingServiceIdClaim(), new Claim(ClaimTypes.Name, "test-user")]);
         var principal = new ClaimsPrincipal(identity);
         var resolver = new FakeCidmExternalUserResolver(CidmExternalUserResolution.Deny("/Account/NotPermitted"));
         var context = CreateTokenValidatedContext(principal, resolver);
@@ -361,5 +365,66 @@ public class CidmOpenIdConnectEventsTests
         Assert.True(context.Result?.Handled);
         Assert.Equal(StatusCodes.Status302Found, context.HttpContext.Response.StatusCode);
         Assert.Equal("/Account/NotPermitted", context.HttpContext.Response.Headers.Location.ToString());
+    }
+
+    [Theory]
+    [InlineData("other-service-id")]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData(null)]
+    public async Task TokenValidated_ServiceIdMissingOrNotTheConfiguredOne_DeniesWithoutResolvingOrSigningIn(string? tokenServiceId)
+    {
+        var claims = new List<Claim> { new(ClaimTypes.Name, "test-user") };
+        if (tokenServiceId is not null)
+        {
+            claims.Add(new Claim("serviceId", tokenServiceId));
+        }
+
+        var identity = new ClaimsIdentity(claims);
+        var resolver = new FakeCidmExternalUserResolver(CidmExternalUserResolution.Allow());
+        var context = CreateTokenValidatedContext(new ClaimsPrincipal(identity), resolver);
+
+        await CreateEvents().TokenValidated(context);
+
+        Assert.True(context.Result?.Handled);
+        Assert.Equal(StatusCodes.Status302Found, context.HttpContext.Response.StatusCode);
+        Assert.Equal("/Home/Error", context.HttpContext.Response.Headers.Location.ToString());
+        Assert.Null(resolver.ReceivedPrincipal);
+    }
+
+    [Theory]
+    [InlineData("SERVICE-ID-VALUE")]
+    [InlineData("  service-id-value  ")]
+    public async Task TokenValidated_ServiceIdMatchesTheConfiguredOneIgnoringCaseAndPadding_Proceeds(string tokenServiceId)
+    {
+        var identity = new ClaimsIdentity([new Claim("serviceId", tokenServiceId), new Claim(ClaimTypes.Name, "test-user")]);
+        var context = CreateTokenValidatedContext(new ClaimsPrincipal(identity));
+
+        await CreateEvents().TokenValidated(context);
+
+        Assert.False(context.Result?.Handled ?? false);
+    }
+
+    [Fact]
+    public async Task TokenValidated_NoServiceIdConfigured_DeniesEvenATokenWithNoServiceId()
+    {
+        var events = new CidmOpenIdConnectEvents(
+            Microsoft.Extensions.Options.Options.Create(new CidmOptions { ServiceId = " " }),
+            NullLogger<CidmOpenIdConnectEvents>.Instance);
+        var context = CreateTokenValidatedContext(new ClaimsPrincipal(new ClaimsIdentity([new Claim("serviceId", " ")])));
+
+        await events.TokenValidated(context);
+
+        Assert.True(context.Result?.Handled);
+    }
+
+    [Fact]
+    public async Task TokenValidated_PrincipalWithoutClaims_IsDenied()
+    {
+        var context = CreateTokenValidatedContext(new ClaimsPrincipal());
+
+        await CreateEvents().TokenValidated(context);
+
+        Assert.True(context.Result?.Handled);
     }
 }

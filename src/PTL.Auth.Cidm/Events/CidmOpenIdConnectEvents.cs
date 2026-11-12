@@ -11,11 +11,11 @@ using PTL.Common.Auth;
 namespace PTL.Auth.Cidm.Events;
 
 /// <summary>
-/// CIDM-specific hooks into the OpenID Connect handler: injects the non-standard serviceId parameter,
+/// CIDM-specific hooks into the OpenID Connect handler: injects the non-standard serviceId parameter, rejects tokens whose serviceId is not the configured one,
 /// hides OIDC failure detail from the user, and renders the POST-based sign-out form CIDM recommends.
 /// The user's role is never read from the token - it comes from the PTL record the resolver matches.
 /// </summary>
-public sealed class CidmOpenIdConnectEvents : OidcProviderEvents<ICidmExternalUserResolver, CidmExternalUserResolution>
+public sealed partial class CidmOpenIdConnectEvents : OidcProviderEvents<ICidmExternalUserResolver, CidmExternalUserResolution>
 {
     // Claims the app reads after sign-in, on top of the common identity claims. Everything else in the
     // token (roles, relationships, assurance levels, ...) is dropped to keep the session cookie small.
@@ -25,11 +25,38 @@ public sealed class CidmOpenIdConnectEvents : OidcProviderEvents<ICidmExternalUs
         CidmClaimTypes.ContactId);
 
     private readonly CidmOptions _cidmOptions;
+    private readonly ILogger<CidmOpenIdConnectEvents> _logger;
 
     public CidmOpenIdConnectEvents(IOptions<CidmOptions> cidmOptions, ILogger<CidmOpenIdConnectEvents> logger)
         : base(logger, "CIDM", RetainedClaimTypes)
     {
         _cidmOptions = cidmOptions.Value;
+        _logger = logger;
+    }
+
+    public override Task TokenValidated(TokenValidatedContext context)
+    {
+        // Before anything else: a token issued for a different CIDM service must never become a session.
+        if (!HasConfiguredServiceId(context.Principal))
+        {
+            LogServiceIdMismatch(context.Principal?.FindFirst(CidmClaimTypes.ServiceId)?.Value);
+            OpenIdConnectEventHelpers.DenyWithErrorPage(context);
+            return Task.CompletedTask;
+        }
+
+        return base.TokenValidated(context);
+    }
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "CIDM sign-in denied: the token's serviceId '{TokenServiceId}' is missing or does not match the configured service id")]
+    private partial void LogServiceIdMismatch(string? tokenServiceId);
+
+    // Fails closed: an unconfigured service id matches nothing, rather than a token that also has none.
+    private bool HasConfiguredServiceId(ClaimsPrincipal? principal)
+    {
+        var configured = _cidmOptions.ServiceId.Trim();
+        var actual = principal?.FindFirst(CidmClaimTypes.ServiceId)?.Value?.Trim();
+
+        return !string.IsNullOrEmpty(configured) && string.Equals(actual, configured, StringComparison.OrdinalIgnoreCase);
     }
 
     public override Task RedirectToIdentityProvider(RedirectContext context)
