@@ -31,10 +31,9 @@
         .TabulationTable {
             width: 100%;
             border-collapse: collapse;
+            border-spacing: 0;
             empty-cells: show;
             border: 1px solid black !important;
-            outline: 1px solid black;
-            outline-offset: -1px;
             margin-left: 0;
             box-sizing: border-box;
             table-layout: auto;
@@ -45,13 +44,6 @@
             text-align: left;
         }
 
-        .TabulationTable tr > :first-child {
-            border-left: 1px solid black !important;
-        }
-
-        .TabulationTable tr > :last-child {
-            border-right: 1px solid black !important;
-        }
 
         .TabulationHeader1,
         .TabulationHeader2 {
@@ -94,11 +86,6 @@
             text-orientation: mixed;
         }
 
-        .TabulationTable thead + tbody tr:first-child > * {
-            border-top: none;
-        }
-
-
         .NilReturn {
             background-color: #eeeeee;
         }
@@ -111,6 +98,8 @@
 
         .TabulationTable th,
         .TabulationTable td {
+            border: 1px solid black !important;
+            box-sizing: border-box;
             vertical-align: top;
             writing-mode: horizontal-tb;
             text-orientation: mixed;
