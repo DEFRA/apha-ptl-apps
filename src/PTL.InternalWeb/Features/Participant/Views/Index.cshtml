@@ -56,6 +56,10 @@ else
                         {
                             <strong class="govuk-tag govuk-tag--green">Sent</strong>
                         }
+                        else if (!participant.IsActive)
+                        {
+                            <strong class="govuk-tag govuk-tag--grey">Not Sent</strong>
+                        }
                         else
                         {
                             <form method="post" asp-action="SendLoginInstructions" asp-route-participantId="@participant.ParticipantId" asp-route-customerId="@Model.CustomerId"

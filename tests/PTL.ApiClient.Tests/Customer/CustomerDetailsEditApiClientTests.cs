@@ -42,6 +42,21 @@ public class CustomerDetailsEditApiClientTests
     }
 
     [Fact]
+    public async Task SubmitAsync_Forbidden_ReturnsAFailureWithAMessageInsteadOfThrowing()
+    {
+        var client = CreateClient(HttpStatusCode.Forbidden, null);
+
+        var result = await client.SubmitAsync(Guid.NewGuid(), new CustomerDetailsEditSaveRequest(
+            "Jane Doe", "Test Lab", "1 Test Street", "Testville", "", "", "",
+            Guid.NewGuid(), "01234 567890", "", "jane@example.com",
+            "", "Test Lab Invoicing", "1 Test Street", "Testville", "", "", "",
+            Guid.NewGuid(), "", "", ""));
+
+        Assert.False(result.Success);
+        Assert.Contains("another active participant", result.Errors[string.Empty][0]);
+    }
+
+    [Fact]
     public async Task SubmitAsync_Success_ReturnsDeserializedResult()
     {
         const string json = """{"success":true,"errors":{}}""";

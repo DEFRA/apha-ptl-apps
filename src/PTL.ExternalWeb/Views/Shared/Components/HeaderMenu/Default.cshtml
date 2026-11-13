@@ -1,5 +1,7 @@
+@model PTL.Contracts.CreateOrder.CreateOrderEligibilityResponse
 @using PTL.ExternalWeb.Features.Account
 @using PTL.ExternalWeb.Navigation
+@using PTL.Contracts.ExternalUser
 @{
     // Ported from the removed _SideNavigation.cshtml - same NavigationProvider data source, same
     // per-group/per-child role filtering (a group's own RequiredRole/RequireCanOrderOnline, if
@@ -9,7 +11,11 @@
     var roles = User.GetResolvedExternalRoles();
     var canOrderOnline = User.CanOrderOnline();
     var isLabUser = User.IsLabUser();
-    bool IsVisible(NavigationItem item) => item.IsVisibleTo(roles, isLabUser, canOrderOnline);
+    var hasLabCode = !string.IsNullOrWhiteSpace(User.FindFirst(ExternalUserClaimTypes.LabCode)?.Value);
+    // Unlike the Home cards (disabled once submitted), legacy hid a Create order menu link after the year's order was submitted.
+    bool IsVisible(NavigationItem item) =>
+        item.IsVisibleTo(roles, isLabUser, canOrderOnline, hasLabCode, User.CanEditDetails())
+        && item.IsOrderYearOpen(Model.CanCreateCurrentYearOrder, Model.CanCreateNextYearOrder);
 
     var visibleGroups = NavigationProvider.Build()
         .Where(IsVisible)

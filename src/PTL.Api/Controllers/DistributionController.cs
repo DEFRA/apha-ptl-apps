@@ -300,8 +300,8 @@ public sealed partial class DistributionController(
         return outcome.Success ? Ok(new PackagingSaveResult(true)) : NotFound();
     }
 
-    // POST /api/distributions/months/{yearId}/{monthId}/packaging/labels - legacy Print Labels,
-    // returned as printable label text rather than sent to a server-side label printer.
+    // POST /api/distributions/months/{yearId}/{monthId}/packaging/labels - legacy Print Labels: the address lines of each
+    // selected label. The web app sends each one to the printer through the standard label print endpoint.
     [HttpPost("months/{yearId:int}/{monthId:int}/packaging/labels")]
     public async Task<ActionResult<PackagingLabelsResponse>> GetPackagingLabels(
         int yearId, int monthId, [FromBody] PackagingSelectionRequest request, CancellationToken cancellationToken)

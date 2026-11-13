@@ -112,6 +112,10 @@ internal sealed partial class FakeDistributionRepository : IDistributionReposito
 
     public Dictionary<Guid, List<CurrentDistributionData>> CurrentDistributionsByParticipant { get; } = [];
 
+    public Dictionary<Guid, ParticipantNilReturnData> ParticipantNilReturns { get; } = [];
+
+    public List<(Guid DistributionParticipantId, string NilReturnReason)> SavedParticipantNilReturns { get; } = [];
+
     public List<DistributionParticipantEntity> UpdatedParticipantDeadlines { get; } = [];
 
     public List<(MonthlyDistributionSchemeEntity NewScheme, IReadOnlyList<DistributionParticipantEntity> NewParticipants)> RepeatedDistributions { get; } = [];
@@ -122,6 +126,16 @@ internal sealed partial class FakeDistributionRepository : IDistributionReposito
 
     public Task<IReadOnlyList<CurrentDistributionData>> GetCurrentDistributionsAsync(Guid participantId, CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<CurrentDistributionData>>(CurrentDistributionsByParticipant.GetValueOrDefault(participantId) ?? []);
+
+    public Task<ParticipantNilReturnData?> GetParticipantNilReturnAsync(Guid distributionParticipantId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(ParticipantNilReturns.GetValueOrDefault(distributionParticipantId));
+
+    public Task SaveParticipantNilReturnReasonAsync(Guid distributionParticipantId, string nilReturnReason, CancellationToken cancellationToken = default)
+    {
+        ParticipantNilReturns[distributionParticipantId] = new ParticipantNilReturnData(distributionParticipantId, nilReturnReason);
+        SavedParticipantNilReturns.Add((distributionParticipantId, nilReturnReason));
+        return Task.CompletedTask;
+    }
 
     public Task UpdateParticipantDeadlineAsync(DistributionParticipantEntity participant, CancellationToken cancellationToken = default)
     {
@@ -198,6 +212,17 @@ internal sealed partial class FakeDistributionRepository : IDistributionReposito
     public Task<SampleReceiptData?> GetSampleReceiptAsync(
         Guid distributionParticipantId, Guid monthlyDistributionSchemeId, CancellationToken cancellationToken = default) =>
         Task.FromResult(SampleReceipts.GetValueOrDefault((distributionParticipantId, monthlyDistributionSchemeId)));
+
+    public Task<IReadOnlyList<SampleReceiptSampleEntity>> GetSampleReceiptRowsForParticipantAsync(
+        Guid distributionParticipantId,
+        Guid monthlyDistributionSchemeId,
+        CancellationToken cancellationToken = default)
+    {
+        var rows = SampleReceipts.TryGetValue((distributionParticipantId, monthlyDistributionSchemeId), out var data)
+            ? data.Samples.ToList()
+            : [];
+        return Task.FromResult<IReadOnlyList<SampleReceiptSampleEntity>>(rows);
+    }
 
     public Task UpdateSampleReceiptAsync(IReadOnlyList<SampleReceiptSampleEntity> samples, CancellationToken cancellationToken = default)
     {

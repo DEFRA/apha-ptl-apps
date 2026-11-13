@@ -1,5 +1,6 @@
 using System.Net.Http.Json;
 using System.Text.Json.Serialization;
+using PTL.Auth.Entra;
 using PTL.Common.Graph;
 using PTL.Core.User;
 
@@ -8,9 +9,10 @@ namespace PTL.InternalWeb.Infrastructure;
 /// <summary>
 /// Staff directory search backed by Microsoft Graph (replaces legacy UserCreate.aspx's LDAP DirectorySearcher).
 /// Like legacy, the search text is split on spaces and backslashes and each piece is matched against the account
-/// name, first name, surname and display name (legacy's samaccountname, givenname, sn and cn) - here as a prefix
-/// match. The username is built as "domain\account", lowercased, with the domain cut at its first '.', exactly as
-/// legacy and the sign-in resolver build it. Like legacy, every match is returned (Graph's pages are followed), up
+/// name, first name, surname, display name and employee id (legacy's samaccountname, givenname, sn and cn, plus the
+/// employee id) - here as a prefix match. The username is built as "domain\account", lowercased, with the domain cut at its first '.', exactly as
+/// legacy and the sign-in resolver build it; a user with no on-premises account is listed as "demeter\employeeid", the
+/// form sign-in falls back to. Like legacy, every match is returned (Graph's pages are followed), up
 /// to a safety cap; when the cap is reached the result is flagged as truncated so the caller can say so.
 /// </summary>
 public sealed class GraphStaffDirectoryService(IHttpClientFactory httpClientFactory) : IStaffDirectoryService
@@ -20,7 +22,7 @@ public sealed class GraphStaffDirectoryService(IHttpClientFactory httpClientFact
     private const int PageSize = 100;
     private const int MaxPages = 10;
     private const int MaxResults = 500;
-    private const string Select = "id,onPremisesSamAccountName,onPremisesDomainName,mail,givenName,surname,displayName,accountEnabled";
+    private const string Select = "id,onPremisesSamAccountName,onPremisesDomainName,employeeId,mail,givenName,surname,displayName,accountEnabled";
 
     public async Task<StaffDirectorySearchResult> SearchAsync(string searchTerm, CancellationToken cancellationToken = default)
     {
@@ -43,8 +45,9 @@ public sealed class GraphStaffDirectoryService(IHttpClientFactory httpClientFact
         {
             var payload = await GetPageAsync(client, nextUrl, cancellationToken);
             users.AddRange((payload?.Value ?? [])
-                .Where(u => u.AccountEnabled != false && !string.IsNullOrWhiteSpace(u.OnPremisesSamAccountName))
-                .Select(ToStaffDirectoryUser));
+                .Where(u => u.AccountEnabled != false)
+                .Select(ToStaffDirectoryUser)
+                .OfType<StaffDirectoryUser>());
             nextUrl = payload?.NextLink;
         }
 
@@ -91,24 +94,42 @@ public sealed class GraphStaffDirectoryService(IHttpClientFactory httpClientFact
         + string.Join(
             " or ",
             terms.Select(t => t.Replace("'", "''", StringComparison.Ordinal)).Select(t =>
-                $"startsWith(onPremisesSamAccountName,'{t}') or startsWith(givenName,'{t}') or startsWith(surname,'{t}') or startsWith(displayName,'{t}')"))
+                $"startsWith(onPremisesSamAccountName,'{t}') or startsWith(givenName,'{t}') or startsWith(surname,'{t}') or startsWith(displayName,'{t}') or startsWith(employeeId,'{t}')"))
         + ") and accountEnabled eq true";
 
-    private static StaffDirectoryUser ToStaffDirectoryUser(GraphUser user)
+    private static StaffDirectoryUser? ToStaffDirectoryUser(GraphUser user)
     {
-        var domain = (user.OnPremisesDomainName ?? string.Empty).Split('.')[0];
-        var account = user.OnPremisesSamAccountName!;
+        var username = BuildUsername(user);
+        if (username is null)
+        {
+            return null;
+        }
+
         var firstName = user.GivenName ?? string.Empty;
         var lastName = user.Surname ?? string.Empty;
 
         return new StaffDirectoryUser
         {
-            Username = (domain.Length > 0 ? $"{domain}\\{account}" : account).ToLowerInvariant(),
+            Username = username.ToLowerInvariant(),
             Email = user.Mail ?? string.Empty,
             FriendlyName = !string.IsNullOrWhiteSpace(user.DisplayName) ? user.DisplayName : $"{firstName} {lastName}".Trim(),
             FirstName = firstName,
             LastName = lastName
         };
+    }
+
+    // "domain\account" when the user has an on-premises account; otherwise the DEMETER\employeeId form that sign-in uses
+    // for users whose token carries no account claims. Users with neither cannot be matched to a PT-LIMS user and are dropped.
+    private static string? BuildUsername(GraphUser user)
+    {
+        if (string.IsNullOrWhiteSpace(user.OnPremisesSamAccountName))
+        {
+            return EmployeeUserName.FromEmployeeId(user.EmployeeId);
+        }
+
+        var domain = (user.OnPremisesDomainName ?? string.Empty).Split('.')[0];
+
+        return domain.Length > 0 ? $"{domain}\\{user.OnPremisesSamAccountName}" : user.OnPremisesSamAccountName;
     }
 
     private sealed class GraphUserList
@@ -127,6 +148,9 @@ public sealed class GraphStaffDirectoryService(IHttpClientFactory httpClientFact
 
         [JsonPropertyName("onPremisesDomainName")]
         public string? OnPremisesDomainName { get; set; }
+
+        [JsonPropertyName("employeeId")]
+        public string? EmployeeId { get; set; }
 
         [JsonPropertyName("mail")]
         public string? Mail { get; set; }

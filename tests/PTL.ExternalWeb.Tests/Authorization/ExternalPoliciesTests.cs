@@ -41,6 +41,35 @@ public class ExternalPoliciesTests
     }
 
     [Fact]
+    public async Task CanEditDetailsPolicy_NeedsAPrimaryContactWhoIsTheCustomersOnlyActiveParticipant()
+    {
+        using var provider = new ServiceCollection().AddLogging().AddExternalAuthorization().BuildServiceProvider();
+        var authorization = provider.GetRequiredService<IAuthorizationService>();
+
+        ClaimsPrincipal Principal(string userType, bool canEdit, params string[] roles)
+        {
+            var claims = roles.Select(role => new Claim(ClaimTypes.Role, role)).ToList();
+            claims.Add(new Claim(ExternalUserClaimTypes.UserType, userType));
+            if (canEdit)
+            {
+                claims.Add(new Claim(ExternalUserClaimTypes.CanEditDetails, "true"));
+            }
+
+            return new ClaimsPrincipal(new ClaimsIdentity(claims, "test"));
+        }
+
+        var onlyActive = await authorization.AuthorizeAsync(Principal("Participant", true, ExternalRoleNames.Participant), ExternalPolicies.CanEditDetails);
+        var sharedCustomer = await authorization.AuthorizeAsync(Principal("Participant", false, ExternalRoleNames.Participant), ExternalPolicies.CanEditDetails);
+        var labUser = await authorization.AuthorizeAsync(Principal("LabUser", true, ExternalRoleNames.LabUser, ExternalRoleNames.Participant), ExternalPolicies.CanEditDetails);
+        var viewer = await authorization.AuthorizeAsync(Principal("Viewer", true, ExternalRoleNames.Viewer), ExternalPolicies.CanEditDetails);
+
+        Assert.True(onlyActive.Succeeded);
+        Assert.False(sharedCustomer.Succeeded);
+        Assert.False(labUser.Succeeded);
+        Assert.False(viewer.Succeeded);
+    }
+
+    [Fact]
     public async Task PrimaryContactPolicy_IsSatisfiedByAParticipantButNotByALabUser()
     {
         using var provider = new ServiceCollection().AddLogging().AddExternalAuthorization().BuildServiceProvider();

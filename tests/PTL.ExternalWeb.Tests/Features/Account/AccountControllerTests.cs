@@ -1,8 +1,10 @@
 using System.Reflection;
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ViewFeatures;
 using Microsoft.Extensions.DependencyInjection;
 using PTL.Auth.Cidm;
 using PTL.ExternalWeb.Features.Account;
@@ -112,11 +114,41 @@ public class AccountControllerTests
         Assert.Equal("/Account/SignedOut", signOut.Properties!.RedirectUri);
     }
 
+    [Fact]
+    public void ExtendSession_ReturnsNoContent()
+    {
+        var result = new AccountController().ExtendSession();
+
+        Assert.IsType<NoContentResult>(result);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task SessionExpired_SignsOutOnlyTheLocalCookieAndClearsTheUser(bool wasSignedIn)
+    {
+        var httpContext = CreateHttpContextWithFakeAuth(out var authService);
+        if (wasSignedIn)
+        {
+            httpContext.User = new ClaimsPrincipal(new ClaimsIdentity(CookieAuthenticationDefaults.AuthenticationScheme));
+        }
+
+        var controller = new AccountController { ControllerContext = new ControllerContext { HttpContext = httpContext } };
+
+        var result = await controller.SessionExpired();
+
+        Assert.IsType<ViewResult>(result);
+        // Never a federated CIDM sign-out, so an active CIDM session can sign the user back in.
+        Assert.Equal([CookieAuthenticationDefaults.AuthenticationScheme], authService.SignOutSchemes);
+        Assert.False(httpContext.User.Identity?.IsAuthenticated);
+    }
+
     private static DefaultHttpContext CreateHttpContextWithFakeAuth(out FakeAuthenticationService authService)
     {
         authService = new FakeAuthenticationService();
         var services = new ServiceCollection();
         services.AddSingleton<IAuthenticationService>(authService);
+        services.AddSingleton<ITempDataDictionaryFactory>(new TempDataDictionaryFactory(new FakeTempDataProvider()));
         return new DefaultHttpContext { RequestServices = services.BuildServiceProvider() };
     }
 }

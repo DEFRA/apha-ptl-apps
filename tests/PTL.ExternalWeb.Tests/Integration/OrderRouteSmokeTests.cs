@@ -545,6 +545,23 @@ public partial class OrderRouteSmokeTests : IClassFixture<PtlExternalWebTestFact
     }
 
     [Fact]
+    public async Task Review_TermsLinkOpensTheTermsPdfShippedWithTheApp()
+    {
+        var client = CreateClient(ReviewApi());
+        var cookies = await SignInAsync(client);
+
+        var body = await GetAsync(client, cookies, "/Order/Review?year=current");
+
+        const string href = "/documents/VETQAS%20Ts%20%26%20Cs%20April%202025%20Version%206%201.pdf";
+        Assert.Contains($"href=\"{href}\"", body);
+
+        var pdf = await client.GetAsync(href);
+
+        Assert.Equal(HttpStatusCode.OK, pdf.StatusCode);
+        Assert.Equal("application/pdf", pdf.Content.Headers.ContentType?.MediaType);
+    }
+
+    [Fact]
     public async Task Review_WithoutConsentsOrATermsAddress_HidesBothSections()
     {
         var api = new FakeCreateOrderApiClient { GetResult = new(CreateOrderApiStatus.Ok, FakeCreateOrderApiClient.SampleOrder(selected: true)) };
@@ -700,6 +717,48 @@ public partial class OrderRouteSmokeTests : IClassFixture<PtlExternalWebTestFact
         Assert.DoesNotContain("Order has been submitted for 2027/28", homeBody);
         Assert.DoesNotContain("app-card-link--header\" href=\"/Order/CurrentYear", homeBody);
         Assert.Contains("app-card-link--header\" href=\"/Order/NextYear", homeBody);
+    }
+
+    [Fact]
+    public async Task Menu_OrderAlreadySubmittedForCurrentYear_HidesThatYearsLinkAndKeepsTheNextYears()
+    {
+        var api = new FakeCreateOrderApiClient { Eligibility = new(true, false, true, "2026/27", "2027/28") };
+        var client = CreateClient(api);
+        var cookies = await SignInAsync(client);
+
+        var homeBody = await GetAsync(client, cookies, "/Home/Index");
+
+        // Legacy hid the menu link once submitted (the Home card is disabled instead).
+        Assert.DoesNotMatch("app-menu-panel__link\"[^>]*>Create order for current year", homeBody);
+        Assert.Matches("app-menu-panel__link\"[^>]*>Create order for next year", homeBody);
+        Assert.Contains("Order has been submitted for 2026/27.", homeBody);
+    }
+
+    [Fact]
+    public async Task Menu_OrderAlreadySubmittedForNextYear_HidesThatYearsLinkAndKeepsTheCurrentYears()
+    {
+        var api = new FakeCreateOrderApiClient { Eligibility = new(true, true, false, "2026/27", "2027/28") };
+        var client = CreateClient(api);
+        var cookies = await SignInAsync(client);
+
+        var body = await GetAsync(client, cookies, "/Order/CurrentYear");
+
+        // The menu is on every page, not just Home.
+        Assert.Matches("app-menu-panel__link\"[^>]*>Create order for current year", body);
+        Assert.DoesNotMatch("app-menu-panel__link\"[^>]*>Create order for next year", body);
+    }
+
+    [Fact]
+    public async Task Menu_EligibilityLookupFails_StillShowsBothYearLinks()
+    {
+        var api = new FakeCreateOrderApiClient { EligibilityException = new HttpRequestException("down") };
+        var client = CreateClient(api);
+        var cookies = await SignInAsync(client);
+
+        var body = await GetAsync(client, cookies, "/Home/Index");
+
+        Assert.Matches("app-menu-panel__link\"[^>]*>Create order for current year", body);
+        Assert.Matches("app-menu-panel__link\"[^>]*>Create order for next year", body);
     }
 
     [Fact]

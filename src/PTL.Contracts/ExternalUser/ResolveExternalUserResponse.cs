@@ -12,6 +12,7 @@ namespace PTL.Contracts.ExternalUser;
 /// <param name="TestConsultantId">The matched Test Consultant record.</param>
 /// <param name="LabUserId">The matched Lab User record.</param>
 /// <param name="CanOrderOnline">Whether the single active lab may order online.</param>
+/// <param name="CanEditDetails">Whether the single active lab is its customer's only active participant, so may edit the customer and participant details.</param>
 public sealed record ResolveExternalUserResponse(
     ExternalUserResolutionStatus Status,
     string DisplayName,
@@ -23,7 +24,8 @@ public sealed record ResolveExternalUserResponse(
     Guid? ViewerId = null,
     Guid? TestConsultantId = null,
     Guid? LabUserId = null,
-    bool CanOrderOnline = false)
+    bool CanOrderOnline = false,
+    bool CanEditDetails = false)
 {
     /// <summary>Creates the response for a user who was not matched or may not sign in.</summary>
     public static ResolveExternalUserResponse Denied(ExternalUserResolutionStatus status, string displayName) =>

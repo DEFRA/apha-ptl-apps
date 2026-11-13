@@ -163,9 +163,12 @@ public sealed class ContractPostageTests
     [Fact]
     public async Task Recalculate_UnknownContract_DoesNothing()
     {
-        var (service, _, _, _) = await CreateService(isOnlineOrder: true);
+        var (service, contracts, _, contractId) = await CreateService(isOnlineOrder: true);
+        var before = contracts.Contracts[contractId].NumberCourier;
 
         await service.RecalculateAsync(Guid.NewGuid());
+
+        Assert.Equal(before, contracts.Contracts[contractId].NumberCourier);
     }
 
     [Fact]

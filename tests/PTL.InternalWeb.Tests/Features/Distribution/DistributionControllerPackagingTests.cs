@@ -20,14 +20,14 @@ public class DistributionControllerPackagingTests
     private static readonly Guid Dp3 = Guid.Parse("d0000000-0000-0000-0000-0000000000d3");
 
     // An initialised month by default; the dashboard redirect is what the not-initialised tests exercise.
-    private static DistributionController CreateController(FakeDistributionApiClient apiClient, bool monthInitialised = true)
+    private static DistributionController CreateController(FakeDistributionApiClient apiClient, bool monthInitialised = true, FakeLabelPrinterApiClient? printer = null)
     {
         if (monthInitialised)
         {
             apiClient.Schedule ??= new MonthlyDistributionResponse(Guid.NewGuid(), Year, Month, []);
         }
 
-        return new(apiClient, new FakeSearchApiClient(), new FakeLookupApiClient(), new FakeGroupAddressApiClient(), new FakeParticipantApiClient(), new FakeLabelPrinterApiClient())
+        return new(apiClient, new FakeSearchApiClient(), new FakeLookupApiClient(), new FakeGroupAddressApiClient(), new FakeParticipantApiClient(), printer ?? new FakeLabelPrinterApiClient())
         {
             TempData = new TempDataDictionary(new DefaultHttpContext(), new FakeTempDataProvider()),
         };
@@ -547,29 +547,46 @@ public class DistributionControllerPackagingTests
     // ---------- POST: labels ----------
 
     [Fact]
-    public async Task Packaging_Post_Labels_WithLabels_ShowsThePrintableLabelsView()
+    public async Task Packaging_Post_Labels_WithLabels_SendsEachLabelToThePrinterAndShowsASuccessNotification()
     {
         var labels = new PackagingLabelsResponse([new PackagingLabelResponse(["A Contact", "An Org"]), new PackagingLabelResponse(["Another"])]);
         var apiClient = new FakeDistributionApiClient { PackagingLabels = labels, Packaging = Sheet() };
-        var controller = CreateController(apiClient);
+        var printer = new FakeLabelPrinterApiClient();
+        var controller = CreateController(apiClient, printer: printer);
 
         var result = await controller.Packaging(Year, Month, ModelOf(0, 2, printKeys: ["key1", "key2"]), "labels", CancellationToken.None);
 
-        var view = Assert.IsType<ViewResult>(result);
-        Assert.Equal("PackagingLabels", view.ViewName);
-        var model = Assert.IsType<PackagingLabelsViewModel>(view.Model);
-        Assert.Equal(Year, model.YearId);
-        Assert.Equal(Month, model.MonthId);
-        Assert.Equal(0, model.Mode);
-        Assert.Equal(2, model.Week);
-        Assert.Equal("May 2026", model.MonthDescription);
-        Assert.Same(labels.Labels, model.Labels);
+        Assert.Equal(2, printer.PrintedLines.Count);
+        Assert.Equal(["A Contact", "An Org"], printer.PrintedLines[0]);
+        Assert.Equal(["Another"], printer.PrintedLines[1]);
+        var model = ViewModelOf(result);
+        Assert.Null(model.Message);
+        Assert.Equal(["key1", "key2"], model.PrintKeys);
+        var notification = controller.TempData.GetNotification();
+        Assert.Equal(NotificationType.Success, notification!.Type);
+        Assert.Equal("Labels sent to printer.", notification.Message);
         var request = Assert.Single(apiClient.PackagingLabelRequests);
         string[] expectedKeys = ["key1", "key2"];
         Assert.Equal(expectedKeys, request.SelectedKeys);
         Assert.Equal(0, request.Mode);
         Assert.Equal(2, request.Week);
-        Assert.Empty(apiClient.PackagingRequests);
+    }
+
+    [Fact]
+    public async Task Packaging_Post_Labels_PrinterFails_StillAttemptsEveryLabelAndShowsAnErrorNotification()
+    {
+        var labels = new PackagingLabelsResponse([new PackagingLabelResponse(["One"]), new PackagingLabelResponse(["Two"])]);
+        var apiClient = new FakeDistributionApiClient { PackagingLabels = labels, Packaging = Sheet() };
+        var printer = new FakeLabelPrinterApiClient { PrintResult = false };
+        var controller = CreateController(apiClient, printer: printer);
+
+        var result = await controller.Packaging(Year, Month, ModelOf(0, 2, printKeys: ["key1"]), "labels", CancellationToken.None);
+
+        Assert.Equal(2, printer.PrintedLines.Count);
+        Assert.Null(ViewModelOf(result).Message);
+        var notification = controller.TempData.GetNotification();
+        Assert.Equal(NotificationType.Error, notification!.Type);
+        Assert.Equal("There was a problem printing the labels. Please try again.", notification.Message);
     }
 
     [Theory]
@@ -582,7 +599,8 @@ public class DistributionControllerPackagingTests
             PackagingLabels = apiReturnsEmptyList ? new PackagingLabelsResponse([]) : null,
             Packaging = Sheet(1, 2),
         };
-        var controller = CreateController(apiClient);
+        var printer = new FakeLabelPrinterApiClient();
+        var controller = CreateController(apiClient, printer: printer);
 
         var result = await controller.Packaging(Year, Month, ModelOf(1, 2, printKeys: ["key1"]), "labels", CancellationToken.None);
 
@@ -591,6 +609,8 @@ public class DistributionControllerPackagingTests
         Assert.Null(model.MessageDetail);
         Assert.Same(apiClient.Packaging, model.Sheet);
         Assert.Single(apiClient.PackagingLabelRequests);
+        Assert.Empty(printer.PrintedLines);
+        Assert.Null(controller.TempData.GetNotification());
     }
 
     [Fact]

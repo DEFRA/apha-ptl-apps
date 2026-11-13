@@ -13,6 +13,7 @@ public sealed record PdfRenderOptions(
     string MarginBottom = "12mm",
     string MarginLeft = "10mm",
     string MarginRight = "10mm",
+    bool JavaScriptEnabled = false,
     string? HeaderTemplate = null,
     string? FooterTemplate = null)
 {
@@ -167,7 +168,7 @@ public sealed partial class PlaywrightHtmlToPdfRenderer : IHtmlToPdfRenderer, IA
 
     private static async Task<byte[]> PrintAsync(IBrowser chromium, string html, PdfRenderOptions options)
     {
-        await using var context = await chromium.NewContextAsync(new BrowserNewContextOptions { JavaScriptEnabled = false });
+        await using var context = await chromium.NewContextAsync(new BrowserNewContextOptions { JavaScriptEnabled = options.JavaScriptEnabled });
         var page = await context.NewPageAsync();
         await page.SetContentAsync(html, new PageSetContentOptions { WaitUntil = WaitUntilState.Load });
 

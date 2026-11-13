@@ -5,13 +5,13 @@ using PTL.ApiClient;
 using PTL.Auth.Entra;
 using PTL.Auth.Entra.Events;
 using PTL.Common.Graph;
+using PTL.Common.SessionTimeout;
 using PTL.Core.Contract.Document;
 using PTL.Core.User;
 using PTL.InternalWeb.Authorization;
 using PTL.InternalWeb.Features.Account;
 using PTL.InternalWeb.Features.SystemAdministration;
 using PTL.InternalWeb.Infrastructure;
-using PTL.InternalWeb.SessionTimeout;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.AddPtlWebFrontEnd();
@@ -20,10 +20,7 @@ builder.Services.AddScoped<IEntraInternalUserResolver, InternalUserResolver>();
 
 // Client-side inactivity warning (see _SessionTimeoutWarning.cshtml/session-timeout.js) - a UX/
 // security layer independent of the 14-day sliding auth cookie and Entra token refresh above.
-builder.Services.AddOptions<SessionTimeoutOptions>()
-    .Bind(builder.Configuration.GetSection(SessionTimeoutOptions.SectionName))
-    .ValidateOnStart();
-builder.Services.AddSingleton<IValidateOptions<SessionTimeoutOptions>, SessionTimeoutOptionsValidator>();
+builder.Services.AddPtlSessionTimeout(builder.Configuration);
 
 // Roles come from the PTL database (resolved at sign-in by InternalUserResolver), never from Entra ID
 // groups or app roles. Every endpoint requires a signed-in user unless it opts out with [AllowAnonymous].
@@ -46,6 +43,7 @@ builder.Services.AddScoped<ITemplateMergeService, TemplateMergeService>();
 // (the "Graph" configuration section) are held by this app only - PTL.Api no longer has them.
 builder.Services.AddGraphClient(builder.Configuration);
 builder.Services.AddScoped<IStaffDirectoryService, GraphStaffDirectoryService>();
+builder.Services.AddScoped<IEmployeeIdLookup, GraphEmployeeIdLookup>();
 
 // Bundled so SystemAdministrationController's constructor takes one parameter instead of 8 - see
 // SystemAdministrationApiClients remarks.

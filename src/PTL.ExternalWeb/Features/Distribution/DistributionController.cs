@@ -19,6 +19,8 @@ public sealed class DistributionController(IDistributionApiClient distributionAp
     private const string SubmitCommand = "submit";
     private const string SaveFailedKey = "SaveFailed";
     private const string ExternalAuditReason = "External participant results updated.";
+    private const string NilReturnSuccessMessage = "Nil return recorded successfully.";
+    private const string NilReturnClosedMessage = "This distribution is closed and results can no longer be edited.";
     private static readonly string[] ValidSortColumns = ["reference", "schemeCode", "schemeName", "distributionDate"];
     private static readonly string[] ValidSortDirections = ["asc", "desc"];
     private static readonly string[] ValidCurrentSortColumns = [.. ValidSortColumns, "deadlineDate", "status"];
@@ -78,7 +80,23 @@ public sealed class DistributionController(IDistributionApiClient distributionAp
     public async Task<IActionResult> Entry(Guid schemeId, CancellationToken cancellationToken)
     {
         var page = await GetOwnResultsAsync(schemeId, cancellationToken);
-        return page is null ? RedirectToAction(nameof(Current)) : View(ToResultsEntryViewModel(page));
+        if (page is null)
+        {
+            return RedirectToAction(nameof(Current));
+        }
+
+        var model = ToResultsEntryViewModel(page);
+        var nilReturn = await distributionApiClient.GetParticipantNilReturnAsync(
+            page.MonthlyDistributionSchemeId,
+            page.DistributionParticipantId,
+            cancellationToken);
+        if (nilReturn is not null)
+        {
+            model.HasNilReturn = nilReturn.HasNilReturn;
+            model.NilReturnReason = nilReturn.NilReturnReason;
+        }
+
+        return View(model);
     }
 
     [HttpPost]
@@ -106,11 +124,14 @@ public sealed class DistributionController(IDistributionApiClient distributionAp
         if (own.IsReadOnly)
         {
             ViewData[SaveFailedKey] = true;
-            return View(RehydrateResultsEntry(model, own));
+            var readOnly = RehydrateResultsEntry(model, own);
+            await PopulateNilReturnStateAsync(readOnly, own, cancellationToken);
+            return View(readOnly);
         }
 
         if (!ModelState.IsValid)
         {
+            await PopulateNilReturnStateAsync(model, own, cancellationToken);
             return View(model);
         }
 
@@ -119,6 +140,7 @@ public sealed class DistributionController(IDistributionApiClient distributionAp
         if (unlisted.Count > 0)
         {
             var invalidOptions = RehydrateResultsEntry(model, own);
+            await PopulateNilReturnStateAsync(invalidOptions, own, cancellationToken);
             ApplyResultsEntryFieldErrors(invalidOptions, unlisted);
             return View(invalidOptions);
         }
@@ -139,12 +161,15 @@ public sealed class DistributionController(IDistributionApiClient distributionAp
         if (result is null)
         {
             TempData.SetNotification(NotificationType.Error, "Results could not be saved. Please try again later.");
-            return View(RehydrateResultsEntry(model, own));
+            var failed = RehydrateResultsEntry(model, own);
+            await PopulateNilReturnStateAsync(failed, own, cancellationToken);
+            return View(failed);
         }
 
         if (!result.Success)
         {
             var invalid = RehydrateResultsEntry(model, own);
+            await PopulateNilReturnStateAsync(invalid, own, cancellationToken);
             ViewData[SaveFailedKey] = result.DeadlinePassed;
             ApplyResultsEntryFieldErrors(invalid, result.FieldErrorsByItemId);
             return View(invalid);
@@ -152,6 +177,94 @@ public sealed class DistributionController(IDistributionApiClient distributionAp
 
         TempData.SetNotification(NotificationType.Success, request.Submitted == true ? "Results submitted successfully." : "Results saved successfully.");
         return RedirectToAction(nameof(Current));
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> NilReturn(Guid schemeId, CancellationToken cancellationToken)
+    {
+        var own = await GetOwnResultsAsync(schemeId, cancellationToken);
+        if (own is null)
+        {
+            return RedirectToAction(nameof(Current));
+        }
+
+        if (own.IsReadOnly)
+        {
+            TempData.SetNotification(NotificationType.Error, NilReturnClosedMessage);
+            return RedirectToAction(nameof(Entry), new { schemeId });
+        }
+
+        var existing = await distributionApiClient.GetParticipantNilReturnAsync(
+            own.MonthlyDistributionSchemeId,
+            own.DistributionParticipantId,
+            cancellationToken);
+
+        return View(new DistributionNilReturnViewModel
+        {
+            MonthlyDistributionSchemeId = own.MonthlyDistributionSchemeId,
+            Heading = own.Heading,
+            NilReturnReason = existing?.NilReturnReason,
+            HasNilReturn = existing?.HasNilReturn == true,
+        });
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> NilReturn(DistributionNilReturnViewModel model, string? command, CancellationToken cancellationToken)
+    {
+        if (string.Equals(command, CancelCommand, StringComparison.OrdinalIgnoreCase))
+        {
+            return RedirectToAction(nameof(Entry), new { schemeId = model.MonthlyDistributionSchemeId });
+        }
+
+        var own = model.MonthlyDistributionSchemeId is { } schemeId
+            ? await GetOwnResultsAsync(schemeId, cancellationToken)
+            : null;
+        if (own is null)
+        {
+            return RedirectToAction(nameof(Current));
+        }
+
+        if (own.IsReadOnly)
+        {
+            ModelState.AddModelError(string.Empty, NilReturnClosedMessage);
+            return View(ToNilReturnViewModel(model, own));
+        }
+
+        var response = await distributionApiClient.SaveParticipantNilReturnAsync(
+            own.MonthlyDistributionSchemeId,
+            own.DistributionParticipantId,
+            new ParticipantNilReturnSaveRequest(model.NilReturnReason),
+            cancellationToken);
+
+        if (response is null)
+        {
+            ModelState.AddModelError(string.Empty, "Nil return could not be saved. Please try again later.");
+            return View(ToNilReturnViewModel(model, own));
+        }
+
+        if (!response.Success)
+        {
+            if (response.DeadlinePassed)
+            {
+                ModelState.AddModelError(string.Empty, NilReturnClosedMessage);
+            }
+
+            if (response.HasResults)
+            {
+                ModelState.AddModelError(string.Empty, "Results have already been entered for this distribution and a nil return cannot be submitted.");
+            }
+
+            if (response.ReasonRequired)
+            {
+                ModelState.AddModelError(nameof(DistributionNilReturnViewModel.NilReturnReason), "Enter a reason for nil return.");
+            }
+
+            return View(ToNilReturnViewModel(model, own));
+        }
+
+        TempData.SetNotification(NotificationType.Success, NilReturnSuccessMessage);
+        return RedirectToAction(nameof(Entry), new { schemeId = own.MonthlyDistributionSchemeId });
     }
 
     // Legacy DistributionsPrevious.aspx - Year/Month dropdowns are exact matches, the 3 text
@@ -201,6 +314,17 @@ public sealed class DistributionController(IDistributionApiClient distributionAp
         return View(page);
     }
 
+    private async Task PopulateNilReturnStateAsync(DistributionResultsEntryViewModel model, ActualResultsResponse own, CancellationToken cancellationToken)
+    {
+        var nilReturn = await distributionApiClient.GetParticipantNilReturnAsync(
+            own.MonthlyDistributionSchemeId,
+            own.DistributionParticipantId,
+            cancellationToken);
+
+        model.HasNilReturn = nilReturn?.HasNilReturn == true;
+        model.NilReturnReason = nilReturn?.NilReturnReason;
+    }
+
     private async Task<ActualResultsResponse?> GetOwnResultsAsync(Guid monthlyDistributionSchemeId, CancellationToken cancellationToken)
     {
         var participantId = User.GetParticipantId();
@@ -208,6 +332,14 @@ public sealed class DistributionController(IDistributionApiClient distributionAp
             ? null
             : await distributionApiClient.GetActualResultsForParticipantAsync(monthlyDistributionSchemeId, participantId.Value, cancellationToken);
     }
+
+    private static DistributionNilReturnViewModel ToNilReturnViewModel(DistributionNilReturnViewModel posted, ActualResultsResponse own) => new()
+    {
+        MonthlyDistributionSchemeId = own.MonthlyDistributionSchemeId,
+        Heading = own.Heading,
+        NilReturnReason = posted.NilReturnReason,
+        HasNilReturn = posted.HasNilReturn,
+    };
 
     private static DistributionResultsEntryViewModel RehydrateResultsEntry(DistributionResultsEntryViewModel posted, ActualResultsResponse page)
     {

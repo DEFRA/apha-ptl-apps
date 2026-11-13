@@ -11,8 +11,9 @@ public sealed class ParticipantDetailsEditService(
     public async Task<ParticipantDetailsEditState?> GetAsync(Guid participantId, CancellationToken cancellationToken = default)
     {
         var participant = await participantRepository.GetByIdAsync(participantId, cancellationToken);
-        if (participant is null)
+        if (participant is null || !await SoleActiveParticipant.IsAsync(participantRepository, participant, cancellationToken))
         {
+            // Legacy EditParticipantDetails.aspx refused anyone but the customer's only active participant.
             return null;
         }
 
@@ -48,6 +49,11 @@ public sealed class ParticipantDetailsEditService(
     {
         var participant = await participantRepository.GetByIdAsync(participantId, cancellationToken)
             ?? throw new InvalidOperationException($"Participant {participantId} not found.");
+
+        if (!await SoleActiveParticipant.IsAsync(participantRepository, participant, cancellationToken))
+        {
+            throw new DetailsEditNotPermittedException();
+        }
 
         var existingPending = await pendingParticipantUpdateRepository.GetByParticipantIdAsync(participantId, cancellationToken);
         if (existingPending is not null)

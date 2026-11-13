@@ -177,9 +177,10 @@
                 <label class="govuk-label govuk-checkboxes__label" for="TermsAccepted">I have read and agreed to the terms and conditions</label>
                 @if (Model.TermsUrl is not null)
                 {
-                    <div id="TermsAccepted-hint" class="govuk-hint govuk-checkboxes__hint">
+                    @* On the label's line, as legacy had it; it drops below the label only when the screen is too narrow. *@
+                    <span id="TermsAccepted-hint" class="app-checkboxes__inline-link">
                         <a class="govuk-link" href="@Model.TermsUrl" target="_blank" rel="noopener noreferrer">View terms and conditions (opens in new tab)</a>
-                    </div>
+                    </span>
                 }
             </div>
         </div>

@@ -245,6 +245,13 @@ public partial class SystemAdministrationController
         }
 
         var row = model.Rows[rowIndex!.Value];
+        if (row.IsInactive)
+        {
+            model.Message = "Login instructions can only be sent to an active test consultant.";
+            model.MessageIsError = true;
+            return;
+        }
+
         var stored = row.ExternalTestConsultantId is { } id
             ? (await externalTestConsultantApiClient.GetAllAsync(cancellationToken)).FirstOrDefault(c => c.ExternalTestConsultantId == id)
             : null;

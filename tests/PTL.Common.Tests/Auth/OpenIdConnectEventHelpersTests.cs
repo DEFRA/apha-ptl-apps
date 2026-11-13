@@ -173,4 +173,16 @@ public class OpenIdConnectEventHelpersTests
         Assert.Equal("/Home/Error", httpContext.Response.Headers.Location.ToString());
         Assert.IsType<InvalidOperationException>(loggedException);
     }
+
+    [Fact]
+    public void DenyWithErrorPage_HandlesResponseAndRedirectsToGenericErrorPage()
+    {
+        var context = CreateContext(new ClaimsPrincipal(new ClaimsIdentity()));
+
+        OpenIdConnectEventHelpers.DenyWithErrorPage(context);
+
+        Assert.True(context.Result?.Handled);
+        Assert.Equal(StatusCodes.Status302Found, context.HttpContext.Response.StatusCode);
+        Assert.Equal("/Home/Error", context.HttpContext.Response.Headers.Location.ToString());
+    }
 }

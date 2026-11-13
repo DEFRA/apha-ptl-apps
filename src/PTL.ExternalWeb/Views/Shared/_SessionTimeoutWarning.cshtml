@@ -1,0 +1,56 @@
+@using Microsoft.AspNetCore.Antiforgery
+@using Microsoft.Extensions.Options
+@using PTL.Common.SessionTimeout
+@using PTL.ExternalWeb.Infrastructure
+@inject IOptions<SessionTimeoutOptions> SessionTimeoutOptionsAccessor
+@inject IAntiforgery Antiforgery
+@{
+    // Rendered only for signed-in pages (see _Layout.cshtml) - an anonymous visitor has no session to
+    // warn about. A client-side UX/security layer on top of the sliding auth cookie and CIDM token refresh.
+    var options = SessionTimeoutOptionsAccessor.Value;
+    var warningAfterMs = (long)options.InactivityWarningAfter.TotalMilliseconds;
+    var expireAfterMs = (long)options.ExpireAfterWarning.TotalMilliseconds;
+    var initialCountdown = SessionTimeoutText.Duration((int)options.ExpireAfterWarning.TotalSeconds);
+    // A data attribute rather than a form field, so pages that assert they render no form fields are unaffected.
+    var antiforgeryToken = Antiforgery.GetAndStoreTokens(Context).RequestToken;
+}
+
+@* A native modal <dialog>: session-timeout.js opens it with showModal(), which makes the rest of the page inert,
+   keeps keyboard focus inside and returns focus to where it was on close. Closed (no "open" attribute) until then.
+   Styled like the GOV.UK notification banner (blue header band, blue border). Focus goes to the title, so a
+   screen reader reads the title and message first and no button shows its yellow focus state until tabbed to. *@
+<dialog id="session-timeout-warning"
+        class="govuk-notification-banner app-session-timeout-dialog"
+        role="alertdialog"
+        aria-labelledby="session-timeout-warning-title"
+        aria-describedby="session-timeout-warning-description"
+        data-warning-after-ms="@warningAfterMs"
+        data-expire-after-ms="@expireAfterMs"
+        data-extend-url="@Url.Action("ExtendSession", "Account")"
+        data-expired-url="@Url.Action("SessionExpired", "Account")"
+        data-signout-url="@Url.Action("Logout", "Account")"
+        data-antiforgery-token="@antiforgeryToken">
+    <div class="govuk-notification-banner__header">
+        <h2 class="govuk-notification-banner__title app-session-timeout-dialog__title" id="session-timeout-warning-title" tabindex="-1" autofocus>Extend session?</h2>
+    </div>
+    <div class="govuk-notification-banner__content">
+        <p class="govuk-body" id="session-timeout-warning-description">
+            You've been inactive for a while. Your session will expire in
+            <strong id="session-timeout-countdown">@initialCountdown</strong>
+            unless you extend it.
+        </p>
+        @* Announces the remaining time at a few milestones only, not every second, which would be disruptive for
+           screen reader users - see session-timeout.js. *@
+        <span id="session-timeout-countdown-announcement" class="govuk-visually-hidden" aria-live="polite"></span>
+        <div class="govuk-button-group">
+            <button type="button" id="session-timeout-extend" class="govuk-button" data-module="govuk-button">
+                Yes, extend my session
+            </button>
+            <button type="button" id="session-timeout-signout" class="govuk-button govuk-button--secondary" data-module="govuk-button">
+                No, sign out
+            </button>
+        </div>
+    </div>
+</dialog>
+
+<script src="~/js/session-timeout.js" asp-append-version="true"></script>

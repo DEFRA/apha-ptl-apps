@@ -7,16 +7,16 @@
     var canOrderOnline = User.CanOrderOnline();
     var isLabUser = User.IsLabUser();
     bool IsVisible(NavigationItem item) =>
-        item.IsVisibleTo(roles, isLabUser, canOrderOnline);
+        item.IsVisibleTo(roles, isLabUser, canOrderOnline, canEditDetails: User.CanEditDetails());
 
     // An Orders card stays on Home but is disabled, with its blurb replaced, once an order for its year has been submitted
-    // (the header menu stays claim-based; the order page itself explains why the year is unavailable).
+    // (the header menu hides the link instead; the order page itself explains why the year is unavailable).
     string? SubmittedMessage(NavigationItem item) =>
         item.ControllerName == "Order" && item.ActionName is { } actionName ? Model.SubmittedOrderMessage(actionName) : null;
 
     // See _HeaderMenu.cshtml for why groups and children are each filtered independently
     // (Results has no group-level role - only its children do).
-    var visibleSections = NavigationProvider.Build()
+    var visibleSections = NavigationProvider.BuildForHome()
         .Where(IsVisible)
         .Select(group => new { group.Text, Children = group.Children.Where(IsVisible).ToList() })
         .Where(group => group.Children.Count > 0)

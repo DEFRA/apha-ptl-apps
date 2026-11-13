@@ -771,7 +771,8 @@ public class DistributionPreviousAndResultsRouteSmokeTests : IClassFixture<PtlEx
         var body = await response.Content.ReadAsStringAsync();
 
         Assert.DoesNotContain("--error", body, StringComparison.Ordinal);
-        Assert.DoesNotContain("aria-describedby", body, StringComparison.Ordinal);
+        // Scoped to the form fields: the session timeout dialog legitimately uses aria-describedby.
+        Assert.DoesNotMatch("<(input|select|textarea)[^>]*aria-describedby", body);
     }
 
     [Fact]
@@ -789,6 +790,94 @@ public class DistributionPreviousAndResultsRouteSmokeTests : IClassFixture<PtlEx
         Assert.DoesNotContain("name=\"command\" value=\"save\"", body, StringComparison.Ordinal);
         Assert.DoesNotContain("name=\"command\" value=\"submit\"", body, StringComparison.Ordinal);
         Assert.Contains(">Back<", body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Entry_Get_WithExistingNilReturn_ShowsStatusAndReason()
+    {
+        var f = NewEntryFixture();
+        var client = CreateClient(new FakeDistributionApiClient
+        {
+            ActualResults = f.Own,
+            ParticipantNilReturn = new ParticipantNilReturnResponse(true, "No samples available")
+        });
+        var cookies = await SignInAsync(client);
+
+        var response = await CookieForwardingHttpClient.SendWithCookiesAsync(client, HttpMethod.Get, $"/Distribution/Entry?schemeId={f.SchemeId}", cookies);
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("A nil return has been submitted for this distribution.", body, StringComparison.Ordinal);
+        Assert.Contains("Reason:", body, StringComparison.Ordinal);
+        Assert.Contains("No samples available", body, StringComparison.Ordinal);
+        Assert.Contains(">View nil return<", body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task NilReturn_Post_Success_RedirectsToEntry_AndEntryShowsStatus()
+    {
+        var f = NewEntryFixture();
+        var apiClient = new FakeDistributionApiClient
+        {
+            ActualResults = f.Own,
+            ParticipantNilReturnSaveResult = new ParticipantNilReturnSaveResult(true),
+            ParticipantNilReturn = new ParticipantNilReturnResponse(true, "No samples received")
+        };
+        var client = CreateClient(apiClient, allowAutoRedirect: false);
+        var cookies = await SignInAsync(client);
+
+        var entryResponse = await CookieForwardingHttpClient.SendWithCookiesAsync(client, HttpMethod.Get, $"/Distribution/NilReturn?schemeId={f.SchemeId}", cookies);
+        var entryBody = await entryResponse.Content.ReadAsStringAsync();
+        var token = Regex.Match(entryBody, "__RequestVerificationToken[^>]*value=\"([^\"]+)\"").Groups[1].Value;
+
+        var form = new Dictionary<string, string>
+        {
+            ["__RequestVerificationToken"] = token,
+            ["MonthlyDistributionSchemeId"] = f.SchemeId.ToString(),
+            ["NilReturnReason"] = "No samples received",
+            ["command"] = "submit"
+        };
+
+        var post = await CookieForwardingHttpClient.SendWithCookiesAsync(
+            client, HttpMethod.Post, "/Distribution/NilReturn", cookies, new FormUrlEncodedContent(form));
+
+        Assert.Equal(HttpStatusCode.Redirect, post.StatusCode);
+        Assert.Contains($"/Distribution/Entry?schemeId={f.SchemeId}", post.Headers.Location!.ToString(), StringComparison.OrdinalIgnoreCase);
+
+        var saved = Assert.Single(apiClient.SavedParticipantNilReturns);
+        Assert.Equal("No samples received", saved.Request.NilReturnReason);
+    }
+
+    [Fact]
+    public async Task NilReturn_Post_MissingReason_ShowsValidationMessage()
+    {
+        var f = NewEntryFixture();
+        var apiClient = new FakeDistributionApiClient
+        {
+            ActualResults = f.Own,
+            ParticipantNilReturnSaveResult = new ParticipantNilReturnSaveResult(false, ReasonRequired: true)
+        };
+        var client = CreateClient(apiClient, allowAutoRedirect: false);
+        var cookies = await SignInAsync(client);
+
+        var get = await CookieForwardingHttpClient.SendWithCookiesAsync(client, HttpMethod.Get, $"/Distribution/NilReturn?schemeId={f.SchemeId}", cookies);
+        var body = await get.Content.ReadAsStringAsync();
+        var token = Regex.Match(body, "__RequestVerificationToken[^>]*value=\"([^\"]+)\"").Groups[1].Value;
+
+        var form = new Dictionary<string, string>
+        {
+            ["__RequestVerificationToken"] = token,
+            ["MonthlyDistributionSchemeId"] = f.SchemeId.ToString(),
+            ["NilReturnReason"] = "",
+            ["command"] = "submit"
+        };
+
+        var post = await CookieForwardingHttpClient.SendWithCookiesAsync(
+            client, HttpMethod.Post, "/Distribution/NilReturn", cookies, new FormUrlEncodedContent(form));
+        var postBody = await post.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.OK, post.StatusCode);
+        Assert.Contains("Enter a reason for nil return.", postBody, StringComparison.Ordinal);
     }
 
     [Fact]

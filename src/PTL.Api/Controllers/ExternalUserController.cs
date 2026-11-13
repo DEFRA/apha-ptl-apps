@@ -41,7 +41,8 @@ public sealed class ExternalUserController(IExternalUserService externalUserServ
             result.ViewerId,
             result.TestConsultantId,
             result.LabUserId,
-            result.CanOrderOnline));
+            result.CanOrderOnline,
+            result.CanEditDetails));
     }
 
     /// <summary>The active labs a signed-in Participant or Lab User can work on (empty for any other user), for the lab selection page.</summary>

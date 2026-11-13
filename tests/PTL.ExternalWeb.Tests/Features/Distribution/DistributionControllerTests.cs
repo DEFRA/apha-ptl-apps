@@ -398,6 +398,96 @@ public class DistributionControllerTests
         Assert.True(model.IsReadOnly);
     }
 
+    [Fact]
+    public async Task Entry_Get_WithExistingNilReturn_MapsStateToViewModel()
+    {
+        var schemeId = Guid.NewGuid();
+        var apiClient = new FakeDistributionApiClient
+        {
+            ActualResults = OwnResults(schemeId, Guid.NewGuid()),
+            ParticipantNilReturn = new ParticipantNilReturnResponse(true, "No samples available")
+        };
+        var controller = new DistributionController(apiClient);
+        AuthenticatedParticipant.Attach(controller, Guid.NewGuid());
+
+        var result = await controller.Entry(schemeId, CancellationToken.None);
+
+        var model = Assert.IsType<DistributionResultsEntryViewModel>(Assert.IsType<ViewResult>(result).Model);
+        Assert.True(model.HasNilReturn);
+        Assert.Equal("No samples available", model.NilReturnReason);
+    }
+
+    [Fact]
+    public async Task NilReturn_Get_OpenDistribution_LoadsViewWithExistingReason()
+    {
+        var schemeId = Guid.NewGuid();
+        var apiClient = new FakeDistributionApiClient
+        {
+            ActualResults = OwnResults(schemeId, Guid.NewGuid()),
+            ParticipantNilReturn = new ParticipantNilReturnResponse(true, "Reason text")
+        };
+        var controller = new DistributionController(apiClient);
+        AuthenticatedParticipant.Attach(controller, Guid.NewGuid());
+
+        var result = await controller.NilReturn(schemeId, CancellationToken.None);
+
+        var model = Assert.IsType<DistributionNilReturnViewModel>(Assert.IsType<ViewResult>(result).Model);
+        Assert.Equal(schemeId, model.MonthlyDistributionSchemeId);
+        Assert.True(model.HasNilReturn);
+        Assert.Equal("Reason text", model.NilReturnReason);
+    }
+
+    [Fact]
+    public async Task NilReturn_Post_Success_RedirectsToEntry_AndSavesReason()
+    {
+        var schemeId = Guid.NewGuid();
+        var ownParticipantId = Guid.NewGuid();
+        var apiClient = new FakeDistributionApiClient
+        {
+            ActualResults = OwnResults(schemeId, ownParticipantId),
+            ParticipantNilReturnSaveResult = new ParticipantNilReturnSaveResult(true)
+        };
+        var controller = new DistributionController(apiClient);
+        AuthenticatedParticipant.Attach(controller, Guid.NewGuid());
+
+        var result = await controller.NilReturn(new DistributionNilReturnViewModel
+        {
+            MonthlyDistributionSchemeId = schemeId,
+            NilReturnReason = "No samples received"
+        }, "submit", CancellationToken.None);
+
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal(nameof(DistributionController.Entry), redirect.ActionName);
+        Assert.Equal(schemeId, redirect.RouteValues!["schemeId"]);
+
+        var saved = Assert.Single(apiClient.SavedParticipantNilReturns);
+        Assert.Equal(schemeId, saved.SchemeId);
+        Assert.Equal(ownParticipantId, saved.DistributionParticipantId);
+        Assert.Equal("No samples received", saved.Request.NilReturnReason);
+    }
+
+    [Fact]
+    public async Task NilReturn_Post_ReasonRequired_AddsFieldError()
+    {
+        var schemeId = Guid.NewGuid();
+        var apiClient = new FakeDistributionApiClient
+        {
+            ActualResults = OwnResults(schemeId, Guid.NewGuid()),
+            ParticipantNilReturnSaveResult = new ParticipantNilReturnSaveResult(false, ReasonRequired: true)
+        };
+        var controller = new DistributionController(apiClient);
+        AuthenticatedParticipant.Attach(controller, Guid.NewGuid());
+
+        var result = await controller.NilReturn(new DistributionNilReturnViewModel
+        {
+            MonthlyDistributionSchemeId = schemeId,
+            NilReturnReason = ""
+        }, "submit", CancellationToken.None);
+
+        Assert.IsType<ViewResult>(result);
+        Assert.Equal("Enter a reason for nil return.", Assert.Single(controller.ModelState[nameof(DistributionNilReturnViewModel.NilReturnReason)]!.Errors).ErrorMessage);
+    }
+
     private sealed record DropdownFixture(
         Guid SchemeId, Guid ResultItemId, Guid SampleValueId, Guid MethodItemId, ActualResultsResponse Own);
 

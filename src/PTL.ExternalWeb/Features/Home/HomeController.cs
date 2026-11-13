@@ -1,9 +1,8 @@
+using System.Net;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Polly;
 using PTL.ApiClient;
 using PTL.Common.Auth;
-using PTL.Contracts.CreateOrder;
 using PTL.ExternalWeb.Features.Account;
 
 namespace PTL.ExternalWeb.Features.Home;
@@ -19,38 +18,17 @@ public class HomeController(IApiClient apiClient, ISystemMessageApiClient system
     {
         var displayName = User.GetDisplayName(preferredClaimType: ExternalUserClaimTypes.DisplayName) ?? string.Empty;
         var importantMessage = await systemMessageApiClient.GetImportantMessageAsync(HttpContext.RequestAborted);
-        var eligibility = await GetOrderEligibilityAsync(HttpContext.RequestAborted);
+        var eligibility = await OrderEligibilityLookup.GetAsync(User, createOrderApiClient, HttpContext.RequestAborted);
         return View(new HomeIndexViewModel(
             displayName,
             User.GetResolvedExternalRoles(),
-            importantMessage.ImportantMessage,
+            // Rows saved before the save-time decode fix hold entity-escaped HTML; decoding here repairs them without a data patch.
+            importantMessage.ImportantMessage is { } stored ? WebUtility.HtmlDecode(stored) : null,
             eligibility.CanCreateCurrentYearOrder,
             eligibility.CanCreateNextYearOrder,
             eligibility.CurrentYear,
             eligibility.NextYear));
     }
-
-    // Legacy Home.aspx keeps each "Create order" card but disables it once an order for that year is submitted. The order
-    // pages enforce the same rules themselves, so a failed lookup shows both cards enabled rather than breaking Home.
-    private async Task<CreateOrderEligibilityResponse> GetOrderEligibilityAsync(CancellationToken cancellationToken)
-    {
-        var participantId = User.GetParticipantId();
-        if (participantId is null || !User.CanOrderOnline())
-        {
-            return AllowBoth;
-        }
-
-        try
-        {
-            return await createOrderApiClient.GetEligibilityAsync(participantId.Value, cancellationToken) ?? AllowBoth;
-        }
-        catch (Exception exception) when (exception is HttpRequestException or TaskCanceledException or ExecutionRejectedException)
-        {
-            return AllowBoth;
-        }
-    }
-
-    private static readonly CreateOrderEligibilityResponse AllowBoth = new(true, true, true);
 
     // Legal/informational page - deliberately anonymous, like PTL.ExternalWeb's other
     // [AllowAnonymous] pages (ApiStatus, Error), since it must be reachable before sign-in.

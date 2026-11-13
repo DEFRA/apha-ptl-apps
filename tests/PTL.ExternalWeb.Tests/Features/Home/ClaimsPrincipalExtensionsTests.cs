@@ -47,6 +47,17 @@ public class ClaimsPrincipalExtensionsTests
         Assert.Equal(expected, principal.HasResolvedExternalRole(roleToCheck));
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void CanEditDetails_FollowsTheClaim(bool claimPresent)
+    {
+        var claims = claimPresent ? [new Claim(ExternalUserClaimTypes.CanEditDetails, "true")] : Array.Empty<Claim>();
+        var principal = new ClaimsPrincipal(new ClaimsIdentity(claims, "TestAuth"));
+
+        Assert.Equal(claimPresent, principal.CanEditDetails());
+    }
+
     [Fact]
     public void CanOrderOnline_ClaimPresent_ReturnsTrue()
     {

@@ -11,7 +11,7 @@ namespace PTL.ExternalWeb.Features.Participant;
 
 // Legacy EditParticipantDetails.aspx (tracker row 7) - participant self-service edit of
 // participant/laboratory details, submitted as a pending update for admin approval (Story 744639).
-[Authorize(Policy = ExternalPolicies.PrimaryContact)]
+[Authorize(Policy = ExternalPolicies.CanEditDetails)]
 public sealed class ParticipantController(IParticipantDetailsEditApiClient participantDetailsEditApiClient, ILookupApiClient lookupApiClient) : Controller
 {
     private const string PleaseSelectOptionText = "Please select";

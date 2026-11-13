@@ -90,18 +90,3 @@ public sealed class PackagingViewModel
         return ticks.Where(t => !shown.Contains(t)).Distinct();
     }
 }
-
-public sealed class PackagingLabelsViewModel
-{
-    public int YearId { get; set; }
-
-    public int MonthId { get; set; }
-
-    public int Mode { get; set; }
-
-    public int Week { get; set; }
-
-    public string MonthDescription { get; set; } = string.Empty;
-
-    public IReadOnlyList<PackagingLabelResponse> Labels { get; set; } = [];
-}

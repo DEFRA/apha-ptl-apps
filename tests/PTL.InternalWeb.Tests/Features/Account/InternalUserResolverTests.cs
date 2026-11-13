@@ -100,6 +100,110 @@ public class InternalUserResolverTests
     }
 
     [Fact]
+    public async Task ResolveAsync_UsesTheDirectoryEmployeeId_WhenTheTokenHasNoAccountClaims()
+    {
+        var objectId = Guid.NewGuid();
+        var principal = CreatePrincipal(new Claim(EntraClaimTypes.ObjectId, objectId.ToString()));
+        var apiClient = new FakeInternalUserApiClient(new ResolveInternalUserResponse(true, Guid.NewGuid(), "Alice User", "QAU", ["Admin"]));
+        var lookup = new FakeEmployeeIdLookup { EmployeeId = "12345" };
+
+        var result = await new InternalUserResolver(apiClient, NullLogger<InternalUserResolver>.Instance, lookup).ResolveAsync(principal, CancellationToken.None);
+
+        Assert.True(result.IsAllowed);
+        Assert.Equal(objectId, lookup.RequestedObjectId);
+        Assert.Equal("DEMETER\\12345", apiClient.ReceivedRequest!.Username);
+    }
+
+    [Fact]
+    public async Task ResolveAsync_PrefersTheDirectoryEmployeeId_ToABareAccountName()
+    {
+        var principal = CreatePrincipal(
+            new Claim(EntraClaimTypes.ObjectId, Guid.NewGuid().ToString()),
+            new Claim(EntraClaimTypes.OnPremisesSamAccountName, "auser"));
+        var apiClient = new FakeInternalUserApiClient(new ResolveInternalUserResponse(false, null, "", "", []));
+
+        await new InternalUserResolver(apiClient, NullLogger<InternalUserResolver>.Instance, new FakeEmployeeIdLookup { EmployeeId = "12345" })
+            .ResolveAsync(principal, CancellationToken.None);
+
+        Assert.Equal("DEMETER\\12345", apiClient.ReceivedRequest!.Username);
+    }
+
+    [Fact]
+    public async Task ResolveAsync_DoesNotQueryTheDirectory_WhenTheTokenGivesADomainQualifiedName()
+    {
+        var principal = CreatePrincipal(
+            new Claim(EntraClaimTypes.ObjectId, Guid.NewGuid().ToString()),
+            new Claim(EntraClaimTypes.OnPremisesSamAccountName, "auser"),
+            new Claim(EntraClaimTypes.OnPremisesDomainName, "DEFRA"));
+        var apiClient = new FakeInternalUserApiClient(new ResolveInternalUserResponse(false, null, "", "", []));
+        var lookup = new FakeEmployeeIdLookup { EmployeeId = "12345" };
+
+        await new InternalUserResolver(apiClient, NullLogger<InternalUserResolver>.Instance, lookup).ResolveAsync(principal, CancellationToken.None);
+
+        Assert.Null(lookup.RequestedObjectId);
+        Assert.Equal("DEFRA\\auser", apiClient.ReceivedRequest!.Username);
+    }
+
+    [Fact]
+    public async Task ResolveAsync_KeepsTheBareAccountName_WhenTheDirectoryHasNoEmployeeId()
+    {
+        var principal = CreatePrincipal(
+            new Claim(EntraClaimTypes.ObjectId, Guid.NewGuid().ToString()),
+            new Claim(EntraClaimTypes.OnPremisesSamAccountName, "auser"));
+        var apiClient = new FakeInternalUserApiClient(new ResolveInternalUserResponse(false, null, "", "", []));
+
+        await new InternalUserResolver(apiClient, NullLogger<InternalUserResolver>.Instance, new FakeEmployeeIdLookup())
+            .ResolveAsync(principal, CancellationToken.None);
+
+        Assert.Equal("auser", apiClient.ReceivedRequest!.Username);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("  ")]
+    [InlineData("12\\34")]
+    public async Task ResolveAsync_DeniesWithoutCallingApi_WhenTheDirectoryEmployeeIdIsMissingOrUnusable(string? employeeId)
+    {
+        var principal = CreatePrincipal(new Claim(EntraClaimTypes.ObjectId, Guid.NewGuid().ToString()));
+        var apiClient = new FakeInternalUserApiClient(new ResolveInternalUserResponse(true, Guid.NewGuid(), "Alice User", "QAU", []));
+
+        var result = await new InternalUserResolver(apiClient, NullLogger<InternalUserResolver>.Instance, new FakeEmployeeIdLookup { EmployeeId = employeeId })
+            .ResolveAsync(principal, CancellationToken.None);
+
+        Assert.False(result.IsAllowed);
+        Assert.Equal("/Account/NotPermitted", result.DenialRedirectPath);
+        Assert.Null(apiClient.ReceivedRequest);
+    }
+
+    [Fact]
+    public async Task ResolveAsync_DeniesWithoutCallingApi_WhenTheDirectoryLookupFailsAndTheTokenHasNoAccountName()
+    {
+        var principal = CreatePrincipal(new Claim(EntraClaimTypes.ObjectId, Guid.NewGuid().ToString()));
+        var apiClient = new FakeInternalUserApiClient(new ResolveInternalUserResponse(true, Guid.NewGuid(), "Alice User", "QAU", []));
+
+        var result = await new InternalUserResolver(apiClient, NullLogger<InternalUserResolver>.Instance, new FakeEmployeeIdLookup { Throw = true })
+            .ResolveAsync(principal, CancellationToken.None);
+
+        Assert.False(result.IsAllowed);
+        Assert.Equal("/Account/NotPermitted", result.DenialRedirectPath);
+        Assert.Null(apiClient.ReceivedRequest);
+    }
+
+    [Fact]
+    public async Task ResolveAsync_FallsBackToTheBareAccountName_WhenTheDirectoryLookupFails()
+    {
+        var principal = CreatePrincipal(
+            new Claim(EntraClaimTypes.ObjectId, Guid.NewGuid().ToString()),
+            new Claim(EntraClaimTypes.OnPremisesSamAccountName, "auser"));
+        var apiClient = new FakeInternalUserApiClient(new ResolveInternalUserResponse(false, null, "", "", []));
+
+        await new InternalUserResolver(apiClient, NullLogger<InternalUserResolver>.Instance, new FakeEmployeeIdLookup { Throw = true })
+            .ResolveAsync(principal, CancellationToken.None);
+
+        Assert.Equal("auser", apiClient.ReceivedRequest!.Username);
+    }
+
+    [Fact]
     public async Task ResolveAsync_ApiCallThrowsHttpRequestException_DeniesWithErrorRedirect()
     {
         var principal = CreatePrincipal(
