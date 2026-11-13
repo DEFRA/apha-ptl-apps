@@ -1,0 +1,24 @@
+@using PTL.ExternalWeb.Features.LoadTesting
+@model LoadTestingLoginViewModel
+@{
+    ViewData["Title"] = "Load testing sign in";
+}
+
+<div class="govuk-grid-row">
+    <div class="govuk-grid-column-two-thirds">
+        <h1 class="govuk-heading-l">Load testing sign in</h1>
+        <p class="govuk-body">Performance environment only. Enter the email of a user that exists in PTL.</p>
+        @if (!string.IsNullOrEmpty(Model.Error))
+        {
+            <p class="govuk-error-message" id="email-error"><span class="govuk-visually-hidden">Error:</span> @Model.Error</p>
+        }
+        <form method="post" action="/perf/login">
+            <input type="hidden" name="returnUrl" value="@Model.ReturnUrl" />
+            <div class="govuk-form-group">
+                <label class="govuk-label" for="email">Email address</label>
+                <input class="govuk-input" id="email" name="email" type="email" value="@Model.Email" autocomplete="off" />
+            </div>
+            <button type="submit" class="govuk-button" data-module="govuk-button">Sign in</button>
+        </form>
+    </div>
+</div>
