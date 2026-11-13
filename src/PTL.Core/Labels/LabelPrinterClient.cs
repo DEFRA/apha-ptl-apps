@@ -163,7 +163,7 @@ public sealed class LabelPrinterClient(IOptions<LabelPrinterOptions> options, IL
                 break;
             }
 
-            reply.Write(buffer, 0, read);
+            await reply.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
         }
 
         return Encoding.Latin1.GetString(reply.GetBuffer(), 0, (int)reply.Length);
