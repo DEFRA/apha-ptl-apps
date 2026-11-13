@@ -42,8 +42,12 @@
     // Choosing a lab is the step before Home, so there is no trail above it (its "Home" link would only bring the user back here).
     var isLabSelectionPage = string.Equals(currentController, "Lab", StringComparison.OrdinalIgnoreCase)
         && string.Equals(currentAction, "Select", StringComparison.OrdinalIgnoreCase);
+
+    var showCookieConsentBanner = string.IsNullOrEmpty(Context.Request.Cookies[CookiePreferenceNames.ConsentSet]);
+    var cookiePreferenceDecision = TempData["CookiePreferencesUpdated"] as string;
 }
 
+@await Html.PartialAsync("_CookieBanner", (showCookieConsentBanner, cookiePreferenceDecision))
 @await Html.PartialAsync("_Header", ("VETQAS Proficiency Testing", "width:180px; height:auto;"))
 <div class="govuk-width-container app-width-container">
     <main role="main" class="pb-3" id="main-content">
@@ -71,6 +75,7 @@
         } from '/js/govuk-frontend-6.5.0.min.js'
         initAll()
 </script>
+<script src="/js/site.js" asp-append-version="true" defer></script>
 <script src="/js/header-menu.js" defer></script>
 @await RenderSectionAsync("Scripts", required: false)
 </body>

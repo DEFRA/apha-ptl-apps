@@ -1,0 +1,78 @@
+@model PTL.ExternalWeb.Features.Home.CookiesViewModel
+@{
+    ViewData["Title"] = "Cookies";
+}
+
+<h1 class="govuk-heading-l">Cookies on Proficiency Testing</h1>
+
+<p class="govuk-body">Cookies are files saved on your phone, tablet or computer when you visit a website.</p>
+
+<p class="govuk-body">We use cookies to make this service work and collect information about how you use it.</p>
+
+<h2 class="govuk-heading-m">Essential cookies (strictly necessary)</h2>
+<p class="govuk-body">Essential cookies keep your information secure and allow core service features to work.</p>
+
+<table class="govuk-table">
+    <caption class="govuk-table__caption govuk-table__caption--s">Essential cookies we use</caption>
+    <thead class="govuk-table__head">
+        <tr class="govuk-table__row">
+            <th class="govuk-table__header" scope="col">Name</th>
+            <th class="govuk-table__header" scope="col">Purpose</th>
+            <th class="govuk-table__header" scope="col">Expires</th>
+        </tr>
+    </thead>
+    <tbody class="govuk-table__body">
+        <tr class="govuk-table__row">
+            <td class="govuk-table__cell">Authentication cookies</td>
+            <td class="govuk-table__cell">Keep you signed in while using the service.</td>
+            <td class="govuk-table__cell">As configured by sign-in policy</td>
+        </tr>
+        <tr class="govuk-table__row">
+            <td class="govuk-table__cell">@CookiePreferenceNames.ConsentSet</td>
+            <td class="govuk-table__cell">Remembers that you have set your cookie preferences.</td>
+            <td class="govuk-table__cell">6 months</td>
+        </tr>
+    </tbody>
+</table>
+
+<h2 class="govuk-heading-m">Cookies that measure website use (analytics)</h2>
+<p class="govuk-body">We use analytics cookies to understand how people use this service and make improvements.</p>
+
+<table class="govuk-table">
+    <caption class="govuk-table__caption govuk-table__caption--s">Analytics cookies we use</caption>
+    <thead class="govuk-table__head">
+        <tr class="govuk-table__row">
+            <th class="govuk-table__header" scope="col">Name</th>
+            <th class="govuk-table__header" scope="col">Purpose</th>
+            <th class="govuk-table__header" scope="col">Expires</th>
+        </tr>
+    </thead>
+    <tbody class="govuk-table__body">
+        <tr class="govuk-table__row">
+            <td class="govuk-table__cell">@CookiePreferenceNames.Analytics</td>
+            <td class="govuk-table__cell">Stores whether you accept analytics cookies.</td>
+            <td class="govuk-table__cell">6 months</td>
+        </tr>
+    </tbody>
+</table>
+
+<form method="post" asp-controller="Home" asp-action="Cookies" novalidate>
+    <div class="govuk-form-group">
+        <fieldset class="govuk-fieldset" aria-describedby="analytics-cookies-hint">
+            <legend class="govuk-fieldset__legend govuk-fieldset__legend--s">Do you want to accept analytics cookies?</legend>
+            <div id="analytics-cookies-hint" class="govuk-hint">You can change your choice at any time.</div>
+            <div class="govuk-radios" data-module="govuk-radios">
+                <div class="govuk-radios__item">
+                    <input class="govuk-radios__input" id="analytics-cookies-yes" asp-for="UseAnalyticsCookies" type="radio" value="true">
+                    <label class="govuk-label govuk-radios__label" for="analytics-cookies-yes">Yes</label>
+                </div>
+                <div class="govuk-radios__item">
+                    <input class="govuk-radios__input" id="analytics-cookies-no" asp-for="UseAnalyticsCookies" type="radio" value="false">
+                    <label class="govuk-label govuk-radios__label" for="analytics-cookies-no">No</label>
+                </div>
+            </div>
+        </fieldset>
+    </div>
+
+    <button class="govuk-button" data-module="govuk-button" type="submit">Save cookie settings</button>
+</form>

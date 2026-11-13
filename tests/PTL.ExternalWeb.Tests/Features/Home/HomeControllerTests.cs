@@ -1,10 +1,12 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ViewFeatures;
 using PTL.ApiClient;
 using PTL.ExternalWeb.Features.Account;
 using PTL.ExternalWeb.Features.Home;
 using PTL.ExternalWeb.Tests.TestSupport;
+using PTL.ExternalWeb.ViewSupport;
 
 namespace PTL.ExternalWeb.Tests.Features.Home;
 
@@ -21,6 +23,18 @@ public class HomeControllerTests
                 }
             }
         };
+
+    private static HomeController CreateCookiesController(DefaultHttpContext httpContext)
+    {
+        var controller = new HomeController(new FakeApiClient(), new FakeSystemMessageApiClient(), new FakeCreateOrderApiClient())
+        {
+            ControllerContext = new ControllerContext { HttpContext = httpContext },
+            Url = new FakeUrlHelper(),
+            TempData = new TempDataDictionary(httpContext, new FakeTempDataProvider())
+        };
+
+        return controller;
+    }
 
     [Fact]
     public async Task Index_DisplayNameAndResolvedRolesClaimsPresent_ShowsBoth()
@@ -189,6 +203,79 @@ public class HomeControllerTests
         var model = Assert.IsType<HomeIndexViewModel>(Assert.IsType<ViewResult>(result).Model);
         Assert.True(model.CanCreateCurrentYearOrder);
         Assert.True(model.CanCreateNextYearOrder);
+    }
+
+    [Fact]
+    public void Cookies_Get_AnalyticsCookieIsTrue_ModelReflectsEnabled()
+    {
+        var httpContext = new DefaultHttpContext();
+        httpContext.Request.Headers.Cookie = $"{CookiePreferenceNames.Analytics}=TrUe";
+
+        var controller = CreateCookiesController(httpContext);
+
+        var result = controller.Cookies();
+
+        var viewResult = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<CookiesViewModel>(viewResult.Model);
+        Assert.True(model.UseAnalyticsCookies);
+    }
+
+    [Fact]
+    public void Cookies_Get_AnalyticsCookieMissing_ModelReflectsDisabled()
+    {
+        var controller = CreateCookiesController(new DefaultHttpContext());
+
+        var result = controller.Cookies();
+
+        var viewResult = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<CookiesViewModel>(viewResult.Model);
+        Assert.False(model.UseAnalyticsCookies);
+    }
+
+    [Fact]
+    public void Cookies_Post_LocalReturnUrl_SetsCookiesTempDataAndRedirectsToReturnUrl()
+    {
+        var controller = CreateCookiesController(new DefaultHttpContext());
+
+        var result = controller.Cookies(new CookiesViewModel { UseAnalyticsCookies = true }, "/Home/Index");
+
+        var redirect = Assert.IsType<RedirectResult>(result);
+        Assert.Equal("/Home/Index", redirect.Url);
+        Assert.Equal("accepted", controller.TempData["CookiePreferencesUpdated"]);
+
+        var setCookie = controller.HttpContext.Response.Headers.SetCookie.ToArray();
+        Assert.Contains(setCookie, header => header.Contains($"{CookiePreferenceNames.ConsentSet}=True", StringComparison.Ordinal));
+        Assert.Contains(setCookie, header => header.Contains($"{CookiePreferenceNames.Analytics}=True", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Cookies_Post_NoReturnUrl_UsesLocalRefererPathAndQuery()
+    {
+        var httpContext = new DefaultHttpContext();
+        httpContext.Request.Headers.Referer = "https://localhost/Help/Index?section=foo";
+        var controller = CreateCookiesController(httpContext);
+
+        var result = controller.Cookies(new CookiesViewModel { UseAnalyticsCookies = false });
+
+        var redirect = Assert.IsType<RedirectResult>(result);
+        Assert.Equal("/Help/Index?section=foo", redirect.Url);
+        Assert.Equal("rejected", controller.TempData["CookiePreferencesUpdated"]);
+
+        var setCookie = controller.HttpContext.Response.Headers.SetCookie.ToArray();
+        Assert.Contains(setCookie, header => header.Contains($"{CookiePreferenceNames.Analytics}=False", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Cookies_Post_UnsafeReturnAndInvalidReferer_FallsBackToCookiesAction()
+    {
+        var httpContext = new DefaultHttpContext();
+        httpContext.Request.Headers.Referer = "not-a-valid-uri";
+        var controller = CreateCookiesController(httpContext);
+
+        var result = controller.Cookies(new CookiesViewModel { UseAnalyticsCookies = true }, "https://evil.example/steal");
+
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal(nameof(HomeController.Cookies), redirect.ActionName);
     }
 
     [Fact]
