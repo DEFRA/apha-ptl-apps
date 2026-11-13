@@ -771,7 +771,7 @@ public sealed partial class DistributionController(
         return null;
     }
 
-    // Same print path as the Customer, Participant and Group Address labels (ILabelPrinterApiClient -> PTL.Api -> ZPL over the
+    // Same print path as the Customer, Participant and Group Address labels (ILabelPrinterApiClient -> PTL.Api -> Fingerprint over the
     // printer socket). Like legacy ButtonPrintLabels_Click, every label is attempted and one failure fails the whole report.
     private async Task PrintPackagingLabelsAsync(IReadOnlyList<PackagingLabelResponse> labels, CancellationToken cancellationToken)
     {

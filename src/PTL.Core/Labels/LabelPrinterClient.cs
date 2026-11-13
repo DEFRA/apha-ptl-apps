@@ -7,8 +7,8 @@ namespace PTL.Core.Labels;
 
 // Sends the composed label straight to the configured network printer - the "raw/JetDirect" port
 // 9100 protocol, so no OS print driver/spooler is required (unavailable on this app's Linux
-// container hosting). The label is formatted as ZPL (ZplLabelFormatter) before being written to the
-// socket - the PC43 is a ZPL-capable printer and will not render plain text sent over the raw port.
+// container hosting). The label is formatted as Fingerprint (FingerprintLabelFormatter) before being written to the
+// socket - the PC43t's command language is Fingerprint, so plain text sent over the raw port would not print as a label.
 // Mirrors legacy LabelBase.Print()'s own shape: attempt the print, log the outcome, return a plain
 // success/failure bool for the caller to show a confirmation message from - never throws for a
 // printing failure, only for a null label.
@@ -57,11 +57,11 @@ public sealed class LabelPrinterClient(IOptions<LabelPrinterOptions> options, IL
             "Print request completed. Success={Success} Host={Host} Port={Port}");
 
     // TEMPORARY: always logged for troubleshooting. Label text is name and address data - revert to Debug or remove.
-    private static readonly Action<ILogger, string?, int, int, string, Exception?> LogGeneratedZplMessage =
+    private static readonly Action<ILogger, string?, int, int, string, Exception?> LogGeneratedPayloadMessage =
         LoggerMessage.Define<string?, int, int, string>(
             LogLevel.Information,
-            new EventId(8, nameof(LogGeneratedZplMessage)),
-            "Generated ZPL payload. Host={Host} Port={Port} PayloadLength={PayloadLength}\n{ZplPayload}");
+            new EventId(8, nameof(LogGeneratedPayloadMessage)),
+            "Generated Fingerprint payload. Host={Host} Port={Port} PayloadLength={PayloadLength}\n{Payload}");
 
     public async Task<bool> PrintAsync(AddressLabel label, CancellationToken cancellationToken = default)
     {
@@ -88,8 +88,8 @@ public sealed class LabelPrinterClient(IOptions<LabelPrinterOptions> options, IL
 
             await using var stream = client.GetStream();
 
-            var payload = ZplLabelFormatter.ToZpl(label);
-            LogGeneratedZplMessage(logger, settings.Host, settings.Port, payload.Length, Encoding.ASCII.GetString(payload), null);
+            var payload = FingerprintLabelFormatter.ToFingerprint(label);
+            LogGeneratedPayloadMessage(logger, settings.Host, settings.Port, payload.Length, Encoding.ASCII.GetString(payload), null);
 
             await stream.WriteAsync(payload, cancellationToken);
             await stream.FlushAsync(cancellationToken);

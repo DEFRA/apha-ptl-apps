@@ -50,7 +50,7 @@ public class LabelPrinterClientDiagnosticsTests
         using var received = new MemoryStream();
         await accepted.GetStream().CopyToAsync(received);
 
-        var expected = ZplLabelFormatter.ToZpl(Label);
+        var expected = FingerprintLabelFormatter.ToFingerprint(Label);
         Assert.True(printed);
         Assert.Equal(expected, received.ToArray());
         Assert.Equal([3, 4, 5, 8, 6, 7], logger.Entries.Select(e => e.EventId.Id));
@@ -63,7 +63,7 @@ public class LabelPrinterClientDiagnosticsTests
         Assert.Equal(expected.Length.ToString(CultureInfo.InvariantCulture), Value(logger.Entries[4], "PayloadLength"));
         Assert.Equal("True", Value(logger.Entries[5], "Success"));
 
-        // Label text is personal data: only the ZPL entry may carry it.
+        // Label text is personal data: only the payload entry may carry it.
         foreach (var entry in logger.Entries.Where(e => e.EventId.Id != 8))
         {
             Assert.DoesNotContain("Alice", entry.Message, StringComparison.Ordinal);
@@ -72,7 +72,7 @@ public class LabelPrinterClientDiagnosticsTests
     }
 
     [Fact]
-    public async Task PrintAsync_Success_LogsTheGeneratedZplWithHostPortAndPayloadLengthBeforeItIsSent()
+    public async Task PrintAsync_Success_LogsTheGeneratedFingerprintWithHostPortAndPayloadLengthBeforeItIsSent()
     {
         var logger = new MessageCapturingLogger<LabelPrinterClient>();
         using var listener = new TcpListener(IPAddress.Loopback, 0);
@@ -81,16 +81,16 @@ public class LabelPrinterClientDiagnosticsTests
 
         await CreateClient("127.0.0.1", port, logger).PrintAsync(Label);
 
-        var zpl = Assert.Single(logger.Entries, e => e.EventId.Id == 8);
-        var expected = ZplLabelFormatter.ToZpl(Label);
-        Assert.Equal(LogLevel.Information, zpl.Level);
-        Assert.Equal(Encoding.ASCII.GetString(expected), Value(zpl, "ZplPayload"));
-        Assert.Equal(expected.Length.ToString(CultureInfo.InvariantCulture), Value(zpl, "PayloadLength"));
-        Assert.Equal("127.0.0.1", Value(zpl, "Host"));
-        Assert.Equal(port.ToString(CultureInfo.InvariantCulture), Value(zpl, "Port"));
-        Assert.StartsWith("Generated ZPL payload.", zpl.Message, StringComparison.Ordinal);
-        Assert.Contains("^XA", zpl.Message, StringComparison.Ordinal);
-        Assert.True(logger.Entries.IndexOf(zpl) < logger.Entries.FindIndex(e => e.EventId.Id == 6));
+        var payload = Assert.Single(logger.Entries, e => e.EventId.Id == 8);
+        var expected = FingerprintLabelFormatter.ToFingerprint(Label);
+        Assert.Equal(LogLevel.Information, payload.Level);
+        Assert.Equal(Encoding.ASCII.GetString(expected), Value(payload, "Payload"));
+        Assert.Equal(expected.Length.ToString(CultureInfo.InvariantCulture), Value(payload, "PayloadLength"));
+        Assert.Equal("127.0.0.1", Value(payload, "Host"));
+        Assert.Equal(port.ToString(CultureInfo.InvariantCulture), Value(payload, "Port"));
+        Assert.StartsWith("Generated Fingerprint payload.", payload.Message, StringComparison.Ordinal);
+        Assert.Contains("INPUT ON", payload.Message, StringComparison.Ordinal);
+        Assert.True(logger.Entries.IndexOf(payload) < logger.Entries.FindIndex(e => e.EventId.Id == 6));
     }
 
     [Fact]
