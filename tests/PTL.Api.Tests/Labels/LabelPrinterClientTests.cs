@@ -12,7 +12,7 @@ public class LabelPrinterClientTests
         new(Options.Create(options), NullLogger<LabelPrinterClient>.Instance);
 
     [Fact]
-    public async Task PrintAsync_ConfiguredHost_SendsTheZplFormattedLabelOverTheSocket()
+    public async Task PrintAsync_ConfiguredHost_SendsTheFingerprintFormattedLabelOverTheSocket()
     {
         using var listener = new TcpListener(IPAddress.Loopback, 0);
         listener.Start();
@@ -36,7 +36,7 @@ public class LabelPrinterClientTests
         }
 
         Assert.True(await printTask);
-        Assert.Equal(ZplLabelFormatter.ToZpl(label), buffer.ToArray());
+        Assert.Equal(FingerprintLabelFormatter.ToFingerprint(label), buffer.ToArray());
     }
 
     [Fact]
