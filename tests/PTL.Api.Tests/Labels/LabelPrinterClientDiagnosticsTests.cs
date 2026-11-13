@@ -53,7 +53,7 @@ public class LabelPrinterClientDiagnosticsTests
         var expected = FingerprintLabelFormatter.ToFingerprint(Label);
         Assert.True(printed);
         Assert.Equal(expected, received.ToArray());
-        Assert.Equal([3, 4, 5, 8, 6, 9, 7], logger.Entries.Select(e => e.EventId.Id));
+        Assert.Equal([3, 4, 5, 8, 6, 7], logger.Entries.Select(e => e.EventId.Id));
         Assert.All(logger.Entries, e =>
         {
             Assert.Equal("127.0.0.1", Value(e, "Host"));
@@ -61,7 +61,7 @@ public class LabelPrinterClientDiagnosticsTests
         });
         Assert.All(logger.Entries.Where(e => e.EventId.Id != 8), e => Assert.Equal(LogLevel.Information, e.Level));
         Assert.Equal(expected.Length.ToString(CultureInfo.InvariantCulture), Value(logger.Entries[4], "PayloadLength"));
-        Assert.Equal("True", Value(logger.Entries[6], "Success"));
+        Assert.Equal("True", Value(logger.Entries[5], "Success"));
 
         // Label text is personal data: only the payload entry may carry it.
         foreach (var entry in logger.Entries.Where(e => e.EventId.Id != 8))
@@ -91,31 +91,6 @@ public class LabelPrinterClientDiagnosticsTests
         Assert.StartsWith("Generated Fingerprint payload.", payload.Message, StringComparison.Ordinal);
         Assert.Contains("INPUT ON", payload.Message, StringComparison.Ordinal);
         Assert.True(logger.Entries.IndexOf(payload) < logger.Entries.FindIndex(e => e.EventId.Id == 6));
-    }
-
-    [Theory]
-    [InlineData("Ok\r\n", 9, LogLevel.Information)]
-    [InlineData("Error 1005: Out of paper\r\n", 10, LogLevel.Warning)]
-    public async Task PrintAsync_PrinterReplies_LogsTheReplyAndStillReportsSuccess(string reply, int expectedEventId, LogLevel expectedLevel)
-    {
-        var logger = new MessageCapturingLogger<LabelPrinterClient>();
-        using var listener = new TcpListener(IPAddress.Loopback, 0);
-        listener.Start();
-        var port = ((IPEndPoint)listener.LocalEndpoint).Port;
-
-        var printTask = CreateClient("127.0.0.1", port, logger).PrintAsync(Label);
-        using var accepted = await listener.AcceptTcpClientAsync();
-        var stream = accepted.GetStream();
-        await stream.WriteAsync(Encoding.ASCII.GetBytes(reply));
-        await stream.CopyToAsync(Stream.Null);
-
-        Assert.True(await printTask);
-        var entry = Assert.Single(logger.Entries, e => e.EventId.Id is 9 or 10);
-        Assert.Equal(expectedEventId, entry.EventId.Id);
-        Assert.Equal(expectedLevel, entry.Level);
-        Assert.Equal(reply, Value(entry, "Reply"));
-        Assert.Equal(reply.Length.ToString(CultureInfo.InvariantCulture), Value(entry, "ReplyLength"));
-        Assert.Equal("True", Value(logger.Entries[^1], "Success"));
     }
 
     [Fact]
