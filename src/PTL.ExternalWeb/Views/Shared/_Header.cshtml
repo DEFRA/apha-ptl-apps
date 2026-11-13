@@ -8,14 +8,14 @@
 @{
     var isSignedIn = User.Identity is not null && User.Identity.IsAuthenticated;
 
-    // Sign out must stay a form post (CSRF); it sits in the top bar with Menu, CIDM account and User Manual.
+    // Sign out must stay a form post (CSRF); it sits in the top bar with Menu, VETQAS Account and User Manual.
     Func<dynamic, IHtmlContent> signOutForm = @<form asp-controller="Account" asp-action="Logout" method="post" class="app-signout-form">
         @Html.AntiForgeryToken()
         <button type="submit" class="app-signout-button">Sign out</button>
     </form>;
     IHtmlContent? signOut = isSignedIn ? signOutForm(0) : null;
 }
-<govuk-page-header service-name="@Model.ServiceName" logo-style="@Model.LogoStyle" logo-url="~/images/apha-scientific-logo.png" logo-alt="APHA Scientific" secondary-logo-url="~/images/vetqas-logo.jpg" secondary-logo-alt="VETQAS" secondary-logo-style="width:70px; height:auto;" show-menu-toggle="@isSignedIn" account-link-text="@(isSignedIn ? "CIDM account" : null)" account-link-href="@CidmOptionsAccessor.Value.AccountPortalUrl" help-link-text="User Manual" help-link-href="/documents/User Manual.pdf" extra-actions="@signOut">
+<govuk-page-header service-name="@Model.ServiceName" logo-style="@Model.LogoStyle" logo-url="~/images/apha-scientific-logo.png" logo-alt="APHA Scientific" secondary-logo-url="~/images/vetqas-logo.jpg" secondary-logo-alt="VETQAS" secondary-logo-style="width:70px; height:auto;" show-menu-toggle="@isSignedIn" account-link-text="@(isSignedIn ? "VETQAS Account" : null)" account-link-href="@CidmOptionsAccessor.Value.AccountPortalUrl" help-link-text="User Manual" help-link-href="/documents/User Manual.pdf" extra-actions="@signOut">
     @if (User.Identity is not null && User.Identity.IsAuthenticated)
     {
         // CIDM's id_token has no "name" claim without the "profile" scope, so the resolved
