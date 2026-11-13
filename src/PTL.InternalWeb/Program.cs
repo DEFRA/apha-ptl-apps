@@ -10,6 +10,7 @@ using PTL.Core.Contract.Document;
 using PTL.Core.User;
 using PTL.InternalWeb.Authorization;
 using PTL.InternalWeb.Features.Account;
+using PTL.InternalWeb.Features.LoadTesting;
 using PTL.InternalWeb.Features.SystemAdministration;
 using PTL.InternalWeb.Infrastructure;
 
@@ -17,6 +18,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.AddPtlWebFrontEnd();
 builder.AddEntraAuthentication();
 builder.Services.AddScoped<IEntraInternalUserResolver, InternalUserResolver>();
+builder.AddLoadTesting();
 
 // Client-side inactivity warning (see _SessionTimeoutWarning.cshtml/session-timeout.js) - a UX/
 // security layer independent of the 14-day sliding auth cookie and Entra token refresh above.
