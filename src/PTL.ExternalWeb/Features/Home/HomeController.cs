@@ -22,8 +22,7 @@ public class HomeController(IApiClient apiClient, ISystemMessageApiClient system
         return View(new HomeIndexViewModel(
             displayName,
             User.GetResolvedExternalRoles(),
-            // Rows saved before the save-time decode fix hold entity-escaped HTML; decoding here repairs them without a data patch.
-            importantMessage.ImportantMessage is { } stored ? WebUtility.HtmlDecode(stored) : null,
+            DecodeStoredHtml(importantMessage.ImportantMessage),
             eligibility.CanCreateCurrentYearOrder,
             eligibility.CanCreateNextYearOrder,
             eligibility.CurrentYear,
@@ -44,6 +43,9 @@ public class HomeController(IApiClient apiClient, ISystemMessageApiClient system
     public async Task<IActionResult> Information()
     {
         var message = await systemMessageApiClient.GetMessageAsync(HttpContext.RequestAborted);
-        return View(new InformationViewModel(message.Message));
+        return View(new InformationViewModel(DecodeStoredHtml(message.Message)));
     }
+
+    // Rows saved before the save-time decode fix hold entity-escaped HTML; decoding here repairs them without a data patch.
+    private static string? DecodeStoredHtml(string? stored) => stored is null ? null : WebUtility.HtmlDecode(stored);
 }
