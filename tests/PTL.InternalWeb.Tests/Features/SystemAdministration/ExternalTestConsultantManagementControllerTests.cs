@@ -184,6 +184,64 @@ public class ExternalTestConsultantManagementControllerTests
     }
 
     [Fact]
+    public async Task Add_WithANameAlreadyOnThePage_IsRejectedIgnoringCaseAndSpacesAndAddsNoRow()
+    {
+        var (controller, api) = Arrange();
+        var model = Page(Row(IdA, "Alan"));
+        model.Add = new ExternalTestConsultantAddViewModel { Name = "  aLAN ", Email = "other@example.com" };
+
+        var result = PageModel(await Post(controller, model, PendingListCommands.Add));
+
+        Assert.Single(result.Rows);
+        Assert.Equal("This external test consultant already exists. Please try with a different name.", controller.ModelState["Add.Name"]!.Errors[0].ErrorMessage);
+        AssertNothingWritten(api);
+    }
+
+    [Fact]
+    public async Task Add_WithTheNameOfARowThatWasRemoved_IsAllowed()
+    {
+        var (controller, _) = Arrange();
+        var removed = Row(IdA, "Alan");
+        removed.IsRemoved = true;
+        var model = Page(removed);
+        model.Add = new ExternalTestConsultantAddViewModel { Name = "Alan", Email = "alan2@example.com" };
+
+        var result = PageModel(await Post(controller, model, PendingListCommands.Add));
+
+        Assert.Equal(2, result.Rows.Count);
+        Assert.True(controller.ModelState.IsValid);
+    }
+
+    [Fact]
+    public async Task Update_RenamingToAnotherRowsName_IsRejectedAndKeepsTheRowInEditMode()
+    {
+        var (controller, _) = Arrange();
+        var model = Page(Row(IdA, "Alan"), Row(IdB, "Zoe"));
+        model.EditIndex = 1;
+        model.Edit = new ExternalTestConsultantEditViewModel { Name = "alan", Email = "zoe@example.com" };
+
+        var result = PageModel(await Post(controller, model, PendingListCommands.Update, 1));
+
+        Assert.Equal(1, result.EditIndex);
+        Assert.Equal("Zoe", result.Rows[1].Name);
+        Assert.Equal("This external test consultant already exists. Please try with a different name.", controller.ModelState["Edit.Name"]!.Errors[0].ErrorMessage);
+    }
+
+    [Fact]
+    public async Task Update_KeepingItsOwnNameWithAnotherCase_IsAllowed()
+    {
+        var (controller, _) = Arrange();
+        var model = Page(Row(IdA, "Alan"), Row(IdB, "Zoe"));
+        model.EditIndex = 0;
+        model.Edit = new ExternalTestConsultantEditViewModel { Name = "ALAN", Email = "alan@example.com" };
+
+        var result = PageModel(await Post(controller, model, PendingListCommands.Update, 0));
+
+        Assert.Equal("ALAN", result.Rows[0].Name);
+        Assert.True(controller.ModelState.IsValid);
+    }
+
+    [Fact]
     public async Task Submit_WithNoRowInEditMode_BehavesAsAdd()
     {
         var (controller, _) = Arrange();
@@ -442,7 +500,9 @@ public class ExternalTestConsultantManagementControllerTests
         var result = PageModel(await Post(controller, model, PendingListCommands.Save));
 
         Assert.True(result.Rows[0].IsRemoved);
-        Assert.Equal("Alan: This external test consultant is being used on: 1 scheme(s).", controller.ModelState["Rows"]!.Errors[0].ErrorMessage);
+        Assert.Equal("Alan: This external test consultant is being used on: 1 scheme(s).", result.Message);
+        Assert.True(result.MessageIsError);
+        Assert.True(controller.ModelState.IsValid);
         Assert.Null(controller.TempData.GetNotification());
     }
 
@@ -454,9 +514,10 @@ public class ExternalTestConsultantManagementControllerTests
         var model = Page(Row(IdA, "Alan"));
         model.Rows[0].IsRemoved = true;
 
-        PageModel(await Post(controller, model, PendingListCommands.Save));
+        var result = PageModel(await Post(controller, model, PendingListCommands.Save));
 
-        Assert.Equal("Alan: The external test consultant could not be removed.", controller.ModelState["Rows"]!.Errors[0].ErrorMessage);
+        Assert.Equal("Alan: The external test consultant could not be removed.", result.Message);
+        Assert.True(result.MessageIsError);
     }
 
     [Fact]
@@ -483,9 +544,10 @@ public class ExternalTestConsultantManagementControllerTests
         api.SaveResult = new ExternalTestConsultantSaveResult(false, null, new Dictionary<string, string[]>());
         var model = Page(Row(null, "Grace"));
 
-        PageModel(await Post(controller, model, PendingListCommands.Save));
+        var result = PageModel(await Post(controller, model, PendingListCommands.Save));
 
-        Assert.Equal("Grace: The external test consultant could not be saved.", controller.ModelState["Rows"]!.Errors[0].ErrorMessage);
+        Assert.Equal("Grace: The external test consultant could not be saved.", result.Message);
+        Assert.True(result.MessageIsError);
     }
 
     [Fact]
@@ -495,9 +557,10 @@ public class ExternalTestConsultantManagementControllerTests
         api.SetStatusResult = new ExternalTestConsultantSaveResult(false, null, new Dictionary<string, string[]> { [string.Empty] = ["This external test consultant is being used on: 1 scheme(s)."] });
         var model = Page(Row(IdA, "Alan", isInactive: true));
 
-        PageModel(await Post(controller, model, PendingListCommands.Save));
+        var result = PageModel(await Post(controller, model, PendingListCommands.Save));
 
-        Assert.Equal("Alan: This external test consultant is being used on: 1 scheme(s).", controller.ModelState["Rows"]!.Errors[0].ErrorMessage);
+        Assert.Equal("Alan: This external test consultant is being used on: 1 scheme(s).", result.Message);
+        Assert.True(result.MessageIsError);
         Assert.Null(controller.TempData.GetNotification());
     }
 

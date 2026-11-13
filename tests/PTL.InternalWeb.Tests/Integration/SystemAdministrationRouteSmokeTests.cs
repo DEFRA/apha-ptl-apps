@@ -357,19 +357,18 @@ public partial class SystemAdministrationRouteSmokeTests : IClassFixture<WebAppl
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 
-    // Cancel on both edit screens is a button of a separate GET form that goes to the section landing page.
+    // Cancel on both edit screens is a link to the section landing page.
     [Fact]
-    public async Task ExternalSiteManagement_Cancel_IsAButtonThatGoesToTheSystemAdministrationIndex()
+    public async Task ExternalSiteManagement_Cancel_IsALinkToTheSystemAdministrationIndex()
     {
         var body = await _factory.CreateClient().GetStringAsync("/SystemAdministration/ExternalSiteManagement");
 
-        Assert.Matches("<button[^>]*form=\"external-site-cancel-form\"[^>]*>Cancel</button>", body);
-        Assert.Matches("<form id=\"external-site-cancel-form\" method=\"get\" action=\"/SystemAdministration(/Index)?\"></form>", body);
-        Assert.DoesNotContain(">Cancel</a>", body, StringComparison.Ordinal);
+        Assert.Matches("<a class=\"govuk-button govuk-button--secondary\"[^>]*href=\"/SystemAdministration(/Index)?\">Cancel</a>", body);
+        Assert.DoesNotContain("external-site-cancel-form", body, StringComparison.Ordinal);
     }
 
     [Fact]
-    public async Task AdministrationCharge_Cancel_IsAButtonThatGoesToTheSystemAdministrationIndex()
+    public async Task AdministrationCharge_Cancel_IsALinkToTheSystemAdministrationIndex()
     {
         var factory = _factory.WithWebHostBuilder(builder =>
             builder.ConfigureServices(services =>
@@ -383,9 +382,8 @@ public partial class SystemAdministrationRouteSmokeTests : IClassFixture<WebAppl
 
         var body = await factory.CreateClient().GetStringAsync("/SystemAdministration/AdministrationCharge");
 
-        Assert.Matches("<button[^>]*form=\"administration-charge-cancel-form\"[^>]*>Cancel</button>", body);
-        Assert.Matches("<form id=\"administration-charge-cancel-form\" method=\"get\" action=\"/SystemAdministration(/Index)?\"></form>", body);
-        Assert.DoesNotContain(">Cancel</a>", body, StringComparison.Ordinal);
+        Assert.Matches("<a class=\"govuk-button govuk-button--secondary\"[^>]*href=\"/SystemAdministration(/Index)?\">Cancel</a>", body);
+        Assert.DoesNotContain("administration-charge-cancel-form", body, StringComparison.Ordinal);
     }
 
     // Locks in that the saved Further Information/Important Message content actually renders
@@ -534,7 +532,7 @@ public partial class SystemAdministrationRouteSmokeTests : IClassFixture<WebAppl
     }
 
     [Fact]
-    public async Task CreateUserSearch_Post_DirectoryFails_RendersProblemInErrorSummary()
+    public async Task CreateUserSearch_Post_DirectoryFails_ShowsAnErrorBannerOnAFreshPage()
     {
         var factory = _factory.WithWebHostBuilder(builder =>
             builder.ConfigureServices(services =>
@@ -559,9 +557,9 @@ public partial class SystemAdministrationRouteSmokeTests : IClassFixture<WebAppl
         var body = await response.Content.ReadAsStringAsync();
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.Contains("govuk-error-summary", body, StringComparison.Ordinal);
         Assert.Contains("problem searching the staff directory", body, StringComparison.Ordinal);
-        Assert.Contains("<title>Error:", body, StringComparison.Ordinal);
+        Assert.Contains("govuk-notification-banner", body, StringComparison.Ordinal);
+        Assert.DoesNotContain("govuk-error-summary", body, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -706,7 +704,8 @@ public partial class SystemAdministrationRouteSmokeTests : IClassFixture<WebAppl
             Content = new FormUrlEncodedContent(new Dictionary<string, string>
             {
                 ["__RequestVerificationToken"] = token,
-                ["SelectedUserId"] = userId.ToString()
+                ["SelectedUserId"] = userId.ToString(),
+                ["confirmation"] = "confirm"
             })
         };
         request.Headers.Add("Cookie", cookie);
@@ -716,6 +715,41 @@ public partial class SystemAdministrationRouteSmokeTests : IClassFixture<WebAppl
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Contains("User Removed Successfully", body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task RemoveUser_Post_NotConfirmed_RendersTheConfirmationPageAndKeepsTheSelection()
+    {
+        var userId = Guid.NewGuid();
+        var userApiClient = new FakeUserApiClient();
+        var factory = _factory.WithWebHostBuilder(builder =>
+            builder.ConfigureServices(services =>
+            {
+                services.RemoveAll<IUserApiClient>();
+                services.AddSingleton<IUserApiClient>(userApiClient);
+            }));
+        var client = factory.CreateClient();
+        var (token, cookie) = await GetAntiforgeryAsync(client, "/SystemAdministration/RemoveUser");
+
+        var request = new HttpRequestMessage(HttpMethod.Post, "/SystemAdministration/RemoveUser")
+        {
+            Content = new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["__RequestVerificationToken"] = token,
+                ["SelectedUserId"] = userId.ToString()
+            })
+        };
+        request.Headers.Add("Cookie", cookie);
+
+        var response = await client.SendAsync(request);
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("revoke all of their application access", body, StringComparison.Ordinal);
+        Assert.Contains($"name=\"SelectedUserId\" value=\"{userId}\"", body, StringComparison.Ordinal);
+        Assert.Matches("<a class=\"govuk-button govuk-button--secondary\"[^>]*href=\"/SystemAdministration/RemoveUser\">Cancel</a>", body);
+        Assert.DoesNotContain("onclick=", body, StringComparison.Ordinal);
+        Assert.Empty(userApiClient.RemoveCalls);
     }
 
     [Fact]

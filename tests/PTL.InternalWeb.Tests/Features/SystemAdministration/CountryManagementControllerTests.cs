@@ -593,7 +593,9 @@ public class CountryManagementControllerTests
         Assert.Equal(["Germany", "Spain"], page.Rows.Select(r => r.Country));
         Assert.True(page.Rows[0].IsRemoved);
         Assert.False(page.Rows[1].IsRemoved);
-        Assert.Equal(["Germany: Germany is in use."], controller.ModelState["Rows"]!.Errors.Select(e => e.ErrorMessage));
+        Assert.Equal("Germany: Germany is in use.", page.Message);
+        Assert.True(page.MessageIsError);
+        Assert.True(controller.ModelState.IsValid);
         Assert.Null(controller.TempData.GetNotification());
         Assert.Equal("Spain", Assert.Single(api.CreateRequests).Country);
     }
@@ -609,7 +611,8 @@ public class CountryManagementControllerTests
         var page = PageModel(await controller.CountryManagement(model, PendingListCommands.Save, null, CancellationToken.None));
 
         Assert.True(Assert.Single(page.Rows).IsRemoved);
-        Assert.Equal("France: The country could not be removed.", Assert.Single(controller.ModelState["Rows"]!.Errors).ErrorMessage);
+        Assert.Equal("France: The country could not be removed.", page.Message);
+        Assert.True(page.MessageIsError);
         Assert.Null(controller.TempData.GetNotification());
     }
 

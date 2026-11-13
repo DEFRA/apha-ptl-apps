@@ -29,6 +29,9 @@ public sealed record ConfirmationPageViewModel
     // Cancel posts that form back with confirmation=cancel and the action redisplays it unchanged.
     public string? CancelUrl { get; init; }
 
+    // Renders a CancelUrl Cancel as a grey secondary button, matching pages that use buttons rather than links.
+    public bool CancelAsButton { get; init; }
+
     public string PostUrl { get; init; } = string.Empty;
 
     public IReadOnlyList<KeyValuePair<string, string>> Fields { get; init; } = [];

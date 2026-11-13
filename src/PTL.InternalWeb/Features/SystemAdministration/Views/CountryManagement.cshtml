@@ -148,6 +148,6 @@
 
     <div class="govuk-button-group">
         <button class="govuk-button" data-module="govuk-button" type="submit" formaction="@ButtonUrl(PendingListCommands.Save)">Save</button>
-        <button class="govuk-button govuk-button--secondary" data-module="govuk-button" type="submit" formnovalidate formaction="@ButtonUrl(PendingListCommands.Cancel)">Cancel</button>
+        <a class="govuk-button govuk-button--secondary" data-module="govuk-button" href="@Url.Action("Index")">Cancel</a>
     </div>
 </form>

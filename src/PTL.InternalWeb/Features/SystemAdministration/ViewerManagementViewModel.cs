@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Mvc.ModelBinding;
 
 namespace PTL.InternalWeb.Features.SystemAdministration;
 
-public sealed class ViewerManagementViewModel
+public sealed class ViewerManagementViewModel : IPendingListMessage
 {
     // Legacy held this list in ViewState until the page-level Save/Apply wrote it to the database;
     // here it is round-tripped through the page's form (Rows[i].*) instead.

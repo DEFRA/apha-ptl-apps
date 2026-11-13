@@ -55,7 +55,8 @@ public class SystemAdministrationControllerTests
             staffDirectoryService ?? new FakeStaffDirectoryService(),
             NullLogger<SystemAdministrationController>.Instance)
         {
-            TempData = new TempDataDictionary(new DefaultHttpContext(), new FakeTempDataProvider())
+            TempData = new TempDataDictionary(new DefaultHttpContext(), new FakeTempDataProvider()),
+            Url = new FakeUrlHelper()
         };
 
     [Fact]
@@ -696,18 +697,18 @@ public class SystemAdministrationControllerTests
     }
 
     [Fact]
-    public async Task CreateUserSearch_NoResults_ShowsNoValidResultsMessage()
+    public async Task CreateUserSearch_NoResults_RedirectsToAFreshPageWithAnInformationBanner()
     {
         var controller = CreateController(staffDirectoryService: new FakeStaffDirectoryService());
         var model = new CreateUserViewModel { SearchTerm = "nobody" };
 
         var result = await controller.CreateUserSearch(model, CancellationToken.None);
 
-        var view = Assert.IsType<ViewResult>(result);
-        var resultModel = Assert.IsType<CreateUserViewModel>(view.Model);
-        Assert.Equal("No valid search results found", resultModel.Message);
-        Assert.True(resultModel.HasSearched);
-        Assert.Empty(resultModel.ResultOptions);
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal(nameof(SystemAdministrationController.CreateUser), redirect.ActionName);
+        var notification = controller.TempData.GetNotification();
+        Assert.Equal(NotificationType.Information, notification!.Type);
+        Assert.Equal("No valid search results found", notification.Message);
     }
 
     // Legacy GetADList: a person who already has a PT-LIMS account is not offered.
@@ -732,7 +733,7 @@ public class SystemAdministrationControllerTests
     }
 
     [Fact]
-    public async Task CreateUserSearch_EveryMatchAlreadyHasAnAccount_ShowsNoValidResultsMessage()
+    public async Task CreateUserSearch_EveryMatchAlreadyHasAnAccount_RedirectsWithTheNoValidResultsBanner()
     {
         var directory = new FakeStaffDirectoryService { Results = [new StaffDirectoryUser { Username = "m100001", FriendlyName = "Jane Smith" }] };
         var userApiClient = new FakeUserApiClient { Users = [new UserResponse(Guid.NewGuid(), "m100001", "Jane Smith", "Jane", "Smith", "jane@apha.gov.uk", "Science", false, null, 0, string.Empty)] };
@@ -740,13 +741,25 @@ public class SystemAdministrationControllerTests
 
         var result = await controller.CreateUserSearch(new CreateUserViewModel { SearchTerm = "jane" }, CancellationToken.None);
 
-        var resultModel = Assert.IsType<CreateUserViewModel>(Assert.IsType<ViewResult>(result).Model);
-        Assert.Equal("No valid search results found", resultModel.Message);
-        Assert.Empty(resultModel.ResultOptions);
+        Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal("No valid search results found", controller.TempData.GetNotification()!.Message);
     }
 
     [Fact]
-    public async Task CreateUserSearch_TruncatedResults_ShowsRefineYourSearchMessage()
+    public async Task CreateUserSearch_TruncatedButNothingLeftAfterFiltering_StillSaysNoValidResultsFound()
+    {
+        var directory = new FakeStaffDirectoryService { Results = [new StaffDirectoryUser { Username = "m100001", FriendlyName = "Jane Smith" }], IsTruncated = true };
+        var userApiClient = new FakeUserApiClient { Users = [new UserResponse(Guid.NewGuid(), "m100001", "Jane Smith", "Jane", "Smith", "jane@apha.gov.uk", "Science", false, null, 0, string.Empty)] };
+        var controller = CreateController(userApiClient: userApiClient, staffDirectoryService: directory);
+
+        var result = await controller.CreateUserSearch(new CreateUserViewModel { SearchTerm = "jane" }, CancellationToken.None);
+
+        Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal("No valid search results found", controller.TempData.GetNotification()!.Message);
+    }
+
+    [Fact]
+    public async Task CreateUserSearch_TruncatedResults_ShowsRefineYourSearchBannerWithTheResults()
     {
         var directory = new FakeStaffDirectoryService
         {
@@ -759,7 +772,9 @@ public class SystemAdministrationControllerTests
 
         var resultModel = Assert.IsType<CreateUserViewModel>(Assert.IsType<ViewResult>(result).Model);
         Assert.Single(resultModel.ResultOptions);
-        Assert.Contains("narrow your search", resultModel.Message, StringComparison.Ordinal);
+        var notification = controller.TempData.GetNotification();
+        Assert.Equal(NotificationType.Information, notification!.Type);
+        Assert.Contains("narrow your search", notification.Message, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -786,28 +801,29 @@ public class SystemAdministrationControllerTests
 
     [Theory]
     [MemberData(nameof(DirectoryFailures))]
-    public async Task CreateUserSearch_DirectoryFails_ShowsProblemInErrorSummaryInsteadOfThrowing(Exception failure)
+    public async Task CreateUserSearch_DirectoryFails_RedirectsWithAnErrorBannerInsteadOfThrowing(Exception failure)
     {
         var controller = CreateController(staffDirectoryService: new FakeStaffDirectoryService { Exception = failure });
 
         var result = await controller.CreateUserSearch(new CreateUserViewModel { SearchTerm = "jane" }, CancellationToken.None);
 
-        var view = Assert.IsType<ViewResult>(result);
-        var resultModel = Assert.IsType<CreateUserViewModel>(view.Model);
-        Assert.False(resultModel.HasSearched);
-        var error = Assert.Single(controller.ModelState[string.Empty]!.Errors);
-        Assert.Contains("problem searching the staff directory", error.ErrorMessage, StringComparison.Ordinal);
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal(nameof(SystemAdministrationController.CreateUser), redirect.ActionName);
+        var notification = controller.TempData.GetNotification();
+        Assert.Equal(NotificationType.Error, notification!.Type);
+        Assert.Contains("problem searching the staff directory", notification.Message, StringComparison.Ordinal);
+        Assert.True(controller.ModelState.IsValid);
     }
 
     [Fact]
-    public async Task CreateUserSearch_RequestTimesOut_ShowsProblemInErrorSummaryInsteadOfThrowing()
+    public async Task CreateUserSearch_RequestTimesOut_RedirectsWithAnErrorBannerInsteadOfThrowing()
     {
         var controller = CreateController(staffDirectoryService: new FakeStaffDirectoryService { Exception = new TaskCanceledException("timeout") });
 
         var result = await controller.CreateUserSearch(new CreateUserViewModel { SearchTerm = "jane" }, CancellationToken.None);
 
-        Assert.IsType<ViewResult>(result);
-        Assert.False(controller.ModelState.IsValid);
+        Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal(NotificationType.Error, controller.TempData.GetNotification()!.Type);
     }
 
     [Fact]
@@ -937,9 +953,9 @@ public class SystemAdministrationControllerTests
 
         var result = await controller.CreateUserConfirm(model, CancellationToken.None);
 
-        Assert.IsType<ViewResult>(result);
+        Assert.IsType<RedirectToActionResult>(result);
         Assert.Null(apiClient.LastCreateRequest);
-        Assert.Contains(controller.ModelState[string.Empty]!.Errors, e => e.ErrorMessage.Contains("problem searching the staff directory", StringComparison.Ordinal));
+        Assert.Contains("problem searching the staff directory", controller.TempData.GetNotification()!.Message, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -1175,12 +1191,32 @@ public class SystemAdministrationControllerTests
         var controller = CreateController(userApiClient: userApiClient);
         var model = new RemoveUserViewModel { SelectedUserId = null };
 
-        var result = await controller.RemoveUser(model, CancellationToken.None);
+        var result = await controller.RemoveUser(model, null, CancellationToken.None);
 
         var view = Assert.IsType<ViewResult>(result);
         var resultModel = Assert.IsType<RemoveUserViewModel>(view.Model);
         Assert.True(resultModel.MessageIsError);
         Assert.Equal("Select a user to remove.", resultModel.Message);
+        Assert.Empty(userApiClient.RemoveCalls);
+    }
+
+    [Fact]
+    public async Task RemoveUser_Post_NotConfirmed_AsksOnTheConfirmationPageWithoutRemoving()
+    {
+        var userApiClient = new FakeUserApiClient();
+        var controller = CreateController(userApiClient: userApiClient);
+        var model = new RemoveUserViewModel { SelectedUserId = Guid.NewGuid() };
+
+        var result = await controller.RemoveUser(model, null, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        Assert.Equal(ConfirmationFlow.ViewName, view.ViewName);
+        var page = Assert.IsType<ConfirmationPageViewModel>(view.Model);
+        Assert.Equal("Remove User", page.Title);
+        Assert.Contains("revoke all of their application access", page.Message, StringComparison.Ordinal);
+        Assert.True(page.IsDestructive);
+        Assert.Contains(nameof(SystemAdministrationController.RemoveUser), page.CancelUrl, StringComparison.Ordinal);
+        Assert.True(page.CancelAsButton);
         Assert.Empty(userApiClient.RemoveCalls);
     }
 
@@ -1192,7 +1228,7 @@ public class SystemAdministrationControllerTests
         var controller = CreateController(userApiClient: userApiClient);
         var model = new RemoveUserViewModel { SelectedUserId = userId };
 
-        var result = await controller.RemoveUser(model, CancellationToken.None);
+        var result = await controller.RemoveUser(model, ConfirmationFlow.Confirmed, CancellationToken.None);
 
         var view = Assert.IsType<ViewResult>(result);
         var resultModel = Assert.IsType<RemoveUserViewModel>(view.Model);
@@ -1209,7 +1245,7 @@ public class SystemAdministrationControllerTests
         var controller = CreateController(userApiClient: userApiClient);
         var model = new RemoveUserViewModel { SelectedUserId = userId };
 
-        var result = await controller.RemoveUser(model, CancellationToken.None);
+        var result = await controller.RemoveUser(model, ConfirmationFlow.Confirmed, CancellationToken.None);
 
         var view = Assert.IsType<ViewResult>(result);
         var resultModel = Assert.IsType<RemoveUserViewModel>(view.Model);
@@ -1234,7 +1270,7 @@ public class SystemAdministrationControllerTests
         };
         var model = new RemoveUserViewModel { SelectedUserId = userId };
 
-        await controller.RemoveUser(model, CancellationToken.None);
+        await controller.RemoveUser(model, ConfirmationFlow.Confirmed, CancellationToken.None);
 
         Assert.Equal(signedInUserId, userApiClient.LastRemoveActingUserId);
     }
@@ -1247,7 +1283,7 @@ public class SystemAdministrationControllerTests
         var controller = CreateController(userApiClient: userApiClient);
         var model = new RemoveUserViewModel { SelectedUserId = userId };
 
-        await controller.RemoveUser(model, CancellationToken.None);
+        await controller.RemoveUser(model, ConfirmationFlow.Confirmed, CancellationToken.None);
 
         Assert.Null(userApiClient.LastRemoveActingUserId);
     }

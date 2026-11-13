@@ -44,8 +44,8 @@ public partial class TestConsultantPagesRenderTests : IClassFixture<WebApplicati
         {
             TestConsultants =
             [
-                new UserResponse(IdAlan, "m100001", "Alan Smith", "Alan", "Smith", "alan@apha.gov.uk", "Science", false, null),
-                new UserResponse(IdZoe, "m100002", "Zoe Jones", "Zoe", "Jones", "zoe@apha.gov.uk", "Virology", true, new DateTime(2026, 10, 8), 1, "Scheme A")
+                new UserResponse(IdAlan, "m100001", "Alan Jones", "Alan", "Jones", "alan@apha.gov.uk", "Science", false, null),
+                new UserResponse(IdZoe, "m100002", "Zoe Smith", "Zoe", "Smith", "zoe@apha.gov.uk", "Virology", true, new DateTime(2026, 10, 8), 1, "Scheme A")
             ]
         };
 
@@ -69,7 +69,6 @@ public partial class TestConsultantPagesRenderTests : IClassFixture<WebApplicati
         + $"\"[^>]*>{label}";
 
     private static string Hidden(string name, string value) => $"<input type=\"hidden\" name=\"{Regex.Escape(name)}\" value=\"{Regex.Escape(value)}\" />";
-
     private static KeyValuePair<string, string> Field(string name, string value) => new(name, value);
 
     private static List<KeyValuePair<string, string>> ExternalRows(params (Guid? Id, string Name, string Department, string Email, bool IsInactive)[] rows) =>
@@ -89,9 +88,9 @@ public partial class TestConsultantPagesRenderTests : IClassFixture<WebApplicati
 
     private static List<KeyValuePair<string, string>> SavedInternalRows() =>
     [
-        Field("Rows[0].UserId", IdAlan.ToString()), Field("Rows[0].Username", "m100001"), Field("Rows[0].FriendlyName", "Alan Smith"),
+        Field("Rows[0].UserId", IdAlan.ToString()), Field("Rows[0].Username", "m100001"), Field("Rows[0].FriendlyName", "Alan Jones"),
         Field("Rows[0].Department", "Science"), Field("Rows[0].IsInactive", "false"), Field("Rows[0].InactiveDate", string.Empty),
-        Field("Rows[1].UserId", IdZoe.ToString()), Field("Rows[1].Username", "m100002"), Field("Rows[1].FriendlyName", "Zoe Jones"),
+        Field("Rows[1].UserId", IdZoe.ToString()), Field("Rows[1].Username", "m100002"), Field("Rows[1].FriendlyName", "Zoe Smith"),
         Field("Rows[1].Department", "Virology"), Field("Rows[1].IsInactive", "true"), Field("Rows[1].InactiveDate", string.Empty)
     ];
 
@@ -125,7 +124,7 @@ public partial class TestConsultantPagesRenderTests : IClassFixture<WebApplicati
     [Theory]
     [InlineData(External)]
     [InlineData(Internal)]
-    public async Task Get_RendersActionsAsTheLastColumnWithSecondarySubmitButtonsAndNoLinksScriptOrBrowserDialogs(string page)
+    public async Task Get_RendersActionsAsTheLastColumnWithSecondarySubmitButtonsAndNoStatusColumnOrBrowserDialogs(string page)
     {
         var html = await _factory.CreateClient().GetStringAsync($"/SystemAdministration/{page}");
         var main = MainContent(html);
@@ -143,15 +142,14 @@ public partial class TestConsultantPagesRenderTests : IClassFixture<WebApplicati
         }
 
         Assert.Equal(1, headers.Count(h => h == "Actions"));
+        Assert.DoesNotContain("Status", headers);
         Assert.Matches(Button(page, "Edit", "edit", 0), main);
         Assert.Matches(Button(page, "Edit", "edit", 1), main);
         Assert.Matches(Button(page, "Active", "toggle", 0), main);
         Assert.Matches(Button(page, "Inactive", "toggle", 1), main);
         Assert.Matches(Button(page, "Save", "save", cssClass: "govuk-button\""), main);
-        Assert.Matches(Button(page, "Cancel", "cancel"), main);
-        Assert.Matches("formnovalidate[^>]*formaction=\"/SystemAdministration/" + page + "\\?command=cancel\"", main);
-        Assert.DoesNotMatch("<a[^>]*govuk-button", main);
-        Assert.DoesNotContain(">Edit</a>", main, StringComparison.Ordinal);
+        Assert.Matches("<a class=\"govuk-button govuk-button--secondary\"[^>]*href=\"/SystemAdministration(/Index)?\">Cancel</a>", main);
+        Assert.DoesNotContain("command=cancel\"", main, StringComparison.Ordinal);
         Assert.DoesNotContain("onclick", html, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("confirm(", html, StringComparison.Ordinal);
         Assert.DoesNotContain("alert(", html, StringComparison.Ordinal);
@@ -166,7 +164,7 @@ public partial class TestConsultantPagesRenderTests : IClassFixture<WebApplicati
         Assert.Matches(Button(External, "Remove", "remove", 0), main);
         Assert.Matches(Button(External, "Remove", "remove", 1), main);
         Assert.Matches(Button(External, "Apply", "apply"), main);
-        Assert.Matches("command=save\"[^>]*>Save</button>[\\s\\S]*command=apply\"[^>]*>Apply</button>[\\s\\S]*command=cancel\"[^>]*>Cancel</button>", main);
+        Assert.Matches("command=save\"[^>]*>Save</button>[\\s\\S]*command=apply\"[^>]*>Apply</button>[\\s\\S]*>Cancel</a>", main);
         Assert.Matches(Button(External, "Add", "add"), main);
         Assert.Matches("<table id=\"Rows\"", main);
         Assert.Matches(Hidden("Rows[0].ExternalTestConsultantId", IdAlan.ToString()), main);
@@ -341,7 +339,8 @@ public partial class TestConsultantPagesRenderTests : IClassFixture<WebApplicati
         var main = MainContent(await response.Content.ReadAsStringAsync());
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.Contains("govuk-error-summary", main, StringComparison.Ordinal);
+        Assert.Contains("govuk-notification-banner", main, StringComparison.Ordinal);
+        Assert.DoesNotContain("govuk-error-summary", main, StringComparison.Ordinal);
         Assert.Contains("Alan: Alan is still assigned.", main, StringComparison.Ordinal);
         Assert.Matches(Hidden("Rows[0].IsRemoved", "true"), main);
     }

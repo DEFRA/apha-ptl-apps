@@ -9,6 +9,7 @@ namespace PTL.Core.TestConsultant;
 public static partial class ExternalTestConsultantValidator
 {
     public const string NameRequiredMessage = "Enter a name";
+    public const string DuplicateNameMessage = "This external test consultant already exists. Please try with a different name.";
     public const string EmailRequiredMessage = "Enter an email address";
     public const string EmailInvalidMessage = "Enter an email address in the correct format";
 

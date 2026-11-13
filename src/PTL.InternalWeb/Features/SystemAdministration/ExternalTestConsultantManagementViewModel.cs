@@ -5,7 +5,7 @@ namespace PTL.InternalWeb.Features.SystemAdministration;
 
 // Manage External Test Consultants - legacy ManageExternalTCs.aspx. The list is held on the page (round-tripped
 // through the form, where legacy used ViewState) until the page-level Save/Apply writes it.
-public sealed class ExternalTestConsultantManagementViewModel
+public sealed class ExternalTestConsultantManagementViewModel : IPendingListMessage
 {
     public List<ExternalTestConsultantRowViewModel> Rows { get; set; } = [];
 
