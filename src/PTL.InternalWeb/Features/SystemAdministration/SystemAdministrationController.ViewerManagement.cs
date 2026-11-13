@@ -135,10 +135,10 @@ public partial class SystemAdministrationController
     private async Task<IActionResult> SaveViewersAsync(ViewerManagementViewModel model, bool leavePage, CancellationToken cancellationToken)
     {
         model.EditIndex = null;
-        await DeleteRemovedViewersAsync(model, cancellationToken);
+        var allRemoved = await DeleteRemovedViewersAsync(model, cancellationToken);
         await WriteChangedViewersAsync(model, cancellationToken);
 
-        if (!ModelState.IsValid || model.MessageIsError)
+        if (!allRemoved || !ModelState.IsValid)
         {
             return ViewerPage(model);
         }
@@ -203,8 +203,10 @@ public partial class SystemAdministrationController
         model.MessageIsError = true;
     }
 
-    private async Task DeleteRemovedViewersAsync(ViewerManagementViewModel model, CancellationToken cancellationToken)
+    // False when the API refused to remove a viewer (the reason is in the page banner).
+    private async Task<bool> DeleteRemovedViewersAsync(ViewerManagementViewModel model, CancellationToken cancellationToken)
     {
+        var allRemoved = true;
         foreach (var row in model.Rows.Where(r => r.IsRemoved).ToList())
         {
             var result = row.ViewerId is { } id
@@ -217,9 +219,12 @@ public partial class SystemAdministrationController
                 continue;
             }
 
+            allRemoved = false;
             LogViewerRemoveBlockedMessage(logger, row.ViewerId.GetValueOrDefault(), null);
             PendingList.AddOutcomeError(model, $"{row.Name}: {result.Message ?? "The viewer could not be removed."}");
         }
+
+        return allRemoved;
     }
 
     private async Task WriteChangedViewersAsync(ViewerManagementViewModel model, CancellationToken cancellationToken)

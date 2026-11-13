@@ -207,10 +207,10 @@ public partial class SystemAdministrationController
     private async Task<IActionResult> SaveExternalTestConsultantsAsync(ExternalTestConsultantManagementViewModel model, bool leavePage, CancellationToken cancellationToken)
     {
         model.EditIndex = null;
-        await DeleteRemovedExternalTestConsultantsAsync(model, cancellationToken);
-        await WriteChangedExternalTestConsultantsAsync(model, cancellationToken);
+        var allRemoved = await DeleteRemovedExternalTestConsultantsAsync(model, cancellationToken);
+        var allSaved = await WriteChangedExternalTestConsultantsAsync(model, cancellationToken);
 
-        if (!ModelState.IsValid || model.MessageIsError)
+        if (!allRemoved || !allSaved || !ModelState.IsValid)
         {
             return ExternalTestConsultantPage(model);
         }
@@ -282,8 +282,10 @@ public partial class SystemAdministrationController
         model.MessageIsError = true;
     }
 
-    private async Task DeleteRemovedExternalTestConsultantsAsync(ExternalTestConsultantManagementViewModel model, CancellationToken cancellationToken)
+    // False when the API refused to remove a consultant (the reason is in the page banner).
+    private async Task<bool> DeleteRemovedExternalTestConsultantsAsync(ExternalTestConsultantManagementViewModel model, CancellationToken cancellationToken)
     {
+        var allRemoved = true;
         foreach (var row in model.Rows.Where(r => r.IsRemoved).ToList())
         {
             var result = row.ExternalTestConsultantId is { } id
@@ -296,12 +298,17 @@ public partial class SystemAdministrationController
                 continue;
             }
 
+            allRemoved = false;
             PendingList.AddOutcomeError(model, $"{row.Name}: {result.Message ?? "The external test consultant could not be removed."}");
         }
+
+        return allRemoved;
     }
 
-    private async Task WriteChangedExternalTestConsultantsAsync(ExternalTestConsultantManagementViewModel model, CancellationToken cancellationToken)
+    // False when the API rejected any row or status change (field problems also land in the validation summary).
+    private async Task<bool> WriteChangedExternalTestConsultantsAsync(ExternalTestConsultantManagementViewModel model, CancellationToken cancellationToken)
     {
+        var allSaved = true;
         var persisted = (await externalTestConsultantApiClient.GetAllAsync(cancellationToken)).ToDictionary(c => c.ExternalTestConsultantId);
 
         foreach (var row in model.Rows.Where(r => !r.IsRemoved))
@@ -314,6 +321,7 @@ public partial class SystemAdministrationController
 
             if (!await SaveExternalTestConsultantDetailsAsync(model, row, stored, cancellationToken))
             {
+                allSaved = false;
                 continue;
             }
 
@@ -321,8 +329,11 @@ public partial class SystemAdministrationController
             {
                 var status = await externalTestConsultantApiClient.SetStatusAsync(savedId, row.IsInactive, cancellationToken);
                 AddExternalTestConsultantErrors(model, row, status);
+                allSaved &= status.Success;
             }
         }
+
+        return allSaved;
     }
 
     // Creates a new consultant or updates one whose name, department or email changed. False if the API rejected it.
