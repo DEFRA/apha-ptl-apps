@@ -4,16 +4,24 @@ using System.Text;
 namespace PTL.Core.Labels;
 
 // Converts a composed AddressLabel into Intermec/Honeywell Fingerprint (Direct Protocol) statements, the command
-// language the PC43t is configured with. Unlike ZPL, Fingerprint's origin is the bottom-left of the label and Y
-// increases upward, so the first line is placed near the top and each later line steps down. The 4in x 6in label at
-// 203 dpi is an assumption carried over from the previous layout - the media size configured on the printer must match.
+// language the PC43t is configured with. The layout reproduces legacy LabelBase.Print(): Arial 10pt text drawn from
+// the top-left of a 4in x 6in page (400 x 600 in 1/100 inch, from GetPrinterSettings). Fingerprint measures from the
+// bottom-left with Y increasing upward, so each line's Y is converted from a distance down the page.
 public static class FingerprintLabelFormatter
 {
     private const int DotsPerInch = 203;
-    private const int LabelHeightInches = 6;
-    private const int MarginDots = 40;
-    private const int FontHeightDots = 30;
-    private const int LineSpacingDots = 40;
+
+    // Legacy page height: 600 hundredths of an inch.
+    private const int LabelHeightDots = 6 * DotsPerInch;
+
+    // Legacy drew at X = 0.
+    private const int LeftDots = 0;
+
+    // GDI places Arial 10pt text with its baseline one ascent (0.905 em = 25.5 dots) below the top of the line,
+    // and steps each line by Arial's line height (1.149 em = 32.4 dots).
+    private const int FirstBaselineFromTopDots = 26;
+    private const int LineSpacingDots = 32;
+
     private const string FontName = "Swiss 721 BT";
     private const int FontSizePoints = 10;
     private const string NewLine = "\r\n";
@@ -22,19 +30,22 @@ public static class FingerprintLabelFormatter
     {
         ArgumentNullException.ThrowIfNull(label);
 
+        // VERBON makes the printer answer each statement with Ok or an error message; LabelPrinterClient logs the reply.
         var fingerprint = new StringBuilder();
         fingerprint.Append("INPUT ON").Append(NewLine);
+        fingerprint.Append("VERBON").Append(NewLine);
         fingerprint.Append("CLL").Append(NewLine);
         fingerprint.Append(CultureInfo.InvariantCulture, $"FT \"{FontName}\",{FontSizePoints}").Append(NewLine);
 
-        var y = (LabelHeightInches * DotsPerInch) - MarginDots - FontHeightDots;
+        var y = LabelHeightDots - FirstBaselineFromTopDots;
         foreach (var line in label.Lines)
         {
-            fingerprint.Append(CultureInfo.InvariantCulture, $"PP {MarginDots},{y}:PT {ToStringExpression(line)}").Append(NewLine);
+            fingerprint.Append(CultureInfo.InvariantCulture, $"PP {LeftDots},{y}:PT {ToStringExpression(line)}").Append(NewLine);
             y -= LineSpacingDots;
         }
 
         fingerprint.Append("PF").Append(NewLine);
+        fingerprint.Append("VERBOFF").Append(NewLine);
         fingerprint.Append("INPUT OFF").Append(NewLine);
         return Encoding.ASCII.GetBytes(fingerprint.ToString());
     }

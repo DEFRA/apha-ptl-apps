@@ -14,6 +14,10 @@ namespace PTL.Core.Labels;
 // printing failure, only for a null label.
 public sealed class LabelPrinterClient(IOptions<LabelPrinterOptions> options, ILogger<LabelPrinterClient> logger) : ILabelPrinterClient
 {
+    // Like legacy's PrinterDelay pause, this gives the printer time to take the job and answer before the connection closes.
+    private const int ReplyIdleTimeoutMilliseconds = 500;
+    private const int MaxReplyBytes = 4096;
+
     private static readonly Action<ILogger, Exception?> LogHostNotConfiguredMessage =
         LoggerMessage.Define(
             LogLevel.Error,
@@ -63,6 +67,18 @@ public sealed class LabelPrinterClient(IOptions<LabelPrinterOptions> options, IL
             new EventId(8, nameof(LogGeneratedPayloadMessage)),
             "Generated Fingerprint payload. Host={Host} Port={Port} PayloadLength={PayloadLength}\n{Payload}");
 
+    private static readonly Action<ILogger, string?, int, int, string, Exception?> LogPrinterReplyMessage =
+        LoggerMessage.Define<string?, int, int, string>(
+            LogLevel.Information,
+            new EventId(9, nameof(LogPrinterReplyMessage)),
+            "Printer reply received. Host={Host} Port={Port} ReplyLength={ReplyLength}\n{Reply}");
+
+    private static readonly Action<ILogger, string?, int, int, string, Exception?> LogPrinterReportedErrorMessage =
+        LoggerMessage.Define<string?, int, int, string>(
+            LogLevel.Warning,
+            new EventId(10, nameof(LogPrinterReportedErrorMessage)),
+            "Printer reported an error. Host={Host} Port={Port} ReplyLength={ReplyLength}\n{Reply}");
+
     public async Task<bool> PrintAsync(AddressLabel label, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(label);
@@ -95,6 +111,16 @@ public sealed class LabelPrinterClient(IOptions<LabelPrinterOptions> options, IL
             await stream.FlushAsync(cancellationToken);
             LogDataSentMessage(logger, settings.Host, settings.Port, payload.Length, null);
 
+            var reply = await ReadReplyAsync(stream, cancellationToken);
+            if (reply.Contains("error", StringComparison.OrdinalIgnoreCase))
+            {
+                LogPrinterReportedErrorMessage(logger, settings.Host, settings.Port, reply.Length, reply, null);
+            }
+            else
+            {
+                LogPrinterReplyMessage(logger, settings.Host, settings.Port, reply.Length, reply, null);
+            }
+
             LogPrintCompletedMessage(logger, true, settings.Host, settings.Port, null);
             return true;
         }
@@ -104,5 +130,42 @@ public sealed class LabelPrinterClient(IOptions<LabelPrinterOptions> options, IL
             LogPrintCompletedMessage(logger, false, settings.Host, settings.Port, null);
             return false;
         }
+    }
+
+    // Collects what the printer sends back (verbose mode) until it has been quiet for a moment. The job has already been
+    // sent, so a silent printer or a dropped connection here is not a print failure.
+    private static async Task<string> ReadReplyAsync(NetworkStream stream, CancellationToken cancellationToken)
+    {
+        using var reply = new MemoryStream();
+        var buffer = new byte[512];
+
+        while (reply.Length < MaxReplyBytes)
+        {
+            using var idle = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            idle.CancelAfter(ReplyIdleTimeoutMilliseconds);
+
+            int read;
+            try
+            {
+                read = await stream.ReadAsync(buffer, idle.Token);
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                break;
+            }
+            catch (Exception ex) when (ex is IOException or SocketException)
+            {
+                break;
+            }
+
+            if (read == 0)
+            {
+                break;
+            }
+
+            await reply.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
+        }
+
+        return Encoding.Latin1.GetString(reply.GetBuffer(), 0, (int)reply.Length);
     }
 }
