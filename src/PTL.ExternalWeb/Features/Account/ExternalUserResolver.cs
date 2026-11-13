@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Security.Claims;
 using Microsoft.Extensions.Logging;
 using Polly;
@@ -9,11 +10,11 @@ using PTL.Contracts.ExternalUser;
 namespace PTL.ExternalWeb.Features.Account;
 
 /// <summary>
-/// Resolves a CIDM-authenticated external user against PTL.Api's Participant/Viewer/Test
-/// Consultant tables, once per sign-in (called from <c>CidmOpenIdConnectEvents.TokenValidated</c>,
-/// before the local cookie is written). Adds <see cref="ExternalUserClaimTypes.DisplayName"/> and
-/// <see cref="ExternalUserClaimTypes.ResolvedRoles"/> so the landing page never needs to call
-/// PTL.Api again to know who the user is.
+/// Resolves a CIDM-authenticated external user against PTL.Api once per sign-in (called from
+/// <c>CidmOpenIdConnectEvents.TokenValidated</c>, before the local cookie is written). Only the CIDM contact id,
+/// email and name are sent - the user type and roles come from the PTL record PTL.Api matches, never from the
+/// token. Adds the <see cref="ExternalUserClaimTypes"/> claims so the landing page never needs to call PTL.Api
+/// again to know who the user is.
 /// </summary>
 /// <param name="externalUserApiClient">Calls PTL.Api's external-user resolve endpoint.</param>
 /// <param name="logger">Logs resolution failures so a sign-in landing on /Home/Error is diagnosable.</param>
@@ -26,25 +27,20 @@ public sealed partial class ExternalUserResolver(IExternalUserApiClient external
 
         // contactId is CIDM's stable identifier for the person, independent of which
         // organisation/relationship they're currently acting under.
-        if (!Guid.TryParse(principal.FindFirst(CidmClaimTypes.ContactId)?.Value, out var ssoIdExt))
+        if (!Guid.TryParse(principal.FindFirst(CidmClaimTypes.ContactId)?.Value, out var ssoIdExt) || ssoIdExt == Guid.Empty)
         {
             LogMissingContactIdClaim(CidmClaimTypes.ContactId);
-            return CidmExternalUserResolution.Deny("/Account/NotPermitted");
+            return CidmExternalUserResolution.Deny(NotPermittedReasons.PathFor());
         }
 
         var email = principal.FindFirst(ClaimTypes.Email)?.Value ?? principal.FindFirst("email")?.Value ?? string.Empty;
         var displayName = ResolveDisplayName(principal);
 
-        // CidmOpenIdConnectEvents.TokenValidated already added a standard ClaimTypes.Role claim for
-        // each raw CIDM role ("Participant", "Viewer", "Test Consultant", ...) before calling this
-        // resolver - a user can hold more than one simultaneously.
-        var cidmRoles = principal.FindAll(ClaimTypes.Role).Select(claim => claim.Value).Distinct().ToList();
-
         ResolveExternalUserResponse response;
         try
         {
             response = await externalUserApiClient.ResolveAsync(
-                new ResolveExternalUserRequest(ssoIdExt, email, displayName, cidmRoles),
+                new ResolveExternalUserRequest(ssoIdExt, email, displayName),
                 cancellationToken);
         }
         catch (Exception exception) when (exception is HttpRequestException or TaskCanceledException or ExecutionRejectedException or NotSupportedException)
@@ -59,20 +55,26 @@ public sealed partial class ExternalUserResolver(IExternalUserApiClient external
             return CidmExternalUserResolution.Deny("/Home/Error");
         }
 
-        // No CIDM role resolved to an existing record - nothing in PTL this person is permitted to
-        // use, so deny entirely rather than signing them into an app with no accessible data. The
-        // "inactive" reason is surfaced distinctly so NotPermitted can show clearer guidance when a
-        // record exists but is marked inactive, rather than the generic "no access at all" message.
-        if (response.Roles.Count == 0)
+        // The denial page only distinguishes "inactive" and "no active lab"; every other reason (no record, an
+        // ambiguous email, an email already linked to someone else) shows the same generic message, so the page
+        // never reveals whether an email address is known to PTL.
+        return response.Status switch
         {
-            var reason = response.HasInactiveMatch ? "?reason=inactive" : string.Empty;
-            return CidmExternalUserResolution.Deny($"/Account/NotPermitted{reason}");
-        }
+            ExternalUserResolutionStatus.Resolved => CidmExternalUserResolution.Allow(BuildClaims(response)),
+            ExternalUserResolutionStatus.Inactive => CidmExternalUserResolution.Deny(NotPermittedReasons.PathFor(NotPermittedReasons.Inactive)),
+            ExternalUserResolutionStatus.NoActiveLab => CidmExternalUserResolution.Deny(NotPermittedReasons.PathFor(NotPermittedReasons.NoActiveLab)),
+            _ => CidmExternalUserResolution.Deny(NotPermittedReasons.PathFor())
+        };
+    }
 
+    private static Dictionary<string, string> BuildClaims(ResolveExternalUserResponse response)
+    {
         var claims = new Dictionary<string, string>
         {
             [ExternalUserClaimTypes.DisplayName] = response.DisplayName,
-            [ExternalUserClaimTypes.ResolvedRoles] = string.Join(',', response.Roles)
+            [ExternalUserClaimTypes.ResolvedRoles] = string.Join(',', response.Roles),
+            [ExternalUserClaimTypes.UserType] = $"{response.UserType}",
+            [ExternalUserClaimTypes.LabCount] = response.Labs.Count.ToString(CultureInfo.InvariantCulture)
         };
 
         if (!string.IsNullOrWhiteSpace(response.LabCode))
@@ -85,38 +87,37 @@ public sealed partial class ExternalUserResolver(IExternalUserApiClient external
             claims[ExternalUserClaimTypes.CanOrderOnline] = "true";
         }
 
-        if (response.ParticipantId is { } participantId)
-        {
-            claims[ExternalUserClaimTypes.ParticipantId] = participantId.ToString();
-        }
+        AddId(claims, ExternalUserClaimTypes.ParticipantId, response.ParticipantId);
+        AddId(claims, ExternalUserClaimTypes.ViewerId, response.ViewerId);
+        AddId(claims, ExternalUserClaimTypes.TestConsultantId, response.TestConsultantId);
+        AddId(claims, ExternalUserClaimTypes.LabUserId, response.LabUserId);
 
-        if (response.ViewerId is { } viewerId)
-        {
-            claims[ExternalUserClaimTypes.ViewerId] = viewerId.ToString();
-        }
+        return claims;
+    }
 
-        if (response.TestConsultantId is { } testConsultantId)
+    private static void AddId(Dictionary<string, string> claims, string claimType, Guid? id)
+    {
+        if (id is { } value)
         {
-            claims[ExternalUserClaimTypes.TestConsultantId] = testConsultantId.ToString();
+            claims[claimType] = value.ToString();
         }
-
-        return CidmExternalUserResolution.Allow(claims);
     }
 
     // CIDM's display-name claim set isn't fully confirmed for PT-LIMS's registration, so this
     // tries the same conventions CDC's resolver tries (firstName/lastName), then falls back to
-    // more standard OIDC claim names, before giving up to an empty string.
+    // more standard OIDC claim names, before giving up to an empty string. Capped to what PTL.Api accepts.
     private static string ResolveDisplayName(ClaimsPrincipal principal)
     {
         var firstName = principal.FindFirst("firstName")?.Value ?? principal.FindFirst(ClaimTypes.GivenName)?.Value;
         var lastName = principal.FindFirst("lastName")?.Value ?? principal.FindFirst(ClaimTypes.Surname)?.Value;
         var fullName = string.Join(' ', new[] { firstName, lastName }.Where(part => !string.IsNullOrWhiteSpace(part)));
-        if (!string.IsNullOrWhiteSpace(fullName))
-        {
-            return fullName;
-        }
+        var displayName = !string.IsNullOrWhiteSpace(fullName)
+            ? fullName
+            : principal.FindFirst("name")?.Value ?? principal.FindFirst(ClaimTypes.Name)?.Value ?? string.Empty;
 
-        return principal.FindFirst("name")?.Value ?? principal.FindFirst(ClaimTypes.Name)?.Value ?? string.Empty;
+        return displayName.Length > ResolveExternalUserRequest.MaxDisplayNameLength
+            ? displayName[..ResolveExternalUserRequest.MaxDisplayNameLength]
+            : displayName;
     }
 
     [LoggerMessage(Level = LogLevel.Error, Message = "Failed to resolve external user (SsoIdExt={SsoIdExt}) against PTL.Api")]

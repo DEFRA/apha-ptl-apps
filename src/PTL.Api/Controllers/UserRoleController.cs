@@ -57,7 +57,7 @@ public sealed class UserRoleController(IUserRoleService userRoleService) : Contr
             return ValidationProblem(ModelState);
         }
 
-        var rows = request.Items.Select(i => (i.UserId, (IReadOnlyList<Guid>)i.RoleIds)).ToList();
+        var rows = request.Items.Select(i => (i.UserId, i.RoleIds)).ToList();
         var results = await userRoleService.SetUserRolesBatchAsync(rows, request.ActingUserId, cancellationToken);
         return Ok(new SetUserRolesBatchResponse(results.Select(r => new ContractsSetUserRolesItemResult(r.UserId, r.Success, r.Message)).ToList()));
     }

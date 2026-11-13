@@ -932,7 +932,7 @@ public class ContractController(IContractApiClient contractApiClient, ICustomerA
         ArgumentNullException.ThrowIfNull(result.Contract);
         LogCreatedContractMessage(logger, result.Contract.ContractId, null);
         TempData.SetNotification(NotificationType.Success, "Contract created successfully.");
-        return RedirectToAction(nameof(Details), new { id = result.Contract.ContractId });
+        return RedirectToAction(nameof(Index), new { customerId });
     }
 
     [HttpGet]
@@ -974,7 +974,7 @@ public class ContractController(IContractApiClient contractApiClient, ICustomerA
 
         LogUpdatedContractMessage(logger, id, null);
         TempData.SetNotification(NotificationType.Success, "Contract updated successfully.");
-        return RedirectToAction(nameof(Details), new { id });
+        return RedirectToAction(nameof(Index), new { customerId = result.Contract?.CustomerId ?? model.CustomerId.GetValueOrDefault() });
     }
 
     // Review Pending Orders (legacy ReviewPendingOrders.aspx) - two grids, current and next year.

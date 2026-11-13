@@ -38,6 +38,10 @@ public sealed class ViewerRowViewModel
 
     public string Email { get; set; } = string.Empty;
 
+    // Whether the login instructions email has been sent to the saved address. Cleared on the page as soon as the
+    // email address is edited, and again by the database when the new address is saved.
+    public bool LoginInstructionsSent { get; set; }
+
     // Removed on this page but not yet deleted: the delete happens with the page-level Save/Apply.
     public bool IsRemoved { get; set; }
 

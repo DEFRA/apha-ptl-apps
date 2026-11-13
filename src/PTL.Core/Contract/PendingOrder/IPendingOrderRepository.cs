@@ -28,6 +28,10 @@ public interface IPendingOrderRepository
     // spuPendingContractByPendingContractID - persists the purchase order number before approval.
     Task UpdatePurchaseOrderNumberAsync(Guid pendingContractId, string purchaseOrderNumber, CancellationToken cancellationToken = default);
 
+    // spuPendingContractByPendingContractID with @IsSubmitted = 1 - the participant's Submit: stores the purchase
+    // order number and makes the order visible to administrators (the procedure stamps fldOrderSubmitDate).
+    Task SubmitAsync(Guid pendingContractId, string purchaseOrderNumber, CancellationToken cancellationToken = default);
+
     // spdPendingContractByPendingContractID - soft-deletes (fldIsDeleted = 1). Returns false when
     // the order is still outstanding afterwards.
     Task<bool> MarkDecidedAsync(Guid customerId, Guid pendingContractId, CancellationToken cancellationToken = default);

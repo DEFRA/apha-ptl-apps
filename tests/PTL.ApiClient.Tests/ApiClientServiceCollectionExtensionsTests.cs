@@ -29,6 +29,7 @@ public class ApiClientServiceCollectionExtensionsTests
         Assert.IsType<CustomerApiClient>(provider.GetRequiredService<ICustomerApiClient>());
         Assert.IsType<ParticipantApiClient>(provider.GetRequiredService<IParticipantApiClient>());
         Assert.IsType<SearchApiClient>(provider.GetRequiredService<ISearchApiClient>());
+        Assert.IsType<LoginInstructionsApiClient>(provider.GetRequiredService<ILoginInstructionsApiClient>());
         Assert.IsType<ParticipantSchemeApiClient>(provider.GetRequiredService<IParticipantSchemeApiClient>());
         Assert.IsType<ContractApiClient>(provider.GetRequiredService<IContractApiClient>());
         Assert.IsType<GroupAddressApiClient>(provider.GetRequiredService<IGroupAddressApiClient>());

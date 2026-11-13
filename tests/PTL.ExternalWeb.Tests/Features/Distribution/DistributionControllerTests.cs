@@ -91,11 +91,11 @@ public class DistributionControllerTests
     }
 
     [Theory]
-    [InlineData(null, null, "B,A,C", "", "asc")]
+    [InlineData(null, null, "B,A,C", "distributionDate", "desc")]
     [InlineData("reference", "asc", "A,B,C", "reference", "asc")]
     [InlineData("reference", "desc", "C,B,A", "reference", "desc")]
-    [InlineData("nonsense", "sideways", "B,A,C", "", "asc")]
-    public async Task Current_SortsByTheRequestedColumn_AndKeepsLegacyOrderWithoutOne(
+    [InlineData("nonsense", "sideways", "B,A,C", "distributionDate", "desc")]
+    public async Task Current_SortsByTheRequestedColumn_AndUsesDistributionDateDescendingByDefault(
         string? sortBy, string? sortDir, string expectedOrder, string expectedSortBy, string expectedDir)
     {
         var apiClient = new FakeDistributionApiClient
@@ -149,6 +149,8 @@ public class DistributionControllerTests
         Assert.Equal(1, model.Page);
         Assert.Equal(ReferenceSchemeListQuery.DefaultPageSize, model.PageSize);
         Assert.Empty(model.Distributions);
+        Assert.Equal("distributionDate", model.SortBy);
+        Assert.Equal("desc", model.SortDirection);
     }
 
     [Fact]

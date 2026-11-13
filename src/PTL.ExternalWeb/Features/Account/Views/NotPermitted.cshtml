@@ -1,3 +1,4 @@
+@using PTL.ExternalWeb.Features.Account
 @model string?
 @{
     ViewData["Title"] = "You cannot sign in with this account";
@@ -6,9 +7,14 @@
 <div class="govuk-grid-row">
     <div class="govuk-grid-column-two-thirds">
         <h1 class="govuk-heading-l">You cannot sign in with this account</h1>
-        @if (Model == "inactive")
+        @if (Model == NotPermittedReasons.Inactive)
         {
             <p class="govuk-body">Your account is not currently active. Contact APHA if you believe this is incorrect.</p>
+        }
+        else if (Model == NotPermittedReasons.NoActiveLab)
+        {
+            <p class="govuk-body">You are not linked to any lab at the moment, so there is nothing for you to see yet.</p>
+            <p class="govuk-body">This usually means the lab you work with has not been switched on for you. Please ask the person who looks after your lab's account to check, or contact APHA, and we will sort it out.</p>
         }
         else
         {

@@ -91,7 +91,7 @@
                         <td class="govuk-table__cell">@row.LabName</td>
                         <td class="govuk-table__cell">@row.ContactName</td>
                         <td class="govuk-table__cell">
-                            <a class="govuk-link" asp-action="PrintParticipantAddressLabel" asp-route-participantId="@row.ParticipantId">Print<span class="govuk-visually-hidden"> for @row.LabCode @row.LabName</span></a>
+                            <a class="govuk-link" asp-action="PrintParticipantAddressLabel" asp-route-participantId="@row.ParticipantId" asp-route-labCode="@Model.Search.LabCode" asp-route-labName="@Model.Search.LabName" asp-route-contactName="@Model.Search.ContactName">Print<span class="govuk-visually-hidden"> for @row.LabCode @row.LabName</span></a>
                         </td>
                     </tr>
                 }

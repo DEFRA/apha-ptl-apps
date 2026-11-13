@@ -13,21 +13,45 @@ internal sealed class FakeCreateOrderApiClient : ICreateOrderApiClient
     public CreateOrderApiResult GetResult { get; set; } = new(CreateOrderApiStatus.Ok, SampleOrder());
     public CreateOrderApiResult ChangeResult { get; set; } = new(CreateOrderApiStatus.Ok, SampleOrder(selected: true));
     public CreateOrderApiStatus ClearStatus { get; set; } = CreateOrderApiStatus.Ok;
+    public CreateOrderSubmitApiResult SaveResult { get; set; } = new(CreateOrderApiStatus.Ok, []);
+    public CreateOrderSubmitApiResult SubmitResult { get; set; } = new(CreateOrderApiStatus.Ok, []);
 
     public string? LastGetYear { get; private set; }
+    public bool? LastGetReview { get; private set; }
     public Guid? LastParticipantId { get; private set; }
     public string? LastChangeYear { get; private set; }
     public CreateOrderLineChangeRequest? LastChange { get; private set; }
     public string? LastClearYear { get; private set; }
+    public string? LastSaveYear { get; private set; }
+    public CreateOrderSaveRequest? LastSave { get; private set; }
+    public string? LastSubmitYear { get; private set; }
+    public CreateOrderSubmitRequest? LastSubmit { get; private set; }
 
     public Task<CreateOrderEligibilityResponse?> GetEligibilityAsync(Guid participantId, CancellationToken cancellationToken = default) =>
         EligibilityException is null ? Task.FromResult(Eligibility) : Task.FromException<CreateOrderEligibilityResponse?>(EligibilityException);
 
-    public Task<CreateOrderApiResult> GetAsync(Guid participantId, string year, CancellationToken cancellationToken = default)
+    public Task<CreateOrderApiResult> GetAsync(Guid participantId, string year, bool review = false, CancellationToken cancellationToken = default)
     {
         LastParticipantId = participantId;
         LastGetYear = year;
+        LastGetReview = review;
         return Task.FromResult(GetResult);
+    }
+
+    public Task<CreateOrderSubmitApiResult> SavePurchaseOrderAsync(Guid participantId, string year, CreateOrderSaveRequest request, CancellationToken cancellationToken = default)
+    {
+        LastParticipantId = participantId;
+        LastSaveYear = year;
+        LastSave = request;
+        return Task.FromResult(SaveResult);
+    }
+
+    public Task<CreateOrderSubmitApiResult> SubmitAsync(Guid participantId, string year, CreateOrderSubmitRequest request, CancellationToken cancellationToken = default)
+    {
+        LastParticipantId = participantId;
+        LastSubmitYear = year;
+        LastSubmit = request;
+        return Task.FromResult(SubmitResult);
     }
 
     public Task<CreateOrderApiResult> ChangeAsync(Guid participantId, string year, CreateOrderLineChangeRequest request, CancellationToken cancellationToken = default)

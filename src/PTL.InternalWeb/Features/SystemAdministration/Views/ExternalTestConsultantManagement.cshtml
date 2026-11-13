@@ -53,6 +53,7 @@
         <input type="hidden" name="Rows[@i].Name" value="@hiddenRow.Name" />
         <input type="hidden" name="Rows[@i].Department" value="@hiddenRow.Department" />
         <input type="hidden" name="Rows[@i].Email" value="@hiddenRow.Email" />
+        <input type="hidden" name="Rows[@i].LoginInstructionsSent" value="@(hiddenRow.LoginInstructionsSent ? "true" : "false")" />
         <input type="hidden" name="Rows[@i].IsInactive" value="@(hiddenRow.IsInactive ? "true" : "false")" />
         <input type="hidden" name="Rows[@i].InactiveDate" value="@(hiddenRow.InactiveDate?.ToString("yyyy-MM-dd'T'HH:mm:ss", CultureInfo.InvariantCulture) ?? string.Empty)" />
         <input type="hidden" name="Rows[@i].IsRemoved" value="@(hiddenRow.IsRemoved ? "true" : "false")" />
@@ -66,13 +67,14 @@
                 <th scope="col" class="govuk-table__header">Email</th>
                 <th scope="col" class="govuk-table__header">Inactive Date</th>
                 <th scope="col" class="govuk-table__header">Actions</th>
+                <th scope="col" class="govuk-table__header">Login Instructions</th>
             </tr>
         </thead>
         <tbody class="govuk-table__body">
             @if (Model.Rows.All(r => r.IsRemoved))
             {
                 <tr class="govuk-table__row">
-                    <td class="govuk-table__cell" colspan="5">There are no External Test Consultants to display.</td>
+                    <td class="govuk-table__cell" colspan="6">There are no External Test Consultants to display.</td>
                 </tr>
             }
             @for (var i = 0; i < Model.Rows.Count; i++)
@@ -140,6 +142,16 @@
                             }
                             <button class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0" data-module="govuk-button" type="submit" formnovalidate formaction="@ButtonUrl(PendingListCommands.Toggle, i)">@(row.IsInactive ? "Inactive" : "Active")<span class="govuk-visually-hidden"> - select to make @row.Name @(row.IsInactive ? "active" : "inactive")</span></button>
                         </div>
+                    </td>
+                    <td class="govuk-table__cell">
+                        @if (row.LoginInstructionsSent)
+                        {
+                            <strong class="govuk-tag govuk-tag--green">Sent</strong>
+                        }
+                        else
+                        {
+                            <button type="submit" class="govuk-link ptl-link-button" formnovalidate formaction="@ButtonUrl(PendingListCommands.SendInstructions, i)">Send Instructions<span class="govuk-visually-hidden"> to test consultant @row.Name</span></button>
+                        }
                     </td>
                 </tr>
             }

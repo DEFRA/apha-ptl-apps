@@ -6,11 +6,13 @@ using PTL.Api.Tests.Contract;
 using PTL.Api.Tests.Customer;
 using PTL.Api.Tests.Lookup;
 using PTL.Api.Tests.Participant;
+using PTL.Api.Tests.Scheme;
 using PTL.Contracts.CreateOrder;
 using PTL.Core.Contract.CreateOrder;
 using PTL.Core.Lookup;
 using CoreCustomer = PTL.Core.Customer.Customer;
 using CoreParticipant = PTL.Core.Participant.Participant;
+using CoreScheme = PTL.Core.Scheme.Scheme;
 
 namespace PTL.Api.Tests.Endpoints;
 
@@ -18,12 +20,13 @@ public class CreateOrderControllerTests
 {
     private sealed record Setup(CreateOrderController Controller, Guid ParticipantId, FakeCreateOrderStore Store, AvailableSchemeEntity Scheme);
 
-    private static async Task<Setup> CreateAsync(bool canOrderOnline = true)
+    private static async Task<Setup> CreateAsync(bool canOrderOnline = true, string? consentText = null)
     {
         var store = new FakeCreateOrderStore();
         var participants = new FakeParticipantRepository();
         var customers = new FakeCustomerRepository();
         var lookup = new FakeLookupRepository();
+        var schemes = new FakeSchemeRepository();
 
         var currencyId = Guid.NewGuid();
         var customer = await customers.CreateAsync(new CoreCustomer { CanOrderOnline = canOrderOnline, CurrencyId = currencyId });
@@ -36,7 +39,19 @@ public class CreateOrderControllerTests
         store.AvailableSchemes.Add(scheme);
         lookup.SchemeCurrencies = [new SchemeCurrencyEntity { SchemeId = scheme.SchemeId, CurrencyId = currencyId, Price = 100m, CurrencySymbol = "£" }];
 
-        var service = new CreateOrderService(store, store, participants, customers, lookup, Options.Create(new CreateOrderOptions()));
+        if (consentText is not null)
+        {
+            await schemes.CreateAsync(new CoreScheme
+            {
+                SchemeId = scheme.SchemeId,
+                Identifier = scheme.Identifier,
+                Name = scheme.Name,
+                DataConsentDeclarationActive = true,
+                DataConsentDeclarationText = consentText
+            });
+        }
+
+        var service = new CreateOrderService(store, store, participants, customers, lookup, schemes, Options.Create(new CreateOrderOptions()));
         return new Setup(new CreateOrderController(service), participant.ParticipantId, store, scheme);
     }
 
@@ -58,7 +73,7 @@ public class CreateOrderControllerTests
         var result = await setup.Controller.GetEligibility(setup.ParticipantId, CancellationToken.None);
 
         var response = Assert.IsType<CreateOrderEligibilityResponse>(Assert.IsType<OkObjectResult>(result.Result).Value);
-        Assert.Equal(new CreateOrderEligibilityResponse(true, true, true), response);
+        Assert.Equal(new CreateOrderEligibilityResponse(true, true, true, "2026/27", ""), response);
     }
 
     [Fact]
@@ -66,7 +81,7 @@ public class CreateOrderControllerTests
     {
         var setup = await CreateAsync();
 
-        var result = await setup.Controller.Get(setup.ParticipantId, OrderYear.Current, CancellationToken.None);
+        var result = await setup.Controller.Get(setup.ParticipantId, OrderYear.Current, review: false, CancellationToken.None);
 
         var response = Assert.IsType<CreateOrderResponse>(Assert.IsType<OkObjectResult>(result.Result).Value);
         Assert.Equal("2026/27", response.Year);
@@ -78,6 +93,8 @@ public class CreateOrderControllerTests
         Assert.Equal(100m, scheme.AnnualPrice);
         Assert.Equal(12, scheme.Months.Count);
         Assert.False(response.CanProceed);
+        Assert.Null(response.Consents);
+        Assert.Empty(response.DataConsents);
     }
 
     [Fact]
@@ -85,7 +102,7 @@ public class CreateOrderControllerTests
     {
         var setup = await CreateAsync(canOrderOnline: false);
 
-        var result = await setup.Controller.Get(setup.ParticipantId, OrderYear.Current, CancellationToken.None);
+        var result = await setup.Controller.Get(setup.ParticipantId, OrderYear.Current, review: false, CancellationToken.None);
 
         Assert.Equal(StatusCodes.Status403Forbidden, Assert.IsType<StatusCodeResult>(result.Result).StatusCode);
     }
@@ -95,7 +112,7 @@ public class CreateOrderControllerTests
     {
         var setup = await CreateAsync();
 
-        var result = await setup.Controller.Get(Guid.NewGuid(), OrderYear.Current, CancellationToken.None);
+        var result = await setup.Controller.Get(Guid.NewGuid(), OrderYear.Current, review: false, CancellationToken.None);
 
         Assert.IsType<NotFoundResult>(result.Result);
     }
@@ -162,5 +179,117 @@ public class CreateOrderControllerTests
         var setup = await CreateAsync();
 
         Assert.IsType<NotFoundResult>(await setup.Controller.Clear(Guid.NewGuid(), OrderYear.Current, CancellationToken.None));
+    }
+
+    private static async Task<Setup> CreateWithSelectedSchemeAsync()
+    {
+        var setup = await CreateAsync();
+        await setup.Controller.Change(
+            setup.ParticipantId, OrderYear.Current, new CreateOrderLineChangeRequest(setup.Scheme.SchemeId, "select", true), CancellationToken.None);
+        return setup;
+    }
+
+    [Fact]
+    public async Task Get_ForReview_ReturnsThePurchaseOrderAndAConsentList()
+    {
+        var setup = await CreateWithSelectedSchemeAsync();
+        await setup.Controller.SavePurchaseOrder(setup.ParticipantId, OrderYear.Current, new CreateOrderSaveRequest("PO-1"), CancellationToken.None);
+
+        var result = await setup.Controller.Get(setup.ParticipantId, OrderYear.Current, review: true, CancellationToken.None);
+
+        var response = Assert.IsType<CreateOrderResponse>(Assert.IsType<OkObjectResult>(result.Result).Value);
+        Assert.Equal("PO-1", response.PurchaseOrderNumber);
+        Assert.NotNull(response.Consents);
+        Assert.Empty(response.DataConsents);
+    }
+
+    [Fact]
+    public async Task Get_ForReview_WithAnActiveConsentDeclaration_ReturnsTheConsent()
+    {
+        var setup = await CreateAsync(consentText: "Share my data");
+        await setup.Controller.Change(
+            setup.ParticipantId, OrderYear.Current, new CreateOrderLineChangeRequest(setup.Scheme.SchemeId, "select", true), CancellationToken.None);
+
+        var result = await setup.Controller.Get(setup.ParticipantId, OrderYear.Current, review: true, CancellationToken.None);
+
+        var response = Assert.IsType<CreateOrderResponse>(Assert.IsType<OkObjectResult>(result.Result).Value);
+        var consent = Assert.Single(response.DataConsents);
+        Assert.Equal(new CreateOrderConsentResponse(setup.Scheme.SchemeId, "PT1", "Alpha", "Share my data", false), consent);
+    }
+
+    [Fact]
+    public async Task SavePurchaseOrder_Eligible_ReturnsNoContent()
+    {
+        var setup = await CreateWithSelectedSchemeAsync();
+
+        var result = await setup.Controller.SavePurchaseOrder(setup.ParticipantId, OrderYear.Current, new CreateOrderSaveRequest("PO-1"), CancellationToken.None);
+
+        Assert.IsType<NoContentResult>(result);
+        Assert.Equal("PO-1", Assert.Single(setup.Store.Orders).PurchaseOrderNumber);
+    }
+
+    [Fact]
+    public async Task SavePurchaseOrder_TooLong_ReturnsTheFieldErrors()
+    {
+        var setup = await CreateWithSelectedSchemeAsync();
+
+        var result = await setup.Controller.SavePurchaseOrder(setup.ParticipantId, OrderYear.Current, new CreateOrderSaveRequest(new string('A', 256)), CancellationToken.None);
+
+        var validation = Assert.IsType<CreateOrderValidationResponse>(Assert.IsType<BadRequestObjectResult>(result).Value);
+        Assert.Equal("PurchaseOrderNumber", Assert.Single(validation.Errors).Field);
+    }
+
+    [Fact]
+    public async Task SavePurchaseOrder_NotEligibleOrUnknown_IsRefused()
+    {
+        var ineligible = await CreateAsync(canOrderOnline: false);
+        var known = await CreateAsync();
+
+        var forbidden = await ineligible.Controller.SavePurchaseOrder(ineligible.ParticipantId, OrderYear.Current, new CreateOrderSaveRequest("PO"), CancellationToken.None);
+        var missing = await known.Controller.SavePurchaseOrder(Guid.NewGuid(), OrderYear.Current, new CreateOrderSaveRequest("PO"), CancellationToken.None);
+
+        Assert.Equal(StatusCodes.Status403Forbidden, Assert.IsType<StatusCodeResult>(forbidden).StatusCode);
+        Assert.IsType<NotFoundResult>(missing);
+    }
+
+    [Fact]
+    public async Task Submit_ValidOrder_ReturnsNoContentAndSubmitsIt()
+    {
+        var setup = await CreateWithSelectedSchemeAsync();
+
+        var result = await setup.Controller.Submit(
+            setup.ParticipantId, OrderYear.Current, new CreateOrderSubmitRequest("PO-2", TermsAccepted: true, ConsentedSchemeIds: null), CancellationToken.None);
+
+        Assert.IsType<NoContentResult>(result);
+        var order = Assert.Single(setup.Store.Orders);
+        Assert.True(order.IsSubmitted);
+        Assert.Equal("PO-2", order.PurchaseOrderNumber);
+    }
+
+    [Fact]
+    public async Task Submit_TermsNotAccepted_ReturnsTheFieldErrors()
+    {
+        var setup = await CreateWithSelectedSchemeAsync();
+
+        var result = await setup.Controller.Submit(
+            setup.ParticipantId, OrderYear.Current, new CreateOrderSubmitRequest("PO-2", TermsAccepted: false, ConsentedSchemeIds: []), CancellationToken.None);
+
+        var validation = Assert.IsType<CreateOrderValidationResponse>(Assert.IsType<BadRequestObjectResult>(result).Value);
+        Assert.Equal("TermsAccepted", Assert.Single(validation.Errors).Field);
+        Assert.False(Assert.Single(setup.Store.Orders).IsSubmitted);
+    }
+
+    [Fact]
+    public async Task Submit_NotEligibleOrUnknown_IsRefused()
+    {
+        var ineligible = await CreateAsync(canOrderOnline: false);
+        var known = await CreateAsync();
+        var request = new CreateOrderSubmitRequest("PO", TermsAccepted: true, ConsentedSchemeIds: []);
+
+        var forbidden = await ineligible.Controller.Submit(ineligible.ParticipantId, OrderYear.Current, request, CancellationToken.None);
+        var missing = await known.Controller.Submit(Guid.NewGuid(), OrderYear.Current, request, CancellationToken.None);
+
+        Assert.Equal(StatusCodes.Status403Forbidden, Assert.IsType<StatusCodeResult>(forbidden).StatusCode);
+        Assert.IsType<NotFoundResult>(missing);
     }
 }

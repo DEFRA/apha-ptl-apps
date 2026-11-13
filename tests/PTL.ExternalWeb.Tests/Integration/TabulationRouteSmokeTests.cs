@@ -624,14 +624,15 @@ public class TabulationRouteSmokeTests : IClassFixture<PtlExternalWebTestFactory
 
     [Theory]
     [InlineData("reference", "D1a/00001", "D1a/00002")]
-    [InlineData("schemeName", "Brucella", "TB")]
+    [InlineData("schemeName", "Brucella", "Tuberculosis")]
     public async Task Index_SortedByEachColumn_OrdersTabulationsByThatColumn(string sortBy, string firstValue, string secondValue)
     {
+        // "TB" alone could match a random antiforgery token earlier in the page, so the name is a longer, unmistakable word.
         var apiClient = new FakeDistributionApiClient
         {
             Tabulations = new PublishedTabulationSummaryListResponse(
             [
-                Summary(Guid.NewGuid(), "D1a/00002", "TB", "TB", "Summary B", new DateTime(2026, 5, 1), 2026, 5),
+                Summary(Guid.NewGuid(), "D1a/00002", "TB", "Tuberculosis", "Summary B", new DateTime(2026, 5, 1), 2026, 5),
                 Summary(Guid.NewGuid(), "D1a/00001", "BT", "Brucella", "Summary A", new DateTime(2026, 4, 1), 2026, 4),
             ])
         };
@@ -643,7 +644,23 @@ public class TabulationRouteSmokeTests : IClassFixture<PtlExternalWebTestFactory
         var body = await response.Content.ReadAsStringAsync();
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.True(body.IndexOf(firstValue, StringComparison.Ordinal) < body.IndexOf(secondValue, StringComparison.Ordinal),
+
+        var rowMatches = Regex.Matches(body, "<tr class=\"govuk-table__row\">(?<row>.*?)</tr>", RegexOptions.Singleline);
+        var rows = rowMatches
+            .Select(m => m.Groups["row"].Value)
+            .Select(row => Regex.Matches(row, "<td class=\"govuk-table__cell\">(?<cell>.*?)</td>", RegexOptions.Singleline)
+                .Select(c => c.Groups["cell"].Value.Trim())
+                .ToList())
+            .Where(cells => cells.Count >= 3)
+            .ToList();
+
+        var valuesInOrder = (sortBy == "schemeName" ? rows.Select(r => r[2]) : rows.Select(r => r[0])).ToList();
+        var firstIndex = valuesInOrder.FindIndex(v => v.Contains(firstValue, StringComparison.Ordinal));
+        var secondIndex = valuesInOrder.FindIndex(v => v.Contains(secondValue, StringComparison.Ordinal));
+
+        Assert.True(firstIndex >= 0 && secondIndex >= 0,
+            $"Expected both '{firstValue}' and '{secondValue}' to appear in the rendered table column for {sortBy}.");
+        Assert.True(firstIndex < secondIndex,
             $"Expected '{firstValue}' to appear before '{secondValue}' when sorted ascending by {sortBy}.");
     }
 

@@ -9,6 +9,7 @@ namespace PTL.InternalWeb.Features.SystemAdministration;
 //   remove     - Remove: viewers/countries show a confirmation page then mark the row removed; the test
 //                consultant pages mark it removed directly. Nothing is deleted until the page is saved.
 //   toggle     - the Status link of the test consultant pages: flips Active/Inactive in the pending list.
+//   sendInstructions - the Send Instructions link of the Viewer and External Test Consultant pages: emails the saved address now.
 //   apply/save - ButtonApply/ButtonSave: write the pending rows; save then leaves the page.
 //   cancel     - ButtonCancel: leaves the page, discarding all pending changes.
 //   submit     - the Enter key in a text box (the hidden default button).
@@ -25,6 +26,8 @@ public static class PendingListCommands
     public const string Remove = "remove";
 
     public const string Toggle = "toggle";
+
+    public const string SendInstructions = "sendInstructions";
 
     public const string Apply = "apply";
 

@@ -38,6 +38,10 @@ public sealed class ExternalTestConsultantRowViewModel
 
     public bool IsInactive { get; set; }
 
+    // Whether the login instructions email has been sent to the saved address. Cleared on the page as soon as the
+    // email address is edited, and again by the database when the new address is saved.
+    public bool LoginInstructionsSent { get; set; }
+
     // Display only: the API stamps the real date when the status change is saved.
     public DateTime? InactiveDate { get; set; }
 

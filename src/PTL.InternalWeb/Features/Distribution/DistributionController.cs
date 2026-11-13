@@ -31,7 +31,13 @@ namespace PTL.InternalWeb.Features.Distribution;
 // Distributions/ folder - held by anyone with Internal User or Scheduling); Scheduling/ pages and actions
 // additionally need Scheduling, and Internal User/ pages (Preparation, Packaging, Results) need Internal User.
 [Authorize(Policy = PtlPolicies.Distributions)]
-public sealed partial class DistributionController(IDistributionApiClient distributionApiClient, ISearchApiClient searchApiClient, ILookupApiClient lookupApiClient) : Controller
+public sealed partial class DistributionController(
+    IDistributionApiClient distributionApiClient,
+    ISearchApiClient searchApiClient,
+    ILookupApiClient lookupApiClient,
+    IGroupAddressApiClient groupAddressApiClient,
+    IParticipantApiClient participantApiClient,
+    ILabelPrinterApiClient labelPrinterApiClient) : Controller
 {
     private static readonly string[] MonthOrder =
     [
@@ -1137,8 +1143,10 @@ public sealed partial class DistributionController(IDistributionApiClient distri
     // Cancel = discard, no save at all (legacy ButtonCancel_Click, CausesValidation=False).
     // cancelAudit = Cancel on the audit-reason step - legacy Audit.aspx always returns to
     // ~/Scheduling/monthlys.aspx for this screen, so there is only one destination.
+    // Every sample/result cell posts several fields, so a large distribution exceeds the 1,024-value default.
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [RequestFormLimits(ValueCountLimit = 20000)]
     [Authorize(Policy = PtlPolicies.Scheduling)]
     public async Task<IActionResult> IntendedResults(int year, int monthId, Guid schemeId, IntendedResultsViewModel model, string command, CancellationToken cancellationToken)
     {

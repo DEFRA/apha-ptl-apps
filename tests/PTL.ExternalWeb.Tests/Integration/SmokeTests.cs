@@ -15,6 +15,7 @@ public class SmokeTests : IClassFixture<PtlExternalWebTestFactory>
 
     [Theory]
     [InlineData("/Home/Privacy")]
+    [InlineData("/Home/Accessibility")]
     public async Task Routes_ReturnSuccess(string url)
     {
         var client = _factory.CreateClient();
@@ -22,6 +23,33 @@ public class SmokeTests : IClassFixture<PtlExternalWebTestFactory>
         var response = await client.GetAsync(url);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task LegalPages_Anonymous_ShowTheLegacyContent()
+    {
+        var client = _factory.CreateClient();
+
+        var privacy = await client.GetStringAsync("/Home/Privacy");
+        var accessibility = await client.GetStringAsync("/Home/Accessibility");
+
+        Assert.Contains("VETQAS privacy notice", privacy);
+        Assert.Contains("Who collects your personal data?", privacy);
+        Assert.Contains("Accessibility statement for the PT", accessibility);
+        Assert.Contains("Enforcement procedure", accessibility);
+    }
+
+    [Fact]
+    public async Task Footer_LinksToTheAccessibilityAndPrivacyPages()
+    {
+        var client = _factory.CreateClient();
+
+        var body = await client.GetStringAsync("/Home/Privacy");
+
+        Assert.Contains("href=\"/Home/Accessibility\"", body);
+        Assert.Contains("href=\"/Home/Privacy\"", body);
+        Assert.DoesNotContain("/Home/SystemInformation", body);
+        Assert.DoesNotContain("Terms and conditions", body);
     }
 
     [Fact]

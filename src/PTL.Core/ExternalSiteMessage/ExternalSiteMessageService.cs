@@ -1,3 +1,4 @@
+using System.Net;
 using PTL.Core.Audit;
 
 namespace PTL.Core.ExternalSiteMessage;
@@ -17,8 +18,10 @@ public sealed class ExternalSiteMessageService(IExternalSiteMessageRepository re
 
         var updated = new ExternalSiteMessage
         {
-            Message = message,
-            ImportantMessage = importantMessage,
+            // The editor posts its HTML entity-escaped (TinyMCE encoding "xml"); legacy HtmlDecoded it before saving,
+            // otherwise the external pages show the tags as text.
+            Message = WebUtility.HtmlDecode(message),
+            ImportantMessage = WebUtility.HtmlDecode(importantMessage),
             SupportEmailAddress = supportEmailAddress
         };
 

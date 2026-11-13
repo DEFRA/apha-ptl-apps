@@ -25,18 +25,22 @@ document.addEventListener('DOMContentLoaded', () => {
     let failed = false;
 
     try {
+      const params = new URLSearchParams({
+        __RequestVerificationToken: token.value,
+        year: container.dataset.year,
+        search: container.dataset.search ?? '',
+        schemeId: input.dataset.schemeId,
+        field: input.dataset.orderField,
+        checked: String(input.checked)
+      });
+      // The server returns the re-priced body, so it needs the sort the page was loaded with.
+      JSON.parse(container.dataset.sort ?? '[]').forEach((value) => params.append('sort', value));
+
       const response = await fetch(container.dataset.changeUrl, {
         method: 'POST',
         credentials: 'same-origin',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({
-          __RequestVerificationToken: token.value,
-          year: container.dataset.year,
-          search: container.dataset.search ?? '',
-          schemeId: input.dataset.schemeId,
-          field: input.dataset.orderField,
-          checked: String(input.checked)
-        })
+        body: params
       });
 
       if (!response.ok) {

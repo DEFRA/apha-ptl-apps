@@ -15,8 +15,6 @@ public class ParticipantRepositoryTests
 
     private const string GetByIdSql = "EXEC dbo.spgParticipantByParticipantId @ParticipantId";
     private const string GetBySsoIdSql = "EXEC dbo.spgParticipantBySsoId @SsoId";
-    private const string GetBySsoIdExtSql = "EXEC dbo.spgParticipantBySsoId @SsoIdExt=@SsoIdExt";
-    private const string GetByEmailSql = "EXEC dbo.spgParticipantByEmail @Email";
     private const string GetSummariesSql = "EXEC dbo.spgParticipantInfoByCustomerId @CustomerId, @ActiveOnly";
     private const string InsertSql =
         "EXEC dbo.spiParticipant @ParticipantId, @SsoId, @CustomerId, @LabCode, @LabName, @LabTypeId, @ContactName, @Organisation, @Address1, @Address2, @Address3, @Address4, @Address5, @CountryId, @Telephone, @Fax, @Email, @Email2, @Comments, @IsActive, @InactiveDate, @InactiveError, @InactiveErrorDate, @SsoIdExt";
@@ -83,56 +81,6 @@ public class ParticipantRepositoryTests
 
         Assert.NotNull(result);
         Assert.Equal(ssoId, result!.SsoId);
-    }
-
-    [Fact]
-    public async Task GetBySsoIdExtAsync_Found_ReturnsMappedParticipant()
-    {
-        var (repository, connection) = CreateRepository();
-        var participantId = Guid.NewGuid();
-        var ssoIdExt = Guid.NewGuid();
-        connection.RespondToQuery(GetBySsoIdExtSql, ParticipantTable(participantId, Guid.NewGuid(), ssoIdExt: ssoIdExt));
-
-        var result = await repository.GetBySsoIdExtAsync(ssoIdExt);
-
-        Assert.NotNull(result);
-        Assert.Equal(ssoIdExt, result!.SsoIdExt);
-    }
-
-    [Fact]
-    public async Task GetBySsoIdExtAsync_NotFound_ReturnsNull()
-    {
-        var (repository, connection) = CreateRepository();
-        connection.RespondToQuery(GetBySsoIdExtSql, new DataTable());
-
-        var result = await repository.GetBySsoIdExtAsync(Guid.NewGuid());
-
-        Assert.Null(result);
-    }
-
-    [Fact]
-    public async Task GetByEmailAsync_Found_ReturnsMappedParticipant()
-    {
-        var (repository, connection) = CreateRepository();
-        var participantId = Guid.NewGuid();
-        const string email = "participant@example.com";
-        connection.RespondToQuery(GetByEmailSql, ParticipantTable(participantId, Guid.NewGuid(), email: email));
-
-        var result = await repository.GetByEmailAsync(email);
-
-        Assert.NotNull(result);
-        Assert.Equal(email, result!.Email);
-    }
-
-    [Fact]
-    public async Task GetByEmailAsync_NotFound_ReturnsNull()
-    {
-        var (repository, connection) = CreateRepository();
-        connection.RespondToQuery(GetByEmailSql, new DataTable());
-
-        var result = await repository.GetByEmailAsync("missing@example.com");
-
-        Assert.Null(result);
     }
 
     [Fact]

@@ -17,12 +17,13 @@ public sealed class CreateOrderController(ICreateOrderService createOrderService
         var eligibility = await createOrderService.GetEligibilityAsync(participantId, cancellationToken);
         return eligibility is null
             ? NotFound()
-            : Ok(new CreateOrderEligibilityResponse(eligibility.CanOrderOnline, eligibility.CanCreateCurrentYearOrder, eligibility.CanCreateNextYearOrder));
+            : Ok(new CreateOrderEligibilityResponse(
+                eligibility.CanOrderOnline, eligibility.CanCreateCurrentYearOrder, eligibility.CanCreateNextYearOrder, eligibility.CurrentYear, eligibility.NextYear));
     }
 
     [HttpGet("{participantId:guid}/{year}")]
-    public async Task<ActionResult<CreateOrderResponse>> Get(Guid participantId, OrderYear year, CancellationToken cancellationToken) =>
-        ToActionResult(await createOrderService.GetOrderAsync(participantId, year, cancellationToken));
+    public async Task<ActionResult<CreateOrderResponse>> Get(Guid participantId, OrderYear year, [FromQuery] bool review, CancellationToken cancellationToken) =>
+        ToActionResult(await createOrderService.GetOrderAsync(participantId, year, review, cancellationToken));
 
     [HttpPost("{participantId:guid}/{year}/change")]
     public async Task<ActionResult<CreateOrderResponse>> Change(
@@ -48,6 +49,25 @@ public sealed class CreateOrderController(ICreateOrderService createOrderService
             _ => NotFound()
         };
 
+    // Legacy stage 2 Save: 204 when stored, 400 with the field errors when the purchase order number is too long.
+    [HttpPost("{participantId:guid}/{year}/purchase-order")]
+    public async Task<IActionResult> SavePurchaseOrder(Guid participantId, OrderYear year, [FromBody] CreateOrderSaveRequest request, CancellationToken cancellationToken) =>
+        ToActionResult(await createOrderService.SavePurchaseOrderAsync(participantId, year, request.PurchaseOrderNumber, cancellationToken));
+
+    // Legacy stage 2 Submit: 204 when the order is submitted, 400 with the field errors when a rule fails.
+    [HttpPost("{participantId:guid}/{year}/submit")]
+    public async Task<IActionResult> Submit(Guid participantId, OrderYear year, [FromBody] CreateOrderSubmitRequest request, CancellationToken cancellationToken) =>
+        ToActionResult(await createOrderService.SubmitAsync(
+            participantId, year, new CreateOrderSubmission(request.PurchaseOrderNumber, request.TermsAccepted, request.ConsentedSchemeIds ?? []), cancellationToken));
+
+    private IActionResult ToActionResult(CreateOrderSubmitOutcome outcome) => outcome.Access switch
+    {
+        CreateOrderAccess.Allowed when outcome.Errors.Count == 0 => NoContent(),
+        CreateOrderAccess.Allowed => BadRequest(new CreateOrderValidationResponse([.. outcome.Errors.Select(e => new CreateOrderValidationErrorResponse(e.Field, e.Message))])),
+        CreateOrderAccess.NotEligible => StatusCode(StatusCodes.Status403Forbidden),
+        _ => NotFound()
+    };
+
     private ActionResult<CreateOrderResponse> ToActionResult(CreateOrderResult result) => result.Access switch
     {
         CreateOrderAccess.Allowed => Ok(ToResponse(result.Page!)),
@@ -66,7 +86,9 @@ public sealed class CreateOrderController(ICreateOrderService createOrderService
         page.SchemeTotal,
         page.PostageTotal,
         page.OrderTotal,
-        page.CanProceed);
+        page.CanProceed,
+        page.PurchaseOrderNumber,
+        page.Consents?.Select(c => new CreateOrderConsentResponse(c.SchemeId, c.Identifier, c.Name, c.Text, c.Given)).ToList());
 
     private static CreateOrderSchemeResponse ToResponse(CreateOrderScheme scheme) => new(
         scheme.SchemeId,

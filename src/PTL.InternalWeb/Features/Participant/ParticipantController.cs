@@ -14,7 +14,7 @@ namespace PTL.InternalWeb.Features.Participant;
 
 // Legacy "Contracts Admin" folder - requires the Contracts Admin role (PtlPolicies.ContractsAdmin).
 [Authorize(Policy = PtlPolicies.ContractsAdmin)]
-public class ParticipantController(IParticipantApiClient participantApiClient, ICustomerApiClient customerApiClient, ILookupApiClient lookupApiClient, ILogger<ParticipantController> logger) : Controller
+public class ParticipantController(IParticipantApiClient participantApiClient, ICustomerApiClient customerApiClient, ILookupApiClient lookupApiClient, ILabelPrinterApiClient labelPrinterApiClient, ILoginInstructionsApiClient loginInstructionsApiClient, ILogger<ParticipantController> logger) : Controller
 {
     // Legacy ReviewPendingParticipantUpdates.aspx GridView.PageSize.
     private const int PendingUpdatesPageSize = 20;
@@ -55,11 +55,32 @@ public class ParticipantController(IParticipantApiClient participantApiClient, I
             new EventId(6, nameof(LogFailedToReactivateParticipantMessage)),
             "Failed to reactivate participant {ParticipantId}");
 
-    public async Task<IActionResult> Index(Guid customerId, bool includeInactive = false, int page = 1, int pageSize = PTL.SharedUI.Pagination.PaginationModel.DefaultPageSize, CancellationToken cancellationToken = default)
+    // Legacy ParticipantList.aspx fetches every participant (FetchParticipantInfoCollection, activeOnly = False) and shows a Status column.
+    public async Task<IActionResult> Index(Guid customerId, bool includeInactive = true, int page = 1, int pageSize = PTL.SharedUI.Pagination.PaginationModel.DefaultPageSize, CancellationToken cancellationToken = default)
     {
         var result = await participantApiClient.SearchParticipantsAsync(new ParticipantSearchRequest(customerId, includeInactive, page, pageSize), cancellationToken);
         LogDisplayedParticipantListMessage(logger, includeInactive, page, result.TotalCount, null);
         return View(new ParticipantListViewModel(customerId, includeInactive, page, pageSize, result.TotalCount, result.Items));
+    }
+
+    // The Send Instructions link of the Login Instructions column: emails the address saved on the participant, then comes back to the same page of the list.
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> SendLoginInstructions(Guid participantId, Guid customerId, bool includeInactive = true, int page = 1, int pageSize = PTL.SharedUI.Pagination.PaginationModel.DefaultPageSize, CancellationToken cancellationToken = default)
+    {
+        var result = await loginInstructionsApiClient.SendToParticipantAsync(participantId, cancellationToken);
+        if (result.Success)
+        {
+            var participant = await participantApiClient.GetParticipantAsync(participantId, cancellationToken);
+            var recipient = string.IsNullOrWhiteSpace(participant?.ContactName) ? string.Empty : $" to {participant.ContactName}";
+            TempData.SetNotification(NotificationType.Success, $"Login instructions sent{recipient}.");
+        }
+        else
+        {
+            TempData.SetNotification(NotificationType.Error, result.Message ?? "The login instructions email could not be sent. Please try again.");
+        }
+
+        return RedirectToAction(nameof(Index), new { customerId, includeInactive, page, pageSize });
     }
 
     public async Task<IActionResult> Details(Guid id, CancellationToken cancellationToken)
@@ -144,7 +165,7 @@ public class ParticipantController(IParticipantApiClient participantApiClient, I
         }
 
         TempData.SetNotification(NotificationType.Success, "Participant created successfully.");
-        return RedirectToAction(nameof(Details), new { id = result.Participant.ParticipantId });
+        return RedirectToAction(nameof(Index), new { customerId });
     }
 
     [HttpGet]
@@ -213,7 +234,7 @@ public class ParticipantController(IParticipantApiClient participantApiClient, I
         }
 
         TempData.SetNotification(NotificationType.Success, "Participant updated successfully.");
-        return RedirectToAction(nameof(Details), new { id = result.Participant.ParticipantId });
+        return RedirectToAction(nameof(Index), new { customerId = result.Participant.CustomerId });
     }
 
     // Review Pending Participant Updates (legacy ReviewPendingParticipantUpdates.aspx). Legacy loaded every pending
@@ -498,7 +519,13 @@ public class ParticipantController(IParticipantApiClient participantApiClient, I
             Telephone = model.Telephone
         });
 
-        return LabelPdf(label);
+        var printed = await labelPrinterApiClient.PrintAsync(label.Lines, cancellationToken);
+        SetPrintNotification(printed);
+
+        // Legacy's print button re-renders the SAME postback (ViewState intact) - redisplaying the
+        // posted model here preserves any not-yet-saved edits the same way, rather than navigating
+        // away and discarding them.
+        return await RedisplayParticipantFormAsync(model, cancellationToken);
     }
 
     [HttpGet]
@@ -524,11 +551,15 @@ public class ParticipantController(IParticipantApiClient participantApiClient, I
             Telephone = participant.Telephone
         });
 
-        return LabelPdf(label);
+        var printed = await labelPrinterApiClient.PrintAsync(label.Lines, cancellationToken);
+        SetPrintNotification(printed);
+        return RedirectToAction(nameof(Details), new { id });
     }
 
-    private FileContentResult LabelPdf(AddressLabel label) =>
-        File(AddressLabelPdfRenderer.Render(label), AddressLabelPdfRenderer.ContentType, "address-label.pdf");
+    private void SetPrintNotification(bool printed) =>
+        TempData.SetNotification(
+            printed ? NotificationType.Success : NotificationType.Error,
+            printed ? "Label sent to printer." : "There was a problem printing the label. Please try again.");
 
     // Legacy took the country from DropDownCountry.SelectedItem.Text - the name shown on the form,
     // not a saved value - so the lookup list is the faithful equivalent for unsaved form state.

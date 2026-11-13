@@ -14,8 +14,9 @@ public enum CreateOrderAccess
 }
 
 // Legacy PermissionState.CanOrderOnline / CanCreateNewCurrentOrder / CanCreateNewNextOrder: the two
-// per-year flags already include CanOrderOnline, as legacy's CreateCurrent/NextOrderPageGuard needs both.
-public sealed record CreateOrderEligibility(bool CanOrderOnline, bool CanCreateCurrentYearOrder, bool CanCreateNextYearOrder);
+// per-year flags already include CanOrderOnline, as legacy's CreateCurrent/NextOrderPageGuard needs both. The year labels
+// ("2026/27") are for the Home cards, which legacy kept but disabled once that year's order was submitted.
+public sealed record CreateOrderEligibility(bool CanOrderOnline, bool CanCreateCurrentYearOrder, bool CanCreateNextYearOrder, string CurrentYear = "", string NextYear = "");
 
 // One distribution-month checkbox. Selected + AlreadyParticipating means the participant already
 // holds that month (shown ticked and locked); Selected without it is a month in the pending order.
@@ -52,9 +53,26 @@ public sealed record CreateOrderPage(
     IReadOnlyList<CreateOrderScheduleGroup> AvailableSchemes,
     decimal SchemeTotal,
     decimal PostageTotal,
-    bool CanProceed)
+    bool CanProceed,
+    string PurchaseOrderNumber = "",
+    IReadOnlyList<CreateOrderConsent>? Consents = null)
 {
     public decimal OrderTotal => SchemeTotal + PostageTotal;
+}
+
+// A selected scheme whose Data Consent Declaration is active (legacy DivDataConsentDeclarationSection).
+public sealed record CreateOrderConsent(Guid SchemeId, string Identifier, string Name, string Text, bool Given);
+
+// Legacy BtnSubmit_Click inputs: the textbox, the terms checkbox and the ticked consent checkboxes.
+public sealed record CreateOrderSubmission(string? PurchaseOrderNumber, bool TermsAccepted, IReadOnlyCollection<Guid> ConsentedSchemeIds);
+
+// Field is "Schemes", "PurchaseOrderNumber", "TermsAccepted" or "DataConsent".
+public sealed record CreateOrderValidationError(string Field, string Message);
+
+// Errors empty means the save or submit went through (when Access is Allowed).
+public sealed record CreateOrderSubmitOutcome(CreateOrderAccess Access, IReadOnlyList<CreateOrderValidationError> Errors)
+{
+    public bool Succeeded => Access == CreateOrderAccess.Allowed && Errors.Count == 0;
 }
 
 public sealed record CreateOrderResult(CreateOrderAccess Access, CreateOrderPage? Page = null);

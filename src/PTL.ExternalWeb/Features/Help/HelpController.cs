@@ -1,5 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
-using PTL.ExternalWeb.Features.Account;
+using PTL.Contracts.ExternalUser;
 
 namespace PTL.ExternalWeb.Features.Help;
 

@@ -16,6 +16,34 @@
   color: var(--govuk-link-colour, #1a65a6);
 }
 
+/* A button that reads as a link in a table cell - for an action that posts (sends an email) rather than navigates. */
+.app-inline-form {
+  display: inline;
+  margin: 0;
+}
+
+.app-link-button {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  cursor: pointer;
+  color: var(--govuk-link-colour, #1a65a6);
+  text-decoration: underline;
+}
+
+.app-link-button:hover {
+  color: var(--govuk-link-hover-colour, #0f385c);
+}
+
+.app-link-button:focus {
+  outline: 3px solid transparent;
+  color: var(--govuk-focus-text-colour, #0b0c0c);
+  background-color: var(--govuk-focus-colour, #fd0);
+  box-shadow: 0 -2px var(--govuk-focus-colour, #fd0), 0 4px var(--govuk-focus-text-colour, #0b0c0c);
+  text-decoration: none;
+}
+
 /* Scheme List "enrolment highlighting" (AC3) - legacy's bold-schemes.js reproduced as a server-rendered, accessible row tint rather than client-side jQuery/yellow DOM manipulation */
 .app-table__row--enrolled {
   background-color: #f3f2f1;
@@ -24,6 +52,47 @@
 /* Keep multi-word status tags (e.g. "In Progress") on one line in table cells */
 .govuk-table__cell .govuk-tag {
   white-space: nowrap;
+}
+
+/* govuk-frontend caps notification banner content at 605px; the Home banner uses the whole width, as legacy. */
+.app-notification-banner--full .govuk-notification-banner__content > * {
+  max-width: none;
+}
+
+/* Home: the admin-authored Important message, as legacy (red text, 18px, warning icon); #ae0c0c is 7.3:1 on white. */
+.app-important-message {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  color: #ae0c0c;
+  font-size: 1.125rem;
+  line-height: 1.4;
+}
+
+.app-important-message__icon {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: #ae0c0c;
+  color: #fff;
+  font-weight: 700;
+  font-size: 1.25rem;
+  line-height: 30px;
+  text-align: center;
+}
+
+.app-important-message__text {
+  flex: 1;
+  min-width: 0;
+}
+
+.app-important-message__text p {
+  margin: 0 0 0.75rem;
+}
+
+.app-important-message__text > :last-child {
+  margin-bottom: 0;
 }
 
 
@@ -53,9 +122,22 @@
   color: #ffffff;
 }
 
+/* Sign out in the dark top bar: same white underlined look as the other links there. */
+.app-header__actions .app-signout-button {
+  color: #ffffff;
+  text-decoration: underline;
+}
+
 .govuk-service-navigation__service-name img {
   height: 80px;
   width: auto;
+}
+
+/* ExternalWeb shows two logos (APHA Scientific, VETQAS) side by side, as legacy. */
+.govuk-service-navigation__service-name {
+  display: flex;
+  align-items: center;
+  gap: 20px;
 }
 
 /* Not a built-in govuk-frontend default, but a common, GDS-compliant customisation used by
@@ -163,6 +245,19 @@
   position: absolute;
   inset: 0;
 }
+
+/* Disabled tile (legacy MaterialCard.Enabled = False): greyed, no hover colour change. */
+.app-card--disabled,
+.app-card--disabled:hover {
+  background-color: #f3f2f1;
+}
+
+.app-card--disabled .govuk-heading-m,
+.app-card--disabled p,
+.app-card--disabled:hover .govuk-heading-m,
+.app-card--disabled:hover p {
+  color: #505a5f;
+}
 /* Create New Order (legacy PendingContractOrder.aspx): month strip under each selected scheme row */
 .app-order-row--selected {
   background-color: #f3f2f1;
@@ -172,6 +267,12 @@
   margin-bottom: 0;
 }
 
+/* Month strip as in legacy: twelve equal columns under the scheme, each with the checkbox centred and the month name below. */
+.app-month-cell {
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
 .app-month-strip {
   display: flex;
   flex-wrap: wrap;
@@ -179,13 +280,196 @@
   gap: 5px 20px;
 }
 
-.app-month .govuk-checkboxes__item {
-  float: none;
+.app-month-cell .app-month-strip {
+  display: grid;
+  gap: 0;
+  grid-template-columns: repeat(12, minmax(3rem, 1fr));
 }
 
-.app-month--unavailable {
+/* Two fixed rows (44px checkbox slot, then the name) so every month name sits on the same line, ticked or not. */
+.app-month {
+  display: grid;
+  grid-template-rows: 44px auto;
+  justify-items: center;
+  align-content: start;
+  padding-bottom: 5px;
+  border-left: 1px solid var(--govuk-border-colour, #b1b4b6);
+}
+
+.app-month .govuk-checkboxes,
+.app-checkbox-centre {
+  height: 44px;
+}
+
+/* Centres a small checkbox in its table column. */
+.app-checkbox-centre {
+  display: flex;
+  justify-content: center;
+}
+
+.app-cell-centre {
+  text-align: center;
+}
+
+/* Same column widths in every scheme table so headers wrap identically whether or not a row is selected. */
+.app-order-table--fixed {
+  table-layout: fixed;
+  min-width: 56rem;
+}
+
+/* Pending order and Print: same fixed layout; the minimum width only applies on screen so the printout fits the page. */
+.app-order-table--review {
+  table-layout: fixed;
+}
+
+@media screen {
+  .app-order-table--review {
+    min-width: 56rem;
+  }
+}
+
+.app-month .govuk-checkboxes__item,
+.app-checkbox-centre .govuk-checkboxes__item {
+  float: none;
+  width: 44px;
+  height: 44px;
+  min-height: 0;
+  padding: 0;
+  margin: 0;
+}
+
+.app-month .govuk-checkboxes__input,
+.app-checkbox-centre .govuk-checkboxes__input {
+  top: 0;
+  left: 0;
+  margin: 0;
+}
+
+.app-month .govuk-checkboxes__label,
+.app-checkbox-centre .govuk-checkboxes__label {
+  display: block;
+  box-sizing: border-box;
+  width: 44px;
+  height: 44px;
+  min-height: 0;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* The small checkbox box is 24px wide; centre it in the 44px target. */
+.app-month .govuk-checkboxes__label::before,
+.app-checkbox-centre .govuk-checkboxes__label::before {
+  left: 10px;
+}
+
+.app-month .govuk-checkboxes__label::after,
+.app-checkbox-centre .govuk-checkboxes__label::after {
+  left: 16px;
+}
+
+.app-month__box {
+  display: block;
+  width: 44px;
+  height: 44px;
+}
+
+/* One style for every month name, offered or not, as in legacy. */
+.app-month__name {
+  display: block;
+  margin: -6px 0 0;
+  font-size: 1rem;
+  line-height: 1.25;
+  text-align: center;
+  cursor: pointer;
+}
+
+.app-month--unavailable .app-month__name {
+  cursor: default;
+}
+
+/* Read-only month on the Pending order page: a month that is not part of the order. */
+.app-month-off {
   color: #505a5f;
-  padding-left: 40px;
+  padding: 2px 8px;
+}
+
+/* Pending order: months sit in twelve equal cells, centred, with compact tags so they fit the five price columns. */
+.app-month-cell .app-month-strip > .govuk-tag,
+.app-month-cell .app-month-strip > .app-month-off {
+  justify-self: center;
+  padding-right: 4px;
+  padding-left: 4px;
+}
+
+/* Order printout (legacy printed the Pending Order page: logo block shown, navigation and breadcrumb hidden). */
+.app-print-only {
+  display: none;
+}
+
+/* Twelve equal cells, tick above the month name, as legacy's month strip. */
+.app-print-months {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.app-print-month {
+  margin: 0;
+  padding: 0 2px;
+  border-left: 1px solid var(--govuk-border-colour, #b1b4b6);
+  text-align: center;
+  color: #505a5f;
+}
+
+.app-print-month--selected {
+  color: var(--govuk-text-colour, #0b0c0c);
+  font-weight: 700;
+}
+
+.app-print-month__tick,
+.app-print-month__name {
+  display: block;
+}
+
+@media print {
+  body .app-print-actions,
+  body .govuk-back-link,
+  body .govuk-breadcrumbs,
+  body .govuk-header,
+  body .govuk-footer,
+  body .govuk-phase-banner,
+  body .govuk-service-navigation,
+  body .govuk-skip-link {
+    display: none;
+  }
+
+  .govuk-main-wrapper {
+    padding-top: 0;
+  }
+
+  .app-print-only {
+    display: block;
+  }
+
+  .app-print-logo {
+    max-width: 100%;
+    height: auto;
+    margin-bottom: 20px;
+  }
+
+  .app-print-footer {
+    margin-top: 30px;
+    padding-top: 10px;
+    border-top: 1px solid #0b0c0c;
+  }
+
+  /* Keep a scheme row with its month strip, and never split a row across pages. */
+  .app-order-table tr {
+    break-inside: avoid;
+  }
 }
 
 /* GOV.UK component rules that set display (e.g. error summary/message) otherwise win over the hidden attribute. */
@@ -195,6 +479,12 @@
 
 .app-table-scroll {
   overflow-x: auto;
+}
+
+/* overflow-x:auto also clips the 10px checkbox hover halo; pad the wrapper and pull it back so the table stays aligned. */
+.app-order-scroll {
+  padding: 10px 0 10px 10px;
+  margin: -10px 0 -10px -10px;
 }
 
 /* Read-only results tables: fixed 65/35 columns as legacy (pt-results__table-readonly-column1/2) so values line up. */

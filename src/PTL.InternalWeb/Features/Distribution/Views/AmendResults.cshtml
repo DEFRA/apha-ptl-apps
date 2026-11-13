@@ -23,13 +23,13 @@
     string? ErrorFor(string name) =>
         ViewData.ModelState.TryGetValue(name, out var entry) && entry.Errors.Count > 0 ? entry.Errors[0].ErrorMessage : null;
 
-    bool IsFreeText(AmendItemResponse item) => item.FormatString.StartsWith('^');
+    static bool IsFreeText(AmendItemResponse item) => item.FormatString.StartsWith('^');
 
     // Legacy showed "Input must be of format: {Message}" as a tooltip; here it is a hint under the item's column header.
-    string? HintId(AmendItemResponse item) =>
+    static string? HintId(AmendItemResponse item) =>
         IsFreeText(item) && !string.IsNullOrEmpty(item.Message) ? $"hint_{item.ItemId:N}" : null;
 
-    string? DescribedBy(params string?[] ids)
+    static string? DescribedBy(params string?[] ids)
     {
         var joined = string.Join(' ', ids.Where(i => !string.IsNullOrEmpty(i)));
         return joined.Length == 0 ? null : joined;

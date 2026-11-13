@@ -9,7 +9,7 @@
         .Select(t => new Microsoft.AspNetCore.Mvc.Rendering.SelectListItem(t.Name, t.TabulationId.ToString()))
         .ToList();
 
-    string AvailabilityText(SchemeTabulationAvailability availability) => availability switch
+    static string AvailabilityText(SchemeTabulationAvailability availability) => availability switch
     {
         SchemeTabulationAvailability.All => "All",
         SchemeTabulationAvailability.ParticipantsOnly => "Participants Only",

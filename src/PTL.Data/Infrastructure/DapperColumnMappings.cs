@@ -56,6 +56,15 @@ public static partial class DapperColumnMappings
     private const string ColCustomerId = "fldCustomerId";
     private const string ColName = "fldName";
     private const string ColIsActive = "fldIsActive";
+    private const string ColStartYearId = "fldStartYearId";
+    private const string ColEndYearId = "fldEndYearId";
+    private const string ColNoLongerInUse = "fldNoLongerInUse";
+    private const string ColForeignInstances = "ForeignInstances";
+    private const string ColForeignInstancesString = "ForeignInstancesString";
+    private const string ColSharedId = "fldSharedId";
+    private const string ColTestType = "fldTestType";
+    private const string ColTestResultItemTypeId = "fldTestResultItemTypeId";
+    private const string ColTestMethodItemTypeId = "fldTestMethodItemTypeId";
     private const string ColYearId = "fldYearId";
     private const string ColMonthId = "fldMonthId";
     private const string ColAddress1 = "fldAddress1";
@@ -115,6 +124,7 @@ public static partial class DapperColumnMappings
     private const string ColSampleId = "fldSampleId";
     private const string ColTestResultItemId = "fldTestResultItemId";
     private const string ColSchemeName = "fldSchemeName";
+    private const string ColLoginInstructionsSent = "fldLoginInstructionsSent";
     private const string ColImportExportLicenceRequired = "fldImportExportLicenceRequired";
     private const string ColRequiresAssessment = "fldRequiresAssessment";
     private const string ColScheduleCode = "fldScheduleCode";
@@ -263,6 +273,7 @@ public static partial class DapperColumnMappings
             [ColLabName] = nameof(ParticipantSummaryEntity.LabName),
             [ColContactName] = nameof(ParticipantSummaryEntity.ContactName),
             [ColIsActive] = nameof(ParticipantSummaryEntity.IsActive),
+            [ColLoginInstructionsSent] = nameof(ParticipantSummaryEntity.LoginInstructionsSent),
         });
 
         Map<ViewerEntity>(new(StringComparer.OrdinalIgnoreCase)
@@ -272,6 +283,7 @@ public static partial class DapperColumnMappings
             [ColEmail] = nameof(ViewerEntity.Email),
             ["fldSsoId"] = nameof(ViewerEntity.SsoId),
             ["fldSsoIdExt"] = nameof(ViewerEntity.SsoIdExt),
+            [ColLoginInstructionsSent] = nameof(ViewerEntity.LoginInstructionsSent),
         });
 
         Map<ViewerSchemeEntity>(new(StringComparer.OrdinalIgnoreCase)
@@ -298,6 +310,7 @@ public static partial class DapperColumnMappings
             ["fldSsoIdExt"] = nameof(PTL.Core.TestConsultant.TestConsultant.SsoIdExt),
             [ColIsInactive] = nameof(PTL.Core.TestConsultant.TestConsultant.IsInactive),
             [ColInactiveDate] = nameof(PTL.Core.TestConsultant.TestConsultant.InactiveDate),
+            [ColLoginInstructionsSent] = nameof(PTL.Core.TestConsultant.TestConsultant.LoginInstructionsSent),
             ["fldAllocationCount"] = nameof(PTL.Core.TestConsultant.TestConsultant.AllocationCount),
             ["fldAllocationString"] = nameof(PTL.Core.TestConsultant.TestConsultant.AllocationString),
         });
@@ -391,62 +404,62 @@ public static partial class DapperColumnMappings
         {
             ["fldCategoryItemTypeId"] = nameof(CoreCategoryItemType.CategoryItemTypeId),
             [ColName] = nameof(CoreCategoryItemType.Name),
-            ["fldStartYearId"] = nameof(CoreCategoryItemType.StartYearId),
-            ["fldEndYearId"] = nameof(CoreCategoryItemType.EndYearId),
-            ["fldNoLongerInUse"] = nameof(CoreCategoryItemType.NoLongerInUse),
-            ["ForeignInstances"] = nameof(CoreCategoryItemType.ForeignInstances),
-            ["ForeignInstancesString"] = nameof(CoreCategoryItemType.ForeignInstancesString),
+            [ColStartYearId] = nameof(CoreCategoryItemType.StartYearId),
+            [ColEndYearId] = nameof(CoreCategoryItemType.EndYearId),
+            [ColNoLongerInUse] = nameof(CoreCategoryItemType.NoLongerInUse),
+            [ColForeignInstances] = nameof(CoreCategoryItemType.ForeignInstances),
+            [ColForeignInstancesString] = nameof(CoreCategoryItemType.ForeignInstancesString),
         });
 
         Map<CoreCriterionItemType>(new(StringComparer.OrdinalIgnoreCase)
         {
             ["fldCriterionItemTypeId"] = nameof(CoreCriterionItemType.CriterionItemTypeId),
             [ColName] = nameof(CoreCriterionItemType.Name),
-            ["fldStartYearId"] = nameof(CoreCriterionItemType.StartYearId),
-            ["fldEndYearId"] = nameof(CoreCriterionItemType.EndYearId),
-            ["fldNoLongerInUse"] = nameof(CoreCriterionItemType.NoLongerInUse),
-            ["ForeignInstances"] = nameof(CoreCriterionItemType.ForeignInstances),
-            ["ForeignInstancesString"] = nameof(CoreCriterionItemType.ForeignInstancesString),
+            [ColStartYearId] = nameof(CoreCriterionItemType.StartYearId),
+            [ColEndYearId] = nameof(CoreCriterionItemType.EndYearId),
+            [ColNoLongerInUse] = nameof(CoreCriterionItemType.NoLongerInUse),
+            [ColForeignInstances] = nameof(CoreCriterionItemType.ForeignInstances),
+            [ColForeignInstancesString] = nameof(CoreCriterionItemType.ForeignInstancesString),
         });
 
         Map<CoreTestType>(new(StringComparer.OrdinalIgnoreCase)
         {
             [ColTestTypeId] = nameof(CoreTestType.TestTypeId),
-            ["fldSharedId"] = nameof(CoreTestType.SharedId),
-            ["fldTestType"] = nameof(CoreTestType.Name),
-            ["fldStartYearId"] = nameof(CoreTestType.StartYearId),
-            ["fldEndYearId"] = nameof(CoreTestType.EndYearId),
-            ["fldNoLongerInUse"] = nameof(CoreTestType.NoLongerInUse),
-            ["ForeignInstances"] = nameof(CoreTestType.ForeignInstances),
-            ["ForeignInstancesString"] = nameof(CoreTestType.ForeignInstancesString),
+            [ColSharedId] = nameof(CoreTestType.SharedId),
+            [ColTestType] = nameof(CoreTestType.Name),
+            [ColStartYearId] = nameof(CoreTestType.StartYearId),
+            [ColEndYearId] = nameof(CoreTestType.EndYearId),
+            [ColNoLongerInUse] = nameof(CoreTestType.NoLongerInUse),
+            [ColForeignInstances] = nameof(CoreTestType.ForeignInstances),
+            [ColForeignInstancesString] = nameof(CoreTestType.ForeignInstancesString),
         });
 
         Map<CoreTestResultItemType>(new(StringComparer.OrdinalIgnoreCase)
         {
-            ["fldTestResultItemTypeId"] = nameof(CoreTestResultItemType.TestResultItemTypeId),
-            ["fldSharedId"] = nameof(CoreTestResultItemType.SharedId),
+            [ColTestResultItemTypeId] = nameof(CoreTestResultItemType.TestResultItemTypeId),
+            [ColSharedId] = nameof(CoreTestResultItemType.SharedId),
             ["fldTestResultItemType"] = nameof(CoreTestResultItemType.Name),
-            ["fldStartYearId"] = nameof(CoreTestResultItemType.StartYearId),
-            ["fldEndYearId"] = nameof(CoreTestResultItemType.EndYearId),
-            ["fldNoLongerInUse"] = nameof(CoreTestResultItemType.NoLongerInUse),
+            [ColStartYearId] = nameof(CoreTestResultItemType.StartYearId),
+            [ColEndYearId] = nameof(CoreTestResultItemType.EndYearId),
+            [ColNoLongerInUse] = nameof(CoreTestResultItemType.NoLongerInUse),
             ["fldTestReturnValueTypeId"] = nameof(CoreTestResultItemType.TestReturnValueTypeId),
             ["fldTestReturnValueType"] = nameof(CoreTestResultItemType.TestReturnValueTypeName),
-            ["ForeignInstances"] = nameof(CoreTestResultItemType.ForeignInstances),
-            ["ForeignInstancesString"] = nameof(CoreTestResultItemType.ForeignInstancesString),
+            [ColForeignInstances] = nameof(CoreTestResultItemType.ForeignInstances),
+            [ColForeignInstancesString] = nameof(CoreTestResultItemType.ForeignInstancesString),
         });
 
         Map<CoreTestMethodItemType>(new(StringComparer.OrdinalIgnoreCase)
         {
-            ["fldTestMethodItemTypeId"] = nameof(CoreTestMethodItemType.TestMethodItemTypeId),
-            ["fldSharedId"] = nameof(CoreTestMethodItemType.SharedId),
+            [ColTestMethodItemTypeId] = nameof(CoreTestMethodItemType.TestMethodItemTypeId),
+            [ColSharedId] = nameof(CoreTestMethodItemType.SharedId),
             ["fldTestMethodItemType"] = nameof(CoreTestMethodItemType.Name),
-            ["fldStartYearId"] = nameof(CoreTestMethodItemType.StartYearId),
-            ["fldEndYearId"] = nameof(CoreTestMethodItemType.EndYearId),
-            ["fldNoLongerInUse"] = nameof(CoreTestMethodItemType.NoLongerInUse),
+            [ColStartYearId] = nameof(CoreTestMethodItemType.StartYearId),
+            [ColEndYearId] = nameof(CoreTestMethodItemType.EndYearId),
+            [ColNoLongerInUse] = nameof(CoreTestMethodItemType.NoLongerInUse),
             ["fldTestReturnValueTypeId"] = nameof(CoreTestMethodItemType.TestReturnValueTypeId),
             ["fldTestReturnValueType"] = nameof(CoreTestMethodItemType.TestReturnValueTypeName),
-            ["ForeignInstances"] = nameof(CoreTestMethodItemType.ForeignInstances),
-            ["ForeignInstancesString"] = nameof(CoreTestMethodItemType.ForeignInstancesString),
+            [ColForeignInstances] = nameof(CoreTestMethodItemType.ForeignInstances),
+            [ColForeignInstancesString] = nameof(CoreTestMethodItemType.ForeignInstancesString),
         });
 
         // spgContractMerge result set 1 (legacy ContractMergeInfo).
@@ -681,7 +694,7 @@ public static partial class DapperColumnMappings
         Map<CoreScheme>(new(StringComparer.OrdinalIgnoreCase)
         {
             [ColSchemeId] = nameof(CoreScheme.SchemeId),
-            ["fldSharedId"] = nameof(CoreScheme.SharedId),
+            [ColSharedId] = nameof(CoreScheme.SharedId),
             [ColYearId] = nameof(CoreScheme.YearId),
             [ColIdentifier] = nameof(CoreScheme.Identifier),
             [ColName] = nameof(CoreScheme.Name),
@@ -755,7 +768,7 @@ public static partial class DapperColumnMappings
 
         Map<SchemeSummaryEntity>(new(StringComparer.OrdinalIgnoreCase)
         {
-            ["fldSharedId"] = nameof(SchemeSummaryEntity.SharedId),
+            [ColSharedId] = nameof(SchemeSummaryEntity.SharedId),
             [ColYearId] = nameof(SchemeSummaryEntity.YearId),
             ["fldCurrentSchemeId"] = nameof(SchemeSummaryEntity.CurrentSchemeId),
             ["fldCurrentIdentifier"] = nameof(SchemeSummaryEntity.CurrentIdentifier),
@@ -780,7 +793,7 @@ public static partial class DapperColumnMappings
         Map<SchemeHistoryEntity>(new(StringComparer.OrdinalIgnoreCase)
         {
             ["fldCurrentSchemeId"] = nameof(SchemeHistoryEntity.SchemeId),
-            ["fldSharedId"] = nameof(SchemeHistoryEntity.SharedId),
+            [ColSharedId] = nameof(SchemeHistoryEntity.SharedId),
             [ColYearId] = nameof(SchemeHistoryEntity.YearId),
             ["fldCurrentIdentifier"] = nameof(SchemeHistoryEntity.Identifier),
             ["fldCurrentName"] = nameof(SchemeHistoryEntity.Name),
@@ -987,7 +1000,7 @@ public static partial class DapperColumnMappings
         {
             [ColTestMethodItemId] = nameof(DistributionTestMethodItemEntity.TestMethodItemId),
             [ColTestId] = nameof(DistributionTestMethodItemEntity.TestId),
-            ["fldTestMethodItemTypeId"] = nameof(DistributionTestMethodItemEntity.TestMethodItemTypeId),
+            [ColTestMethodItemTypeId] = nameof(DistributionTestMethodItemEntity.TestMethodItemTypeId),
             ["TestMethodItemTypeName"] = nameof(DistributionTestMethodItemEntity.Name),
             [ColOrder] = nameof(DistributionTestMethodItemEntity.Order),
             ["fldIsApplicable"] = nameof(DistributionTestMethodItemEntity.IsApplicable),
@@ -1000,7 +1013,7 @@ public static partial class DapperColumnMappings
         {
             [ColTestResultItemId] = nameof(DistributionTestResultItemEntity.TestResultItemId),
             [ColTestId] = nameof(DistributionTestResultItemEntity.TestId),
-            ["fldTestResultItemTypeId"] = nameof(DistributionTestResultItemEntity.TestResultItemTypeId),
+            [ColTestResultItemTypeId] = nameof(DistributionTestResultItemEntity.TestResultItemTypeId),
             ["TestResultItemTypeName"] = nameof(DistributionTestResultItemEntity.Name),
             [ColOrder] = nameof(DistributionTestResultItemEntity.Order),
             [ColFormatString] = nameof(DistributionTestResultItemEntity.FormatString),
@@ -1084,7 +1097,7 @@ public static partial class DapperColumnMappings
         Map<SampleReceiptTestEntity>(new(StringComparer.OrdinalIgnoreCase)
         {
             ["fldTestId"] = nameof(SampleReceiptTestEntity.TestId),
-            ["fldTestType"] = nameof(SampleReceiptTestEntity.TestType),
+            [ColTestType] = nameof(SampleReceiptTestEntity.TestType),
         });
 
         Map<SampleReceiptSampleEntity>(new(StringComparer.OrdinalIgnoreCase)
@@ -1206,7 +1219,7 @@ public static partial class DapperColumnMappings
         {
             [ColTestId] = nameof(SchemeTest.TestId),
             [ColTestTypeId] = nameof(SchemeTest.TestTypeId),
-            ["fldTestType"] = nameof(SchemeTest.TestType),
+            [ColTestType] = nameof(SchemeTest.TestType),
             [ColSchemeId] = nameof(SchemeTest.SchemeId),
             [ColOrder] = nameof(SchemeTest.Order),
         });
@@ -1214,7 +1227,7 @@ public static partial class DapperColumnMappings
         Map<SchemeTestResultItem>(new(StringComparer.OrdinalIgnoreCase)
         {
             [ColTestResultItemId] = nameof(SchemeTestResultItem.TestResultItemId),
-            ["fldTestResultItemTypeId"] = nameof(SchemeTestResultItem.TestResultItemTypeId),
+            [ColTestResultItemTypeId] = nameof(SchemeTestResultItem.TestResultItemTypeId),
             ["fldTestResultItemType"] = nameof(SchemeTestResultItem.TestResultItemType),
             [ColTestId] = nameof(SchemeTestResultItem.TestId),
             [ColOrder] = nameof(SchemeTestResultItem.Order),
@@ -1224,7 +1237,7 @@ public static partial class DapperColumnMappings
         Map<SchemeTestMethodItem>(new(StringComparer.OrdinalIgnoreCase)
         {
             [ColTestMethodItemId] = nameof(SchemeTestMethodItem.TestMethodItemId),
-            ["fldTestMethodItemTypeId"] = nameof(SchemeTestMethodItem.TestMethodItemTypeId),
+            [ColTestMethodItemTypeId] = nameof(SchemeTestMethodItem.TestMethodItemTypeId),
             ["fldTestMethodItemType"] = nameof(SchemeTestMethodItem.TestMethodItemType),
             [ColTestId] = nameof(SchemeTestMethodItem.TestId),
             [ColOrder] = nameof(SchemeTestMethodItem.Order),
@@ -1275,15 +1288,15 @@ public static partial class DapperColumnMappings
         Map<SchemeItemTypeEntity>(new(StringComparer.OrdinalIgnoreCase)
         {
             [ColTestTypeId] = nameof(SchemeItemTypeEntity.ItemTypeId),
-            ["fldTestType"] = nameof(SchemeItemTypeEntity.Name),
-            ["fldTestResultItemTypeId"] = nameof(SchemeItemTypeEntity.ItemTypeId),
+            [ColTestType] = nameof(SchemeItemTypeEntity.Name),
+            [ColTestResultItemTypeId] = nameof(SchemeItemTypeEntity.ItemTypeId),
             ["fldTestResultItemType"] = nameof(SchemeItemTypeEntity.Name),
-            ["fldTestMethodItemTypeId"] = nameof(SchemeItemTypeEntity.ItemTypeId),
+            [ColTestMethodItemTypeId] = nameof(SchemeItemTypeEntity.ItemTypeId),
             ["fldTestMethodItemType"] = nameof(SchemeItemTypeEntity.Name),
             ["fldCategoryItemTypeId"] = nameof(SchemeItemTypeEntity.ItemTypeId),
             ["fldCriterionItemTypeId"] = nameof(SchemeItemTypeEntity.ItemTypeId),
             [ColName] = nameof(SchemeItemTypeEntity.Name),
-            ["fldNoLongerInUse"] = nameof(SchemeItemTypeEntity.NoLongerInUse),
+            [ColNoLongerInUse] = nameof(SchemeItemTypeEntity.NoLongerInUse),
         });
 
         Map<PostagePricingPlanEntity>(new(StringComparer.OrdinalIgnoreCase)

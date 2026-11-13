@@ -1,9 +1,20 @@
 @model string
 
-@* Shared by Distribution/Previous.cshtml and Tabulation/Index.cshtml - see
+@* Shared by Comments, Distribution/Previous, Tabulation/Index and Order - see
    docs/Code-Duplication-Playbook.md. Model is the current controller action name, so "Show All"
-   re-submits the form's own action with no query values. *@
+   re-submits the form's own action with no query values. Set ViewData["ShowAllUrl"] to override
+   the target (e.g. to keep sort state). *@
+@{
+    var showAllUrl = ViewData["ShowAllUrl"] as string;
+}
 <div class="govuk-button-group">
     <button class="govuk-button" data-module="govuk-button" type="submit">Search</button>
-    <a class="govuk-button govuk-button--secondary" data-module="govuk-button" asp-action="@Model">Show All</a>
+    @if (showAllUrl is not null)
+    {
+        <a class="govuk-button govuk-button--secondary" data-module="govuk-button" href="@showAllUrl">Show All</a>
+    }
+    else
+    {
+        <a class="govuk-button govuk-button--secondary" data-module="govuk-button" asp-action="@Model">Show All</a>
+    }
 </div>

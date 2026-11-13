@@ -69,8 +69,13 @@ internal sealed class FakeCreateOrderStore : ICreateOrderRepository, IPendingOrd
         return Task.FromResult<IReadOnlyList<PendingOrderSchemeEntity>>([.. lines]);
     }
 
-    public Task UpdateSchemeAsync(PendingOrderSchemeEntity scheme, bool dataConsentDeclarationGiven, CancellationToken cancellationToken = default) =>
-        Task.CompletedTask;
+    public Task UpdateSchemeAsync(PendingOrderSchemeEntity scheme, bool dataConsentDeclarationGiven, CancellationToken cancellationToken = default)
+    {
+        ConsentUpdates.Add((scheme.SchemeId, dataConsentDeclarationGiven));
+        return Task.CompletedTask;
+    }
+
+    public List<(Guid SchemeId, bool Given)> ConsentUpdates { get; } = [];
 
     public Task DeleteSchemeAsync(Guid pendingParticipantSchemeId, CancellationToken cancellationToken = default)
     {
@@ -94,7 +99,19 @@ internal sealed class FakeCreateOrderStore : ICreateOrderRepository, IPendingOrd
 
     public Task<PendingOrderSchemeEntity?> GetSchemeByIdAsync(Guid pendingParticipantSchemeId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
 
-    public Task UpdatePurchaseOrderNumberAsync(Guid pendingContractId, string purchaseOrderNumber, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    public Task UpdatePurchaseOrderNumberAsync(Guid pendingContractId, string purchaseOrderNumber, CancellationToken cancellationToken = default)
+    {
+        _orders.Single(o => o.PendingContractId == pendingContractId).PurchaseOrderNumber = purchaseOrderNumber;
+        return Task.CompletedTask;
+    }
+
+    public Task SubmitAsync(Guid pendingContractId, string purchaseOrderNumber, CancellationToken cancellationToken = default)
+    {
+        var order = _orders.Single(o => o.PendingContractId == pendingContractId);
+        order.PurchaseOrderNumber = purchaseOrderNumber;
+        order.IsSubmitted = true;
+        return Task.CompletedTask;
+    }
 
     public Task QueueNotificationAsync(PendingOrderNotification notification, CancellationToken cancellationToken = default) => throw new NotSupportedException();
 

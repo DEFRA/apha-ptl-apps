@@ -26,6 +26,7 @@ using PTL.Core.ExternalUser;
 using PTL.Core.GroupAddress;
 using PTL.Core.InternalUser;
 using PTL.Core.Invoice;
+using PTL.Core.Labels;
 using PTL.Core.Lookup;
 using PTL.Core.Notifications;
 using PTL.Core.Participant;
@@ -132,7 +133,10 @@ builder.Services.AddScoped<IParticipantSchemeRepository, ParticipantSchemeReposi
 builder.Services.AddScoped<IParticipantSchemeService, ParticipantSchemeService>();
 
 builder.Services.AddScoped<ITestConsultantRepository, TestConsultantRepository>();
+builder.Services.AddScoped<IExternalUserRepository, PTL.Data.ExternalUser.ExternalUserRepository>();
 builder.Services.AddScoped<IExternalUserService, ExternalUserService>();
+builder.Services.AddScoped<PTL.Core.LabUsers.ILabUserRepository, PTL.Data.LabUsers.LabUserRepository>();
+builder.Services.AddScoped<PTL.Core.LabUsers.ILabUserService, PTL.Core.LabUsers.LabUserService>();
 builder.Services.AddScoped<ITestConsultantService, TestConsultantService>();
 
 builder.Services.AddScoped<ISystemMessageRepository, SystemMessageRepository>();
@@ -178,6 +182,11 @@ builder.Services.Configure<ParticipantUpdateEmailOptions>(builder.Configuration.
 builder.Services.AddScoped<ICustomerUpdateNotifier, CustomerUpdateNotifier>();
 builder.Services.AddScoped<IParticipantUpdateNotifier, ParticipantUpdateNotifier>();
 
+// Login instruction emails (Manage Participants / Viewers / External Test Consultants): sent through GOV.UK Notify when a user presses Send Instructions.
+builder.Services.AddScoped<PTL.Core.LoginInstructions.ILoginInstructionsRepository, PTL.Data.LoginInstructions.LoginInstructionsRepository>();
+builder.Services.AddScoped<PTL.Core.LoginInstructions.ILoginInstructionRecipientResolver, PTL.Core.LoginInstructions.LoginInstructionRecipientResolver>();
+builder.Services.AddScoped<PTL.Core.LoginInstructions.ILoginInstructionsService, PTL.Core.LoginInstructions.LoginInstructionsService>();
+
 // Single shared S3 configuration root for every S3-backed feature (export templates, invoice
 // archives) - one bucket, one prefix per feature (docs/migration/invoice-migration.md). Provider
 // and region never vary by environment, so they are not bound from configuration at all - see
@@ -218,6 +227,16 @@ builder.Services.AddScoped<ISchemeService, SchemeService>();
 
 builder.Services.AddScoped<ILookupRepository, LookupRepository>();
 builder.Services.AddScoped<ILookupService, LookupService>();
+
+// Replaces legacy LabelBase.Print() (web.config LabelPrinterName + the Windows print spooler) -
+// the printer is reached over the network instead (see LabelPrinterOptions). Host is deliberately
+// left blank by default (appsettings.json) and must be supplied per environment; a blank Host fails
+// the print cleanly rather than preventing startup, so this is NOT bound with .ValidateOnStart().
+// Lives here, not in a web front-end, so every caller (InternalWeb today, others later) shares one
+// printer configuration and connection point.
+builder.Services.AddOptions<LabelPrinterOptions>()
+    .Bind(builder.Configuration.GetSection(LabelPrinterOptions.SectionName));
+builder.Services.AddSingleton<ILabelPrinterClient, LabelPrinterClient>();
 
 builder.Services.AddScoped<IDistributionRepository, DistributionRepository>();
 builder.Services.AddScoped<IDistributionService, DistributionService>();

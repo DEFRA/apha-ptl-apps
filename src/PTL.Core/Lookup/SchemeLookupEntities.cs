@@ -47,7 +47,6 @@ public class SchemeUserEntity
     public bool IsInactive { get; set; }
 
     // Set by the repository from which spgaUserAllTestConsultant result set the row came.
-    // Only internal consultants may be the Primary Test Consultant.
     public bool IsExternal { get; set; }
 }
 

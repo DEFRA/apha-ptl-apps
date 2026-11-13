@@ -8,9 +8,8 @@
     // header dropdown panel instead of a side column.
     var roles = User.GetResolvedExternalRoles();
     var canOrderOnline = User.CanOrderOnline();
-    bool IsVisible(NavigationItem item) =>
-        (item.RequiredRole is null || roles.Contains(item.RequiredRole, StringComparer.OrdinalIgnoreCase))
-        && (!item.RequireCanOrderOnline || canOrderOnline);
+    var isLabUser = User.IsLabUser();
+    bool IsVisible(NavigationItem item) => item.IsVisibleTo(roles, isLabUser, canOrderOnline);
 
     var visibleGroups = NavigationProvider.Build()
         .Where(IsVisible)

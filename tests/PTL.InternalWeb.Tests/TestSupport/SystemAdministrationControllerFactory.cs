@@ -23,7 +23,8 @@ internal static class SystemAdministrationControllerFactory
         FakeViewerApiClient? viewerApiClient = null,
         FakeUserApiClient? userApiClient = null,
         FakeExternalTestConsultantApiClient? externalTestConsultantApiClient = null,
-        FakeStaffDirectoryService? staffDirectoryService = null)
+        FakeStaffDirectoryService? staffDirectoryService = null,
+        FakeLoginInstructionsApiClient? loginInstructionsApiClient = null)
     {
         var httpContext = new DefaultHttpContext { RequestServices = Services };
 
@@ -39,7 +40,8 @@ internal static class SystemAdministrationControllerFactory
                 Role = new FakeRoleApiClient(),
                 Lookup = new FakeLookupApiClient(),
                 ExternalTestConsultant = externalTestConsultantApiClient ?? new FakeExternalTestConsultantApiClient(),
-                Viewer = viewerApiClient ?? new FakeViewerApiClient()
+                Viewer = viewerApiClient ?? new FakeViewerApiClient(),
+                LoginInstructions = loginInstructionsApiClient ?? new FakeLoginInstructionsApiClient()
             },
             staffDirectoryService ?? new FakeStaffDirectoryService(),
             NullLogger<SystemAdministrationController>.Instance)

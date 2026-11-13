@@ -23,7 +23,7 @@ public partial class SystemAdministrationController
         {
             Rows = [.. viewers
                 .OrderBy(v => v.Name, StringComparer.OrdinalIgnoreCase)
-                .Select(v => new ViewerRowViewModel { ViewerId = v.ViewerId, Name = v.Name, Email = v.Email })]
+                .Select(v => new ViewerRowViewModel { ViewerId = v.ViewerId, Name = v.Name, Email = v.Email, LoginInstructionsSent = v.LoginInstructionsSent })]
         });
     }
 
@@ -53,6 +53,12 @@ public partial class SystemAdministrationController
         if (PendingListCommands.Is(command, PendingListCommands.Remove))
         {
             return await RemoveViewerAsync(model, rowIndex, cancellationToken);
+        }
+
+        if (PendingListCommands.Is(command, PendingListCommands.SendInstructions))
+        {
+            await SendViewerLoginInstructionsAsync(model, rowIndex, cancellationToken);
+            return ViewerPage(model);
         }
 
         ApplyViewerRowCommand(model, command, rowIndex);
@@ -110,8 +116,14 @@ public partial class SystemAdministrationController
         }
 
         var row = model.Rows[rowIndex];
+        var email = model.Edit.Email.Trim();
+        if (!string.Equals(row.Email, email, StringComparison.OrdinalIgnoreCase))
+        {
+            row.LoginInstructionsSent = false;
+        }
+
         row.Name = model.Edit.Name.Trim();
-        row.Email = model.Edit.Email.Trim();
+        row.Email = email;
         model.Edit = new ViewerEditViewModel();
         model.EditIndex = null;
     }
@@ -132,7 +144,63 @@ public partial class SystemAdministrationController
         }
 
         TempData.SetNotification(NotificationType.Success, "Viewers saved successfully.");
-        return leavePage ? RedirectToAction(nameof(Index)) : ViewerPage(model);
+        if (leavePage)
+        {
+            return RedirectToAction(nameof(Index));
+        }
+
+        await RefreshViewerLoginInstructionsAsync(model, cancellationToken);
+        return ViewerPage(model);
+    }
+
+    // The database clears the sent flag when a saved email address changed, so the page takes its state from there.
+    private async Task RefreshViewerLoginInstructionsAsync(ViewerManagementViewModel model, CancellationToken cancellationToken)
+    {
+        var sentById = (await viewerApiClient.GetAllAsync(cancellationToken)).ToDictionary(v => v.ViewerId, v => v.LoginInstructionsSent);
+        foreach (var row in model.Rows)
+        {
+            row.LoginInstructionsSent = row.ViewerId is { } id && sentById.GetValueOrDefault(id);
+        }
+    }
+
+    // The Send Instructions link of one row. The email goes to the address saved on the viewer, so a row with unsaved
+    // changes has to be saved first.
+    private async Task SendViewerLoginInstructionsAsync(ViewerManagementViewModel model, int? rowIndex, CancellationToken cancellationToken)
+    {
+        if (!PendingList.IsRow(model.Rows, rowIndex))
+        {
+            return;
+        }
+
+        var row = model.Rows[rowIndex!.Value];
+        var stored = row.ViewerId is { } id
+            ? (await viewerApiClient.GetAllAsync(cancellationToken)).FirstOrDefault(v => v.ViewerId == id)
+            : null;
+
+        if (stored is null || !string.Equals(stored.Email, row.Email, StringComparison.OrdinalIgnoreCase))
+        {
+            model.Message = "Save your changes to this viewer before sending the login instructions.";
+            model.MessageIsError = true;
+            return;
+        }
+
+        // Already sent from another page or session: show it as sent rather than emailing the viewer twice.
+        if (stored.LoginInstructionsSent)
+        {
+            row.LoginInstructionsSent = true;
+            return;
+        }
+
+        var result = await loginInstructionsApiClient.SendToViewerAsync(stored.ViewerId, cancellationToken);
+        if (result.Success)
+        {
+            row.LoginInstructionsSent = true;
+            TempData.SetNotification(NotificationType.Success, $"Login instructions sent to {row.Name}.");
+            return;
+        }
+
+        model.Message = result.Message ?? "The login instructions email could not be sent. Please try again.";
+        model.MessageIsError = true;
     }
 
     private async Task DeleteRemovedViewersAsync(ViewerManagementViewModel model, CancellationToken cancellationToken)

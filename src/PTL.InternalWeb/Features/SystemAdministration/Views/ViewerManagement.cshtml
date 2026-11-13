@@ -60,6 +60,7 @@
         <input type="hidden" name="Rows[@i].ViewerId" value="@(hiddenRow.ViewerId?.ToString() ?? string.Empty)" />
         <input type="hidden" name="Rows[@i].Name" value="@hiddenRow.Name" />
         <input type="hidden" name="Rows[@i].Email" value="@hiddenRow.Email" />
+        <input type="hidden" name="Rows[@i].LoginInstructionsSent" value="@(hiddenRow.LoginInstructionsSent ? "true" : "false")" />
         <input type="hidden" name="Rows[@i].IsRemoved" value="@(hiddenRow.IsRemoved ? "true" : "false")" />
     }
 
@@ -69,13 +70,14 @@
                 <th scope="col" class="govuk-table__header">Name</th>
                 <th scope="col" class="govuk-table__header">Email</th>
                 <th scope="col" class="govuk-table__header">Actions</th>
+                <th scope="col" class="govuk-table__header">Login Instructions</th>
             </tr>
         </thead>
         <tbody class="govuk-table__body">
             @if (Model.Rows.All(r => r.IsRemoved))
             {
                 <tr class="govuk-table__row">
-                    <td class="govuk-table__cell" colspan="3">There are no Viewers to display.</td>
+                    <td class="govuk-table__cell" colspan="4">There are no Viewers to display.</td>
                 </tr>
             }
             @for (var i = 0; i < Model.Rows.Count; i++)
@@ -135,6 +137,16 @@
                             </div>
                         </td>
                     }
+                    <td class="govuk-table__cell">
+                        @if (row.LoginInstructionsSent)
+                        {
+                            <strong class="govuk-tag govuk-tag--green">Sent</strong>
+                        }
+                        else
+                        {
+                            <button type="submit" class="govuk-link ptl-link-button" formnovalidate formaction="@ButtonUrl(PendingListCommands.SendInstructions, i)">Send Instructions<span class="govuk-visually-hidden"> to viewer @row.Name</span></button>
+                        }
+                    </td>
                 </tr>
             }
         </tbody>

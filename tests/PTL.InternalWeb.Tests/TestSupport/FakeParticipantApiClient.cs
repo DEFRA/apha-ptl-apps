@@ -6,6 +6,7 @@ namespace PTL.InternalWeb.Tests.TestSupport;
 internal sealed class FakeParticipantApiClient : IParticipantApiClient
 {
     public ParticipantSearchResponse SearchResponse { get; set; } = new([], 0, 1, 20);
+    public ParticipantSearchRequest? LastSearchRequest { get; private set; }
     public ParticipantResponse? ParticipantResponse { get; set; }
     public ParticipantResponse? CreatedOrUpdatedResponse { get; set; }
     public ParticipantSaveResult? SaveResult { get; set; }
@@ -18,8 +19,11 @@ internal sealed class FakeParticipantApiClient : IParticipantApiClient
     public Task<ParticipantResponse?> GetParticipantAsync(Guid participantId, CancellationToken cancellationToken = default) =>
         Task.FromResult(ParticipantResponse);
 
-    public Task<ParticipantSearchResponse> SearchParticipantsAsync(ParticipantSearchRequest request, CancellationToken cancellationToken = default) =>
-        Task.FromResult(SearchResponse);
+    public Task<ParticipantSearchResponse> SearchParticipantsAsync(ParticipantSearchRequest request, CancellationToken cancellationToken = default)
+    {
+        LastSearchRequest = request;
+        return Task.FromResult(SearchResponse);
+    }
 
     public Task<ParticipantSaveResult> CreateParticipantAsync(ParticipantRequest request, CancellationToken cancellationToken = default)
     {

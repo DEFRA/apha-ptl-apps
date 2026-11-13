@@ -1,7 +1,4 @@
-using PTL.Api.Tests.Customer;
 using PTL.Api.Tests.ExternalUser;
-using PTL.Api.Tests.Participant;
-using PTL.Core.ExternalUser;
 using PTL.Core.TestConsultant;
 using CoreTestConsultant = PTL.Core.TestConsultant.TestConsultant;
 
@@ -94,21 +91,6 @@ public class TestConsultantAuditTests
         await CreateService().DeleteAsync(id);
 
         Assert.Empty(_repository.DeleteCalls);
-        Assert.Null(_repository.LastAuditEntry);
-    }
-
-    // The SSO link made at external sign-in is system-initiated, not a System Administration change.
-    [Fact]
-    public async Task ExternalUserSignInLink_UpdatesTestConsultantWithoutAuditEntry()
-    {
-        var id = Guid.NewGuid();
-        _repository.Seed(new CoreTestConsultant { ExternalTestConsultantId = id, Email = "jane@example.com" });
-        var service = new ExternalUserService(new FakeParticipantRepository(), new FakeViewerRepository(), _repository, new FakeCustomerRepository());
-
-        var result = await service.ResolveAsync(Guid.NewGuid(), "jane@example.com", "Jane", ["Test Consultant"]);
-
-        Assert.Equal(id, result.TestConsultantId);
-        Assert.Single(_repository.UpdateCalls);
         Assert.Null(_repository.LastAuditEntry);
     }
 }

@@ -24,11 +24,9 @@ public class OidcProviderEventsTests
         }
     }
 
-    private sealed class TestEvents(ILogger logger, Action<ClaimsIdentity>? mapClaims = null)
+    private sealed class TestEvents(ILogger logger)
         : OidcProviderEvents<FakeResolver, TestResolution>(logger, "Test", OpenIdConnectEventHelpers.RetainedClaims())
     {
-        protected override void MapClaims(ClaimsPrincipal principal, ClaimsIdentity identity) => mapClaims?.Invoke(identity);
-
         protected override Task<TestResolution> ResolveAsync(FakeResolver resolver, ClaimsPrincipal principal, CancellationToken cancellationToken) =>
             resolver.ResolveAsync(principal, cancellationToken);
     }
@@ -63,41 +61,39 @@ public class OidcProviderEventsTests
     [Fact]
     public async Task TokenValidated_PrincipalWithoutClaimsIdentity_DoesNothing()
     {
-        var mapped = false;
-        var context = CreateContext(new ClaimsPrincipal());
+        var resolver = new FakeResolver(new TestResolution(true));
+        var context = CreateContext(new ClaimsPrincipal(), resolver);
 
-        await new TestEvents(new CapturingLogger(), _ => mapped = true).TokenValidated(context);
+        await new TestEvents(new CapturingLogger()).TokenValidated(context);
 
-        Assert.False(mapped);
+        Assert.Null(resolver.ReceivedPrincipal);
     }
 
     [Fact]
-    public async Task TokenValidated_NoResolverRegistered_MapsClaimsThenTrimsThoseNotRetained()
+    public async Task TokenValidated_NoResolverRegistered_TrimsClaimsThatAreNotRetained()
     {
         var identity = new ClaimsIdentity([new Claim(ClaimTypes.Name, "test-user"), new Claim("bulky", "x")]);
         var context = CreateContext(new ClaimsPrincipal(identity));
 
-        await new TestEvents(new CapturingLogger(), id => id.AddClaim(new Claim(ClaimTypes.Email, "a@b.test"))).TokenValidated(context);
+        await new TestEvents(new CapturingLogger()).TokenValidated(context);
 
         Assert.Contains(identity.Claims, c => c.Type == ClaimTypes.Name);
-        Assert.Contains(identity.Claims, c => c.Type == ClaimTypes.Email);
         Assert.DoesNotContain(identity.Claims, c => c.Type == "bulky");
         Assert.False(context.Result?.Handled ?? false);
     }
 
     [Fact]
-    public async Task TokenValidated_ResolverAllows_PassesMappedPrincipalAndAddsReturnedClaims()
+    public async Task TokenValidated_ResolverAllows_PassesPrincipalAndAddsReturnedClaims()
     {
         var identity = new ClaimsIdentity([new Claim(ClaimTypes.Name, "test-user")]);
         var principal = new ClaimsPrincipal(identity);
         var resolver = new FakeResolver(new TestResolution(true, Claims: new Dictionary<string, string> { ["resolved"] = "yes" }));
         var context = CreateContext(principal, resolver);
 
-        await new TestEvents(new CapturingLogger(), id => id.AddClaim(new Claim(ClaimTypes.Email, "a@b.test"))).TokenValidated(context);
+        await new TestEvents(new CapturingLogger()).TokenValidated(context);
 
         Assert.Same(principal, resolver.ReceivedPrincipal);
         Assert.Contains(identity.Claims, c => c.Type == "resolved" && c.Value == "yes");
-        Assert.Contains(identity.Claims, c => c.Type == ClaimTypes.Email);
     }
 
     [Fact]

@@ -111,7 +111,7 @@ public sealed class ContractRepository(IDbConnectionFactory connectionFactory) :
         var schemeRows = (await multi.ReadAsync()).ToList();
         var participantRows = (await multi.ReadAsync()).ToList();
 
-        IDictionary<string, object> Row(dynamic row) => (IDictionary<string, object>)row;
+        static IDictionary<string, object> Row(dynamic row) => (IDictionary<string, object>)row;
 
         var headerRow = Row(header);
         var aggregate = new ContractItemsAggregate

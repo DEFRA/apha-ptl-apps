@@ -47,6 +47,12 @@ internal sealed class FakePendingOrderRepository : IPendingOrderRepository
         return Task.CompletedTask;
     }
 
+    public Task SubmitAsync(Guid pendingContractId, string purchaseOrderNumber, CancellationToken cancellationToken = default)
+    {
+        LastPurchaseOrderNumber = purchaseOrderNumber;
+        return Task.CompletedTask;
+    }
+
     public List<PendingOrderNotification> QueuedNotifications { get; } = [];
 
     // Rows of tblOnlineContractOrderEmail that have no fldDateSent yet.
