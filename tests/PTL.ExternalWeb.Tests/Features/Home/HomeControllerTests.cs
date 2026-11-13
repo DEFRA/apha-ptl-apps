@@ -225,6 +225,20 @@ public class HomeControllerTests
     }
 
     [Fact]
+    public async Task Information_MessageStoredEntityEscaped_DecodesToRealHtml()
+    {
+        var controller = new HomeController(new FakeApiClient(), new FakeSystemMessageApiClient(message: "&lt;p&gt;Fish &amp;amp; chips&lt;/p&gt;"), new FakeCreateOrderApiClient())
+        {
+            ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() }
+        };
+
+        var result = await controller.Information();
+
+        var model = Assert.IsType<InformationViewModel>(Assert.IsType<ViewResult>(result).Model);
+        Assert.Equal("<p>Fish &amp; chips</p>", model.MessageHtml);
+    }
+
+    [Fact]
     public async Task Information_NoMessagePublished_ViewModelHasNullMessage()
     {
         var controller = new HomeController(new FakeApiClient(), new FakeSystemMessageApiClient(), new FakeCreateOrderApiClient())
