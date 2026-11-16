@@ -430,20 +430,107 @@ public class IntendedResultsControllerTests
     }
 
     // Mirrors legacy's disabled controls: a non-applicable sample/test pair's server-fetched
-    // (stored) values stand as-is, never overlaid by anything posted for it.
+    // (stored) values stand as-is, never overlaid by anything posted for it. The posted
+    // IsApplicable is deliberately contradicted here - applicability is server-owned.
     [Fact]
     public async Task IntendedResults_Post_NonApplicableSample_RehydrationDoesNotOverlayPostedValues()
     {
         var apiClient = new FakeDistributionApiClient { IntendedResults = Response(sampleIsApplicable: false) };
         var controller = CreateController(apiClient);
         controller.ModelState.AddModelError("AuditWhy", "Input can not exceed 2000 characters");
-        var posted = PostedModel(sampleValue: "Should not appear", sampleIsApplicable: false);
+        var posted = PostedModel(sampleValue: "Should not appear", sampleIsApplicable: true);
 
         var result = await controller.IntendedResults(2026, 4, SchemeId, posted, "save", CancellationToken.None);
 
         var model = Assert.IsType<IntendedResultsViewModel>(Assert.IsType<ViewResult>(result).Model);
         var value = Assert.Single(Assert.Single(Assert.Single(model.Tests).Samples).Values);
         Assert.Equal("Server result", value.IntendedResult);
+        Assert.False(Assert.Single(Assert.Single(model.Tests).Samples).IsApplicable);
+    }
+
+    // A form that omits the TestId/SampleId hidden inputs binds every row to Guid.Empty, which
+    // used to collide inside ToDictionary and 500 the whole screen.
+    [Fact]
+    public async Task IntendedResults_Post_DuplicateTestIds_RehydratesWithoutThrowing()
+    {
+        var apiClient = new FakeDistributionApiClient { IntendedResults = Response() };
+        var controller = CreateController(apiClient);
+        controller.ModelState.AddModelError("AuditWhy", "Input can not exceed 2000 characters");
+        var posted = new IntendedResultsViewModel
+        {
+            Tests =
+            [
+                new IntendedResultsTestViewModel { TestId = Guid.Empty },
+                new IntendedResultsTestViewModel { TestId = Guid.Empty },
+            ],
+        };
+
+        var result = await controller.IntendedResults(2026, 4, SchemeId, posted, "save", CancellationToken.None);
+
+        var model = Assert.IsType<IntendedResultsViewModel>(Assert.IsType<ViewResult>(result).Model);
+        Assert.Equal("Server value", Assert.Single(model.Tests).MethodItems.Single().IntendedResult);
+    }
+
+    // SampleResultItemId is a storage key and stays Guid.Empty until a cell is first saved, so a
+    // sample with two never-saved cells posts two empty ids. The overlay keys on TestResultItemId
+    // instead, exactly as legacy's GetSampleResultItemByResultItemId did.
+    [Fact]
+    public async Task IntendedResults_Post_UnsavedValuesShareAnEmptyId_OverlaysByTestResultItemId()
+    {
+        var secondResultItemId = Guid.Parse("88888888-8888-8888-8888-888888888888");
+        var apiClient = new FakeDistributionApiClient
+        {
+            IntendedResults = new IntendedResultsResponse(
+                SchemeId, "17152A/BA", "PT0060", "Mastitis bovine", false,
+                [
+                    new IntendedResultsTestResponse(
+                        TestId, "Somatic cell count",
+                        [
+                            new IntendedResultsResultItemResponse(ResultItemId, "Result A", "^[0-9]+$", "Numeric", false),
+                            new IntendedResultsResultItemResponse(secondResultItemId, "Result B", "^[0-9]+$", "Numeric", false),
+                        ],
+                        [],
+                        [
+                            new IntendedResultsSampleRowResponse(
+                                SampleId, "S1", "Internal 1", true,
+                                [
+                                    new IntendedResultsSampleResultValueResponse(Guid.Empty, ResultItemId, "", ""),
+                                    new IntendedResultsSampleResultValueResponse(Guid.Empty, secondResultItemId, "", ""),
+                                ]),
+                        ]),
+                ]),
+        };
+        var controller = CreateController(apiClient);
+        controller.ModelState.AddModelError("AuditWhy", "Input can not exceed 2000 characters");
+        var posted = new IntendedResultsViewModel
+        {
+            Tests =
+            [
+                new IntendedResultsTestViewModel
+                {
+                    TestId = TestId,
+                    Samples =
+                    [
+                        new IntendedResultsSampleRowViewModel
+                        {
+                            SampleId = SampleId,
+                            Values =
+                            [
+                                new IntendedResultsSampleValueViewModel { SampleResultItemId = Guid.Empty, TestResultItemId = ResultItemId, IntendedResult = "first" },
+                                new IntendedResultsSampleValueViewModel { SampleResultItemId = Guid.Empty, TestResultItemId = secondResultItemId, IntendedResult = "second" },
+                            ],
+                        },
+                    ],
+                },
+            ],
+        };
+
+        var result = await controller.IntendedResults(2026, 4, SchemeId, posted, "save", CancellationToken.None);
+
+        var model = Assert.IsType<IntendedResultsViewModel>(Assert.IsType<ViewResult>(result).Model);
+        var values = Assert.Single(Assert.Single(model.Tests).Samples).Values;
+        Assert.Equal("first", values.Single(v => v.TestResultItemId == ResultItemId).IntendedResult);
+        Assert.Equal("second", values.Single(v => v.TestResultItemId == secondResultItemId).IntendedResult);
     }
 
     [Fact]

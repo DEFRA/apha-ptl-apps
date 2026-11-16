@@ -92,12 +92,11 @@ public sealed record IntendedResultsResultItemUpdate(Guid TestResultItemId, bool
 
 public sealed record IntendedResultsMethodItemUpdate(Guid TestMethodItemId, string IntendedResult);
 
+// IsApplicable is deliberately absent: legacy rendered the allocation checkbox disabled and read
+// the flag straight off the Session-held SampleTest on every rebuild, so it is resolved here from
+// the stored data (see IntendedResultsService.BuildApplicableSampleTests) rather than posted.
 public sealed record IntendedResultsSampleRowUpdate(
     Guid SampleId,
-    // Read-only on this screen (set on Sample Numbers) - round-tripped so the service can skip
-    // diffing/validating a cell legacy would have rendered disabled, rather than mistaking a
-    // disabled control's absent post data for "changed to blank".
-    bool IsApplicable,
     IReadOnlyList<IntendedResultsSampleResultValueUpdate> Values);
 
 public sealed record IntendedResultsSampleResultValueUpdate(
