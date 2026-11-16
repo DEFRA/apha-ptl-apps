@@ -60,10 +60,11 @@ public sealed class LabelPrinterClient(IOptions<LabelPrinterOptions> options, IL
             new EventId(7, nameof(LogPrintCompletedMessage)),
             "Print request completed. Success={Success} Host={Host} Port={Port}");
 
-    // TEMPORARY: always logged for troubleshooting. Label text is name and address data - revert to Debug or remove.
+    // The payload carries the name and address being printed, so only this entry is label content and it stays at
+    // Debug; every other entry logs the host, port and lengths needed to diagnose a print without that content.
     private static readonly Action<ILogger, string?, int, int, string, Exception?> LogGeneratedPayloadMessage =
         LoggerMessage.Define<string?, int, int, string>(
-            LogLevel.Information,
+            LogLevel.Debug,
             new EventId(8, nameof(LogGeneratedPayloadMessage)),
             "Generated Fingerprint payload. Host={Host} Port={Port} PayloadLength={PayloadLength}\n{Payload}");
 
@@ -112,7 +113,8 @@ public sealed class LabelPrinterClient(IOptions<LabelPrinterOptions> options, IL
             LogDataSentMessage(logger, settings.Host, settings.Port, payload.Length, null);
 
             var reply = await ReadReplyAsync(stream, cancellationToken);
-            if (reply.Contains("error", StringComparison.OrdinalIgnoreCase))
+            var printerReportedError = PrinterReportedError(reply);
+            if (printerReportedError)
             {
                 LogPrinterReportedErrorMessage(logger, settings.Host, settings.Port, reply.Length, reply, null);
             }
@@ -121,8 +123,8 @@ public sealed class LabelPrinterClient(IOptions<LabelPrinterOptions> options, IL
                 LogPrinterReplyMessage(logger, settings.Host, settings.Port, reply.Length, reply, null);
             }
 
-            LogPrintCompletedMessage(logger, true, settings.Host, settings.Port, null);
-            return true;
+            LogPrintCompletedMessage(logger, !printerReportedError, settings.Host, settings.Port, null);
+            return !printerReportedError;
         }
         catch (Exception ex) when (ex is SocketException or IOException or OperationCanceledException)
         {
@@ -131,6 +133,12 @@ public sealed class LabelPrinterClient(IOptions<LabelPrinterOptions> options, IL
             return false;
         }
     }
+
+    // In verbose mode the printer answers each statement with Ok, or with an error message such as
+    // "Error 1003 : Field out of label" - which means it discarded the label and the user has nothing to collect, so
+    // the print is reported as failed. A silent printer says nothing to go on and stays a success.
+    private static bool PrinterReportedError(string reply) =>
+        reply.Contains("error", StringComparison.OrdinalIgnoreCase);
 
     // Collects what the printer sends back (verbose mode) until it has been quiet for a moment. The job has already been
     // sent, so a silent printer or a dropped connection here is not a print failure.

@@ -157,7 +157,7 @@ public class TestConsultantTabulationApiClientTests
 
         var request = Assert.Single(requests);
         Assert.Equal((HttpMethod.Put, $"/api/test-consultant/schemes/{SchemeId}/comments"), (request.Method, request.PathAndQuery));
-        var body = JsonDocument.Parse(request.Body!).RootElement;
+        var body = JsonElement.Parse(request.Body!);
         Assert.Equal(("<p>Hi</p>", true), (body.GetProperty("comments").GetString(), body.GetProperty("submit").GetBoolean()));
         Assert.Equal((false, "Comments required."), (result.Value!.Success, result.Value.Errors["Comments"]));
     }

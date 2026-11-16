@@ -72,7 +72,7 @@ public class DistributionApiClientAmendResultsTests
 
         var request = Assert.Single(requests);
         Assert.Equal((HttpMethod.Put, Url), (request.Method, request.PathAndQuery));
-        var body = JsonDocument.Parse(request.Body!).RootElement;
+        var body = JsonElement.Parse(request.Body!);
         Assert.Equal("Typo", body.GetProperty("auditWhy").GetString());
         Assert.Equal("Lost", body.GetProperty("nilReturns")[0].GetProperty("nilReturnReason").GetString());
         Assert.Equal(Rating, body.GetProperty("ratings")[0].GetProperty("ratingId").GetGuid());
