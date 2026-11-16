@@ -9,11 +9,12 @@ public sealed class TabulationEmailOptions
     // The ready date and "today" are calendar days in this zone.
     public string TimeZone { get; set; } = "Europe/London";
 
-    // Paths of the comment pages linked from the Test Consultant emails (legacy Test Consultant/Tabulation.aspx
-    // and CommentsEntry.aspx). The internal page is migrated (PTL.InternalWeb TestConsultantController); the external one is not yet.
+    // Paths of the comment pages linked from the Test Consultant emails. The internal one keeps the legacy
+    // Test Consultant/Tabulation.aspx URL (TestConsultantController has a matching [Route]); the external one is
+    // the migrated PTL.ExternalWeb CommentsController.Entry route, NOT legacy CommentsEntry.aspx.
     public string InternalCommentsPath { get; set; } = "Test%20Consultant/Tabulation";
 
-    public string ExternalCommentsPath { get; set; } = "CommentsEntry";
+    public string ExternalCommentsPath { get; set; } = "Comments/Entry";
 }
 
 public sealed class PublicationNotificationOptions
