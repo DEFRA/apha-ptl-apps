@@ -445,7 +445,6 @@ public sealed partial class DistributionController(
                 [.. t.MethodItems.Select(m => new IntendedResultsMethodItemUpdate(m.TestMethodItemId, m.IntendedResult))],
                 [.. t.Samples.Select(s => new IntendedResultsSampleRowUpdate(
                     s.SampleId,
-                    s.IsApplicable,
                     [.. s.Values.Select(v => new IntendedResultsSampleResultValueUpdate(v.SampleResultItemId, v.IntendedResult, v.IntendedResult2))]))]))],
             request.RequiresAuditReason,
             await AuditWhoAsync(cancellationToken),

@@ -52,8 +52,9 @@
             }
             for (var s = 0; s < Model.Tests[t].Samples.Count; s++)
             {
+                @* IsApplicable is deliberately absent: it is server-owned (set on Sample Numbers) and
+                   re-read from the API on every redisplay, exactly like legacy's disabled checkbox. *@
                 <input type="hidden" asp-for="Tests[t].Samples[s].SampleId" />
-                <input type="hidden" asp-for="Tests[t].Samples[s].IsApplicable" />
                 for (var v = 0; v < Model.Tests[t].Samples[s].Values.Count; v++)
                 {
                     <input type="hidden" asp-for="Tests[t].Samples[s].Values[v].SampleResultItemId" />
@@ -109,6 +110,8 @@
 
             <h2 class="govuk-heading-m">@test.TestName</h2>
 
+            <input type="hidden" asp-for="Tests[t].TestId" />
+
             <div class="govuk-!-margin-bottom-6" style="overflow-x: auto;">
                 <table class="govuk-table">
                     <caption class="govuk-table__caption govuk-visually-hidden">Intended Results for @test.TestName</caption>
@@ -157,6 +160,8 @@
                                 var sample = test.Samples[s];
                                 <tr class="govuk-table__row">
                                     <th scope="row" class="govuk-table__header">
+                                        @* Inside the cell, not the row: an input is not valid markup as a direct child of tr. *@
+                                        <input type="hidden" asp-for="Tests[t].Samples[s].SampleId" />
                                         <strong>@sample.SampleNumber:</strong><br />@sample.InternalDescription
                                     </th>
                                     @for (var r = 0; r < test.ResultItems.Count; r++)

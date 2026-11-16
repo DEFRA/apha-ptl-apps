@@ -128,12 +128,13 @@ public class IntendedResultsServiceTests
     private static IntendedResultsSampleResultValueUpdate Value(Guid sampleResultItemId, string intendedResult, string intendedResult2 = "") =>
         new(sampleResultItemId, intendedResult, intendedResult2);
 
-    private static IntendedResultsSampleRowUpdate SampleOneRow(bool isApplicable, params IntendedResultsSampleResultValueUpdate[] values) =>
-        new(SampleOneId, isApplicable, values);
+    // Sample One is applicable in the fixture's SampleTests; applicability is resolved there, not posted.
+    private static IntendedResultsSampleRowUpdate SampleOneRow(params IntendedResultsSampleResultValueUpdate[] values) =>
+        new(SampleOneId, values);
 
     // Sample One posted back exactly as stored, so nothing on it is dirty.
     private static IntendedResultsSampleRowUpdate UnchangedSampleOneRow() =>
-        SampleOneRow(true, Value(SampleOneResultValueId, ""), Value(SampleOneRangeValueId, "", ""));
+        SampleOneRow(Value(SampleOneResultValueId, ""), Value(SampleOneRangeValueId, "", ""));
 
     private static IntendedResultsTestUpdate TestUpdate(
         IReadOnlyList<IntendedResultsMethodItemUpdate>? methodItems = null,
@@ -421,7 +422,7 @@ public class IntendedResultsServiceTests
     public async Task SaveIntendedResultsAsync_InvalidSampleResultValue_FailsAndWritesNothing()
     {
         var (service, repository) = CreateService(Scheme(), Data());
-        var update = Update(TestUpdate(samples: [SampleOneRow(true, Value(SampleOneResultValueId, "abc"), Value(SampleOneRangeValueId, "", ""))]));
+        var update = Update(TestUpdate(samples: [SampleOneRow(Value(SampleOneResultValueId, "abc"), Value(SampleOneRangeValueId, "", ""))]));
 
         var outcome = await service.SaveIntendedResultsAsync(SchemeId, update, CancellationToken.None);
 
@@ -438,7 +439,7 @@ public class IntendedResultsServiceTests
     {
         var (service, repository) = CreateService(Scheme(), Data());
         var update = Update(TestUpdate(samples:
-            [SampleOneRow(true, Value(SampleOneResultValueId, ""), Value(SampleOneRangeValueId, "5", "xyz"))]));
+            [SampleOneRow(Value(SampleOneResultValueId, ""), Value(SampleOneRangeValueId, "5", "xyz"))]));
 
         var outcome = await service.SaveIntendedResultsAsync(SchemeId, update, CancellationToken.None);
 
@@ -457,7 +458,7 @@ public class IntendedResultsServiceTests
         var update = Update(TestUpdate(samples:
         [
             UnchangedSampleOneRow(),
-            new IntendedResultsSampleRowUpdate(SampleTwoId, false, [Value(SampleTwoResultValueId, "not-numeric")]),
+            new IntendedResultsSampleRowUpdate(SampleTwoId, [Value(SampleTwoResultValueId, "not-numeric")]),
         ]));
 
         var outcome = await service.SaveIntendedResultsAsync(SchemeId, update, CancellationToken.None);
@@ -481,7 +482,7 @@ public class IntendedResultsServiceTests
     public async Task SaveIntendedResultsAsync_UnknownSampleResultItemId_IsIgnored()
     {
         var (service, repository) = CreateService(Scheme(), SavedData());
-        var update = Update(TestUpdate(samples: [SampleOneRow(true, Value(Guid.NewGuid(), "whatever"))]));
+        var update = Update(TestUpdate(samples: [SampleOneRow(Value(Guid.NewGuid(), "whatever"))]));
 
         var outcome = await service.SaveIntendedResultsAsync(SchemeId, update, CancellationToken.None);
 
@@ -565,7 +566,7 @@ public class IntendedResultsServiceTests
     public async Task SaveIntendedResultsAsync_SampleValueChanged_WritesOnlyThatSampleResultItem()
     {
         var (service, repository) = CreateService(Scheme(), SavedData());
-        var update = Update(TestUpdate(samples: [SampleOneRow(true, Value(SampleOneResultValueId, "42"), Value(SampleOneRangeValueId, "", ""))]));
+        var update = Update(TestUpdate(samples: [SampleOneRow(Value(SampleOneResultValueId, "42"), Value(SampleOneRangeValueId, "", ""))]));
 
         await service.SaveIntendedResultsAsync(SchemeId, update, CancellationToken.None);
 
@@ -588,7 +589,7 @@ public class IntendedResultsServiceTests
             samples:
             [
                 UnchangedSampleOneRow(),
-                new IntendedResultsSampleRowUpdate(SampleTwoId, false, [Value(SampleTwoResultValueId, "999")]),
+                new IntendedResultsSampleRowUpdate(SampleTwoId, [Value(SampleTwoResultValueId, "999")]),
             ]));
 
         await service.SaveIntendedResultsAsync(SchemeId, update, CancellationToken.None);
@@ -606,7 +607,7 @@ public class IntendedResultsServiceTests
         var (service, repository) = CreateService(Scheme(), data);
         var update = Update(TestUpdate(
             resultItems: [new IntendedResultsResultItemUpdate(RangeResultItemId, false)],
-            samples: [SampleOneRow(true, Value(SampleOneResultValueId, ""), Value(SampleOneRangeValueId, "", "99"))]));
+            samples: [SampleOneRow(Value(SampleOneResultValueId, ""), Value(SampleOneRangeValueId, "", "99"))]));
 
         await service.SaveIntendedResultsAsync(SchemeId, update, CancellationToken.None);
 
@@ -621,7 +622,7 @@ public class IntendedResultsServiceTests
         var (service, repository) = CreateService(Scheme(), SavedData());
         var update = Update(TestUpdate(
             resultItems: [new IntendedResultsResultItemUpdate(RangeResultItemId, true)],
-            samples: [SampleOneRow(true, Value(SampleOneResultValueId, ""), Value(SampleOneRangeValueId, "10", "20"))]));
+            samples: [SampleOneRow(Value(SampleOneResultValueId, ""), Value(SampleOneRangeValueId, "10", "20"))]));
 
         await service.SaveIntendedResultsAsync(SchemeId, update, CancellationToken.None);
 
@@ -666,7 +667,7 @@ public class IntendedResultsServiceTests
         var update = Update(
             TestUpdate(
                 methodItems: [MethodUpdate("54")],
-                samples: [SampleOneRow(true, Value(SampleOneResultValueId, "42"), Value(SampleOneRangeValueId, "", ""))]),
+                samples: [SampleOneRow(Value(SampleOneResultValueId, "42"), Value(SampleOneRangeValueId, "", ""))]),
             requiresAuditReason: true,
             auditWhy: AuditReason);
 
