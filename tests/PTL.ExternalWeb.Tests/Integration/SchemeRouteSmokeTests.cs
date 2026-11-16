@@ -49,7 +49,7 @@ public class SchemeRouteSmokeTests : IClassFixture<PtlExternalWebTestFactory>
         Assert.Contains("Non-Commercial Test Scheme", body);
         Assert.Contains("PT5678", body);
         Assert.Contains("2025/26", body);
-        Assert.Equal(2, System.Text.RegularExpressions.Regex.Matches(body, ">Current contract year<").Count);
+        Assert.Equal(2, System.Text.RegularExpressions.Regex.Count(body, ">Current contract year<"));
     }
 
     [Fact]
