@@ -105,37 +105,12 @@ else
         <tbody class="govuk-table__body">
             @foreach (var scheme in Model.CommercialSchemes)
             {
-                var rowClass = scheme.IsParticipating ? "govuk-table__row app-table__row--enrolled" : "govuk-table__row";
-                var cellClass = scheme.IsParticipating ? "govuk-table__cell govuk-!-font-weight-bold" : "govuk-table__cell";
-                <tr class="@rowClass">
-                    <td class="@cellClass">
-                        @scheme.Identifier
-                        @if (scheme.IsParticipating)
-                        {
-                            <span aria-hidden="true"> *</span>
-                        }
-                    </td>
-                    <td class="@cellClass">@scheme.Name</td>
-                    <td class="govuk-table__cell">@scheme.Year</td>
-                    <td class="govuk-table__cell">
-                        @if (scheme.IsParticipating)
-                        {
-                            <strong class="govuk-tag govuk-tag--green">Yes</strong>
-                        }
-                        else
-                        {
-                            <span>No</span>
-                        }
-                    </td>
-                </tr>
+                <partial name="_SchemeRow" model="@((scheme, true))" />
             }
         </tbody>
     </table>
 
-    @if (Model.CommercialSchemes.Any(scheme => scheme.IsParticipating))
-    {
-        <p class="govuk-body-s govuk-hint">* You are enrolled in this scheme</p>
-    }
+    <partial name="_SchemeEnrolledHint" model="Model.CommercialSchemes" />
 
     <govuk-pagination model="pagination" />
 }
@@ -170,27 +145,12 @@ else
         <tbody class="govuk-table__body">
             @foreach (var scheme in Model.NonCommercialSchemes)
             {
-                var rowClass = scheme.IsParticipating ? "govuk-table__row app-table__row--enrolled" : "govuk-table__row";
-                var cellClass = scheme.IsParticipating ? "govuk-table__cell govuk-!-font-weight-bold" : "govuk-table__cell";
-                <tr class="@rowClass">
-                    <td class="@cellClass">
-                        @scheme.Identifier
-                        @if (scheme.IsParticipating)
-                        {
-                            <span aria-hidden="true"> *</span>
-                        }
-                    </td>
-                    <td class="@cellClass">@scheme.Name</td>
-                    <td class="govuk-table__cell">@scheme.Year</td>
-                </tr>
+                <partial name="_SchemeRow" model="@((scheme, false))" />
             }
         </tbody>
     </table>
 
-    @if (Model.NonCommercialSchemes.Any(scheme => scheme.IsParticipating))
-    {
-        <p class="govuk-body-s govuk-hint">* You are enrolled in this scheme</p>
-    }
+    <partial name="_SchemeEnrolledHint" model="Model.NonCommercialSchemes" />
 
     <govuk-pagination model="ncPagination" />
 }
