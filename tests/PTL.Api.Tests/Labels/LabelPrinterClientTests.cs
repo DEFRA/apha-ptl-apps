@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Sockets;
+using System.Text;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using PTL.Core.Labels;
@@ -37,6 +38,45 @@ public class LabelPrinterClientTests
 
         Assert.True(await printTask);
         Assert.Equal(FingerprintLabelFormatter.ToFingerprint(label), buffer.ToArray());
+    }
+
+    [Fact]
+    public async Task PrintAsync_SendsTheLabelLaidOutForTheConfiguredMedia()
+    {
+        using var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        var port = ((IPEndPoint)listener.LocalEndpoint).Port;
+        var acceptTask = listener.AcceptTcpClientAsync();
+
+        var printTask = CreateClient(new LabelPrinterOptions { Host = "127.0.0.1", Port = port })
+            .PrintAsync(AddressLabel.FromFields("Alice Example"));
+
+        using var serverClient = await acceptTask;
+        using var received = new MemoryStream();
+        await serverClient.GetStream().CopyToAsync(received);
+
+        Assert.True(await printTask);
+        var payload = Encoding.ASCII.GetString(received.ToArray());
+        Assert.Contains("FT \"Univers Bold\",10", payload, StringComparison.Ordinal);
+        Assert.Contains("PP 0,375:PT \"Alice Example\"", payload, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task PrintAsync_PrinterRejectsTheLabel_ReturnsFalse()
+    {
+        using var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        var port = ((IPEndPoint)listener.LocalEndpoint).Port;
+
+        var printTask = CreateClient(new LabelPrinterOptions { Host = "127.0.0.1", Port = port })
+            .PrintAsync(AddressLabel.FromFields("Alice Example"));
+
+        using var serverClient = await listener.AcceptTcpClientAsync();
+        var serverStream = serverClient.GetStream();
+        await serverStream.WriteAsync(Encoding.ASCII.GetBytes("Ok\r\nError 1003 : Field out of label\r\n"));
+        await serverStream.CopyToAsync(Stream.Null);
+
+        Assert.False(await printTask);
     }
 
     [Fact]

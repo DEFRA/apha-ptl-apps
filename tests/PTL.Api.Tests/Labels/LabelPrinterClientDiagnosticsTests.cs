@@ -60,6 +60,7 @@ public class LabelPrinterClientDiagnosticsTests
             Assert.Equal(port.ToString(CultureInfo.InvariantCulture), Value(e, "Port"));
         });
         Assert.All(logger.Entries.Where(e => e.EventId.Id != 8), e => Assert.Equal(LogLevel.Information, e.Level));
+        Assert.Equal(LogLevel.Debug, logger.Entries[3].Level);
         Assert.Equal(expected.Length.ToString(CultureInfo.InvariantCulture), Value(logger.Entries[4], "PayloadLength"));
         Assert.Equal("True", Value(logger.Entries[6], "Success"));
 
@@ -83,7 +84,7 @@ public class LabelPrinterClientDiagnosticsTests
 
         var payload = Assert.Single(logger.Entries, e => e.EventId.Id == 8);
         var expected = FingerprintLabelFormatter.ToFingerprint(Label);
-        Assert.Equal(LogLevel.Information, payload.Level);
+        Assert.Equal(LogLevel.Debug, payload.Level);
         Assert.Equal(Encoding.ASCII.GetString(expected), Value(payload, "Payload"));
         Assert.Equal(expected.Length.ToString(CultureInfo.InvariantCulture), Value(payload, "PayloadLength"));
         Assert.Equal("127.0.0.1", Value(payload, "Host"));
@@ -94,9 +95,11 @@ public class LabelPrinterClientDiagnosticsTests
     }
 
     [Theory]
-    [InlineData("Ok\r\n", 9, LogLevel.Information)]
-    [InlineData("Error 1005: Out of paper\r\n", 10, LogLevel.Warning)]
-    public async Task PrintAsync_PrinterReplies_LogsTheReplyAndStillReportsSuccess(string reply, int expectedEventId, LogLevel expectedLevel)
+    [InlineData("Ok\r\n", 9, LogLevel.Information, true)]
+    [InlineData("", 9, LogLevel.Information, true)]
+    [InlineData("Ok\r\nError 1003 : Field out of label\r\n", 10, LogLevel.Warning, false)]
+    [InlineData("Error 1005: Out of paper\r\n", 10, LogLevel.Warning, false)]
+    public async Task PrintAsync_PrinterReplies_LogsTheReplyAndReportsWhetherThePrinterAcceptedTheLabel(string reply, int expectedEventId, LogLevel expectedLevel, bool expectedSuccess)
     {
         var logger = new MessageCapturingLogger<LabelPrinterClient>();
         using var listener = new TcpListener(IPAddress.Loopback, 0);
@@ -109,13 +112,13 @@ public class LabelPrinterClientDiagnosticsTests
         await stream.WriteAsync(Encoding.ASCII.GetBytes(reply));
         await stream.CopyToAsync(Stream.Null);
 
-        Assert.True(await printTask);
+        Assert.Equal(expectedSuccess, await printTask);
         var entry = Assert.Single(logger.Entries, e => e.EventId.Id is 9 or 10);
         Assert.Equal(expectedEventId, entry.EventId.Id);
         Assert.Equal(expectedLevel, entry.Level);
         Assert.Equal(reply, Value(entry, "Reply"));
         Assert.Equal(reply.Length.ToString(CultureInfo.InvariantCulture), Value(entry, "ReplyLength"));
-        Assert.Equal("True", Value(logger.Entries[^1], "Success"));
+        Assert.Equal(expectedSuccess.ToString(), Value(logger.Entries[^1], "Success"));
     }
 
     [Fact]
