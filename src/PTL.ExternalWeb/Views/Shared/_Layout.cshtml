@@ -21,7 +21,6 @@
     <script>
             document.body.className += ' js-enabled' + ('noModule' in HTMLScriptElement.prototype ? ' govuk-frontend-supported' : '');
     </script>
-    <a href="#main-content" class="govuk-skip-link" data-module="govuk-skip-link">Skip to main content</a>
     @model dynamic
 
 @{
@@ -48,6 +47,7 @@
 }
 
 @await Html.PartialAsync("_CookieBanner", (showCookieConsentBanner, cookiePreferenceDecision))
+<a href="#main-content" class="govuk-skip-link" data-module="govuk-skip-link">Skip to main content</a>
 @await Html.PartialAsync("_Header", ("VETQAS Proficiency Testing", "width:180px; height:auto;"))
 <div class="govuk-width-container app-width-container">
     <main role="main" class="pb-3" id="main-content">

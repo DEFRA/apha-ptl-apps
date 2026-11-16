@@ -6,8 +6,8 @@
         ? "You’ve accepted analytics cookies."
         : "You’ve rejected analytics cookies.";
 
-    <div class="govuk-cookie-banner" data-nosnippet role="region" aria-label="Cookies on Proficiency Testing" id="cookie-confirmation-banner" aria-live="polite">
-        <div class="govuk-cookie-banner__message govuk-width-container">
+    <div class="govuk-cookie-banner" data-nosnippet role="region" aria-label="Cookies on Proficiency Testing" id="cookie-confirmation-banner">
+        <div class="govuk-cookie-banner__message govuk-width-container" role="alert">
             <div class="govuk-grid-row">
                 <div class="govuk-grid-column-two-thirds">
                     <h2 class="govuk-cookie-banner__heading govuk-heading-m">Your cookie settings were saved</h2>
@@ -15,7 +15,7 @@
                         <p class="govuk-body">@decisionMessage</p>
                         <p class="govuk-body">You can <a class="govuk-link" asp-controller="Home" asp-action="Cookies">change your cookie settings</a> at any time.</p>
                     </div>
-                    <div class="govuk-button-group">
+                    <div class="govuk-button-group app-js-only">
                         <button type="button" class="govuk-button" data-module="govuk-button" data-hide-cookie-confirmation="true">Hide this message</button>
                     </div>
                 </div>

@@ -23,9 +23,24 @@
     </thead>
     <tbody class="govuk-table__body">
         <tr class="govuk-table__row">
-            <td class="govuk-table__cell">Authentication cookies</td>
-            <td class="govuk-table__cell">Keep you signed in while using the service.</td>
-            <td class="govuk-table__cell">As configured by sign-in policy</td>
+            <td class="govuk-table__cell">.AspNetCore.Cookies</td>
+            <td class="govuk-table__cell">Keeps you signed in while using the service.</td>
+            <td class="govuk-table__cell">When you sign out or close your browser</td>
+        </tr>
+        <tr class="govuk-table__row">
+            <td class="govuk-table__cell">.AspNetCore.Correlation.* and .AspNetCore.OpenIdConnect.Nonce.*</td>
+            <td class="govuk-table__cell">Protect your sign-in from being forged. They are removed once you have signed in.</td>
+            <td class="govuk-table__cell">15 minutes</td>
+        </tr>
+        <tr class="govuk-table__row">
+            <td class="govuk-table__cell">.AspNetCore.Antiforgery.*</td>
+            <td class="govuk-table__cell">Stops another website from submitting a form on your behalf.</td>
+            <td class="govuk-table__cell">When you close your browser</td>
+        </tr>
+        <tr class="govuk-table__row">
+            <td class="govuk-table__cell">.AspNet.Core.Mvc.CookieTempDataProvider</td>
+            <td class="govuk-table__cell">Shows a one-off message after you save, for example 'Your changes have been submitted'.</td>
+            <td class="govuk-table__cell">When the message has been shown</td>
         </tr>
         <tr class="govuk-table__row">
             <td class="govuk-table__cell">@CookiePreferenceNames.ConsentSet</td>
