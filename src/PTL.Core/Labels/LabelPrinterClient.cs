@@ -7,13 +7,17 @@ namespace PTL.Core.Labels;
 
 // Sends the composed label straight to the configured network printer - the "raw/JetDirect" port
 // 9100 protocol, so no OS print driver/spooler is required (unavailable on this app's Linux
-// container hosting). The label is formatted as ZPL (ZplLabelFormatter) before being written to the
-// socket - the PC43 is a ZPL-capable printer and will not render plain text sent over the raw port.
+// container hosting). The label is formatted as Fingerprint (FingerprintLabelFormatter) before being written to the
+// socket - the PC43t's command language is Fingerprint, so plain text sent over the raw port would not print as a label.
 // Mirrors legacy LabelBase.Print()'s own shape: attempt the print, log the outcome, return a plain
 // success/failure bool for the caller to show a confirmation message from - never throws for a
 // printing failure, only for a null label.
 public sealed class LabelPrinterClient(IOptions<LabelPrinterOptions> options, ILogger<LabelPrinterClient> logger) : ILabelPrinterClient
 {
+    // Like legacy's PrinterDelay pause, this gives the printer time to take the job and answer before the connection closes.
+    private const int ReplyIdleTimeoutMilliseconds = 500;
+    private const int MaxReplyBytes = 4096;
+
     private static readonly Action<ILogger, Exception?> LogHostNotConfiguredMessage =
         LoggerMessage.Define(
             LogLevel.Error,
@@ -56,12 +60,25 @@ public sealed class LabelPrinterClient(IOptions<LabelPrinterOptions> options, IL
             new EventId(7, nameof(LogPrintCompletedMessage)),
             "Print request completed. Success={Success} Host={Host} Port={Port}");
 
-    // TEMPORARY: always logged for troubleshooting. Label text is name and address data - revert to Debug or remove.
-    private static readonly Action<ILogger, string?, int, int, string, Exception?> LogGeneratedZplMessage =
+    // The payload carries the name and address being printed, so only this entry is label content and it stays at
+    // Debug; every other entry logs the host, port and lengths needed to diagnose a print without that content.
+    private static readonly Action<ILogger, string?, int, int, string, Exception?> LogGeneratedPayloadMessage =
+        LoggerMessage.Define<string?, int, int, string>(
+            LogLevel.Debug,
+            new EventId(8, nameof(LogGeneratedPayloadMessage)),
+            "Generated Fingerprint payload. Host={Host} Port={Port} PayloadLength={PayloadLength}\n{Payload}");
+
+    private static readonly Action<ILogger, string?, int, int, string, Exception?> LogPrinterReplyMessage =
         LoggerMessage.Define<string?, int, int, string>(
             LogLevel.Information,
-            new EventId(8, nameof(LogGeneratedZplMessage)),
-            "Generated ZPL payload. Host={Host} Port={Port} PayloadLength={PayloadLength}\n{ZplPayload}");
+            new EventId(9, nameof(LogPrinterReplyMessage)),
+            "Printer reply received. Host={Host} Port={Port} ReplyLength={ReplyLength}\n{Reply}");
+
+    private static readonly Action<ILogger, string?, int, int, string, Exception?> LogPrinterReportedErrorMessage =
+        LoggerMessage.Define<string?, int, int, string>(
+            LogLevel.Warning,
+            new EventId(10, nameof(LogPrinterReportedErrorMessage)),
+            "Printer reported an error. Host={Host} Port={Port} ReplyLength={ReplyLength}\n{Reply}");
 
     public async Task<bool> PrintAsync(AddressLabel label, CancellationToken cancellationToken = default)
     {
@@ -88,15 +105,26 @@ public sealed class LabelPrinterClient(IOptions<LabelPrinterOptions> options, IL
 
             await using var stream = client.GetStream();
 
-            var payload = ZplLabelFormatter.ToZpl(label);
-            LogGeneratedZplMessage(logger, settings.Host, settings.Port, payload.Length, Encoding.ASCII.GetString(payload), null);
+            var payload = FingerprintLabelFormatter.ToFingerprint(label);
+            LogGeneratedPayloadMessage(logger, settings.Host, settings.Port, payload.Length, Encoding.ASCII.GetString(payload), null);
 
             await stream.WriteAsync(payload, cancellationToken);
             await stream.FlushAsync(cancellationToken);
             LogDataSentMessage(logger, settings.Host, settings.Port, payload.Length, null);
 
-            LogPrintCompletedMessage(logger, true, settings.Host, settings.Port, null);
-            return true;
+            var reply = await ReadReplyAsync(stream, cancellationToken);
+            var printerReportedError = PrinterReportedError(reply);
+            if (printerReportedError)
+            {
+                LogPrinterReportedErrorMessage(logger, settings.Host, settings.Port, reply.Length, reply, null);
+            }
+            else
+            {
+                LogPrinterReplyMessage(logger, settings.Host, settings.Port, reply.Length, reply, null);
+            }
+
+            LogPrintCompletedMessage(logger, !printerReportedError, settings.Host, settings.Port, null);
+            return !printerReportedError;
         }
         catch (Exception ex) when (ex is SocketException or IOException or OperationCanceledException)
         {
@@ -104,5 +132,48 @@ public sealed class LabelPrinterClient(IOptions<LabelPrinterOptions> options, IL
             LogPrintCompletedMessage(logger, false, settings.Host, settings.Port, null);
             return false;
         }
+    }
+
+    // In verbose mode the printer answers each statement with Ok, or with an error message such as
+    // "Error 1003 : Field out of label" - which means it discarded the label and the user has nothing to collect, so
+    // the print is reported as failed. A silent printer says nothing to go on and stays a success.
+    private static bool PrinterReportedError(string reply) =>
+        reply.Contains("error", StringComparison.OrdinalIgnoreCase);
+
+    // Collects what the printer sends back (verbose mode) until it has been quiet for a moment. The job has already been
+    // sent, so a silent printer or a dropped connection here is not a print failure.
+    private static async Task<string> ReadReplyAsync(NetworkStream stream, CancellationToken cancellationToken)
+    {
+        using var reply = new MemoryStream();
+        var buffer = new byte[512];
+
+        while (reply.Length < MaxReplyBytes)
+        {
+            using var idle = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            idle.CancelAfter(ReplyIdleTimeoutMilliseconds);
+
+            int read;
+            try
+            {
+                read = await stream.ReadAsync(buffer, idle.Token);
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                break;
+            }
+            catch (Exception ex) when (ex is IOException or SocketException)
+            {
+                break;
+            }
+
+            if (read == 0)
+            {
+                break;
+            }
+
+            await reply.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
+        }
+
+        return Encoding.Latin1.GetString(reply.GetBuffer(), 0, (int)reply.Length);
     }
 }

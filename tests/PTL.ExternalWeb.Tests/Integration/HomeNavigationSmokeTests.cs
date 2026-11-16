@@ -344,7 +344,7 @@ public class HomeNavigationSmokeTests : IClassFixture<PtlExternalWebTestFactory>
         Assert.Contains(
             "href=\"https://cidm.test/management\" target=\"_blank\" rel=\"noopener noreferrer\"",
             body, StringComparison.Ordinal);
-        Assert.Matches("app-header__help-link\" href=\"https://cidm.test/management\"[^>]*>\\s*CIDM account", body);
+        Assert.Matches("app-header__help-link\" href=\"https://cidm.test/management\"[^>]*>\\s*VETQAS Account", body);
     }
 
     [Fact]

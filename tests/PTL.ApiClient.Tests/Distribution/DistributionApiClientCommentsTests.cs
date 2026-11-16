@@ -64,7 +64,7 @@ public class DistributionApiClientCommentsTests
 
         var request = Assert.Single(requests);
         Assert.Equal((HttpMethod.Put, Url), (request.Method, request.PathAndQuery));
-        var body = JsonDocument.Parse(request.Body!).RootElement;
+        var body = JsonElement.Parse(request.Body!);
         Assert.Equal(("Hi", true, "Typo"), (body.GetProperty("comments").GetString(), body.GetProperty("submit").GetBoolean(), body.GetProperty("auditWhy").GetString()));
         Assert.Equal(Token, body.GetProperty("stagedAttachmentTokens")[0].GetGuid());
         Assert.Equal(AttachmentId, body.GetProperty("removedAttachmentIds")[0].GetGuid());
@@ -97,7 +97,7 @@ public class DistributionApiClientCommentsTests
 
         var request = Assert.Single(requests);
         Assert.Equal((HttpMethod.Post, $"{Url}/attachments/staged"), (request.Method, request.PathAndQuery));
-        var body = JsonDocument.Parse(request.Body!).RootElement;
+        var body = JsonElement.Parse(request.Body!);
         Assert.Equal(("notes.pdf", "application/pdf"), (body.GetProperty("fileName").GetString(), body.GetProperty("contentType").GetString()));
         Assert.Equal([1, 2], body.GetProperty("fileData").GetBytesFromBase64());
         Assert.Equal((true, Token, "notes.pdf"), (result!.Success, result.Token, result.FileName));
@@ -121,7 +121,7 @@ public class DistributionApiClientCommentsTests
 
         var request = Assert.Single(requests);
         Assert.Equal((HttpMethod.Post, $"{Url}/attachments/staged/discard"), (request.Method, request.PathAndQuery));
-        var tokens = JsonDocument.Parse(request.Body!).RootElement.GetProperty("tokens");
+        var tokens = JsonElement.Parse(request.Body!).GetProperty("tokens");
         Assert.Equal(Token, Assert.Single(tokens.EnumerateArray()).GetGuid());
     }
 
