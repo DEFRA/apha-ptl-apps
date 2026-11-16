@@ -538,7 +538,7 @@ public class DistributionControllerTests
                 IntendedResultsTestId,
                 [],
                 [new IntendedResultsMethodItemRequest(IntendedResultsMethodItemId, "42")],
-                [new IntendedResultsSampleRowRequest(IntendedResultsSampleId, true, [])]),
+                [new IntendedResultsSampleRowRequest(IntendedResultsSampleId, [])]),
         ], false);
 
         var result = await controller.SaveIntendedResults(IntendedResultsSchemeId, request, CancellationToken.None);
@@ -564,7 +564,7 @@ public class DistributionControllerTests
                 IntendedResultsTestId,
                 [],
                 [new IntendedResultsMethodItemRequest(IntendedResultsMethodItemId, "not-numeric")],
-                [new IntendedResultsSampleRowRequest(IntendedResultsSampleId, true, [])]),
+                [new IntendedResultsSampleRowRequest(IntendedResultsSampleId, [])]),
         ], false);
 
         var result = await controller.SaveIntendedResults(IntendedResultsSchemeId, request, CancellationToken.None);
@@ -591,7 +591,7 @@ public class DistributionControllerTests
                 IntendedResultsTestId,
                 [],
                 [new IntendedResultsMethodItemRequest(IntendedResultsMethodItemId, "42")],
-                [new IntendedResultsSampleRowRequest(IntendedResultsSampleId, true, [])]),
+                [new IntendedResultsSampleRowRequest(IntendedResultsSampleId, [])]),
         ], false);
 
         await controller.SaveIntendedResults(IntendedResultsSchemeId, request, CancellationToken.None);
@@ -611,7 +611,7 @@ public class DistributionControllerTests
                 IntendedResultsTestId,
                 [],
                 [new IntendedResultsMethodItemRequest(IntendedResultsMethodItemId, "42")],
-                [new IntendedResultsSampleRowRequest(IntendedResultsSampleId, true, [])]),
+                [new IntendedResultsSampleRowRequest(IntendedResultsSampleId, [])]),
         ], false);
 
         await controller.SaveIntendedResults(IntendedResultsSchemeId, request, CancellationToken.None);

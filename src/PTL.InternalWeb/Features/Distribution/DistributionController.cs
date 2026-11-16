@@ -1058,7 +1058,7 @@ public sealed partial class DistributionController(
         model.PendingCommand = posted.PendingCommand;
         model.AuditWhy = posted.AuditWhy;
 
-        var postedSamples = posted.Samples.ToDictionary(s => s.SampleId);
+        var postedSamples = ToOverlayLookup(posted.Samples, s => s.SampleId);
         foreach (var sample in model.Samples)
         {
             if (!postedSamples.TryGetValue(sample.SampleId, out var postedSample))
@@ -1077,12 +1077,12 @@ public sealed partial class DistributionController(
                 continue;
             }
 
-            var postedAllocations = postedSample.Allocations.ToDictionary(a => a.SampleTestId, a => a.IsApplicable);
+            var postedAllocations = ToOverlayLookup(postedSample.Allocations, a => a.SampleTestId);
             foreach (var allocation in sample.Allocations)
             {
-                if (postedAllocations.TryGetValue(allocation.SampleTestId, out var isApplicable))
+                if (postedAllocations.TryGetValue(allocation.SampleTestId, out var postedAllocation))
                 {
-                    allocation.IsApplicable = isApplicable;
+                    allocation.IsApplicable = postedAllocation.IsApplicable;
                 }
             }
         }
@@ -1181,7 +1181,6 @@ public sealed partial class DistributionController(
                 [.. t.MethodItems.Select(m => new IntendedResultsMethodItemRequest(m.TestMethodItemId, m.IntendedResult ?? string.Empty))],
                 [.. t.Samples.Select(s => new IntendedResultsSampleRowRequest(
                     s.SampleId,
-                    s.IsApplicable,
                     [.. s.Values.Select(v => new IntendedResultsSampleResultValueRequest(v.SampleResultItemId, v.IntendedResult ?? string.Empty, v.IntendedResult2 ?? string.Empty))]))]))],
             model.RequiresAuditReason,
             model.AuditWhy);
@@ -1342,7 +1341,7 @@ public sealed partial class DistributionController(
         model.PendingCommand = posted.PendingCommand;
         model.AuditWhy = posted.AuditWhy;
 
-        var postedTestsById = posted.Tests.ToDictionary(t => t.TestId);
+        var postedTestsById = ToOverlayLookup(posted.Tests, t => t.TestId);
         foreach (var test in model.Tests)
         {
             if (!postedTestsById.TryGetValue(test.TestId, out var postedTest))
@@ -1356,9 +1355,23 @@ public sealed partial class DistributionController(
         return model;
     }
 
+    // Posted ids are untrusted: a replayed or hand-crafted form can repeat one, and an unsaved
+    // sample result cell legitimately carries Guid.Empty. First-wins rather than ToDictionary, so
+    // a duplicate degrades to "that edit is not overlaid" instead of a 500.
+    private static Dictionary<Guid, T> ToOverlayLookup<T>(IEnumerable<T> items, Func<T, Guid> keySelector)
+    {
+        var lookup = new Dictionary<Guid, T>();
+        foreach (var item in items)
+        {
+            lookup.TryAdd(keySelector(item), item);
+        }
+
+        return lookup;
+    }
+
     private static void OverlayPostedTest(IntendedResultsTestViewModel test, IntendedResultsTestViewModel postedTest)
     {
-        var postedResultItemsById = postedTest.ResultItems.ToDictionary(r => r.TestResultItemId);
+        var postedResultItemsById = ToOverlayLookup(postedTest.ResultItems, r => r.TestResultItemId);
         foreach (var resultItem in test.ResultItems)
         {
             if (postedResultItemsById.TryGetValue(resultItem.TestResultItemId, out var postedResultItem))
@@ -1367,7 +1380,7 @@ public sealed partial class DistributionController(
             }
         }
 
-        var postedMethodItemsById = postedTest.MethodItems.ToDictionary(m => m.TestMethodItemId);
+        var postedMethodItemsById = ToOverlayLookup(postedTest.MethodItems, m => m.TestMethodItemId);
         foreach (var methodItem in test.MethodItems)
         {
             if (postedMethodItemsById.TryGetValue(methodItem.TestMethodItemId, out var postedMethodItem))
@@ -1376,20 +1389,23 @@ public sealed partial class DistributionController(
             }
         }
 
-        var postedSamplesById = postedTest.Samples.ToDictionary(s => s.SampleId);
+        var postedSamplesById = ToOverlayLookup(postedTest.Samples, s => s.SampleId);
         foreach (var sample in test.Samples)
         {
             // Mirrors legacy's disabled controls: a non-applicable sample/test pair is never
             // posted back by a real browser, so its server-fetched (stored) values stand as-is.
+            // IsApplicable comes from the freshly fetched page, never from the post.
             if (!sample.IsApplicable || !postedSamplesById.TryGetValue(sample.SampleId, out var postedSample))
             {
                 continue;
             }
 
-            var postedValuesById = postedSample.Values.ToDictionary(v => v.SampleResultItemId);
+            // Keyed by TestResultItemId, as legacy's GetSampleResultItemByResultItemId was:
+            // SampleResultItemId is a storage key and is Guid.Empty until the cell is first saved.
+            var postedValuesById = ToOverlayLookup(postedSample.Values, v => v.TestResultItemId);
             foreach (var value in sample.Values)
             {
-                if (postedValuesById.TryGetValue(value.SampleResultItemId, out var postedValue))
+                if (postedValuesById.TryGetValue(value.TestResultItemId, out var postedValue))
                 {
                     value.IntendedResult = postedValue.IntendedResult;
                     value.IntendedResult2 = postedValue.IntendedResult2;
