@@ -142,8 +142,8 @@ public class GovUkPaginationTagHelper(IUrlHelperFactory urlHelperFactory) : TagH
     {
         var routeValues = new Dictionary<string, object?>(Model.RouteValues)
         {
-            ["page"] = page,
-            ["pageSize"] = Model.PageSize
+            [Model.PageParameter] = page,
+            [Model.PageSizeParameter] = Model.PageSize
         };
         return routeValues;
     }
@@ -179,16 +179,17 @@ public class GovUkPageSizeSelectorTagHelper(IUrlHelperFactory urlHelperFactory) 
         output.Attributes.RemoveAll(ModelAttributeName);
 
         var html = new System.Text.StringBuilder();
-        html.Append("""<input type="hidden" name="page" value="1" />""");
+        html.Append(CultureInfo.InvariantCulture, $"""<input type="hidden" name="{WebUtility.HtmlEncode(Model.PageParameter)}" value="1" />""");
         foreach (var (key, value) in Model.RouteValues)
         {
             html.Append(CultureInfo.InvariantCulture, $"""<input type="hidden" name="{WebUtility.HtmlEncode(key)}" value="{WebUtility.HtmlEncode(value?.ToString())}" />""");
         }
 
-        html.Append("""
+        var pageSizeName = WebUtility.HtmlEncode(Model.PageSizeParameter);
+        html.Append(CultureInfo.InvariantCulture, $"""
             <div class="govuk-form-group govuk-!-margin-bottom-0">
-                <label class="govuk-label" for="pageSize">Items per page</label>
-                <select class="govuk-select" id="pageSize" name="pageSize" onchange="this.form.submit()">
+                <label class="govuk-label" for="{pageSizeName}">Items per page</label>
+                <select class="govuk-select" id="{pageSizeName}" name="{pageSizeName}" onchange="this.form.submit()">
             """);
         foreach (var size in PaginationModel.AvailablePageSizes)
         {

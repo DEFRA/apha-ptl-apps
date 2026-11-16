@@ -12,9 +12,33 @@
             ["sortBy"] = Model.SortBy,
             ["sortDir"] = Model.SortDirection,
             ["ncSortBy"] = Model.NonCommercialSortBy,
+            ["ncSortDir"] = Model.NonCommercialSortDirection,
+            ["ncPage"] = Model.NonCommercialPage,
+            ["ncPageSize"] = Model.NonCommercialPageSize
+        }
+    };
+
+    // The non-commercial table pages on its own parameters so changing one table never moves the other.
+    var ncPagination = new PaginationModel
+    {
+        CurrentPage = Model.NonCommercialPage,
+        PageSize = Model.NonCommercialPageSize,
+        TotalRecords = Model.NonCommercialSchemeTotalCount,
+        PageParameter = "ncPage",
+        PageSizeParameter = "ncPageSize",
+        RouteValues = new Dictionary<string, object?>
+        {
+            ["page"] = Model.Page,
+            ["pageSize"] = Model.PageSize,
+            ["sortBy"] = Model.SortBy,
+            ["sortDir"] = Model.SortDirection,
+            ["ncSortBy"] = Model.NonCommercialSortBy,
             ["ncSortDir"] = Model.NonCommercialSortDirection
         }
     };
+
+    // Legacy MaterialGridView only drew its page-size dropdown and pager for more than 15 rows.
+    const int LegacyPagerThreshold = 15;
 
     // Sorting is applied in-memory by the controller (AC5) - these helpers just build the
     // toggle-direction links for each sortable column header, preserving every other query value.
@@ -28,7 +52,9 @@
             sortBy = column,
             sortDir = dir,
             ncSortBy = Model.NonCommercialSortBy,
-            ncSortDir = Model.NonCommercialSortDirection
+            ncSortDir = Model.NonCommercialSortDirection,
+            ncPage = Model.NonCommercialPage,
+            ncPageSize = Model.NonCommercialPageSize
         })!;
     }
 
@@ -42,7 +68,9 @@
             sortBy = Model.SortBy,
             sortDir = Model.SortDirection,
             ncSortBy = column,
-            ncSortDir = dir
+            ncSortDir = dir,
+            ncPage = 1,
+            ncPageSize = Model.NonCommercialPageSize
         })!;
     }
 }
@@ -69,7 +97,7 @@ else
                     <a class="govuk-link" href="@CommercialSortUrl("name")">Scheme name@(SortIndicator(Model.SortBy, Model.SortDirection, "name"))</a>
                 </th>
                 <th scope="col" class="govuk-table__header" aria-sort="@AriaSort(Model.SortBy, Model.SortDirection, "year")">
-                    <a class="govuk-link" href="@CommercialSortUrl("year")">Year@(SortIndicator(Model.SortBy, Model.SortDirection, "year"))</a>
+                    <a class="govuk-link" href="@CommercialSortUrl("year")">Current contract year@(SortIndicator(Model.SortBy, Model.SortDirection, "year"))</a>
                 </th>
                 <th scope="col" class="govuk-table__header">Participating</th>
             </tr>
@@ -114,12 +142,17 @@ else
 
 <h2 class="govuk-heading-l">Non-commercial schemes</h2>
 
-@if (Model.NonCommercialSchemes.Count == 0)
+@if (Model.NonCommercialSchemeTotalCount == 0)
 {
     <partial name="_SchemeEmptyState" model="@("You are not currently registered to any non-commercial schemes.")" />
 }
 else
 {
+    @if (Model.NonCommercialSchemeTotalCount > LegacyPagerThreshold)
+    {
+        <govuk-page-size-selector model="ncPagination" />
+    }
+
     <table class="govuk-table">
         <thead class="govuk-table__head">
             <tr class="govuk-table__row">
@@ -130,19 +163,34 @@ else
                     <a class="govuk-link" href="@NonCommercialSortUrl("name")">Scheme name@(SortIndicator(Model.NonCommercialSortBy, Model.NonCommercialSortDirection, "name"))</a>
                 </th>
                 <th scope="col" class="govuk-table__header" aria-sort="@AriaSort(Model.NonCommercialSortBy, Model.NonCommercialSortDirection, "year")">
-                    <a class="govuk-link" href="@NonCommercialSortUrl("year")">Year@(SortIndicator(Model.NonCommercialSortBy, Model.NonCommercialSortDirection, "year"))</a>
+                    <a class="govuk-link" href="@NonCommercialSortUrl("year")">Current contract year@(SortIndicator(Model.NonCommercialSortBy, Model.NonCommercialSortDirection, "year"))</a>
                 </th>
             </tr>
         </thead>
         <tbody class="govuk-table__body">
             @foreach (var scheme in Model.NonCommercialSchemes)
             {
-                <tr class="govuk-table__row">
-                    <td class="govuk-table__cell">@scheme.Identifier</td>
-                    <td class="govuk-table__cell">@scheme.Name</td>
+                var rowClass = scheme.IsParticipating ? "govuk-table__row app-table__row--enrolled" : "govuk-table__row";
+                var cellClass = scheme.IsParticipating ? "govuk-table__cell govuk-!-font-weight-bold" : "govuk-table__cell";
+                <tr class="@rowClass">
+                    <td class="@cellClass">
+                        @scheme.Identifier
+                        @if (scheme.IsParticipating)
+                        {
+                            <span aria-hidden="true"> *</span>
+                        }
+                    </td>
+                    <td class="@cellClass">@scheme.Name</td>
                     <td class="govuk-table__cell">@scheme.Year</td>
                 </tr>
             }
         </tbody>
     </table>
+
+    @if (Model.NonCommercialSchemes.Any(scheme => scheme.IsParticipating))
+    {
+        <p class="govuk-body-s govuk-hint">* You are enrolled in this scheme</p>
+    }
+
+    <govuk-pagination model="ncPagination" />
 }

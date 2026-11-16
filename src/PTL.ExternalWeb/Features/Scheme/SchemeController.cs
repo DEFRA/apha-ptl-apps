@@ -29,7 +29,9 @@ public sealed class SchemeController(ISchemeApiClient schemeApiClient) : Control
         string sortBy = "code",
         string sortDir = "asc",
         string ncSortBy = "code",
-        string ncSortDir = "asc")
+        string ncSortDir = "asc",
+        int ncPage = 1,
+        int ncPageSize = DefaultPageSize)
     {
         sortBy = ValidSortColumns.Contains(sortBy) ? sortBy : "code";
         sortDir = ValidSortDirections.Contains(sortDir) ? sortDir : "asc";
@@ -39,13 +41,15 @@ public sealed class SchemeController(ISchemeApiClient schemeApiClient) : Control
         var participantId = User.GetParticipantId();
         if (participantId is null)
         {
-            return View(new SchemeListViewModel([], 0, 1, DefaultPageSize, sortBy, sortDir, [], ncSortBy, ncSortDir));
+            return View(new SchemeListViewModel([], 0, 1, DefaultPageSize, sortBy, sortDir, [], ncSortBy, ncSortDir, 0, 1, DefaultPageSize));
         }
 
         var result = await schemeApiClient.GetSchemesForParticipantAsync(participantId.Value, HttpContext.RequestAborted);
 
         page = Math.Max(page, 1);
         pageSize = PaginationModel.AvailablePageSizes.Contains(pageSize) ? pageSize : DefaultPageSize;
+        ncPage = Math.Max(ncPage, 1);
+        ncPageSize = PaginationModel.AvailablePageSizes.Contains(ncPageSize) ? ncPageSize : DefaultPageSize;
 
         var sortedCommercialSchemes = SortSchemes(result.CommercialSchemes, sortBy, sortDir);
         var pagedCommercialSchemes = sortedCommercialSchemes
@@ -54,6 +58,10 @@ public sealed class SchemeController(ISchemeApiClient schemeApiClient) : Control
             .ToList();
 
         var sortedNonCommercialSchemes = SortSchemes(result.NonCommercialSchemes, ncSortBy, ncSortDir);
+        var pagedNonCommercialSchemes = sortedNonCommercialSchemes
+            .Skip((ncPage - 1) * ncPageSize)
+            .Take(ncPageSize)
+            .ToList();
 
         return View(new SchemeListViewModel(
             pagedCommercialSchemes,
@@ -62,9 +70,12 @@ public sealed class SchemeController(ISchemeApiClient schemeApiClient) : Control
             pageSize,
             sortBy,
             sortDir,
-            sortedNonCommercialSchemes,
+            pagedNonCommercialSchemes,
             ncSortBy,
-            ncSortDir));
+            ncSortDir,
+            result.NonCommercialSchemes.Count,
+            ncPage,
+            ncPageSize));
     }
 
     private static List<ParticipantSchemeSummaryResponse> SortSchemes(
