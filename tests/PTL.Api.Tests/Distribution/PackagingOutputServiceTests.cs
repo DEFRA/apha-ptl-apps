@@ -85,13 +85,45 @@ public class PackagingOutputServiceTests
         Assert.Null(await h.Service.GetLabelsAsync(2026, 5, PackagingMode.GroupAddress, 1, ["x"]));
     }
 
+    // Legacy: printAll stays true when no Print box is ticked, so the whole sheet prints.
     [Fact]
-    public async Task GetLabelsAsync_EmptySelection_ReturnsNoLabelsAndLooksUpNothing()
+    public async Task GetLabelsAsync_EmptySelection_PrintsEveryBlockOnTheSheet()
+    {
+        var h = new Harness();
+        h.Sheet(PackagingMode.GroupAddress, 1, GroupAddressRaw());
+        h.Repository.GroupLabelAddresses[GroupA] = Address("group a");
+        h.Repository.GroupLabelAddresses[GroupB] = Address("group b");
+        h.Repository.ParticipantLabelAddresses[(Part1, Scheme1)] = Address("p1");
+        h.Repository.ParticipantLabelAddresses[(Part2, Scheme2)] = Address("p2");
+
+        var labels = await h.Service.GetLabelsAsync(2026, 5, PackagingMode.GroupAddress, 1, []);
+
+        Assert.Equal(["group a a1", "p1 contact", "p2 contact", "group b a1"], labels!.Select(l => l.Lines[0]));
+        Assert.Equal([GroupA, GroupB], h.Repository.GroupLabelRequests);
+    }
+
+    [Fact]
+    public async Task GetLabelsAsync_EmptySelectionAndNothingToPack_ReturnsNoLabelsAndLooksUpNothing()
+    {
+        var h = new Harness();
+        h.Sheet(PackagingMode.GroupAddress, 1, Raw(
+            groups: [Group(GroupA, date: Day1)],
+            items: [Item(GroupA, Scheme1, Day1, sets: 0)]));
+
+        var labels = await h.Service.GetLabelsAsync(2026, 5, PackagingMode.GroupAddress, 1, []);
+
+        Assert.Empty(labels!);
+        Assert.Empty(h.Repository.GroupLabelRequests);
+        Assert.Empty(h.Repository.ParticipantLabelRequests);
+    }
+
+    [Fact]
+    public async Task GetLabelsAsync_SelectionThatMatchesNoBlock_ReturnsNoLabelsAndLooksUpNothing()
     {
         var h = new Harness();
         h.Sheet(PackagingMode.GroupAddress, 1, GroupAddressRaw());
 
-        var labels = await h.Service.GetLabelsAsync(2026, 5, PackagingMode.GroupAddress, 1, []);
+        var labels = await h.Service.GetLabelsAsync(2026, 5, PackagingMode.GroupAddress, 1, ["not-a-print-key"]);
 
         Assert.Empty(labels!);
         Assert.Empty(h.Repository.GroupLabelRequests);

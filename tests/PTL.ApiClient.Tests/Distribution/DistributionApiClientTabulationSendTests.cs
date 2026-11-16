@@ -27,7 +27,7 @@ public class DistributionApiClientTabulationSendTests
 
     private static void AssertStagedBody(string? body)
     {
-        var staged = JsonDocument.Parse(body!).RootElement.GetProperty("staged");
+        var staged = JsonElement.Parse(body!).GetProperty("staged");
         Assert.Equal(1, staged.GetArrayLength());
         Assert.Equal(SchemeId, staged[0].GetProperty("monthlyDistributionSchemeId").GetGuid());
         Assert.Equal("SendToTC", staged[0].GetProperty("command").GetString());
@@ -68,7 +68,7 @@ public class DistributionApiClientTabulationSendTests
 
         var request = Assert.Single(requests);
         Assert.Equal((HttpMethod.Post, $"{Base}/stage"), (request.Method, request.PathAndQuery));
-        var body = JsonDocument.Parse(request.Body!).RootElement;
+        var body = JsonElement.Parse(request.Body!);
         Assert.Equal("SendToAssessor", body.GetProperty("command").GetString());
         AssertStagedBody(request.Body);
         Assert.Equal(new TabulationSendResponse(SchemeId, "BT: Brucella", "D1a/S1", "SendToTC", "Send to TC", "Are you sure?"), result);

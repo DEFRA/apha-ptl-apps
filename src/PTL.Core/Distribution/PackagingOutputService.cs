@@ -38,7 +38,8 @@ public sealed class PackagingOutputService(
         var selected = new HashSet<string>(selectedKeys, StringComparer.OrdinalIgnoreCase);
         var labels = new List<PackagingLabel>();
 
-        foreach (var block in sheet.Blocks.Where(b => selected.Contains(b.PrintKey)))
+        // Legacy ButtonPrintLabels_Click leaves printAll true when no Print box is ticked, printing every row.
+        foreach (var block in sheet.Blocks.Where(b => selected.Count == 0 || selected.Contains(b.PrintKey)))
         {
             switch (mode)
             {

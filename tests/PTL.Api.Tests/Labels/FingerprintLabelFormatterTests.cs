@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text;
 using PTL.Core.Labels;
 
@@ -13,19 +14,47 @@ public class FingerprintLabelFormatterTests
     {
         var statements = Statements(AddressLabel.FromFields("Alice Example"));
 
-        Assert.Equal(["INPUT ON", "VERBON", "CLL", "FT \"Swiss 721 BT\",10"], statements[..4]);
+        Assert.Equal(["INPUT ON", "VERBON", "CLL", "FT \"Univers Bold\",10"], statements[..4]);
         Assert.Equal(["PF", "VERBOFF", "INPUT OFF"], statements[^3..]);
     }
 
-    // Legacy: Arial 10pt from the top-left of a 4in x 6in (1218 dot) page, one Arial line height (32 dots) per line.
+    // The PC43d's configured media is 75mm x 50.13mm, which at 203 dpi (8 dots/mm) is 600 x 401 dots. Fingerprint
+    // measures up from the bottom of the label, so the first line sits at 401 - 26 = 375 and each line steps down 32.
     [Fact]
     public void ToFingerprint_EmitsOnePositionAndTextStatementPerLine_StartingAtTheTopLeftAndStepsDown()
     {
         var statements = Statements(AddressLabel.FromFields("Alice Example", "1 Sample Street", "United Kingdom"));
 
         Assert.Equal(
-            ["PP 0,1192:PT \"Alice Example\"", "PP 0,1160:PT \"1 Sample Street\"", "PP 0,1128:PT \"United Kingdom\""],
+            ["PP 0,375:PT \"Alice Example\"", "PP 0,343:PT \"1 Sample Street\"", "PP 0,311:PT \"United Kingdom\""],
             statements[4..^3]);
+    }
+
+    [Fact]
+    public void ToFingerprint_AFullParticipantLabel_PlacesEveryLineInsideTheLabel()
+    {
+        var label = new AddressLabel(["1", "2", "3", "4", "5", "6", "7", "8", "9"]);
+
+        var positions = Statements(label)[4..^3]
+            .Select(statement => int.Parse(statement.Split(':')[0].Split(',')[1], CultureInfo.InvariantCulture))
+            .ToArray();
+
+        Assert.Equal([375, 343, 311, 279, 247, 215, 183, 151, 119], positions);
+        // The configured media is 50.13mm, which at 203 dpi is 401 dots.
+        Assert.All(positions, y => Assert.InRange(y, 0, 400));
+    }
+
+    // A field below the bottom of the label is Error 1003 "Field out of label" and the printer discards the whole
+    // label, so the lines that still fit must print - as legacy's DrawString clipped at the rectangle's edge.
+    [Fact]
+    public void ToFingerprint_MoreLinesThanTheLabelHolds_DropsTheLinesThatWouldFallOffIt()
+    {
+        var label = new AddressLabel([.. Enumerable.Range(1, 20).Select(line => $"Line {line}")]);
+
+        var statements = Statements(label)[4..^3];
+
+        Assert.Equal(12, statements.Length);
+        Assert.Equal("PP 0,23:PT \"Line 12\"", statements[^1]);
     }
 
     [Fact]
@@ -33,7 +62,7 @@ public class FingerprintLabelFormatterTests
     {
         var statements = Statements(new AddressLabel(["The \"Old\" Lab"]));
 
-        Assert.Contains("PP 0,1192:PT \"The \"+CHR$(34)+\"Old\"+CHR$(34)+\" Lab\"", statements);
+        Assert.Contains("PP 0,375:PT \"The \"+CHR$(34)+\"Old\"+CHR$(34)+\" Lab\"", statements);
     }
 
     [Fact]
@@ -41,7 +70,7 @@ public class FingerprintLabelFormatterTests
     {
         var statements = Statements(new AddressLabel(["Caf\u00E9 \u20AC"]));
 
-        Assert.Contains("PP 0,1192:PT \"Caf\"+CHR$(233)+\" ?\"", statements);
+        Assert.Contains("PP 0,375:PT \"Caf\"+CHR$(233)+\" ?\"", statements);
     }
 
     [Fact]
@@ -50,7 +79,7 @@ public class FingerprintLabelFormatterTests
         var statements = Statements(new AddressLabel(["A\r\nINPUT OFF\nB"]));
 
         Assert.Equal(8, statements.Length);
-        Assert.Contains("PP 0,1192:PT \"A  INPUT OFF B\"", statements);
+        Assert.Contains("PP 0,375:PT \"A  INPUT OFF B\"", statements);
     }
 
     [Fact]
@@ -58,7 +87,7 @@ public class FingerprintLabelFormatterTests
     {
         var statements = Statements(new AddressLabel(["Tel: 01234"]));
 
-        Assert.Contains("PP 0,1192:PT \"Tel: 01234\"", statements);
+        Assert.Contains("PP 0,375:PT \"Tel: 01234\"", statements);
     }
 
     [Fact]
