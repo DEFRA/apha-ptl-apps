@@ -3,10 +3,8 @@ using PTL.Contracts.Scheme;
 namespace PTL.ExternalWeb.Features.Scheme;
 
 /// <summary>View model for the participant-facing Scheme List screen (legacy SchemeList.aspx).
-/// Only the commercial schemes table is paginated (legacy GridView paging) - the non-commercial
-/// table only ever shows the schemes this participant is actually linked to, never large enough
-/// to need paging. Both tables are independently sortable (legacy GridView SortExpression on
-/// SchemeCode/SchemeName/Year on both grids).</summary>
+/// Both tables page and sort independently, as the legacy grids did: each has its own page, page
+/// size and sort (legacy GridView SortExpression on SchemeCode/SchemeName/Year on both grids).</summary>
 public sealed record SchemeListViewModel(
     IReadOnlyList<ParticipantSchemeSummaryResponse> CommercialSchemes,
     int CommercialSchemeTotalCount,
@@ -16,4 +14,7 @@ public sealed record SchemeListViewModel(
     string SortDirection,
     IReadOnlyList<ParticipantSchemeSummaryResponse> NonCommercialSchemes,
     string NonCommercialSortBy,
-    string NonCommercialSortDirection);
+    string NonCommercialSortDirection,
+    int NonCommercialSchemeTotalCount,
+    int NonCommercialPage,
+    int NonCommercialPageSize);
