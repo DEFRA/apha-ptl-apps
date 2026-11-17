@@ -520,14 +520,29 @@ public partial class SystemAdministrationController : Controller
 
     // Matches legacy Button_DeleteUser_Click - revokes every role then removes the user record.
     // Blocked (Success = false) if the selection is the current user, same reasoning as the
-    // self-Admin-removal guard in ManageUserRoles.
+    // self-Admin-removal guard in ManageUserRoles. Legacy's browser confirm() is replaced by the shared
+    // two-step confirmation page.
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> RemoveUser(RemoveUserViewModel model, CancellationToken cancellationToken)
+    public async Task<IActionResult> RemoveUser(RemoveUserViewModel model, string? confirmation, CancellationToken cancellationToken)
     {
         if (model.SelectedUserId is not Guid userId)
         {
             return View(await BuildRemoveUserViewModelAsync("Select a user to remove.", messageIsError: true, cancellationToken));
+        }
+
+        if (!ConfirmationFlow.IsConfirmed(confirmation))
+        {
+            return this.ConfirmationPage(
+                new ConfirmationPageViewModel
+                {
+                    Title = "Remove User",
+                    Message = "Are you sure you want to remove this user? This will revoke all of their application access.",
+                    ConfirmText = "Remove User",
+                    IsDestructive = true,
+                    CancelUrl = Url.Action(nameof(RemoveUser)),
+                },
+                nameof(RemoveUser));
         }
 
         var result = await userApiClient.RemoveUserAsync(userId, GetCurrentUserId(), cancellationToken);

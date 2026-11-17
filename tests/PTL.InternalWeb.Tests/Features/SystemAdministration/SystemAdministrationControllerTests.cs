@@ -1175,12 +1175,32 @@ public class SystemAdministrationControllerTests
         var controller = CreateController(userApiClient: userApiClient);
         var model = new RemoveUserViewModel { SelectedUserId = null };
 
-        var result = await controller.RemoveUser(model, CancellationToken.None);
+        var result = await controller.RemoveUser(model, ConfirmationFlow.Confirmed, CancellationToken.None);
 
         var view = Assert.IsType<ViewResult>(result);
         var resultModel = Assert.IsType<RemoveUserViewModel>(view.Model);
         Assert.True(resultModel.MessageIsError);
         Assert.Equal("Select a user to remove.", resultModel.Message);
+        Assert.Empty(userApiClient.RemoveCalls);
+    }
+
+    [Fact]
+    public async Task RemoveUser_Post_NotConfirmed_AsksOnTheConfirmationPageWithoutRemoving()
+    {
+        var userApiClient = new FakeUserApiClient();
+        var controller = CreateController(userApiClient: userApiClient);
+        controller.Url = new FakeUrlHelper();
+        var model = new RemoveUserViewModel { SelectedUserId = Guid.NewGuid() };
+
+        var result = await controller.RemoveUser(model, null, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        Assert.Equal(ConfirmationFlow.ViewName, view.ViewName);
+        var page = Assert.IsType<ConfirmationPageViewModel>(view.Model);
+        Assert.Equal("Remove User", page.Title);
+        Assert.Contains("revoke all of their application access", page.Message, StringComparison.Ordinal);
+        Assert.True(page.IsDestructive);
+        Assert.Contains(nameof(SystemAdministrationController.RemoveUser), page.CancelUrl, StringComparison.Ordinal);
         Assert.Empty(userApiClient.RemoveCalls);
     }
 
@@ -1192,7 +1212,7 @@ public class SystemAdministrationControllerTests
         var controller = CreateController(userApiClient: userApiClient);
         var model = new RemoveUserViewModel { SelectedUserId = userId };
 
-        var result = await controller.RemoveUser(model, CancellationToken.None);
+        var result = await controller.RemoveUser(model, ConfirmationFlow.Confirmed, CancellationToken.None);
 
         var view = Assert.IsType<ViewResult>(result);
         var resultModel = Assert.IsType<RemoveUserViewModel>(view.Model);
@@ -1209,7 +1229,7 @@ public class SystemAdministrationControllerTests
         var controller = CreateController(userApiClient: userApiClient);
         var model = new RemoveUserViewModel { SelectedUserId = userId };
 
-        var result = await controller.RemoveUser(model, CancellationToken.None);
+        var result = await controller.RemoveUser(model, ConfirmationFlow.Confirmed, CancellationToken.None);
 
         var view = Assert.IsType<ViewResult>(result);
         var resultModel = Assert.IsType<RemoveUserViewModel>(view.Model);
@@ -1234,7 +1254,7 @@ public class SystemAdministrationControllerTests
         };
         var model = new RemoveUserViewModel { SelectedUserId = userId };
 
-        await controller.RemoveUser(model, CancellationToken.None);
+        await controller.RemoveUser(model, ConfirmationFlow.Confirmed, CancellationToken.None);
 
         Assert.Equal(signedInUserId, userApiClient.LastRemoveActingUserId);
     }
@@ -1247,7 +1267,7 @@ public class SystemAdministrationControllerTests
         var controller = CreateController(userApiClient: userApiClient);
         var model = new RemoveUserViewModel { SelectedUserId = userId };
 
-        await controller.RemoveUser(model, CancellationToken.None);
+        await controller.RemoveUser(model, ConfirmationFlow.Confirmed, CancellationToken.None);
 
         Assert.Null(userApiClient.LastRemoveActingUserId);
     }
