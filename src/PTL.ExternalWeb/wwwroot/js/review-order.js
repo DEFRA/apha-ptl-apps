@@ -8,10 +8,10 @@ document.addEventListener('DOMContentLoaded', () => {
     print.addEventListener('click', () => window.print());
   }
 
-  // A saved PDF is named after the page title, so print under the page name alone (no "- Proficiency Testing - GOV.UK").
+  // A saved PDF is named after the page title, so print without the trailing "- GOV.UK".
   const pageTitle = document.title;
   window.addEventListener('beforeprint', () => {
-    document.title = pageTitle.split(' - ')[0];
+    document.title = pageTitle.replace(/ - GOV\.UK$/, '');
   });
   window.addEventListener('afterprint', () => {
     document.title = pageTitle;
