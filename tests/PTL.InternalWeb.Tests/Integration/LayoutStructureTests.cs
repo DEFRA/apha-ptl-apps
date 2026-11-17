@@ -50,7 +50,7 @@ public class LayoutStructureTests : IClassFixture<WebApplicationFactory<Program>
     {
         var html = await GetHomePageAsync();
 
-        Assert.Contains("<title>Home - Proficiency Testing - Internal</title>", html, StringComparison.Ordinal);
+        Assert.Contains("<title>Home - Proficiency Testing</title>", html, StringComparison.Ordinal);
     }
 
     // The configured two-minute ExpireAfterWarning, shown the way session-timeout.js counts it down.
