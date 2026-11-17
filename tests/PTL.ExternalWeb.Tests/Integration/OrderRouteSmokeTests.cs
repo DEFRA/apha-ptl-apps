@@ -27,11 +27,12 @@ public partial class OrderRouteSmokeTests : IClassFixture<PtlExternalWebTestFact
             }))
             .CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = allowAutoRedirect });
 
-    private static async Task<Dictionary<string, string>> SignInAsync(HttpClient client, string roles = "Participant", bool canOrderOnline = true)
+    private static async Task<Dictionary<string, string>> SignInAsync(HttpClient client, string roles = "Participant", bool canOrderOnline = true, string? userType = null)
     {
         var cookies = new Dictionary<string, string>();
         var url = $"{PtlExternalWebTestFactory.TestSignInPath}?roles={Uri.EscapeDataString(roles)}&participantId={Guid.NewGuid()}"
-            + (canOrderOnline ? "&canOrderOnline=true" : string.Empty);
+            + (canOrderOnline ? "&canOrderOnline=true" : string.Empty)
+            + (userType is null ? string.Empty : $"&userType={userType}");
         CookieForwardingHttpClient.CaptureCookies(await client.GetAsync(url), cookies);
         return cookies;
     }
@@ -488,6 +489,26 @@ public partial class OrderRouteSmokeTests : IClassFixture<PtlExternalWebTestFact
     }
 
     [Fact]
+    public async Task Review_ExplainsTheSaveAndSubmitOptionsAboveTheButtons()
+    {
+        var client = CreateClient(ReviewApi());
+        var cookies = await SignInAsync(client);
+
+        var body = await GetAsync(client, cookies, "/Order/Review?year=current");
+
+        Assert.Contains("You can save your order and return to it later, or submit it when you are ready.", body);
+        Assert.Contains("<strong>Save:</strong> Saves your order so you can continue or make changes the next time you sign in. Your order will not be submitted.", body);
+        Assert.Contains("<strong>Submit:</strong> Sends your completed order to VETQAS. Only select Submit when you are ready to place your order.", body);
+        // The guidance is inset text, comes before the buttons and is tied to the two buttons it describes.
+        Assert.Contains("class=\"govuk-inset-text app-print-actions\" id=\"save-submit-guidance\"", body);
+        Assert.True(
+            body.IndexOf("You can save your order", StringComparison.Ordinal) < body.IndexOf("id=\"submit-order\"", StringComparison.Ordinal),
+            "The guidance should come before the buttons.");
+        Assert.Contains("id=\"submit-order\" class=\"govuk-button\" data-module=\"govuk-button\" data-prevent-double-click=\"true\" aria-describedby=\"submit-guidance\"", body);
+        Assert.Contains("aria-describedby=\"save-guidance\">Save</button>", body);
+    }
+
+    [Fact]
     public async Task Review_TermsLinkOpensTheTermsPdfShippedWithTheApp()
     {
         var client = CreateClient(ReviewApi());
@@ -605,6 +626,31 @@ public partial class OrderRouteSmokeTests : IClassFixture<PtlExternalWebTestFact
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Null(api.LastSave);
         Assert.Null(api.LastSubmit);
+    }
+
+    [Theory]
+    [InlineData("/Order/CurrentYear")]
+    [InlineData("/Order/NextYear")]
+    [InlineData("/Order/Review?year=current")]
+    public async Task OrderPages_LabUser_AreForbiddenEvenWhenTheCustomerCanOrderOnline(string url)
+    {
+        var client = CreateClient(ReviewApi());
+        var cookies = await SignInAsync(client, roles: "Participant,Viewer", userType: "LabUser");
+
+        var response = await CookieForwardingHttpClient.SendWithCookiesAsync(client, HttpMethod.Get, url, cookies);
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task OrderPages_PrimaryContact_AreStillAvailable()
+    {
+        var client = CreateClient(ReviewApi());
+        var cookies = await SignInAsync(client, roles: "Participant,Viewer", userType: "Participant");
+
+        var response = await CookieForwardingHttpClient.SendWithCookiesAsync(client, HttpMethod.Get, "/Order/CurrentYear", cookies);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 
     [Fact]

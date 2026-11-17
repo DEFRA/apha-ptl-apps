@@ -12,8 +12,8 @@ namespace PTL.ExternalWeb.Features.Order;
 // Legacy PendingContractOrder.aspx (tracker row 12, Stories 744642 and 744643): a participant picks schemes and
 // distribution months for the current or next contract year and sees live pricing (stage 1), then reviews the pending
 // order, enters a purchase order number, accepts the terms and submits it (stage 2). The order is a server-side
-// draft that PTL.Api creates, prices and persists on every change, exactly as legacy did.
-[Authorize(Policy = ExternalPolicies.Participant)]
+// draft that PTL.Api creates, prices and persists on every change, exactly as legacy did. Lab Users cannot order.
+[Authorize(Policy = ExternalPolicies.PrimaryContact)]
 public sealed class OrderController(ICreateOrderApiClient createOrderApiClient, IOptions<OrderPageOptions> pageOptions) : Controller
 {
     public const string CurrentYearSlug = "current";
