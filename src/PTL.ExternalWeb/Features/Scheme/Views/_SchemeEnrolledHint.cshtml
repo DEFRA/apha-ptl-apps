@@ -1,0 +1,6 @@
+@using PTL.Contracts.Scheme
+@model IReadOnlyList<ParticipantSchemeSummaryResponse>
+@if (Model.Any(scheme => scheme.IsParticipating))
+{
+    <p class="govuk-body-s govuk-hint">* You are enrolled in this scheme</p>
+}

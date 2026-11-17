@@ -1,0 +1,35 @@
+name: Pre-pull final-stage base image
+description: >
+  Starts pulling the base image of the Dockerfile's `final` stage in the background, so its large
+  layers download while the earlier build stages (restore, publish) run. `docker build --pull` then
+  finds the image already present or joins the pull that is in flight. Best effort only: it never
+  fails the job, because the build pulls the image itself when this does nothing.
+
+inputs:
+  dockerfile:
+    description: Path to the Dockerfile that is about to be built.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Start background pull
+      shell: pwsh
+      env:
+        DOCKERFILE: ${{ inputs.dockerfile }}
+      run: |
+        $ErrorActionPreference = "Continue"
+
+        $match = Select-String -Path $env:DOCKERFILE -Pattern '^\s*FROM\s+(\S+)\s+AS\s+final\s*$' | Select-Object -First 1
+        if (-not $match) {
+          Write-Host "No 'final' stage found in $($env:DOCKERFILE); skipping pre-pull."
+          exit 0
+        }
+
+        $image = $match.Matches[0].Groups[1].Value
+        Write-Host "Pulling $image in the background while the build stages run."
+
+        $log = Join-Path $env:RUNNER_TEMP "prepull.log"
+        Start-Process -FilePath "docker" -ArgumentList @("pull", $image) `
+          -RedirectStandardOutput $log -RedirectStandardError "$log.err" -WindowStyle Hidden | Out-Null
+        exit 0

@@ -163,15 +163,6 @@ public sealed class OrderController(ICreateOrderApiClient createOrderApiClient, 
         return RedirectToAction("Index", "Home");
     }
 
-    // Req3 print-only slice: printable pending-order summary before submission, with the same access
-    // and selection guard as Review.
-    [HttpGet]
-    public async Task<IActionResult> Print(string? year, CancellationToken cancellationToken)
-    {
-        var review = await GetReviewModelAsync(year, includeConsents: true, SortValues, cancellationToken);
-        return review.Error ?? View("Print", review.Model!);
-    }
-
     private async Task<IActionResult> ReviewWithErrorsAsync(
         string slug, CreateOrderReviewForm form, IReadOnlyList<CreateOrderValidationErrorResponse> errors, CancellationToken cancellationToken)
     {
