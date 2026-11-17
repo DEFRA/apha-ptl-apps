@@ -81,6 +81,17 @@ public class LabUserNavigationTests
     }
 
     [Fact]
+    public void OrdersSection_IsHiddenFromLabUsersEvenWhenTheCustomerCanOrderOnline()
+    {
+        var orders = Section("Orders");
+        string[] roles = [ExternalRoleNames.Participant, ExternalRoleNames.Viewer];
+
+        Assert.True(orders.ExcludeLabUsers);
+        Assert.True(orders.IsVisibleTo(roles, isLabUser: false, canOrderOnline: true));
+        Assert.False(orders.IsVisibleTo(roles, isLabUser: true, canOrderOnline: true));
+    }
+
+    [Fact]
     public void SectionsWithoutTheExclusion_AreStillVisibleToLabUsers()
     {
         var schemes = Section("Schemes");
