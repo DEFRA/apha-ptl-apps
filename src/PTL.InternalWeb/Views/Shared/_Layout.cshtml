@@ -9,7 +9,7 @@
         && (string.Equals(currentAction, "Login", StringComparison.OrdinalIgnoreCase)
             || string.Equals(currentAction, "SessionExpired", StringComparison.OrdinalIgnoreCase));
 
-    const string serviceName = "Proficiency Testing - Internal";
+    const string serviceName = "Proficiency Testing";
     var pageTitle = ViewData["Title"]?.ToString();
 
     // GOV.UK service manual: the title must name the page, and must be prefixed with "Error:" when
@@ -43,7 +43,7 @@
             document.body.className += ' js-enabled' + ('noModule' in HTMLScriptElement.prototype ? ' govuk-frontend-supported' : '');
     </script>
     <a href="#main-content" class="govuk-skip-link" data-module="govuk-skip-link">Skip to main content</a>
-    @await Html.PartialAsync("_Header", ("Proficiency Testing - Internal", "height:80px; width:auto;"))
+    @await Html.PartialAsync("_Header", ("Proficiency Testing", "height:80px; width:auto;"))
     <div class="govuk-width-container app-width-container">
         @* Breadcrumbs and the side navigation sit outside <main> so that the skip link lands on the
            page's own content, and so <main> holds only what is unique to this page. *@

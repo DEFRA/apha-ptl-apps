@@ -17,6 +17,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.AddPtlWebFrontEnd();
 builder.AddEntraAuthentication();
 builder.Services.AddScoped<IEntraInternalUserResolver, InternalUserResolver>();
+builder.Services.AddPtlLoadTesting(builder.Configuration, "Entra ID is bypassed by the username-only sign-in");
 
 // Client-side inactivity warning (see _SessionTimeoutWarning.cshtml/session-timeout.js) - a UX/
 // security layer independent of the 14-day sliding auth cookie and Entra token refresh above.

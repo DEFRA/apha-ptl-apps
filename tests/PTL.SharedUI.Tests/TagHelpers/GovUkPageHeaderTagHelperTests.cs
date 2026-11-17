@@ -63,12 +63,12 @@ public class GovUkPageHeaderTagHelperTests
     [Fact]
     public async Task ProcessAsync_RendersServiceNameLogoAndChildContent()
     {
-        var (helper, context, output) = Create("Proficiency Testing - Internal", "height:80px; width:auto;", "<nav>Signed in as: Jane</nav>");
+        var (helper, context, output) = Create("Proficiency Testing", "height:80px; width:auto;", "<nav>Signed in as: Jane</nav>");
 
         await helper.ProcessAsync(context, output);
 
         var html = output.Content.GetContent();
-        Assert.Contains("Proficiency Testing - Internal", html, StringComparison.Ordinal);
+        Assert.Contains("Proficiency Testing", html, StringComparison.Ordinal);
         Assert.Contains("height:80px; width:auto;", html, StringComparison.Ordinal);
         Assert.Contains("<nav>Signed in as: Jane</nav>", html, StringComparison.Ordinal);
         Assert.Contains("AphaLogo.png", html, StringComparison.Ordinal);
@@ -111,7 +111,7 @@ public class GovUkPageHeaderTagHelperTests
     [Fact]
     public async Task ProcessAsync_NoSecondaryLogo_RendersASingleImage()
     {
-        var (helper, context, output) = Create("Proficiency Testing - Internal", null, string.Empty);
+        var (helper, context, output) = Create("Proficiency Testing", null, string.Empty);
 
         await helper.ProcessAsync(context, output);
 
@@ -178,7 +178,7 @@ public class GovUkPageHeaderTagHelperTests
     [Fact]
     public async Task ProcessAsync_NestsTheServiceNavigationContainerInsideTheWidthContainer()
     {
-        var (helper, context, output) = Create("Proficiency Testing - Internal", null, "<nav>Signed in as: Jane</nav>");
+        var (helper, context, output) = Create("Proficiency Testing", null, "<nav>Signed in as: Jane</nav>");
 
         await helper.ProcessAsync(context, output);
 
@@ -190,7 +190,7 @@ public class GovUkPageHeaderTagHelperTests
     [Fact]
     public async Task ProcessAsync_SuppressesOwnTagName()
     {
-        var (helper, context, output) = Create("Proficiency Testing - Internal", null, string.Empty);
+        var (helper, context, output) = Create("Proficiency Testing", null, string.Empty);
 
         await helper.ProcessAsync(context, output);
 
@@ -201,7 +201,7 @@ public class GovUkPageHeaderTagHelperTests
     [Fact]
     public async Task ProcessAsync_ShowMenuToggleDefaultsFalse_NoToggleButtonRendered()
     {
-        var (helper, context, output) = Create("Proficiency Testing - Internal", null, string.Empty);
+        var (helper, context, output) = Create("Proficiency Testing", null, string.Empty);
 
         await helper.ProcessAsync(context, output);
 
