@@ -26,6 +26,19 @@ updates:
     commit-message:
       prefix: "chore(deps)"
     groups:
+      # Microsoft.Extensions.*, ASP.NET Core and System.* packages share transitive dependencies across
+      # projects, so bumping one project alone fails restore with NU1605 (package downgrade). Group them
+      # across all directories, for every update type, so they always move together in one pull request.
+      # Listed first: a package that matches several groups is placed in the first one.
+      dotnet-platform:
+        patterns:
+          - "Microsoft.Extensions.*"
+          - "Microsoft.AspNetCore.*"
+          - "System.*"
+        update-types:
+          - major
+          - minor
+          - patch
       nuget-minor-and-patch:
         update-types:
           - minor
