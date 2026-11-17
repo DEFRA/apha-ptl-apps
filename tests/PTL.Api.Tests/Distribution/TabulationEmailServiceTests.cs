@@ -147,7 +147,7 @@ public class TabulationEmailServiceTests
     [Fact]
     public async Task ProcessScheduledEmailsAsync_FirstRequestToAnExternalConsultant_LinksTheExternalCommentsPage()
     {
-        var h = new Harness(o => o.ExternalCommentsPath = "/CommentsEntry/", externalUrl: "https://external.example.test/");
+        var h = new Harness(o => o.ExternalCommentsPath = "/Comments/Entry/", externalUrl: "https://external.example.test/");
         h.AddStandardConsultants();
         h.Repository.EmailCandidates.Add(Candidate(Mds1, daysSinceReady: 0, tc1: Tc2));
 
@@ -156,7 +156,7 @@ public class TabulationEmailServiceTests
         var sent = Assert.Single(h.Notify.Sent);
         Assert.Equal(Tc2Email, sent.Email);
         Assert.Equal("Bob External", sent.Personalisation!["DisplayName"]);
-        Assert.Equal($"{WebAddressPrefix}https://external.example.test/CommentsEntry?ref={Mds1}", sent.Personalisation["WebAddress"]);
+        Assert.Equal($"{WebAddressPrefix}https://external.example.test/Comments/Entry?schemeId={Mds1}", sent.Personalisation["WebAddress"]);
     }
 
     [Fact]
@@ -333,7 +333,7 @@ public class TabulationEmailServiceTests
             ("SchemeName", "PT0060: Mastitis bovine"),
             ("MonthlyDistributionReferenceFull", "17152A/BA"),
             ("CommentDeadlineDays", "2"),
-            ("WebAddress", $"{WebAddressPrefix}https://external.example.test/CommentsEntry?ref={Mds1}"),
+            ("WebAddress", $"{WebAddressPrefix}https://external.example.test/Comments/Entry?schemeId={Mds1}"),
             ("DateTimeNow", "12/05/2026"));
         Assert.Equal(
             $"{WebAddressPrefix}https://internal.example.test/Test%20Consultant/Tabulation?MonthlyDistributionSchemeId={Mds1}",

@@ -15,7 +15,7 @@ public sealed class SchemeController(ISchemeApiClient schemeApiClient) : Control
 {
     // Legacy GridView page size for this screen - distinct from PaginationModel.DefaultPageSize
     // (25), which is the InternalWeb admin-screen convention.
-    private const int DefaultPageSize = 15;
+    internal const int DefaultPageSize = 15;
 
     private static readonly string[] ValidSortColumns = ["code", "name", "year"];
     private static readonly string[] ValidSortDirections = ["asc", "desc"];
@@ -23,29 +23,29 @@ public sealed class SchemeController(ISchemeApiClient schemeApiClient) : Control
     // Pagination and sorting are both applied in-memory over the already-fetched full list, not as
     // a paged/sorted repository query - GetSchemesForParticipantAsync reuses the existing legacy
     // stored procedures as-is (see SchemeService), which already return the full set unsorted.
-    public async Task<IActionResult> Index(
-        int page = 1,
-        int pageSize = DefaultPageSize,
-        string sortBy = "code",
-        string sortDir = "asc",
-        string ncSortBy = "code",
-        string ncSortDir = "asc")
+    public async Task<IActionResult> Index([FromQuery] SchemeListQuery query)
     {
-        sortBy = ValidSortColumns.Contains(sortBy) ? sortBy : "code";
-        sortDir = ValidSortDirections.Contains(sortDir) ? sortDir : "asc";
-        ncSortBy = ValidSortColumns.Contains(ncSortBy) ? ncSortBy : "code";
-        ncSortDir = ValidSortDirections.Contains(ncSortDir) ? ncSortDir : "asc";
+        var page = query.Page;
+        var pageSize = query.PageSize;
+        var ncPage = query.NcPage;
+        var ncPageSize = query.NcPageSize;
+        var sortBy = ValidSortColumns.Contains(query.SortBy) ? query.SortBy : "code";
+        var sortDir = ValidSortDirections.Contains(query.SortDir) ? query.SortDir : "asc";
+        var ncSortBy = ValidSortColumns.Contains(query.NcSortBy) ? query.NcSortBy : "code";
+        var ncSortDir = ValidSortDirections.Contains(query.NcSortDir) ? query.NcSortDir : "asc";
 
         var participantId = User.GetParticipantId();
         if (participantId is null)
         {
-            return View(new SchemeListViewModel([], 0, 1, DefaultPageSize, sortBy, sortDir, [], ncSortBy, ncSortDir));
+            return View(new SchemeListViewModel([], 0, 1, DefaultPageSize, sortBy, sortDir, [], ncSortBy, ncSortDir, 0, 1, DefaultPageSize));
         }
 
         var result = await schemeApiClient.GetSchemesForParticipantAsync(participantId.Value, HttpContext.RequestAborted);
 
         page = Math.Max(page, 1);
         pageSize = PaginationModel.AvailablePageSizes.Contains(pageSize) ? pageSize : DefaultPageSize;
+        ncPage = Math.Max(ncPage, 1);
+        ncPageSize = PaginationModel.AvailablePageSizes.Contains(ncPageSize) ? ncPageSize : DefaultPageSize;
 
         var sortedCommercialSchemes = SortSchemes(result.CommercialSchemes, sortBy, sortDir);
         var pagedCommercialSchemes = sortedCommercialSchemes
@@ -54,6 +54,10 @@ public sealed class SchemeController(ISchemeApiClient schemeApiClient) : Control
             .ToList();
 
         var sortedNonCommercialSchemes = SortSchemes(result.NonCommercialSchemes, ncSortBy, ncSortDir);
+        var pagedNonCommercialSchemes = sortedNonCommercialSchemes
+            .Skip((ncPage - 1) * ncPageSize)
+            .Take(ncPageSize)
+            .ToList();
 
         return View(new SchemeListViewModel(
             pagedCommercialSchemes,
@@ -62,9 +66,12 @@ public sealed class SchemeController(ISchemeApiClient schemeApiClient) : Control
             pageSize,
             sortBy,
             sortDir,
-            sortedNonCommercialSchemes,
+            pagedNonCommercialSchemes,
             ncSortBy,
-            ncSortDir));
+            ncSortDir,
+            result.NonCommercialSchemes.Count,
+            ncPage,
+            ncPageSize));
     }
 
     private static List<ParticipantSchemeSummaryResponse> SortSchemes(

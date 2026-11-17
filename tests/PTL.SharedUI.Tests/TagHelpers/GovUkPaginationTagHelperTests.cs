@@ -211,6 +211,19 @@ public class GovUkPageSizeSelectorTagHelperTests
     }
 
     [Fact]
+    public void Process_CustomParameterNames_UsesThemForTheHiddenPageInputAndTheDropdown()
+    {
+        var model = new PaginationModel { PageSize = 15, PageParameter = "ncPage", PageSizeParameter = "ncPageSize" };
+
+        var (_, html) = Render(model);
+
+        Assert.Contains("""<input type="hidden" name="ncPage" value="1" />""", html, StringComparison.Ordinal);
+        Assert.Contains("""<select class="govuk-select" id="ncPageSize" name="ncPageSize" onchange="this.form.submit()">""", html, StringComparison.Ordinal);
+        Assert.Contains("""for="ncPageSize">Items per page</label>""", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("name=\"page\"", html, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Process_NullRouteValue_RendersEmptyHiddenInputValue()
     {
         var model = new PaginationModel { RouteValues = new Dictionary<string, object?> { ["yearId"] = null } };
