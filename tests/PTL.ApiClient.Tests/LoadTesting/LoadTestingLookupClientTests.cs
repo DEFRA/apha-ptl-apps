@@ -36,7 +36,7 @@ public class LoadTestingLookupClientTests
         Assert.Equal(HttpMethod.Post, request.Method);
         Assert.Equal("/api/load-testing/internal-users/lookup", request.RequestUri!.AbsolutePath);
         Assert.Equal(["true"], request.Headers.GetValues(LoadTestingHeaders.Enabled));
-        Assert.Equal(@"DEFRA\tester", JsonDocument.Parse(Assert.Single(bodies)).RootElement.GetProperty("username").GetString());
+        Assert.Equal(@"DEFRA\tester", JsonElement.Parse(Assert.Single(bodies)).GetProperty("username").GetString());
     }
 
     [Fact]
@@ -51,7 +51,7 @@ public class LoadTestingLookupClientTests
         Assert.Equal(HttpMethod.Post, request.Method);
         Assert.Equal("/api/load-testing/external-users/lookup", request.RequestUri!.AbsolutePath);
         Assert.Equal(["true"], request.Headers.GetValues(LoadTestingHeaders.Enabled));
-        Assert.Equal("tester@example.test", JsonDocument.Parse(Assert.Single(bodies)).RootElement.GetProperty("email").GetString());
+        Assert.Equal("tester@example.test", JsonElement.Parse(Assert.Single(bodies)).GetProperty("email").GetString());
     }
 
     [Fact]
