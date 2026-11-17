@@ -113,6 +113,30 @@ public class HomeNavigationSmokeTests : IClassFixture<PtlExternalWebTestFactory>
     }
 
     [Fact]
+    public async Task LabUser_HomeShowsSchemesAndResultsButNoOrdersOrAccountCards()
+    {
+        var client = _factory.CreateClient();
+        var cookies = new Dictionary<string, string>();
+        var signInResponse = await client.GetAsync(
+            $"{PtlExternalWebTestFactory.TestSignInPath}?roles={Uri.EscapeDataString("Participant,Viewer")}&userType=LabUser&canOrderOnline=true&labCode=LAB001");
+        CookieForwardingHttpClient.CaptureCookies(signInResponse, cookies);
+
+        var homeResponse = await CookieForwardingHttpClient.SendWithCookiesAsync(client, HttpMethod.Get, "/Home/Index", cookies);
+        var body = await homeResponse.Content.ReadAsStringAsync();
+
+        var headings = Regex.Matches(body, "<h2 class=\"govuk-heading-l\">(?<text>[^<]+)</h2>")
+            .Select(match => match.Groups["text"].Value.Trim())
+            .ToList();
+        Assert.Equal(["Schemes", "Results"], headings);
+        Assert.Contains("View schemes", body);
+        Assert.Contains("Enter results", body);
+        Assert.Contains("View results", body);
+        Assert.Contains("View reports", body);
+        Assert.DoesNotContain("Create order", body);
+        Assert.DoesNotContain("/Order/", body);
+    }
+
+    [Fact]
     public async Task HomeCards_AreGroupedInLegacyOrder_OrdersThenSchemesThenResultsThenAccounts()
     {
         var client = _factory.CreateClient();

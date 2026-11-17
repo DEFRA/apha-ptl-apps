@@ -27,11 +27,12 @@ public partial class OrderRouteSmokeTests : IClassFixture<PtlExternalWebTestFact
             }))
             .CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = allowAutoRedirect });
 
-    private static async Task<Dictionary<string, string>> SignInAsync(HttpClient client, string roles = "Participant", bool canOrderOnline = true)
+    private static async Task<Dictionary<string, string>> SignInAsync(HttpClient client, string roles = "Participant", bool canOrderOnline = true, string? userType = null)
     {
         var cookies = new Dictionary<string, string>();
         var url = $"{PtlExternalWebTestFactory.TestSignInPath}?roles={Uri.EscapeDataString(roles)}&participantId={Guid.NewGuid()}"
-            + (canOrderOnline ? "&canOrderOnline=true" : string.Empty);
+            + (canOrderOnline ? "&canOrderOnline=true" : string.Empty)
+            + (userType is null ? string.Empty : $"&userType={userType}");
         CookieForwardingHttpClient.CaptureCookies(await client.GetAsync(url), cookies);
         return cookies;
     }
@@ -625,6 +626,31 @@ public partial class OrderRouteSmokeTests : IClassFixture<PtlExternalWebTestFact
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Null(api.LastSave);
         Assert.Null(api.LastSubmit);
+    }
+
+    [Theory]
+    [InlineData("/Order/CurrentYear")]
+    [InlineData("/Order/NextYear")]
+    [InlineData("/Order/Review?year=current")]
+    public async Task OrderPages_LabUser_AreForbiddenEvenWhenTheCustomerCanOrderOnline(string url)
+    {
+        var client = CreateClient(ReviewApi());
+        var cookies = await SignInAsync(client, roles: "Participant,Viewer", userType: "LabUser");
+
+        var response = await CookieForwardingHttpClient.SendWithCookiesAsync(client, HttpMethod.Get, url, cookies);
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task OrderPages_PrimaryContact_AreStillAvailable()
+    {
+        var client = CreateClient(ReviewApi());
+        var cookies = await SignInAsync(client, roles: "Participant,Viewer", userType: "Participant");
+
+        var response = await CookieForwardingHttpClient.SendWithCookiesAsync(client, HttpMethod.Get, "/Order/CurrentYear", cookies);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 
     [Fact]

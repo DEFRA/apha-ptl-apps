@@ -501,13 +501,13 @@ public class OrderControllerTests
     }
 
     [Fact]
-    public void OrderController_IsRestrictedToParticipants()
+    public void OrderController_IsRestrictedToThePrimaryContact_NotLabUsers()
     {
         var authorize = typeof(OrderController).GetCustomAttributes(typeof(Microsoft.AspNetCore.Authorization.AuthorizeAttribute), inherit: true)
             .Cast<Microsoft.AspNetCore.Authorization.AuthorizeAttribute>()
             .Single();
 
-        Assert.Equal(PTL.ExternalWeb.Authorization.ExternalPolicies.Participant, authorize.Policy);
+        Assert.Equal(PTL.ExternalWeb.Authorization.ExternalPolicies.PrimaryContact, authorize.Policy);
     }
 
     [Fact]
