@@ -25,7 +25,7 @@
         <details class="govuk-details">
             <summary class="govuk-details__summary">
                 <span class="govuk-details__summary-text">
-                    @scheme.DistributionTitle<span class="govuk-!-font-weight-regular"> (Due Date: @scheme.TargetDate.ToString("dd/MM/yyyy", culture))</span>
+                    @scheme.DistributionTitle
                 </span>
             </summary>
             <div class="govuk-details__text">
@@ -35,11 +35,9 @@
                         <thead class="govuk-table__head">
                             <tr class="govuk-table__row">
                                 <th scope="col" class="govuk-table__header">Tabulation Name</th>
-                                <th scope="col" class="govuk-table__header">Test Consultant</th>
-                                <th scope="col" class="govuk-table__header">Assessor</th>
+                                <th scope="col" class="govuk-table__header">Due Date</th>
                                 <th scope="col" class="govuk-table__header">Single Participant</th>
                                 <th scope="col" class="govuk-table__header">Availability</th>
-                                <th scope="col" class="govuk-table__header">Status</th>
                                 <th scope="col" class="govuk-table__header">View</th>
                             </tr>
                         </thead>
@@ -55,11 +53,9 @@
                                             <span class="govuk-visually-hidden">This Tabulation has already been published @tabulation.PublishCount.ToString(culture) @(tabulation.PublishCount == 1 ? "time" : "times")</span>
                                         }
                                     </td>
-                                    <td class="govuk-table__cell">@scheme.TestConsultants</td>
-                                    <td class="govuk-table__cell">@scheme.Assessors</td>
+                                    <td class="govuk-table__cell">@scheme.TargetDate.ToString("dd/MM/yyyy", culture)</td>
                                     <td class="govuk-table__cell">@(tabulation.IsSingleParticipant ? "Yes" : "No")</td>
                                     <td class="govuk-table__cell">@tabulation.Availability</td>
-                                    <td class="govuk-table__cell"><strong class="govuk-tag govuk-tag--yellow">@tabulation.Status</strong></td>
                                     <td class="govuk-table__cell">
                                         <a class="govuk-link" href="@ResultsSignOffQueueViewModel.TabulationUrl(tabulation.TabulationId)">View<span class="govuk-visually-hidden"> @tabulation.Name</span></a>
                                     </td>
