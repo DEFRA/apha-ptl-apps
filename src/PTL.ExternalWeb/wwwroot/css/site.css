@@ -317,6 +317,12 @@
   min-width: 56rem;
 }
 
+/* A fixed layout never grows a column, so a long scheme name must wrap rather than run into the price cell. */
+.app-order-table--fixed .govuk-table__cell,
+.app-order-table--review .govuk-table__cell {
+  overflow-wrap: anywhere;
+}
+
 /* Pending order and Print: same fixed layout; the minimum width only applies on screen so the printout fits the page. */
 .app-order-table--review {
   table-layout: fixed;

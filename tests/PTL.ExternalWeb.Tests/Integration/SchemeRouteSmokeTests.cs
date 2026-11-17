@@ -267,6 +267,7 @@ public class SchemeRouteSmokeTests : IClassFixture<PtlExternalWebTestFactory>
         Assert.Contains("app-table__row--enrolled", body);
         Assert.Contains("govuk-!-font-weight-bold", body);
         Assert.Contains("<span aria-hidden=\"true\"> *</span>", body);
+        Assert.Contains("<td class=\"govuk-table__cell govuk-!-font-weight-bold\">2025/26</td>", body);
         Assert.Contains("You are enrolled in this scheme", body);
     }
 
