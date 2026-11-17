@@ -59,6 +59,13 @@ table.TabulationTable {
     background-color: #eeeeee;
 }
 
+.ptl-assessment-chart {
+    display: block;
+    max-width: 100%;
+    height: auto;
+    margin-bottom: 30px;
+}
+
 /* The scroll region is focusable so keyboard users can scroll wide tables; give it the GOV.UK focus style. */
 .ptl-tabulation-scroll:focus {
     outline: 3px solid #ffdd00;

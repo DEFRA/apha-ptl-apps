@@ -39,6 +39,23 @@ public sealed record TabulationAccordionSection(string Title, TabulationTableRes
 
 public sealed record TabulationAccordionViewModel(string Id, IReadOnlyList<TabulationAccordionSection> Sections);
 
-/// <summary>Legacy AssessmentResults.aspx - rendered as a data table rather than the legacy bar
-/// chart (not required by this story's acceptance criteria).</summary>
-public sealed record AssessmentResultsPageViewModel(Guid PublishedTabulationId, Guid TestId, AssessmentResultsResponse Results, string? ReturnUrl = null);
+/// <summary>Legacy AssessmentResults.aspx - the information list, the bar chart and its data table.
+/// Details splits the builder's "Label: value" titles (after the intro sentence); legacy ExternalWeb
+/// calls the tabulation "Report".</summary>
+public sealed record AssessmentResultsPageViewModel(Guid PublishedTabulationId, Guid TestId, AssessmentResultsResponse Results, string? ReturnUrl = null)
+{
+    public IReadOnlyList<(string Label, string Value)> Details { get; } =
+        [.. Results.Titles.Skip(1).Where(t => !string.IsNullOrWhiteSpace(t)).Select(SplitTitle)];
+
+    private static (string Label, string Value) SplitTitle(string title)
+    {
+        var separator = title.IndexOf(": ", StringComparison.Ordinal);
+        if (separator < 0)
+        {
+            return (string.Empty, title.Trim());
+        }
+
+        var label = title[..separator];
+        return (label == "Tabulation" ? "Report" : label, title[(separator + 2)..].Trim());
+    }
+}
