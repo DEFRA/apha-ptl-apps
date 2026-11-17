@@ -53,7 +53,7 @@ else
         @if (Model.CancelUrl is not null)
         {
             @* A link, not a <button>: a submit button in this form would post confirmation=confirm. *@
-            <a class="govuk-button govuk-button--secondary" role="button" draggable="false" data-module="govuk-button" href="@Model.CancelUrl">@Model.CancelText</a>
+            <a class="govuk-button govuk-button--secondary" data-module="govuk-button" href="@Model.CancelUrl">@Model.CancelText</a>
         }
         else
         {
