@@ -689,6 +689,41 @@ public partial class SystemAdministrationRouteSmokeTests : IClassFixture<WebAppl
     }
 
     [Fact]
+    public async Task RemoveUser_Post_NotConfirmed_RendersTheConfirmationPageAndKeepsTheSelection()
+    {
+        var userId = Guid.NewGuid();
+        var userApiClient = new FakeUserApiClient();
+        var factory = _factory.WithWebHostBuilder(builder =>
+            builder.ConfigureServices(services =>
+            {
+                services.RemoveAll<IUserApiClient>();
+                services.AddSingleton<IUserApiClient>(userApiClient);
+            }));
+        var client = factory.CreateClient();
+        var (token, cookie) = await GetAntiforgeryAsync(client, "/SystemAdministration/RemoveUser");
+
+        var request = new HttpRequestMessage(HttpMethod.Post, "/SystemAdministration/RemoveUser")
+        {
+            Content = new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["__RequestVerificationToken"] = token,
+                ["SelectedUserId"] = userId.ToString()
+            })
+        };
+        request.Headers.Add("Cookie", cookie);
+
+        var response = await client.SendAsync(request);
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("revoke all of their application access", body, StringComparison.Ordinal);
+        Assert.Contains($"name=\"SelectedUserId\" value=\"{userId}\"", body, StringComparison.Ordinal);
+        Assert.Contains("name=\"confirmation\" value=\"confirm\"", body, StringComparison.Ordinal);
+        Assert.DoesNotContain("onclick=", body, StringComparison.Ordinal);
+        Assert.Empty(userApiClient.RemoveCalls);
+    }
+
+    [Fact]
     public async Task RemoveUser_Post_Valid_RendersSuccessBanner()
     {
         var userId = Guid.NewGuid();
@@ -706,7 +741,8 @@ public partial class SystemAdministrationRouteSmokeTests : IClassFixture<WebAppl
             Content = new FormUrlEncodedContent(new Dictionary<string, string>
             {
                 ["__RequestVerificationToken"] = token,
-                ["SelectedUserId"] = userId.ToString()
+                ["SelectedUserId"] = userId.ToString(),
+                ["confirmation"] = "confirm"
             })
         };
         request.Headers.Add("Cookie", cookie);
