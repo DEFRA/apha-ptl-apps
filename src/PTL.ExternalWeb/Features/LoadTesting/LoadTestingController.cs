@@ -27,9 +27,9 @@ public sealed class LoadTestingController(
     public IActionResult Login(string? returnUrl = null) =>
         options.Value.Enabled ? View(new LoadTestingLoginViewModel { ReturnUrl = returnUrl }) : NotFound();
 
-    // No antiforgery token so a JMeter script can sign in with a single POST.
+    // Validate antiforgery token on POST login to prevent CSRF.
     [HttpPost("perf/login")]
-    [IgnoreAntiforgeryToken]
+    [ValidateAntiForgeryToken]
     public async Task<IActionResult> Login(LoadTestingLoginViewModel model, CancellationToken cancellationToken)
     {
         if (!options.Value.Enabled)
