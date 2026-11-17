@@ -186,10 +186,16 @@
         </div>
     </div>
 
+    <div class="govuk-inset-text app-print-actions" id="save-submit-guidance">
+        <p class="govuk-body">You can save your order and return to it later, or submit it when you are ready.</p>
+        <p class="govuk-body" id="save-guidance"><strong>Save:</strong> Saves your order so you can continue or make changes the next time you sign in. Your order will not be submitted.</p>
+        <p class="govuk-body" id="submit-guidance"><strong>Submit:</strong> Sends your completed order to VETQAS. Only select Submit when you are ready to place your order.</p>
+    </div>
+
     <div class="govuk-button-group app-print-actions">
-        <button type="submit" id="submit-order" class="govuk-button" data-module="govuk-button" data-prevent-double-click="true">Submit</button>
+        <button type="submit" id="submit-order" class="govuk-button" data-module="govuk-button" data-prevent-double-click="true" aria-describedby="submit-guidance">Submit</button>
         <a class="govuk-button govuk-button--secondary" asp-controller="Order" asp-action="@Model.BackAction" draggable="false" data-module="govuk-button">Previous</a>
-        <button type="submit" class="govuk-button govuk-button--secondary" data-module="govuk-button" formaction="@Url.Action("Save", "Order")">Save</button>
+        <button type="submit" class="govuk-button govuk-button--secondary" data-module="govuk-button" formaction="@Url.Action("Save", "Order")" aria-describedby="save-guidance">Save</button>
         @* Legacy's Print ran window.print() on this page, so the button is only shown once the script is running. *@
         <button type="button" id="print-order" class="govuk-button govuk-button--secondary" data-module="govuk-button" hidden>Print</button>
     </div>
