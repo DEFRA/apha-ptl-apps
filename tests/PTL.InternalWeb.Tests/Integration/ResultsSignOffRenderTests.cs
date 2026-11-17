@@ -69,7 +69,7 @@ public class ResultsSignOffRenderTests(WebApplicationFactory<Program> rawFactory
     }
 
     [Fact]
-    public async Task Queue_ListsEachMonthWithItsSchemesCollapsedAndTheDueDate()
+    public async Task Queue_ListsEachMonthWithItsSchemesCollapsed()
     {
         Queue();
 
@@ -78,25 +78,39 @@ public class ResultsSignOffRenderTests(WebApplicationFactory<Program> rawFactory
         Assert.Contains("The table below shows each Tabulation on each Distribution that is ready to be signed-off.", html, StringComparison.Ordinal);
         Assert.Contains("<h2 class=\"govuk-heading-m\">June 2026</h2>", html, StringComparison.Ordinal);
         Assert.Contains("17208/BA/PT0074 PM: Pasteurella", html, StringComparison.Ordinal);
-        Assert.Contains("(Due Date: 21/07/2026)", html, StringComparison.Ordinal);
         Assert.Matches("<details class=\"govuk-details\">", html);
         Assert.DoesNotContain("<details class=\"govuk-details\" open", html, StringComparison.Ordinal);
     }
 
     [Fact]
-    public async Task Queue_ShowsLegacyColumnsPlusTheStoryColumns()
+    public async Task Queue_ShowsLegacyColumnsWithTheDueDateOnEveryRow()
     {
         Queue(single: true, availability: "Participants Only");
 
         var html = MainContent(await GetAsync());
 
         var headers = Regex.Matches(html, "<th scope=\"col\" class=\"govuk-table__header\">([^<]*)</th>").Select(m => m.Groups[1].Value);
-        Assert.Equal(["Tabulation Name", "Test Consultant", "Assessor", "Single Participant", "Availability", "Status", "View"], headers);
-        Assert.Contains("<td class=\"govuk-table__cell\">Jane Smith, John Doe</td>", html, StringComparison.Ordinal);
-        Assert.Contains("<td class=\"govuk-table__cell\">Ann Assessor</td>", html, StringComparison.Ordinal);
+        Assert.Equal(["Tabulation Name", "Due Date", "Single Participant", "Availability", "View"], headers);
+        Assert.Contains("<td class=\"govuk-table__cell\">21/07/2026</td>", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("(Due Date:", html, StringComparison.Ordinal);
         Assert.Contains("<td class=\"govuk-table__cell\">Yes</td>", html, StringComparison.Ordinal);
         Assert.Contains("<td class=\"govuk-table__cell\">Participants Only</td>", html, StringComparison.Ordinal);
-        Assert.Contains("Awaiting Sign-off", html, StringComparison.Ordinal);
+    }
+
+    // Legacy SignOff.aspx had no Test Consultant, Assessor or Status column.
+    [Fact]
+    public async Task Queue_DoesNotShowTheTestConsultantAssessorOrStatusColumns()
+    {
+        Queue();
+
+        var html = MainContent(await GetAsync());
+
+        Assert.DoesNotContain(">Test Consultant<", html, StringComparison.Ordinal);
+        Assert.DoesNotContain(">Assessor<", html, StringComparison.Ordinal);
+        Assert.DoesNotContain(">Status<", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("Jane Smith, John Doe", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("Ann Assessor", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("Awaiting Sign-off", html, StringComparison.Ordinal);
     }
 
     [Fact]
