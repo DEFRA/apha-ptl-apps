@@ -1,6 +1,22 @@
 // Pending order (legacy PendingContractOrder.aspx stage 2): Submit stays disabled until the terms - and any data
 // consent - are ticked. The page works without this script; the server rejects an unticked submit with an error.
 document.addEventListener('DOMContentLoaded', () => {
+  // Legacy's Print ran window.print() on this page; it needs script, so the button stays hidden without it.
+  const print = document.getElementById('print-order');
+  if (print) {
+    print.hidden = false;
+    print.addEventListener('click', () => window.print());
+  }
+
+  // A saved PDF is named after the page title, so print under the page name alone (no "- Proficiency Testing - GOV.UK").
+  const pageTitle = document.title;
+  window.addEventListener('beforeprint', () => {
+    document.title = pageTitle.split(' - ')[0];
+  });
+  window.addEventListener('afterprint', () => {
+    document.title = pageTitle;
+  });
+
   const terms = document.getElementById('TermsAccepted');
   const submit = document.getElementById('submit-order');
   if (!terms || !submit) {

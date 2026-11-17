@@ -408,36 +408,9 @@
   padding-left: 4px;
 }
 
-/* Order printout (legacy printed the Pending Order page: logo block shown, navigation and breadcrumb hidden). */
-.app-print-only {
+/* GOV.UK's display on .govuk-button would otherwise override the hidden attribute (Print shows only once the script runs). */
+.govuk-button[hidden] {
   display: none;
-}
-
-/* Twelve equal cells, tick above the month name, as legacy's month strip. */
-.app-print-months {
-  display: grid;
-  grid-template-columns: repeat(12, 1fr);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.app-print-month {
-  margin: 0;
-  padding: 0 2px;
-  border-left: 1px solid var(--govuk-border-colour, #b1b4b6);
-  text-align: center;
-  color: #505a5f;
-}
-
-.app-print-month--selected {
-  color: var(--govuk-text-colour, #0b0c0c);
-  font-weight: 700;
-}
-
-.app-print-month__tick,
-.app-print-month__name {
-  display: block;
 }
 
 @media print {
@@ -456,25 +429,96 @@
     padding-top: 0;
   }
 
-  .app-print-only {
-    display: block;
-  }
-
-  .app-print-logo {
-    max-width: 100%;
-    height: auto;
-    margin-bottom: 20px;
-  }
-
-  .app-print-footer {
-    margin-top: 30px;
-    padding-top: 10px;
-    border-top: 1px solid #0b0c0c;
-  }
-
   /* Keep a scheme row with its month strip, and never split a row across pages. */
   .app-order-table tr {
     break-inside: avoid;
+  }
+
+  /* Pending order prints as itself, as legacy did: keep its header (logos, lab number) and footer, hide controls that do nothing on paper.
+     tabulation.css hides the template wrappers for every page, so they are shown again here. */
+  body:has(.app-print-page) .govuk-template__header,
+  body:has(.app-print-page) .govuk-template__footer,
+  body:has(.app-print-page) .govuk-header,
+  body:has(.app-print-page) .govuk-service-navigation,
+  body:has(.app-print-page) .govuk-footer {
+    display: block;
+  }
+
+  body:has(.app-print-page) #app-menu-toggle,
+  body:has(.app-print-page) .app-signout-form,
+  body:has(.app-print-page) .govuk-notification-banner,
+  body:has(.app-print-page) .govuk-error-summary {
+    display: none;
+  }
+
+  /* GOV.UK's 14pt print size overflows the seven-column table and month strip on A4, so this page prints at about legacy's size. */
+  body:has(.app-print-page) h1.govuk-heading-xl {
+    font-size: 24pt;
+    margin-bottom: 12pt;
+  }
+
+  body:has(.app-print-page) .govuk-heading-m,
+  body:has(.app-print-page) .govuk-table__caption--m {
+    font-size: 14pt;
+  }
+
+  body:has(.app-print-page) .govuk-body,
+  body:has(.app-print-page) .govuk-table__header,
+  body:has(.app-print-page) .govuk-table__cell,
+  body:has(.app-print-page) .govuk-summary-list__key,
+  body:has(.app-print-page) .govuk-summary-list__value,
+  body:has(.app-print-page) .govuk-label,
+  body:has(.app-print-page) .govuk-checkboxes__label,
+  body:has(.app-print-page) .govuk-hint,
+  body:has(.app-print-page) .govuk-input,
+  body:has(.app-print-page) .govuk-fieldset__legend,
+  body:has(.app-print-page) main .govuk-link {
+    font-size: 10.5pt;
+  }
+
+  body:has(.app-print-page) .app-order-table--review .govuk-table__header,
+  body:has(.app-print-page) .app-order-table--review .govuk-table__cell {
+    padding-right: 6px;
+  }
+
+  /* Sorting does nothing on paper, so the column header links print as plain text. */
+  body:has(.app-print-page) .app-order-table thead a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  /* GOV.UK prints the address after every link; legacy printed just the link text (website, terms and conditions, column headings). */
+  body:has(.app-print-page) .govuk-link[href]::after {
+    content: none;
+  }
+
+  body:has(.app-print-page) .govuk-header__product-name {
+    font-size: 16pt;
+  }
+
+  body:has(.app-print-page) .govuk-footer,
+  body:has(.app-print-page) .govuk-footer__link,
+  body:has(.app-print-page) .govuk-footer__licence-description {
+    font-size: 10pt;
+  }
+
+  /* Twelve months must fit the table's right-hand cells; a tag colour is dropped on paper, so a month in the order gets a text tick. */
+  body:has(.app-print-page) .app-month-cell .app-month-strip {
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+  }
+
+  body:has(.app-print-page) .app-month-cell .govuk-tag,
+  body:has(.app-print-page) .app-month-cell .app-month-off {
+    font-size: 9pt;
+    padding: 0 1px;
+    white-space: nowrap;
+    border: 0;
+    background: none;
+    color: #0b0c0c;
+  }
+
+  body:has(.app-print-page) .app-month-cell .govuk-tag:not(.govuk-tag--grey)::before {
+    content: "\2714";
   }
 }
 
