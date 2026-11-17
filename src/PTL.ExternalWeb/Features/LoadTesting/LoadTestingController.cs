@@ -1,9 +1,7 @@
 using System.Security.Claims;
-using Microsoft.AspNetCore.Authentication;
-using Microsoft.AspNetCore.Authentication.Cookies;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
+using PTL.ApiClient;
 using PTL.Auth.Cidm.Claims;
 using PTL.Auth.Cidm.Events;
 using PTL.Contracts.LoadTesting;
@@ -16,37 +14,24 @@ namespace PTL.ExternalWeb.Features.LoadTesting;
 /// <see cref="ICidmExternalUserResolver"/> as a real CIDM sign-in, so the session carries identical claims and no user record is
 /// written. 404 unless <see cref="LoadTestingOptions.Enabled"/>.
 /// </summary>
-[AllowAnonymous]
 [SkipLabSelection]
 public sealed class LoadTestingController(
     IOptions<LoadTestingOptions> options,
     ILoadTestingLookupClient lookupClient,
-    ICidmExternalUserResolver resolver) : Controller
+    ICidmExternalUserResolver resolver) : LoadTestingControllerBase<LoadTestingLoginViewModel>(options)
 {
-    [HttpGet("perf/login")]
-    public IActionResult Login(string? returnUrl = null) =>
-        options.Value.Enabled ? View(new LoadTestingLoginViewModel { ReturnUrl = returnUrl }) : NotFound();
-
-    // Validate antiforgery token on POST login to prevent CSRF.
-    [HttpPost("perf/login")]
-    [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Login(LoadTestingLoginViewModel model, CancellationToken cancellationToken)
+    protected override async Task<IActionResult> SignInAsync(LoadTestingLoginViewModel model, CancellationToken cancellationToken)
     {
-        if (!options.Value.Enabled)
-        {
-            return NotFound();
-        }
-
         var email = model.Email?.Trim().ToLowerInvariant();
         if (string.IsNullOrEmpty(email))
         {
             return Fail(model, StatusCodes.Status400BadRequest, "Enter an email address.");
         }
 
-        var lookup = await lookupClient.LookupAsync(email, cancellationToken);
+        var lookup = await lookupClient.LookupExternalUserAsync(email, cancellationToken);
         if (lookup is null)
         {
-            return Fail(model, StatusCodes.Status503ServiceUnavailable, "PTL.Api has no load-testing lookup; deploy the PTL.Api build that includes it.");
+            return Fail(model, StatusCodes.Status503ServiceUnavailable, ApiUnavailableError);
         }
 
         if (lookup.Status != LoadTestingLookupStatus.Found || lookup.SsoIdExt is not { } contactId)
@@ -67,11 +52,6 @@ public sealed class LoadTestingController(
         ]));
 
         var resolution = await resolver.ResolveAsync(principal, cancellationToken);
-        if (!resolution.IsAllowed)
-        {
-            return Fail(model, StatusCodes.Status403Forbidden, "This user cannot sign in (inactive, no active lab, or not resolved).");
-        }
-
         var claims = new List<Claim>
         {
             new(ClaimTypes.NameIdentifier, contactId.ToString()),
@@ -79,29 +59,12 @@ public sealed class LoadTestingController(
             new(ClaimTypes.Email, email),
             new(CidmClaimTypes.ContactId, contactId.ToString())
         };
-        claims.AddRange((resolution.Claims ?? new Dictionary<string, string>()).Select(claim => new Claim(claim.Key, claim.Value)));
 
-        var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
-        await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(identity));
-
-        return !string.IsNullOrEmpty(model.ReturnUrl) && Url.IsLocalUrl(model.ReturnUrl)
-            ? LocalRedirect(model.ReturnUrl)
-            : RedirectToAction("Index", "Home");
-    }
-
-    private ViewResult Fail(LoadTestingLoginViewModel model, int statusCode, string error)
-    {
-        Response.StatusCode = statusCode;
-        model.Error = error;
-        return View(model);
+        return await CompleteSignInAsync(model, resolution, claims, "This user cannot sign in (inactive, no active lab, or not resolved).");
     }
 }
 
-public sealed class LoadTestingLoginViewModel
+public sealed class LoadTestingLoginViewModel : LoadTestingLoginViewModelBase
 {
     public string? Email { get; set; }
-
-    public string? ReturnUrl { get; set; }
-
-    public string? Error { get; set; }
 }

@@ -15,10 +15,11 @@ public sealed class LoadTestingExternalUserController(IExternalUserRepository re
 {
     [HttpPost("external-users/lookup")]
     public async Task<ActionResult<LoadTestingLookupResponse>> Lookup(
+        [FromHeader(Name = LoadTestingHeaders.Enabled)] string? loadTesting,
         [FromBody] LoadTestingLookupRequest request,
         CancellationToken cancellationToken)
     {
-        if (Request.Headers[LoadTestingHeaders.Enabled] != "true")
+        if (loadTesting != "true")
         {
             return NotFound();
         }

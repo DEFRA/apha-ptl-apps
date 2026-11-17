@@ -1,4 +1,3 @@
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using PTL.Api.LoadTesting;
 using PTL.Api.Tests.InternalUser;
@@ -14,23 +13,11 @@ public class LoadTestingInternalUserControllerTests
 
     private readonly FakeInternalUserRepository _users = new();
 
-    private LoadTestingInternalUserController CreateController(string? headerValue = "true")
-    {
-        var httpContext = new DefaultHttpContext();
-        if (headerValue is not null)
-        {
-            httpContext.Request.Headers[LoadTestingHeaders.Enabled] = headerValue;
-        }
-
-        return new LoadTestingInternalUserController(_users)
-        {
-            ControllerContext = new ControllerContext { HttpContext = httpContext }
-        };
-    }
+    private LoadTestingInternalUserController CreateController() => new(_users);
 
     private async Task<LoadTestingInternalLookupResponse> LookupAsync(string username = Username)
     {
-        var result = await CreateController().Lookup(new LoadTestingInternalLookupRequest(username), CancellationToken.None);
+        var result = await CreateController().Lookup("true", new LoadTestingInternalLookupRequest(username), CancellationToken.None);
         return Assert.IsType<LoadTestingInternalLookupResponse>(Assert.IsType<OkObjectResult>(result.Result).Value);
     }
 
@@ -39,17 +26,20 @@ public class LoadTestingInternalUserControllerTests
     [InlineData("false")]
     public async Task Lookup_WithoutTheLoadTestingHeader_IsNotFound(string? headerValue)
     {
-        var result = await CreateController(headerValue).Lookup(new LoadTestingInternalLookupRequest(Username), CancellationToken.None);
+        var result = await CreateController().Lookup(headerValue, new LoadTestingInternalLookupRequest(Username), CancellationToken.None);
 
         Assert.IsType<NotFoundResult>(result.Result);
     }
 
-    [Fact]
-    public async Task Lookup_BlankUsername_IsBadRequest()
+    [Theory]
+    [InlineData("  ")]
+    [InlineData(null)]
+    public async Task Lookup_BlankOrMissingUsername_IsBadRequestNamingTheField(string? username)
     {
-        var result = await CreateController().Lookup(new LoadTestingInternalLookupRequest("  "), CancellationToken.None);
+        var result = await CreateController().Lookup("true", new LoadTestingInternalLookupRequest(username!), CancellationToken.None);
 
-        Assert.IsType<BadRequestObjectResult>(result.Result);
+        var problem = Assert.IsType<ValidationProblemDetails>(Assert.IsType<BadRequestObjectResult>(result.Result).Value);
+        Assert.Equal(["The username is required."], problem.Errors[nameof(LoadTestingInternalLookupRequest.Username)]);
     }
 
     [Fact]

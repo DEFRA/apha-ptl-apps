@@ -14,10 +14,11 @@ public sealed class LoadTestingInternalUserController(IInternalUserRepository re
 {
     [HttpPost("internal-users/lookup")]
     public async Task<ActionResult<LoadTestingInternalLookupResponse>> Lookup(
+        [FromHeader(Name = LoadTestingHeaders.Enabled)] string? loadTesting,
         [FromBody] LoadTestingInternalLookupRequest request,
         CancellationToken cancellationToken)
     {
-        if (Request.Headers[LoadTestingHeaders.Enabled] != "true")
+        if (loadTesting != "true")
         {
             return NotFound();
         }

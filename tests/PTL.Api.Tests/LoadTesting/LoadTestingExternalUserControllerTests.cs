@@ -1,4 +1,3 @@
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using PTL.Api.LoadTesting;
 using PTL.Api.Tests.ExternalUser;
@@ -14,23 +13,11 @@ public class LoadTestingExternalUserControllerTests
 
     private readonly FakeExternalUserRepository _users = new();
 
-    private LoadTestingExternalUserController CreateController(string? headerValue = "true")
-    {
-        var httpContext = new DefaultHttpContext();
-        if (headerValue is not null)
-        {
-            httpContext.Request.Headers[LoadTestingHeaders.Enabled] = headerValue;
-        }
-
-        return new LoadTestingExternalUserController(_users)
-        {
-            ControllerContext = new ControllerContext { HttpContext = httpContext }
-        };
-    }
+    private LoadTestingExternalUserController CreateController() => new(_users);
 
     private async Task<LoadTestingLookupResponse> LookupAsync(string email = Email)
     {
-        var result = await CreateController().Lookup(new LoadTestingLookupRequest(email), CancellationToken.None);
+        var result = await CreateController().Lookup("true", new LoadTestingLookupRequest(email), CancellationToken.None);
         return Assert.IsType<LoadTestingLookupResponse>(Assert.IsType<OkObjectResult>(result.Result).Value);
     }
 
@@ -39,18 +26,22 @@ public class LoadTestingExternalUserControllerTests
     [InlineData("false")]
     public async Task Lookup_WithoutTheLoadTestingHeader_IsNotFound(string? headerValue)
     {
-        var result = await CreateController(headerValue).Lookup(new LoadTestingLookupRequest(Email), CancellationToken.None);
+        var result = await CreateController().Lookup(headerValue, new LoadTestingLookupRequest(Email), CancellationToken.None);
 
         Assert.IsType<NotFoundResult>(result.Result);
         Assert.Equal(0, _users.FindByEmailCalls);
     }
 
-    [Fact]
-    public async Task Lookup_BlankEmail_IsBadRequest()
+    [Theory]
+    [InlineData("  ")]
+    [InlineData(null)]
+    public async Task Lookup_BlankOrMissingEmail_IsBadRequestNamingTheField(string? email)
     {
-        var result = await CreateController().Lookup(new LoadTestingLookupRequest("  "), CancellationToken.None);
+        var result = await CreateController().Lookup("true", new LoadTestingLookupRequest(email!), CancellationToken.None);
 
-        Assert.IsType<BadRequestObjectResult>(result.Result);
+        var problem = Assert.IsType<ValidationProblemDetails>(Assert.IsType<BadRequestObjectResult>(result.Result).Value);
+        Assert.Equal(["The email is required."], problem.Errors[nameof(LoadTestingLookupRequest.Email)]);
+        Assert.Equal(0, _users.FindByEmailCalls);
     }
 
     [Fact]

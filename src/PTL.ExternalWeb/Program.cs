@@ -7,7 +7,6 @@ using PTL.Common.SessionTimeout;
 using PTL.ExternalWeb.Authorization;
 using PTL.ExternalWeb.Features.Account;
 using PTL.ExternalWeb.Features.Lab;
-using PTL.ExternalWeb.Features.LoadTesting;
 using PTL.ExternalWeb.Features.Order;
 using PTL.ExternalWeb.Features.Tabulation;
 using PTL.ExternalWeb.Infrastructure;
@@ -16,7 +15,7 @@ using PTL.ExternalWeb.Infrastructure.Pdf;
 var builder = WebApplication.CreateBuilder(args);
 builder.AddPtlWebFrontEnd();
 builder.AddCidmAuthentication();
-builder.AddLoadTesting();
+builder.Services.AddPtlLoadTesting(builder.Configuration, "CIDM is bypassed by the email-only sign-in");
 builder.Services.AddScoped<ICidmExternalUserResolver, ExternalUserResolver>();
 // Client-side inactivity warning (see _SessionTimeoutWarning.cshtml/session-timeout.js), independent of the
 // sliding auth cookie and CIDM token refresh.
