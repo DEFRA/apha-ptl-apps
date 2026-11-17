@@ -5,7 +5,6 @@
 }
 
 <h1 class="govuk-heading-l">Assessment results</h1>
-<h2 class="govuk-heading-m">@results.DistributionHeading</h2>
 
 @if (!results.IsAssessmentSubmitted)
 {
@@ -13,13 +12,25 @@
 }
 else
 {
-    @foreach (var title in results.Titles)
-    {
-        <p class="govuk-body">@title</p>
-    }
+    <h2 class="govuk-visually-hidden">Assessment information</h2>
+    <dl class="govuk-summary-list">
+        @foreach (var (label, value) in Model.Details)
+        {
+            <div class="govuk-summary-list__row">
+                <dt class="govuk-summary-list__key">@label</dt>
+                <dd class="govuk-summary-list__value">@value</dd>
+            </div>
+        }
+    </dl>
 
+    <h2 class="govuk-heading-m">Score distribution chart</h2>
+    <p class="govuk-body">@(results.Titles.Count > 0 ? results.Titles[0] : string.Empty)</p>
+    <govuk-assessment-chart results="results" width="1024" height="400" bar-colour="#00703c"
+                            show-y-axis-title="false" legend="@results.YAxisTitle" />
+
+    <h2 class="govuk-heading-m">Assessment results data table</h2>
     <table class="govuk-table">
-        <caption class="govuk-table__caption govuk-visually-hidden">Assessment results</caption>
+        <caption class="govuk-table__caption govuk-table__caption--s">Frequency of assessment scores</caption>
         <thead class="govuk-table__head">
             <tr class="govuk-table__row">
                 <th scope="col" class="govuk-table__header">@results.XAxisTitle</th>
@@ -30,7 +41,7 @@ else
             @foreach (var score in results.Scores)
             {
                 <tr class="govuk-table__row">
-                    <td class="govuk-table__cell">@score.Label</td>
+                    <th scope="row" class="govuk-table__header">@score.Label</th>
                     <td class="govuk-table__cell govuk-table__cell--numeric">@score.Frequency</td>
                 </tr>
             }

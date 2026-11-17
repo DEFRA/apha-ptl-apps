@@ -78,6 +78,13 @@ jobs:
         with:
           dotnet-version: ${{ inputs.dotnet-version }}
 
+      - name: Cache NuGet packages
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', '**/Directory.Build.props') }}
+          restore-keys: nuget-${{ runner.os }}-
+
       - name: Restore solution
         run: dotnet restore PTL.slnx
 
@@ -161,6 +168,14 @@ jobs:
           build-mode: ${{ matrix.build-mode }}
           queries: security-extended
           config-file: ./.github/codeql/codeql-config.yml
+
+      - name: Cache NuGet packages
+        if: matrix.language == 'csharp'
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', '**/Directory.Build.props') }}
+          restore-keys: nuget-${{ runner.os }}-
 
       - name: Restore solution
         if: matrix.language == 'csharp'

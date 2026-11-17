@@ -428,7 +428,7 @@ public partial class OrderRouteSmokeTests : IClassFixture<PtlExternalWebTestFact
         }
 
         InOrder(body, "Order details", "Contract year", "Purchase order number", "Scheme price", "Combined postage", "Total amount");
-        InOrder(body, ">Submit</button>", ">Previous</a>", ">Save</button>", ">Print</a>");
+        InOrder(body, ">Submit</button>", ">Previous</a>", ">Save</button>", ">Print</button>");
         Assert.Contains("You must agree to your data being shared for the schemes listed below before you can proceed with your order.", body);
         Assert.Contains("PT200: Microbiology", body);
     }
@@ -443,68 +443,6 @@ public partial class OrderRouteSmokeTests : IClassFixture<PtlExternalWebTestFact
 
         Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
         Assert.EndsWith("/Order/CurrentYear", response.Headers.Location!.ToString());
-    }
-
-    [Fact]
-    public async Task Print_WithSelection_RendersPrintableSummary()
-    {
-        var api = new FakeCreateOrderApiClient { GetResult = new(CreateOrderApiStatus.Ok, FakeCreateOrderApiClient.SampleOrder(selected: true)) };
-        var client = CreateClient(api);
-        var cookies = await SignInAsync(client);
-
-        var body = await GetAsync(client, cookies, "/Order/Print?year=current");
-
-        Assert.Contains("<h1 class=\"govuk-heading-xl\">Pending order</h1>", body);
-        Assert.Contains("Contract year", body);
-        Assert.Contains("Purchase order number", body);
-        Assert.Contains("Not provided", body);
-        Assert.Contains("Microbiology", body);
-        Assert.Contains("Combined postage (", body);
-        Assert.Contains("(Courier or Bio-Freeze)", body);
-        Assert.Contains("Total amount (", body);
-        Assert.Contains("Print this page", body);
-        Assert.DoesNotContain("Submit", body);
-    }
-
-    [Fact]
-    public async Task Print_FollowsTheLegacyPendingOrderPrintout_LogoDetailsMonthStripAndFooter()
-    {
-        var api = new FakeCreateOrderApiClient { GetResult = new(CreateOrderApiStatus.Ok, FakeCreateOrderApiClient.SampleOrder(selected: true)) };
-        var client = CreateClient(api);
-        var cookies = await SignInAsync(client);
-
-        var body = await GetAsync(client, cookies, "/Order/Print?year=current");
-
-        // Print-only identity: the legacy logo block and copyright line (the app header and footer are hidden in print).
-        Assert.Contains("class=\"app-print-only app-print-logo\" src=\"/images/vetqasheader.png\" alt=\"VETQAS and APHA Scientific\"", body);
-        Assert.Matches("class=\"govuk-body-s app-print-only app-print-footer\">&copy; Copyright \\d{4}, Animal and Plant Health Agency", body);
-        Assert.Contains("For price-lists, including distribution dates, please refer to our", body);
-        Assert.Contains("QAL/00001", body);
-        Assert.Contains("LAB001", body);
-        Assert.Contains("Schemes you have selected", body);
-        Assert.Contains(">Full price</th>", body);
-        Assert.Contains("Order details", body);
-
-        // Months are a 12-cell strip with a text tick and a spoken state, not colour alone.
-        Assert.Contains("aria-label=\"Distribution months for Microbiology\"", body);
-        Assert.Contains("app-print-month--selected", body);
-        Assert.Contains("(in this order)", body);
-        Assert.Contains("(not in this order)", body);
-        Assert.Equal(12, Regex.Count(body, "<li class=\"app-print-month[ \"]"));
-    }
-
-    [Fact]
-    public async Task Print_ShowsTheConsentsTermsLinkAndTheConfiguredPriceListLink()
-    {
-        var client = CreateClient(ReviewApi());
-        var cookies = await SignInAsync(client);
-
-        var body = await GetAsync(client, cookies, "/Order/Print?year=current");
-
-        Assert.Contains("Data consent", body);
-        Assert.Contains("I agree to share my data", body);
-        Assert.Contains("Not yet agreed", body);
-        Assert.Contains("Terms and conditions:", body);
     }
 
     private static CreateOrderResponse ReviewOrder() => FakeCreateOrderApiClient.SampleOrder(selected: true) with
@@ -537,7 +475,12 @@ public partial class OrderRouteSmokeTests : IClassFixture<PtlExternalWebTestFact
         Assert.Contains("id=\"submit-order\"", body);
         Assert.Contains("formaction=\"/Order/Save\"", body);
         Assert.Contains(">Save</button>", body);
-        Assert.Contains(">Print</a>", body);
+        Assert.Contains(">Print</button>", body);
+        // Print runs window.print() on this page (as legacy did): a script-only button, hidden until the script shows it.
+        Assert.Matches("<button type=\"button\" id=\"print-order\"[^>]* hidden>Print</button>", body);
+        Assert.DoesNotContain("/Order/Print", body);
+        Assert.Contains("app-print-page", body);
+        Assert.Contains("govuk-button-group app-print-actions", body);
         Assert.Contains(">Previous</a>", body);
         Assert.Contains("/js/review-order.js", body);
         Assert.Matches(AntiforgeryTokenPattern, body);
@@ -665,27 +608,14 @@ public partial class OrderRouteSmokeTests : IClassFixture<PtlExternalWebTestFact
     }
 
     [Fact]
-    public async Task Print_ShowsTheSavedPurchaseOrderNumber()
+    public async Task Print_IsNotARoute_PrintingHappensOnTheReviewPage()
     {
-        var client = CreateClient(ReviewApi());
-        var cookies = await SignInAsync(client);
-
-        var body = await GetAsync(client, cookies, "/Order/Print?year=current");
-
-        Assert.Contains("PO-1", body);
-        Assert.DoesNotContain("Not provided", body);
-    }
-
-    [Fact]
-    public async Task Print_NothingSelected_RedirectsBackToTheOrderPage()
-    {
-        var client = CreateClient(new FakeCreateOrderApiClient(), allowAutoRedirect: false);
+        var client = CreateClient(ReviewApi(), allowAutoRedirect: false);
         var cookies = await SignInAsync(client);
 
         var response = await CookieForwardingHttpClient.SendWithCookiesAsync(client, HttpMethod.Get, "/Order/Print?year=current", cookies);
 
-        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
-        Assert.EndsWith("/Order/CurrentYear", response.Headers.Location!.ToString());
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
     [Fact]

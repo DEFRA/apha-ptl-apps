@@ -582,7 +582,7 @@ public class TabulationRouteSmokeTests : IClassFixture<PtlExternalWebTestFactory
     }
 
     [Fact]
-    public async Task AssessmentResults_SubmittedScores_RendersDataTableNotChart()
+    public async Task AssessmentResults_SubmittedScores_RendersDetailsChartAndDataTable()
     {
         var tabulationId = Guid.NewGuid();
         var testId = Guid.NewGuid();
@@ -590,9 +590,15 @@ public class TabulationRouteSmokeTests : IClassFixture<PtlExternalWebTestFactory
         {
             AssessmentResults = new AssessmentResultsResponse(
                 IsAssessmentSubmitted: true,
-                Titles: ["Assessment results for Culture test"],
-                XAxisTitle: "Score",
-                YAxisTitle: "Number of participants",
+                Titles:
+                [
+                    "Bar chart shows the frequency of assessment scores",
+                    "Scheme: Brucella: serology",
+                    "Tabulation: Summary A",
+                    "Average score: 3.5",
+                ],
+                XAxisTitle: "Assessment Score",
+                YAxisTitle: "Frequency",
                 Scores: [new AssessmentScoreFrequencyResponse(2, "Satisfactory", 5)],
                 DistributionHeading: "D1a/S1 BT: Brucella")
         };
@@ -604,9 +610,42 @@ public class TabulationRouteSmokeTests : IClassFixture<PtlExternalWebTestFactory
         var body = await response.Content.ReadAsStringAsync();
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.Contains("Satisfactory", body);
-        Assert.Contains("govuk-table", body);
+        Assert.Contains("<dt class=\"govuk-summary-list__key\">Scheme</dt>", body, StringComparison.Ordinal);
+        Assert.Contains("<dd class=\"govuk-summary-list__value\">Brucella: serology</dd>", body, StringComparison.Ordinal);
+        Assert.Contains("<dt class=\"govuk-summary-list__key\">Report</dt>", body, StringComparison.Ordinal);
+        Assert.DoesNotContain(">Tabulation</dt>", body, StringComparison.Ordinal);
+        Assert.Contains("Score distribution chart", body, StringComparison.Ordinal);
+        Assert.Contains("<svg class=\"ptl-assessment-chart\"", body, StringComparison.Ordinal);
+        Assert.Contains("fill=\"#00703c\"", body, StringComparison.Ordinal);
+        Assert.Contains("Assessment results data table", body, StringComparison.Ordinal);
+        Assert.Contains("Frequency of assessment scores</caption>", body, StringComparison.Ordinal);
+        Assert.Contains("<th scope=\"row\" class=\"govuk-table__header\">Satisfactory</th>", body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task AssessmentResults_NotSubmitted_ShowsTheMessageWithoutAChart()
+    {
+        var apiClient = new FakeDistributionApiClient
+        {
+            AssessmentResults = new AssessmentResultsResponse(
+                IsAssessmentSubmitted: false,
+                Titles: [],
+                XAxisTitle: "Assessment Score",
+                YAxisTitle: "Frequency",
+                Scores: [],
+                DistributionHeading: "D1a/S1 BT: Brucella")
+        };
+        var client = CreateClient(apiClient);
+        var cookies = await SignInAsync(client, "Participant,Viewer", participantId: Guid.NewGuid());
+
+        var response = await CookieForwardingHttpClient.SendWithCookiesAsync(
+            client, HttpMethod.Get, $"/Tabulation/AssessmentResults?publishedTabulationId={Guid.NewGuid()}&testId={Guid.NewGuid()}", cookies);
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("Assessment results have not yet been submitted for this test.", body, StringComparison.Ordinal);
         Assert.DoesNotContain("ptl-assessment-chart", body, StringComparison.Ordinal);
+        Assert.DoesNotContain("govuk-summary-list", body, StringComparison.Ordinal);
     }
 
     [Fact]

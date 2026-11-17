@@ -7,7 +7,7 @@
 
 <govuk-error-summary errors="@Model.ErrorSummary" />
 
-<h1 class="govuk-heading-xl">Pending order</h1>
+<h1 class="govuk-heading-xl app-print-page">Pending order</h1>
 
 <partial name="_PriceListNote" model="@(Model.DistributionTimetableUrl ?? string.Empty)" />
 
@@ -108,7 +108,7 @@
     }
     <div class="govuk-form-group @(poError is null ? null : "govuk-form-group--error")">
         <label class="govuk-label govuk-label--s" for="PurchaseOrderNumber">Purchase order number (optional)</label>
-        <div id="PurchaseOrderNumber-hint" class="govuk-hint">Select Save to keep it for later or to include it when you print.</div>
+        <div id="PurchaseOrderNumber-hint" class="govuk-hint">Select Save to keep it for later.</div>
         @if (poError is not null)
         {
             <p id="PurchaseOrderNumber-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @poError</p>
@@ -186,11 +186,12 @@
         </div>
     </div>
 
-    <div class="govuk-button-group">
+    <div class="govuk-button-group app-print-actions">
         <button type="submit" id="submit-order" class="govuk-button" data-module="govuk-button" data-prevent-double-click="true">Submit</button>
         <a class="govuk-button govuk-button--secondary" asp-controller="Order" asp-action="@Model.BackAction" draggable="false" data-module="govuk-button">Previous</a>
         <button type="submit" class="govuk-button govuk-button--secondary" data-module="govuk-button" formaction="@Url.Action("Save", "Order")">Save</button>
-        <a class="govuk-button govuk-button--secondary" href="@Url.Action("Print", "Order", new { year = Model.YearSlug, sort = Model.Sort.Values })" draggable="false" data-module="govuk-button">Print</a>
+        @* Legacy's Print ran window.print() on this page, so the button is only shown once the script is running. *@
+        <button type="button" id="print-order" class="govuk-button govuk-button--secondary" data-module="govuk-button" hidden>Print</button>
     </div>
 </form>
 

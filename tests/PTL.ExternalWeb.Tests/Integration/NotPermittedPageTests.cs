@@ -42,7 +42,8 @@ public class NotPermittedPageTests(PtlExternalWebTestFactory factory) : IClassFi
     {
         var body = await GetBodyAsync(path);
 
-        Assert.Contains("not set up to access the Proficiency Testing external service", body);
+        Assert.Contains("not authorised to access the VETQAS Proficiency Testing service", body);
+        Assert.Contains("mailto:vetqas@apha.gov.uk", body);
         Assert.DoesNotContain("something-unknown", body);
     }
 
