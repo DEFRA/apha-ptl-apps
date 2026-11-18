@@ -13,7 +13,8 @@
     var blocked = document.getElementById('unsaved-changes-blocked');
     var blockedText = document.getElementById('unsaved-changes-blocked-text');
     var leave = document.getElementById('unsaved-changes-leave');
-    var dirty = !banner.hasAttribute('hidden');
+    // data-unsaved-dirty: the page itself is the unsaved change (an Audit Trail step), armed with the banner still hidden.
+    var dirty = !banner.hasAttribute('hidden') || !!document.querySelector('[data-unsaved-dirty]');
 
     var watched = document.querySelector('[data-unsaved-watch]');
     if (watched) {
@@ -36,9 +37,10 @@
         watched.addEventListener('change', markDirty);
     }
 
-    // In-page anchors, downloads, new tabs and the banner's own escape link are left alone.
+    // In-page anchors, downloads, new tabs, the banner's own escape link and links marked
+    // data-unsaved-ignore (a Cancel that is a link) are left alone.
     function isProtected(link) {
-        if (link === leave || link.hasAttribute('download') || link.target === '_blank') {
+        if (link === leave || link.hasAttribute('download') || link.target === '_blank' || link.hasAttribute('data-unsaved-ignore')) {
             return false;
         }
 

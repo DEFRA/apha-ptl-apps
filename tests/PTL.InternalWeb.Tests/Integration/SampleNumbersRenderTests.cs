@@ -164,6 +164,7 @@ public partial class SampleNumbersRenderTests : IClassFixture<WebApplicationFact
         Assert.Contains("name=\"command\" value=\"saveAndGoToIntendedResults\"", html, StringComparison.Ordinal);
         Assert.Contains("name=\"command\" value=\"cancelAudit\"", html, StringComparison.Ordinal);
         Assert.Contains("formnovalidate", html, StringComparison.Ordinal);
+        UnsavedChangesAssertions.AssertAuditStepWarnsOnNavigateAway(html);
 
         // Every pending edit rides along hidden - legacy kept these in Session.
         AssertHiddenInput(html, "Comments", "User comments");

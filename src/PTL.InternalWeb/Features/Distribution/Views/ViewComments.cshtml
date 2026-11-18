@@ -18,6 +18,9 @@
 {
     <h1 class="govuk-heading-l">Audit Trail</h1>
 
+    ViewData["UnsavedChangesSaveOrCancel"] = true;
+    <partial name="_UnsavedChangesBanner" model="false" />
+
     <govuk-error-summary errors="@errors" />
 
     <p class="govuk-body">Changes have been made to the following object:</p>
@@ -37,7 +40,7 @@
         </div>
     }
 
-    <form method="post" asp-action="ViewComments" asp-route-year="@Model.YearId" asp-route-monthId="@Model.MonthId" asp-route-schemeId="@Model.MonthlyDistributionSchemeId" novalidate>
+    <form method="post" asp-action="ViewComments" asp-route-year="@Model.YearId" asp-route-monthId="@Model.MonthId" asp-route-schemeId="@Model.MonthlyDistributionSchemeId" novalidate data-unsaved-dirty>
         @* No server-side session (legacy kept the comments in Session while Audit.aspx ran), so the
            unsaved comments ride along hidden or they are lost when the audited save runs. *@
         @* Literal, not asp-for: the editing form posted IsAuditStep=False and the tag helper would echo that stale value back. *@
@@ -63,6 +66,8 @@
             <button type="submit" name="command" value="cancelAudit" class="govuk-button govuk-button--secondary" data-module="govuk-button" formnovalidate>Cancel</button>
         </div>
     </form>
+
+    <script src="~/js/unsaved-changes.js" asp-append-version="true"></script>
 
     return;
 }

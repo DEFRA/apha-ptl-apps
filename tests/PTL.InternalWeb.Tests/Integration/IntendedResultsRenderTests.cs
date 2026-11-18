@@ -153,6 +153,8 @@ public class IntendedResultsRenderTests : IClassFixture<WebApplicationFactory<Pr
         Assert.Contains("<h1 class=\"govuk-heading-l\">Audit Trail</h1>", html, StringComparison.Ordinal);
         Assert.Matches("name=\"IsAuditStep\" value=\"true\"", html);
         Assert.DoesNotMatch("name=\"IsAuditStep\" value=\"False\"", html);
+        UnsavedChangesAssertions.AssertAuditStepWarnsOnNavigateAway(html);
+        UnsavedChangesAssertions.AssertNotArmed(page);
     }
 
     [Fact]
