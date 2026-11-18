@@ -123,7 +123,9 @@
         }
         else if (!isHome)
         {
-            <li class="govuk-breadcrumbs__list-item">@ToDisplay(controller)@(string.IsNullOrWhiteSpace(action) || string.Equals(action, "Index", StringComparison.OrdinalIgnoreCase) ? "" : $" - {ToDisplay(action)}")</li>
+            @* Home's own pages (Cookies, Accessibility) show just the page name after the Home crumb. *@
+            var isHomePage = string.Equals(controller, "Home", StringComparison.OrdinalIgnoreCase);
+            <li class="govuk-breadcrumbs__list-item">@(isHomePage ? ToDisplay(action) : ToDisplay(controller) + (string.IsNullOrWhiteSpace(action) || string.Equals(action, "Index", StringComparison.OrdinalIgnoreCase) ? "" : $" - {ToDisplay(action)}"))</li>
         }
     </ol>
 

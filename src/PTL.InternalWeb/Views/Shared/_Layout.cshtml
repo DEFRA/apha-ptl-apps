@@ -9,6 +9,13 @@
         && (string.Equals(currentAction, "Login", StringComparison.OrdinalIgnoreCase)
             || string.Equals(currentAction, "SessionExpired", StringComparison.OrdinalIgnoreCase));
 
+    // Footer pages keep the breadcrumbs but not the left-hand navigation.
+    var isHomeController = string.Equals(currentController, "Home", StringComparison.OrdinalIgnoreCase);
+    var hidesSideNavigation = hidesNavigationChrome
+        || (isHomeController
+            && (string.Equals(currentAction, "Cookies", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(currentAction, "Accessibility", StringComparison.OrdinalIgnoreCase)));
+
     const string serviceName = "Proficiency Testing";
     var pageTitle = ViewData["Title"]?.ToString();
 
@@ -54,13 +61,13 @@
 
         <div class="govuk-main-wrapper">
             <div class="govuk-grid-row">
-                @if (!hidesNavigationChrome)
+                @if (!hidesSideNavigation)
                 {
                     <div class="govuk-grid-column-one-quarter">
                         @await Html.PartialAsync("_SideNavigation")
                     </div>
                 }
-                <div class="@(hidesNavigationChrome ? "govuk-grid-column-full" : "govuk-grid-column-three-quarters")">
+                <div class="@(hidesSideNavigation ? "govuk-grid-column-full" : "govuk-grid-column-three-quarters")">
                     @await RenderSectionAsync("BackLink", required: false)
                     <main class="app-main-class" id="main-content">
                         @await Html.PartialAsync("_NotificationBanner")
