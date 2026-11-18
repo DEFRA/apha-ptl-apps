@@ -128,9 +128,9 @@ public class AuthorizationRouteTests(PtlInternalWebTestFactory factory) : IClass
         var body = await response.Content.ReadAsStringAsync();
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
-        Assert.Contains("<h1 class=\"govuk-heading-l\">Access Denied</h1>", body, StringComparison.Ordinal);
-        Assert.Contains("Shown when access to the requested page is restricted.", body, StringComparison.Ordinal);
-        Assert.Contains("To gain access, contact a System Administrator.", body, StringComparison.Ordinal);
+        Assert.Contains("<title>Access denied - Proficiency Testing</title>", body, StringComparison.Ordinal);
+        Assert.Contains("<h1 class=\"govuk-heading-l\">You do not have permission to view this page</h1>", body, StringComparison.Ordinal);
+        Assert.Contains("To get access, contact a System Administrator.", body, StringComparison.Ordinal);
     }
 
     [Fact]

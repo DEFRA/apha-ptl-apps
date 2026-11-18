@@ -2,15 +2,18 @@
     var currentController = (ViewContext.RouteData.Values["controller"]?.ToString() ?? string.Empty).Trim();
     var currentAction = (ViewContext.RouteData.Values["action"]?.ToString() ?? string.Empty).Trim();
     var isAccountController = string.Equals(currentController, "Account", StringComparison.OrdinalIgnoreCase);
+    var isHomeController = string.Equals(currentController, "Home", StringComparison.OrdinalIgnoreCase);
     // Login has no signed-in context to navigate from; SessionExpired is shown precisely because
     // the session (and any navigation context) has just ended - neither page has a left-nav
-    // section or breadcrumb trail to show.
-    var hidesNavigationChrome = isAccountController
+    // section or breadcrumb trail to show. Nor do the error and page-not-found pages.
+    var hidesNavigationChrome = (isAccountController
         && (string.Equals(currentAction, "Login", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(currentAction, "SessionExpired", StringComparison.OrdinalIgnoreCase));
+            || string.Equals(currentAction, "SessionExpired", StringComparison.OrdinalIgnoreCase)))
+        || (isHomeController
+            && (string.Equals(currentAction, "Error", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(currentAction, "StatusCodePage", StringComparison.OrdinalIgnoreCase)));
 
     // Footer pages keep the breadcrumbs but not the left-hand navigation.
-    var isHomeController = string.Equals(currentController, "Home", StringComparison.OrdinalIgnoreCase);
     var hidesSideNavigation = hidesNavigationChrome
         || (isHomeController
             && (string.Equals(currentAction, "Cookies", StringComparison.OrdinalIgnoreCase)
