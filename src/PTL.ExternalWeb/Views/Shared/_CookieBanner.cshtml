@@ -6,7 +6,7 @@
         ? "You’ve accepted analytics cookies."
         : "You’ve rejected analytics cookies.";
 
-    <div class="govuk-cookie-banner" data-nosnippet role="region" aria-label="Cookies on Proficiency Testing" id="cookie-confirmation-banner">
+    <section class="govuk-cookie-banner" data-nosnippet aria-label="Cookies on Proficiency Testing" id="cookie-confirmation-banner">
         <div class="govuk-cookie-banner__message govuk-width-container" role="alert">
             <div class="govuk-grid-row">
                 <div class="govuk-grid-column-two-thirds">
@@ -21,12 +21,12 @@
                 </div>
             </div>
         </div>
-    </div>
+    </section>
 }
 
 @if (Model.ShowConsentBanner)
 {
-    <div class="govuk-cookie-banner" data-nosnippet role="region" aria-label="Cookies on Proficiency Testing">
+    <section class="govuk-cookie-banner" data-nosnippet aria-label="Cookies on Proficiency Testing">
         <div class="govuk-cookie-banner__message govuk-width-container">
             <div class="govuk-grid-row">
                 <div class="govuk-grid-column-two-thirds">
@@ -49,5 +49,5 @@
                 </div>
             </div>
         </div>
-    </div>
+    </section>
 }

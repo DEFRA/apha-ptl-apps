@@ -2,6 +2,7 @@ using System.Net;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 using PTL.ApiClient;
 using PTL.Common.Auth;
 using PTL.ExternalWeb.Features.Account;
@@ -39,6 +40,11 @@ public class HomeController(IApiClient apiClient, ISystemMessageApiClient system
     [ValidateAntiForgeryToken]
     public IActionResult Cookies(CookiesViewModel model, string? returnUrl = null)
     {
+        if (!ModelState.IsValid)
+        {
+            return View(model);
+        }
+
         SaveCookiePreferences(model.UseAnalyticsCookies);
         TempData["CookiePreferencesUpdated"] = model.UseAnalyticsCookies ? "accepted" : "rejected";
 
@@ -91,7 +97,7 @@ public class HomeController(IApiClient apiClient, ISystemMessageApiClient system
             HttpOnly = true,
             IsEssential = true,
             SameSite = SameSiteMode.Lax,
-            Secure = Request.IsHttps
+            Secure = true
         };
 
         Response.Cookies.Append(CookiePreferenceNames.ConsentSet, bool.TrueString, cookieOptions);
@@ -101,5 +107,6 @@ public class HomeController(IApiClient apiClient, ISystemMessageApiClient system
 
 public sealed class CookiesViewModel
 {
+    [BindRequired]
     public bool UseAnalyticsCookies { get; set; }
 }
