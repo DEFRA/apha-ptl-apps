@@ -9,9 +9,8 @@
     var hidesNavigationChrome = (isAccountController
         && (string.Equals(currentAction, "Login", StringComparison.OrdinalIgnoreCase)
             || string.Equals(currentAction, "SessionExpired", StringComparison.OrdinalIgnoreCase)))
-        || (isHomeController
-            && (string.Equals(currentAction, "Error", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(currentAction, "StatusCodePage", StringComparison.OrdinalIgnoreCase)));
+        || (isHomeController && string.Equals(currentAction, "Error", StringComparison.OrdinalIgnoreCase))
+        || string.Equals(currentController, "Error", StringComparison.OrdinalIgnoreCase);
 
     // Footer pages keep the breadcrumbs but not the left-hand navigation.
     var hidesSideNavigation = hidesNavigationChrome

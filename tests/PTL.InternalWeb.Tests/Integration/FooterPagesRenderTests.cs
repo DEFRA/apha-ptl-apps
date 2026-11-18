@@ -11,8 +11,8 @@ public class FooterPagesRenderTests(PtlInternalWebTestFactory factory) : IClassF
         factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
 
     [Theory]
-    [InlineData("/Cookies", "Cookies on Proficiency Testing", "Cookies")]
-    [InlineData("/Accessibility", "Accessibility statement for the PT", "Accessibility")]
+    [InlineData("/Home/Cookies", "Cookies on Proficiency Testing", "Cookies")]
+    [InlineData("/Home/Accessibility", "Accessibility statement for the PT", "Accessibility")]
     public async Task FooterPage_IsAnonymous_KeepsBreadcrumbs_AndHidesSideNavigation(string url, string heading, string crumb)
     {
         var response = await AnonymousClient().GetAsync(url);
@@ -29,7 +29,7 @@ public class FooterPagesRenderTests(PtlInternalWebTestFactory factory) : IClassF
     [Fact]
     public async Task CookiesPage_ListsEssentialCookiesOnly()
     {
-        var html = await AnonymousClient().GetStringAsync("/Cookies");
+        var html = await AnonymousClient().GetStringAsync("/Home/Cookies");
 
         Assert.Contains("only uses essential cookies", html, StringComparison.Ordinal);
         Assert.Contains(".AspNetCore.Cookies", html, StringComparison.Ordinal);
@@ -41,10 +41,10 @@ public class FooterPagesRenderTests(PtlInternalWebTestFactory factory) : IClassF
     [Fact]
     public async Task Footer_LinksStayInsideInternalWeb()
     {
-        var html = await AnonymousClient().GetStringAsync("/Cookies");
+        var html = await AnonymousClient().GetStringAsync("/Home/Cookies");
 
-        Assert.Contains("href=\"/Cookies\"", html, StringComparison.Ordinal);
-        Assert.Contains("href=\"/Accessibility\"", html, StringComparison.Ordinal);
+        Assert.Contains("href=\"/Home/Cookies\"", html, StringComparison.Ordinal);
+        Assert.Contains("href=\"/Home/Accessibility\"", html, StringComparison.Ordinal);
         Assert.Contains("href=\"/docs/TermsAndConditions.pdf\"", html, StringComparison.Ordinal);
     }
 }

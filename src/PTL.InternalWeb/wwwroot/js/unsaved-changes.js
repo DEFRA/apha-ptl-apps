@@ -40,7 +40,7 @@
     // In-page anchors, downloads, new tabs, the banner's own escape link and links marked
     // data-unsaved-ignore (a Cancel that is a link) are left alone.
     function isProtected(link) {
-        if (link === leave || link.hasAttribute('download') || link.target === '_blank' || link.hasAttribute('data-unsaved-ignore')) {
+        if (link === leave || link.hasAttribute('download') || link.target === '_blank' || 'unsavedIgnore' in link.dataset) {
             return false;
         }
 

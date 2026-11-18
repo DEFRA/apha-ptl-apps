@@ -44,4 +44,20 @@ public class HomeControllerTests
         var model = Assert.IsType<ErrorViewModel>(viewResult.Model);
         Assert.True(model.ShowRequestId);
     }
+
+    [Fact]
+    public void Cookies_ReturnsItsView()
+    {
+        var result = new HomeController(new FakeApiClient()).Cookies();
+
+        Assert.Null(Assert.IsType<ViewResult>(result).ViewName);
+    }
+
+    [Fact]
+    public void Accessibility_ReturnsItsView()
+    {
+        var result = new HomeController(new FakeApiClient()).Accessibility();
+
+        Assert.Null(Assert.IsType<ViewResult>(result).ViewName);
+    }
 }
