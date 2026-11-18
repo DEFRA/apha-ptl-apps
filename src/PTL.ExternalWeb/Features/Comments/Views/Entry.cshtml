@@ -28,7 +28,6 @@
 <form method="post" asp-action="Entry" asp-route-schemeId="@Model.MonthlyDistributionSchemeId" novalidate>
     <input type="hidden" asp-for="MonthlyDistributionSchemeId" />
     <input type="hidden" asp-for="ReturnUrl" />
-    <input type="hidden" asp-for="Acknowledged" value="false" />
     <input type="hidden" name="IsFiltered" value="true" />
     @foreach (var sample in Model.AllSamples)
     {
@@ -184,6 +183,8 @@
 
     @if (Model.IsSubmitted)
     {
+        @* Acknowledged is [BindRequired]; no checkbox is rendered here to supply it for Draw/Export. *@
+        <input type="hidden" name="Acknowledged" value="false" />
         <div class="govuk-button-group">
             @if (!string.IsNullOrWhiteSpace(Model.ReturnUrl))
             {
