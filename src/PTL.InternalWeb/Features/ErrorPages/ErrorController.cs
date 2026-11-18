@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using PTL.ApiClient;
 
-namespace PTL.InternalWeb.Features.Error;
+namespace PTL.InternalWeb.Features.ErrorPages;
 
 // Re-executed (Program.cs) for an error response that has no body. Re-execution keeps the original method, so this
 // answers a refused POST as well; the app has no global antiforgery filter, and this action changes nothing.

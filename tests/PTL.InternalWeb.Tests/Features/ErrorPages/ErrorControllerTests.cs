@@ -2,9 +2,9 @@ using System.Diagnostics;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using PTL.ApiClient;
-using PTL.InternalWeb.Features.Error;
+using PTL.InternalWeb.Features.ErrorPages;
 
-namespace PTL.InternalWeb.Tests.Features.Error;
+namespace PTL.InternalWeb.Tests.Features.ErrorPages;
 
 public class ErrorControllerTests
 {
