@@ -169,6 +169,9 @@ public class ViewCommentsRenderTests : IClassFixture<WebApplicationFactory<Progr
         Assert.Contains("<h1 class=\"govuk-heading-l\">Audit Trail</h1>", html, StringComparison.Ordinal);
         Assert.Matches("name=\"IsAuditStep\" value=\"true\"", html);
         Assert.DoesNotMatch("name=\"IsAuditStep\" value=\"False\"", html);
+
+        // Cancel on the audit step returns to the editing page, which is not itself armed.
+        UnsavedChangesAssertions.AssertNotArmed(MainContent(await PostHtmlAsync(("command", "cancelAudit"))));
     }
 
     [Theory]
@@ -189,5 +192,6 @@ public class ViewCommentsRenderTests : IClassFixture<WebApplicationFactory<Progr
         Assert.True(HasCommandButton(html, command, "Save"));
         Assert.True(HasCommandButton(html, "cancelAudit", "Cancel"));
         Assert.DoesNotContain("AttachmentAuditWhy", html, StringComparison.Ordinal);
+        UnsavedChangesAssertions.AssertAuditStepWarnsOnNavigateAway(html);
     }
 }

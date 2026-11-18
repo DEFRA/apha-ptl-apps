@@ -9,7 +9,14 @@
     </div>
     <div class="govuk-notification-banner__content">
         <p class="govuk-notification-banner__heading">You have changes that have not been saved.</p>
-        <p class="govuk-body">Select <strong>Save</strong> to keep them and leave this page, or <strong>Apply</strong> to keep them and carry on working.</p>
+        @if (ViewData["UnsavedChangesSaveOrCancel"] is true)
+        {
+            <p class="govuk-body">Select <strong>Save</strong> to keep them, or <strong>Cancel</strong> to discard them.</p>
+        }
+        else
+        {
+            <p class="govuk-body">Select <strong>Save</strong> to keep them and leave this page, or <strong>Apply</strong> to keep them and carry on working.</p>
+        }
         <p class="govuk-body" id="unsaved-changes-blocked" hidden>
             <span id="unsaved-changes-blocked-text"></span>
             <a class="govuk-link" href="#" id="unsaved-changes-leave">Leave this page without saving</a>

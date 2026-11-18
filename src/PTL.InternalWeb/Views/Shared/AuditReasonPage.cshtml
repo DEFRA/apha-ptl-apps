@@ -14,13 +14,16 @@
 
 <h1 class="govuk-heading-l">Audit Trail</h1>
 
+@{ ViewData["UnsavedChangesSaveOrCancel"] = true; }
+<partial name="_UnsavedChangesBanner" model="false" />
+
 <p class="govuk-body">Changes have been made to the following object:</p>
 
 <h2 class="govuk-heading-m">@Model.AuditObjectName</h2>
 
 <hr class="govuk-section-break govuk-section-break--visible govuk-section-break--m">
 
-<form method="post" action="@Model.PostUrl" novalidate>
+<form method="post" action="@Model.PostUrl" novalidate data-unsaved-dirty>
     @Html.AntiForgeryToken()
     @* The original edit has no server-side state, so every field rides along hidden. Razor encodes names and values. *@
     @foreach (var field in Model.Fields)
@@ -36,6 +39,8 @@
 
     <div class="govuk-button-group">
         <button type="submit" class="govuk-button" data-module="govuk-button">Save</button>
-        <a class="govuk-button govuk-button--secondary" data-module="govuk-button" href="@Model.CancelUrl">Cancel</a>
+        <a class="govuk-button govuk-button--secondary" data-module="govuk-button" href="@Model.CancelUrl" data-unsaved-ignore>Cancel</a>
     </div>
 </form>
+
+<script src="~/js/unsaved-changes.js" asp-append-version="true"></script>

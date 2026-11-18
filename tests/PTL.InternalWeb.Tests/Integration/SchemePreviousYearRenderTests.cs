@@ -773,4 +773,26 @@ public class SchemePreviousYearRenderTests : IClassFixture<WebApplicationFactory
         Assert.Single(redisplayed.Tags("button"), b => b.Text == "Apply");
         Assert.Null(_schemes.LastUpdateRequest);
     }
+
+    // Current/Next Year (Edit) and Previous Year (Apply) both divert an audited Test or Results Tabulation change to the shared page.
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task AuditedSave_ShowsTheAuditTrailPage_ArmedToWarnOnNavigateAway(bool isReadOnly)
+    {
+        _schemes.SchemeResponse = SchemeFormTestData.Scheme(requiresAssessment: false, isReadOnly: isReadOnly);
+        _schemes.SaveResult = new(false, null, new Dictionary<string, string[]>(), AuditReasonRequired: true, AuditObjectName: "Test: Brucella");
+        var client = _factory.CreateClient();
+        var editHtml = await (await client.GetAsync($"/Scheme/Edit/{SchemeFormTestData.SchemeId}")).Content.ReadAsStringAsync();
+        UnsavedChangesAssertions.AssertNotArmed(editHtml);
+        var page = SchemeFormPage.Parse(editHtml);
+
+        var response = await ApplyAsync(client, page);
+        var html = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("<h1 class=\"govuk-heading-l\">Audit Trail</h1>", html, StringComparison.Ordinal);
+        UnsavedChangesAssertions.AssertAuditStepWarnsOnNavigateAway(html);
+        Assert.Matches("<a [^>]*data-unsaved-ignore[^>]*>Cancel</a>", html);
+    }
 }
