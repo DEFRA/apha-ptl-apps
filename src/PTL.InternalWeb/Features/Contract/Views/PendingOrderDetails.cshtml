@@ -165,7 +165,7 @@ else
         <button class="govuk-button" data-module="govuk-button" type="submit">Approve</button>
         <button class="govuk-button govuk-button--warning" data-module="govuk-button" type="submit"
                 formaction="@Url.Action("DeclinePendingOrder", new { pendingContractId = order.PendingContractId })">Decline</button>
-        <a class="govuk-link" asp-action="ReviewPendingOrders">Cancel</a>
+        <a class="govuk-button govuk-button--secondary" asp-action="ReviewPendingOrders">Cancel</a>
     </div>
 </form>
 
