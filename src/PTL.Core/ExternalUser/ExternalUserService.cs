@@ -49,9 +49,16 @@ public sealed partial class ExternalUserService(
             justLinked = true;
         }
 
-        // The lowest user type is the first table that matched; anything else under the same contact id is ignored.
+        // The lowest user type is the first table that matched; anything else under the same contact id is ignored,
+        // except that Viewer and Test Consultant records of the same person are combined.
         var userType = matches.Min(match => match.UserType);
-        var rows = matches.Where(match => match.UserType == userType).ToList();
+        if (!justLinked && IsViewerOrTestConsultant(userType))
+        {
+            matches = await TopUpViewerTestConsultantAsync(userType, matches, ssoIdExt, cancellationToken);
+            userType = matches.Min(match => match.UserType);
+        }
+
+        var rows = matches.Where(match => match.UserType == userType || (IsViewerOrTestConsultant(userType) && IsViewerOrTestConsultant(match.UserType))).ToList();
 
         if (!justLinked)
         {
@@ -61,9 +68,9 @@ public sealed partial class ExternalUserService(
         return await BuildResultAsync(userType, rows, displayName, cancellationToken);
     }
 
-    // Email is only a one-time bootstrap: it finds the record to link, and is never consulted again once the
-    // contact id is on it. A record already linked to any identity is left alone, so a changed or re-used email
-    // can never move an account to another person.
+    // Email is only a bootstrap: it finds the record to link, and is never consulted for a record that already carries
+    // the contact id (apart from picking up a missing Viewer/Test Consultant partner). A record already linked to any
+    // identity is left alone, so a changed or re-used email can never move an account to another person.
     private async Task<(IReadOnlyList<ExternalUserMatch> Matches, ExternalUserResolutionStatus? Denial)> LinkByEmailAsync(
         Guid ssoIdExt, string email, CancellationToken cancellationToken)
     {
@@ -102,8 +109,75 @@ public sealed partial class ExternalUserService(
         }
 
         LogLinked(logger, userType, linked[0].UserId, ssoIdExt);
+
+        if (userType == ExternalUserType.Viewer)
+        {
+            linked = await LinkCompanionAsync(ExternalUserType.TestConsultant, candidates, email, ssoIdExt, linked, cancellationToken);
+        }
+
         return (linked, null);
     }
+
+    // A returning Viewer-only or Test Consultant-only user may have gained the other record since signing in. The email
+    // used is the one on the already-linked PTL record (never the token's), so a changed CIDM email cannot attach
+    // anything new.
+    private async Task<IReadOnlyList<ExternalUserMatch>> TopUpViewerTestConsultantAsync(
+        ExternalUserType userType,
+        IReadOnlyList<ExternalUserMatch> matches,
+        Guid ssoIdExt,
+        CancellationToken cancellationToken)
+    {
+        var companionType = userType == ExternalUserType.Viewer ? ExternalUserType.TestConsultant : ExternalUserType.Viewer;
+        if (matches.Any(match => match.UserType == companionType))
+        {
+            return matches;
+        }
+
+        var email = matches.First(match => match.UserType == userType).Email?.Trim();
+        if (string.IsNullOrEmpty(email))
+        {
+            return matches;
+        }
+
+        var candidates = await externalUserRepository.FindByEmailAsync(email, cancellationToken);
+        return await LinkCompanionAsync(companionType, candidates, email, ssoIdExt, matches, cancellationToken);
+    }
+
+    // A person who is both a Viewer and a Test Consultant holds both records under one email. The second record is
+    // linked too, but never at the cost of the sign-in: if it is claimed by another identity or is ambiguous, the user
+    // still signs in with the record they already had.
+    private async Task<IReadOnlyList<ExternalUserMatch>> LinkCompanionAsync(
+        ExternalUserType companionType,
+        IReadOnlyList<ExternalUserMatch> candidates,
+        string email,
+        Guid ssoIdExt,
+        IReadOnlyList<ExternalUserMatch> current,
+        CancellationToken cancellationToken)
+    {
+        var companions = candidates.Where(candidate => candidate.UserType == companionType).ToList();
+        if (companions.Count == 0)
+        {
+            return current;
+        }
+
+        if (companions.Any(row => row.SsoIdExt is not null) || companions.Select(row => row.UserId).Distinct().Count() > 1)
+        {
+            LogCompanionNotLinked(logger, companionType, companions[0].UserId);
+            return current;
+        }
+
+        var linkedWithCompanion = await externalUserRepository.LinkAsync(companionType, email, ssoIdExt, cancellationToken);
+        if (linkedWithCompanion.Count == 0)
+        {
+            return current;
+        }
+
+        LogLinked(logger, companionType, companions[0].UserId, ssoIdExt);
+        return linkedWithCompanion;
+    }
+
+    private static bool IsViewerOrTestConsultant(ExternalUserType userType) =>
+        userType is ExternalUserType.Viewer or ExternalUserType.TestConsultant;
 
     private async Task<ExternalUserResolutionResult> BuildResultAsync(
         ExternalUserType userType,
@@ -125,22 +199,29 @@ public sealed partial class ExternalUserService(
         // With one lab there is nothing to choose, so the user acts for it straight away; with several, the
         // lab-selection screen sets the lab and nothing is scoped to a lab until then.
         var singleLab = labs.Count == 1 ? labs[0] : null;
-        var userId = rows[0].UserId;
+
+        // Only a Viewer + Test Consultant pair can span two types; an inactive Test Consultant leaves just the Viewer.
+        var activeTypes = activeRows.Select(row => row.UserType).Distinct().ToList();
+        var resolvedType = activeTypes.Min();
+        var roles = activeTypes.SelectMany(type => RolesByUserType[type]).Distinct().ToList();
 
         return new ExternalUserResolutionResult(
             ExternalUserResolutionStatus.Resolved,
             displayName,
-            userType,
-            RolesByUserType[userType],
+            resolvedType,
+            roles,
             labs,
             ParticipantId: singleLab?.ParticipantId,
             LabCode: singleLab?.LabCode,
-            ViewerId: userType == ExternalUserType.Viewer ? userId : null,
-            TestConsultantId: userType == ExternalUserType.TestConsultant ? userId : null,
-            LabUserId: userType == ExternalUserType.LabUser ? userId : null,
+            ViewerId: UserIdOfType(activeRows, ExternalUserType.Viewer),
+            TestConsultantId: UserIdOfType(activeRows, ExternalUserType.TestConsultant),
+            LabUserId: UserIdOfType(activeRows, ExternalUserType.LabUser),
             CanOrderOnline: singleLab is not null && await CanOrderOnlineAsync(singleLab.ParticipantId, cancellationToken),
             CanEditDetails: singleLab is not null && await CanEditDetailsAsync(singleLab.ParticipantId, cancellationToken));
     }
+
+    private static Guid? UserIdOfType(List<ExternalUserMatch> rows, ExternalUserType userType) =>
+        rows.Where(row => row.UserType == userType).Select(row => (Guid?)row.UserId).FirstOrDefault();
 
     public async Task<IReadOnlyList<ExternalLab>> GetLabsAsync(Guid ssoIdExt, CancellationToken cancellationToken = default)
     {
@@ -219,6 +300,10 @@ public sealed partial class ExternalUserService(
     [LoggerMessage(EventId = 123, Level = LogLevel.Warning,
         Message = "CIDM sign-in denied: the email matches {UserCount} {UserType} records, so no single user can be chosen")]
     private static partial void LogAmbiguousEmail(ILogger logger, ExternalUserType userType, int userCount);
+
+    [LoggerMessage(EventId = 125, Level = LogLevel.Warning,
+        Message = "{UserType} record not linked alongside the user's other Viewer/Test Consultant record: it is already linked to a different CIDM contact or the email matches several of them. UserId={UserId}")]
+    private static partial void LogCompanionNotLinked(ILogger logger, ExternalUserType userType, Guid userId);
 
     [LoggerMessage(EventId = 124, Level = LogLevel.Warning,
         Message = "CIDM email differs from the PTL record's email; signed in by contact id. UserType={UserType} UserId={UserId}")]

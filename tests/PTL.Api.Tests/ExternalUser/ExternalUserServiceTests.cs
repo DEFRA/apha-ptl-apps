@@ -36,7 +36,7 @@ public class ExternalUserServiceTests
     // ---- returning users (found by contact id) ----
 
     [Fact]
-    public async Task ResolveAsync_ReturningViewer_ResolvesByContactIdWithoutTouchingTheEmail()
+    public async Task ResolveAsync_ReturningViewer_ResolvesByContactIdAndLinksNothingWhenThereIsNoTestConsultant()
     {
         var ssoIdExt = Guid.NewGuid();
         var viewer = _users.Add(ExternalUserType.Viewer, ssoIdExt: ssoIdExt);
@@ -52,8 +52,63 @@ public class ExternalUserServiceTests
         Assert.Null(result.ParticipantId);
         Assert.Empty(result.Labs!);
         Assert.Equal(DisplayName, result.DisplayName);
-        Assert.Equal(0, _users.FindByEmailCalls);
         Assert.Equal(0, _users.LinkCalls);
+    }
+
+    [Fact]
+    public async Task ResolveAsync_ReturningViewerWhoHasSinceBecomeATestConsultant_PicksUpTheTestConsultantRecord()
+    {
+        var ssoIdExt = Guid.NewGuid();
+        var viewer = _users.Add(ExternalUserType.Viewer, ssoIdExt: ssoIdExt);
+        var consultant = _users.Add(ExternalUserType.TestConsultant);
+
+        var result = await ResolveAsync(ssoIdExt);
+
+        Assert.Equal([ExternalRoleNames.Viewer, ExternalRoleNames.TestConsultant], result.Roles);
+        Assert.Equal(viewer.UserId, result.ViewerId);
+        Assert.Equal(consultant.UserId, result.TestConsultantId);
+        Assert.Equal(ssoIdExt, _users.Rows.Single(row => row.UserType == ExternalUserType.TestConsultant).SsoIdExt);
+    }
+
+    [Fact]
+    public async Task ResolveAsync_ReturningTestConsultantWhoHasSinceBecomeAViewer_PicksUpTheViewerRecord()
+    {
+        var ssoIdExt = Guid.NewGuid();
+        var consultant = _users.Add(ExternalUserType.TestConsultant, ssoIdExt: ssoIdExt);
+        var viewer = _users.Add(ExternalUserType.Viewer);
+
+        var result = await ResolveAsync(ssoIdExt);
+
+        Assert.Equal(ExternalUserType.Viewer, result.UserType);
+        Assert.Equal(viewer.UserId, result.ViewerId);
+        Assert.Equal(consultant.UserId, result.TestConsultantId);
+    }
+
+    [Fact]
+    public async Task ResolveAsync_ReturningViewer_LooksForTheTestConsultantByTheRecordsEmailNotTheTokens()
+    {
+        var ssoIdExt = Guid.NewGuid();
+        _users.Add(ExternalUserType.Viewer, ssoIdExt: ssoIdExt);
+        _users.Add(ExternalUserType.TestConsultant, email: "other@example.com");
+
+        var result = await ResolveAsync(ssoIdExt, "other@example.com");
+
+        Assert.Equal([ExternalRoleNames.Viewer], result.Roles);
+        Assert.Equal(0, _users.LinkCalls);
+    }
+
+    [Fact]
+    public async Task ResolveAsync_ReturningViewerWhoseTestConsultantIsLinkedElsewhere_StaysAViewer()
+    {
+        var ssoIdExt = Guid.NewGuid();
+        _users.Add(ExternalUserType.Viewer, ssoIdExt: ssoIdExt);
+        _users.Add(ExternalUserType.TestConsultant, ssoIdExt: Guid.NewGuid());
+
+        var result = await ResolveAsync(ssoIdExt);
+
+        Assert.Equal([ExternalRoleNames.Viewer], result.Roles);
+        Assert.Equal(0, _users.LinkCalls);
+        Assert.Contains(_logger.Entries, entry => entry.EventId.Id == 125);
     }
 
     [Fact]
@@ -161,6 +216,37 @@ public class ExternalUserServiceTests
 
         Assert.Equal(ExternalUserType.Participant, result.UserType);
         Assert.Null(result.ViewerId);
+    }
+
+    [Fact]
+    public async Task ResolveAsync_ReturningViewerAndTestConsultant_GrantsBothRolesAndBothIds()
+    {
+        var ssoIdExt = Guid.NewGuid();
+        var viewer = _users.Add(ExternalUserType.Viewer, ssoIdExt: ssoIdExt);
+        var consultant = _users.Add(ExternalUserType.TestConsultant, ssoIdExt: ssoIdExt);
+
+        var result = await ResolveAsync(ssoIdExt);
+
+        Assert.True(result.IsResolved);
+        Assert.Equal(ExternalUserType.Viewer, result.UserType);
+        Assert.Equal([ExternalRoleNames.Viewer, ExternalRoleNames.TestConsultant], result.Roles);
+        Assert.Equal(viewer.UserId, result.ViewerId);
+        Assert.Equal(consultant.UserId, result.TestConsultantId);
+    }
+
+    [Fact]
+    public async Task ResolveAsync_ReturningViewerWithInactiveTestConsultant_GrantsViewerOnly()
+    {
+        var ssoIdExt = Guid.NewGuid();
+        var viewer = _users.Add(ExternalUserType.Viewer, ssoIdExt: ssoIdExt);
+        _users.Add(ExternalUserType.TestConsultant, ssoIdExt: ssoIdExt, isActive: false);
+
+        var result = await ResolveAsync(ssoIdExt);
+
+        Assert.True(result.IsResolved);
+        Assert.Equal([ExternalRoleNames.Viewer], result.Roles);
+        Assert.Equal(viewer.UserId, result.ViewerId);
+        Assert.Null(result.TestConsultantId);
     }
 
     // ---- lab users ----
@@ -432,17 +518,15 @@ public class ExternalUserServiceTests
     }
 
     [Fact]
-    public async Task ResolveAsync_FirstSignInThenSecondSignIn_SecondUsesOnlyTheContactId()
+    public async Task ResolveAsync_FirstSignInThenSecondSignIn_SecondDoesNotLinkAgain()
     {
         var ssoIdExt = Guid.NewGuid();
         _users.Add(ExternalUserType.Viewer);
         await ResolveAsync(ssoIdExt);
-        var emailCallsAfterFirst = _users.FindByEmailCalls;
 
         var second = await ResolveAsync(ssoIdExt);
 
         Assert.True(second.IsResolved);
-        Assert.Equal(emailCallsAfterFirst, _users.FindByEmailCalls);
         Assert.Equal(1, _users.LinkCalls);
     }
 
@@ -480,6 +564,39 @@ public class ExternalUserServiceTests
         Assert.Equal(ssoIdExt, _users.Rows.Single(row => row.UserType == ExternalUserType.Participant).SsoIdExt);
         Assert.Null(_users.Rows.Single(row => row.UserType == ExternalUserType.Viewer).SsoIdExt);
         Assert.Null(_users.Rows.Single(row => row.UserType == ExternalUserType.LabUser).SsoIdExt);
+    }
+
+    [Fact]
+    public async Task ResolveAsync_FirstSignInViewerAndTestConsultantWithSameEmail_LinksBothAndGrantsBothRoles()
+    {
+        var ssoIdExt = Guid.NewGuid();
+        var viewer = _users.Add(ExternalUserType.Viewer);
+        var consultant = _users.Add(ExternalUserType.TestConsultant);
+
+        var result = await ResolveAsync(ssoIdExt);
+
+        Assert.True(result.IsResolved);
+        Assert.Equal([ExternalRoleNames.Viewer, ExternalRoleNames.TestConsultant], result.Roles);
+        Assert.Equal(viewer.UserId, result.ViewerId);
+        Assert.Equal(consultant.UserId, result.TestConsultantId);
+        Assert.All(_users.Rows, row => Assert.Equal(ssoIdExt, row.SsoIdExt));
+    }
+
+    [Fact]
+    public async Task ResolveAsync_FirstSignInViewerWithTestConsultantLinkedElsewhere_SignsInAsViewerAndLeavesTheConsultantAlone()
+    {
+        var ssoIdExt = Guid.NewGuid();
+        var otherOwner = Guid.NewGuid();
+        _users.Add(ExternalUserType.Viewer);
+        _users.Add(ExternalUserType.TestConsultant, ssoIdExt: otherOwner);
+
+        var result = await ResolveAsync(ssoIdExt);
+
+        Assert.True(result.IsResolved);
+        Assert.Equal([ExternalRoleNames.Viewer], result.Roles);
+        Assert.Null(result.TestConsultantId);
+        Assert.Equal(otherOwner, _users.Rows.Single(row => row.UserType == ExternalUserType.TestConsultant).SsoIdExt);
+        Assert.Contains(_logger.Entries, entry => entry.EventId.Id == 125);
     }
 
     [Fact]
