@@ -262,7 +262,7 @@ container image or component Git tag is published.
 2. Retrieve and validate the component release labels again.
 3. Read the latest `api-v*`, `internalweb-v*` and `externalweb-v*` tags.
 4. Calculate each affected component's next semantic version.
-5. Reuse the validated container artifact instead of rebuilding it.
+5. Build the component image, verify the FortiGate CA chain and scan it with Trivy inside the publish job (the image is not moved between jobs).
 6. Assume the AWS publishing role through OIDC.
 7. Verify the expected AWS account and Region.
 8. Push a unique candidate image to the component ECR repository.

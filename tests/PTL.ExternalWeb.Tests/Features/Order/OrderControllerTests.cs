@@ -495,46 +495,19 @@ public class OrderControllerTests
     }
 
     [Fact]
-    public async Task Print_OrderCanProceed_ReturnsPrintableSummaryView()
+    public void OrderController_HasNoSeparatePrintAction()
     {
-        var api = new FakeCreateOrderApiClient { GetResult = new(CreateOrderApiStatus.Ok, FakeCreateOrderApiClient.SampleOrder(selected: true)) };
-
-        var result = await CreateController(api).Print("current", CancellationToken.None);
-
-        var view = Assert.IsType<ViewResult>(result);
-        Assert.Equal("Print", view.ViewName);
-        var model = Assert.IsType<CreateOrderReviewViewModel>(view.Model);
-        Assert.Equal("current", model.YearSlug);
+        Assert.DoesNotContain(typeof(OrderController).GetMethods(), m => m.Name is "Print" or "PrintReview");
     }
 
     [Fact]
-    public async Task Print_NotAllowedOrNotFoundOrInvalid_AreHandled()
-    {
-        var forbidden = new FakeCreateOrderApiClient { GetResult = Status(CreateOrderApiStatus.NotAllowed) };
-        var missing = new FakeCreateOrderApiClient { GetResult = Status(CreateOrderApiStatus.NotFound) };
-
-        Assert.Equal("NotAvailable", Assert.IsType<ViewResult>(await CreateController(forbidden).Print("current", CancellationToken.None)).ViewName);
-        Assert.IsType<NotFoundResult>(await CreateController(missing).Print("current", CancellationToken.None));
-        Assert.IsType<NotFoundResult>(await CreateController().Print("bogus", CancellationToken.None));
-        Assert.IsType<NotFoundResult>(await CreateController(signedInAsParticipant: false).Print("current", CancellationToken.None));
-    }
-
-    [Fact]
-    public async Task Print_NothingSelectedYet_RedirectsBackToTheYearPage()
-    {
-        var result = await CreateController().Print("next", CancellationToken.None);
-
-        Assert.Equal(nameof(OrderController.NextYear), Assert.IsType<RedirectToActionResult>(result).ActionName);
-    }
-
-    [Fact]
-    public void OrderController_IsRestrictedToParticipants()
+    public void OrderController_IsRestrictedToThePrimaryContact_NotLabUsers()
     {
         var authorize = typeof(OrderController).GetCustomAttributes(typeof(Microsoft.AspNetCore.Authorization.AuthorizeAttribute), inherit: true)
             .Cast<Microsoft.AspNetCore.Authorization.AuthorizeAttribute>()
             .Single();
 
-        Assert.Equal(PTL.ExternalWeb.Authorization.ExternalPolicies.Participant, authorize.Policy);
+        Assert.Equal(PTL.ExternalWeb.Authorization.ExternalPolicies.PrimaryContact, authorize.Policy);
     }
 
     [Fact]

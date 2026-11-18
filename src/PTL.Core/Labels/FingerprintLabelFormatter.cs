@@ -4,25 +4,28 @@ using System.Text;
 namespace PTL.Core.Labels;
 
 // Converts a composed AddressLabel into Intermec/Honeywell Fingerprint (Direct Protocol) statements, the command
-// language the PC43t is configured with. The layout reproduces legacy LabelBase.Print(): Arial 10pt text drawn from
-// the top-left of a 4in x 6in page (400 x 600 in 1/100 inch, from GetPrinterSettings). Fingerprint measures from the
-// bottom-left with Y increasing upward, so each line's Y is converted from a distance down the page.
+// language the PC43d is configured with. The layout reproduces legacy LabelBase.Print(): 10pt bold text drawn from
+// the top-left of the label, one line per address field. Fingerprint measures from the bottom-left of the label with
+// Y increasing upward, so each line's Y is converted from its distance down the label.
 public static class FingerprintLabelFormatter
 {
-    private const int DotsPerInch = 203;
-
-    // Legacy page height: 600 hundredths of an inch.
-    private const int LabelHeightDots = 6 * DotsPerInch;
+    // The label the printer is set up for, in dots. Legacy's LabelPrinterPrintableWidth/Height (400 x 600 hundredths
+    // of an inch) described the Windows driver's 4in x 6in page instead, and the driver scaled that page onto whatever
+    // media was loaded; Fingerprint places each field on the media itself, so these must be the media's own size or
+    // the text lands off the label and it feeds out blank. The PC43d is configured for 75mm x 50.13mm media and its
+    // printhead is 203 dpi (203 / 25.4 = 8 dots per mm), so the label is 75 x 8 = 600 by 50.13 x 8 = 401 dots.
+    private const int LabelHeightDots = 401;
 
     // Legacy drew at X = 0.
     private const int LeftDots = 0;
 
-    // GDI places Arial 10pt text with its baseline one ascent (0.905 em = 25.5 dots) below the top of the line,
-    // and steps each line by Arial's line height (1.149 em = 32.4 dots).
+    // GDI placed Arial 10pt text with its baseline one ascent (0.905 em = 25.5 dots) below the top of the line, and
+    // stepped each line by Arial's line height (1.149 em = 32.4 dots).
     private const int FirstBaselineFromTopDots = 26;
     private const int LineSpacingDots = 32;
 
-    private const string FontName = "Swiss 721 BT";
+    // Resident PC43d font closest to legacy's Arial 10pt Bold.
+    private const string FontName = "Univers Bold";
     private const int FontSizePoints = 10;
     private const string NewLine = "\r\n";
 
@@ -40,6 +43,13 @@ public static class FingerprintLabelFormatter
         var y = LabelHeightDots - FirstBaselineFromTopDots;
         foreach (var line in label.Lines)
         {
+            // A field below the bottom of the label is Error 1003 "Field out of label" and costs the whole label, so
+            // lines that no longer fit are dropped - legacy's DrawString likewise clipped them at the rectangle's edge.
+            if (y < 0)
+            {
+                break;
+            }
+
             fingerprint.Append(CultureInfo.InvariantCulture, $"PP {LeftDots},{y}:PT {ToStringExpression(line)}").Append(NewLine);
             y -= LineSpacingDots;
         }

@@ -18,9 +18,10 @@ public sealed class TabulationEmailContext(
 
     public static string Format(DateTime day) => day.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture);
 
-    // Legacy <<WebAddress>>: external consultants use CommentsEntry, internal ones Test Consultant/Tabulation.
+    // Legacy <<WebAddress>>: external consultants use Comments/Entry, internal ones Test Consultant/Tabulation.
+    // The query keys are the action parameter names - schemeId externally, MonthlyDistributionSchemeId internally.
     public string CommentsLink(Guid monthlyDistributionSchemeId, bool isExternal) => isExternal
-        ? $"{externalOptions.Value.AppUrl.TrimEnd('/')}/{options.Value.ExternalCommentsPath.Trim('/')}?ref={monthlyDistributionSchemeId}"
+        ? $"{externalOptions.Value.AppUrl.TrimEnd('/')}/{options.Value.ExternalCommentsPath.Trim('/')}?schemeId={monthlyDistributionSchemeId}"
         : $"{internalOptions.Value.AppUrl.TrimEnd('/')}/{options.Value.InternalCommentsPath.Trim('/')}?MonthlyDistributionSchemeId={monthlyDistributionSchemeId}";
 
     // Legacy <<ExternalServer>>/<<ExternalAddress>> were two settings; here both come from External:AppUrl.

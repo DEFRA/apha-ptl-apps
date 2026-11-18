@@ -69,9 +69,10 @@ public sealed record IntendedResultsResultItemRequest(Guid TestResultItemId, boo
 
 public sealed record IntendedResultsMethodItemRequest(Guid TestMethodItemId, string IntendedResult);
 
+// IsApplicable is deliberately absent: the sample/test allocation is owned by the Sample Numbers
+// screen and is resolved server-side from the stored SampleTest, never trusted from this post.
 public sealed record IntendedResultsSampleRowRequest(
     Guid SampleId,
-    bool IsApplicable,
     IReadOnlyList<IntendedResultsSampleResultValueRequest> Values);
 
 public sealed record IntendedResultsSampleResultValueRequest(

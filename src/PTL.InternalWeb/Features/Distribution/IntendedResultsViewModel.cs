@@ -143,11 +143,9 @@ public sealed class IntendedResultsSampleRowViewModel
     public string? InternalDescription { get; set; }
 
     // Sample Allocation for THIS test - read-only here (set on Sample Numbers). Legacy disables
-    // every Result Item input for this sample/test pair when false; the round-tripped value lets
-    // the server skip diffing/validating a cell legacy would never have posted back.
-#pragma warning disable S6964
+    // every Result Item input for this sample/test pair when false. Display-only: never posted,
+    // always re-read from the API, and the save path resolves it from the stored SampleTest.
     public bool IsApplicable { get; set; }
-#pragma warning restore S6964
 
     public List<IntendedResultsSampleValueViewModel> Values { get; set; } = [];
 }

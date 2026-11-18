@@ -61,6 +61,8 @@ public static class NavigationProvider
             // Legacy's PnlOrdersSection.Visible = IsParticipant AndAlso CanOrderOnline (Home.aspx.vb) -
             // being a Participant alone isn't enough; the linked Customer must also be order-eligible.
             RequireCanOrderOnline = true,
+            // A Lab User holds the Participant role too but may not place orders; OrderController enforces the same rule.
+            ExcludeLabUsers = true,
             Children =
             [
                 new NavigationItem
@@ -187,7 +189,6 @@ public static class NavigationProvider
         ["Distribution/Current"] = [new("Current distributions")],
         ["Help/Index"] = [new("Help")],
         ["Distribution/Entry"] = [new("Current distributions", DistributionControllerName, "Current"), new("Results entry")],
-        ["Distribution/NilReturn"] = [new("Current distributions", DistributionControllerName, "Current"), new("Nil return")],
         ["Distribution/Previous"] = [new("Previous distributions")],
         ["Distribution/Results"] = [new("Previous distributions", DistributionControllerName, "Previous"), new("View results")],
         ["Tabulation/Index"] = [new(ReportsText)],

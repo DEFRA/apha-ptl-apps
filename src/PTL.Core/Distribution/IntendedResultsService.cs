@@ -194,18 +194,24 @@ public sealed class IntendedResultsService(
             sample.ExternalDescription ?? string.Empty);
     }
 
+    // Legacy read IsApplicable off the Session-held SampleTest on every rebuild and rendered the
+    // checkbox disabled, so the flag is never a function of what the user posts.
+    private static HashSet<(Guid SampleId, Guid TestId)> BuildApplicableSampleTests(IntendedResultsData data) =>
+        [.. data.SampleTests.Where(st => st.IsApplicable).Select(st => (st.SampleId, st.TestId))];
+
     private static Dictionary<Guid, IReadOnlyList<SampleNumbersError>> CollectFieldErrors(IntendedResultsUpdate update, IntendedResultsData data)
     {
         var resultItemsById = data.TestResultItems.ToDictionary(r => r.TestResultItemId);
         var methodItemsById = data.TestMethodItems.ToDictionary(m => m.TestMethodItemId);
         var sampleResultItemsById = data.SampleResultItems.ToDictionary(s => s.SampleResultItemId);
+        var applicableSampleTests = BuildApplicableSampleTests(data);
 
         var errors = new Dictionary<Guid, IReadOnlyList<SampleNumbersError>>();
 
         foreach (var test in update.Tests)
         {
             CollectMethodItemErrors(test, methodItemsById, errors);
-            CollectSampleErrors(test, sampleResultItemsById, resultItemsById, errors);
+            CollectSampleErrors(test, applicableSampleTests, sampleResultItemsById, resultItemsById, errors);
         }
 
         return errors;
@@ -233,6 +239,7 @@ public sealed class IntendedResultsService(
 
     private static void CollectSampleErrors(
         IntendedResultsTestUpdate test,
+        HashSet<(Guid SampleId, Guid TestId)> applicableSampleTests,
         Dictionary<Guid, DistributionSampleResultItemEntity> sampleResultItemsById,
         Dictionary<Guid, DistributionTestResultItemEntity> resultItemsById,
         Dictionary<Guid, IReadOnlyList<SampleNumbersError>> errors)
@@ -241,7 +248,7 @@ public sealed class IntendedResultsService(
         {
             // Legacy disables the Result Item controls entirely for a non-applicable
             // sample/test pair, and a disabled RegularExpressionValidator never fires.
-            if (!sample.IsApplicable)
+            if (!applicableSampleTests.Contains((sample.SampleId, test.TestId)))
             {
                 continue;
             }
@@ -302,6 +309,7 @@ public sealed class IntendedResultsService(
         var methodItemsById = data.TestMethodItems.ToDictionary(m => m.TestMethodItemId);
         var resultItemsById = data.TestResultItems.ToDictionary(r => r.TestResultItemId);
         var sampleResultItemsById = data.SampleResultItems.ToDictionary(s => s.SampleResultItemId);
+        var applicableSampleTests = BuildApplicableSampleTests(data);
 
         var changes = new IntendedResultsChanges([], [], [], [], []);
 
@@ -315,7 +323,7 @@ public sealed class IntendedResultsService(
             {
                 // Mirrors legacy's disabled controls: a non-applicable sample/test pair is never
                 // posted back by a real browser, so it must never be read as "changed to blank".
-                if (!sample.IsApplicable)
+                if (!applicableSampleTests.Contains((sample.SampleId, test.TestId)))
                 {
                     continue;
                 }

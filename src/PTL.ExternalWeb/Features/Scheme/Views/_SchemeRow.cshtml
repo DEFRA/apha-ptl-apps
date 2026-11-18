@@ -1,0 +1,31 @@
+@using PTL.Contracts.Scheme
+@model (ParticipantSchemeSummaryResponse Scheme, bool ShowParticipating)
+@{
+    var scheme = Model.Scheme;
+    var rowClass = scheme.IsParticipating ? "govuk-table__row app-table__row--enrolled" : "govuk-table__row";
+    var cellClass = scheme.IsParticipating ? "govuk-table__cell govuk-!-font-weight-bold" : "govuk-table__cell";
+}
+<tr class="@rowClass">
+    <td class="@cellClass">
+        @scheme.Identifier
+        @if (scheme.IsParticipating)
+        {
+            <span aria-hidden="true"> *</span>
+        }
+    </td>
+    <td class="@cellClass">@scheme.Name</td>
+    <td class="@cellClass">@scheme.Year</td>
+    @if (Model.ShowParticipating)
+    {
+        <td class="govuk-table__cell">
+            @if (scheme.IsParticipating)
+            {
+                <strong class="govuk-tag govuk-tag--green">Yes</strong>
+            }
+            else
+            {
+                <span>No</span>
+            }
+        </td>
+    }
+</tr>
