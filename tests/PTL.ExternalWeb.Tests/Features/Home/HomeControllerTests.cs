@@ -244,8 +244,8 @@ public class HomeControllerTests
         Assert.Equal("accepted", controller.TempData["CookiePreferencesUpdated"]);
 
         var setCookie = controller.HttpContext.Response.Headers.SetCookie.ToArray();
-        Assert.Contains(setCookie, header => header.Contains($"{CookiePreferenceNames.ConsentSet}=True", StringComparison.Ordinal));
-        Assert.Contains(setCookie, header => header.Contains($"{CookiePreferenceNames.Analytics}=True", StringComparison.Ordinal));
+        Assert.Contains(setCookie, header => header is not null && header.Contains($"{CookiePreferenceNames.ConsentSet}=True", StringComparison.Ordinal));
+        Assert.Contains(setCookie, header => header is not null && header.Contains($"{CookiePreferenceNames.Analytics}=True", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -262,7 +262,7 @@ public class HomeControllerTests
         Assert.Equal("rejected", controller.TempData["CookiePreferencesUpdated"]);
 
         var setCookie = controller.HttpContext.Response.Headers.SetCookie.ToArray();
-        Assert.Contains(setCookie, header => header.Contains($"{CookiePreferenceNames.Analytics}=False", StringComparison.Ordinal));
+        Assert.Contains(setCookie, header => header is not null && header.Contains($"{CookiePreferenceNames.Analytics}=False", StringComparison.Ordinal));
     }
 
     [Fact]
