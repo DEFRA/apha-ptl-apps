@@ -68,6 +68,16 @@ public class RenewContractsViewModelTests
         Assert.False(model.HasNoItems);
     }
 
+    // Legacy MergeContractsViewModel constructor: both Select All boxes start ticked.
+    [Fact]
+    public void SelectAllBoxes_StartTicked()
+    {
+        var model = new RenewContractsViewModel();
+
+        Assert.True(model.SelectAllContracts);
+        Assert.True(model.SelectAllItems);
+    }
+
     private static RenewableContractItemDto Item(string labCode, string oldScheme, string identifier, Guid? contractId = null) => new(
         contractId ?? Guid.NewGuid(),
         "A",

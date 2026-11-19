@@ -1,18 +1,25 @@
 @model PTL.InternalWeb.Features.Contract.RenewContractsViewModel
+@using PTL.InternalWeb.Features.Contract
 @{
     ViewData["Title"] = "Renew Contracts";
+
+    var itemsError = ViewData.ModelState.TryGetValue(RenewContractsViewModel.ItemsField, out var itemsEntry) && itemsEntry.Errors.Count > 0
+        ? itemsEntry.Errors[0].ErrorMessage
+        : null;
+    var errors = new List<(string Field, string Message)>();
+    if (itemsError is not null)
+    {
+        errors.Add((Model.ItemsErrorAnchor, itemsError));
+    }
+    if (!string.IsNullOrEmpty(Model.ErrorMessage))
+    {
+        errors.Add((string.Empty, Model.ErrorMessage));
+    }
 }
+
+<govuk-error-summary errors="@errors" />
 
 <h1 class="govuk-heading-l">Renew Contracts</h1>
-
-@if (!string.IsNullOrEmpty(Model.ErrorMessage))
-{
-    <div class="govuk-error-summary" data-module="govuk-error-summary" role="alert">
-        <div class="govuk-error-summary__body">
-            <p class="govuk-body"><strong>@Model.ErrorMessage</strong></p>
-        </div>
-    </div>
-}
 
 @* Section 1: Customer Name and Location *@
 <p class="govuk-body">@Model.QalNumber, @Model.CustomerName, @Model.CustomerOrganisation</p>
@@ -23,14 +30,16 @@
 }
 else
 {
-    <form method="post" asp-action="RenewContracts">
+    @* autocomplete="off": a reload must not bring back ticks the browser remembered instead of the rendered state. *@
+    <form method="post" asp-action="RenewContracts" autocomplete="off">
         <input type="hidden" name="customerId" value="@Model.CustomerId" />
+        <input type="hidden" name="selectionChanged" id="SelectionChanged" value="@(Model.SelectionChanged ? "true" : "false")" />
 
         <h2 class="govuk-heading-m">Select the Contract(s) that are to be merged and renewed</h2>
 
         <div class="govuk-checkboxes govuk-checkboxes--small govuk-!-margin-bottom-2">
             <div class="govuk-checkboxes__item">
-                <input class="govuk-checkboxes__input" type="checkbox" id="ContractSelectAllCheckBox" checked />
+                <input class="govuk-checkboxes__input" type="checkbox" id="ContractSelectAllCheckBox" name="selectAllContracts" value="true" checked="@(Model.SelectAllContracts ? "checked" : null)" />
                 <label class="govuk-label govuk-checkboxes__label" for="ContractSelectAllCheckBox">Select All</label>
             </div>
         </div>
@@ -60,7 +69,7 @@ else
                             <div class="govuk-checkboxes govuk-checkboxes--small">
                                 <div class="govuk-checkboxes__item">
                                     <input class="govuk-checkboxes__input contract-checkbox" type="checkbox" id="contract-select-@contract.ContractId" name="selectedContractIds" value="@contract.ContractId" checked="@(isChecked ? "checked" : null)" />
-                                    <label class="govuk-label govuk-checkboxes__label govuk-visually-hidden" for="contract-select-@contract.ContractId">Select contract @contract.Suffix</label>
+                                    <label class="govuk-label govuk-checkboxes__label" for="contract-select-@contract.ContractId"><span class="govuk-visually-hidden">Select contract @contract.Suffix</span></label>
                                 </div>
                             </div>
                         </td>
@@ -88,14 +97,20 @@ else
             </select>
         </div>
 
+        <div class="govuk-form-group@(itemsError is null ? string.Empty : " govuk-form-group--error")" id="renew-items" tabindex="-1">
         <h2 class="govuk-heading-m">Select the Items that are to appear on the new Contract</h2>
+
+        @if (itemsError is not null)
+        {
+            <p id="@RenewContractsViewModel.ItemsField-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @itemsError</p>
+        }
 
         <p class="govuk-body" id="NoItemsPanel" hidden="@(!Model.HasNoItems)">There are no Items on the selected Contracts.</p>
 
         <div id="ItemsPanel" hidden="@(Model.HasNoItems)">
             <div class="govuk-checkboxes govuk-checkboxes--small govuk-!-margin-bottom-2">
                 <div class="govuk-checkboxes__item">
-                    <input class="govuk-checkboxes__input" type="checkbox" id="SchemeSelectAllCheckBox" checked />
+                    <input class="govuk-checkboxes__input" type="checkbox" id="SchemeSelectAllCheckBox" name="selectAllItems" value="true" checked="@(Model.SelectAllItems ? "checked" : null)" />
                     <label class="govuk-label govuk-checkboxes__label" for="SchemeSelectAllCheckBox">Select All</label>
                 </div>
             </div>
@@ -123,8 +138,8 @@ else
                             <td class="govuk-table__cell">
                                 <div class="govuk-checkboxes govuk-checkboxes--small">
                                     <div class="govuk-checkboxes__item">
-                                        <input class="govuk-checkboxes__input item-row-checkbox" type="checkbox" id="item-row-select-@row.First.ParticipantSchemeId" name="selectedItemIdentifiers" value="@row.Identifier" checked="@(isChecked ? "checked" : null)" disabled="@(item.IsRenewable ? null : "disabled")" />
-                                        <label class="govuk-label govuk-checkboxes__label govuk-visually-hidden" for="item-row-select-@row.First.ParticipantSchemeId">Select item @row.Identifier</label>
+                                        <input class="govuk-checkboxes__input item-row-checkbox" type="checkbox" id="@RenewContractsViewModel.ItemCheckboxId(row)" name="selectedItemIdentifiers" value="@row.Identifier" checked="@(isChecked ? "checked" : null)" disabled="@(item.IsRenewable ? null : "disabled")" aria-describedby="@(itemsError is null ? null : $"{RenewContractsViewModel.ItemsField}-error")" />
+                                        <label class="govuk-label govuk-checkboxes__label" for="@RenewContractsViewModel.ItemCheckboxId(row)"><span class="govuk-visually-hidden">Select item @row.Identifier</span></label>
                                     </div>
                                 </div>
                             </td>
@@ -132,6 +147,7 @@ else
                     }
                 </tbody>
             </table>
+        </div>
         </div>
 
         <div class="govuk-button-group">
@@ -144,53 +160,82 @@ else
         (function () {
             var contractCheckboxes = Array.prototype.slice.call(document.querySelectorAll('.contract-checkbox'));
             var itemRows = Array.prototype.slice.call(document.querySelectorAll('.item-row'));
-            var rowCheckboxes = Array.prototype.slice.call(document.querySelectorAll('.item-row-checkbox'));
             var itemsPanel = document.getElementById('ItemsPanel');
             var noItemsPanel = document.getElementById('NoItemsPanel');
+            var contractSelectAll = document.getElementById('ContractSelectAllCheckBox');
+            var schemeSelectAll = document.getElementById('SchemeSelectAllCheckBox');
+            var selectionChanged = document.getElementById('SelectionChanged');
+
+            function markChanged() {
+                selectionChanged.value = 'true';
+            }
 
             function contractIdsOf(row) {
                 return (row.dataset.contractIds || '').split(' ');
             }
 
+            function selectedContracts() {
+                var selected = {};
+                contractCheckboxes.forEach(function (cb) { if (cb.checked) { selected[cb.value] = true; } });
+                return selected;
+            }
+
+            function isShown(row, selected) {
+                return contractIdsOf(row).some(function (id) { return selected[id] === true; });
+            }
+
             // Mirrors MergeContractsViewModel.IsVisible: an item row shows only while one of its contracts is selected.
             function sync() {
-                var selectedContracts = {};
-                contractCheckboxes.forEach(function (cb) { if (cb.checked) { selectedContracts[cb.value] = true; } });
-
-                itemRows.forEach(function (row) {
-                    row.hidden = !contractIdsOf(row).some(function (id) { return selectedContracts[id] === true; });
-                });
+                var selected = selectedContracts();
+                itemRows.forEach(function (row) { row.hidden = !isShown(row, selected); });
 
                 var anyVisible = itemRows.some(function (row) { return !row.hidden; });
                 itemsPanel.hidden = !anyVisible;
                 noItemsPanel.hidden = anyVisible;
             }
 
+            // Legacy ContractUpdate: selecting a contract ticks its renewable items; deselecting it unticks the items it
+            // was showing, unless another selected contract still shows them.
             contractCheckboxes.forEach(function (cb) {
                 cb.addEventListener('change', function () {
-                    // Legacy ContractUpdate re-selects the affected items when a contract is
-                    // selected, and leaves them alone when it is deselected.
-                    if (cb.checked) {
-                        itemRows
-                            .filter(function (row) { return contractIdsOf(row).indexOf(cb.value) >= 0; })
-                            .forEach(function (row) {
-                                var rowCheckbox = row.querySelector('.item-row-checkbox');
-                                if (rowCheckbox && !rowCheckbox.disabled) { rowCheckbox.checked = true; }
-                            });
-                    }
+                    markChanged();
+                    var selected = selectedContracts();
+                    itemRows
+                        .filter(function (row) { return contractIdsOf(row).indexOf(cb.value) >= 0; })
+                        .forEach(function (row) {
+                            var box = row.querySelector('.item-row-checkbox');
+                            if (!box || box.disabled) { return; }
+                            if (cb.checked) {
+                                box.checked = true;
+                            } else if (!isShown(row, selected)) {
+                                box.checked = false;
+                            }
+                        });
                     sync();
                 });
             });
 
-            document.getElementById('ContractSelectAllCheckBox')?.addEventListener('change', function (e) {
+            // Legacy SelectAllContractCheckBox_CheckedChanged: sets every contract; the box itself keeps what the user chose.
+            contractSelectAll.addEventListener('change', function () {
                 contractCheckboxes.forEach(function (cb) {
-                    cb.checked = e.target.checked;
+                    cb.checked = contractSelectAll.checked;
                     cb.dispatchEvent(new Event('change'));
                 });
             });
 
-            document.getElementById('SchemeSelectAllCheckBox')?.addEventListener('change', function (e) {
-                rowCheckboxes.forEach(function (cb) { if (!cb.disabled) { cb.checked = e.target.checked; } });
+            // Legacy SelectAllSchemeCheckBox_CheckedChanged: sets the enabled items on show; the box keeps what the user chose.
+            schemeSelectAll.addEventListener('change', function () {
+                itemRows.forEach(function (row) {
+                    var box = row.querySelector('.item-row-checkbox');
+                    if (!row.hidden && box && !box.disabled) {
+                        box.checked = schemeSelectAll.checked;
+                        markChanged();
+                    }
+                });
+            });
+
+            itemRows.forEach(function (row) {
+                row.querySelector('.item-row-checkbox')?.addEventListener('change', markChanged);
             });
 
             sync();
