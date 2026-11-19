@@ -1,10 +1,10 @@
 using System.Net;
-using Microsoft.AspNetCore.Mvc.Testing;
+using PTL.ExternalWeb.Tests.TestSupport;
 
 namespace PTL.ExternalWeb.Tests.Integration;
 
 // The rich text wire encoder lives once in PTL.SharedUI and is served to the editor pages as a static web asset.
-public class RichTextWireAssetTests(WebApplicationFactory<Program> factory) : IClassFixture<WebApplicationFactory<Program>>
+public class RichTextWireAssetTests(PtlExternalWebTestFactory factory) : IClassFixture<PtlExternalWebTestFactory>
 {
     [Fact]
     public async Task SharedWireScript_IsServedWithoutSigningIn()
