@@ -796,31 +796,22 @@ public class ContractController(IContractApiClient contractApiClient, ICustomerA
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> RenewContracts(
-        Guid customerId,
-        List<Guid> selectedContractIds,
-        List<Guid> selectedParticipantSchemeIds,
-        string? newContractSignatory,
-        List<string>? selectedItemIdentifiers,
-        string? command,
-        bool selectAllContracts,
-        bool selectAllItems,
-        bool selectionChanged,
-        CancellationToken cancellationToken)
+    public async Task<IActionResult> RenewContracts(Guid customerId, RenewContractsForm form, CancellationToken cancellationToken)
     {
-        selectedContractIds ??= [];
-        selectedParticipantSchemeIds ??= [];
+        var selectedContractIds = form.SelectedContractIds ?? [];
+        var selectedParticipantSchemeIds = form.SelectedParticipantSchemeIds ?? [];
+        var selectedItemIdentifiers = form.SelectedItemIdentifiers;
 
         // "Update items" (the no-script way to refresh the item list after changing the contract selection).
-        if (string.Equals(command, RefreshRenewItemsCommand, StringComparison.Ordinal))
+        if (string.Equals(form.Command, RefreshRenewItemsCommand, StringComparison.Ordinal))
         {
             var refreshed = await BuildRenewContractsModelAsync(customerId, cancellationToken);
             refreshed.SelectedContractIds = selectedContractIds;
             refreshed.SelectedItemIdentifiers = selectedItemIdentifiers ?? [];
             refreshed.SelectedParticipantSchemeIds = SelectedRenewableItemIds(refreshed.Items, refreshed.SelectedItemIdentifiers, selectedContractIds);
-            refreshed.NewContractSignatory = newContractSignatory;
-            refreshed.SelectAllContracts = selectAllContracts;
-            refreshed.SelectAllItems = selectAllItems;
+            refreshed.NewContractSignatory = form.NewContractSignatory;
+            refreshed.SelectAllContracts = form.SelectAllContracts;
+            refreshed.SelectAllItems = form.SelectAllItems;
             // Updating the items follows a contract change, which re-evaluated legacy Save.
             refreshed.SelectionChanged = true;
             return View(refreshed);
@@ -842,10 +833,10 @@ public class ContractController(IContractApiClient contractApiClient, ICustomerA
         if (selectedParticipantSchemeIds.Count == 0)
         {
             renewableItems ??= (await contractRenewalApiClient.GetRenewableItemsAsync(customerId, cancellationToken)).Items;
-            refuseEmpty = selectionChanged || renewableItems.Count == 0 || renewableItems.Any(i => i.IsRenewable);
+            refuseEmpty = form.SelectionChanged || renewableItems.Count == 0 || renewableItems.Any(i => i.IsRenewable);
         }
 
-        var request = new RenewContractRequest(selectedContractIds, selectedParticipantSchemeIds, newContractSignatory);
+        var request = new RenewContractRequest(selectedContractIds, selectedParticipantSchemeIds, form.NewContractSignatory);
         var result = refuseEmpty
             ? new RenewContractResponse(false, null, RenewContractsService.NoItemsSelectedMessage)
             : await contractRenewalApiClient.RenewContractsAsync(customerId, request, cancellationToken);
@@ -856,10 +847,10 @@ public class ContractController(IContractApiClient contractApiClient, ICustomerA
             model.SelectedContractIds = selectedContractIds;
             model.SelectedParticipantSchemeIds = selectedParticipantSchemeIds;
             model.SelectedItemIdentifiers = selectedItemIdentifiers;
-            model.NewContractSignatory = newContractSignatory;
-            model.SelectAllContracts = selectAllContracts;
-            model.SelectAllItems = selectAllItems;
-            model.SelectionChanged = selectionChanged;
+            model.NewContractSignatory = form.NewContractSignatory;
+            model.SelectAllContracts = form.SelectAllContracts;
+            model.SelectAllItems = form.SelectAllItems;
+            model.SelectionChanged = form.SelectionChanged;
             if (string.Equals(result.ErrorMessage, RenewContractsService.NoItemsSelectedMessage, StringComparison.Ordinal))
             {
                 // An unticked row posts nothing; an empty list keeps every row unticked instead of falling back to the defaults.

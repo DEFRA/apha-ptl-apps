@@ -8,6 +8,7 @@ using PTL.Contracts.Contract;
 using PTL.Core.Contract.Document;
 using PTL.Core.Contract.Export.Templates;
 using PTL.InternalWeb.Confirmation;
+using PTL.InternalWeb.Features.Contract;
 using PTL.InternalWeb.Tests.TestSupport;
 using PTL.SharedUI.Notifications;
 
@@ -511,7 +512,10 @@ public class ContractControllerTests
         var contractRenewalApiClient = new FakeContractRenewalApiClient { RenewResult = new RenewContractResponse(true, Guid.NewGuid(), null) };
         var controller = CreateController(new FakeContractApiClient(), contractRenewalApiClient: contractRenewalApiClient);
 
-        var result = await controller.RenewContracts(customerId, [Guid.NewGuid()], [Guid.NewGuid()], "Alice Example", null, null, true, true, false, CancellationToken.None);
+        var result = await controller.RenewContracts(
+            customerId,
+            new RenewContractsForm { SelectedContractIds = [Guid.NewGuid()], SelectedParticipantSchemeIds = [Guid.NewGuid()], NewContractSignatory = "Alice Example", SelectAllContracts = true, SelectAllItems = true },
+            CancellationToken.None);
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
         Assert.Equal("Index", redirect.ActionName);
@@ -531,7 +535,10 @@ public class ContractControllerTests
         };
         var controller = CreateController(new FakeContractApiClient(), contractRenewalApiClient: contractRenewalApiClient);
 
-        var result = await controller.RenewContracts(customerId, [selectedContractId], [selectedParticipantSchemeId], "Alice Example", null, null, true, false, true, CancellationToken.None);
+        var result = await controller.RenewContracts(
+            customerId,
+            new RenewContractsForm { SelectedContractIds = [selectedContractId], SelectedParticipantSchemeIds = [selectedParticipantSchemeId], NewContractSignatory = "Alice Example", SelectAllContracts = true, SelectionChanged = true },
+            CancellationToken.None);
 
         var view = Assert.IsType<ViewResult>(result);
         var model = Assert.IsType<PTL.InternalWeb.Features.Contract.RenewContractsViewModel>(view.Model);
@@ -549,7 +556,10 @@ public class ContractControllerTests
         var contractRenewalApiClient = new FakeContractRenewalApiClient { RenewResult = new RenewContractResponse(true, Guid.NewGuid(), null) };
         var controller = CreateController(new FakeContractApiClient(), contractRenewalApiClient: contractRenewalApiClient);
 
-        var result = await controller.RenewContracts(Guid.NewGuid(), null!, null!, "Alice Example", null, null, false, false, true, CancellationToken.None);
+        var result = await controller.RenewContracts(
+            Guid.NewGuid(),
+            new RenewContractsForm { NewContractSignatory = "Alice Example", SelectionChanged = true },
+            CancellationToken.None);
 
         var model = Assert.IsType<PTL.InternalWeb.Features.Contract.RenewContractsViewModel>(Assert.IsType<ViewResult>(result).Model);
         Assert.Null(contractRenewalApiClient.LastRenewRequest);
@@ -577,7 +587,10 @@ public class ContractControllerTests
         };
         var controller = CreateController(new FakeContractApiClient(), contractRenewalApiClient: contractRenewalApiClient);
 
-        var result = await controller.RenewContracts(Guid.NewGuid(), [contractA], [], null, ["S1", "S2"], null, true, true, true, CancellationToken.None);
+        var result = await controller.RenewContracts(
+            Guid.NewGuid(),
+            new RenewContractsForm { SelectedContractIds = [contractA], SelectedItemIdentifiers = ["S1", "S2"], SelectAllContracts = true, SelectAllItems = true, SelectionChanged = true },
+            CancellationToken.None);
 
         Assert.IsType<ViewResult>(result);
         Assert.Null(contractRenewalApiClient.LastRenewRequest);
@@ -597,7 +610,10 @@ public class ContractControllerTests
         };
         var controller = CreateController(new FakeContractApiClient(), contractRenewalApiClient: contractRenewalApiClient);
 
-        var result = await controller.RenewContracts(customerId, [contractA], [], "Alice Example", null, null, true, true, false, CancellationToken.None);
+        var result = await controller.RenewContracts(
+            customerId,
+            new RenewContractsForm { SelectedContractIds = [contractA], NewContractSignatory = "Alice Example", SelectAllContracts = true, SelectAllItems = true },
+            CancellationToken.None);
 
         Assert.IsType<RedirectToActionResult>(result);
         Assert.Equal([contractA], contractRenewalApiClient.LastRenewRequest!.ContractIds);
@@ -619,7 +635,10 @@ public class ContractControllerTests
         };
         var controller = CreateController(new FakeContractApiClient(), contractRenewalApiClient: contractRenewalApiClient);
 
-        var result = await controller.RenewContracts(Guid.NewGuid(), [contractA], [], null, null, null, true, false, selectionChanged, CancellationToken.None);
+        var result = await controller.RenewContracts(
+            Guid.NewGuid(),
+            new RenewContractsForm { SelectedContractIds = [contractA], SelectAllContracts = true, SelectionChanged = selectionChanged },
+            CancellationToken.None);
 
         if (renews)
         {
@@ -645,7 +664,10 @@ public class ContractControllerTests
         };
         var controller = CreateController(new FakeContractApiClient(), contractRenewalApiClient: contractRenewalApiClient);
 
-        var result = await controller.RenewContracts(Guid.NewGuid(), [Guid.NewGuid()], [Guid.NewGuid()], null, null, null, true, true, false, CancellationToken.None);
+        var result = await controller.RenewContracts(
+            Guid.NewGuid(),
+            new RenewContractsForm { SelectedContractIds = [Guid.NewGuid()], SelectedParticipantSchemeIds = [Guid.NewGuid()], SelectAllContracts = true, SelectAllItems = true },
+            CancellationToken.None);
 
         var model = Assert.IsType<PTL.InternalWeb.Features.Contract.RenewContractsViewModel>(Assert.IsType<ViewResult>(result).Model);
         Assert.NotNull(contractRenewalApiClient.LastRenewRequest);
@@ -677,7 +699,10 @@ public class ContractControllerTests
         };
         var controller = CreateController(new FakeContractApiClient(), contractRenewalApiClient: contractRenewalApiClient);
 
-        var result = await controller.RenewContracts(customerId, [contractA], [], "Alice Example", ["S1", "S3", "S4"], null, true, true, true, CancellationToken.None);
+        var result = await controller.RenewContracts(
+            customerId,
+            new RenewContractsForm { SelectedContractIds = [contractA], NewContractSignatory = "Alice Example", SelectedItemIdentifiers = ["S1", "S3", "S4"], SelectAllContracts = true, SelectAllItems = true, SelectionChanged = true },
+            CancellationToken.None);
 
         Assert.IsType<RedirectToActionResult>(result);
         Assert.Equal([contractA], contractRenewalApiClient.LastRenewRequest!.ContractIds);
@@ -691,7 +716,10 @@ public class ContractControllerTests
         var contractRenewalApiClient = new FakeContractRenewalApiClient();
         var controller = CreateController(new FakeContractApiClient(), contractRenewalApiClient: contractRenewalApiClient);
 
-        await controller.RenewContracts(Guid.NewGuid(), [Guid.NewGuid()], [participantSchemeId], null, null, null, true, true, false, CancellationToken.None);
+        await controller.RenewContracts(
+            Guid.NewGuid(),
+            new RenewContractsForm { SelectedContractIds = [Guid.NewGuid()], SelectedParticipantSchemeIds = [participantSchemeId], SelectAllContracts = true, SelectAllItems = true },
+            CancellationToken.None);
 
         Assert.Equal([participantSchemeId], contractRenewalApiClient.LastRenewRequest!.ParticipantSchemeIds);
     }
@@ -709,7 +737,10 @@ public class ContractControllerTests
         };
         var controller = CreateController(new FakeContractApiClient(), contractRenewalApiClient: contractRenewalApiClient);
 
-        var result = await controller.RenewContracts(Guid.NewGuid(), [contractId], [], null, ["S1"], null, true, true, false, CancellationToken.None);
+        var result = await controller.RenewContracts(
+            Guid.NewGuid(),
+            new RenewContractsForm { SelectedContractIds = [contractId], SelectedItemIdentifiers = ["S1"], SelectAllContracts = true, SelectAllItems = true },
+            CancellationToken.None);
 
         var model = Assert.IsType<PTL.InternalWeb.Features.Contract.RenewContractsViewModel>(Assert.IsType<ViewResult>(result).Model);
         Assert.Equal(["S1"], model.SelectedItemIdentifiers);
@@ -738,7 +769,10 @@ public class ContractControllerTests
         };
         var controller = CreateController(new FakeContractApiClient(), contractRenewalApiClient: contractRenewalApiClient);
 
-        var result = await controller.RenewContracts(Guid.NewGuid(), [contractA], [], "Alice Example", ["S1", "S2"], "refresh", false, true, false, CancellationToken.None);
+        var result = await controller.RenewContracts(
+            Guid.NewGuid(),
+            new RenewContractsForm { SelectedContractIds = [contractA], NewContractSignatory = "Alice Example", SelectedItemIdentifiers = ["S1", "S2"], Command = "refresh", SelectAllItems = true },
+            CancellationToken.None);
 
         var model = Assert.IsType<PTL.InternalWeb.Features.Contract.RenewContractsViewModel>(Assert.IsType<ViewResult>(result).Model);
         Assert.Null(contractRenewalApiClient.LastRenewRequest);
