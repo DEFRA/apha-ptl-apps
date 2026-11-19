@@ -7,7 +7,7 @@ public sealed class OrderPageOptions
 
     // Legacy read this from the app setting TermsAndConditionsWebLink. The PDF ships with this app (wwwroot/documents), so the default is a
     // site-relative path (spaces and the ampersand encoded). Blank, the Terms and Conditions link is not shown.
-    public string? TermsAndConditionsUrl { get; set; } = "/documents/VETQAS%20Ts%20%26%20Cs%20April%202025%20Version%206%201.pdf";
+    public string? TermsAndConditionsUrl { get; set; } = "/documents/VETQAS-Ts-and-Cs-April-2025-Version-6-1.pdf";
 
     // Legacy read this from the app setting DistributionTimetableWebLink. Left blank, "website" is shown as plain text.
     public string? DistributionTimetableUrl { get; set; } = "https://www.aphascientific.com/services/vetqas-proficiency-testing/";
