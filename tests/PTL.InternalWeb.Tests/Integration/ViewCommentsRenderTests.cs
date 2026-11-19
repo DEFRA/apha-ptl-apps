@@ -54,7 +54,12 @@ public class ViewCommentsRenderTests : IClassFixture<WebApplicationFactory<Progr
         var page = await (await client.GetAsync(Url)).Content.ReadAsStringAsync();
         var token = Regex.Match(page, "__RequestVerificationToken[^>]*value=\"([^\"]+)\"").Groups[1].Value;
 
-        var content = new List<KeyValuePair<string, string>> { new("__RequestVerificationToken", token), new("Comments", "<p>New</p>") };
+        var content = new List<KeyValuePair<string, string>> { new("__RequestVerificationToken", token) };
+        if (!fields.Any(f => f.Name == "Comments"))
+        {
+            content.Add(new("Comments", "<p>New</p>"));
+        }
+
         content.AddRange(fields.Select(f => new KeyValuePair<string, string>(f.Name, f.Value)));
 
         var response = await client.PostAsync(Url, new FormUrlEncodedContent(content));
@@ -172,6 +177,20 @@ public class ViewCommentsRenderTests : IClassFixture<WebApplicationFactory<Progr
 
         // Cancel on the audit step returns to the editing page, which is not itself armed.
         UnsavedChangesAssertions.AssertNotArmed(MainContent(await PostHtmlAsync(("command", "cancelAudit"))));
+    }
+
+    // The audit step carries the unsaved comments in a hidden field; it must use the wire format too, or the
+    // markup would be posted raw (and blocked by the WAF) when the audited save runs.
+    [Fact]
+    public async Task Post_AuditStep_CarriesTheCommentsInTheRichTextWireFormat()
+    {
+        Seed();
+        _apiClient.CommentsSaveResult = new TestConsultantCommentsSaveResult(false, true, "Comments for D1a/S1", new Dictionary<string, string>());
+        var wire = PTL.SharedUI.RichText.RichTextTransport.Encode("<p>Caf\u00e9 <strong>New</strong></p>");
+
+        var html = MainContent(await PostHtmlAsync(("Comments", wire), ("command", "save")));
+
+        Assert.Contains($"<input type=\"hidden\" id=\"Comments\" name=\"Comments\" value=\"{System.Text.Encodings.Web.HtmlEncoder.Default.Encode(wire)}\" />", html, StringComparison.Ordinal);
     }
 
     [Theory]

@@ -144,6 +144,35 @@ public class CommentsRouteSmokeTests : IClassFixture<PtlExternalWebTestFactory>
         Assert.Empty(apiClient.SavedRequests);
     }
 
+    // The editor script posts the HTML as ptl-b64:<base64> so the WAF XSS rules never see the markup.
+    [Fact]
+    public async Task Entry_Post_CommentsInTheRichTextWireFormat_AreDecodedBeforeTheyAreSaved()
+    {
+        var apiClient = new FakeTestConsultantTabulationApiClient
+        {
+            Tabulation = DraftTabulation(),
+            SaveResult = new TestConsultantTabulationSaveResult(true, false, new Dictionary<string, string>())
+        };
+        var client = CreateClient(apiClient, allowAutoRedirect: false);
+        var cookies = await SignInAsync(client, Guid.NewGuid());
+        var (token, _) = await GetEntryTokenAsync(client, cookies, apiClient.SchemeId);
+
+        var form = new Dictionary<string, string>
+        {
+            ["__RequestVerificationToken"] = token,
+            ["MonthlyDistributionSchemeId"] = apiClient.SchemeId.ToString(),
+            ["Comments"] = PTL.SharedUI.RichText.RichTextTransport.Encode("<p>Caf\u00e9 <strong>Submit</strong></p>"),
+            ["Acknowledged"] = "true",
+            ["command"] = "submit"
+        };
+
+        var response = await CookieForwardingHttpClient.SendWithCookiesAsync(
+            client, HttpMethod.Post, $"/Comments/Entry?schemeId={apiClient.SchemeId}", cookies, new FormUrlEncodedContent(form));
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        Assert.Equal("<p>Caf\u00e9 <strong>Submit</strong></p>", Assert.Single(apiClient.SavedRequests).Comments);
+    }
+
     [Fact]
     public async Task Entry_Post_SubmitWithAcknowledgement_SavesAndRedirects()
     {
