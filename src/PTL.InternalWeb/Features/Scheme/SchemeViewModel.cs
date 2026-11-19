@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc.Rendering;
 using PTL.Contracts.Scheme;
 using PTL.Contracts.Search;
 using PTL.Core.Scheme;
+using PTL.SharedUI.RichText;
 using CoreScheme = PTL.Core.Scheme.Scheme;
 using CoreSchemeIdentifier = PTL.Core.Scheme.SchemeIdentifier;
 
@@ -309,6 +310,7 @@ public sealed class SchemeFormViewModel : IValidatableObject
     // Additional configuration - see class remarks above.
     [Required(ErrorMessage = "Enter the instructions")]
     [StringLength(50000, ErrorMessage = "Instructions must not exceed 50,000 characters")]
+    [RichTextBinder]
     public string? Instructions { get; set; }
 
 #pragma warning disable S6964

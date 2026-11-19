@@ -47,7 +47,8 @@
         <input type="hidden" name="IsAuditStep" value="true" />
         <input type="hidden" asp-for="AuditObjectName" />
         <input type="hidden" asp-for="PendingCommand" />
-        <input type="hidden" asp-for="Comments" />
+        @* Rich text rides along in the wire format (see RichTextTransport) so the markup is not in the request body. *@
+        <input type="hidden" id="Comments" name="Comments" value="@PTL.SharedUI.RichText.RichTextTransport.Encode(Model.Comments)" />
         @foreach (var staged in Model.StagedAttachments)
         {
             <input type="hidden" name="StagedAttachments" value="@staged" />

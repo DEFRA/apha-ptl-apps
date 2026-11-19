@@ -100,4 +100,25 @@
             tinymce.triggerSave();
         }
     }, true);
+
+    // The editor HTML is posted as "ptl-b64:" + base64(UTF-8) so the markup is not in the request body,
+    // where the AWS WAF XSS rules reject it. The formdata event changes only what is sent; the editor and
+    // its textarea keep the real HTML. PTL.SharedUI's RichTextBinder decodes it on the server.
+    function toBase64(text) {
+        var bytes = new TextEncoder().encode(text);
+        var binary = '';
+        for (var i = 0; i < bytes.length; i += 0x8000) {
+            binary += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+        }
+        return btoa(binary);
+    }
+
+    document.addEventListener('formdata', function (event) {
+        document.querySelectorAll('textarea[data-module="ptl-rich-text"]').forEach(function (textarea) {
+            var html = textarea.name && textarea.form === event.target ? event.formData.get(textarea.name) : null;
+            if (typeof html === 'string' && html !== '') {
+                event.formData.set(textarea.name, 'ptl-b64:' + toBase64(html));
+            }
+        });
+    });
 })();

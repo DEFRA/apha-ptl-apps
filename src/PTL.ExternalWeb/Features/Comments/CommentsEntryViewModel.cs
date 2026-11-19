@@ -1,6 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
 using PTL.Contracts.Distribution;
+using PTL.SharedUI.RichText;
 
 namespace PTL.ExternalWeb.Features.Comments;
 
@@ -40,6 +41,7 @@ public sealed class CommentsEntryViewModel
     public bool? IsFiltered { get; set; }
 
     [StringLength(50000, ErrorMessage = "Comments must not exceed 50,000 characters. Note that rich text such as font changes and bullet points will artificially count towards this character limit.")]
+    [RichTextBinder]
     public string? Comments { get; set; }
 
     [BindRequired]

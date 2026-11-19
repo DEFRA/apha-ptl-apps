@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using PTL.SharedUI.RichText;
 
 namespace PTL.InternalWeb.Features.SystemAdministration;
 
@@ -7,11 +8,13 @@ public sealed class ExternalSiteManagementViewModel
     // Further Information - no validation at all, matching legacy (TxtMessage on
     // EditMessageOnWebsite.aspx carries no validators despite the varchar(8000) column).
     // Nullable so MVC does not add an implicit [Required] - an empty form field posts null.
+    [RichTextBinder]
     public string? Message { get; set; } = string.Empty;
 
     // Visible-character limit (500, after stripping HTML tags) is HTML-aware and so is owned by
     // PTL.Core.ExternalSiteMessage.ExternalSiteMessageValidator, not a DataAnnotation here - a
     // plain StringLength would count raw markup, not visible text.
+    [RichTextBinder]
     public string? ImportantMessage { get; set; } = string.Empty;
 
     [Required(ErrorMessage = "The Email Address is required")]
