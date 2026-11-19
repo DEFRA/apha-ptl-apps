@@ -13,7 +13,7 @@ public class TabulationEmailOptionsTests
         Assert.Equal("TabulationEmails", TabulationEmailOptions.SectionName);
         Assert.True(options.Enabled);
         Assert.Equal("Europe/London", options.TimeZone);
-        Assert.Equal("Test%20Consultant/Tabulation", options.InternalCommentsPath);
+        Assert.Equal("test-consultant/Tabulation", options.InternalCommentsPath);
         Assert.Equal("Comments/Entry", options.ExternalCommentsPath);
     }
 

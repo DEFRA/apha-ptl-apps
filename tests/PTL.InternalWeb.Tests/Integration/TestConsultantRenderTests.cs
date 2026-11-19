@@ -15,7 +15,7 @@ namespace PTL.InternalWeb.Tests.Integration;
 // Tabulation.aspx - through the real MVC pipeline, with the "Test Consultant" role signed in.
 public class TestConsultantRenderTests : IClassFixture<WebApplicationFactory<Program>>
 {
-    private static readonly string TabulationUrl = $"/Test%20Consultant/Tabulation?monthlyDistributionSchemeId={SchemeId}";
+    private static readonly string TabulationUrl = $"/test-consultant/Tabulation?monthlyDistributionSchemeId={SchemeId}";
 
     private readonly WebApplicationFactory<Program> _rawFactory;
     private readonly FakeTestConsultantTabulationApiClient _apiClient = new();
@@ -68,7 +68,7 @@ public class TestConsultantRenderTests : IClassFixture<WebApplicationFactory<Pro
             Dist(2026, 1, "17050/BA: PT0001 Brucella", submitted: true),
             Dist(2025, 5, "Last year's distribution")]);
 
-        var html = MainContent(await GetAsync("/Test%20Consultant"));
+        var html = MainContent(await GetAsync("/test-consultant"));
 
         Assert.Contains("June 2026", html, StringComparison.Ordinal);
         Assert.Contains("January 2026", html, StringComparison.Ordinal);
@@ -77,7 +77,7 @@ public class TestConsultantRenderTests : IClassFixture<WebApplicationFactory<Pro
         Assert.Contains("Awaiting comments", html, StringComparison.Ordinal);
         Assert.Contains("Comments submitted", html, StringComparison.Ordinal);
         Assert.Contains("21/06/2026", html, StringComparison.Ordinal);
-        Assert.Contains($"href=\"/Test%20Consultant/Tabulation?monthlyDistributionSchemeId={SchemeId}\"", html, StringComparison.Ordinal);
+        Assert.Contains($"href=\"/test-consultant/Tabulation?monthlyDistributionSchemeId={SchemeId}\"", html, StringComparison.Ordinal);
         Assert.Contains("Comments Required", html, StringComparison.Ordinal);
         Assert.Contains("View Results / Comments", html, StringComparison.Ordinal);
         Assert.Contains("<option value=\"2026\" selected=\"selected\">2026</option>", html, StringComparison.Ordinal);
@@ -89,7 +89,7 @@ public class TestConsultantRenderTests : IClassFixture<WebApplicationFactory<Pro
     [Fact]
     public async Task Menu_NoDistributions_SaysSo()
     {
-        var html = MainContent(await GetAsync("/Test%20Consultant"));
+        var html = MainContent(await GetAsync("/test-consultant"));
 
         Assert.Contains("There are no distributions that require comments.", html, StringComparison.Ordinal);
         Assert.DoesNotContain("Select Year", html, StringComparison.Ordinal);
@@ -100,7 +100,7 @@ public class TestConsultantRenderTests : IClassFixture<WebApplicationFactory<Pro
     {
         _apiClient.Distributions = new([Dist(2026, 6, "June")]);
 
-        var html = MainContent(await GetAsync("/Test%20Consultant?year=1999"));
+        var html = MainContent(await GetAsync("/test-consultant?year=1999"));
 
         Assert.Contains("June 2026", html, StringComparison.Ordinal);
     }
@@ -199,7 +199,7 @@ public class TestConsultantRenderTests : IClassFixture<WebApplicationFactory<Pro
         Assert.Contains("data-module=\"ptl-rich-text\"", html, StringComparison.Ordinal);
         Assert.Contains("&lt;p&gt;Draft&lt;/p&gt;", html, StringComparison.Ordinal);
         Assert.True(HasCommandButton(html, "save", "Save"));
-        Assert.Matches("<a[^>]*govuk-button--secondary[^>]*href=\"/Test%20Consultant\"[^>]*>Cancel</a>", html);
+        Assert.Matches("<a[^>]*govuk-button--secondary[^>]*href=\"/test-consultant\"[^>]*>Cancel</a>", html);
         Assert.True(HasCommandButton(html, "submit", "Save and Submit"));
         Assert.Contains("Once your comments are submitted, you will not be able to edit them again.", html, StringComparison.Ordinal);
     }
@@ -217,7 +217,7 @@ public class TestConsultantRenderTests : IClassFixture<WebApplicationFactory<Pro
         Assert.DoesNotContain("Please use the box below the Tabulation", html, StringComparison.Ordinal);
         Assert.False(HasCommandButton(html, "save", "Save"));
         Assert.False(HasCommandButton(html, "submit", "Save and Submit"));
-        Assert.Matches("<a[^>]*govuk-button--secondary[^>]*href=\"/Test%20Consultant\"[^>]*>Back</a>", html);
+        Assert.Matches("<a[^>]*govuk-button--secondary[^>]*href=\"/test-consultant\"[^>]*>Back</a>", html);
         Assert.Contains("<h2 class=\"govuk-heading-m commentsTitle\">Comments provided by A Author:</h2>", html, StringComparison.Ordinal);
         Assert.True(HasCommandButton(html, "export", "Export to Excel"));
     }
@@ -251,7 +251,7 @@ public class TestConsultantRenderTests : IClassFixture<WebApplicationFactory<Pro
         var html = await GetAsync(TabulationUrl);
 
         Assert.DoesNotContain("govuk-back-link", html, StringComparison.Ordinal);
-        Assert.Matches("<a class=\"govuk-breadcrumbs__link\" href=\"/Test%20Consultant\">Test Consultant</a>", html);
+        Assert.Matches("<a class=\"govuk-breadcrumbs__link\" href=\"/test-consultant\">Test Consultant</a>", html);
     }
 
     // On-screen GOV.UK typography comes from #commentsDiv, exactly as on Distribution's Tabulation page.
@@ -323,11 +323,37 @@ public class TestConsultantRenderTests : IClassFixture<WebApplicationFactory<Pro
         var response = await PostAsync(("Comments", "<p>New</p>"), ("command", "submit"), ("confirmation", "confirm"));
 
         Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
-        Assert.Equal("/Test%20Consultant", response.Headers.Location!.OriginalString);
+        Assert.Equal("/test-consultant", response.Headers.Location!.OriginalString);
         var (schemeId, request) = Assert.Single(_apiClient.Saved);
         Assert.Equal((SchemeId, "<p>New</p>", true), (schemeId, request.Comments, request.Submit));
     }
 
+    // The editor script posts the HTML as ptl-b64:<base64> so the WAF XSS rules never see the markup.
+    [Fact]
+    public async Task Post_CommentsInTheRichTextWireFormat_AreDecodedBeforeTheyAreSaved()
+    {
+        _apiClient.Tabulation = new(TestConsultantApiStatus.Ok, Tabulation());
+        var wire = PTL.SharedUI.RichText.RichTextTransport.Encode("<p>Caf\u00e9 <strong>New</strong></p>");
+
+        var response = await PostAsync(("Comments", wire), ("command", "submit"), ("confirmation", "confirm"));
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        var (_, request) = Assert.Single(_apiClient.Saved);
+        Assert.Equal("<p>Caf\u00e9 <strong>New</strong></p>", request.Comments);
+    }
+
+    // The confirmation page echoes the posted form, so the wire format must survive a round trip untouched.
+    [Fact]
+    public async Task Post_SaveWithCommentsInTheWireFormat_EchoesTheWireFormatOnTheConfirmationPage()
+    {
+        _apiClient.Tabulation = new(TestConsultantApiStatus.Ok, Tabulation());
+        var wire = PTL.SharedUI.RichText.RichTextTransport.Encode("<p>New</p>");
+
+        var html = MainContent(await (await PostAsync(("Comments", wire), ("command", "save"))).Content.ReadAsStringAsync());
+
+        Assert.Contains($"<input type=\"hidden\" name=\"Comments\" value=\"{System.Text.Encodings.Web.HtmlEncoder.Default.Encode(wire)}\" />", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("&lt;p&gt;", html, StringComparison.Ordinal);
+    }
     // Save and Save and Submit open the shared confirmation page first; its OK re-posts the comments typed so far.
     [Theory]
     [InlineData("save", "Are you sure you wish to save your comments?", false)]
@@ -396,7 +422,7 @@ public class TestConsultantRenderTests : IClassFixture<WebApplicationFactory<Pro
     [Fact]
     public async Task Menu_UserWithoutTheTestConsultantRole_IsRefused()
     {
-        var response = await Factory("Admin").CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false }).GetAsync("/Test%20Consultant");
+        var response = await Factory("Admin").CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false }).GetAsync("/test-consultant");
 
         Assert.NotEqual(HttpStatusCode.OK, response.StatusCode);
     }
@@ -407,7 +433,7 @@ public class TestConsultantRenderTests : IClassFixture<WebApplicationFactory<Pro
         var client = _rawFactory.WithWebHostBuilder(builder => builder.UseSetting(SignedInUserHostingStartup.UseRealAuthSetting, "true"))
             .CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
 
-        Assert.Equal(HttpStatusCode.Redirect, (await client.GetAsync("/Test%20Consultant")).StatusCode);
+        Assert.Equal(HttpStatusCode.Redirect, (await client.GetAsync("/test-consultant")).StatusCode);
     }
 
     [Fact]
@@ -416,7 +442,7 @@ public class TestConsultantRenderTests : IClassFixture<WebApplicationFactory<Pro
         _apiClient.Tabulation = new(TestConsultantApiStatus.Ok, Tabulation());
 
         // TabulationEmailOptions.InternalCommentsPath + ?MonthlyDistributionSchemeId=...
-        var html = await GetAsync($"/Test%20Consultant/Tabulation?MonthlyDistributionSchemeId={SchemeId}");
+        var html = await GetAsync($"/test-consultant/Tabulation?MonthlyDistributionSchemeId={SchemeId}");
 
         Assert.Contains("FINAL REPORT for D1a/S1 BT: Brucella", html, StringComparison.Ordinal);
     }

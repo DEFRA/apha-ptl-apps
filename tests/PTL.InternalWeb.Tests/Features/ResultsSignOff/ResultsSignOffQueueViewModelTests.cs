@@ -40,6 +40,6 @@ public class ResultsSignOffQueueViewModelTests
     {
         var id = Guid.Parse("22222222-2222-2222-2222-222222222222");
 
-        Assert.Equal("/Results%20Sign-off/Tabulation?tabulationId=22222222-2222-2222-2222-222222222222", ResultsSignOffQueueViewModel.TabulationUrl(id));
+        Assert.Equal("/results-sign-off/Tabulation?tabulationId=22222222-2222-2222-2222-222222222222", ResultsSignOffQueueViewModel.TabulationUrl(id));
     }
 }

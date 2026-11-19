@@ -135,7 +135,7 @@ public class TabulationEmailServiceTests
             ("SchemeName", "PT0060: Mastitis bovine"),
             ("MonthlyDistributionReferenceFull", "17152A/BA"),
             ("CommentDeadlineDays", "7"),
-            ("WebAddress", $"{WebAddressPrefix}https://internal.example.test/Test%20Consultant/Tabulation?MonthlyDistributionSchemeId={Mds1}"),
+            ("WebAddress", $"{WebAddressPrefix}https://internal.example.test/test-consultant/Tabulation?MonthlyDistributionSchemeId={Mds1}"),
             ("DateTimeNow", "12/05/2026"));
         Assert.Equal([(Mds1, 1)], h.Repository.EmailStates);
         var information = Assert.Single(h.Logger.At(LogLevel.Information), e => e.Message.StartsWith("Tabulation email sent", StringComparison.Ordinal));
@@ -162,14 +162,14 @@ public class TabulationEmailServiceTests
     [Fact]
     public async Task ProcessScheduledEmailsAsync_FirstRequest_TrimsSlashesFromTheInternalLink()
     {
-        var h = new Harness(o => o.InternalCommentsPath = "/Test%20Consultant/Tabulation/", internalUrl: "https://internal.example.test/");
+        var h = new Harness(o => o.InternalCommentsPath = "/test-consultant/Tabulation/", internalUrl: "https://internal.example.test/");
         h.AddStandardConsultants();
         h.Repository.EmailCandidates.Add(Candidate(Mds1, daysSinceReady: 0));
 
         await h.Service.ProcessScheduledEmailsAsync();
 
         Assert.Equal(
-            $"{WebAddressPrefix}https://internal.example.test/Test%20Consultant/Tabulation?MonthlyDistributionSchemeId={Mds1}",
+            $"{WebAddressPrefix}https://internal.example.test/test-consultant/Tabulation?MonthlyDistributionSchemeId={Mds1}",
             Assert.Single(h.Notify.Sent).Personalisation!["WebAddress"]);
     }
 
@@ -336,7 +336,7 @@ public class TabulationEmailServiceTests
             ("WebAddress", $"{WebAddressPrefix}https://external.example.test/Comments/Entry?schemeId={Mds1}"),
             ("DateTimeNow", "12/05/2026"));
         Assert.Equal(
-            $"{WebAddressPrefix}https://internal.example.test/Test%20Consultant/Tabulation?MonthlyDistributionSchemeId={Mds1}",
+            $"{WebAddressPrefix}https://internal.example.test/test-consultant/Tabulation?MonthlyDistributionSchemeId={Mds1}",
             h.Notify.Sent[2].Personalisation!["WebAddress"]);
         Assert.Equal([(Mds1, 2)], h.Repository.EmailStates);
         Assert.All([1, 2, 3], slot => Assert.False(h.Guard.ChaserSent(Mds1, slot)));

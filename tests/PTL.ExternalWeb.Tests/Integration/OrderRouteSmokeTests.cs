@@ -516,7 +516,7 @@ public partial class OrderRouteSmokeTests : IClassFixture<PtlExternalWebTestFact
 
         var body = await GetAsync(client, cookies, "/Order/Review?year=current");
 
-        const string href = "/documents/VETQAS%20Ts%20%26%20Cs%20April%202025%20Version%206%201.pdf";
+        const string href = "/documents/VETQAS-Ts-and-Cs-April-2025-Version-6-1.pdf";
         Assert.Contains($"href=\"{href}\"", body);
 
         var pdf = await client.GetAsync(href);

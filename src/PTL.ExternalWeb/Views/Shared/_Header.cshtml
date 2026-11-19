@@ -15,7 +15,7 @@
     </form>;
     IHtmlContent? signOut = isSignedIn ? signOutForm(0) : null;
 }
-<govuk-page-header service-name="@Model.ServiceName" logo-style="@Model.LogoStyle" logo-url="~/images/apha-scientific-logo.png" logo-alt="APHA Scientific" secondary-logo-url="~/images/vetqas-logo.jpg" secondary-logo-alt="VETQAS" secondary-logo-style="width:70px; height:auto;" show-menu-toggle="@isSignedIn" account-link-text="@(isSignedIn ? "VETQAS Account" : null)" account-link-href="@CidmOptionsAccessor.Value.AccountPortalUrl" help-link-text="User Manual" help-link-href="/documents/User Manual.pdf" extra-actions="@signOut">
+<govuk-page-header service-name="@Model.ServiceName" logo-style="@Model.LogoStyle" logo-url="~/images/apha-scientific-logo.png" logo-alt="APHA Scientific" secondary-logo-url="~/images/vetqas-logo.jpg" secondary-logo-alt="VETQAS" secondary-logo-style="width:70px; height:auto;" show-menu-toggle="@isSignedIn" account-link-text="@(isSignedIn ? "VETQAS Account" : null)" account-link-href="@CidmOptionsAccessor.Value.AccountPortalUrl" help-link-text="User Manual" help-link-href="/documents/User-Manual.pdf" extra-actions="@signOut">
     @if (User.Identity is not null && User.Identity.IsAuthenticated)
     {
         // CIDM's id_token has no "name" claim without the "profile" scope, so the resolved

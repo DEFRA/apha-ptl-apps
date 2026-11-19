@@ -14,7 +14,7 @@ namespace PTL.InternalWeb.Tests.Integration;
 // "Results Sign-off" role signed in. The wording is legacy's.
 public class ResultsSignOffRenderTests(WebApplicationFactory<Program> rawFactory) : IClassFixture<WebApplicationFactory<Program>>
 {
-    private const string QueueUrl = "/Results%20Sign-off";
+    private const string QueueUrl = "/results-sign-off";
 
     private static readonly Guid TabulationId = Guid.Parse("22222222-2222-2222-2222-222222222222");
 
@@ -144,7 +144,7 @@ public class ResultsSignOffRenderTests(WebApplicationFactory<Program> rawFactory
 
         var html = MainContent(await GetAsync());
 
-        Assert.Contains($"href=\"/Results%20Sign-off/Tabulation?tabulationId={TabulationId}\"", html, StringComparison.Ordinal);
+        Assert.Contains($"href=\"/results-sign-off/Tabulation?tabulationId={TabulationId}\"", html, StringComparison.Ordinal);
         Assert.Matches("View<span class=\"govuk-visually-hidden\"> FINAL REPORT</span>", html);
     }
 
@@ -191,7 +191,7 @@ public class ResultsSignOffRenderTests(WebApplicationFactory<Program> rawFactory
     private static readonly Guid AttachmentId = Guid.Parse("44444444-4444-4444-4444-444444444444");
     private static readonly Guid ParticipantId = Guid.Parse("55555555-5555-5555-5555-555555555555");
 
-    private static string ReviewUrl => $"/Results%20Sign-off/Tabulation?tabulationId={TabulationId}";
+    private static string ReviewUrl => $"/results-sign-off/Tabulation?tabulationId={TabulationId}";
 
     private static TabulationTableResponse Table(Guid? assessmentTestId) =>
         new("Brucella", [new TabulationGridRowResponse([new TabulationCellResponse("Lab 001", 1, 1, "Cell", false)], false)], assessmentTestId);
@@ -289,7 +289,7 @@ public class ResultsSignOffRenderTests(WebApplicationFactory<Program> rawFactory
 
         var html = await GetReviewAsync();
 
-        Assert.Contains($"href=\"/Results%20Sign-off/AssessmentResults?tabulationId={TabulationId}&amp;testId={TestId}\"", html, StringComparison.Ordinal);
+        Assert.Contains($"href=\"/results-sign-off/AssessmentResults?tabulationId={TabulationId}&amp;testId={TestId}\"", html, StringComparison.Ordinal);
         Assert.Contains("View assessment results", html, StringComparison.Ordinal);
     }
 
@@ -327,7 +327,7 @@ public class ResultsSignOffRenderTests(WebApplicationFactory<Program> rawFactory
         Assert.Contains("<p>Scheme comments</p>", comments, StringComparison.Ordinal);
         Assert.Contains("<h2 class=\"govuk-heading-m commentsTitle\">Comments provided by Dr A, QAU:</h2>", comments, StringComparison.Ordinal);
         Assert.Contains("<p>Consultant words</p>", comments, StringComparison.Ordinal);
-        Assert.Contains($"href=\"/Results%20Sign-off/Attachment?tabulationId={TabulationId}&amp;attachmentId={AttachmentId}\">View Supporting Document</a>", html, StringComparison.Ordinal);
+        Assert.Contains($"href=\"/results-sign-off/Attachment?tabulationId={TabulationId}&amp;attachmentId={AttachmentId}\">View Supporting Document</a>", html, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -349,13 +349,13 @@ public class ResultsSignOffRenderTests(WebApplicationFactory<Program> rawFactory
         var html = await GetReviewAsync();
 
         // One form holds the group, so the three controls are direct children of govuk-button-group and share a baseline.
-        var form = Regex.Match(html, "<form[^>]*method=\"post\"[^>]*action=\"/Results%20Sign-off/Authorise\"[^>]*>(?<inner>.*?)</form>", RegexOptions.Singleline).Groups["inner"].Value;
+        var form = Regex.Match(html, "<form[^>]*method=\"post\"[^>]*action=\"/results-sign-off/Authorise\"[^>]*>(?<inner>.*?)</form>", RegexOptions.Singleline).Groups["inner"].Value;
         Assert.NotEmpty(form);
         var group = Regex.Match(form, "<div class=\"govuk-button-group\">(?<inner>.*?)</div>", RegexOptions.Singleline).Groups["inner"].Value;
         Assert.DoesNotContain("<form", group, StringComparison.Ordinal);
-        Assert.Matches("<button[^>]*class=\"govuk-button\"[^>]*formaction=\"/Results%20Sign-off/Authorise\"[^>]*>Authorise</button>", group);
-        Assert.Matches("<button[^>]*class=\"govuk-button govuk-button--warning\"[^>]*formaction=\"/Results%20Sign-off/Reject\"[^>]*>Reject</button>", group);
-        Assert.Matches("<a class=\"govuk-button govuk-button--secondary\"[^>]*href=\"/Results%20Sign-off\">Cancel</a>", group);
+        Assert.Matches("<button[^>]*class=\"govuk-button\"[^>]*formaction=\"/results-sign-off/Authorise\"[^>]*>Authorise</button>", group);
+        Assert.Matches("<button[^>]*class=\"govuk-button govuk-button--warning\"[^>]*formaction=\"/results-sign-off/Reject\"[^>]*>Reject</button>", group);
+        Assert.Matches("<a class=\"govuk-button govuk-button--secondary\"[^>]*href=\"/results-sign-off\">Cancel</a>", group);
         Assert.True(group.IndexOf(">Authorise</button>", StringComparison.Ordinal) < group.IndexOf(">Reject</button>", StringComparison.Ordinal));
         Assert.True(group.IndexOf(">Reject</button>", StringComparison.Ordinal) < group.IndexOf(">Cancel</a>", StringComparison.Ordinal));
     }
@@ -376,7 +376,7 @@ public class ResultsSignOffRenderTests(WebApplicationFactory<Program> rawFactory
         var html = await response.Content.ReadAsStringAsync();
 
         var crumbs = Regex.Match(html, "<ol class=\"govuk-breadcrumbs__list\">(?<inner>.*?)</ol>", RegexOptions.Singleline).Groups["inner"].Value;
-        Assert.Contains("href=\"/Results%20Sign-off\">Results Sign-off</a>", crumbs, StringComparison.Ordinal);
+        Assert.Contains("href=\"/results-sign-off\">Results Sign-off</a>", crumbs, StringComparison.Ordinal);
         Assert.Matches("Results Sign-Off Tabulation\\s*</li>", crumbs);
     }
 
@@ -395,7 +395,7 @@ public class ResultsSignOffRenderTests(WebApplicationFactory<Program> rawFactory
 
     // ---- Assessment results ---------------------------------------------------------------------
 
-    private static string AssessmentUrl => $"/Results%20Sign-off/AssessmentResults?tabulationId={TabulationId}&testId={TestId}";
+    private static string AssessmentUrl => $"/results-sign-off/AssessmentResults?tabulationId={TabulationId}&testId={TestId}";
 
     [Fact]
     public async Task AssessmentResults_ShowsTheChartWithItsDataTableAndALinkBackToTheTabulation()
@@ -414,7 +414,7 @@ public class ResultsSignOffRenderTests(WebApplicationFactory<Program> rawFactory
         Assert.Contains("<h2 class=\"govuk-heading-m\">D1a/S1 BT: Brucella</h2>", main, StringComparison.Ordinal);
         Assert.Contains("<svg class=\"ptl-assessment-chart\"", main, StringComparison.Ordinal);
         Assert.Contains("Bar chart shows the frequency of assessment scores (data table)", main, StringComparison.Ordinal);
-        Assert.Contains($"href=\"/Results%20Sign-off/Tabulation?tabulationId={TabulationId}\">Back</a>", main, StringComparison.Ordinal);
+        Assert.Contains($"href=\"/results-sign-off/Tabulation?tabulationId={TabulationId}\">Back</a>", main, StringComparison.Ordinal);
         Assert.Equal([(TabulationId, TestId, false)], _distribution.RequestedAssessmentResults);
     }
 
@@ -427,7 +427,7 @@ public class ResultsSignOffRenderTests(WebApplicationFactory<Program> rawFactory
         var html = await response.Content.ReadAsStringAsync();
 
         var crumbs = Regex.Match(html, "<ol class=\"govuk-breadcrumbs__list\">(?<inner>.*?)</ol>", RegexOptions.Singleline).Groups["inner"].Value;
-        Assert.Contains($"href=\"/Results%20Sign-off/Tabulation?tabulationId={TabulationId}\">Results Sign-Off Tabulation</a>", crumbs, StringComparison.Ordinal);
+        Assert.Contains($"href=\"/results-sign-off/Tabulation?tabulationId={TabulationId}\">Results Sign-Off Tabulation</a>", crumbs, StringComparison.Ordinal);
         Assert.Matches("Assessment Results\\s*</li>", crumbs);
     }
 
@@ -446,7 +446,7 @@ public class ResultsSignOffRenderTests(WebApplicationFactory<Program> rawFactory
     {
         _distribution.TabulationAttachment = new TabulationAttachmentFile([1, 2, 3], "application/pdf", "inline; filename=support.pdf");
 
-        var response = await Factory("Results Sign-off").CreateClient().GetAsync($"/Results%20Sign-off/Attachment?tabulationId={TabulationId}&attachmentId={AttachmentId}");
+        var response = await Factory("Results Sign-off").CreateClient().GetAsync($"/results-sign-off/Attachment?tabulationId={TabulationId}&attachmentId={AttachmentId}");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal("application/pdf", response.Content.Headers.ContentType!.MediaType);
@@ -465,7 +465,7 @@ public class ResultsSignOffRenderTests(WebApplicationFactory<Program> rawFactory
 
         var fields = new List<KeyValuePair<string, string>> { new("__RequestVerificationToken", token), new("tabulationId", TabulationId.ToString()) };
         fields.AddRange(extra.Select(f => new KeyValuePair<string, string>(f.Name, f.Value)));
-        return await client.PostAsync($"/Results%20Sign-off/{action}", new FormUrlEncodedContent(fields));
+        return await client.PostAsync($"/results-sign-off/{action}", new FormUrlEncodedContent(fields));
     }
 
     [Fact]
@@ -481,7 +481,7 @@ public class ResultsSignOffRenderTests(WebApplicationFactory<Program> rawFactory
         Assert.Contains("Are you sure you wish to Reject this Tabulation?", html, StringComparison.Ordinal);
         Assert.Contains("Rejected Tabulations are returned for amendments and restart the tabulation cycle.", html, StringComparison.Ordinal);
         Assert.Contains("govuk-button--warning", html, StringComparison.Ordinal);
-        Assert.Contains($"href=\"/Results%20Sign-off/Tabulation?tabulationId={TabulationId}\"", html, StringComparison.Ordinal);
+        Assert.Contains($"href=\"/results-sign-off/Tabulation?tabulationId={TabulationId}\"", html, StringComparison.Ordinal);
         Assert.Empty(_apiClient.Rejected);
     }
 
@@ -518,7 +518,7 @@ public class ResultsSignOffRenderTests(WebApplicationFactory<Program> rawFactory
     {
         var client = Factory("Admin").CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
 
-        var response = await client.PostAsync("/Results%20Sign-off/Reject", new FormUrlEncodedContent([new("tabulationId", TabulationId.ToString()), new("confirmation", "confirm")]));
+        var response = await client.PostAsync("/results-sign-off/Reject", new FormUrlEncodedContent([new("tabulationId", TabulationId.ToString()), new("confirmation", "confirm")]));
 
         Assert.NotEqual(HttpStatusCode.OK, response.StatusCode);
         Assert.Empty(_apiClient.Rejected);
@@ -539,7 +539,7 @@ public class ResultsSignOffRenderTests(WebApplicationFactory<Program> rawFactory
         Assert.Contains("Are you sure you wish to Authorise this Tabulation?", html, StringComparison.Ordinal);
         Assert.Contains("Authorising publishes the Tabulation and sends its Tabulation Published notification emails.", html, StringComparison.Ordinal);
         Assert.DoesNotContain("govuk-button--warning", html, StringComparison.Ordinal);
-        Assert.Contains($"href=\"/Results%20Sign-off/Tabulation?tabulationId={TabulationId}\"", html, StringComparison.Ordinal);
+        Assert.Contains($"href=\"/results-sign-off/Tabulation?tabulationId={TabulationId}\"", html, StringComparison.Ordinal);
         Assert.Empty(_apiClient.Authorised);
     }
 
@@ -576,7 +576,7 @@ public class ResultsSignOffRenderTests(WebApplicationFactory<Program> rawFactory
     {
         var client = Factory("Admin").CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
 
-        var response = await client.PostAsync("/Results%20Sign-off/Authorise", new FormUrlEncodedContent([new("tabulationId", TabulationId.ToString()), new("confirmation", "confirm")]));
+        var response = await client.PostAsync("/results-sign-off/Authorise", new FormUrlEncodedContent([new("tabulationId", TabulationId.ToString()), new("confirmation", "confirm")]));
 
         Assert.NotEqual(HttpStatusCode.OK, response.StatusCode);
         Assert.Empty(_apiClient.Authorised);

@@ -13,7 +13,7 @@ namespace PTL.InternalWeb.Features.TestConsultant;
 // Which schemes a Test Consultant may open is decided by PTL.Api from the signed-in user, so a request for anyone
 // else's scheme gets the shared Access Denied page. Save and Save and Submit return to the menu, as legacy did, and Cancel and Back are links to it.
 [Authorize(Policy = PtlPolicies.TestConsultant)]
-[Route("Test Consultant")]
+[Route("test-consultant")]
 public sealed class TestConsultantController(ITestConsultantTabulationApiClient apiClient) : Controller
 {
     private const string TabulationView = "Tabulation";
