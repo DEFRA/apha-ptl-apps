@@ -12,7 +12,7 @@ public sealed class TabulationEmailOptions
     // Paths of the comment pages linked from the Test Consultant emails. The internal one keeps the legacy
     // Test Consultant/Tabulation.aspx URL (TestConsultantController has a matching [Route]); the external one is
     // the migrated PTL.ExternalWeb CommentsController.Entry route, NOT legacy CommentsEntry.aspx.
-    public string InternalCommentsPath { get; set; } = "Test%20Consultant/Tabulation";
+    public string InternalCommentsPath { get; set; } = "test-consultant/Tabulation";
 
     public string ExternalCommentsPath { get; set; } = "Comments/Entry";
 }

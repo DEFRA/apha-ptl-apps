@@ -8,7 +8,7 @@ namespace PTL.InternalWeb.Features.ResultsSignOff;
 public sealed class ResultsSignOffQueueViewModel
 {
     // Legacy linked each View to Results Sign-off/Tabulation.aspx?TabulationId=... (the review page).
-    public const string TabulationPath = "/Results%20Sign-off/Tabulation";
+    public const string TabulationPath = "/results-sign-off/Tabulation";
 
     public required IReadOnlyList<ResultsSignOffMonthGroup> Months { get; init; }
 

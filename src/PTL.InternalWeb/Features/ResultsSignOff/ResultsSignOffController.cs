@@ -11,7 +11,7 @@ namespace PTL.InternalWeb.Features.ResultsSignOff;
 // AssessmentResults.aspx, open only to the Results Sign-off role. The review reads the draft tabulation the Distribution pages
 // already load. Authorise publishes it and Reject returns it for amendments.
 [Authorize(Policy = PtlPolicies.ResultsSignOff)]
-[Route("Results Sign-off")]
+[Route("results-sign-off")]
 public sealed class ResultsSignOffController(IResultsSignOffApiClient apiClient, IDistributionApiClient distributionApiClient) : Controller
 {
     // Legacy BtnReject and BtnAuthorise had no confirmation; the shared confirmation page asks before a decision that cannot be undone.
