@@ -189,11 +189,48 @@ public sealed class RenewContractsServiceTests
 
         var createdParticipantSchemes = participantRepository.CreatedRecords;
         Assert.Single(createdParticipantSchemes);
+        Assert.NotEqual(Guid.Empty, createdParticipantSchemes[0].ParticipantSchemeId);
+        Assert.DoesNotContain(createdParticipantSchemes[0].ParticipantSchemeId, new[] { participantSchemeId1, participantSchemeId2 });
+        Assert.Equal(result.NewContractId, createdParticipantSchemes[0].ContractId);
         Assert.Equal(nextSchemeId, createdParticipantSchemes[0].SchemeId);
         Assert.Equal(participantId, createdParticipantSchemes[0].ParticipantId);
         Assert.True(createdParticipantSchemes[0].DistributionMonthJan);
         Assert.True(createdParticipantSchemes[0].DistributionMonthFeb);
         Assert.True(createdParticipantSchemes[0].DistributionMonthMar);
+    }
+
+    // Each renewed item is a new tlnkParticipantScheme row, so each needs its own new primary key.
+    [Fact]
+    public async Task RenewContractsAsync_RenewingSeveralItems_GivesEachNewRecordItsOwnId()
+    {
+        var customerId = Guid.NewGuid();
+        var contractId = Guid.NewGuid();
+        var oldScheme = new CoreScheme { SchemeId = Guid.NewGuid(), SharedId = Guid.NewGuid(), YearId = 2026, Identifier = "OLD-010", Name = "Old" };
+        var nextScheme = new CoreScheme { SchemeId = Guid.NewGuid(), SharedId = oldScheme.SharedId, YearId = 2027, Identifier = "NEXT-010", Name = "Next" };
+        var first = new ParticipantSchemeRecord { ParticipantSchemeId = Guid.NewGuid(), ContractId = contractId, ParticipantId = Guid.NewGuid(), SchemeId = oldScheme.SchemeId };
+        var second = new ParticipantSchemeRecord { ParticipantSchemeId = Guid.NewGuid(), ContractId = contractId, ParticipantId = Guid.NewGuid(), SchemeId = oldScheme.SchemeId };
+        var merge = new ContractMergeData(
+        [
+            new RenewableContractEntity { ContractId = contractId, Suffix = "A" }
+        ],
+        [
+            new RenewableContractItemEntity { ContractId = contractId, Suffix = "A", ParticipantSchemeId = first.ParticipantSchemeId, LabCode = "L1", OldSchemeIdentifier = "OLD-010", NewSchemeIdentifier = "NEXT-010" },
+            new RenewableContractItemEntity { ContractId = contractId, Suffix = "A", ParticipantSchemeId = second.ParticipantSchemeId, LabCode = "L2", OldSchemeIdentifier = "OLD-010", NewSchemeIdentifier = "NEXT-010" }
+        ]);
+        var (service, participantRepository) = CreateService(
+            merge,
+            [new ContractSummaryEntity { ContractId = contractId, CustomerId = customerId, YearId = 2026, IsActive = true, Suffix = "A" }],
+            [first, second],
+            [oldScheme, nextScheme],
+            new SystemSettingsEntity { NextYearWithDelayId = 2027, UTNumber = "UT3/306" });
+
+        var result = await service.RenewContractsAsync(customerId, [contractId], [first.ParticipantSchemeId, second.ParticipantSchemeId], null);
+
+        Assert.True(result.Success);
+        var ids = participantRepository.CreatedRecords.Select(r => r.ParticipantSchemeId).ToList();
+        Assert.Equal(2, ids.Count);
+        Assert.DoesNotContain(Guid.Empty, ids);
+        Assert.Equal(2, ids.Distinct().Count());
     }
 
     [Fact]
@@ -340,6 +377,109 @@ public sealed class RenewContractsServiceTests
         Assert.Empty(participantSchemeRepository.CreatedRecords);
     }
 
+    // Legacy disabled Save while nothing was ticked; ids that are not this customer's renewable items count as nothing.
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RenewContractsAsync_WhenNoItemOfTheCustomerIsSelected_IsRefusedAndNothingIsSaved(bool postsAnUnknownId)
+    {
+        var customerId = Guid.NewGuid();
+        var contractId = Guid.NewGuid();
+        var merge = new ContractMergeData(
+        [
+            new RenewableContractEntity { ContractId = contractId, ContractSignatory = "Alice Example" }
+        ],
+        [
+            new RenewableContractItemEntity { ContractId = contractId, Suffix = "A", ParticipantSchemeId = Guid.NewGuid(), LabCode = "LAB", OldSchemeIdentifier = "OLD-006", OldSchemeName = "Old Scheme", NewSchemeIdentifier = "NEW-006", NewSchemeName = "New Scheme" }
+        ]);
+        var contractRepository = new TestContractRepository([new ContractSummaryEntity { ContractId = contractId, CustomerId = customerId, YearId = 2026, IsActive = true, Suffix = "A" }]);
+        var participantSchemeRepository = new TestParticipantSchemeRepository([]);
+        var service = new RenewContractsService(
+            new TestContractMergeRepository(merge),
+            contractRepository,
+            participantSchemeRepository,
+            new TestSchemeRepository([]),
+            new TestLookupRepository(new SystemSettingsEntity { NextYearWithDelayId = 2027, UTNumber = "UT3/306" }, []));
+
+        var result = await service.RenewContractsAsync(customerId, [contractId], postsAnUnknownId ? [Guid.NewGuid()] : [], "Alice Example");
+
+        Assert.False(result.Success);
+        Assert.Null(result.NewContractId);
+        Assert.Equal(RenewContractsService.NoItemsSelectedMessage, result.ErrorMessage);
+        Assert.Empty(contractRepository.CreatedContracts);
+        Assert.Empty(participantSchemeRepository.CreatedRecords);
+    }
+
+    // Legacy kept Save enabled when no item had a next-year scheme on first load, and saving created a contract with no items.
+    [Fact]
+    public async Task RenewContractsAsync_WhenNoItemHasANextYearSchemeAndEveryContractIsSelected_CreatesAnEmptyContract()
+    {
+        var (service, contractRepository, participantSchemeRepository, contractA, contractB) = CreateWithNoRenewableItems();
+
+        var result = await service.RenewContractsAsync(Guid.NewGuid(), [contractA, contractB], [], "Alice Example");
+
+        Assert.True(result.Success);
+        var created = Assert.Single(contractRepository.CreatedContracts);
+        Assert.Equal(result.NewContractId, created.ContractId);
+        Assert.Equal("Alice Example", created.ContractSignatory);
+        Assert.Empty(participantSchemeRepository.CreatedRecords);
+    }
+
+    // Changing a contract tick disabled legacy Save, so with a contract left out nothing is renewed.
+    [Fact]
+    public async Task RenewContractsAsync_WhenNoItemHasANextYearSchemeButAContractIsLeftOut_IsRefused()
+    {
+        var (service, contractRepository, _, contractA, _) = CreateWithNoRenewableItems();
+
+        var result = await service.RenewContractsAsync(Guid.NewGuid(), [contractA], [], null);
+
+        Assert.False(result.Success);
+        Assert.Equal(RenewContractsService.NoItemsSelectedMessage, result.ErrorMessage);
+        Assert.Empty(contractRepository.CreatedContracts);
+    }
+
+    [Fact]
+    public async Task RenewContractsAsync_WhenTheCustomerHasNoItems_IsRefused()
+    {
+        var contractId = Guid.NewGuid();
+        var contractRepository = new TestContractRepository([]);
+        var service = new RenewContractsService(
+            new TestContractMergeRepository(new ContractMergeData([new RenewableContractEntity { ContractId = contractId }], [])),
+            contractRepository,
+            new TestParticipantSchemeRepository([]),
+            new TestSchemeRepository([]),
+            new TestLookupRepository(new SystemSettingsEntity { NextYearWithDelayId = 2027 }, []));
+
+        var result = await service.RenewContractsAsync(Guid.NewGuid(), [contractId], [], null);
+
+        Assert.False(result.Success);
+        Assert.Empty(contractRepository.CreatedContracts);
+    }
+
+    private static (RenewContractsService Service, TestContractRepository Contracts, TestParticipantSchemeRepository ParticipantSchemes, Guid ContractA, Guid ContractB) CreateWithNoRenewableItems()
+    {
+        var contractA = Guid.NewGuid();
+        var contractB = Guid.NewGuid();
+        var merge = new ContractMergeData(
+        [
+            new RenewableContractEntity { ContractId = contractA, Suffix = "A" },
+            new RenewableContractEntity { ContractId = contractB, Suffix = "B" }
+        ],
+        [
+            new RenewableContractItemEntity { ContractId = contractA, Suffix = "A", ParticipantSchemeId = Guid.NewGuid(), LabCode = "LAB", OldSchemeIdentifier = "OLD-007" },
+            new RenewableContractItemEntity { ContractId = contractB, Suffix = "B", ParticipantSchemeId = Guid.NewGuid(), LabCode = "LAB", OldSchemeIdentifier = "OLD-008" }
+        ]);
+        var contractRepository = new TestContractRepository([]);
+        var participantSchemeRepository = new TestParticipantSchemeRepository([]);
+        var service = new RenewContractsService(
+            new TestContractMergeRepository(merge),
+            contractRepository,
+            participantSchemeRepository,
+            new TestSchemeRepository([]),
+            new TestLookupRepository(new SystemSettingsEntity { NextYearWithDelayId = 2027, UTNumber = "UT3/306" }, []));
+        return (service, contractRepository, participantSchemeRepository, contractA, contractB);
+    }
+
     private static (RenewContractsService Service, TestParticipantSchemeRepository ParticipantRepository) CreateService(
         ContractMergeData? mergeData = null,
         IReadOnlyList<ContractSummaryEntity>? contractSummaries = null,
@@ -383,8 +523,11 @@ public sealed class RenewContractsServiceTests
         public Task<CoreContract> CreateAsync(CoreContract contract, CancellationToken cancellationToken = default)
         {
             contract.ContractId = contract.ContractId == Guid.Empty ? Guid.NewGuid() : contract.ContractId;
+            CreatedContracts.Add(contract);
             return Task.FromResult(contract);
         }
+
+        public List<CoreContract> CreatedContracts { get; } = [];
 
         public Task<CoreContract?> UpdateAsync(CoreContract contract, CancellationToken cancellationToken = default) => Task.FromResult<CoreContract?>(contract);
 

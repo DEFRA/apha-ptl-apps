@@ -7,6 +7,7 @@ using PTL.ApiClient;
 using PTL.Contracts.Contract;
 using PTL.Core.Contract.Document;
 using PTL.Core.Contract.Export.Templates;
+using PTL.Core.Contract.Renew;
 using PTL.InternalWeb.Authorization;
 using PTL.InternalWeb.Confirmation;
 using PTL.InternalWeb.Navigation;
@@ -795,39 +796,50 @@ public class ContractController(IContractApiClient contractApiClient, ICustomerA
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> RenewContracts(
-        Guid customerId,
-        List<Guid> selectedContractIds,
-        List<Guid> selectedParticipantSchemeIds,
-        string? newContractSignatory,
-        List<string>? selectedItemIdentifiers,
-        string? command,
-        CancellationToken cancellationToken)
+    public async Task<IActionResult> RenewContracts(Guid customerId, RenewContractsForm form, CancellationToken cancellationToken)
     {
-        selectedContractIds ??= [];
-        selectedParticipantSchemeIds ??= [];
+        var selectedContractIds = form.SelectedContractIds ?? [];
+        var selectedParticipantSchemeIds = form.SelectedParticipantSchemeIds ?? [];
+        var selectedItemIdentifiers = form.SelectedItemIdentifiers;
 
         // "Update items" (the no-script way to refresh the item list after changing the contract selection).
-        if (string.Equals(command, RefreshRenewItemsCommand, StringComparison.Ordinal))
+        if (string.Equals(form.Command, RefreshRenewItemsCommand, StringComparison.Ordinal))
         {
             var refreshed = await BuildRenewContractsModelAsync(customerId, cancellationToken);
             refreshed.SelectedContractIds = selectedContractIds;
             refreshed.SelectedItemIdentifiers = selectedItemIdentifiers ?? [];
             refreshed.SelectedParticipantSchemeIds = SelectedRenewableItemIds(refreshed.Items, refreshed.SelectedItemIdentifiers, selectedContractIds);
-            refreshed.NewContractSignatory = newContractSignatory;
+            refreshed.NewContractSignatory = form.NewContractSignatory;
+            refreshed.SelectAllContracts = form.SelectAllContracts ?? false;
+            refreshed.SelectAllItems = form.SelectAllItems ?? false;
+            // Updating the items follows a contract change, which re-evaluated legacy Save.
+            refreshed.SelectionChanged = true;
             return View(refreshed);
         }
 
         // The page posts its ticked rows by Identifier; an item is renewed only when its row is ticked, it
         // has a new scheme and its contract is selected (legacy MergeContractsViewModel).
+        IReadOnlyList<RenewableContractItemDto>? renewableItems = null;
         if (selectedItemIdentifiers is { Count: > 0 })
         {
-            var renewableItems = await contractRenewalApiClient.GetRenewableItemsAsync(customerId, cancellationToken);
-            selectedParticipantSchemeIds = SelectedRenewableItemIds(renewableItems.Items, selectedItemIdentifiers, selectedContractIds);
+            renewableItems = (await contractRenewalApiClient.GetRenewableItemsAsync(customerId, cancellationToken)).Items;
+            selectedParticipantSchemeIds = SelectedRenewableItemIds(renewableItems, selectedItemIdentifiers, selectedContractIds);
         }
 
-        var request = new RenewContractRequest(selectedContractIds, selectedParticipantSchemeIds, newContractSignatory);
-        var result = await contractRenewalApiClient.RenewContractsAsync(customerId, request, cancellationToken);
+        // Legacy Save started enabled and was only disabled once a tick changed with no item left selected. So nothing
+        // ticked is refused, unless no tick has changed - then no item could be ticked, and the API decides on legacy's
+        // empty contract.
+        var refuseEmpty = false;
+        if (selectedParticipantSchemeIds.Count == 0)
+        {
+            renewableItems ??= (await contractRenewalApiClient.GetRenewableItemsAsync(customerId, cancellationToken)).Items;
+            refuseEmpty = form.SelectionChanged == true || renewableItems.Count == 0 || renewableItems.Any(i => i.IsRenewable);
+        }
+
+        var request = new RenewContractRequest(selectedContractIds, selectedParticipantSchemeIds, form.NewContractSignatory);
+        var result = refuseEmpty
+            ? new RenewContractResponse(false, null, RenewContractsService.NoItemsSelectedMessage)
+            : await contractRenewalApiClient.RenewContractsAsync(customerId, request, cancellationToken);
 
         if (!result.Success)
         {
@@ -835,8 +847,21 @@ public class ContractController(IContractApiClient contractApiClient, ICustomerA
             model.SelectedContractIds = selectedContractIds;
             model.SelectedParticipantSchemeIds = selectedParticipantSchemeIds;
             model.SelectedItemIdentifiers = selectedItemIdentifiers;
-            model.NewContractSignatory = newContractSignatory;
-            model.ErrorMessage = result.ErrorMessage;
+            model.NewContractSignatory = form.NewContractSignatory;
+            model.SelectAllContracts = form.SelectAllContracts ?? false;
+            model.SelectAllItems = form.SelectAllItems ?? false;
+            model.SelectionChanged = form.SelectionChanged ?? false;
+            if (string.Equals(result.ErrorMessage, RenewContractsService.NoItemsSelectedMessage, StringComparison.Ordinal))
+            {
+                // An unticked row posts nothing; an empty list keeps every row unticked instead of falling back to the defaults.
+                model.SelectedItemIdentifiers = selectedItemIdentifiers ?? [];
+                ModelState.AddModelError(RenewContractsViewModel.ItemsField, RenewContractsService.NoItemsSelectedMessage);
+            }
+            else
+            {
+                model.ErrorMessage = result.ErrorMessage;
+            }
+
             return View(model);
         }
 

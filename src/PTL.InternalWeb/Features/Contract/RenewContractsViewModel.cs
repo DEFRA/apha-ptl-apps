@@ -5,6 +5,9 @@ namespace PTL.InternalWeb.Features.Contract;
 // Legacy MergeContracts.aspx / MergeContractsViewModel - screen users know as "Renew Contracts".
 public sealed class RenewContractsViewModel
 {
+    // Model-state key of the item selection error; the posted field the rows share.
+    public const string ItemsField = "selectedItemIdentifiers";
+
     public Guid CustomerId { get; set; }
 
     public string CustomerName { get; set; } = string.Empty;
@@ -53,6 +56,22 @@ public sealed class RenewContractsViewModel
         row.Items.Any(i => SelectedContractIds.Contains(i.ContractId));
 
     public bool HasNoItems => !ItemRows.Any(IsRowVisible);
+
+    // Legacy SelectAllContracts/SelectAllSchemes: ticked on first load, then only ever what the user last set them to -
+    // never worked out from the rows.
+    public bool SelectAllContracts { get; set; } = true;
+
+    public bool SelectAllItems { get; set; } = true;
+
+    // Whether any contract or item tick has changed since the page first loaded (legacy re-evaluated Save on each change).
+    public bool SelectionChanged { get; set; }
+
+    // Where the item selection error links to: the first tickable row shown, or the items section itself.
+    public string ItemsErrorAnchor =>
+        ItemRows.Where(r => r.First.IsRenewable && IsRowVisible(r)).Select(r => ItemCheckboxId(r)).FirstOrDefault()
+        ?? "renew-items";
+
+    public static string ItemCheckboxId(RenewContractsItemRow row) => $"item-row-select-{row.First.ParticipantSchemeId}";
 
     public bool IsRowSelected(RenewContractsItemRow row) =>
         SelectedItemIdentifiers is { } identifiers

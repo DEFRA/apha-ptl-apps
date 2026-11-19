@@ -79,6 +79,7 @@ public sealed class RenewContractsService(
     public const string NextYearContractsExistMessage = "The merging of existing Contracts is not allowed as Contracts already exist for next year.";
     public const string NoItemsMessage = "There are no Items on the selected Contracts.";
     public const string WeightedPricingUnavailableMessage = "This contract can not be renewed because one or more of the selected contract items have weighted pricing plan and the weighted pricing plan for the next year does not exist.";
+    public const string NoItemsSelectedMessage = "Select at least one item to appear on the new contract";
 
     public async Task<RenewableContractsResult> GetRenewableContractsAsync(Guid customerId, CancellationToken cancellationToken = default)
     {
@@ -128,6 +129,13 @@ public sealed class RenewContractsService(
             .Where(suffixByParticipantSchemeId.ContainsKey)
             .OrderBy(id => suffixByParticipantSchemeId[id], StringComparer.Ordinal)
             .ToList();
+
+        // Legacy disabled Save while no item was ticked; a selected item whose next-year scheme cannot be
+        // resolved is still skipped below, as legacy did.
+        if (orderedParticipantSchemeIds.Count == 0 && !IsEmptyRenewalAllowed(merge, contractIds))
+        {
+            return new RenewContractsResult(false, null, NoItemsSelectedMessage);
+        }
 
         var actionsRequiredBuilder = new StringBuilder();
         var renewalInformationBuilder = new StringBuilder();
@@ -184,6 +192,13 @@ public sealed class RenewContractsService(
         return new RenewContractsResult(true, createdContract.ContractId, null);
     }
 
+    // Legacy only disabled Save after a tick changed, so when no item had a next-year scheme on first load
+    // (every contract still selected) Save stayed enabled and created a contract with no items.
+    private static bool IsEmptyRenewalAllowed(ContractMergeData merge, IReadOnlyList<Guid> contractIds) =>
+        merge.ParticipantSchemes.Count > 0
+        && !merge.ParticipantSchemes.Any(p => p.IsRenewable)
+        && merge.Contracts.All(c => contractIds.Contains(c.ContractId));
+
     // Resolves one selected participant scheme's next-year scheme and either merges it into an
     // already-built new record (duplicate scheme on this contract set) or creates a new one. A
     // missing old record, missing next-year scheme, or unresolved scheme is silently skipped -
@@ -230,9 +245,11 @@ public sealed class RenewContractsService(
     }
 
     // Legacy ContractMergeService.CreateNewParticipantScheme - each distribution month is the old
-    // month AND the new scheme's month; every other field is copied verbatim.
+    // month AND the new scheme's month; every other field is copied verbatim. The id is new, as in
+    // legacy ParticipantScheme.NewParticipantScheme.
     private static ParticipantSchemeRecord CreateNewParticipantScheme(ParticipantSchemeRecord oldRecord, Scheme.Scheme newScheme) => new()
     {
+        ParticipantSchemeId = Guid.NewGuid(),
         ParticipantId = oldRecord.ParticipantId,
         SchemeId = newScheme.SchemeId,
         GroupAddressId = oldRecord.GroupAddressId,
