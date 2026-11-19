@@ -104,6 +104,16 @@ public class ViewCommentsRenderTests : IClassFixture<WebApplicationFactory<Progr
     }
 
     [Fact]
+    public async Task Get_LoadsTheSharedRichTextWireScript()
+    {
+        Seed();
+
+        var html = await GetHtmlAsync();
+
+        Assert.Contains("src=\"/_content/PTL.SharedUI/js/ptl-rich-text-wire.js?v=", html, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Get_CannotSubmit_HidesTheSubmitButton()
     {
         Seed(canSubmit: false);
