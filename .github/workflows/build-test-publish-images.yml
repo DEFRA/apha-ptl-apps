@@ -343,12 +343,40 @@ jobs:
           dotnet build PTL.slnx --configuration Release --no-restore
           # coverlet.msbuild only produces coverage.cobertura.xml during dotnet test;
           # the scanner has nothing to ingest without this step (see SonarQube.Analysis.xml).
-          dotnet test PTL.slnx `
-            --configuration Release `
-            --no-restore `
-            --logger "trx;LogFilePrefix=ptl-sonar-tests" `
-            --results-directory "${{ runner.temp }}/test-results" `
-            /p:Threshold=0
+          function Get-ProjectsWithoutCoverage {
+            foreach ($project in Get-ChildItem -Path tests -Recurse -Filter *.csproj) {
+              $report = Join-Path $project.DirectoryName "coverage.cobertura.xml"
+              $covered = 0
+              if (Test-Path $report) {
+                $covered = [int]([xml](Get-Content $report -Raw)).coverage.'lines-covered'
+              }
+              if ($covered -eq 0) { $project.FullName }
+            }
+          }
+          $testArgs = @(
+            "--configuration", "Release",
+            "--logger", "trx;LogFilePrefix=ptl-sonar-tests",
+            "--results-directory", "${{ runner.temp }}/test-results",
+            "/p:Threshold=0"
+          )
+          dotnet test PTL.slnx --no-restore @testArgs
+          # coverlet.msbuild intermittently writes an empty report ("No coverage hits were collected")
+          # even though every test passed (see the retry note in the quality job). Threshold=0 above
+          # hides that, and SonarCloud would then report 0% for the whole project, so re-run only the
+          # affected test projects and fail rather than send an empty report.
+          $maxRetries = 2
+          for ($retry = 1; $retry -le $maxRetries; $retry++) {
+            $missing = @(Get-ProjectsWithoutCoverage)
+            if ($missing.Count -eq 0) { break }
+            foreach ($project in $missing) {
+              Write-Warning "No coverage collected for $project - re-running it (retry $retry of $maxRetries)."
+              dotnet test $project --no-build --no-restore @testArgs
+            }
+          }
+          $missing = @(Get-ProjectsWithoutCoverage)
+          if ($missing.Count -gt 0) {
+            throw "No coverage was collected for: $($missing -join ', '). Not sending an empty report to SonarCloud."
+          }
           & $env:SONAR_SCANNER_PATH end `
             "/d:sonar.token=$env:SONAR_TOKEN"
 
