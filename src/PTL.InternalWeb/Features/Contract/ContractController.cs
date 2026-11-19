@@ -810,8 +810,8 @@ public class ContractController(IContractApiClient contractApiClient, ICustomerA
             refreshed.SelectedItemIdentifiers = selectedItemIdentifiers ?? [];
             refreshed.SelectedParticipantSchemeIds = SelectedRenewableItemIds(refreshed.Items, refreshed.SelectedItemIdentifiers, selectedContractIds);
             refreshed.NewContractSignatory = form.NewContractSignatory;
-            refreshed.SelectAllContracts = form.SelectAllContracts;
-            refreshed.SelectAllItems = form.SelectAllItems;
+            refreshed.SelectAllContracts = form.SelectAllContracts ?? false;
+            refreshed.SelectAllItems = form.SelectAllItems ?? false;
             // Updating the items follows a contract change, which re-evaluated legacy Save.
             refreshed.SelectionChanged = true;
             return View(refreshed);
@@ -833,7 +833,7 @@ public class ContractController(IContractApiClient contractApiClient, ICustomerA
         if (selectedParticipantSchemeIds.Count == 0)
         {
             renewableItems ??= (await contractRenewalApiClient.GetRenewableItemsAsync(customerId, cancellationToken)).Items;
-            refuseEmpty = form.SelectionChanged || renewableItems.Count == 0 || renewableItems.Any(i => i.IsRenewable);
+            refuseEmpty = form.SelectionChanged == true || renewableItems.Count == 0 || renewableItems.Any(i => i.IsRenewable);
         }
 
         var request = new RenewContractRequest(selectedContractIds, selectedParticipantSchemeIds, form.NewContractSignatory);
@@ -848,9 +848,9 @@ public class ContractController(IContractApiClient contractApiClient, ICustomerA
             model.SelectedParticipantSchemeIds = selectedParticipantSchemeIds;
             model.SelectedItemIdentifiers = selectedItemIdentifiers;
             model.NewContractSignatory = form.NewContractSignatory;
-            model.SelectAllContracts = form.SelectAllContracts;
-            model.SelectAllItems = form.SelectAllItems;
-            model.SelectionChanged = form.SelectionChanged;
+            model.SelectAllContracts = form.SelectAllContracts ?? false;
+            model.SelectAllItems = form.SelectAllItems ?? false;
+            model.SelectionChanged = form.SelectionChanged ?? false;
             if (string.Equals(result.ErrorMessage, RenewContractsService.NoItemsSelectedMessage, StringComparison.Ordinal))
             {
                 // An unticked row posts nothing; an empty list keeps every row unticked instead of falling back to the defaults.

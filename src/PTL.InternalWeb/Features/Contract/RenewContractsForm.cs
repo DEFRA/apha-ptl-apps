@@ -13,9 +13,10 @@ public sealed class RenewContractsForm
 
     public string? Command { get; set; }
 
-    public bool SelectAllContracts { get; set; }
+    // An unticked checkbox posts nothing, so a missing value means false.
+    public bool? SelectAllContracts { get; set; }
 
-    public bool SelectAllItems { get; set; }
+    public bool? SelectAllItems { get; set; }
 
-    public bool SelectionChanged { get; set; }
+    public bool? SelectionChanged { get; set; }
 }
