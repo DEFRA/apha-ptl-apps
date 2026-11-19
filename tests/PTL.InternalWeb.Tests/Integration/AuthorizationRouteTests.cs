@@ -25,7 +25,7 @@ public class AuthorizationRouteTests(PtlInternalWebTestFactory factory) : IClass
     [InlineData("/Distribution/Search")]
     [InlineData("/SystemAdministration/Index")]
     [InlineData("/Invoice/Index")]
-    [InlineData("/Results%20Sign-off")]
+    [InlineData("/results-sign-off")]
     [InlineData("/Assessor")]
     [InlineData("/Home/Index")]
     public async Task AnonymousRequest_IsSentToSignIn_NotToThePage(string url)
@@ -52,7 +52,7 @@ public class AuthorizationRouteTests(PtlInternalWebTestFactory factory) : IClass
     [InlineData("/Distribution/Search")]
     [InlineData("/SystemAdministration/Index")]
     [InlineData("/Invoice/Index")]
-    [InlineData("/Results%20Sign-off")]
+    [InlineData("/results-sign-off")]
     [InlineData("/Assessor")]
     public async Task SignedInUserWithoutThePtlRole_IsRedirectedToAccessDenied(string url)
     {
@@ -71,9 +71,9 @@ public class AuthorizationRouteTests(PtlInternalWebTestFactory factory) : IClass
     [InlineData("Scheme Admin", "/Distribution/Index")]
     [InlineData("Contracts Admin", "/Invoice/Index")]
     [InlineData("Generate Invoices", "/Invoice/Index")]
-    [InlineData("Admin", "/Test%20Consultant")]
-    [InlineData("Admin", "/Results%20Sign-off")]
-    [InlineData("Test Consultant", "/Results%20Sign-off")]
+    [InlineData("Admin", "/test-consultant")]
+    [InlineData("Admin", "/results-sign-off")]
+    [InlineData("Test Consultant", "/results-sign-off")]
     [InlineData("Admin", "/Assessor")]
     [InlineData("Results Sign-off", "/Assessor")]
     [InlineData("Internal User,Distributions", "/Distribution/Schedule?year=2026&monthId=4")]

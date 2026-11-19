@@ -226,13 +226,13 @@ public class GovUkPageHeaderTagHelperTests
     [Fact]
     public async Task ProcessAsync_HelpLinkTextAndHrefSet_RendersVisibleLinkAfterToggle()
     {
-        var (helper, context, output) = Create("Proficiency Testing - External", null, string.Empty, showMenuToggle: true, helpLinkText: "User Manual", helpLinkHref: "/documents/User Manual.pdf");
+        var (helper, context, output) = Create("Proficiency Testing - External", null, string.Empty, showMenuToggle: true, helpLinkText: "User Manual", helpLinkHref: "/documents/User-Manual.pdf");
 
         await helper.ProcessAsync(context, output);
 
         var html = output.Content.GetContent();
         Assert.Contains("app-header__help-link", html, StringComparison.Ordinal);
-        Assert.Contains("href=\"/documents/User Manual.pdf\"", html, StringComparison.Ordinal);
+        Assert.Contains("href=\"/documents/User-Manual.pdf\"", html, StringComparison.Ordinal);
         Assert.Contains("User Manual", html, StringComparison.Ordinal);
         Assert.True(html.IndexOf("app-menu-toggle", StringComparison.Ordinal) < html.IndexOf("app-header__help-link", StringComparison.Ordinal));
     }

@@ -84,7 +84,7 @@ public class CreateOrderReviewViewModelTests
     {
         var options = new OrderPageOptions();
 
-        Assert.Equal("/documents/VETQAS%20Ts%20%26%20Cs%20April%202025%20Version%206%201.pdf", options.SafeTermsAndConditionsUrl);
+        Assert.Equal("/documents/VETQAS-Ts-and-Cs-April-2025-Version-6-1.pdf", options.SafeTermsAndConditionsUrl);
         Assert.Equal("https://www.aphascientific.com/services/vetqas-proficiency-testing/", options.SafeDistributionTimetableUrl);
     }
 
