@@ -10,6 +10,11 @@ internal static class TestHostConfiguration
 #pragma warning disable CA2255 // ModuleInitializer is the only hook that runs before the first host build.
     [ModuleInitializer]
 #pragma warning restore CA2255
-    internal static void SetApiBaseUrl() =>
+    internal static void SetApiBaseUrl()
+    {
         Environment.SetEnvironmentVariable("Api__BaseUrl", "http://localhost");
+
+        // ApiAuthentication options are validated on start; ClientApp comes from appsettings.json.
+        Environment.SetEnvironmentVariable("ApiAuthentication__ApiKey", "test-api-key");
+    }
 }

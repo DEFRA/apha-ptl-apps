@@ -6,6 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using PTL.Api.Tests.ExternalUser;
 using PTL.Api.Tests.InternalUser;
+using PTL.Api.Tests.TestSupport;
 using PTL.Contracts.ExternalUser;
 using PTL.Contracts.LoadTesting;
 using PTL.Core.ExternalUser;
@@ -57,7 +58,7 @@ public class LoadTestingRouteTests : IClassFixture<WebApplicationFactory<Program
             request.Headers.Add(LoadTestingHeaders.Enabled, header);
         }
 
-        return await _factory.CreateClient().SendAsync(request);
+        return await _factory.CreateAuthenticatedClient().SendAsync(request);
     }
 
     [Theory]
