@@ -48,11 +48,15 @@ public partial class LoadTestingLoginTests(PtlExternalWebTestFactory factory) : 
         WebApplicationFactory<Program> source,
         bool enabled,
         ILoadTestingLookupClient? lookup = null,
-        FakeExternalUserApiClient? api = null) =>
+        FakeExternalUserApiClient? api = null,
+        string? expiresOn = null) =>
         source.WithWebHostBuilder(builder =>
         {
-            builder.ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(
-                new Dictionary<string, string?> { ["LoadTesting:Enabled"] = enabled ? "true" : "false" }));
+            builder.ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["LoadTesting:Enabled"] = enabled ? "true" : "false",
+                ["LoadTesting:ExpiresOn"] = expiresOn ?? DateTime.UtcNow.AddYears(1).ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture),
+            }));
 
             builder.ConfigureServices(services =>
             {
@@ -103,6 +107,17 @@ public partial class LoadTestingLoginTests(PtlExternalWebTestFactory factory) : 
     private static bool HasSessionCookie(HttpResponseMessage response) =>
         response.Headers.TryGetValues("Set-Cookie", out var values)
         && values.Any(cookie => cookie.StartsWith(".AspNetCore.Cookies", StringComparison.Ordinal));
+
+    [Fact]
+    public async Task WhenEnabledButExpired_LoginPageIsNotFoundAndAccountLoginStillChallengesCidm()
+    {
+        var client = CreateApp(factory, enabled: true, expiresOn: "2000-01-01")
+            .CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+
+        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync("/perf/login")).StatusCode);
+        var login = await client.GetAsync("/Account/Login");
+        Assert.DoesNotContain("/perf/login", login.Headers.Location?.ToString() ?? string.Empty, StringComparison.Ordinal);
+    }
 
     [Fact]
     public async Task WhenDisabled_LoginPageAndPostAreNotFound()

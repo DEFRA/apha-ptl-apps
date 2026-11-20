@@ -12,13 +12,14 @@ namespace PTL.ExternalWeb.Features.LoadTesting;
 /// <summary>
 /// Email-only sign-in for JMeter runs. Uses the contact id PTL.Api already stores for the email and resolves it through the same
 /// <see cref="ICidmExternalUserResolver"/> as a real CIDM sign-in, so the session carries identical claims and no user record is
-/// written. 404 unless <see cref="LoadTestingOptions.Enabled"/>.
+/// written. 404 unless <see cref="LoadTestingOptions.IsAvailable"/>.
 /// </summary>
 [SkipLabSelection]
 public sealed class LoadTestingController(
     IOptions<LoadTestingOptions> options,
+    TimeProvider timeProvider,
     ILoadTestingLookupClient lookupClient,
-    ICidmExternalUserResolver resolver) : LoadTestingControllerBase<LoadTestingLoginViewModel>(options)
+    ICidmExternalUserResolver resolver) : LoadTestingControllerBase<LoadTestingLoginViewModel>(options, timeProvider)
 {
     protected override async Task<IActionResult> SignInAsync(LoadTestingLoginViewModel model, CancellationToken cancellationToken)
     {

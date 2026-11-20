@@ -8,6 +8,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging.Abstractions;
 using PTL.Api.Controllers;
 using PTL.Api.Tests.Search;
+using PTL.Api.Tests.TestSupport;
 using PTL.Contracts.Search;
 using PTL.Core.Search;
 
@@ -176,7 +177,7 @@ public class SearchControllerTests : IClassFixture<WebApplicationFactory<Program
         {
             CustomerRows = [new CustomerSearchRow { CustomerId = Guid.NewGuid(), Name = "Alpha" }],
         };
-        var client = WithRepository(repository).CreateClient();
+        var client = WithRepository(repository).CreateAuthenticatedClient();
         var countryId = Guid.NewGuid();
 
         var response = await client.GetAsync($"/api/search/customers?qalNumber=QAL%2F1&accountNumber=ACC&name=Alpha%20%26%20Co&contactName=Amy&organisation=Org&countryId={countryId}");
@@ -192,7 +193,7 @@ public class SearchControllerTests : IClassFixture<WebApplicationFactory<Program
     public async Task GetCustomers_NoQueryString_SearchesWithEmptyCriteria()
     {
         var repository = new FakeSearchRepository();
-        var client = WithRepository(repository).CreateClient();
+        var client = WithRepository(repository).CreateAuthenticatedClient();
 
         var response = await client.GetAsync("/api/search/customers?countryId=");
 
@@ -205,7 +206,7 @@ public class SearchControllerTests : IClassFixture<WebApplicationFactory<Program
     public async Task GetCustomers_MalformedCountryId_ReturnsBadRequest()
     {
         var repository = new FakeSearchRepository();
-        var client = WithRepository(repository).CreateClient();
+        var client = WithRepository(repository).CreateAuthenticatedClient();
 
         var response = await client.GetAsync("/api/search/customers?countryId=not-a-guid");
 
@@ -220,7 +221,7 @@ public class SearchControllerTests : IClassFixture<WebApplicationFactory<Program
         {
             ParticipantRows = [new ParticipantSearchRow { ParticipantId = Guid.NewGuid(), LabCode = "LAB1" }],
         };
-        var client = WithRepository(repository).CreateClient();
+        var client = WithRepository(repository).CreateAuthenticatedClient();
 
         var response = await client.GetAsync("/api/search/participants?labCode=LAB1&labName=Lab%20One&contactName=Bob");
 
@@ -234,7 +235,7 @@ public class SearchControllerTests : IClassFixture<WebApplicationFactory<Program
     public async Task GetParticipants_NoQueryString_SearchesWithEmptyCriteria()
     {
         var repository = new FakeSearchRepository();
-        var client = WithRepository(repository).CreateClient();
+        var client = WithRepository(repository).CreateAuthenticatedClient();
 
         var response = await client.GetAsync("/api/search/participants");
 
@@ -413,7 +414,7 @@ public class SearchControllerTests : IClassFixture<WebApplicationFactory<Program
         {
             DistributionNumberRows = [new DistributionNumberSearchRow { MonthlyDistributionSchemeId = Guid.NewGuid(), SchemeId = Guid.NewGuid(), DistributionNumber = "D1a/00001" }],
         };
-        var client = WithRepository(repository).CreateClient();
+        var client = WithRepository(repository).CreateAuthenticatedClient();
 
         var response = await client.GetAsync("/api/search/distributions?distributionNumber=D1a");
 
@@ -427,7 +428,7 @@ public class SearchControllerTests : IClassFixture<WebApplicationFactory<Program
     public async Task GetDistributions_NoQueryString_SearchesWithEmptyCriteria()
     {
         var repository = new FakeSearchRepository();
-        var client = WithRepository(repository).CreateClient();
+        var client = WithRepository(repository).CreateAuthenticatedClient();
 
         var response = await client.GetAsync("/api/search/distributions");
 
@@ -442,7 +443,7 @@ public class SearchControllerTests : IClassFixture<WebApplicationFactory<Program
         {
             SampleNumberRows = [new SampleNumberSearchRow { SampleId = Guid.NewGuid(), SchemeId = Guid.NewGuid(), SampleNumber = "S00001" }],
         };
-        var client = WithRepository(repository).CreateClient();
+        var client = WithRepository(repository).CreateAuthenticatedClient();
 
         var response = await client.GetAsync("/api/search/samples?sampleNumber=S00001");
 
@@ -456,7 +457,7 @@ public class SearchControllerTests : IClassFixture<WebApplicationFactory<Program
     public async Task GetSamples_NoQueryString_SearchesWithEmptyCriteria()
     {
         var repository = new FakeSearchRepository();
-        var client = WithRepository(repository).CreateClient();
+        var client = WithRepository(repository).CreateAuthenticatedClient();
 
         var response = await client.GetAsync("/api/search/samples");
 
@@ -502,7 +503,7 @@ public class SearchControllerTests : IClassFixture<WebApplicationFactory<Program
         {
             SchemeNameRows = [new SchemeNameSearchRow { SchemeId = Guid.NewGuid(), SchemeName = "Salmonella & Co", SchemeIdentifier = "PT1", Year = "2026/27" }],
         };
-        var client = WithRepository(repository).CreateClient();
+        var client = WithRepository(repository).CreateAuthenticatedClient();
 
         var response = await client.GetAsync("/api/search/schemes?schemeName=salmonella%20%26");
 

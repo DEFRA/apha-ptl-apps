@@ -10,7 +10,7 @@ using PTL.Common.Auth;
 namespace PTL.ApiClient;
 
 /// <summary>
-/// Shared mechanics of the identity-provider-free sign-in used by JMeter runs: 404 unless <see cref="LoadTestingOptions.Enabled"/>,
+/// Shared mechanics of the identity-provider-free sign-in used by JMeter runs: 404 unless <see cref="LoadTestingOptions.IsAvailable"/>,
 /// an antiforgery-protected POST, and a cookie sign-in carrying the claims the app's own resolver returns, so no user record is
 /// written. The derived controller supplies how its user is looked up and resolved.
 /// </summary>
@@ -22,17 +22,24 @@ public abstract class LoadTestingControllerBase<TModel> : Controller
     protected const string ApiUnavailableError = "PTL.Api has no load-testing lookup; deploy the PTL.Api build that includes it.";
 
     private readonly IOptions<LoadTestingOptions> _options;
+    private readonly TimeProvider _timeProvider;
 
-    protected LoadTestingControllerBase(IOptions<LoadTestingOptions> options) => _options = options;
+    protected LoadTestingControllerBase(IOptions<LoadTestingOptions> options, TimeProvider timeProvider)
+    {
+        _options = options;
+        _timeProvider = timeProvider;
+    }
 
     [HttpGet("login")]
     public IActionResult Login(string? returnUrl = null) =>
-        _options.Value.Enabled ? View(new TModel { ReturnUrl = returnUrl }) : NotFound();
+        IsAvailable ? View(new TModel { ReturnUrl = returnUrl }) : NotFound();
 
     [HttpPost("login")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Login(TModel model, CancellationToken cancellationToken) =>
-        _options.Value.Enabled ? await SignInAsync(model, cancellationToken) : NotFound();
+        IsAvailable ? await SignInAsync(model, cancellationToken) : NotFound();
+
+    private bool IsAvailable => _options.Value.IsAvailable(_timeProvider);
 
     /// <summary>Validates the entered user, looks them up and resolves them, then calls <see cref="CompleteSignInAsync"/> or <see cref="Fail"/>.</summary>
     protected abstract Task<IActionResult> SignInAsync(TModel model, CancellationToken cancellationToken);

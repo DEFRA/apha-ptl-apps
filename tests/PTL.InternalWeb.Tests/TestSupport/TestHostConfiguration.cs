@@ -14,6 +14,8 @@ internal static class TestHostConfiguration
     {
         Environment.SetEnvironmentVariable("Api__BaseUrl", "http://localhost");
 
+        // ApiAuthentication options are validated on start; ClientApp comes from appsettings.json.
+        Environment.SetEnvironmentVariable("ApiAuthentication__ApiKey", "test-api-key");
         // EntraOptions.ValidateOnStart() fails host startup without these - every integration test
         // replaces IEntraInternalUserResolver's dependencies with fakes, so the actual values never
         // matter, only that the host can start at all.

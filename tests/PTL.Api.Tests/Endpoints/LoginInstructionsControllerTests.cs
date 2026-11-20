@@ -9,6 +9,7 @@ using PTL.Api.Controllers;
 using PTL.Api.Tests.Audit;
 using PTL.Api.Tests.ExternalUser;
 using PTL.Api.Tests.Participant;
+using PTL.Api.Tests.TestSupport;
 using PTL.Contracts.LoginInstructions;
 using PTL.Contracts.TestConsultant;
 using PTL.Contracts.Viewer;
@@ -129,7 +130,7 @@ public class LoginInstructionsControllerTests : IClassFixture<WebApplicationFact
         {
             services.RemoveAll<ILoginInstructionsService>();
             services.AddSingleton<ILoginInstructionsService>(new ScriptedLoginInstructionsService(LoginInstructionsOutcome.NotFound));
-        })).CreateClient();
+        })).CreateAuthenticatedClient();
 
         var response = await client.PostAsync($"/api/login-instructions/viewers/{Guid.NewGuid()}", content: null);
 
@@ -144,7 +145,7 @@ public class LoginInstructionsControllerTests : IClassFixture<WebApplicationFact
         {
             services.RemoveAll<ILoginInstructionsService>();
             services.AddSingleton<ILoginInstructionsService>(service);
-        })).CreateClient();
+        })).CreateAuthenticatedClient();
         var id = Guid.NewGuid();
 
         var response = await client.PostAsync($"/api/login-instructions/external-test-consultants/{id}", content: null);

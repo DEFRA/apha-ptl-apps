@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Configuration;
 using PTL.Api.LoadTesting;
+using PTL.Api.Tests.Distribution;
 using PTL.Api.Tests.ExternalUser;
 using PTL.Contracts.ExternalUser;
 using PTL.Contracts.LoadTesting;
@@ -13,7 +15,25 @@ public class LoadTestingExternalUserControllerTests
 
     private readonly FakeExternalUserRepository _users = new();
 
-    private LoadTestingExternalUserController CreateController() => new(_users);
+    private LoadTestingExternalUserController CreateController(string? expiresOn = "2027-01-31", DateTimeOffset? utcNow = null) =>
+        new(
+            _users,
+            new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> { ["LoadTesting:ExpiresOn"] = expiresOn }).Build(),
+            new FixedTimeProvider(utcNow ?? new DateTimeOffset(2026, 11, 20, 12, 0, 0, TimeSpan.Zero)));
+
+    [Theory]
+    [InlineData("2027-01-31")]
+    [InlineData(null)]
+    public async Task Lookup_AfterTheExpiryDateOrWithoutOne_IsNotFoundWithoutQuerying(string? expiresOn)
+    {
+        _users.Add(ExternalUserType.Participant, Email, Linked, labCode: "4097");
+
+        var result = await CreateController(expiresOn, new DateTimeOffset(2027, 2, 1, 0, 0, 0, TimeSpan.Zero))
+            .Lookup("true", new LoadTestingLookupRequest(Email), CancellationToken.None);
+
+        Assert.IsType<NotFoundResult>(result.Result);
+        Assert.Equal(0, _users.FindByEmailCalls);
+    }
 
     private async Task<LoadTestingLookupResponse> LookupAsync(string email = Email)
     {

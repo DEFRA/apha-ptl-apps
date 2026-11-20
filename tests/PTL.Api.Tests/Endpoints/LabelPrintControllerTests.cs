@@ -6,6 +6,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using PTL.Api.Controllers;
+using PTL.Api.Tests.TestSupport;
 using PTL.Contracts.Labels;
 using PTL.Core.Labels;
 
@@ -54,7 +55,7 @@ public class LabelPrintControllerTests : IClassFixture<WebApplicationFactory<Pro
         {
             services.RemoveAll<ILabelPrinterClient>();
             services.AddSingleton<ILabelPrinterClient>(printerClient);
-        })).CreateClient();
+        })).CreateAuthenticatedClient();
 
         var response = await client.PostAsJsonAsync("/api/labels/print", new LabelPrintRequest(["Alice Example", "1 Sample Street"]));
 

@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using PTL.Common.LoadTesting;
 using PTL.Contracts.LoadTesting;
 using PTL.Core.ExternalUser;
 
@@ -7,11 +8,14 @@ namespace PTL.Api.LoadTesting;
 /// <summary>
 /// Read-only lookup of the contact id already stored for an external user's email, so the load-testing sign-in can use the
 /// user's existing link instead of writing one. 404 unless the caller sends <see cref="LoadTestingHeaders.Enabled"/>, which
-/// PTL.ExternalWeb does only while its own switch is on, so PTL.Api needs no setting of its own.
+/// PTL.ExternalWeb does only while its own switch is on, and <c>LoadTesting:ExpiresOn</c> has not passed.
 /// </summary>
 [ApiController]
 [Route("api/load-testing")]
-public sealed class LoadTestingExternalUserController(IExternalUserRepository repository) : ControllerBase
+public sealed class LoadTestingExternalUserController(
+    IExternalUserRepository repository,
+    IConfiguration configuration,
+    TimeProvider timeProvider) : ControllerBase
 {
     [HttpPost("external-users/lookup")]
     public async Task<ActionResult<LoadTestingLookupResponse>> Lookup(
@@ -19,7 +23,7 @@ public sealed class LoadTestingExternalUserController(IExternalUserRepository re
         [FromBody] LoadTestingLookupRequest request,
         CancellationToken cancellationToken)
     {
-        if (loadTesting != "true")
+        if (loadTesting != "true" || !LoadTestingExpiry.IsOpen(configuration.GetValue<DateOnly?>(LoadTestingExpiry.ConfigurationKey), timeProvider))
         {
             return NotFound();
         }

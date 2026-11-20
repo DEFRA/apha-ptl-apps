@@ -20,13 +20,16 @@ public class LoadTestingControllerBaseTests
 
     private readonly CapturingAuthenticationService _authentication = new();
 
-    private TestController CreateController(bool enabled, Func<TestController, TestModel, Task<IActionResult>>? signIn = null)
+    private TestController CreateController(bool enabled, Func<TestController, TestModel, Task<IActionResult>>? signIn = null) =>
+        CreateController(new LoadTestingOptions { Enabled = enabled, ExpiresOn = FixedTimeProvider.LastDay }, FixedTimeProvider.BeforeExpiry, signIn);
+
+    private TestController CreateController(LoadTestingOptions options, TimeProvider timeProvider, Func<TestController, TestModel, Task<IActionResult>>? signIn = null)
     {
         var services = new ServiceCollection();
         services.AddSingleton<IAuthenticationService>(_authentication);
         var httpContext = new DefaultHttpContext { RequestServices = services.BuildServiceProvider() };
 
-        return new TestController(Options.Create(new LoadTestingOptions { Enabled = enabled }), signIn)
+        return new TestController(Options.Create(options), timeProvider, signIn)
         {
             ControllerContext = new ControllerContext { HttpContext = httpContext },
             TempData = new TempDataDictionary(httpContext, new NoTempDataProvider()),
@@ -72,6 +75,41 @@ public class LoadTestingControllerBaseTests
 
         Assert.Same(expected, result);
         Assert.Equal(1, controller.SignInCalls);
+    }
+
+    [Fact]
+    public void LoginGet_OnTheLastDay_ShowsTheForm()
+    {
+        var controller = CreateController(new LoadTestingOptions { Enabled = true, ExpiresOn = FixedTimeProvider.LastDay }, FixedTimeProvider.LastMomentOfLastDay);
+
+        Assert.IsType<ViewResult>(controller.Login("/dashboard"));
+    }
+
+    [Fact]
+    public void LoginGet_AfterTheExpiryDate_IsNotFoundEvenWhenEnabled()
+    {
+        var controller = CreateController(new LoadTestingOptions { Enabled = true, ExpiresOn = FixedTimeProvider.LastDay }, FixedTimeProvider.DayAfterExpiry);
+
+        Assert.IsType<NotFoundResult>(controller.Login("/dashboard"));
+    }
+
+    [Fact]
+    public async Task LoginPost_AfterTheExpiryDate_IsNotFoundWithoutSigningIn()
+    {
+        var controller = CreateController(new LoadTestingOptions { Enabled = true, ExpiresOn = FixedTimeProvider.LastDay }, FixedTimeProvider.DayAfterExpiry);
+
+        var result = await controller.Login(new TestModel(), CancellationToken.None);
+
+        Assert.IsType<NotFoundResult>(result);
+        Assert.Equal(0, controller.SignInCalls);
+    }
+
+    [Fact]
+    public void LoginGet_WithoutAnExpiryDate_IsNotFoundEvenWhenEnabled()
+    {
+        var controller = CreateController(new LoadTestingOptions { Enabled = true }, FixedTimeProvider.BeforeExpiry);
+
+        Assert.IsType<NotFoundResult>(controller.Login("/dashboard"));
     }
 
     [Fact]
@@ -176,8 +214,8 @@ public class LoadTestingControllerBaseTests
         public string? DenialRedirectPath => null;
     }
 
-    private sealed class TestController(IOptions<LoadTestingOptions> options, Func<TestController, TestModel, Task<IActionResult>>? signIn)
-        : LoadTestingControllerBase<TestModel>(options)
+    private sealed class TestController(IOptions<LoadTestingOptions> options, TimeProvider timeProvider, Func<TestController, TestModel, Task<IActionResult>>? signIn)
+        : LoadTestingControllerBase<TestModel>(options, timeProvider)
     {
         public const string ApiUnavailable = ApiUnavailableError;
 

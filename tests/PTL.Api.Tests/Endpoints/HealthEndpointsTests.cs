@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
+using PTL.Api.Tests.TestSupport;
 using PTL.Common.Health;
 
 namespace PTL.Api.Tests.Endpoints;
@@ -34,7 +35,7 @@ public class HealthEndpointsTests : IClassFixture<WebApplicationFactory<Program>
     [Fact]
     public async Task Root_ReturnsHelloWorld()
     {
-        var client = _factory.CreateClient();
+        var client = _factory.CreateAuthenticatedClient();
 
         var response = await client.GetAsync("/");
 

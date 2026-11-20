@@ -1,6 +1,9 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Http.Resilience;
+using Microsoft.Extensions.Options;
+using PTL.ApiClient.Authentication;
+using PTL.Common.ApiAuthentication;
 using PTL.Common.Audit;
 using PTL.Common.Correlation;
 
@@ -33,6 +36,18 @@ public static class ApiClientServiceCollectionExtensions
 
         // Forwards the signed-in user's ID so System Administration changes are audited against them.
         services.AddTransient<ActingUserDelegatingHandler>();
+
+        // PTL.Api rejects any request without this front-end's API key and name. Applied to every
+        // HttpClient so a new typed client can't forget it; the handler itself skips non-API hosts.
+        services.AddOptions<ApiAuthenticationOptions>()
+            .Bind(configuration.GetSection(ApiAuthenticationOptions.SectionName))
+            .Validate(options => !string.IsNullOrWhiteSpace(options.ApiKey),
+                "Configuration value 'ApiAuthentication:ApiKey' is required.")
+            .Validate(options => ApiAuthenticationOptions.AllowedClientApps.Contains(options.ClientApp),
+                "Configuration value 'ApiAuthentication:ClientApp' must be 'InternalWeb' or 'ExternalWeb'.")
+            .ValidateOnStart();
+        services.ConfigureHttpClientDefaults(builder => builder.AddHttpMessageHandler(provider =>
+            new ApiKeyDelegatingHandler(baseUri, provider.GetRequiredService<IOptions<ApiAuthenticationOptions>>())));
 
         services.AddHttpClient<IApiClient, ApiClient>(client =>
         {
