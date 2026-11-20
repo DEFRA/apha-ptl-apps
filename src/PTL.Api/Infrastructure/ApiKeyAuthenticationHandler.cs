@@ -28,25 +28,29 @@ internal sealed partial class ApiKeyAuthenticationHandler(
 
     protected override Task<AuthenticateResult> HandleAuthenticateAsync()
     {
+        // Always compare, so only the key check itself decides whether the request is authenticated.
+        var expectedKey = apiAuthenticationOptions.Value.ApiKey;
+        _ = TryGetHeader(ApiAuthenticationOptions.ApiKeyHeaderName, out var providedKey);
+
+        if (KeysMatch(providedKey, expectedKey))
+        {
+            var identity = new ClaimsIdentity(SchemeName);
+            if (TryGetHeader(ApiAuthenticationOptions.ClientAppHeaderName, out var clientApp))
+            {
+                identity.AddClaim(new Claim(ClientAppClaimType, clientApp));
+            }
+
+            return Task.FromResult(AuthenticateResult.Success(new AuthenticationTicket(new ClaimsPrincipal(identity), SchemeName)));
+        }
+
         // No key is NoResult, not Fail, so the anonymous health endpoints are unaffected; the challenge below logs it.
-        if (!TryGetHeader(ApiAuthenticationOptions.ApiKeyHeaderName, out var providedKey))
+        if (providedKey.Length == 0)
         {
             return Task.FromResult(AuthenticateResult.NoResult());
         }
 
-        if (!KeysMatch(providedKey, apiAuthenticationOptions.Value.ApiKey))
-        {
-            LogInvalidApiKey(Logger);
-            return Task.FromResult(AuthenticateResult.Fail("Invalid API key."));
-        }
-
-        var identity = new ClaimsIdentity(SchemeName);
-        if (TryGetHeader(ApiAuthenticationOptions.ClientAppHeaderName, out var clientApp))
-        {
-            identity.AddClaim(new Claim(ClientAppClaimType, clientApp));
-        }
-
-        return Task.FromResult(AuthenticateResult.Success(new AuthenticationTicket(new ClaimsPrincipal(identity), SchemeName)));
+        LogInvalidApiKey(Logger);
+        return Task.FromResult(AuthenticateResult.Fail("Invalid API key."));
     }
 
     protected override Task HandleChallengeAsync(AuthenticationProperties properties)
