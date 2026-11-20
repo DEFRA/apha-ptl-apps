@@ -45,7 +45,7 @@ internal static class StartupChecks
         if (string.IsNullOrWhiteSpace(key))
         {
             throw new InvalidOperationException(
-                "ApiAuthentication:ApiKey is not configured. Locally, set it in appsettings.Development.json or launchSettings.json; " +
+                "ApiAuthentication:ApiKey is not configured. Locally, set it with dotnet user-secrets (see README); " +
                 "in a deployed environment, check the ApiAuthentication__ApiKey secret wiring in the ECS task definition.");
         }
 

@@ -8,7 +8,6 @@
       "applicationUrl": "http://localhost:5252",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development",
-        "ApiAuthentication__ApiKey": "local-dev-api-key",
         "AWS_PROFILE": "ptl_developers_permissions-951656660068"
       }
     }

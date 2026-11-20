@@ -8,8 +8,7 @@
       "applicationUrl": "http://localhost:5215",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development",
-        "Api__BaseUrl": "http://localhost:5252",
-        "ApiAuthentication__ApiKey": "local-dev-api-key"
+        "Api__BaseUrl": "http://localhost:5252"
       }
     }
   }
