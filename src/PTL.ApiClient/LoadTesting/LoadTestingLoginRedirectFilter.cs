@@ -6,11 +6,11 @@ using Microsoft.Extensions.Options;
 namespace PTL.ApiClient;
 
 /// <summary>Sends an unauthenticated visitor to the load-testing sign-in instead of the identity provider while the switch is on.</summary>
-public sealed class LoadTestingLoginRedirectFilter(IOptions<LoadTestingOptions> options) : IResourceFilter
+public sealed class LoadTestingLoginRedirectFilter(IOptions<LoadTestingOptions> options, TimeProvider timeProvider) : IResourceFilter
 {
     public void OnResourceExecuting(ResourceExecutingContext context)
     {
-        if (!options.Value.Enabled || context.HttpContext.User.Identity?.IsAuthenticated == true)
+        if (!options.Value.IsAvailable(timeProvider) || context.HttpContext.User.Identity?.IsAuthenticated == true)
         {
             return;
         }

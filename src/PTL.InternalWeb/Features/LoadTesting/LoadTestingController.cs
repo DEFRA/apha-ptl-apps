@@ -11,12 +11,13 @@ namespace PTL.InternalWeb.Features.LoadTesting;
 /// <summary>
 /// Username-only sign-in for JMeter runs. Uses the directory object id PTL.Api already stores for the username and resolves it
 /// through the same <see cref="IEntraInternalUserResolver"/> as a real Entra sign-in, so the session carries identical claims and
-/// no user record is written. 404 unless <see cref="LoadTestingOptions.Enabled"/>.
+/// no user record is written. 404 unless <see cref="LoadTestingOptions.IsAvailable"/>.
 /// </summary>
 public sealed class LoadTestingController(
     IOptions<LoadTestingOptions> options,
+    TimeProvider timeProvider,
     ILoadTestingLookupClient lookupClient,
-    IEntraInternalUserResolver resolver) : LoadTestingControllerBase<LoadTestingLoginViewModel>(options)
+    IEntraInternalUserResolver resolver) : LoadTestingControllerBase<LoadTestingLoginViewModel>(options, timeProvider)
 {
     protected override async Task<IActionResult> SignInAsync(LoadTestingLoginViewModel model, CancellationToken cancellationToken)
     {

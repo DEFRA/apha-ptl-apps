@@ -39,6 +39,7 @@ public class LoadTestingRouteTests : IClassFixture<WebApplicationFactory<Program
             {
                 ["TabulationEmails:Enabled"] = "false",
                 ["PublicationNotifications:Enabled"] = "false",
+                ["LoadTesting:ExpiresOn"] = DateTime.UtcNow.AddYears(1).ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture),
             }));
             builder.ConfigureServices(services =>
             {
@@ -50,7 +51,7 @@ public class LoadTestingRouteTests : IClassFixture<WebApplicationFactory<Program
         });
     }
 
-    private async Task<HttpResponseMessage> PostAsync(string path, object body, string? header)
+    private async Task<HttpResponseMessage> PostAsync(string path, object body, string? header, string? expiresOn = null)
     {
         using var request = new HttpRequestMessage(HttpMethod.Post, path) { Content = JsonContent.Create(body) };
         if (header is not null)
@@ -58,7 +59,35 @@ public class LoadTestingRouteTests : IClassFixture<WebApplicationFactory<Program
             request.Headers.Add(LoadTestingHeaders.Enabled, header);
         }
 
-        return await _factory.CreateAuthenticatedClient().SendAsync(request);
+        var factory = expiresOn is null
+            ? _factory
+            : _factory.WithWebHostBuilder(builder => builder.ConfigureAppConfiguration((_, config) =>
+                config.AddInMemoryCollection(new Dictionary<string, string?> { ["LoadTesting:ExpiresOn"] = expiresOn })));
+
+        return await factory.CreateAuthenticatedClient().SendAsync(request);
+    }
+
+    [Theory]
+    [InlineData("2000-01-01")]
+    [InlineData("")]
+    public async Task InternalLookup_WithTheHeaderAfterTheExpiryDate_IsNotFound(string expiresOn)
+    {
+        _internalUsers.Seed(new CoreInternalUser { UserId = Guid.NewGuid(), Username = @"DEFRA\tester", SsoIdInt = Linked });
+
+        var response = await PostAsync("/api/load-testing/internal-users/lookup", new LoadTestingInternalLookupRequest(@"DEFRA\tester"), "true", expiresOn);
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task ExternalLookup_WithTheHeaderAfterTheExpiryDate_IsNotFound()
+    {
+        _externalUsers.Add(ExternalUserType.Participant, "tester@example.test", Linked, labCode: "4097");
+
+        var response = await PostAsync("/api/load-testing/external-users/lookup", new LoadTestingLookupRequest("tester@example.test"), "true", "2000-01-01");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal(0, _externalUsers.FindByEmailCalls);
     }
 
     [Theory]

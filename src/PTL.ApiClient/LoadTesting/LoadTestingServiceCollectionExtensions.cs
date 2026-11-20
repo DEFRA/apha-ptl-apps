@@ -1,6 +1,8 @@
+using System.Globalization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -21,10 +23,13 @@ public static class LoadTestingServiceCollectionExtensions
         var apiBaseUrl = configuration["Api:BaseUrl"]
             ?? throw new InvalidOperationException("Configuration value 'Api:BaseUrl' is required.");
 
-        services.Configure<LoadTestingOptions>(configuration.GetSection(LoadTestingOptions.SectionName));
+        // Bound at startup: the redirect filter runs on every request, so an unparsable ExpiresOn must stop the app, not every page.
+        services.AddOptions<LoadTestingOptions>().Bind(configuration.GetSection(LoadTestingOptions.SectionName)).ValidateOnStart();
+        services.TryAddSingleton(TimeProvider.System);
         services.Configure<MvcOptions>(options => options.Filters.Add<LoadTestingLoginRedirectFilter>());
         services.AddHostedService(provider => new LoadTestingStartupWarning(
             provider.GetRequiredService<IOptions<LoadTestingOptions>>(),
+            provider.GetRequiredService<TimeProvider>(),
             provider.GetRequiredService<ILogger<LoadTestingStartupWarning>>(),
             bypassedSignIn));
 
@@ -41,14 +46,20 @@ public static class LoadTestingServiceCollectionExtensions
 
 internal sealed partial class LoadTestingStartupWarning(
     IOptions<LoadTestingOptions> options,
+    TimeProvider timeProvider,
     ILogger<LoadTestingStartupWarning> logger,
     string bypassedSignIn) : IHostedService
 {
     public Task StartAsync(CancellationToken cancellationToken)
     {
-        if (options.Value.Enabled)
+        var settings = options.Value;
+        if (settings.IsAvailable(timeProvider))
         {
-            LogEnabled(bypassedSignIn);
+            LogEnabled(bypassedSignIn, settings.ExpiresOn!.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
+        }
+        else if (settings.Enabled)
+        {
+            LogExpired(settings.ExpiresOn?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? "not set");
         }
 
         return Task.CompletedTask;
@@ -56,6 +67,9 @@ internal sealed partial class LoadTestingStartupWarning(
 
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
-    [LoggerMessage(Level = LogLevel.Warning, Message = "LoadTesting is enabled: {BypassedSignIn} at /perf/login")]
-    private partial void LogEnabled(string bypassedSignIn);
+    [LoggerMessage(Level = LogLevel.Warning, Message = "LoadTesting is enabled until {ExpiresOn}: {BypassedSignIn} at /perf/login")]
+    private partial void LogEnabled(string bypassedSignIn, string expiresOn);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "LoadTesting is enabled but unavailable: LoadTesting:ExpiresOn ({ExpiresOn}) is missing or has passed")]
+    private partial void LogExpired(string expiresOn);
 }
