@@ -1,21 +1,16 @@
-using PTL.Api.Tests.ExternalUser;
-using PTL.Api.Tests.Participant;
+using PTL.Contracts.Distribution;
 using PTL.Core.Distribution;
-using PTL.Core.Viewer;
-using ParticipantEntity = PTL.Core.Participant.Participant;
-using TestConsultantEntity = PTL.Core.TestConsultant.TestConsultant;
 
 namespace PTL.Api.Tests.Distribution;
 
 public class ParticipantTabulationServiceTests
 {
-    private readonly FakeDistributionRepository _repository = new();
-    private readonly FakeParticipantRepository _participantRepository = new();
-    private readonly FakeViewerRepository _viewerRepository = new();
-    private readonly FakeTestConsultantRepository _testConsultantRepository = new();
+    private static readonly Guid SsoIdExt = Guid.Parse("6a8754e2-2ce7-f111-84e7-70a8a53681e7");
+    private static readonly Guid LabId = Guid.Parse("11111111-1111-1111-1111-111111111111");
 
-    private ParticipantTabulationService Service =>
-        new(_repository, _participantRepository, _viewerRepository, _testConsultantRepository, new TabulationReportService(_repository));
+    private readonly FakeDistributionRepository _repository = new();
+
+    private ParticipantTabulationService Service => new(_repository, new TabulationReportService(_repository));
 
     private static PublishedTabulationSummaryEntity Tabulation(Guid? id = null) => new()
     {
@@ -29,64 +24,74 @@ public class ParticipantTabulationServiceTests
     };
 
     [Fact]
-    public async Task GetTabulationsForUserAsync_UnknownParticipant_ReturnsEmptyList()
+    public async Task GetTabulationsForUserAsync_ContactIdOnly_ReturnsTheTestConsultantOrViewerList()
     {
-        var result = await Service.GetTabulationsForUserAsync(Guid.NewGuid(), null, null, CancellationToken.None);
+        _repository.TabulationsForExternalUser[(SsoIdExt, null)] = [Tabulation()];
 
-        Assert.Empty(result.Tabulations);
-    }
-
-    [Fact]
-    public async Task GetTabulationsForUserAsync_ResolvesParticipantSsoIdAndReturnsTheirTabulations()
-    {
-        var participantId = Guid.NewGuid();
-        var ssoId = Guid.NewGuid();
-        await _participantRepository.CreateAsync(new ParticipantEntity { ParticipantId = participantId, SsoId = ssoId });
-        _repository.TabulationsBySsoId[ssoId] = [Tabulation()];
-
-        var result = await Service.GetTabulationsForUserAsync(participantId, null, null, CancellationToken.None);
+        var result = await Service.GetTabulationsForUserAsync(new ExternalTabulationCaller(SsoIdExt, null, null), CancellationToken.None);
 
         var tabulation = Assert.Single(result.Tabulations);
         Assert.Equal("BT", tabulation.SchemeCode);
         Assert.Equal("Brucella", tabulation.SchemeName);
+        Assert.Equal((SsoIdExt, (Guid?)null), Assert.Single(_repository.ExternalUserTabulationRequests));
     }
 
     [Fact]
-    public async Task GetTabulationsForUserAsync_ResolvesViewerSsoIdByFetchingAllViewers()
+    public async Task GetTabulationsForUserAsync_SelectedLab_IsPassedWithTheContactId()
     {
-        var viewerId = Guid.NewGuid();
-        var ssoId = Guid.NewGuid();
-        await _viewerRepository.CreateAsync(new ViewerEntity { ViewerId = viewerId, SsoId = ssoId, Name = "Jane", Email = "jane@example.com" });
-        _repository.TabulationsBySsoId[ssoId] = [Tabulation()];
+        _repository.TabulationsForExternalUser[(SsoIdExt, LabId)] = [Tabulation(), Tabulation()];
 
-        var result = await Service.GetTabulationsForUserAsync(null, viewerId, null, CancellationToken.None);
+        var result = await Service.GetTabulationsForUserAsync(new ExternalTabulationCaller(SsoIdExt, LabId, null), CancellationToken.None);
 
-        Assert.Single(result.Tabulations);
+        Assert.Equal(2, result.Tabulations.Count);
+        Assert.Equal((SsoIdExt, (Guid?)LabId), Assert.Single(_repository.ExternalUserTabulationRequests));
     }
 
     [Fact]
-    public async Task GetTabulationsForUserAsync_ResolvesTestConsultantSsoIdByFetchingAllTestConsultants()
+    public async Task GetTabulationsForUserAsync_EmptyLabId_IsSentAsNoLab()
     {
-        var testConsultantId = Guid.NewGuid();
-        var ssoId = Guid.NewGuid();
-        await _testConsultantRepository.CreateAsync(new TestConsultantEntity { ExternalTestConsultantId = testConsultantId, SsoId = ssoId, Name = "Dr Smith", Email = "smith@example.com" });
-        _repository.TabulationsBySsoId[ssoId] = [Tabulation()];
+        await Service.GetTabulationsForUserAsync(new ExternalTabulationCaller(SsoIdExt, Guid.Empty, null), CancellationToken.None);
 
-        var result = await Service.GetTabulationsForUserAsync(null, null, testConsultantId, CancellationToken.None);
-
-        Assert.Single(result.Tabulations);
+        Assert.Equal((SsoIdExt, (Guid?)null), Assert.Single(_repository.ExternalUserTabulationRequests));
     }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("00000000-0000-0000-0000-000000000000")]
+    public async Task GetTabulationsForUserAsync_NoContactId_ReturnsEmptyWithoutQuerying(string? ssoIdExt)
+    {
+        var caller = new ExternalTabulationCaller(ssoIdExt is null ? null : Guid.Parse(ssoIdExt), LabId, Guid.NewGuid());
+
+        var result = await Service.GetTabulationsForUserAsync(caller, CancellationToken.None);
+
+        Assert.Empty(result.Tabulations);
+        Assert.Empty(_repository.ExternalUserTabulationRequests);
+    }
+
+    [Fact]
+    public async Task GetTabulationsForUserAsync_NullCaller_Throws() =>
+        await Assert.ThrowsAsync<ArgumentNullException>(() => Service.GetTabulationsForUserAsync(null!, CancellationToken.None));
 
     [Fact]
     public async Task GetPublishedTabulationForUserAsync_IdNotInCallersOwnList_ReturnsNull()
     {
-        var participantId = Guid.NewGuid();
-        var ssoId = Guid.NewGuid();
-        await _participantRepository.CreateAsync(new ParticipantEntity { ParticipantId = participantId, SsoId = ssoId });
-        _repository.TabulationsBySsoId[ssoId] = [Tabulation()];
+        _repository.TabulationsForExternalUser[(SsoIdExt, null)] = [Tabulation()];
         var someoneElsesTabulationId = Guid.NewGuid();
+        _repository.PublishedTabulationSources[someoneElsesTabulationId] = new TabulationSource { IsPublished = true, TabulationName = "Other" };
 
-        var result = await Service.GetPublishedTabulationForUserAsync(someoneElsesTabulationId, participantId, null, null, CancellationToken.None);
+        var result = await Service.GetPublishedTabulationForUserAsync(someoneElsesTabulationId, new ExternalTabulationCaller(SsoIdExt, null, null), CancellationToken.None);
+
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public async Task GetPublishedTabulationForUserAsync_AnotherContactsReport_ReturnsNull()
+    {
+        var tabulationId = Guid.NewGuid();
+        _repository.TabulationsForExternalUser[(Guid.NewGuid(), null)] = [Tabulation(tabulationId)];
+        _repository.PublishedTabulationSources[tabulationId] = new TabulationSource { IsPublished = true, TabulationName = "Summary" };
+
+        var result = await Service.GetPublishedTabulationForUserAsync(tabulationId, new ExternalTabulationCaller(SsoIdExt, null, null), CancellationToken.None);
 
         Assert.Null(result);
     }
@@ -94,31 +99,74 @@ public class ParticipantTabulationServiceTests
     [Fact]
     public async Task GetPublishedTabulationForUserAsync_IdInCallersOwnList_ReturnsTheReport()
     {
-        var participantId = Guid.NewGuid();
-        var ssoId = Guid.NewGuid();
         var tabulationId = Guid.NewGuid();
-        await _participantRepository.CreateAsync(new ParticipantEntity { ParticipantId = participantId, SsoId = ssoId });
-        _repository.TabulationsBySsoId[ssoId] = [Tabulation(tabulationId)];
+        _repository.TabulationsForExternalUser[(SsoIdExt, LabId)] = [Tabulation(tabulationId)];
         _repository.PublishedTabulationSources[tabulationId] = new TabulationSource { IsPublished = true, TabulationName = "Summary" };
 
-        var result = await Service.GetPublishedTabulationForUserAsync(tabulationId, participantId, null, null, CancellationToken.None);
+        var result = await Service.GetPublishedTabulationForUserAsync(tabulationId, new ExternalTabulationCaller(SsoIdExt, LabId, null), CancellationToken.None);
 
         Assert.NotNull(result);
     }
 
     [Fact]
-    public async Task GetAttachmentForUserAsync_IdNotInCallersOwnList_ReturnsNull()
+    public async Task GetPublishedTabulationForUserAsync_NoContactId_ReturnsNull()
     {
-        var result = await Service.GetAttachmentForUserAsync(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), null, null, CancellationToken.None);
+        var tabulationId = Guid.NewGuid();
+        _repository.PublishedTabulationSources[tabulationId] = new TabulationSource { IsPublished = true, TabulationName = "Summary" };
+
+        var result = await Service.GetPublishedTabulationForUserAsync(tabulationId, new ExternalTabulationCaller(null, LabId, null), CancellationToken.None);
 
         Assert.Null(result);
     }
 
     [Fact]
-    public async Task GetAssessmentResultsForUserAsync_IdNotInCallersOwnList_ReturnsNull()
+    public async Task GetAttachmentForUserAsync_IdNotInCallersOwnList_ReturnsNull()
     {
-        var result = await Service.GetAssessmentResultsForUserAsync(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), null, null, CancellationToken.None);
+        var result = await Service.GetAttachmentForUserAsync(Guid.NewGuid(), Guid.NewGuid(), new ExternalTabulationCaller(SsoIdExt, null, null), CancellationToken.None);
 
         Assert.Null(result);
+    }
+
+    [Fact]
+    public async Task GetAttachmentForUserAsync_IdInCallersOwnList_ReturnsThePublishedAttachment()
+    {
+        var tabulationId = Guid.NewGuid();
+        var attachment = new TabulationSourceAttachment(Guid.NewGuid(), "guide.pdf", "application/pdf", [1, 2, 3]);
+        var source = new TabulationSource { IsPublished = true, TabulationName = "Summary" };
+        source.Attachments.Add(attachment);
+        _repository.PublishedTabulationSources[tabulationId] = source;
+        _repository.TabulationsForExternalUser[(SsoIdExt, null)] = [Tabulation(tabulationId)];
+
+        var result = await Service.GetAttachmentForUserAsync(tabulationId, attachment.AttachmentId, new ExternalTabulationCaller(SsoIdExt, null, null), CancellationToken.None);
+
+        Assert.Same(attachment, result);
+    }
+
+    [Fact]
+    public async Task GetAssessmentResultsForUserAsync_IdNotInCallersOwnList_ReturnsNull()
+    {
+        var result = await Service.GetAssessmentResultsForUserAsync(Guid.NewGuid(), Guid.NewGuid(), new ExternalTabulationCaller(SsoIdExt, null, null), CancellationToken.None);
+
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public async Task GetAssessmentResultsForUserAsync_IdInCallersOwnList_LooksUpThePublishedScores()
+    {
+        var tabulationId = Guid.NewGuid();
+        _repository.TabulationsForExternalUser[(SsoIdExt, null)] = [Tabulation(tabulationId)];
+
+        var result = await Service.GetAssessmentResultsForUserAsync(tabulationId, Guid.NewGuid(), new ExternalTabulationCaller(SsoIdExt, null, null), CancellationToken.None);
+
+        Assert.Null(result);
+        Assert.Single(_repository.ExternalUserTabulationRequests);
+    }
+
+    [Fact]
+    public async Task PerIdLookups_NullCaller_Throw()
+    {
+        await Assert.ThrowsAsync<ArgumentNullException>(() => Service.GetPublishedTabulationForUserAsync(Guid.NewGuid(), null!, CancellationToken.None));
+        await Assert.ThrowsAsync<ArgumentNullException>(() => Service.GetAssessmentResultsForUserAsync(Guid.NewGuid(), Guid.NewGuid(), null!, CancellationToken.None));
+        await Assert.ThrowsAsync<ArgumentNullException>(() => Service.GetAttachmentForUserAsync(Guid.NewGuid(), Guid.NewGuid(), null!, CancellationToken.None));
     }
 }

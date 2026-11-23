@@ -39,18 +39,18 @@ internal sealed partial class FakeDistributionApiClient
 
     // InternalWeb never calls the ExternalWeb-only "for-user" tabulation methods.
     public Task<PublishedTabulationSummaryListResponse> GetTabulationsForUserAsync(
-        Guid? participantId, Guid? viewerId, Guid? testConsultantId, CancellationToken cancellationToken = default) =>
+        ExternalTabulationCaller caller, CancellationToken cancellationToken = default) =>
         throw new NotSupportedException();
 
     public Task<TabulationReportResponse?> GetPublishedTabulationForUserAsync(
-        Guid publishedTabulationId, Guid? participantId, Guid? viewerId, Guid? testConsultantId, CancellationToken cancellationToken = default) =>
+        Guid publishedTabulationId, ExternalTabulationCaller caller, CancellationToken cancellationToken = default) =>
         throw new NotSupportedException();
 
     public Task<AssessmentResultsResponse?> GetAssessmentResultsForUserAsync(
-        Guid publishedTabulationId, Guid testId, Guid? participantId, Guid? viewerId, Guid? testConsultantId, CancellationToken cancellationToken = default) =>
+        Guid publishedTabulationId, Guid testId, ExternalTabulationCaller caller, CancellationToken cancellationToken = default) =>
         throw new NotSupportedException();
 
     public Task<TabulationAttachmentFile?> GetPublishedTabulationAttachmentForUserAsync(
-        Guid publishedTabulationId, Guid attachmentId, Guid? participantId, Guid? viewerId, Guid? testConsultantId, CancellationToken cancellationToken = default) =>
+        Guid publishedTabulationId, Guid attachmentId, ExternalTabulationCaller caller, CancellationToken cancellationToken = default) =>
         throw new NotSupportedException();
 }

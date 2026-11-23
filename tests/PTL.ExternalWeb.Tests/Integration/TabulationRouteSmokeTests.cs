@@ -69,7 +69,8 @@ public class TabulationRouteSmokeTests : IClassFixture<PtlExternalWebTestFactory
                 }
             })).CreateClient();
 
-    private static async Task<Dictionary<string, string>> SignInAsync(HttpClient client, string roles, Guid? participantId = null, Guid? viewerId = null)
+    private static async Task<Dictionary<string, string>> SignInAsync(
+        HttpClient client, string roles, Guid? participantId = null, Guid? viewerId = null, Guid? contactId = null)
     {
         var cookies = new Dictionary<string, string>();
         var query = $"roles={Uri.EscapeDataString(roles)}";
@@ -81,6 +82,11 @@ public class TabulationRouteSmokeTests : IClassFixture<PtlExternalWebTestFactory
         if (viewerId is not null)
         {
             query += $"&viewerId={viewerId}";
+        }
+
+        if (contactId is not null)
+        {
+            query += $"&contactId={contactId}";
         }
 
         var signInResponse = await client.GetAsync($"{PtlExternalWebTestFactory.TestSignInPath}?{query}");
@@ -569,7 +575,7 @@ public class TabulationRouteSmokeTests : IClassFixture<PtlExternalWebTestFactory
     public async Task Report_ApiResolvesNothingForThisUser_RendersNotFound()
     {
         // Covers the Access Restrictions AC: ParticipantTabulationService only ever serves a
-        // publishedTabulationId that is present in spgTabulations' own result for this SsoId, so a
+        // publishedTabulationId that is present in spgTabulations' own result for this contact id, so a
         // tampered id that belongs to someone else's scheme also resolves to nothing.
         var apiClient = new FakeDistributionApiClient { PublishedTabulation = null };
         var client = CreateClient(apiClient);
@@ -579,6 +585,39 @@ public class TabulationRouteSmokeTests : IClassFixture<PtlExternalWebTestFactory
             client, HttpMethod.Get, $"/Tabulation/Report?publishedTabulationId={Guid.NewGuid()}", cookies);
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Index_SendsTheSignedInContactIdLabAndViewer_IgnoringQueryStringIds()
+    {
+        var contactId = Guid.NewGuid();
+        var labId = Guid.NewGuid();
+        var viewerId = Guid.NewGuid();
+        var apiClient = new FakeDistributionApiClient { Tabulations = new PublishedTabulationSummaryListResponse([]) };
+        var client = CreateClient(apiClient);
+        var cookies = await SignInAsync(client, "Participant,Viewer", participantId: labId, viewerId: viewerId, contactId: contactId);
+
+        var response = await CookieForwardingHttpClient.SendWithCookiesAsync(
+            client, HttpMethod.Get, $"/Tabulation/Index?ssoIdExt={Guid.NewGuid()}&participantId={Guid.NewGuid()}", cookies);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(new ExternalTabulationCaller(contactId, labId, viewerId), Assert.Single(apiClient.TabulationCallers));
+    }
+
+    [Fact]
+    public async Task Report_TestConsultant_SendsOnlyTheContactId()
+    {
+        var contactId = Guid.NewGuid();
+        var tabulationId = Guid.NewGuid();
+        var apiClient = new FakeDistributionApiClient { PublishedTabulation = Report(tabulationId) };
+        var client = CreateClient(apiClient);
+        var cookies = await SignInAsync(client, "Test Consultant,Viewer", contactId: contactId);
+
+        var response = await CookieForwardingHttpClient.SendWithCookiesAsync(
+            client, HttpMethod.Get, $"/Tabulation/Report?publishedTabulationId={tabulationId}", cookies);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(new ExternalTabulationCaller(contactId, null, null), Assert.Single(apiClient.TabulationCallers));
     }
 
     [Fact]

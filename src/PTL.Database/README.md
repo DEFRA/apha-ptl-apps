@@ -31,6 +31,7 @@ There is no journal table, so track what has been run here:
 | 0014-InheritContactIdOnNewParticipant.sql | | | | |
 | 0015-CreateLabUserManagement.sql | | | | |
 | 0016-ClearSsoIdExtOnEmailChange.sql | | | | |
+| 0017-ExtendSpgTabulationsForSsoIdExt.sql | | | | |
 
 If this grows to the point where manually tracking applied scripts becomes error-prone, introduce
 a proper migration tool (e.g. DbUp) pointed at this same `Scripts` folder rather than changing how

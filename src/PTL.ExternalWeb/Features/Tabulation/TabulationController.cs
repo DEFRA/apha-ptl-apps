@@ -14,7 +14,7 @@ namespace PTL.ExternalWeb.Features.Tabulation;
 // Reports". Gated on IsViewer alone, exactly like legacy (ExternalUserService now grants the
 // Viewer role to every resolved Participant/Test Consultant too - see its own comments - so this
 // single-role check already covers all three legacy-visible roles). Every lookup is further scoped
-// to the caller's own access by PTL.Api's "for-user" tabulation endpoints
+// to the caller's CIDM contact id and selected lab by PTL.Api's "for-user" tabulation endpoints
 // (ParticipantTabulationService), never by trusting a bare id from the URL.
 [Authorize(Policy = ExternalPolicies.Viewer)]
 public sealed partial class TabulationController(
@@ -37,9 +37,7 @@ public sealed partial class TabulationController(
         var page = Math.Max(query.Page, 1);
         var pageSize = PaginationModel.AvailablePageSizes.Contains(query.PageSize) ? query.PageSize : ReferenceSchemeListQuery.DefaultPageSize;
 
-        var (participantId, viewerId, testConsultantId) = CallerIds();
-
-        var list = await distributionApiClient.GetTabulationsForUserAsync(participantId, viewerId, testConsultantId, cancellationToken);
+        var list = await distributionApiClient.GetTabulationsForUserAsync(Caller(), cancellationToken);
 
         // Legacy Tabulations.aspx.vb's PopulateDropdowns builds the Year dropdown from both
         // YearId and DistributionDate.Year across the user's own full (unfiltered) tabulation list.
@@ -61,9 +59,7 @@ public sealed partial class TabulationController(
     // staff-facing Tabulation/PublishedTabulation, this is always the signed-in user's own report).
     public async Task<IActionResult> Report(Guid publishedTabulationId, string? returnUrl, CancellationToken cancellationToken)
     {
-        var (participantId, viewerId, testConsultantId) = CallerIds();
-        var report = await distributionApiClient.GetPublishedTabulationForUserAsync(
-            publishedTabulationId, participantId, viewerId, testConsultantId, cancellationToken);
+        var report = await distributionApiClient.GetPublishedTabulationForUserAsync(publishedTabulationId, Caller(), cancellationToken);
         if (report is null)
         {
             return NotFound();
@@ -77,9 +73,7 @@ public sealed partial class TabulationController(
     // Legacy AssessmentResults.aspx - rendered as a data table (see AssessmentResultsPageViewModel).
     public async Task<IActionResult> AssessmentResults(Guid publishedTabulationId, Guid testId, string? returnUrl, CancellationToken cancellationToken)
     {
-        var (participantId, viewerId, testConsultantId) = CallerIds();
-        var results = await distributionApiClient.GetAssessmentResultsForUserAsync(
-            publishedTabulationId, testId, participantId, viewerId, testConsultantId, cancellationToken);
+        var results = await distributionApiClient.GetAssessmentResultsForUserAsync(publishedTabulationId, testId, Caller(), cancellationToken);
         if (results is null)
         {
             return NotFound();
@@ -93,9 +87,7 @@ public sealed partial class TabulationController(
     // Legacy AttachmentDisplay "View Supporting Document" (Attachment.aspx), without the session hand-off.
     public async Task<IActionResult> Attachment(Guid publishedTabulationId, Guid attachmentId, CancellationToken cancellationToken)
     {
-        var (participantId, viewerId, testConsultantId) = CallerIds();
-        var file = await distributionApiClient.GetPublishedTabulationAttachmentForUserAsync(
-            publishedTabulationId, attachmentId, participantId, viewerId, testConsultantId, cancellationToken);
+        var file = await distributionApiClient.GetPublishedTabulationAttachmentForUserAsync(publishedTabulationId, attachmentId, Caller(), cancellationToken);
         if (file is null)
         {
             return NotFound();
@@ -108,9 +100,7 @@ public sealed partial class TabulationController(
     [HttpGet]
     public async Task<IActionResult> GeneratePdf(Guid publishedTabulationId, CancellationToken cancellationToken)
     {
-        var (participantId, viewerId, testConsultantId) = CallerIds();
-        var report = await distributionApiClient.GetPublishedTabulationForUserAsync(
-            publishedTabulationId, participantId, viewerId, testConsultantId, cancellationToken);
+        var report = await distributionApiClient.GetPublishedTabulationForUserAsync(publishedTabulationId, Caller(), cancellationToken);
         if (report is null)
         {
             return NotFound();
@@ -133,8 +123,8 @@ public sealed partial class TabulationController(
     [LoggerMessage(Level = LogLevel.Error, Message = "Failed to generate tabulation PDF for published tabulation {PublishedTabulationId}.")]
     private partial void LogPdfGenerationFailed(Exception exception, Guid publishedTabulationId);
 
-    private (Guid? ParticipantId, Guid? ViewerId, Guid? TestConsultantId) CallerIds() =>
-        (User.GetParticipantId(), User.GetViewerId(), User.GetTestConsultantId());
+    private ExternalTabulationCaller Caller() =>
+        new(User.GetContactId(), User.GetParticipantId(), User.GetViewerId());
 
     // Legacy ShowPrintableTabulation names the file {Distribution}_{SchemeName}_{DistributionDate}.pdf.
     private static string BuildPdfFileName(TabulationReportResponse report)

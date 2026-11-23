@@ -90,20 +90,18 @@ public sealed partial class DistributionController
     }
 
     // ExternalWeb Tabulations.aspx / TabulationView.aspx / AssessmentResults.aspx - every endpoint
-    // below is scoped to the caller's own Participant/Viewer/Test Consultant access (re-checked
-    // against spgTabulations - see ParticipantTabulationService), unlike the unscoped
+    // below is scoped to the caller's CIDM contact id and selected lab (re-checked against
+    // spgTabulations - see ParticipantTabulationService), unlike the unscoped
     // tabulations/published-tabulations endpoints above, which InternalWeb staff use with no such
     // restriction.
     [HttpGet("tabulations/for-user")]
     [ProducesResponseType<PublishedTabulationSummaryListResponse>(StatusCodes.Status200OK)]
     public async Task<ActionResult<PublishedTabulationSummaryListResponse>> GetTabulationsForUser(
-        [FromQuery] Guid? participantId,
-        [FromQuery] Guid? viewerId,
-        [FromQuery] Guid? testConsultantId,
+        [FromQuery] ExternalTabulationCaller caller,
         [FromServices] IParticipantTabulationService participantTabulationService,
         CancellationToken cancellationToken)
     {
-        var tabulations = await participantTabulationService.GetTabulationsForUserAsync(participantId, viewerId, testConsultantId, cancellationToken);
+        var tabulations = await participantTabulationService.GetTabulationsForUserAsync(caller, cancellationToken);
         return Ok(tabulations);
     }
 
@@ -112,13 +110,11 @@ public sealed partial class DistributionController
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<TabulationReportResponse>> GetPublishedTabulationForUser(
         Guid publishedTabulationId,
-        [FromQuery] Guid? participantId,
-        [FromQuery] Guid? viewerId,
-        [FromQuery] Guid? testConsultantId,
+        [FromQuery] ExternalTabulationCaller caller,
         [FromServices] IParticipantTabulationService participantTabulationService,
         CancellationToken cancellationToken)
     {
-        var report = await participantTabulationService.GetPublishedTabulationForUserAsync(publishedTabulationId, participantId, viewerId, testConsultantId, cancellationToken);
+        var report = await participantTabulationService.GetPublishedTabulationForUserAsync(publishedTabulationId, caller, cancellationToken);
         return report is null ? NotFound() : Ok(report);
     }
 
@@ -128,13 +124,11 @@ public sealed partial class DistributionController
     public async Task<ActionResult<AssessmentResultsResponse>> GetAssessmentResultsForUser(
         Guid publishedTabulationId,
         Guid testId,
-        [FromQuery] Guid? participantId,
-        [FromQuery] Guid? viewerId,
-        [FromQuery] Guid? testConsultantId,
+        [FromQuery] ExternalTabulationCaller caller,
         [FromServices] IParticipantTabulationService participantTabulationService,
         CancellationToken cancellationToken)
     {
-        var results = await participantTabulationService.GetAssessmentResultsForUserAsync(publishedTabulationId, testId, participantId, viewerId, testConsultantId, cancellationToken);
+        var results = await participantTabulationService.GetAssessmentResultsForUserAsync(publishedTabulationId, testId, caller, cancellationToken);
         return results is null ? NotFound() : Ok(results);
     }
 
@@ -144,13 +138,11 @@ public sealed partial class DistributionController
     public async Task<IActionResult> GetPublishedTabulationAttachmentForUser(
         Guid publishedTabulationId,
         Guid attachmentId,
-        [FromQuery] Guid? participantId,
-        [FromQuery] Guid? viewerId,
-        [FromQuery] Guid? testConsultantId,
+        [FromQuery] ExternalTabulationCaller caller,
         [FromServices] IParticipantTabulationService participantTabulationService,
         CancellationToken cancellationToken)
     {
-        var attachment = await participantTabulationService.GetAttachmentForUserAsync(publishedTabulationId, attachmentId, participantId, viewerId, testConsultantId, cancellationToken);
+        var attachment = await participantTabulationService.GetAttachmentForUserAsync(publishedTabulationId, attachmentId, caller, cancellationToken);
         return attachment is null ? NotFound() : AttachmentFile(attachment);
     }
 

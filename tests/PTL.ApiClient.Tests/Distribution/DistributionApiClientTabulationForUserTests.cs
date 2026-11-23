@@ -1,5 +1,6 @@
 using System.Net;
 using PTL.ApiClient.Distribution;
+using PTL.Contracts.Distribution;
 
 namespace PTL.ApiClient.Tests.Distribution;
 
@@ -8,7 +9,7 @@ public class DistributionApiClientTabulationForUserTests
     private static readonly Guid PublishedId = Guid.Parse("22222222-2222-2222-2222-222222222222");
     private static readonly Guid ParticipantId = Guid.Parse("33333333-3333-3333-3333-333333333333");
     private static readonly Guid ViewerId = Guid.Parse("44444444-4444-4444-4444-444444444444");
-    private static readonly Guid TestConsultantId = Guid.Parse("55555555-5555-5555-5555-555555555555");
+    private static readonly Guid SsoIdExt = Guid.Parse("55555555-5555-5555-5555-555555555555");
     private static readonly Guid TestId = Guid.Parse("66666666-6666-6666-6666-666666666666");
     private static readonly Guid AttachmentId = Guid.Parse("77777777-7777-7777-7777-777777777777");
 
@@ -26,14 +27,14 @@ public class DistributionApiClientTabulationForUserTests
     }
 
     [Fact]
-    public async Task GetTabulationsForUserAsync_PassesAllThreeRoleIdsAndDeserialises()
+    public async Task GetTabulationsForUserAsync_PassesTheCallerAndDeserialises()
     {
         var (client, requested) = Create(HttpStatusCode.OK, ListJson);
 
-        var result = await client.GetTabulationsForUserAsync(ParticipantId, ViewerId, TestConsultantId);
+        var result = await client.GetTabulationsForUserAsync(new ExternalTabulationCaller(SsoIdExt, ParticipantId, ViewerId));
 
         Assert.Equal(
-            $"/api/distributions/tabulations/for-user?participantId={ParticipantId}&viewerId={ViewerId}&testConsultantId={TestConsultantId}",
+            $"/api/distributions/tabulations/for-user?ssoIdExt={SsoIdExt}&participantId={ParticipantId}&viewerId={ViewerId}",
             Assert.Single(requested).PathAndQuery);
         var tabulation = Assert.Single(result.Tabulations);
         Assert.Equal("BT", tabulation.SchemeCode);
@@ -44,11 +45,11 @@ public class DistributionApiClientTabulationForUserTests
     {
         var (client, requested) = Create(HttpStatusCode.NotFound, null);
 
-        var result = await client.GetPublishedTabulationForUserAsync(PublishedId, ParticipantId, null, null);
+        var result = await client.GetPublishedTabulationForUserAsync(PublishedId, new ExternalTabulationCaller(SsoIdExt, ParticipantId, null));
 
         Assert.Null(result);
         Assert.Equal(
-            $"/api/distributions/published-tabulations/{PublishedId}/for-user?participantId={ParticipantId}&viewerId=&testConsultantId=",
+            $"/api/distributions/published-tabulations/{PublishedId}/for-user?ssoIdExt={SsoIdExt}&participantId={ParticipantId}&viewerId=",
             Assert.Single(requested).PathAndQuery);
     }
 
@@ -57,11 +58,11 @@ public class DistributionApiClientTabulationForUserTests
     {
         var (client, requested) = Create(HttpStatusCode.NotFound, null);
 
-        var result = await client.GetAssessmentResultsForUserAsync(PublishedId, TestId, null, ViewerId, null);
+        var result = await client.GetAssessmentResultsForUserAsync(PublishedId, TestId, new ExternalTabulationCaller(SsoIdExt, null, ViewerId));
 
         Assert.Null(result);
         Assert.Equal(
-            $"/api/distributions/published-tabulations/{PublishedId}/tests/{TestId}/assessment-results/for-user?participantId=&viewerId={ViewerId}&testConsultantId=",
+            $"/api/distributions/published-tabulations/{PublishedId}/tests/{TestId}/assessment-results/for-user?ssoIdExt={SsoIdExt}&participantId=&viewerId={ViewerId}",
             Assert.Single(requested).PathAndQuery);
     }
 
@@ -70,11 +71,19 @@ public class DistributionApiClientTabulationForUserTests
     {
         var (client, requested) = Create(HttpStatusCode.NotFound, null);
 
-        var result = await client.GetPublishedTabulationAttachmentForUserAsync(PublishedId, AttachmentId, null, null, TestConsultantId);
+        var result = await client.GetPublishedTabulationAttachmentForUserAsync(PublishedId, AttachmentId, new ExternalTabulationCaller(SsoIdExt, null, null));
 
         Assert.Null(result);
         Assert.Equal(
-            $"/api/distributions/published-tabulations/{PublishedId}/attachments/{AttachmentId}/for-user?participantId=&viewerId=&testConsultantId={TestConsultantId}",
+            $"/api/distributions/published-tabulations/{PublishedId}/attachments/{AttachmentId}/for-user?ssoIdExt={SsoIdExt}&participantId=&viewerId=",
             Assert.Single(requested).PathAndQuery);
+    }
+
+    [Fact]
+    public async Task GetTabulationsForUserAsync_NullCaller_Throws()
+    {
+        var (client, _) = Create(HttpStatusCode.OK, ListJson);
+
+        await Assert.ThrowsAsync<ArgumentNullException>(() => client.GetTabulationsForUserAsync(null!));
     }
 }

@@ -25,24 +25,30 @@ public sealed partial class DistributionApiClient
         await GetAttachmentFileAsync($"/api/distributions/{TabulationSegment(isPublished)}/{tabulationId}/attachments/{attachmentId}", cancellationToken);
 
     public Task<PublishedTabulationSummaryListResponse> GetTabulationsForUserAsync(
-        Guid? participantId, Guid? viewerId, Guid? testConsultantId, CancellationToken cancellationToken = default) =>
+        ExternalTabulationCaller caller, CancellationToken cancellationToken = default) =>
         GetAsync<PublishedTabulationSummaryListResponse>(
-            $"/api/distributions/tabulations/for-user?participantId={participantId}&viewerId={viewerId}&testConsultantId={testConsultantId}", cancellationToken);
+            $"/api/distributions/tabulations/for-user?{CallerQuery(caller)}", cancellationToken);
 
     public Task<TabulationReportResponse?> GetPublishedTabulationForUserAsync(
-        Guid publishedTabulationId, Guid? participantId, Guid? viewerId, Guid? testConsultantId, CancellationToken cancellationToken = default) =>
+        Guid publishedTabulationId, ExternalTabulationCaller caller, CancellationToken cancellationToken = default) =>
         GetOrNullAsync<TabulationReportResponse>(
-            $"/api/distributions/published-tabulations/{publishedTabulationId}/for-user?participantId={participantId}&viewerId={viewerId}&testConsultantId={testConsultantId}", cancellationToken);
+            $"/api/distributions/published-tabulations/{publishedTabulationId}/for-user?{CallerQuery(caller)}", cancellationToken);
 
     public Task<AssessmentResultsResponse?> GetAssessmentResultsForUserAsync(
-        Guid publishedTabulationId, Guid testId, Guid? participantId, Guid? viewerId, Guid? testConsultantId, CancellationToken cancellationToken = default) =>
+        Guid publishedTabulationId, Guid testId, ExternalTabulationCaller caller, CancellationToken cancellationToken = default) =>
         GetOrNullAsync<AssessmentResultsResponse>(
-            $"/api/distributions/published-tabulations/{publishedTabulationId}/tests/{testId}/assessment-results/for-user?participantId={participantId}&viewerId={viewerId}&testConsultantId={testConsultantId}", cancellationToken);
+            $"/api/distributions/published-tabulations/{publishedTabulationId}/tests/{testId}/assessment-results/for-user?{CallerQuery(caller)}", cancellationToken);
 
     public async Task<TabulationAttachmentFile?> GetPublishedTabulationAttachmentForUserAsync(
-        Guid publishedTabulationId, Guid attachmentId, Guid? participantId, Guid? viewerId, Guid? testConsultantId, CancellationToken cancellationToken = default) =>
+        Guid publishedTabulationId, Guid attachmentId, ExternalTabulationCaller caller, CancellationToken cancellationToken = default) =>
         await GetAttachmentFileAsync(
-            $"/api/distributions/published-tabulations/{publishedTabulationId}/attachments/{attachmentId}/for-user?participantId={participantId}&viewerId={viewerId}&testConsultantId={testConsultantId}", cancellationToken);
+            $"/api/distributions/published-tabulations/{publishedTabulationId}/attachments/{attachmentId}/for-user?{CallerQuery(caller)}", cancellationToken);
+
+    private static string CallerQuery(ExternalTabulationCaller caller)
+    {
+        ArgumentNullException.ThrowIfNull(caller);
+        return $"ssoIdExt={caller.SsoIdExt}&participantId={caller.ParticipantId}&viewerId={caller.ViewerId}";
+    }
 
     private async Task<T> GetAsync<T>(string url, CancellationToken cancellationToken)
         where T : class

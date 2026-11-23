@@ -174,21 +174,35 @@ internal sealed partial class FakeDistributionApiClient : IDistributionApiClient
         return Task.FromResult(ActualResults);
     }
 
+    public List<ExternalTabulationCaller> TabulationCallers { get; } = [];
+
     public Task<PublishedTabulationSummaryListResponse> GetTabulationsForUserAsync(
-        Guid? participantId, Guid? viewerId, Guid? testConsultantId, CancellationToken cancellationToken = default) =>
-        Task.FromResult(Tabulations);
+        ExternalTabulationCaller caller, CancellationToken cancellationToken = default)
+    {
+        TabulationCallers.Add(caller);
+        return Task.FromResult(Tabulations);
+    }
 
     public Task<TabulationReportResponse?> GetPublishedTabulationForUserAsync(
-        Guid publishedTabulationId, Guid? participantId, Guid? viewerId, Guid? testConsultantId, CancellationToken cancellationToken = default) =>
-        Task.FromResult(PublishedTabulation);
+        Guid publishedTabulationId, ExternalTabulationCaller caller, CancellationToken cancellationToken = default)
+    {
+        TabulationCallers.Add(caller);
+        return Task.FromResult(PublishedTabulation);
+    }
 
     public Task<AssessmentResultsResponse?> GetAssessmentResultsForUserAsync(
-        Guid publishedTabulationId, Guid testId, Guid? participantId, Guid? viewerId, Guid? testConsultantId, CancellationToken cancellationToken = default) =>
-        Task.FromResult(AssessmentResults);
+        Guid publishedTabulationId, Guid testId, ExternalTabulationCaller caller, CancellationToken cancellationToken = default)
+    {
+        TabulationCallers.Add(caller);
+        return Task.FromResult(AssessmentResults);
+    }
 
     public Task<TabulationAttachmentFile?> GetPublishedTabulationAttachmentForUserAsync(
-        Guid publishedTabulationId, Guid attachmentId, Guid? participantId, Guid? viewerId, Guid? testConsultantId, CancellationToken cancellationToken = default) =>
-        Task.FromResult(Attachment);
+        Guid publishedTabulationId, Guid attachmentId, ExternalTabulationCaller caller, CancellationToken cancellationToken = default)
+    {
+        TabulationCallers.Add(caller);
+        return Task.FromResult(Attachment);
+    }
 
     public Task<ActualResultsSaveResult?> SaveActualResultsAsync(
         Guid monthlyDistributionSchemeId, Guid distributionParticipantId, ActualResultsSaveRequest request, CancellationToken cancellationToken = default)
