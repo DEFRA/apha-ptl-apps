@@ -80,6 +80,45 @@ public class ExternalSiteMessageServiceTests
     }
 
     [Fact]
+    public async Task UpdateAsync_PastedEditorChrome_IsStrippedAndTextKept()
+    {
+        var repository = new FakeExternalSiteMessageRepository();
+        var service = CreateService(repository);
+        const string chrome =
+            "<div class=\"tox\" role=\"application\" aria-disabled=\"false\"><div class=\"tox-toolbar__group\" role=\"toolbar\" title=\"\">"
+            + "<button aria-label=\"Bold\"><svg><path d=\"M1\"/></svg></button></div></div>";
+
+        await service.UpdateAsync("<p>Further information</p>" + chrome, chrome + "<p>Notice</p>", "vetqas@apha.gov.uk");
+
+        Assert.Equal("<p>Further information</p>", repository.Updated!.Message);
+        Assert.Equal("<p>Notice</p>", repository.Updated.ImportantMessage);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_ToolbarFormatting_IsKept()
+    {
+        var repository = new FakeExternalSiteMessageRepository();
+        var service = CreateService(repository);
+        const string html = "<p><strong>Bold</strong> <em>italic</em> <span style=\"text-decoration: underline;\">underline</span> m<sup>2</sup></p>";
+
+        await service.UpdateAsync(html, html, "vetqas@apha.gov.uk");
+
+        Assert.Equal(html, repository.Updated!.Message);
+        Assert.Equal(html, repository.Updated.ImportantMessage);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_Link_IsUnwrappedToItsText()
+    {
+        var repository = new FakeExternalSiteMessageRepository();
+        var service = CreateService(repository);
+
+        await service.UpdateAsync("<p>Email <a href=\"mailto:vetqas@apha.gov.uk\">vetqas@apha.gov.uk</a></p>", "Notice", "vetqas@apha.gov.uk");
+
+        Assert.Equal("<p>Email vetqas@apha.gov.uk</p>", repository.Updated!.Message);
+    }
+
+    [Fact]
     public async Task UpdateAsync_InvalidEmail_ThrowsValidationException()
     {
         var service = CreateService(new FakeExternalSiteMessageRepository());
