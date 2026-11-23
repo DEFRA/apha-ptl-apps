@@ -22,7 +22,7 @@
          RemoteFailureContext) - used by both PTL.Auth.Cidm and PTL.Auth.Entra. -->
     <PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" Version="10.0.15" />
     <!-- Retry/timeout/circuit-breaker for the Microsoft Graph HTTP clients under Graph/ (same package PTL.Auth.Entra uses). -->
-    <PackageReference Include="Microsoft.Extensions.Http.Resilience" Version="11.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Http.Resilience" Version="11.0.1" />
   </ItemGroup>
 
 </Project>
