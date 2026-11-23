@@ -20,7 +20,7 @@
     <PackageReference Include="Serilog.Sinks.Console" Version="6.1.1" />
     <PackageReference Include="Serilog.Formatting.Compact" Version="3.0.0" />
     <PackageReference Include="Serilog.Enrichers.Environment" Version="3.0.1" />
-    <PackageReference Include="Swashbuckle.AspNetCore" Version="10.3.1" />
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="11.0.1" />
     <PackageReference Include="AWSSDK.Extensions.NETCore.Setup" Version="4.1.0.1" />
     <!-- AWSSDK.SSOOIDC 4.0.100.16 requires AWSSDK.Core >= 4.0.102.8; this also carries the GHSA-9cvc-h2w8-phrp fix. -->
     <PackageReference Include="AWSSDK.Core" Version="4.1.1" />
