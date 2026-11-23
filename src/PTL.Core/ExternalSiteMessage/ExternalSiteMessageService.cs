@@ -1,5 +1,6 @@
 using System.Net;
 using PTL.Core.Audit;
+using PTL.Core.Scheme;
 
 namespace PTL.Core.ExternalSiteMessage;
 
@@ -19,9 +20,10 @@ public sealed class ExternalSiteMessageService(IExternalSiteMessageRepository re
         var updated = new ExternalSiteMessage
         {
             // The editor posts its HTML entity-escaped (TinyMCE encoding "xml"); legacy HtmlDecoded it before saving,
-            // otherwise the external pages show the tags as text.
-            Message = WebUtility.HtmlDecode(message),
-            ImportantMessage = WebUtility.HtmlDecode(importantMessage),
+            // otherwise the external pages show the tags as text. Then restricted to the same allow-list as the
+            // other rich text fields, so markup the toolbar cannot produce (such as pasted editor chrome) is not stored.
+            Message = SchemeInstructions.Sanitise(WebUtility.HtmlDecode(message)),
+            ImportantMessage = SchemeInstructions.Sanitise(WebUtility.HtmlDecode(importantMessage)),
             SupportEmailAddress = supportEmailAddress
         };
 
