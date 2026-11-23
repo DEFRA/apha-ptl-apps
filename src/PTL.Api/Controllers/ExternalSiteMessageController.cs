@@ -7,10 +7,8 @@ namespace PTL.Api.Controllers;
 // [NEEDS INVESTIGATION] Not yet protected with authorization: authentication/authorization are
 // out of scope for this phase, same as the other System Administration controllers.
 //
-// Admin-publish side only. The external-facing display of this content (ViewInformation.aspx's
-// Further Information screen, Home.aspx's Important Message banner, ErrorGeneric.aspx/
-// ErrorPageNotFound.aspx's support email) has no equivalent yet in PTL.ExternalWeb -
-// deliberately deferred to a follow-up story, not part of this change.
+// Admin-publish side. PTL.ExternalWeb's error pages also read the support email from GET (legacy
+// ErrorGeneric.aspx/ErrorPageNotFound.aspx); its Home banner and Information page use api/system-messages.
 [ApiController]
 [Route("api/external-site-message")]
 public sealed class ExternalSiteMessageController(IExternalSiteMessageService externalSiteMessageService) : ControllerBase

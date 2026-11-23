@@ -39,6 +39,9 @@ public sealed class PtlExternalWebTestFactory : WebApplicationFactory<Program>
     /// <summary>The PTL.Api lab user calls the Lab users pages make, answered from what a test puts in it.</summary>
     internal FakeLabUserApiClient LabUserApi { get; } = new();
 
+    /// <summary>The support email every error page shows (<see cref="FakeExternalSiteMessageApiClient.DefaultSupportEmailAddress"/>).</summary>
+    internal FakeExternalSiteMessageApiClient ExternalSiteMessageApi { get; } = new();
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(new Dictionary<string, string?>
@@ -83,6 +86,9 @@ public sealed class PtlExternalWebTestFactory : WebApplicationFactory<Program>
             // The lab selection and Lab users pages call these; tests set up what they return (see ExternalUserApi/LabUserApi).
             services.AddSingleton<IExternalUserApiClient>(ExternalUserApi);
             services.AddSingleton<ILabUserApiClient>(LabUserApi);
+
+            // Every error page's SupportContact view component reads the Administrator-set support email.
+            services.AddSingleton<IExternalSiteMessageApiClient>(ExternalSiteMessageApi);
         });
     }
 

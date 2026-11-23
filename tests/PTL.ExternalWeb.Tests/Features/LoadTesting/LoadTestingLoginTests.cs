@@ -123,7 +123,8 @@ public partial class LoadTestingLoginTests(PtlExternalWebTestFactory factory) : 
     public async Task WhenDisabled_LoginPageAndPostAreNotFound()
     {
         var app = CreateApp(factory, enabled: false);
-        var client = app.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        // The 404 page's forms set an antiforgery cookie; a cookie container would send it with the POST beside the issued one.
+        var client = app.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false, HandleCookies = false });
         var (cookie, token) = IssueAntiforgeryTokens(app.Services);
         using var post = new HttpRequestMessage(HttpMethod.Post, "/perf/login")
         {

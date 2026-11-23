@@ -39,6 +39,8 @@ builder.Services.Configure<CookieAuthenticationOptions>(
     options => options.AccessDeniedPath = "/AccessDenied");
 
 var app = builder.Build();
+// An error response with no body (an unknown URL, a NotFound()) shows the friendly page; the status code is kept.
+app.UseStatusCodePagesWithReExecute("/Error/{0}");
 app.UsePtlWebFrontEnd();
 
 await app.RunAsync();
