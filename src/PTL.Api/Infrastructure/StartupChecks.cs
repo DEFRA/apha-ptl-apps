@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Configuration;
+using PTL.Common.ApiAuthentication;
 using PTL.Data.Infrastructure;
 
 namespace PTL.Api.Infrastructure;
@@ -29,6 +30,23 @@ internal static class StartupChecks
             throw new InvalidOperationException(
                 "HealthCheck:ReadinessKey is not configured. Locally, set it in appsettings.Development.json; " +
                 "in a deployed environment, check the HealthCheck__ReadinessKey secret wiring in the ECS task definition.");
+        }
+
+        return key;
+    }
+
+    /// <summary>
+    /// Fails fast at startup if the API key the web front-ends must send isn't configured -
+    /// otherwise every request would be rejected with a 401 and the cause would be far less obvious.
+    /// </summary>
+    public static string RequireApiKey(IConfiguration configuration)
+    {
+        var key = configuration[$"{ApiAuthenticationOptions.SectionName}:{nameof(ApiAuthenticationOptions.ApiKey)}"];
+        if (string.IsNullOrWhiteSpace(key))
+        {
+            throw new InvalidOperationException(
+                "ApiAuthentication:ApiKey is not configured. Locally, set it with dotnet user-secrets (see README); " +
+                "in a deployed environment, check the ApiAuthentication__ApiKey secret wiring in the ECS task definition.");
         }
 
         return key;

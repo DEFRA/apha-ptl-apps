@@ -1,8 +1,11 @@
 using System.Reflection;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.Options;
 using Microsoft.OpenApi;
 using PTL.Api.Features.Health;
 using PTL.Api.Infrastructure;
+using PTL.Common.ApiAuthentication;
 using PTL.Common.Correlation;
 using PTL.Common.Health;
 using PTL.Core.AdministrationCharge;
@@ -101,6 +104,19 @@ StartupChecks.RequireDatabaseOptions(builder.Configuration);
 // wiring here would otherwise be invisible, since ReadinessKeyFilter must
 // return an identical 404 for "not configured" and "wrong key" alike.
 StartupChecks.RequireReadinessKey(builder.Configuration);
+
+// ApiAuthentication__ApiKey - injected from Parameter Store / Secrets Manager like the values above.
+// Every endpoint requires the web front-end's API key and a known X-Client-App, except the
+// explicitly anonymous health checks. This authenticates the calling application, not the user.
+StartupChecks.RequireApiKey(builder.Configuration);
+builder.Services.Configure<ApiAuthenticationOptions>(builder.Configuration.GetSection(ApiAuthenticationOptions.SectionName));
+builder.Services.AddAuthentication(ApiKeyAuthenticationHandler.SchemeName)
+    .AddScheme<AuthenticationSchemeOptions, ApiKeyAuthenticationHandler>(ApiKeyAuthenticationHandler.SchemeName, configureOptions: null);
+builder.Services.AddAuthorizationBuilder()
+    .SetFallbackPolicy(new AuthorizationPolicyBuilder(ApiKeyAuthenticationHandler.SchemeName)
+        .RequireAuthenticatedUser()
+        .RequireClaim(ApiKeyAuthenticationHandler.ClientAppClaimType, ApiAuthenticationOptions.AllowedClientApps)
+        .Build());
 
 builder.Services.AddSingleton<IDbConnectionFactory, SqlConnectionFactory>();
 builder.Services.AddHealthChecks()
@@ -383,6 +399,17 @@ builder.Services.AddSwaggerGen(options =>
     options.TagActionsBy(api => [api.ActionDescriptor.RouteValues["controller"] ?? "Default"]);
     options.DocInclusionPredicate((_, _) => true);
 
+    // Namespace-qualified: several contracts share a class name (e.g. Lookup and Country CountryResponse).
+    options.CustomSchemaIds(SchemaId);
+    static string SchemaId(Type type)
+    {
+        var name = (type.IsGenericType ? type.GetGenericTypeDefinition() : type).FullName ?? type.Name;
+        name = name.Split('`')[0].Replace('+', '.');
+        return type.IsGenericType
+            ? $"{name}Of{string.Join("And", type.GetGenericArguments().Select(SchemaId))}"
+            : name;
+    }
+
     // Picks up <summary>/<param>/<returns> comments from controllers and request/response DTOs.
     var apiXmlFile = Path.Combine(AppContext.BaseDirectory, $"{Assembly.GetExecutingAssembly().GetName().Name}.xml");
     if (File.Exists(apiXmlFile))
@@ -396,19 +423,24 @@ builder.Services.AddSwaggerGen(options =>
         options.IncludeXmlComments(contractsXmlFile);
     }
 
-    const string bearerScheme = "Bearer";
-    options.AddSecurityDefinition(bearerScheme, new OpenApiSecurityScheme
+    options.AddSecurityDefinition(ApiAuthenticationOptions.ApiKeyHeaderName, new OpenApiSecurityScheme
     {
-        Name = "Authorization",
-        Type = SecuritySchemeType.Http,
-        Scheme = "bearer",
-        BearerFormat = "JWT",
+        Name = ApiAuthenticationOptions.ApiKeyHeaderName,
+        Type = SecuritySchemeType.ApiKey,
         In = ParameterLocation.Header,
-        Description = "Enter a JWT bearer token. Example: \"Bearer {token}\""
+        Description = "The API key shared with the calling web front-end."
+    });
+    options.AddSecurityDefinition(ApiAuthenticationOptions.ClientAppHeaderName, new OpenApiSecurityScheme
+    {
+        Name = ApiAuthenticationOptions.ClientAppHeaderName,
+        Type = SecuritySchemeType.ApiKey,
+        In = ParameterLocation.Header,
+        Description = "The calling web front-end: InternalWeb or ExternalWeb."
     });
     options.AddSecurityRequirement(document => new OpenApiSecurityRequirement
     {
-        [new OpenApiSecuritySchemeReference(bearerScheme, document)] = []
+        [new OpenApiSecuritySchemeReference(ApiAuthenticationOptions.ApiKeyHeaderName, document)] = [],
+        [new OpenApiSecuritySchemeReference(ApiAuthenticationOptions.ClientAppHeaderName, document)] = []
     });
 });
 
@@ -464,6 +496,9 @@ if (app.Environment.IsDevelopment())
 // correlate.
 app.UseCorrelationId();
 app.UseSerilogRequestLogging();
+
+app.UseAuthentication();
+app.UseAuthorization();
 
 app.MapGet("/", () => "Hello World!");
 

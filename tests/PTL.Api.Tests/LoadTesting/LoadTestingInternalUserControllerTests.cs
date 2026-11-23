@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Configuration;
 using PTL.Api.LoadTesting;
+using PTL.Api.Tests.Distribution;
 using PTL.Api.Tests.InternalUser;
 using PTL.Contracts.LoadTesting;
 using CoreInternalUser = PTL.Core.InternalUser.InternalUser;
@@ -13,7 +15,35 @@ public class LoadTestingInternalUserControllerTests
 
     private readonly FakeInternalUserRepository _users = new();
 
-    private LoadTestingInternalUserController CreateController() => new(_users);
+    private LoadTestingInternalUserController CreateController(string? expiresOn = "2027-01-31", DateTimeOffset? utcNow = null) =>
+        new(
+            _users,
+            new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> { ["LoadTesting:ExpiresOn"] = expiresOn }).Build(),
+            new FixedTimeProvider(utcNow ?? new DateTimeOffset(2026, 11, 20, 12, 0, 0, TimeSpan.Zero)));
+
+    [Fact]
+    public async Task Lookup_OnTheLastDay_IsStillAvailable()
+    {
+        _users.Seed(new CoreInternalUser { UserId = Guid.NewGuid(), Username = Username, SsoIdInt = Linked });
+
+        var result = await CreateController(utcNow: new DateTimeOffset(2027, 1, 31, 23, 59, 59, TimeSpan.Zero))
+            .Lookup("true", new LoadTestingInternalLookupRequest(Username), CancellationToken.None);
+
+        Assert.IsType<OkObjectResult>(result.Result);
+    }
+
+    [Theory]
+    [InlineData("2027-01-31")]
+    [InlineData(null)]
+    public async Task Lookup_AfterTheExpiryDateOrWithoutOne_IsNotFound(string? expiresOn)
+    {
+        _users.Seed(new CoreInternalUser { UserId = Guid.NewGuid(), Username = Username, SsoIdInt = Linked });
+
+        var result = await CreateController(expiresOn, new DateTimeOffset(2027, 2, 1, 0, 0, 0, TimeSpan.Zero))
+            .Lookup("true", new LoadTestingInternalLookupRequest(Username), CancellationToken.None);
+
+        Assert.IsType<NotFoundResult>(result.Result);
+    }
 
     private async Task<LoadTestingInternalLookupResponse> LookupAsync(string username = Username)
     {

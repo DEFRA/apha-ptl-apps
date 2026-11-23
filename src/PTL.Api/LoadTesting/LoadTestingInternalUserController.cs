@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using PTL.Common.LoadTesting;
 using PTL.Contracts.LoadTesting;
 using PTL.Core.InternalUser;
 
@@ -6,11 +7,15 @@ namespace PTL.Api.LoadTesting;
 
 /// <summary>
 /// Read-only lookup of the directory object id already stored for an internal user's username, so the load-testing sign-in can
-/// reuse it instead of letting sign-in write one. 404 unless the caller sends <see cref="LoadTestingHeaders.Enabled"/>.
+/// reuse it instead of letting sign-in write one. 404 unless the caller sends <see cref="LoadTestingHeaders.Enabled"/> and
+/// <c>LoadTesting:ExpiresOn</c> has not passed.
 /// </summary>
 [ApiController]
 [Route("api/load-testing")]
-public sealed class LoadTestingInternalUserController(IInternalUserRepository repository) : ControllerBase
+public sealed class LoadTestingInternalUserController(
+    IInternalUserRepository repository,
+    IConfiguration configuration,
+    TimeProvider timeProvider) : ControllerBase
 {
     [HttpPost("internal-users/lookup")]
     public async Task<ActionResult<LoadTestingInternalLookupResponse>> Lookup(
@@ -18,7 +23,7 @@ public sealed class LoadTestingInternalUserController(IInternalUserRepository re
         [FromBody] LoadTestingInternalLookupRequest request,
         CancellationToken cancellationToken)
     {
-        if (loadTesting != "true")
+        if (loadTesting != "true" || !LoadTestingExpiry.IsOpen(configuration.GetValue<DateOnly?>(LoadTestingExpiry.ConfigurationKey), timeProvider))
         {
             return NotFound();
         }

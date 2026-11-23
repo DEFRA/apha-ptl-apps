@@ -83,4 +83,29 @@ public class StartupChecksTests
 
         Assert.Equal("abc123", result);
     }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void RequireApiKey_Throws_WhenMissing(string? apiKey)
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?> { ["ApiAuthentication:ApiKey"] = apiKey })
+            .Build();
+
+        var ex = Assert.Throws<InvalidOperationException>(() => StartupChecks.RequireApiKey(configuration));
+
+        Assert.Contains("ApiAuthentication__ApiKey", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void RequireApiKey_ReturnsValue_WhenPresent()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?> { ["ApiAuthentication:ApiKey"] = "key-123" })
+            .Build();
+
+        Assert.Equal("key-123", StartupChecks.RequireApiKey(configuration));
+    }
 }

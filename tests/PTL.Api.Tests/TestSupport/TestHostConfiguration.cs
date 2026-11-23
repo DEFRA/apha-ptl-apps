@@ -4,6 +4,7 @@ namespace PTL.Api.Tests.TestSupport;
 
 internal static class TestHostConfiguration
 {
+    internal const string ApiKey = "test-api-key";
     // WebApplicationFactory boots the real Program, whose StartupChecks fail fast without
     // Database:Host/Name and HealthCheck:ReadinessKey. Locally those live in a gitignored
     // appsettings.Development.json, which the test host (Production environment) never reads.
@@ -18,5 +19,6 @@ internal static class TestHostConfiguration
         Environment.SetEnvironmentVariable("Database__IntegratedSecurity", "true");
         Environment.SetEnvironmentVariable("Database__TrustServerCertificate", "true");
         Environment.SetEnvironmentVariable("HealthCheck__ReadinessKey", "local-dev-readiness-key");
+        Environment.SetEnvironmentVariable("ApiAuthentication__ApiKey", ApiKey);
     }
 }

@@ -11,8 +11,8 @@ namespace PTL.ApiClient.Tests.LoadTesting;
 
 public class LoadTestingLoginRedirectFilterTests
 {
-    private static LoadTestingLoginRedirectFilter CreateFilter(bool enabled) =>
-        new(Options.Create(new LoadTestingOptions { Enabled = enabled }));
+    private static LoadTestingLoginRedirectFilter CreateFilter(bool enabled, TimeProvider? timeProvider = null) =>
+        new(Options.Create(new LoadTestingOptions { Enabled = enabled, ExpiresOn = FixedTimeProvider.LastDay }), timeProvider ?? FixedTimeProvider.BeforeExpiry);
 
     private static ResourceExecutingContext CreateContext(
         string? controller = "Account",
@@ -76,6 +76,16 @@ public class LoadTestingLoginRedirectFilterTests
         var context = CreateContext();
 
         CreateFilter(enabled: false).OnResourceExecuting(context);
+
+        Assert.Null(context.Result);
+    }
+
+    [Fact]
+    public void EnabledButExpired_LeavesAccountLoginToTheIdentityProvider()
+    {
+        var context = CreateContext();
+
+        CreateFilter(enabled: true, FixedTimeProvider.DayAfterExpiry).OnResourceExecuting(context);
 
         Assert.Null(context.Result);
     }

@@ -160,6 +160,23 @@ dotnet user-secrets set "Cidm:Address" "https://your-account.cpdev.cui.defra.gov
 dotnet user-secrets set "Cidm:Policy" "b2c_1a_cui_cpdev_signupsignin"
 ```
 
+## API authentication (PTL.Api)
+
+PTL.Api accepts a request only if it carries `X-Api-Key` and `X-Client-App` (`InternalWeb` or `ExternalWeb`); the web
+front-ends add both headers to every API call. All three apps fail to start without `ApiAuthentication:ApiKey`, and the
+same value must be used by all three. `ApiAuthentication:ClientApp` is committed in each web app's `appsettings.json`.
+
+| Config key | Env var (task definition `name`) | Local source |
+|---|---|---|
+| `ApiAuthentication:ApiKey` | `ApiAuthentication__ApiKey` (Parameter Store / Secrets Manager) | `dotnet user-secrets` |
+
+Set the same locally generated value for all three apps once:
+
+```powershell
+$bytes = New-Object byte[] 32; [Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($bytes); $key = [Convert]::ToBase64String($bytes)
+foreach ($p in 'src/PTL.Api', 'src/PTL.InternalWeb', 'src/PTL.ExternalWeb') { dotnet user-secrets set "ApiAuthentication:ApiKey" $key --project $p }
+```
+
 ## Code Quality
 
 - **`.editorconfig`** defines formatting and style conventions.

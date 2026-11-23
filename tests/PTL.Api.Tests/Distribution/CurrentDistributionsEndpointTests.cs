@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using PTL.Api.Tests.TestSupport;
 using PTL.Contracts.Distribution;
 using PTL.Core.Distribution;
 
@@ -43,7 +44,7 @@ public class CurrentDistributionsEndpointTests : IClassFixture<WebApplicationFac
         {
             services.RemoveAll<ICurrentDistributionsService>();
             services.AddSingleton<ICurrentDistributionsService>(service);
-        })).CreateClient();
+        })).CreateAuthenticatedClient();
 
     [Fact]
     public async Task GetCurrent_ThroughTheRealRouting_ReturnsTheParticipantsRows()
