@@ -1,72 +1,59 @@
 using PTL.Contracts.Distribution;
-using PTL.Core.Participant;
-using PTL.Core.TestConsultant;
-using PTL.Core.Viewer;
 
 namespace PTL.Core.Distribution;
 
-// Legacy ExternalWeb Tabulations.aspx / TabulationView.aspx / AssessmentResults.aspx - kept out of
-// TabulationReportService (whose constructor is shared by InternalWeb features and two existing
-// test files) since this is the only consumer that needs
-// IParticipantRepository/IViewerRepository/ITestConsultantRepository.
-//
-// spgPublishedTabulation/spgPublishedAssessmentScoreByTestId only filter by id - they do not check
-// the caller is actually authorised to see that tabulation (unlike spgTabulations, which already
-// encodes the full Participant/Viewer/TestConsultant + AvailableToParticipants/Viewers rule). So
-// every per-id lookup here first re-confirms the id is present in that same user's
-// spgTabulations-backed list before calling through to ITabulationReportService, closing that gap
-// without any new SQL or stored procedure.
+// Legacy ExternalWeb Tabulations.aspx / TabulationView.aspx / AssessmentResults.aspx. Access is decided by
+// spgTabulations' @SsoIdExt branch from the caller's CIDM contact id (and selected lab), never by the legacy fldSsoId,
+// which the new application does not maintain. spgPublishedTabulation/spgPublishedAssessmentScoreByTestId only filter
+// by id, so every per-id lookup first re-confirms the id is in that same caller's list.
 public interface IParticipantTabulationService
 {
     Task<PublishedTabulationSummaryListResponse> GetTabulationsForUserAsync(
-        Guid? participantId, Guid? viewerId, Guid? testConsultantId, CancellationToken cancellationToken = default);
+        ExternalTabulationCaller caller, CancellationToken cancellationToken = default);
 
     Task<TabulationReportResponse?> GetPublishedTabulationForUserAsync(
-        Guid publishedTabulationId, Guid? participantId, Guid? viewerId, Guid? testConsultantId, CancellationToken cancellationToken = default);
+        Guid publishedTabulationId, ExternalTabulationCaller caller, CancellationToken cancellationToken = default);
 
     Task<AssessmentResultsResponse?> GetAssessmentResultsForUserAsync(
-        Guid publishedTabulationId, Guid testId, Guid? participantId, Guid? viewerId, Guid? testConsultantId, CancellationToken cancellationToken = default);
+        Guid publishedTabulationId, Guid testId, ExternalTabulationCaller caller, CancellationToken cancellationToken = default);
 
     Task<TabulationSourceAttachment?> GetAttachmentForUserAsync(
-        Guid publishedTabulationId, Guid attachmentId, Guid? participantId, Guid? viewerId, Guid? testConsultantId, CancellationToken cancellationToken = default);
+        Guid publishedTabulationId, Guid attachmentId, ExternalTabulationCaller caller, CancellationToken cancellationToken = default);
 }
 
 public sealed class ParticipantTabulationService(
     IDistributionRepository distributionRepository,
-    IParticipantRepository participantRepository,
-    IViewerRepository viewerRepository,
-    ITestConsultantRepository testConsultantRepository,
     ITabulationReportService tabulationReportService) : IParticipantTabulationService
 {
     public async Task<PublishedTabulationSummaryListResponse> GetTabulationsForUserAsync(
-        Guid? participantId, Guid? viewerId, Guid? testConsultantId, CancellationToken cancellationToken = default)
+        ExternalTabulationCaller caller, CancellationToken cancellationToken = default)
     {
-        var ssoId = await ResolveSsoIdAsync(participantId, viewerId, testConsultantId, cancellationToken);
-        if (ssoId is null)
-        {
-            return new PublishedTabulationSummaryListResponse([]);
-        }
+        ArgumentNullException.ThrowIfNull(caller);
 
-        var tabulations = await distributionRepository.GetTabulationsForSsoIdAsync(ssoId.Value, cancellationToken);
+        var tabulations = await GetCallersTabulationsAsync(caller, cancellationToken);
         return new PublishedTabulationSummaryListResponse([.. tabulations.Select(ToResponse)]);
     }
 
     public async Task<TabulationReportResponse?> GetPublishedTabulationForUserAsync(
-        Guid publishedTabulationId, Guid? participantId, Guid? viewerId, Guid? testConsultantId, CancellationToken cancellationToken = default)
+        Guid publishedTabulationId, ExternalTabulationCaller caller, CancellationToken cancellationToken = default)
     {
-        if (!await IsAuthorizedAsync(publishedTabulationId, participantId, viewerId, testConsultantId, cancellationToken))
+        ArgumentNullException.ThrowIfNull(caller);
+
+        if (!await IsAuthorizedAsync(publishedTabulationId, caller, cancellationToken))
         {
             return null;
         }
 
         return await tabulationReportService.GetPublishedTabulationAsync(
-            publishedTabulationId, participantId ?? Guid.Empty, viewerId ?? Guid.Empty, cancellationToken);
+            publishedTabulationId, caller.ParticipantId ?? Guid.Empty, caller.ViewerId ?? Guid.Empty, cancellationToken);
     }
 
     public async Task<AssessmentResultsResponse?> GetAssessmentResultsForUserAsync(
-        Guid publishedTabulationId, Guid testId, Guid? participantId, Guid? viewerId, Guid? testConsultantId, CancellationToken cancellationToken = default)
+        Guid publishedTabulationId, Guid testId, ExternalTabulationCaller caller, CancellationToken cancellationToken = default)
     {
-        if (!await IsAuthorizedAsync(publishedTabulationId, participantId, viewerId, testConsultantId, cancellationToken))
+        ArgumentNullException.ThrowIfNull(caller);
+
+        if (!await IsAuthorizedAsync(publishedTabulationId, caller, cancellationToken))
         {
             return null;
         }
@@ -75,9 +62,11 @@ public sealed class ParticipantTabulationService(
     }
 
     public async Task<TabulationSourceAttachment?> GetAttachmentForUserAsync(
-        Guid publishedTabulationId, Guid attachmentId, Guid? participantId, Guid? viewerId, Guid? testConsultantId, CancellationToken cancellationToken = default)
+        Guid publishedTabulationId, Guid attachmentId, ExternalTabulationCaller caller, CancellationToken cancellationToken = default)
     {
-        if (!await IsAuthorizedAsync(publishedTabulationId, participantId, viewerId, testConsultantId, cancellationToken))
+        ArgumentNullException.ThrowIfNull(caller);
+
+        if (!await IsAuthorizedAsync(publishedTabulationId, caller, cancellationToken))
         {
             return null;
         }
@@ -85,63 +74,20 @@ public sealed class ParticipantTabulationService(
         return await tabulationReportService.GetAttachmentAsync(publishedTabulationId, isPublished: true, attachmentId, cancellationToken);
     }
 
-    private async Task<bool> IsAuthorizedAsync(
-        Guid publishedTabulationId, Guid? participantId, Guid? viewerId, Guid? testConsultantId, CancellationToken cancellationToken)
+    private async Task<bool> IsAuthorizedAsync(Guid publishedTabulationId, ExternalTabulationCaller caller, CancellationToken cancellationToken)
     {
-        var ssoId = await ResolveSsoIdAsync(participantId, viewerId, testConsultantId, cancellationToken);
-        if (ssoId is null)
-        {
-            return false;
-        }
-
-        var tabulations = await distributionRepository.GetTabulationsForSsoIdAsync(ssoId.Value, cancellationToken);
+        var tabulations = await GetCallersTabulationsAsync(caller, cancellationToken);
         return tabulations.Any(t => t.TabulationId == publishedTabulationId);
     }
 
-    // A person's SsoId is the same across their Participant/Viewer/Test Consultant records (see
-    // spgTabulations, which matches Participant, Viewer and Test Consultant rows against the one
-    // @SsoId) - resolving via whichever role claim is present is enough to call spgTabulations
-    // correctly either way.
-    private async Task<Guid?> ResolveSsoIdAsync(Guid? participantId, Guid? viewerId, Guid? testConsultantId, CancellationToken cancellationToken)
-    {
-        if (participantId is { } pid)
-        {
-            var participant = await participantRepository.GetByIdAsync(pid, cancellationToken);
-            if (participant is not null)
-            {
-                return participant.SsoId;
-            }
-        }
+    // No contact id means no identity to scope to, so nothing is visible.
+    private Task<IReadOnlyList<PublishedTabulationSummaryEntity>> GetCallersTabulationsAsync(
+        ExternalTabulationCaller caller, CancellationToken cancellationToken) =>
+        caller.SsoIdExt is { } ssoIdExt && ssoIdExt != Guid.Empty
+            ? distributionRepository.GetTabulationsForExternalUserAsync(ssoIdExt, NullIfEmpty(caller.ParticipantId), cancellationToken)
+            : Task.FromResult<IReadOnlyList<PublishedTabulationSummaryEntity>>([]);
 
-        if (viewerId is { } vid)
-        {
-            // No single-record "viewer by id" stored procedure exists - spgaViewers (GetAllAsync)
-            // already returns every viewer including SsoId, so the existing
-            // SystemAdministrationController.ViewerManagement/ViewerService.DeleteAsync pattern of
-            // fetch-all-then-filter is reused here rather than adding a new query.
-            var viewers = await viewerRepository.GetAllAsync(cancellationToken);
-            var viewer = viewers.FirstOrDefault(v => v.ViewerId == vid);
-            if (viewer is not null)
-            {
-                return viewer.SsoId;
-            }
-        }
-
-        if (testConsultantId is { } tcId)
-        {
-            // Same reasoning as Viewer above - no single-record lookup exists, spgaExtTestConsultants
-            // (GetAllAsync, the External Test Consultant Management grid) already returns every test
-            // consultant including SsoId.
-            var testConsultants = await testConsultantRepository.GetAllAsync(cancellationToken);
-            var testConsultant = testConsultants.FirstOrDefault(t => t.ExternalTestConsultantId == tcId);
-            if (testConsultant is not null)
-            {
-                return testConsultant.SsoId;
-            }
-        }
-
-        return null;
-    }
+    private static Guid? NullIfEmpty(Guid? id) => id == Guid.Empty ? null : id;
 
     private static PublishedTabulationSummaryResponse ToResponse(PublishedTabulationSummaryEntity tabulation) => new(
         tabulation.TabulationId,

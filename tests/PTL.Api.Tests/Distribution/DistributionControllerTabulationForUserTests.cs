@@ -9,13 +9,12 @@ namespace PTL.Api.Tests.Distribution;
 // ExternalWeb-only "for-user" tabulation endpoints - IParticipantTabulationService via [FromServices].
 public class DistributionControllerTabulationForUserTests
 {
+    private static readonly ExternalTabulationCaller NoCaller = new(null, null, null);
+
     private readonly FakeDistributionRepository _repository = new();
-    private readonly PTL.Api.Tests.Participant.FakeParticipantRepository _participantRepository = new();
-    private readonly PTL.Api.Tests.Participant.FakeViewerRepository _viewerRepository = new();
-    private readonly PTL.Api.Tests.ExternalUser.FakeTestConsultantRepository _testConsultantRepository = new();
 
     private IParticipantTabulationService Service =>
-        new ParticipantTabulationService(_repository, _participantRepository, _viewerRepository, _testConsultantRepository, new TabulationReportService(_repository));
+        new ParticipantTabulationService(_repository, new TabulationReportService(_repository));
 
     private DistributionController CreateController() =>
         new(
@@ -39,24 +38,52 @@ public class DistributionControllerTabulationForUserTests
     [Fact]
     public async Task GetTabulationsForUser_NoClaims_ReturnsEmptyList()
     {
-        var result = await CreateController().GetTabulationsForUser(null, null, null, Service, CancellationToken.None);
+        var result = await CreateController().GetTabulationsForUser(NoCaller, Service, CancellationToken.None);
 
         var list = Assert.IsType<PublishedTabulationSummaryListResponse>(Assert.IsType<OkObjectResult>(result.Result).Value);
         Assert.Empty(list.Tabulations);
     }
 
     [Fact]
+    public async Task GetTabulationsForUser_ContactId_ReturnsThatContactsList()
+    {
+        var ssoIdExt = Guid.NewGuid();
+        _repository.TabulationsForExternalUser[(ssoIdExt, null)] =
+        [
+            new PublishedTabulationSummaryEntity { TabulationId = Guid.NewGuid(), SchemeName = "BT: Brucella", DistributionReference = "D1a/S1" },
+        ];
+
+        var result = await CreateController().GetTabulationsForUser(new ExternalTabulationCaller(ssoIdExt, null, null), Service, CancellationToken.None);
+
+        var list = Assert.IsType<PublishedTabulationSummaryListResponse>(Assert.IsType<OkObjectResult>(result.Result).Value);
+        Assert.Equal("BT", Assert.Single(list.Tabulations).SchemeCode);
+    }
+
+    [Fact]
     public async Task GetPublishedTabulationForUser_NotInCallersOwnList_ReturnsNotFound()
     {
-        var result = await CreateController().GetPublishedTabulationForUser(Guid.NewGuid(), null, null, null, Service, CancellationToken.None);
+        var result = await CreateController().GetPublishedTabulationForUser(Guid.NewGuid(), NoCaller, Service, CancellationToken.None);
 
         Assert.IsType<NotFoundResult>(result.Result);
     }
 
     [Fact]
+    public async Task GetPublishedTabulationForUser_InCallersOwnList_ReturnsTheReport()
+    {
+        var ssoIdExt = Guid.NewGuid();
+        var tabulationId = Guid.NewGuid();
+        _repository.TabulationsForExternalUser[(ssoIdExt, null)] = [new PublishedTabulationSummaryEntity { TabulationId = tabulationId }];
+        _repository.PublishedTabulationSources[tabulationId] = new TabulationSource { IsPublished = true, TabulationName = "Summary" };
+
+        var result = await CreateController().GetPublishedTabulationForUser(tabulationId, new ExternalTabulationCaller(ssoIdExt, null, null), Service, CancellationToken.None);
+
+        Assert.IsType<TabulationReportResponse>(Assert.IsType<OkObjectResult>(result.Result).Value);
+    }
+
+    [Fact]
     public async Task GetAssessmentResultsForUser_NotInCallersOwnList_ReturnsNotFound()
     {
-        var result = await CreateController().GetAssessmentResultsForUser(Guid.NewGuid(), Guid.NewGuid(), null, null, null, Service, CancellationToken.None);
+        var result = await CreateController().GetAssessmentResultsForUser(Guid.NewGuid(), Guid.NewGuid(), NoCaller, Service, CancellationToken.None);
 
         Assert.IsType<NotFoundResult>(result.Result);
     }
@@ -64,7 +91,7 @@ public class DistributionControllerTabulationForUserTests
     [Fact]
     public async Task GetPublishedTabulationAttachmentForUser_NotInCallersOwnList_ReturnsNotFound()
     {
-        var result = await CreateController().GetPublishedTabulationAttachmentForUser(Guid.NewGuid(), Guid.NewGuid(), null, null, null, Service, CancellationToken.None);
+        var result = await CreateController().GetPublishedTabulationAttachmentForUser(Guid.NewGuid(), Guid.NewGuid(), NoCaller, Service, CancellationToken.None);
 
         Assert.IsType<NotFoundResult>(result);
     }

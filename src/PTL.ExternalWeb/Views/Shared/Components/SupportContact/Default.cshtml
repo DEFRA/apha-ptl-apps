@@ -1,0 +1,10 @@
+@model PTL.ExternalWeb.Features.ErrorPages.SupportContactViewModel
+
+@if (Model.EmailAddress is not null)
+{
+    <p class="govuk-body">@Model.LeadIn at <a class="govuk-link" href="mailto:@Model.EmailAddress">@Model.EmailAddress</a>.</p>
+}
+else
+{
+    <p class="govuk-body">@Model.LeadIn.</p>
+}

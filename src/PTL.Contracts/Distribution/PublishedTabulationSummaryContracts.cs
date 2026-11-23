@@ -13,3 +13,7 @@ public sealed record PublishedTabulationSummaryResponse(
     int MonthId);
 
 public sealed record PublishedTabulationSummaryListResponse(IReadOnlyList<PublishedTabulationSummaryResponse> Tabulations);
+
+// The signed-in external user a "for-user" tabulation request is scoped to: the CIDM contact id (fldSsoIdExt) and, for a
+// Participant or Lab User, the selected lab. ViewerId only picks the viewer's own view of a report, never access.
+public sealed record ExternalTabulationCaller(Guid? SsoIdExt, Guid? ParticipantId, Guid? ViewerId);

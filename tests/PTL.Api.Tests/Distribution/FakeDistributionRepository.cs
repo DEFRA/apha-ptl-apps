@@ -21,12 +21,17 @@ internal sealed partial class FakeDistributionRepository : IDistributionReposito
 
     public Dictionary<Guid, List<ParticipantPastDistributionEntity>> ParticipantHistoryBySsoId { get; } = [];
 
-    public Dictionary<Guid, List<PublishedTabulationSummaryEntity>> TabulationsBySsoId { get; } = [];
+    public Dictionary<(Guid SsoIdExt, Guid? ParticipantId), List<PublishedTabulationSummaryEntity>> TabulationsForExternalUser { get; } = [];
 
-    public Task<IReadOnlyList<PublishedTabulationSummaryEntity>> GetTabulationsForSsoIdAsync(
-        Guid ssoId, CancellationToken cancellationToken = default) =>
-        Task.FromResult<IReadOnlyList<PublishedTabulationSummaryEntity>>(
-            TabulationsBySsoId.TryGetValue(ssoId, out var tabulations) ? tabulations : []);
+    public List<(Guid SsoIdExt, Guid? ParticipantId)> ExternalUserTabulationRequests { get; } = [];
+
+    public Task<IReadOnlyList<PublishedTabulationSummaryEntity>> GetTabulationsForExternalUserAsync(
+        Guid ssoIdExt, Guid? participantId, CancellationToken cancellationToken = default)
+    {
+        ExternalUserTabulationRequests.Add((ssoIdExt, participantId));
+        return Task.FromResult<IReadOnlyList<PublishedTabulationSummaryEntity>>(
+            TabulationsForExternalUser.TryGetValue((ssoIdExt, participantId), out var tabulations) ? tabulations : []);
+    }
 
     public Task<IReadOnlyList<DistributionMonthSummaryEntity>> GetMonthlyDistributionSummariesAsync(CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<DistributionMonthSummaryEntity>>(Summaries);

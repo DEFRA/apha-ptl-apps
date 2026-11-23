@@ -82,7 +82,8 @@ public partial class AccountRouteSmokeTests : IClassFixture<PtlExternalWebTestFa
         var body = await response.Content.ReadAsStringAsync();
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.Contains("An error occurred while processing your request.", body);
+        Assert.Contains("Sorry, there is a problem with the service", body);
+        Assert.DoesNotContain("An error occurred while processing your request.", body);
     }
 
     [Fact]
