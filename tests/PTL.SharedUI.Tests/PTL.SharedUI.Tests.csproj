@@ -9,6 +9,8 @@
          measured by its own consuming projects (PTL.Api.Tests, PTL.ApiClient.Tests) - without this
          filter its large, mostly record-only surface dilutes this project's coverage percentage. -->
     <Include>[PTL.SharedUI]*</Include>
+    <!-- Compiled shared views are static markup, rendered and asserted by the web apps' own tests. -->
+    <Exclude>[PTL.SharedUI]AspNetCoreGeneratedDocument*</Exclude>
   </PropertyGroup>
 
   <ItemGroup>

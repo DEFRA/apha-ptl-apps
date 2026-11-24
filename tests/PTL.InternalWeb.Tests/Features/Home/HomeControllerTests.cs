@@ -60,4 +60,12 @@ public class HomeControllerTests
 
         Assert.Null(Assert.IsType<ViewResult>(result).ViewName);
     }
+
+    [Fact]
+    public void Privacy_ReturnsItsView()
+    {
+        var result = new HomeController(new FakeApiClient()).Privacy();
+
+        Assert.Null(Assert.IsType<ViewResult>(result).ViewName);
+    }
 }

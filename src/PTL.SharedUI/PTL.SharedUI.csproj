@@ -7,6 +7,8 @@
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <!-- CS1591 (missing XML comment) is informational only, matching PTL.Common's convention. -->
     <NoWarn>$(NoWarn);CS1591</NoWarn>
+    <!-- Compiles Views/Shared/*.cshtml as MVC views so both web apps can render shared partials by name. -->
+    <AddRazorSupportForMvc>true</AddRazorSupportForMvc>
   </PropertyGroup>
 
   <!-- Razor SDK so wwwroot/js/ptl-rich-text-wire.js is served to both web apps as a static web asset under
