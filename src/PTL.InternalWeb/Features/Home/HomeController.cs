@@ -15,4 +15,8 @@ public class HomeController(IApiClient apiClient) : HomeControllerBase(apiClient
     [AllowAnonymous]
     [HttpGet]
     public IActionResult Cookies() => View();
+
+    [AllowAnonymous]
+    [HttpGet]
+    public IActionResult Privacy() => View();
 }

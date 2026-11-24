@@ -16,7 +16,8 @@
     var hidesSideNavigation = hidesNavigationChrome
         || (isHomeController
             && (string.Equals(currentAction, "Cookies", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(currentAction, "Accessibility", StringComparison.OrdinalIgnoreCase)));
+                || string.Equals(currentAction, "Accessibility", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(currentAction, "Privacy", StringComparison.OrdinalIgnoreCase)));
 
     const string serviceName = "Proficiency Testing";
     var pageTitle = ViewData["Title"]?.ToString();
