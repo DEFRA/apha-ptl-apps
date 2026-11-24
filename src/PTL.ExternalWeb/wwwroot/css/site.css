@@ -1,14 +1,5 @@
 /* Shared layout styling */
 
-/* Needs JavaScript to work, so it stays hidden until the layout's inline script adds js-enabled to the body */
-.app-js-only {
-  display: none;
-}
-
-.js-enabled .app-js-only {
-  display: flex;
-}
-
 /* Sign out must be a form post for CSRF protection; reset button chrome so it reads as a service navigation link */
 .app-signout-form {
   display: inline;

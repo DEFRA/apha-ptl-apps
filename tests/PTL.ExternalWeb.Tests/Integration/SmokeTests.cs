@@ -40,6 +40,31 @@ public class SmokeTests : IClassFixture<PtlExternalWebTestFactory>
     }
 
     [Fact]
+    public async Task CookiesPage_Anonymous_ListsEssentialCookiesOnly()
+    {
+        var html = await _factory.CreateClient().GetStringAsync("/Home/Cookies");
+
+        Assert.Contains("Cookies on Proficiency Testing", html);
+        Assert.Contains("only uses essential cookies", html);
+        Assert.Contains(".AspNetCore.Cookies", html);
+        Assert.Contains(".AspNetCore.Antiforgery.*", html);
+        Assert.Contains(".AspNetCore.Mvc.CookieTempDataProvider", html);
+        Assert.DoesNotContain("ptl-contract-search", html);
+        Assert.DoesNotContain("analytics", html, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Theory]
+    [InlineData("/Home/Cookies")]
+    [InlineData("/Home/Accessibility")]
+    [InlineData("/Home/Privacy")]
+    public async Task Pages_ShowNoCookieConsentBanner(string url)
+    {
+        var html = await _factory.CreateClient().GetStringAsync(url);
+
+        Assert.DoesNotContain("govuk-cookie-banner", html);
+    }
+
+    [Fact]
     public async Task Footer_LinksToTheAccessibilityAndPrivacyPages()
     {
         var client = _factory.CreateClient();
