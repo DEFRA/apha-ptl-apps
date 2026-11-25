@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging.Abstractions;
 using PTL.Api.Controllers;
 using PTL.Contracts.Distribution;
 using PTL.Core.Distribution;
@@ -14,7 +15,7 @@ public class DistributionControllerTabulationForUserTests
     private readonly FakeDistributionRepository _repository = new();
 
     private IParticipantTabulationService Service =>
-        new ParticipantTabulationService(_repository, new TabulationReportService(_repository));
+        new ParticipantTabulationService(_repository, new TabulationReportService(_repository), NullLogger<ParticipantTabulationService>.Instance);
 
     private DistributionController CreateController() =>
         new(

@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging.Abstractions;
 using PTL.Contracts.Distribution;
 using PTL.Core.Distribution;
 
@@ -10,7 +11,7 @@ public class ParticipantTabulationServiceTests
 
     private readonly FakeDistributionRepository _repository = new();
 
-    private ParticipantTabulationService Service => new(_repository, new TabulationReportService(_repository));
+    private ParticipantTabulationService Service => new(_repository, new TabulationReportService(_repository), NullLogger<ParticipantTabulationService>.Instance);
 
     private static PublishedTabulationSummaryEntity Tabulation(Guid? id = null) => new()
     {

@@ -1,3 +1,5 @@
+using System.Diagnostics;
+using Microsoft.Extensions.Logging;
 using PTL.Contracts.Distribution;
 
 namespace PTL.Core.Distribution;
@@ -21,9 +23,10 @@ public interface IParticipantTabulationService
         Guid publishedTabulationId, Guid attachmentId, ExternalTabulationCaller caller, CancellationToken cancellationToken = default);
 }
 
-public sealed class ParticipantTabulationService(
+public sealed partial class ParticipantTabulationService(
     IDistributionRepository distributionRepository,
-    ITabulationReportService tabulationReportService) : IParticipantTabulationService
+    ITabulationReportService tabulationReportService,
+    ILogger<ParticipantTabulationService> logger) : IParticipantTabulationService
 {
     public async Task<PublishedTabulationSummaryListResponse> GetTabulationsForUserAsync(
         ExternalTabulationCaller caller, CancellationToken cancellationToken = default)
@@ -77,15 +80,41 @@ public sealed class ParticipantTabulationService(
     private async Task<bool> IsAuthorizedAsync(Guid publishedTabulationId, ExternalTabulationCaller caller, CancellationToken cancellationToken)
     {
         var tabulations = await GetCallersTabulationsAsync(caller, cancellationToken);
-        return tabulations.Any(t => t.TabulationId == publishedTabulationId);
+        var authorized = tabulations.Any(t => t.TabulationId == publishedTabulationId);
+        if (!authorized)
+        {
+            LogTabulationNotInCallersList(logger, publishedTabulationId, caller.SsoIdExt, caller.ParticipantId, tabulations.Count);
+        }
+
+        return authorized;
     }
 
     // No contact id means no identity to scope to, so nothing is visible.
-    private Task<IReadOnlyList<PublishedTabulationSummaryEntity>> GetCallersTabulationsAsync(
-        ExternalTabulationCaller caller, CancellationToken cancellationToken) =>
-        caller.SsoIdExt is { } ssoIdExt && ssoIdExt != Guid.Empty
-            ? distributionRepository.GetTabulationsForExternalUserAsync(ssoIdExt, NullIfEmpty(caller.ParticipantId), cancellationToken)
-            : Task.FromResult<IReadOnlyList<PublishedTabulationSummaryEntity>>([]);
+    private async Task<IReadOnlyList<PublishedTabulationSummaryEntity>> GetCallersTabulationsAsync(
+        ExternalTabulationCaller caller, CancellationToken cancellationToken)
+    {
+        if (caller.SsoIdExt is not { } ssoIdExt || ssoIdExt == Guid.Empty)
+        {
+            LogNoContactId(logger, caller.ParticipantId, caller.ViewerId);
+            return [];
+        }
+
+        var participantId = NullIfEmpty(caller.ParticipantId);
+        var started = Stopwatch.GetTimestamp();
+        var tabulations = await distributionRepository.GetTabulationsForExternalUserAsync(ssoIdExt, participantId, cancellationToken);
+        var elapsedMs = Stopwatch.GetElapsedTime(started).TotalMilliseconds;
+        LogTabulationsFound(logger, tabulations.Count, ssoIdExt, participantId, caller.ViewerId, elapsedMs);
+        return tabulations;
+    }
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "External tabulation lookup has no CIDM contact id (ParticipantId={ParticipantId}, ViewerId={ViewerId}); returning no tabulations.")]
+    private static partial void LogNoContactId(ILogger logger, Guid? participantId, Guid? viewerId);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "spgTabulations returned {Count} tabulations for SsoIdExt={SsoIdExt}, ParticipantId={ParticipantId}, ViewerId={ViewerId} in {ElapsedMs:0.0} ms.")]
+    private static partial void LogTabulationsFound(ILogger logger, int count, Guid ssoIdExt, Guid? participantId, Guid? viewerId, double elapsedMs);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Published tabulation {PublishedTabulationId} is not in the caller's {Count} tabulations (SsoIdExt={SsoIdExt}, ParticipantId={ParticipantId}).")]
+    private static partial void LogTabulationNotInCallersList(ILogger logger, Guid publishedTabulationId, Guid? ssoIdExt, Guid? participantId, int count);
 
     private static Guid? NullIfEmpty(Guid? id) => id == Guid.Empty ? null : id;
 

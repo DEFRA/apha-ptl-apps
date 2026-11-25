@@ -37,7 +37,8 @@ public sealed partial class TabulationController(
         var page = Math.Max(query.Page, 1);
         var pageSize = PaginationModel.AvailablePageSizes.Contains(query.PageSize) ? query.PageSize : ReferenceSchemeListQuery.DefaultPageSize;
 
-        var list = await distributionApiClient.GetTabulationsForUserAsync(Caller(), cancellationToken);
+        var caller = Caller();
+        var list = await distributionApiClient.GetTabulationsForUserAsync(caller, cancellationToken);
 
         // Legacy Tabulations.aspx.vb's PopulateDropdowns builds the Year dropdown from both
         // YearId and DistributionDate.Year across the user's own full (unfiltered) tabulation list.
@@ -48,6 +49,16 @@ public sealed partial class TabulationController(
             .ToList();
 
         var filtered = Filter(list.Tabulations, query.Year, query.Month, query.DistributionReference, query.SchemeCode, query.SchemeName);
+        var userType = User.FindFirst(ExternalUserClaimTypes.UserType)?.Value;
+        var testConsultantId = User.GetTestConsultantId();
+        LogReportsListed(
+            userType,
+            caller.SsoIdExt is not null,
+            caller.ParticipantId,
+            caller.ViewerId,
+            testConsultantId,
+            list.Tabulations.Count,
+            filtered.Count);
         var sorted = Sort(filtered, sortBy, sortDir);
         var paged = sorted.Skip((page - 1) * pageSize).Take(pageSize).ToList();
 
@@ -122,6 +133,9 @@ public sealed partial class TabulationController(
 
     [LoggerMessage(Level = LogLevel.Error, Message = "Failed to generate tabulation PDF for published tabulation {PublishedTabulationId}.")]
     private partial void LogPdfGenerationFailed(Exception exception, Guid publishedTabulationId);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "View reports: UserType={UserType}, HasContactId={HasContactId}, ParticipantId={ParticipantId}, ViewerId={ViewerId}, TestConsultantId={TestConsultantId}; API returned {ReturnedCount}, {ShownCount} after filters.")]
+    private partial void LogReportsListed(string? userType, bool hasContactId, Guid? participantId, Guid? viewerId, Guid? testConsultantId, int returnedCount, int shownCount);
 
     private ExternalTabulationCaller Caller() =>
         new(User.GetContactId(), User.GetParticipantId(), User.GetViewerId());
