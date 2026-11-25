@@ -98,7 +98,7 @@ builder.Host.UseSerilog((context, services, configuration) => configuration
 // Database__Host/Database__Name/Database__User/Database__Password environment
 // variables, which the ECS task definition injects from Parameter Store at
 // container start - never baked into the image or read from appsettings.json.
-StartupChecks.RequireDatabaseOptions(builder.Configuration);
+var databaseOptions = StartupChecks.RequireDatabaseOptions(builder.Configuration);
 
 // HealthCheck__ReadinessKey - same fail-fast reasoning: a broken secret
 // wiring here would otherwise be invisible, since ReadinessKeyFilter must
@@ -445,6 +445,12 @@ builder.Services.AddSwaggerGen(options =>
 });
 
 var app = builder.Build();
+
+// Which database this task talks to (host and name only, never the credentials).
+LoggerMessage.Define<string, string>(
+    LogLevel.Information,
+    new EventId(3, "DatabaseTarget"),
+    "Database target: Host={DatabaseHost} Name={DatabaseName}")(app.Logger, databaseOptions.Host, databaseOptions.Name, null);
 
 // TEMPORARY DIAGNOSTIC - remove once SSO credential resolution is confirmed fixed in every
 // environment. Logs only the resolved credential provider type and a masked key prefix - never
