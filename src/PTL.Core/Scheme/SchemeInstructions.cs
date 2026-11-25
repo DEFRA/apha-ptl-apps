@@ -1,5 +1,9 @@
 using System.Net;
+using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
+using AngleSharp.Css.Dom;
+using AngleSharp.Dom;
+using Ganss.Xss;
 
 namespace PTL.Core.Scheme;
 
@@ -19,14 +23,19 @@ public static partial class SchemeInstructions
         "p", "br", "b", "strong", "i", "em", "u", "sup", "sub", "span"
     };
 
-    [GeneratedRegex("<a\\b[^>]*>(.*?)</a>", RegexOptions.IgnoreCase | RegexOptions.Singleline, 1000)]
-    private static partial Regex AnchorPattern();
+    // ITHC-001: a regex cannot parse HTML the way a browser does (an unterminated tag, for example, was left in place
+    // and completed by the page markup after it), so the allow-list is enforced by a real HTML parser instead. The
+    // configured instance is never changed after construction, which is what makes it safe to share across threads.
+    private static readonly HtmlSanitizer Sanitiser = CreateSanitiser();
+
+    // Safe span styles noted during a sanitise, keyed by the element (each call parses its own DOM, and the table is
+    // thread-safe and holds its keys weakly, so concurrent calls never see each other's entries).
+    private static readonly ConditionalWeakTable<IElement, string> SafeSpanStyles = new();
+
+    private const int MaxPasses = 5;
 
     [GeneratedRegex("</?([a-zA-Z][a-zA-Z0-9]*)\\b[^>]*>", RegexOptions.None, 1000)]
     private static partial Regex TagPattern();
-
-    [GeneratedRegex("style\\s*=\\s*(\"([^\"]*)\"|'([^']*)')", RegexOptions.IgnoreCase, 1000)]
-    private static partial Regex StyleAttributePattern();
 
     // Underline and strikethrough only - anything else a style could carry is dropped.
     [GeneratedRegex("^\\s*(text-decoration\\s*:\\s*(underline|line-through)\\s*;?\\s*)+$", RegexOptions.IgnoreCase, 1000)]
@@ -53,25 +62,65 @@ public static partial class SchemeInstructions
             return string.Empty;
         }
 
-        var withoutAnchors = AnchorPattern().Replace(CollapseAccidentalDoubleEncoding(html), "$1");
-
-        return TagPattern().Replace(withoutAnchors, match =>
+        // Each pass's decode step can turn text that a previous pass escaped back into markup, so the result is only
+        // final once a pass leaves it unchanged - which makes sanitising twice the same as sanitising once. Every pass
+        // ends in the sanitiser, so whatever is returned has been through it. Editor output settles on the first pass.
+        var current = html;
+        for (var pass = 0; pass < MaxPasses; pass++)
         {
-            var name = match.Groups[1].Value.ToLowerInvariant();
-            if (!AllowedTags.Contains(name))
+            var next = Sanitiser.Sanitize(CollapseAccidentalDoubleEncoding(current));
+            if (next == current)
             {
-                return string.Empty;
+                break;
             }
 
-            if (match.Value.StartsWith("</", StringComparison.Ordinal))
-            {
-                return $"</{name}>";
-            }
+            current = next;
+        }
 
-            return name == "span" && SafeStyle(match.Value) is { } style
-                ? $"<span style=\"{style}\">"
-                : $"<{name}>";
-        });
+        return current;
+    }
+
+    // Nothing but the allow-listed tags survives: no attributes, URLs, classes, CSS or comments. Disallowed elements
+    // (including the hyperlinks the editor inserted for emails and URLs) are removed but their text is kept.
+    private static HtmlSanitizer CreateSanitiser()
+    {
+        var sanitiser = new HtmlSanitizer(new HtmlSanitizerOptions
+        {
+            AllowedTags = new HashSet<string>(AllowedTags, StringComparer.OrdinalIgnoreCase),
+            AllowedAttributes = new HashSet<string>(StringComparer.OrdinalIgnoreCase),
+            AllowedCssProperties = new HashSet<string>(StringComparer.OrdinalIgnoreCase),
+            AllowedSchemes = new HashSet<string>(StringComparer.OrdinalIgnoreCase),
+            UriAttributes = new HashSet<string>(StringComparer.OrdinalIgnoreCase),
+            AllowedAtRules = new HashSet<CssRuleType>(),
+        })
+        {
+            KeepChildNodes = true,
+        };
+
+        // The one attribute exception: a span may keep a style that is purely an underline or strikethrough. Style is
+        // not an allowed attribute, so it is removed like any other; a safe one is noted as it goes and put back once
+        // sanitising has finished, exactly as written (re-serialising it through the CSS parser would change the
+        // stored text). The anchored pattern admits nothing else, so the value restored is inert.
+        sanitiser.RemovingAttribute += (_, e) =>
+        {
+            if (e.Reason == RemoveReason.NotAllowedAttribute
+                && e.Tag.LocalName == "span"
+                && e.Attribute.LocalName == "style"
+                && SafeStylePattern().IsMatch(e.Attribute.Value))
+            {
+                SafeSpanStyles.AddOrUpdate(e.Tag, e.Attribute.Value.Trim());
+            }
+        };
+        sanitiser.PostProcessNode += (_, e) =>
+        {
+            if (e.Node is IElement element && SafeSpanStyles.TryGetValue(element, out var style))
+            {
+                element.SetAttribute("style", style);
+                SafeSpanStyles.Remove(element);
+            }
+        };
+
+        return sanitiser;
     }
 
     // A round trip through the editor can occasionally leave the previous save's tag delimiters -
@@ -106,18 +155,6 @@ public static partial class SchemeInstructions
         current = TrailingParagraphWrapperPattern().Replace(current, "</p>");
 
         return current;
-    }
-
-    private static string? SafeStyle(string tag)
-    {
-        var style = StyleAttributePattern().Match(tag);
-        if (!style.Success)
-        {
-            return null;
-        }
-
-        var value = style.Groups[2].Success ? style.Groups[2].Value : style.Groups[3].Value;
-        return SafeStylePattern().IsMatch(value) ? value.Trim() : null;
     }
 
     /// <summary>Legacy TextPlain - what the required-field check actually measured.</summary>

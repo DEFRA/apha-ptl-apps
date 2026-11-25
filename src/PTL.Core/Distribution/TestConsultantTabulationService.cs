@@ -145,7 +145,8 @@ public sealed class TestConsultantTabulationService(
         }
 
         var comments = SchemeInstructions.Sanitise(posted);
-        var commentsChanged = !string.Equals(comments, state.Comments, StringComparison.Ordinal);
+        // Compared in the same sanitised form - see TestConsultantCommentsService.SaveAsync.
+        var commentsChanged = !string.Equals(comments, SchemeInstructions.Sanitise(state.Comments), StringComparison.Ordinal);
         if (!commentsChanged && !request.Submit)
         {
             return Saved(new TestConsultantTabulationSaveResult(true, false, new Dictionary<string, string>()));

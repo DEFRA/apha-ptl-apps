@@ -140,6 +140,8 @@ public class SchemeController(ISchemeApiClient schemeApiClient, ILookupApiClient
 
         var model = ToFormViewModel(scheme);
         model.IsViewMode = true;
+        // View mode renders the instructions as HTML; rows saved by legacy were never sanitised (ITHC-001).
+        model.Instructions = SchemeInstructions.Sanitise(model.Instructions);
         await PopulateFormAsync(model, cancellationToken);
         return View(model);
     }

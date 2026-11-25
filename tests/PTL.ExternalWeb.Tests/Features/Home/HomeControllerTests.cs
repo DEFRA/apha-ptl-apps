@@ -101,15 +101,17 @@ public class HomeControllerTests
         Assert.Equal("<p>Planned maintenance <strong>Friday</strong></p>", model.ImportantMessageHtml);
     }
 
+    // ITHC-001: the API decodes legacy entity-escaped rows and then sanitises them (SystemMessageServiceTests). Decoding
+    // again here would turn escaped text in that sanitised HTML back into live markup, so it is passed through as is.
     [Fact]
-    public async Task Index_ImportantMessageStoredEntityEscaped_DecodesToRealHtml()
+    public async Task Index_ImportantMessage_IsNotDecodedAfterTheApiHasSanitisedIt()
     {
-        var controller = CreateController(importantMessage: "&lt;p&gt;Planned &amp;amp; maintenance&lt;/p&gt;");
+        var controller = CreateController(importantMessage: "<p>&lt;img src=x onerror=alert(1)&gt; &amp; maintenance</p>");
 
         var result = await controller.Index();
 
         var model = Assert.IsType<HomeIndexViewModel>(Assert.IsType<ViewResult>(result).Model);
-        Assert.Equal("<p>Planned &amp; maintenance</p>", model.ImportantMessageHtml);
+        Assert.Equal("<p>&lt;img src=x onerror=alert(1)&gt; &amp; maintenance</p>", model.ImportantMessageHtml);
     }
 
     [Fact]
@@ -236,9 +238,9 @@ public class HomeControllerTests
     }
 
     [Fact]
-    public async Task Information_MessageStoredEntityEscaped_DecodesToRealHtml()
+    public async Task Information_Message_IsNotDecodedAfterTheApiHasSanitisedIt()
     {
-        var controller = new HomeController(new FakeApiClient(), new FakeSystemMessageApiClient(message: "&lt;p&gt;Fish &amp;amp; chips&lt;/p&gt;"), new FakeCreateOrderApiClient())
+        var controller = new HomeController(new FakeApiClient(), new FakeSystemMessageApiClient(message: "<p>&lt;script&gt;alert(1)&lt;/script&gt; Fish &amp; chips</p>"), new FakeCreateOrderApiClient())
         {
             ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() }
         };
@@ -246,7 +248,7 @@ public class HomeControllerTests
         var result = await controller.Information();
 
         var model = Assert.IsType<InformationViewModel>(Assert.IsType<ViewResult>(result).Model);
-        Assert.Equal("<p>Fish &amp; chips</p>", model.MessageHtml);
+        Assert.Equal("<p>&lt;script&gt;alert(1)&lt;/script&gt; Fish &amp; chips</p>", model.MessageHtml);
     }
 
     [Fact]

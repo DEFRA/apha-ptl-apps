@@ -108,7 +108,9 @@ public sealed class TestConsultantCommentsService(
 
         // Legacy: Submit sets the flag; Save also sets it for assessment schemes; once set it stays set.
         var isSubmitted = current.IsCommentSubmitted || current.RequiresAssessment || request.Submit;
-        var commentsChanged = !string.Equals(comments, current.TestConsultantComments, StringComparison.Ordinal);
+        // Compared in the same sanitised form, so text stored before ITHC-001 (which kept character references such as
+        // &deg; that the parser now resolves) is not mistaken for an edit when it is saved back unchanged.
+        var commentsChanged = !string.Equals(comments, SchemeInstructions.Sanitise(current.TestConsultantComments), StringComparison.Ordinal);
         var filesChanged = removed.Count > 0 || staged.Count > 0;
 
         if (!commentsChanged && !filesChanged && isSubmitted == current.IsCommentSubmitted)

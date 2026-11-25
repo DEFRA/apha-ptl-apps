@@ -259,6 +259,19 @@ public class TestConsultantCommentsServiceTests
         Assert.Empty(_repository.UpdatedComments);
     }
 
+    // ITHC-001: rows saved by the regex sanitiser kept character references (&deg;) that the parser now resolves, and
+    // the editor posts them that way again - re-saving unchanged text must not demand an audit reason.
+    [Fact]
+    public async Task Save_UnchangedTextStoredBeforeTheParserSanitiser_IsNotAnEdit()
+    {
+        Seed(comments: "<p>Store at 4&deg;C</p>");
+
+        var result = await Service.SaveAsync(SchemeId, Save("&lt;p&gt;Store at 4&amp;deg;C&lt;/p&gt;"), "who");
+
+        Assert.Equal((true, false), (result!.Success, result.AuditReasonRequired));
+        Assert.Empty(_repository.UpdatedComments);
+    }
+
     [Fact]
     public async Task Save_NothingChangedOnASubmittedScheme_SucceedsWithoutWriting()
     {

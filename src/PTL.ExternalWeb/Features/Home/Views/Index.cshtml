@@ -34,8 +34,8 @@
    the static text/link below is always shown (legacy pt-alert); the admin-authored
    ImportantMessage (tblExtWebsiteMessage) is nested inside it, same as legacy, only when
    published. Html.Raw preserves its formatting (AC: "formatting is preserved") - safe here
-   because this content is never user-supplied: it's written by internal staff via
-   ProficiencyTestingWeb/Admin/EditMessageOnWebsite.aspx, which already sanitises it on save. *@
+   because the API restricts it to the rich text allow-list (HtmlSanitizer) as it is read, so
+   rows legacy stored unsanitised are cleaned too (ITHC-001). *@
 <section class="govuk-notification-banner app-notification-banner--full" aria-labelledby="important-message-title" data-module="govuk-notification-banner">
     <div class="govuk-notification-banner__header">
         <h2 class="govuk-notification-banner__title" id="important-message-title">Important</h2>

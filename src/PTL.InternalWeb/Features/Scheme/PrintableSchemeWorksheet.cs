@@ -1,4 +1,5 @@
 using PTL.Contracts.Scheme;
+using PTL.Core.Scheme;
 
 namespace PTL.InternalWeb.Features.Scheme;
 
@@ -53,7 +54,8 @@ public static class PrintableSchemeWorksheetBuilder
         return new PrintableSchemeWorksheet(
             LabIdLabel: "LAB. IDENTIFICATION NO.",
             SchemeHeading: $"{scheme.Identifier}: {scheme.Name}",
-            Instructions: scheme.Instructions,
+            // Rendered with Html.Raw; rows saved by legacy were never sanitised (ITHC-001).
+            Instructions: SchemeInstructions.Sanitise(scheme.Instructions),
             ShowDistributionItems: scheme.DateOfReceipt || scheme.ConditionOnReceipt || scheme.StorageConditions,
             DateOfReceipt: scheme.DateOfReceipt,
             ConditionOnReceipt: scheme.ConditionOnReceipt,
