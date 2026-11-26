@@ -5,7 +5,7 @@
 
     // Page-size selector: picking a size submits its form straight away.
     document.addEventListener('change', function (event) {
-        var select = event.target.closest?.('[data-ptl-auto-submit]');
+        const select = event.target.closest?.('[data-ptl-auto-submit]');
         if (select?.form) {
             select.form.submit();
         }
@@ -13,7 +13,7 @@
 
     // "Back" links that return to the previous page in the browser history.
     document.addEventListener('click', function (event) {
-        var link = event.target.closest?.('[data-ptl-back]');
+        const link = event.target.closest?.('[data-ptl-back]');
         if (link) {
             event.preventDefault();
             history.back();
