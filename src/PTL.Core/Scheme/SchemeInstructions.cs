@@ -30,7 +30,7 @@ public static partial class SchemeInstructions
 
     // Safe span styles noted during a sanitise, keyed by the element (each call parses its own DOM, and the table is
     // thread-safe and holds its keys weakly, so concurrent calls never see each other's entries).
-    private static readonly ConditionalWeakTable<IElement, string> SafeSpanStyles = new();
+    private static readonly ConditionalWeakTable<IElement, string> SafeSpanStyles = [];
 
     private const int MaxPasses = 5;
 

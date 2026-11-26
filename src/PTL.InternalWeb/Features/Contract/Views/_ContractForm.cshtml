@@ -40,7 +40,7 @@
 
 <div class="govuk-form-group">
     <label class="govuk-label" asp-for="ContractType">Contract Type</label>
-    <select class="govuk-select" asp-for="ContractType" onchange="ptlContractTypeChanged()">
+    <select class="govuk-select" asp-for="ContractType">
         <option value="UT">UT</option>
         <option value="FT">FT</option>
     </select>
@@ -171,7 +171,9 @@
     }
 
     (function () {
-        var form = document.getElementById('ContractType')?.closest('form');
+        var contractType = document.getElementById('ContractType');
+        contractType?.addEventListener('change', ptlContractTypeChanged);
+        var form = contractType?.closest('form');
         if (!form) { return; }
         form.addEventListener('submit', function () {
             if (document.getElementById('ContractType').value === 'UT') {

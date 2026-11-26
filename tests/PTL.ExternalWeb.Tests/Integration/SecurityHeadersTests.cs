@@ -1,10 +1,14 @@
+using System.Text.RegularExpressions;
 using PTL.ExternalWeb.Tests.TestSupport;
 
 namespace PTL.ExternalWeb.Tests.Integration;
 
 // ITHC-005: the shared security headers reach real ExternalWeb pages, static files and error pages.
-public class SecurityHeadersTests(PtlExternalWebTestFactory factory) : IClassFixture<PtlExternalWebTestFactory>
+public partial class SecurityHeadersTests(PtlExternalWebTestFactory factory) : IClassFixture<PtlExternalWebTestFactory>
 {
+    [GeneratedRegex("script-src 'self' 'nonce-([^']+)';")]
+    private static partial Regex ScriptNonce();
+
     [Theory]
     [InlineData("/Home/Accessibility")]
     [InlineData("/lib/tinymce/tinymce.min.js")]
@@ -14,7 +18,8 @@ public class SecurityHeadersTests(PtlExternalWebTestFactory factory) : IClassFix
     {
         var response = await factory.CreateClient().GetAsync(path);
 
-        Assert.Equal(PTL.ApiClient.PtlWebApplicationExtensions.ContentSecurityPolicy, Assert.Single(response.Headers.GetValues("Content-Security-Policy")));
+        var policy = Assert.Single(response.Headers.GetValues("Content-Security-Policy"));
+        Assert.Equal(PTL.ApiClient.PtlWebApplicationExtensions.ContentSecurityPolicy(ScriptNonce().Match(policy).Groups[1].Value), policy);
         Assert.Equal("DENY", Assert.Single(response.Headers.GetValues("X-Frame-Options")));
         Assert.Equal("nosniff", Assert.Single(response.Headers.GetValues("X-Content-Type-Options")));
         Assert.Equal("strict-origin-when-cross-origin", Assert.Single(response.Headers.GetValues("Referrer-Policy")));
@@ -26,5 +31,19 @@ public class SecurityHeadersTests(PtlExternalWebTestFactory factory) : IClassFix
         var html = await factory.CreateClient().GetStringAsync("/Home/Accessibility");
 
         Assert.Contains("Accessibility statement", html, StringComparison.Ordinal);
+    }
+
+    // Every inline script the layout renders carries the nonce the policy allows - so none is refused.
+    [Fact]
+    public async Task EveryInlineScriptOnThePage_CarriesTheHeadersNonce()
+    {
+        var response = await factory.CreateClient().GetAsync("/Home/Accessibility");
+        var nonce = ScriptNonce().Match(Assert.Single(response.Headers.GetValues("Content-Security-Policy"))).Groups[1].Value;
+        var html = await response.Content.ReadAsStringAsync();
+
+        var inline = Regex.Matches(html, "<script\\b(?![^>]*\\bsrc=)[^>]*>", RegexOptions.None, TimeSpan.FromSeconds(1));
+        Assert.NotEmpty(inline);
+        Assert.All(inline, script => Assert.Contains($"nonce=\"{nonce}\"", script.Value, StringComparison.Ordinal));
+        Assert.Contains("/_content/PTL.SharedUI/js/ptl-unobtrusive.js", html, StringComparison.Ordinal);
     }
 }

@@ -189,7 +189,7 @@ public class GovUkPageSizeSelectorTagHelper(IUrlHelperFactory urlHelperFactory) 
         html.Append(CultureInfo.InvariantCulture, $"""
             <div class="govuk-form-group govuk-!-margin-bottom-0">
                 <label class="govuk-label" for="{pageSizeName}">Items per page</label>
-                <select class="govuk-select" id="{pageSizeName}" name="{pageSizeName}" onchange="this.form.submit()">
+                <select class="govuk-select" id="{pageSizeName}" name="{pageSizeName}" data-ptl-auto-submit>
             """);
         foreach (var size in PaginationModel.AvailablePageSizes)
         {

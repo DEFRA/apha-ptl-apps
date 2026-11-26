@@ -48,4 +48,21 @@ public class CidmSignOutFormWriterTests
         Assert.Contains("cidmSignOutForm", html);
         Assert.Contains(".submit()", html);
     }
+
+    // The Content-Security-Policy refuses inline scripts without this request's nonce, which would leave sign-out stuck here.
+    [Fact]
+    public void WriteForm_WithANonce_LetsTheAutoSubmitScriptRun()
+    {
+        var html = CidmSignOutFormWriter.WriteForm("https://cidm.test/signout", null, null, null, "abc123");
+
+        Assert.Contains("<script nonce=\"abc123\">document.getElementById('cidmSignOutForm').submit();</script>", html);
+    }
+
+    [Fact]
+    public void WriteForm_WithoutANonce_RendersAPlainScript()
+    {
+        var html = CidmSignOutFormWriter.WriteForm("https://cidm.test/signout", null, null, null);
+
+        Assert.Contains("<script>document.getElementById('cidmSignOutForm').submit();</script>", html);
+    }
 }

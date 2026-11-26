@@ -162,7 +162,10 @@ public class SchemeRouteSmokeTests : IClassFixture<WebApplicationFactory<Program
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Contains("vetqasheader-greyscale.png", html, StringComparison.Ordinal);
-        Assert.Contains("window.print()", html, StringComparison.Ordinal);
+        // Wired by print-button.js - an inline onclick would be refused by the Content-Security-Policy.
+        Assert.Contains("data-ptl-print>Print</button>", html, StringComparison.Ordinal);
+        Assert.Contains("/js/print-button.js", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("onclick=", html, StringComparison.Ordinal);
     }
 
     [Fact]

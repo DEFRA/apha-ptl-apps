@@ -7,6 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using PTL.Common.Correlation;
 using PTL.Common.Health;
+using PTL.Common.Security;
 using Serilog;
 using Serilog.Formatting.Compact;
 
@@ -19,11 +20,11 @@ namespace PTL.ApiClient;
 /// </summary>
 public static class PtlWebApplicationExtensions
 {
-    // Every script, style, image, font and fetch is served by the app itself. 'unsafe-inline' stays until the inline
-    // <script> blocks and on* handlers in the views move to files; form-action is left out because sign-out posts
-    // and is then redirected to Entra ID / CIDM.
-    public const string ContentSecurityPolicy =
-        "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; " +
+    // Every script, style, image, font and fetch is served by the app itself; inline scripts run only with this request's
+    // nonce. style-src keeps 'unsafe-inline' because TinyMCE cannot format content without inline styles. form-action is
+    // left out because sign-out posts and is then redirected to Entra ID / CIDM.
+    public static string ContentSecurityPolicy(string nonce) =>
+        $"default-src 'self'; script-src 'self' 'nonce-{nonce}'; style-src 'self' 'unsafe-inline'; " +
         "img-src 'self' data:; font-src 'self' data:; connect-src 'self'; object-src 'none'; " +
         "base-uri 'self'; frame-ancestors 'none'";
 
@@ -163,7 +164,7 @@ public static class PtlWebApplicationExtensions
     private static Task AddSecurityHeaders(HttpContext context, RequestDelegate next)
     {
         var headers = context.Response.Headers;
-        headers.ContentSecurityPolicy = ContentSecurityPolicy;
+        headers.ContentSecurityPolicy = ContentSecurityPolicy(CspNonce.Create(context));
         headers.XFrameOptions = "DENY";
         headers.XContentTypeOptions = "nosniff";
         headers["Referrer-Policy"] = "strict-origin-when-cross-origin";

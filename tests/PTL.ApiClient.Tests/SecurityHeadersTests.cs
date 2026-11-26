@@ -1,20 +1,22 @@
 using System.Net;
+using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using PTL.Common.Security;
 
 namespace PTL.ApiClient.Tests;
 
 // ITHC-005: browser security headers applied by UsePtlWebFrontEnd to every response of both web front-ends.
-public class SecurityHeadersTests
+public partial class SecurityHeadersTests
 {
-    private const string ExpectedPolicy =
-        "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; " +
+    [GeneratedRegex("^default-src 'self'; script-src 'self' 'nonce-([0-9a-f]{32})'; style-src 'self' 'unsafe-inline'; " +
         "img-src 'self' data:; font-src 'self' data:; connect-src 'self'; object-src 'none'; " +
-        "base-uri 'self'; frame-ancestors 'none'";
+        "base-uri 'self'; frame-ancestors 'none'$")]
+    private static partial Regex ExpectedPolicy();
 
     [Theory]
     [InlineData("Production", "/probe", HttpStatusCode.OK)]
@@ -29,11 +31,59 @@ public class SecurityHeadersTests
         var response = await app.GetTestClient().GetAsync(path);
 
         Assert.Equal(expectedStatus, response.StatusCode);
-        Assert.Equal(ExpectedPolicy, Single(response, "Content-Security-Policy"));
+        Assert.Matches(ExpectedPolicy(), Single(response, "Content-Security-Policy"));
         Assert.Equal("DENY", Single(response, "X-Frame-Options"));
         Assert.Equal("nosniff", Single(response, "X-Content-Type-Options"));
         Assert.Equal("strict-origin-when-cross-origin", Single(response, "Referrer-Policy"));
     }
+
+    [Fact]
+    public async Task ScriptSource_AllowsNoInlineScriptWithoutTheNonce()
+    {
+        await using var app = await StartAppAsync("Production");
+
+        var policy = Single(await app.GetTestClient().GetAsync("/probe"), "Content-Security-Policy");
+        var scriptSrc = policy.Split(';').Single(d => d.Trim().StartsWith("script-src", StringComparison.Ordinal));
+
+        Assert.DoesNotContain("unsafe-inline", scriptSrc, StringComparison.Ordinal);
+        Assert.DoesNotContain("unsafe-eval", scriptSrc, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Nonce_IsNewForEveryRequest()
+    {
+        await using var app = await StartAppAsync("Production");
+        var client = app.GetTestClient();
+
+        var first = NonceOf(await client.GetAsync("/probe"));
+        var second = NonceOf(await client.GetAsync("/probe"));
+
+        Assert.NotEqual(first, second);
+    }
+
+    [Fact]
+    public async Task Nonce_InTheHeader_IsTheOneThePageCanUse()
+    {
+        await using var app = await StartAppAsync("Production");
+
+        var response = await app.GetTestClient().GetAsync("/nonce");
+
+        Assert.Equal(NonceOf(response), await response.Content.ReadAsStringAsync());
+    }
+
+    // The exception handler re-runs the pipeline for the error page; its nonce must match the header that is sent.
+    [Fact]
+    public async Task Nonce_OnTheErrorPage_MatchesItsHeader()
+    {
+        await using var app = await StartAppAsync("Production");
+
+        var response = await app.GetTestClient().GetAsync("/boom-nonce");
+
+        Assert.Equal(NonceOf(response), await response.Content.ReadAsStringAsync());
+    }
+
+    private static string NonceOf(HttpResponseMessage response) =>
+        ExpectedPolicy().Match(Single(response, "Content-Security-Policy")).Groups[1].Value;
 
     [Fact]
     public async Task ExceptionResponse_IsStillTheFriendlyErrorPage()
@@ -139,7 +189,12 @@ public class SecurityHeadersTests
         app.UsePtlWebFrontEnd();
         app.MapGet("/probe", () => "ok");
         app.MapGet("/boom", string () => throw new InvalidOperationException("boom"));
-        app.MapGet("/Home/Error", () => "error page");
+        app.MapGet("/Home/Error", (HttpContext context) =>
+            context.Request.Path == "/Home/Error" && context.Features.Get<Microsoft.AspNetCore.Diagnostics.IExceptionHandlerPathFeature>()?.Path == "/boom-nonce"
+                ? CspNonce.Get(context)
+                : "error page");
+        app.MapGet("/nonce", (HttpContext context) => CspNonce.Get(context));
+        app.MapGet("/boom-nonce", string () => throw new InvalidOperationException("boom"));
         app.MapGet("/form", (HttpContext context, IAntiforgery antiforgery) =>
         {
             antiforgery.GetAndStoreTokens(context);
