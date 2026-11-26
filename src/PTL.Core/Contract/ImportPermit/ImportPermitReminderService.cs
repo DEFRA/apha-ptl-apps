@@ -222,10 +222,16 @@ public sealed partial class ImportPermitReminderService(
     private static string BuildParticipantList(IReadOnlyList<ImportPermitParticipantEntity> participants)
     {
         var list = new StringBuilder();
-        foreach (var participant in participants)
+        for (var i = 0; i < participants.Count; i++)
         {
-            list.AppendLine("---");
-            list.AppendLine();
+            var participant = participants[i];
+            // A leading "---" would render as a rule straight under the template's "Order Details" heading.
+            if (i > 0)
+            {
+                list.AppendLine("---");
+                list.AppendLine();
+            }
+
             list.AppendLine(CultureInfo.InvariantCulture, $"QAL number: {participant.QalNumber}");
             list.AppendLine(CultureInfo.InvariantCulture, $"Lab code: {participant.LabCode}");
             list.AppendLine(CultureInfo.InvariantCulture, $"Scheme name: {participant.SchemeName}");
