@@ -266,6 +266,17 @@ public class PrintableResultsWorksheetBuilderTests
         Assert.True(worksheet.DateOfReceipt);
         Assert.True(worksheet.ConditionOnReceipt);
         Assert.True(worksheet.StorageConditions);
+    }
+
+    // ITHC-001: the view renders the instructions with Html.Raw; they are copied from legacy scheme rows.
+    [Fact]
+    public void Build_SanitisesTheInstructionsItRendersAsHtml()
+    {
+        var page = Page([], hasIntendedResults: true) with { Instructions = "<p>Keep refrigerated.</p><svg onload=alert(1)>" };
+
+        var worksheet = PrintableResultsWorksheetBuilder.Build(2026, 4, page, showValues: false);
+
+        Assert.Equal("<p>Keep refrigerated.</p>", worksheet.Instructions);
         Assert.True(worksheet.HasIntendedResults);
     }
 

@@ -316,6 +316,18 @@ public class TestConsultantTabulationServiceTests
         Assert.Empty(_distributionRepository.UpdatedComments);
     }
 
+    // ITHC-001: see TestConsultantCommentsServiceTests.Save_UnchangedTextStoredBeforeTheParserSanitiser_IsNotAnEdit.
+    [Fact]
+    public async Task SaveCommentsAsync_UnchangedDraftStoredBeforeTheParserSanitiser_WritesNothing()
+    {
+        SeedScheme(comments: "<p>Store at 4&deg;C</p>");
+
+        var result = (await Service.SaveCommentsAsync(ConsultantId, SchemeId, new("&lt;p&gt;Store at 4&amp;deg;C&lt;/p&gt;", false))).Value!;
+
+        Assert.True(result.Success);
+        Assert.Empty(_distributionRepository.UpdatedComments);
+    }
+
     [Fact]
     public async Task SaveCommentsAsync_ChangedDraft_TakesOverTheAuthor()
     {

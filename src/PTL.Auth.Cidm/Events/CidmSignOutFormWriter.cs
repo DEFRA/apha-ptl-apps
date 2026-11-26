@@ -10,9 +10,10 @@ namespace PTL.Auth.Cidm.Events;
 /// </summary>
 internal static class CidmSignOutFormWriter
 {
-    public static string WriteForm(string endSessionEndpoint, string? idTokenHint, string? postLogoutRedirectUri, string? state)
+    public static string WriteForm(string endSessionEndpoint, string? idTokenHint, string? postLogoutRedirectUri, string? state, string? scriptNonce = null)
     {
         var encoder = HtmlEncoder.Default;
+        var nonceAttribute = scriptNonce is null ? string.Empty : $" nonce=\"{encoder.Encode(scriptNonce)}\"";
 
         return $"""
             <!DOCTYPE html>
@@ -28,7 +29,7 @@ internal static class CidmSignOutFormWriter
                   <input type="submit" value="Continue" />
                 </noscript>
               </form>
-              <script>document.getElementById('cidmSignOutForm').submit();</script>
+              <script{nonceAttribute}>document.getElementById('cidmSignOutForm').submit();</script>
             </body>
             </html>
             """;

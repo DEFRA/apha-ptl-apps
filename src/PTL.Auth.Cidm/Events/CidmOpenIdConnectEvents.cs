@@ -7,6 +7,7 @@ using Microsoft.Extensions.Options;
 using PTL.Auth.Cidm.Claims;
 using PTL.Auth.Cidm.Options;
 using PTL.Common.Auth;
+using PTL.Common.Security;
 
 namespace PTL.Auth.Cidm.Events;
 
@@ -110,7 +111,8 @@ public sealed partial class CidmOpenIdConnectEvents : OidcProviderEvents<ICidmEx
             endSessionEndpoint,
             context.ProtocolMessage.IdTokenHint,
             context.ProtocolMessage.PostLogoutRedirectUri,
-            context.ProtocolMessage.State));
+            context.ProtocolMessage.State,
+            CspNonce.Get(context.HttpContext)));
     }
 
     public override Task SignedOutCallbackRedirect(RemoteSignOutContext context)

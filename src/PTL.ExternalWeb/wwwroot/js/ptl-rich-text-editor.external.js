@@ -31,6 +31,8 @@
         tinymce.init({
             target: textarea,
             base_url: '/lib/tinymce',
+            // asp-append-version only versions tinymce.min.js; this versions the plugins, skin and theme it loads itself.
+            cache_suffix: '?v=8.11.0',
             license_key: 'gpl',
             plugins: 'lists save charmap',
             toolbar: textarea.dataset.toolbar,

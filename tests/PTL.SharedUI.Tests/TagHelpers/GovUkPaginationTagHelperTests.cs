@@ -218,7 +218,8 @@ public class GovUkPageSizeSelectorTagHelperTests
         var (_, html) = Render(model);
 
         Assert.Contains("""<input type="hidden" name="ncPage" value="1" />""", html, StringComparison.Ordinal);
-        Assert.Contains("""<select class="govuk-select" id="ncPageSize" name="ncPageSize" onchange="this.form.submit()">""", html, StringComparison.Ordinal);
+        Assert.Contains("""<select class="govuk-select" id="ncPageSize" name="ncPageSize" data-ptl-auto-submit>""", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("onchange", html, StringComparison.Ordinal);
         Assert.Contains("""for="ncPageSize">Items per page</label>""", html, StringComparison.Ordinal);
         Assert.DoesNotContain("name=\"page\"", html, StringComparison.Ordinal);
     }

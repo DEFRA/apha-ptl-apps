@@ -50,7 +50,8 @@
     {
         <h1 class="govuk-heading-l">Tabulation</h1>
     }
-    <h2 class="govuk-heading-m">@report.DistributionHeading</h2>
+    @* Legacy Tabulation.aspx and PublishedTabulation.aspx both show the "FINAL REPORT for ..." title on screen. *@
+    <h2 class="govuk-heading-m">@report.Title</h2>
     <h3 class="govuk-heading-s">@report.TabulationName</h3>
     @if (isIssued)
     {

@@ -35,6 +35,17 @@ public class PrintableSchemeWorksheetBuilderTests
         Assert.Equal("LAB. IDENTIFICATION NO.", worksheet.LabIdLabel);
     }
 
+    // ITHC-001: the view renders the instructions with Html.Raw, and legacy stored them unsanitised.
+    [Fact]
+    public void Build_SanitisesTheInstructionsItRendersAsHtml()
+    {
+        var scheme = SampleScheme(5) with { Instructions = "<p onclick=\"alert(1)\">Pack carefully.</p><img src=x onerror=alert(1)>" };
+
+        var worksheet = PrintableSchemeWorksheetBuilder.Build(scheme);
+
+        Assert.Equal("<p>Pack carefully.</p>", worksheet.Instructions);
+    }
+
     [Theory]
     [InlineData(1, "00/0001")]
     [InlineData(9, "00/0009")]

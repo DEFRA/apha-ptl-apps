@@ -174,6 +174,22 @@ public class ImportPermitReminderServiceTests
         Assert.Contains("QAL123", list, StringComparison.Ordinal);
         Assert.Contains("D-001", list, StringComparison.Ordinal);
         Assert.Contains("PT-900", list, StringComparison.Ordinal);
+        Assert.StartsWith("QAL number: ", list, StringComparison.Ordinal);
+        Assert.Single(list.Split('\n'), line => line.TrimEnd() == "---");
+    }
+
+    [Fact]
+    public async Task ProcessRemindersAsync_CustomerEmailWithOneParticipantHasNoSeparator()
+    {
+        var h = new Harness();
+        h.Due(28, [CustomerRow()], [ParticipantRow()]);
+
+        await h.Service.ProcessRemindersAsync();
+
+        var customerEmail = Assert.Single(h.Notify.Sent, s => s.TemplateId == ImportPermitReminderTemplates.CustomerId);
+        var list = Assert.Contains("participant_list", customerEmail.Personalisation!);
+        Assert.StartsWith("QAL number: ", list, StringComparison.Ordinal);
+        Assert.DoesNotContain("---", list, StringComparison.Ordinal);
     }
 
     [Fact]

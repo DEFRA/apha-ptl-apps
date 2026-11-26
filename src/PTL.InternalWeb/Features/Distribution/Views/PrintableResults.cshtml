@@ -7,6 +7,10 @@
     <link rel="stylesheet" href="~/css/printable-scheme.css" />
 }
 
+@section Scripts {
+    <script src="~/js/print-button.js" asp-append-version="true"></script>
+}
+
 
 <h1 class="govuk-heading-l noprint">Printable Results</h1>
 <h2 class="govuk-heading-m noprint">@Model.SchemeHeading</h2>
@@ -206,5 +210,5 @@
 
     <br />
     <br />
-    <button type="button" class="govuk-button noprint" data-module="govuk-button" onclick="window.print(); return false;">Print</button>
+    <button type="button" class="govuk-button noprint" data-module="govuk-button" data-ptl-print>Print</button>
 </div>

@@ -190,6 +190,20 @@ public partial class SchemeControllerTests
         Assert.True(model.IsViewMode);
     }
 
+    // ITHC-001: view mode renders the instructions as HTML, and legacy stored them unsanitised.
+    [Fact]
+    public async Task Details_SanitisesTheInstructionsViewModeRendersAsHtml()
+    {
+        var schemeId = Guid.NewGuid();
+        var scheme = SampleScheme(schemeId, Guid.NewGuid()) with { Instructions = "<p>Keep</p><script>alert(1)</script><img src=x onerror=alert(1)>" };
+        var controller = CreateController(new FakeSchemeApiClient { SchemeResponse = scheme });
+
+        var result = await controller.Details(schemeId, CancellationToken.None);
+
+        var model = Assert.IsType<PTL.InternalWeb.Features.Scheme.SchemeFormViewModel>(Assert.IsType<ViewResult>(result).Model);
+        Assert.Equal("<p>Keep</p>alert(1)", model.Instructions);
+    }
+
     [Fact]
     public async Task Renew_UnknownScheme_ReturnsNotFound()
     {

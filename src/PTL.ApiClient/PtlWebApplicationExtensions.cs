@@ -1,11 +1,13 @@
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Mvc.Razor;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using PTL.Common.Correlation;
 using PTL.Common.Health;
+using PTL.Common.Security;
 using Serilog;
 using Serilog.Formatting.Compact;
 
@@ -18,6 +20,14 @@ namespace PTL.ApiClient;
 /// </summary>
 public static class PtlWebApplicationExtensions
 {
+    // Every script, style, image, font and fetch is served by the app itself; inline scripts run only with this request's
+    // nonce. style-src keeps 'unsafe-inline' because TinyMCE cannot format content without inline styles. form-action is
+    // left out because sign-out posts and is then redirected to Entra ID / CIDM.
+    public static string ContentSecurityPolicy(string nonce) =>
+        $"default-src 'self'; script-src 'self' 'nonce-{nonce}'; style-src 'self' 'unsafe-inline'; " +
+        "img-src 'self' data:; font-src 'self' data:; connect-src 'self'; object-src 'none'; " +
+        "base-uri 'self'; frame-ancestors 'none'";
+
     public static WebApplicationBuilder AddPtlWebFrontEnd(this WebApplicationBuilder builder)
     {
         // Structured JSON to stdout only - ECS/Fargate storage is ephemeral, so no file sinks. The
@@ -54,6 +64,11 @@ public static class PtlWebApplicationExtensions
         });
         // Also enable Razor Pages (some projects in the solution use Razor Pages)
         builder.Services.AddRazorPages();
+
+        builder.Services.AddHsts(options => options.MaxAge = TimeSpan.FromDays(365));
+
+        // X-Frame-Options: DENY is set on every response below; antiforgery would add a second, SAMEORIGIN value to form pages.
+        builder.Services.AddAntiforgery(options => options.SuppressXFrameOptionsHeader = true);
 
         // Typed client for calling PTL.Api, shared with other web front-ends via the PTL.ApiClient library.
         builder.Services.AddPtlApiClient(builder.Configuration);
@@ -110,7 +125,13 @@ public static class PtlWebApplicationExtensions
         if (!app.Environment.IsDevelopment())
         {
             app.UseExceptionHandler("/Home/Error");
+
+            // Sent only when the request is HTTPS - which, behind the ALB, the forwarded headers above establish.
+            app.UseHsts();
         }
+
+        // After the exception handler, so the error page it re-executes gets the headers too.
+        app.Use(AddSecurityHeaders);
 
         // Correlation ID before request logging so the one-line-per-request log carries it, and so it's
         // available on HttpContext.Items for CorrelationIdDelegatingHandler when calling PTL.Api.
@@ -138,5 +159,15 @@ public static class PtlWebApplicationExtensions
         app.MapRazorPages();
 
         return app;
+    }
+
+    private static Task AddSecurityHeaders(HttpContext context, RequestDelegate next)
+    {
+        var headers = context.Response.Headers;
+        headers.ContentSecurityPolicy = ContentSecurityPolicy(CspNonce.Create(context));
+        headers.XFrameOptions = "DENY";
+        headers.XContentTypeOptions = "nosniff";
+        headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
+        return next(context);
     }
 }

@@ -1,4 +1,5 @@
 using PTL.Contracts.Distribution;
+using PTL.Core.Scheme;
 
 namespace PTL.InternalWeb.Features.Distribution;
 
@@ -94,7 +95,8 @@ public static class PrintableResultsWorksheetBuilder
             DateOfDistributionLabel: $"DATE OF DISTRIBUTION: {distributionDate:dd/MM/yyyy}",
             SchemeHeading: $"{page.SchemeIdentifier}: {page.SchemeName}",
             VersionLabel: $"Version: {page.SchemeVersionDate:dd/MM/yyyy}",
-            Instructions: page.Instructions,
+            // Rendered with Html.Raw; copied from the scheme, whose legacy rows were never sanitised (ITHC-001).
+            Instructions: SchemeInstructions.Sanitise(page.Instructions),
             ShowDistributionItems: page.DateOfReceipt || page.ConditionOnReceipt || page.StorageConditions,
             DateOfReceipt: page.DateOfReceipt,
             ConditionOnReceipt: page.ConditionOnReceipt,

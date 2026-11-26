@@ -7,6 +7,10 @@
     <link rel="stylesheet" href="~/css/printable-scheme.css" />
 }
 
+@section Scripts {
+    <script src="~/js/print-button.js" asp-append-version="true"></script>
+}
+
 <div class="ptl-worksheet">
         @* These tblWorkSheetNoBorder/tableWorkSheetLabId tables are pure layout (logo, lab-id box,
            scheme heading) with no column headings to give - role="presentation" is the correct
@@ -126,5 +130,5 @@
 
         <br />
         <br />
-        <button type="button" class="govuk-button noprint" data-module="govuk-button" onclick="window.print(); return false;">Print</button>
+        <button type="button" class="govuk-button noprint" data-module="govuk-button" data-ptl-print>Print</button>
     </div>
