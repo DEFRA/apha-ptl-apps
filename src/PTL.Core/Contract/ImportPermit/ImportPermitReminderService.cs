@@ -219,7 +219,7 @@ public sealed partial class ImportPermitReminderService(
 
     // The legacy HTML table of the customer template's <<ParticipantList>>, as the plain labelled
     // blocks GOV.UK Notify can render.
-    private static string BuildParticipantList(IReadOnlyList<ImportPermitParticipantEntity> participants)
+    private static string BuildParticipantList(List<ImportPermitParticipantEntity> participants)
     {
         var list = new StringBuilder();
         for (var i = 0; i < participants.Count; i++)
