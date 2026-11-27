@@ -324,6 +324,12 @@ jobs:
         shell: pwsh
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          # vstest force-kills testhost 100 ms after the run ends by default. coverlet.msbuild writes its
+          # hit file in a ProcessExit handler, and PTL.InternalWeb.Tests (hundreds of WebApplicationFactory
+          # hosts) needs longer than that to shut down, so the kill lands before the hits are flushed and
+          # coverlet reports 0% ("No coverage hits were collected"). This is only an upper bound - testhost
+          # exits as soon as it is done.
+          VSTEST_TESTHOST_SHUTDOWN_TIMEOUT: "60000"
         run: |
           $ErrorActionPreference = "Stop"
           if ([string]::IsNullOrWhiteSpace($env:SONAR_TOKEN)) {
@@ -360,8 +366,8 @@ jobs:
             "/p:Threshold=0"
           )
           dotnet test PTL.slnx --no-restore @testArgs
-          # coverlet.msbuild intermittently writes an empty report ("No coverage hits were collected")
-          # even though every test passed (see the retry note in the quality job). Threshold=0 above
+          # coverlet.msbuild can still write an empty report ("No coverage hits were collected") even
+          # though every test passed (see VSTEST_TESTHOST_SHUTDOWN_TIMEOUT above for the main cause). Threshold=0 above
           # hides that, and SonarCloud would then report 0% for the whole project, so re-run only the
           # affected test projects and fail rather than send an empty report.
           $maxRetries = 2
