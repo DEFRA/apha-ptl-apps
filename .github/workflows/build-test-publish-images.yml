@@ -231,7 +231,8 @@ jobs:
   quality:
     name: Format, build and test solution
     runs-on: windows-2022
-    timeout-minutes: 20
+    # Three full test attempts take ~6-7 min each on a runner, so 20 cancelled the job mid-retry.
+    timeout-minutes: 30
     permissions:
       contents: read
     steps:
@@ -257,6 +258,12 @@ jobs:
         run: dotnet build PTL.slnx --configuration Release --no-restore --warnaserror
       - name: Test solution
         shell: pwsh
+        env:
+          # vstest force-kills testhost 100 ms after the run ends by default, before coverlet.msbuild's
+          # ProcessExit handler has written its hit file (PTL.InternalWeb.Tests hosts hundreds of
+          # WebApplicationFactory instances and shuts down slowly). That is the root cause of the
+          # empty/missing coverage below. Only an upper bound - testhost exits as soon as it is done.
+          VSTEST_TESTHOST_SHUTDOWN_TIMEOUT: "60000"
         run: |
           $ErrorActionPreference = "Stop"
           # coverlet.msbuild 10.0.1 intermittently throws "Unable to read beyond the end of the
